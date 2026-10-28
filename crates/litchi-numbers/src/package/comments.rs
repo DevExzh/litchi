@@ -420,6 +420,8 @@ pub enum LimitKind {
     TextBytes,
     /// Native references inspected.
     References,
+    /// Encoded native reference payload bytes inspected.
+    ReferenceBytes,
     /// Reply records inspected.
     Replies,
     /// Wire nesting inspected.
@@ -2007,6 +2009,10 @@ fn table_info_error_is_resource(error: &table_info_codec::DecodeError) -> bool {
     error.field_limit_values().is_some()
         || error.work_limit_values().is_some()
         || error.wire_resource_limit().is_some()
+        || error.output_limit_values().is_some()
+        || error.allocation_limit_values().is_some()
+        || error.retained_limit_values().is_some()
+        || error.scratch_limit_values().is_some()
         || error.allocation_amount().is_some()
 }
 
@@ -2038,7 +2044,7 @@ fn map_comment_table_info_error(error: table_info_codec::DecodeError, path: Path
             path,
         },
         Some(table_info_codec::WireResourceLimit::Nesting { observed, maximum }) => Error::Limit {
-            kind: LimitKind::WireWork,
+            kind: LimitKind::WireNesting,
             observed: observed
                 .map(|value| usize::try_from(value).unwrap_or(usize::MAX))
                 .unwrap_or(usize::MAX),
@@ -2047,7 +2053,41 @@ fn map_comment_table_info_error(error: table_info_codec::DecodeError, path: Path
                 .unwrap_or(usize::MAX),
             path,
         },
-        _ => Error::InvalidSource { path },
+        _ => {
+            if let Some((observed, maximum)) = error.output_limit_values() {
+                return Error::Limit {
+                    kind: LimitKind::OutputBytes,
+                    observed,
+                    maximum,
+                    path,
+                };
+            }
+            if let Some((observed, maximum)) = error.allocation_limit_values() {
+                return Error::Limit {
+                    kind: LimitKind::Allocations,
+                    observed,
+                    maximum,
+                    path,
+                };
+            }
+            if let Some((observed, maximum)) = error.retained_limit_values() {
+                return Error::Limit {
+                    kind: LimitKind::RetainedBytes,
+                    observed,
+                    maximum,
+                    path,
+                };
+            }
+            if let Some((observed, maximum)) = error.scratch_limit_values() {
+                return Error::Limit {
+                    kind: LimitKind::ScratchBytes,
+                    observed,
+                    maximum,
+                    path,
+                };
+            }
+            Error::InvalidSource { path }
+        },
     }
 }
 
@@ -2465,6 +2505,20 @@ fn map_table_codec_error(
                     path,
                 }
             },
+            numbers_table_cell_storage_codec::DecodeLimit::Allocation { requested } => {
+                Error::Allocation {
+                    amount: requested,
+                    path,
+                }
+            },
+            numbers_table_cell_storage_codec::DecodeLimit::Retained { observed, maximum } => {
+                Error::Limit {
+                    kind: LimitKind::RetainedBytes,
+                    observed,
+                    maximum,
+                    path,
+                }
+            },
             _ => Error::InvalidSource { path },
         };
     }
@@ -2721,11 +2775,31 @@ fn map_comment_codec_error(error: comment_storage_codec::DecodeError, path: Path
                 maximum,
                 path,
             },
+            comment_storage_codec::DecodeLimit::OutputBytes { observed, maximum } => Error::Limit {
+                kind: LimitKind::OutputBytes,
+                observed,
+                maximum,
+                path,
+            },
             comment_storage_codec::DecodeLimit::References { observed, maximum } => Error::Limit {
                 kind: LimitKind::References,
                 observed,
                 maximum,
                 path,
+            },
+            comment_storage_codec::DecodeLimit::Replies { observed, maximum } => Error::Limit {
+                kind: LimitKind::Replies,
+                observed,
+                maximum,
+                path,
+            },
+            comment_storage_codec::DecodeLimit::ReferenceBytes { observed, maximum } => {
+                Error::Limit {
+                    kind: LimitKind::ReferenceBytes,
+                    observed,
+                    maximum,
+                    path,
+                }
             },
             comment_storage_codec::DecodeLimit::Text { observed, maximum } => Error::Limit {
                 kind: LimitKind::TextBytes,
@@ -2749,6 +2823,24 @@ fn map_comment_codec_error(error: comment_storage_codec::DecodeError, path: Path
                 kind: LimitKind::WireNesting,
                 observed: usize::try_from(observed).unwrap_or(usize::MAX),
                 maximum: usize::try_from(maximum).unwrap_or(usize::MAX),
+                path,
+            },
+            comment_storage_codec::DecodeLimit::Allocations { observed, maximum } => Error::Limit {
+                kind: LimitKind::Allocations,
+                observed,
+                maximum,
+                path,
+            },
+            comment_storage_codec::DecodeLimit::Scratch { observed, maximum } => Error::Limit {
+                kind: LimitKind::ScratchBytes,
+                observed,
+                maximum,
+                path,
+            },
+            comment_storage_codec::DecodeLimit::Retained { observed, maximum } => Error::Limit {
+                kind: LimitKind::RetainedBytes,
+                observed,
+                maximum,
                 path,
             },
             _ => Error::InvalidSource { path },

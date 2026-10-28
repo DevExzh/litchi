@@ -18,7 +18,7 @@ use fixture::*;
 use litchi_iwa_archive::{Limits, package::Catalog};
 use litchi_iwa_core::{Archive, RawMessage, SnappyStream};
 use litchi_iwa_protos::{tsp, tst};
-use litchi_numbers::cell::comment::CommentReplyIndex;
+use litchi_numbers::cell::comment::{CommentReplyIndex, transaction};
 use litchi_numbers::{At, Package, SheetSelector, TableSelector};
 use prost::Message as _;
 
@@ -813,7 +813,13 @@ fn semantic_and_physical_limits_reject_without_mutating_the_source() -> TestResu
         )?
         .append("x".repeat(16 * 1024))
         .commit();
-    assert!(result.is_err());
+    assert!(matches!(
+        result,
+        Err(transaction::Error::Limit {
+            kind: transaction::LimitKind::TextBytes,
+            ..
+        })
+    ));
     assert_eq!(exact_bytes(&package)?, before);
     Ok(())
 }

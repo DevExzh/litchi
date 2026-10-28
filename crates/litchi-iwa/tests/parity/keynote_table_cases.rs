@@ -1,6 +1,8 @@
 //! Keynote slide-table cell parity cases (wave W1-C, record 0372): cell
 //! writes through `slide::drawable::Edit::set_table_cell`.
 
+use std::hint::black_box;
+
 use litchi_iwa::keynote;
 use litchi_iwa::shapes::{DrawablePoint, DrawableSize};
 use litchi_iwa_archive::package::{Catalog, EntryEdit};
@@ -692,6 +694,111 @@ fn keynote_slide_table_comment_cost_abba() -> TestResult {
                 "W1-G measured",
             )?;
             Ok(leaf_bytes!(commit.package()))
+        },
+    )
+}
+
+/// Full Keynote facade cost probe for reading a host-authored root/reply
+/// thread.  The semantic projection is consumed by `black_box` so the probe
+/// includes the reader work.
+#[test]
+#[ignore = "callgrind cost probe; run explicitly"]
+fn keynote_slide_table_comment_read_cost_abba() -> TestResult {
+    let input = populated_comment_fixture(true)?;
+    let position = comment_position_at(COMMENT_ROW, COMMENT_COLUMN)?;
+    crate::pages_cost_probes::abba(
+        &input,
+        |source| {
+            let editor = keynote::Draft::from_bytes(source)?;
+            let model = host_model(&editor)?;
+            let comment = editor
+                .slide_table_cell_comment(SLIDE, model, COMMENT_ROW, COMMENT_COLUMN)?
+                .ok_or("host read did not find the populated root comment")?;
+            let replies = editor.slide_table_cell_comment_replies(
+                SLIDE,
+                model,
+                COMMENT_ROW,
+                COMMENT_COLUMN,
+            )?;
+            black_box((comment.comment.text.len(), replies.len()));
+            Ok(editor.to_bytes()?)
+        },
+        |source| {
+            let package = Package::from_bytes(source)?;
+            let comment = package
+                .slide_table_cell_comment(
+                    SlideSelector::index(SLIDE),
+                    TableSelector::index(0),
+                    position,
+                )?
+                .ok_or("leaf read did not find the populated root comment")?;
+            let replies = package.slide_table_cell_comment_replies(
+                SlideSelector::index(SLIDE),
+                TableSelector::index(0),
+                position,
+            )?;
+            black_box((comment.text().len(), replies.len()));
+            Ok(leaf_bytes!(package))
+        },
+    )
+}
+
+/// Full Keynote facade cost probe for creating a root comment on the stored
+/// target cell used by the existing root-create parity case.
+#[test]
+#[ignore = "callgrind cost probe; run explicitly"]
+fn keynote_slide_table_comment_create_cost_abba() -> TestResult {
+    let input = fixture(TABLE)?;
+    let position = comment_position_at(COMMENT_ROW, COMMENT_COLUMN)?;
+    crate::pages_cost_probes::abba(
+        &input,
+        |source| {
+            let mut editor = keynote::Draft::from_bytes(source)?;
+            let model = host_model(&editor)?;
+            editor.set_slide_table_cell_comment(
+                SLIDE,
+                model,
+                COMMENT_ROW,
+                COMMENT_COLUMN,
+                "W1-G create",
+            )?;
+            Ok(editor.to_bytes()?)
+        },
+        |source| {
+            let package = Package::from_bytes(source)?;
+            let commit = package.set_slide_table_cell_comment(
+                SlideSelector::index(SLIDE),
+                TableSelector::index(0),
+                position,
+                "W1-G create",
+            )?;
+            Ok(leaf_bytes!(commit.package()))
+        },
+    )
+}
+
+/// Full Keynote facade cost probe for clearing a host-authored root comment.
+#[test]
+#[ignore = "callgrind cost probe; run explicitly"]
+fn keynote_slide_table_comment_clear_cost_abba() -> TestResult {
+    let input = populated_comment_fixture(false)?;
+    let position = comment_position_at(COMMENT_ROW, COMMENT_COLUMN)?;
+    crate::pages_cost_probes::abba(
+        &input,
+        |source| {
+            let mut editor = keynote::Draft::from_bytes(source)?;
+            let model = host_model(&editor)?;
+            editor.clear_slide_table_cell_comment(SLIDE, model, COMMENT_ROW, COMMENT_COLUMN)?;
+            Ok(editor.to_bytes()?)
+        },
+        |source| {
+            let package = Package::from_bytes(source)?;
+            let clear = package.clear_slide_table_cell_comment(
+                SlideSelector::index(SLIDE),
+                TableSelector::index(0),
+                position,
+            )?;
+            Ok(leaf_bytes!(clear.package()))
         },
     )
 }

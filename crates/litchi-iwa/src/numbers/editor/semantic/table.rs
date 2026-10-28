@@ -3069,6 +3069,29 @@ impl Draft {
         Ok(())
     }
 
+    /// Run the pre-focused Numbers comment clear for the parity oracle.
+    ///
+    /// This is deliberately paired with
+    /// [`Self::__parity_set_table_cell_comment_legacy`]: it resolves the
+    /// selector here and invokes the legacy package writer directly, without
+    /// constructing the focused Numbers package owner.
+    #[cfg(feature = "parity-host-oracle")]
+    #[doc(hidden)]
+    pub fn __parity_clear_table_cell_comment_legacy(
+        &mut self,
+        selector: litchi_numbers::TableSelector<'_>,
+        row: usize,
+        column: usize,
+    ) -> Result<()> {
+        let table_id = selectors::table_id(self, selector)?;
+        let mut staged = self.package.clone();
+        clear_attached_cell_comment_in_package(&mut staged, table_id, row, column)?;
+        let bytes = staged.to_bytes()?;
+        HostPackage::from_bytes(&bytes)?;
+        self.package = staged;
+        Ok(())
+    }
+
     /// Inspect the conditional-highlight style set attached to a writable BNC cell.
     pub fn cell_conditional_highlighting(
         &self,

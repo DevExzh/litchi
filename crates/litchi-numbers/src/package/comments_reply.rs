@@ -683,6 +683,7 @@ fn map_root_error(error: RootError, path: Path) -> Error {
                 RootLimitKind::WireWork => LimitKind::Work,
                 RootLimitKind::TextBytes => LimitKind::TextBytes,
                 RootLimitKind::References => LimitKind::References,
+                RootLimitKind::ReferenceBytes => LimitKind::ReferenceBytes,
                 RootLimitKind::CompressedBytes => LimitKind::CompressedBytes,
                 _ => LimitKind::Work,
             },

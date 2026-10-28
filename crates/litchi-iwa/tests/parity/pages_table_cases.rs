@@ -1,6 +1,8 @@
 //! Pages body-table parity cases of wave W1-B (record 0371): cell values
 //! through the leaf `table::values` family and the cell reads.
 
+use std::hint::black_box;
+
 use litchi_iwa::pages::{self, CellValue, TableCellUpdate};
 use litchi_iwa_common::comment::AuthorId;
 use litchi_iwa_common::table::coordinate::At;
@@ -598,6 +600,103 @@ fn pages_body_table_comment_cost_abba() -> TestResult {
             let package = Package::from_bytes(source)?;
             let commit = package.set_body_table_cell_comment(TABLE, position, "W1-G measured")?;
             Ok(leaf_bytes!(commit.package()))
+        },
+    )
+}
+
+/// Full Pages facade cost probe for reading a populated root/reply thread.
+/// The source is host-authored before ABBA and the semantic values are fed to
+/// `black_box`, so this measures the read route rather than ZIP serialization
+/// alone.
+#[test]
+#[ignore = "callgrind cost probe; run explicitly"]
+fn pages_body_table_comment_read_cost_abba() -> TestResult {
+    let input = fixture(COMMENTS)?;
+    let position = comment_position()?;
+    crate::pages_cost_probes::abba(
+        &input,
+        |source| {
+            let editor = pages::Draft::from_bytes(source)?;
+            let model = host_model(&editor)?;
+            let comment = editor
+                .table_cell_comment(model, COMMENT_ROW, COMMENT_COLUMN)?
+                .ok_or("host read did not find the populated root comment")?;
+            let replies = editor.table_cell_comment_replies(model, COMMENT_ROW, COMMENT_COLUMN)?;
+            black_box((comment.comment.text.len(), replies.len()));
+            Ok(editor.to_bytes()?)
+        },
+        |source| {
+            let package = Package::from_bytes(source)?;
+            let comment = package
+                .body_table_cell_comment(TABLE, position)?
+                .ok_or("leaf read did not find the populated root comment")?;
+            let replies = package.body_table_cell_comment_replies(TABLE, position)?;
+            black_box((comment.text().len(), replies.len()));
+            Ok(leaf_bytes!(package))
+        },
+    )
+}
+
+/// Full Pages facade cost probe for creating a root comment on an existing
+/// stored cell without a prior root comment.
+#[test]
+#[ignore = "callgrind cost probe; run explicitly"]
+fn pages_body_table_comment_create_cost_abba() -> TestResult {
+    let base = fixture(CELLS)?;
+    let authored = pages::Draft::from_bytes(&base.bytes)?;
+    let model = host_model(&authored)?;
+    if authored
+        .table_cell_comment(model, COMMENT_ROW, COMMENT_COLUMN)?
+        .is_some()
+    {
+        return Err("Pages create probe target already has a root comment".into());
+    }
+    let input = crate::harness::Fixture {
+        path: "generated:pages-table-comment-root-create-cost",
+        bytes: base.bytes,
+    };
+    let position = comment_position()?;
+    crate::pages_cost_probes::abba(
+        &input,
+        |source| {
+            let mut editor = pages::Draft::from_bytes(source)?;
+            let model = host_model(&editor)?;
+            editor.set_table_cell_comment(model, COMMENT_ROW, COMMENT_COLUMN, "W1-G create")?;
+            Ok(editor.to_bytes()?)
+        },
+        |source| {
+            let package = Package::from_bytes(source)?;
+            let commit = package.set_body_table_cell_comment(TABLE, position, "W1-G create")?;
+            Ok(leaf_bytes!(commit.package()))
+        },
+    )
+}
+
+/// Full Pages facade cost probe for clearing a host-authored populated root.
+#[test]
+#[ignore = "callgrind cost probe; run explicitly"]
+fn pages_body_table_comment_clear_cost_abba() -> TestResult {
+    let base = fixture(CELLS)?;
+    let mut authored = pages::Draft::from_bytes(&base.bytes)?;
+    let model = host_model(&authored)?;
+    authored.set_table_cell_comment(model, COMMENT_ROW, COMMENT_COLUMN, "W1-G clear")?;
+    let input = crate::harness::Fixture {
+        path: "generated:pages-table-comment-root-clear-cost",
+        bytes: authored.to_bytes()?,
+    };
+    let position = comment_position()?;
+    crate::pages_cost_probes::abba(
+        &input,
+        |source| {
+            let mut editor = pages::Draft::from_bytes(source)?;
+            let model = host_model(&editor)?;
+            editor.clear_table_cell_comment(model, COMMENT_ROW, COMMENT_COLUMN)?;
+            Ok(editor.to_bytes()?)
+        },
+        |source| {
+            let package = Package::from_bytes(source)?;
+            let clear = package.clear_body_table_cell_comment(TABLE, position)?;
+            Ok(leaf_bytes!(clear.package()))
         },
     )
 }

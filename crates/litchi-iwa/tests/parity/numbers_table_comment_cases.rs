@@ -6,6 +6,8 @@
 
 #[cfg(feature = "parity-host-oracle")]
 use std::collections::BTreeSet;
+#[cfg(feature = "parity-host-oracle")]
+use std::hint::black_box;
 
 use litchi_iwa::numbers;
 #[cfg(feature = "parity-host-oracle")]
@@ -41,6 +43,8 @@ const ROOT_PREVIEWS: [&str; 3] = ["preview.jpg", "preview-micro.jpg", "preview-w
 #[derive(Clone, Copy, Debug)]
 enum Operation {
     Set,
+    Create,
+    Clear,
 }
 
 fn position() -> At {
@@ -272,7 +276,7 @@ fn preview_names(bytes: &[u8]) -> TestResult<BTreeSet<String>> {
 fn host_route(source: &[u8], operation: Operation) -> TestResult<Vec<u8>> {
     let mut editor = numbers::Draft::from_bytes(source)?;
     match operation {
-        Operation::Set => {
+        Operation::Set | Operation::Create => {
             // This is the deliberately independent legacy oracle.  The
             // helper resolves the selector and calls the old package writer
             // directly; it never constructs a focused `litchi_numbers`
@@ -284,6 +288,13 @@ fn host_route(source: &[u8], operation: Operation) -> TestResult<Vec<u8>> {
                 "W1-G revised root",
             )?;
         },
+        Operation::Clear => {
+            editor.__parity_clear_table_cell_comment_legacy(
+                TableSelector::index(0),
+                ROW,
+                COLUMN,
+            )?;
+        },
     }
     Ok(editor.to_bytes()?)
 }
@@ -292,11 +303,16 @@ fn host_route(source: &[u8], operation: Operation) -> TestResult<Vec<u8>> {
 fn leaf_route(source: &[u8], operation: Operation) -> TestResult<LeafRun> {
     let package = Package::from_bytes(source)?;
     let commit = match operation {
-        Operation::Set => package.set_table_cell_comment(
+        Operation::Set | Operation::Create => package.set_table_cell_comment(
             SheetSelector::index(0),
             TableSelector::index(0),
             position(),
             "W1-G revised root",
+        )?,
+        Operation::Clear => package.clear_table_cell_comment(
+            SheetSelector::index(0),
+            TableSelector::index(0),
+            position(),
         )?,
     };
     let restored = commit
@@ -442,5 +458,93 @@ fn numbers_table_cell_comment_cost_abba() -> TestResult {
             )?;
             Ok(leaf_bytes!(commit.package()))
         },
+    )
+}
+
+/// Full Numbers facade cost probe for reading a populated root/reply thread.
+/// This uses the feature-gated legacy host reader as the differential oracle;
+/// it is not a supported host API and is not native application evidence.
+#[cfg(feature = "parity-host-oracle")]
+#[test]
+#[ignore = "callgrind cost probe; run explicitly"]
+fn numbers_table_cell_comment_read_cost_abba() -> TestResult {
+    let input = populated_comment_fixture()?;
+    crate::pages_cost_probes::abba(
+        &input,
+        |source| {
+            let editor = numbers::Draft::from_bytes(source)?;
+            let model = host_model(&editor)?;
+            let root = editor
+                .__parity_read_table_cell_comment(TableSelector::index(0), position())?
+                .ok_or("host read did not find the populated root comment")?;
+            let replies = editor.cell_comment_replies(model, ROW, COLUMN)?;
+            black_box((root.comment.text.len(), replies.len()));
+            Ok(editor.to_bytes()?)
+        },
+        |source| {
+            let package = Package::from_bytes(source)?;
+            let root = package
+                .table_cell_comment(SheetSelector::index(0), TableSelector::index(0), position())?
+                .ok_or("leaf read did not find the populated root comment")?;
+            let replies = package.table_cell_comment_replies(
+                SheetSelector::index(0),
+                TableSelector::index(0),
+                position(),
+            )?;
+            black_box((root.text().len(), replies.len()));
+            Ok(leaf_bytes!(package))
+        },
+    )
+}
+
+/// Full Numbers facade cost probe for creating a root comment.  The input is
+/// host-authored and cleared before ABBA, and both mutation routes use the
+/// feature-gated legacy writer/reader oracle boundary described above.
+#[cfg(feature = "parity-host-oracle")]
+#[test]
+#[ignore = "callgrind cost probe; run explicitly"]
+fn numbers_table_cell_comment_create_cost_abba() -> TestResult {
+    let native = native_fixture()?;
+    let mut editor = numbers::Draft::from_bytes(&native.bytes)?;
+    editor.__parity_clear_table_cell_comment_legacy(TableSelector::index(0), ROW, COLUMN)?;
+    let input = Fixture {
+        path: "generated:numbers-table-comment-root-create-cost",
+        bytes: editor.to_bytes()?,
+    };
+    if numbers::Draft::from_bytes(&input.bytes)?
+        .__parity_read_table_cell_comment(TableSelector::index(0), position())?
+        .is_some()
+    {
+        return Err("Numbers create probe target still has a root comment".into());
+    }
+    crate::pages_cost_probes::abba(
+        &input,
+        |source| host_route(source, Operation::Create),
+        |source| Ok(leaf_route(source, Operation::Create)?.output),
+    )
+}
+
+/// Full Numbers facade cost probe for clearing a host-authored root comment.
+/// The root has no replies, matching the supported root-only clear profile.
+#[cfg(feature = "parity-host-oracle")]
+#[test]
+#[ignore = "callgrind cost probe; run explicitly"]
+fn numbers_table_cell_comment_clear_cost_abba() -> TestResult {
+    let native = native_fixture()?;
+    let mut editor = numbers::Draft::from_bytes(&native.bytes)?;
+    editor.__parity_set_table_cell_comment_legacy(
+        TableSelector::index(0),
+        ROW,
+        COLUMN,
+        "W1-G clear",
+    )?;
+    let input = Fixture {
+        path: "generated:numbers-table-comment-root-clear-cost",
+        bytes: editor.to_bytes()?,
+    };
+    crate::pages_cost_probes::abba(
+        &input,
+        |source| host_route(source, Operation::Clear),
+        |source| Ok(leaf_route(source, Operation::Clear)?.output),
     )
 }
