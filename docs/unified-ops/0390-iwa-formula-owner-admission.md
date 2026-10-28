@@ -73,35 +73,38 @@ with its cached value, and serializes. The leaf side uses selector-first
 is measured in host/leaf/leaf/host order; the setup is not counted as an
 isolated edit or as a whole-file benchmark.
 
-Frozen source: `f6c8ec8d05c17c857717e3aabbd458c775f6679e`.
+Frozen source: `2e1a7a3f6ad31e6546bfe7b0557246af949e7eb5` (the docs-only
+current WP tip after merge `f6c8ec8d05c17c857717e3aabbd458c775f6679e`).
 Release binary (kept outside the repository):
-`/home/zhuhe/code/litchi-worktrees/.coord/iwa-w1f-owner-admission/perf/target/release/deps/parity-21b48e7cda91f127`,
-210,622,272 bytes, SHA-256
-`1880a011ea758960b1e17806fdf89767cff10f36b88f24b6f955264104fed4de`.
+`/home/zhuhe/code/litchi-worktrees/.coord/iwa-w1f-owner-admission/perf/rerun-2e1a7a3f6a/archive/parity-96c80ba0598fc9992029b4c8fbf395b9a45c9beb6f40abf35d6f234dbc1dcd0c`,
+210,625,192 bytes, mode 0555, SHA-256
+`96c80ba0598fc9992029b4c8fbf395b9a45c9beb6f40abf35d6f234dbc1dcd0c`.
 
 | Route | Host Ir | Leaf Ir | Delta |
 |---|---:|---:|---:|
-| Basic no-cache authoring | 189,911,777 | 84,006,705 | **−55.765%** |
-| Native-graph cached authoring | 159,359,920 | 50,054,882 | **−68.590%** |
-| Basic explicit cached authoring | 189,851,535 | 84,016,025 | **−55.746%** |
-| Owner-admission workflow | 499,430,093 | 51,663,518 | **−89.656%** |
+| Basic no-cache authoring | 189,879,802 | 83,999,055 | **−55.762%** |
+| Native-graph cached authoring | 159,284,086 | 50,061,400 | **−68.571%** |
+| Basic explicit cached authoring | 189,859,438 | 84,013,752 | **−55.749%** |
+| Owner-admission workflow | 500,405,208 | 51,610,047 | **−89.686%** |
 
 All four routes are faster on the leaf side and meet the prescribed no-more-
-than-5%-slower bar. Captures are external: `perf/callgrind/{basic,graph,cached,
-owner}.{host,leaf}` under the same `.coord/iwa-w1f-owner-admission` directory;
-their sizes and SHA-256 values are retained in the handoff receipt.
+than-5%-slower bar. Captures and exact-test exit logs are external under
+`perf/rerun-2e1a7a3f6a/{callgrind,logs}`; their sizes and SHA-256 values are in
+`perf/rerun-2e1a7a3f6a/receipt-2e1a7a3f6a.txt`. The earlier f6c8 receipt remains
+historical only: it had a graph-leaf hash transcription typo and no persisted
+per-capture logs, so it is not the current qualification receipt.
 
 Regenerate the complete set with:
 
 ```sh
 CARGO_BUILD_JOBS=4 CARGO_INCREMENTAL=0 \
-  CARGO_TARGET_DIR=/home/zhuhe/code/litchi-worktrees/.coord/iwa-w1f-owner-admission/perf/target \
+  CARGO_TARGET_DIR=/home/zhuhe/code/litchi-worktrees/.coord/iwa-w1f-owner-admission/perf/rerun-2e1a7a3f6a/target \
   CARGO_PROFILE_RELEASE_DEBUG=1 \
-  cargo test --release --offline -p litchi-iwa --test parity --no-run
+  cargo test --release --locked --offline -p litchi-iwa --test parity --no-run
 taskset -c 3 valgrind --tool=callgrind \
   --callgrind-out-file=/home/zhuhe/code/litchi-worktrees/.coord/iwa-w1f-owner-admission/perf/callgrind/basic.host \
   --toggle-collect='*numbers_formula_author_cases::host_route*' \
-  /home/zhuhe/code/litchi-worktrees/.coord/iwa-w1f-owner-admission/perf/target/release/deps/parity-21b48e7cda91f127 \
+  /home/zhuhe/code/litchi-worktrees/.coord/iwa-w1f-owner-admission/perf/rerun-2e1a7a3f6a/archive/parity-96c80ba0598fc9992029b4c8fbf395b9a45c9beb6f40abf35d6f234dbc1dcd0c \
   --ignored --exact numbers_formula_author_cases::numbers_table_formula_author_cost_abba --test-threads=1
 # Repeat with leaf_cost_route, the graph/cached exact test names, and the
 # owner route toggles host_formula_owner_admission_route and
