@@ -194,6 +194,7 @@ pub struct Workspace<'s> {
     /// `(component, object, message)` of the registry payload.
     registry: Option<(usize, u64, usize)>,
     uuid_seed: u64,
+    source_work: usize,
 }
 
 impl fmt::Debug for Workspace<'_> {
@@ -218,11 +219,35 @@ impl<'s> Workspace<'s> {
         let mut index = HashMap::new();
         let mut ambiguous = HashSet::new();
         let mut registry = None;
+        let mut source_work = 0usize;
         for position in 0..source.count() {
             let (name, archive) = source
                 .component(position)
                 .ok_or(Error::Invalid("a component vanished"))?;
+            source_work = source_work.saturating_add(name.len()).saturating_add(
+                archive
+                    .objects
+                    .len()
+                    .saturating_mul(size_of::<ArchiveObject>()),
+            );
             for object in &archive.objects {
+                source_work = source_work
+                    .saturating_add(
+                        object
+                            .messages
+                            .len()
+                            .saturating_mul(size_of::<RawMessage>()),
+                    )
+                    .saturating_add(
+                        object
+                            .archive_info
+                            .message_infos
+                            .len()
+                            .saturating_mul(size_of::<litchi_iwa_core::MessageInfo>()),
+                    );
+                for message in &object.messages {
+                    source_work = source_work.saturating_add(message.data.len());
+                }
                 let identifier = object
                     .archive_info
                     .identifier
@@ -256,6 +281,7 @@ impl<'s> Workspace<'s> {
             ambiguous,
             registry,
             uuid_seed: 0,
+            source_work,
         })
     }
 
@@ -271,38 +297,7 @@ impl<'s> Workspace<'s> {
     /// engine's operation budget.
     #[must_use]
     pub(crate) fn source_work(&self) -> usize {
-        let mut work = 0usize;
-        for position in 0..self.source.count() {
-            let Some((name, archive)) = self.source.component(position) else {
-                continue;
-            };
-            work = work.saturating_add(name.len());
-            work = work.saturating_add(
-                archive
-                    .objects
-                    .len()
-                    .saturating_mul(size_of::<ArchiveObject>()),
-            );
-            for object in &archive.objects {
-                work = work.saturating_add(
-                    object
-                        .messages
-                        .len()
-                        .saturating_mul(size_of::<RawMessage>()),
-                );
-                for message in &object.messages {
-                    work = work.saturating_add(message.data.len());
-                }
-                work = work.saturating_add(
-                    object
-                        .archive_info
-                        .message_infos
-                        .len()
-                        .saturating_mul(size_of::<litchi_iwa_core::MessageInfo>()),
-                );
-            }
-        }
-        work
+        self.source_work
     }
 
     /// Finish the edit.
