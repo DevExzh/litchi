@@ -97,6 +97,12 @@ pub enum LimitKind {
     WireNesting,
     /// Work performed by one strict codec operation.
     WireWork,
+    /// Logical output allocations reserved by one strict codec operation.
+    WireAllocations,
+    /// Retained bytes charged by one strict codec operation.
+    WireRetainedBytes,
+    /// Scratch bytes charged by one strict codec operation.
+    WireScratchBytes,
     /// Aggregate transaction topology and codec work.
     TransactionWork,
 }
@@ -165,6 +171,9 @@ impl fmt::Display for LimitKind {
             Self::WireFields => "wire fields",
             Self::WireNesting => "wire nesting",
             Self::WireWork => "wire work",
+            Self::WireAllocations => "wire allocations",
+            Self::WireRetainedBytes => "wire retained bytes",
+            Self::WireScratchBytes => "wire scratch bytes",
             Self::TransactionWork => "transaction work",
         })
     }

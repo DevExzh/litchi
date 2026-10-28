@@ -6867,3 +6867,68 @@ See [0063](0063-source-pptx-modern-comments.md).
   No API, ledger or native disposition changes. The next integrated source
   receives fresh post-merge checks, all 53 gate rows, the complete 56-route
   iWork and 14-comparison FIN instruction matrices, then quiet wall/CLI runs.
+
+- Post-merge checks on `9932c7d069` passed on unchanged clean source. Its long
+  gate was held to finish the in-flight W1-G comments slice before freezing
+  the combined candidate. The failed `177ef72ce0` gate and its passing
+  source-bound instruction receipts remain preserved; neither qualifies a
+  later source.
+- Accepted W1-G `fd204957f1` (record 0379), synchronized with `9932c7d069`.
+  Pages, Keynote and Numbers share the bounded root-comment rewrite engine.
+  Pages and Keynote expose the canonical read/edit/apply families, with
+  replies read from the returned comment snapshot. Existing Numbers APIs
+  remain intact. Resource limits retain their dimensions through parser,
+  codec, graph and candidate-readback adapters; focused refusals remain
+  terminal. Full reply-thread mutation and broader host profiles remain
+  explicit follow-ups.
+- Differential proof uses the independent Numbers legacy oracle, populated
+  direct reader comparisons, exact inverse/source checks, and scoped Tier B
+  policies. Pages fresh creation validates the host's generated local author
+  and existing author registry against the leaf's authorless profile; only
+  the selected new identities are normalized. Numbers clear validates the
+  selected list's source-derived counter policy. Existing roots, replies,
+  unrelated content and unknown bytes stay exact, with corruption controls
+  for references, metadata, nested fields and counter encodings. Nine
+  Numbers and six Pages focused checks pass, along with the Keynote slice
+  checks, strict scoped Clippy, default compilation, formatting, rustdoc,
+  all 73 glossary profiles, ledger, boundaries, no-`3rdparty` and all three
+  affected locked offline fuzz workspaces.
+- The twelve full-facade comment cost routes pass on measured source
+  `9d9666b782`: 24 CPU-3 Callgrind captures and 36 matching test logs, with
+  archived binary identity and exact inclusive probe attribution verified
+  independently by the coordinator. The worst slowdown is Numbers set at
+  +0.984293%; the other eleven routes use fewer instructions than the host.
+  Numbers create/clear measure forward publication without inverse work.
+  These results qualify the slice, not the subsequent integrated candidate
+  or the unified `File` stack.
+- The ledger now has 1,179 migrated, 43 retired and 1,009 host-only rows.
+  The comments family has five migrated reads, fourteen host-only mutation
+  rows and three retired oracle seams; the whole-ledger delta is three new
+  migrated reads and three retired seams. All 492 pending native routes
+  still block W3. Native-authored read receipts are not mutation acceptance.
+  The next frozen candidate will include the separately accepted W2-D
+  example/test slices, then receive all 53 gate rows, 68 iWork instruction
+  routes (135 captures), 14 FIN comparisons and a quiet wall/CLI interval.
+- At the user's request, the coordinator removed 33 clean inactive merged
+  worktrees and 27 merged local branches. Active checkouts, unmerged work and
+  eighteen historical worktrees with local changes were preserved. Release
+  artifacts, local locks and saved evidence were retained outside the retired
+  checkouts with an external inventory. Integration source was unchanged by
+  cleanup; future completed work packages receive the same ancestry and
+  local-state checks before retirement.
+
+- Post-merge checks on `1e3978082b` passed on unchanged clean source:
+  workspace all-target/all-feature compilation, all 20 locked offline fuzz
+  workspaces, crate boundaries and exit ledger. The completed W1-G and
+  Numbers-proof worktrees and branches were then retired after artifact
+  preservation, bringing this continuation's cleanup to 35 worktrees and
+  29 branches.
+- Accepted W2-D `021bfd23ff` (code `3525ba2180`, record 0388), synchronized
+  with the comments integration. The Numbers hidden-axis create and visible
+  row/column insertion examples now live in the leaf crate and use focused
+  selectors and transactions. The insertion example checks 6×4 to 7×5
+  extents, shifted hidden indices and saved-file reopen. The host physical
+  deletion example remains byte-identical: clearing visibility is not a
+  replacement for deletion. Both examples build and run on the synchronized
+  source; strict scoped Clippy, formatting and repository guards pass.
+  No runtime, ledger, native-evidence or performance disposition changes.

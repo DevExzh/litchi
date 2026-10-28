@@ -3043,6 +3043,55 @@ impl Draft {
         Ok(())
     }
 
+    /// Run the pre-focused Numbers comment writer for a differential oracle.
+    ///
+    /// This deliberately hidden seam exists only for the host-vs-leaf parity
+    /// harness.  It resolves the archive-free selector here, then invokes the
+    /// legacy writer directly; supported application callers must use the
+    /// selector-first `litchi_numbers` transaction instead.  Keeping this
+    /// route explicit prevents a focused-owner delegation from masquerading as
+    /// an independent host oracle.
+    #[cfg(feature = "parity-host-oracle")]
+    #[doc(hidden)]
+    pub fn __parity_set_table_cell_comment_legacy(
+        &mut self,
+        selector: litchi_numbers::TableSelector<'_>,
+        row: usize,
+        column: usize,
+        text: impl Into<String>,
+    ) -> Result<()> {
+        let table_id = selectors::table_id(self, selector)?;
+        let mut staged = self.package.clone();
+        set_cell_comment_in_package(&mut staged, table_id, row, column, text.into())?;
+        let bytes = staged.to_bytes()?;
+        HostPackage::from_bytes(&bytes)?;
+        self.package = staged;
+        Ok(())
+    }
+
+    /// Run the pre-focused Numbers comment clear for the parity oracle.
+    ///
+    /// This is deliberately paired with
+    /// [`Self::__parity_set_table_cell_comment_legacy`]: it resolves the
+    /// selector here and invokes the legacy package writer directly, without
+    /// constructing the focused Numbers package owner.
+    #[cfg(feature = "parity-host-oracle")]
+    #[doc(hidden)]
+    pub fn __parity_clear_table_cell_comment_legacy(
+        &mut self,
+        selector: litchi_numbers::TableSelector<'_>,
+        row: usize,
+        column: usize,
+    ) -> Result<()> {
+        let table_id = selectors::table_id(self, selector)?;
+        let mut staged = self.package.clone();
+        clear_attached_cell_comment_in_package(&mut staged, table_id, row, column)?;
+        let bytes = staged.to_bytes()?;
+        HostPackage::from_bytes(&bytes)?;
+        self.package = staged;
+        Ok(())
+    }
+
     /// Inspect the conditional-highlight style set attached to a writable BNC cell.
     pub fn cell_conditional_highlighting(
         &self,
@@ -3119,6 +3168,30 @@ impl Draft {
         }
         *self = verified;
         Ok(actual)
+    }
+
+    /// Read a root comment for the host-vs-leaf parity harness.
+    ///
+    /// This hidden selector-first seam is deliberately not part of the
+    /// supported Numbers editor API.  It keeps the retired raw-ID root reader
+    /// out of the public host surface while allowing the differential tests
+    /// to compare the genuine host model with the focused reader on the same
+    /// source bytes.  The returned compatibility witness never leaves the
+    /// parity feature's test route.
+    #[doc(hidden)]
+    #[cfg(feature = "parity-host-oracle")]
+    pub fn __parity_read_table_cell_comment(
+        &self,
+        selector: litchi_numbers::TableSelector<'_>,
+        position: litchi_numbers::table::At,
+    ) -> Result<Option<TableCellComment>> {
+        let table_id = selectors::table_id(self, selector)?;
+        cell_comment_in_package(
+            &self.package,
+            table_id,
+            position.row() as usize,
+            position.column() as usize,
+        )
     }
 
     /// Read the direct replies attached to a cell comment in stored order.

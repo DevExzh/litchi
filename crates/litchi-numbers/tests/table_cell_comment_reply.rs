@@ -18,7 +18,7 @@ use fixture::*;
 use litchi_iwa_archive::{Limits, package::Catalog};
 use litchi_iwa_core::{Archive, RawMessage, SnappyStream};
 use litchi_iwa_protos::{tsp, tst};
-use litchi_numbers::cell::comment::CommentReplyIndex;
+use litchi_numbers::cell::comment::{CommentReplyIndex, transaction};
 use litchi_numbers::{At, Package, SheetSelector, TableSelector};
 use prost::Message as _;
 
@@ -460,6 +460,33 @@ fn root_comment_creation_materializes_a_missing_cell_slot_atomically() -> TestRe
 }
 
 #[test]
+fn shared_root_clear_detaches_a_new_root_and_reopens_atomically() -> TestResult {
+    let source = fixture(FixtureMode::Rootless, None)?;
+    let package = load_package(&source)?;
+    let created = package.set_table_cell_comment(
+        SheetSelector::index(0),
+        TableSelector::index(0),
+        At::new(1, 0),
+        "temporary root",
+    )?;
+    let cleared = created.package().clear_table_cell_comment(
+        SheetSelector::index(0),
+        TableSelector::index(0),
+        At::new(1, 0),
+    )?;
+    assert_eq!(
+        cleared.package().table_cell_comment(
+            SheetSelector::index(0),
+            TableSelector::index(0),
+            At::new(1, 0),
+        )?,
+        None,
+    );
+    assert!(cleared.diagnostics().changed());
+    Ok(())
+}
+
+#[test]
 fn root_comment_creation_fails_closed_on_unsupported_graphs() -> TestResult {
     for (mode, corruption) in [
         (FixtureMode::SingleRoot, Some(Corruption::MissingAuthor)),
@@ -786,7 +813,58 @@ fn semantic_and_physical_limits_reject_without_mutating_the_source() -> TestResu
         )?
         .append("x".repeat(16 * 1024))
         .commit();
-    assert!(result.is_err());
+    assert!(matches!(
+        result,
+        Err(transaction::Error::Limit {
+            kind: transaction::LimitKind::TextBytes,
+            ..
+        })
+    ));
+    assert_eq!(exact_bytes(&package)?, before);
+    Ok(())
+}
+
+#[test]
+fn shared_root_entry_limit_rejects_candidate_before_publish() -> TestResult {
+    let source = fixture(FixtureMode::Rootless, None)?;
+    let source_catalog = Catalog::from_bytes(&source, Default::default())?;
+    let source_max_entry = source_catalog
+        .iter()
+        .map(|entry| entry.data().len())
+        .max()
+        .ok_or_else(|| io::Error::other("source has no entries"))?;
+    let source_max_entry = u64::try_from(source_max_entry)?;
+    let source_limits = litchi_numbers::SourceLimits::builder()
+        .max_input_bytes(litchi_numbers::SourceLimits::MAXIMUM.max_input_bytes())
+        .and_then(|builder| {
+            builder.max_members(litchi_numbers::SourceLimits::MAXIMUM.max_members())
+        })
+        .and_then(|builder| builder.max_entry_bytes(source_max_entry))
+        .and_then(|builder| {
+            builder.max_aggregate_bytes(litchi_numbers::SourceLimits::MAXIMUM.max_aggregate_bytes())
+        })
+        .and_then(|builder| {
+            builder.max_component_bytes(litchi_numbers::SourceLimits::MAXIMUM.max_component_bytes())
+        })
+        .and_then(|builder| builder.build())?;
+    let package = Package::from_bytes_with_options(
+        &source,
+        litchi_numbers::OpenOptions::new().source_limits(source_limits),
+    )?;
+    let before = exact_bytes(&package)?;
+    let error = package
+        .set_table_cell_comment(
+            SheetSelector::index(0),
+            TableSelector::index(0),
+            At::new(1, 0),
+            "root under a retained-entry ceiling",
+        )
+        .expect_err("the candidate must exceed the retained entry ceiling");
+    assert!(
+        format!("{error:?}").contains("CompressedBytes")
+            || format!("{error:?}").contains("EntryBytes"),
+        "expected a typed retained-entry limit, got {error:?}"
+    );
     assert_eq!(exact_bytes(&package)?, before);
     Ok(())
 }
@@ -900,8 +978,14 @@ fn retained_compressed_entry_limit_accepts_exact_reply_output() -> TestResult {
         )
         .expect_err("one byte below the encoded reply member must refuse");
     assert!(
-        format!("{error:?}").contains("CompressedBytes"),
-        "expected typed compressed-budget refusal, got {error:?}"
+        matches!(
+            &error,
+            transaction::Error::Limit {
+                kind: transaction::LimitKind::CompressedBytes,
+                ..
+            }
+        ),
+        "expected typed compressed-budget refusal through the public reply route, got {error:?}"
     );
     assert_eq!(exact_bytes(&one_under_package)?, before);
     Ok(())

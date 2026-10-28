@@ -105,6 +105,14 @@ path = "examples/read_numbers.rs"
 name = "numbers_save_package"
 path = "examples/save_package.rs"
 
+[[example]]
+name = "create_numbers_table_hidden_axes"
+path = "examples/create_numbers_table_hidden_axes.rs"
+
+[[example]]
+name = "edit_numbers_hidden_table_topology"
+path = "examples/edit_numbers_hidden_table_topology.rs"
+
 [features]
 default = []
 internal-iwork-source = []
