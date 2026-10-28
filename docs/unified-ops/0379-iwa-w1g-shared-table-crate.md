@@ -29,8 +29,10 @@
   family runs 88.2% below its host route and the Keynote family 0.9% above
   its host route (§4). Hidden axes (§2a): the engine lift leaves the Pages
   route unchanged (+0.008%); the Keynote and Numbers families run 60.4%
-  and 18.1% below their host routes. Group 2 has no performance claim yet;
-  measurement is held for the coordinator's quiet window.
+  and 18.1% below their host routes. Group 2's focused full-facade probes
+  on source commit `cfc334e754` measured Pages −96.517%, Keynote −36.624%
+  and Numbers +0.956% (§4.2); final integrated-tree qualification remains
+  with the coordinator.
 
 ## 1. Why a new crate
 
@@ -463,6 +465,66 @@ order. The Numbers and Keynote test names are
 `keynote_hidden_axes_cases::keynote_hidden_axes_cost_abba`; the Pages test is
 `hidden_axes_cost_probe`.
 
+### 4.2 Root-comment facade rerun
+
+The root-comment probes run on clean source commit `cfc334e754cc2e2edaba2598d31ef21325aae256`,
+using the release-derived `profiling` profile (`opt-level = 3`, `lto = true`,
+debug information retained) and CPU 3 pinned with `taskset`. Each ignored test
+uses the shared `pages_cost_probes::abba` helper (host, leaf, leaf, host); the
+Callgrind collection toggles isolate `probe_host` and `probe_leaf`. These are
+full facade routes, including package open, selector resolution, edit, commit
+and serialization. The Numbers host closure is the explicit parity-only
+legacy writer, while the Pages source is host-authored before ABBA and the
+Keynote/Numbers sources are native fixtures. This is source/build evidence,
+not Apple open/save evidence.
+
+| Route | Host instructions | Leaf instructions | Δ |
+|---|---:|---:|---:|
+| Pages `pages_body_table_comment_cost_abba` | 2,591,437,381 | 90,265,537 | **−96.517%** |
+| Keynote `keynote_slide_table_comment_cost_abba` | 656,778,207 | 416,237,421 | **−36.624%** |
+| Numbers `numbers_table_cell_comment_cost_abba` | 73,190,152 | 73,889,963 | **+0.956%** |
+
+The external artifact manifest is below. The profiling binary is intentionally
+not committed (497,767,840 bytes); all captures are below the repository's
+evidence threshold and remain outside the checkout:
+
+| Artifact | Size | SHA-256 |
+|---|---:|---|
+| `/home/zhuhe/code/litchi-worktrees/uo2-iwa-w1g/target/profiling/deps/parity-a78c3cd1bd84cfcd` | 497,767,840 bytes | `e01dd99c4f027fdb33350b876436ed1e2f27ec101f5d1a59b9f5660952291fee` |
+| `comments-cfc334e754/pages-host.out` | 564,259 bytes | `4ae0ee2a654f736c5c7c8b1d71d7bd6024e7382954fac9288d14c83c9cd1922b` |
+| `comments-cfc334e754/pages-leaf.out` | 657,162 bytes | `6ea7bf272312b5b6e18414ae544bdf097f6e2b5eebe92cc36fae2d3707a2c744` |
+| `comments-cfc334e754/keynote-host.out` | 760,833 bytes | `6041c0866f9128eae85dddf64c5f44b44875556eac2abb34928b8fbd674b8fc2` |
+| `comments-cfc334e754/keynote-leaf.out` | 731,394 bytes | `c4e11693ead3484856cc0b4b9dfc187f54200f126b975ba9e84a927eaaf02497` |
+| `comments-cfc334e754/numbers-host.out` | 501,435 bytes | `8c129af94453bac47f3c3d9a0ccf0de7a2525ac5acb3adc5b6cef7a98b95935f` |
+| `comments-cfc334e754/numbers-leaf.out` | 530,672 bytes | `626d1af2f31bb97201fa47e789db8a7c45bdcb790be95bd26e8bbb8dc26683ce` |
+
+The external paths above are relative to
+`/home/zhuhe/code/litchi-worktrees/.coord/iwa-w1g/cg/`. Regenerate the
+binary with:
+
+```sh
+PATH=/home/zhuhe/code/litchi-worktrees/.coord/bin:/home/zhuhe/.cargo/bin:/usr/bin:/bin \
+CARGO_TARGET_DIR=/home/zhuhe/code/litchi-worktrees/uo2-iwa-w1g/target \
+CARGO_INCREMENTAL=0 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_BUILD_JOBS=4 \
+cargo test --locked --profile profiling -p litchi-iwa \
+  --features parity-host-oracle --test parity --no-run
+```
+
+Then run each route twice, changing `--toggle-collect` and the output path:
+
+```sh
+taskset -c 3 valgrind --tool=callgrind --quiet --error-exitcode=1 \
+  --callgrind-out-file=/home/zhuhe/code/litchi-worktrees/.coord/iwa-w1g/cg/comments-cfc334e754/<route>.out \
+  '--toggle-collect=*probe_host*' \
+  /home/zhuhe/code/litchi-worktrees/uo2-iwa-w1g/target/profiling/deps/parity-a78c3cd1bd84cfcd \
+  --ignored --exact <parity-test> --test-threads=1
+```
+
+Use `*probe_leaf*` for the paired leaf capture; `<parity-test>` is one of
+`pages_table_cases::pages_body_table_comment_cost_abba`,
+`keynote_table_cases::keynote_slide_table_comment_cost_abba` and
+`numbers_table_comment_cases::numbers_table_cell_comment_cost_abba`.
+
 ## 5. Gaps
 
 | Gap | Finding | Next step |
@@ -474,7 +536,7 @@ order. The Numbers and Keynote test names are
 | hidden axes on tables whose formula owner has dependencies (`slide-table-read-native.key`, nine Numbers fixtures) | refused (`InvalidSource`): the engine proves an empty dependency graph before changing hidden state (§2a.3); the host edits them | re-plan the owner's dependencies with the W1-F formula engine |
 | hidden-axis owner creation | the engine registers the new objects' UUIDs and writes empty filter offsets; the host does neither (pinned on Numbers) | macOS run decides |
 | clearing hidden axes | the engine keeps cleared state records, the host drops them (pinned) | macOS run decides |
-| group 2 | root-only table-cell comment Set/create/Clear uses the shared native graph/rewrite engine in all three leaves; reply-thread mutation rows remain host-only and all native evidence is pending | finish scoped Clippy/docs and final integrated performance, then lift replies and clear the queued native routes |
+| group 2 | root-only table-cell comment Set/create/Clear uses the shared native graph/rewrite engine in all three leaves; reply-thread mutation rows remain host-only and all native evidence is pending | coordinator repeats the cost probes on the final integrated tree; then lift replies and clear the queued native routes |
 | groups 3–5 | cell rich text, topology orchestration and conditional highlights are not started | next W1-G slices, in that order |
 
 ## 6. Verification
@@ -540,10 +602,11 @@ merged candidate `4abb90f713` (code fixes `828d02cad9` and `86bd7f5e3a`, with th
   the Pages focused route was 34,078,005 instructions. These are slice
   evidence, not the coordinator's final integrated-tree qualification.
 
-The current group-2 checks are separate from the historical rows above. On the
-continuation source tree before its final commit, the focused parity runs
-passed: Numbers default read (1/1), Numbers with `parity-host-oracle` (3/3),
-Pages comment cases (3/3), and Keynote comment cases (6/6). The Keynote cases
+The current group-2 checks are separate from the historical rows above. On
+source commit `47f72dc6a0`, the focused parity runs passed: Numbers default
+read (1/1), Numbers with `parity-host-oracle` (4/4), Pages comment cases
+(3/3), Keynote comment cases (6/6), and the shared duplicate-storage unit
+regression (1/1). The Keynote cases
 include native D2 root read/clear, a host-authored populated reply read,
 source-metadata-preserving replacement, and an unrelated-properties
 patch-conflict control. The Numbers set case uses the explicit hidden legacy
@@ -551,9 +614,10 @@ oracle seam and its control; its populated reply read source is host-authored
 before serialization. Pages uses a host-authored no-reply root for mutation
 and table 0 B2 from the populated native comment fixture for root/reply read.
 The three affected fuzz-lock manifests (`litchi-numbers`, `litchi-pages`, and
-`litchi-keynote`) also passed `cargo check --locked --offline --bins`.
-These are differential proofs, not Apple open/save evidence; all three routes
-remain `Evidence::Queued` and native verification/performance are still
-pending. The final commit must rerun formatting, focused compilation/Clippy,
-ledger, boundary, glossary and affected fuzz-lock gates; the coordinator must
-repeat the full gate and final performance on one integrated trunk commit.
+`litchi-keynote`) also passed `cargo check --locked --offline --bins` on this
+source. The focused all-target/all-feature compile and Clippy gates passed,
+and the full-facade cost probes in §4.2 passed on clean source commit
+`cfc334e754`. These are differential proofs, not Apple open/save evidence;
+all three routes remain `Evidence::Queued`. The coordinator must repeat the
+full gate and final performance on one integrated trunk commit, and native
+verification remains pending.
