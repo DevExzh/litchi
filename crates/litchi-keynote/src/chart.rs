@@ -434,6 +434,25 @@ pub mod data {
     };
 }
 
+/// Exact-source transactions for one slide chart's effective font identity
+/// and face traits.
+pub mod font {
+    pub use crate::package::slide_chart_font::{
+        ChartFont, Diagnostics, Error, FontCommit as Commit, FontEdit as Edit, FontPatch as Patch,
+        LimitKind, Refusal,
+    };
+    pub use litchi_iwa_text::font::{Font, NameError as FontNameError};
+
+    /// Exact-source transactions for one slide chart's effective point size.
+    pub mod size {
+        pub use crate::package::slide_chart_font::{
+            Diagnostics, Error, FontSizeCommit as Commit, FontSizeEdit as Edit,
+            FontSizePatch as Patch, LimitKind, Refusal,
+        };
+        pub use litchi_iwa_text::character::TextPointSize;
+    }
+}
+
 /// Chart lifecycle of a slide chart: kind, series direction, frame,
 /// complete data, removal and duplication (record 0372).
 pub mod lifecycle {
