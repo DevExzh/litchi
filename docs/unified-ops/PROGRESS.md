@@ -6568,3 +6568,41 @@ See [0063](0063-source-pptx-modern-comments.md).
   - W1-G: landing the gate-green Numbers hidden axes;
   - 0377a: the F1–F5 performance fixes.
 - Queued for the next free slot: W1-E's chart-lifecycle clone, caption graph and remaining chart-style codecs; W1-G group 2 (cell comments); W2-A sheet shape styles. A full gate on `c9fd1baf87` is running. Nothing pushed.
+
+## Coordinator restart and branch audit (2026-10-28)
+
+- Restarted from clean trunk `a7cf18a8e4`. The ledger check passes: 1,122
+  migrated, 38 retired and 1,068 host-only rows; 441 native routes remain
+  pending. These counts describe migration evidence, not complete feature
+  coverage or native acceptance.
+- Recovered the prior coordinator's briefs and evidence from
+  `/home/zhuhe/code/litchi-worktrees/.coord/`. The full gate on
+  `c9fd1baf87` stopped after rows 00–26 and has no completion marker or
+  running process. Its partial results do not establish a green gate. The
+  last recorded complete green gate remains `debf91e97c`.
+- Resumed five isolated implementation agents under coordinator integration.
+  Existing staged, unstaged and untracked work belongs to its assigned
+  package and is being preserved. No stale donor branch is a merge candidate.
+
+| Branch | Audited tip | State at restart and disposition |
+|---|---|---|
+| `uo2/iwa-w0a`, `uo2/iwa-w0b`, `uo2/iwa-w0c` | ancestors of trunk | Already integrated; no new commits to land. |
+| `uo2/iwa-w1a` | `1e495baabd` | Dirty 0370k DataFormat/numeral-system slice; assigned to finish and close the recorded instruction-cost gap before admission. |
+| `uo2/iwa-w1b` | `7a1b5c4054` | Four unmerged commits plus unfinished evidence; assigned Pages table duplication and line endpoints, including shared line-end payloads. |
+| `uo2/iwa-w1b-cellwriter`, `uo2/iwa-w1d` | ancestors of trunk | Already integrated; no new commits to land. |
+| `uo2/iwa-w1c` | `c9fd1baf87` | Dirty Keynote table lifecycle/duplication facade and tests; assigned completion and parity/performance qualification. |
+| `uo2/iwa-w1e` | `dd50089073` | Clean, integrated slice 6; next shared chart/caption engine slice queued for a free slot. |
+| `uo2/iwa-w1f` | `85078c36c8` | Staged and unstaged 0376c cell-writer repairs; assigned column counts, dependency envelopes and formula-list key reuse with formula-authoring parity. |
+| `uo2/iwa-w1g` | `4fe6bd1d77` | Five unmerged commits and a record edit; assigned hidden-axis admission/facade and host-builder review, fresh scoped checks and a clean handoff. |
+| `uo2/iwa-w2a` | `e0875f89ec` | Clean and integrated through 0378a; Numbers shape styles and text layout queued behind shared dependencies. |
+| `uo2/fin-perf` | `187863518e` | Ten unmerged commits plus harness/lock edits; 0377a remains a separate performance package, pending evidence review and an available slot. |
+
+- Each active package must return a clean exact commit with current trunk
+  merged, scoped gates, a slice record, checked ledger/native-queue entries
+  and measured host/leaf costs. The coordinator reviews and merges accepted
+  slices, checks composition and fuzz locks, then runs all 53 rows against
+  one frozen integrated commit. No historical slice gate substitutes for it.
+- Later work remains ordered: W1-G comments/rich text/topology/highlights;
+  shared engines and W2 drawable/chart facades; W2-D test/example relocation;
+  separate D7 unified dispatch/schema/capabilities; final parity/performance
+  and native verification. Pending native routes still block W3 deletion.
