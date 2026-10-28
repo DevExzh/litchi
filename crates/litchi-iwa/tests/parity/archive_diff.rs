@@ -163,6 +163,29 @@ pub fn compare_with_policies(
     )
 }
 
+/// Compare with a narrowly scoped reference-order policy.
+pub fn compare_with_reference_policy(
+    input: &[u8],
+    host: &[u8],
+    leaf: &[u8],
+    known: &KnownFields,
+    leaf_drops: &[&str],
+    policy: MetadataPolicy,
+    reference_policy: ReferenceOrderPolicy,
+) -> TestResult<Diff> {
+    compare_with_policies_except_objects_and_members_with_reference_policy(
+        input,
+        host,
+        leaf,
+        known,
+        leaf_drops,
+        policy,
+        &BTreeSet::new(),
+        &[],
+        reference_policy,
+    )
+}
+
 /// [`compare_with_policies`] with a documented host-only object island.
 ///
 /// The excluded identifiers are still subject to the caller's graph proof;
@@ -178,7 +201,7 @@ pub fn compare_with_policies_except_objects(
     policy: MetadataPolicy,
     excluded_object_ids: &BTreeSet<u64>,
 ) -> TestResult<Diff> {
-    compare_with_policies_except_objects_and_members(
+    compare_with_policies_except_objects_and_members_with_reference_policy(
         input,
         host,
         leaf,
@@ -187,6 +210,7 @@ pub fn compare_with_policies_except_objects(
         policy,
         excluded_object_ids,
         &[],
+        ReferenceOrderPolicy::Exact,
     )
 }
 
@@ -201,6 +225,30 @@ pub fn compare_with_policies_except_objects_and_members(
     policy: MetadataPolicy,
     excluded_object_ids: &BTreeSet<u64>,
     allowed_host_members: &[&str],
+) -> TestResult<Diff> {
+    compare_with_policies_except_objects_and_members_with_reference_policy(
+        input,
+        host,
+        leaf,
+        known,
+        leaf_drops,
+        policy,
+        excluded_object_ids,
+        allowed_host_members,
+        ReferenceOrderPolicy::Exact,
+    )
+}
+
+fn compare_with_policies_except_objects_and_members_with_reference_policy(
+    input: &[u8],
+    host: &[u8],
+    leaf: &[u8],
+    known: &KnownFields,
+    leaf_drops: &[&str],
+    policy: MetadataPolicy,
+    excluded_object_ids: &BTreeSet<u64>,
+    allowed_host_members: &[&str],
+    reference_policy: ReferenceOrderPolicy,
 ) -> TestResult<Diff> {
     let input = members(input)?;
     let mut host = members(host)?;
@@ -325,6 +373,7 @@ pub fn compare_with_policies_except_objects_and_members(
             &objects(&l.data)?,
             known,
             policy,
+            reference_policy,
             &mut diff,
             excluded_object_ids,
             allowed_host_members,
@@ -357,6 +406,7 @@ fn compare_objects(
     leaf: &[Object],
     known: &KnownFields,
     policy: MetadataPolicy,
+    reference_policy: ReferenceOrderPolicy,
     diff: &mut Diff,
     excluded_object_ids: &BTreeSet<u64>,
     allowed_host_members: &[&str],
@@ -435,10 +485,452 @@ fn compare_objects(
             l,
             known,
             policy,
+            reference_policy,
             diff,
             excluded_object_ids,
             allowed_host_members,
         );
+    }
+}
+
+const CHART_MESSAGE_TYPE: u32 = 5_021;
+const REFERENCE_LINE_NON_STYLES_MAP: u32 = 1;
+const REFERENCE_LINE_STYLES_MAP: u32 = 2;
+const REFERENCE_LINE_AXIS_ITEMS: u32 = 2;
+const REFERENCE_LINE_AXIS_STYLES: u32 = 2;
+const REFERENCE_LINE_STYLE_ENTRIES: u32 = 2;
+const REFERENCE_LINE_NON_STYLE: u32 = 1;
+const REFERENCE_LINE_ITEM_UUID: u32 = 2;
+const REFERENCE_LINE_STYLE_REFERENCE: u32 = 2;
+const REFERENCE_LINE_IDENTIFIER: u32 = 1;
+const REFERENCE_LINE_UUID_UPPER: u32 = 2;
+
+fn compare_archive_references(
+    source: Option<&Object>,
+    host_archive_info: &ArchiveInfo,
+    leaf_archive_info: &ArchiveInfo,
+    host: &Object,
+    leaf: &Object,
+    reference_policy: ReferenceOrderPolicy,
+) -> Result<Vec<String>, String> {
+    let references = |info: &ArchiveInfo| {
+        info.message_infos
+            .iter()
+            .map(|message| {
+                (
+                    message.type_,
+                    message.object_references.clone(),
+                    message.data_references.clone(),
+                )
+            })
+            .collect::<Vec<_>>()
+    };
+    if host_archive_info.message_infos.len() != leaf_archive_info.message_infos.len() {
+        return Err(format!(
+            "message types or object/data references differ (host {:?}, leaf {:?})",
+            references(host_archive_info),
+            references(leaf_archive_info)
+        ));
+    }
+    if host.messages.len() != leaf.messages.len() {
+        return Err(format!(
+            "message types or object/data references differ (host {:?}, leaf {:?})",
+            references(host_archive_info),
+            references(leaf_archive_info)
+        ));
+    }
+
+    let mut notes = Vec::new();
+    for (position, ((host_message_info, leaf_message_info), (host_message, leaf_message))) in
+        host_archive_info
+            .message_infos
+            .iter()
+            .zip(&leaf_archive_info.message_infos)
+            .zip(host.messages.iter().zip(&leaf.messages))
+            .enumerate()
+    {
+        if host_message_info.type_ != leaf_message_info.type_
+            || host_message_info.data_references != leaf_message_info.data_references
+        {
+            return Err(format!(
+                "message types or object/data references differ (host {:?}, leaf {:?})",
+                references(host_archive_info),
+                references(leaf_archive_info)
+            ));
+        }
+        let selected_reference_line_chart = host.identifier == leaf.identifier
+            && reference_line_policy_selected(reference_policy, host.identifier);
+        if host_message_info.type_ == CHART_MESSAGE_TYPE && selected_reference_line_chart {
+            match compare_reference_line_metadata(
+                &host_message.data,
+                &host_message_info.object_references,
+                &leaf_message.data,
+                &leaf_message_info.object_references,
+            ) {
+                Ok(true) => notes.push(
+                    "chart reference-line-owned dependency references differ only in order; all unrelated references remain ordered and exact"
+                        .to_owned(),
+                ),
+                Ok(false) => {},
+                Err(reason) => {
+                    return Err(format!(
+                        "chart reference-line metadata references differ: {reason} (host {:?}, leaf {:?})",
+                        references(host_archive_info),
+                        references(leaf_archive_info)
+                    ));
+                },
+            }
+            let Some(source_message) = source
+                .and_then(|object| object.info.message_infos.get(position))
+                .filter(|message| message.type_ == CHART_MESSAGE_TYPE)
+                .and_then(|_| source.and_then(|object| object.messages.get(position)))
+            else {
+                return Err(
+                    "selected chart reference-line message is absent from the source snapshot"
+                        .to_owned(),
+                );
+            };
+            if let Err(reason) = compare_reference_line_payloads(
+                &source_message.data,
+                &host_message.data,
+                &leaf_message.data,
+            ) {
+                return Err(format!(
+                    "chart reference-line payload differs outside allocation UUIDs: {reason}"
+                ));
+            }
+        } else if host_message_info.object_references != leaf_message_info.object_references {
+            return Err(format!(
+                "message types or object/data references differ (host {:?}, leaf {:?})",
+                references(host_archive_info),
+                references(leaf_archive_info)
+            ));
+        }
+    }
+    Ok(notes)
+}
+
+fn compare_reference_line_metadata(
+    host_payload: &[u8],
+    host_references: &[u64],
+    leaf_payload: &[u8],
+    leaf_references: &[u64],
+) -> Result<bool, String> {
+    let host_owned = reference_line_object_ids(host_payload)?;
+    let leaf_owned = reference_line_object_ids(leaf_payload)?;
+    if host_owned != leaf_owned {
+        return Err(format!(
+            "extension-owned IDs differ (host {host_owned:?}, leaf {leaf_owned:?})"
+        ));
+    }
+    let (host_owned_refs, host_other_refs) =
+        split_reference_line_references(host_references, &host_owned, "host")?;
+    let (leaf_owned_refs, leaf_other_refs) =
+        split_reference_line_references(leaf_references, &leaf_owned, "leaf")?;
+    if host_other_refs != leaf_other_refs {
+        return Err(format!(
+            "unowned reference order or multiplicity differs (host {host_other_refs:?}, leaf {leaf_other_refs:?})"
+        ));
+    }
+    let mut host_owned_sorted = host_owned_refs.clone();
+    let mut leaf_owned_sorted = leaf_owned_refs.clone();
+    host_owned_sorted.sort_unstable();
+    leaf_owned_sorted.sort_unstable();
+    if host_owned_sorted != leaf_owned_sorted {
+        return Err(format!(
+            "owned reference membership or multiplicity differs (host {host_owned_refs:?}, leaf {leaf_owned_refs:?})"
+        ));
+    }
+    Ok(host_owned_refs != leaf_owned_refs)
+}
+
+fn compare_reference_line_payloads(source: &[u8], host: &[u8], leaf: &[u8]) -> Result<(), String> {
+    let source_uuids = reference_line_item_uuid_payloads(source)?;
+    validate_existing_reference_line_item_uuids(&source_uuids, host, "host")?;
+    validate_existing_reference_line_item_uuids(&source_uuids, leaf, "leaf")?;
+    let host = reference_line_payload_without_item_uuids(host, &source_uuids)?;
+    let leaf = reference_line_payload_without_item_uuids(leaf, &source_uuids)?;
+    if host == leaf {
+        return Ok(());
+    }
+    Err(format!(
+        "first difference at {:?}",
+        first_difference(&host, &leaf)
+    ))
+}
+
+fn reference_line_payload_without_item_uuids(
+    payload: &[u8],
+    source_uuids: &BTreeMap<u64, Vec<u8>>,
+) -> Result<Vec<u8>, String> {
+    use litchi_iwa_protos::chart_style_codec::{self as codec, Limits};
+
+    let Some(extension) = codec::reference_lines(payload, Limits::DEFAULT)
+        .map_err(|error| format!("chart reference-lines extension: {error}"))?
+    else {
+        return Ok(payload.to_vec());
+    };
+    let extension = litchi_iwa_common::wire::transform_length_delimited_fields_at_path(
+        extension,
+        &[REFERENCE_LINE_NON_STYLES_MAP, REFERENCE_LINE_AXIS_ITEMS],
+        |item| -> Result<Vec<u8>, litchi_iwa_common::Error> {
+            let reference = required_length_delimited(
+                item,
+                REFERENCE_LINE_NON_STYLE,
+                "reference-line non-style reference",
+            )
+            .map_err(litchi_iwa_common::Error::InvalidFormat)?;
+            let identifier = required_varint(
+                reference,
+                REFERENCE_LINE_IDENTIFIER,
+                "reference-line non-style identifier",
+            )
+            .map_err(litchi_iwa_common::Error::InvalidFormat)?;
+            if source_uuids.contains_key(&identifier) {
+                return Ok(item.to_vec());
+            }
+            litchi_iwa_common::wire::transform_length_delimited_fields_at_path(
+                item,
+                &[REFERENCE_LINE_ITEM_UUID],
+                |uuid| {
+                    let uuid = litchi_iwa_common::wire::patch_varint_field(
+                        uuid,
+                        REFERENCE_LINE_IDENTIFIER,
+                        true,
+                        Some(0),
+                    )?;
+                    litchi_iwa_common::wire::patch_varint_field(
+                        &uuid,
+                        REFERENCE_LINE_UUID_UPPER,
+                        true,
+                        Some(0),
+                    )
+                },
+            )
+        },
+    )
+    .map_err(|error| format!("reference-line item UUIDs: {error}"))?;
+    codec::rewrite_reference_lines(payload, Some(&extension), Limits::DEFAULT)
+        .map(|rewrite| rewrite.into_bytes().into_owned())
+        .map_err(|error| format!("chart reference-lines rewrite: {error}"))
+}
+
+fn validate_existing_reference_line_item_uuids(
+    source_uuids: &BTreeMap<u64, Vec<u8>>,
+    payload: &[u8],
+    side: &str,
+) -> Result<(), String> {
+    let output_uuids = reference_line_item_uuid_payloads(payload)?;
+    for (identifier, expected) in source_uuids {
+        let Some(actual) = output_uuids.get(identifier) else {
+            return Err(format!(
+                "{side} output is missing existing reference-line item UUID for object {identifier}"
+            ));
+        };
+        if actual != expected {
+            return Err(format!(
+                "{side} output changed existing reference-line item UUID for object {identifier}"
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn reference_line_item_uuid_payloads(payload: &[u8]) -> Result<BTreeMap<u64, Vec<u8>>, String> {
+    use litchi_iwa_common::wire::repeated_length_delimited_payloads;
+    use litchi_iwa_protos::chart_style_codec::{self as codec, Limits};
+
+    let extension = codec::reference_lines(payload, Limits::DEFAULT)
+        .map_err(|error| format!("chart reference-lines extension: {error}"))?;
+    let Some(extension) = extension else {
+        return Ok(BTreeMap::new());
+    };
+    let mut output = BTreeMap::new();
+    for axis in repeated_length_delimited_payloads(extension, REFERENCE_LINE_NON_STYLES_MAP)
+        .map_err(|error| format!("reference-line non-style map: {error}"))?
+    {
+        for item in repeated_length_delimited_payloads(axis, REFERENCE_LINE_AXIS_ITEMS)
+            .map_err(|error| format!("reference-line items: {error}"))?
+        {
+            let reference = required_length_delimited(
+                item,
+                REFERENCE_LINE_NON_STYLE,
+                "reference-line non-style reference",
+            )?;
+            let uuid = required_length_delimited(
+                item,
+                REFERENCE_LINE_ITEM_UUID,
+                "reference-line non-style UUID",
+            )?;
+            let identifier = required_varint(
+                reference,
+                REFERENCE_LINE_IDENTIFIER,
+                "reference-line non-style identifier",
+            )?;
+            required_varint(
+                uuid,
+                REFERENCE_LINE_IDENTIFIER,
+                "reference-line non-style UUID lower half",
+            )?;
+            required_varint(
+                uuid,
+                REFERENCE_LINE_UUID_UPPER,
+                "reference-line non-style UUID upper half",
+            )?;
+            if output.insert(identifier, uuid.to_vec()).is_some() {
+                return Err(format!(
+                    "extension-owned reference-line object ID {identifier} is repeated"
+                ));
+            }
+        }
+    }
+    Ok(output)
+}
+
+fn split_reference_line_references(
+    references: &[u64],
+    owned: &[u64],
+    side: &str,
+) -> Result<(Vec<u64>, Vec<u64>), String> {
+    for identifier in owned {
+        let count = references
+            .iter()
+            .filter(|candidate| *candidate == identifier)
+            .count();
+        if count != 1 {
+            return Err(format!(
+                "{side} metadata references owned line object {identifier} {count} times"
+            ));
+        }
+    }
+    let mut owned_references = Vec::new();
+    let mut other_references = Vec::new();
+    for identifier in references {
+        if owned.contains(identifier) {
+            owned_references.push(*identifier);
+        } else {
+            other_references.push(*identifier);
+        }
+    }
+    Ok((owned_references, other_references))
+}
+
+fn reference_line_object_ids(payload: &[u8]) -> Result<Vec<u64>, String> {
+    use litchi_iwa_common::wire::repeated_length_delimited_payloads;
+    use litchi_iwa_protos::chart_style_codec::{self as codec, Limits};
+
+    let extension = codec::reference_lines(payload, Limits::DEFAULT)
+        .map_err(|error| format!("chart reference-lines extension: {error}"))?;
+    let Some(extension) = extension else {
+        return Ok(Vec::new());
+    };
+    let mut identifiers = Vec::new();
+    for axis in repeated_length_delimited_payloads(extension, REFERENCE_LINE_NON_STYLES_MAP)
+        .map_err(|error| format!("reference-line non-style map: {error}"))?
+    {
+        for item in repeated_length_delimited_payloads(axis, REFERENCE_LINE_AXIS_ITEMS)
+            .map_err(|error| format!("reference-line items: {error}"))?
+        {
+            let reference = required_length_delimited(
+                item,
+                REFERENCE_LINE_NON_STYLE,
+                "reference-line non-style reference",
+            )?;
+            let uuid = required_length_delimited(
+                item,
+                REFERENCE_LINE_ITEM_UUID,
+                "reference-line non-style UUID",
+            )?;
+            identifiers.push(required_varint(
+                reference,
+                REFERENCE_LINE_IDENTIFIER,
+                "reference-line non-style identifier",
+            )?);
+            required_varint(
+                uuid,
+                REFERENCE_LINE_IDENTIFIER,
+                "reference-line non-style UUID lower half",
+            )?;
+            required_varint(
+                uuid,
+                REFERENCE_LINE_UUID_UPPER,
+                "reference-line non-style UUID upper half",
+            )?;
+        }
+    }
+    for axis in repeated_length_delimited_payloads(extension, REFERENCE_LINE_STYLES_MAP)
+        .map_err(|error| format!("reference-line style map: {error}"))?
+    {
+        let Some(sparse) =
+            optional_length_delimited(axis, REFERENCE_LINE_AXIS_STYLES, "reference-line styles")?
+        else {
+            continue;
+        };
+        for entry in repeated_length_delimited_payloads(sparse, REFERENCE_LINE_STYLE_ENTRIES)
+            .map_err(|error| format!("reference-line style entries: {error}"))?
+        {
+            let reference = required_length_delimited(
+                entry,
+                REFERENCE_LINE_STYLE_REFERENCE,
+                "reference-line style reference",
+            )?;
+            required_varint(
+                entry,
+                REFERENCE_LINE_IDENTIFIER,
+                "reference-line style index",
+            )?;
+            identifiers.push(required_varint(
+                reference,
+                REFERENCE_LINE_IDENTIFIER,
+                "reference-line style identifier",
+            )?);
+        }
+    }
+    let mut seen = BTreeSet::new();
+    for identifier in &identifiers {
+        if *identifier == 0 || !seen.insert(*identifier) {
+            return Err(format!(
+                "extension-owned reference-line object ID {identifier} is zero or repeated"
+            ));
+        }
+    }
+    Ok(identifiers)
+}
+
+fn optional_length_delimited<'a>(
+    data: &'a [u8],
+    field: u32,
+    label: &str,
+) -> Result<Option<&'a [u8]>, String> {
+    use litchi_iwa_common::wire::repeated_length_delimited_payloads;
+
+    let payloads = repeated_length_delimited_payloads(data, field)
+        .map_err(|error| format!("{label}: {error}"))?;
+    match payloads.as_slice() {
+        [] => Ok(None),
+        [payload] => Ok(Some(*payload)),
+        _ => Err(format!("{label} field {field} is repeated")),
+    }
+}
+
+fn required_length_delimited<'a>(
+    data: &'a [u8],
+    field: u32,
+    label: &str,
+) -> Result<&'a [u8], String> {
+    optional_length_delimited(data, field, label)?
+        .ok_or_else(|| format!("{label} field {field} is missing"))
+}
+
+fn required_varint(data: &[u8], field: u32, label: &str) -> Result<u64, String> {
+    use litchi_iwa_common::wire::repeated_varint_values;
+
+    let values =
+        repeated_varint_values(data, field).map_err(|error| format!("{label}: {error}"))?;
+    match values.as_slice() {
+        [value] => Ok(*value),
+        [] => Err(format!("{label} field {field} is missing")),
+        _ => Err(format!("{label} field {field} is repeated")),
     }
 }
 
@@ -458,6 +950,7 @@ fn compare_known(
     leaf: &Object,
     known: &KnownFields,
     policy: MetadataPolicy,
+    reference_policy: ReferenceOrderPolicy,
     diff: &mut Diff,
     excluded_object_ids: &BTreeSet<u64>,
     allowed_host_members: &[&str],
@@ -470,24 +963,11 @@ fn compare_known(
         ));
         return;
     }
-    let references = |info: &ArchiveInfo| {
-        info.message_infos
-            .iter()
-            .map(|m| {
-                (
-                    m.type_,
-                    m.object_references.clone(),
-                    m.data_references.clone(),
-                )
-            })
-            .collect::<Vec<_>>()
-    };
-    if references(&host.info) != references(&leaf.info) {
-        diff.violations.push(format!(
-            "{label}: message types or object/data references differ (host {:?}, leaf {:?})",
-            references(&host.info),
-            references(&leaf.info)
-        ));
+    match compare_archive_references(source, &host.info, &leaf.info, host, leaf, reference_policy) {
+        Ok(notes) => diff
+            .notes
+            .extend(notes.into_iter().map(|note| format!("{label}: {note}"))),
+        Err(detail) => diff.violations.push(format!("{label}: {detail}")),
     }
     for (position, (h, l)) in host.messages.iter().zip(&leaf.messages).enumerate() {
         if h.type_ != l.type_ {
@@ -570,6 +1050,26 @@ fn compare_known(
 }
 
 const PACKAGE_METADATA: u32 = 11_006;
+
+/// Reference-order rules that a parity case may opt into.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum ReferenceOrderPolicy {
+    /// Require every message reference list to match in source order.
+    #[default]
+    Exact,
+    /// For one selected chart's message 5021 only, permit the host's
+    /// reference-line-owned dependency IDs to be reordered while preserving
+    /// every other reference and its order.
+    ReferenceLineAllocation { chart_object_id: u64 },
+}
+
+fn reference_line_policy_selected(policy: ReferenceOrderPolicy, object_id: u64) -> bool {
+    matches!(
+        policy,
+        ReferenceOrderPolicy::ReferenceLineAllocation { chart_object_id }
+            if chart_object_id == object_id
+    )
+}
 
 /// Documented leaf metadata policies a case accepts. Each one normalises the
 /// compared metadata values for exactly the difference it names (after
@@ -846,4 +1346,237 @@ pub fn debug_diff(host: &str, leaf: &str) -> String {
         let _ = writeln!(text, "    + leaf {line}");
     }
     text
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn varint(mut value: u64) -> Vec<u8> {
+        let mut output = Vec::new();
+        loop {
+            let mut byte = (value & 0x7f) as u8;
+            value >>= 7;
+            if value != 0 {
+                byte |= 0x80;
+            }
+            output.push(byte);
+            if value == 0 {
+                return output;
+            }
+        }
+    }
+
+    fn varint_field(field: u32, value: u64) -> Vec<u8> {
+        let mut output = varint(u64::from(field) << 3);
+        output.extend(varint(value));
+        output
+    }
+
+    fn length_delimited(field: u32, payload: &[u8]) -> Vec<u8> {
+        let mut output = varint((u64::from(field) << 3) | 2);
+        output.extend(varint(payload.len() as u64));
+        output.extend_from_slice(payload);
+        output
+    }
+
+    fn chart_reference_line_payload(identifiers: &[u64]) -> Vec<u8> {
+        chart_reference_line_payload_with_uuid_unknown(identifiers, None)
+    }
+
+    fn chart_reference_line_payload_with_uuid_unknown(
+        identifiers: &[u64],
+        uuid_unknown: Option<(u64, u64)>,
+    ) -> Vec<u8> {
+        let mut axis_id = varint_field(1, 2);
+        axis_id.extend(varint_field(2, 0));
+        let mut axis = length_delimited(1, &axis_id);
+        for identifier in identifiers {
+            let reference = varint_field(1, *identifier);
+            let mut uuid = varint_field(1, *identifier);
+            uuid.extend(varint_field(2, identifier.saturating_add(100)));
+            if let Some((unknown_identifier, unknown_value)) = uuid_unknown
+                && unknown_identifier == *identifier
+            {
+                uuid.extend(varint_field(12_345, unknown_value));
+            }
+            let mut item = length_delimited(1, &reference);
+            item.extend(length_delimited(2, &uuid));
+            axis.extend(length_delimited(2, &item));
+        }
+        let extension = length_delimited(1, &axis);
+        let chart = length_delimited(10_005, &extension);
+        length_delimited(10_000, &chart)
+    }
+
+    #[test]
+    fn reference_line_policy_only_permits_owned_dependency_reordering() {
+        let payload = chart_reference_line_payload(&[11, 22]);
+        let reordered =
+            compare_reference_line_metadata(&payload, &[7, 11, 8, 22], &payload, &[7, 22, 8, 11])
+                .expect("owned references can reorder");
+        assert!(reordered);
+
+        let error =
+            compare_reference_line_metadata(&payload, &[7, 11, 8, 22], &payload, &[8, 22, 7, 11])
+                .expect_err("unrelated references cannot reorder");
+        assert!(error.contains("unowned reference order"), "{error}");
+    }
+
+    #[test]
+    fn reference_line_policy_is_opt_in_and_chart_bound() {
+        assert!(!reference_line_policy_selected(
+            ReferenceOrderPolicy::Exact,
+            42
+        ));
+        assert!(!reference_line_policy_selected(
+            ReferenceOrderPolicy::ReferenceLineAllocation { chart_object_id: 7 },
+            42
+        ));
+        assert!(reference_line_policy_selected(
+            ReferenceOrderPolicy::ReferenceLineAllocation {
+                chart_object_id: 42
+            },
+            42
+        ));
+    }
+
+    #[test]
+    fn reference_line_policy_preserves_unchanged_unknown_payload_bytes() {
+        let payload = chart_reference_line_payload(&[11, 22]);
+        let mut with_unknown = payload.clone();
+        litchi_iwa_common::wire::append_varint_field(&mut with_unknown, 12_345, 1)
+            .expect("unknown field is bounded");
+        assert!(compare_reference_line_payloads(&payload, &with_unknown, &with_unknown).is_ok());
+
+        let mut changed = payload.clone();
+        litchi_iwa_common::wire::append_varint_field(&mut changed, 12_345, 2)
+            .expect("unknown field is bounded");
+        assert!(compare_reference_line_payloads(&payload, &with_unknown, &changed).is_err());
+    }
+
+    #[test]
+    fn reference_line_policy_preserves_unknown_fields_in_new_item_uuids() {
+        let source = chart_reference_line_payload(&[11]);
+        let host = chart_reference_line_payload_with_uuid_unknown(&[11, 22], Some((22, 17)));
+        let same = chart_reference_line_payload_with_uuid_unknown(&[11, 22], Some((22, 17)));
+        let changed = chart_reference_line_payload_with_uuid_unknown(&[11, 22], Some((22, 18)));
+        assert!(compare_reference_line_payloads(&source, &host, &same).is_ok());
+        assert!(compare_reference_line_payloads(&source, &host, &changed).is_err());
+    }
+
+    #[test]
+    fn reference_line_policy_default_and_wrong_chart_reject_reordered_metadata() {
+        let payload = chart_reference_line_payload(&[11, 22]);
+        let host = synthetic_chart_object(42, &[7, 11, 8, 22], &payload);
+        let leaf = synthetic_chart_object(42, &[7, 22, 8, 11], &payload);
+
+        assert!(
+            compare_archive_references(
+                Some(&host),
+                &host.info,
+                &leaf.info,
+                &host,
+                &leaf,
+                ReferenceOrderPolicy::Exact,
+            )
+            .is_err()
+        );
+        assert!(
+            compare_archive_references(
+                Some(&host),
+                &host.info,
+                &leaf.info,
+                &host,
+                &leaf,
+                ReferenceOrderPolicy::ReferenceLineAllocation { chart_object_id: 7 },
+            )
+            .is_err()
+        );
+        assert!(
+            compare_archive_references(
+                Some(&host),
+                &host.info,
+                &leaf.info,
+                &host,
+                &leaf,
+                ReferenceOrderPolicy::ReferenceLineAllocation {
+                    chart_object_id: 42
+                },
+            )
+            .is_ok()
+        );
+    }
+
+    fn synthetic_chart_object(identifier: u64, references: &[u64], payload: &[u8]) -> Object {
+        let mut message_info = litchi_iwa_archive::iwa::MessageInfo::new(
+            CHART_MESSAGE_TYPE,
+            payload.len(),
+            litchi_iwa_archive::iwa::Limits::default(),
+        )
+        .expect("synthetic message metadata is bounded");
+        message_info.object_references = references.to_vec();
+        Object {
+            identifier,
+            info: ArchiveInfo {
+                identifier: Some(identifier),
+                message_infos: vec![message_info],
+                should_merge: None,
+            },
+            messages: vec![RawMessage {
+                type_: CHART_MESSAGE_TYPE,
+                data: payload.to_vec(),
+            }],
+            raw: Vec::new(),
+        }
+    }
+
+    #[test]
+    fn reference_line_policy_rejects_missing_duplicate_wrong_and_malformed_refs() {
+        let payload = chart_reference_line_payload(&[11, 22]);
+        let missing =
+            compare_reference_line_metadata(&payload, &[7, 11, 8, 22], &payload, &[7, 11, 8])
+                .expect_err("missing owned reference must fail");
+        assert!(
+            missing.contains("owned line object 22 0 times"),
+            "{missing}"
+        );
+
+        let duplicate = compare_reference_line_metadata(
+            &payload,
+            &[7, 11, 8, 22],
+            &payload,
+            &[7, 11, 11, 8, 22],
+        )
+        .expect_err("duplicate owned reference must fail");
+        assert!(
+            duplicate.contains("owned line object 11 2 times"),
+            "{duplicate}"
+        );
+
+        let wrong_payload = chart_reference_line_payload(&[11, 33]);
+        let wrong = compare_reference_line_metadata(
+            &payload,
+            &[7, 11, 8, 22],
+            &wrong_payload,
+            &[7, 11, 8, 33],
+        )
+        .expect_err("wrong extension-owned reference must fail");
+        assert!(wrong.contains("extension-owned IDs differ"), "{wrong}");
+
+        let duplicate_payload = chart_reference_line_payload(&[11, 11]);
+        let duplicate_payload_error = reference_line_object_ids(&duplicate_payload)
+            .expect_err("duplicate extension-owned ID must fail");
+        assert!(
+            duplicate_payload_error.contains("zero or repeated"),
+            "{duplicate_payload_error}"
+        );
+
+        let malformed =
+            reference_line_object_ids(&[0xff]).expect_err("malformed chart payload must fail");
+        assert!(
+            malformed.contains("chart reference-lines extension"),
+            "{malformed}"
+        );
+    }
 }

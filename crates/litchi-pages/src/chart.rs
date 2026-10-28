@@ -22,3 +22,20 @@ pub mod data {
 pub mod metadata {
     pub use crate::package::body_chart_metadata::{Error, LimitKind};
 }
+
+/// Exact-source visible title transactions of one rooted body chart:
+/// [`crate::Package::edit_body_chart_title`].
+pub mod title {
+    pub use crate::package::body_chart_text::{
+        Commit, Diagnostics, Edit, Error, LimitKind, Patch, Refusal,
+    };
+}
+
+/// Exact-source category/value axis-title transactions of one rooted body
+/// chart: [`crate::Package::edit_body_chart_axis_title`].
+pub mod axis_title {
+    pub use crate::package::body_chart_text::{
+        Commit, Diagnostics, Edit, Error, LimitKind, Patch, Refusal,
+    };
+    pub use litchi_iwa_common::chart::axis::Axis;
+}

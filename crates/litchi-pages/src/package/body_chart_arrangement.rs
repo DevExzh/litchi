@@ -29,7 +29,8 @@ use litchi_iwa_common::{
 };
 use litchi_iwa_core::{ArchiveObject, RawMessage, SnappyStream};
 use litchi_iwa_protos::{
-    chart_arrangement_codec as codec, pages_body_codec, pages_drawable_order_codec,
+    chart_arrangement_codec as codec, chart_style_codec, pages_body_codec,
+    pages_drawable_order_codec,
 };
 use thiserror::Error as ThisError;
 
@@ -734,6 +735,53 @@ impl ArrangementBudget {
             .and_then(|value| value.with_rewrite_work(self.limits.max_rewrite_work().min(work)))
             .and_then(|value| value.with_nesting(self.limits.max_nesting().min(self.max_nesting)))
             .map_err(map_wire_error)
+    }
+
+    /// Build chart-reference codec limits from the operation's residual wire
+    /// ledger. A global ownership proof must not use process-wide defaults.
+    pub(super) fn reference_codec_limits(
+        &self,
+        payload: &[u8],
+    ) -> Result<chart_style_codec::Limits, Error> {
+        let limits = self.residual_wire_limits()?;
+        chart_style_codec::Limits::DEFAULT
+            .with_max_bytes(
+                limits
+                    .max_input_bytes()
+                    .min(payload.len().max(1))
+                    .min(256 * 1024 * 1024),
+            )
+            .and_then(|value| value.with_max_fields(limits.max_fields().clamp(1, 16 * 1024 * 1024)))
+            .map_err(|_| Error::InvalidSource)
+    }
+
+    /// Admit work and temporary vector capacity before reference discovery
+    /// enters the codec.
+    pub(super) fn preflight_reference_scan(&self, payload: &[u8]) -> Result<(), Error> {
+        self.preflight_work(payload.len())?;
+        self.preflight_allocations(1)?;
+        self.preflight_retained(
+            payload
+                .len()
+                .checked_mul(size_of::<u64>())
+                .ok_or(Error::InvalidSource)?,
+        )
+    }
+
+    /// Charge a completed reference scan using the actual vector cardinality.
+    pub(super) fn charge_reference_scan(
+        &mut self,
+        payload: &[u8],
+        references: usize,
+    ) -> Result<(), Error> {
+        self.work(payload.len())?;
+        self.allocations(1)?;
+        self.retained(
+            references
+                .checked_mul(size_of::<u64>())
+                .ok_or(Error::InvalidSource)?,
+        )?;
+        self.references(references)
     }
 
     pub(super) fn residual_output_bytes(&self) -> Result<usize, Error> {

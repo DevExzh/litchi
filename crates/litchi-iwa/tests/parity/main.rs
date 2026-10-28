@@ -25,6 +25,8 @@
 mod archive_diff;
 mod chart_font_cases;
 mod chart_style_cases;
+mod chart_text_cases;
+mod chart_text_cost;
 mod cost_probes;
 mod formula_refresh_cases;
 mod harness;
@@ -68,6 +70,7 @@ mod numbers_lifecycle_cases;
 mod numbers_media_add_cases;
 mod numbers_media_cases;
 mod numbers_owner_allocation;
+mod numbers_shape_style_cases;
 mod numbers_text_box_cases;
 mod numbers_text_box_list_cases;
 mod numbers_text_box_named_style_cases;
