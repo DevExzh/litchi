@@ -921,6 +921,7 @@ fn ensure_empty_thread<P: TableLeaf>(
         .ok_or(Fault::Invalid)?
         .data
         .as_slice();
+    validate_clear_comment_storage_payload(source)?;
     let options = comment_codec::DecodeOptions::new(
         source.len().max(1),
         source.len().saturating_mul(4).max(1),
@@ -936,6 +937,20 @@ fn ensure_empty_thread<P: TableLeaf>(
         return Err(Fault::Dependency);
     }
     Ok(snapshot.author().map(|author| author.identifier()))
+}
+
+/// A clear deletes the complete storage object rather than rewriting one
+/// selected field.  Unknown top-level payload fields would therefore be
+/// silently lost; the text/reply routes may preserve such bytes, but this
+/// destructive route must refuse them before publication.
+fn validate_clear_comment_storage_payload(data: &[u8]) -> FaultResult<()> {
+    let view = WireView::parse(data, WireLimits::DEFAULT).map_err(map_wire_error)?;
+    for field in view.fields() {
+        if !matches!(field.number(), 1..=5) || field.wire_type() != 2 {
+            return Err(Fault::Dependency);
+        }
+    }
+    Ok(())
 }
 
 fn remove_generated_author_if_unshared<P: TableLeaf>(
