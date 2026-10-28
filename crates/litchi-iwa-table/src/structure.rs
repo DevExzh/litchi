@@ -41,13 +41,12 @@ pub trait TableLeaf: TableSource + Sized {
     ///
     /// # Errors
     ///
-    /// [`ReopenError`] when the candidate fails the leaf's strict ingress.
-    fn reopen_candidate(&self, candidate: Arc<[u8]>) -> Result<Self, ReopenError>;
+    /// [`Fault`] when the candidate fails the leaf's strict ingress.  Leaves
+    /// retain bounded resource failures (`Limit` and `Allocation`) so the
+    /// focused public transaction does not collapse a typed refusal into
+    /// generic verification failure.
+    fn reopen_candidate(&self, candidate: Arc<[u8]>) -> FaultResult<Self>;
 }
-
-/// A candidate failed the leaf's strict ingress.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct ReopenError;
 
 /// The root previews a changed structure makes stale.
 pub const ROOT_PREVIEWS: [&str; 3] = ["preview.jpg", "preview-micro.jpg", "preview-web.jpg"];
@@ -619,10 +618,7 @@ impl<'p, P: TableLeaf> Working<'p, P> {
             .reassemble_with_changes_to_bytes(&insertions, &edits, &deleted, self.catalog.limits())
             .map_err(|error| map_archive(&error))?;
         let bytes: Arc<[u8]> = output.into();
-        let candidate = self
-            .source
-            .reopen_candidate(Arc::clone(&bytes))
-            .map_err(|ReopenError| Fault::Verification)?;
+        let candidate = self.source.reopen_candidate(Arc::clone(&bytes))?;
         let inserted: Vec<&str> = registry
             .entry_insertions
             .iter()

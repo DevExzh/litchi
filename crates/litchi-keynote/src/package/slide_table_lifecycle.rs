@@ -35,7 +35,7 @@ use litchi_iwa_table::structure::{
 use thiserror::Error as ThisError;
 
 use super::structure::wire::{self, Fields, LENGTH_DELIMITED};
-use super::{Package, slide_table_core as core};
+use super::{Package, slide_table_core as core, slide_table_merges};
 use crate::SlideSelector;
 use crate::slide::table::TableSelector;
 
@@ -274,6 +274,62 @@ fn reopen_error(error: super::ReadError) -> Error {
     }
 }
 
+/// The table graph copier does not rewrite the merge owner's table identity.
+/// Refuse a merged source before cloning so a successful commit can never
+/// publish a copied table whose merge reader follows back to the source.
+fn reject_merged_duplicate(
+    source: &Package,
+    slide: SlideSelector<'_>,
+    table: TableSelector,
+) -> Result<(), Error> {
+    let regions = source
+        .slide_table_merges(slide, table)
+        .map_err(map_merge_error)?;
+    if regions.is_empty() {
+        Ok(())
+    } else {
+        Err(Error::Refused(Refusal::UnsupportedDependency))
+    }
+}
+
+fn map_merge_error(error: slide_table_merges::Error) -> Error {
+    match error {
+        slide_table_merges::Error::Refused(refusal) => match refusal {
+            slide_table_merges::Refusal::UnsupportedSource => {
+                Error::Refused(Refusal::UnsupportedSource)
+            },
+            slide_table_merges::Refusal::UnsupportedDependency
+            | slide_table_merges::Refusal::UnsupportedTopology => {
+                Error::Refused(Refusal::UnsupportedDependency)
+            },
+            slide_table_merges::Refusal::AmbiguousSelector => {
+                Error::Refused(Refusal::AmbiguousSelector)
+            },
+            slide_table_merges::Refusal::EmptySlideName
+            | slide_table_merges::Refusal::SlideNameNotFound
+            | slide_table_merges::Refusal::SlidePositionNotFound { .. }
+            | slide_table_merges::Refusal::TablePositionNotFound { .. } => {
+                Error::Refused(Refusal::TableNotFound)
+            },
+            slide_table_merges::Refusal::InvalidRegion => {
+                Error::Refused(Refusal::UnsupportedDependency)
+            },
+        },
+        slide_table_merges::Error::Limit {
+            observed, maximum, ..
+        } => Error::Limit {
+            kind: LimitKind::Selection,
+            observed,
+            maximum,
+        },
+        slide_table_merges::Error::Allocation { amount } => Error::Allocation { amount },
+        slide_table_merges::Error::InvalidSource | slide_table_merges::Error::PatchConflict => {
+            Error::InvalidSource
+        },
+        slide_table_merges::Error::Verification => Error::Verification,
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Action {
     Duplicate,
@@ -319,6 +375,9 @@ impl<'a> Edit<'a> {
         let mut budget = core::Budget::new(self.source).map_err(select_error)?;
         let target =
             core::select_table(self.source, slide, table, &mut budget).map_err(select_error)?;
+        if matches!(action, Action::Duplicate) {
+            reject_merged_duplicate(self.source, slide, table)?;
+        }
         self.staged = Some(Staged { action, target });
         Ok(self)
     }

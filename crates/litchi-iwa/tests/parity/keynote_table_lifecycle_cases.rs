@@ -14,7 +14,9 @@ use litchi_keynote::slide::drawable::{Geometry, Kind, NewTable};
 use litchi_keynote::slide::table::lock::State;
 use litchi_keynote::{Package, SlideSelector, TableSelector};
 
+use crate::archive_diff::{self, MetadataPolicy};
 use crate::harness::{Case, Evidence, Format, LeafRun, TestResult, Tier, fixture};
+use crate::known_fields::KnownFields;
 use crate::leaf_bytes;
 
 const DECKS: [&str; 3] = [
@@ -25,6 +27,75 @@ const DECKS: [&str; 3] = [
 
 /// The deck whose first table has a merged range.
 const MERGED: &str = "iwork/keynote/slide-table-read-native.key";
+
+// These are the host-only object islands recorded for the three tracked
+// removal fixtures. They are pinned evidence, not an allowance inferred from
+// whatever a new leaf output happens to delete.
+const TABLE_DISCOVERY_ORPHANS: &[u64] = &[
+    2_653_182, 2_653_183, 2_653_185, 2_653_186, 2_653_190, 2_653_193, 2_653_194, 2_653_195,
+    2_653_196, 2_653_197, 2_653_198, 2_653_199, 2_653_201, 2_653_202, 2_653_203, 2_653_204,
+    2_653_205, 2_653_289, 2_653_290, 2_653_291, 2_653_292, 2_653_293, 2_653_294, 2_653_295,
+    2_653_296, 2_653_297, 2_653_298, 2_653_299, 2_653_300, 2_653_469,
+];
+const READ_NATIVE_ORPHANS: &[u64] = &[
+    2_653_182, 2_653_183, 2_653_185, 2_653_186, 2_653_190, 2_653_193, 2_653_194, 2_653_195,
+    2_653_196, 2_653_197, 2_653_198, 2_653_199, 2_653_201, 2_653_202, 2_653_203, 2_653_204,
+    2_653_205, 2_653_289, 2_653_290, 2_653_291, 2_653_292, 2_653_293, 2_653_294, 2_653_295,
+    2_653_296, 2_653_297, 2_653_298, 2_653_299, 2_653_300, 2_653_469, 2_657_477, 2_657_484,
+];
+
+const TABLE_DISCOVERY_ORPHAN_MEMBERS: &[&str] = &[
+    "Index/Tables/DataList-2653290-2.iwa",
+    "Index/Tables/DataList-2653291-2.iwa",
+    "Index/Tables/DataList-2653292-2.iwa",
+    "Index/Tables/DataList-2653293-2.iwa",
+    "Index/Tables/DataList-2653294-2.iwa",
+    "Index/Tables/DataList-2653295-2.iwa",
+    "Index/Tables/DataList-2653296-2.iwa",
+    "Index/Tables/DataList-2653297-2.iwa",
+    "Index/Tables/DataList-2653298-2.iwa",
+    "Index/Tables/DataList-2653299-2.iwa",
+    "Index/Tables/DataList-2653300-2.iwa",
+    "Index/Tables/DataList-2653469-2.iwa",
+    "Index/Tables/HeaderStorageBucket-2653198-2.iwa",
+    "Index/Tables/HeaderStorageBucket-2653199-2.iwa",
+    "Index/Tables/Tile-2653289-2.iwa",
+];
+const READ_NATIVE_ORPHAN_MEMBERS: &[&str] = &[
+    "Index/Tables/DataList-2653164-2.iwa",
+    "Index/Tables/DataList-2653290-2.iwa",
+    "Index/Tables/DataList-2653291-2.iwa",
+    "Index/Tables/DataList-2653292-2.iwa",
+    "Index/Tables/DataList-2653293-2.iwa",
+    "Index/Tables/DataList-2653294-2.iwa",
+    "Index/Tables/DataList-2653295-2.iwa",
+    "Index/Tables/DataList-2653296-2.iwa",
+    "Index/Tables/DataList-2653297-2.iwa",
+    "Index/Tables/DataList-2653298-2.iwa",
+    "Index/Tables/DataList-2653299-2.iwa",
+    "Index/Tables/DataList-2653300-2.iwa",
+    "Index/Tables/DataList-2653469-2.iwa",
+    "Index/Tables/HeaderStorageBucket-2653198-2.iwa",
+    "Index/Tables/HeaderStorageBucket-2653199-2.iwa",
+    "Index/Tables/Tile-2653289-2.iwa",
+];
+
+fn expected_remove_orphans(path: &str) -> BTreeSet<u64> {
+    let ids = if path == "iwork/keynote/slide-table-read-native.key" {
+        READ_NATIVE_ORPHANS
+    } else {
+        TABLE_DISCOVERY_ORPHANS
+    };
+    ids.iter().copied().collect()
+}
+
+fn expected_remove_orphan_members(path: &str) -> &'static [&'static str] {
+    if path == "iwork/keynote/slide-table-read-native.key" {
+        READ_NATIVE_ORPHAN_MEMBERS
+    } else {
+        TABLE_DISCOVERY_ORPHAN_MEMBERS
+    }
+}
 
 /// A read's outcome, with the error reduced to its presence.
 fn outcome<T: std::fmt::Debug, E>(result: Result<T, E>) -> String {
@@ -214,6 +285,12 @@ fn leaf_lifecycle(
 fn keynote_slide_table_duplicate_parity() -> TestResult {
     for path in DECKS {
         let input = fixture(path)?;
+        if !Package::from_bytes(&input.bytes)?
+            .slide_table_merges(SlideSelector::index(0), TableSelector::index(0))?
+            .is_empty()
+        {
+            continue;
+        }
         Case::new(
             "keynote_slide_table_duplicate_parity",
             Format::Keynote,
@@ -310,6 +387,11 @@ fn keynote_slide_table_remove_divergence_is_reported() -> TestResult {
             .copied()
             .collect::<BTreeSet<_>>();
         assert!(!orphans.is_empty(), "{path}: the host keeps no orphan");
+        assert_eq!(
+            orphans,
+            expected_remove_orphans(path),
+            "{path}: host-only island changed; update the fixture evidence and closure proof"
+        );
         for (identifier, (component, types, references)) in &host_objects {
             if orphans.contains(identifier) {
                 continue;
@@ -318,10 +400,14 @@ fn keynote_slide_table_remove_divergence_is_reported() -> TestResult {
                 references.iter().all(|target| !orphans.contains(target)),
                 "{path}: kept object {identifier} references an orphan"
             );
-            let (leaf_component, leaf_types, _) = leaf_objects
+            let (leaf_component, leaf_types, leaf_references) = leaf_objects
                 .get(identifier)
                 .ok_or("a host object is missing from the leaf")?;
-            assert_eq!((component, types), (leaf_component, leaf_types));
+            assert_eq!(
+                (component, types, references),
+                (leaf_component, leaf_types, leaf_references),
+                "{path}: surviving object {identifier} metadata/references"
+            );
         }
         assert!(
             leaf_objects
@@ -337,11 +423,55 @@ fn keynote_slide_table_remove_divergence_is_reported() -> TestResult {
         }
         // The summary model (TST.SummaryModelArchive) is among them.
         assert!(island.contains_key(&6_316), "{path}: {island:?}");
-        assert_eq!(tables_agree(&host)?, tables_agree(&leaf)?);
-        eprintln!(
-            "{path}: the host keeps {} orphaned objects, by message type {island:?}",
-            orphans.len()
+        let diff = archive_diff::compare_with_policies_except_objects_and_members(
+            &input,
+            &host,
+            &leaf,
+            &KnownFields::for_format(Format::Keynote),
+            &["preview.jpg", "preview-micro.jpg", "preview-web.jpg"],
+            MetadataPolicy {
+                save_token: true,
+                fresh_uuids: true,
+            },
+            &expected_remove_orphans(path),
+            expected_remove_orphan_members(path),
+        )?;
+        assert!(
+            diff.violations.is_empty(),
+            "{path}: surviving known fields, references, or untouched bytes differ\n{}",
+            diff.render()
         );
+        assert_eq!(tables_agree(&host)?, tables_agree(&leaf)?);
+        if path == DECKS[0] {
+            // Negative control: removing an unrelated surviving text box must
+            // not disappear behind the first table's pinned orphan allowance.
+            let package = Package::from_bytes(&leaf)?;
+            let drawables = package.slide_drawable_list(SlideSelector::index(0))?;
+            let text_box = drawables
+                .into_iter()
+                .find(|drawable| drawable.kind() != Kind::Table)
+                .ok_or("table-discovery fixture has no surviving text box")?;
+            let mut edit = package.edit_slide_drawables();
+            edit.remove(SlideSelector::index(0), text_box.selector())?;
+            let altered_leaf = leaf_bytes!(edit.commit()?.package());
+            let negative = archive_diff::compare_with_policies_except_objects_and_members(
+                &input,
+                &host,
+                &altered_leaf,
+                &KnownFields::for_format(Format::Keynote),
+                &["preview.jpg", "preview-micro.jpg", "preview-web.jpg"],
+                MetadataPolicy {
+                    save_token: true,
+                    fresh_uuids: true,
+                },
+                &expected_remove_orphans(path),
+                expected_remove_orphan_members(path),
+            )?;
+            assert!(
+                !negative.violations.is_empty(),
+                "{path}: fixed orphan allowance masked an unrelated survivor removal"
+            );
+        }
     }
     Ok(())
 }
@@ -385,10 +515,10 @@ fn keynote_slide_table_add_divergence_is_reported() -> TestResult {
     Ok(())
 }
 
-/// Pinned shared defect (record 0372): the host's table-graph copy, and the
-/// shared engine lifted from it, copy the model's merge owner verbatim, so a
-/// copied table's merges still name the source table and neither reader
-/// accepts them. The source table keeps its merge.
+/// Pinned host defect (record 0372): the host's table-graph copy copies the
+/// model's merge owner verbatim, so the copied table's merge still names the
+/// source table. The leaf refuses this dependency before clone; a successful
+/// leaf commit must never publish a table that neither merge reader accepts.
 #[test]
 fn keynote_slide_table_duplicate_merge_owner_divergence_is_reported() -> TestResult {
     let input = fixture(MERGED)?.bytes;
@@ -396,40 +526,42 @@ fn keynote_slide_table_duplicate_merge_owner_divergence_is_reported() -> TestRes
     let table = first_table(&editor)?;
     editor.duplicate_slide_table(0, table)?;
     let host = editor.to_bytes()?;
-    let leaf = leaf_bytes!(
-        Package::from_bytes(&input)?
-            .edit_slide_table_lifecycle()
-            .duplicate(SlideSelector::index(0), TableSelector::index(0))?
-            .commit()?
-            .package()
+    let editor = keynote::Draft::from_bytes(&host)?;
+    let package = Package::from_bytes(&host)?;
+    let tables = editor.slide_tables(0)?;
+    assert_eq!(tables.len(), 2);
+    assert_eq!(
+        editor
+            .slide_table_cell_merges(0, tables[0].model_object_id)?
+            .len(),
+        1
     );
-    for output in [host, leaf] {
-        let editor = keynote::Draft::from_bytes(&output)?;
-        let package = Package::from_bytes(&output)?;
-        let tables = editor.slide_tables(0)?;
-        assert_eq!(tables.len(), 2);
-        assert_eq!(
-            editor
-                .slide_table_cell_merges(0, tables[0].model_object_id)?
-                .len(),
-            1
-        );
-        assert_eq!(
-            package
-                .slide_table_merges(SlideSelector::index(0), TableSelector::index(0))?
-                .len(),
-            1
-        );
-        assert!(
-            editor
-                .slide_table_cell_merges(0, tables[1].model_object_id)
-                .is_err()
-        );
-        assert!(
-            package
-                .slide_table_merges(SlideSelector::index(0), TableSelector::index(1))
-                .is_err()
-        );
-    }
+    assert_eq!(
+        package
+            .slide_table_merges(SlideSelector::index(0), TableSelector::index(0))?
+            .len(),
+        1
+    );
+    assert!(
+        editor
+            .slide_table_cell_merges(0, tables[1].model_object_id)
+            .is_err()
+    );
+    assert!(
+        package
+            .slide_table_merges(SlideSelector::index(0), TableSelector::index(1))
+            .is_err()
+    );
+
+    let error = Package::from_bytes(&input)?
+        .edit_slide_table_lifecycle()
+        .duplicate(SlideSelector::index(0), TableSelector::index(0))
+        .expect_err("merged-table duplication must refuse before clone");
+    assert!(matches!(
+        error,
+        litchi_keynote::slide::table::lifecycle::Error::Refused(
+            litchi_keynote::slide::table::lifecycle::Refusal::UnsupportedDependency
+        )
+    ));
     Ok(())
 }

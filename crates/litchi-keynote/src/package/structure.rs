@@ -17,6 +17,7 @@ use std::sync::Arc;
 
 use litchi_iwa_archive::package::{EntryEdit, EntryInsertion};
 use litchi_iwa_core::{Archive, Limits as ArchiveLimits};
+use litchi_iwa_table::structure::{Fault, FaultLimit, FaultResult};
 
 use super::{Package, PhysicalSource};
 
@@ -287,12 +288,50 @@ impl Package {
 /// The shared table structure set (`litchi-iwa-table`, record 0379)
 /// reopens its candidates as structural candidates of this package.
 impl litchi_iwa_table::structure::TableLeaf for Package {
-    fn reopen_candidate(
-        &self,
-        candidate: Arc<[u8]>,
-    ) -> Result<Self, litchi_iwa_table::structure::ReopenError> {
+    fn reopen_candidate(&self, candidate: Arc<[u8]>) -> FaultResult<Self> {
         self.structure_reopen_shared(candidate)
-            .map_err(|_error| litchi_iwa_table::structure::ReopenError)
+            .map_err(reopen_fault)
+    }
+}
+
+/// Preserve bounded candidate-ingress failures at the shared structural
+/// boundary. Candidate shape and format failures remain verification failures;
+/// resource failures retain their typed limit or allocation classification.
+fn reopen_fault(error: super::ReadError) -> Fault {
+    match error {
+        super::ReadError::SemanticLimit {
+            kind,
+            observed,
+            maximum,
+            ..
+        } => Fault::Limit {
+            kind: match kind {
+                super::SemanticLimitKind::Objects => FaultLimit::Identifiers,
+                _ => FaultLimit::PayloadBytes,
+            },
+            observed: observed as u64,
+            maximum: maximum as u64,
+        },
+        super::ReadError::PayloadLimit {
+            observed, maximum, ..
+        } => Fault::Limit {
+            kind: FaultLimit::PayloadBytes,
+            observed: observed as u64,
+            maximum: maximum as u64,
+        },
+        super::ReadError::Allocation { amount, .. } => Fault::Allocation { amount },
+        super::ReadError::Archive(error) => match error {
+            litchi_iwa_archive::Error::Limit {
+                observed, maximum, ..
+            } => Fault::Limit {
+                kind: FaultLimit::PackageBytes,
+                observed,
+                maximum,
+            },
+            litchi_iwa_archive::Error::Allocation { amount, .. } => Fault::Allocation { amount },
+            _ => Fault::Verification,
+        },
+        _ => Fault::Verification,
     }
 }
 
