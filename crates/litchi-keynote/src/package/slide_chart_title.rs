@@ -33,7 +33,7 @@ use litchi_iwa_core::{
     Archive, ArchiveObject, ArchiveReferenceKind, ArchiveReferenceOccurrence,
     ArchiveReferenceScope, RawMessage, SnappyStream,
 };
-use litchi_iwa_style::chart_text::title::{
+use litchi_iwa_protos::keynote_chart_title_codec::{
     ChartTitleWrite, DecodeError as ChartTitleDecodeError, DecodeLimit as ChartTitleDecodeLimit,
     DecodeOptions, WireResourceLimit as ChartTitleWireResourceLimit, decode_visible_chart_title,
     rewrite_chart_title as rewrite_chart_title_payload,

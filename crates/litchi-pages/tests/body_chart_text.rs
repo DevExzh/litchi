@@ -1,6 +1,7 @@
 //! Focused selector and exact-no-op coverage for body-chart text facades.
 
-use litchi_pages::chart::{caption, title};
+use litchi_iwa_common::chart::axis::Axis;
+use litchi_pages::chart::title;
 use litchi_pages::{BodyChartSelector, Package};
 
 const NATIVE: &[u8] =
@@ -32,14 +33,38 @@ fn native_body_chart_title_reads_and_unstaged_edit_is_an_exact_noop() -> TestRes
 }
 
 #[test]
-fn body_chart_caption_keeps_unmatched_selector_typed() -> TestResult {
+fn body_chart_title_and_axis_title_mutations_are_reversible() -> TestResult {
     let package = Package::from_bytes(NATIVE)?;
-    let error = package
-        .body_chart_caption(BodyChartSelector::index(99))
-        .expect_err("unknown chart must be refused by the focused route");
-    assert!(matches!(
-        error,
-        caption::Error::Refused(caption::Refusal::ChartNotFound)
-    ));
+    let title = package
+        .edit_body_chart_title(BodyChartSelector::index(0))?
+        .set("Pages W1-E title")?
+        .commit()?;
+    assert_eq!(
+        title
+            .package()
+            .body_chart_title(BodyChartSelector::index(0))?,
+        Some("Pages W1-E title".to_owned())
+    );
+    let restored = title
+        .package()
+        .apply_body_chart_title(&title.patch().inverse())?;
+    assert_eq!(exact_bytes(restored.package())?, NATIVE);
+
+    for axis in [Axis::Category, Axis::Value] {
+        let commit = package
+            .edit_body_chart_axis_title(BodyChartSelector::index(0), axis)?
+            .set("Pages W1-E axis")?
+            .commit()?;
+        assert_eq!(
+            commit
+                .package()
+                .body_chart_axis_title(BodyChartSelector::index(0), axis)?,
+            Some("Pages W1-E axis".to_owned())
+        );
+        let restored = commit
+            .package()
+            .apply_body_chart_axis_title(&commit.patch().inverse())?;
+        assert_eq!(exact_bytes(restored.package())?, NATIVE);
+    }
     Ok(())
 }

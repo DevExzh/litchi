@@ -21,13 +21,13 @@ use litchi_core::Position;
 use litchi_iwa_archive::package::{EntryEdit, ExactArtifacts};
 use litchi_iwa_common::{WireLimits, encode_varint_into, varint::encoded_len, wire::WireField};
 use litchi_iwa_core::{Archive, RawMessage, SnappyStream};
-use litchi_iwa_protos::package_metadata_codec;
-use litchi_iwa_style::chart_text::axis_title::{
+use litchi_iwa_protos::keynote_chart_axis_title_codec::{
     AxisTitleKind, AxisTitleWrite, DecodeError as ChartAxisTitleDecodeError,
     DecodeLimit as ChartAxisTitleDecodeLimit, DecodeOptions, DecodeReport,
     RewriteExecutionRequirements, WireResourceLimit as ChartAxisTitleWireResourceLimit,
     decode_axis_titles_with_report, prepare_axis_title_rewrite,
 };
+use litchi_iwa_protos::package_metadata_codec;
 use thiserror::Error as ThisError;
 
 use super::chart_axis_support::{self, AxisSelection, AxisSupportBudget, AxisSupportError};

@@ -17,24 +17,14 @@ use std::sync::Arc;
 use litchi_core::Position;
 use litchi_iwa_archive::package::SharedBytes;
 use litchi_iwa_common::chart::axis::Axis;
-use litchi_iwa_common::wire::patch_length_delimited_field;
 use litchi_iwa_protos::chart_style_codec::{self as chart_codec, Archive as ChartArchive};
-use litchi_iwa_style::chart_text::{axis_title, title};
+use litchi_iwa_style::chart_text::{self, ChartTextKind};
 use thiserror::Error as ThisError;
 
 use super::Package;
 use super::body_chart_arrangement::{self as arrangement, ArrangementBudget, ChartTarget};
 use super::body_drawable_graph::{self as graph, Budget as GraphBudget, ObjectIndex};
 use crate::selector::BodyChartSelector;
-
-const GENERATED_EXTENSION_FIELD: u32 = 10_000;
-
-const fn codec_axis(axis: Axis) -> axis_title::AxisTitleKind {
-    match axis {
-        Axis::Category => axis_title::AxisTitleKind::Category,
-        Axis::Value => axis_title::AxisTitleKind::Value,
-    }
-}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub(super) enum Kind {
@@ -66,10 +56,22 @@ pub enum LimitKind {
     PayloadBytes,
     /// Generated-extension wire bytes.
     WireBytes,
+    /// Strict generated-extension fields visited.
+    WireFields,
+    /// Strict generated-extension nesting.
+    WireNesting,
+    /// Strict generated-extension work.
+    WireWork,
     /// Candidate package bytes.
     OutputBytes,
+    /// Selected title text bytes.
+    TextBytes,
     /// Bounded temporary allocations.
     Allocations,
+    /// Source and candidate bytes retained together.
+    RetainedBytes,
+    /// Candidate scratch bytes.
+    ScratchBytes,
 }
 
 impl fmt::Display for LimitKind {
@@ -77,8 +79,14 @@ impl fmt::Display for LimitKind {
         formatter.write_str(match self {
             Self::PayloadBytes => "payload bytes",
             Self::WireBytes => "wire bytes",
+            Self::WireFields => "wire fields",
+            Self::WireNesting => "wire nesting",
+            Self::WireWork => "wire work",
             Self::OutputBytes => "output bytes",
+            Self::TextBytes => "text bytes",
             Self::Allocations => "allocations",
+            Self::RetainedBytes => "retained bytes",
+            Self::ScratchBytes => "scratch bytes",
         })
     }
 }
@@ -225,91 +233,116 @@ fn owns_reference(info: &litchi_iwa_core::MessageInfo, identifier: u64, field: u
     fields == 1
 }
 
-fn extension(payload: &[u8]) -> Result<Option<&[u8]>, Error> {
-    let view =
-        litchi_iwa_common::wire::WireView::parse(payload, litchi_iwa_common::WireLimits::DEFAULT)
-            .map_err(|_| Error::InvalidSource)?;
-    let mut selected = None;
-    for field in view.fields() {
-        if field.number() != GENERATED_EXTENSION_FIELD {
-            continue;
-        }
-        if selected.is_some() || field.wire_type() != 2 {
-            return Err(Error::InvalidSource);
-        }
-        field
-            .validate_canonical_framing()
-            .map_err(|_| Error::InvalidSource)?;
-        selected = Some(field.payload());
-    }
-    Ok(selected)
-}
-
 fn read_payload(payload: &[u8], kind: Kind) -> Result<Option<Box<str>>, Error> {
-    let Some(extension) = extension(payload)? else {
-        return Ok(None);
-    };
-    match kind {
-        Kind::Title => {
-            title::decode_chart_title(extension, title::DecodeOptions::for_source(extension))
-                .map_err(|_| Error::InvalidSource)
-                .map(|snapshot| snapshot.visible_title().map(Into::into))
-        },
-        Kind::Axis(axis) => axis_title::decode_axis_title(
-            extension,
-            axis_title::DecodeOptions::for_source(extension),
-        )
-        .map_err(|_| Error::InvalidSource)
-        .map(|snapshot| snapshot.visible_title(codec_axis(axis)).map(Into::into)),
-    }
+    let (snapshot, _report) = chart_text::decode(
+        payload,
+        shared_kind(kind),
+        chart_text::Limits::for_source(payload),
+    )
+    .map_err(map_chart_text_error)?;
+    Ok(snapshot.text().map(Into::into))
 }
 
 fn rewrite_payload(payload: &[u8], kind: Kind, after: Option<&str>) -> Result<Vec<u8>, Error> {
-    let old = extension(payload)?;
-    let output = old
-        .map_or(0, |value| value.len())
-        .checked_add(after.map_or(0, str::len))
-        .and_then(|value| value.checked_add(64))
+    chart_text::rewrite(
+        payload,
+        shared_kind(kind),
+        after,
+        rewrite_limits(payload, after)?,
+    )
+    .map(|rewrite| rewrite.into_output())
+    .map_err(map_chart_text_error)
+}
+
+const fn shared_kind(kind: Kind) -> ChartTextKind {
+    match kind {
+        Kind::Title => ChartTextKind::Title,
+        Kind::Axis(axis) => ChartTextKind::Axis(axis),
+    }
+}
+
+fn rewrite_limits(payload: &[u8], after: Option<&str>) -> Result<chart_text::Limits, Error> {
+    let replacement = after.map_or(0, str::len);
+    let output = payload
+        .len()
+        .checked_add(replacement)
+        .and_then(|value| value.checked_add(96))
         .ok_or(Error::InvalidSource)?
         .max(1);
-    let rewritten = match kind {
-        Kind::Title => title::rewrite_chart_title(
-            old.unwrap_or_default(),
-            title::ChartTitleWrite::new(Some(after.is_some()), after),
-            title::DecodeOptions::new(
-                output,
-                output.saturating_mul(8),
-                output.saturating_mul(16),
-                8,
-            )
-            .with_max_output_bytes(output)
-            .with_max_title_bytes(output),
-        )
-        .map_err(|_| Error::InvalidSource)?,
-        Kind::Axis(axis) => axis_title::rewrite_axis_title(
-            old.unwrap_or_default(),
-            axis_title::AxisTitleWrite::preserve().with_title(codec_axis(axis), after),
-            axis_title::DecodeOptions::new(
-                output,
-                output.saturating_mul(8),
-                output.saturating_mul(16),
-                8,
-            )
-            .with_max_output_bytes(output)
-            .with_max_title_bytes(output)
-            .with_max_allocations(output)
-            .with_max_retained_bytes(output.saturating_mul(2))
-            .with_max_scratch_bytes(output),
-        )
-        .map_err(|_| Error::InvalidSource)?,
-    };
-    patch_length_delimited_field(
-        payload,
-        GENERATED_EXTENSION_FIELD,
-        old.is_some(),
-        Some(rewritten.as_slice()),
-    )
-    .map_err(|_| Error::InvalidSource)
+    let retained = payload
+        .len()
+        .checked_add(output)
+        .ok_or(Error::InvalidSource)?
+        .max(1);
+    let work = payload
+        .len()
+        .checked_mul(16)
+        .and_then(|value| value.checked_add(output))
+        .ok_or(Error::InvalidSource)?
+        .max(1);
+    Ok(chart_text::Limits::new(
+        payload.len().max(1),
+        payload.len().saturating_mul(8).max(1),
+        output,
+        8,
+        work,
+        output,
+        output,
+        retained,
+        output,
+    ))
+}
+
+fn map_chart_text_error(error: chart_text::Error) -> Error {
+    match error {
+        chart_text::Error::InvalidSource => Error::InvalidSource,
+        chart_text::Error::Allocation { amount } => Error::Allocation { amount },
+        chart_text::Error::Limit {
+            kind,
+            observed,
+            maximum,
+        } => Error::Limit {
+            kind: match kind {
+                chart_text::LimitKind::InputBytes => LimitKind::PayloadBytes,
+                chart_text::LimitKind::Fields => LimitKind::WireFields,
+                chart_text::LimitKind::OutputBytes => LimitKind::OutputBytes,
+                chart_text::LimitKind::Nesting => LimitKind::WireNesting,
+                chart_text::LimitKind::Work => LimitKind::WireWork,
+                chart_text::LimitKind::TextBytes => LimitKind::TextBytes,
+                chart_text::LimitKind::Allocations => LimitKind::Allocations,
+                chart_text::LimitKind::RetainedBytes => LimitKind::RetainedBytes,
+                chart_text::LimitKind::ScratchBytes => LimitKind::ScratchBytes,
+                _ => return Error::InvalidSource,
+            },
+            observed,
+            maximum,
+        },
+        _ => Error::InvalidSource,
+    }
+}
+
+fn map_chart_codec_error(error: chart_codec::Error) -> Error {
+    match error {
+        chart_codec::Error::Limit {
+            kind,
+            observed,
+            maximum,
+        } => Error::Limit {
+            kind: match kind {
+                chart_codec::LimitKind::Bytes => LimitKind::WireBytes,
+                chart_codec::LimitKind::Fields => LimitKind::WireFields,
+                _ => return Error::InvalidSource,
+            },
+            observed: count(observed),
+            maximum: count(maximum),
+        },
+        chart_codec::Error::Allocation { bytes } => Error::Allocation { amount: bytes },
+        _ => Error::InvalidSource,
+    }
+}
+
+fn count(value: usize) -> u64 {
+    u64::try_from(value).unwrap_or(u64::MAX)
 }
 
 fn map_arrangement_error(error: arrangement::Error) -> Error {
@@ -340,7 +373,7 @@ fn resolve(package: &Package, selector: BodyChartSelector, kind: Kind) -> Result
     let payload =
         arrangement::selected_chart_payload(package, &chart).map_err(map_arrangement_error)?;
     let references = chart_codec::references(payload, chart_codec::Limits::DEFAULT)
-        .map_err(|_| Error::InvalidSource)?;
+        .map_err(map_chart_codec_error)?;
     let identifier = match kind {
         Kind::Title => references.chart_non_style(),
         Kind::Axis(Axis::Category) => references.category_axis_non_styles().first().copied(),

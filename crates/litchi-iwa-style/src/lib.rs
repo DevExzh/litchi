@@ -9,8 +9,8 @@
 //!
 //! - [`chart_font`]: the chart-font graph engine (paragraph-style font
 //!   variations of a chart's text);
-//! - [`chart_text`]: the shared chart title, caption and axis-title wire
-//!   engines;
+//! - [`chart_text`]: the shared chart title and axis-title wire engine
+//!   (caption authoring remains a deferred host-only follow-up);
 //! - [`drawing`]: the stored drawing values (colors, strokes, fills) in both
 //!   directions;
 //! - [`media`]: the embedded-media inventory of a package;

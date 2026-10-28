@@ -18,14 +18,6 @@ pub mod data {
     };
 }
 
-/// Exact-source caption transactions of one rooted body chart:
-/// [`crate::Package::edit_body_chart_caption`].
-pub mod caption {
-    pub use crate::package::body_chart_caption::{
-        Commit, Diagnostics, Edit, Error, LimitKind, Patch, Refusal,
-    };
-}
-
 /// Typed failures of the body-chart metadata reader.
 pub mod metadata {
     pub use crate::package::body_chart_metadata::{Error, LimitKind};

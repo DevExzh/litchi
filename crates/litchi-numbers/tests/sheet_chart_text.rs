@@ -1,7 +1,7 @@
 //! Focused selector and exact-no-op coverage for sheet-chart text facades.
 
 use litchi_iwa_common::chart::axis::Axis;
-use litchi_numbers::sheet::chart::{axis_title, caption, title};
+use litchi_numbers::sheet::chart::{axis_title, title};
 use litchi_numbers::{ChartSelector, Package, SheetSelector};
 
 const NATIVE: &[u8] =
@@ -33,6 +33,45 @@ fn native_chart_title_reads_and_unstaged_edit_is_an_exact_noop() -> TestResult {
 }
 
 #[test]
+fn chart_title_and_axis_title_mutations_are_reversible() -> TestResult {
+    let package = Package::from_bytes(NATIVE)?;
+    let title = package
+        .edit_sheet_chart_title(SheetSelector::index(0), ChartSelector::index(0))?
+        .set("Numbers W1-E title")?
+        .commit()?;
+    assert_eq!(
+        title
+            .package()
+            .sheet_chart_title(SheetSelector::index(0), ChartSelector::index(0))?,
+        Some("Numbers W1-E title".to_owned())
+    );
+    let restored = title
+        .package()
+        .apply_sheet_chart_title(&title.patch().inverse())?;
+    assert_eq!(exact_bytes(restored.package())?, NATIVE);
+
+    for axis in [Axis::Category, Axis::Value] {
+        let commit = package
+            .edit_sheet_chart_axis_title(SheetSelector::index(0), ChartSelector::index(0), axis)?
+            .set("Numbers W1-E axis")?
+            .commit()?;
+        assert_eq!(
+            commit.package().sheet_chart_axis_title(
+                SheetSelector::index(0),
+                ChartSelector::index(0),
+                axis
+            )?,
+            Some("Numbers W1-E axis".to_owned())
+        );
+        let restored = commit
+            .package()
+            .apply_sheet_chart_axis_title(&commit.patch().inverse())?;
+        assert_eq!(exact_bytes(restored.package())?, NATIVE);
+    }
+    Ok(())
+}
+
+#[test]
 fn chart_text_facades_keep_selector_refusals_typed() -> TestResult {
     let package = Package::from_bytes(NATIVE)?;
     let title_error = package
@@ -55,12 +94,5 @@ fn chart_text_facades_keep_selector_refusals_typed() -> TestResult {
         axis_title::Error::Refused(axis_title::Refusal::ChartNotFound)
     ));
 
-    let caption_error = package
-        .sheet_chart_caption(SheetSelector::index(0), ChartSelector::index(99))
-        .expect_err("unknown chart must be refused by the focused caption route");
-    assert!(matches!(
-        caption_error,
-        caption::Error::Refused(caption::Refusal::ChartNotFound)
-    ));
     Ok(())
 }

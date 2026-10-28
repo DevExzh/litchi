@@ -22,8 +22,9 @@ use litchi_core::Position;
 use litchi_iwa_archive::package::ExactArtifacts;
 use litchi_iwa_common::wire::{patch_length_delimited_field, transform_length_delimited_field};
 use litchi_iwa_core::{Archive, ArchiveObject, RawMessage};
-use litchi_iwa_protos::pages_movie_caption_codec;
-use litchi_iwa_style::chart_text::caption_graph as graph_codec;
+use litchi_iwa_protos::{
+    keynote_chart_caption_graph_codec as graph_codec, pages_movie_caption_codec,
+};
 use thiserror::Error as ThisError;
 
 use super::Package;
@@ -667,7 +668,7 @@ fn drawable_width(
 
 /// The theme's document stylesheet and first caption paragraph-style
 /// preset, and the document language (the host's `image_caption_theme`).
-pub(crate) fn caption_theme(package: &Package) -> Result<(u64, u64, Option<String>), Error> {
+fn caption_theme(package: &Package) -> Result<(u64, u64, Option<String>), Error> {
     let mut budget = Budget::new(package)?;
     let (theme, language) = graph::root_theme(package, &mut budget)?;
     let index = ObjectIndex::new(package, &mut budget)?;

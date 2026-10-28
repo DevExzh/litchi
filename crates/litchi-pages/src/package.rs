@@ -6,7 +6,6 @@
 
 pub(crate) mod body_bookmarks;
 pub(crate) mod body_chart_arrangement;
-pub(crate) mod body_chart_caption;
 pub(crate) mod body_chart_data;
 pub(crate) mod body_chart_metadata;
 pub(crate) mod body_chart_text;

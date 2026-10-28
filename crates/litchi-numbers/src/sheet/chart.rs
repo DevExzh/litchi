@@ -40,14 +40,6 @@ pub mod axis_title {
     pub use litchi_iwa_common::chart::axis::Axis;
 }
 
-/// Exact-source visible caption transactions of a selected sheet chart:
-/// [`crate::Package::edit_sheet_chart_caption`].
-pub mod caption {
-    pub use crate::package::sheet_chart_caption::{
-        Commit, Diagnostics, Edit, Error, LimitKind, Patch, Refusal,
-    };
-}
-
 /// Exact-source axis-style properties of a chart's primary value or
 /// category axis: [`crate::Package::edit_sheet_chart_axis`].
 pub mod axis {
