@@ -432,6 +432,15 @@ fn numbers_table_cell_comment_cost_abba() -> TestResult {
     crate::pages_cost_probes::abba(
         &input,
         |source| host_route(source, Operation::Set),
-        |source| leaf_route(source, Operation::Set).map(|run| run.output),
+        |source| {
+            let package = Package::from_bytes(source)?;
+            let commit = package.set_table_cell_comment(
+                SheetSelector::index(0),
+                TableSelector::index(0),
+                position(),
+                "W1-G revised root",
+            )?;
+            Ok(leaf_bytes!(commit.package()))
+        },
     )
 }
