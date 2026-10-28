@@ -1050,8 +1050,8 @@ numbers/editor/semantic/workbook.rs	open	1	numbers	io	host-only	litchi-numbers	-
 numbers/editor/semantic/workbook.rs	package	1	numbers	io	host-only	litchi-numbers	-	-	-	-
 numbers/editor/semantic/workbook.rs	remove_table	1	numbers	table.lifecycle	migrated	litchi_numbers::Package::edit_table_lifecycle	numbers_table_remove_parity	B	-	-
 numbers/editor/semantic/workbook.rs	resize_table	1	numbers	table.lifecycle	migrated	litchi_numbers::Package::edit_table_resize	numbers_table_resize_parity	A	-	-
-numbers/editor/semantic/workbook.rs	set_formula	1	numbers	table.formula	host-only	litchi-numbers	-	-	-	-
-numbers/editor/semantic/workbook.rs	set_formula_with_cached_value	1	numbers	table.formula	host-only	litchi-numbers	-	-	-	-
+numbers/editor/semantic/workbook.rs	set_formula	1	numbers	table.formula	migrated	litchi_numbers::Package::edit_table_cells::Edit::set_formula	numbers_table_formula_author_parity,numbers_table_formula_author_graph_parity	B	-	host differential only; native-authored/open-save evidence is queued in 0363-mac-queue.md (record 0376c)
+numbers/editor/semantic/workbook.rs	set_formula_with_cached_value	1	numbers	table.formula	migrated	litchi_numbers::Package::edit_table_cells::Edit::set_formula_cached	numbers_table_formula_cached_parity,numbers_table_formula_author_graph_parity	B	-	host differential only; native-authored/open-save evidence is queued in 0363-mac-queue.md (record 0376c)
 numbers/editor/semantic/workbook.rs	sheets	1	numbers	sheet.lifecycle	migrated	litchi_numbers::Package::sheets	numbers_workbook_catalog_read_parity	A	-	-
 numbers/editor/semantic/workbook.rs	tables	1	numbers	table.lifecycle	migrated	litchi_numbers::Sheet::tables	numbers_workbook_catalog_read_parity	A	-	-
 numbers/editor/sheet_audio.rs	add_sheet_audio	1	numbers	drawable.audio	host-only	litchi-numbers	-	-	-	-
@@ -1348,8 +1348,8 @@ numbers/editor/topology_oracle.rs	__edit_table_topology_unverified	1	numbers	oth
 package.rs	apply	1	shared	io	host-only	litchi-iwa-archive::unstable (physical) / leaf Package	-	-	-	-
 package.rs	archive	1	shared	other	migrated	litchi_iwa_archive::unstable::cached_component	numbers_physical_access_parity	A	test-data/iwork/numbers/table-merges-native-receipt.json	host delegates (record 0363 D5, record 0367); read-only physical access, also checked on Pages and Keynote native fixtures
 package.rs	archive	2	shared	other	migrated	litchi_iwa_archive::unstable::cached_component	numbers_physical_access_parity	A	test-data/iwork/numbers/table-merges-native-receipt.json	host delegates (record 0363 D5, record 0367); read-only physical access, also checked on Pages and Keynote native fixtures
-package.rs	calculation_engine_entry_name	1	shared	other	host-only	litchi-iwa-archive / litchi-iwa-common (see record 0363 section 3)	-	-	-	-
-package.rs	calculation_engine_entry_name	2	shared	other	host-only	litchi-iwa-archive / litchi-iwa-common (see record 0363 section 3)	-	-	-	-
+package.rs	calculation_engine_entry_name	1	shared	other	retired	-	-	-	-	retired: host package-member lookup by entry name (Index/CalculationEngine*.iwa); the leaf has no member-name API (D5) and locates the TSCE.CalculationEngineArchive object (message type 4000) directly in its structural working set: litchi_iwa_table::structure::duplicate and litchi-numbers conditional_highlight::volatile refuse a second engine, and the litchi-keynote and litchi-pages formula publish select it by message type (record 0376c)
+package.rs	calculation_engine_entry_name	2	shared	other	retired	-	-	-	-	retired: host package-member lookup by entry name (Index/CalculationEngine*.iwa); the leaf has no member-name API (D5) and locates the TSCE.CalculationEngineArchive object (message type 4000) directly in its structural working set: litchi_iwa_table::structure::duplicate and litchi-numbers conditional_highlight::volatile refuse a second engine, and the litchi-keynote and litchi-pages formula publish select it by message type (record 0376c)
 package.rs	commit	1	shared	io	host-only	litchi-iwa-archive::unstable (physical) / leaf Package	-	-	-	-
 package.rs	contains_entry	1	shared	other	host-only	litchi-iwa-archive / litchi-iwa-common (see record 0363 section 3)	-	-	-	-
 package.rs	contains_entry	2	shared	other	host-only	litchi-iwa-archive / litchi-iwa-common (see record 0363 section 3)	-	-	-	-

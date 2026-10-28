@@ -17,6 +17,40 @@ use super::{
 };
 use crate::package::table_cells::{DependencyKind, Error, LimitKind, Path, Refusal};
 
+fn map_write_limit(kind: litchi_numbers_wire::LimitKind) -> LimitKind {
+    match kind {
+        litchi_numbers_wire::LimitKind::InputBytes | litchi_numbers_wire::LimitKind::TailBytes => {
+            LimitKind::WireBytes
+        },
+        litchi_numbers_wire::LimitKind::OutputBytes => LimitKind::OutputBytes,
+        litchi_numbers_wire::LimitKind::Fields => LimitKind::WireFields,
+        litchi_numbers_wire::LimitKind::Items => LimitKind::RetainedElements,
+        _ => LimitKind::WireWork,
+    }
+}
+
+fn map_write_error(error: table_write::WriteError, path: Path, refused: Error) -> Error {
+    match error {
+        table_write::WriteError::Invalid => Error::InvalidSource { path },
+        table_write::WriteError::Unsupported => refused,
+        table_write::WriteError::LimitExceeded {
+            kind,
+            observed,
+            maximum,
+        } => Error::Limit {
+            kind: map_write_limit(kind),
+            observed: usize_u64(observed),
+            maximum: usize_u64(maximum),
+            path,
+        },
+        table_write::WriteError::Allocation { requested } => Error::Allocation {
+            kind: LimitKind::RetainedBytes,
+            amount: requested,
+        },
+        _ => Error::InvalidSource { path },
+    }
+}
+
 /// Per-column cell-count deltas, sorted by column, in storage reserved up
 /// front.
 #[derive(Debug, Default)]
@@ -122,16 +156,65 @@ impl Deltas {
             .with_input_bytes(bucket.len().max(1))
             .and_then(|limits| limits.with_output_bytes(bound.max(1)))
             .map_err(|_error| Error::InvalidSource { path })?;
-        let output = table_write::header_adjust_many(bucket, &self.0, &limits).map_err(
-            |error| match error {
-                table_write::WriteError::Unsupported => refused,
-                table_write::WriteError::Allocation { requested } => Error::Allocation {
-                    kind: LimitKind::RetainedBytes,
-                    amount: requested,
-                },
-                _ => Error::InvalidSource { path },
-            },
-        )?;
+        let output = table_write::header_adjust_many(bucket, &self.0, &limits)
+            .map_err(|error| map_write_error(error, path, refused))?;
         Ok((output != bucket).then_some(output))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{DependencyKind, Error, LimitKind, Path, Refusal, map_write_error};
+
+    fn path() -> Path {
+        Path::Table { sheet: 0, table: 0 }
+    }
+
+    fn refused(path: Path) -> Error {
+        Error::Refused(Refusal::UnsupportedDependency {
+            path,
+            kind: DependencyKind::CellStorage,
+        })
+    }
+
+    #[test]
+    fn bounded_header_errors_keep_their_public_categories() {
+        let path = path();
+        assert!(matches!(
+            map_write_error(
+                litchi_numbers_wire::table_write::WriteError::Invalid,
+                path,
+                refused(path),
+            ),
+            Error::InvalidSource { path: actual } if actual == path
+        ));
+        assert!(matches!(
+            map_write_error(
+                litchi_numbers_wire::table_write::WriteError::LimitExceeded {
+                    kind: litchi_numbers_wire::LimitKind::Fields,
+                    observed: 9,
+                    maximum: 8,
+                },
+                path,
+                refused(path),
+            ),
+            Error::Limit {
+                kind: LimitKind::WireFields,
+                observed: 9,
+                maximum: 8,
+                path: actual,
+            } if actual == path
+        ));
+        assert!(matches!(
+            map_write_error(
+                litchi_numbers_wire::table_write::WriteError::Allocation { requested: 64 },
+                path,
+                refused(path),
+            ),
+            Error::Allocation {
+                kind: LimitKind::RetainedBytes,
+                amount: 64,
+            }
+        ));
     }
 }
