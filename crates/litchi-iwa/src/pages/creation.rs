@@ -1432,7 +1432,6 @@ fn install_initial_table_graph(
         .table_dimensions(table.rows, table.columns)
         .language(language)
         .locale(locale)
-        .without_owner_extents()
         .build_package()?;
 
     let mut document_objects = source.archive(DOCUMENT_ARCHIVE_ENTRY)?.objects;
