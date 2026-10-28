@@ -383,6 +383,7 @@ fn keynote_slide_table_cell_format_read_parity() -> TestResult {
             leaf_read(bytes, at)
         })
         .run()?;
+        assert_eq!(host_read(&formatted.bytes, at)?, format);
         assert_eq!(leaf_read(&formatted.bytes, at)?, format);
     }
     Ok(())
@@ -469,6 +470,7 @@ fn keynote_slide_table_cell_numeral_system_format_read_parity() -> TestResult {
         })
         .read("leaf cell format", move |bytes| leaf_read(bytes, at))
         .run()?;
+        assert_eq!(host_read(&formatted.bytes, at)?, format);
         assert_eq!(leaf_read(&formatted.bytes, at)?, format);
         assert!(leaf_set(&input.bytes, at, &format).is_err());
     }

@@ -6741,3 +6741,25 @@ See [0063](0063-source-pptx-modern-comments.md).
 - Ledger totals remain 1,146 migrated, 40 retired and 1,042 host-only. The 451
   pending native routes continue to block W3; no host deletion is authorized
   by these branch or instruction-count results.
+
+- The full 53-row run on frozen `39e4bf101c` completed with 52 passing rows
+  and one failure in row 33: Pages reference-line allocation parity compared
+  the legacy host's randomized dependency-reference order as an exact list.
+  The complete unchanged-source receipt and failed log remain external under
+  `.coord/resume-20261028/full-39e4bf101c/`. This candidate is not full-gate
+  green. Its 19 iWork instruction routes and 14 FIN instruction legs passed;
+  those measurements remain bound to that source and do not qualify later
+  integration. Quiet wall/CLI measurements have not been run.
+- Accepted the direct cell-format reader proof at `2c0cca02f7` (code
+  `70538aede2`, record 0370k). Four Pages/Keynote generic and numeral-system
+  read cases now compare both readers with the expected value on the same
+  host-authored input. Existing exact-byte roundtrips and terminal refusals
+  remain checked. Four focused read tests, formatting and strict Clippy pass.
+  No production behavior, ledger row, native claim or cost receipt changed.
+- The next candidate will include the separately reviewed chart-ordering
+  harness repair and accepted chart-text, Numbers drawable-style, leaf-test
+  relocation and cached-formula dispatch slices. Owners must synchronize
+  each package with current trunk before integration. Final qualification
+  will rerun all 53 rows and the expanded performance matrix on one source.
+  W1-G comments remain outside this candidate while resource/admission,
+  oracle and metadata-preservation findings and performance are resolved.
