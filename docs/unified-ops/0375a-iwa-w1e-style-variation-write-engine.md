@@ -41,6 +41,11 @@
 | `3b9b92ac03` | `litchi-keynote` | after the trunk merge: W1-C's media-asset reads use `litchi_iwa_style::media` (edge `litchi-keynote -> litchi-iwa-style`); keynote and litchi fuzz locks |
 | `7f08c1f2f0` | style | the shape-style **plan API** for the leaves; multi-slot `ShapeProperty`; `Shadows`, `ShapeEffects`, `TextLayout`, `TextColumns`; edge `litchi-iwa-style -> litchi-iwa-text` |
 | `fae0aa7ee5` | tests | 16 more shape cases (28), two mac-queue rows |
+| `eb53437e0b` | docs | this record (slices 4-5) |
+| `b8c3fa430b`, `f6b2181b0f`, `958b79321b` | protos, style, tests | `chart_style_codec::{reference_lines, rewrite_reference_lines}`; `reference_line` graph engine; 8 cases; ledger `charts/archive.rs` reference_lines migrated, decode/encode/new retired; one mac-queue row |
+| `5d0bf085a4`, `4013918ab7`, `dc7a9d1602` | text-wire, style, tests | `paragraph_style::{FontOverrides, font_overrides, font_variation}` (small W1-D hunk); `chart_font` graph engine (edge `litchi-iwa-style -> litchi-iwa-text-wire`); 6 cases; ledger `charts/font.rs` ×2 migrated; two mac-queue rows |
+| `7ee3a24297`, `6fc57851f1` | style, tests | `number_format` dual-formatter codec; `ValueLabelAffixes`, `ValueLabelNumberFormats`; 6 cases; one mac-queue row |
+| `f35f76a03f` | tests | reference-line and chart-font cost probes |
 | this commit | docs | this record |
 
 ## 2. The engine
@@ -135,6 +140,24 @@ flag and its payload together): `Fills`, `Strokes`, `Shadows`,
 and media) and line endpoints (written with the line geometry) use the plan
 layer with the families' values.
 
+### 2.4 Reference lines, chart font, number formats
+
+- `reference_line` ports the host's `set_chart_reference_lines`: the
+  primary value axis's `ReferenceLineNonStyleArchive` objects listed by the
+  chart's `reference_lines` extension (field 10005, read and rewritten
+  through `chart_style_codec::{reference_lines, rewrite_reference_lines}`).
+  Retained lines are patched, surplus lines removed, new ones allocated with
+  an item UUID; the extension keeps every other axis entry raw and trims the
+  primary axis's style entries to the new count.
+- `chart_font` ports the host's chart-font engine: each unique chart
+  paragraph style is replaced by a fresh font variation
+  (`litchi_iwa_text_wire::paragraph_style::font_variation`, a small W1-D
+  addition) or by its parent, the chart repointed, the variations registered
+  and the replaced font-only variations pruned.
+- `number_format` is the dual `TSK.FormatStructArchive` codec of chart axes
+  and value labels; `series::property::{ValueLabelAffixes,
+  ValueLabelNumberFormats}` use it.
+
 ## 3. Parity
 
 `crates/litchi-iwa/tests/parity/series_graph_cases.rs`: the host editors
@@ -156,6 +179,12 @@ host's read of the property on both outputs and strictly reopens both.
 | data-symbol and trendline allocation | three formats each | B |
 | error bars: patch, removal; allocation | Keynote, Numbers; Keynote, Numbers, Pages | A; B |
 | pie and value labels: patch, removal; allocation | Numbers, Keynote; three formats | A; B |
+
+Reference lines (`reference_line_cases.rs`): 5 Tier A (patch, removal),
+3 Tier B (allocation; the chart payload is compared byte for byte with the
+item UUIDs zeroed). Chart font (`chart_font_cases.rs`): 2 Tier A (resets),
+4 Tier B (variation allocations; fresh-UUID policy). Value-label affixes and
+number formats: 3 Tier A, 3 Tier B in `series_graph_cases.rs`.
 
 Shape styles (`shape_style_cases.rs`, a rectangle or text box the host
 added to `chart-data-native.*`): fills, strokes, text layout, text-box
@@ -187,6 +216,8 @@ admission (strict reopen), the host route its own reopen-and-verify.
 | `series_graph_write_cost_abba` (styled allocation, container allocation, container release) | 8,477,902,285 | 1,876,741,217 | −77.9% |
 | `series_graph_write_cost_abba`, extended with data symbols and a trendline | 15,083,360,713 | 3,164,011,104 | −79.0% |
 | `shape_style_write_cost_abba` (allocation, rewrite, collapse) | 2,647,457,057 | 1,547,306,775 | −41.6% |
+| `reference_line_write_cost_abba` (allocation, patch, removal) | 7,146,318,200 | 1,372,168,953 | −80.8% |
+| `chart_font_write_cost_abba` (font, size, reset) | 10,982,142,908 | 2,577,566,323 | −76.5% |
 
 ```sh
 CARGO_PROFILE_RELEASE_DEBUG=1 cargo test --release -p litchi-iwa --test parity --no-run
@@ -200,6 +231,4 @@ taskset -c 3 valgrind --tool=callgrind '--toggle-collect=*series_graph_cases::ho
 
 | Capability | Engine state | Next |
 |---|---|---|
-| value-label affixes and number formats | same engine (`Base::Styled`) | port the per-property patches |
 | line endpoints and image fills on shape styles | plan layer (`Slot::{HeadLineEnd, TailLineEnd, Fill}`) | the families supply the values, data references and media |
-| chart drawable codec and reference lines; chart font | 0375 §6 | coordinate with W1-C; values in `litchi_iwa_text` |

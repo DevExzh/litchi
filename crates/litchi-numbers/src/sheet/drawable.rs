@@ -49,6 +49,96 @@ pub mod properties {
     };
 }
 
+/// Exact-source Drop Cap transactions for the paragraphs of the text a
+/// sheet text box or shape owns: [`crate::Package::edit_sheet_drawable_drop_caps`].
+pub mod drop_cap {
+    pub use crate::package::sheet_drawable_drop_cap::{
+        Commit, Diagnostics, Edit, Error, LimitKind, Patch, Refusal,
+    };
+    pub use litchi_iwa_text::TextPosition;
+    pub use litchi_iwa_text::paragraph::drop_cap::{
+        CharacterCount, DropCap, LineCount, Outdent, Padding, RaisedLines, Wrap,
+    };
+}
+
+/// Exact-source named paragraph-style transactions for the text a sheet
+/// text box or shape owns: [`crate::Package::edit_sheet_text_box_named_styles`].
+pub mod named_style {
+    pub use crate::package::sheet_drawable_named_style::{
+        Commit, Diagnostics, Edit, Error, LimitKind, Patch, Refusal,
+    };
+    pub use litchi_iwa_text::paragraph::style::{
+        NamedParagraphStyle, ParagraphStyleId, ParagraphStyleName,
+    };
+}
+
+/// Exact-source transactions for the comment attached directly to a sheet
+/// drawable and its replies: [`crate::Package::edit_sheet_drawable_comment`].
+pub mod comment {
+    pub use crate::package::sheet_drawable_comment::{
+        Commit, Diagnostics, DrawableComment, Edit, Error, LimitKind, Patch, Refusal,
+    };
+}
+
+/// The embedded media assets of the document and its sheets, and
+/// exact-source replacement of their bytes: [`crate::Package::edit_media`].
+pub mod media {
+    pub use crate::package::sheet_media::{
+        Commit, Diagnostics, Edit, Error, LimitKind, Patch, Refusal,
+    };
+    pub use litchi_iwa_common::media::Type;
+    pub use litchi_iwa_common::media::embedded::{AssetId, Embedded};
+}
+
+/// Exact-source highlight, comment and reply transactions for the text a
+/// sheet text box or shape owns: [`crate::Package::edit_sheet_drawable_annotations`].
+pub mod annotation {
+    pub use crate::package::sheet_drawable_annotation::{
+        Comment, Commit, Diagnostics, Edit, Error, Highlight, LimitKind, Patch, Refusal,
+    };
+    pub use litchi_iwa_text::position::{TextPosition, TextRange};
+}
+
+/// Exact-source Date & Time field transactions for the text a sheet text
+/// box or shape owns: [`crate::Package::edit_sheet_drawable_date_time_fields`].
+pub mod date_time {
+    pub use crate::package::sheet_drawable_date_time::{
+        Commit, DateTimeField, Diagnostics, Edit, Error, LimitKind, Patch, Refusal,
+    };
+    pub use litchi_iwa_text::date_time::{
+        DisplayText, Format, FormatterStyle, Instant, LocaleIdentifier, Settings, UpdatePlan,
+    };
+    pub use litchi_iwa_text::position::{TextPosition, TextRange};
+}
+
+/// Exact-source hyperlink transactions for the text a sheet text box or
+/// shape owns: [`crate::Package::edit_sheet_drawable_hyperlinks`].
+pub mod hyperlink {
+    pub use crate::package::sheet_drawable_hyperlink::{
+        Commit, Diagnostics, Edit, Error, Hyperlink, LimitKind, Patch, Refusal,
+    };
+    pub use litchi_iwa_text::hyperlink::TextHyperlinkTarget;
+    pub use litchi_iwa_text::position::{TextPosition, TextRange};
+}
+
+/// Exact-source paragraph-list transactions for the text a sheet text box
+/// or shape owns: [`crate::Package::edit_sheet_text_box_lists`].
+pub mod list {
+    pub use crate::package::sheet_drawable_list::{
+        Commit, Diagnostics, Edit, Error, LimitKind, Patch, Refusal,
+    };
+    pub use litchi_iwa_text::TextPosition;
+    pub use litchi_iwa_text::paragraph::list::{
+        ParagraphList, ParagraphListBullet, ParagraphListBulletBaselineOffset,
+        ParagraphListBulletGeometry, ParagraphListBulletScale, ParagraphListIndentation,
+        ParagraphListLabelColor, ParagraphListLabelIndent, ParagraphListLevel,
+        ParagraphListLevelPlacement, ParagraphListNumberFormat, ParagraphListNumberPunctuation,
+        ParagraphListNumberScale, ParagraphListNumberSequence, ParagraphListNumberTiering,
+        ParagraphListNumbering, ParagraphListPlacement, ParagraphListStart, ParagraphListTextGap,
+    };
+    pub use litchi_iwa_text_wire::list::{Property, PropertyKind};
+}
+
 /// Exact-source text-language transactions for the storage a sheet text
 /// box or shape owns: [`crate::Package::edit_sheet_drawable_text_languages`].
 pub mod language {
@@ -308,6 +398,87 @@ impl GeometryFlags {
     #[must_use]
     pub const fn toggle_reflection(self) -> Self {
         Self(self.0 ^ Self::REFLECTED)
+    }
+}
+
+/// The placement of a new sheet image (Numbers' Insert ▸ Image).
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct ImageOptions {
+    /// Top-left position on the sheet, in points.
+    pub position: Point,
+    /// Displayed size, in points.
+    pub size: Size,
+    /// Untransformed media dimensions, in points.
+    pub natural_size: Size,
+}
+
+impl ImageOptions {
+    /// Options whose displayed and natural sizes are equal.
+    #[must_use]
+    pub const fn new(position: Point, size: Size) -> Self {
+        Self {
+            position,
+            size,
+            natural_size: size,
+        }
+    }
+
+    /// Set the media dimensions independently of the displayed size.
+    #[must_use]
+    pub const fn with_natural_size(mut self, natural_size: Size) -> Self {
+        self.natural_size = natural_size;
+        self
+    }
+}
+
+/// The placement and timing of a new sheet movie.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct MovieOptions {
+    /// Top-left position on the sheet, in points.
+    pub position: Point,
+    /// Displayed size, in points.
+    pub size: Size,
+    /// Untransformed media dimensions, in points.
+    pub natural_size: Size,
+    /// Playable duration of the movie.
+    pub duration: std::time::Duration,
+}
+
+impl MovieOptions {
+    /// Options whose displayed and natural sizes are equal.
+    #[must_use]
+    pub const fn new(position: Point, size: Size, duration: std::time::Duration) -> Self {
+        Self {
+            position,
+            size,
+            natural_size: size,
+            duration,
+        }
+    }
+
+    /// Set the media dimensions independently of the displayed size.
+    #[must_use]
+    pub const fn with_natural_size(mut self, natural_size: Size) -> Self {
+        self.natural_size = natural_size;
+        self
+    }
+}
+
+/// The placement and timing of a new sheet audio clip (a zero-size
+/// control).
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct AudioOptions {
+    /// Position of the audio control, in points.
+    pub position: Point,
+    /// Playable duration of the clip.
+    pub duration: std::time::Duration,
+}
+
+impl AudioOptions {
+    /// Options for a clip at `position` lasting `duration`.
+    #[must_use]
+    pub const fn new(position: Point, duration: std::time::Duration) -> Self {
+        Self { position, duration }
     }
 }
 
