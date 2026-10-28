@@ -550,14 +550,10 @@ impl Budget {
                 self.limits.max_nesting() as usize,
             ));
         }
-        let field_storage = source.len().checked_mul(size_of::<WireField>()).ok_or_else(|| {
-            Self::limit(
-                LimitKind::ScratchBytes,
-                usize::MAX,
-                self.limits.max_scratch_bytes(),
-            )
-        })?;
-        self.scratch(field_storage)?;
+        // The first pass is allocation-free; reserve only its fixed visitor
+        // state before scanning. The exact field-vector capacity is admitted
+        // after this pass and before the allocating second pass.
+        self.scratch(size_of::<WireField>())?;
         self.allocation(1)?;
         let limits = self.wire_limits()?;
         self.source(source.len())?;
@@ -569,6 +565,15 @@ impl Budget {
         })
         .map_err(map_wire_error)?;
         self.fields(field_count)?;
+        let field_storage = field_count.checked_mul(size_of::<WireField>()).ok_or_else(|| {
+            Self::limit(
+                LimitKind::ScratchBytes,
+                usize::MAX,
+                self.limits.max_scratch_bytes(),
+            )
+        })?;
+        self.scratch(field_storage)?;
+        self.allocation(1)?;
         self.work(source.len().checked_add(field_count).ok_or_else(|| {
             Self::limit(LimitKind::Work, usize::MAX, self.limits.max_work_bytes())
         })?)?;
