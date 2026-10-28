@@ -60,9 +60,60 @@ pub(super) fn map_table_info_codec_error(error: table_info_codec::DecodeError) -
             path: Path::Package,
         };
     }
+    if let Some(limit) = error.wire_resource_limit() {
+        return match limit {
+            table_info_codec::WireResourceLimit::Bytes { observed, maximum } => Error::Limit {
+                kind: LimitKind::WireBytes,
+                observed: observed.map(usize_as_u64).unwrap_or(u64::MAX),
+                maximum: maximum.map(usize_as_u64).unwrap_or(u64::MAX),
+                path: Path::Package,
+            },
+            table_info_codec::WireResourceLimit::Nesting { observed, maximum } => Error::Limit {
+                kind: LimitKind::WireNesting,
+                observed: observed.map(u64::from).unwrap_or(u64::MAX),
+                maximum: maximum.map(u64::from).unwrap_or(u64::MAX),
+                path: Path::Package,
+            },
+            _ => Error::InvalidSource {
+                path: Path::Package,
+            },
+        };
+    }
     if let Some((observed, maximum)) = error.work_limit_values() {
         return Error::Limit {
             kind: LimitKind::WireWork,
+            observed: usize_as_u64(observed),
+            maximum: usize_as_u64(maximum),
+            path: Path::Package,
+        };
+    }
+    if let Some((observed, maximum)) = error.output_limit_values() {
+        return Error::Limit {
+            kind: LimitKind::OutputBytes,
+            observed: usize_as_u64(observed),
+            maximum: usize_as_u64(maximum),
+            path: Path::Package,
+        };
+    }
+    if let Some((observed, maximum)) = error.allocation_limit_values() {
+        return Error::Limit {
+            kind: LimitKind::WireAllocations,
+            observed: usize_as_u64(observed),
+            maximum: usize_as_u64(maximum),
+            path: Path::Package,
+        };
+    }
+    if let Some((observed, maximum)) = error.retained_limit_values() {
+        return Error::Limit {
+            kind: LimitKind::WireRetainedBytes,
+            observed: usize_as_u64(observed),
+            maximum: usize_as_u64(maximum),
+            path: Path::Package,
+        };
+    }
+    if let Some((observed, maximum)) = error.scratch_limit_values() {
+        return Error::Limit {
+            kind: LimitKind::WireScratchBytes,
             observed: usize_as_u64(observed),
             maximum: usize_as_u64(maximum),
             path: Path::Package,

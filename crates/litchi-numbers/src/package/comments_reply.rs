@@ -178,8 +178,26 @@ pub enum LimitKind {
     PayloadObjects,
     /// Native messages inspected or retained.
     PayloadMessages,
+    /// Native messages inspected per owning container.
+    MessagesPerContainer,
     /// Native list items inspected or retained.
     PayloadItems,
+    /// Native metadata items inspected.
+    MetadataItems,
+    /// Native Snappy frames inspected.
+    SnappyFrames,
+    /// Addressable table rows inspected.
+    TableRows,
+    /// Addressable table columns inspected.
+    TableColumns,
+    /// Addressable table cells inspected.
+    TableCells,
+    /// Materialized sparse table cells inspected.
+    MaterializedCells,
+    /// Repeated Numbers-wire items inspected.
+    Items,
+    /// Comment replies inspected or emitted.
+    Replies,
     /// Native references inspected or emitted.
     References,
     /// Encoded native fields inspected.
@@ -683,7 +701,23 @@ fn map_root_error(error: RootError, path: Path) -> Error {
                 RootLimitKind::WireWork => LimitKind::Work,
                 RootLimitKind::TextBytes => LimitKind::TextBytes,
                 RootLimitKind::References => LimitKind::References,
+                RootLimitKind::ReferenceBytes => LimitKind::ReferenceBytes,
                 RootLimitKind::CompressedBytes => LimitKind::CompressedBytes,
+                RootLimitKind::Objects => LimitKind::PayloadObjects,
+                RootLimitKind::Messages => LimitKind::PayloadMessages,
+                RootLimitKind::MessagesPerObject => LimitKind::MessagesPerContainer,
+                RootLimitKind::MetadataItems => LimitKind::MetadataItems,
+                RootLimitKind::SnappyFrames => LimitKind::SnappyFrames,
+                RootLimitKind::TableRows => LimitKind::TableRows,
+                RootLimitKind::TableColumns => LimitKind::TableColumns,
+                RootLimitKind::TableCells => LimitKind::TableCells,
+                RootLimitKind::MaterializedCells => LimitKind::MaterializedCells,
+                RootLimitKind::Items => LimitKind::Items,
+                RootLimitKind::Replies => LimitKind::Replies,
+                RootLimitKind::WireNesting => LimitKind::Nesting,
+                RootLimitKind::ScratchBytes => LimitKind::ScratchBytes,
+                RootLimitKind::RetainedBytes => LimitKind::RetainedBytes,
+                RootLimitKind::Allocations => LimitKind::Allocations,
             },
             observed,
             maximum,
@@ -1887,7 +1921,129 @@ fn require_exact_apply_source(source_is_exact: bool) -> Result<(), Error> {
 
 #[cfg(test)]
 mod tests {
-    use super::{Error, LimitKind, Path, Refusal, map_native_error, require_exact_apply_source};
+    use super::{
+        Error, LimitKind, Path, Refusal, map_native_error, map_root_error,
+        require_exact_apply_source,
+    };
+
+    #[test]
+    fn root_limit_axes_reach_public_error_without_coercion() {
+        let cases = [
+            (
+                crate::package::comments::LimitKind::InputBytes,
+                LimitKind::InputBytes,
+            ),
+            (
+                crate::package::comments::LimitKind::OutputBytes,
+                LimitKind::OutputBytes,
+            ),
+            (
+                crate::package::comments::LimitKind::WireFields,
+                LimitKind::Fields,
+            ),
+            (
+                crate::package::comments::LimitKind::WireBytes,
+                LimitKind::EncodedBytes,
+            ),
+            (
+                crate::package::comments::LimitKind::WireWork,
+                LimitKind::Work,
+            ),
+            (
+                crate::package::comments::LimitKind::Objects,
+                LimitKind::PayloadObjects,
+            ),
+            (
+                crate::package::comments::LimitKind::Messages,
+                LimitKind::PayloadMessages,
+            ),
+            (
+                crate::package::comments::LimitKind::MessagesPerObject,
+                LimitKind::MessagesPerContainer,
+            ),
+            (
+                crate::package::comments::LimitKind::MetadataItems,
+                LimitKind::MetadataItems,
+            ),
+            (
+                crate::package::comments::LimitKind::SnappyFrames,
+                LimitKind::SnappyFrames,
+            ),
+            (
+                crate::package::comments::LimitKind::TableRows,
+                LimitKind::TableRows,
+            ),
+            (
+                crate::package::comments::LimitKind::TableColumns,
+                LimitKind::TableColumns,
+            ),
+            (
+                crate::package::comments::LimitKind::TableCells,
+                LimitKind::TableCells,
+            ),
+            (
+                crate::package::comments::LimitKind::MaterializedCells,
+                LimitKind::MaterializedCells,
+            ),
+            (crate::package::comments::LimitKind::Items, LimitKind::Items),
+            (
+                crate::package::comments::LimitKind::TextBytes,
+                LimitKind::TextBytes,
+            ),
+            (
+                crate::package::comments::LimitKind::References,
+                LimitKind::References,
+            ),
+            (
+                crate::package::comments::LimitKind::ReferenceBytes,
+                LimitKind::ReferenceBytes,
+            ),
+            (
+                crate::package::comments::LimitKind::Replies,
+                LimitKind::Replies,
+            ),
+            (
+                crate::package::comments::LimitKind::WireNesting,
+                LimitKind::Nesting,
+            ),
+            (
+                crate::package::comments::LimitKind::ScratchBytes,
+                LimitKind::ScratchBytes,
+            ),
+            (
+                crate::package::comments::LimitKind::RetainedBytes,
+                LimitKind::RetainedBytes,
+            ),
+            (
+                crate::package::comments::LimitKind::Allocations,
+                LimitKind::Allocations,
+            ),
+            (
+                crate::package::comments::LimitKind::CompressedBytes,
+                LimitKind::CompressedBytes,
+            ),
+        ];
+        for (kind, expected) in cases {
+            let error = map_root_error(
+                crate::package::comments::Error::Limit {
+                    kind,
+                    observed: 53,
+                    maximum: 31,
+                    path: crate::package::comments::Path::Package,
+                },
+                Path::Package,
+            );
+            assert_eq!(
+                error,
+                Error::Limit {
+                    kind: expected,
+                    observed: 53,
+                    maximum: 31,
+                    path: Path::Package,
+                }
+            );
+        }
+    }
 
     #[test]
     fn native_limit_payload_reaches_public_error() {
