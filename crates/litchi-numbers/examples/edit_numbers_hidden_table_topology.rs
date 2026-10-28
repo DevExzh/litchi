@@ -30,6 +30,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     ])?;
 
     let package = Package::open(&source)?;
+    let source_table = package
+        .table(SheetSelector::index(0), TableSelector::index(0))?
+        .ok_or("the source document has no table")?;
+    assert_eq!(
+        (
+            source_table.dimensions().rows(),
+            source_table.dimensions().columns()
+        ),
+        (6, 4)
+    );
     assert_eq!(
         package.table_hidden_axes(SheetSelector::index(0), TableSelector::index(0))?,
         initial
@@ -45,6 +55,32 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             .table_hidden_axes(SheetSelector::index(0), TableSelector::index(0))?,
         shifted
     );
+    let committed_table = commit
+        .package()
+        .table(SheetSelector::index(0), TableSelector::index(0))?
+        .ok_or("the committed document has no table")?;
+    assert_eq!(
+        (
+            committed_table.dimensions().rows(),
+            committed_table.dimensions().columns()
+        ),
+        (7, 5)
+    );
     commit.package().save(&output)?;
+    let reopened = Package::open(&output)?;
+    assert_eq!(
+        reopened.table_hidden_axes(SheetSelector::index(0), TableSelector::index(0))?,
+        shifted
+    );
+    let reopened_table = reopened
+        .table(SheetSelector::index(0), TableSelector::index(0))?
+        .ok_or("the reopened document has no table")?;
+    assert_eq!(
+        (
+            reopened_table.dimensions().rows(),
+            reopened_table.dimensions().columns()
+        ),
+        (7, 5)
+    );
     Ok(())
 }

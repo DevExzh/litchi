@@ -113,10 +113,6 @@ path = "examples/create_numbers_table_hidden_axes.rs"
 name = "edit_numbers_hidden_table_topology"
 path = "examples/edit_numbers_hidden_table_topology.rs"
 
-[[example]]
-name = "delete_numbers_hidden_table_axes"
-path = "examples/delete_numbers_hidden_table_axes.rs"
-
 [features]
 default = []
 internal-iwork-source = []
