@@ -17,6 +17,7 @@ use std::sync::Arc;
 
 use litchi_iwa_archive::package::{EntryEdit, EntryInsertion};
 use litchi_iwa_core::{Archive, Limits as ArchiveLimits};
+use litchi_iwa_table::structure::{Fault, FaultLimit, FaultResult};
 
 use super::{Package, PhysicalSource};
 
@@ -259,20 +260,78 @@ impl Package {
         &self,
         bytes: Vec<u8>,
     ) -> Result<Self, super::ReadError> {
+        self.structure_reopen_shared(Arc::from(bytes))
+    }
+
+    /// [`Self::structure_reopen`] over shared candidate bytes.
+    pub(in crate::package) fn structure_reopen_shared(
+        &self,
+        bytes: Arc<[u8]>,
+    ) -> Result<Self, super::ReadError> {
         // A structural candidate is an edited reassembly of this package:
         // unchanged IWA members reuse their parsed archives (the ZIP and
         // every budget are still checked in full).
         let candidate = match &self.state.source {
             PhysicalSource::Package(base) => {
-                let catalog = base.reopen(Arc::from(bytes))?;
+                let catalog = base.reopen(bytes)?;
                 Self::from_source_catalog(catalog, self.state.options)?
             },
             PhysicalSource::Semantic(_) => {
-                Self::from_source_with_options(Arc::from(bytes), self.state.options)?
+                Self::from_source_with_options(bytes, self.state.options)?
             },
         };
         candidate.validate()?;
         Ok(candidate)
+    }
+}
+
+/// The shared table structure set (`litchi-iwa-table`, record 0379)
+/// reopens its candidates as structural candidates of this package.
+impl litchi_iwa_table::structure::TableLeaf for Package {
+    fn reopen_candidate(&self, candidate: Arc<[u8]>) -> FaultResult<Self> {
+        self.structure_reopen_shared(candidate)
+            .map_err(reopen_fault)
+    }
+}
+
+/// Preserve bounded candidate-ingress failures at the shared structural
+/// boundary. Candidate shape and format failures remain verification failures;
+/// resource failures retain their typed limit or allocation classification.
+fn reopen_fault(error: super::ReadError) -> Fault {
+    match error {
+        super::ReadError::SemanticLimit {
+            kind,
+            observed,
+            maximum,
+            ..
+        } => Fault::Limit {
+            kind: match kind {
+                super::SemanticLimitKind::Objects => FaultLimit::Identifiers,
+                _ => FaultLimit::PayloadBytes,
+            },
+            observed: observed as u64,
+            maximum: maximum as u64,
+        },
+        super::ReadError::PayloadLimit {
+            observed, maximum, ..
+        } => Fault::Limit {
+            kind: FaultLimit::PayloadBytes,
+            observed: observed as u64,
+            maximum: maximum as u64,
+        },
+        super::ReadError::Allocation { amount, .. } => Fault::Allocation { amount },
+        super::ReadError::Archive(error) => match error {
+            litchi_iwa_archive::Error::Limit {
+                observed, maximum, ..
+            } => Fault::Limit {
+                kind: FaultLimit::PackageBytes,
+                observed,
+                maximum,
+            },
+            litchi_iwa_archive::Error::Allocation { amount, .. } => Fault::Allocation { amount },
+            _ => Fault::Verification,
+        },
+        _ => Fault::Verification,
     }
 }
 

@@ -6632,3 +6632,16 @@ See [0063](0063-source-pptx-modern-comments.md).
 - The separate 0377a performance owner is auditing and completing the
   existing `uo2/fin-perf` changes alongside the five-agent iWork wave. The
   final full gate has not yet run on this resumed integration.
+- Post-merge checks on `0944b7319f` passed: workspace all-target/all-feature
+  compilation, all 20 fuzz workspaces with locked offline resolution, crate
+  boundaries and the exit ledger.
+- Accepted W1-C repair `ea0352fad2` (implementation `db38bb09f8`, record
+  0372). The shared structural reopen seam retains typed resource errors;
+  Keynote refuses unsafe merged-table duplication before publication.
+  Table-removal parity now compares all surviving known fields, references
+  and untouched bytes with a pinned orphan allowance and a negative control.
+  Scoped lifecycle/parity/Numbers regressions, formatting, Clippy, rustdoc,
+  glossary, ledger, boundaries and affected fuzz locks pass. Fresh branch
+  measurements show duplicate/remove facade costs 84.6%/87.0% below the host.
+  Pages will adopt the shared error seam when W1-B next syncs trunk.
+  Native mutation evidence and final integrated qualification remain pending.
