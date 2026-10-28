@@ -55,11 +55,10 @@ fn leaf_comment_thread(bytes: &[u8]) -> TestResult<String> {
     let package = Package::from_bytes(bytes)?;
     let position = comment_position()?;
     let comment = package.body_table_cell_comment(TABLE, position)?;
-    let replies = if comment.is_some() {
-        package.body_table_cell_comment_replies(TABLE, position)?
-    } else {
-        Box::new([])
-    };
+    let replies = comment
+        .as_ref()
+        .and_then(|comment| comment.replies())
+        .unwrap_or(&[]);
     Ok(format!(
         "root={:?};replies={:?}",
         comment.as_ref().map(|value| value.text()),
@@ -123,7 +122,7 @@ fn leaf_populated_comment_thread(bytes: &[u8]) -> TestResult<String> {
     if comment.text().is_empty() || comment.timestamp().is_none() || comment.author().is_none() {
         return Err("leaf root comment is missing text/date/author metadata".into());
     }
-    let replies = package.body_table_cell_comment_replies(TABLE, position)?;
+    let replies = comment.replies().unwrap_or(&[]);
     if replies.is_empty() {
         return Err("leaf read did not find a populated reply".into());
     }
@@ -182,7 +181,7 @@ fn assert_populated_comment_semantics(bytes: &[u8]) -> TestResult {
     let leaf = package
         .body_table_cell_comment(TABLE, position)?
         .ok_or("leaf read did not find the populated root comment")?;
-    let leaf_replies = package.body_table_cell_comment_replies(TABLE, position)?;
+    let leaf_replies = leaf.replies().unwrap_or(&[]);
     if leaf_replies.is_empty() {
         return Err("leaf source must contain a non-empty reply list".into());
     }
@@ -543,7 +542,10 @@ fn pages_body_table_comment_set_parity() -> TestResult {
             Ok(())
         },
         |package, position| {
-            let commit = package.set_body_table_cell_comment(TABLE, position, "W1-G root")?;
+            let commit = package
+                .edit_body_table_cell_comment(TABLE, position)?
+                .set("W1-G root")?
+                .commit()?;
             let restored = commit
                 .package()
                 .apply_body_table_cell_comment(&commit.patch().inverse())?;
@@ -576,7 +578,10 @@ fn pages_body_table_comment_clear_parity() -> TestResult {
             Ok(())
         },
         |package, position| {
-            let clear = package.clear_body_table_cell_comment(TABLE, position)?;
+            let clear = package
+                .edit_body_table_cell_comment(TABLE, position)?
+                .clear()?
+                .commit()?;
             let restored = clear
                 .package()
                 .apply_body_table_cell_comment(&clear.patch().inverse())?;
@@ -613,7 +618,10 @@ fn pages_body_table_comment_cost_abba() -> TestResult {
         },
         |source| {
             let package = Package::from_bytes(source)?;
-            let commit = package.set_body_table_cell_comment(TABLE, position, "W1-G measured")?;
+            let commit = package
+                .edit_body_table_cell_comment(TABLE, position)?
+                .set("W1-G measured")?
+                .commit()?;
             Ok(leaf_bytes!(commit.package()))
         },
     )
@@ -645,7 +653,7 @@ fn pages_body_table_comment_read_cost_abba() -> TestResult {
             let comment = package
                 .body_table_cell_comment(TABLE, position)?
                 .ok_or("leaf read did not find the populated root comment")?;
-            let replies = package.body_table_cell_comment_replies(TABLE, position)?;
+            let replies = comment.replies().unwrap_or(&[]);
             black_box((comment.text().len(), replies.len()));
             Ok(leaf_bytes!(package))
         },
@@ -681,7 +689,10 @@ fn pages_body_table_comment_create_cost_abba() -> TestResult {
         },
         |source| {
             let package = Package::from_bytes(source)?;
-            let commit = package.set_body_table_cell_comment(TABLE, position, "W1-G create")?;
+            let commit = package
+                .edit_body_table_cell_comment(TABLE, position)?
+                .set("W1-G create")?
+                .commit()?;
             Ok(leaf_bytes!(commit.package()))
         },
     )
@@ -710,7 +721,10 @@ fn pages_body_table_comment_clear_cost_abba() -> TestResult {
         },
         |source| {
             let package = Package::from_bytes(source)?;
-            let clear = package.clear_body_table_cell_comment(TABLE, position)?;
+            let clear = package
+                .edit_body_table_cell_comment(TABLE, position)?
+                .clear()?
+                .commit()?;
             Ok(leaf_bytes!(clear.package()))
         },
     )

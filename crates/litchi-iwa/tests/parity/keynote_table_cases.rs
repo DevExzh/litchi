@@ -113,11 +113,10 @@ fn leaf_comment_thread_at(bytes: &[u8], row: usize, column: usize) -> TestResult
         TableSelector::index(0),
         position,
     )?;
-    let replies = package.slide_table_cell_comment_replies(
-        SlideSelector::index(SLIDE),
-        TableSelector::index(0),
-        position,
-    )?;
+    let replies = comment
+        .as_ref()
+        .and_then(|comment| comment.replies())
+        .unwrap_or(&[]);
     Ok(format!(
         "root={:?};replies={:?}",
         comment.as_ref().map(|value| value.text()),
@@ -315,11 +314,7 @@ fn comment_read_case(
             {
                 return Err("leaf root comment is missing text/date/author metadata".into());
             }
-            let replies = package.slide_table_cell_comment_replies(
-                SlideSelector::index(SLIDE),
-                TableSelector::index(0),
-                comment_position_at(row, column)?,
-            )?;
+            let replies = comment.replies().unwrap_or(&[]);
             if require_reply && replies.is_empty() {
                 return Err("leaf read did not find a populated reply".into());
             }
@@ -399,11 +394,7 @@ fn assert_comment_semantics(
             position,
         )?
         .ok_or("leaf read did not find the populated root comment")?;
-    let leaf_replies = package.slide_table_cell_comment_replies(
-        SlideSelector::index(SLIDE),
-        TableSelector::index(0),
-        comment_position_at(row, column)?,
-    )?;
+    let leaf_replies = leaf.replies().unwrap_or(&[]);
     if require_reply && leaf_replies.is_empty() {
         return Err("leaf source must contain a non-empty reply list".into());
     }
@@ -566,12 +557,14 @@ fn keynote_slide_table_comment_set_parity() -> TestResult {
             Ok(())
         },
         |package, position| {
-            let commit = package.set_slide_table_cell_comment(
-                SlideSelector::index(SLIDE),
-                TableSelector::index(0),
-                position,
-                "W1-G root",
-            )?;
+            let commit = package
+                .edit_slide_table_cell_comment(
+                    SlideSelector::index(SLIDE),
+                    TableSelector::index(0),
+                    position,
+                )?
+                .set("W1-G root")?
+                .commit()?;
             let restored = commit
                 .package()
                 .apply_slide_table_cell_comment(&commit.patch().inverse())?;
@@ -599,11 +592,14 @@ fn keynote_slide_table_comment_clear_parity() -> TestResult {
             Ok(())
         },
         |package, position| {
-            let clear = package.clear_slide_table_cell_comment(
-                SlideSelector::index(SLIDE),
-                TableSelector::index(0),
-                position,
-            )?;
+            let clear = package
+                .edit_slide_table_cell_comment(
+                    SlideSelector::index(SLIDE),
+                    TableSelector::index(0),
+                    position,
+                )?
+                .clear()?
+                .commit()?;
             let undo_clear = clear
                 .package()
                 .apply_slide_table_cell_comment(&clear.patch().inverse())?;
@@ -631,12 +627,14 @@ fn keynote_slide_table_comment_replace_preserves_source_metadata() -> TestResult
             Ok(())
         },
         |package, position| {
-            let commit = package.set_slide_table_cell_comment(
-                SlideSelector::index(SLIDE),
-                TableSelector::index(0),
-                position,
-                "W1-G replacement",
-            )?;
+            let commit = package
+                .edit_slide_table_cell_comment(
+                    SlideSelector::index(SLIDE),
+                    TableSelector::index(0),
+                    position,
+                )?
+                .set("W1-G replacement")?
+                .commit()?;
             let restored = commit
                 .package()
                 .apply_slide_table_cell_comment(&commit.patch().inverse())?;
@@ -652,12 +650,14 @@ fn keynote_slide_table_comment_replace_preserves_source_metadata() -> TestResult
 fn keynote_slide_table_comment_patch_rejects_unrelated_metadata_change() -> TestResult {
     let input = fixture("iwork/keynote/slide-table-read-native.key")?;
     let package = Package::from_bytes(&input.bytes)?;
-    let commit = package.set_slide_table_cell_comment(
-        SlideSelector::index(SLIDE),
-        TableSelector::index(0),
-        comment_position_at(1, 3)?,
-        "W1-G metadata conflict",
-    )?;
+    let commit = package
+        .edit_slide_table_cell_comment(
+            SlideSelector::index(SLIDE),
+            TableSelector::index(0),
+            comment_position_at(1, 3)?,
+        )?
+        .set("W1-G metadata conflict")?
+        .commit()?;
     let stale_bytes = mutate_unrelated_properties(&input.bytes)?;
     let stale = Package::from_bytes(&stale_bytes)?;
     let error = stale.apply_slide_table_cell_comment(commit.patch());
@@ -687,12 +687,14 @@ fn keynote_slide_table_comment_cost_abba() -> TestResult {
         },
         |source| {
             let package = Package::from_bytes(source)?;
-            let commit = package.set_slide_table_cell_comment(
-                SlideSelector::index(SLIDE),
-                TableSelector::index(0),
-                position,
-                "W1-G measured",
-            )?;
+            let commit = package
+                .edit_slide_table_cell_comment(
+                    SlideSelector::index(SLIDE),
+                    TableSelector::index(0),
+                    position,
+                )?
+                .set("W1-G measured")?
+                .commit()?;
             Ok(leaf_bytes!(commit.package()))
         },
     )
@@ -732,11 +734,7 @@ fn keynote_slide_table_comment_read_cost_abba() -> TestResult {
                     position,
                 )?
                 .ok_or("leaf read did not find the populated root comment")?;
-            let replies = package.slide_table_cell_comment_replies(
-                SlideSelector::index(SLIDE),
-                TableSelector::index(0),
-                position,
-            )?;
+            let replies = comment.replies().unwrap_or(&[]);
             black_box((comment.text().len(), replies.len()));
             Ok(leaf_bytes!(package))
         },
@@ -766,12 +764,14 @@ fn keynote_slide_table_comment_create_cost_abba() -> TestResult {
         },
         |source| {
             let package = Package::from_bytes(source)?;
-            let commit = package.set_slide_table_cell_comment(
-                SlideSelector::index(SLIDE),
-                TableSelector::index(0),
-                position,
-                "W1-G create",
-            )?;
+            let commit = package
+                .edit_slide_table_cell_comment(
+                    SlideSelector::index(SLIDE),
+                    TableSelector::index(0),
+                    position,
+                )?
+                .set("W1-G create")?
+                .commit()?;
             Ok(leaf_bytes!(commit.package()))
         },
     )
@@ -793,11 +793,14 @@ fn keynote_slide_table_comment_clear_cost_abba() -> TestResult {
         },
         |source| {
             let package = Package::from_bytes(source)?;
-            let clear = package.clear_slide_table_cell_comment(
-                SlideSelector::index(SLIDE),
-                TableSelector::index(0),
-                position,
-            )?;
+            let clear = package
+                .edit_slide_table_cell_comment(
+                    SlideSelector::index(SLIDE),
+                    TableSelector::index(0),
+                    position,
+                )?
+                .clear()?
+                .commit()?;
             Ok(leaf_bytes!(clear.package()))
         },
     )

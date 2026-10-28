@@ -16,7 +16,7 @@ use thiserror::Error;
 
 use super::{Package, PackageError, table_cells, table_lock};
 use crate::selector::BodyTableSelector;
-use litchi_iwa_common::table::read::{Comment, CommentReply};
+use litchi_iwa_common::table::read::Comment;
 
 type CellPosition = At;
 
@@ -554,18 +554,6 @@ impl Package {
         read_comment(self, selector.into(), cell)
     }
 
-    /// Read source-ordered replies from one selected body-table cell.
-    pub fn body_table_cell_comment_replies<'table>(
-        &self,
-        selector: impl Into<BodyTableSelector<'table>>,
-        cell: CellPosition,
-    ) -> Result<Box<[CommentReply]>, BodyTableCommentError> {
-        Ok(read_comment(self, selector.into(), cell)?
-            .and_then(|comment| comment.replies().map(ToOwned::to_owned))
-            .unwrap_or_default()
-            .into())
-    }
-
     /// Start a selector-first body-table cell comment edit.
     pub fn edit_body_table_cell_comment<'table>(
         &self,
@@ -635,29 +623,6 @@ impl Package {
             patch: patch.clone(),
             diagnostics: BodyTableCommentDiagnostics::published(patch.touched_components),
         })
-    }
-
-    /// Convenience root-comment set/create operation.
-    pub fn set_body_table_cell_comment<'table>(
-        &self,
-        selector: impl Into<BodyTableSelector<'table>>,
-        cell: CellPosition,
-        text: impl AsRef<str>,
-    ) -> Result<BodyTableCommentCommit, BodyTableCommentError> {
-        self.edit_body_table_cell_comment(selector, cell)?
-            .set(text)?
-            .commit()
-    }
-
-    /// Convenience root-comment removal operation; reply-bearing roots are refused.
-    pub fn clear_body_table_cell_comment<'table>(
-        &self,
-        selector: impl Into<BodyTableSelector<'table>>,
-        cell: CellPosition,
-    ) -> Result<BodyTableCommentCommit, BodyTableCommentError> {
-        self.edit_body_table_cell_comment(selector, cell)?
-            .clear()?
-            .commit()
     }
 }
 

@@ -19,7 +19,7 @@ use super::{
 };
 use crate::selector::SlideSelector;
 use crate::slide::table::TableSelector;
-use litchi_iwa_common::table::read::{Comment, CommentReply};
+use litchi_iwa_common::table::read::Comment;
 
 type CellPosition = At;
 
@@ -580,19 +580,6 @@ impl Package {
         read_comment(self, slide.into(), table.into(), cell)
     }
 
-    /// Read source-ordered replies from one selected slide-table cell.
-    pub fn slide_table_cell_comment_replies<'table>(
-        &self,
-        slide: impl Into<SlideSelector<'table>>,
-        table: impl Into<TableSelector>,
-        cell: CellPosition,
-    ) -> Result<Box<[CommentReply]>, SlideTableCommentError> {
-        Ok(read_comment(self, slide.into(), table.into(), cell)?
-            .and_then(|comment| comment.replies().map(ToOwned::to_owned))
-            .unwrap_or_default()
-            .into())
-    }
-
     /// Start a selector-first slide-table cell comment edit.
     pub fn edit_slide_table_cell_comment<'table>(
         &self,
@@ -668,31 +655,6 @@ impl Package {
             patch: patch.clone(),
             diagnostics: SlideTableCommentDiagnostics::published(patch.touched_components),
         })
-    }
-
-    /// Convenience root-comment set/create operation.
-    pub fn set_slide_table_cell_comment<'table>(
-        &self,
-        slide: impl Into<SlideSelector<'table>>,
-        table: impl Into<TableSelector>,
-        cell: CellPosition,
-        text: impl AsRef<str>,
-    ) -> Result<SlideTableCommentCommit, SlideTableCommentError> {
-        self.edit_slide_table_cell_comment(slide, table, cell)?
-            .set(text)?
-            .commit()
-    }
-
-    /// Convenience root-comment removal operation; reply-bearing roots are refused.
-    pub fn clear_slide_table_cell_comment<'table>(
-        &self,
-        slide: impl Into<SlideSelector<'table>>,
-        table: impl Into<TableSelector>,
-        cell: CellPosition,
-    ) -> Result<SlideTableCommentCommit, SlideTableCommentError> {
-        self.edit_slide_table_cell_comment(slide, table, cell)?
-            .clear()?
-            .commit()
     }
 }
 

@@ -689,7 +689,7 @@ keynote/editor/slide_tables/comments.rs	remove_slide_table_cell_comment_reply	1	
 keynote/editor/slide_tables/comments.rs	set_slide_table_cell_comment	1	keynote	table.cell_comment	host-only	-	-	-	-	root replacement with replies remains deferred; no full host coverage claim
 keynote/editor/slide_tables/comments.rs	set_slide_table_cell_comment_reply	1	keynote	table.cell_comment	host-only	-	-	-	-	root-only shared slice; reply-thread lifecycle remains deferred
 keynote/editor/slide_tables/comments.rs	slide_table_cell_comment	1	keynote	table.cell_comment	migrated	litchi_keynote::Package::slide_table_cell_comment	keynote_slide_table_comment_read_parity	A	-	-
-keynote/editor/slide_tables/comments.rs	slide_table_cell_comment_replies	1	keynote	table.cell_comment	migrated	litchi_keynote::Package::slide_table_cell_comment_replies	keynote_slide_table_comment_replies_read_parity	A	-	-
+keynote/editor/slide_tables/comments.rs	slide_table_cell_comment_replies	1	keynote	table.cell_comment	migrated	litchi_keynote::Package::slide_table_cell_comment	keynote_slide_table_comment_replies_read_parity	A	-	-
 keynote/editor/slide_tables/conditional_highlight.rs	clear_slide_table_cell_conditional_highlighting	1	keynote	table.conditional_highlight	host-only	litchi-keynote	-	-	-	-
 keynote/editor/slide_tables/conditional_highlight.rs	set_slide_table_cell_conditional_highlighting	1	keynote	table.conditional_highlight	host-only	litchi-keynote	-	-	-	-
 keynote/editor/slide_tables/conditional_highlight.rs	slide_table_cell_conditional_highlight_rules	1	keynote	table.conditional_highlight	host-only	litchi-keynote	-	-	-	-
@@ -1883,7 +1883,7 @@ pages/editor/tables/comments.rs	remove_table_cell_comment_reply	1	pages	table.ce
 pages/editor/tables/comments.rs	set_table_cell_comment	1	pages	table.cell_comment	host-only	-	-	-	-	root replacement with replies remains deferred; no full host coverage claim
 pages/editor/tables/comments.rs	set_table_cell_comment_reply	1	pages	table.cell_comment	host-only	-	-	-	-	root-only shared slice; reply-thread lifecycle remains deferred
 pages/editor/tables/comments.rs	table_cell_comment	1	pages	table.cell_comment	migrated	litchi_pages::Package::body_table_cell_comment	pages_body_table_comment_read_parity	A	test-data/iwork/pages/body-table-comment-hidden-native-saved-receipt.json	-
-pages/editor/tables/comments.rs	table_cell_comment_replies	1	pages	table.cell_comment	migrated	litchi_pages::Package::body_table_cell_comment_replies	pages_body_table_comment_replies_read_parity	A	test-data/iwork/pages/body-table-comment-hidden-native-saved-receipt.json	-
+pages/editor/tables/comments.rs	table_cell_comment_replies	1	pages	table.cell_comment	migrated	litchi_pages::Package::body_table_cell_comment	pages_body_table_comment_replies_read_parity	A	test-data/iwork/pages/body-table-comment-hidden-native-saved-receipt.json	-
 pages/editor/tables/conditional_highlight.rs	clear_table_cell_conditional_highlighting	1	pages	table.conditional_highlight	host-only	litchi-pages	-	-	-	-
 pages/editor/tables/conditional_highlight.rs	set_table_cell_conditional_highlighting	1	pages	table.conditional_highlight	host-only	litchi-pages	-	-	-	-
 pages/editor/tables/conditional_highlight.rs	table_cell_conditional_highlight_rules	1	pages	table.conditional_highlight	host-only	litchi-pages	-	-	-	-

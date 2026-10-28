@@ -13,9 +13,12 @@
   checker passes after removing the newly introduced root-level comment
   exports. The resource-dimension repair is committed as `03f991fcf6`; its
   current-source read/create/clear instruction probes are recorded in §4.3.
-  Final integrated performance and native verification remain pending (§2b,
-  §6). Groups 3–5 (rich text, topology, conditional highlights) are not
-  started (§5).
+  The pre-repair WP source/probe receipt is `e09f2269d0`; its twelve-route
+  read/create/Set/clear matrix is retained as historical evidence in §4.4,
+  but does not qualify the repaired public API. Final clean-source and
+  integrated performance and native verification remain pending (§2b, §6).
+  Groups 3–5 (rich text, topology, conditional highlights) are not started
+  (§5).
 - Date: 2026-10-28 continuation; group 6 completed 2026-10-27.
 - Review follow-up (`828d02cad9`): owner-extents coordinates require
   canonical value varints, and the Numbers facade preserves typed resolver
@@ -33,8 +36,11 @@
   route unchanged (+0.008%); the Keynote and Numbers families run 60.4%
   and 18.1% below their host routes. Group 2's focused full-facade probes
   on source commit `cfc334e754` measured Pages −96.517%, Keynote −36.624%
-  and Numbers +0.956% (§4.2); final integrated-tree qualification remains
-  with the coordinator.
+  and Numbers +0.956% (§4.2). The pre-repair source `e09f2269d0` twelve-route
+  matrix measured Pages −96.349% to −97.201%, Keynote −34.398% to −52.520%,
+  and Numbers −31.796% to +1.043% (§4.4); those captures do not qualify the
+  repaired public API, and final clean-source/integrated-tree qualification
+  remains with the coordinator.
 
 ## 1. Why a new crate
 
@@ -336,14 +342,16 @@ remain part of each facade contract.
 
 The public leaf surfaces retain their selector-first shape:
 
-- Pages: `body_table_cell_comment`, `body_table_cell_comment_replies`,
-  `edit_body_table_cell_comment`, `apply_body_table_cell_comment`,
-  `set_body_table_cell_comment` and `clear_body_table_cell_comment`;
-- Keynote: the corresponding `slide_table_cell_comment*` methods; and
+- Pages: `body_table_cell_comment`, `edit_body_table_cell_comment` and
+  `apply_body_table_cell_comment`; replies are read from `Comment::replies()`;
+- Keynote: `slide_table_cell_comment`, `edit_slide_table_cell_comment` and
+  `apply_slide_table_cell_comment`; replies are read from
+  `Comment::replies()`; and
 - Numbers: `table_cell_comment_replies`, `set_table_cell_comment`,
   `clear_table_cell_comment`, and the existing reply methods.
 
-Reply reads remain supported. Reply mutations remain explicit terminal
+Reply reads remain supported through the root `Comment::replies()` projection.
+Reply mutations remain explicit terminal
 `UnsupportedDependency` refusals in the Pages and Keynote focused route, and
 Numbers preserves its existing reply-bearing replacement refusal. Clearing or
 replacing a root that has replies is therefore not claimed as a complete host
@@ -356,7 +364,7 @@ The differential cases currently run are:
 |---|---|---|
 | Pages | `pages_body_table_comment_read_parity`, `pages_body_table_comment_set_parity`, `pages_body_table_comment_clear_parity`, `pages_body_table_comment_replies_read_parity` | B for root writes; A for populated root/reply read |
 | Keynote | `keynote_slide_table_comment_set_parity`, `keynote_slide_table_comment_clear_parity`, `keynote_slide_table_comment_replace_preserves_source_metadata`, `keynote_slide_table_comment_patch_rejects_unrelated_metadata_change`, `keynote_slide_table_comment_read_parity`, `keynote_slide_table_comment_replies_read_parity` | B for root writes; A for reads |
-| Numbers | `numbers_table_cell_comment_set_parity`, `numbers_table_cell_comment_host_oracle_control`, `numbers_table_cell_comment_replies_read_parity`, `numbers_table_cell_comment_replies_semantic_parity` | B for root write; A for populated root/reply read |
+| Numbers | `numbers_table_cell_comment_set_parity`, `numbers_table_cell_comment_host_oracle_control`, `numbers_table_cell_comment_replies_read_parity` (the case also performs the direct semantic comparison) | B for root write; A for populated root/reply read |
 
 The host remains the differential oracle. The original slice plan covered 17
 candidate rows. The current ledger has 22 rows: five migrated reads (including
@@ -616,6 +624,18 @@ each test with `taskset -c 3 valgrind --tool=callgrind --quiet
 output and toggle for each route. The exact test names are the nine
 `*_comment_{read,create,clear}_cost_abba` functions in the Pages, Keynote and
 Numbers parity modules.
+
+### 4.4 Canonical-API twelve-route matrix
+
+The previous captures are historical: they were taken from pre-repair source
+`e09f2269d0`, before the duplicate Pages/Keynote Package setters, clearers and
+plural reply getters were removed. The historical route values remain in the
+external capture manifest and are not a qualification of the current public
+API. A fresh matrix must be captured after the repair and recorded against
+one clean source commit. The final route set is Pages, Keynote and Numbers
+read/create/Set/clear (twelve full facade routes), with Pages/Keynote writes
+using `Package::edit_*().set/clear()?.commit()` and read replies projected
+from the root `Comment::replies()` snapshot.
 
 ## 5. Gaps
 
