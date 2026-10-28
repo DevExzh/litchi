@@ -189,6 +189,34 @@ fn leaf_read(source: &[u8], kind: Kind, property: PropertyKind) -> TestResult<St
     })
 }
 
+fn populated_read_fixture(kind: Kind, property: PropertyKind) -> TestResult<Fixture> {
+    let base = authored_fixture()?;
+    let operation = Op::Set(match property {
+        PropertyKind::Fill => Property::Fill(Fill::Solid(color(0.9, 0.3, 0.1)?)),
+        PropertyKind::Stroke => Property::Stroke(Some(Stroke::new(
+            color(0.2, 0.6, 0.3)?,
+            Width::new(3.0)?,
+            Pattern::MediumDash,
+        ))),
+        PropertyKind::Effects => Property::Effects(effects()?),
+        PropertyKind::TextLayout => Property::TextLayout(layout()?),
+        PropertyKind::Columns => Property::Columns(columns()?),
+        _ => return Err("unsupported Numbers drawable style read property kind".into()),
+    });
+    Ok(Fixture {
+        path: base.path,
+        bytes: host_route(&base.bytes, kind, &operation)?,
+    })
+}
+
+fn reader_values_match(host: &str, leaf: &str) -> TestResult {
+    if host == leaf {
+        Ok(())
+    } else {
+        Err(format!("host and leaf reader values differ: host={host:?}, leaf={leaf:?}").into())
+    }
+}
+
 fn run_case(
     name: &'static str,
     kind: Kind,
@@ -319,7 +347,12 @@ fn numbers_shape_style_read_parity() -> TestResult {
         (Kind::TextBox, PropertyKind::Columns),
         (Kind::TextBox, PropertyKind::TextLayout),
     ] {
-        let input = authored_fixture()?;
+        let input = populated_read_fixture(kind, property)?;
+        assert_eq!(
+            host_read(&input.bytes, kind, property)?,
+            leaf_read(&input.bytes, kind, property)?,
+            "host and leaf readers must agree on the host-authored source"
+        );
         Case::new(
             "numbers_shape_style_read_parity",
             Format::Numbers,
@@ -338,5 +371,22 @@ fn numbers_shape_style_read_parity() -> TestResult {
         })
         .run()?;
     }
+    Ok(())
+}
+
+#[test]
+fn numbers_shape_style_read_parity_rejects_mismatched_reader_values() -> TestResult {
+    let input = populated_read_fixture(Kind::Shape, PropertyKind::Fill)?;
+    let host = host_read(&input.bytes, Kind::Shape, PropertyKind::Fill)?;
+    let mut mismatched_leaf = leaf_read(&input.bytes, Kind::Shape, PropertyKind::Fill)?;
+    mismatched_leaf.push_str(" (negative-control mismatch)");
+    let error = reader_values_match(&host, &mismatched_leaf)
+        .expect_err("the read proof must reject mismatched reader values");
+    assert!(
+        error
+            .to_string()
+            .contains("host and leaf reader values differ"),
+        "unexpected mismatch error: {error}"
+    );
     Ok(())
 }

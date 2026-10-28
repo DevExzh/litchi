@@ -52,6 +52,15 @@ The shared parity harness does not include Numbers shadow rows here: a
 host-readable fixture is absent, so those rows stay host-only until an
 Apple-authored fixture and a separate owner decision exist.
 
+The read proof was tightened after review: each of the six read vectors now
+starts from a separately host-authored, non-default property value and
+directly compares `host_read(source, kind, property)` with
+`leaf_read(source, kind, property)`. The read-only `Case` still requires both
+routes to preserve the source bytes exactly. A negative-control test alters a
+leaf reader value and verifies that the direct comparison rejects it; the
+generic harness's same-reader-across-output checks remain additional
+coverage, not the cross-implementation proof.
+
 ## Performance and verification
 
 `numbers_w2a_cost.rs` adds ignored full-facade ABBA probes for all 18 routes.
@@ -140,8 +149,9 @@ still pending, as are native open/save/close/reopen evidence and the final
 integrated 53-row root gate.
 
 Scoped verification: rustfmt, strict Numbers Clippy, 8 facade tests, 18
-host-vs-leaf parity vectors, Numbers API glossary, ledger, crate boundaries,
-Numbers fuzz-lock compile and Numbers rustdoc all pass. The integrated 53-row
+host-vs-leaf parity vectors plus the direct-reader negative control, Numbers
+API glossary, ledger, crate boundaries, Numbers fuzz-lock compile and Numbers
+rustdoc all pass. The integrated 53-row
 gate, native open/save/close/reopen evidence, and final wall-clock
 qualification remain coordinator-owned. The working tree contains no
 untracked upstream-fixture references, generated binaries or large evidence
