@@ -61,6 +61,13 @@ pub mod cell_appearance {
         pub borders: Borders,
     }
 }
+/// Slide-table duplication and removal over the shared table structure set
+/// (record 0372).
+pub mod lifecycle {
+    pub use crate::package::slide_table_lifecycle::{
+        Commit, Diagnostics, Edit, Error, LimitKind, Patch, Refusal,
+    };
+}
 /// Decimal number display formats for existing table cells.
 pub mod number_format;
 /// Physical row-sort transaction values for a Keynote slide table.
