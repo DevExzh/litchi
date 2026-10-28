@@ -778,7 +778,7 @@ changed. The nine current-source read/create/clear Callgrind ABBA pairs and
 their exact external artifacts are recorded in §4.3; the coordinator must
 repeat them on the final integrated trunk candidate.
 
-Continuation proof checkpoint (source commit `481862ddca`, after the Numbers
+Continuation proof checkpoint (source commit `0acc4231ee`, after the Numbers
 parity checkpoint `63d96fcfbf` was handed to F): the Pages comment target ran
 with `parity-host-oracle` and passed the six focused checks (read, populated
 reply read, root replacement, root create, root clear, and the exact surviving
