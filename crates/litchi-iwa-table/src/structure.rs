@@ -89,6 +89,10 @@ pub enum FaultLimit {
     PayloadBytes,
     /// Object identifiers.
     Identifiers,
+    /// Temporary graph scratch bytes.
+    ScratchBytes,
+    /// Fallible graph allocation events.
+    AllocationEvents,
 }
 
 pub type FaultResult<T> = Result<T, Fault>;

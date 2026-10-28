@@ -52,6 +52,24 @@ pub(super) fn fault(error: &GraphError) -> Fault {
             observed: u64::MAX,
             maximum: u64::MAX,
         },
+        GraphError::Limit {
+            kind: litchi_iwa_style::graph::GraphLimitKind::ScratchBytes,
+            observed,
+            maximum,
+        } => Fault::Limit {
+            kind: structure::FaultLimit::ScratchBytes,
+            observed: *observed as u64,
+            maximum: *maximum as u64,
+        },
+        GraphError::Limit {
+            kind: litchi_iwa_style::graph::GraphLimitKind::AllocationEvents,
+            observed,
+            maximum,
+        } => Fault::Limit {
+            kind: structure::FaultLimit::AllocationEvents,
+            observed: *observed as u64,
+            maximum: *maximum as u64,
+        },
         _ => Fault::Invalid,
     }
 }

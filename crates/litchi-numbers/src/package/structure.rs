@@ -205,6 +205,10 @@ macro_rules! structural_family {
             PayloadBytes,
             /// Native object identifiers.
             Identifiers,
+            /// Temporary graph scratch bytes.
+            ScratchBytes,
+            /// Fallible graph allocation events.
+            AllocationEvents,
             $(
                 /// A bounded wire operation performed by this family.
                 $wire_variant($wire_kind),
@@ -217,6 +221,8 @@ macro_rules! structural_family {
                     Self::PackageBytes => "package bytes",
                     Self::PayloadBytes => "payload bytes",
                     Self::Identifiers => "object identifiers",
+                    Self::ScratchBytes => "scratch bytes",
+                    Self::AllocationEvents => "allocation events",
                     $(Self::$wire_variant(kind) => return ::std::fmt::Display::fmt(kind, formatter),)?
                 })
             }
@@ -238,6 +244,8 @@ macro_rules! structural_family {
                             FaultLimit::PackageBytes => LimitKind::PackageBytes,
                             FaultLimit::PayloadBytes => LimitKind::PayloadBytes,
                             FaultLimit::Identifiers => LimitKind::Identifiers,
+                            FaultLimit::ScratchBytes => LimitKind::ScratchBytes,
+                            FaultLimit::AllocationEvents => LimitKind::AllocationEvents,
                         },
                         observed,
                         maximum,
