@@ -732,6 +732,24 @@ impl Sheet<'_> {
         at: impl Into<At<'a>>,
         content: impl Into<Content>,
     ) -> Result<&mut Self> {
+        self.set_coalesced(at, content).map(|_| self)
+    }
+
+    /// Internal payload setter used by the unified XLSX coalescer.
+    ///
+    /// It returns `false` only when a bounded edit proves an exact
+    /// source-equivalent no-op; otherwise it returns `true` after staging a
+    /// payload. The hidden entry point keeps the same bounded capture,
+    /// source-equivalent no-op, and action-map behavior as [`Self::set`].
+    /// The unified coalescer calls it only for distinct, unsigned bounded
+    /// targets. Unbounded or repeated callers must not interpret the result
+    /// as a general before/after projection.
+    #[doc(hidden)]
+    pub fn set_coalesced<'a>(
+        &mut self,
+        at: impl Into<At<'a>>,
+        content: impl Into<Content>,
+    ) -> Result<bool> {
         let address = at.into().resolve()?;
         let content = content.into();
         content.validate_for_write()?;
@@ -787,7 +805,7 @@ impl Sheet<'_> {
                 self.edit
                     .release_cell_capture_facet(self.position, address, CaptureFacet::Payload);
             }
-            return Ok(self);
+            return Ok(false);
         }
         let _capture =
             self.edit
@@ -798,7 +816,7 @@ impl Sheet<'_> {
             },
             Entry::Occupied(mut entry) => entry.get_mut().set_payload(Payload::Set(content)),
         }
-        Ok(self)
+        Ok(true)
     }
 
     /// Write `text` as the cell's own inline rich string: each run keeps
