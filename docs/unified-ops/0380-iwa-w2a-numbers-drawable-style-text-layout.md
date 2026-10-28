@@ -2,6 +2,9 @@
 
 - Status: implementation slice prepared on `uo2/iwa-w2a`; coordinator
   integration is held until the current integrated 53-row gate completes.
+  The ledger destinations are provisional: no parity, scoped gate, native
+  acceptance or performance result has been executed or accepted for this
+  slice.
 - Scope: the 18 Numbers host rows for shape fill, stroke, effects and frame
   text layout, plus text-box columns and frame text layout (set, reset and
   read). Numbers shadow rows remain excluded because the host does not read a
@@ -23,10 +26,15 @@ sheet and drawable selectors through `sheet_drawable_graph`, rejects properties
 that do not apply to the selected shape/text box, refuses image fills, charges
 staged capacity before work, and uses the shared exact-source artifact pair.
 The candidate is reopened through the strict Numbers ingress and every final
-staged property is read back before a commit is returned. Untouched components
-and members remain under the style graph publisher's exact-source locality
-policy; `Patch::inverse()` and patch-source authorization are covered by the
-crate tests.
+staged property is read back before a commit is returned. Reset expectations
+are derived independently from the selected style's parent-chain effective
+value, checked in the working graph, and checked again after reopen; exclusive
+resets must remove the selected direct slots, while shared resets must retain
+an inherited child link without mutating the sibling. Staging ceilings are
+reported through the scoped wire `LimitKind` values. Untouched components and
+members remain under the style graph publisher's exact-source locality policy;
+`Patch::inverse()` and patch-source authorization are covered by the crate
+tests.
 
 ## Differential proof and evidence boundary
 
@@ -35,8 +43,9 @@ routes with the leaf on a source-built `basic.numbers` fixture containing a
 text box and rectangle. Set/allocation cases are Tier B because fresh style
 identities and the save-token policy differ; resets, rewrites and reads are
 declared Tier A where the host and leaf retain the same exact graph. The
-parity cases include inverse restoration and strict leaf reopen. They are
-queued for native open/save/close/reopen evidence in
+parity cases include inverse restoration and strict leaf reopen, but the cases
+remain unexecuted under the build hold and therefore are not differential
+proof. They are queued for native open/save/close/reopen evidence in
 `docs/unified-ops/0363-mac-queue.md`; no E3/E4 claim is made by this slice.
 
 The shared parity harness does not include Numbers shadow rows here: a

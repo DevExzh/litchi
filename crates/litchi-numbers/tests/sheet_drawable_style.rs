@@ -9,7 +9,10 @@ use std::path::PathBuf;
 use litchi_core::edit::RefusalKind;
 use litchi_iwa_common::color::{RgbColorSpace, Rgba};
 use litchi_iwa_common::shape::effects::{self, Effects, Reflection, ReflectionOpacity};
-use litchi_iwa_common::shape::fill::Fill;
+use litchi_iwa_common::shape::fill::{
+    Angle, Fill, Gradient, Kind as GradientKind, Opacity as GradientOpacity, Stop, StopMidpoint,
+    StopPosition,
+};
 use litchi_iwa_common::shape::path::Preset;
 use litchi_iwa_common::shape::stroke::{Pattern, Stroke, Width};
 use litchi_iwa_common::text::layout::{AutoSize, Inset, Insets, Layout, VerticalAlignment};
@@ -93,6 +96,22 @@ fn effects() -> TestResult<Effects> {
     ))
 }
 
+fn large_gradient() -> TestResult<Fill> {
+    let base = color(0.2, 0.5, 0.8)?;
+    let stops = (0..2048)
+        .map(|index| {
+            let position = StopPosition::new(index as f32 / 2047.0)?;
+            Ok(Stop::new(base, position, StopMidpoint::CENTER))
+        })
+        .collect::<TestResult<Vec<_>>>()?;
+    Ok(Fill::Gradient(Gradient::advanced(
+        GradientKind::Linear,
+        stops,
+        GradientOpacity::OPAQUE,
+        Angle::from_degrees(0.0)?,
+    )?))
+}
+
 #[test]
 fn shape_style_round_trips_and_inverse_restores_exact_source() -> TestResult {
     let package = authored()?;
@@ -131,7 +150,7 @@ fn text_box_columns_and_layout_are_selector_first() -> TestResult {
     let package = authored()?;
     let mut edit = package.edit_sheet_drawable_style(0, DrawableSelector::text_box(0))?;
     edit.set(Property::Columns(columns()?))?
-        .set(Property::TextLayout(layout()?));
+        .set(Property::TextLayout(layout()?))?;
     let commit = edit.commit()?;
     assert_eq!(
         commit
@@ -183,5 +202,125 @@ fn unsupported_targets_and_empty_commits_are_typed() -> TestResult {
         package.sheet_drawable_style("missing", 0, PropertyKind::Fill),
         Err(style::Error::Refused(style::Refusal::SheetNotFound))
     ));
+    assert!(matches!(
+        package.sheet_drawable_style(0, DrawableSelector::shape(9), PropertyKind::Fill),
+        Err(style::Error::Refused(style::Refusal::DrawableNotFound { .. }))
+    ));
+    Ok(())
+}
+
+#[test]
+fn staged_budgets_are_atomic_and_typed() -> TestResult {
+    let package = authored()?;
+    let mut operations = package.edit_sheet_drawable_style(0, DrawableSelector::shape(0))?;
+    let repeated = Property::Effects(effects()?);
+    for _ in 0..64 {
+        operations.set(repeated.clone())?;
+    }
+    let error = operations
+        .set(repeated.clone())
+        .expect_err("the finite operation budget must refuse before staging");
+    assert!(matches!(
+        error,
+        style::Error::Limit {
+            kind: style::LimitKind::Wire(litchi_iwa_common::LimitKind::RewriteWork),
+            observed: 65,
+            maximum: 64,
+        }
+    ));
+    let operation_commit = operations.commit()?;
+    assert!(operation_commit.diagnostics().changed());
+
+    let mut aggregate = package.edit_sheet_drawable_style(0, DrawableSelector::shape(0))?;
+    let error = aggregate
+        .set(Property::Fill(large_gradient()?))
+        .expect_err("the aggregate staged-value budget must refuse before staging");
+    assert!(matches!(
+        error,
+        style::Error::Limit {
+            kind: style::LimitKind::Wire(litchi_iwa_common::LimitKind::OutputBytes),
+            ..
+        }
+    ));
+    aggregate.set(Property::Effects(effects()?))?;
+    assert!(aggregate.commit()?.diagnostics().changed());
+    Ok(())
+}
+
+#[test]
+fn repeated_set_reset_rewrite_uses_the_final_property_state() -> TestResult {
+    let package = authored()?;
+    let final_fill = Fill::Solid(color(0.8, 0.2, 0.1)?);
+    let mut edit = package.edit_sheet_drawable_style(0, DrawableSelector::shape(0))?;
+    edit.set(Property::Fill(Fill::Solid(color(0.1, 0.2, 0.3)?)))?
+        .set(Property::Fill(Fill::Solid(color(0.4, 0.5, 0.6)?)))?
+        .reset(PropertyKind::Fill)?
+        .set(Property::Fill(final_fill.clone()))?;
+    let commit = edit.commit()?;
+    assert_eq!(
+        commit.package().sheet_drawable_style(
+            0,
+            DrawableSelector::shape(0),
+            PropertyKind::Fill,
+        )?,
+        Property::Fill(final_fill),
+    );
+    let restored = commit
+        .package()
+        .apply_sheet_drawable_style(&commit.patch().inverse())?;
+    assert_eq!(bytes(restored.package())?, bytes(&package)?);
+    Ok(())
+}
+
+#[test]
+fn reset_proves_inherited_value_and_preserves_the_sibling_drawable() -> TestResult {
+    let package = authored()?;
+    let baseline = package.sheet_drawable_style(
+        0,
+        DrawableSelector::shape(0),
+        PropertyKind::Fill,
+    )?;
+    let sibling_layout = package.sheet_drawable_style(
+        0,
+        DrawableSelector::text_box(0),
+        PropertyKind::TextLayout,
+    )?;
+    let before_list = package.sheet_drawable_list(0)?;
+    let styled = package
+        .edit_sheet_drawable_style(0, DrawableSelector::shape(0))?
+        .set(Property::Fill(Fill::Solid(color(0.7, 0.3, 0.2)?)))?
+        .commit()?;
+    let mut reset = styled
+        .package()
+        .edit_sheet_drawable_style(0, DrawableSelector::shape(0))?;
+    reset.reset(PropertyKind::Fill)?;
+    let reset_commit = reset.commit()?;
+    assert_eq!(
+        reset_commit.package().sheet_drawable_style(
+            0,
+            DrawableSelector::shape(0),
+            PropertyKind::Fill,
+        )?,
+        baseline,
+    );
+    assert_eq!(
+        reset_commit.package().sheet_drawable_style(
+            0,
+            DrawableSelector::text_box(0),
+            PropertyKind::TextLayout,
+        )?,
+        sibling_layout,
+    );
+    assert_eq!(reset_commit.package().sheet_drawable_list(0)?, before_list);
+    let restored = reset_commit
+        .package()
+        .apply_sheet_drawable_style(&reset_commit.patch().inverse())?;
+    assert_eq!(bytes(restored.package())?, bytes(styled.package())?);
+    Ok(())
+}
+
+#[test]
+fn malformed_sources_fail_before_the_style_route() -> TestResult {
+    assert!(Package::from_bytes(b"not a Numbers package").is_err());
     Ok(())
 }
