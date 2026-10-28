@@ -41,6 +41,65 @@ pub use crate::package::sheet_drawable::{
     Commit, Diagnostics, Edit, Error, LimitKind, Patch, Refusal,
 };
 
+/// Exact-source shape and text-frame style transactions for one sheet shape
+/// or text box: fill, stroke, effects, frame layout and text columns.
+pub mod style {
+    pub use crate::package::sheet_drawable_style::{
+        Commit, Diagnostics, Edit, Error, LimitKind, Patch, Refusal,
+    };
+    pub use litchi_iwa_common::shape::effects::Effects;
+    pub use litchi_iwa_common::shape::fill::Fill;
+    pub use litchi_iwa_common::shape::stroke::Stroke;
+    pub use litchi_iwa_common::text::layout::Layout;
+    pub use litchi_iwa_text::columns::Columns;
+
+    /// One semantic drawing or text-frame style value.
+    #[derive(Debug, Clone, PartialEq)]
+    #[non_exhaustive]
+    pub enum Property {
+        /// The fill (image fills are read-only in this family).
+        Fill(Fill),
+        /// The stroke (`None`: the hidden stroke).
+        Stroke(Option<Stroke>),
+        /// Opacity and reflection.
+        Effects(Effects),
+        /// Vertical alignment, insets and autosizing of the text frame.
+        TextLayout(Layout),
+        /// Uniform columns in a text box.
+        Columns(Columns),
+    }
+
+    /// Which [`Property`] a read or reset addresses.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+    #[non_exhaustive]
+    pub enum PropertyKind {
+        /// The fill.
+        Fill,
+        /// The stroke.
+        Stroke,
+        /// Opacity and reflection.
+        Effects,
+        /// The text-frame layout.
+        TextLayout,
+        /// The text-frame columns.
+        Columns,
+    }
+
+    impl Property {
+        /// The kind of this property.
+        #[must_use]
+        pub const fn kind(&self) -> PropertyKind {
+            match self {
+                Self::Fill(_) => PropertyKind::Fill,
+                Self::Stroke(_) => PropertyKind::Stroke,
+                Self::Effects(_) => PropertyKind::Effects,
+                Self::TextLayout(_) => PropertyKind::TextLayout,
+                Self::Columns(_) => PropertyKind::Columns,
+            }
+        }
+    }
+}
+
 /// Exact-source frame, property and playback transactions for one sheet
 /// drawable: [`crate::Package::edit_sheet_drawable_properties`].
 pub mod properties {

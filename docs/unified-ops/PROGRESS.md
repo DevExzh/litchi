@@ -6794,3 +6794,19 @@ See [0063](0063-source-pptx-modern-comments.md).
   receipt is preserved and the integrated candidate will be remeasured.
   Twelve ledger rows migrate and twelve native routes remain queued. These
   are leaf APIs; unified chart-text dispatch remains a D7 follow-up.
+
+- Post-merge checks on `8b598c68a8` passed on unchanged clean source:
+  workspace all-target/all-feature compilation, all 20 locked offline fuzz
+  workspaces, crate boundaries and exit ledger.
+- Accepted W2-A `c9f713639e` (record 0380), synchronized with the chart-text
+  integration. Numbers drawable styles reuse the shared style engine for
+  shape fill/stroke/effects/text layout and text-box columns/layout. Staging
+  is admitted before allocation; resets verify inherited effective values.
+  Eight facade tests and four parity tests pass, including eighteen vectors,
+  six populated direct host/leaf reads and a mismatch control through the
+  same comparison path. Formatting, strict Clippy, ledger and boundaries
+  pass. Eighteen CPU-pinned instruction probes passed on measured source
+  `d1b11fed01`; final integrated measurements remain required. Eighteen
+  ledger rows migrate; shadow routes lacking a usable host fixture remain
+  excluded. Two native queue entries cover the new read/edit families.
+  Unified drawable-style dispatch remains a separate D7 follow-up.

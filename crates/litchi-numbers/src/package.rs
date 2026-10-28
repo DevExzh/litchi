@@ -75,6 +75,7 @@ mod sheet_drawable_media;
 pub(crate) mod sheet_drawable_named_style;
 pub(crate) mod sheet_drawable_plain_text;
 pub(crate) mod sheet_drawable_properties;
+pub(crate) mod sheet_drawable_style;
 pub(crate) mod sheet_drawable_text;
 pub(crate) mod sheet_lifecycle;
 pub(crate) mod sheet_media;
