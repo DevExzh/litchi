@@ -82,37 +82,6 @@ pub const fn is_display_family(family: Family) -> bool {
     !matches!(family, Family::ScalarControl | Family::PopUpMenu)
 }
 
-/// One family read: `Some(None)` reports an automatic cell, `None` a cell of
-/// another family.
-fn family_read<T, E>(
-    result: Result<Option<T>, E>,
-    wrong: impl Fn(&E) -> bool,
-    native: impl Fn(E) -> Error,
-) -> Result<Option<Option<T>>, Error> {
-    match result {
-        Ok(value) => Ok(Some(value)),
-        Err(error) if wrong(&error) => Ok(None),
-        Err(error) => Err(native(error)),
-    }
-}
-
-macro_rules! read_family {
-    ($reader:ident, $error:ident, $variant:ident, $source:expr, $target:expr, $path:expr, $automatic:ident) => {
-        match family_read(
-            display::$reader($source, $target, $path),
-            |error| matches!(error, $error::WrongFormatFamily),
-            |error| match error {
-                $error::WrongFormatFamily => Error::Verification,
-                $error::Native(error) => error,
-            },
-        )? {
-            Some(Some(value)) => return Ok(DataFormat::$variant(value)),
-            Some(None) => $automatic = true,
-            None => {},
-        }
-    };
-}
-
 /// Read the selected stored cell's display format.
 ///
 /// # Errors
@@ -121,6 +90,20 @@ macro_rules! read_family {
 /// cell holds a format no family reader admits (a native shape outside the
 /// engines).
 pub fn read(source: &dyn TableSource, target: Target, path: Path) -> Result<DataFormat, Error> {
+    let mut budget = TransactionBudget::for_cell_control(source);
+    read_with_budget(source, target, path, &mut budget)
+}
+
+/// Read the selected cell's complete format against a caller-owned
+/// transaction ledger.  Candidate verification uses this entry point so its
+/// semantic readback cannot create a fresh budget after publication work has
+/// already consumed the operation's original one.
+pub fn read_with_budget(
+    source: &dyn TableSource,
+    target: Target,
+    path: Path,
+    budget: &mut TransactionBudget,
+) -> Result<DataFormat, Error> {
     if let Some(control) = pop_up_menu::read_cell_control(source, target)? {
         return Ok(match control {
             CellControl::Checkbox(value) => DataFormat::Checkbox(value),
@@ -132,24 +115,16 @@ pub fn read(source: &dyn TableSource, target: Target, path: Path) -> Result<Data
     }
     // One validation pass for the ten display families (record 0370k); a
     // cell outside them is a custom format or unsupported.
-    let mut budget = TransactionBudget::for_cell_control(source);
-    if let Some(format) = display::read_any_display_format(source, target, path, &mut budget)? {
+    if let Some(format) = display::read_any_display_format(source, target, path, budget)? {
         return Ok(format);
     }
-    let mut automatic = false;
-    read_family!(
-        read_custom_format,
-        CustomFormatReadError,
-        Custom,
-        source,
-        target,
-        path,
-        automatic
-    );
-    if automatic {
-        Ok(DataFormat::Automatic)
-    } else {
-        Err(Error::Refused(Refusal::UnsupportedDependency { path }))
+    match display::read_custom_format_with_budget(source, target, path, budget) {
+        Ok(Some(value)) => Ok(DataFormat::Custom(value)),
+        Ok(None) => Ok(DataFormat::Automatic),
+        Err(CustomFormatReadError::WrongFormatFamily) => {
+            Err(Error::Refused(Refusal::UnsupportedDependency { path }))
+        },
+        Err(CustomFormatReadError::Native(error)) => Err(error),
     }
 }
 

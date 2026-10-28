@@ -571,9 +571,17 @@ fn engine_rewrite(
         path,
         &mut budget,
     )?;
-    source
+    let candidate = source
         .reopen_candidate(std::sync::Arc::from(bytes))
-        .map_err(|_error| Error::Verification)
+        .map_err(|_error| Error::Verification)?;
+    let candidate_catalog = super::table_headers::rewrite::physical_source(&candidate)
+        .map_err(|_error| Error::Verification)?;
+    budget.charge_candidate_reopen(candidate_catalog, path)?;
+    let candidate_target = popup::resolve_cell(&candidate, sheet, table, at)?;
+    if data_format::read_with_budget(&candidate, candidate_target, path, &mut budget)? != after {
+        return Err(Error::Verification);
+    }
+    Ok(candidate)
 }
 
 fn read(package: &Package, sheet: usize, table: usize, at: At) -> Result<DataFormat, Error> {

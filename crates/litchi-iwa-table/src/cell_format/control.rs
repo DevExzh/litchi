@@ -2133,16 +2133,29 @@ pub fn require_exclusive_selected_model_reference(
     budget: &mut TransactionBudget,
 ) -> Result<(), Error> {
     match source.proofs() {
-        Some(proofs) => proofs
-            .census(source, budget, path)?
-            .prove_exclusive_after_preflight(target, identifier, path, budget),
+        Some(proofs) => {
+            let (census, precharged_references) = proofs.census(source, budget, path)?;
+            census.prove_exclusive_after_preflight(
+                target,
+                identifier,
+                path,
+                budget,
+                precharged_references,
+            )
+        },
         None => {
             // Keep the non-memoized Pages/Keynote route under the same
             // admission ordering as the Numbers proof cache. The census is
             // built only after all work/allocation charges have succeeded.
-            preflight_reference_census(source, None, true, budget, path)?;
-            ReferenceCensus::build(source, None)
-                .prove_exclusive_after_preflight(target, identifier, path, budget)
+            let precharged_references =
+                preflight_reference_census(source, None, true, budget, path)?;
+            ReferenceCensus::build(source, None).prove_exclusive_after_preflight(
+                target,
+                identifier,
+                path,
+                budget,
+                precharged_references,
+            )
         },
     }
 }
@@ -2198,13 +2211,15 @@ impl PackageProofs {
         source: &dyn TableSource,
         budget: &mut TransactionBudget,
         path: Path,
-    ) -> Result<&ReferenceCensus, Error> {
+    ) -> Result<(&ReferenceCensus, usize), Error> {
         let build = self.census.get().is_none();
-        preflight_reference_census(source, self.inherited.as_ref(), build, budget, path)?;
-        Ok(self
+        let precharged_references =
+            preflight_reference_census(source, self.inherited.as_ref(), build, budget, path)?;
+        let census = self
             .census
             .get_or_init(|| Arc::new(ReferenceCensus::build(source, self.inherited.as_ref())))
-            .as_ref())
+            .as_ref();
+        Ok((census, precharged_references))
     }
 
     /// [`popup_metadata::inspect_cross_component_read`], memoized for
@@ -2401,6 +2416,7 @@ impl ReferenceCensus {
         identifier: u64,
         path: Path,
         budget: &mut TransactionBudget,
+        mut precharged_references: usize,
     ) -> Result<(), Error> {
         let refused =
             || Error::Refused(crate::cell_format::Refusal::UnsupportedDependency { path });
@@ -2426,7 +2442,9 @@ impl ReferenceCensus {
                 inspected = inspected
                     .checked_add(*occurrences)
                     .ok_or(Error::InvalidSource { path })?;
-                budget.charge_payload_references(*occurrences, path)?;
+                let replay_references = occurrences.saturating_sub(precharged_references);
+                precharged_references = precharged_references.saturating_sub(*occurrences);
+                budget.charge_payload_references(replay_references, path)?;
                 if unexpected {
                     return Err(refused());
                 }
@@ -2454,15 +2472,17 @@ impl ReferenceCensus {
 /// charged the same work only while replaying it. That made a cold, tiny-
 /// budget refusal perform an unadmitted package-wide inspection. This pass is
 /// intentionally structural: it reads only already-parsed object metadata,
-/// charges the complete cold-build bound up front, and leaves the strict
-/// `RejectUnknownMetadata` inspection to the admitted build below.
+/// charges the complete reference-occurrence and cold-build bounds up front,
+/// and leaves the strict `RejectUnknownMetadata` inspection to the admitted
+/// build below. The returned occurrence count is consumed by the proof replay
+/// so the same reference work is not charged a second time.
 fn preflight_reference_census(
     source: &dyn TableSource,
     inherited: Option<&InheritedCensus>,
     build: bool,
     budget: &mut TransactionBudget,
     path: Path,
-) -> Result<(), Error> {
+) -> Result<usize, Error> {
     let limits = source
         .archive_limits()
         .effective_archive_limits()
@@ -2472,6 +2492,7 @@ fn preflight_reference_census(
     let mut work = 0usize;
     let mut changed_components = 0usize;
     let mut changed_reference_objects = 0usize;
+    let mut references = 0usize;
     for component in source.catalog().iter() {
         let archive_key = archive_key(component.archive());
         let shared = inherited.and_then(|inherited| {
@@ -2496,11 +2517,18 @@ fn preflight_reference_census(
                 .ok_or(Error::InvalidSource { path })?;
             objects = objects.saturating_add(1);
             work = work.saturating_add(header_bytes.saturating_mul(4));
+            references = references.saturating_add(reference_occurrence_count(object));
             if shared.is_none() && object_reference_capacity(object) != 0 {
                 changed_reference_objects = changed_reference_objects.saturating_add(1);
             }
         }
     }
+
+    // `inspect_references_with_policy` reports every object and data
+    // reference in the already-parsed ArchiveInfo. Charge that complete
+    // bound before strict header inspection so a low reference ceiling
+    // refuses cold work without constructing a census first.
+    budget.charge_payload_references(references, path)?;
 
     // One logical allocation per replayed object is the existing proof
     // charge. A cold build additionally retains one object slice per changed
@@ -2514,7 +2542,8 @@ fn preflight_reference_census(
             .saturating_add(2);
     }
     budget.charge_allocations(allocations, path)?;
-    budget.charge_transaction_work(work, path)
+    budget.charge_transaction_work(work, path)?;
+    Ok(references)
 }
 
 fn archive_key(archive: &Archive) -> usize {
@@ -2536,6 +2565,32 @@ fn object_reference_capacity(object: &ArchiveObject) -> usize {
             )
         })
         .sum()
+}
+
+fn reference_occurrence_count(object: &ArchiveObject) -> usize {
+    object
+        .archive_info
+        .message_infos
+        .iter()
+        .map(|message| {
+            message
+                .object_references
+                .len()
+                .saturating_add(message.data_references.len())
+                .saturating_add(
+                    message
+                        .field_infos
+                        .iter()
+                        .map(|field| {
+                            field
+                                .object_references
+                                .len()
+                                .saturating_add(field.data_references.len())
+                        })
+                        .fold(0usize, usize::saturating_add),
+                )
+        })
+        .fold(0usize, usize::saturating_add)
 }
 
 /// Inspect every object of one component archive.
@@ -3077,7 +3132,13 @@ mod census_tests {
     fn prove(bytes: &[u8]) -> Result<(), Error> {
         let source = Memoized::open(&fixture("numbers/basic.numbers"));
         let mut budget = TransactionBudget::for_cell_control(&source);
-        census_of(bytes).prove_exclusive_after_preflight(target(), 20, Path::Package, &mut budget)
+        census_of(bytes).prove_exclusive_after_preflight(
+            target(),
+            20,
+            Path::Package,
+            &mut budget,
+            0,
+        )
     }
 
     fn fixture(name: &str) -> Vec<u8> {
@@ -3189,7 +3250,7 @@ mod census_tests {
         let bytes = fixture("numbers/basic.numbers");
         let parent = Memoized::open(&bytes);
         let mut budget = TransactionBudget::for_cell_control(&parent);
-        let census = parent
+        let (census, _) = parent
             .proofs
             .census(&parent, &mut budget, Path::Package)
             .expect("census");
@@ -3199,7 +3260,7 @@ mod census_tests {
         // Reopening identical bytes shares every parsed archive.
         let reopened = parent.reopen(&bytes);
         let mut budget = TransactionBudget::for_cell_control(&reopened);
-        let inherited = reopened
+        let (inherited, _) = reopened
             .proofs
             .census(&reopened, &mut budget, Path::Package)
             .expect("inherited census");
@@ -3218,7 +3279,7 @@ mod census_tests {
             .proofs
             .reopened(parent.catalog(), unrelated.catalog());
         let mut budget = TransactionBudget::for_cell_control(&unrelated);
-        let rebuilt = unrelated
+        let (rebuilt, _) = unrelated
             .proofs
             .census(&unrelated, &mut budget, Path::Package)
             .expect("rebuilt census");
@@ -3287,6 +3348,45 @@ mod census_tests {
     }
 
     #[test]
+    fn a_low_reference_budget_refuses_before_cold_census_inspection() {
+        let bytes = fixture("numbers/basic.numbers");
+        let cold = Memoized::open(&bytes);
+        let mut budget = TransactionBudget::for_cell_control(&cold);
+        budget.remaining_payload_references = 0;
+        assert!(matches!(
+            require_exclusive_selected_model_reference(
+                &cold,
+                target(),
+                20,
+                Path::Package,
+                &mut budget,
+            ),
+            Err(Error::Limit {
+                kind: crate::cell_format::LimitKind::PayloadReferences,
+                ..
+            })
+        ));
+        assert!(cold.proofs.census.get().is_none());
+    }
+
+    #[test]
+    fn candidate_reopen_budget_is_charged_before_readback() {
+        let bytes = fixture("numbers/basic.numbers");
+        let candidate = Memoized::open(&bytes);
+        let mut budget = TransactionBudget::for_cell_control(&candidate);
+        budget.remaining_payload_objects = 0;
+
+        assert!(matches!(
+            budget.charge_candidate_reopen(&candidate.catalog, Path::Package),
+            Err(Error::Limit {
+                kind: crate::cell_format::LimitKind::PayloadObjects,
+                ..
+            })
+        ));
+        assert_eq!(budget.remaining_payload_objects, 0);
+    }
+
+    #[test]
     fn a_changed_archive_is_reinspected_while_unchanged_archives_reuse_census() {
         let bytes = fixture("numbers/basic.numbers");
         let parent = Memoized::open(&bytes);
@@ -3347,7 +3447,7 @@ mod census_tests {
             .expect("reassemble candidate");
         let candidate = parent.reopen(&candidate_bytes);
         let mut candidate_budget = TransactionBudget::for_cell_control(&candidate);
-        let candidate_census = candidate
+        let (candidate_census, _) = candidate
             .proofs
             .census(&candidate, &mut candidate_budget, Path::Package)
             .expect("candidate census");
