@@ -94,6 +94,10 @@ pub enum LimitKind {
     PayloadItems,
     /// Semantic UTF-8 text retained by the reopened document.
     TextBytes,
+    /// Temporary graph scratch bytes.
+    ScratchBytes,
+    /// Fallible graph allocation events.
+    AllocationEvents,
 }
 
 impl fmt::Display for LimitKind {
@@ -106,6 +110,8 @@ impl fmt::Display for LimitKind {
             Self::WireWork => "wire work",
             Self::PayloadItems => "payload items",
             Self::TextBytes => "text bytes",
+            Self::ScratchBytes => "scratch bytes",
+            Self::AllocationEvents => "allocation events",
         })
     }
 }
@@ -180,6 +186,24 @@ impl From<GraphError> for Error {
 fn from_engine(error: litchi_iwa_style::graph::Error) -> Error {
     match error {
         litchi_iwa_style::graph::Error::Invalid(_) => Refusal::UnsupportedStyle.into(),
+        litchi_iwa_style::graph::Error::Limit {
+            kind: litchi_iwa_style::graph::GraphLimitKind::ScratchBytes,
+            observed,
+            maximum,
+        } => Error::Limit {
+            kind: LimitKind::ScratchBytes,
+            observed: observed as u64,
+            maximum: maximum as u64,
+        },
+        litchi_iwa_style::graph::Error::Limit {
+            kind: litchi_iwa_style::graph::GraphLimitKind::AllocationEvents,
+            observed,
+            maximum,
+        } => Error::Limit {
+            kind: LimitKind::AllocationEvents,
+            observed: observed as u64,
+            maximum: maximum as u64,
+        },
         _ => Error::InvalidSource,
     }
 }

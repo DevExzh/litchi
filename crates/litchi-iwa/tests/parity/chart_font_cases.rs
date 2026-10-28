@@ -96,7 +96,35 @@ fn host_read(bytes: &[u8], target: Target, chart: u64) -> TestResult<String> {
 fn engine_write(source: &[u8], chart: u64, change: &Change) -> TestResult<Vec<u8>> {
     let components = Components::read(source)?;
     let mut workspace = Workspace::new(&components.archives, CoreLimits::default())?;
-    chart_font::set(&mut workspace, chart, change)?;
+    let payload = components
+        .objects()
+        .find(|object| object.archive_info.identifier == Some(chart))
+        .and_then(|object| {
+            object
+                .messages
+                .iter()
+                .find(|message| message.type_ == 5_021)
+                .map(|message| message.data.as_slice())
+        })
+        .ok_or("missing chart payload")?;
+    // The parity fixture exercises the complete graph route: source index,
+    // every paragraph-style walk, stylesheet registration and candidate
+    // readback. Its explicit work profile is intentionally wider than the
+    // payload-only convenience profile; production owners derive this same
+    // residual from their package admission budget.
+    let base = chart_font::Limits::for_source(payload);
+    let fixture_limits = chart_font::Limits::new(
+        base.max_input_bytes().saturating_mul(4),
+        base.max_fields().saturating_mul(4),
+        base.max_output_bytes(),
+        base.max_nesting(),
+        base.max_work_bytes().saturating_mul(256),
+        base.max_text_bytes(),
+        base.max_allocations(),
+        base.max_retained_bytes().saturating_mul(4),
+        base.max_scratch_bytes().saturating_mul(8),
+    );
+    chart_font::set(&mut workspace, chart, change, fixture_limits)?;
     publish_changes(source, &components, workspace.finish())
 }
 
