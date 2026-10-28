@@ -807,3 +807,17 @@ supported root create/set/clear native acceptance from deferred host-only
 reply operations. No new release performance capture was made here: the
 historical captures in §§4.2–4.4 remain non-qualifying until F's reviewed
 Numbers proof and the coordinator's final clean-source twelve-route matrix.
+
+Combined handoff source `444c331122` is a real merge of the Pages proof
+follow-up and F's accepted Numbers proof tip `4b1f3000bc`. On that merged
+source, the Numbers comment target passed nine non-cost checks: root read with
+replies, set, create, create-identity mask control, clear, populated-neighbor
+clear, clear policy controls, clear storage/text controls, and the independent
+host-oracle control. The Numbers create/clear controls retain source-owned
+3056 metadata and reject identity, locality, duplicate, and low-limit
+corruption; their cost probes use the forward-only leaf route
+(open/edit/commit/serialize), while older captures that included inverse
+application remain historical and do not qualify final performance. The
+merged source also passed the six Pages comment checks above, formatting,
+feature-enabled all-target parity Clippy, and default-feature parity
+`--no-run`; no final release performance capture was made after this merge.
