@@ -9,6 +9,8 @@
 //!
 //! - [`chart_font`]: the chart-font graph engine (paragraph-style font
 //!   variations of a chart's text);
+//! - [`chart_text`]: the shared chart title, caption and axis-title wire
+//!   engines;
 //! - [`drawing`]: the stored drawing values (colors, strokes, fills) in both
 //!   directions;
 //! - [`media`]: the embedded-media inventory of a package;
@@ -30,6 +32,7 @@
 #![forbid(unsafe_code)]
 
 pub mod chart_font;
+pub mod chart_text;
 pub mod drawing;
 pub mod graph;
 pub mod line_end;

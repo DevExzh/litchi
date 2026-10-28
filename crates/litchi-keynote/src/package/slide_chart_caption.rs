@@ -41,9 +41,9 @@ use litchi_iwa_protos::package_metadata_codec::{
     inspect_package_metadata_with_visitor, prepare_package_metadata_additions_and_save_tokens,
     prepare_package_metadata_save_tokens,
 };
-use litchi_iwa_protos::{
-    keynote_chart_caption_codec, keynote_chart_caption_graph_codec as graph_codec,
-    keynote_movie_caption_codec, pages_movie_caption_codec,
+use litchi_iwa_protos::{keynote_movie_caption_codec, pages_movie_caption_codec};
+use litchi_iwa_style::chart_text::{
+    caption as keynote_chart_caption_codec, caption_graph as graph_codec,
 };
 use thiserror::Error as ThisError;
 
