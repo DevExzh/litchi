@@ -1,9 +1,9 @@
 # 0381 — W2-D: relocate the focused Numbers comment-read tests
 
 - Status: implementation slice on `uo2/iwa-w2d`, cut from
-  `feat/unified-ops-api` at `c650ba53f34faf334cf256fbc98fdb4b83d64335`.
-  Build and validation gates are intentionally pending the coordinator's
-  build-hold clearance; this record is not a merge or W3 deletion approval.
+  `feat/unified-ops-api` at `c650ba53f34faf334cf256fbc98fdb4b83d64335` and
+  validated after merging coordinator root `bb2475b8b0c11c8cef304178ee3fca1f590e9633`.
+  This record is not a merge or W3 deletion approval.
 - Date: 2026-10-28.
 - Plan: [0363](0363-iwa-monolith-exit-plan.md), W2-D; parity policy
   [0369](0369-iwa-exit-parity-harness-and-ledger.md). The historical
@@ -67,13 +67,32 @@ other focused graphs are generated in memory by the existing support module.
 No fixture was copied, no provenance changed, and no `3rdparty/` path was
 introduced. The host remains available as the differential oracle elsewhere.
 
-## 4. Deferred verification
+## 4. Verification on the merged work-package branch
 
-Per the coordinator build hold, no Cargo command, test, formatter, Clippy,
-boundary checker, fuzz lock, or benchmark has been run on this branch yet.
-After clearance, the targeted Numbers integration test and the normal scoped
-format/Clippy, rustdoc/glossary, boundary, ledger, and affected fuzz-lock
-checks must run on the final integrated trunk. The historical parity/cost
-targets remain in `litchi-iwa` and are not part of this relocation gate.
+The checks below ran at `60d6abb5fe478a149252e40da835644a1ff546e3`, with
+`CARGO_BUILD_JOBS=4`, `CARGO_INCREMENTAL=0`,
+`CARGO_PROFILE_DEV_DEBUG=0`, `CARGO_PROFILE_TEST_DEBUG=0`,
+`RUST_TEST_THREADS=8`, the coordinator OOM shim, and no benchmark or parity
+target changes. The glossary command retained its target outside the
+repository. Existing vendored `zlib-rs` and fuzz-target dead-code warnings did
+not fail any gate.
+
+| Check | Result |
+|---|---|
+| `cargo test -p litchi-numbers --test numbers_focused_comment_reads --all-features` | 17 passed, 0 failed |
+| `cargo fmt --all --check` | pass |
+| `cargo clippy -p litchi-numbers --test numbers_focused_comment_reads --all-features -- -D warnings` | pass |
+| `python3 tools/check_crate_boundaries.py` | pass; 70 packages, 313 declarations, 12 explicit debt items |
+| `python3 tools/iwa_exit_ledger.py --check` | pass |
+| `RUSTC_BOOTSTRAP=1 python3 tools/check_api_glossary.py --target-dir /home/zhuhe/code/litchi-worktrees/.coord/iwa-w2d-glossary-20261028` | pass; 73 profiles, 3,957 banned names, 708 transaction families, 125 immutable owners, 721 explicit result contracts |
+| `cargo check --locked --offline --manifest-path crates/litchi/fuzz/Cargo.toml --bins` | pass |
+| `cargo check --locked --offline --manifest-path crates/litchi-iwa-protos/fuzz/Cargo.toml --bins` | pass |
+| `python3 -m unittest tools.test_no_3rdparty_references tools.test_iwa_exit_ledger` | 17 passed |
+| `python3 -m unittest tools.test_check_api_glossary` | 58 passed |
+
+The historical parity/cost targets remain in `litchi-iwa` and were not
+changed or rerun as part of this relocation gate. The coordinator's full
+53-row gate, final integrated performance qualification, and native evidence
+remain coordinator-owned.
 
 No native queue entry is added or cleared by this slice.
