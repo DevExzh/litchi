@@ -484,25 +484,19 @@ fn pages_body_table_reads_parity() -> TestResult {
 fn pages_body_table_comment_read_case(name: &'static str) -> TestResult {
     let input = fixture(COMMENTS)?;
     assert_populated_comment_semantics(&input.bytes)?;
-    Case::new(
-        name,
-        Format::Pages,
-        Tier::A,
-        Evidence::Queued,
-        &input,
-    )
-    .read_only()
-    .host(|source| Ok(pages::Draft::from_bytes(source)?.to_bytes()?))
-    .leaf(|source| Ok(LeafRun::output(leaf_bytes!(Package::from_bytes(source)?))))
-    .read(
-        "host populated table comment thread",
-        host_populated_comment_thread,
-    )
-    .read(
-        "leaf populated table comment thread",
-        leaf_populated_comment_thread,
-    )
-    .run()?;
+    Case::new(name, Format::Pages, Tier::A, Evidence::Queued, &input)
+        .read_only()
+        .host(|source| Ok(pages::Draft::from_bytes(source)?.to_bytes()?))
+        .leaf(|source| Ok(LeafRun::output(leaf_bytes!(Package::from_bytes(source)?))))
+        .read(
+            "host populated table comment thread",
+            host_populated_comment_thread,
+        )
+        .read(
+            "leaf populated table comment thread",
+            leaf_populated_comment_thread,
+        )
+        .run()?;
     Ok(())
 }
 
