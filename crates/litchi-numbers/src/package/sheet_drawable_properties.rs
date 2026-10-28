@@ -191,18 +191,6 @@ impl From<Fault> for Error {
                 observed,
                 maximum,
             },
-            Fault::GraphLimit {
-                kind,
-                observed,
-                maximum,
-            } => Self::Limit {
-                kind: match kind {
-                    structure::GraphLimitKind::ScratchBytes => LimitKind::ScratchBytes,
-                    structure::GraphLimitKind::AllocationEvents => LimitKind::AllocationEvents,
-                },
-                observed,
-                maximum,
-            },
             Fault::Allocation { amount } => Self::Allocation { amount },
             Fault::Verification => Self::Verification,
         }

@@ -23,9 +23,9 @@
 // (`litchi_iwa_table::structure`, record 0379); Numbers keeps its sheet and
 // document helpers, the patch artifacts and the family macro here.
 pub(super) use litchi_iwa_table::structure::{
-    Fault, FaultLimit, FaultResult, GraphLimitKind, allocation, budget, collect, copy_bytes,
-    exact_source, formula, has_field, map_archive, map_core, map_wire, metadata, new_object, plan,
-    put_bytes, put_varint, references, reserve, source_owner, strip_fields, unique_message,
+    Fault, FaultLimit, FaultResult, allocation, budget, collect, copy_bytes, exact_source, formula,
+    has_field, map_archive, map_core, map_wire, metadata, new_object, plan, put_bytes, put_varint,
+    references, reserve, source_owner, strip_fields, unique_message,
 };
 
 /// The Numbers working set: the shared engine over a Numbers [`Package`].
@@ -244,14 +244,6 @@ macro_rules! structural_family {
                             FaultLimit::PackageBytes => LimitKind::PackageBytes,
                             FaultLimit::PayloadBytes => LimitKind::PayloadBytes,
                             FaultLimit::Identifiers => LimitKind::Identifiers,
-                        },
-                        observed,
-                        maximum,
-                    },
-                    Fault::GraphLimit { kind, observed, maximum } => Self::Limit {
-                        kind: match kind {
-                            $crate::package::structure::GraphLimitKind::ScratchBytes => LimitKind::ScratchBytes,
-                            $crate::package::structure::GraphLimitKind::AllocationEvents => LimitKind::AllocationEvents,
                         },
                         observed,
                         maximum,
