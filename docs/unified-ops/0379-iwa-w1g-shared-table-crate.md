@@ -346,6 +346,62 @@ family B, run A B B A, open + edit + commit + serialize), collected with
 The Keynote leaf route pays the slide-table selection proof and its
 inventory; it stays inside the 5% bar.
 
+### 4.1 Hidden-axis review rerun
+
+The review fix was measured again on source commit `d82fc08989`, based on
+merged candidate `4abb90f713`, after the canonical coordinate-value check and
+the lossless Numbers error mappings. The profiling binary was built from the
+same source bytes before the commit was created (the commit records the
+rustfmt-normalized mapping arms and the regression test) with the
+release-derived `profiling` profile
+(`lto = true`, debug information retained), then each probe ran on CPU 3 under
+`taskset`/callgrind with the host and leaf probes collected separately. The
+Numbers and Keynote probes used the prescribed A, B, B, A order; the Pages
+probe is a single focused facade route and therefore has no host-versus-leaf
+comparison.
+
+| Route | Host instructions | Leaf/focused instructions | Δ |
+|---|---:|---:|---:|
+| Numbers `numbers_hidden_axes_cost_abba` host/leaf probe | 62,529,923 | 51,213,830 | **−18.097%** |
+| Keynote `keynote_hidden_axes_cost_abba` host/leaf probe | 850,468,093 | 336,595,982 | **−60.422%** |
+| Pages `native_hidden_axes::hidden_axes_cost_probe` focused route | — | 34,078,005 | −0.100% vs the prior after probe |
+
+The Numbers and Keynote results are within the established cost bar. The
+Pages value is reported as an engine/facade probe only, not as host-vs-leaf
+parity or a qualification of the whole `File` stack. Raw callgrind output and
+the profiling binary remain outside the repository under
+`.coord/iwa-w1g/cg/`; the Numbers/Keynote profiling binary SHA-256 is
+`a13fceee820290d82e4f70a6fb0dd02f2a1a3164295874df55ca0fa711ffbbb5` and the
+Pages profiling binary SHA-256 is
+`31659bbaa0f9cdc44b427f3df59d4ad802ee7b0afbf7918807d51527a9786ebd`.
+
+The external artifact manifest is:
+
+| Artifact | Size | SHA-256 |
+|---|---:|---|
+| `/home/zhuhe/code/litchi-worktrees/uo2-iwa-w1g/target/profiling/deps/parity-15e248d1d90252bd` | 472,404,512 bytes | `a13fceee820290d82e4f70a6fb0dd02f2a1a3164295874df55ca0fa711ffbbb5` |
+| `/home/zhuhe/code/litchi-worktrees/uo2-iwa-w1g/target/profiling/deps/native_hidden_axes-007c6be3300edad5` | 34,327,072 bytes | `31659bbaa0f9cdc44b427f3df59d4ad802ee7b0afbf7918807d51527a9786ebd` |
+| `/home/zhuhe/code/litchi-worktrees/.coord/iwa-w1g/cg/current-numbers-host.out` | 465,419 bytes | `9c906f4b5a77a91933f8b28f2ff182567c7cb4c97b15864b93c36d506cfc5224` |
+| `/home/zhuhe/code/litchi-worktrees/.coord/iwa-w1g/cg/current-numbers-leaf.out` | 618,093 bytes | `aa13f8db95fbb50eff795e25c021d8a4be68209a07da2fa15664181da05acd5a` |
+| `/home/zhuhe/code/litchi-worktrees/.coord/iwa-w1g/cg/current-keynote-host.out` | 687,987 bytes | `655bdb7a7f8f28dd649ba8d378eb614169d6396bdbd3053444c5f3c4d37b341e` |
+| `/home/zhuhe/code/litchi-worktrees/.coord/iwa-w1g/cg/current-keynote-leaf.out` | 705,093 bytes | `394ab2d4fcbfa7cdda94dd6ed16c6738fb882550ddab3de82d35706a5cde7ec3` |
+| `/home/zhuhe/code/litchi-worktrees/.coord/iwa-w1g/cg/current-pages.out` | 599,645 bytes | `5baad48d0c85f6a81311c03e82f5cbd551e8da588ada687807b8623b0c499d1c` |
+
+The two binaries are in this worktree's untracked `target/`; the callgrind
+captures are in the external coordinator directory. None is repository
+evidence. To regenerate them, source `iwa-w1g/env.sh`, build with
+`CARGO_BUILD_JOBS=4 cargo test --profile profiling -p litchi-iwa --test parity
+--all-features --no-run --locked` and
+`CARGO_BUILD_JOBS=4 cargo test --profile profiling -p litchi-pages --test
+native_hidden_axes --no-run --locked`, then run each ignored test with
+`taskset -c 3 valgrind --tool=callgrind --quiet
+--callgrind-out-file=<external-output> --toggle-collect=<probe>
+<profiling-binary> --ignored --exact <test> --test-threads=1` in A, B, B, A
+order. The Numbers and Keynote test names are
+`numbers_hidden_axes_cases::numbers_hidden_axes_cost_abba` and
+`keynote_hidden_axes_cases::keynote_hidden_axes_cost_abba`; the Pages test is
+`hidden_axes_cost_probe`.
+
 ## 5. Gaps
 
 | Gap | Finding | Next step |
@@ -390,3 +446,23 @@ nothing for every commit.
 The capability and registry goldens and the OfficeCLI corpus pass unchanged
 inside the litchi-ops chunks; no `litchi-ops` dispatch changed (owner
 decision D7), so they were not re-blessed.
+
+The table above is historical evidence from the earlier group-1 and group-6
+commits; it is not a complete gate for the current integrated tree.  The
+review follow-up was rerun on source commit `d82fc08989`, based on merged
+candidate `4abb90f713` (code fix `828d02cad9`, with the current
+`feat/unified-ops-api` parent), as follows:
+
+- the owner-extents unit tests (including the non-canonical value-varint
+  refusal), Numbers hidden-axis facade tests (including the low-limit
+  candidate readback regression), and the active Numbers/Keynote parity
+  cases passed on that source tree;
+- `cargo fmt --all --check`, the focused `litchi-iwa-table`/`litchi-numbers`
+  Clippy gate, the exit-ledger check, crate-boundary and API-glossary checks,
+  the non-iWork gate, and the affected no-`3rdparty` tests were rerun on this
+  source tree;
+- a new release callgrind ABBA run on this same candidate is recorded in the
+  coordinator scratch directory named above (§4.1); it measured −18.097% for
+  Numbers and −60.422% for Keynote, while the Pages focused route was
+  34,078,005 instructions. The historical values in this record remain
+  context only until the coordinator's final integrated-tree qualification.
