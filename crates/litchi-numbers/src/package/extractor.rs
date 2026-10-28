@@ -5374,6 +5374,12 @@ fn map_formula_render_decode_error(error: numbers_formula_codec::DecodeError) ->
             maximum,
             path: SemanticPath::StructuredTables,
         },
+        Some(DecodeLimit::Owners { observed, maximum }) => Error::SemanticLimit {
+            kind: SemanticLimitKind::References,
+            observed,
+            maximum,
+            path: SemanticPath::StructuredTables,
+        },
         Some(DecodeLimit::Text { observed, maximum }) => Error::SemanticLimit {
             kind: SemanticLimitKind::TextBytes,
             observed,

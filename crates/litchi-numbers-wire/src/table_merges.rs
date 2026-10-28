@@ -951,6 +951,9 @@ fn map_formula_error(error: numbers_formula_codec::DecodeError) -> Error {
         Some(DecodeLimit::Nodes { observed, maximum }) => {
             limit(LimitKind::Fields, observed, maximum)
         },
+        Some(DecodeLimit::Owners { observed, maximum }) => {
+            limit(LimitKind::Fields, observed, maximum)
+        },
         Some(DecodeLimit::Text { observed, maximum }) => {
             limit(LimitKind::InputBytes, observed, maximum)
         },

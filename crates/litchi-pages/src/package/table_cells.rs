@@ -1708,6 +1708,11 @@ fn map_formula_decode_error(error: litchi_iwa_protos::numbers_formula_codec::Dec
             observed: usize_as_u64(observed),
             maximum: usize_as_u64(maximum),
         },
+        Some(DecodeLimit::Owners { observed, maximum }) => Error::Limit {
+            kind: LimitKind::PayloadReferences,
+            observed: usize_as_u64(observed),
+            maximum: usize_as_u64(maximum),
+        },
         Some(DecodeLimit::Nesting { observed, maximum }) => Error::Limit {
             kind: LimitKind::WireNesting,
             observed: u64::from(observed),

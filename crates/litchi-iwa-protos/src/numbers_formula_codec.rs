@@ -29,6 +29,7 @@ pub struct DecodeOptions {
     max_work: usize,
     recursion_limit: u32,
     max_nodes: usize,
+    max_owner_entries: usize,
     max_text_bytes: usize,
     allow_opaque_unknown_fields: bool,
     allow_unknown_functions: bool,
@@ -52,12 +53,25 @@ impl DecodeOptions {
             max_work,
             recursion_limit,
             max_nodes,
+            max_owner_entries: max_nodes,
             max_text_bytes,
             allow_opaque_unknown_fields: false,
             allow_unknown_functions: false,
             render_recursion_limit: MAX_RENDER_DEPTH,
             render_mode: false,
         }
+    }
+
+    /// Set the independent ceiling for resolved formula-owner registry entries.
+    ///
+    /// Formula AST nodes and owner-registry entries are separate bounded
+    /// resources: a one-node scalar formula may still need a multi-owner
+    /// registry when it is authored in a workbook with several formula
+    /// owners.
+    #[must_use]
+    pub const fn with_max_owner_entries(mut self, maximum: usize) -> Self {
+        self.max_owner_entries = maximum;
+        self
     }
 
     /// Permit unknown, canonically framed fields to remain opaque while the
@@ -341,10 +355,11 @@ pub fn plan_resolved_formula_read_registry<'source>(
     internal_order: &'source [usize],
     options: DecodeOptions,
 ) -> Result<FormulaReadRegistryPlan<'source>, DecodeError> {
-    if owners.len() > options.max_nodes || internal_order.len() > options.max_nodes {
-        return Err(DecodeError::limited(DecodeLimit::Nodes {
+    if owners.len() > options.max_owner_entries || internal_order.len() > options.max_owner_entries
+    {
+        return Err(DecodeError::limited(DecodeLimit::Owners {
             observed: owners.len().max(internal_order.len()),
-            maximum: options.max_nodes,
+            maximum: options.max_owner_entries,
         }));
     }
     if owners.len() != internal_order.len() {
@@ -424,10 +439,10 @@ pub fn execute_resolved_formula_read_registry_plan(
             maximum: options.max_bytes,
         }));
     }
-    if plan.requirements.owners > options.max_nodes {
-        return Err(DecodeError::limited(DecodeLimit::Nodes {
+    if plan.requirements.owners > options.max_owner_entries {
+        return Err(DecodeError::limited(DecodeLimit::Owners {
             observed: plan.requirements.owners,
-            maximum: options.max_nodes,
+            maximum: options.max_owner_entries,
         }));
     }
     if plan.requirements.work > options.max_work {
@@ -1127,6 +1142,7 @@ pub enum DecodeLimit {
     Work { observed: usize, maximum: usize },
     Nesting { observed: u32, maximum: u32 },
     Nodes { observed: usize, maximum: usize },
+    Owners { observed: usize, maximum: usize },
     Text { observed: usize, maximum: usize },
     Allocation { requested: usize },
 }
@@ -1506,10 +1522,10 @@ fn plan_formula_archive_in<'nodes, 'text>(
             maximum: options.max_nodes,
         }));
     }
-    if owners.len() > options.max_nodes {
-        return Err(DecodeError::limited(DecodeLimit::Nodes {
+    if owners.len() > options.max_owner_entries {
+        return Err(DecodeError::limited(DecodeLimit::Owners {
             observed: owners.len(),
-            maximum: options.max_nodes,
+            maximum: options.max_owner_entries,
         }));
     }
     let owner_work = owners
@@ -8223,6 +8239,70 @@ mod tests {
         let options = broad_write_options();
         let plan = plan_resolved_formula_read_registry(owners, &order, options).unwrap();
         execute_resolved_formula_read_registry_plan(plan, options).unwrap()
+    }
+
+    #[test]
+    fn resolved_formula_owner_registry_has_independent_ceiling() {
+        let context = FormulaWriteContext::new(7, 0, 0, 4, 4);
+        let owners = [
+            ResolvedFormulaWriteOwner::new(FormulaWriteOwnerUid::from_halves(1, 1), 8, 4, 4),
+            ResolvedFormulaWriteOwner::new(FormulaWriteOwnerUid::from_halves(2, 2), 9, 4, 4),
+            ResolvedFormulaWriteOwner::new(FormulaWriteOwnerUid::from_halves(3, 3), 10, 4, 4),
+        ];
+        let nodes = [FormulaWriteNode::Number(7.0)];
+        let options = write_options(8 * 1024 * 1024, 1_000_000, 100_000_000, 1, 1_000_000, 16)
+            .with_max_owner_entries(owners.len())
+            .with_render_recursion_limit(256);
+        let plan = plan_resolved_formula_archive(
+            &nodes,
+            context,
+            &owners,
+            FormulaWriteDependencyLimits::new(0, 0),
+            options,
+        )
+        .expect("three resolved owners must not widen the one-node AST ceiling");
+        assert_eq!(plan.requirements().nodes(), 1);
+        let (output, report) = execute_formula_archive_plan(plan, options).unwrap();
+        assert_eq!(report.requirements().nodes(), 1);
+        assert!(!output.is_empty());
+
+        let too_many_nodes = [
+            FormulaWriteNode::Number(1.0),
+            FormulaWriteNode::Number(2.0),
+            FormulaWriteNode::Binary(BinaryOperator::Add),
+        ];
+        assert!(matches!(
+            plan_resolved_formula_archive(
+                &too_many_nodes,
+                context,
+                &owners,
+                FormulaWriteDependencyLimits::new(0, 0),
+                options,
+            )
+            .unwrap_err()
+            .resource_limit(),
+            Some(DecodeLimit::Nodes {
+                observed: 3,
+                maximum: 1,
+            })
+        ));
+
+        let too_few_owners = options.with_max_owner_entries(2);
+        assert!(matches!(
+            plan_resolved_formula_archive(
+                &nodes,
+                context,
+                &owners,
+                FormulaWriteDependencyLimits::new(0, 0),
+                too_few_owners,
+            )
+            .unwrap_err()
+            .resource_limit(),
+            Some(DecodeLimit::Owners {
+                observed: 3,
+                maximum: 2,
+            })
+        ));
     }
 
     #[derive(Default)]
