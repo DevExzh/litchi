@@ -1,0 +1,37 @@
+{
+  "record": "0377a",
+  "schema": "litchi.unified-fin-perf.xlsx-batch-repair.v1",
+  "date": "2026-10-28",
+  "route": "xlsx_eager_cell_value_set_batch1000",
+  "group": "F3",
+  "metric": "callgrind Ir",
+  "counted_calls": 1,
+  "warmup": "one uncounted call; fin_perf_region only",
+  "cpu": 47,
+  "order": ["base", "candidate", "candidate", "base"],
+  "candidate_source_commit": "1abe5a5cf794a4ec78de7f51f4c346e77cf4e28b",
+  "baseline_source_commit": "839212fa9da2e4eff14dcae9c3aa242e49f25729",
+  "harness_main_sha256": "551e5440ae82bfe983fb74c8a5e4e36e727176469efda0998e9b3c29d79b1a4d",
+  "candidate_binary": {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/fin-perf/bin/fin-cand-1abe5a5cf7-debug1",
+    "size_bytes": 385525480,
+    "sha256": "0c55e2ab3f8142003c16b0431049924c923397774a85a0946d0e38cc64074c22"
+  },
+  "baseline_binary": {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/fin-perf/bin/fin-base",
+    "size_bytes": 362495936,
+    "sha256": "1c8d4b7abdf94f7d3ad0a7b6665cf512a4ebbc9ae9d76786d76779e1f96e883b"
+  },
+  "raw_capture_directory": "/home/zhuhe/code/litchi-worktrees/.coord/fin-perf/repair-1abe5a5cf7-batch1000-debug1",
+  "totals_ir": {
+    "01-base": 30048818,
+    "02-candidate": 30290668,
+    "03-candidate": 30209692,
+    "04-base": 30055506
+  },
+  "paired_ratios": [1.008048569, 1.005130042],
+  "median_ratio": 1.006589306,
+  "worst_ratio": 1.008048569,
+  "threshold": 1.05,
+  "result": "pass"
+}
