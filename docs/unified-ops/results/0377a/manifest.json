@@ -1,0 +1,54 @@
+{
+  "record": "0377a",
+  "measurement": "F2 source-bound callgrind remeasurement",
+  "date": "2026-10-28",
+  "candidate_source_commit": "123409faecd8f6d5451e4d368ff21617e89f8289",
+  "baseline_source_commit": "839212fa9da2e4eff14dcae9c3aa242e49f25729",
+  "harness_sha256": "551e5440ae82bfe983fb74c8a5e4e36e727176469efda0998e9b3c29d79b1a4d",
+    "build": {
+        "candidate_cwd": "/home/zhuhe/code/litchi-worktrees/uo2-fin-perf",
+        "candidate_command": "PATH=/home/zhuhe/code/litchi-worktrees/.coord/bin:$HOME/.cargo/bin:$PATH CARGO_TARGET_DIR=/home/zhuhe/code/litchi-worktrees/uo2-fin-perf/target CARGO_INCREMENTAL=0 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_BUILD_JOBS=6 cargo build --release --offline --manifest-path tools/perf-baseline/unified-fin-perf/Cargo.toml",
+        "baseline_cwd": "/home/zhuhe/code/litchi-worktrees/.coord/fin-perf/base",
+        "baseline_command": "PATH=/home/zhuhe/code/litchi-worktrees/.coord/bin:$HOME/.cargo/bin:$PATH CARGO_TARGET_DIR=/home/zhuhe/code/litchi-worktrees/.coord/fin-perf/base-target CARGO_INCREMENTAL=0 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_BUILD_JOBS=6 cargo build --release --offline --manifest-path tools/perf-baseline/unified-fin-perf/Cargo.toml --features base",
+        "harness_source": "tools/perf-baseline/unified-fin-perf",
+        "binary_copy": "cp target/release/unified-fin-perf /home/zhuhe/code/litchi-worktrees/.coord/fin-perf/bin/fin-cand"
+    },
+  "baseline_binary": {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/fin-perf/bin/fin-base",
+    "sha256": "1c8d4b7abdf94f7d3ad0a7b6665cf512a4ebbc9ae9d76786d76779e1f96e883b",
+        "size_bytes": 362495936
+  },
+  "candidate_binary": {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/fin-perf/bin/fin-cand",
+    "sha256": "7da00dec5c3eb61eb4824919b88cfbec7bf9a6df9c95a776b98af31ead152cd6",
+    "size_bytes": 384736336
+  },
+  "raw_capture_directory": "/home/zhuhe/code/litchi-worktrees/.coord/fin-perf/cga-f2-final2-20261028",
+  "raw_summary": "/home/zhuhe/code/litchi-worktrees/.coord/fin-perf/cga-f2-final2-20261028.tsv",
+  "command": "CGDIR=cga-f2-final2-20261028 cg-list.sh <(awk '$2 ~ /^(docx|xlsx|pptx)_eager_metadata_title_set$/' routes.tsv) cga-f2-final2-20261028.tsv 'base cand' 2",
+  "counted_calls_per_route": 3,
+  "warmup": "one uncounted call on both sides; fin_perf_region only",
+  "rows": [
+    {
+      "route": "docx_eager_metadata_title_set",
+      "leaf_base_ir": 70759.666667,
+      "leaf_candidate_ir": 66416.666667,
+      "unified_base_ir": 73196.333333,
+      "unified_candidate_ir": 70695.666667
+    },
+    {
+      "route": "xlsx_eager_metadata_title_set",
+      "leaf_base_ir": 135227.666667,
+      "leaf_candidate_ir": 135060.0,
+      "unified_base_ir": 138899.0,
+      "unified_candidate_ir": 142310.0
+    },
+    {
+      "route": "pptx_eager_metadata_title_set",
+      "leaf_base_ir": 1413128.0,
+      "leaf_candidate_ir": 1338478.333333,
+      "unified_base_ir": 1419234.666667,
+      "unified_candidate_ir": 1349360.333333
+    }
+  ]
+}

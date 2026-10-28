@@ -108,7 +108,10 @@ impl<R: Read + Seek> Reader<R> {
             .map(|_| ())
     }
 
-    fn validate_package_ole_file(ole: &OleFile<R>, source_limits: SourceLimits) -> Result<()> {
+    pub(crate) fn validate_package_ole_file(
+        ole: &OleFile<R>,
+        source_limits: SourceLimits,
+    ) -> Result<()> {
         validate_package_size(ole.file_size(), source_limits)?;
 
         // Verify it's a Word document by checking for the WordDocument stream
@@ -469,8 +472,14 @@ pub fn open_package(
     Reader::<Cursor<Vec<u8>>>::validate_package_ole_file(&ole, source_limits)?;
     let leniency = options.leniency_value();
     match Document::from_ole_with_options(&mut ole, options) {
-        Ok(document) => Package::from_validated_ole(ole, document, source_limits, leniency)
-            .map(OpenOutcome::Opened),
+        Ok(document) => Package::from_validated_ole(
+            ole,
+            document,
+            source_limits,
+            leniency,
+            leniency == Leniency::Strict,
+        )
+        .map(OpenOutcome::Opened),
         Err(Error::PasswordRequired) => Ok(OpenOutcome::PasswordRequired(Box::new(ole))),
         Err(error) => Err(error),
     }
@@ -675,18 +684,29 @@ impl Package {
         let source_limits = options.source_limits_value();
         let leniency = options.leniency_value();
         let document = Document::from_ole_with_options(&mut raw.ole, options)?;
-        Self::from_validated_ole(raw.ole, document, source_limits, leniency)
+        Self::from_validated_ole(
+            raw.ole,
+            document,
+            source_limits,
+            leniency,
+            leniency == Leniency::Strict,
+        )
     }
 
     /// Adopt an already parsed and fully validated candidate without opening
     /// its CFB container a second time.  The caller must have applied the same
     /// package and semantic validation gates used by [`Self::from_raw`].
+    /// `strict_parse` says the caller parsed `document` under the default
+    /// leniency and `source_limits`; with no encryption, that is the reader
+    /// gate a body snapshot of these bytes applies.
     pub(crate) fn from_validated_ole(
         ole: OleFile<Cursor<Vec<u8>>>,
         document: Document,
         source_limits: SourceLimits,
         leniency: Leniency,
+        strict_parse: bool,
     ) -> Result<Self> {
+        let strict_document = strict_parse && !document.fib().is_encrypted();
         // The semantic document open has already charged these streams, but
         // adoption has a second metadata path through SharedOleFile. Repeat
         // the allocation-free directory preflight immediately before that
@@ -709,6 +729,7 @@ impl Package {
             leniency,
             edit_profile: None,
             body_source: Arc::default(),
+            strict_document,
         })
     }
 

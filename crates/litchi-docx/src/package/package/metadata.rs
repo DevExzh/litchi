@@ -225,6 +225,29 @@ impl Package {
             return Err(Error::Signed);
         }
 
+        // A core-only change reads and diffs only the core family, and the
+        // published slot is the value just written (record 0377a).
+        if !has_parts {
+            let mut package = self.clone();
+            let mut core_patch = families::Patch::default();
+            package.edit_semantic_opc_known("edit_metadata", |opc| {
+                let (commit, core) =
+                    families::publish_core_metadata(opc, Host::Word, target.cloned())
+                        .map_err(crate::Error::from)?;
+                let (core_package, committed_core_patch) = commit.into_parts();
+                *opc = core_package;
+                core_patch = committed_core_patch;
+                let slot = litchi_ooxml_common::properties::Slot::published(opc, core);
+                Ok(((), Some(slot)))
+            })?;
+            return Ok((
+                package,
+                !core_patch.is_noop(),
+                families::Patch::default(),
+                core_patch,
+            ));
+        }
+
         let mut package = self.clone();
         let mut parts_failure = None;
         let mut core_patch = families::Patch::default();

@@ -697,21 +697,30 @@ fn write_new_row(
         return Ok(());
     }
     let name = sibling_name(sheet_data_name, "row");
-    let tag = Tag {
-        name: name.clone().into_boxed_str(),
-        attributes: Box::new([]),
-    };
-    let mut appended = vec![("r", number.to_string())];
-    let mut removed = Vec::new();
     if let Some(action) = edits.row {
+        let tag = Tag {
+            name: name.clone().into_boxed_str(),
+            attributes: Box::new([]),
+        };
+        let mut appended = vec![("r", number.to_string())];
+        let mut removed = Vec::new();
         row_effect_attributes(action, descent_name, &mut removed, &mut appended);
+        write_tag(output, &tag, !creates_cell, &removed, &appended);
+    } else {
+        // A row with no row-level effect: the same bytes `write_tag` writes
+        // for its one `r` attribute, without the per-row tag and list.
+        output.push(b'<');
+        output.extend_from_slice(name.as_bytes());
+        output.extend_from_slice(b" r=\"");
+        output.extend_from_slice(number.to_string().as_bytes());
+        output.extend_from_slice(if creates_cell { b"\">" } else { b"\"/>" });
     }
-    write_tag(output, &tag, !creates_cell, &removed, &appended);
     if !creates_cell {
         return Ok(());
     }
+    let cell_name = sibling_name(&name, "c");
     for (address, action) in &edits.cells {
-        write_new_action(output, &name, *address, action)?;
+        write_new_cell(output, &cell_name, *address, action)?;
     }
     write_close(output, &name);
     Ok(())
@@ -838,6 +847,19 @@ fn write_new_action(
     address: Address,
     action: &Action,
 ) -> Result<()> {
+    write_new_cell(output, &sibling_name(row_name, "c"), address, action)
+}
+
+/// Write one created cell. `name` is the cell element's qualified name (the
+/// row's prefix and `c`); the tag is written directly, byte-identical to
+/// `write_tag` with the same attributes, without a per-cell tag, attribute
+/// list or address string (record 0377a).
+fn write_new_cell(
+    output: &mut Vec<u8>,
+    name: &str,
+    address: Address,
+    action: &Action,
+) -> Result<()> {
     let Action::Update { payload, style } = action else {
         return Ok(());
     };
@@ -853,23 +875,23 @@ fn write_new_action(
                 | Payload::Rich(_)
         )
     });
-    let name = sibling_name(row_name, "c");
-    let tag = Tag {
-        name: name.clone().into_boxed_str(),
-        attributes: Box::new([]),
-    };
-    let mut appended = vec![("r", address.a1())];
+    output.push(b'<');
+    output.extend_from_slice(name.as_bytes());
+    // An A1 label is letters and digits: XML escaping leaves it unchanged.
+    output.extend_from_slice(b" r=\"");
+    address.append_a1(output);
+    output.push(b'"');
     if let Some(cell_type) = content.and_then(payload_type) {
-        appended.push(("t", cell_type.to_owned()));
+        write_attribute(output, "t", cell_type);
     }
     if let Some(StyleEffect::Set(key)) = style {
-        appended.push(("s", key.to_string()));
+        write_attribute(output, "s", &key.to_string());
     }
     let empty = content.is_none();
-    write_tag(output, &tag, empty, &[], &appended);
+    output.extend_from_slice(if empty { b"/>" } else { b">" });
     if let Some(content) = content {
-        write_payload(output, &name, content)?;
-        write_close(output, &name);
+        write_payload(output, name, content)?;
+        write_close(output, name);
     }
     Ok(())
 }

@@ -128,9 +128,14 @@ pub fn fin_perf_region<T>(call: impl FnOnce() -> Result<T>) -> Result<T> {
     black_box(call())
 }
 
+/// The uncounted twin. Its body must differ from [`fin_perf_region`]'s:
+/// with identical bodies the two are folded into one symbol, and callgrind
+/// then counts the warm-up call too (record 0377a).
 #[inline(never)]
 fn uncounted<T>(call: impl FnOnce() -> Result<T>) -> Result<T> {
-    black_box(call())
+    let output = call();
+    black_box(COUNTING.load(Ordering::Relaxed));
+    black_box(output)
 }
 
 pub fn run_timed<T>(call: impl FnOnce() -> Result<T>) -> Result<(T, Duration)> {
