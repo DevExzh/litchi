@@ -114,15 +114,15 @@ fn engine_write(source: &[u8], chart: u64, change: &Change) -> TestResult<Vec<u8
     // residual from their package admission budget.
     let base = chart_font::Limits::for_source(payload);
     let fixture_limits = chart_font::Limits::new(
-        base.max_input_bytes(),
-        base.max_fields(),
+        base.max_input_bytes().saturating_mul(4),
+        base.max_fields().saturating_mul(4),
         base.max_output_bytes(),
         base.max_nesting(),
         base.max_work_bytes().saturating_mul(256),
         base.max_text_bytes(),
         base.max_allocations(),
-        base.max_retained_bytes(),
-        base.max_scratch_bytes(),
+        base.max_retained_bytes().saturating_mul(4),
+        base.max_scratch_bytes().saturating_mul(8),
     );
     chart_font::set(&mut workspace, chart, change, fixture_limits)?;
     publish_changes(source, &components, workspace.finish())
