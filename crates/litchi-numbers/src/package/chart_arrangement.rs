@@ -33,7 +33,7 @@ use litchi_iwa_protos::chart_arrangement_codec::{
     RewriteExecutionRequirements,
 };
 use litchi_iwa_protos::numbers_sheet_order_codec;
-use litchi_iwa_protos::{chart_data_codec, chart_metadata_codec};
+use litchi_iwa_protos::{chart_data_codec, chart_metadata_codec, chart_style_codec};
 use thiserror::Error as ThisError;
 
 use super::{Error as PackageError, Package};
@@ -781,6 +781,55 @@ impl ChartBudget {
             .and_then(|limits| limits.with_rewrite_work(work))
             .and_then(|limits| limits.with_nesting(nesting))
             .map_err(|_| Error::InvalidSource)
+    }
+
+    /// Build the strict chart-reference codec limits from the ledger's
+    /// residual wire budgets.  Reference discovery is a package-wide proof,
+    /// so it must never re-enter the codec with its process-wide defaults.
+    pub(super) fn reference_codec_limits(
+        &self,
+        payload: &[u8],
+    ) -> Result<chart_style_codec::Limits, Error> {
+        let limits = self.residual_wire_limits()?;
+        chart_style_codec::Limits::DEFAULT
+            .with_max_bytes(
+                limits
+                    .max_input_bytes()
+                    .min(payload.len().max(1))
+                    .min(256 * 1024 * 1024),
+            )
+            .and_then(|value| value.with_max_fields(limits.max_fields().clamp(1, 16 * 1024 * 1024)))
+            .map_err(|_| Error::InvalidSource)
+    }
+
+    /// Admit the work and temporary reference-vector capacity before the
+    /// reference codec is allowed to allocate.
+    pub(super) fn preflight_reference_scan(&self, payload: &[u8]) -> Result<(), Error> {
+        self.preflight_work(payload.len())?;
+        self.preflight_allocations(1)?;
+        self.preflight_retained(
+            payload
+                .len()
+                .checked_mul(size_of::<u64>())
+                .ok_or(Error::InvalidSource)?,
+        )
+    }
+
+    /// Charge one completed reference scan against the actual number of
+    /// references returned by the codec.
+    pub(super) fn charge_reference_scan(
+        &mut self,
+        payload: &[u8],
+        references: usize,
+    ) -> Result<(), Error> {
+        self.work(payload.len())?;
+        self.allocations(1)?;
+        self.retained(
+            references
+                .checked_mul(size_of::<u64>())
+                .ok_or(Error::InvalidSource)?,
+        )?;
+        self.references(references)
     }
 
     fn codec_options(&self, source: &[u8]) -> Result<DecodeOptions, Error> {
@@ -2206,6 +2255,102 @@ pub(super) fn verify_locality(
     Ok(())
 }
 
+/// Prove that a focused chart-text publication changed only one archive
+/// message while retaining every other ZIP member and object byte.
+pub(super) fn verify_message_locality(
+    source: &Package,
+    candidate: &Package,
+    component_name: &str,
+    component_index: usize,
+    object_index: usize,
+    object_identifier: u64,
+    message_index: usize,
+    message_type: u32,
+    expected_payload: &[u8],
+    budget: &mut ChartBudget,
+) -> Result<(), Error> {
+    let source_catalog = physical_catalog(source)?;
+    let candidate_catalog = physical_catalog(candidate)?;
+    verify_package_entries(source_catalog, candidate_catalog, component_name)?;
+    let source_component = source
+        .state
+        .components
+        .catalog()
+        .get_index(component_index)
+        .ok_or(Error::InvalidSource)?;
+    let candidate_component = candidate
+        .state
+        .components
+        .catalog()
+        .get_index(component_index)
+        .ok_or(Error::InvalidSource)?;
+    if source_component.name() != component_name
+        || candidate_component.name() != component_name
+        || source_component.archive().objects.len() != candidate_component.archive().objects.len()
+    {
+        return Err(Error::Verification);
+    }
+    let archive_limits = source_catalog
+        .limits()
+        .effective_archive_limits()
+        .map_err(|_| Error::InvalidSource)?;
+    let mut selected_seen = false;
+    for (index, (before, after)) in source_component
+        .archive()
+        .objects
+        .iter()
+        .zip(&candidate_component.archive().objects)
+        .enumerate()
+    {
+        budget.work(
+            archive_object_work(before)?
+                .checked_add(archive_object_work(after)?)
+                .ok_or(Error::InvalidSource)?,
+        )?;
+        if index != object_index {
+            if !before.same_content_ignoring_offsets(after) {
+                return Err(Error::Verification);
+            }
+            continue;
+        }
+        selected_seen = true;
+        if before.archive_info.identifier != Some(object_identifier)
+            || after.archive_info.identifier != Some(object_identifier)
+        {
+            return Err(Error::Verification);
+        }
+        let message = after
+            .messages
+            .get(message_index)
+            .filter(|message| message.type_ == message_type)
+            .ok_or(Error::Verification)?;
+        if message.data.as_slice() != expected_payload {
+            return Err(Error::Verification);
+        }
+        let mut expected = before.clone();
+        expected
+            .replace_message_preserving_header(
+                message_index,
+                RawMessage {
+                    type_: message_type,
+                    data: message.data.clone(),
+                },
+                archive_limits,
+            )
+            .map_err(|_| Error::Verification)?;
+        expected.header_length = after.header_length;
+        expected.data_length = after.data_length;
+        if !expected.same_content_ignoring_offsets(after) {
+            return Err(Error::Verification);
+        }
+    }
+    if selected_seen {
+        Ok(())
+    } else {
+        Err(Error::Verification)
+    }
+}
+
 fn verify_package_entries(
     source_catalog: &SourceCatalog,
     candidate_catalog: &SourceCatalog,
@@ -2349,10 +2494,54 @@ fn same_entry_fixed_metadata(left: &Entry, right: &Entry) -> bool {
 }
 
 fn same_selected_entry_records(left: &Entry, right: &Entry) -> bool {
-    same_selected_central_record(
+    zip_local_header_preserved(
+        left.raw_record().local_record(),
+        right.raw_record().local_record(),
+    ) && same_selected_central_record(
         left.raw_record().central_directory_record(),
         right.raw_record().central_directory_record(),
     )
+}
+
+fn zip_local_header_preserved(left: &[u8], right: &[u8]) -> bool {
+    let Some(left_len) = zip_local_header_len(left) else {
+        return false;
+    };
+    let Some(right_len) = zip_local_header_len(right) else {
+        return false;
+    };
+    left_len == right_len
+        && zip_record_equal_outside(&left[..left_len], &right[..right_len], &[(14, 26)])
+}
+
+fn zip_local_header_len(record: &[u8]) -> Option<usize> {
+    if record.len() < 30 || record.get(..4) != Some(b"PK\x03\x04") {
+        return None;
+    }
+    let name = usize::from(u16::from_le_bytes([record[26], record[27]]));
+    let extra = usize::from(u16::from_le_bytes([record[28], record[29]]));
+    30usize
+        .checked_add(name)?
+        .checked_add(extra)
+        .filter(|length| *length <= record.len())
+}
+
+fn zip_record_equal_outside(left: &[u8], right: &[u8], excluded: &[(usize, usize)]) -> bool {
+    if left.len() != right.len() {
+        return false;
+    }
+    let mut cursor = 0;
+    for &(start, end) in excluded {
+        if start < cursor
+            || end < start
+            || end > left.len()
+            || left[cursor..start] != right[cursor..start]
+        {
+            return false;
+        }
+        cursor = end;
+    }
+    left[cursor..] == right[cursor..]
 }
 
 fn same_selected_central_record(left: &[u8], right: &[u8]) -> bool {
@@ -2925,7 +3114,7 @@ fn _component_archive(package: &Package, component_index: usize) -> Result<&Arch
 
 #[cfg(test)]
 mod tests {
-    use super::same_selected_central_record;
+    use super::{same_selected_central_record, zip_record_equal_outside};
 
     #[test]
     fn selected_central_record_mask_preserves_timestamp_and_allows_sizes() {
@@ -2947,5 +3136,14 @@ mod tests {
         let mut filename_length = source.clone();
         filename_length[28] ^= 1;
         assert!(!same_selected_central_record(&source, &filename_length));
+    }
+
+    #[test]
+    fn locality_negative_control_rejects_unrelated_zip_mutation() {
+        let source = b"untouched-member";
+        let mut candidate = source.to_vec();
+        candidate[3] ^= 1;
+        assert!(!zip_record_equal_outside(source, &candidate, &[]));
+        assert!(zip_record_equal_outside(source, &candidate, &[(3, 4)]));
     }
 }

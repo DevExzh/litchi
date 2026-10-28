@@ -22,8 +22,9 @@ use litchi_core::Position;
 use litchi_iwa_archive::package::ExactArtifacts;
 use litchi_iwa_common::wire::{patch_length_delimited_field, transform_length_delimited_field};
 use litchi_iwa_core::{Archive, ArchiveObject, RawMessage};
-use litchi_iwa_protos::keynote_chart_caption_graph_codec as graph_codec;
-use litchi_iwa_protos::pages_movie_caption_codec;
+use litchi_iwa_protos::{
+    keynote_chart_caption_graph_codec as graph_codec, pages_movie_caption_codec,
+};
 use thiserror::Error as ThisError;
 
 use super::Package;
@@ -100,6 +101,10 @@ pub enum LimitKind {
     WireNesting,
     /// Aggregate wire traversal, text rewrite and reassembly work.
     WireWork,
+    /// Semantic section or body-storage cardinality.
+    PayloadItems,
+    /// Semantic UTF-8 text retained by the reopened document.
+    TextBytes,
 }
 
 impl fmt::Display for LimitKind {
@@ -110,6 +115,8 @@ impl fmt::Display for LimitKind {
             Self::WireFields => "wire fields",
             Self::WireNesting => "wire nesting",
             Self::WireWork => "wire work",
+            Self::PayloadItems => "payload items",
+            Self::TextBytes => "text bytes",
         })
     }
 }
@@ -228,6 +235,8 @@ impl From<GraphError> for Error {
                     GraphLimit::WireFields => LimitKind::WireFields,
                     GraphLimit::WireNesting => LimitKind::WireNesting,
                     GraphLimit::WireWork => LimitKind::WireWork,
+                    GraphLimit::SemanticItems => LimitKind::PayloadItems,
+                    GraphLimit::SemanticTextBytes => LimitKind::TextBytes,
                 },
                 observed,
                 maximum,
@@ -667,7 +676,7 @@ fn drawable_width(
 
 /// The theme's document stylesheet and first caption paragraph-style
 /// preset, and the document language (the host's `image_caption_theme`).
-fn caption_theme(package: &Package) -> Result<(u64, u64, Option<String>), Error> {
+pub(crate) fn caption_theme(package: &Package) -> Result<(u64, u64, Option<String>), Error> {
     let mut budget = Budget::new(package)?;
     let (theme, language) = graph::root_theme(package, &mut budget)?;
     let index = ObjectIndex::new(package, &mut budget)?;

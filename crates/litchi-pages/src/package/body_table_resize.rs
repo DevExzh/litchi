@@ -80,6 +80,10 @@ pub enum LimitKind {
     WireNesting,
     /// Aggregate wire traversal and rewrite work.
     WireWork,
+    /// Semantic section or body-storage cardinality.
+    PayloadItems,
+    /// Semantic UTF-8 text retained by the reopened document.
+    TextBytes,
 }
 
 impl fmt::Display for LimitKind {
@@ -90,6 +94,8 @@ impl fmt::Display for LimitKind {
             Self::WireFields => "wire fields",
             Self::WireNesting => "wire nesting",
             Self::WireWork => "wire work",
+            Self::PayloadItems => "payload items",
+            Self::TextBytes => "text bytes",
         })
     }
 }
@@ -202,6 +208,8 @@ impl From<GraphError> for Error {
                     GraphLimit::WireFields => LimitKind::WireFields,
                     GraphLimit::WireNesting => LimitKind::WireNesting,
                     GraphLimit::WireWork => LimitKind::WireWork,
+                    GraphLimit::SemanticItems => LimitKind::PayloadItems,
+                    GraphLimit::SemanticTextBytes => LimitKind::TextBytes,
                 },
                 observed,
                 maximum,

@@ -6709,3 +6709,104 @@ See [0063](0063-source-pptx-modern-comments.md).
 - The exit ledger remains 1,146 migrated, 40 retired and 1,042 host-only rows.
   All 451 pending native routes still block W3. Leaf slices do not complete
   D7 unified dispatch/schema/capability exposure.
+
+- Final instruction qualification on integrated `bb2475b8b0` passed all 15
+  required and four optional iWork probes. Its separate 0377a matrix failed
+  the XLSX 1,000-cell unified route: median +5.195%, worst +5.283%. The other
+  13 legs passed. That candidate was returned for repair; no full-gate or
+  quiet-wall qualification is claimed for it. External receipts remain under
+  `.coord/resume-20261028/perf/`, including the failed captures.
+- Accepted the narrow 0377a repair at `0d4f5f9b97` (code `1abe5a5cf7`).
+  Unsigned distinct-target XLSX coalescing reuses the native setter's exact
+  source-no-op result and worksheet admission. Signed repeated-target and
+  clear paths retain their prior state checks. Tight-budget signed
+  cancellation, scalar/formula no-ops and rich/shared-string cases pass;
+  scoped Clippy, rustdoc, glossary, boundaries and policy checks pass.
+  The matching-profile CPU-pinned ABBA probe is +0.659% median and +0.805%
+  worst versus baseline. Earlier failed probes are retained in record 0377a.
+  Final measurements and the complete 53-row gate must use the new frozen
+  integrated candidate; branch evidence does not substitute for that gate.
+- Next-wave work remains isolated from this qualification candidate.
+  W2-A `c23e181d15` is accepted for the queue: 18 Numbers drawable style/layout
+  rows, host differential tests and 18 passing instruction probes (0380).
+  W2-D `8dd007be1a` is accepted for the queue: relocation of 17 leaf-only
+  Numbers comment-read tests, preserving host parity/cost oracles (0381).
+  W1-E shared chart title/axis facades remain in review for separate axis
+  measurements and precise resource-limit kinds. W1-G is replacing duplicate
+  comment writers with one shared root Set/create/Clear engine; replies remain
+  deferred and unsupported host coverage stays host-only. D7 Numbers cached
+  formula dispatch (0382) was returned for operation admission before parsing
+  and repeated-property ordering tests. Scoped builds and instruction probes
+  are allowed until the coordinator reserves the final wall interval.
+- Ledger totals remain 1,146 migrated, 40 retired and 1,042 host-only. The 451
+  pending native routes continue to block W3; no host deletion is authorized
+  by these branch or instruction-count results.
+
+- The full 53-row run on frozen `39e4bf101c` completed with 52 passing rows
+  and one failure in row 33: Pages reference-line allocation parity compared
+  the legacy host's randomized dependency-reference order as an exact list.
+  The complete unchanged-source receipt and failed log remain external under
+  `.coord/resume-20261028/full-39e4bf101c/`. This candidate is not full-gate
+  green. Its 19 iWork instruction routes and 14 FIN instruction legs passed;
+  those measurements remain bound to that source and do not qualify later
+  integration. Quiet wall/CLI measurements have not been run.
+- Accepted the direct cell-format reader proof at `2c0cca02f7` (code
+  `70538aede2`, record 0370k). Four Pages/Keynote generic and numeral-system
+  read cases now compare both readers with the expected value on the same
+  host-authored input. Existing exact-byte roundtrips and terminal refusals
+  remain checked. Four focused read tests, formatting and strict Clippy pass.
+  No production behavior, ledger row, native claim or cost receipt changed.
+- The next candidate will include the separately reviewed chart-ordering
+  harness repair and accepted chart-text, Numbers drawable-style, leaf-test
+  relocation and cached-formula dispatch slices. Owners must synchronize
+  each package with current trunk before integration. Final qualification
+  will rerun all 53 rows and the expanded performance matrix on one source.
+  W1-G comments remain outside this candidate while resource/admission,
+  oracle and metadata-preservation findings and performance are resolved.
+
+- Post-merge checks on `5d878047d9` passed on unchanged clean source:
+  workspace all-target/all-feature compilation, all 20 locked offline fuzz
+  workspaces, crate boundaries and exit ledger.
+- Accepted the selected-chart reference-line parity correction at
+  `5caf04d919` (code `de367c1b08`, record 0383), synchronized with current
+  trunk. Only the three allocation cases opt into unordered membership for
+  the selected chart's extension-owned dependency references. Unrelated
+  references retain exact order and multiplicity. Existing item UUIDs must
+  match the source, and only known UUID halves of newly allocated items may
+  differ; unknown bytes remain strict. Six comparator controls, ten route
+  tests, three independently started Pages allocation runs, four direct
+  cell-format reader tests, formatting and strict Clippy pass. This changes
+  the differential proof, not a production writer or native-evidence claim.
+
+- Post-merge checks on `54cf5d34da` passed on unchanged clean source:
+  workspace all-target/all-feature compilation, all 20 locked offline fuzz
+  workspaces, crate boundaries and exit ledger.
+- Accepted W1-E chart title/axis-title slice `80f1854acd` (record 0375b),
+  synchronized to current trunk. Numbers and Pages share the bounded chart
+  text engine; Keynote behavior is unchanged and captions remain deferred.
+  Review closed shared-chart ownership, candidate-copy admission, precise
+  resource dimensions and source-relative locality gaps. Populated reads
+  now compare host and leaf directly, and clear-only routes operate on one
+  common input with exact inverses. Seven parity cases, four Numbers and
+  three Pages facade tests, strict Clippy, formatting, ledger and boundary
+  checks pass after synchronization. Eighteen independent CPU-pinned
+  instruction probes passed on measured source `4aa57b3c19`; this historical
+  receipt is preserved and the integrated candidate will be remeasured.
+  Twelve ledger rows migrate and twelve native routes remain queued. These
+  are leaf APIs; unified chart-text dispatch remains a D7 follow-up.
+
+- Post-merge checks on `8b598c68a8` passed on unchanged clean source:
+  workspace all-target/all-feature compilation, all 20 locked offline fuzz
+  workspaces, crate boundaries and exit ledger.
+- Accepted W2-A `c9f713639e` (record 0380), synchronized with the chart-text
+  integration. Numbers drawable styles reuse the shared style engine for
+  shape fill/stroke/effects/text layout and text-box columns/layout. Staging
+  is admitted before allocation; resets verify inherited effective values.
+  Eight facade tests and four parity tests pass, including eighteen vectors,
+  six populated direct host/leaf reads and a mismatch control through the
+  same comparison path. Formatting, strict Clippy, ledger and boundaries
+  pass. Eighteen CPU-pinned instruction probes passed on measured source
+  `d1b11fed01`; final integrated measurements remain required. Eighteen
+  ledger rows migrate; shadow routes lacking a usable host fixture remain
+  excluded. Two native queue entries cover the new read/edit families.
+  Unified drawable-style dispatch remains a separate D7 follow-up.
