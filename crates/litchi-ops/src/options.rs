@@ -327,8 +327,7 @@ impl OpenOptions {
     }
 
     /// Replace the Keynote ingress options (source and semantic limits) used
-    /// for Keynote packages and package directories (record 0306); as
-    /// [`Self::pages_options`].
+    /// for Keynote packages and package directories (record 0306).
     ///
     /// ```
     /// let options = litchi_ops::OpenOptions::new()
@@ -343,8 +342,8 @@ impl OpenOptions {
     }
 
     /// Replace the Numbers ingress options (source and semantic limits) used
-    /// for Numbers packages and package directories (record 0306); as
-    /// [`Self::pages_options`].
+    /// for Numbers packages and package directories (record 0306); following
+    /// the same ingress-option contract as the Pages setter above.
     ///
     /// ```
     /// let options = litchi_ops::OpenOptions::new()

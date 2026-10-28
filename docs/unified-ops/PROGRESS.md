@@ -6810,3 +6810,40 @@ See [0063](0063-source-pptx-modern-comments.md).
   ledger rows migrate; shadow routes lacking a usable host fixture remain
   excluded. Two native queue entries cover the new read/edit families.
   Unified drawable-style dispatch remains a separate D7 follow-up.
+
+- Post-merge checks on `b2a2e4c8db` passed on unchanged clean source:
+  workspace all-target/all-feature compilation, all 20 locked offline fuzz
+  workspaces, crate boundaries and exit ledger.
+- Accepted W2-D `002099f522` (record 0381), synchronized to current trunk:
+  seventeen leaf-only Numbers comment-read tests now live with the Numbers
+  owner. Host differential/cost oracles and their fixtures remain in place
+  until W3. The relocated tests, focused Clippy, ledger and boundaries pass.
+  Integration also corrects the shared parity module's alphabetical order,
+  which the full-workspace formatting check exposed after W2-A. No runtime
+  behavior, fixture, native evidence or ledger disposition changes here.
+- Current ledger totals are 1,176 migrated, 40 retired and 1,012 host-only
+  rows. All 465 pending native entries still block W3. Cached-formula D7
+  dispatch is the remaining accepted slice before the next frozen gate;
+  chart-text and drawable-style unified dispatch remain follow-up work.
+
+- Post-merge checks on `d2f3eb4ba0` passed on unchanged clean source:
+  workspace all-target/all-feature compilation, all 20 locked offline fuzz
+  workspaces, crate boundaries and exit ledger.
+- Accepted D7 cached-formula dispatch `bc45b01548` (record 0382), synchronized
+  to current trunk. Numbers `set cell` accepts finite numeric, boolean and
+  text `cachedValue` alongside a non-null formula. Checked operation
+  admission precedes formula parsing and cache construction; unsupported
+  combinations return typed terminal refusals. Twenty-one unified tests,
+  strict focused Clippy, full formatting, ledger and boundaries pass.
+  Capability/registry goldens declare the property set-only. Historical
+  full-File versus direct-leaf instruction cost is +0.599201% on source
+  `8b3ef8b0fd`; the integrated candidate must be remeasured. No ledger count
+  or native disposition changes; native queue entry 241 remains pending.
+- Freeze this accepted integration after post-merge checks for a fresh
+  53-row gate, 56 iWork instruction routes and 14 FIN instruction legs,
+  followed by a quiet wall/CLI interval. Earlier source-bound receipts do
+  not qualify this candidate. W1-G comments stay in their work branch:
+  review closed metadata preservation, duplicate storage, feature gating
+  and Pages/Keynote resource mappings, but Numbers resource mappings and
+  read/create/clear performance coverage still need completion. All 465
+  pending native entries continue to block W3.

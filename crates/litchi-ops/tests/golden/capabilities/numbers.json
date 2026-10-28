@@ -336,6 +336,12 @@
           "set": true,
           "get": true
         },
+        "cachedValue": {
+          "type": "scalar",
+          "add": false,
+          "set": true,
+          "get": false
+        },
         "comment": {
           "type": "string",
           "add": false,

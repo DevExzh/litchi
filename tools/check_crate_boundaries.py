@@ -15154,7 +15154,7 @@ IWA_NUMBERS_CELL_COMMENT_READER_COMPAT_TEST_SOURCE_PRESERVATION = re.compile(
     r"\bassert_eq!\s*\(\s*&?\s*source\b"
 )
 IWA_NUMBERS_CELL_COMMENT_READER_PARITY_SOURCE = Path(
-    "crates/litchi-iwa/tests/numbers_focused_comment_reads.rs"
+    "crates/litchi-numbers/tests/numbers_focused_comment_reads.rs"
 )
 IWA_NUMBERS_CELL_COMMENT_READER_PARITY_TEST = (
     "focused_numbers_comment_reads_match_wire_oracle_by_selector_and_a1"
