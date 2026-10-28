@@ -1,9 +1,9 @@
 # 0371 — W1-B: Pages body media, shapes, text fields and table cells out of the host
 
-- Status: first merge-ready slice on branch `uo2/iwa-w1b` (cut from trunk
-  `feat/unified-ops-api` at `f35f1c9f55`; trunk merged several times, last
-  at the head of this slice). The wave continues (§6).
-- Date: 2026-10-26.
+- Status: resumed merge-ready slice on branch `uo2/iwa-w1b` (the branch was
+  merged with coordinator trunk `aeac888d5f17c73a11f6e6f6c0d6bdf2102f248b`
+  before this handoff). The wave continues (§6).
+- Date: 2026-10-28 (record opened 2026-10-26).
 - Plan: [0363](0363-iwa-monolith-exit-plan.md) wave W1-B (§0, §3.2, §4, §7);
   harness and ledger [0369](0369-iwa-exit-parity-harness-and-ledger.md);
   shared engines from W0-B [0368](0368-iwa-w0b-codecs-formula-graph-table-vocabulary.md),
@@ -43,6 +43,8 @@
 | `613d5e28c9`, `287c252b4a` | cell borders: `litchi_iwa_table::cell_appearance::{borders, plan_border}` (the host's stroke layers: the highest-order run covering the cell on each side; a set restrokes the cell's own one-cell run in place, appends a run to the side's layer at the cell's index or creates that layer, with the next order); `Edit::{set_border, clear_border}` and `Appearance::borders` replace `{set,clear}_table_cell_border` and `table_cell_borders` | 3 |
 | `689b1cd6d6` | `litchi_pages::builder::Builder::{language, locale}` (the host's fields: the document language and locales, the settings' language and creation/last locales, every storage language table; `PackageError::{InvalidLanguage, InvalidLocale}`); `Identity` gains its version UUID (`from_parts`, `version_uuid`), written to `versionUUID`, the properties' `revision` and the package metadata revision, as the host does — before, every leaf-built document carried the template's version UUID. Identity, revision, language, locale and the body text are one publication (the body-text transaction only validates) | 5 (`new`, `body_text`, `language`, `locale`, `build`) |
 | `923ee3148b` | `drawable::style` — `Package::{body_drawable_style, edit_body_drawable_style, apply_body_drawable_style}`; `Edit::{set, reset}` over `Property::{Fill, Stroke, Shadow, Effects, TextLayout}`: the shared `litchi_iwa_style::shape` engine (W1-E, record 0375a) on a workspace over this package's parsed components, one publication per edit | 15 |
+| `f9ebce8575`, `27619e3f3c` | shared `litchi_iwa_style::line_end` codec and `drawable::style` line-endpoint facade — `PropertyKind::LineEndpoints`, `Endpoints` and `Endpoint`; `Edit::{set, reset}` and `Package::body_drawable_style` replace host `set_body_line_endpoints`, `reset_body_line_endpoints` and `body_line_endpoints`, with fresh variation UUIDs on allocation and exact in-place rewrites/resets | 3 |
+| `7a1b5c4054` plus resumed bounded/refusal hardening | `table::creation::Edit::duplicate(BodyTableSelector, Position)` over `litchi_iwa_table::structure::duplicate`: copies a populated body table's cells, styles, formula lists and owner family, allocates a new drawable/model/storage graph, names it with the next free `"<name> copy"`, anchors its attachment in the body story, and publishes the registry references; typed selector, dependency and position refusals remain terminal. A source with non-empty merged-cell geometry is preflighted through the bounded merge reader and terminally refused as `UnsupportedDependency` until the shared clone can rebind its inline merge owner. | 1 |
 | `acf5fd71ad` | crate-boundary gate: the bookmark, date-time and attachment re-export modules move to their own files; the movie-playback owner keeps its feature-gated declaration with a `#[path]` twin for builds without the host seam; the retired-host-route audit skips the parity harness (whose cases call host routes by design) | — |
 | `234929c79b`, `28fb68c468` | performance (§4): the section-text preflight sums retained header lengths instead of re-encoding the archive and clones the parsed component instead of reparsing it; every Pages commit-time candidate reopen calls `SourceCatalog::reopen` | — |
 
@@ -87,12 +89,14 @@ Cases live in `crates/litchi-iwa/tests/parity/pages_{drawable,text,table}_cases.
 | cell fill, layout and border reads (every cell of four native fixtures and a host-styled one) | 1 | A | queued |
 | cell borders (new layer, second run, restroke, cleared edges) | 2 | A | queued |
 | body shape styles: set (six values), rewrite (two), reset (five), reads | 4 | set B (fresh registry UUID); rewrite, reset, reads A | queued |
+| body line endpoints: set, reset and reads | 2 | set B (fresh registry UUID); reset and reads A | queued |
 | builder language and locale with body text (fr, ja, de-CH; empty and multi-paragraph bodies) | 1 | B (the registry's object UUIDs by form; the leaf build takes the host output's identity) | queued |
 | table add (3×4 at offset 0) | 1 | B (the table UUID, and the owner UUID and owner-map entry derived from it, by form; fresh metadata UUIDs) | queued |
 | media remove (image native + host-built; movie; audio) | 3 | image B (ZIP layout), movie and audio A | queued |
 | media duplicate (image native + host-built; movie; audio) | 3 | B (fresh UUIDs; Document.iwa byte-identical) | queued |
 | media replace (image data, movie data and poster, audio data, asset) and asset reads | 5 + read sweep over 6 documents | movie/poster/audio A, image and asset B (ZIP layout), reads A | queued |
 | media add (image, movie, audio; native and blank documents) | 3 | B (fresh UUIDs; new members' ZIP layout) | queued |
+| populated body-table duplicate (three focused cases, merge-owner refusal, plus corpus sweep) | 4 focused + 17 corpus routes; 1 merged-table route refused before publish | B (fresh UUIDs and formula-owner identifiers by policy; untouched members exact; merged geometry is a terminal typed refusal pending shared owner rebinding) | queued |
 
 Tier B for creations: both routes draw a random `text_attribute_uuid_string`
 for a new smart field, so the case registers a known-field decoder that
@@ -113,7 +117,13 @@ corpus has no native file with them.
 
 | Route | Divergence | Owner |
 |---|---|---|
-| — | none: `add_table` was pinned here until W1-A aligned the shared table graph (record 0370f); it is now migrated (tier B) | — |
+| `duplicate_table` formula-owner allocation | the Pages host repeats an owner-map internal identifier when the source map already contains the next owner value; the leaf allocates above the complete map. Tier B compares the cloned owner family by form and preserves exact reads; volatile, spanning, whole-owner, error and spill dependencies are refused on both routes | W1-B / policy 0368a |
+| `duplicate_table` merged-cell owner | the shared structural clone currently copies a non-empty inline `TST.TableModelArchive.merge_owner` without rebinding its owner UUID to the new table. Pages preflights merge geometry and returns typed `Refusal::UnsupportedDependency` before allocation/publication, so it cannot publish an unreadable copied merge graph; the focused regression records the host acceptance and leaf safety refusal. Rebinding remains a shared-engine/W1-C follow-up | W1-B / shared duplicate engine |
+
+The `add_table` route was pinned here until W1-A aligned the shared table graph
+(record 0370f); it is now migrated (tier B). The duplicate route's four
+dependency refusals are intentional and terminal; they are recorded as parity
+cases rather than silently falling back to the host.
 
 The number-attachment removal divergence pinned in the first slice was a
 host defect and is fixed (§3, item 3).
@@ -196,6 +206,80 @@ one edit, commit and write. Numbers are the sum of the two runs of each side.
 | cell border set (table 0, top edge of cell 1,1) | 3,381,823,315 | — | 89,096,263 | −97.4% |
 | body shape fill set (host rectangle on `chart-data-native`) | 416,949,768 | — | 142,213,368 | −65.9% |
 | builder: body `Bonjour`, `fr`/`fr_FR` | 3,565,170 | 7,061,105 (four publications) → 5,489,195 (two) | 3,499,471 (one) | −1.8% |
+| body line endpoints set (`chart-data-native`) | 423,638,442 | — | 143,606,634 | −66.1% |
+| body line endpoints reset (`chart-data-native`) | 549,682,634 | — | 127,418,970 | −76.8% |
+| body line endpoints read (`chart-data-native`) | 155,394,765 | — | 31,411,145 | −79.8% |
+| populated body-table duplicate (`body-table-cells-native`) | 4,215,551,178 | — | 138,534,970 | −96.7% |
+
+### 4.1 Resumed qualification on the final work-package candidate
+
+The boundedness and merge-owner repairs were remeasured after merging the
+current coordinator trunk. The source was `6bb1d58021` (branch
+`uo2/iwa-w1b`, coordinator parent `0944b7319f`). The release parity binary was
+built from that exact source with
+`CARGO_PROFILE_RELEASE_DEBUG=1 CARGO_BUILD_JOBS=4 cargo test --release -p
+litchi-iwa --all-features --test parity --no-run`. The prescribed probe then
+used CPU 3, callgrind instruction counts, and the existing host/leaf ABBA
+probe pair:
+
+```sh
+bash /home/zhuhe/code/litchi-worktrees/.coord/iwa-w1b/cg.sh \
+  target/release/deps/parity-bf69cf43b955a09c \
+  pages_shape_style_cases::line_endpoints_set_cost_abba \
+  pages_shape_style_cases::line_endpoints_reset_cost_abba \
+  pages_shape_style_cases::line_endpoints_read_cost_abba \
+  pages_lifecycle_cases::table_duplicate_cost_abba
+```
+
+| Final-candidate route | Host Ir | Leaf Ir | Leaf delta |
+|---|---:|---:|---:|
+| line endpoints set | 423,509,798 | 143,612,630 | −66.09% |
+| line endpoints reset | 549,099,195 | 127,434,349 | −76.79% |
+| line endpoints read | 155,392,745 | 31,413,766 | −79.78% |
+| supported body-table duplicate | 4,220,277,802 | 139,246,763 | −96.70% |
+
+All supported routes remain below the host cost; the no-more-than-5%/20 µs
+bar is met. The merged-cell route is intentionally refused before candidate
+publication, so it has no mutation cost to qualify. These are full parity
+facade probes (not engine-only measurements).
+
+The raw callgrind outputs and binary remain outside the repository. This
+manifest makes the receipt reproducible without committing large evidence:
+
+| Artifact | Size | SHA-256 |
+|---|---:|---|
+| `/home/zhuhe/code/litchi-worktrees/uo2-iwa-w1b/target/release/deps/parity-bf69cf43b955a09c` | 198,830,136 | `66ede694ec732bb3150a34823d649a77e22dfddcee224094998ce9167ce15056` |
+| `/home/zhuhe/code/litchi-worktrees/.coord/iwa-w1b/cg_results.txt` | 3,298 | `0e805233b8b6f5372ebe01ecd348c2186b72da3394b5c3a643e0e711f6418daf` |
+| `cg/pages_shape_style_cases::line_endpoints_set_cost_abba.host.out` | 592,436 | `80cef034853a871d9e80caa9f86a3960fe4d5e52ac1a3b21668b6d04cbd04e0b` |
+| `cg/pages_shape_style_cases::line_endpoints_set_cost_abba.leaf.out` | 480,629 | `f5b0aa6c4b6e4d6a33ca0aca2f5ed47132ab32ff6620960bc73dbfe72b69facf` |
+| `cg/pages_shape_style_cases::line_endpoints_reset_cost_abba.host.out` | 565,209 | `f851d2587642a30ebe9d1325aa5c71ad5c6932937ace5c8aa68bf6547fc7eec4` |
+| `cg/pages_shape_style_cases::line_endpoints_reset_cost_abba.leaf.out` | 449,489 | `05460e47157c3cedb9c5d757f0e01f16ca263ba4efbe0bcb3e3e236dea280244` |
+| `cg/pages_shape_style_cases::line_endpoints_read_cost_abba.host.out` | 382,185 | `61cbfdc3c3c97201a6b585f151a58924be12058cd156ebd4a9ee0ee706dc40d6` |
+| `cg/pages_shape_style_cases::line_endpoints_read_cost_abba.leaf.out` | 297,556 | `298db18e0dec06a098f37d1ac0609643e4f4c42f09126ffdd6368df30804192e` |
+| `cg/pages_lifecycle_cases::table_duplicate_cost_abba.host.out` | 830,838 | `5ec3f079e18882862d2e97e78fc63c3795dfd3be0ad54e8ee8efebc5b8283cd` |
+| `cg/pages_lifecycle_cases::table_duplicate_cost_abba.leaf.out` | 780,391 | `b78d89938a5e8c7e42a3c91a75323be088b859bcb950e32688c89771560dfc8a` |
+
+The coordinator then integrated W1-C's typed `TableLeaf::FaultResult` seam at
+`aeac888d5f17c73a11f6e6f6c0d6bdf2102f248b`. Pages now preserves candidate
+resource failures at that boundary: archive limits are `PackageBytes`, Pages
+object-inventory limits are `Identifiers`, payload and semantic ceilings are
+`PayloadBytes`, and bounded allocations remain `Allocation`; malformed or
+shape-invalid candidates remain `Verification`. This adapter qualification is
+scoped to the work-package candidate and does not supersede the performance
+source above: final host-vs-leaf measurement must be rerun after coordinator
+integration.
+
+The resumed scoped checks on the post-W1-C branch passed:
+
+| Check | Result |
+|---|---|
+| `cargo fmt --all --check` | pass |
+| `CARGO_BUILD_JOBS=4 cargo check -p litchi-pages --all-features` | pass |
+| `CARGO_BUILD_JOBS=4 cargo test -p litchi-pages --all-features --test body_table_creation --quiet` | 7 passed |
+| `CARGO_BUILD_JOBS=4 cargo test -p litchi-iwa --all-features --test parity pages_body_line_endpoints -- --nocapture` | 2 passed |
+| `CARGO_BUILD_JOBS=4 cargo test -p litchi-iwa --all-features --test parity pages_body_table_duplicate -- --nocapture` | 4 passed; 17 corpus routes, 5 refused |
+
+The raw files are relative to `/home/zhuhe/code/litchi-worktrees/.coord/iwa-w1b`.
 
 The whole-body set route was the only miss: the leaf `edit_body_text` (an
 existing family) re-encoded every archive header in its physical preflight
@@ -219,6 +303,8 @@ taskset -c 3 valgrind --tool=callgrind '--toggle-collect=*probe_host*' \
 | `cargo clippy -p litchi-pages -p litchi-iwa -p litchi-ops -p litchi -p litchi-py --all-targets --all-features -- -D warnings` | 0 |
 | `cargo clippy -p litchi-ops --no-default-features --all-targets -- -D warnings`, and `--features pages` | 0, 0 |
 | `cargo test -p litchi-pages --all-features` (729) / `-p litchi-iwa --all-features` (1,963, parity target 169 + 15 ignored probes) / `-p litchi --all-features` (209) | 0 / 0 / 0 |
+| resumed boundedness follow-up: `cargo test -p litchi-pages --all-features`; `cargo test -p litchi-iwa-style --all-features` (7 + doctests); focused parity `pages_body_line_endpoints` (2), `pages_body_table_duplicate_merge_owner_readback` (1), and `pages_body_table_duplicate_corpus_parity` (17 routes + 5 refusals) | 0 / 0 / 0 |
+| resumed `cargo clippy -p litchi-pages -p litchi-iwa-style -p litchi-iwa --all-targets --all-features -- -D warnings` | 0 |
 | `RUSTDOCFLAGS=-Dwarnings cargo doc --no-deps --all-features -p litchi-pages` | 0 |
 | `RUSTC_BOOTSTRAP=1 python3 tools/check_api_glossary.py --profile pages` | 0 |
 | `python3 -m unittest tools.test_officecli_corpus tools.test_officecli_capability_delta tools.test_no_3rdparty_references tools.test_check_crate_boundaries tools.test_non_iwork_gate tools.test_iwa_exit_ledger` (1,289) | 0 |
@@ -238,14 +324,29 @@ No litchi-ops code, capability or corpus-visible behaviour changed, so the
 capability/registry goldens and the OfficeCLI corpus were not re-blessed.
 Both pre-commit size checks printed nothing for every commit.
 
+The resumed hardening keeps the same public route contract while closing three
+boundedness/safety holes found during coordinator review: body line-end field
+scans now use the owning `Budget` (including the flip varint and retained
+endpoint copies), and the shared line-end codec has one bounded
+`decode(payload, limits)` entry point whose structured error keeps semantic
+unknown-endpoint, wire-limit and allocation failures distinct. The Pages
+facade maps those wire failures to its typed `Limit`/`Allocation` errors;
+malformed endpoint semantics remain the terminal `UnsupportedStyle` refusal.
+Duplicate-table candidate readback now preserves `table_lock` limit and
+allocation failures instead of turning them into `Verification`. Finally,
+duplicate preflight reads the selected table's merge geometry under its own
+bounded reader, preserves merge-reader limit/allocation distinctions, and
+returns `UnsupportedDependency` for non-empty merge owners until the shared
+clone engine can rebind them.
+
 ## 6. Gaps and follow-ups (rest of W1-B)
 
 | Gap | Rows | Next step / dependency |
 |---|---:|---|
 | text-box attachments (incl. removal) and date-time fields | 5 + 5 | text boxes are W2-B |
-| shape lifecycle; shape fill, stroke, shadow, effects, text layout, line ends, preset | ~37 | W1-E codecs (`shape_style_codec` straight lines landed) |
+| shape lifecycle; shape fill, stroke, shadow, effects, text layout and preset | ~34 | W1-E codecs (`shape_style_codec` straight lines landed); line endpoints are migrated in this slice |
 | table cell formats, rich text, topology, comment writes, conditional highlights | ~120 | cores in `litchi-iwa-table` (W1-G, record 0379); W1-B adds the Pages facades when each group lands |
 | image cell fills | — | data-reference registry bookkeeping for a style variation (host `register_style_object` with a data identifier) |
-| `duplicate_table` | 1 | format-neutral core in `litchi-iwa-table` over `litchi_numbers_wire::{table_lifecycle, formula_graph}`, after the crate lands |
 | table formulas | — | W1-F formula engine (record 0376) |
 | Builder `body_table` | 1 | the host bootstraps the first table graph from its Numbers builder; the leaf `table::creation` needs a template table, so a table-less document needs that bootstrap first |
+| non-empty merged-cell table duplication | 1 focused/corpus route | Pages refuses before publication because the shared duplicate engine does not yet rebind the inline merge-owner UUID; W1-C/shared duplicate-engine work must repair the owner remap before this route can move from the explicit safety refusal to parity |
