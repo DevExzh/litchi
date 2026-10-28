@@ -59,21 +59,54 @@ No native evidence, fixture, ledger migration, or queue disposition was
 invented by this repair. The existing host-vs-leaf formula-author parity rows
 remain Tier B/queued until the coordinator obtains native evidence.
 
-## Performance route prepared, not qualified
+## Performance qualification on frozen source
 
 The affected existing routes are the three formula-authoring ABBA probes in
 `crates/litchi-iwa/tests/parity/numbers_formula_author_cases.rs`, especially
 `numbers_table_formula_author_graph_cost_abba`, which already exercises
 resolved formula-owner state. A new ignored full-facade probe,
 `numbers_table_formula_owner_admission_cost_abba`, prepares a source-built
-two-table workbook, invokes the independent legacy `Draft` formula writer on
-both owners, duplicates the sheet, and edits the cloned formula with its
-cached value. The leaf side uses selector-first `Package` table-cell and sheet
-lifecycle transactions. A normal test run of the probe passes in
-host/leaf/leaf/host order; no wall-clock or callgrind result is claimed here. The
-coordinator must run the prescribed release-mode pinned-CPU measurement on the
-final integrated commit and qualify this full facade route separately from the
-codec unit cost.
+two-table workbook outside the capture, invokes the independent legacy `Draft`
+formula writer on both owners, duplicates the sheet, edits the cloned formula
+with its cached value, and serializes. The leaf side uses selector-first
+`Package` table-cell and sheet lifecycle transactions. The full logical route
+is measured in host/leaf/leaf/host order; the setup is not counted as an
+isolated edit or as a whole-file benchmark.
+
+Frozen source: `f6c8ec8d05c17c857717e3aabbd458c775f6679e`.
+Release binary (kept outside the repository):
+`/home/zhuhe/code/litchi-worktrees/.coord/iwa-w1f-owner-admission/perf/target/release/deps/parity-21b48e7cda91f127`,
+210,622,272 bytes, SHA-256
+`1880a011ea758960b1e17806fdf89767cff10f36b88f24b6f955264104fed4de`.
+
+| Route | Host Ir | Leaf Ir | Delta |
+|---|---:|---:|---:|
+| Basic no-cache authoring | 189,911,777 | 84,006,705 | **−55.765%** |
+| Native-graph cached authoring | 159,359,920 | 50,054,882 | **−68.590%** |
+| Basic explicit cached authoring | 189,851,535 | 84,016,025 | **−55.746%** |
+| Owner-admission workflow | 499,430,093 | 51,663,518 | **−89.656%** |
+
+All four routes are faster on the leaf side and meet the prescribed no-more-
+than-5%-slower bar. Captures are external: `perf/callgrind/{basic,graph,cached,
+owner}.{host,leaf}` under the same `.coord/iwa-w1f-owner-admission` directory;
+their sizes and SHA-256 values are retained in the handoff receipt.
+
+Regenerate the complete set with:
+
+```sh
+CARGO_BUILD_JOBS=4 CARGO_INCREMENTAL=0 \
+  CARGO_TARGET_DIR=/home/zhuhe/code/litchi-worktrees/.coord/iwa-w1f-owner-admission/perf/target \
+  CARGO_PROFILE_RELEASE_DEBUG=1 \
+  cargo test --release --offline -p litchi-iwa --test parity --no-run
+taskset -c 3 valgrind --tool=callgrind \
+  --callgrind-out-file=/home/zhuhe/code/litchi-worktrees/.coord/iwa-w1f-owner-admission/perf/callgrind/basic.host \
+  --toggle-collect='*numbers_formula_author_cases::host_route*' \
+  /home/zhuhe/code/litchi-worktrees/.coord/iwa-w1f-owner-admission/perf/target/release/deps/parity-21b48e7cda91f127 \
+  --ignored --exact numbers_formula_author_cases::numbers_table_formula_author_cost_abba --test-threads=1
+# Repeat with leaf_cost_route, the graph/cached exact test names, and the
+# owner route toggles host_formula_owner_admission_route and
+# leaf_formula_owner_admission_route.
+```
 
 ## Review follow-up
 
@@ -106,10 +139,15 @@ All commands used offline with `CARGO_BUILD_JOBS=2`,
 | Command | Result |
 |---|---|
 | `cargo test --offline -p litchi-iwa-protos numbers_formula_codec::tests::resolved_formula_owner_registry_has_independent_ceiling -- --nocapture` | pass |
+| `cargo test --offline -p litchi-iwa-protos numbers_formula_codec::tests --lib -- --nocapture --test-threads=1` | 39 passed |
+| `cargo test --offline -p litchi-numbers-wire formula_cache --lib -- --nocapture --test-threads=1` | 49 passed |
+| `cargo test --offline -p litchi-numbers-wire --test table_merges -- --nocapture --test-threads=1` | 16 passed |
 | `cargo test --offline -p litchi-numbers --test source_built_sheet_duplicate_tables -- --nocapture` | 4 passed |
 | `cargo test --offline -p litchi-numbers --test formula_authoring -- --nocapture --test-threads=1` | 16 passed |
 | `cargo test --offline -p litchi-iwa --test parity numbers_formula_author_cases -- --nocapture --test-threads=1` | 5 passed, 4 intentional cost probes ignored |
 | `cargo test --offline -p litchi-iwa --test parity -- --ignored --exact numbers_formula_author_cases::numbers_table_formula_owner_admission_cost_abba --nocapture --test-threads=1` | pass; execution smoke only |
+| `cargo test --offline -p litchi-pages --test body_table_merges -- --nocapture --test-threads=1` | 11 passed |
+| `cargo test --offline -p litchi-keynote --test slide_table_merges -- --nocapture --test-threads=1` | 4 passed |
 | `cargo fmt --all -- --check` | pass |
 | `cargo test --offline -p litchi-iwa --test parity --no-run` | pass |
 | `python3 -m unittest tools.test_no_3rdparty_references` | 4 passed |
