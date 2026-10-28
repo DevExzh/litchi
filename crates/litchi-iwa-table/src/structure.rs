@@ -126,6 +126,33 @@ pub fn copy_bytes(bytes: &[u8]) -> FaultResult<Vec<u8>> {
 pub fn map_core(error: &litchi_iwa_core::Error) -> Fault {
     match error {
         litchi_iwa_core::Error::Allocation { requested, .. } => allocation(*requested),
+        litchi_iwa_core::Error::Limit {
+            kind,
+            observed,
+            maximum,
+        } => Fault::Limit {
+            kind: match kind {
+                litchi_iwa_core::LimitKind::ArchiveBytes
+                | litchi_iwa_core::LimitKind::SnappyCompressedChunkBytes
+                | litchi_iwa_core::LimitKind::SnappyCompressedStreamBytes
+                | litchi_iwa_core::LimitKind::SnappyFrames => FaultLimit::PackageBytes,
+                litchi_iwa_core::LimitKind::Objects | litchi_iwa_core::LimitKind::MetadataItems => {
+                    FaultLimit::Identifiers
+                },
+                litchi_iwa_core::LimitKind::Messages
+                | litchi_iwa_core::LimitKind::MessagesPerObject
+                | litchi_iwa_core::LimitKind::ObjectBytes
+                | litchi_iwa_core::LimitKind::MessageBytes
+                | litchi_iwa_core::LimitKind::HeaderBytes
+                | litchi_iwa_core::LimitKind::HeaderFields
+                | litchi_iwa_core::LimitKind::HeaderNesting
+                | litchi_iwa_core::LimitKind::HeaderMemoryBytes
+                | litchi_iwa_core::LimitKind::SnappyChunkBytes
+                | litchi_iwa_core::LimitKind::SnappyStreamBytes => FaultLimit::PayloadBytes,
+            },
+            observed: u64::try_from(*observed).unwrap_or(u64::MAX),
+            maximum: u64::try_from(*maximum).unwrap_or(u64::MAX),
+        },
         _ => Fault::Invalid,
     }
 }

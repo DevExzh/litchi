@@ -173,6 +173,11 @@ impl<'source> SelectedBodyTableStorage<'source> {
         self.data_store
     }
 
+    /// Borrow the validated sparse tile routes for a focused table writer.
+    pub(crate) fn tiles(&self) -> &[wire_cells::TileReference] {
+        &self.tiles
+    }
+
     /// Feed all selected cells to a Pages-owned semantic sink.
     pub(crate) fn read_into<Budget, Sink, Resolve>(
         &self,
