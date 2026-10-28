@@ -3,7 +3,7 @@
 use std::fmt::{Debug, Write as _};
 use std::path::{Path, PathBuf};
 
-use crate::archive_diff::{self, MetadataPolicy, first_difference};
+use crate::archive_diff::{self, MetadataPolicy, ReferenceOrderPolicy, first_difference};
 use crate::known_fields::KnownFields;
 
 /// Result type of routes, reads and cases.
@@ -122,6 +122,7 @@ pub struct Case<'a> {
     read_only: bool,
     leaf_drops: &'static [&'static str],
     metadata: MetadataPolicy,
+    reference_policy: ReferenceOrderPolicy,
 }
 
 /// What a passing case observed.
@@ -155,6 +156,7 @@ impl Case<'_> {
             read_only: false,
             leaf_drops: &[],
             metadata: MetadataPolicy::default(),
+            reference_policy: ReferenceOrderPolicy::Exact,
         }
     }
 }
@@ -175,7 +177,11 @@ impl<'a> Case<'a> {
     }
 
     /// A read applied to both outputs; the two results must be equal.
-    /// Add host reads and leaf reads alike.
+    /// Register one reader that is run independently on the host and leaf
+    /// output bytes. The two results are compared, but this does not compare
+    /// two different reader functions with one another; a case that needs a
+    /// host-reader versus leaf-reader assertion must perform that semantic
+    /// comparison explicitly.
     #[must_use]
     pub fn read<T: Debug>(
         mut self,
@@ -190,8 +196,10 @@ impl<'a> Case<'a> {
     }
 
     /// Mark a read-route case: both routes open the fixture and save it
-    /// unchanged (both outputs must equal the input), and the reads carry
-    /// the comparison.
+    /// unchanged (both outputs must equal the input). Registered readers are
+    /// still each applied to both outputs; this flag does not compare
+    /// different host and leaf reader functions, which needs an explicit
+    /// semantic assertion in the case.
     #[must_use]
     pub fn read_only(mut self) -> Self {
         self.read_only = true;
@@ -223,6 +231,15 @@ impl<'a> Case<'a> {
             save_token: true,
             fresh_uuids: true,
         };
+        self
+    }
+
+    /// Accept only the host's unordered dependency order for reference-line
+    /// objects owned by the selected chart's message 5021. Unrelated message
+    /// references and their order remain strict.
+    #[must_use]
+    pub fn reference_line_allocation_metadata(mut self, chart_object_id: u64) -> Self {
+        self.reference_policy = ReferenceOrderPolicy::ReferenceLineAllocation { chart_object_id };
         self
     }
 
@@ -299,13 +316,14 @@ impl<'a> Case<'a> {
             ));
         }
 
-        let diff = archive_diff::compare_with_policies(
+        let diff = archive_diff::compare_with_reference_policy(
             input,
             &host_output,
             leaf_output,
             &self.known,
             self.leaf_drops,
             self.metadata,
+            self.reference_policy,
         )?;
         match self.tier {
             Tier::A => {

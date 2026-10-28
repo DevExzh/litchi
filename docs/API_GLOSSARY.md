@@ -2909,6 +2909,18 @@ carry a list position or a kind and position, never a native identifier.
 | `litchi_numbers::sheet::chart::series::{Edit, Patch, Commit, Diagnostics, Error, LimitKind, Refusal, Property, PropertyKind, ConnectionLine, WedgeExplosion, LabelDistance, LabelVisibility, Symbol, SymbolShape, SymbolSize, Trendline, TrendlineType, PolynomialOrder, MovingAveragePeriod, Visibility, Stroke, StrokePattern, SymbolFill, Fill, Gradient, error_bar}` | Registered family; `Package::{sheet_chart_series(sheet, chart, PropertyKind), edit_sheet_chart_series, apply_sheet_chart_series}`; `Edit::set(Property)` with one value per series on the W1-E graph engine (`litchi_iwa_style::series`) and series-style write rules; the host all-series and one-series `set_sheet_chart_*` routes of connection lines, wedge explosions, label distances, data symbols, trendlines, error bars, pie labels, value-label visibility, series strokes, fills, symbol fills and symbol outlines collapse into it; `Edit::reset(PropertyKind, series)` replaces `reset_sheet_chart_series_{stroke,fill,symbol_fill,symbol_outline}`; `Refusal::{UnsupportedKind, SeriesCount, SeriesNotFound, NotResettable, SharedStyle, ImageFill}` | ✅ 0378 |
 | `litchi_numbers::sheet::chart::axis::{Edit, Patch, Commit, Diagnostics, Error, LimitKind, Refusal, Property, PropertyKind, Axis, TickMarkLocation, Visibility}` | Registered family; `Package::{sheet_chart_axis(sheet, chart, Axis, PropertyKind), edit_sheet_chart_axis, apply_sheet_chart_axis}`; `Edit::set(Axis, Property)` on the primary value or category axis style (line, major/minor gridlines, minor tick marks, tick-mark location, the value axis minimum label) or non-style (labels, the category axis series names), refusing a shared axis style; replaces `set_sheet_chart_axis_{line,major_gridlines,minor_gridlines,minor_tick_marks}_visible`, `set_sheet_chart_axis_tick_mark_location`, `set_sheet_chart_value_axis_minimum_label_visible`, `set_sheet_chart_axis_labels_visible`, `set_sheet_chart_category_axis_series_names_visible` and their reads | ✅ 0378 |
 
+## W1-E chart title and axis-title facades (record 0375b)
+
+The bounded generated-extension title and category/value-axis-title rewrite
+engine lives in `litchi_iwa_style::chart_text`. Format owners retain selector
+resolution, chart-reference ownership and exact package publication; caption
+authoring is explicitly deferred and Keynote keeps its native codec route.
+
+| Canonical name | Meaning | Status |
+|---|---|---|
+| `litchi_numbers::sheet::chart::{title, axis_title}::{Edit, Patch, Commit, Diagnostics, Error, LimitKind, Refusal}` | Registered selector-first families; `Package::{sheet_chart_title, edit_sheet_chart_title, apply_sheet_chart_title}` and `Package::{sheet_chart_axis_title, edit_sheet_chart_axis_title, apply_sheet_chart_axis_title}` | ⏳ 0375b: parity and native queue pending |
+| `litchi_pages::chart::{title, axis_title}::{Edit, Patch, Commit, Diagnostics, Error, LimitKind, Refusal}` | Registered selector-first families; `Package::{body_chart_title, edit_body_chart_title, apply_body_chart_title}` and `Package::{body_chart_axis_title, edit_body_chart_axis_title, apply_body_chart_axis_title}` | ⏳ 0375b: parity and native queue pending |
+
 ## iWork facade retirement and iWork open options (record 0306)
 
 | Canonical name | Banned | Status |

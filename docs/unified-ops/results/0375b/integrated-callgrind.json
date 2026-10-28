@@ -1,0 +1,417 @@
+{
+  "record": "0375b",
+  "date": "2026-10-28",
+  "status": "post-merge source-bound qualification; no wall-clock claim",
+  "source_commit": "4aa57b3c19c24ce625f31cdd5489ff0a1d39bc68",
+  "merged_frozen_trunk": "39e4bf101ca51f269e9352f8fed868cb84799113",
+  "binary": {
+    "path": "/home/zhuhe/code/litchi-worktrees/uo2-iwa-w1e/target/release/deps/parity-25144fe4e83e134e",
+    "bytes": 39688944,
+    "sha256": "26883da1062e498de6461693d8c9a3c350990a21d125fe587ce1713eff56c9cb"
+  },
+  "evidence": {
+    "root": "/tmp/litchi-w1e-chart-text-integrated-20261028",
+    "manifest": "artifact-manifest.tsv",
+    "manifest_bytes": 24706,
+    "manifest_sha256": "3ece5ae7f940c51510f1e12c7b59e8d85059a00a72ae5baadb2a5286ee9a6751",
+    "manifest_files": 186,
+    "retained_streams": [
+      "build stdout/stderr",
+      "route stdout/stderr",
+      "callgrind",
+      "callgrind_annotate stdout/stderr"
+    ]
+  },
+  "commands": {
+    "build": "env CARGO_BUILD_JOBS=4 CARGO_INCREMENTAL=0 CARGO_PROFILE_RELEASE_DEBUG=0 CARGO_NET_OFFLINE=true LITCHI_MEM_MAX=20G cargo test --release --offline -p litchi-iwa --test parity chart_text_cost --no-run",
+    "probe_template": "taskset -c 3 valgrind --tool=callgrind --quiet --callgrind-out-file=\"$EVIDENCE_DIR/captures/${ROUTE}-${SIDE}.callgrind\" \"--toggle-collect=*chart_text_cost::${HELPER}*\" \"$PARITY_BIN\" \"chart_text_cost::${ROUTE}\" --ignored --exact --test-threads=1 >\"$EVIDENCE_DIR/captures/${ROUTE}-${SIDE}.stdout.log\" 2>\"$EVIDENCE_DIR/captures/${ROUTE}-${SIDE}.stderr.log\"",
+    "annotation": "callgrind_annotate --inclusive=yes \"$EVIDENCE_DIR/captures/${ROUTE}-${SIDE}.callgrind\" >\"$EVIDENCE_DIR/captures/${ROUTE}-${SIDE}.annotate.log\" 2>\"$EVIDENCE_DIR/captures/${ROUTE}-${SIDE}.annotate.stderr.log\"",
+    "fail_closed": [
+      "probe exit status must be zero",
+      "grep -Fxc \"test chart_text_cost::${ROUTE} ... ok\" stdout must equal 1",
+      "exactly one test-result summary must report 1 passed, 0 failed, 0 ignored",
+      "callgrind_annotate exit status must be zero",
+      "annotated parity::chart_text_cost::<helper> Ir must be a positive integer"
+    ]
+  },
+  "routes": [
+    {
+      "test": "numbers_chart_title_read_cost_abba",
+      "host_helper": "numbers_title_read_host",
+      "leaf_helper": "numbers_title_read_leaf",
+      "host_ir": 69581656,
+      "leaf_ir": 33924667,
+      "delta_percent": -51.24,
+      "check": "pass",
+      "host_artifact": {
+        "ir": 69581656,
+        "file": "captures/numbers_chart_title_read_cost_abba-host.callgrind",
+        "bytes": 90819,
+        "sha256": "f0b71b9ea5a793be46fbc8ceaca28d86c4b8a3abec5e4f27bcf41241aace5676"
+      },
+      "leaf_artifact": {
+        "ir": 33924667,
+        "file": "captures/numbers_chart_title_read_cost_abba-leaf.callgrind",
+        "bytes": 82343,
+        "sha256": "6dd342da2538a277ed3229ea5e5b035bb732bc0217648fe35aae6854f85db7cb"
+      }
+    },
+    {
+      "test": "numbers_chart_title_set_cost_abba",
+      "host_helper": "numbers_title_set_host",
+      "leaf_helper": "numbers_title_set_leaf",
+      "host_ir": 151034431,
+      "leaf_ir": 72929450,
+      "delta_percent": -51.71,
+      "check": "pass",
+      "host_artifact": {
+        "ir": 151034431,
+        "file": "captures/numbers_chart_title_set_cost_abba-host.callgrind",
+        "bytes": 108953,
+        "sha256": "68a6ab09f3acb6200466670a35e32314ce528984ea33d593f2a4b29a5e0f185c"
+      },
+      "leaf_artifact": {
+        "ir": 72929450,
+        "file": "captures/numbers_chart_title_set_cost_abba-leaf.callgrind",
+        "bytes": 106861,
+        "sha256": "650c8ba630b3c0934da60982577d1663a3a1ac588e165b3a9cfa359cd08e3199"
+      }
+    },
+    {
+      "test": "numbers_chart_title_clear_cost_abba",
+      "host_helper": "numbers_title_clear_host",
+      "leaf_helper": "numbers_title_clear_leaf",
+      "host_ir": 151045301,
+      "leaf_ir": 72939949,
+      "delta_percent": -51.71,
+      "check": "pass",
+      "host_artifact": {
+        "ir": 151045301,
+        "file": "captures/numbers_chart_title_clear_cost_abba-host.callgrind",
+        "bytes": 108745,
+        "sha256": "b82166b72a22039c7d5dbb638667db863b0e776511b954b8b3cd997ecffe7382"
+      },
+      "leaf_artifact": {
+        "ir": 72939949,
+        "file": "captures/numbers_chart_title_clear_cost_abba-leaf.callgrind",
+        "bytes": 106170,
+        "sha256": "c6495fa0b0cddc1e73dca2227f7e29fd3686a9d3e04c82081a8ba4d5113cb6f9"
+      }
+    },
+    {
+      "test": "numbers_chart_category_axis_read_cost_abba",
+      "host_helper": "numbers_axis_read_host",
+      "leaf_helper": "numbers_axis_read_leaf",
+      "host_ir": 69589373,
+      "leaf_ir": 33908327,
+      "delta_percent": -51.27,
+      "check": "pass",
+      "host_artifact": {
+        "ir": 69589373,
+        "file": "captures/numbers_chart_category_axis_read_cost_abba-host.callgrind",
+        "bytes": 90262,
+        "sha256": "081d66051008f234a66c1f49b054ba6c0760022e42738f27b0c330beaed0874a"
+      },
+      "leaf_artifact": {
+        "ir": 33908327,
+        "file": "captures/numbers_chart_category_axis_read_cost_abba-leaf.callgrind",
+        "bytes": 82182,
+        "sha256": "4e793db61e8a4a2dbb11ee685a3fed3cb51e090846c3b36e3218246378d90b42"
+      }
+    },
+    {
+      "test": "numbers_chart_category_axis_set_cost_abba",
+      "host_helper": "numbers_axis_set_host",
+      "leaf_helper": "numbers_axis_set_leaf",
+      "host_ir": 151021222,
+      "leaf_ir": 72975760,
+      "delta_percent": -51.68,
+      "check": "pass",
+      "host_artifact": {
+        "ir": 151021222,
+        "file": "captures/numbers_chart_category_axis_set_cost_abba-host.callgrind",
+        "bytes": 109106,
+        "sha256": "166b8aa1bd8935a5e4380408b729fd6ba8248fc987b55307d76513b4ded0f5ba"
+      },
+      "leaf_artifact": {
+        "ir": 72975760,
+        "file": "captures/numbers_chart_category_axis_set_cost_abba-leaf.callgrind",
+        "bytes": 106850,
+        "sha256": "85b92188b5fa6410045b6f9908166c7c3c46fa5030f160da3d881d9deb10d976"
+      }
+    },
+    {
+      "test": "numbers_chart_category_axis_clear_cost_abba",
+      "host_helper": "numbers_axis_clear_host",
+      "leaf_helper": "numbers_axis_clear_leaf",
+      "host_ir": 151030859,
+      "leaf_ir": 72974591,
+      "delta_percent": -51.68,
+      "check": "pass",
+      "host_artifact": {
+        "ir": 151030859,
+        "file": "captures/numbers_chart_category_axis_clear_cost_abba-host.callgrind",
+        "bytes": 109002,
+        "sha256": "c3989d97846d367dea3c6d92a3acc01f5acc48e66227a7aa4835b7ee0483874e"
+      },
+      "leaf_artifact": {
+        "ir": 72974591,
+        "file": "captures/numbers_chart_category_axis_clear_cost_abba-leaf.callgrind",
+        "bytes": 106145,
+        "sha256": "f41c8118676330e1e2270b4dc29b23ba2a8ac8a93cf4a1729b2d9418ff13f953"
+      }
+    },
+    {
+      "test": "numbers_chart_value_axis_read_cost_abba",
+      "host_helper": "numbers_axis_read_host",
+      "leaf_helper": "numbers_axis_read_leaf",
+      "host_ir": 69569524,
+      "leaf_ir": 33915891,
+      "delta_percent": -51.25,
+      "check": "pass",
+      "host_artifact": {
+        "ir": 69569524,
+        "file": "captures/numbers_chart_value_axis_read_cost_abba-host.callgrind",
+        "bytes": 90363,
+        "sha256": "e8b6f5807b5556fb41456c6c4113b30b57b286c434d47d9461363c39a3d5b0a9"
+      },
+      "leaf_artifact": {
+        "ir": 33915891,
+        "file": "captures/numbers_chart_value_axis_read_cost_abba-leaf.callgrind",
+        "bytes": 82186,
+        "sha256": "35088cd0c3669f106651ca17626f3af528a2d7f9a8796ff6b829131ead6770fd"
+      }
+    },
+    {
+      "test": "numbers_chart_value_axis_set_cost_abba",
+      "host_helper": "numbers_axis_set_host",
+      "leaf_helper": "numbers_axis_set_leaf",
+      "host_ir": 151043932,
+      "leaf_ir": 72993476,
+      "delta_percent": -51.67,
+      "check": "pass",
+      "host_artifact": {
+        "ir": 151043932,
+        "file": "captures/numbers_chart_value_axis_set_cost_abba-host.callgrind",
+        "bytes": 109177,
+        "sha256": "9ccca1480b21f945e7abf0048ff9147802412a0a302cd658f8d5761509f7b887"
+      },
+      "leaf_artifact": {
+        "ir": 72993476,
+        "file": "captures/numbers_chart_value_axis_set_cost_abba-leaf.callgrind",
+        "bytes": 106823,
+        "sha256": "84f112bb6054f0e7c0f1e8952d29c83bcd89f897e14f6e5c2874bb58ffc047ae"
+      }
+    },
+    {
+      "test": "numbers_chart_value_axis_clear_cost_abba",
+      "host_helper": "numbers_axis_clear_host",
+      "leaf_helper": "numbers_axis_clear_leaf",
+      "host_ir": 151054313,
+      "leaf_ir": 72977238,
+      "delta_percent": -51.69,
+      "check": "pass",
+      "host_artifact": {
+        "ir": 151054313,
+        "file": "captures/numbers_chart_value_axis_clear_cost_abba-host.callgrind",
+        "bytes": 109041,
+        "sha256": "3b79c47b90e54029fb4bd5bc973b62d20cc17a733275d632a927b513e886af58"
+      },
+      "leaf_artifact": {
+        "ir": 72977238,
+        "file": "captures/numbers_chart_value_axis_clear_cost_abba-leaf.callgrind",
+        "bytes": 106198,
+        "sha256": "ecea96adc5b85c5553bea3ff952f3567e76b3b6358ed2bf72270c957de7aec07"
+      }
+    },
+    {
+      "test": "pages_chart_title_read_cost_abba",
+      "host_helper": "pages_title_read_host",
+      "leaf_helper": "pages_title_read_leaf",
+      "host_ir": 53367762,
+      "leaf_ir": 2167655,
+      "delta_percent": -95.94,
+      "check": "pass",
+      "host_artifact": {
+        "ir": 53367762,
+        "file": "captures/pages_chart_title_read_cost_abba-host.callgrind",
+        "bytes": 95689,
+        "sha256": "878820f8bd2b48662eba26093179e1934dc3ec046249f5e9b1869026d9b1a5ae"
+      },
+      "leaf_artifact": {
+        "ir": 2167655,
+        "file": "captures/pages_chart_title_read_cost_abba-leaf.callgrind",
+        "bytes": 67633,
+        "sha256": "a123c094faeb88486f22cc546fab1faead1ec9688ca6f2ec83c39869fc53fd7d"
+      }
+    },
+    {
+      "test": "pages_chart_title_set_cost_abba",
+      "host_helper": "pages_title_set_host",
+      "leaf_helper": "pages_title_set_leaf",
+      "host_ir": 108902248,
+      "leaf_ir": 4865970,
+      "delta_percent": -95.53,
+      "check": "pass",
+      "host_artifact": {
+        "ir": 108902248,
+        "file": "captures/pages_chart_title_set_cost_abba-host.callgrind",
+        "bytes": 113422,
+        "sha256": "9d0a4ffc9ec334f0ed70adb80303b71d9cca01a1eedf00da218a45557a078a8c"
+      },
+      "leaf_artifact": {
+        "ir": 4865970,
+        "file": "captures/pages_chart_title_set_cost_abba-leaf.callgrind",
+        "bytes": 91689,
+        "sha256": "ce9224a3fe567445629f6b79883f4d4bd7df8f8e12bef70521972e8ba26626dc"
+      }
+    },
+    {
+      "test": "pages_chart_title_clear_cost_abba",
+      "host_helper": "pages_title_clear_host",
+      "leaf_helper": "pages_title_clear_leaf",
+      "host_ir": 108930205,
+      "leaf_ir": 4903084,
+      "delta_percent": -95.5,
+      "check": "pass",
+      "host_artifact": {
+        "ir": 108930205,
+        "file": "captures/pages_chart_title_clear_cost_abba-host.callgrind",
+        "bytes": 113193,
+        "sha256": "b358f3e9fe1f090d4cdcd0e443dd91c966e8c82fe0d3f804740af19ecff044ba"
+      },
+      "leaf_artifact": {
+        "ir": 4903084,
+        "file": "captures/pages_chart_title_clear_cost_abba-leaf.callgrind",
+        "bytes": 90960,
+        "sha256": "3c0669fb8cc5fd85a49a956d38a4d54577bdb2498d4970947e1c0744e2e2710f"
+      }
+    },
+    {
+      "test": "pages_chart_category_axis_read_cost_abba",
+      "host_helper": "pages_axis_read_host",
+      "leaf_helper": "pages_axis_read_leaf",
+      "host_ir": 53306309,
+      "leaf_ir": 2170575,
+      "delta_percent": -95.93,
+      "check": "pass",
+      "host_artifact": {
+        "ir": 53306309,
+        "file": "captures/pages_chart_category_axis_read_cost_abba-host.callgrind",
+        "bytes": 95064,
+        "sha256": "7ac0c62111e072819e32d3eff5a0cbe22369eda32071bc6188895755ff462966"
+      },
+      "leaf_artifact": {
+        "ir": 2170575,
+        "file": "captures/pages_chart_category_axis_read_cost_abba-leaf.callgrind",
+        "bytes": 67498,
+        "sha256": "ee85de557f9838416b71396ee48a35f20eeee6c5dfcb8aba0a5fddd8b8ad0d5e"
+      }
+    },
+    {
+      "test": "pages_chart_category_axis_set_cost_abba",
+      "host_helper": "pages_axis_set_host",
+      "leaf_helper": "pages_axis_set_leaf",
+      "host_ir": 108962545,
+      "leaf_ir": 4883069,
+      "delta_percent": -95.52,
+      "check": "pass",
+      "host_artifact": {
+        "ir": 108962545,
+        "file": "captures/pages_chart_category_axis_set_cost_abba-host.callgrind",
+        "bytes": 113602,
+        "sha256": "6113a8fd42a39d0015378e1425b51be68e1263e262748d5eaa890c2d427f346c"
+      },
+      "leaf_artifact": {
+        "ir": 4883069,
+        "file": "captures/pages_chart_category_axis_set_cost_abba-leaf.callgrind",
+        "bytes": 91865,
+        "sha256": "b4addea2c7567bdd58c2bab5b395a7c4e78d73a8496d362a3a9822dd8429778b"
+      }
+    },
+    {
+      "test": "pages_chart_category_axis_clear_cost_abba",
+      "host_helper": "pages_axis_clear_host",
+      "leaf_helper": "pages_axis_clear_leaf",
+      "host_ir": 108871297,
+      "leaf_ir": 4917896,
+      "delta_percent": -95.48,
+      "check": "pass",
+      "host_artifact": {
+        "ir": 108871297,
+        "file": "captures/pages_chart_category_axis_clear_cost_abba-host.callgrind",
+        "bytes": 113447,
+        "sha256": "c3dc8d214f1372e3cf5c8086f83c140344e6b0ea4d2a272f540a81034e85fa45"
+      },
+      "leaf_artifact": {
+        "ir": 4917896,
+        "file": "captures/pages_chart_category_axis_clear_cost_abba-leaf.callgrind",
+        "bytes": 90453,
+        "sha256": "fa772a1fbaaf478253a39eda7d0999e451a18de03502422c8af8feb8875ca245"
+      }
+    },
+    {
+      "test": "pages_chart_value_axis_read_cost_abba",
+      "host_helper": "pages_axis_read_host",
+      "leaf_helper": "pages_axis_read_leaf",
+      "host_ir": 53280581,
+      "leaf_ir": 2173875,
+      "delta_percent": -95.92,
+      "check": "pass",
+      "host_artifact": {
+        "ir": 53280581,
+        "file": "captures/pages_chart_value_axis_read_cost_abba-host.callgrind",
+        "bytes": 95085,
+        "sha256": "6efea9c348a95ca4d224de4e24b332d5d406552179d6f636c750a21d0fd79573"
+      },
+      "leaf_artifact": {
+        "ir": 2173875,
+        "file": "captures/pages_chart_value_axis_read_cost_abba-leaf.callgrind",
+        "bytes": 67649,
+        "sha256": "44e0c9fd0776e1df1f83c258f9b29cab30672e6be674edf82f79fadabddf0e74"
+      }
+    },
+    {
+      "test": "pages_chart_value_axis_set_cost_abba",
+      "host_helper": "pages_axis_set_host",
+      "leaf_helper": "pages_axis_set_leaf",
+      "host_ir": 108792690,
+      "leaf_ir": 4883510,
+      "delta_percent": -95.51,
+      "check": "pass",
+      "host_artifact": {
+        "ir": 108792690,
+        "file": "captures/pages_chart_value_axis_set_cost_abba-host.callgrind",
+        "bytes": 113623,
+        "sha256": "8793fd19a9acbe57c2e48804d2e429bb41bc35670d0883e194f3c0629e5b22fb"
+      },
+      "leaf_artifact": {
+        "ir": 4883510,
+        "file": "captures/pages_chart_value_axis_set_cost_abba-leaf.callgrind",
+        "bytes": 91771,
+        "sha256": "ad313a02e4c5f6fff31d686f14cb4f04ebe5f562ae70d3782b13932b74309eab"
+      }
+    },
+    {
+      "test": "pages_chart_value_axis_clear_cost_abba",
+      "host_helper": "pages_axis_clear_host",
+      "leaf_helper": "pages_axis_clear_leaf",
+      "host_ir": 108815600,
+      "leaf_ir": 4913829,
+      "delta_percent": -95.48,
+      "check": "pass",
+      "host_artifact": {
+        "ir": 108815600,
+        "file": "captures/pages_chart_value_axis_clear_cost_abba-host.callgrind",
+        "bytes": 113481,
+        "sha256": "0b07fa8c96766a1ceff648b3dbcd3ff9030b73e64323332cba88cc7fcfaad0ff"
+      },
+      "leaf_artifact": {
+        "ir": 4913829,
+        "file": "captures/pages_chart_value_axis_clear_cost_abba-leaf.callgrind",
+        "bytes": 90523,
+        "sha256": "a29942f1fe67d91f6db8dbbe47ec2c0dfe3ba82beab92ea2cbeaf32ed408f818"
+      }
+    }
+  ]
+}

@@ -1,0 +1,113 @@
+{
+  "record": "0375b",
+  "checked_head": "b571642f01ea30f13d21e99e3716c4160789d123",
+  "measured_source_commit": "4aa57b3c19c24ce625f31cdd5489ff0a1d39bc68",
+  "status": "all requested final-source checks passed with exit 0",
+  "logs_root": "/tmp/litchi-w1e-final-gates-20261028",
+  "log_manifest": {
+    "path": "log-manifest.tsv",
+    "bytes": 2244,
+    "sha256": "1d0e7b87c3e58fc11a1b4dcd4fa196bb3d7aad5292b35443e1bf86d9eae7eaea",
+    "files": 24
+  },
+  "rustdoc_json": [
+    {
+      "profile": "litchi-numbers --all-features --document-hidden-items",
+      "path": "target-numbers/doc/litchi_numbers.json",
+      "bytes": 42792426,
+      "sha256": "c044b870d1e7103ca6d5ecce7fe40cd167c08478b9af176acee8da5798103b9f"
+    },
+    {
+      "profile": "litchi-pages --all-features --document-hidden-items",
+      "path": "target-pages/doc/litchi_pages.json",
+      "bytes": 35263323,
+      "sha256": "6ae2646c495b03ca78d55fbd9aa7f4fac74068145c6312a935e23af16d54179e"
+    }
+  ],
+  "checks": [
+    {
+      "name": "rustdoc_numbers",
+      "exit": 0,
+      "command": "RUSTC_BOOTSTRAP=1 RUSTDOCFLAGS=-Dwarnings CARGO_BUILD_JOBS=1 CARGO_INCREMENTAL=0 CARGO_NET_OFFLINE=true LITCHI_MEM_MAX=20G cargo rustdoc --offline --locked --target-dir \"$GATE_DIR/target-numbers\" -p litchi-numbers --lib --all-features -- -Zunstable-options --output-format json --document-hidden-items",
+      "stdout": "rustdoc_numbers.stdout.log",
+      "stderr": "rustdoc_numbers.stderr.log"
+    },
+    {
+      "name": "rustdoc_pages",
+      "exit": 0,
+      "command": "RUSTC_BOOTSTRAP=1 RUSTDOCFLAGS=-Dwarnings CARGO_BUILD_JOBS=1 CARGO_INCREMENTAL=0 CARGO_NET_OFFLINE=true LITCHI_MEM_MAX=20G cargo rustdoc --offline --locked --target-dir \"$GATE_DIR/target-pages\" -p litchi-pages --lib --all-features -- -Zunstable-options --output-format json --document-hidden-items",
+      "stdout": "rustdoc_pages.stdout.log",
+      "stderr": "rustdoc_pages.stderr.log"
+    },
+    {
+      "name": "glossary_numbers_minimal",
+      "exit": 0,
+      "command": "python3 tools/check_api_glossary.py --profile numbers-minimal --json \"$GATE_DIR/target-numbers/doc/litchi_numbers.json\"",
+      "stdout": "glossary_numbers_min.stdout.log",
+      "stderr": "glossary_numbers_min.stderr.log"
+    },
+    {
+      "name": "glossary_numbers_full",
+      "exit": 0,
+      "command": "python3 tools/check_api_glossary.py --profile numbers-full --json \"$GATE_DIR/target-numbers/doc/litchi_numbers.json\"",
+      "stdout": "glossary_numbers_full.stdout.log",
+      "stderr": "glossary_numbers_full.stderr.log"
+    },
+    {
+      "name": "glossary_pages",
+      "exit": 0,
+      "command": "python3 tools/check_api_glossary.py --profile pages --json \"$GATE_DIR/target-pages/doc/litchi_pages.json\"",
+      "stdout": "glossary_pages.stdout.log",
+      "stderr": "glossary_pages.stderr.log"
+    },
+    {
+      "name": "ledger",
+      "exit": 0,
+      "command": "python3 tools/iwa_exit_ledger.py --check",
+      "stdout": "ledger.stdout.log",
+      "stderr": "ledger.stderr.log"
+    },
+    {
+      "name": "ledger_unit",
+      "exit": 0,
+      "command": "python3 -m unittest tools.test_iwa_exit_ledger",
+      "stdout": "ledger_unit.stdout.log",
+      "stderr": "ledger_unit.stderr.log"
+    },
+    {
+      "name": "boundaries",
+      "exit": 0,
+      "command": "python3 tools/check_crate_boundaries.py",
+      "stdout": "boundaries.stdout.log",
+      "stderr": "boundaries.stderr.log"
+    },
+    {
+      "name": "boundaries_unit",
+      "exit": 0,
+      "command": "python3 -m unittest tools.test_check_crate_boundaries",
+      "stdout": "boundaries_unit.stdout.log",
+      "stderr": "boundaries_unit.stderr.log"
+    },
+    {
+      "name": "no_3rdparty",
+      "exit": 0,
+      "command": "python3 -m unittest tools.test_no_3rdparty_references",
+      "stdout": "no_3rdparty.stdout.log",
+      "stderr": "no_3rdparty.stderr.log"
+    },
+    {
+      "name": "numbers_fuzz_locked_offline",
+      "exit": 0,
+      "command": "CARGO_TARGET_DIR=\"$GATE_DIR/target-numbers-fuzz\" CARGO_BUILD_JOBS=1 CARGO_INCREMENTAL=0 CARGO_NET_OFFLINE=true LITCHI_MEM_MAX=20G cargo check --offline --locked --manifest-path crates/litchi-numbers/fuzz/Cargo.toml --all-targets --bins",
+      "stdout": "numbers_fuzz.stdout.log",
+      "stderr": "numbers_fuzz.stderr.log"
+    },
+    {
+      "name": "pages_fuzz_locked_offline",
+      "exit": 0,
+      "command": "CARGO_TARGET_DIR=\"$GATE_DIR/target-pages-fuzz\" CARGO_BUILD_JOBS=1 CARGO_INCREMENTAL=0 CARGO_NET_OFFLINE=true LITCHI_MEM_MAX=20G cargo check --offline --locked --manifest-path crates/litchi-pages/fuzz/Cargo.toml --all-targets --bins",
+      "stdout": "pages_fuzz.stdout.log",
+      "stderr": "pages_fuzz.stderr.log"
+    }
+  ]
+}

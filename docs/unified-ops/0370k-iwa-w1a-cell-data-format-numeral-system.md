@@ -176,3 +176,35 @@ performance qualification.
 | `python3 tools/iwa_exit_ledger.py --check` | 0 |
 | `python3 tools/check_crate_boundaries.py`; `python3 -m unittest tools.test_check_iwork_leaf_public_api tools.test_check_api_glossary` | 0 |
 | `cargo check -q --locked --offline --manifest-path crates/litchi-numbers/fuzz/Cargo.toml --bins`; `.../litchi-numbers-wire/fuzz/Cargo.toml`; `.../litchi-pages/fuzz/Cargo.toml`; `.../litchi-keynote/fuzz/Cargo.toml` | 0 |
+
+## 6. Read-proof audit on the frozen integration root
+
+The read-proof repair branch `uo2/iwa-w1a-read-proof` was cut from frozen
+root `39e4bf101ca51f269e9352f8fed868cb84799113`. Source commit
+`70538aede2df90ff221c64eeb58fcb4f426a6db7` adds four assertions to the
+existing Pages and Keynote parity tests:
+
+- `pages_body_table_cell_format_read_parity` and
+  `keynote_slide_table_cell_format_read_parity` now read the same
+  host-authored `formatted.bytes` through both `host_read` and `leaf_read`,
+  and compare each result with the expected `DataFormat`.
+- `pages_body_table_cell_numeral_system_format_read_parity` and
+  `keynote_slide_table_cell_numeral_system_format_read_parity` make the same
+  direct host/leaf read proof for every numeral-system sample, while keeping
+  the existing terminal write-refusal assertion.
+
+This closes the distinction between `Case::read`'s per-label comparison and
+an explicit host-reader-versus-leaf-reader proof on one host-authored source.
+The existing Numbers read test already performs both direct expected-value
+checks (or its documented refusal path), so it was not changed. Tier A exact
+source/output checks, expected values, refusal assertions, ledger rows, and
+performance receipts are unchanged. No native evidence is added.
+
+Focused validation on source commit `70538aede2df90ff221c64eeb58fcb4f426a6db7`:
+
+| Command | Result |
+|---|---|
+| `cargo test --offline -p litchi-iwa --test parity cell_format_read_parity -- --nocapture` | 2 passed |
+| `cargo test --offline -p litchi-iwa --test parity numeral_system_format_read_parity -- --nocapture` | 2 passed |
+| `cargo fmt --all -- --check` | passed |
+| `cargo clippy --offline --locked -p litchi-iwa --test parity -- -D warnings` | passed; existing vendor warnings only |
