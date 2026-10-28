@@ -494,14 +494,6 @@ impl Budget {
             self.limits.max_work_bytes(),
             self.work_bytes,
         )?;
-        if work < 200_000 {
-            eprintln!(
-                "chart-font budget work used={} max={} residual={}",
-                self.work_bytes,
-                self.limits.max_work_bytes(),
-                work
-            );
-        }
         if self.max_depth > self.limits.max_nesting() {
             return Err(Self::limit(
                 LimitKind::Nesting,
@@ -573,6 +565,21 @@ impl Budget {
         self.scratch(report.scratch_bytes)?;
         self.reserve_output(report.output_bytes)?;
         self.finish_output(report.output_bytes);
+        Ok(())
+    }
+
+    fn admit_registry(&mut self, workspace: &Workspace<'_>, extra: usize) -> Result<()> {
+        let payload = workspace.registry_payload_len()?;
+        if payload == 0 {
+            return Ok(());
+        }
+        let retained = payload.saturating_add(extra);
+        self.source(payload)?;
+        self.fields(payload)?;
+        self.work(payload.saturating_mul(4))?;
+        self.allocation(4)?;
+        self.scratch(retained)?;
+        self.reserve_output(retained)?;
         Ok(())
     }
 
@@ -1222,6 +1229,11 @@ pub fn set(
         },
         _ => {},
     }
+    let original = workspace;
+    budget.allocation(2)?;
+    budget.scratch(original.source_work())?;
+    let mut staged = original.fork();
+    let workspace = &mut staged;
     let references = paragraph_styles(workspace, chart, &mut budget)?;
     let unique = unique(&references, &mut budget)?;
     budget.allocation(unique.len().saturating_mul(2).max(1))?;
@@ -1318,10 +1330,11 @@ pub fn set(
         insert(workspace, &chart_member, addition, &mut budget)?;
     }
     if let Some(last) = last {
+        budget.admit_registry(workspace, 64)?;
         workspace.set_last_object_identifier(last)?;
     }
     prune(workspace, &chart_member, &unique, &mut budget)?;
-    match change {
+    let result = match change {
         Change::Font(target)
             if uniform(workspace, chart, &mut budget, effective_font)? != *target =>
         {
@@ -1339,6 +1352,13 @@ pub fn set(
             ))
         },
         _ => Ok(budget.report(true)),
+    };
+    match result {
+        Ok(report) => {
+            *original = staged;
+            Ok(report)
+        },
+        Err(error) => Err(error),
     }
 }
 
@@ -1468,11 +1488,13 @@ fn insert(
     let style_member = workspace.member(style_location).to_owned();
     budget.work(workspace.registry_inspection_work())?;
     if let Some(style_component) = workspace.component_for_member(&style_member)? {
+        budget.admit_registry(workspace, 64)?;
         workspace.add_object_uuids(style_component, &[addition.identifier])?;
         budget.work(workspace.registry_inspection_work())?;
         if let Some(owner) = workspace.component_for_member(chart_member)?
             && owner != style_component
         {
+            budget.admit_registry(workspace, 64)?;
             workspace.add_external_reference(owner, style_component, addition.identifier)?;
         }
     }
@@ -1574,6 +1596,7 @@ fn owner_reference_if_unused(
             return Ok(());
         }
     }
+    budget.admit_registry(workspace, 64)?;
     Ok(workspace.remove_external_reference(owner, style_component, style)?)
 }
 
@@ -1644,14 +1667,17 @@ fn prune(
             field.object_references.retain(|id| *id != style);
         }
         workspace.remove(style)?;
+        budget.admit_registry(workspace, 64)?;
         budget.work(workspace.registry_inspection_work())?;
         if let Some(style_component) = workspace.component_for_member(&style_member)? {
+            budget.admit_registry(workspace, 64)?;
             workspace.remove_object_uuids(style_component, &[style])?;
             workspace.remove_external_references_to(style_component, style)?;
             budget.work(workspace.registry_inspection_work())?;
             if let Some(owner) = workspace.component_for_member(chart_member)?
                 && owner != style_component
             {
+                budget.admit_registry(workspace, 64)?;
                 workspace.add_external_reference(owner, style_component, parent)?;
             }
         }

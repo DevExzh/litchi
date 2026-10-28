@@ -168,7 +168,7 @@ impl From<RewriteError> for Error {
 pub type Result<T> = std::result::Result<T, Error>;
 
 /// A member the edit creates.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 #[non_exhaustive]
 pub struct Insertion {
     /// The new member name.
@@ -294,6 +294,23 @@ impl<'s> Workspace<'s> {
     #[must_use]
     pub const fn limits(&self) -> Limits {
         self.limits
+    }
+
+    /// Clone the mutable graph staging state so a caller can publish no
+    /// partial changes when a later admission fails.
+    pub(crate) fn fork(&self) -> Self {
+        Self {
+            source: self.source,
+            limits: self.limits,
+            changed: self.changed.clone(),
+            created: self.created.clone(),
+            deleted: self.deleted.clone(),
+            index: self.index.clone(),
+            ambiguous: self.ambiguous.clone(),
+            registry: self.registry,
+            uuid_seed: self.uuid_seed,
+            source_work: self.source_work,
+        }
     }
 
     /// Estimate the bounded traversal and metadata work performed while the
@@ -749,6 +766,11 @@ impl<'s> Workspace<'s> {
             .ok()
             .flatten()
             .map_or(0, <[u8]>::len)
+    }
+
+    /// The current registry payload extent used by a bounded metadata plan.
+    pub(crate) fn registry_payload_len(&self) -> Result<usize> {
+        Ok(self.registry_payload()?.map_or(0, <[u8]>::len))
     }
 
     /// The effective locator of current component `component`.

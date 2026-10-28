@@ -350,3 +350,67 @@ fn chart_font_set_refusal_keeps_source_publicly_unpublished() -> TestResult {
     assert!(changes.is_empty());
     Ok(())
 }
+
+#[test]
+fn chart_font_fanout_low_resource_refusals_stay_unpublished() -> TestResult {
+    let (_single, multi) = paired_single_and_multi()?;
+    let base = base_limits(&multi);
+    let (successful, changes) = run_set(&multi, &font_change()?, base);
+    let report = successful?;
+    assert!(report.changed());
+    assert!(!changes.is_empty());
+
+    let cases = [
+        (
+            LimitKind::Work,
+            limits_with(
+                base,
+                None,
+                None,
+                None,
+                None,
+                Some(report.work_bytes().saturating_sub(1)),
+                None,
+                None,
+                None,
+            ),
+        ),
+        (
+            LimitKind::Allocations,
+            limits_with(
+                base,
+                None,
+                None,
+                None,
+                None,
+                None,
+                Some(report.allocations().saturating_sub(1)),
+                None,
+                None,
+            ),
+        ),
+        (
+            LimitKind::ScratchBytes,
+            limits_with(
+                base,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                Some(report.scratch_bytes().saturating_sub(1)),
+            ),
+        ),
+    ];
+    for (kind, limits) in cases {
+        let (result, unpublished) = run_set(&multi, &font_change()?, limits);
+        assert_limit(result, kind);
+        assert!(
+            unpublished.is_empty(),
+            "fanout {kind} refusal must not leave graph changes publishable"
+        );
+    }
+    Ok(())
+}
