@@ -6709,3 +6709,35 @@ See [0063](0063-source-pptx-modern-comments.md).
 - The exit ledger remains 1,146 migrated, 40 retired and 1,042 host-only rows.
   All 451 pending native routes still block W3. Leaf slices do not complete
   D7 unified dispatch/schema/capability exposure.
+
+- Final instruction qualification on integrated `bb2475b8b0` passed all 15
+  required and four optional iWork probes. Its separate 0377a matrix failed
+  the XLSX 1,000-cell unified route: median +5.195%, worst +5.283%. The other
+  13 legs passed. That candidate was returned for repair; no full-gate or
+  quiet-wall qualification is claimed for it. External receipts remain under
+  `.coord/resume-20261028/perf/`, including the failed captures.
+- Accepted the narrow 0377a repair at `0d4f5f9b97` (code `1abe5a5cf7`).
+  Unsigned distinct-target XLSX coalescing reuses the native setter's exact
+  source-no-op result and worksheet admission. Signed repeated-target and
+  clear paths retain their prior state checks. Tight-budget signed
+  cancellation, scalar/formula no-ops and rich/shared-string cases pass;
+  scoped Clippy, rustdoc, glossary, boundaries and policy checks pass.
+  The matching-profile CPU-pinned ABBA probe is +0.659% median and +0.805%
+  worst versus baseline. Earlier failed probes are retained in record 0377a.
+  Final measurements and the complete 53-row gate must use the new frozen
+  integrated candidate; branch evidence does not substitute for that gate.
+- Next-wave work remains isolated from this qualification candidate.
+  W2-A `c23e181d15` is accepted for the queue: 18 Numbers drawable style/layout
+  rows, host differential tests and 18 passing instruction probes (0380).
+  W2-D `8dd007be1a` is accepted for the queue: relocation of 17 leaf-only
+  Numbers comment-read tests, preserving host parity/cost oracles (0381).
+  W1-E shared chart title/axis facades remain in review for separate axis
+  measurements and precise resource-limit kinds. W1-G is replacing duplicate
+  comment writers with one shared root Set/create/Clear engine; replies remain
+  deferred and unsupported host coverage stays host-only. D7 Numbers cached
+  formula dispatch (0382) was returned for operation admission before parsing
+  and repeated-property ordering tests. Scoped builds and instruction probes
+  are allowed until the coordinator reserves the final wall interval.
+- Ledger totals remain 1,146 migrated, 40 retired and 1,042 host-only. The 451
+  pending native routes continue to block W3; no host deletion is authorized
+  by these branch or instruction-count results.
