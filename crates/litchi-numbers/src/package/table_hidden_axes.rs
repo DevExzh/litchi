@@ -326,9 +326,7 @@ fn map_header_error(error: super::table_headers::Error) -> engine::Error {
                 engine::Refusal::TableNotFound
             },
             HeaderRefusal::TableLocked { .. } => engine::Refusal::TableLocked,
-            HeaderRefusal::UnsupportedDependency { .. } => {
-                engine::Refusal::UnsupportedDependency
-            },
+            HeaderRefusal::UnsupportedDependency { .. } => engine::Refusal::UnsupportedDependency,
             HeaderRefusal::UnsupportedSource => engine::Refusal::UnsupportedSource,
             HeaderRefusal::InvalidSettings { .. } => return engine::Error::InvalidSource,
         }),
@@ -349,9 +347,7 @@ fn map_header_error(error: super::table_headers::Error) -> engine::Error {
     }
 }
 
-const fn map_header_limit_kind(
-    kind: super::table_headers::LimitKind,
-) -> engine::LimitKind {
+const fn map_header_limit_kind(kind: super::table_headers::LimitKind) -> engine::LimitKind {
     use super::table_headers::LimitKind as H;
     use engine::LimitKind as E;
     match kind {
@@ -478,9 +474,7 @@ fn map_common_error(error: litchi_iwa_common::Error) -> engine::Error {
             observed: u64::try_from(observed).unwrap_or(u64::MAX),
             maximum: u64::try_from(limit).unwrap_or(u64::MAX),
         },
-        litchi_iwa_common::Error::Allocation { amount, .. } => {
-            engine::Error::Allocation { amount }
-        },
+        litchi_iwa_common::Error::Allocation { amount, .. } => engine::Error::Allocation { amount },
         _ => engine::Error::InvalidSource,
     }
 }
