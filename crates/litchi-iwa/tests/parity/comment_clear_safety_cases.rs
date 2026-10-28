@@ -44,6 +44,7 @@ enum NumbersMutation {
     UnknownSurvivingReference,
     SelectedStorageShouldMerge,
     MalformedTableInfo,
+    OpaqueTableInfo,
 }
 
 fn pages_root_source() -> TestResult<(Vec<u8>, At)> {
@@ -264,6 +265,20 @@ fn mutate_numbers_source(mutation: NumbersMutation) -> TestResult<Vec<u8>> {
                 vec![RawMessage {
                     type_: TABLE_INFO_MESSAGE_TYPE,
                     data: vec![0xff],
+                }],
+                Default::default(),
+            )?);
+            Ok(archive.to_bytes(Default::default())?)
+        }),
+        NumbersMutation::OpaqueTableInfo => rewrite_numbers_member(NUMBERS_SOURCE, |stream| {
+            let mut archive = Archive::parse(&stream, Default::default())?;
+            archive.objects.push(ArchiveObject::new(
+                99_997,
+                vec![RawMessage {
+                    type_: TABLE_INFO_MESSAGE_TYPE,
+                    // Canonical field 99 is wire-valid but is not a table-info
+                    // model/data-store envelope. Required known links are absent.
+                    data: vec![0x98, 0x06, 0x01],
                 }],
                 Default::default(),
             )?);
@@ -541,5 +556,11 @@ fn numbers_root_clear_refuses_selected_storage_header_mismatch() -> TestResult {
 #[test]
 fn numbers_root_clear_refuses_nonempty_malformed_table_info() -> TestResult {
     let corrupted = mutate_numbers_source(NumbersMutation::MalformedTableInfo)?;
+    assert_numbers_clear_refuses(&corrupted, expect_numbers_invalid)
+}
+
+#[test]
+fn numbers_root_clear_refuses_opaque_table_info_schema() -> TestResult {
+    let corrupted = mutate_numbers_source(NumbersMutation::OpaqueTableInfo)?;
     assert_numbers_clear_refuses(&corrupted, expect_numbers_invalid)
 }

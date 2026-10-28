@@ -19,27 +19,27 @@ kept distinct from these proof cases.
 
 ## Frozen-candidate result
 
-The baseline controls pass on `295b`. The seven mutation controls are
+The baseline controls pass on `295b`. The eight mutation controls are
 intentionally red on that candidate: Pages, Keynote, and Numbers currently
 publish the corrupted clear candidate instead of refusing it. This is the
 preserved regression evidence for the coordinator's W1-G repair; the proof
 must not be weakened to accept that behavior.
 
 Test module: `crates/litchi-iwa/tests/parity/comment_clear_safety_cases.rs`.
-The clean evidence commit is `21711985a0971ae450d7c8be1db12909c57c81eb`.
+The clean evidence commit is `88237f11d82353f0ec1666267ad34ec9e39e30c3`.
 The scoped command was:
 
 ```text
 CARGO_BUILD_JOBS=2 CARGO_INCREMENTAL=0 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 PATH=/home/zhuhe/code/litchi-worktrees/.coord/bin:$PATH cargo test --offline -p litchi-iwa --test parity comment_clear_safety_cases -- --nocapture --test-threads=1
 ```
 
-Result on the extended proof run: 3 baseline tests passed and 7 mutation
+Result on the extended proof run: 3 baseline tests passed and 8 mutation
 tests failed because the candidate published a lossy clear before reaching the
 typed-refusal match. The proof assertions are therefore red for the intended
 runtime defect. The fresh raw stdout/stderr receipt is outside the repository
-at `/home/zhuhe/code/litchi-worktrees/.coord/resume-20261028/comments-clear-proof-295b-red-raw-extended.log`
-(21,140 bytes, SHA-256
-`34ae3f031df1bbf0aff9b672df27860160a7806c72cc3077bdab78567a800d16`). It
-records source `21711985a0971ae450d7c8be1db12909c57c81eb`, clean status before
-and after, exit `101`, and all seven `unexpectedly published a lossy candidate`
+at `/home/zhuhe/code/litchi-worktrees/.coord/resume-20261028/comments-clear-proof-295b-red-raw-extended2.log`
+(21,443 bytes, SHA-256
+`fa948bb36469434058d03fc5403e042c54dd8d6af615891fca79188c865b23f2`). It
+records source `88237f11d82353f0ec1666267ad34ec9e39e30c3`, clean status before
+and after, exit `101`, and all eight `unexpectedly published a lossy candidate`
 failures. No performance or native acceptance claim is made here.
