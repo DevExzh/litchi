@@ -3456,6 +3456,22 @@ pub(crate) mod coalesce {
                     )
                     .with_format(FileFormat::Xlsx)
                 })?;
+            // Ordinary coalesced runs have distinct targets and no pending
+            // action for the current cell. The native setter already owns
+            // the bounded source comparison and payload admission; using its
+            // change result avoids a second projected-state read and the
+            // duplicate source-store lookup performed by `Sheet::set`.
+            // Signed runs retain the state path because repeated targets can
+            // cancel and reapply the same source cell.
+            if !self.allow_repeated {
+                if let CellOperation::Set(content) = &plan.operation {
+                    let changed = worksheet
+                        .set_coalesced(plan.target.address, content.clone())
+                        .map_err(native_error)?;
+                    self.capture_sheet = changed.then_some(plan.target.sheet);
+                    return Ok(changed);
+                }
+            }
             let before = worksheet.state(plan.target.address).map_err(native_error)?;
             let key = plan.key();
             if let Some(initial) = self.initial.as_mut() {
