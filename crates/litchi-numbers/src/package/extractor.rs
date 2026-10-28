@@ -5375,6 +5375,8 @@ fn map_formula_render_decode_error(error: numbers_formula_codec::DecodeError) ->
             path: SemanticPath::StructuredTables,
         },
         Some(DecodeLimit::Owners { observed, maximum }) => Error::SemanticLimit {
+            // Formula rendering exposes resolved owner entries through the
+            // existing semantic References dimension.
             kind: SemanticLimitKind::References,
             observed,
             maximum,

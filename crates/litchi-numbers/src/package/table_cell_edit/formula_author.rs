@@ -1353,6 +1353,9 @@ fn map_codec(error: codec::DecodeError, path: Path) -> Error {
             (LimitKind::FormulaWork, observed, maximum)
         },
         Some(DecodeLimit::Owners { observed, maximum }) => {
+            // The transaction's existing References budget counts the
+            // source-resolved owner entries retained by formula authoring;
+            // this is not an AST-node observation.
             (LimitKind::References, observed, maximum)
         },
         Some(DecodeLimit::Text { observed, maximum }) => {

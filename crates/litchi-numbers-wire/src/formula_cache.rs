@@ -1473,6 +1473,8 @@ fn map_formula_decode_failure(error: formula_codec::DecodeError) -> Error {
                 usize_to_u64_saturating(maximum),
             ),
             formula_codec::DecodeLimit::Owners { observed, maximum } => (
+                // The formula-cache wire budget calls resolved owner entries
+                // wire references; preserve that unit rather than Nodes.
                 LimitKind::WireReferences,
                 usize_to_u64_saturating(observed),
                 usize_to_u64_saturating(maximum),

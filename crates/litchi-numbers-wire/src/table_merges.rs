@@ -119,10 +119,29 @@ impl From<ReadReport> for AttemptedCost {
 }
 
 /// Failure while reading native merge storage.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct OwnerEntriesLimit {
+    observed: usize,
+    maximum: usize,
+}
+
+impl OwnerEntriesLimit {
+    #[must_use]
+    pub const fn observed(self) -> usize {
+        self.observed
+    }
+
+    #[must_use]
+    pub const fn maximum(self) -> usize {
+        self.maximum
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MergeReadError {
     error: Error,
     attempted: AttemptedCost,
+    owner_entries_limit: Option<OwnerEntriesLimit>,
 }
 
 impl MergeReadError {
@@ -137,10 +156,24 @@ impl MergeReadError {
     pub const fn attempted(&self) -> AttemptedCost {
         self.attempted
     }
+
+    /// Return an exact resolved-owner limit refusal when formula decoding
+    /// exceeded that dimension. This remains separate from protobuf fields.
+    #[must_use]
+    pub const fn owner_entries_limit(&self) -> Option<OwnerEntriesLimit> {
+        self.owner_entries_limit
+    }
 }
 
 impl fmt::Display for MergeReadError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if let Some(limit) = self.owner_entries_limit {
+            return write!(
+                formatter,
+                "table merge formula owner entries limit exceeded: observed {}, maximum {}",
+                limit.observed, limit.maximum
+            );
+        }
         self.error.fmt(formatter)
     }
 }
@@ -298,6 +331,7 @@ struct Decoder {
     regions: Vec<Region>,
     indexes: Vec<u32>,
     overlap_checks: usize,
+    owner_entries_limit: Option<OwnerEntriesLimit>,
 }
 
 impl Decoder {
@@ -308,6 +342,7 @@ impl Decoder {
             regions: Vec::new(),
             indexes: Vec::new(),
             overlap_checks: 0,
+            owner_entries_limit: None,
         }
     }
 
@@ -340,6 +375,7 @@ impl Decoder {
         MergeReadError {
             error,
             attempted: self.report.into(),
+            owner_entries_limit: self.owner_entries_limit,
         }
     }
 
@@ -771,7 +807,15 @@ impl Decoder {
             options,
             &mut visitor,
         )
-        .map_err(map_formula_error)?;
+        .map_err(|error| {
+            if let Some(numbers_formula_codec::DecodeLimit::Owners { observed, maximum }) =
+                error.resource_limit()
+            {
+                self.owner_entries_limit = Some(OwnerEntriesLimit { observed, maximum });
+                return invalid("iWork merge formula owner-entry limit exceeded");
+            }
+            map_formula_error(error)
+        })?;
         debug_assert_eq!(report.bytes(), source.len());
         self.charge_fields(report.fields())?;
         self.charge_work(report.work())?;
@@ -936,6 +980,10 @@ fn limit(kind: LimitKind, observed: usize, maximum: usize) -> Error {
 fn map_formula_error(error: numbers_formula_codec::DecodeError) -> Error {
     use numbers_formula_codec::DecodeLimit;
     match error.resource_limit() {
+        Some(DecodeLimit::Allocation { requested }) => Error::Allocation {
+            resource: "table merge formula",
+            amount: requested,
+        },
         Some(DecodeLimit::Bytes { observed, maximum }) => {
             limit(LimitKind::InputBytes, observed, maximum)
         },
@@ -951,15 +999,11 @@ fn map_formula_error(error: numbers_formula_codec::DecodeError) -> Error {
         Some(DecodeLimit::Nodes { observed, maximum }) => {
             limit(LimitKind::Fields, observed, maximum)
         },
-        Some(DecodeLimit::Owners { observed, maximum }) => {
-            limit(LimitKind::Fields, observed, maximum)
+        Some(DecodeLimit::Owners { .. }) => {
+            invalid("iWork merge formula owner-entry limit exceeded")
         },
         Some(DecodeLimit::Text { observed, maximum }) => {
             limit(LimitKind::InputBytes, observed, maximum)
-        },
-        Some(DecodeLimit::Allocation { requested }) => Error::Allocation {
-            resource: "table merge formula",
-            amount: requested,
         },
         None => invalid("iWork table merge formula is malformed"),
     }

@@ -355,13 +355,7 @@ pub fn plan_resolved_formula_read_registry<'source>(
     internal_order: &'source [usize],
     options: DecodeOptions,
 ) -> Result<FormulaReadRegistryPlan<'source>, DecodeError> {
-    if owners.len() > options.max_owner_entries || internal_order.len() > options.max_owner_entries
-    {
-        return Err(DecodeError::limited(DecodeLimit::Owners {
-            observed: owners.len().max(internal_order.len()),
-            maximum: options.max_owner_entries,
-        }));
-    }
+    validate_owner_entries(owners.len().max(internal_order.len()), options)?;
     if owners.len() != internal_order.len() {
         return Err(DecodeError::invalid(InvalidReason::ExternalOwner));
     }
@@ -433,16 +427,11 @@ pub fn execute_resolved_formula_read_registry_plan(
     plan: FormulaReadRegistryPlan<'_>,
     options: DecodeOptions,
 ) -> Result<ResolvedFormulaReadRegistry, DecodeError> {
+    validate_owner_entries(plan.owners.len().max(plan.internal_order.len()), options)?;
     if plan.requirements.retained_bytes > options.max_bytes {
         return Err(DecodeError::limited(DecodeLimit::Bytes {
             observed: plan.requirements.retained_bytes,
             maximum: options.max_bytes,
-        }));
-    }
-    if plan.requirements.owners > options.max_owner_entries {
-        return Err(DecodeError::limited(DecodeLimit::Owners {
-            observed: plan.requirements.owners,
-            maximum: options.max_owner_entries,
         }));
     }
     if plan.requirements.work > options.max_work {
@@ -1522,12 +1511,7 @@ fn plan_formula_archive_in<'nodes, 'text>(
             maximum: options.max_nodes,
         }));
     }
-    if owners.len() > options.max_owner_entries {
-        return Err(DecodeError::limited(DecodeLimit::Owners {
-            observed: owners.len(),
-            maximum: options.max_owner_entries,
-        }));
-    }
+    validate_owner_entries(owners.len(), options)?;
     let owner_work = owners
         .len()
         .checked_mul(owners.len())
@@ -1660,6 +1644,7 @@ pub fn execute_formula_archive_plan_with_visitor(
     options: DecodeOptions,
     visitor: &mut dyn FormulaWriteDependencyVisitor,
 ) -> Result<(Vec<u8>, FormulaWriteReport), DecodeError> {
+    validate_owner_entries(plan.owners.len(), options)?;
     validate_write_requirements(plan.requirements, options)?;
     let mut output = reserve_formula_output(plan.requirements.output_bytes)?;
     put_key(&mut output, 1, 2);
@@ -2464,6 +2449,16 @@ fn axis_ranges_len(
         },
     }
     Ok(length)
+}
+
+fn validate_owner_entries(observed: usize, options: DecodeOptions) -> Result<(), DecodeError> {
+    if observed > options.max_owner_entries {
+        return Err(DecodeError::limited(DecodeLimit::Owners {
+            observed,
+            maximum: options.max_owner_entries,
+        }));
+    }
+    Ok(())
 }
 
 fn validate_write_requirements(
@@ -8266,6 +8261,52 @@ mod tests {
         assert_eq!(report.requirements().nodes(), 1);
         assert!(!output.is_empty());
 
+        let lowered_owner_options = options.with_max_owner_entries(2);
+        let lowered_owner_plan = plan_resolved_formula_archive(
+            &nodes,
+            context,
+            &owners,
+            FormulaWriteDependencyLimits::new(0, 0),
+            options,
+        )
+        .unwrap();
+        let mut lowered_facts = WriteFacts::default();
+        assert!(matches!(
+            execute_formula_archive_plan_with_visitor(
+                lowered_owner_plan,
+                lowered_owner_options,
+                &mut lowered_facts,
+            )
+            .unwrap_err()
+            .resource_limit(),
+            Some(DecodeLimit::Owners {
+                observed: 3,
+                maximum: 2,
+            })
+        ));
+        assert!(lowered_facts.precedents.is_empty());
+        assert!(lowered_facts.ranges.is_empty());
+
+        let zero_owner_options = options.with_max_owner_entries(0);
+        let zero_owner_plan = plan_resolved_formula_archive(
+            &nodes,
+            context,
+            &[],
+            FormulaWriteDependencyLimits::new(0, 0),
+            zero_owner_options,
+        )
+        .unwrap();
+        let mut zero_owner_facts = WriteFacts::default();
+        let (zero_owner_output, _) = execute_formula_archive_plan_with_visitor(
+            zero_owner_plan,
+            zero_owner_options,
+            &mut zero_owner_facts,
+        )
+        .unwrap();
+        assert!(!zero_owner_output.is_empty());
+        assert!(zero_owner_facts.precedents.is_empty());
+        assert!(zero_owner_facts.ranges.is_empty());
+
         let too_many_nodes = [
             FormulaWriteNode::Number(1.0),
             FormulaWriteNode::Number(2.0),
@@ -8714,7 +8755,7 @@ mod tests {
         let registry = execute_resolved_formula_read_registry_plan(plan, exact).unwrap();
         assert_eq!(registry.requirements(), four);
 
-        let execute_nodes_max_minus_one = write_options(
+        let execute_owner_max_minus_one = write_options(
             usize::MAX,
             usize::MAX,
             four.work(),
@@ -8724,13 +8765,13 @@ mod tests {
         );
         let plan = plan_resolved_formula_read_registry(&four_owners, &four_order, exact).unwrap();
         let error =
-            match execute_resolved_formula_read_registry_plan(plan, execute_nodes_max_minus_one) {
-                Ok(_registry) => panic!("lowered node ceiling must refuse before publication"),
+            match execute_resolved_formula_read_registry_plan(plan, execute_owner_max_minus_one) {
+                Ok(_registry) => panic!("lowered owner ceiling must refuse before publication"),
                 Err(error) => error,
             };
         assert!(matches!(
             error.resource_limit(),
-            Some(DecodeLimit::Nodes { .. })
+            Some(DecodeLimit::Owners { .. })
         ));
 
         let plan = plan_resolved_formula_read_registry(&four_owners, &four_order, exact).unwrap();
@@ -8970,7 +9011,7 @@ mod tests {
             )
             .unwrap_err()
             .resource_limit(),
-            Some(DecodeLimit::Nodes { .. })
+            Some(DecodeLimit::Owners { .. })
         ));
         let owner_work_max_minus_one = write_options(usize::MAX, usize::MAX, 3, 2, usize::MAX, 16);
         assert!(matches!(

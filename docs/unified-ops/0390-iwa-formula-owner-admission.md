@@ -75,6 +75,23 @@ coordinator must run the prescribed release-mode pinned-CPU measurement on the
 final integrated commit and qualify this full facade route separately from the
 codec unit cost.
 
+## Review follow-up
+
+Execution now rechecks the actual owner slices on every formula-write plan and
+resolved-read-registry plan before any output or retained-vector allocation.
+The regression controls cover a lowered owner ceiling after planning (with no
+dependency visitor callback) and a valid zero-owner scalar plan; the existing
+read-registry lowered-limit case now reports the typed owner dimension. This
+prevents a plan admitted under a broader profile from bypassing a narrower
+execution profile.
+
+The merge wire reader keeps an owner-entry refusal in a scoped
+`OwnerEntriesLimit` seam on `MergeReadError`; the Numbers table-merge facade
+maps that exact dimension to its own `LimitKind::OwnerEntries`. It is not
+coerced into protobuf fields. The other adapter mappings to existing reference
+dimensions are documented at their mapping sites because those adapters count
+resolved owner entries as retained formula references.
+
 ## Verification on this WP
 
 All commands used offline with `CARGO_BUILD_JOBS=2`,
@@ -84,6 +101,7 @@ All commands used offline with `CARGO_BUILD_JOBS=2`,
 |---|---|
 | `cargo test --offline -p litchi-iwa-protos numbers_formula_codec::tests::resolved_formula_owner_registry_has_independent_ceiling -- --nocapture` | pass |
 | `cargo test --offline -p litchi-numbers --test source_built_sheet_duplicate_tables -- --nocapture` | 4 passed |
+| `cargo test --offline -p litchi-numbers --test formula_authoring -- --nocapture --test-threads=1` | 16 passed |
 | `cargo test --offline -p litchi-iwa --test parity numbers_formula_author_cases -- --nocapture --test-threads=1` | 5 passed, 4 intentional cost probes ignored |
 | `cargo test --offline -p litchi-iwa --test parity -- --ignored --exact numbers_formula_author_cases::numbers_table_formula_owner_admission_cost_abba --nocapture --test-threads=1` | pass; execution smoke only |
 | `cargo fmt --all -- --check` | pass |
