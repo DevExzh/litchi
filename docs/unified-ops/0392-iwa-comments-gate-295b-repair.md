@@ -1,11 +1,13 @@
 # 0392 — W1-G comments gate repair on the 295b candidate
 
 - **Base:** `295b421bcd3d9ec0b0b9208e4039de22623685bc`
-- **Implementation commits:** `5fc2f905a0` and `56020e9214` on
-  `uo2/iwa-comments-gate-295b-repair`.
-- **Status:** scoped Numbers/shared-engine repair is complete and remains
-  unintegrated. Coordinator review, Pages/Keynote clear-safety proof,
-  final integrated performance, and native acceptance remain pending.
+- **Implementation commits:** `5fc2f905a0`, `56020e9214`, strict-clear
+  admission checkpoint `c4a823fc58`, mirror repair `9d0d581e8f`, and proof
+  merge `d34aacac9a` on `uo2/iwa-comments-gate-295b-repair`.
+- **Status:** the scoped Numbers/shared-engine repair and independent
+  Pages/Keynote/Numbers clear-safety proof are green on this unintegrated WP.
+  Coordinator review, final integrated performance, and native acceptance
+  remain pending.
 
 ## Scope and root causes
 
@@ -33,6 +35,12 @@ root operation.
    `ArchiveInfo` metadata, rejects empty table-info candidates, and rejects
    unknown top-level comment payload fields before mutation. Unknown fields
    remain supported by non-destructive read/text paths.
+6. Clear admission now pre-charges and runs a package-wide
+   `RejectUnknownMetadata` archive-reference census, binds the deleted root
+   to the selected list message, checks metadata UUID/external ownership,
+   validates selected storage/list mirrors, and strictly decodes table-info,
+   model, tile, and list payloads. Generic and keyed list mirrors are
+   preserved; only the selected keyed/ordinal mirror may be removed.
 
 No public selector, convenience API, ledger disposition, or native evidence
 claim was added by this repair. Unsupported reply authoring and native
@@ -50,6 +58,7 @@ The original gate failures now pass without weakening the existing assertions:
 | `table_cell_comment_reply` | 31 passed |
 | `table_cell_comment_metadata_native` | 5 passed |
 | `numbers_focused_comment_reads` | 17 passed |
+| `litchi-iwa` clear-safety parity module | 11 passed |
 
 The clear-loss controls retain their exact typed outcomes and source bytes:
 
@@ -61,8 +70,9 @@ The clear-loss controls retain their exact typed outcomes and source bytes:
 
 The valid root-only clear, inverse, candidate reopen, locality, no-op, and
 reply-bearing refusal cases remain green. Host-backed Pages/Keynote clear
-baseline and negative proof is tracked separately by the coordinator before
-integration.
+baseline and negative proof is recorded in
+[0393](0393-iwa-comments-clear-safety-proof.md) and runs against the repaired
+shared engine.
 
 ## Scoped gates
 

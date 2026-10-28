@@ -43,3 +43,22 @@ at `/home/zhuhe/code/litchi-worktrees/.coord/resume-20261028/comments-clear-proo
 records source `88237f11d82353f0ec1666267ad34ec9e39e30c3`, clean status before
 and after, exit `101`, and all eight `unexpectedly published a lossy candidate`
 failures. No performance or native acceptance claim is made here.
+
+## Repaired shared-engine result
+
+The exact proof tip `d50d57d8c439d2891f81311383b95d30eeb3a663` was merged into
+the repair WP at `d34aacac9a`. The repaired shared engine adds the strict
+package-wide reference/header/table admission described in record 0392. The
+current parity module contains 11 cases (three successful baselines and eight
+typed loss/refusal controls), and all 11 pass on the repaired source:
+
+```text
+CARGO_BUILD_JOBS=2 CARGO_INCREMENTAL=0 CARGO_PROFILE_DEV_DEBUG=0 \
+CARGO_PROFILE_TEST_DEBUG=0 cargo test --offline -p litchi-iwa --test parity \
+comment_clear_safety_cases -- --nocapture
+```
+
+The repaired run preserves source bytes and semantic roots on every refusal;
+the successful baselines reopen and invert byte-exactly. This remains parity
+proof only: no native E3/E4 acceptance or performance qualification is
+claimed.
