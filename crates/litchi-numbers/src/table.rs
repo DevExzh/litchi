@@ -16,6 +16,8 @@ pub mod dimension;
 pub mod edit;
 /// Header, footer, and repeating-row/column semantics.
 pub mod headers;
+/// Hidden rows and columns of a table (record 0379).
+pub mod hidden_axes;
 /// Exact-source transactions that add an empty table to a sheet or remove a
 /// table and its private graph. Start with
 /// [`crate::Package::edit_table_lifecycle`].

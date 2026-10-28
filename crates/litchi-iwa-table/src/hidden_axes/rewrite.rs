@@ -72,12 +72,14 @@ struct OwnerCreationIds {
 impl OwnerCreationIds {
     const COUNT: usize = OWNER_CREATION_OBJECTS;
 
+    /// The identifiers in allocation (and archive) order: the two filter
+    /// sets, then the two formula owners, as the host allocates them.
     const fn as_array(self) -> [u64; Self::COUNT] {
         [
-            self.column_formula,
-            self.row_formula,
             self.column_filter,
             self.row_filter,
+            self.column_formula,
+            self.row_formula,
         ]
     }
 }
@@ -760,11 +762,13 @@ fn next_owner_creation_ids(floor: u64) -> Result<OwnerCreationIds, Error> {
         observed: u64::MAX,
         maximum: u64::MAX - 1,
     })?;
+    // The host editor allocates the two filter sets before the two formula
+    // owners (record 0379: identity allocation follows the host).
     Ok(OwnerCreationIds {
-        column_formula: first,
-        row_formula: second,
-        column_filter: third,
-        row_filter: fourth,
+        column_filter: first,
+        row_filter: second,
+        column_formula: third,
+        row_formula: fourth,
     })
 }
 
@@ -1576,16 +1580,16 @@ fn build_owner_helper_objects(
     }
     let ids = plan.ids.as_array();
     let payloads = [
-        formula_payloads[0].clone(),
-        formula_payloads[1].clone(),
         filter_payload.clone(),
         filter_payload,
+        formula_payloads[0].clone(),
+        formula_payloads[1].clone(),
     ];
     let types = [
-        HIDDEN_STATE_FORMULA_OWNER_MESSAGE_TYPE,
-        HIDDEN_STATE_FORMULA_OWNER_MESSAGE_TYPE,
         FILTER_SET_MESSAGE_TYPE,
         FILTER_SET_MESSAGE_TYPE,
+        HIDDEN_STATE_FORMULA_OWNER_MESSAGE_TYPE,
+        HIDDEN_STATE_FORMULA_OWNER_MESSAGE_TYPE,
     ];
     let mut objects = Vec::new();
     objects
