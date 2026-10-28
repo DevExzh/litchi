@@ -16,6 +16,8 @@ use litchi_iwa_common::comment::AuthorId;
 use litchi_iwa_protos::tsd;
 #[cfg(feature = "parity-host-oracle")]
 use litchi_iwa_protos::tsk;
+#[cfg(feature = "parity-host-oracle")]
+use litchi_iwa_protos::tst;
 use litchi_numbers::table::At;
 use litchi_numbers::{Package, SheetSelector, TableSelector};
 #[cfg(feature = "parity-host-oracle")]
@@ -25,7 +27,7 @@ use prost::Message as _;
 use crate::harness::fixture;
 use crate::harness::{Case, Evidence, Fixture, Format, LeafRun, TestResult, Tier};
 #[cfg(feature = "parity-host-oracle")]
-use crate::known_fields::{Decoded, decode_as};
+use crate::known_fields::{Decoded, decode_as, top_level_fields};
 use crate::leaf_bytes;
 #[cfg(feature = "parity-host-oracle")]
 use crate::text_glue::Workspace;
@@ -72,6 +74,24 @@ fn populated_comment_fixture() -> TestResult<Fixture> {
 #[cfg(feature = "parity-host-oracle")]
 fn native_fixture() -> TestResult<Fixture> {
     fixture(FIXTURE)
+}
+
+#[cfg(feature = "parity-host-oracle")]
+fn rootless_fixture() -> TestResult<Fixture> {
+    let native = native_fixture()?;
+    let mut editor = numbers::Draft::from_bytes(&native.bytes)?;
+    editor.__parity_clear_table_cell_comment_legacy(TableSelector::index(0), ROW, COLUMN)?;
+    let input = Fixture {
+        path: "generated:numbers-table-comment-root-create-parity",
+        bytes: editor.to_bytes()?,
+    };
+    if numbers::Draft::from_bytes(&input.bytes)?
+        .__parity_read_table_cell_comment(TableSelector::index(0), position())?
+        .is_some()
+    {
+        return Err("Numbers create target still has a root comment".into());
+    }
+    Ok(input)
 }
 
 fn host_populated_replies(bytes: &[u8]) -> TestResult<String> {
@@ -158,6 +178,35 @@ fn author_metadata(
 #[cfg(feature = "parity-host-oracle")]
 fn decode_comment_storage(data: &[u8]) -> Result<Decoded, prost::DecodeError> {
     let decoded = decode_as::<tsd::CommentStorageArchive>(data)?;
+    Ok(decoded)
+}
+
+#[cfg(feature = "parity-host-oracle")]
+fn masked_new_comment_storage(data: &[u8]) -> Result<Decoded, prost::DecodeError> {
+    let mut message = tsd::CommentStorageArchive::decode(data)?;
+    if message.creation_date.is_some() {
+        message.creation_date = Some(litchi_iwa_protos::tsp::Date { seconds: 0.0 });
+    }
+    if message.storage_uuid.is_some() {
+        message.storage_uuid = Some(litchi_iwa_protos::tsp::Uuid { lower: 1, upper: 1 });
+    }
+    let mut decoded = decode_as::<tsd::CommentStorageArchive>(&message.encode_to_vec())?;
+    decoded.unknown_fields = top_level_fields(data)
+        .difference(&top_level_fields(&decoded.canonical))
+        .copied()
+        .collect();
+    Ok(decoded)
+}
+
+#[cfg(feature = "parity-host-oracle")]
+fn masked_clear_table_data_list(data: &[u8]) -> Result<Decoded, prost::DecodeError> {
+    let mut message = tst::TableDataList::decode(data)?;
+    message.next_list_id = 0;
+    let mut decoded = decode_as::<tst::TableDataList>(&message.encode_to_vec())?;
+    decoded.unknown_fields = top_level_fields(data)
+        .difference(&top_level_fields(&decoded.canonical))
+        .copied()
+        .collect();
     Ok(decoded)
 }
 
@@ -300,6 +349,25 @@ fn host_route(source: &[u8], operation: Operation) -> TestResult<Vec<u8>> {
 }
 
 #[cfg(feature = "parity-host-oracle")]
+fn leaf_forward(source: &[u8], operation: Operation) -> TestResult<Vec<u8>> {
+    let package = Package::from_bytes(source)?;
+    let commit = match operation {
+        Operation::Set | Operation::Create => package.set_table_cell_comment(
+            SheetSelector::index(0),
+            TableSelector::index(0),
+            position(),
+            "W1-G revised root",
+        )?,
+        Operation::Clear => package.clear_table_cell_comment(
+            SheetSelector::index(0),
+            TableSelector::index(0),
+            position(),
+        )?,
+    };
+    Ok(leaf_bytes!(commit.package()))
+}
+
+#[cfg(feature = "parity-host-oracle")]
 fn leaf_route(source: &[u8], operation: Operation) -> TestResult<LeafRun> {
     let package = Package::from_bytes(source)?;
     let commit = match operation {
@@ -332,7 +400,7 @@ fn run(
     evidence: Evidence,
     input: &Fixture,
 ) -> TestResult {
-    Case::new(name, Format::Numbers, tier, evidence, input)
+    let mut case = Case::new(name, Format::Numbers, tier, evidence, input)
         .host(move |source| host_route(source, operation))
         .leaf(move |source| leaf_route(source, operation))
         .known_fields(|known| {
@@ -350,8 +418,25 @@ fn run(
                 )
         })
         .leaf_invalidates_root_previews()
-        .leaf_structural_metadata()
-        .run()
+        .leaf_structural_metadata();
+    if matches!(operation, Operation::Create) {
+        case = case.known_fields(|known| {
+            known.with(
+                3_056,
+                "TSD.CommentStorageArchive (new-object date and storage UUID masked)",
+                masked_new_comment_storage,
+            )
+        });
+    } else if matches!(operation, Operation::Clear) {
+        case = case.known_fields(|known| {
+            known.with(
+                6_005,
+                "TST.TableDataList (clear watermark masked)",
+                masked_clear_table_data_list,
+            )
+        });
+    }
+    case.run()
         .map_err(|error| format!("{operation:?}: {error}"))?;
     Ok(())
 }
@@ -403,6 +488,69 @@ fn numbers_table_cell_comment_set_parity() -> TestResult {
         assert_eq!(after.1, before.1, "{route} rewrote existing comment date");
         assert_eq!(after.2, before.2, "{route} rewrote existing comment UUID");
     }
+    Ok(())
+}
+
+#[cfg(feature = "parity-host-oracle")]
+#[test]
+fn numbers_table_cell_comment_create_parity() -> TestResult {
+    let input = rootless_fixture()?;
+    run(
+        "numbers_table_cell_comment_create_parity",
+        Operation::Create,
+        Tier::B,
+        Evidence::Queued,
+        &input,
+    )?;
+    let host = host_route(&input.bytes, Operation::Create)?;
+    let leaf = leaf_route(&input.bytes, Operation::Create)?.output;
+    let host_root = numbers::Draft::from_bytes(&host)?
+        .__parity_read_table_cell_comment(TableSelector::index(0), position())?
+        .ok_or("legacy host create did not persist the root comment")?;
+    assert_eq!(host_root.comment.text, "W1-G revised root");
+    let leaf_root = Package::from_bytes(&leaf)?
+        .table_cell_comment(SheetSelector::index(0), TableSelector::index(0), position())?
+        .ok_or("leaf create did not persist the root comment")?;
+    assert_eq!(leaf_root.text(), "W1-G revised root");
+    Ok(())
+}
+
+#[cfg(feature = "parity-host-oracle")]
+#[test]
+fn numbers_table_cell_comment_clear_parity() -> TestResult {
+    let input = native_fixture()?;
+    let editor = numbers::Draft::from_bytes(&input.bytes)?;
+    let model = host_model(&editor)?;
+    if editor
+        .__parity_read_table_cell_comment(TableSelector::index(0), position())?
+        .is_none()
+    {
+        return Err("Numbers clear target has no root comment".into());
+    }
+    if !editor.cell_comment_replies(model, ROW, COLUMN)?.is_empty() {
+        return Err("Numbers clear target unexpectedly has replies".into());
+    }
+    run(
+        "numbers_table_cell_comment_clear_parity",
+        Operation::Clear,
+        Tier::B,
+        Evidence::Queued,
+        &input,
+    )?;
+    let host = host_route(&input.bytes, Operation::Clear)?;
+    let leaf = leaf_route(&input.bytes, Operation::Clear)?.output;
+    assert!(
+        numbers::Draft::from_bytes(&host)?
+            .__parity_read_table_cell_comment(TableSelector::index(0), position())?
+            .is_none(),
+        "legacy host clear left a root comment"
+    );
+    assert!(
+        Package::from_bytes(&leaf)?
+            .table_cell_comment(SheetSelector::index(0), TableSelector::index(0), position())?
+            .is_none(),
+        "leaf clear left a root comment"
+    );
     Ok(())
 }
 
@@ -515,7 +663,7 @@ fn numbers_table_cell_comment_create_cost_abba() -> TestResult {
     crate::pages_cost_probes::abba(
         &input,
         |source| host_route(source, Operation::Create),
-        |source| Ok(leaf_route(source, Operation::Create)?.output),
+        |source| leaf_forward(source, Operation::Create),
     )
 }
 
@@ -540,6 +688,6 @@ fn numbers_table_cell_comment_clear_cost_abba() -> TestResult {
     crate::pages_cost_probes::abba(
         &input,
         |source| host_route(source, Operation::Clear),
-        |source| Ok(leaf_route(source, Operation::Clear)?.output),
+        |source| leaf_forward(source, Operation::Clear),
     )
 }
