@@ -245,6 +245,46 @@ mod registration_tests {
             }
         }
     }
+
+    #[test]
+    fn bounded_registration_reports_nonzero_insufficient_dimensions() {
+        fn one_fields(limits: &mut RegistrationLimits) {
+            limits.max_fields = 1;
+        }
+        fn one_work(limits: &mut RegistrationLimits) {
+            limits.max_work_bytes = 1;
+        }
+        fn one_allocations(limits: &mut RegistrationLimits) {
+            limits.max_allocations = 1;
+        }
+        fn one_scratch(limits: &mut RegistrationLimits) {
+            limits.max_scratch_bytes = 1;
+        }
+        let source = stylesheet();
+        let cases: &[(RegistrationLimitKind, fn(&mut RegistrationLimits))] = &[
+            (RegistrationLimitKind::Fields, one_fields),
+            (RegistrationLimitKind::Work, one_work),
+            (RegistrationLimitKind::Allocations, one_allocations),
+            (RegistrationLimitKind::ScratchBytes, one_scratch),
+        ];
+        for &(expected, mutate) in cases {
+            let mut limited = limits();
+            mutate(&mut limited);
+            let error = stylesheet_with_variation_admitted(&source, 10, 13, limited)
+                .expect_err("insufficient resource must refuse before rewriting");
+            match error {
+                RegistrationError::Limit {
+                    kind,
+                    observed,
+                    maximum,
+                } => {
+                    assert_eq!(kind, expected);
+                    assert!(observed > maximum);
+                },
+                other => panic!("unexpected registration refusal: {other:?}"),
+            }
+        }
+    }
 }
 
 /// Bounded work consumed by one stylesheet registration transition.
@@ -264,7 +304,7 @@ impl RegistrationLimits {
         max_fields: litchi_iwa_common::WireLimits::MAX_FIELDS,
         max_output_bytes: litchi_iwa_common::WireLimits::MAX_OUTPUT_BYTES,
         max_work_bytes: litchi_iwa_common::WireLimits::MAX_REWRITE_WORK,
-        max_allocations: usize::MAX,
+        max_allocations: litchi_iwa_common::WireLimits::MAX_FIELDS,
         max_scratch_bytes: litchi_iwa_common::WireLimits::MAX_INPUT_BYTES,
     };
 }
@@ -304,27 +344,31 @@ fn registration_limit(
     }
 }
 
-fn map_wire_limit(kind: litchi_iwa_common::LimitKind) -> RegistrationLimitKind {
-    match kind {
-        litchi_iwa_common::LimitKind::InputBytes => RegistrationLimitKind::InputBytes,
-        litchi_iwa_common::LimitKind::Fields => RegistrationLimitKind::Fields,
-        litchi_iwa_common::LimitKind::OutputBytes => RegistrationLimitKind::OutputBytes,
-        litchi_iwa_common::LimitKind::RewriteWork => RegistrationLimitKind::Work,
-        litchi_iwa_common::LimitKind::Nesting
-        | litchi_iwa_common::LimitKind::TableRows
-        | litchi_iwa_common::LimitKind::TableColumns
-        | litchi_iwa_common::LimitKind::TableCells
-        | litchi_iwa_common::LimitKind::MaterializedCells => RegistrationLimitKind::Work,
-    }
-}
-
 fn map_wire_error(error: litchi_iwa_common::Error) -> RegistrationError {
     match error {
         litchi_iwa_common::Error::LimitExceeded {
             kind,
             observed,
             limit,
-        } => registration_limit(map_wire_limit(kind), observed, limit),
+        } => match kind {
+            litchi_iwa_common::LimitKind::InputBytes => {
+                registration_limit(RegistrationLimitKind::InputBytes, observed, limit)
+            },
+            litchi_iwa_common::LimitKind::Fields => {
+                registration_limit(RegistrationLimitKind::Fields, observed, limit)
+            },
+            litchi_iwa_common::LimitKind::OutputBytes => {
+                registration_limit(RegistrationLimitKind::OutputBytes, observed, limit)
+            },
+            litchi_iwa_common::LimitKind::RewriteWork => {
+                registration_limit(RegistrationLimitKind::Work, observed, limit)
+            },
+            other => RegistrationError::Wire(litchi_iwa_common::Error::LimitExceeded {
+                kind: other,
+                observed,
+                limit,
+            }),
+        },
         litchi_iwa_common::Error::Allocation { resource, amount } => {
             RegistrationError::Allocation { resource, amount }
         },
@@ -360,28 +404,56 @@ fn registration_add(
     Ok(())
 }
 
+fn registration_admit(
+    current: usize,
+    amount: usize,
+    maximum: usize,
+    kind: RegistrationLimitKind,
+) -> RegistrationResult<()> {
+    let observed = current
+        .checked_add(amount)
+        .ok_or_else(|| registration_limit(kind, usize::MAX, maximum))?;
+    if observed > maximum {
+        return Err(registration_limit(kind, observed, maximum));
+    }
+    Ok(())
+}
+
+fn registration_remaining(
+    current: usize,
+    maximum: usize,
+    kind: RegistrationLimitKind,
+) -> RegistrationResult<usize> {
+    maximum
+        .checked_sub(current)
+        .filter(|remaining| *remaining > 0)
+        .ok_or_else(|| registration_limit(kind, current.saturating_add(1), maximum))
+}
+
 fn registration_wire_limits(
     limits: RegistrationLimits,
+    scan: &RegistrationScan,
 ) -> RegistrationResult<litchi_iwa_common::WireLimits> {
-    if limits.max_input_bytes == 0 {
-        return Err(registration_limit(RegistrationLimitKind::InputBytes, 1, 0));
-    }
-    if limits.max_fields == 0 {
-        return Err(registration_limit(RegistrationLimitKind::Fields, 1, 0));
-    }
-    if limits.max_work_bytes == 0 {
-        return Err(registration_limit(RegistrationLimitKind::Work, 1, 0));
-    }
+    let input = registration_remaining(
+        scan.input_bytes,
+        limits.max_input_bytes,
+        RegistrationLimitKind::InputBytes,
+    )?;
+    let fields = registration_remaining(
+        scan.fields,
+        limits.max_fields,
+        RegistrationLimitKind::Fields,
+    )?;
+    let work = registration_remaining(
+        scan.work_bytes,
+        limits.max_work_bytes,
+        RegistrationLimitKind::Work,
+    )?
+    .min(litchi_iwa_common::WireLimits::MAX_REWRITE_WORK);
     litchi_iwa_common::WireLimits::DEFAULT
-        .with_input_bytes(limits.max_input_bytes)
-        .and_then(|value| value.with_fields(limits.max_fields))
-        .and_then(|value| {
-            value.with_rewrite_work(
-                limits
-                    .max_work_bytes
-                    .min(litchi_iwa_common::WireLimits::MAX_REWRITE_WORK),
-            )
-        })
+        .with_input_bytes(input)
+        .and_then(|value| value.with_fields(fields))
+        .and_then(|value| value.with_rewrite_work(work))
         .map_err(map_wire_error)
 }
 
@@ -390,7 +462,19 @@ fn registration_fields(
     limits: RegistrationLimits,
     scan: &mut RegistrationScan,
 ) -> RegistrationResult<Vec<wire::WireField>> {
-    let wire_limits = registration_wire_limits(limits)?;
+    registration_admit(
+        scan.input_bytes,
+        data.len(),
+        limits.max_input_bytes,
+        RegistrationLimitKind::InputBytes,
+    )?;
+    registration_admit(
+        scan.work_bytes,
+        data.len(),
+        limits.max_work_bytes,
+        RegistrationLimitKind::Work,
+    )?;
+    let wire_limits = registration_wire_limits(limits, scan)?;
     registration_add(
         &mut scan.scratch_bytes,
         size_of::<wire::WireField>(),
@@ -403,18 +487,20 @@ fn registration_fields(
         limits.max_allocations,
         RegistrationLimitKind::Allocations,
     )?;
-    registration_add(
-        &mut scan.work_bytes,
-        data.len(),
-        limits.max_work_bytes,
-        RegistrationLimitKind::Work,
-    )?;
     let mut field_count = 0usize;
     wire::visit_wire_fields(data, wire_limits, |_field| {
         field_count = field_count.saturating_add(1);
         Ok(())
     })
     .map_err(map_wire_error)?;
+    let second_work = data.len().checked_add(field_count).ok_or_else(|| {
+        registration_limit(
+            RegistrationLimitKind::Work,
+            usize::MAX,
+            limits.max_work_bytes,
+        )
+    })?;
+    let first_work = second_work;
     registration_add(
         &mut scan.input_bytes,
         data.len(),
@@ -429,16 +515,29 @@ fn registration_fields(
     )?;
     registration_add(
         &mut scan.work_bytes,
-        data.len().checked_add(field_count).ok_or_else(|| {
-            registration_limit(
-                RegistrationLimitKind::Work,
-                usize::MAX,
-                limits.max_work_bytes,
-            )
-        })?,
+        first_work,
         limits.max_work_bytes,
         RegistrationLimitKind::Work,
     )?;
+    registration_admit(
+        scan.input_bytes,
+        data.len(),
+        limits.max_input_bytes,
+        RegistrationLimitKind::InputBytes,
+    )?;
+    registration_admit(
+        scan.fields,
+        field_count,
+        limits.max_fields,
+        RegistrationLimitKind::Fields,
+    )?;
+    registration_admit(
+        scan.work_bytes,
+        second_work,
+        limits.max_work_bytes,
+        RegistrationLimitKind::Work,
+    )?;
+    let second_wire_limits = registration_wire_limits(limits, scan)?;
     let field_storage = field_count
         .checked_mul(size_of::<wire::WireField>())
         .ok_or_else(|| {
@@ -460,7 +559,26 @@ fn registration_fields(
         limits.max_allocations,
         RegistrationLimitKind::Allocations,
     )?;
-    wire::parse_wire_fields(data, wire_limits).map_err(map_wire_error)
+    let fields = wire::parse_wire_fields(data, second_wire_limits).map_err(map_wire_error)?;
+    registration_add(
+        &mut scan.input_bytes,
+        data.len(),
+        limits.max_input_bytes,
+        RegistrationLimitKind::InputBytes,
+    )?;
+    registration_add(
+        &mut scan.fields,
+        field_count,
+        limits.max_fields,
+        RegistrationLimitKind::Fields,
+    )?;
+    registration_add(
+        &mut scan.work_bytes,
+        second_work,
+        limits.max_work_bytes,
+        RegistrationLimitKind::Work,
+    )?;
+    Ok(fields)
 }
 
 fn scan_reference(
@@ -579,34 +697,6 @@ fn registration_reserve<T>(
             amount: additional,
         })?;
     Ok(())
-}
-
-fn bounded_reference(
-    identifier: u64,
-    scan: &mut RegistrationScan,
-    limits: RegistrationLimits,
-) -> RegistrationResult<Vec<u8>> {
-    let mut output = Vec::new();
-    output
-        .try_reserve_exact(11)
-        .map_err(|_| RegistrationError::Allocation {
-            resource: "stylesheet reference",
-            amount: 11,
-        })?;
-    registration_add(
-        &mut scan.allocations,
-        1,
-        limits.max_allocations,
-        RegistrationLimitKind::Allocations,
-    )?;
-    registration_add(
-        &mut scan.scratch_bytes,
-        11,
-        limits.max_scratch_bytes,
-        RegistrationLimitKind::ScratchBytes,
-    )?;
-    push_varint_field(&mut output, REFERENCE_IDENTIFIER, identifier);
-    Ok(output)
 }
 
 fn bounded_reference_identifier(
@@ -791,6 +881,45 @@ fn bounded_rewrite_repeated(
     Ok(output)
 }
 
+fn map_char_style_error(error: litchi_iwa_text_wire::CharStyleError) -> RegistrationError {
+    match error {
+        litchi_iwa_text_wire::CharStyleError::Limit {
+            kind,
+            observed,
+            maximum,
+        } => match kind {
+            litchi_iwa_common::LimitKind::InputBytes => {
+                registration_limit(RegistrationLimitKind::InputBytes, observed, maximum)
+            },
+            litchi_iwa_common::LimitKind::Fields => {
+                registration_limit(RegistrationLimitKind::Fields, observed, maximum)
+            },
+            litchi_iwa_common::LimitKind::OutputBytes => {
+                registration_limit(RegistrationLimitKind::OutputBytes, observed, maximum)
+            },
+            litchi_iwa_common::LimitKind::RewriteWork => {
+                registration_limit(RegistrationLimitKind::Work, observed, maximum)
+            },
+            other => RegistrationError::Wire(litchi_iwa_common::Error::LimitExceeded {
+                kind: other,
+                observed,
+                limit: maximum,
+            }),
+        },
+        litchi_iwa_text_wire::CharStyleError::Allocation { amount } => {
+            RegistrationError::Allocation {
+                resource: "stylesheet text-wire output",
+                amount,
+            }
+        },
+        litchi_iwa_text_wire::CharStyleError::Invalid
+        | litchi_iwa_text_wire::CharStyleError::Span => {
+            RegistrationError::Invalid("invalid stylesheet text-wire payload")
+        },
+        _ => RegistrationError::Invalid("unsupported stylesheet text-wire failure"),
+    }
+}
+
 fn bounded_register(
     stylesheet: &[u8],
     parent: u64,
@@ -798,7 +927,7 @@ fn bounded_register(
     limits: RegistrationLimits,
 ) -> RegistrationResult<(Vec<u8>, RegistrationReport)> {
     let mut scan = scan_stylesheet(stylesheet, limits)?;
-    let mut styles = bounded_repeated_payloads(stylesheet, STYLESHEET_STYLES, limits, &mut scan)?;
+    let styles = bounded_repeated_payloads(stylesheet, STYLESHEET_STYLES, limits, &mut scan)?;
     for payload in &styles {
         if bounded_reference_identifier(payload, limits, &mut scan)? == style {
             return Err(RegistrationError::Invalid(
@@ -806,64 +935,50 @@ fn bounded_register(
             ));
         }
     }
-    let mut parent_entries =
+    let parent_entries =
         bounded_repeated_payloads(stylesheet, STYLESHEET_PARENT_CHILDREN, limits, &mut scan)?;
-    let style_reference = bounded_reference(style, &mut scan, limits)?;
-    registration_reserve(&mut styles, 1, &mut scan, limits, "stylesheet styles")?;
-    styles.push(style_reference);
-    let data = bounded_rewrite_repeated(stylesheet, STYLESHEET_STYLES, &styles, limits, &mut scan)?;
-    let mut matches = 0usize;
-    let mut entries = Vec::new();
-    registration_reserve(
-        &mut entries,
-        parent_entries.len().saturating_add(1),
-        &mut scan,
-        limits,
-        "stylesheet parent entries",
-    )?;
-    for entry in parent_entries.drain(..) {
-        let entry_parent = bounded_repeated_payloads(&entry, CHILDREN_PARENT, limits, &mut scan)?
+    let mut parent_matches = 0usize;
+    for entry in &parent_entries {
+        let entry_parent = bounded_repeated_payloads(entry, CHILDREN_PARENT, limits, &mut scan)?
             .first()
             .map(|payload| bounded_reference_identifier(payload, limits, &mut scan))
             .transpose()?
             .unwrap_or(0);
         if entry_parent == parent {
-            matches += 1;
-            let mut children = bounded_repeated_payloads(&entry, CHILDREN, limits, &mut scan)?;
-            children.push(bounded_reference(style, &mut scan, limits)?);
-            entries.push(bounded_rewrite_repeated(
-                &entry, CHILDREN, &children, limits, &mut scan,
-            )?);
-        } else {
-            entries.push(entry);
+            parent_matches += 1;
         }
     }
-    if matches > 1 {
+    if parent_matches > 1 {
         return Err(RegistrationError::Invalid(
             "the stylesheet repeats a parent style",
         ));
     }
-    if matches == 0 {
-        let mut entry = Vec::new();
-        registration_reserve(&mut entry, 32, &mut scan, limits, "stylesheet parent entry")?;
-        push_message_field(
-            &mut entry,
-            CHILDREN_PARENT,
-            &bounded_reference(parent, &mut scan, limits)?,
-        );
-        push_message_field(
-            &mut entry,
-            CHILDREN,
-            &bounded_reference(style, &mut scan, limits)?,
-        );
-        entries.push(entry);
-    }
-    let output = bounded_rewrite_repeated(
-        &data,
-        STYLESHEET_PARENT_CHILDREN,
-        &entries,
-        limits,
-        &mut scan,
+    // The shared text-wire writer preserves insertion-after-last-style and
+    // unknown/order bytes exactly. The preflight above validates ownership;
+    // this second scan admits the writer's nested traversal against residual
+    // input/field/work allowances before it allocates its candidate buffer.
+    scan_stylesheet(stylesheet, limits).map(|next| scan = next)?;
+    let wire_limits = registration_wire_limits(limits, &scan)?;
+    let output =
+        litchi_iwa_text_wire::stylesheet_with_style(stylesheet, style, Some(parent), wire_limits)
+            .map_err(map_char_style_error)?;
+    registration_add(
+        &mut scan.output_bytes,
+        output.len(),
+        limits.max_output_bytes,
+        RegistrationLimitKind::OutputBytes,
+    )?;
+    registration_add(
+        &mut scan.work_bytes,
+        output.len(),
+        limits.max_work_bytes,
+        RegistrationLimitKind::Work,
+    )?;
+    registration_add(
+        &mut scan.allocations,
+        1,
+        limits.max_allocations,
+        RegistrationLimitKind::Allocations,
     )?;
     Ok((
         output,
