@@ -130,6 +130,7 @@ mod registration_tests {
     use super::{
         RegistrationError, RegistrationLimitKind, RegistrationLimits,
         stylesheet_with_variation_admitted, stylesheet_without_variation_admitted,
+        stylesheet_writer_output_bound,
     };
     use crate::graph::push_message_field;
 
@@ -204,6 +205,28 @@ mod registration_tests {
             },
             other => panic!("unexpected output refusal: {other:?}"),
         }
+    }
+
+    #[test]
+    fn bounded_registration_writer_boundary_is_admitted_once() {
+        let source = stylesheet();
+        let bound = stylesheet_writer_output_bound(&source, 10, 13, 1).expect("writer bound");
+        let mut exact = limits();
+        exact.max_output_bytes = bound;
+        stylesheet_with_variation_admitted(&source, 10, 13, exact)
+            .expect("the pre-admitted writer bound fits exactly once");
+
+        let mut short = limits();
+        short.max_output_bytes = bound.saturating_sub(1);
+        let error = stylesheet_with_variation_admitted(&source, 10, 13, short)
+            .expect_err("validation may fit while the writer phase does not");
+        assert!(matches!(
+            error,
+            RegistrationError::Limit {
+                kind: RegistrationLimitKind::OutputBytes,
+                ..
+            }
+        ));
     }
 
     #[test]
@@ -1049,24 +1072,6 @@ fn bounded_register(
     let output =
         litchi_iwa_text_wire::stylesheet_with_style(stylesheet, style, Some(parent), wire_limits)
             .map_err(map_char_style_error)?;
-    registration_add(
-        &mut scan.output_bytes,
-        output.len(),
-        limits.max_output_bytes,
-        RegistrationLimitKind::OutputBytes,
-    )?;
-    registration_add(
-        &mut scan.work_bytes,
-        output.len(),
-        limits.max_work_bytes,
-        RegistrationLimitKind::Work,
-    )?;
-    registration_add(
-        &mut scan.allocations,
-        1,
-        limits.max_allocations,
-        RegistrationLimitKind::Allocations,
-    )?;
     Ok((
         output,
         RegistrationReport {
