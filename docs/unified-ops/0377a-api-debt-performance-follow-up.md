@@ -1,8 +1,9 @@
 # 0377a — bounded API-debt performance follow-up
 
 - Status: bounded source-bound qualification is recorded on `uo2/fin-perf`;
-  coordinator review, trunk synchronization, and final integrated
-  qualification remain pending.
+  the branch is synchronized with coordinator trunk at merge commit
+  `b9f5c8bd15f3b670793e3ed2f9d987e0725b8f52`. Final integrated qualification
+  remains the coordinator's responsibility.
 - Date: 2026-10-28.
 - Baseline: `839212fa9da2e4eff14dcae9c3aa242e49f25729`.
 - Candidate source for the F1/F3/F4/F5 and CLI measurements:
@@ -118,8 +119,14 @@ cargo test -p litchi-xlsx --lib metadata::tests -- --nocapture  # 11 passed
 
 The candidate release binaries were rebuilt after the harness change; the
 candidate target was 5.0 GiB (below the 30 GiB work-package limit), and no raw
-captures or binaries are committed. Remaining gates are `cargo fmt`, scoped
-Clippy/checks after the current trunk merge, the matrix `--check`, and a quiet
-final wall qualification on the coordinator's final integrated commit. The
-branch must be merged with current `feat/unified-ops-api` before handoff; only
-the coordinator may integrate it into trunk.
+captures or binaries are committed. Before handoff, this branch completed the
+scoped format check, release harness check, transaction/ODF/DOCX/XLSX tests,
+ODC all-target checks, Clippy with the documented pre-existing ODF
+`manual_range_contains` allowance, rustdoc (including `litchi-sheet`), the
+73-profile API glossary, ledger/matrix checks, and crate-boundary audit. The
+source-bound callgrind and compact manifest identify their exact source and
+binary hashes; F1/F3/F4/F5 wall values remain provisional under shared-host
+load. The coordinator must rerun quiet wall checks and full integrated gates
+on the final trunk candidate; only the coordinator may integrate it into
+trunk. This branch is clean after merge commit
+`b9f5c8bd15f3b670793e3ed2f9d987e0725b8f52`.
