@@ -1,12 +1,14 @@
 # 0377a — bounded API-debt performance follow-up
 
-- Status: bounded source-bound qualification is recorded on `uo2/fin-perf`;
-  the branch is synchronized with coordinator trunk at merge commit
-  `b9f5c8bd15f3b670793e3ed2f9d987e0725b8f52`. Final integrated qualification
+- Status: bounded source-bound qualification is recorded on `uo2/fin-perf` at
+  repair commit `1abe5a5cf794a4ec78de7f51f4c346e77cf4e28b`, a descendant of the
+  coordinator frozen candidate `bb2475b8b0c11c8cef304178ee3fca1f590e9633`.
+  Its immediate parent is the bounded predecessor repair
+  `27a22f7ccaf6ab3889040bb8d10300c802e325fe`. Final integrated qualification
   remains the coordinator's responsibility.
 - Date: 2026-10-28.
 - Baseline: `839212fa9da2e4eff14dcae9c3aa242e49f25729`.
-- Candidate source for the F1/F3/F4/F5 and CLI measurements:
+- Historical candidate source for the F1/F3/F4/F5 and CLI measurements:
   `187863518e` plus the recorded `extra.rs` working-tree change; the source
   hashes and release binary hashes are in `results/0377a/cli.json`.
 - Candidate source for the source-bound F2 remeasurement:
@@ -105,6 +107,109 @@ XLSX 0.966, PPTX 0.976 and XLS 0.959; `cli-version` was 0.925–0.954. The
 in-process medians were 1.000–1.031. These process-start rows are diagnostic
 and carry no unified leaf budget.
 
+## Final XLSX batch repair remeasurement
+
+The first integrated candidate, `bb2475b8b0c11c8cef304178ee3fca1f590e9633`,
+failed the source-bound XLSX 1,000-cell unified instruction route. Its
+preserved receipt is outside the repository at
+`/home/zhuhe/code/litchi-worktrees/.coord/resume-20261028/perf/fin-final-bb2475b8b0/`:
+base totals were 30,045,503 and 29,998,170 Ir, candidate totals were
+31,582,848 and 31,580,006 Ir, with median ratio 1.051948538 and worst ratio
+1.052825822. This failed receipt remains evidence; it was not overwritten.
+
+The first bounded predecessor, `27a22f7ccaf6ab3889040bb8d10300c802e325fe`,
+also failed under the matching release-debug configuration. Its preserved
+ABBA capture directory is
+`/home/zhuhe/code/litchi-worktrees/.coord/fin-perf/repair-27a22-batch1000-debug1-preopt/`:
+base totals were 30,007,770 and 30,011,846 Ir, candidate totals were
+31,611,640 and 31,690,204 Ir, with paired ratios 1.053448490 and
+1.055923184, median 1.054685837 and worst 1.055923184. The earlier diagnostic
+debug-info-off run is retained separately at
+`/home/zhuhe/code/litchi-worktrees/.coord/fin-perf/repair-27a22-batch1000/`:
+30,049,152 / 31,683,801 / 31,598,838 / 30,056,013 Ir, median 1.052865416
+and worst 1.054399172. Neither failed receipt was replaced by the repaired
+run below.
+
+The bounded repair is intentionally narrower than a general setter change:
+the native worksheet setter returns a hidden coalescer result, and the unified
+route consumes it only for unsigned runs with distinct bounded targets. The
+result is `false` only for a bounded exact source-equivalent no-op and `true`
+after staging a payload. Signed/repeated runs retain the projected-state path,
+as do rich/retype/clear operations. Rich and shared-string source checks still
+distinguish same-visible-text representation changes, so a plain set over rich
+text is not collapsed as a no-op.
+
+The repaired source-bound candidate is commit `1abe5a5cf794a4ec78de7f51f4c346e77cf4e28b`.
+It was built from the clean worktree with release debug information enabled by
+the harness profile (matching the baseline), LTO and panic-abort:
+
+```text
+cwd=/home/zhuhe/code/litchi-worktrees/uo2-fin-perf
+env PATH=/home/zhuhe/code/litchi-worktrees/.coord/bin:$HOME/.cargo/bin:$PATH CARGO_TARGET_DIR=/home/zhuhe/code/litchi-worktrees/uo2-fin-perf/target CARGO_INCREMENTAL=0 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_BUILD_JOBS=4 RUST_TEST_THREADS=4 cargo build --release --offline --locked --manifest-path tools/perf-baseline/unified-fin-perf/Cargo.toml
+```
+
+The candidate copy is
+`/home/zhuhe/code/litchi-worktrees/.coord/fin-perf/bin/fin-cand-1abe5a5cf7-debug1`,
+385,525,480 bytes, SHA-256
+`0c55e2ab3f8142003c16b0431049924c923397774a85a0946d0e38cc64074c22`.
+The baseline is `fin-base`, source `839212fa9da2e4eff14dcae9c3aa242e49f25729`,
+362,495,936 bytes, SHA-256
+`1c8d4b7abdf94f7d3ad0a7b6665cf512a4ebbc9ae9d76786d76779e1f96e883b`.
+
+Using the corrected `fin_perf_region` harness (main source SHA-256
+`551e5440ae82bfe983fb74c8a5e4e36e727176469efda0998e9b3c29d79b1a4d`),
+Callgrind, `taskset -c 47`, and ABBA order `base, candidate, candidate, base`,
+the retained captures are in
+`/home/zhuhe/code/litchi-worktrees/.coord/fin-perf/repair-1abe5a5cf7-batch1000-debug1/`.
+The route printed a successful JSON result in every log and all four counted
+totals were positive:
+
+| capture | build | Ir |
+|---|---|---:|
+| 01 | baseline | 30,048,818 |
+| 02 | candidate | 30,290,668 |
+| 03 | candidate | 30,209,692 |
+| 04 | baseline | 30,055,506 |
+
+The paired ratios are 1.008048569 and 1.005130042; median is 1.006589306 and
+worst is 1.008048569. Both are below the 1.05 instruction-cost bar. This is
+instruction-count evidence for the unified batch route; no quiet wall or CLI
+qualification is claimed by this repair receipt.
+
+The repaired captures can be regenerated from the source-bound binaries with
+the following per-capture command (substitute the listed binary and output
+prefix for each ABBA leg, without reusing an output file):
+
+```sh
+systemd-run --user --scope --quiet --collect \
+  -p OOMPolicy=continue -p MemoryMax=20G -p MemorySwapMax=0 -- \
+  taskset --cpu-list 47 valgrind --tool=callgrind --collect-atstart=no \
+  --toggle-collect='*fin_perf_region*' \
+  --callgrind-out-file=/home/zhuhe/code/litchi-worktrees/.coord/fin-perf/repair-1abe5a5cf7-batch1000-debug1/<capture>.cg \
+  /home/zhuhe/code/litchi-worktrees/.coord/fin-perf/bin/<fin-base-or-fin-cand-1abe5a5cf7-debug1> \
+  --groups batch --formats xlsx \
+  --routes xlsx_eager_cell_value_set_batch1000 --callgrind unified --iterations 1 \
+  > /home/zhuhe/code/litchi-worktrees/.coord/fin-perf/repair-1abe5a5cf7-batch1000-debug1/<capture>.log 2>&1
+```
+
+For symbol attribution, run the same `callgrind_annotate` command used by the
+reviewed capture set on each resulting `.cg` file, writing to a new external
+text file (the raw `.cg` and annotation files remain outside the repository):
+
+```sh
+callgrind_annotate --auto=yes --inclusive=no --threshold=1 \
+  /home/zhuhe/code/litchi-worktrees/.coord/fin-perf/repair-1abe5a5cf7-batch1000-debug1/<capture>.cg \
+  > /home/zhuhe/code/litchi-worktrees/.coord/fin-perf/repair-1abe5a5cf7-batch1000-debug1/<capture>.annotate.txt
+```
+
+The focused verification covered the unsigned coalescer's scalar/no-op and
+formula transaction cases, plus native exact-source cases for same-text rich
+inline/shared strings and formula state. `xlsx_coalescing` passed 11 tests and
+the native cell edit suite passed 80 tests, including
+`plain_set_over_same_visible_rich_text_erases_runs`,
+`same_text_rich_run_property_change_is_not_collapsed_as_a_noop`, and
+`unbounded_plain_set_preserves_shared_string_identity`.
+
 ## Verification and gaps
 
 Scoped correctness checks passed before this record was written:
@@ -115,10 +220,13 @@ cargo test -p litchi-ops --all-features --lib format::odf_tree:: -- --nocapture 
 cargo test -p litchi-ops --no-default-features --features odc --all-targets  # passed
 cargo test -p litchi-docx --lib metadata::tests -- --nocapture  # 13 passed
 cargo test -p litchi-xlsx --lib metadata::tests -- --nocapture  # 11 passed
+cargo test -p litchi-ops --all-features --test xlsx_coalescing -- --nocapture  # 11 passed
+cargo test -p litchi-xlsx --all-features --lib workbook::edit::tests::cells:: -- --nocapture  # 80 passed
+cargo test -p litchi-xlsx --all-features --lib workbook::edit::tests::worksheet_edit_state:: -- --nocapture  # 3 passed
 ```
 
 The candidate release binaries were rebuilt after the harness change; the
-candidate target was 5.0 GiB (below the 30 GiB work-package limit), and no raw
+current candidate target is 28 GiB (below the 30 GiB work-package limit), and no raw
 captures or binaries are committed. Before handoff, this branch completed the
 scoped format check, release harness check, transaction/ODF/DOCX/XLSX tests,
 ODC all-target checks, strict scoped Clippy, rustdoc (including `litchi-sheet`), the
@@ -127,6 +235,7 @@ source-bound callgrind and compact manifest identify their exact source and
 binary hashes; F1/F3/F4/F5 wall values remain provisional under shared-host
 load. The coordinator must rerun quiet wall checks and full integrated gates
 on the final trunk candidate; only the coordinator may integrate it into
-trunk. The synchronized merge commit is
-`b9f5c8bd15f3b670793e3ed2f9d987e0725b8f52`; this handoff adds only the
-narrow lint and matrix-receipt updates described above.
+trunk. This handoff adds the bounded XLSX coalescer repair at
+`1abe5a5cf794a4ec78de7f51f4c346e77cf4e28b` and the compact receipt
+`results/0377a/xlsx-batch-repair.json`; it does not claim integrated trunk
+qualification.
