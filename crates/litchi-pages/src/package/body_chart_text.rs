@@ -54,6 +54,8 @@ impl Kind {
 pub enum LimitKind {
     /// One native payload inspected by the selector or codec.
     PayloadBytes,
+    /// Semantic section or body-storage items admitted by candidate reopen.
+    PayloadItems,
     /// Generated-extension wire bytes.
     WireBytes,
     /// Strict generated-extension fields visited.
@@ -78,6 +80,7 @@ impl fmt::Display for LimitKind {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter.write_str(match self {
             Self::PayloadBytes => "payload bytes",
+            Self::PayloadItems => "payload items",
             Self::WireBytes => "wire bytes",
             Self::WireFields => "wire fields",
             Self::WireNesting => "wire nesting",
@@ -469,6 +472,8 @@ fn map_graph_error(error: graph::GraphError) -> Error {
         } => Error::Limit {
             kind: match kind {
                 graph::GraphLimit::InputBytes => LimitKind::PayloadBytes,
+                graph::GraphLimit::SemanticItems => LimitKind::PayloadItems,
+                graph::GraphLimit::SemanticTextBytes => LimitKind::TextBytes,
                 graph::GraphLimit::OutputBytes => LimitKind::OutputBytes,
                 graph::GraphLimit::WireFields => LimitKind::WireFields,
                 graph::GraphLimit::WireNesting => LimitKind::WireNesting,
@@ -808,5 +813,42 @@ impl Package {
 
     pub fn apply_body_chart_axis_title(&self, patch: &Patch) -> Result<Commit, Error> {
         apply_patch(self, patch)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{Error, LimitKind, map_graph_error};
+    use crate::package::body_drawable_graph::{GraphError, GraphLimit};
+
+    #[test]
+    fn semantic_candidate_limits_keep_their_resource_kinds() {
+        let items = map_graph_error(GraphError::Limit {
+            kind: GraphLimit::SemanticItems,
+            observed: 17,
+            maximum: 16,
+        });
+        assert!(matches!(
+            items,
+            Error::Limit {
+                kind: LimitKind::PayloadItems,
+                observed: 17,
+                maximum: 16,
+            }
+        ));
+
+        let text = map_graph_error(GraphError::Limit {
+            kind: GraphLimit::SemanticTextBytes,
+            observed: 257,
+            maximum: 256,
+        });
+        assert!(matches!(
+            text,
+            Error::Limit {
+                kind: LimitKind::TextBytes,
+                observed: 257,
+                maximum: 256,
+            }
+        ));
     }
 }

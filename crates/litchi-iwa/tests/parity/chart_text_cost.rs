@@ -24,7 +24,6 @@ use crate::leaf_bytes;
 
 const NUMBERS: &str = "iwork/numbers/chart-data-native.numbers";
 const NUMBERS_CHART: usize = 1;
-const AXES: [Axis; 2] = [Axis::Category, Axis::Value];
 
 fn numbers_input() -> TestResult<(Fixture, u64, u64)> {
     let native = fixture(NUMBERS)?;
@@ -66,11 +65,7 @@ fn numbers_input_with_text(axis: Option<Axis>) -> TestResult<(Fixture, u64, u64)
     let (input, sheet, chart) = numbers_input()?;
     let mut editor = numbers::Draft::from_bytes(&input.bytes)?;
     match axis {
-        Some(_) => {
-            for axis in AXES {
-                editor.set_sheet_chart_axis_title(sheet, chart, axis, "cost seed")?;
-            }
-        },
+        Some(axis) => editor.set_sheet_chart_axis_title(sheet, chart, axis, "cost seed")?,
         None => editor.set_sheet_chart_title(sheet, chart, "cost seed")?,
     }
     Ok((
@@ -117,11 +112,7 @@ fn pages_input_with_text(axis: Option<Axis>) -> TestResult<(Fixture, u64)> {
     let (input, chart) = pages_input()?;
     let mut editor = pages::Draft::from_bytes(&input.bytes)?;
     match axis {
-        Some(_) => {
-            for axis in AXES {
-                editor.set_body_chart_axis_title(chart, axis, "cost seed")?;
-            }
-        },
+        Some(axis) => editor.set_body_chart_axis_title(chart, axis, "cost seed")?,
         None => editor.set_body_chart_title(chart, "cost seed")?,
     }
     Ok((
@@ -150,24 +141,20 @@ fn numbers_title_read_leaf(source: &[u8]) -> TestResult<()> {
 }
 
 #[inline(never)]
-fn numbers_axis_read_host(source: &[u8], sheet: u64, chart: u64) -> TestResult<()> {
+fn numbers_axis_read_host(source: &[u8], sheet: u64, chart: u64, axis: Axis) -> TestResult<()> {
     let editor = numbers::Draft::from_bytes(source)?;
-    for axis in AXES {
-        black_box(editor.sheet_chart_axis_title(sheet, chart, axis)?);
-    }
+    black_box(editor.sheet_chart_axis_title(sheet, chart, axis)?);
     Ok(())
 }
 
 #[inline(never)]
-fn numbers_axis_read_leaf(source: &[u8]) -> TestResult<()> {
+fn numbers_axis_read_leaf(source: &[u8], axis: Axis) -> TestResult<()> {
     let package = NumbersPackage::from_bytes(source)?;
-    for axis in AXES {
-        black_box(package.sheet_chart_axis_title(
-            SheetSelector::index(0),
-            ChartSelector::index(NUMBERS_CHART),
-            axis,
-        )?);
-    }
+    black_box(package.sheet_chart_axis_title(
+        SheetSelector::index(0),
+        ChartSelector::index(NUMBERS_CHART),
+        axis,
+    )?);
     Ok(())
 }
 
@@ -189,27 +176,23 @@ fn numbers_title_set_leaf(source: &[u8]) -> TestResult<Vec<u8>> {
 }
 
 #[inline(never)]
-fn numbers_axis_set_host(source: &[u8], sheet: u64, chart: u64) -> TestResult<Vec<u8>> {
+fn numbers_axis_set_host(source: &[u8], sheet: u64, chart: u64, axis: Axis) -> TestResult<Vec<u8>> {
     let mut editor = numbers::Draft::from_bytes(source)?;
-    for axis in AXES {
-        editor.set_sheet_chart_axis_title(sheet, chart, axis, "cost probe")?;
-    }
+    editor.set_sheet_chart_axis_title(sheet, chart, axis, "cost probe")?;
     Ok(editor.to_bytes()?)
 }
 
 #[inline(never)]
-fn numbers_axis_set_leaf(source: &[u8]) -> TestResult<Vec<u8>> {
+fn numbers_axis_set_leaf(source: &[u8], axis: Axis) -> TestResult<Vec<u8>> {
     let mut package = NumbersPackage::from_bytes(source)?;
-    for axis in AXES {
-        let edit = package
-            .edit_sheet_chart_axis_title(
-                SheetSelector::index(0),
-                ChartSelector::index(NUMBERS_CHART),
-                axis,
-            )?
-            .set("cost probe")?;
-        package = edit.commit()?.into_package();
-    }
+    let edit = package
+        .edit_sheet_chart_axis_title(
+            SheetSelector::index(0),
+            ChartSelector::index(NUMBERS_CHART),
+            axis,
+        )?
+        .set("cost probe")?;
+    package = edit.commit()?.into_package();
     Ok(leaf_bytes!(&package))
 }
 
@@ -231,27 +214,28 @@ fn numbers_title_clear_leaf(source: &[u8]) -> TestResult<Vec<u8>> {
 }
 
 #[inline(never)]
-fn numbers_axis_clear_host(source: &[u8], sheet: u64, chart: u64) -> TestResult<Vec<u8>> {
+fn numbers_axis_clear_host(
+    source: &[u8],
+    sheet: u64,
+    chart: u64,
+    axis: Axis,
+) -> TestResult<Vec<u8>> {
     let mut editor = numbers::Draft::from_bytes(source)?;
-    for axis in AXES {
-        black_box(editor.remove_sheet_chart_axis_title(sheet, chart, axis)?);
-    }
+    black_box(editor.remove_sheet_chart_axis_title(sheet, chart, axis)?);
     Ok(editor.to_bytes()?)
 }
 
 #[inline(never)]
-fn numbers_axis_clear_leaf(source: &[u8]) -> TestResult<Vec<u8>> {
+fn numbers_axis_clear_leaf(source: &[u8], axis: Axis) -> TestResult<Vec<u8>> {
     let mut package = NumbersPackage::from_bytes(source)?;
-    for axis in AXES {
-        let edit = package
-            .edit_sheet_chart_axis_title(
-                SheetSelector::index(0),
-                ChartSelector::index(NUMBERS_CHART),
-                axis,
-            )?
-            .clear()?;
-        package = edit.commit()?.into_package();
-    }
+    let edit = package
+        .edit_sheet_chart_axis_title(
+            SheetSelector::index(0),
+            ChartSelector::index(NUMBERS_CHART),
+            axis,
+        )?
+        .clear()?;
+    package = edit.commit()?.into_package();
     Ok(leaf_bytes!(&package))
 }
 
@@ -270,20 +254,16 @@ fn pages_title_read_leaf(source: &[u8]) -> TestResult<()> {
 }
 
 #[inline(never)]
-fn pages_axis_read_host(source: &[u8], chart: u64) -> TestResult<()> {
+fn pages_axis_read_host(source: &[u8], chart: u64, axis: Axis) -> TestResult<()> {
     let editor = pages::Draft::from_bytes(source)?;
-    for axis in AXES {
-        black_box(editor.body_chart_axis_title(chart, axis)?);
-    }
+    black_box(editor.body_chart_axis_title(chart, axis)?);
     Ok(())
 }
 
 #[inline(never)]
-fn pages_axis_read_leaf(source: &[u8]) -> TestResult<()> {
+fn pages_axis_read_leaf(source: &[u8], axis: Axis) -> TestResult<()> {
     let package = PagesPackage::from_bytes(source)?;
-    for axis in AXES {
-        black_box(package.body_chart_axis_title(BodyChartSelector::index(0), axis)?);
-    }
+    black_box(package.body_chart_axis_title(BodyChartSelector::index(0), axis)?);
     Ok(())
 }
 
@@ -305,23 +285,19 @@ fn pages_title_set_leaf(source: &[u8]) -> TestResult<Vec<u8>> {
 }
 
 #[inline(never)]
-fn pages_axis_set_host(source: &[u8], chart: u64) -> TestResult<Vec<u8>> {
+fn pages_axis_set_host(source: &[u8], chart: u64, axis: Axis) -> TestResult<Vec<u8>> {
     let mut editor = pages::Draft::from_bytes(source)?;
-    for axis in AXES {
-        editor.set_body_chart_axis_title(chart, axis, "cost probe")?;
-    }
+    editor.set_body_chart_axis_title(chart, axis, "cost probe")?;
     Ok(editor.to_bytes()?)
 }
 
 #[inline(never)]
-fn pages_axis_set_leaf(source: &[u8]) -> TestResult<Vec<u8>> {
+fn pages_axis_set_leaf(source: &[u8], axis: Axis) -> TestResult<Vec<u8>> {
     let mut package = PagesPackage::from_bytes(source)?;
-    for axis in AXES {
-        let edit = package
-            .edit_body_chart_axis_title(BodyChartSelector::index(0), axis)?
-            .set("cost probe")?;
-        package = edit.commit()?.into_package();
-    }
+    let edit = package
+        .edit_body_chart_axis_title(BodyChartSelector::index(0), axis)?
+        .set("cost probe")?;
+    package = edit.commit()?.into_package();
     Ok(leaf_bytes!(&package))
 }
 
@@ -343,23 +319,19 @@ fn pages_title_clear_leaf(source: &[u8]) -> TestResult<Vec<u8>> {
 }
 
 #[inline(never)]
-fn pages_axis_clear_host(source: &[u8], chart: u64) -> TestResult<Vec<u8>> {
+fn pages_axis_clear_host(source: &[u8], chart: u64, axis: Axis) -> TestResult<Vec<u8>> {
     let mut editor = pages::Draft::from_bytes(source)?;
-    for axis in AXES {
-        black_box(editor.remove_body_chart_axis_title(chart, axis)?);
-    }
+    black_box(editor.remove_body_chart_axis_title(chart, axis)?);
     Ok(editor.to_bytes()?)
 }
 
 #[inline(never)]
-fn pages_axis_clear_leaf(source: &[u8]) -> TestResult<Vec<u8>> {
+fn pages_axis_clear_leaf(source: &[u8], axis: Axis) -> TestResult<Vec<u8>> {
     let mut package = PagesPackage::from_bytes(source)?;
-    for axis in AXES {
-        let edit = package
-            .edit_body_chart_axis_title(BodyChartSelector::index(0), axis)?
-            .clear()?;
-        package = edit.commit()?.into_package();
-    }
+    let edit = package
+        .edit_body_chart_axis_title(BodyChartSelector::index(0), axis)?
+        .clear()?;
+    package = edit.commit()?.into_package();
     Ok(leaf_bytes!(&package))
 }
 
@@ -398,34 +370,127 @@ fn numbers_chart_title_clear_cost_abba() -> TestResult {
 
 #[test]
 #[ignore = "callgrind cost probe; coordinator runs it after integration"]
-fn numbers_chart_axis_read_cost_abba() -> TestResult {
+fn numbers_chart_category_axis_read_cost_abba() -> TestResult {
     let (input, sheet, chart) = numbers_input_with_text(Some(Axis::Category))?;
-    black_box(numbers_axis_read_host(&input.bytes, sheet, chart)?);
-    black_box(numbers_axis_read_leaf(&input.bytes)?);
-    black_box(numbers_axis_read_leaf(&input.bytes)?);
-    black_box(numbers_axis_read_host(&input.bytes, sheet, chart)?);
+    black_box(numbers_axis_read_host(
+        &input.bytes,
+        sheet,
+        chart,
+        Axis::Category,
+    )?);
+    black_box(numbers_axis_read_leaf(&input.bytes, Axis::Category)?);
+    black_box(numbers_axis_read_leaf(&input.bytes, Axis::Category)?);
+    black_box(numbers_axis_read_host(
+        &input.bytes,
+        sheet,
+        chart,
+        Axis::Category,
+    )?);
     Ok(())
 }
 
 #[test]
 #[ignore = "callgrind cost probe; coordinator runs it after integration"]
-fn numbers_chart_axis_set_cost_abba() -> TestResult {
+fn numbers_chart_value_axis_read_cost_abba() -> TestResult {
+    let (input, sheet, chart) = numbers_input_with_text(Some(Axis::Value))?;
+    black_box(numbers_axis_read_host(
+        &input.bytes,
+        sheet,
+        chart,
+        Axis::Value,
+    )?);
+    black_box(numbers_axis_read_leaf(&input.bytes, Axis::Value)?);
+    black_box(numbers_axis_read_leaf(&input.bytes, Axis::Value)?);
+    black_box(numbers_axis_read_host(
+        &input.bytes,
+        sheet,
+        chart,
+        Axis::Value,
+    )?);
+    Ok(())
+}
+
+#[test]
+#[ignore = "callgrind cost probe; coordinator runs it after integration"]
+fn numbers_chart_category_axis_set_cost_abba() -> TestResult {
     let (input, sheet, chart) = numbers_input()?;
-    black_box(numbers_axis_set_host(&input.bytes, sheet, chart)?);
-    black_box(numbers_axis_set_leaf(&input.bytes)?);
-    black_box(numbers_axis_set_leaf(&input.bytes)?);
-    black_box(numbers_axis_set_host(&input.bytes, sheet, chart)?);
+    black_box(numbers_axis_set_host(
+        &input.bytes,
+        sheet,
+        chart,
+        Axis::Category,
+    )?);
+    black_box(numbers_axis_set_leaf(&input.bytes, Axis::Category)?);
+    black_box(numbers_axis_set_leaf(&input.bytes, Axis::Category)?);
+    black_box(numbers_axis_set_host(
+        &input.bytes,
+        sheet,
+        chart,
+        Axis::Category,
+    )?);
     Ok(())
 }
 
 #[test]
 #[ignore = "callgrind cost probe; coordinator runs it after integration"]
-fn numbers_chart_axis_clear_cost_abba() -> TestResult {
+fn numbers_chart_value_axis_set_cost_abba() -> TestResult {
+    let (input, sheet, chart) = numbers_input()?;
+    black_box(numbers_axis_set_host(
+        &input.bytes,
+        sheet,
+        chart,
+        Axis::Value,
+    )?);
+    black_box(numbers_axis_set_leaf(&input.bytes, Axis::Value)?);
+    black_box(numbers_axis_set_leaf(&input.bytes, Axis::Value)?);
+    black_box(numbers_axis_set_host(
+        &input.bytes,
+        sheet,
+        chart,
+        Axis::Value,
+    )?);
+    Ok(())
+}
+
+#[test]
+#[ignore = "callgrind cost probe; coordinator runs it after integration"]
+fn numbers_chart_category_axis_clear_cost_abba() -> TestResult {
     let (input, sheet, chart) = numbers_input_with_text(Some(Axis::Category))?;
-    black_box(numbers_axis_clear_host(&input.bytes, sheet, chart)?);
-    black_box(numbers_axis_clear_leaf(&input.bytes)?);
-    black_box(numbers_axis_clear_leaf(&input.bytes)?);
-    black_box(numbers_axis_clear_host(&input.bytes, sheet, chart)?);
+    black_box(numbers_axis_clear_host(
+        &input.bytes,
+        sheet,
+        chart,
+        Axis::Category,
+    )?);
+    black_box(numbers_axis_clear_leaf(&input.bytes, Axis::Category)?);
+    black_box(numbers_axis_clear_leaf(&input.bytes, Axis::Category)?);
+    black_box(numbers_axis_clear_host(
+        &input.bytes,
+        sheet,
+        chart,
+        Axis::Category,
+    )?);
+    Ok(())
+}
+
+#[test]
+#[ignore = "callgrind cost probe; coordinator runs it after integration"]
+fn numbers_chart_value_axis_clear_cost_abba() -> TestResult {
+    let (input, sheet, chart) = numbers_input_with_text(Some(Axis::Value))?;
+    black_box(numbers_axis_clear_host(
+        &input.bytes,
+        sheet,
+        chart,
+        Axis::Value,
+    )?);
+    black_box(numbers_axis_clear_leaf(&input.bytes, Axis::Value)?);
+    black_box(numbers_axis_clear_leaf(&input.bytes, Axis::Value)?);
+    black_box(numbers_axis_clear_host(
+        &input.bytes,
+        sheet,
+        chart,
+        Axis::Value,
+    )?);
     Ok(())
 }
 
@@ -464,33 +529,66 @@ fn pages_chart_title_clear_cost_abba() -> TestResult {
 
 #[test]
 #[ignore = "callgrind cost probe; coordinator runs it after integration"]
-fn pages_chart_axis_read_cost_abba() -> TestResult {
+fn pages_chart_category_axis_read_cost_abba() -> TestResult {
     let (input, chart) = pages_input_with_text(Some(Axis::Category))?;
-    black_box(pages_axis_read_host(&input.bytes, chart)?);
-    black_box(pages_axis_read_leaf(&input.bytes)?);
-    black_box(pages_axis_read_leaf(&input.bytes)?);
-    black_box(pages_axis_read_host(&input.bytes, chart)?);
+    black_box(pages_axis_read_host(&input.bytes, chart, Axis::Category)?);
+    black_box(pages_axis_read_leaf(&input.bytes, Axis::Category)?);
+    black_box(pages_axis_read_leaf(&input.bytes, Axis::Category)?);
+    black_box(pages_axis_read_host(&input.bytes, chart, Axis::Category)?);
     Ok(())
 }
 
 #[test]
 #[ignore = "callgrind cost probe; coordinator runs it after integration"]
-fn pages_chart_axis_set_cost_abba() -> TestResult {
+fn pages_chart_value_axis_read_cost_abba() -> TestResult {
+    let (input, chart) = pages_input_with_text(Some(Axis::Value))?;
+    black_box(pages_axis_read_host(&input.bytes, chart, Axis::Value)?);
+    black_box(pages_axis_read_leaf(&input.bytes, Axis::Value)?);
+    black_box(pages_axis_read_leaf(&input.bytes, Axis::Value)?);
+    black_box(pages_axis_read_host(&input.bytes, chart, Axis::Value)?);
+    Ok(())
+}
+
+#[test]
+#[ignore = "callgrind cost probe; coordinator runs it after integration"]
+fn pages_chart_category_axis_set_cost_abba() -> TestResult {
     let (input, chart) = pages_input()?;
-    black_box(pages_axis_set_host(&input.bytes, chart)?);
-    black_box(pages_axis_set_leaf(&input.bytes)?);
-    black_box(pages_axis_set_leaf(&input.bytes)?);
-    black_box(pages_axis_set_host(&input.bytes, chart)?);
+    black_box(pages_axis_set_host(&input.bytes, chart, Axis::Category)?);
+    black_box(pages_axis_set_leaf(&input.bytes, Axis::Category)?);
+    black_box(pages_axis_set_leaf(&input.bytes, Axis::Category)?);
+    black_box(pages_axis_set_host(&input.bytes, chart, Axis::Category)?);
     Ok(())
 }
 
 #[test]
 #[ignore = "callgrind cost probe; coordinator runs it after integration"]
-fn pages_chart_axis_clear_cost_abba() -> TestResult {
+fn pages_chart_value_axis_set_cost_abba() -> TestResult {
+    let (input, chart) = pages_input()?;
+    black_box(pages_axis_set_host(&input.bytes, chart, Axis::Value)?);
+    black_box(pages_axis_set_leaf(&input.bytes, Axis::Value)?);
+    black_box(pages_axis_set_leaf(&input.bytes, Axis::Value)?);
+    black_box(pages_axis_set_host(&input.bytes, chart, Axis::Value)?);
+    Ok(())
+}
+
+#[test]
+#[ignore = "callgrind cost probe; coordinator runs it after integration"]
+fn pages_chart_category_axis_clear_cost_abba() -> TestResult {
     let (input, chart) = pages_input_with_text(Some(Axis::Category))?;
-    black_box(pages_axis_clear_host(&input.bytes, chart)?);
-    black_box(pages_axis_clear_leaf(&input.bytes)?);
-    black_box(pages_axis_clear_leaf(&input.bytes)?);
-    black_box(pages_axis_clear_host(&input.bytes, chart)?);
+    black_box(pages_axis_clear_host(&input.bytes, chart, Axis::Category)?);
+    black_box(pages_axis_clear_leaf(&input.bytes, Axis::Category)?);
+    black_box(pages_axis_clear_leaf(&input.bytes, Axis::Category)?);
+    black_box(pages_axis_clear_host(&input.bytes, chart, Axis::Category)?);
+    Ok(())
+}
+
+#[test]
+#[ignore = "callgrind cost probe; coordinator runs it after integration"]
+fn pages_chart_value_axis_clear_cost_abba() -> TestResult {
+    let (input, chart) = pages_input_with_text(Some(Axis::Value))?;
+    black_box(pages_axis_clear_host(&input.bytes, chart, Axis::Value)?);
+    black_box(pages_axis_clear_leaf(&input.bytes, Axis::Value)?);
+    black_box(pages_axis_clear_leaf(&input.bytes, Axis::Value)?);
+    black_box(pages_axis_clear_host(&input.bytes, chart, Axis::Value)?);
     Ok(())
 }

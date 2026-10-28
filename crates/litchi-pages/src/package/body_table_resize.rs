@@ -202,6 +202,9 @@ impl From<GraphError> for Error {
                     GraphLimit::WireFields => LimitKind::WireFields,
                     GraphLimit::WireNesting => LimitKind::WireNesting,
                     GraphLimit::WireWork => LimitKind::WireWork,
+                    GraphLimit::SemanticItems | GraphLimit::SemanticTextBytes => {
+                        LimitKind::WireWork
+                    },
                 },
                 observed,
                 maximum,

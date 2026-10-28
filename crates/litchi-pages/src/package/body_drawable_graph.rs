@@ -57,6 +57,10 @@ pub(crate) enum GraphLimit {
     WireFields,
     WireNesting,
     WireWork,
+    /// Semantic section or body-storage cardinality.
+    SemanticItems,
+    /// Semantic UTF-8 text retained by the reopened document.
+    SemanticTextBytes,
 }
 
 pub(crate) type GraphResult<T> = Result<T, GraphError>;
@@ -795,21 +799,23 @@ fn map_package_error(error: PackageError) -> GraphError {
             observed: u64::try_from(observed).unwrap_or(u64::MAX),
             maximum: u64::try_from(maximum).unwrap_or(u64::MAX),
         },
-        PackageError::Semantic(
-            SemanticError::TooManySections {
-                actual: observed,
-                limit: maximum,
-            }
-            | SemanticError::TooManyBodyStorages {
-                actual: observed,
-                limit: maximum,
-            }
-            | SemanticError::TextTooLarge {
-                observed,
-                limit: maximum,
-            },
-        ) => GraphError::Limit {
-            kind: GraphLimit::InputBytes,
+        PackageError::Semantic(SemanticError::TooManySections {
+            actual: observed,
+            limit: maximum,
+        })
+        | PackageError::Semantic(SemanticError::TooManyBodyStorages {
+            actual: observed,
+            limit: maximum,
+        }) => GraphError::Limit {
+            kind: GraphLimit::SemanticItems,
+            observed: u64::try_from(observed).unwrap_or(u64::MAX),
+            maximum: u64::try_from(maximum).unwrap_or(u64::MAX),
+        },
+        PackageError::Semantic(SemanticError::TextTooLarge {
+            observed,
+            limit: maximum,
+        }) => GraphError::Limit {
+            kind: GraphLimit::SemanticTextBytes,
             observed: u64::try_from(observed).unwrap_or(u64::MAX),
             maximum: u64::try_from(maximum).unwrap_or(u64::MAX),
         },
