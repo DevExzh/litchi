@@ -449,8 +449,8 @@ decision D7), so they were not re-blessed.
 
 The table above is historical evidence from the earlier group-1 and group-6
 commits; it is not a complete gate for the current integrated tree.  The
-review follow-up was rerun on source commit `d82fc08989`, based on merged
-candidate `4abb90f713` (code fix `828d02cad9`, with the current
+review follow-up was rerun on final source commit `86bd7f5e3a`, based on
+merged candidate `4abb90f713` (code fixes `828d02cad9` and `86bd7f5e3a`, with the current
 `feat/unified-ops-api` parent), as follows:
 
 - the owner-extents unit tests (including the non-canonical value-varint
@@ -461,8 +461,9 @@ candidate `4abb90f713` (code fix `828d02cad9`, with the current
   Clippy gate, the exit-ledger check, crate-boundary and API-glossary checks,
   the non-iWork gate, and the affected no-`3rdparty` tests were rerun on this
   source tree;
-- a new release callgrind ABBA run on this same candidate is recorded in the
-  coordinator scratch directory named above (§4.1); it measured −18.097% for
-  Numbers and −60.422% for Keynote, while the Pages focused route was
-  34,078,005 instructions. The historical values in this record remain
-  context only until the coordinator's final integrated-tree qualification.
+- the release callgrind ABBA run in §4.1 was built and measured on
+  `d82fc08989`, immediately before `86bd7f5e3a`; the latter only adds the
+  semantic workbook-limit mapper and is not exercised by those host/leaf
+  probes. It measured −18.097% for Numbers and −60.422% for Keynote, while
+  the Pages focused route was 34,078,005 instructions. These are slice
+  evidence, not the coordinator's final integrated-tree qualification.
