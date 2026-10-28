@@ -1,7 +1,8 @@
 # 0391 — W1-G: shared whole-cell text-style substrate
 
 - Status: Numbers-first substrate landing; Pages and Keynote facades are not
-  started and no ledger rows are migrated.
+  started and no ledger rows are migrated. The current clean tip is
+  `941553f2f4`.
 - Source branch: `uo2/iwa-w1g-cell-text-style`, cut from frozen root
   `1e3978082bd8e576f0afeb7e3eebac1ca3908d86`.
 - Scope: shared `litchi-iwa-table::cell_text_style` graph reads and direct
@@ -27,12 +28,12 @@ read with ownership retained; unsupported or ambiguous graph shapes refuse
 typed. Zero ceilings are not raised, and the shared parser does not expose
 native identifiers through supported APIs.
 
-Numbers now routes whole-cell style reads and single-cell writes through the
-shared planner. Multi-cell staged edits temporarily retain the legacy
-compatibility publisher so their existing one-variation-per-cell, atomic
-staging and exact inverse behavior remain unchanged while the shared batch
-plan is completed. This is an explicit bounded compatibility seam, not a
-public alias or a generic-property rewrite.
+Numbers now routes whole-cell style reads and writes through the shared
+planner. Fresh-cell batches, exclusive existing-style batches, and supported
+existing-key release batches are combined in one neutral graph plan, retaining
+one variation per cell, atomic staging and exact inverse behavior. There is no
+legacy whole-cell publisher remaining; unsupported graph shapes return the
+typed shared refusal instead of falling through.
 
 ## Ownership
 
@@ -48,13 +49,16 @@ public alias or a generic-property rewrite.
 
 ## Verification and remaining work
 
-The Numbers `cell_text_style` test target passes all four existing tests,
-including the created-workbook transaction/inverse/readback cases and the
-33-cell corpus (33 styled, no refusals). Shared planner unit tests cover
+The Numbers `cell_text_style` test target passes five tests, including the
+created-workbook transaction/inverse/readback cases, an exclusive existing
+style batch, and the 33-cell corpus (33 styled, no refusals). Shared planner
+unit tests cover
 minimal inherited-property reduction and host-default emphasis semantics.
 Formatting and strict Clippy for `litchi-iwa-table` and `litchi-numbers` pass.
 
-Before Pages/Keynote work begins, complete and requalify the shared batch
-planner for existing-key releases and multi-cell staging, then rerun the
-full Numbers 17-property parity/cost matrix. Only after that acceptance should
-the six Pages/Keynote facade rows and native queue entries be added.
+Before Pages/Keynote work begins, requalify the shared substrate against the
+full Numbers 17-property parity/readback and release-mode facade matrix,
+including malformed/duplicate references, unknown locality, low-limit refusal
+before wire work, inverse/no-op and candidate reopen. Only after that
+acceptance should the six Pages/Keynote facade rows and native queue entries
+be added. Timing remains held until the coordinator grants the slot.
