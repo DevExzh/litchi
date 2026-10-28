@@ -1,8 +1,9 @@
 //! Numbers table-cell comment mutation parity (wave W1-G, record 0379).
 //!
-//! The first shared slice covers only root replacement.  Direct reply
-//! mutations remain an explicit host-only follow-up until their graph
-//! transitions are lifted into the shared native engine.
+//! The shared slice covers Numbers table-cell comment reads and root
+//! create/set/clear transitions. Direct reply mutations remain an explicit
+//! host-only follow-up until their graph transitions are lifted into the
+//! shared native engine.
 
 #[cfg(feature = "parity-host-oracle")]
 use std::collections::{BTreeMap, BTreeSet};
@@ -15,7 +16,9 @@ use litchi_iwa_common::WireLimits;
 #[cfg(feature = "parity-host-oracle")]
 use litchi_iwa_common::comment::AuthorId;
 #[cfg(feature = "parity-host-oracle")]
-use litchi_iwa_common::wire::{WireView, append_varint_field, patch_varint_field};
+use litchi_iwa_common::wire::{
+    WireView, append_varint_field, patch_length_delimited_field, patch_varint_field,
+};
 #[cfg(feature = "parity-host-oracle")]
 use litchi_iwa_protos::tsd;
 #[cfg(feature = "parity-host-oracle")]
@@ -155,6 +158,35 @@ fn data_list_messages(bytes: &[u8]) -> TestResult<BTreeMap<(String, u64, usize),
 }
 
 #[cfg(feature = "parity-host-oracle")]
+fn strict_next_list_id(data: &[u8]) -> TestResult<u32> {
+    let view = WireView::parse(data, WireLimits::DEFAULT)?;
+    let fields = view
+        .fields()
+        .filter(|field| field.number() == 2)
+        .collect::<Vec<_>>();
+    if fields.len() != 1 {
+        return Err(format!(
+            "Numbers TableDataList must contain exactly one next_list_id field, found {}",
+            fields.len()
+        )
+        .into());
+    }
+    let field = fields[0];
+    if field.wire_type() != 0 {
+        return Err(format!(
+            "Numbers TableDataList next_list_id has wire type {}, expected varint",
+            field.wire_type()
+        )
+        .into());
+    }
+    let (value, width) = litchi_iwa_common::varint::decode_varint_from_bytes(field.payload())?;
+    if width != field.payload().len() {
+        return Err("Numbers TableDataList next_list_id is not canonically encoded".into());
+    }
+    u32::try_from(value).map_err(|_| "Numbers TableDataList next_list_id exceeds u32".into())
+}
+
+#[cfg(feature = "parity-host-oracle")]
 fn comment_list_snapshot(bytes: &[u8], position: At) -> TestResult<CommentListSnapshot> {
     let editor = numbers::Draft::from_bytes(bytes)?;
     let comment = editor
@@ -164,6 +196,9 @@ fn comment_list_snapshot(bytes: &[u8], position: At) -> TestResult<CommentListSn
     let mut matches = Vec::new();
     for located in Workspace::open(bytes)?.messages(6_005)? {
         let list = tst::TableDataList::decode(located.payload.as_slice())?;
+        if strict_next_list_id(&located.payload)? != list.next_list_id {
+            return Err("Numbers TableDataList next_list_id projection disagrees with wire".into());
+        }
         if list.list_type != tst::table_data_list::ListType::CommentStorage as i32 {
             continue;
         }
@@ -201,6 +236,9 @@ fn data_list_by_key(bytes: &[u8], key: &(String, u64, usize)) -> TestResult<Data
         .find(|located| located.entry == key.0 && located.object == key.1 && located.index == key.2)
         .ok_or_else(|| format!("Numbers comment list message {key:?} disappeared"))?;
     let list = tst::TableDataList::decode(located.payload.as_slice())?;
+    if strict_next_list_id(&located.payload)? != list.next_list_id {
+        return Err("Numbers TableDataList next_list_id projection disagrees with wire".into());
+    }
     if list.list_type != tst::table_data_list::ListType::CommentStorage as i32 {
         return Err(format!("selected Numbers list {key:?} changed list type").into());
     }
@@ -212,6 +250,7 @@ fn data_list_by_key(bytes: &[u8], key: &(String, u64, usize)) -> TestResult<Data
 
 #[cfg(feature = "parity-host-oracle")]
 fn list_wire_without_target(data: &[u8], target_key: u32) -> TestResult<Vec<Vec<u8>>> {
+    strict_next_list_id(data)?;
     let view = WireView::parse(data, WireLimits::DEFAULT)?;
     let mut fields = Vec::new();
     for field in view.fields() {
@@ -308,6 +347,7 @@ fn validate_clear_candidate(
 
 #[cfg(feature = "parity-host-oracle")]
 fn assert_clear_list_policy(source: &[u8], host: &[u8], leaf: &[u8], position: At) -> TestResult {
+    assert_comment_storage_snapshots(Operation::Clear, source, host, leaf, position)?;
     let source_selected = comment_list_snapshot(source, position)?;
     let host_selected = validate_clear_candidate(source, host, &source_selected)?;
     let leaf_selected = validate_clear_candidate(source, leaf, &source_selected)?;
@@ -391,6 +431,201 @@ fn append_data_list_unknown(bytes: &[u8], key: &(String, u64, usize)) -> TestRes
         .ok_or_else(|| format!("Numbers list {key:?} disappeared"))?;
     let mut payload = located.payload.clone();
     append_varint_field(&mut payload, 90, 1)?;
+    workspace.replace(&located, payload, None)?;
+    workspace.into_bytes()
+}
+
+#[cfg(feature = "parity-host-oracle")]
+type CommentStorageSnapshots = BTreeMap<u64, Vec<Vec<u8>>>;
+
+#[cfg(feature = "parity-host-oracle")]
+fn comment_storage_snapshots(bytes: &[u8]) -> TestResult<CommentStorageSnapshots> {
+    let mut snapshots = BTreeMap::new();
+    for located in Workspace::open(bytes)?.messages(3_056)? {
+        snapshots
+            .entry(located.object)
+            .or_insert_with(Vec::new)
+            .push(located.payload);
+    }
+    Ok(snapshots)
+}
+
+#[cfg(feature = "parity-host-oracle")]
+fn comment_storage_without_text(data: &[u8]) -> TestResult<Vec<u8>> {
+    let view = WireView::parse(data, WireLimits::DEFAULT)?;
+    let mut output = Vec::new();
+    for field in view.fields().filter(|field| field.number() != 1) {
+        output.extend_from_slice(field.raw());
+    }
+    Ok(output)
+}
+
+#[cfg(feature = "parity-host-oracle")]
+fn comment_storage_metadata_equal(source: &[Vec<u8>], candidate: &[Vec<u8>]) -> TestResult<bool> {
+    if source.len() != candidate.len() {
+        return Ok(false);
+    }
+    for (source_payload, candidate_payload) in source.iter().zip(candidate) {
+        if comment_storage_without_text(source_payload)?
+            != comment_storage_without_text(candidate_payload)?
+        {
+            return Ok(false);
+        }
+    }
+    Ok(true)
+}
+
+#[cfg(feature = "parity-host-oracle")]
+fn assert_snapshot_exact(
+    label: &str,
+    source: &CommentStorageSnapshots,
+    candidate: &CommentStorageSnapshots,
+    object_id: u64,
+) -> TestResult {
+    let expected = source
+        .get(&object_id)
+        .ok_or_else(|| format!("{label}: source comment storage {object_id} is missing"))?;
+    let actual = candidate
+        .get(&object_id)
+        .ok_or_else(|| format!("{label}: candidate comment storage {object_id} disappeared"))?;
+    if actual != expected {
+        return Err(format!(
+            "{label}: surviving comment storage {object_id} changed raw 3056 payload"
+        )
+        .into());
+    }
+    Ok(())
+}
+
+#[cfg(feature = "parity-host-oracle")]
+fn assert_comment_storage_snapshots(
+    operation: Operation,
+    source: &[u8],
+    host: &[u8],
+    leaf: &[u8],
+    position: At,
+) -> TestResult {
+    let source_snapshots = comment_storage_snapshots(source)?;
+    let selected_id = match operation {
+        Operation::Create => None,
+        Operation::Set | Operation::Clear => {
+            Some(comment_list_snapshot(source, position)?.storage_id)
+        },
+    };
+    for (label, candidate_bytes) in [("host", host), ("leaf", leaf)] {
+        let candidate = comment_storage_snapshots(candidate_bytes)?;
+        match operation {
+            Operation::Create => {
+                for object_id in source_snapshots.keys() {
+                    assert_snapshot_exact(label, &source_snapshots, &candidate, *object_id)?;
+                }
+                let fresh = candidate
+                    .keys()
+                    .filter(|object_id| !source_snapshots.contains_key(object_id))
+                    .copied()
+                    .collect::<Vec<_>>();
+                let selected = comment_list_snapshot(candidate_bytes, position)?.storage_id;
+                if fresh.len() != 1 || fresh[0] != selected {
+                    return Err(format!(
+                        "{label}: create expected exactly one fresh selected 3056 object {selected}, found {fresh:?}"
+                    )
+                    .into());
+                }
+            },
+            Operation::Clear => {
+                let selected = selected_id.expect("clear has a selected source root");
+                if candidate.contains_key(&selected) {
+                    return Err(format!(
+                        "{label}: clear retained removed selected comment storage {selected}"
+                    )
+                    .into());
+                }
+                for object_id in source_snapshots
+                    .keys()
+                    .filter(|object_id| **object_id != selected)
+                {
+                    assert_snapshot_exact(label, &source_snapshots, &candidate, *object_id)?;
+                }
+                if candidate.keys().any(|object_id| {
+                    *object_id != selected && !source_snapshots.contains_key(object_id)
+                }) {
+                    return Err(format!(
+                        "{label}: clear created a fresh 3056 object outside the removed root"
+                    )
+                    .into());
+                }
+            },
+            Operation::Set => {
+                let selected = selected_id.expect("set has a selected source root");
+                if candidate.keys().ne(source_snapshots.keys()) {
+                    return Err(format!("{label}: set changed the 3056 object inventory").into());
+                }
+                for object_id in source_snapshots
+                    .keys()
+                    .filter(|object_id| **object_id != selected)
+                {
+                    assert_snapshot_exact(label, &source_snapshots, &candidate, *object_id)?;
+                }
+                let source_selected = source_snapshots
+                    .get(&selected)
+                    .ok_or("source selected comment storage disappeared")?;
+                let candidate_selected = candidate
+                    .get(&selected)
+                    .ok_or("candidate selected comment storage disappeared")?;
+                if !comment_storage_metadata_equal(source_selected, candidate_selected)? {
+                    return Err(format!(
+                        "{label}: set changed selected comment metadata outside text"
+                    )
+                    .into());
+                }
+            },
+        }
+    }
+    Ok(())
+}
+
+#[cfg(feature = "parity-host-oracle")]
+fn comment_storage_ids_at(
+    bytes: &[u8],
+    position: At,
+    row: usize,
+    column: usize,
+) -> TestResult<Vec<u64>> {
+    let editor = numbers::Draft::from_bytes(bytes)?;
+    let model = host_model(&editor)?;
+    let root = editor
+        .__parity_read_table_cell_comment(TableSelector::index(0), position)?
+        .ok_or("selected comment root is missing")?;
+    let mut ids = vec![root.storage_id.get()];
+    ids.extend(
+        editor
+            .cell_comment_replies(model, row, column)?
+            .into_iter()
+            .map(|reply| reply.storage_id.get()),
+    );
+    Ok(ids)
+}
+
+#[cfg(feature = "parity-host-oracle")]
+fn replace_comment_text(bytes: &[u8], storage_id: u64, text: &[u8]) -> TestResult<Vec<u8>> {
+    let mut workspace = Workspace::open(bytes)?;
+    let located = workspace.message(storage_id, 3_056)?;
+    let payload = patch_length_delimited_field(&located.payload, 1, true, Some(text))?;
+    workspace.replace(&located, payload, None)?;
+    workspace.into_bytes()
+}
+
+#[cfg(feature = "parity-host-oracle")]
+fn duplicate_data_list_next(bytes: &[u8], key: &(String, u64, usize)) -> TestResult<Vec<u8>> {
+    let mut workspace = Workspace::open(bytes)?;
+    let located = workspace
+        .messages(6_005)?
+        .into_iter()
+        .find(|located| located.entry == key.0 && located.object == key.1 && located.index == key.2)
+        .ok_or_else(|| format!("Numbers list {key:?} disappeared"))?;
+    let current = tst::TableDataList::decode(located.payload.as_slice())?;
+    let mut payload = located.payload.clone();
+    append_varint_field(&mut payload, 2, u64::from(current.next_list_id))?;
     workspace.replace(&located, payload, None)?;
     workspace.into_bytes()
 }
@@ -787,6 +1022,7 @@ fn comment_storage_objects(bytes: &[u8]) -> TestResult<BTreeSet<u64>> {
 
 #[cfg(feature = "parity-host-oracle")]
 fn assert_created_root_semantics(source: &[u8], host: &[u8], leaf: &[u8]) -> TestResult {
+    assert_comment_storage_snapshots(Operation::Create, source, host, leaf, position())?;
     let host_root = numbers::Draft::from_bytes(host)?
         .__parity_read_table_cell_comment(TableSelector::index(0), position())?
         .ok_or("legacy host create did not persist the root comment")?;
@@ -871,6 +1107,7 @@ fn numbers_table_cell_comment_set_parity() -> TestResult {
     )?;
     let host = host_route(&input.bytes, Operation::Set)?;
     let leaf = leaf_route(&input.bytes, Operation::Set)?.output;
+    assert_comment_storage_snapshots(Operation::Set, &input.bytes, &host, &leaf, position())?;
     for (route, output) in [("host", host), ("leaf", leaf)] {
         let after = existing_comment_metadata(&output)?;
         assert_eq!(
@@ -1017,6 +1254,13 @@ fn numbers_table_cell_comment_clear_policy_negative_controls() -> TestResult {
         "clear policy accepted a wrong selected next_list_id"
     );
 
+    let duplicate_selected_counter = duplicate_data_list_next(&leaf, &selected_key)?;
+    assert!(
+        assert_clear_list_policy(&input.bytes, &host, &duplicate_selected_counter, position())
+            .is_err(),
+        "clear policy accepted a duplicated selected next_list_id field"
+    );
+
     let selected_unknown_tail = append_data_list_unknown(&leaf, &selected_key)?;
     assert!(
         assert_clear_list_policy(&input.bytes, &host, &selected_unknown_tail, position()).is_err(),
@@ -1031,6 +1275,34 @@ fn numbers_table_cell_comment_clear_policy_negative_controls() -> TestResult {
     assert!(
         assert_clear_list_policy(&input.bytes, &host, &unrelated_unknown_tail, position()).is_err(),
         "clear policy accepted an unrelated 6005 unknown tail mutation"
+    );
+    Ok(())
+}
+
+#[cfg(feature = "parity-host-oracle")]
+#[test]
+fn numbers_table_cell_comment_clear_storage_text_negative_controls() -> TestResult {
+    let input = populated_neighbor_clear_fixture()?;
+    let host = host_route(&input.bytes, Operation::Clear)?;
+    let leaf = leaf_route(&input.bytes, Operation::Clear)?.output;
+    let neighbor_position = At::new(ROW as u32, (COLUMN + 1) as u32);
+    let neighbor_ids = comment_storage_ids_at(&input.bytes, neighbor_position, ROW, COLUMN + 1)?;
+    let corrupted_neighbor =
+        replace_comment_text(&leaf, neighbor_ids[0], b"W1-G corrupted neighbor root")?;
+    assert!(
+        assert_clear_list_policy(&input.bytes, &host, &corrupted_neighbor, position()).is_err(),
+        "clear proof accepted corrupted unrelated neighbor root text"
+    );
+    let corrupted_reply = replace_comment_text(
+        &leaf,
+        *neighbor_ids
+            .get(1)
+            .ok_or("populated neighbor reply storage is missing")?,
+        b"W1-G corrupted neighbor reply",
+    )?;
+    assert!(
+        assert_clear_list_policy(&input.bytes, &host, &corrupted_reply, position()).is_err(),
+        "clear proof accepted corrupted unrelated neighbor reply text"
     );
     Ok(())
 }
