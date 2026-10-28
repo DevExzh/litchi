@@ -35,6 +35,14 @@ fn leaf(file: &File) -> litchi_numbers::Package {
     litchi_numbers::Package::from_bytes(&file.to_bytes().expect("publish")).expect("leaf reopen")
 }
 
+fn leaf_bytes(package: &litchi_numbers::Package) -> Vec<u8> {
+    let mut bytes = Vec::new();
+    package
+        .write_to(&mut bytes)
+        .expect("serialize leaf package");
+    bytes
+}
+
 #[test]
 fn create_returns_a_deterministic_minimal_workbook() {
     let file = create(FileFormat::Numbers).expect("create");
@@ -197,6 +205,151 @@ fn writes_formulas_through_the_formula_parser() {
         ),
         "{error}"
     );
+}
+
+#[test]
+fn writes_cached_formulas_through_the_unified_route() {
+    let source = read("formula-budget-native.numbers");
+    let source_bytes = source.to_bytes().expect("source bytes");
+    let expression =
+        litchi_numbers::formula::Expression::parse("=B3+1").expect("formula expression");
+    let cached = litchi_numbers::formula::CachedValue::number(2.0).expect("cached number");
+    let direct = litchi_numbers::Package::from_bytes(&source_bytes)
+        .expect("direct leaf source")
+        .edit_table_cells(
+            litchi_numbers::SheetSelector::index(0),
+            litchi_numbers::TableSelector::index(0),
+        )
+        .expect("direct leaf editor")
+        .set_formula_cached(
+            litchi_numbers::At::new(2, 2),
+            expression.clone(),
+            cached.clone(),
+        )
+        .expect("direct cached formula")
+        .commit()
+        .expect("direct cached commit")
+        .into_package();
+    let direct_bytes = leaf_bytes(&direct);
+    let uncached = litchi_numbers::Package::from_bytes(&source_bytes)
+        .expect("uncached leaf source")
+        .edit_table_cells(
+            litchi_numbers::SheetSelector::index(0),
+            litchi_numbers::TableSelector::index(0),
+        )
+        .expect("uncached leaf editor")
+        .set_formula(litchi_numbers::At::new(2, 2), expression)
+        .expect("direct uncached formula")
+        .commit()
+        .expect("direct uncached commit")
+        .into_package();
+    let uncached_bytes = leaf_bytes(&uncached);
+    let unified_uncached = source
+        .set("/sheet[1]/table[1]/C3", props! { "formula" => "=B3+1" })
+        .expect("uncached formula");
+    assert_eq!(
+        unified_uncached.to_bytes().expect("uncached unified bytes"),
+        uncached_bytes,
+        "formula-only authoring must remain on the uncached leaf route"
+    );
+
+    let edited = source
+        .set(
+            "/sheet[1]/table[1]/C3",
+            props! { "formula" => "=B3+1", "cachedValue" => 2.0 },
+        )
+        .expect("cached formula");
+    assert_eq!(
+        edited.to_bytes().expect("unified bytes"),
+        direct_bytes,
+        "unified cached authoring must use the direct leaf route"
+    );
+    let reopened = reopen(&edited);
+    assert_eq!(
+        prop(&reopened, "/sheet[1]/table[1]/C3", "type").as_deref(),
+        Some("formula")
+    );
+    assert!(
+        prop(&reopened, "/sheet[1]/table[1]/C3", "formula")
+            .expect("formula text")
+            .contains("B3")
+    );
+
+    // Reapplying the exact formula and cache is a byte-exact no-op.
+    let repeated = edited
+        .set(
+            "/sheet[1]/table[1]/C3",
+            props! { "formula" => "=B3+1", "cachedValue" => 2.0 },
+        )
+        .expect("cached no-op");
+    assert_eq!(
+        repeated.to_bytes().expect("repeated bytes"),
+        edited.to_bytes().expect("edited bytes")
+    );
+
+    // The public transaction patch restores the immutable source exactly.
+    let transaction = source
+        .edit(|edit| {
+            edit.set(
+                "/sheet[1]/table[1]/C3",
+                props! { "formula" => "=B3+1", "cachedValue" => 2.0 },
+            )
+        })
+        .expect("cached transaction");
+    let restored = transaction
+        .patch()
+        .inverse()
+        .apply(transaction.file())
+        .expect("inverse");
+    assert_eq!(restored.to_bytes().expect("restored bytes"), source_bytes);
+}
+
+#[test]
+fn cached_formula_inputs_refuse_without_mutation() {
+    let source = read("basic.numbers");
+    let before = source.to_bytes().expect("source bytes");
+    let cached_only = source
+        .set("/sheet[1]/table[1]/C3", props! { "cachedValue" => 43.0 })
+        .expect_err("cache without formula");
+    assert_eq!(cached_only.code(), Code::InvalidArgument);
+    let null_formula = source
+        .set(
+            "/sheet[1]/table[1]/C3",
+            props! {
+                "formula" => litchi_ops::PropValue::Null,
+                "cachedValue" => 43.0
+            },
+        )
+        .expect_err("null formula with cache");
+    assert_eq!(null_formula.code(), Code::InvalidArgument);
+    let null_cache = source
+        .set(
+            "/sheet[1]/table[1]/C3",
+            props! {
+                "formula" => "=B3+1",
+                "cachedValue" => litchi_ops::PropValue::Null
+            },
+        )
+        .expect_err("null cache");
+    assert_eq!(null_cache.code(), Code::InvalidValue);
+    let unsupported_cache = source
+        .set(
+            "/sheet[1]/table[1]/C3",
+            props! {
+                "formula" => "=B3+1",
+                "cachedValue" => vec!["not a scalar".to_owned()]
+            },
+        )
+        .expect_err("unsupported cache kind");
+    assert_eq!(unsupported_cache.code(), Code::InvalidValue);
+    let non_finite = source
+        .set(
+            "/sheet[1]/table[1]/C3",
+            props! { "formula" => "=B3+1", "cachedValue" => f64::NAN },
+        )
+        .expect_err("non-finite cache");
+    assert_eq!(non_finite.code(), Code::InvalidValue);
+    assert_eq!(source.to_bytes().expect("unchanged source"), before);
 }
 
 #[test]

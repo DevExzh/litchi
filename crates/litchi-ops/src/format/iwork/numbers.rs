@@ -9,7 +9,7 @@
 //!
 //! | Verb | Element | Leaf transaction |
 //! |---|---|---|
-//! | `set` | `cell` `value`/`formula` | `edit_table_cells` (one per table) |
+//! | `set` | `cell` `value`/`formula`/`cachedValue` | `edit_table_cells` (one per table) |
 //! | `set` | `cell` `numberFormat` | `edit_table_cell_{number,percentage}_format` |
 //! | `set` | `cell` `comment` (`null` clears) | `set_table_cell_comment`, `clear_table_cell_comment` (record 0318) |
 //! | `add` | `comment` under a cell (`text`) | `set_table_cell_comment` |
@@ -43,7 +43,7 @@ use litchi_numbers::cell::data_format::{
     DecimalPlaces, NegativeStyle, Number, Percentage, ThousandsSeparator,
 };
 use litchi_numbers::cell::text_style::CharacterProperties;
-use litchi_numbers::formula::Expression;
+use litchi_numbers::formula::{CachedValue, Expression};
 use litchi_numbers::table::cells::{Change, Edit, Input};
 use litchi_numbers::table::merge::Region;
 use litchi_numbers::table::topology::{ColumnDeletion, ColumnInsertion, RowDeletion, RowInsertion};
@@ -124,6 +124,7 @@ pub(crate) const CELL_PROPS: &[PropSpec] = &[
     PropSpec::new("type", ValueType::Text),
     writable("value", ValueType::Scalar),
     writable("formula", ValueType::Text),
+    set_only("cachedValue", ValueType::Scalar),
     writable("comment", ValueType::Text),
     PropSpec::new("merge", ValueType::Text),
     PropSpec::new("mergeAnchor", ValueType::Bool),
@@ -994,6 +995,11 @@ pub(crate) enum CellWrite {
     Value(Option<Input>),
     /// A formula.
     Formula(Expression),
+    /// A formula with an explicitly authored typed display cache.
+    FormulaCached {
+        expression: Expression,
+        cached: CachedValue,
+    },
 }
 
 impl CellWrite {
@@ -1002,6 +1008,9 @@ impl CellWrite {
             Self::Value(Some(input)) => Change::set(position, input.clone()),
             Self::Value(None) => Change::clear(position),
             Self::Formula(expression) => Change::set_formula(position, expression.clone()),
+            Self::FormulaCached { expression, cached } => {
+                Change::set_formula_cached(position, expression.clone(), cached.clone())
+            },
         }
     }
 }
@@ -1042,16 +1051,100 @@ pub(crate) fn value_input(value: &PropValue<'_>) -> Result<Option<Input>> {
 }
 
 /// The expression of a `formula` value; `null` clears the cell.
-pub(crate) fn formula_write(value: &PropValue<'_>) -> Result<CellWrite> {
+fn formula_expression(value: &PropValue<'_>) -> Result<Option<Expression>> {
     let text = super::write::text(value, "formula")?;
     match text {
-        None => Ok(CellWrite::Value(None)),
-        Some(text) => Expression::parse(&text)
-            .map(CellWrite::Formula)
-            .map_err(|error| {
-                edit_error(EditError::Formula(error)).with_property("formula".to_owned())
-            }),
+        None => Ok(None),
+        Some(text) => Expression::parse(&text).map(Some).map_err(|error| {
+            edit_error(EditError::Formula(error)).with_property("formula".to_owned())
+        }),
     }
+}
+
+/// The expression of a `formula` value; `null` clears the cell.
+pub(crate) fn formula_write(value: &PropValue<'_>) -> Result<CellWrite> {
+    match formula_expression(value)? {
+        None => Ok(CellWrite::Value(None)),
+        Some(expression) => Ok(CellWrite::Formula(expression)),
+    }
+}
+
+/// Convert a unified scalar into the bounded typed cache accepted by the
+/// Numbers formula author.  Date and duration caches deliberately have no
+/// unified scalar representation, so they cannot be guessed or flattened.
+fn cached_value(value: &PropValue<'_>) -> Result<CachedValue> {
+    value
+        .with_coerced(ValueType::Scalar, |scalar| match scalar {
+            Some(Scalar::Text(text)) => {
+                CachedValue::text(text).map_err(|error| edit_error(EditError::Formula(error)))
+            },
+            Some(Scalar::Bool(value)) => Ok(CachedValue::boolean(value)),
+            Some(Scalar::Int(value)) => {
+                #[allow(
+                    clippy::cast_precision_loss,
+                    reason = "Numbers stores cached numeric results as doubles"
+                )]
+                let value = value as f64;
+                CachedValue::number(value).map_err(|error| edit_error(EditError::Formula(error)))
+            },
+            Some(Scalar::Number(value)) => {
+                CachedValue::number(value).map_err(|error| edit_error(EditError::Formula(error)))
+            },
+            None => Err(refusal(
+                Code::InvalidValue,
+                "`cachedValue` must be a finite number, boolean or text",
+            )),
+            Some(other) => Err(refusal(
+                Code::InvalidValue,
+                format!("a Numbers cached formula result cannot be `{other}`"),
+            )),
+        })
+        .map_err(|error| error.with_property("cachedValue".to_owned()))
+}
+
+/// Parse the one cached-formula assignment in a property list before any
+/// cell changes are staged.  The last formula/cache key wins, matching the
+/// ordered property-list contract while preserving the relative order of
+/// unrelated assignments.
+fn cached_formula_write(props: &Props<'_>) -> Result<Option<(usize, CellWrite)>> {
+    if !props
+        .iter()
+        .any(|(key, _)| key.eq_ignore_ascii_case("cachedValue"))
+    {
+        return Ok(None);
+    }
+    let pair_index = props
+        .iter()
+        .enumerate()
+        .filter(|(_, (key, _))| {
+            key.eq_ignore_ascii_case("formula") || key.eq_ignore_ascii_case("cachedValue")
+        })
+        .map(|(index, _)| index)
+        .fold(None, |_, index| Some(index))
+        .expect("cachedValue key found while building cached formula");
+    let Some(formula) = props.get("formula") else {
+        return Err(refusal(
+            Code::InvalidArgument,
+            "`cachedValue` requires a non-null `formula` in the same cell assignment",
+        )
+        .with_property("cachedValue".to_owned()));
+    };
+    let Some(expression) = formula_expression(formula)? else {
+        return Err(refusal(
+            Code::InvalidArgument,
+            "`cachedValue` requires a non-null `formula` in the same cell assignment",
+        )
+        .with_property("cachedValue".to_owned()));
+    };
+    let cached = cached_value(
+        props
+            .get("cachedValue")
+            .expect("cachedValue key found while building cached formula"),
+    )?;
+    Ok(Some((
+        pair_index,
+        CellWrite::FormulaCached { expression, cached },
+    )))
 }
 
 /// The cell assignment of one `value` or `formula` key; `None` for keys of
@@ -1153,10 +1246,32 @@ pub(crate) fn set(
     props: &Props<'_>,
     limits: &SemanticLimits,
 ) -> Result<Commit> {
+    let targets = targets(file, target, limits)?;
+    let cached_formula = match &targets {
+        Targets::EmptyCell(_) => cached_formula_write(props)?,
+        Targets::Nodes(nodes) if nodes.iter().any(|node| node.item().type_name() == "cell") => {
+            cached_formula_write(props)?
+        },
+        Targets::Nodes(_) => None,
+    };
+    let cached_formula_index = cached_formula.as_ref().map(|(index, _)| *index);
+    let cached_formula_write = cached_formula.as_ref().map(|(_, write)| write);
     let mut staged = Staged::default();
     let mut operations = 0_usize;
     let stage_cell =
-        |staged: &mut Staged, address: Address, key: &str, value: &PropValue<'_>| -> Result<()> {
+        |staged: &mut Staged, address: Address, index: usize, key: &str, value: &PropValue<'_>| {
+            if let Some(write) = cached_formula_write
+                && (key.eq_ignore_ascii_case("formula") || key.eq_ignore_ascii_case("cachedValue"))
+            {
+                if Some(index) == cached_formula_index {
+                    staged
+                        .cells
+                        .entry((address.sheet, address.table))
+                        .or_default()
+                        .push(write.change(address.position()));
+                }
+                return Ok(());
+            }
             if let Some(write) = cell_write(key, value)? {
                 staged
                     .cells
@@ -1194,23 +1309,23 @@ pub(crate) fn set(
             }
             Ok(())
         };
-    match targets(file, target, limits)? {
+    match targets {
         Targets::EmptyCell(address) => {
-            for (key, value) in props.iter() {
+            for (index, (key, value)) in props.iter().enumerate() {
                 operations += 1;
                 bound(LimitKind::Operations, operations, limits.max_operations())?;
-                stage_cell(&mut staged, address, key.as_str(), value)?;
+                stage_cell(&mut staged, address, index, key.as_str(), value)?;
             }
         },
         Targets::Nodes(nodes) => {
             for node in &nodes {
-                for (key, value) in props.iter() {
+                for (index, (key, value)) in props.iter().enumerate() {
                     operations += 1;
                     bound(LimitKind::Operations, operations, limits.max_operations())?;
                     let key = key.as_str();
                     let [sheet, table, _, _] = node.item().leaf().map(|value| value as usize);
                     match node.item().type_name() {
-                        "cell" => stage_cell(&mut staged, cell_address(node), key, value)?,
+                        "cell" => stage_cell(&mut staged, cell_address(node), index, key, value)?,
                         "sheet" if key.eq_ignore_ascii_case("name") => {
                             staged.renames_sheets.push((
                                 sheet,

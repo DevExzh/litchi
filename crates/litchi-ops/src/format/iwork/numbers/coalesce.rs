@@ -109,7 +109,10 @@ impl Iwork {
             address,
             change: write.change(address.position()),
             changes,
-            formula: matches!(write, super::CellWrite::Formula(_)),
+            formula: matches!(
+                write,
+                super::CellWrite::Formula(_) | super::CellWrite::FormulaCached { .. }
+            ),
             stored,
         }))
     }
