@@ -273,6 +273,7 @@ const TABLE_ENTRY_REFCOUNT_FIELD: u32 = 2;
 const TABLE_ENTRY_STORAGE_FIELD: u32 = 10;
 const TABLE_REFERENCE_IDENTIFIER_FIELD: u32 = 1;
 const TABLE_MODEL_COMMENT_PATH: [u32; 2] = [4, 19];
+const TABLE_INFO_MESSAGE_TYPE: u32 = 6_000;
 const TABLE_DATA_LIST_MESSAGE_TYPE: u32 = 6_005;
 const COMMENT_STORAGE_MESSAGE_TYPE: u32 = 3_056;
 const ANNOTATION_AUTHOR_MESSAGE_TYPE: u32 = 212;
@@ -619,8 +620,12 @@ pub fn rewrite_root<P: TableLeaf>(
                         author_storage_component.as_deref(),
                     )?;
                 }
-                let mut author =
-                    plan_author(&working, selection, profile.generate_author_if_missing)?;
+                let mut author = plan_author(
+                    &working,
+                    selection,
+                    profile.generate_author_if_missing,
+                    profile.update_author_storage,
+                )?;
                 let allocation_count = 1_usize
                     .saturating_add(if author.new_author { 1 } else { 0 })
                     .saturating_add(if author.new_storage { 1 } else { 0 });
@@ -672,6 +677,7 @@ pub fn rewrite_root<P: TableLeaf>(
         },
         RootOperation::Clear => {
             let root = selection.root_identifier.ok_or(Fault::Invalid)?;
+            validate_clear_source(&working, root)?;
             ensure_unique_root(&working, &census, selection, root)?;
             let author = ensure_empty_thread(&working, root)?;
             detach_root(&mut working, selection, root)?;
@@ -859,6 +865,50 @@ fn ensure_unique_root<P: TableLeaf>(
     Ok(())
 }
 
+/// Admit the exact graph shape required by a destructive root clear.
+///
+/// The shared writer must not treat a readable comment payload as proof that
+/// deleting its object is lossless.  In particular, an unknown sibling
+/// message or a mismatched ArchiveInfo entry could carry bytes which the
+/// focused route does not own.  The native Numbers writer also refuses an
+/// unparseable/empty table-info candidate elsewhere in the package instead of
+/// silently deleting a selected root from an ambiguous document graph.
+fn validate_clear_source<P: TableLeaf>(working: &Working<'_, P>, root: u64) -> FaultResult<()> {
+    let object = working.object(root)?;
+    if object.messages.len() != 1 || object.archive_info.message_infos.len() != 1 {
+        return Err(Fault::Dependency);
+    }
+    let message = object.messages.first().ok_or(Fault::Invalid)?;
+    if message.type_ != COMMENT_STORAGE_MESSAGE_TYPE {
+        return Err(Fault::Invalid);
+    }
+    let info = object
+        .archive_info
+        .message_infos
+        .first()
+        .ok_or(Fault::Invalid)?;
+    if info.type_ != message.type_ || usize::try_from(info.length).ok() != Some(message.data.len())
+    {
+        return Err(Fault::Invalid);
+    }
+    for component in working.component_names() {
+        for candidate in &working.archive(&component)?.objects {
+            for candidate_message in candidate
+                .messages
+                .iter()
+                .filter(|candidate_message| candidate_message.type_ == TABLE_INFO_MESSAGE_TYPE)
+            {
+                let view = WireView::parse(candidate_message.data.as_slice(), WireLimits::DEFAULT)
+                    .map_err(map_wire_error)?;
+                if view.fields().next().is_none() {
+                    return Err(Fault::Invalid);
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
 fn ensure_empty_thread<P: TableLeaf>(
     working: &Working<'_, P>,
     root: u64,
@@ -1027,10 +1077,12 @@ fn validate_existing_comment_list<P: TableLeaf>(
         }
     }
     for root in roots {
-        let root_component = working.locate(root)?.ok_or(Fault::Dependency)?;
-        if root_component != model_component {
-            return Err(Fault::Unsupported);
-        }
+        // Numbers stores the comment-list roots in its DataList component,
+        // while the selected table model is commonly in CalculationEngine.
+        // The list entry and Census ownership checks establish the selected
+        // root's identity; requiring the root to share the model component
+        // rejects the native multi-component profile before its graph can be
+        // validated.
         validate_existing_comment_graph(working, root, model_component, author_storage_component)?;
     }
     Ok(())
@@ -1250,6 +1302,7 @@ fn plan_author<P: TableLeaf>(
     working: &Working<'_, P>,
     selection: &Selection,
     generate_author_if_missing: bool,
+    prefer_new_generated_author: bool,
 ) -> FaultResult<AuthorPlan> {
     let mut generated = None;
     for component in working.component_names() {
@@ -1341,7 +1394,9 @@ fn plan_author<P: TableLeaf>(
                 return Err(Fault::Dependency);
             }
         }
-        if let Some(&author_identifier) = references.first() {
+        if let Some(&author_identifier) = references.first()
+            && !(generate_author_if_missing && prefer_new_generated_author && references.len() > 1)
+        {
             // Native Pages/Keynote creation reuses the first registered
             // author.  Numbers fixtures with an empty registry take the
             // generated-author path below; an existing registry is reused by
@@ -1781,7 +1836,11 @@ fn append_author_storage<P: TableLeaf>(
         info.field_infos.push(field);
         return Ok(());
     }
-    if info.object_references == present && info.field_infos.is_empty() {
+    // Native multi-author registries often carry the references only in the
+    // payload and deliberately omit the ArchiveInfo mirror.  Numbers' old
+    // writer preserved that header shape while appending the new author; it
+    // must not be rejected merely because the wire and header views differ.
+    if info.object_references.is_empty() && info.field_infos.is_empty() {
         object
             .replace_message_preserving_header(
                 message_index,
@@ -1892,9 +1951,14 @@ fn append_list<P: TableLeaf>(
     let next = unique_field(&view, TABLE_LIST_NEXT_ID_FIELD)?
         .ok_or(Fault::Invalid)
         .and_then(|field| read_varint(field.payload()))?;
+    // `Reuse` governs the first key in a newly-created Numbers list.  An
+    // existing list still allocates from its source-authoritative watermark;
+    // reusing key 2 here collides with the native list's first entry whenever
+    // the selected table already has comments.
     let key = match policy {
-        ListKeys::Append => u32::try_from(next.max(2)).map_err(|_| Fault::Invalid)?,
-        ListKeys::Reuse => 2,
+        ListKeys::Append | ListKeys::Reuse => {
+            u32::try_from(next.max(2)).map_err(|_| Fault::Invalid)?
+        },
     };
     if view
         .fields()
@@ -2005,54 +2069,50 @@ fn update_list_metadata<P: TableLeaf>(
         .iter()
         .filter(|identifier| **identifier == root)
         .count();
-    let path = vec![TABLE_LIST_ENTRY_FIELD, key];
-    let mut field_index = None;
-    for (index, field) in info.field_infos.iter().enumerate() {
-        if field.path.path == path && field_index.replace(index).is_some() {
-            return Err(Fault::Dependency);
-        }
-    }
-    // Older host-authored table-list headers carry only the aggregate object
-    // references and no per-field inventory.  The wire list above is still
-    // unambiguous (the selected key/storage/refcount were checked), so keep
-    // that header shape losslessly instead of manufacturing a field path the
-    // source never had.
-    if info.field_infos.is_empty() {
-        if adding {
-            if occurrences != 0 {
-                return Err(Fault::Dependency);
-            }
-            info.object_references.push(root);
-        } else {
-            if occurrences != 1 {
-                return Err(Fault::Dependency);
-            }
-            info.object_references
-                .retain(|identifier| *identifier != root);
-        }
-        return Ok(());
-    }
     if adding {
-        if occurrences != 0 || field_index.is_some() {
+        if occurrences != 0 {
             return Err(Fault::Dependency);
         }
         info.object_references.push(root);
-        let mut field = FieldInfo::new(FieldPath { path }, limits).map_err(map_core_error)?;
-        field.r#type = Some(FieldType::ObjectReference);
-        field.object_references.push(root);
-        info.field_infos.push(field);
+        // A native list with only aggregate references intentionally keeps
+        // that header shape.  A list which already carries FieldInfo mirrors,
+        // and a brand-new list, gain one exact entry for the appended root.
+        if !info.field_infos.is_empty() || occurrences == 0 && info.object_references.len() == 1 {
+            let mut field = FieldInfo::new(
+                FieldPath {
+                    path: vec![TABLE_LIST_ENTRY_FIELD, key],
+                },
+                limits,
+            )
+            .map_err(map_core_error)?;
+            field.r#type = Some(FieldType::ObjectReference);
+            field.object_references.push(root);
+            info.field_infos.push(field);
+        }
     } else {
-        if occurrences != 1 || field_index.is_none() {
+        if occurrences != 1 {
             return Err(Fault::Dependency);
         }
         info.object_references
             .retain(|identifier| *identifier != root);
-        let index = field_index.ok_or(Fault::Invalid)?;
-        let field = info.field_infos.get(index).ok_or(Fault::Invalid)?;
-        if field.object_references.as_slice() != [root] {
-            return Err(Fault::Dependency);
+        if !info.field_infos.is_empty() {
+            // Host headers differ: some identify the entry by [3,key], while
+            // older synthetic/native saves expose only the referenced object
+            // in a generic FieldInfo slot.  Remove exactly the selected
+            // object's one-field mirror when present; leave aggregate-only
+            // ownership untouched when the header carries no such mirror.
+            let mut match_index = None;
+            for (index, field) in info.field_infos.iter().enumerate() {
+                if field.object_references.as_slice() == [root]
+                    && match_index.replace(index).is_some()
+                {
+                    return Err(Fault::Dependency);
+                }
+            }
+            if let Some(index) = match_index {
+                info.field_infos.remove(index);
+            }
         }
-        info.field_infos.remove(index);
     }
     Ok(())
 }
