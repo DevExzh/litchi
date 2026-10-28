@@ -1,4 +1,4 @@
-# 0393 — Pages/Keynote root-comment clear safety proof
+# 0393 — iWork root-comment clear safety proof
 
 This proof-only slice adds focused parity controls for root-only table-comment
 clears on the frozen `295b421bcd3d9ec0b0b9208e4039de22623685bc` candidate.
@@ -19,14 +19,14 @@ kept distinct from these proof cases.
 
 ## Frozen-candidate result
 
-The baseline controls pass on `295b`. The four mutation controls are
-intentionally red on that candidate: both Pages and Keynote currently publish
-the corrupted clear candidate instead of refusing it. This is the preserved
-regression evidence for the coordinator's W1-G repair; the proof must not be
-weakened to accept that behavior.
+The baseline controls pass on `295b`. The seven mutation controls are
+intentionally red on that candidate: Pages, Keynote, and Numbers currently
+publish the corrupted clear candidate instead of refusing it. This is the
+preserved regression evidence for the coordinator's W1-G repair; the proof
+must not be weakened to accept that behavior.
 
 Test module: `crates/litchi-iwa/tests/parity/comment_clear_safety_cases.rs`.
-The clean evidence commit is `1a63ac0919d19d3107cc9addec533ae157ea2729`.
+The clean evidence commit is `21711985a0971ae450d7c8be1db12909c57c81eb`.
 The scoped command was:
 
 ```text
@@ -37,6 +37,9 @@ Result on the extended proof run: 3 baseline tests passed and 7 mutation
 tests failed because the candidate published a lossy clear before reaching the
 typed-refusal match. The proof assertions are therefore red for the intended
 runtime defect. The fresh raw stdout/stderr receipt is outside the repository
-at `/home/zhuhe/code/litchi-worktrees/.coord/resume-20261028/comments-clear-proof-295b-red-raw-extended.log`;
-the final record will bind its source hash, size, and SHA-256 after the clean
-run. No performance or native acceptance claim is made here.
+at `/home/zhuhe/code/litchi-worktrees/.coord/resume-20261028/comments-clear-proof-295b-red-raw-extended.log`
+(21,140 bytes, SHA-256
+`34ae3f031df1bbf0aff9b672df27860160a7806c72cc3077bdab78567a800d16`). It
+records source `21711985a0971ae450d7c8be1db12909c57c81eb`, clean status before
+and after, exit `101`, and all seven `unexpectedly published a lossy candidate`
+failures. No performance or native acceptance claim is made here.
