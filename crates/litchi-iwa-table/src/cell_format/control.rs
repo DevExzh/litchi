@@ -2169,7 +2169,11 @@ impl PackageProofs {
     /// reassembly of `parent`, the package these proofs belong to. A
     /// candidate component whose parsed archive is one of the parent's own
     /// (a reopen shares byte-identical members) inherits that archive's
-    /// census.
+    /// census. The parent and candidate catalogs are live for this handoff;
+    /// `SourceCatalog::reopen` keeps unchanged archives alive through their
+    /// shared `Arc`. An inherited cache is never forwarded from a package
+    /// that has not built its own census, so address keys cannot cross a
+    /// stale parent/candidate generation.
     #[must_use]
     pub fn reopened(&self, parent: &ComponentCatalog, candidate: &ComponentCatalog) -> Self {
         // Keep the parent census itself rather than allocating a pointer

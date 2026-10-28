@@ -31,13 +31,13 @@ use crate::{At, SheetSelector, TableSelector};
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub enum LimitKind {
-    /// A resource of the family transaction the change runs.
-    Transaction,
+    /// Work charged to the family transaction the change runs.
+    TransactionWork,
 }
 
 impl fmt::Display for LimitKind {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        formatter.write_str("transaction")
+        formatter.write_str("transaction work")
     }
 }
 
@@ -153,7 +153,7 @@ macro_rules! from_family {
                     E::Refused(other) => Self::Refused(refusal(other.kind(), false)),
                     E::InvalidSource { .. } => Self::InvalidSource,
                     E::Limit { observed, maximum, .. } => Self::Limit {
-                        kind: LimitKind::Transaction,
+                        kind: LimitKind::TransactionWork,
                         observed,
                         maximum,
                     },
@@ -192,7 +192,7 @@ impl From<engine::Error> for Error {
             engine::Error::Limit {
                 observed, maximum, ..
             } => Self::Limit {
-                kind: LimitKind::Transaction,
+                kind: LimitKind::TransactionWork,
                 observed,
                 maximum,
             },
