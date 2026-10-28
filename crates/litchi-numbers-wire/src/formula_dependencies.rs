@@ -2406,12 +2406,18 @@ fn rewrite_owner(
             None
         }
     };
-    let cell_replacement = (!cell_payload.is_empty()).then_some(cell_payload.as_slice());
-    let tiled_cell_replacement =
-        (!tiled_cell_payload.is_empty()).then_some(tiled_cell_payload.as_slice());
+    let cell_replacement = envelope(snapshot.cell_dependencies().is_some(), &cell_payload);
+    let tiled_cell_replacement = envelope(
+        snapshot.tiled_cell_dependencies().is_some(),
+        &tiled_cell_payload,
+    );
+    // An owner without range tiles still carries the host's explicit empty
+    // range envelope.  Keep an existing envelope empty when the final host
+    // set has no ranges, and create the envelope when the source omitted it
+    // (the native authoring route emits `RangeDependenciesArchive {}`).
     let range_replacement = range_payload
         .as_deref()
-        .filter(|payload| !payload.is_empty());
+        .or_else(|| snapshot.range_dependencies().is_some().then_some(&[][..]));
     let candidate = patch_nested_fields_batched(
         owner.message.payload,
         &[
@@ -2473,6 +2479,13 @@ fn rewrite_owner(
         report,
     )?);
     Ok(())
+}
+
+/// The replacement of an owner's dependency envelope: an envelope the owner
+/// carries stays, empty when nothing is left in it, as in native files and
+/// the host's output (record 0376c).
+fn envelope(present: bool, payload: &[u8]) -> Option<&[u8]> {
+    (present || !payload.is_empty()).then_some(payload)
 }
 
 fn rewrite_range_tiles(
