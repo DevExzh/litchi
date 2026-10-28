@@ -462,6 +462,57 @@ fn pages_body_line_endpoints_reset_parity() -> TestResult {
 
 #[test]
 #[ignore = "callgrind cost probe (record 0371)"]
+fn line_endpoints_set_cost_abba() -> TestResult {
+    let (input, shape) = with_line(NATIVE)?;
+    let ops = [arrows()];
+    crate::pages_cost_probes::abba(
+        &input,
+        |source| host_route(source, shape, &ops),
+        |source| Ok(leaf_bytes!(leaf_commit(source, &ops)?.package())),
+    )
+}
+
+#[test]
+#[ignore = "callgrind cost probe (record 0371)"]
+fn line_endpoints_reset_cost_abba() -> TestResult {
+    let (base, shape) = with_line(NATIVE)?;
+    let input = Fixture {
+        path: NATIVE,
+        bytes: host_route(&base.bytes, shape, &[arrows()])?,
+    };
+    let ops = [Op::Reset(PropertyKind::LineEndpoints)];
+    crate::pages_cost_probes::abba(
+        &input,
+        |source| host_route(source, shape, &ops),
+        |source| Ok(leaf_bytes!(leaf_commit(source, &ops)?.package())),
+    )
+}
+
+#[test]
+#[ignore = "callgrind cost probe (record 0371)"]
+fn line_endpoints_read_cost_abba() -> TestResult {
+    let (base, shape) = with_line(NATIVE)?;
+    let input = Fixture {
+        path: NATIVE,
+        bytes: host_route(&base.bytes, shape, &[arrows()])?,
+    };
+    crate::pages_cost_probes::abba(
+        &input,
+        |source| {
+            let endpoints = pages::Draft::from_bytes(source)?.body_line_endpoints(shape)?;
+            Ok(format!("{endpoints:?}").into_bytes())
+        },
+        |source| {
+            let package = Package::from_bytes(source)?;
+            let endpoints = package
+                .body_drawable_style(DrawableSelector::shape(0), PropertyKind::LineEndpoints)?;
+            Ok(format!("{endpoints:?}").into_bytes())
+        },
+    )
+}
+
+#[test]
+#[ignore = "callgrind cost probe (record 0371)"]
 fn shape_style_set_cost_abba() -> TestResult {
     let (input, shape) = with_rectangle(NATIVE)?;
     let ops = [solid()?];

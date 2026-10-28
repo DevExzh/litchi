@@ -1,8 +1,8 @@
 # 0371 — W1-B: Pages body media, shapes, text fields and table cells out of the host
 
-- Status: first merge-ready slice on branch `uo2/iwa-w1b` (cut from trunk
-  `feat/unified-ops-api` at `f35f1c9f55`; trunk merged several times, last
-  at the head of this slice). The wave continues (§6).
+- Status: resumed merge-ready slice on branch `uo2/iwa-w1b` (cut from trunk
+  `feat/unified-ops-api` at `f35f1c9f55`; the branch is rebased by merge onto
+  the coordinator's current trunk before handoff). The wave continues (§6).
 - Date: 2026-10-26.
 - Plan: [0363](0363-iwa-monolith-exit-plan.md) wave W1-B (§0, §3.2, §4, §7);
   harness and ledger [0369](0369-iwa-exit-parity-harness-and-ledger.md);
@@ -43,6 +43,8 @@
 | `613d5e28c9`, `287c252b4a` | cell borders: `litchi_iwa_table::cell_appearance::{borders, plan_border}` (the host's stroke layers: the highest-order run covering the cell on each side; a set restrokes the cell's own one-cell run in place, appends a run to the side's layer at the cell's index or creates that layer, with the next order); `Edit::{set_border, clear_border}` and `Appearance::borders` replace `{set,clear}_table_cell_border` and `table_cell_borders` | 3 |
 | `689b1cd6d6` | `litchi_pages::builder::Builder::{language, locale}` (the host's fields: the document language and locales, the settings' language and creation/last locales, every storage language table; `PackageError::{InvalidLanguage, InvalidLocale}`); `Identity` gains its version UUID (`from_parts`, `version_uuid`), written to `versionUUID`, the properties' `revision` and the package metadata revision, as the host does — before, every leaf-built document carried the template's version UUID. Identity, revision, language, locale and the body text are one publication (the body-text transaction only validates) | 5 (`new`, `body_text`, `language`, `locale`, `build`) |
 | `923ee3148b` | `drawable::style` — `Package::{body_drawable_style, edit_body_drawable_style, apply_body_drawable_style}`; `Edit::{set, reset}` over `Property::{Fill, Stroke, Shadow, Effects, TextLayout}`: the shared `litchi_iwa_style::shape` engine (W1-E, record 0375a) on a workspace over this package's parsed components, one publication per edit | 15 |
+| `f9ebce8575`, `27619e3f3c` | shared `litchi_iwa_style::line_end` codec and `drawable::style` line-endpoint facade — `PropertyKind::LineEndpoints`, `Endpoints` and `Endpoint`; `Edit::{set, reset}` and `Package::body_drawable_style` replace host `set_body_line_endpoints`, `reset_body_line_endpoints` and `body_line_endpoints`, with fresh variation UUIDs on allocation and exact in-place rewrites/resets | 3 |
+| `7a1b5c4054` | `table::creation::Edit::duplicate(BodyTableSelector, Position)` over `litchi_iwa_table::structure::duplicate`: copies a populated body table's cells, styles, formula lists and owner family, allocates a new drawable/model/storage graph, names it with the next free `"<name> copy"`, anchors its attachment in the body story, and publishes the registry references; typed selector, dependency and position refusals remain terminal | 1 |
 | `acf5fd71ad` | crate-boundary gate: the bookmark, date-time and attachment re-export modules move to their own files; the movie-playback owner keeps its feature-gated declaration with a `#[path]` twin for builds without the host seam; the retired-host-route audit skips the parity harness (whose cases call host routes by design) | — |
 | `234929c79b`, `28fb68c468` | performance (§4): the section-text preflight sums retained header lengths instead of re-encoding the archive and clones the parsed component instead of reparsing it; every Pages commit-time candidate reopen calls `SourceCatalog::reopen` | — |
 
@@ -87,12 +89,14 @@ Cases live in `crates/litchi-iwa/tests/parity/pages_{drawable,text,table}_cases.
 | cell fill, layout and border reads (every cell of four native fixtures and a host-styled one) | 1 | A | queued |
 | cell borders (new layer, second run, restroke, cleared edges) | 2 | A | queued |
 | body shape styles: set (six values), rewrite (two), reset (five), reads | 4 | set B (fresh registry UUID); rewrite, reset, reads A | queued |
+| body line endpoints: set, reset and reads | 2 | set B (fresh registry UUID); reset and reads A | queued |
 | builder language and locale with body text (fr, ja, de-CH; empty and multi-paragraph bodies) | 1 | B (the registry's object UUIDs by form; the leaf build takes the host output's identity) | queued |
 | table add (3×4 at offset 0) | 1 | B (the table UUID, and the owner UUID and owner-map entry derived from it, by form; fresh metadata UUIDs) | queued |
 | media remove (image native + host-built; movie; audio) | 3 | image B (ZIP layout), movie and audio A | queued |
 | media duplicate (image native + host-built; movie; audio) | 3 | B (fresh UUIDs; Document.iwa byte-identical) | queued |
 | media replace (image data, movie data and poster, audio data, asset) and asset reads | 5 + read sweep over 6 documents | movie/poster/audio A, image and asset B (ZIP layout), reads A | queued |
 | media add (image, movie, audio; native and blank documents) | 3 | B (fresh UUIDs; new members' ZIP layout) | queued |
+| populated body-table duplicate (three focused cases plus corpus sweep) | 3 focused + 18 corpus routes | B (fresh UUIDs and formula-owner identifiers by policy; untouched members exact) | queued |
 
 Tier B for creations: both routes draw a random `text_attribute_uuid_string`
 for a new smart field, so the case registers a known-field decoder that
@@ -113,7 +117,12 @@ corpus has no native file with them.
 
 | Route | Divergence | Owner |
 |---|---|---|
-| — | none: `add_table` was pinned here until W1-A aligned the shared table graph (record 0370f); it is now migrated (tier B) | — |
+| `duplicate_table` formula-owner allocation | the Pages host repeats an owner-map internal identifier when the source map already contains the next owner value; the leaf allocates above the complete map. Tier B compares the cloned owner family by form and preserves exact reads; volatile, spanning, whole-owner, error and spill dependencies are refused on both routes | W1-B / policy 0368a |
+
+The `add_table` route was pinned here until W1-A aligned the shared table graph
+(record 0370f); it is now migrated (tier B). The duplicate route's four
+dependency refusals are intentional and terminal; they are recorded as parity
+cases rather than silently falling back to the host.
 
 The number-attachment removal divergence pinned in the first slice was a
 host defect and is fixed (§3, item 3).
@@ -196,6 +205,10 @@ one edit, commit and write. Numbers are the sum of the two runs of each side.
 | cell border set (table 0, top edge of cell 1,1) | 3,381,823,315 | — | 89,096,263 | −97.4% |
 | body shape fill set (host rectangle on `chart-data-native`) | 416,949,768 | — | 142,213,368 | −65.9% |
 | builder: body `Bonjour`, `fr`/`fr_FR` | 3,565,170 | 7,061,105 (four publications) → 5,489,195 (two) | 3,499,471 (one) | −1.8% |
+| body line endpoints set (`chart-data-native`) | 423,638,442 | — | 143,606,634 | −66.1% |
+| body line endpoints reset (`chart-data-native`) | 549,682,634 | — | 127,418,970 | −76.8% |
+| body line endpoints read (`chart-data-native`) | 155,394,765 | — | 31,411,145 | −79.8% |
+| populated body-table duplicate (`body-table-cells-native`) | 4,215,551,178 | — | 138,534,970 | −96.7% |
 
 The whole-body set route was the only miss: the leaf `edit_body_text` (an
 existing family) re-encoded every archive header in its physical preflight
@@ -243,9 +256,8 @@ Both pre-commit size checks printed nothing for every commit.
 | Gap | Rows | Next step / dependency |
 |---|---:|---|
 | text-box attachments (incl. removal) and date-time fields | 5 + 5 | text boxes are W2-B |
-| shape lifecycle; shape fill, stroke, shadow, effects, text layout, line ends, preset | ~37 | W1-E codecs (`shape_style_codec` straight lines landed) |
+| shape lifecycle; shape fill, stroke, shadow, effects, text layout and preset | ~34 | W1-E codecs (`shape_style_codec` straight lines landed); line endpoints are migrated in this slice |
 | table cell formats, rich text, topology, comment writes, conditional highlights | ~120 | cores in `litchi-iwa-table` (W1-G, record 0379); W1-B adds the Pages facades when each group lands |
 | image cell fills | — | data-reference registry bookkeeping for a style variation (host `register_style_object` with a data identifier) |
-| `duplicate_table` | 1 | format-neutral core in `litchi-iwa-table` over `litchi_numbers_wire::{table_lifecycle, formula_graph}`, after the crate lands |
 | table formulas | — | W1-F formula engine (record 0376) |
 | Builder `body_table` | 1 | the host bootstraps the first table graph from its Numbers builder; the leaf `table::creation` needs a template table, so a table-less document needs that bootstrap first |
