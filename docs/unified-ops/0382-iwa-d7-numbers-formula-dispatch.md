@@ -2,7 +2,9 @@
 
 - Status: bounded implementation slice on `uo2/iwa-d7-numbers-formula`, cut
   from frozen coordinator root `bb2475b8b0c11c8cef304178ee3fca1f590e9633`;
-  coordinator integration and the full 53-row gate remain pending.
+  follow-up source commit `796134552fc2061a10fa084e3f44d240dcd85cd2` closes
+  the cfg-sensitive rustdoc link and adds the full-route probe. Coordinator
+  integration and the full 53-row gate remain pending.
 - Date: 2026-10-28.
 - Plan: [0363](0363-iwa-monolith-exit-plan.md) §0 D7; parity and evidence
   policy [0369](0369-iwa-exit-parity-harness-and-ledger.md).
@@ -42,7 +44,11 @@ validated as one assignment, while unrelated property order is preserved.
   for byte with a direct leaf `set_formula_cached` commit from the same source
   and values. It separately compares formula-only output with the direct
   uncached leaf route, then checks reopened formula projection, exact no-op,
-  inverse restoration, and refusal-without-mutation cases.
+  inverse restoration, and refusal-without-mutation cases. Its ignored
+  `cached_formula_full_file_cost_abba` test exercises the complete unified
+  `File` open/set/publish route versus the direct leaf open/edit/commit/write
+  route in `[unified, leaf, leaf, unified]` order and asserts exact bytes on
+  every iteration.
 - The Numbers capability and registry goldens record the set-only schema.
 
 The direct-leaf comparison proves that `cachedValue` reaches the cached leaf
@@ -62,9 +68,49 @@ slice adds no duplicate queue row.
 | `cargo clippy -p litchi-ops --features numbers --test numbers_unified -- -D warnings` | passed; existing vendor zlib warnings are outside the focused crate |
 | Numbers glossary profiles, exit ledger, crate boundaries, no-`3rdparty` tests | passed |
 | `cargo check --locked --offline --manifest-path crates/litchi-ops/fuzz/Cargo.toml --all-targets --features apply` | passed |
-| `RUSTDOCFLAGS=-Dwarnings cargo doc --no-deps -p litchi-ops --features numbers` | blocked by the pre-existing `options.rs:347` link to missing `Self::pages_options`; no owned docs changed |
+| `RUSTDOCFLAGS=-Dwarnings cargo doc --no-deps -p litchi-ops --features numbers` | passed after removing the cfg-sensitive `Self::pages_options` links from the Numbers/Keynote option docs; existing vendor warnings are outside the documented package |
 | Native evidence / queue | no evidence claimed; existing row 241 remains pending |
-| Performance | no wall-time claim; coordinator final qualification required |
+| Full unified-vs-direct-leaf instruction probe | passed on source `796134552fc2061a10fa084e3f44d240dcd85cd2`; pinned `taskset -c 3` release callgrind, exact output equality, no wall timing |
+
+### Branch-bound instruction receipt
+
+The probe was built outside the repository with:
+
+```text
+CARGO_TARGET_DIR=/home/zhuhe/code/litchi-worktrees/.coord/d7-formula-perf-7961345/target \
+CARGO_INCREMENTAL=0 CARGO_PROFILE_RELEASE_DEBUG=1 CARGO_BUILD_JOBS=4 \
+cargo test --release --locked --offline -p litchi-ops --features numbers \
+  --test numbers_unified --no-run
+```
+
+The source fixture is `test-data/iwork/numbers/formula-budget-native.numbers`,
+101,345 bytes, SHA-256
+`6726414adc52762fab5ce3c52d6244d8d55958cf9fc4ee8bb26c00234f048fd3`. The
+release test binary is
+`numbers_unified-f84504c3e8179e98`, 45,344,912 bytes, SHA-256
+`42deb0b45dd1f12ec31c79a22950f43e9fa7cf626588ba0991e3eeb6bb330bef`.
+Each pass ran the ignored test with `--test-threads=1` and
+`--collect-atstart=no`, toggling one route symbol at a time:
+
+```text
+taskset -c 3 valgrind --tool=callgrind --quiet --collect-atstart=no \
+  --toggle-collect='*numbers_unified::unified_cached_formula_route*' ...
+taskset -c 3 valgrind --tool=callgrind --quiet --collect-atstart=no \
+  --toggle-collect='*numbers_unified::direct_cached_formula_route*' ...
+```
+
+The unified route recorded 75,482,316 Ir; the direct leaf route recorded
+75,040,012 Ir, for +442,304 Ir (+0.589424%) on the unified route. The raw
+receipts remain outside the repository under
+`/home/zhuhe/code/litchi-worktrees/.coord/d7-formula-perf-7961345/callgrind/`:
+
+| Artifact | Bytes | SHA-256 |
+|---|---:|---|
+| `unified.callgrind` | 1,198,150 | `b21365b6883ddab3d2094a0cf1ef78735d49da08691f993b2dc284b7d27c4d6c` |
+| `direct.callgrind` | 1,125,965 | `d0ef9a2d02eeefb995009646ddcb3f6f5f71a5758cda44bb320d2a5bb3f3d932` |
+
+This is a source-bound branch receipt only; later merges require final
+integrated requalification. It makes no native acceptance claim.
 
 The coordinator must rerun the affected scoped gates and the complete 53-row
 gate on the final integrated commit. This record does not authorize deleting
