@@ -618,6 +618,14 @@ The three affected fuzz-lock manifests (`litchi-numbers`, `litchi-pages`, and
 source. The focused all-target/all-feature compile and Clippy gates passed,
 and the full-facade cost probes in §4.2 passed on clean source commit
 `cfc334e754`. These are differential proofs, not Apple open/save evidence;
-all three routes remain `Evidence::Queued`. The coordinator must repeat the
-full gate and final performance on one integrated trunk commit, and native
-verification remains pending.
+all three routes remain `Evidence::Queued`.
+
+For the handoff tree, `feat/unified-ops-api` at `b2a2e4c8` was merged into this
+WP as `281aa05899`. On that merged tree the focused parity cases were rerun:
+the shared duplicate-storage regression (1/1), Pages (3/3), Keynote (6/6),
+Numbers default (1/1), and Numbers with `parity-host-oracle` (4/4). The three
+affected fuzz-lock manifests, the ledger, crate-boundary, glossary,
+no-`3rdparty`, and focused formatting checks also pass on the merged tree.
+Those post-merge checks do not requalify the §4.2 measurements: the
+coordinator must repeat the full gate and final performance on one integrated
+trunk commit, and native verification remains pending.
