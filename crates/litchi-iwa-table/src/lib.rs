@@ -29,6 +29,9 @@ pub mod cell_format;
 /// (record 0371).
 pub mod cell_appearance;
 
+/// Format-neutral whole-cell character-style graph planning.
+pub mod cell_text_style;
+
 pub mod hidden_axes;
 
 /// Format-neutral table-cell comment and direct-reply transaction kernel.

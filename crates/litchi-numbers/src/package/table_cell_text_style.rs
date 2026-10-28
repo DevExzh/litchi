@@ -24,6 +24,7 @@ use std::collections::BTreeMap;
 use std::fmt;
 
 use litchi_iwa_core::RawMessage;
+use litchi_iwa_table::cell_text_style as shared;
 use litchi_iwa_text_wire::CharacterProperties;
 use thiserror::Error as ThisError;
 
@@ -256,7 +257,7 @@ impl Edit<'_> {
             let effective = text_style(&published.package, self.sheet, self.table, *position)?;
             let mut expected = properties.clone();
             expected.inherit(&effective);
-            if with_flags_off(expected) != with_flags_off(effective) {
+            if with_flags_off(expected.clone()) != with_flags_off(effective.clone()) {
                 return Err(Error::Verification);
             }
         }
@@ -437,8 +438,212 @@ fn text_style(
     position: At,
 ) -> Result<CharacterProperties, Error> {
     let working = Working::new(package)?;
-    let style = current_style(&working, sheet, table, position)?;
-    effective(&working, style)
+    let target = topology::locate(&working, sheet, table).map_err(from_topology)?;
+    shared::read(
+        package,
+        shared::Target {
+            model_identifier: target.model,
+            row: position.row(),
+            column: position.column(),
+        },
+    )
+    .map_err(from_shared)
+}
+
+fn from_shared(error: shared::Error) -> Error {
+    match error {
+        shared::Error::InvalidSource(_) => Error::InvalidSource,
+        shared::Error::Refused(refusal) => match refusal {
+            shared::Refusal::OutsideTable => Error::Refused(Refusal::CellNotFound),
+            shared::Refusal::UnsupportedStyleList | shared::Refusal::UnsupportedDependency => {
+                Error::Refused(Refusal::UnsupportedDependency)
+            },
+            shared::Refusal::UnsupportedSource => Error::Refused(Refusal::UnsupportedSource),
+            _ => Error::InvalidSource,
+        },
+        shared::Error::Limit {
+            kind,
+            observed,
+            maximum,
+        } => Error::Limit {
+            kind: LimitKind::Wire(kind),
+            observed,
+            maximum,
+        },
+        shared::Error::Allocation { amount } => Error::Allocation { amount },
+        shared::Error::NeedsIdentifier => Error::InvalidSource,
+        _ => Error::InvalidSource,
+    }
+}
+
+/// Apply the shared format-neutral style graph plan through Numbers'
+/// immutable working set and metadata publisher.  All graph decisions and
+/// payload construction come from `litchi-iwa-table`; this adapter owns only
+/// identifier allocation, archive headers, registry transitions and cell
+/// publication.
+fn publish(
+    source: &Package,
+    sheet: usize,
+    table: usize,
+    cells: &[(At, CharacterProperties)],
+) -> Result<structure::Published, Error> {
+    // The shared planner currently emits one-cell graph plans. Preserve the
+    // existing atomic multi-cell staging semantics while the batch plan is
+    // extracted as the next bounded step.
+    if cells.len() > 1 {
+        return publish_legacy(source, sheet, table, cells);
+    }
+    let mut working = Working::new(source)?;
+    working.keep_previews();
+    let target = topology::locate(&working, sheet, table).map_err(from_topology)?;
+    let mut transition = Transition::default();
+    for (position, properties) in cells {
+        let shared_target = shared::Target {
+            model_identifier: target.model,
+            row: position.row(),
+            column: position.column(),
+        };
+        let plan = match shared::plan_set(source, shared_target, properties, None) {
+            Ok(plan) => plan,
+            Err(shared::Error::NeedsIdentifier) => {
+                let fresh = *working.allocate(1)?.first().ok_or(Error::InvalidSource)?;
+                shared::plan_set(source, shared_target, properties, Some(fresh))
+                    .map_err(from_shared)?
+            },
+            Err(error) => return Err(from_shared(error)),
+        };
+        let Some(plan) = plan else { continue };
+        apply_shared_plan(&mut working, &mut transition, plan)?;
+    }
+    working.publish(&transition).map_err(Error::from)
+}
+
+fn apply_shared_plan(
+    working: &mut Working<'_>,
+    transition: &mut Transition,
+    plan: shared::Plan,
+) -> Result<(), Error> {
+    let registry =
+        metadata::registry(working)?.ok_or(Error::Refused(Refusal::UnsupportedSource))?;
+    for rewrite in &plan.rewrites {
+        let object = working.object(rewrite.identifier)?;
+        let index = structure::unique_message(object, &[rewrite.message_type])?;
+        if rewrite.add_references.is_empty() && rewrite.remove_references.is_empty() {
+            replace_message(working, rewrite.identifier, index, rewrite.data.clone())?;
+        } else {
+            match replace_with_references(
+                working,
+                rewrite.identifier,
+                index,
+                rewrite.data.clone(),
+                &rewrite.remove_references,
+                &rewrite.add_references,
+            ) {
+                Ok(()) => {},
+                Err(Fault::Invalid) => {
+                    replace_message(working, rewrite.identifier, index, rewrite.data.clone())?;
+                    let info = &mut working
+                        .object_mut(rewrite.identifier)?
+                        .archive_info
+                        .message_infos
+                        .get_mut(index)
+                        .ok_or(Fault::Invalid)?;
+                    info.object_references
+                        .retain(|reference| !rewrite.remove_references.contains(reference));
+                    for reference in &rewrite.add_references {
+                        if !info.object_references.contains(reference) {
+                            info.object_references.push(*reference);
+                        }
+                    }
+                },
+                Err(error) => return Err(error.into()),
+            }
+        }
+    }
+    if let Some(insertion) = &plan.insertion {
+        let parent = insertion
+            .object_references
+            .first()
+            .copied()
+            .ok_or(Error::InvalidSource)?;
+        let template = working.object(parent)?;
+        let object = structure::new_object(
+            insertion.identifier,
+            Some(template),
+            insertion.message_type,
+            insertion.data.clone(),
+            insertion.object_references.clone(),
+            working.archive_limits(),
+        )?;
+        let entry = working
+            .locate(insertion.beside)?
+            .ok_or(Error::InvalidSource)?;
+        working.insert(&entry, object)?;
+    }
+    for registration in &plan.registrations {
+        match *registration {
+            shared::Registration::Uuid { object } => {
+                let entry = working.locate(object)?.ok_or(Error::InvalidSource)?;
+                let component = registry.component_for_entry(&entry)?.identifier;
+                let seed = metadata::identity_seed(working, object)?;
+                transition.register_uuid(&registry, component, object, seed)?;
+            },
+            shared::Registration::ExternalReference { from, object } => {
+                let from_entry = working.locate(from)?.ok_or(Error::InvalidSource)?;
+                let object_entry = working.locate(object)?.ok_or(Error::InvalidSource)?;
+                let from_component = registry.component_for_entry(&from_entry)?.identifier;
+                let object_component = registry.component_for_entry(&object_entry)?.identifier;
+                transition.reference(&registry, from_component, object_component, object)?;
+            },
+            shared::Registration::Removed { object } => {
+                transition.remove_objects(&registry, &[object])?;
+                transition.release_suffix(&[object])?;
+                working.remove(object)?;
+            },
+        }
+    }
+    if let Some(key) = plan.cell_key {
+        write_shared_key(working, plan.target, key)?;
+    }
+    Ok(())
+}
+
+fn write_shared_key(
+    working: &mut Working<'_>,
+    target: shared::Target,
+    key: u32,
+) -> Result<(), Error> {
+    let (_, model) = topology::message(working, target.model_identifier, &[6_001])?;
+    let geometry = topology::geometry(model).map_err(from_topology)?;
+    let store = single_bytes(model, 4)?
+        .ok_or(Error::InvalidSource)?
+        .to_vec();
+    let position = At::new(target.row, target.column);
+    let Some(located) = locate_cell(working, &store, position)? else {
+        let mut cell = litchi_numbers_wire::BncCell::minimal();
+        cell.set_text_style_identifier(Some(key));
+        return materialize_cell(working, &store, geometry.columns, position, &cell);
+    };
+    let limits = crate::cell::wire::limits_for_source(&located.bytes);
+    let mut cell = litchi_numbers_wire::BncCell::parse(&located.bytes, &limits)
+        .map_err(|_| Error::InvalidSource)?;
+    cell.set_text_style_identifier(Some(key));
+    let encoded = crate::cell::wire::encode(&cell, &limits).map_err(|_| Error::InvalidSource)?;
+    let (_, tile_data) = topology::message(working, located.tile, &[TILE_MESSAGE_TYPE])?;
+    let mut field_index = 0_usize;
+    let rewritten = rebuild(tile_data, |field| {
+        let this = field_index;
+        field_index += 1;
+        if this != located.row_field {
+            return Ok(None);
+        }
+        let row = storage::replace_cell(field.payload, position.column(), &encoded)
+            .map_err(Fault::from)?
+            .ok_or(Fault::Invalid)?;
+        bytes_field(5, &row).map(Some)
+    })?;
+    replace_message(working, located.tile, located.tile_index, rewritten)?;
+    Ok(())
 }
 
 /// `TSWP.ParagraphStyleArchive.para_properties`.
@@ -546,7 +751,11 @@ pub(super) fn replace_message(
     clippy::too_many_lines,
     reason = "one staged publication: styles, stylesheet, list, cells, registry"
 )]
-fn publish(
+#[allow(
+    dead_code,
+    reason = "replaced by the shared cell_text_style graph publisher during extraction"
+)]
+fn publish_legacy(
     source: &Package,
     sheet: usize,
     table: usize,
