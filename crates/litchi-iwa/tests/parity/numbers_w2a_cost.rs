@@ -15,11 +15,18 @@ use std::time::Duration;
 
 use litchi_core::Position;
 use litchi_iwa::numbers;
-use litchi_iwa::shapes::{DrawablePoint, DrawableSize};
+use litchi_iwa::shapes::{DrawablePoint, DrawableSize, ShapeFill};
+use litchi_iwa_common::color::{RgbColorSpace, Rgba};
 use litchi_iwa_common::media::playback::{MediaLoopMode, MediaPlaybackSettings};
 use litchi_iwa_common::shape::path::Preset;
+use litchi_iwa_common::shape::stroke::{Pattern, Stroke, Width};
+use litchi_iwa_common::text::layout::{AutoSize, Inset, Insets, Layout, VerticalAlignment};
+use litchi_iwa_text::columns::{Columns, Count, Gap};
 use litchi_iwa_text::paragraph::format::Alignment;
 use litchi_numbers::Package;
+use litchi_numbers::sheet::drawable::style::{
+    Effects, Fill, Property as StyleProperty, PropertyKind as StyleKind,
+};
 use litchi_numbers::sheet::drawable::text::Property;
 use litchi_numbers::sheet::drawable::{DrawableSelector, Geometry, Kind, Point, Size};
 
@@ -421,6 +428,205 @@ fn numbers_w2a_route_cost_abba_2() -> TestResult {
         let b1 = black_box(w2a_leaf_route_2(route, &input, selector)?);
         let b2 = black_box(w2a_leaf_route_2(route, &input, selector)?);
         let a2 = black_box(w2a_host_route_2(route, &input, sheet, id)?);
+        assert!(!a1.is_empty() && !a2.is_empty() && !b1.is_empty() && !b2.is_empty());
+    }
+    Ok(())
+}
+
+/// The third W2-A facade slice: Numbers shape fill, stroke, effects and
+/// frame layout, plus text-box columns and frame layout. These probes measure
+/// the complete open/select/read-or-edit/commit/serialize route, not the
+/// shared engine in isolation.
+const ROUTES_3: &[(&str, Kind, usize)] = &[
+    ("shape_style_fill_set", Kind::Shape, 0),
+    ("shape_style_fill_reset", Kind::Shape, 0),
+    ("shape_style_fill_read", Kind::Shape, 0),
+    ("shape_style_stroke_set", Kind::Shape, 0),
+    ("shape_style_stroke_reset", Kind::Shape, 0),
+    ("shape_style_stroke_read", Kind::Shape, 0),
+    ("shape_style_effects_set", Kind::Shape, 0),
+    ("shape_style_effects_reset", Kind::Shape, 0),
+    ("shape_style_effects_read", Kind::Shape, 0),
+    ("shape_style_layout_set", Kind::Shape, 0),
+    ("shape_style_layout_reset", Kind::Shape, 0),
+    ("shape_style_layout_read", Kind::Shape, 0),
+    ("text_box_style_columns_set", Kind::TextBox, 0),
+    ("text_box_style_columns_reset", Kind::TextBox, 0),
+    ("text_box_style_columns_read", Kind::TextBox, 0),
+    ("text_box_style_layout_set", Kind::TextBox, 0),
+    ("text_box_style_layout_reset", Kind::TextBox, 0),
+    ("text_box_style_layout_read", Kind::TextBox, 0),
+];
+
+fn style_color() -> TestResult<Rgba> {
+    Ok(Rgba::new(0.9, 0.3, 0.1, 1.0, RgbColorSpace::Srgb)?)
+}
+
+fn style_layout() -> TestResult<Layout> {
+    Ok(Layout::new(
+        VerticalAlignment::Middle,
+        Insets::new(
+            Inset::from_points(4.0)?,
+            Inset::from_points(6.0)?,
+            Inset::from_points(8.0)?,
+            Inset::from_points(10.0)?,
+        ),
+        AutoSize::ShrinkToFit,
+    ))
+}
+
+fn style_columns() -> TestResult<Columns> {
+    Ok(Columns::equal(
+        Count::new(2)?,
+        Some(Gap::from_points(12.0)?),
+    ))
+}
+
+fn style_effects() -> TestResult<Effects> {
+    Ok(Effects::new(
+        litchi_iwa_common::shape::effects::Opacity::new(0.7)?,
+        litchi_iwa_common::shape::effects::Reflection::Disabled,
+    ))
+}
+
+fn style_stroke() -> TestResult<Stroke> {
+    Ok(Stroke::new(style_color()?, Width::new(3.0)?, Pattern::MediumDash))
+}
+
+#[inline(never)]
+fn w2a_host_route_3(route: &str, source: &[u8], sheet: u64, id: u64) -> TestResult<Vec<u8>> {
+    let mut editor = numbers::Draft::from_bytes(source)?;
+    match route {
+        "shape_style_fill_set" => editor.set_sheet_shape_fill(
+            sheet,
+            id,
+            &ShapeFill::Solid(style_color()?),
+        )?,
+        "shape_style_fill_reset" => drop(editor.reset_sheet_shape_fill(sheet, id)?),
+        "shape_style_fill_read" => drop(editor.sheet_shape_fill(sheet, id)?),
+        "shape_style_stroke_set" => editor.set_sheet_shape_stroke(sheet, id, style_stroke()?)?,
+        "shape_style_stroke_reset" => drop(editor.reset_sheet_shape_stroke(sheet, id)?),
+        "shape_style_stroke_read" => drop(editor.sheet_shape_stroke(sheet, id)?),
+        "shape_style_effects_set" => editor.set_sheet_shape_effects(sheet, id, style_effects()?)?,
+        "shape_style_effects_reset" => drop(editor.reset_sheet_shape_effects(sheet, id)?),
+        "shape_style_effects_read" => drop(editor.sheet_shape_effects(sheet, id)?),
+        "shape_style_layout_set" => editor.set_sheet_shape_text_layout(sheet, id, style_layout()?)?,
+        "shape_style_layout_reset" => drop(editor.reset_sheet_shape_text_layout(sheet, id)?),
+        "shape_style_layout_read" => drop(editor.sheet_shape_text_layout(sheet, id)?),
+        "text_box_style_columns_set" => editor.set_sheet_text_box_columns(sheet, id, &style_columns()?)?,
+        "text_box_style_columns_reset" => drop(editor.reset_sheet_text_box_columns(sheet, id)?),
+        "text_box_style_columns_read" => drop(editor.sheet_text_box_columns(sheet, id)?),
+        "text_box_style_layout_set" => {
+            editor.set_sheet_text_box_text_layout(sheet, id, style_layout()?)?
+        },
+        "text_box_style_layout_reset" => drop(editor.reset_sheet_text_box_text_layout(sheet, id)?),
+        "text_box_style_layout_read" => drop(editor.sheet_text_box_text_layout(sheet, id)?),
+        _ => return Err(format!("unknown route {route}").into()),
+    }
+    Ok(editor.to_bytes()?)
+}
+
+#[inline(never)]
+fn w2a_leaf_route_3(route: &str, source: &[u8], selector: DrawableSelector) -> TestResult<Vec<u8>> {
+    let package = Package::from_bytes(source)?;
+    let output = match route {
+        "shape_style_fill_set" => {
+            let mut edit = package.edit_sheet_drawable_style(0, selector)?;
+            edit.set(StyleProperty::Fill(Fill::Solid(style_color()?)))?;
+            edit.commit()?.into_package()
+        },
+        "shape_style_fill_reset" => {
+            let mut edit = package.edit_sheet_drawable_style(0, selector)?;
+            edit.reset(StyleKind::Fill)?;
+            edit.commit()?.into_package()
+        },
+        "shape_style_fill_read" => {
+            drop(package.sheet_drawable_style(0, selector, StyleKind::Fill)?);
+            package
+        },
+        "shape_style_stroke_set" => {
+            let mut edit = package.edit_sheet_drawable_style(0, selector)?;
+            edit.set(StyleProperty::Stroke(Some(style_stroke()?)))?;
+            edit.commit()?.into_package()
+        },
+        "shape_style_stroke_reset" => {
+            let mut edit = package.edit_sheet_drawable_style(0, selector)?;
+            edit.reset(StyleKind::Stroke)?;
+            edit.commit()?.into_package()
+        },
+        "shape_style_stroke_read" => {
+            drop(package.sheet_drawable_style(0, selector, StyleKind::Stroke)?);
+            package
+        },
+        "shape_style_effects_set" => {
+            let mut edit = package.edit_sheet_drawable_style(0, selector)?;
+            edit.set(StyleProperty::Effects(style_effects()?))?;
+            edit.commit()?.into_package()
+        },
+        "shape_style_effects_reset" => {
+            let mut edit = package.edit_sheet_drawable_style(0, selector)?;
+            edit.reset(StyleKind::Effects)?;
+            edit.commit()?.into_package()
+        },
+        "shape_style_effects_read" => {
+            drop(package.sheet_drawable_style(0, selector, StyleKind::Effects)?);
+            package
+        },
+        "shape_style_layout_set" | "text_box_style_layout_set" => {
+            let mut edit = package.edit_sheet_drawable_style(0, selector)?;
+            edit.set(StyleProperty::TextLayout(style_layout()?))?;
+            edit.commit()?.into_package()
+        },
+        "shape_style_layout_reset" | "text_box_style_layout_reset" => {
+            let mut edit = package.edit_sheet_drawable_style(0, selector)?;
+            edit.reset(StyleKind::TextLayout)?;
+            edit.commit()?.into_package()
+        },
+        "shape_style_layout_read" | "text_box_style_layout_read" => {
+            drop(package.sheet_drawable_style(0, selector, StyleKind::TextLayout)?);
+            package
+        },
+        "text_box_style_columns_set" => {
+            let mut edit = package.edit_sheet_drawable_style(0, selector)?;
+            edit.set(StyleProperty::Columns(style_columns()?))?;
+            edit.commit()?.into_package()
+        },
+        "text_box_style_columns_reset" => {
+            let mut edit = package.edit_sheet_drawable_style(0, selector)?;
+            edit.reset(StyleKind::Columns)?;
+            edit.commit()?.into_package()
+        },
+        "text_box_style_columns_read" => {
+            drop(package.sheet_drawable_style(0, selector, StyleKind::Columns)?);
+            package
+        },
+        _ => return Err(format!("unknown route {route}").into()),
+    };
+    let mut bytes = Vec::new();
+    output.write_to(&mut bytes)?;
+    Ok(bytes)
+}
+
+/// Paired cost probe for the complete third W2-A facade slice. Select one
+/// route with `W2A_ROUTE`; otherwise run every route in a single ABBA pass.
+#[test]
+#[ignore = "performance probe; run explicitly under callgrind"]
+fn numbers_w2a_route_cost_abba_3() -> TestResult {
+    let selected = std::env::var("W2A_ROUTE").ok();
+    let input = authored_fixture()?.bytes;
+    for (route, kind, index) in ROUTES_3 {
+        if selected
+            .as_deref()
+            .is_some_and(|selected| selected != *route)
+        {
+            continue;
+        }
+        let (sheet, id) = host_drawable(&numbers::Draft::from_bytes(&input)?, *kind, *index)?;
+        let selector = DrawableSelector::of(*kind, *index);
+        let a1 = black_box(w2a_host_route_3(route, &input, sheet, id)?);
+        let b1 = black_box(w2a_leaf_route_3(route, &input, selector)?);
+        let b2 = black_box(w2a_leaf_route_3(route, &input, selector)?);
+        let a2 = black_box(w2a_host_route_3(route, &input, sheet, id)?);
         assert!(!a1.is_empty() && !a2.is_empty() && !b1.is_empty() && !b2.is_empty());
     }
     Ok(())

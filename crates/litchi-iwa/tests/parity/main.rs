@@ -71,6 +71,7 @@ mod numbers_owner_allocation;
 mod numbers_text_box_cases;
 mod numbers_text_box_list_cases;
 mod numbers_text_box_named_style_cases;
+mod numbers_shape_style_cases;
 mod numbers_volatile_highlight_cases;
 mod numbers_w2a_cost;
 mod pages_builder_cases;

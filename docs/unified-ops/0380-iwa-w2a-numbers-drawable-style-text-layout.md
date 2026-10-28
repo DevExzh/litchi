@@ -1,0 +1,59 @@
+# 0380 — W2-A Numbers drawable style and text-layout slice
+
+- Status: implementation slice prepared on `uo2/iwa-w2a`; coordinator
+  integration is held until the current integrated 53-row gate completes.
+- Scope: the 18 Numbers host rows for shape fill, stroke, effects and frame
+  text layout, plus text-box columns and frame text layout (set, reset and
+  read). Numbers shadow rows remain excluded because the host does not read a
+  themed Numbers rectangle shadow reliably; endpoints, segments, image fills,
+  presets, lifecycle, catalog, captions, titles and comments remain separate
+  owners.
+- Public destination: `litchi_numbers::sheet::drawable::style`, with
+  selector-first `Package::{sheet_drawable_style,
+  edit_sheet_drawable_style, apply_sheet_drawable_style}` and focused
+  `Edit::{set, reset}`, `Commit`, `Patch`, `Diagnostics`, `Error`, `LimitKind`
+  and `Refusal`. No native object identifiers, archives or protobuf values
+  cross the public boundary.
+
+## Implementation
+
+The facade reuses `litchi_iwa_style::shape::{value,set,reset}` and Numbers'
+existing `package::style_graph::{LeafComponents,publish}`. The adapter resolves
+sheet and drawable selectors through `sheet_drawable_graph`, rejects properties
+that do not apply to the selected shape/text box, refuses image fills, charges
+staged capacity before work, and uses the shared exact-source artifact pair.
+The candidate is reopened through the strict Numbers ingress and every final
+staged property is read back before a commit is returned. Untouched components
+and members remain under the style graph publisher's exact-source locality
+policy; `Patch::inverse()` and patch-source authorization are covered by the
+crate tests.
+
+## Differential proof and evidence boundary
+
+`crates/litchi-iwa/tests/parity/numbers_shape_style_cases.rs` compares host
+routes with the leaf on a source-built `basic.numbers` fixture containing a
+text box and rectangle. Set/allocation cases are Tier B because fresh style
+identities and the save-token policy differ; resets, rewrites and reads are
+declared Tier A where the host and leaf retain the same exact graph. The
+parity cases include inverse restoration and strict leaf reopen. They are
+queued for native open/save/close/reopen evidence in
+`docs/unified-ops/0363-mac-queue.md`; no E3/E4 claim is made by this slice.
+
+The shared parity harness does not include Numbers shadow rows here: a
+host-readable fixture is absent, so those rows stay host-only until an
+Apple-authored fixture and a separate owner decision exist.
+
+## Performance and verification
+
+`numbers_w2a_cost.rs` adds ignored full-facade ABBA probes for all 18 routes.
+The probes measure open, selector resolution, read or edit, commit and
+serialization together. They must be run later in release mode on pinned CPU
+3 under the established callgrind/wall-clock methodology; the target is no
+more than 5% or 20 microseconds slower than the paired host route. No cost
+claim is made here and no raw capture is committed.
+
+Under the coordinator's quiet build hold, the following are intentionally
+pending: formatting, Clippy, unit/integration/parity tests, rustdoc and
+glossary/ledger/boundary gates, fuzz-lock checks, and performance execution.
+The working tree contains no untracked upstream-fixture references, generated
+binaries or large evidence artifacts.
