@@ -1,7 +1,7 @@
 # 0376c — W1-F Numbers formula authoring and cell-writer correctness
 
 - Status: slice complete on `uo2/iwa-w1f`; coordinator trunk
-  `aeac888d5f` is merged at `7477da37b1`, with route-attribution and
+  `6f27c738ad` is merged at `fbb40a9d05`, with route-attribution and
   scratch-probe cleanup at `32afc486de` and `72d414a13a`.
 - Date: 2026-10-28.
 - Scope: Numbers cell writes, formula dependency envelopes, formula-list key
@@ -27,6 +27,8 @@
 | `e8aa7a16a7` | parity admission | narrow the no-cache normalizer to C3's known numeric display-cache bytes and add a neighboring-cell negative control |
 | `bd787a55ce` | evidence correction | preserve the original unknown-field census, document the narrow normalizer/negative control and final per-route cost receipts, and record the scoped gates |
 | `7477da37b1` | branch integration | merge coordinator trunk `aeac888d5f` after the scoped gates |
+| `9c342c394b` | gate receipt | record Clippy, rustdoc, glossary, boundary, no-3rdparty, non-iWork and fuzz-lock results |
+| `fbb40a9d05` | branch integration | merge coordinator trunk `6f27c738ad`; rerun focused parity and ledger validation |
 
 ## 2. Public route and correctness contract
 
@@ -165,10 +167,11 @@ The measured binary is also outside the repository: source commit
 
 ## 6. Verification on the merged candidate
 
-The final WP candidate is `7477da37b1` plus this record-only handoff update.
-The source-sensitive checks below were run on the same branch; the parity,
-ledger, and boundary checks were rerun after the `aeac888d5f` merge. Full
-integrated qualification remains coordinator-owned.
+The final WP candidate is `fbb40a9d05` plus this record-only handoff update.
+The source-sensitive checks below were run on the same branch; the parity and
+ledger checks were rerun after the final `6f27c738ad` merge, and the boundary
+audit passed on the integrated WP candidate. Full integrated qualification
+remains coordinator-owned.
 
 | Command | Result |
 |---|---|
@@ -176,11 +179,11 @@ integrated qualification remains coordinator-owned.
 | `cargo test -p litchi-numbers-wire --lib` | 191 passed |
 | `cargo test -p litchi-numbers --lib table_cell_edit::tests` | 19 passed, 1 intentional ignored |
 | `cargo test -p litchi-numbers --test table_cells` | 17 passed |
-| `cargo test -p litchi-iwa --test parity numbers_formula_author_cases -- --nocapture` | 5 passed, 3 intentional cost probes ignored after `7477da37b1` |
+| `cargo test -p litchi-iwa --test parity numbers_formula_author_cases -- --nocapture` | 5 passed, 3 intentional cost probes ignored after `fbb40a9d05` |
 | `cargo clippy -p litchi-numbers-wire -p litchi-numbers -p litchi-iwa --all-targets -- -D warnings` | pass |
 | `RUSTDOCFLAGS=-Dwarnings cargo doc --no-deps -p litchi-numbers-wire -p litchi-numbers -p litchi-iwa` | pass |
 | `check_api_glossary.py --profile numbers-minimal` and `--profile numbers-full` | pass; 53 transaction families, 53 explicit result contracts |
-| `python3 tools/iwa_exit_ledger.py --check` | pass after `7477da37b1` |
+| `python3 tools/iwa_exit_ledger.py --check` | pass after `fbb40a9d05` |
 | `python3 -m unittest tools.test_no_3rdparty_references` | 4 tests passed |
 | `python3 tools/check_crate_boundaries.py` | pass; 70 packages, 313 declarations, 12 explicit debt items |
 | `python3 tools/non_iwork_gate.py verify` | pass; 47 bulk trees and 43 facade-safe trees |
