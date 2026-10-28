@@ -23,8 +23,9 @@ focused lifecycle APIs: single-table cloning, invalid selector
 transactionality, and same-name scoping. The multi-table formula-bearing sheet
 clone remains host-only because the current leaf transaction refuses that
 source with a typed `FormulaWork` limit; it is not weakened to a literal-cell
-test. Both targets retain exact source/inverse, ordering, semantic readback,
-and reopen checks where supported.
+test. The leaf target adds exact inverse checks; the unchanged host target
+retains its original readback/reopen assertions and makes no new inverse claim.
+Both targets preserve ordering and semantic checks where supported.
 
 The leaf tests use `Expression::number` with `CachedValue::number`, preserving
 formula-plus-cache semantics for the supported duplication families. The
