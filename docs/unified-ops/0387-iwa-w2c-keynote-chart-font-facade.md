@@ -1,7 +1,8 @@
 # 0387 — W2-C Keynote slide-chart font facade
 
 - Status: bounded facade slice on `uo2/iwa-w2c-chart-font`, cut from frozen
-  root `9932c7d0691b2c14bbbd11a2dea7df41f66308b6`. Coordinator integration,
+  root `9932c7d0691b2c14bbbd11a2dea7df41f66308b6`, draft tip
+  `dbfe8cf7f6`. Coordinator integration,
   shared-engine admission review, native evidence and final integrated gates
   remain pending. The six exit-ledger rows intentionally remain `host-only`
   until E's shared contract and the scoped qualification gates are accepted;
@@ -99,9 +100,15 @@ Scoped evidence on the current branch:
 
 | Check | Result |
 |---|---|
-| `cargo fmt --all` | pass after the focused edits |
-| Keynote crate check | pass before the final diagnostics/test additions; rerun required after E's contract lands |
-| six focused Keynote facade parity cases | 6 passed |
+| `cargo fmt --all -- --check` | pass |
+| `cargo check --locked -p litchi-keynote` | pass |
+| strict Clippy (`litchi-keynote`, parity test) | pass; vendor warnings only |
+| seven focused Keynote facade parity/control tests | 7 passed |
+| `python3 tools/check_crate_boundaries.py` | pass; 70 packages, 313 declarations, 12 explicit debt items |
+| `python3 tools/iwa_exit_ledger.py --check` | pass; six chart-font rows intentionally host-only |
+| `RUSTC_BOOTSTRAP=1 python3 tools/check_api_glossary.py --target-dir /tmp/iwa-w2c-glossary-20261028` | pass; 73 profiles, 3,957 banned names, 716 families, 729 result contracts |
+| `RUSTDOCFLAGS=-Dwarnings cargo doc --locked --no-deps -p litchi-keynote` | pass |
+| `python3 -m unittest tools.test_no_3rdparty_references tools.test_iwa_exit_ledger` | 17 passed |
 | no-op, inverse and typed-refusal controls | passed |
 | native evidence / queue | pending; no claim |
 | performance | held for coordinator; no claim |
