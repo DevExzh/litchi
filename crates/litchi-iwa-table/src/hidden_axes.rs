@@ -1487,7 +1487,8 @@ fn raw_u32(source: &[u8]) -> Result<u32, Error> {
 }
 
 /// Confirm that every physically present dependency envelope in the
-/// source-built owner is an empty, known length-delimited envelope.  The Pages
+/// source-built owner is an empty, known length-delimited envelope; the two
+/// spanning envelopes may also record the table's extents.  The Pages
 /// codec already decodes the complete nested closure; this bounded raw pass
 /// preserves the distinction between an empty presence marker and a real
 /// dependency graph without retaining another field vector.
@@ -1530,6 +1531,12 @@ fn validate_empty_formula_owner_dependencies(
                     budget,
                 )?,
                 9 => validate_empty_dependency_children(field.payload(), &[1], budget)?,
+                // A table owner records its table's extents in its spanning
+                // dependency envelopes (`total_range_for_table` and
+                // `body_range_for_table`); native owners and the Numbers
+                // builder store them. Extents carry no dependency and hidden
+                // axes leave the geometry unchanged, so they are admitted.
+                7 | 8 => validate_extent_only_spanning(field.payload(), budget)?,
                 _ if !field.payload().is_empty() => {
                     return Err(Error::Refused(Refusal::UnsupportedDependency));
                 },
@@ -1544,6 +1551,83 @@ fn validate_empty_formula_owner_dependencies(
         .into_iter()
         .any(|number| !dependency_fields[number as usize])
     {
+        return Err(Error::InvalidSource);
+    }
+    Ok(())
+}
+
+/// A `TSCE.SpanningDependenciesExpandedArchive` holding at most the table's
+/// two extents and no spanning reference.
+fn validate_extent_only_spanning(source: &[u8], budget: &mut impl Budget) -> Result<(), Error> {
+    let limits = RawWireLimits::new(
+        budget.wire_limits().max_input_bytes(),
+        budget.remaining_wire_fields().max(1),
+        budget.wire_limits().max_nesting(),
+        source.len().max(1),
+    )
+    .map_err(map_wire_error)?;
+    budget.charge_payload_work(source.len())?;
+    let mut fields = RawWireFields::new(source, limits);
+    let mut seen = [false; 2];
+    let mut max_depth = 0usize;
+    while let Some(field) = fields.next().map_err(map_wire_error)? {
+        max_depth = max_depth.max(
+            field
+                .depth()
+                .checked_add(field.group_depth())
+                .ok_or(Error::InvalidSource)?,
+        );
+        let index = match field.number() {
+            2 => 0,
+            3 => 1,
+            _ => return Err(Error::Refused(Refusal::UnsupportedDependency)),
+        };
+        if seen[index]
+            || field.wire_type() != 2
+            || !field.key_is_canonical()
+            || !field.length_is_canonical()
+        {
+            return Err(Error::Refused(Refusal::UnsupportedDependency));
+        }
+        seen[index] = true;
+        validate_range_coordinate(field.payload(), budget)?;
+    }
+    charge_raw_wire_scan(budget, &fields, max_depth)?;
+    Ok(())
+}
+
+/// A canonical `TSCE.RangeCoordinateArchive`: four varints, each once.
+fn validate_range_coordinate(source: &[u8], budget: &mut impl Budget) -> Result<(), Error> {
+    let limits = RawWireLimits::new(
+        budget.wire_limits().max_input_bytes(),
+        budget.remaining_wire_fields().max(1),
+        budget.wire_limits().max_nesting(),
+        source.len().max(1),
+    )
+    .map_err(map_wire_error)?;
+    budget.charge_payload_work(source.len())?;
+    let mut fields = RawWireFields::new(source, limits);
+    let mut seen = [false; 4];
+    let mut max_depth = 0usize;
+    while let Some(field) = fields.next().map_err(map_wire_error)? {
+        max_depth = max_depth.max(
+            field
+                .depth()
+                .checked_add(field.group_depth())
+                .ok_or(Error::InvalidSource)?,
+        );
+        let number = field.number();
+        if !(1..=4).contains(&number)
+            || field.wire_type() != 0
+            || !field.key_is_canonical()
+            || !field.value_is_canonical()
+            || std::mem::replace(&mut seen[(number - 1) as usize], true)
+        {
+            return Err(Error::InvalidSource);
+        }
+    }
+    charge_raw_wire_scan(budget, &fields, max_depth)?;
+    if seen.contains(&false) {
         return Err(Error::InvalidSource);
     }
     Ok(())
@@ -4089,8 +4173,10 @@ fn same_creation_model_object(
         .message_infos
         .get(selected_message)
         .ok_or(Error::Verification)?;
-    let column_references = [added_object_ids[0]];
-    let row_references = [added_object_ids[1]];
+    // `added_object_ids` follows allocation order: filters, then the column
+    // and row formula owners the model references.
+    let column_references = [added_object_ids[2]];
+    let row_references = [added_object_ids[3]];
     let fields = [
         CanonicalObjectReferenceField {
             path: MODEL_COLUMN_REFERENCE_PATH,
@@ -4734,5 +4820,58 @@ mod reference_inventory_tests {
                 ..
             })
         ));
+    }
+}
+
+#[cfg(test)]
+mod owner_extent_tests {
+    use super::*;
+
+    /// A length-delimited field; every payload here is under 128 bytes.
+    fn field(number: u8, payload: &[u8]) -> Vec<u8> {
+        let length = u8::try_from(payload.len()).expect("short payload");
+        let mut encoded = vec![(number << 3) | 2, length];
+        encoded.extend_from_slice(payload);
+        encoded
+    }
+
+    /// A canonical `TSCE.RangeCoordinateArchive`.
+    fn range(corners: [u8; 4]) -> Vec<u8> {
+        let [left, top, right, bottom] = corners;
+        vec![0x08, left, 0x10, top, 0x18, right, 0x20, bottom]
+    }
+
+    fn validate(envelope: &[u8]) -> Result<(), Error> {
+        let mut budget = WireBudget::new(litchi_iwa_archive::Limits::default())?;
+        validate_extent_only_spanning(envelope, &mut budget)
+    }
+
+    #[test]
+    fn table_and_body_extents_are_admitted() {
+        let total = field(2, &range([0, 0, 3, 5]));
+        let body = field(3, &range([1, 1, 3, 5]));
+        assert_eq!(validate(&[]), Ok(()));
+        assert_eq!(validate(&total), Ok(()));
+        assert_eq!(validate(&body), Ok(()));
+        assert_eq!(validate(&[total, body].concat()), Ok(()));
+    }
+
+    #[test]
+    fn spanning_references_and_repeated_extents_stay_refused() {
+        let refused = Err(Error::Refused(Refusal::UnsupportedDependency));
+        let total = field(2, &range([0, 0, 3, 5]));
+        assert_eq!(validate(&field(1, &[0x0a, 0x00])), refused);
+        assert_eq!(validate(&[total.clone(), total].concat()), refused);
+        assert_eq!(validate(&[0x10, 0x05]), refused);
+    }
+
+    #[test]
+    fn malformed_extents_are_invalid() {
+        let missing_corner = field(2, &[0x08, 0, 0x10, 0, 0x18, 3]);
+        let repeated_corner = field(2, &[0x08, 0, 0x08, 0, 0x18, 3, 0x20, 5]);
+        let noncanonical_value = field(2, &[0x08, 0x80, 0x00, 0x10, 0, 0x18, 3, 0x20, 5]);
+        assert_eq!(validate(&missing_corner), Err(Error::InvalidSource));
+        assert_eq!(validate(&repeated_corner), Err(Error::InvalidSource));
+        assert_eq!(validate(&noncanonical_value), Err(Error::InvalidSource));
     }
 }

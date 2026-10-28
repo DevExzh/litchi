@@ -23360,7 +23360,8 @@
         "litchi_numbers::table::resize",
         "litchi_numbers::table::sort::transaction",
         "litchi_numbers::table::title",
-        "litchi_numbers::table::topology"
+        "litchi_numbers::table::topology",
+        "litchi_numbers::table::hidden_axes::transaction"
       ],
       "immutable_owners": [
         "litchi_numbers::Package",
@@ -23579,6 +23580,10 @@
         {
           "method": "litchi_numbers::Package::apply_table_topology",
           "ok": "litchi_numbers::table::topology::Commit"
+        },
+        {
+          "method": "litchi_numbers::Package::apply_table_hidden_axes",
+          "ok": "litchi_numbers::table::hidden_axes::transaction::Commit"
         }
       ]
     },
@@ -24266,7 +24271,8 @@
         "litchi_numbers::table::resize",
         "litchi_numbers::table::sort::transaction",
         "litchi_numbers::table::title",
-        "litchi_numbers::table::topology"
+        "litchi_numbers::table::topology",
+        "litchi_numbers::table::hidden_axes::transaction"
       ],
       "immutable_owners": [
         "litchi_numbers::Package",
@@ -24485,6 +24491,10 @@
         {
           "method": "litchi_numbers::Package::apply_table_topology",
           "ok": "litchi_numbers::table::topology::Commit"
+        },
+        {
+          "method": "litchi_numbers::Package::apply_table_hidden_axes",
+          "ok": "litchi_numbers::table::hidden_axes::transaction::Commit"
         }
       ]
     },
