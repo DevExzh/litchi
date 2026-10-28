@@ -922,12 +922,13 @@ fn style_is_exclusive(source: &dyn TableSource, style: u64, list: u64) -> Result
             if identifier == style || identifier == list {
                 continue;
             }
-            if object
-                .archive_info
-                .message_infos
-                .iter()
-                .any(|info| info.object_references.contains(&style))
-            {
+            if object.archive_info.message_infos.iter().any(|info| {
+                info.object_references.contains(&style)
+                    || info
+                        .field_infos
+                        .iter()
+                        .any(|field| field.object_references.contains(&style))
+            }) {
                 return Ok(false);
             }
             for message in &object.messages {
