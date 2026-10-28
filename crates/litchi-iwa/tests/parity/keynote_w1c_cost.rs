@@ -71,6 +71,8 @@ const ROUTES: &[(&str, &str)] = &[
         "table_cell_fill",
         "iwork/keynote/slide-table-read-native.key",
     ),
+    ("table_duplicate", "iwork/keynote/table-discovery.key"),
+    ("table_remove", "iwork/keynote/table-discovery.key"),
 ];
 
 fn red() -> TestResult<litchi_iwa_common::color::Rgba> {
@@ -199,6 +201,22 @@ fn w1c_host_route(route: &str, source: &[u8], png: &[u8], id: u64) -> TestResult
                 &litchi_iwa::shapes::ShapeFill::Solid(red()?),
             )?;
         },
+        "table_duplicate" => {
+            let drawable = editor
+                .slide_tables(0)?
+                .first()
+                .ok_or("no slide table")?
+                .drawable_object_id;
+            editor.duplicate_slide_table(0, drawable)?;
+        },
+        "table_remove" => {
+            let drawable = editor
+                .slide_tables(0)?
+                .first()
+                .ok_or("no slide table")?
+                .drawable_object_id;
+            editor.remove_slide_table(0, drawable)?;
+        },
         _ => return Err(format!("unknown route {route}").into()),
     }
     Ok(editor.to_bytes()?)
@@ -247,6 +265,16 @@ fn w1c_leaf_route(route: &str, source: &[u8], png: &[u8], position: usize) -> Te
             edit.set_fill(1, 1, litchi_iwa_common::shape::fill::Fill::Solid(red()?))?;
             edit.commit()?.into_package()
         },
+        "table_duplicate" => package
+            .edit_slide_table_lifecycle()
+            .duplicate(slide, litchi_keynote::slide::table::TableSelector::index(0))?
+            .commit()?
+            .into_package(),
+        "table_remove" => package
+            .edit_slide_table_lifecycle()
+            .remove(slide, litchi_keynote::slide::table::TableSelector::index(0))?
+            .commit()?
+            .into_package(),
         "shape_caption" => package
             .edit_slide_shape_text(
                 slide,
