@@ -6,7 +6,7 @@ use std::hint::black_box;
 
 use litchi_iwa::numbers;
 use litchi_iwa_common::formula::{
-    FormulaBinaryOperator, FormulaCachedValue, FormulaCellReference, FormulaExpression,
+    FiniteF64, FormulaBinaryOperator, FormulaCachedValue, FormulaCellReference, FormulaExpression,
 };
 use litchi_iwa_protos::tst;
 use litchi_numbers::formula::{BinaryOperator, CachedValue, CellReference, Expression};
@@ -40,6 +40,10 @@ fn leaf_expression(formula: Formula) -> TestResult<Expression> {
     )?)
 }
 
+fn tile_decode_error() -> prost::DecodeError {
+    tst::Tile::decode(&[0xff][..]).expect_err("invalid tile bytes must fail")
+}
+
 #[inline(never)]
 fn host_route(source: &[u8], (r, c): (usize, usize), formula: Formula) -> TestResult<Vec<u8>> {
     let mut editor = numbers::Draft::from_bytes(source)?;
@@ -58,19 +62,166 @@ fn host_route(source: &[u8], (r, c): (usize, usize), formula: Formula) -> TestRe
 }
 
 /// The no-cache host setter and the leaf's evaluator intentionally disagree
-/// only in the display cache: the host writes zero until Numbers recalculates,
-/// while the leaf publishes the evaluated scalar. Normalize only the raw BNC
-/// storage bytes in `TST.Tile`; the semantic cell reads below still compare the
-/// authored formula and every selected value.
-fn decode_tile_without_cell_storage(data: &[u8]) -> Result<Decoded, prost::DecodeError> {
+/// only in C3's display cache: the host writes zero until Numbers recalculates,
+/// while the leaf publishes the evaluated scalar. Rewrite only that cell's
+/// known numeric cache bytes in the modern BNC storage buffer. Row buffers,
+/// offsets, pre-BNC bytes, styles, formula keys, and opaque tails remain
+/// untouched.
+fn decode_tile_without_formula_cache(data: &[u8]) -> Result<Decoded, prost::DecodeError> {
     let mut tile = tst::Tile::decode(data)?;
+    let zero =
+        litchi_numbers_wire::CachedScalar::Number(FiniteF64::new(0.0).expect("zero is finite"));
+    let mut matches = 0usize;
     for row in &mut tile.row_infos {
-        row.cell_storage_buffer_pre_bnc.clear();
-        row.cell_offsets_pre_bnc.clear();
-        row.cell_storage_buffer = None;
-        row.cell_offsets = None;
+        if row.tile_row_index != 2 {
+            continue;
+        }
+        let Some(offsets) = row.cell_offsets.as_ref() else {
+            continue;
+        };
+        let column = 2usize;
+        let offset_index = column.checked_mul(2).ok_or_else(tile_decode_error)?;
+        let Some(offset_bytes) = offsets.get(offset_index..offset_index + 2) else {
+            continue;
+        };
+        let offset = u16::from_le_bytes([offset_bytes[0], offset_bytes[1]]);
+        if offset == u16::MAX {
+            continue;
+        }
+        let unit = if row.has_wide_offsets.unwrap_or(false) {
+            4usize
+        } else {
+            1usize
+        };
+        let start = usize::from(offset)
+            .checked_mul(unit)
+            .ok_or_else(tile_decode_error)?;
+        let end = offsets[offset_index + 2..]
+            .chunks_exact(2)
+            .map(|bytes| u16::from_le_bytes([bytes[0], bytes[1]]))
+            .find(|offset| *offset != u16::MAX)
+            .map_or_else(
+                || {
+                    row.cell_storage_buffer
+                        .as_ref()
+                        .map_or(Err(tile_decode_error()), |storage| Ok(storage.len()))
+                },
+                |offset| {
+                    usize::from(offset)
+                        .checked_mul(unit)
+                        .ok_or_else(tile_decode_error)
+                },
+            )?;
+        let cell = row
+            .cell_storage_buffer
+            .as_ref()
+            .ok_or_else(tile_decode_error)?
+            .get(start..end)
+            .ok_or_else(tile_decode_error)?
+            .to_vec();
+        let view =
+            litchi_numbers_wire::BncCellView::parse(&cell, &litchi_numbers_wire::Limits::DEFAULT)
+                .map_err(|_error| tile_decode_error())?;
+        let rewritten = view
+            .rewrite_formula_cache(zero, &litchi_numbers_wire::Limits::DEFAULT)
+            .map_err(|_error| tile_decode_error())?;
+        if rewritten.len() != cell.len() {
+            return Err(tile_decode_error());
+        }
+        row.cell_storage_buffer
+            .as_mut()
+            .ok_or_else(tile_decode_error)?[start..end]
+            .copy_from_slice(&rewritten);
+        matches = matches.checked_add(1).ok_or_else(tile_decode_error)?;
     }
-    Ok(decoded(tile, data))
+    if matches != 1 {
+        return Err(tile_decode_error());
+    }
+    let normalized = tile.encode_to_vec();
+    Ok(decoded(tile, &normalized))
+}
+
+fn tile_payload_with_cell(bytes: &[u8], row: u32, column: u32) -> TestResult<Vec<u8>> {
+    use litchi_numbers_wire::{Limits, table_write};
+
+    let package = litchi_iwa::Package::from_bytes(bytes)?;
+    let names: Vec<String> = package.iwa_entry_names().map(str::to_owned).collect();
+    for name in names {
+        for object in package.archive(&name)?.objects {
+            if let Some(message) = object
+                .messages
+                .iter()
+                .find(|message| message.type_ == 6_002)
+            {
+                if table_write::tile_cell(&message.data, row, column, &Limits::DEFAULT)?.is_some() {
+                    return Ok(message.data.clone());
+                }
+            }
+        }
+    }
+    Err(format!("Numbers output has no TST.Tile cell at {row},{column}").into())
+}
+
+fn rewrite_tile_cell(tile: &[u8], row: u32, column: u32, cell: &[u8]) -> TestResult<Vec<u8>> {
+    let mut model = tst::Tile::decode(tile)?;
+    let column = usize::try_from(column)?;
+    let mut matches = 0usize;
+    for row_info in &mut model.row_infos {
+        if row_info.tile_row_index != row {
+            continue;
+        }
+        let offsets = row_info
+            .cell_offsets
+            .as_ref()
+            .ok_or("target row has no modern offsets")?;
+        let offset_index = column.checked_mul(2).ok_or("cell offset index overflow")?;
+        let offset_bytes = offsets
+            .get(offset_index..offset_index + 2)
+            .ok_or("target column is outside the row offsets")?;
+        let offset = u16::from_le_bytes([offset_bytes[0], offset_bytes[1]]);
+        if offset == u16::MAX {
+            return Err("target cell is not stored".into());
+        }
+        let unit = if row_info.has_wide_offsets.unwrap_or(false) {
+            4usize
+        } else {
+            1usize
+        };
+        let start = usize::from(offset)
+            .checked_mul(unit)
+            .ok_or("cell storage offset overflow")?;
+        let end = offsets[offset_index + 2..]
+            .chunks_exact(2)
+            .map(|bytes| u16::from_le_bytes([bytes[0], bytes[1]]))
+            .find(|offset| *offset != u16::MAX)
+            .map_or_else(
+                || {
+                    row_info
+                        .cell_storage_buffer
+                        .as_ref()
+                        .map(|storage| storage.len())
+                        .ok_or("target row has no modern storage")
+                },
+                |offset| {
+                    usize::from(offset)
+                        .checked_mul(unit)
+                        .ok_or("cell end offset overflow")
+                },
+            )?;
+        if cell.len() != end.saturating_sub(start) {
+            return Err("negative-control cell width changed".into());
+        }
+        row_info
+            .cell_storage_buffer
+            .as_mut()
+            .ok_or("target row has no modern storage")?[start..end]
+            .copy_from_slice(cell);
+        matches = matches.checked_add(1).ok_or("cell match count overflow")?;
+    }
+    if matches != 1 {
+        return Err("expected exactly one target row".into());
+    }
+    Ok(model.encode_to_vec())
 }
 
 fn cell_value_projection(bytes: &[u8], (row, column): (usize, usize)) -> TestResult<String> {
@@ -187,8 +338,8 @@ fn run(name: &'static str, input: &Fixture, cell: (usize, usize), formula: Formu
         case = case.known_fields(|known| {
             known.with(
                 6_002,
-                "TST.Tile (no-cache BNC policy normalized)",
-                decode_tile_without_cell_storage,
+                "TST.Tile (C3 numeric cache policy normalized)",
+                decode_tile_without_formula_cache,
             )
         });
     } else {
@@ -288,6 +439,38 @@ fn numbers_table_formula_author_host_set_formula_policy() -> TestResult {
     }
     if leaf_cache != "Some(Number(FiniteF64(43.0)))" {
         return Err(format!("leaf set_formula cache policy changed: {leaf_cache:?}").into());
+    }
+    Ok(())
+}
+
+/// A negative control for the narrowly scoped cache normalizer: changing the
+/// neighboring B3 cell remains visible in the canonical `TST.Tile` fields.
+#[test]
+fn numbers_table_formula_author_cache_normalizer_negative_control() -> TestResult {
+    use litchi_numbers_wire::{BncCellView, Limits, ScalarValue, table_write};
+
+    let input = fixture("iwork/numbers/basic.numbers")?;
+    let leaf = leaf_route(&input.bytes, (2, 2), AUTHOR)?;
+    let tile = tile_payload_with_cell(&leaf.output, 2, 2)
+        .map_err(|error| format!("select C3 tile: {error}"))?;
+    let baseline = decode_tile_without_formula_cache(&tile)
+        .map_err(|error| format!("normalize baseline: {error}"))?
+        .canonical;
+    let other = table_write::tile_cell(&tile, 2, 1, &Limits::DEFAULT)
+        .map_err(|error| format!("select B3: {error}"))?
+        .ok_or("negative control cell B3 is missing")?;
+    let other_view = BncCellView::parse(&other, &Limits::DEFAULT)
+        .map_err(|error| format!("parse B3: {error}"))?;
+    let changed = other_view
+        .rewrite_scalar(ScalarValue::Number(FiniteF64::new(99.0)?), &Limits::DEFAULT)
+        .map_err(|error| format!("rewrite B3: {error}"))?;
+    let mutated_tile =
+        rewrite_tile_cell(&tile, 2, 1, &changed).map_err(|error| format!("publish B3: {error}"))?;
+    let mutated = decode_tile_without_formula_cache(&mutated_tile)
+        .map_err(|error| format!("normalize mutated tile: {error}"))?
+        .canonical;
+    if mutated == baseline {
+        return Err("cache normalizer hid a mutation in neighboring cell B3".into());
     }
     Ok(())
 }
