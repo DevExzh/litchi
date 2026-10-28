@@ -15,6 +15,7 @@ use litchi_iwa_style::chart_font::{self, Change, ChartFont};
 use litchi_iwa_style::graph::Workspace;
 use litchi_iwa_text::character::TextPointSize;
 use litchi_iwa_text::font::Font;
+use litchi_pages::{BodyChartSelector, Package as PagesPackage};
 
 use crate::chart_style_cases::{Components, Target, input};
 use crate::harness::{Case, Evidence, Format, LeafRun, TestResult, Tier};
@@ -173,6 +174,117 @@ fn georgia() -> TestResult<Change> {
 
 fn size(points: f32) -> TestResult<Change> {
     Ok(Change::Size(TextPointSize::from_points(points)?))
+}
+
+fn pages_leaf_bytes(package: &PagesPackage) -> TestResult<Vec<u8>> {
+    let mut bytes = Vec::new();
+    package.write_to(&mut bytes)?;
+    Ok(bytes)
+}
+
+fn pages_leaf_values(bytes: &[u8]) -> TestResult<(ChartFont, TextPointSize)> {
+    let package = PagesPackage::from_bytes(bytes)?;
+    // The host adds the populated Column2d chart at source position zero.
+    let selector = BodyChartSelector::index(0);
+    Ok((
+        package.body_chart_font(selector)?,
+        package.body_chart_font_size(selector)?,
+    ))
+}
+
+fn pages_facade_source() -> TestResult<Vec<u8>> {
+    let input = input(Format::Pages, Kind::Column2d)?;
+    let source = host_write(&input.fixture.bytes, input.target, input.chart, &avenir()?)?;
+    host_write(&source, input.target, input.chart, &size(17.0)?)
+}
+
+fn facade_georgia() -> TestResult<ChartFont> {
+    Ok(ChartFont {
+        font: Font::named("Georgia")?,
+        bold: false,
+        italic: true,
+    })
+}
+
+#[test]
+fn pages_facade_font_read_populated_host_source() -> TestResult {
+    let source = pages_facade_source()?;
+    let (font, size) = pages_leaf_values(&source)?;
+    assert_eq!(font.font.name(), Some("AvenirNext-DemiBold"));
+    assert!(font.bold);
+    assert_eq!(size.points(), 17.0);
+    Ok(())
+}
+
+#[test]
+fn pages_facade_font_set_reset_inverse_noop() -> TestResult {
+    let source = pages_facade_source()?;
+    let package = PagesPackage::from_bytes(&source)?;
+    let selector = BodyChartSelector::index(0);
+    let wanted = facade_georgia()?;
+    let commit = package
+        .edit_body_chart_font(selector)?
+        .set_font(wanted.clone())?
+        .commit()?;
+    let changed = pages_leaf_bytes(commit.package())?;
+    let (font, size) = pages_leaf_values(&changed)?;
+    assert_eq!(font, wanted);
+    assert_eq!(size.points(), 17.0);
+    let reset = commit
+        .package()
+        .edit_body_chart_font(selector)?
+        .reset_font()?
+        .commit()?;
+    let reset_bytes = pages_leaf_bytes(reset.package())?;
+    assert_eq!(pages_leaf_values(&reset_bytes)?.1.points(), 17.0);
+    let restored = reset
+        .package()
+        .apply_body_chart_font(&reset.patch().inverse())?;
+    assert_eq!(pages_leaf_bytes(restored.package())?, changed);
+    let noop = commit
+        .package()
+        .edit_body_chart_font(selector)?
+        .set_font(wanted)?
+        .commit()?;
+    assert!(noop.patch().is_noop());
+    assert_eq!(pages_leaf_bytes(noop.package())?, changed);
+    Ok(())
+}
+
+#[test]
+fn pages_facade_size_set_reset_inverse_noop() -> TestResult {
+    let source = pages_facade_source()?;
+    let package = PagesPackage::from_bytes(&source)?;
+    let selector = BodyChartSelector::index(0);
+    let wanted = TextPointSize::from_points(23.0)?;
+    let commit = package
+        .edit_body_chart_font_size(selector)?
+        .set_size(wanted)
+        .and_then(|edit| edit.commit())?;
+    let changed = pages_leaf_bytes(commit.package())?;
+    let (font, size) = pages_leaf_values(&changed)?;
+    assert_eq!(font.font.name(), Some("AvenirNext-DemiBold"));
+    assert_eq!(size.points(), 23.0);
+    let reset = commit
+        .package()
+        .edit_body_chart_font_size(selector)?
+        .reset_size()?
+        .commit()?;
+    assert_eq!(
+        pages_leaf_values(&pages_leaf_bytes(reset.package())?)?.0,
+        font
+    );
+    let restored = reset
+        .package()
+        .apply_body_chart_font_size(&reset.patch().inverse())?;
+    assert_eq!(pages_leaf_bytes(restored.package())?, changed);
+    let noop = commit
+        .package()
+        .edit_body_chart_font_size(selector)?
+        .set_size(wanted)
+        .and_then(|edit| edit.commit())?;
+    assert!(noop.patch().is_noop());
+    Ok(())
 }
 
 #[test]
