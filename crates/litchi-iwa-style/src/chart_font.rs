@@ -639,7 +639,7 @@ impl<'w, 's> ParagraphStyles<'w, 's> {
         let _ = budget.parse_fields(payload)?;
         // The text-wire effective-property walk descends through the
         // paragraph-style envelope after the root payload has been checked.
-        budget.max_depth = budget.max_depth.max(2);
+        budget.max_depth = budget.max_depth.max(3);
         let _ = identifier;
         Ok(())
     }
