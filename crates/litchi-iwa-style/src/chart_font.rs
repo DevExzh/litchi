@@ -271,10 +271,10 @@ pub enum Error {
     IdentifierOverflow,
 }
 
-    /// Bounded accounting for one chart-font operation. Scratch is a
-    /// conservative parser-buffer admission bound; retained bytes count
-    /// owned candidate/output buffers, while wire fields and output bytes are
-    /// operation totals.
+/// Bounded accounting for one chart-font operation. Scratch is a
+/// conservative parser-buffer admission bound; retained bytes count
+/// owned candidate/output buffers, while wire fields and output bytes are
+/// operation totals.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Report {
     input_bytes: usize,
@@ -494,6 +494,14 @@ impl Budget {
             self.limits.max_work_bytes(),
             self.work_bytes,
         )?;
+        if work < 200_000 {
+            eprintln!(
+                "chart-font budget work used={} max={} residual={}",
+                self.work_bytes,
+                self.limits.max_work_bytes(),
+                work
+            );
+        }
         if self.max_depth > self.limits.max_nesting() {
             return Err(Self::limit(
                 LimitKind::Nesting,
@@ -509,7 +517,7 @@ impl Budget {
             .and_then(|limits| limits.with_fields(fields))
             .and_then(|limits| limits.with_output_bytes(output))
             .and_then(|limits| limits.with_nesting(self.limits.max_nesting() as usize))
-            .and_then(|limits| limits.with_rewrite_work(work))
+            .and_then(|limits| limits.with_rewrite_work(work.min(WireLimits::MAX_REWRITE_WORK)))
             .map_err(map_wire_error)
     }
 
@@ -524,6 +532,48 @@ impl Budget {
             .with_max_bytes(bytes)
             .and_then(|limits| limits.with_max_fields(fields))
             .map_err(map_codec_error)
+    }
+
+    fn registration_limits(self) -> Result<shape::RegistrationLimits, Error> {
+        Ok(shape::RegistrationLimits {
+            max_input_bytes: self.remaining(
+                LimitKind::InputBytes,
+                self.limits.max_input_bytes(),
+                self.input_bytes,
+            )?,
+            max_fields: self.remaining(LimitKind::Fields, self.limits.max_fields(), self.fields)?,
+            max_output_bytes: self.remaining(
+                LimitKind::OutputBytes,
+                self.limits.max_output_bytes(),
+                self.output_bytes,
+            )?,
+            max_work_bytes: self.remaining(
+                LimitKind::Work,
+                self.limits.max_work_bytes(),
+                self.work_bytes,
+            )?,
+            max_allocations: self.remaining(
+                LimitKind::Allocations,
+                self.limits.max_allocations(),
+                self.allocations,
+            )?,
+            max_scratch_bytes: self.remaining(
+                LimitKind::ScratchBytes,
+                self.limits.max_scratch_bytes(),
+                self.scratch_bytes,
+            )?,
+        })
+    }
+
+    fn charge_registration(&mut self, report: shape::RegistrationReport) -> Result<()> {
+        self.source(report.input_bytes)?;
+        self.fields(report.fields)?;
+        self.work(report.work_bytes)?;
+        self.allocation(report.allocations)?;
+        self.scratch(report.scratch_bytes)?;
+        self.reserve_output(report.output_bytes)?;
+        self.finish_output(report.output_bytes);
+        Ok(())
     }
 
     fn remaining(self, kind: LimitKind, maximum: usize, used: usize) -> Result<usize, Error> {
@@ -565,13 +615,15 @@ impl Budget {
         })
         .map_err(map_wire_error)?;
         self.fields(field_count)?;
-        let field_storage = field_count.checked_mul(size_of::<WireField>()).ok_or_else(|| {
-            Self::limit(
-                LimitKind::ScratchBytes,
-                usize::MAX,
-                self.limits.max_scratch_bytes(),
-            )
-        })?;
+        let field_storage = field_count
+            .checked_mul(size_of::<WireField>())
+            .ok_or_else(|| {
+                Self::limit(
+                    LimitKind::ScratchBytes,
+                    usize::MAX,
+                    self.limits.max_scratch_bytes(),
+                )
+            })?;
         self.scratch(field_storage)?;
         self.allocation(1)?;
         self.work(source.len().checked_add(field_count).ok_or_else(|| {
@@ -636,7 +688,16 @@ impl<'w, 's> ParagraphStyles<'w, 's> {
         // The paragraph-style reader may materialize a validated font name;
         // admit one semantic value before delegating to the text-wire codec.
         budget.allocation(1)?;
-        let _ = budget.parse_fields(payload)?;
+        let wire_limits = budget.wire_limits()?;
+        let mut fields = 0usize;
+        wire::visit_wire_fields(payload, wire_limits, |_field| {
+            fields = fields.saturating_add(1);
+            Ok(())
+        })
+        .map_err(map_wire_error)?;
+        budget.source(payload.len())?;
+        budget.fields(fields)?;
+        budget.work(fields)?;
         // The text-wire effective-property walk descends through the
         // paragraph-style envelope after the root payload has been checked.
         budget.max_depth = budget.max_depth.max(3);
@@ -1318,18 +1379,15 @@ fn insert(
         STYLESHEET_MESSAGE_TYPE,
         "a stylesheet must have exactly one payload",
     )?;
-    budget.source(sheet.len())?;
-    budget.work(sheet.len())?;
-    budget.reserve_output(
-        sheet
-            .len()
-            .saturating_add(addition.variation.payload().len())
-            .saturating_add(64),
-    )?;
-    budget.allocation(1)?;
-    budget.scratch(sheet.len().saturating_add(64))?;
-    let data = shape::stylesheet_with_variation(sheet, addition.parent, addition.identifier)?;
-    budget.finish_output(data.len());
+    let registration_limits = budget.registration_limits()?;
+    let (data, registration_report) = shape::stylesheet_with_variation_bounded(
+        sheet,
+        addition.parent,
+        addition.identifier,
+        registration_limits,
+    )
+    .map_err(map_graph_error)?;
+    budget.charge_registration(registration_report)?;
     workspace.replace_payload(addition.stylesheet, message, data)?;
     let info = workspace
         .object_mut(addition.stylesheet)?
@@ -1485,13 +1543,11 @@ fn prune(
             STYLESHEET_MESSAGE_TYPE,
             "a stylesheet must have exactly one payload",
         )?;
-        budget.source(sheet.len())?;
-        budget.work(sheet.len())?;
-        budget.reserve_output(sheet.len().saturating_add(64))?;
-        budget.allocation(1)?;
-        budget.scratch(sheet.len().saturating_add(64))?;
-        let data = shape::stylesheet_without_variation(sheet, parent, style)?;
-        budget.finish_output(data.len());
+        let registration_limits = budget.registration_limits()?;
+        let (data, registration_report) =
+            shape::stylesheet_without_variation_bounded(sheet, parent, style, registration_limits)
+                .map_err(map_graph_error)?;
+        budget.charge_registration(registration_report)?;
         workspace.replace_payload(stylesheet, message, data)?;
         let info = workspace
             .object_mut(stylesheet)?

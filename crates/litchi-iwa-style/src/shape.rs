@@ -40,6 +40,7 @@
 //! families' own values.
 
 use std::collections::{BTreeMap, HashSet};
+use std::mem::size_of;
 
 use litchi_iwa_common::wire;
 use litchi_iwa_core::{ArchiveObject, RawMessage};
@@ -73,6 +74,387 @@ const HEAD_LINE_END: u32 = 6;
 const TAIL_LINE_END: u32 = 7;
 const SHAPE_PROPERTY_FIELDS: std::ops::RangeInclusive<u32> = 1..=7;
 const TEXT_PROPERTY_FIELDS: std::ops::RangeInclusive<u32> = 1..=6;
+
+/// Residual resources admitted by one stylesheet registration transition.
+///
+/// This is crate-private because format owners consume the shared graph
+/// engine rather than exposing a second public stylesheet API. The helper
+/// keeps the existing shape byte-rewrite path, but all nested scans,
+/// fallible-vector capacity and candidate output are admitted first.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct RegistrationLimits {
+    pub(crate) max_input_bytes: usize,
+    pub(crate) max_fields: usize,
+    pub(crate) max_output_bytes: usize,
+    pub(crate) max_work_bytes: usize,
+    pub(crate) max_allocations: usize,
+    pub(crate) max_scratch_bytes: usize,
+}
+
+#[cfg(test)]
+mod registration_tests {
+    use super::{
+        RegistrationLimits, stylesheet_with_variation_bounded, stylesheet_without_variation_bounded,
+    };
+    use crate::graph::push_message_field;
+
+    fn reference(identifier: u64) -> Vec<u8> {
+        let mut output = Vec::new();
+        crate::graph::push_varint_field(&mut output, 1, identifier);
+        output
+    }
+
+    fn stylesheet() -> Vec<u8> {
+        let mut output = Vec::new();
+        push_message_field(&mut output, 1, &reference(11));
+        push_message_field(&mut output, 1, &reference(12));
+        let mut children = Vec::new();
+        push_message_field(&mut children, 1, &reference(10));
+        push_message_field(&mut children, 2, &reference(11));
+        push_message_field(&mut children, 2, &reference(12));
+        push_message_field(&mut output, 5, &children);
+        crate::graph::push_varint_field(&mut output, 99, 7);
+        output
+    }
+
+    fn limits() -> RegistrationLimits {
+        RegistrationLimits {
+            max_input_bytes: 4096,
+            max_fields: 4096,
+            max_output_bytes: 4096,
+            max_work_bytes: 32_768,
+            max_allocations: 4096,
+            max_scratch_bytes: 32_768,
+        }
+    }
+
+    #[test]
+    fn bounded_registration_preserves_unknowns_and_multiple_children() {
+        let source = stylesheet();
+        let (registered, report) = stylesheet_with_variation_bounded(&source, 10, 13, limits())
+            .expect("bounded registration");
+        assert!(registered.windows(2).any(|window| window == [0x98, 0x06]));
+        assert!(report.fields > 5);
+        assert!(report.allocations > 1);
+        let (restored, removal) =
+            stylesheet_without_variation_bounded(&registered, 10, 13, limits())
+                .expect("bounded unregistration");
+        assert_eq!(restored, source);
+        assert!(removal.allocations > 1);
+    }
+
+    #[test]
+    fn bounded_registration_refuses_each_zero_dimension_before_rewrite() {
+        let source = stylesheet();
+        for mutate in [
+            |limits: &mut RegistrationLimits| limits.max_fields = 0,
+            |limits: &mut RegistrationLimits| limits.max_work_bytes = 0,
+            |limits: &mut RegistrationLimits| limits.max_allocations = 0,
+            |limits: &mut RegistrationLimits| limits.max_scratch_bytes = 0,
+        ] {
+            let mut limited = limits();
+            mutate(&mut limited);
+            assert!(stylesheet_with_variation_bounded(&source, 10, 13, limited).is_err());
+        }
+    }
+}
+
+/// Bounded work consumed by one stylesheet registration transition.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct RegistrationReport {
+    pub(crate) input_bytes: usize,
+    pub(crate) output_bytes: usize,
+    pub(crate) fields: usize,
+    pub(crate) work_bytes: usize,
+    pub(crate) allocations: usize,
+    pub(crate) scratch_bytes: usize,
+}
+
+impl RegistrationLimits {
+    pub(crate) const PERMISSIVE: Self = Self {
+        max_input_bytes: litchi_iwa_common::WireLimits::MAX_INPUT_BYTES,
+        max_fields: litchi_iwa_common::WireLimits::MAX_FIELDS,
+        max_output_bytes: litchi_iwa_common::WireLimits::MAX_OUTPUT_BYTES,
+        max_work_bytes: litchi_iwa_common::WireLimits::MAX_REWRITE_WORK,
+        max_allocations: usize::MAX,
+        max_scratch_bytes: litchi_iwa_common::WireLimits::MAX_INPUT_BYTES,
+    };
+}
+
+#[derive(Debug, Clone, Copy)]
+struct RegistrationScan {
+    input_bytes: usize,
+    fields: usize,
+    work_bytes: usize,
+    allocations: usize,
+    scratch_bytes: usize,
+    repeated_styles: usize,
+    repeated_parent_children: usize,
+    repeated_children: usize,
+    copied_bytes: usize,
+}
+
+impl RegistrationScan {
+    const fn empty() -> Self {
+        Self {
+            input_bytes: 0,
+            fields: 0,
+            work_bytes: 0,
+            allocations: 0,
+            scratch_bytes: 0,
+            repeated_styles: 0,
+            repeated_parent_children: 0,
+            repeated_children: 0,
+            copied_bytes: 0,
+        }
+    }
+}
+
+fn registration_limit(
+    kind: litchi_iwa_common::LimitKind,
+    observed: usize,
+    maximum: usize,
+) -> Error {
+    Error::Wire(litchi_iwa_common::Error::LimitExceeded {
+        kind,
+        observed,
+        limit: maximum,
+    })
+}
+
+fn registration_add(
+    current: &mut usize,
+    amount: usize,
+    maximum: usize,
+    kind: litchi_iwa_common::LimitKind,
+) -> Result<()> {
+    let observed = current
+        .checked_add(amount)
+        .ok_or_else(|| registration_limit(kind, usize::MAX, maximum))?;
+    if observed > maximum {
+        return Err(registration_limit(kind, observed, maximum));
+    }
+    *current = observed;
+    Ok(())
+}
+
+fn registration_wire_limits(limits: RegistrationLimits) -> Result<litchi_iwa_common::WireLimits> {
+    if limits.max_input_bytes == 0 {
+        return Err(registration_limit(
+            litchi_iwa_common::LimitKind::InputBytes,
+            1,
+            0,
+        ));
+    }
+    if limits.max_fields == 0 {
+        return Err(registration_limit(
+            litchi_iwa_common::LimitKind::Fields,
+            1,
+            0,
+        ));
+    }
+    if limits.max_work_bytes == 0 {
+        return Err(registration_limit(
+            litchi_iwa_common::LimitKind::RewriteWork,
+            1,
+            0,
+        ));
+    }
+    litchi_iwa_common::WireLimits::DEFAULT
+        .with_input_bytes(limits.max_input_bytes)
+        .and_then(|value| value.with_fields(limits.max_fields))
+        .and_then(|value| {
+            value.with_rewrite_work(
+                limits
+                    .max_work_bytes
+                    .min(litchi_iwa_common::WireLimits::MAX_REWRITE_WORK),
+            )
+        })
+        .map_err(Error::Wire)
+}
+
+fn registration_fields(
+    data: &[u8],
+    limits: RegistrationLimits,
+    scan: &mut RegistrationScan,
+) -> Result<Vec<wire::WireField>> {
+    let wire_limits = registration_wire_limits(limits)?;
+    registration_add(
+        &mut scan.scratch_bytes,
+        size_of::<wire::WireField>(),
+        limits.max_scratch_bytes,
+        litchi_iwa_common::LimitKind::RewriteWork,
+    )?;
+    registration_add(
+        &mut scan.allocations,
+        1,
+        limits.max_allocations,
+        litchi_iwa_common::LimitKind::RewriteWork,
+    )?;
+    let mut field_count = 0usize;
+    wire::visit_wire_fields(data, wire_limits, |_field| {
+        field_count = field_count.saturating_add(1);
+        Ok(())
+    })
+    .map_err(Error::Wire)?;
+    registration_add(
+        &mut scan.input_bytes,
+        data.len(),
+        limits.max_input_bytes,
+        litchi_iwa_common::LimitKind::InputBytes,
+    )?;
+    registration_add(
+        &mut scan.fields,
+        field_count,
+        limits.max_fields,
+        litchi_iwa_common::LimitKind::Fields,
+    )?;
+    let field_storage = field_count
+        .checked_mul(size_of::<wire::WireField>())
+        .ok_or_else(|| {
+            registration_limit(
+                litchi_iwa_common::LimitKind::RewriteWork,
+                usize::MAX,
+                limits.max_work_bytes,
+            )
+        })?;
+    registration_add(
+        &mut scan.scratch_bytes,
+        field_storage,
+        limits.max_scratch_bytes,
+        litchi_iwa_common::LimitKind::RewriteWork,
+    )?;
+    registration_add(
+        &mut scan.allocations,
+        1,
+        limits.max_allocations,
+        litchi_iwa_common::LimitKind::RewriteWork,
+    )?;
+    wire::parse_wire_fields(data, wire_limits).map_err(Error::Wire)
+}
+
+fn scan_reference(
+    data: &[u8],
+    limits: RegistrationLimits,
+    scan: &mut RegistrationScan,
+) -> Result<()> {
+    let fields = registration_fields(data, limits, scan)?;
+    for field in fields {
+        if field.number() != REFERENCE_IDENTIFIER || field.wire_type() != 0 {
+            continue;
+        }
+        scan.copied_bytes = scan
+            .copied_bytes
+            .saturating_add(field.end() - field.start());
+    }
+    Ok(())
+}
+
+fn scan_stylesheet(stylesheet: &[u8], limits: RegistrationLimits) -> Result<RegistrationScan> {
+    let mut scan = RegistrationScan::empty();
+    let fields = registration_fields(stylesheet, limits, &mut scan)?;
+    for field in fields {
+        if field.wire_type() != 2
+            || !matches!(
+                field.number(),
+                STYLESHEET_STYLES | STYLESHEET_PARENT_CHILDREN
+            )
+        {
+            continue;
+        }
+        let payload = field.payload(stylesheet).map_err(Error::Wire)?;
+        if field.number() == STYLESHEET_STYLES {
+            scan.repeated_styles = scan.repeated_styles.saturating_add(1);
+            scan_reference(payload, limits, &mut scan)?;
+        } else {
+            scan.repeated_parent_children = scan.repeated_parent_children.saturating_add(1);
+            let children = registration_fields(payload, limits, &mut scan)?;
+            for child in children {
+                if child.number() != CHILDREN || child.wire_type() != 2 {
+                    continue;
+                }
+                scan.repeated_children = scan.repeated_children.saturating_add(1);
+                scan_reference(
+                    child.payload(payload).map_err(Error::Wire)?,
+                    limits,
+                    &mut scan,
+                )?;
+            }
+        }
+    }
+    Ok(scan)
+}
+
+fn finish_registration(
+    mut scan: RegistrationScan,
+    stylesheet: &[u8],
+    limits: RegistrationLimits,
+) -> Result<(RegistrationScan, usize)> {
+    let copied = scan
+        .copied_bytes
+        .saturating_add(stylesheet.len())
+        .saturating_add(
+            scan.repeated_styles
+                .saturating_add(scan.repeated_parent_children)
+                .saturating_add(scan.repeated_children)
+                .saturating_mul(size_of::<usize>()),
+        );
+    scan.copied_bytes = copied;
+    let output_bound = stylesheet.len().saturating_add(copied).saturating_add(128);
+    registration_add(
+        &mut scan.scratch_bytes,
+        copied,
+        limits.max_scratch_bytes,
+        litchi_iwa_common::LimitKind::RewriteWork,
+    )?;
+    registration_add(
+        &mut scan.allocations,
+        scan.repeated_styles
+            .saturating_add(scan.repeated_parent_children)
+            .saturating_add(scan.repeated_children)
+            .saturating_add(4),
+        limits.max_allocations,
+        litchi_iwa_common::LimitKind::RewriteWork,
+    )?;
+    if output_bound > limits.max_output_bytes {
+        return Err(registration_limit(
+            litchi_iwa_common::LimitKind::OutputBytes,
+            output_bound,
+            limits.max_output_bytes,
+        ));
+    }
+    Ok((scan, output_bound))
+}
+
+/// Bounded stylesheet registration used by shape and chart-font owners.
+pub(crate) fn stylesheet_with_variation_bounded(
+    stylesheet: &[u8],
+    parent: u64,
+    style: u64,
+    limits: RegistrationLimits,
+) -> Result<(Vec<u8>, RegistrationReport)> {
+    let (scan, _) = finish_registration(scan_stylesheet(stylesheet, limits)?, stylesheet, limits)?;
+    let output = stylesheet_with_variation_unbounded(stylesheet, parent, style)?;
+    let output_bytes = output.len();
+    if output_bytes > limits.max_output_bytes {
+        return Err(registration_limit(
+            litchi_iwa_common::LimitKind::OutputBytes,
+            output_bytes,
+            limits.max_output_bytes,
+        ));
+    }
+    Ok((
+        output,
+        RegistrationReport {
+            input_bytes: scan.input_bytes,
+            output_bytes,
+            fields: scan.fields,
+            work_bytes: scan.work_bytes,
+            allocations: scan.allocations,
+            scratch_bytes: scan.scratch_bytes,
+        },
+    ))
+}
 
 /// One drawing property of `TSD.ShapeStylePropertiesArchive`.
 pub trait ShapeProperty {
@@ -803,7 +1185,11 @@ pub fn repoint(shape_info: &[u8], from: u64, to: u64) -> Result<Vec<u8>> {
 ///
 /// A malformed stylesheet, one that already registers `style` or repeats
 /// `parent`.
-pub fn stylesheet_with_variation(stylesheet: &[u8], parent: u64, style: u64) -> Result<Vec<u8>> {
+fn stylesheet_with_variation_unbounded(
+    stylesheet: &[u8],
+    parent: u64,
+    style: u64,
+) -> Result<Vec<u8>> {
     let mut children_ids = Vec::new();
     for entry in graph::repeated(stylesheet, STYLESHEET_PARENT_CHILDREN)? {
         children_ids.extend(style_ids(entry, CHILDREN)?);
@@ -849,6 +1235,12 @@ pub fn stylesheet_with_variation(stylesheet: &[u8], parent: u64, style: u64) -> 
     )?)
 }
 
+/// Register one stylesheet variation under an explicit residual budget.
+pub fn stylesheet_with_variation(stylesheet: &[u8], parent: u64, style: u64) -> Result<Vec<u8>> {
+    stylesheet_with_variation_bounded(stylesheet, parent, style, RegistrationLimits::PERMISSIVE)
+        .map(|(output, _report)| output)
+}
+
 /// Unregister `style` (a child of `parent`) from a `TSS.StylesheetArchive`
 /// payload; a children entry left empty is dropped. The stylesheet
 /// message's metadata loses `style` as an object reference.
@@ -857,7 +1249,11 @@ pub fn stylesheet_with_variation(stylesheet: &[u8], parent: u64, style: u64) -> 
 ///
 /// A stylesheet that does not register `style` exactly once under
 /// `parent`.
-pub fn stylesheet_without_variation(stylesheet: &[u8], parent: u64, style: u64) -> Result<Vec<u8>> {
+fn stylesheet_without_variation_unbounded(
+    stylesheet: &[u8],
+    parent: u64,
+    style: u64,
+) -> Result<Vec<u8>> {
     let mut kept = Vec::new();
     let mut listed = 0usize;
     for entry in graph::repeated(stylesheet, STYLESHEET_STYLES)? {
@@ -911,6 +1307,41 @@ pub fn stylesheet_without_variation(stylesheet: &[u8], parent: u64, style: u64) 
         STYLESHEET_PARENT_CHILDREN,
         &entries,
     )?)
+}
+
+/// Unregister one stylesheet variation under an explicit residual budget.
+pub(crate) fn stylesheet_without_variation_bounded(
+    stylesheet: &[u8],
+    parent: u64,
+    style: u64,
+    limits: RegistrationLimits,
+) -> Result<(Vec<u8>, RegistrationReport)> {
+    let (scan, _) = finish_registration(scan_stylesheet(stylesheet, limits)?, stylesheet, limits)?;
+    let output = stylesheet_without_variation_unbounded(stylesheet, parent, style)?;
+    let output_bytes = output.len();
+    if output_bytes > limits.max_output_bytes {
+        return Err(registration_limit(
+            litchi_iwa_common::LimitKind::OutputBytes,
+            output_bytes,
+            limits.max_output_bytes,
+        ));
+    }
+    Ok((
+        output,
+        RegistrationReport {
+            input_bytes: scan.input_bytes,
+            output_bytes,
+            fields: scan.fields,
+            work_bytes: scan.work_bytes,
+            allocations: scan.allocations,
+            scratch_bytes: scan.scratch_bytes,
+        },
+    ))
+}
+
+pub fn stylesheet_without_variation(stylesheet: &[u8], parent: u64, style: u64) -> Result<Vec<u8>> {
+    stylesheet_without_variation_bounded(stylesheet, parent, style, RegistrationLimits::PERMISSIVE)
+        .map(|(output, _report)| output)
 }
 
 fn shape_style_reference(workspace: &Workspace<'_>, drawable: u64) -> Result<(usize, u64)> {
