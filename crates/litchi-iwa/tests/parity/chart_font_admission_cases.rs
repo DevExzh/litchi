@@ -6,6 +6,7 @@
 //! W1-E owner repairs the shared implementation.
 
 use litchi_iwa_archive::iwa::Limits as CoreLimits;
+use litchi_iwa_common::WireLimits;
 use litchi_iwa_common::chart::kind::Kind;
 use litchi_iwa_common::wire;
 use litchi_iwa_protos::chart_style_codec::{self as chart_codec, Limits as ChartCodecLimits};
@@ -88,21 +89,25 @@ fn paragraph_reference_count(parts: &Parts) -> TestResult<usize> {
 
 fn base_limits(parts: &Parts) -> Limits {
     let package_bytes = parts.source.len();
-    // Explicit finite profile for the tracked host-built chart-data fixture.
-    // Package extent is the byte ceiling for source/candidate/scratch buffers;
-    // the 1 MiB work ceiling covers the complete parsed Numbers archive walk
-    // measured by this fixture's graph. These are test caller limits, not a
-    // production default or a `for_source` heuristic.
+    // Explicit finite whole-graph profile for the tracked host-built fixture.
+    // Eight bounded revisit passes cover validation, ownership, writer
+    // pre-admission, candidate work and readback; work allows eight field/work
+    // units per scanned byte. This is a fixture caller profile, not a
+    // production default or a test-specific observed-value adjustment.
+    const REVISIT_PASSES: usize = 8;
+    let scanned_extent = package_bytes.saturating_mul(REVISIT_PASSES);
     Limits::new(
-        package_bytes,
-        4 * 1024,
-        package_bytes,
+        scanned_extent,
+        scanned_extent.min(WireLimits::MAX_FIELDS),
+        scanned_extent,
         8,
-        1_000_000,
+        scanned_extent
+            .saturating_mul(8)
+            .min(WireLimits::MAX_REWRITE_WORK),
         4 * 1024,
-        4 * 1024,
-        package_bytes,
-        package_bytes,
+        scanned_extent,
+        scanned_extent,
+        scanned_extent,
     )
 }
 
