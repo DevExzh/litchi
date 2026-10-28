@@ -481,12 +481,11 @@ fn pages_body_table_reads_parity() -> TestResult {
     Ok(())
 }
 
-#[test]
-fn pages_body_table_comment_replies_read_parity() -> TestResult {
+fn pages_body_table_comment_read_case(name: &'static str) -> TestResult {
     let input = fixture(COMMENTS)?;
     assert_populated_comment_semantics(&input.bytes)?;
     Case::new(
-        "pages_body_table_comment_replies_read_parity",
+        name,
         Format::Pages,
         Tier::A,
         Evidence::Queued,
@@ -505,6 +504,16 @@ fn pages_body_table_comment_replies_read_parity() -> TestResult {
     )
     .run()?;
     Ok(())
+}
+
+#[test]
+fn pages_body_table_comment_read_parity() -> TestResult {
+    pages_body_table_comment_read_case("pages_body_table_comment_read_parity")
+}
+
+#[test]
+fn pages_body_table_comment_replies_read_parity() -> TestResult {
+    pages_body_table_comment_read_case("pages_body_table_comment_replies_read_parity")
 }
 
 #[test]

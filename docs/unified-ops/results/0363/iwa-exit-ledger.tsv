@@ -794,9 +794,10 @@ numbers/editor/semantic/media.rs	save	1	numbers	io	host-only	litchi-numbers	-	-	
 numbers/editor/semantic/media.rs	sheet_media_assets	1	numbers	media.asset	migrated	litchi_numbers::Package::sheet_media_assets	numbers_media_assets_read_parity	A	-	-
 numbers/editor/semantic/media.rs	to_bytes	1	numbers	io	host-only	litchi-numbers	-	-	-	-
 numbers/editor/semantic/table.rs	add_cell_comment_reply	1	numbers	table.cell_comment	host-only	-	-	-	-	root-only shared slice; reply-thread lifecycle remains deferred
+numbers/editor/semantic/table.rs	__parity_clear_table_cell_comment_legacy	1	numbers	table.cell_comment	retired	-	-	-	-	parity-only hidden legacy host oracle, not a supported Numbers API; removed with the differential host harness in W3
 numbers/editor/semantic/table.rs	__parity_read_table_cell_comment	1	numbers	table.cell_comment	retired	-	-	-	-	parity-only hidden selector witness, not a supported Numbers API; removed with the differential host harness in W3
 numbers/editor/semantic/table.rs	__parity_set_table_cell_comment_legacy	1	numbers	table.cell_comment	retired	-	-	-	-	parity-only hidden legacy host oracle, not a supported Numbers API; removed with the differential host harness in W3
-numbers/editor/semantic/table.rs	cell_comment_replies	1	numbers	table.cell_comment	migrated	litchi_numbers::Package::table_cell_comment_replies	numbers_table_cell_comment_replies_read_parity	A	-	-
+numbers/editor/semantic/table.rs	cell_comment_replies	1	numbers	table.cell_comment	migrated	litchi_numbers::Package::table_cell_comment_replies	numbers_table_cell_comment_replies_read_parity,numbers_table_cell_comment_replies_semantic_parity	A	-	-
 numbers/editor/semantic/table.rs	cell_conditional_highlight_rules	1	numbers	table.conditional_highlight	migrated	litchi_numbers::Package::table_cell_conditional_highlight	numbers_conditional_highlight_read_parity	A	-	-
 numbers/editor/semantic/table.rs	cell_conditional_highlighting	1	numbers	table.conditional_highlight	migrated	litchi_numbers::Package::table_cell_conditional_highlight	numbers_conditional_highlight_read_parity	A	-	-
 numbers/editor/semantic/table.rs	clear_cell_conditional_highlighting	1	numbers	table.conditional_highlight	migrated	litchi_numbers::Package::edit_table_cell_conditional_highlights	numbers_conditional_highlight_clear_parity	B	-	-
@@ -1881,8 +1882,8 @@ pages/editor/tables/comments.rs	clear_table_cell_comment	1	pages	table.cell_comm
 pages/editor/tables/comments.rs	remove_table_cell_comment_reply	1	pages	table.cell_comment	host-only	-	-	-	-	root-only shared slice; reply-thread lifecycle remains deferred
 pages/editor/tables/comments.rs	set_table_cell_comment	1	pages	table.cell_comment	host-only	-	-	-	-	root replacement with replies remains deferred; no full host coverage claim
 pages/editor/tables/comments.rs	set_table_cell_comment_reply	1	pages	table.cell_comment	host-only	-	-	-	-	root-only shared slice; reply-thread lifecycle remains deferred
-pages/editor/tables/comments.rs	table_cell_comment	1	pages	table.cell_comment	migrated	litchi_pages::Package::body_table_cells	pages_body_table_reads_parity	A	test-data/iwork/pages/body-table-cells-native-receipt.json	-
-pages/editor/tables/comments.rs	table_cell_comment_replies	1	pages	table.cell_comment	migrated	litchi_pages::Package::body_table_cell_comment_replies	pages_body_table_comment_replies_read_parity	A	-	-
+pages/editor/tables/comments.rs	table_cell_comment	1	pages	table.cell_comment	migrated	litchi_pages::Package::body_table_cell_comment	pages_body_table_comment_read_parity	A	test-data/iwork/pages/body-table-comment-hidden-native-saved-receipt.json	-
+pages/editor/tables/comments.rs	table_cell_comment_replies	1	pages	table.cell_comment	migrated	litchi_pages::Package::body_table_cell_comment_replies	pages_body_table_comment_replies_read_parity	A	test-data/iwork/pages/body-table-comment-hidden-native-saved-receipt.json	-
 pages/editor/tables/conditional_highlight.rs	clear_table_cell_conditional_highlighting	1	pages	table.conditional_highlight	host-only	litchi-pages	-	-	-	-
 pages/editor/tables/conditional_highlight.rs	set_table_cell_conditional_highlighting	1	pages	table.conditional_highlight	host-only	litchi-pages	-	-	-	-
 pages/editor/tables/conditional_highlight.rs	table_cell_conditional_highlight_rules	1	pages	table.conditional_highlight	host-only	litchi-pages	-	-	-	-
