@@ -14,16 +14,16 @@ use litchi_iwa_common::chart::reference_line::{Line, Value};
 use litchi_iwa_style::graph::Workspace;
 use litchi_iwa_style::reference_line;
 
-use crate::chart_style_cases::{Components, Target, input};
+use crate::chart_style_cases::{Components, Target, input, publish};
 use crate::harness::{Case, Evidence, Format, LeafRun, TestResult, Tier};
 use crate::known_fields::Decoded;
 use crate::series_graph_cases::publish_changes;
 
 const CHART_MESSAGE_TYPE: u32 = 5_021;
 
-/// The chart drawable with every reference-line item UUID zeroed (the one
-/// documented divergence of an allocation: the host draws them at random,
-/// the engine derives them), compared byte for byte otherwise.
+/// The chart drawable with reference-line item UUIDs zeroed for the known-field
+/// decoder. The structural parity policy separately preserves source-existing
+/// UUID submessages and masks only known UUID halves on newly allocated items.
 fn chart_without_item_uuids(data: &[u8]) -> Result<Decoded, prost::DecodeError> {
     use litchi_iwa_protos::chart_style_codec::{self as codec, Limits};
     fn fail<E>(_: E) -> prost::DecodeError {
@@ -105,6 +105,112 @@ fn engine_write(source: &[u8], chart: u64, lines: &[Line]) -> TestResult<Vec<u8>
     publish_changes(source, &components, workspace.finish())
 }
 
+fn corrupt_chart_unknown_payload(source: &[u8], chart: u64) -> TestResult<Vec<u8>> {
+    let components = Components::read(source)?;
+    let (component, message) = components.locate(chart, CHART_MESSAGE_TYPE)?;
+    let payload = components.archives[component]
+        .1
+        .object(chart)
+        .ok_or("chart object vanished")?
+        .messages[message]
+        .data
+        .clone();
+    let mut corrupted = payload;
+    litchi_iwa_common::wire::append_varint_field(&mut corrupted, 12_345, 1)?;
+    publish(
+        source,
+        components,
+        vec![(chart, CHART_MESSAGE_TYPE, corrupted)],
+    )
+}
+
+fn first_reference_line_item_id(payload: &[u8]) -> TestResult<u64> {
+    use litchi_iwa_common::wire::{repeated_length_delimited_payloads, repeated_varint_values};
+    use litchi_iwa_protos::chart_style_codec::{self as codec, Limits};
+
+    let extension =
+        codec::reference_lines(payload, Limits::DEFAULT)?.ok_or("no reference lines")?;
+    let axis = repeated_length_delimited_payloads(extension, 1)?
+        .into_iter()
+        .next()
+        .ok_or("no reference-line axis")?;
+    let item = repeated_length_delimited_payloads(axis, 2)?
+        .into_iter()
+        .next()
+        .ok_or("no reference-line item")?;
+    let reference = repeated_length_delimited_payloads(item, 1)?
+        .into_iter()
+        .next()
+        .ok_or("no reference-line reference")?;
+    repeated_varint_values(reference, 1)?
+        .into_iter()
+        .next()
+        .ok_or_else(|| "reference-line identifier is missing".into())
+}
+
+fn corrupt_existing_chart_item_uuid(
+    source: &[u8],
+    output: &[u8],
+    chart: u64,
+) -> TestResult<Vec<u8>> {
+    use litchi_iwa_common::wire::{
+        patch_varint_field, repeated_length_delimited_payloads, repeated_varint_values,
+        transform_length_delimited_fields_at_path,
+    };
+    use litchi_iwa_protos::chart_style_codec::{self as codec, Limits};
+
+    let source_components = Components::read(source)?;
+    let source_payload = {
+        let (component, message) = source_components.locate(chart, CHART_MESSAGE_TYPE)?;
+        source_components.payload(chart, (component, message))?
+    };
+    let existing_id = first_reference_line_item_id(source_payload)?;
+
+    let components = Components::read(output)?;
+    let (component, message) = components.locate(chart, CHART_MESSAGE_TYPE)?;
+    let payload = components.payload(chart, (component, message))?;
+    let extension =
+        codec::reference_lines(payload, Limits::DEFAULT)?.ok_or("no reference lines")?;
+    let extension = transform_length_delimited_fields_at_path(
+        extension,
+        &[1, 2],
+        |item| -> Result<Vec<u8>, litchi_iwa_common::Error> {
+            let reference = repeated_length_delimited_payloads(item, 1)
+                .map_err(|error| litchi_iwa_common::Error::InvalidFormat(error.to_string()))?
+                .into_iter()
+                .next()
+                .ok_or_else(|| {
+                    litchi_iwa_common::Error::InvalidFormat(
+                        "reference-line reference is missing".to_owned(),
+                    )
+                })?;
+            let identifier = repeated_varint_values(reference, 1)
+                .map_err(|error| litchi_iwa_common::Error::InvalidFormat(error.to_string()))?
+                .into_iter()
+                .next()
+                .ok_or_else(|| {
+                    litchi_iwa_common::Error::InvalidFormat(
+                        "reference-line identifier is missing".to_owned(),
+                    )
+                })?;
+            if identifier != existing_id {
+                return Ok(item.to_vec());
+            }
+            transform_length_delimited_fields_at_path(item, &[2], |uuid| {
+                patch_varint_field(uuid, 1, true, Some(999_999))
+            })
+        },
+    )?;
+    let payload = codec::rewrite_reference_lines(payload, Some(&extension), Limits::DEFAULT)?
+        .into_bytes()
+        .into_owned();
+    publish(
+        output,
+        components,
+        vec![(chart, CHART_MESSAGE_TYPE, payload)],
+    )
+}
+
 /// Write `after`, first written with `before` through the host. A case
 /// that allocates lines is tier B: the host draws the new items' UUIDs,
 /// which live in the chart payload, at random; the engine derives them
@@ -130,13 +236,16 @@ fn line_case(
             host_read(bytes, target, chart)
         });
     if tier == Tier::B {
-        case = case.leaf_structural_metadata().known_fields(|known| {
-            known.with(
-                CHART_MESSAGE_TYPE,
-                "TSCH.ChartDrawableArchive (item UUIDs zeroed)",
-                chart_without_item_uuids,
-            )
-        });
+        case = case
+            .leaf_structural_metadata()
+            .reference_line_allocation_metadata(chart)
+            .known_fields(|known| {
+                known.with(
+                    CHART_MESSAGE_TYPE,
+                    "TSCH.ChartDrawableArchive (item UUIDs zeroed)",
+                    chart_without_item_uuids,
+                )
+            });
     }
     case.run()?;
     Ok(())
@@ -186,6 +295,90 @@ fn pages_chart_reference_lines_allocate_parity() -> TestResult {
         &[Line::minimum()],
         &[Line::minimum(), Line::maximum()],
     )
+}
+
+#[test]
+fn pages_chart_reference_lines_allocate_rejects_changed_unknown_payload() -> TestResult {
+    let mut input = input(Format::Pages, Kind::Column2d)?;
+    let (target, chart) = (input.target, input.chart);
+    input.fixture.bytes = host_write(&input.fixture.bytes, target, chart, &[Line::minimum()])?;
+    let case = Case::new(
+        "pages_chart_reference_lines_allocate_rejects_changed_unknown_payload",
+        Format::Pages,
+        Tier::B,
+        Evidence::Queued,
+        &input.fixture,
+    )
+    .host(|source| host_write(source, target, chart, &[Line::minimum(), Line::maximum()]))
+    .leaf(|source| {
+        let output = engine_write(source, chart, &[Line::minimum(), Line::maximum()])?;
+        Ok(LeafRun::output(corrupt_chart_unknown_payload(
+            &output, chart,
+        )?))
+    })
+    .read("host reference-line read", move |bytes| {
+        host_read(bytes, target, chart)
+    })
+    .leaf_structural_metadata()
+    .reference_line_allocation_metadata(chart)
+    .known_fields(|known| {
+        known.with(
+            CHART_MESSAGE_TYPE,
+            "TSCH.ChartDrawableArchive (item UUIDs zeroed)",
+            chart_without_item_uuids,
+        )
+    });
+    let failure = match case.run() {
+        Ok(_) => return Err("changed unknown chart payload unexpectedly passed".into()),
+        Err(error) => error.to_string(),
+    };
+    assert!(
+        failure.contains("payload differs outside allocation UUIDs"),
+        "{failure}"
+    );
+    Ok(())
+}
+
+#[test]
+fn pages_chart_reference_lines_allocate_rejects_existing_uuid_corruption() -> TestResult {
+    let mut input = input(Format::Pages, Kind::Column2d)?;
+    let (target, chart) = (input.target, input.chart);
+    input.fixture.bytes = host_write(&input.fixture.bytes, target, chart, &[Line::minimum()])?;
+    let case = Case::new(
+        "pages_chart_reference_lines_allocate_rejects_existing_uuid_corruption",
+        Format::Pages,
+        Tier::B,
+        Evidence::Queued,
+        &input.fixture,
+    )
+    .host(|source| host_write(source, target, chart, &[Line::minimum(), Line::maximum()]))
+    .leaf(move |source| {
+        let output = engine_write(source, chart, &[Line::minimum(), Line::maximum()])?;
+        Ok(LeafRun::output(corrupt_existing_chart_item_uuid(
+            source, &output, chart,
+        )?))
+    })
+    .read("host reference-line read", move |bytes| {
+        host_read(bytes, target, chart)
+    })
+    .leaf_structural_metadata()
+    .reference_line_allocation_metadata(chart)
+    .known_fields(|known| {
+        known.with(
+            CHART_MESSAGE_TYPE,
+            "TSCH.ChartDrawableArchive (item UUIDs zeroed)",
+            chart_without_item_uuids,
+        )
+    });
+    let failure = match case.run() {
+        Ok(_) => return Err("existing UUID corruption unexpectedly passed".into()),
+        Err(error) => error.to_string(),
+    };
+    assert!(
+        failure.contains("existing reference-line item UUID"),
+        "{failure}"
+    );
+    Ok(())
 }
 
 #[test]

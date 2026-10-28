@@ -915,7 +915,7 @@ numbers/editor/semantic/text_box.rs	remove_sheet_text_box_hyperlink	1	numbers	te
 numbers/editor/semantic/text_box.rs	remove_sheet_text_box_paragraph_drop_cap	1	numbers	text.drop_cap	migrated	litchi_numbers::sheet::drawable::drop_cap::Edit::remove	numbers_sheet_text_box_drop_cap_remove_parity	B	-	-
 numbers/editor/semantic/text_box.rs	remove_sheet_text_box_text_language_boundary	1	numbers	text.language	migrated	litchi_numbers::sheet::drawable::language::Edit::remove_boundary	numbers_sheet_text_box_language_remove_parity	A	-	-
 numbers/editor/semantic/text_box.rs	replace_sheet_text_box_text	1	numbers	text.character	migrated	litchi_numbers::sheet::drawable::plain_text::Edit::replace	numbers_sheet_text_box_text_replace_parity	A	-	-
-numbers/editor/semantic/text_box.rs	reset_sheet_text_box_columns	1	numbers	drawable.text_box_properties	host-only	litchi-numbers	-	-	-	-
+numbers/editor/semantic/text_box.rs	reset_sheet_text_box_columns	1	numbers	drawable.text_box_properties	migrated	litchi_numbers::Package::edit_sheet_drawable_style	numbers_shape_style_reset_parity	A	-	W2-A 0380: selector-first Columns reset; implementation destination only, parity/gates pending; native acceptance queued in 0363-mac-queue.md
 numbers/editor/semantic/text_box.rs	reset_sheet_text_box_paragraph_alignment	1	numbers	text.paragraph	migrated	litchi_numbers::sheet::drawable::text::Edit::reset	numbers_sheet_text_box_property_reset_parity	B	-	-
 numbers/editor/semantic/text_box.rs	reset_sheet_text_box_paragraph_background	1	numbers	text.paragraph	migrated	litchi_numbers::sheet::drawable::text::Edit::reset	numbers_sheet_text_box_property_reset_parity	B	-	-
 numbers/editor/semantic/text_box.rs	reset_sheet_text_box_paragraph_borders	1	numbers	text.paragraph	migrated	litchi_numbers::sheet::drawable::text::Edit::reset	numbers_sheet_text_box_property_reset_parity	B	-	-
@@ -944,13 +944,13 @@ numbers/editor/semantic/text_box.rs	reset_sheet_text_box_text_color	1	numbers	te
 numbers/editor/semantic/text_box.rs	reset_sheet_text_box_text_decorations	1	numbers	text.character	migrated	litchi_numbers::sheet::drawable::text::Edit::reset	numbers_sheet_text_box_property_reset_parity	B	-	-
 numbers/editor/semantic/text_box.rs	reset_sheet_text_box_text_font	1	numbers	text.character	migrated	litchi_numbers::sheet::drawable::text::Edit::reset	numbers_sheet_text_box_property_reset_parity	B	-	-
 numbers/editor/semantic/text_box.rs	reset_sheet_text_box_text_languages	1	numbers	text.language	migrated	litchi_numbers::sheet::drawable::language::Edit::reset	numbers_sheet_text_box_language_reset_parity	A	-	-
-numbers/editor/semantic/text_box.rs	reset_sheet_text_box_text_layout	1	numbers	text.character	host-only	litchi-numbers	-	-	-	-
+numbers/editor/semantic/text_box.rs	reset_sheet_text_box_text_layout	1	numbers	text.character	migrated	litchi_numbers::Package::edit_sheet_drawable_style	numbers_shape_style_reset_parity	A	-	W2-A 0380: selector-first TextLayout reset; implementation destination only, parity/gates pending; native acceptance queued in 0363-mac-queue.md
 numbers/editor/semantic/text_box.rs	reset_sheet_text_box_text_ligatures	1	numbers	text.character	migrated	litchi_numbers::sheet::drawable::text::Edit::reset	numbers_sheet_text_box_property_reset_parity	B	-	-
 numbers/editor/semantic/text_box.rs	reset_sheet_text_box_text_outline	1	numbers	text.character	migrated	litchi_numbers::sheet::drawable::text::Edit::reset	numbers_sheet_text_box_property_reset_parity	B	-	-
 numbers/editor/semantic/text_box.rs	reset_sheet_text_box_text_script	1	numbers	text.character	migrated	litchi_numbers::sheet::drawable::text::Edit::reset	numbers_sheet_text_box_property_reset_parity	B	-	-
 numbers/editor/semantic/text_box.rs	reset_sheet_text_box_text_shadow	1	numbers	text.character	migrated	litchi_numbers::sheet::drawable::text::Edit::reset	numbers_sheet_text_box_property_reset_parity	B	-	-
 numbers/editor/semantic/text_box.rs	reset_sheet_text_box_text_style	1	numbers	text.character	migrated	litchi_numbers::sheet::drawable::text::Edit::reset	numbers_sheet_text_box_property_reset_parity	B	-	-
-numbers/editor/semantic/text_box.rs	set_sheet_text_box_columns	1	numbers	drawable.text_box_properties	host-only	litchi-numbers	-	-	-	-
+numbers/editor/semantic/text_box.rs	set_sheet_text_box_columns	1	numbers	drawable.text_box_properties	migrated	litchi_numbers::Package::edit_sheet_drawable_style	numbers_shape_style_set_parity	B	-	W2-A 0380: selector-first Columns set; implementation destination only, parity/gates pending; native acceptance queued in 0363-mac-queue.md
 numbers/editor/semantic/text_box.rs	set_sheet_text_box_geometry	1	numbers	drawable.text_box_properties	migrated	litchi_numbers::sheet::drawable::properties::Edit::set_geometry	numbers_sheet_text_box_geometry_parity	A	-	-
 numbers/editor/semantic/text_box.rs	set_sheet_text_box_paragraph_alignment	1	numbers	text.paragraph	migrated	litchi_numbers::sheet::drawable::text::Edit::set	numbers_sheet_text_box_property_set_parity	B	-	-
 numbers/editor/semantic/text_box.rs	set_sheet_text_box_paragraph_background	1	numbers	text.paragraph	migrated	litchi_numbers::sheet::drawable::text::Edit::set	numbers_sheet_text_box_property_set_parity	B	-	-
@@ -984,13 +984,13 @@ numbers/editor/semantic/text_box.rs	set_sheet_text_box_text_color	1	numbers	text
 numbers/editor/semantic/text_box.rs	set_sheet_text_box_text_decorations	1	numbers	text.character	migrated	litchi_numbers::sheet::drawable::text::Edit::set	numbers_sheet_text_box_property_set_parity	B	-	-
 numbers/editor/semantic/text_box.rs	set_sheet_text_box_text_font	1	numbers	text.character	migrated	litchi_numbers::sheet::drawable::text::Edit::set	numbers_sheet_text_box_property_set_parity	B	-	-
 numbers/editor/semantic/text_box.rs	set_sheet_text_box_text_language	1	numbers	text.language	migrated	litchi_numbers::sheet::drawable::language::Edit::set	numbers_sheet_text_box_language_set_parity	A	-	-
-numbers/editor/semantic/text_box.rs	set_sheet_text_box_text_layout	1	numbers	text.character	host-only	litchi-numbers	-	-	-	-
+numbers/editor/semantic/text_box.rs	set_sheet_text_box_text_layout	1	numbers	text.character	migrated	litchi_numbers::Package::edit_sheet_drawable_style	numbers_shape_style_set_parity	B	-	W2-A 0380: selector-first TextLayout set; implementation destination only, parity/gates pending; native acceptance queued in 0363-mac-queue.md
 numbers/editor/semantic/text_box.rs	set_sheet_text_box_text_ligatures	1	numbers	text.character	migrated	litchi_numbers::sheet::drawable::text::Edit::set	numbers_sheet_text_box_property_set_parity	B	-	-
 numbers/editor/semantic/text_box.rs	set_sheet_text_box_text_outline	1	numbers	text.character	migrated	litchi_numbers::sheet::drawable::text::Edit::set	numbers_sheet_text_box_property_set_parity	B	-	-
 numbers/editor/semantic/text_box.rs	set_sheet_text_box_text_script	1	numbers	text.character	migrated	litchi_numbers::sheet::drawable::text::Edit::set	numbers_sheet_text_box_property_set_parity	B	-	-
 numbers/editor/semantic/text_box.rs	set_sheet_text_box_text_shadow	1	numbers	text.character	migrated	litchi_numbers::sheet::drawable::text::Edit::set	numbers_sheet_text_box_property_set_parity	B	-	-
 numbers/editor/semantic/text_box.rs	set_sheet_text_box_text_style	1	numbers	text.character	migrated	litchi_numbers::sheet::drawable::text::Edit::set	numbers_sheet_text_box_property_set_parity	B	-	-
-numbers/editor/semantic/text_box.rs	sheet_text_box_columns	1	numbers	drawable.text_box_properties	host-only	litchi-numbers	-	-	-	-
+numbers/editor/semantic/text_box.rs	sheet_text_box_columns	1	numbers	drawable.text_box_properties	migrated	litchi_numbers::Package::sheet_drawable_style	numbers_shape_style_read_parity	A	-	W2-A 0380: selector-first Columns read; implementation destination only, parity/gates pending; native acceptance queued in 0363-mac-queue.md
 numbers/editor/semantic/text_box.rs	sheet_text_box_comment_replies	1	numbers	text.comment	migrated	litchi_numbers::Package::sheet_drawable_comments	numbers_sheet_text_box_annotation_read_parity	A	-	-
 numbers/editor/semantic/text_box.rs	sheet_text_box_comments	1	numbers	text.comment	migrated	litchi_numbers::Package::sheet_drawable_comments	numbers_sheet_text_box_annotation_read_parity	A	-	-
 numbers/editor/semantic/text_box.rs	sheet_text_box_geometry	1	numbers	drawable.text_box_properties	migrated	litchi_numbers::Package::sheet_drawable_properties	numbers_sheet_text_box_geometry_parity	A	-	-
@@ -1030,7 +1030,7 @@ numbers/editor/semantic/text_box.rs	sheet_text_box_text_decorations	1	numbers	te
 numbers/editor/semantic/text_box.rs	sheet_text_box_text_font	1	numbers	text.character	migrated	litchi_numbers::Package::sheet_text_box_text	numbers_sheet_text_box_property_read_parity	A	-	-
 numbers/editor/semantic/text_box.rs	sheet_text_box_text_language	1	numbers	text.language	migrated	litchi_numbers::Package::sheet_drawable_text_language	numbers_sheet_text_box_language_read_parity	A	-	-
 numbers/editor/semantic/text_box.rs	sheet_text_box_text_languages	1	numbers	text.language	migrated	litchi_numbers::Package::sheet_drawable_text_languages	numbers_sheet_text_box_language_read_parity	A	-	-
-numbers/editor/semantic/text_box.rs	sheet_text_box_text_layout	1	numbers	text.character	host-only	litchi-numbers	-	-	-	-
+numbers/editor/semantic/text_box.rs	sheet_text_box_text_layout	1	numbers	text.character	migrated	litchi_numbers::Package::sheet_drawable_style	numbers_shape_style_read_parity	A	-	W2-A 0380: selector-first TextLayout read; implementation destination only, parity/gates pending; native acceptance queued in 0363-mac-queue.md
 numbers/editor/semantic/text_box.rs	sheet_text_box_text_ligatures	1	numbers	text.character	migrated	litchi_numbers::Package::sheet_text_box_text	numbers_sheet_text_box_property_read_parity	A	-	-
 numbers/editor/semantic/text_box.rs	sheet_text_box_text_outline	1	numbers	text.character	migrated	litchi_numbers::Package::sheet_text_box_text	numbers_sheet_text_box_property_read_parity	A	-	-
 numbers/editor/semantic/text_box.rs	sheet_text_box_text_script	1	numbers	text.character	migrated	litchi_numbers::Package::sheet_text_box_text	numbers_sheet_text_box_property_read_parity	A	-	-
@@ -1073,9 +1073,9 @@ numbers/editor/sheet_charts.rs	set_sheet_chart_direction	1	numbers	chart.lifecyc
 numbers/editor/sheet_charts.rs	set_sheet_chart_geometry	1	numbers	chart.lifecycle	migrated	litchi_numbers::sheet::drawable::properties::Edit::set_geometry	numbers_sheet_chart_geometry_parity	A	-	-
 numbers/editor/sheet_charts.rs	set_sheet_chart_kind	1	numbers	chart.lifecycle	host-only	litchi-numbers	-	-	-	-
 numbers/editor/sheet_charts.rs	sheet_charts	1	numbers	chart.lifecycle	host-only	litchi-numbers	-	-	-	-
-numbers/editor/sheet_charts/axis.rs	remove_sheet_chart_axis_title	1	numbers	chart.text	host-only	litchi-numbers	-	-	-	-
-numbers/editor/sheet_charts/axis.rs	set_sheet_chart_axis_title	1	numbers	chart.text	host-only	litchi-numbers	-	-	-	-
-numbers/editor/sheet_charts/axis.rs	sheet_chart_axis_title	1	numbers	chart.text	host-only	litchi-numbers	-	-	-	-
+numbers/editor/sheet_charts/axis.rs	remove_sheet_chart_axis_title	1	numbers	chart.text	migrated	litchi-numbers::Package::edit_sheet_chart_axis_title	numbers_chart_title_and_axis_title_remove_parity	A	-	-
+numbers/editor/sheet_charts/axis.rs	set_sheet_chart_axis_title	1	numbers	chart.text	migrated	litchi-numbers::Package::edit_sheet_chart_axis_title	numbers_chart_title_and_axis_title_set_parity	A	-	-
+numbers/editor/sheet_charts/axis.rs	sheet_chart_axis_title	1	numbers	chart.text	migrated	litchi-numbers::Package::sheet_chart_axis_title	numbers_chart_title_and_axis_title_read_parity	A	-	-
 numbers/editor/sheet_charts/axis_bounds.rs	set_sheet_chart_value_axis_bounds	1	numbers	chart.legend_axis	host-only	litchi-numbers	-	-	-	-
 numbers/editor/sheet_charts/axis_bounds.rs	sheet_chart_value_axis_bounds	1	numbers	chart.legend_axis	host-only	litchi-numbers	-	-	-	-
 numbers/editor/sheet_charts/axis_gridlines.rs	set_sheet_chart_axis_gridline_stroke	1	numbers	chart.style	host-only	litchi-numbers	-	-	-	-
@@ -1248,9 +1248,9 @@ numbers/editor/sheet_charts/series_value_labels.rs	sheet_chart_series_value_labe
 numbers/editor/sheet_charts/series_value_labels.rs	sheet_chart_series_value_label_visibility	1	numbers	chart.style	migrated	litchi_numbers::Package::sheet_chart_series	numbers_sheet_chart_series_read_parity	A	-	-
 numbers/editor/sheet_charts/shadow.rs	set_sheet_chart_shadow	1	numbers	chart.style	host-only	litchi-numbers	-	-	-	-
 numbers/editor/sheet_charts/shadow.rs	sheet_chart_shadow	1	numbers	chart.style	host-only	litchi-numbers	-	-	-	-
-numbers/editor/sheet_charts/title.rs	remove_sheet_chart_title	1	numbers	chart.text	host-only	litchi-numbers	-	-	-	-
-numbers/editor/sheet_charts/title.rs	set_sheet_chart_title	1	numbers	chart.text	host-only	litchi-numbers	-	-	-	-
-numbers/editor/sheet_charts/title.rs	sheet_chart_title	1	numbers	chart.text	host-only	litchi-numbers	-	-	-	-
+numbers/editor/sheet_charts/title.rs	remove_sheet_chart_title	1	numbers	chart.text	migrated	litchi-numbers::Package::edit_sheet_chart_title	numbers_chart_title_and_axis_title_remove_parity	A	-	-
+numbers/editor/sheet_charts/title.rs	set_sheet_chart_title	1	numbers	chart.text	migrated	litchi-numbers::Package::edit_sheet_chart_title	numbers_chart_title_and_axis_title_set_parity	A	-	-
+numbers/editor/sheet_charts/title.rs	sheet_chart_title	1	numbers	chart.text	migrated	litchi-numbers::Package::sheet_chart_title	numbers_chart_title_and_axis_title_read_parity	A	-	-
 numbers/editor/sheet_delete.rs	remove_sheet	1	numbers	sheet.lifecycle	migrated	litchi_numbers::Package::edit_sheet_lifecycle	numbers_sheet_remove_parity	B	-	-
 numbers/editor/sheet_duplicate.rs	duplicate_sheet	1	numbers	sheet.lifecycle	migrated	litchi_numbers::Package::edit_sheet_lifecycle	numbers_sheet_duplicate_parity	B	-	-
 numbers/editor/sheet_images.rs	add_sheet_image	1	numbers	drawable.image	migrated	litchi_numbers::sheet::drawable::Edit::add_image	numbers_sheet_media_add_parity	B	-	-
@@ -1300,33 +1300,33 @@ numbers/editor/sheet_shapes.rs	flip_sheet_shape	1	numbers	drawable.shape	migrate
 numbers/editor/sheet_shapes.rs	remove_sheet_shape	1	numbers	drawable.shape	migrated	litchi_numbers::sheet::drawable::Edit::remove	numbers_sheet_shape_remove_parity	B	-	-
 numbers/editor/sheet_shapes.rs	replace_sheet_shape_text	1	numbers	drawable.shape	migrated	litchi_numbers::sheet::drawable::plain_text::Edit::replace	numbers_sheet_shape_text_replace_parity	A	-	-
 numbers/editor/sheet_shapes.rs	reset_sheet_line_endpoints	1	numbers	drawable.shape	host-only	litchi-numbers	-	-	-	-
-numbers/editor/sheet_shapes.rs	reset_sheet_shape_effects	1	numbers	drawable.shape	host-only	litchi-numbers	-	-	-	-
-numbers/editor/sheet_shapes.rs	reset_sheet_shape_fill	1	numbers	drawable.shape	host-only	litchi-numbers	-	-	-	-
+numbers/editor/sheet_shapes.rs	reset_sheet_shape_effects	1	numbers	drawable.shape	migrated	litchi_numbers::Package::edit_sheet_drawable_style	numbers_shape_style_reset_parity	A	-	W2-A 0380: selector-first Effects reset; implementation destination only, parity/gates pending; native acceptance queued in 0363-mac-queue.md
+numbers/editor/sheet_shapes.rs	reset_sheet_shape_fill	1	numbers	drawable.shape	migrated	litchi_numbers::Package::edit_sheet_drawable_style	numbers_shape_style_reset_parity	A	-	W2-A 0380: selector-first Fill reset; implementation destination only, parity/gates pending; native acceptance queued in 0363-mac-queue.md
 numbers/editor/sheet_shapes.rs	reset_sheet_shape_shadow	1	numbers	drawable.shape	host-only	litchi-numbers	-	-	-	-
-numbers/editor/sheet_shapes.rs	reset_sheet_shape_stroke	1	numbers	drawable.shape	host-only	litchi-numbers	-	-	-	-
-numbers/editor/sheet_shapes.rs	reset_sheet_shape_text_layout	1	numbers	drawable.shape	host-only	litchi-numbers	-	-	-	-
+numbers/editor/sheet_shapes.rs	reset_sheet_shape_stroke	1	numbers	drawable.shape	migrated	litchi_numbers::Package::edit_sheet_drawable_style	numbers_shape_style_reset_parity	A	-	W2-A 0380: selector-first Stroke reset; implementation destination only, parity/gates pending; native acceptance queued in 0363-mac-queue.md
+numbers/editor/sheet_shapes.rs	reset_sheet_shape_text_layout	1	numbers	drawable.shape	migrated	litchi_numbers::Package::edit_sheet_drawable_style	numbers_shape_style_reset_parity	A	-	W2-A 0380: selector-first TextLayout reset; implementation destination only, parity/gates pending; native acceptance queued in 0363-mac-queue.md
 numbers/editor/sheet_shapes.rs	set_sheet_line_endpoints	1	numbers	drawable.shape	host-only	litchi-numbers	-	-	-	-
 numbers/editor/sheet_shapes.rs	set_sheet_line_segment	1	numbers	drawable.shape	host-only	litchi-numbers	-	-	-	-
-numbers/editor/sheet_shapes.rs	set_sheet_shape_effects	1	numbers	drawable.shape	host-only	litchi-numbers	-	-	-	-
-numbers/editor/sheet_shapes.rs	set_sheet_shape_fill	1	numbers	drawable.shape	host-only	litchi-numbers	-	-	-	-
+numbers/editor/sheet_shapes.rs	set_sheet_shape_effects	1	numbers	drawable.shape	migrated	litchi_numbers::Package::edit_sheet_drawable_style	numbers_shape_style_set_parity	B	-	W2-A 0380: selector-first Effects set; implementation destination only, parity/gates pending; native acceptance queued in 0363-mac-queue.md
+numbers/editor/sheet_shapes.rs	set_sheet_shape_fill	1	numbers	drawable.shape	migrated	litchi_numbers::Package::edit_sheet_drawable_style	numbers_shape_style_set_parity	B	-	W2-A 0380: selector-first Fill set; implementation destination only, parity/gates pending; native acceptance queued in 0363-mac-queue.md
 numbers/editor/sheet_shapes.rs	set_sheet_shape_geometry	1	numbers	drawable.shape	migrated	litchi_numbers::sheet::drawable::properties::Edit::set_geometry	numbers_sheet_shape_geometry_parity	A	-	-
 numbers/editor/sheet_shapes.rs	set_sheet_shape_image_fill	1	numbers	drawable.shape	host-only	litchi-numbers	-	-	-	-
 numbers/editor/sheet_shapes.rs	set_sheet_shape_preset	1	numbers	drawable.shape	host-only	litchi-numbers	-	-	-	-
 numbers/editor/sheet_shapes.rs	set_sheet_shape_properties	1	numbers	drawable.shape	migrated	litchi_numbers::sheet::drawable::properties::Edit::set_properties	numbers_sheet_shape_properties_parity	A	-	-
 numbers/editor/sheet_shapes.rs	set_sheet_shape_shadow	1	numbers	drawable.shape	host-only	litchi-numbers	-	-	-	-
-numbers/editor/sheet_shapes.rs	set_sheet_shape_stroke	1	numbers	drawable.shape	host-only	litchi-numbers	-	-	-	-
+numbers/editor/sheet_shapes.rs	set_sheet_shape_stroke	1	numbers	drawable.shape	migrated	litchi_numbers::Package::edit_sheet_drawable_style	numbers_shape_style_set_parity	B	-	W2-A 0380: selector-first Stroke set; implementation destination only, parity/gates pending; native acceptance queued in 0363-mac-queue.md
 numbers/editor/sheet_shapes.rs	set_sheet_shape_text	1	numbers	drawable.shape	migrated	litchi_numbers::sheet::drawable::plain_text::Edit::set	numbers_sheet_shape_text_set_parity	A	-	-
-numbers/editor/sheet_shapes.rs	set_sheet_shape_text_layout	1	numbers	drawable.shape	host-only	litchi-numbers	-	-	-	-
+numbers/editor/sheet_shapes.rs	set_sheet_shape_text_layout	1	numbers	drawable.shape	migrated	litchi_numbers::Package::edit_sheet_drawable_style	numbers_shape_style_set_parity	B	-	W2-A 0380: selector-first TextLayout set; implementation destination only, parity/gates pending; native acceptance queued in 0363-mac-queue.md
 numbers/editor/sheet_shapes.rs	sheet_line_endpoints	1	numbers	drawable.shape	host-only	litchi-numbers	-	-	-	-
 numbers/editor/sheet_shapes.rs	sheet_line_segment	1	numbers	drawable.shape	host-only	litchi-numbers	-	-	-	-
-numbers/editor/sheet_shapes.rs	sheet_shape_effects	1	numbers	drawable.shape	host-only	litchi-numbers	-	-	-	-
-numbers/editor/sheet_shapes.rs	sheet_shape_fill	1	numbers	drawable.shape	host-only	litchi-numbers	-	-	-	-
+numbers/editor/sheet_shapes.rs	sheet_shape_effects	1	numbers	drawable.shape	migrated	litchi_numbers::Package::sheet_drawable_style	numbers_shape_style_read_parity	A	-	W2-A 0380: selector-first Effects read; implementation destination only, parity/gates pending; native acceptance queued in 0363-mac-queue.md
+numbers/editor/sheet_shapes.rs	sheet_shape_fill	1	numbers	drawable.shape	migrated	litchi_numbers::Package::sheet_drawable_style	numbers_shape_style_read_parity	A	-	W2-A 0380: selector-first Fill read; implementation destination only, parity/gates pending; native acceptance queued in 0363-mac-queue.md
 numbers/editor/sheet_shapes.rs	sheet_shape_geometry	1	numbers	drawable.shape	migrated	litchi_numbers::Package::sheet_drawable_properties	numbers_sheet_shape_geometry_parity	A	-	-
 numbers/editor/sheet_shapes.rs	sheet_shape_preset	1	numbers	drawable.shape	host-only	litchi-numbers	-	-	-	-
 numbers/editor/sheet_shapes.rs	sheet_shape_properties	1	numbers	drawable.shape	migrated	litchi_numbers::Package::sheet_drawable_properties	numbers_sheet_shape_properties_parity	A	-	-
 numbers/editor/sheet_shapes.rs	sheet_shape_shadow	1	numbers	drawable.shape	host-only	litchi-numbers	-	-	-	-
-numbers/editor/sheet_shapes.rs	sheet_shape_stroke	1	numbers	drawable.shape	host-only	litchi-numbers	-	-	-	-
-numbers/editor/sheet_shapes.rs	sheet_shape_text_layout	1	numbers	drawable.shape	host-only	litchi-numbers	-	-	-	-
+numbers/editor/sheet_shapes.rs	sheet_shape_stroke	1	numbers	drawable.shape	migrated	litchi_numbers::Package::sheet_drawable_style	numbers_shape_style_read_parity	A	-	W2-A 0380: selector-first Stroke read; implementation destination only, parity/gates pending; native acceptance queued in 0363-mac-queue.md
+numbers/editor/sheet_shapes.rs	sheet_shape_text_layout	1	numbers	drawable.shape	migrated	litchi_numbers::Package::sheet_drawable_style	numbers_shape_style_read_parity	A	-	W2-A 0380: selector-first TextLayout read; implementation destination only, parity/gates pending; native acceptance queued in 0363-mac-queue.md
 numbers/editor/sheet_shapes.rs	sheet_shapes	1	numbers	drawable.shape	host-only	litchi-numbers	-	-	-	-
 numbers/editor/sheet_shapes/caption.rs	remove_sheet_shape_caption	1	numbers	drawable.shape	host-only	litchi-numbers	-	-	-	-
 numbers/editor/sheet_shapes/caption.rs	remove_sheet_shape_title	1	numbers	drawable.shape	host-only	litchi-numbers	-	-	-	-
@@ -1634,9 +1634,9 @@ pages/editor/charts.rs	set_body_chart_data	1	pages	chart.lifecycle	host-only	lit
 pages/editor/charts.rs	set_body_chart_direction	1	pages	chart.lifecycle	host-only	litchi-pages	-	-	-	-
 pages/editor/charts.rs	set_body_chart_geometry	1	pages	chart.lifecycle	host-only	litchi-pages	-	-	-	-
 pages/editor/charts.rs	set_body_chart_kind	1	pages	chart.lifecycle	host-only	litchi-pages	-	-	-	-
-pages/editor/charts/axis.rs	body_chart_axis_title	1	pages	chart.text	host-only	litchi-pages	-	-	-	-
-pages/editor/charts/axis.rs	remove_body_chart_axis_title	1	pages	chart.text	host-only	litchi-pages	-	-	-	-
-pages/editor/charts/axis.rs	set_body_chart_axis_title	1	pages	chart.text	host-only	litchi-pages	-	-	-	-
+pages/editor/charts/axis.rs	body_chart_axis_title	1	pages	chart.text	migrated	litchi-pages::Package::body_chart_axis_title	pages_chart_title_and_axis_title_read_parity	A	-	-
+pages/editor/charts/axis.rs	remove_body_chart_axis_title	1	pages	chart.text	migrated	litchi-pages::Package::edit_body_chart_axis_title	pages_chart_title_and_axis_title_remove_parity	A	-	-
+pages/editor/charts/axis.rs	set_body_chart_axis_title	1	pages	chart.text	migrated	litchi-pages::Package::edit_body_chart_axis_title	pages_chart_title_and_axis_title_set_parity	A	-	-
 pages/editor/charts/axis_bounds.rs	body_chart_value_axis_bounds	1	pages	chart.legend_axis	host-only	litchi-pages	-	-	-	-
 pages/editor/charts/axis_bounds.rs	set_body_chart_value_axis_bounds	1	pages	chart.legend_axis	host-only	litchi-pages	-	-	-	-
 pages/editor/charts/axis_gridlines.rs	body_chart_axis_gridline_stroke	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
@@ -1807,9 +1807,9 @@ pages/editor/charts/series_value_labels.rs	set_body_chart_series_value_label_vis
 pages/editor/charts/series_value_labels.rs	set_body_chart_series_value_label_visibility	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
 pages/editor/charts/shadow.rs	body_chart_shadow	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
 pages/editor/charts/shadow.rs	set_body_chart_shadow	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
-pages/editor/charts/title.rs	body_chart_title	1	pages	chart.text	host-only	litchi-pages	-	-	-	-
-pages/editor/charts/title.rs	remove_body_chart_title	1	pages	chart.text	host-only	litchi-pages	-	-	-	-
-pages/editor/charts/title.rs	set_body_chart_title	1	pages	chart.text	host-only	litchi-pages	-	-	-	-
+pages/editor/charts/title.rs	body_chart_title	1	pages	chart.text	migrated	litchi-pages::Package::body_chart_title	pages_chart_title_and_axis_title_read_parity	A	-	-
+pages/editor/charts/title.rs	remove_body_chart_title	1	pages	chart.text	migrated	litchi-pages::Package::edit_body_chart_title	pages_chart_title_and_axis_title_remove_parity	A	-	-
+pages/editor/charts/title.rs	set_body_chart_title	1	pages	chart.text	migrated	litchi-pages::Package::edit_body_chart_title	pages_chart_title_and_axis_title_set_parity	A	-	-
 pages/editor/date_time_fields.rs	add_text_box_date_time_field	1	pages	text.date_time_field	host-only	litchi-pages	-	-	-	-
 pages/editor/date_time_fields.rs	insert_text_box_date_time_field	1	pages	text.date_time_field	host-only	litchi-pages	-	-	-	-
 pages/editor/date_time_fields.rs	remove_text_box_date_time_field	1	pages	text.date_time_field	host-only	litchi-pages	-	-	-	-
