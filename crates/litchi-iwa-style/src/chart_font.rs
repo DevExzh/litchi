@@ -584,15 +584,11 @@ impl Budget {
         Ok(remaining)
     }
 
-    fn parse_fields<'source>(&mut self, source: &'source [u8]) -> Result<Vec<WireField>> {
+    fn parse_fields(&mut self, source: &[u8]) -> Result<Vec<WireField>> {
         self.fields_at_depth(source, 1)
     }
 
-    fn fields_at_depth<'source>(
-        &mut self,
-        source: &'source [u8],
-        depth: u32,
-    ) -> Result<Vec<WireField>> {
+    fn fields_at_depth(&mut self, source: &[u8], depth: u32) -> Result<Vec<WireField>> {
         if depth > self.limits.max_nesting() {
             return Err(Self::limit(
                 LimitKind::Nesting,
@@ -1039,8 +1035,7 @@ fn style_links(payload: &[u8], budget: &mut Budget) -> Result<(Option<u64>, Opti
         let Some(reference_field) = base_fields
             .iter()
             .copied()
-            .filter(|field| field.number() == number)
-            .next_back()
+            .rfind(|field| field.number() == number)
         else {
             return Ok(None);
         };
@@ -1065,8 +1060,7 @@ fn varint_field(
     let Some(field) = fields
         .iter()
         .copied()
-        .filter(|field| field.number() == number)
-        .next_back()
+        .rfind(|field| field.number() == number)
     else {
         return Ok(None);
     };
