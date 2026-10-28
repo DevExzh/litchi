@@ -367,8 +367,7 @@ fn engine_limits(package: &Package, payload: &[u8]) -> Result<engine::Limits, Er
         package_bytes.max(payload.len()).max(1),
         metadata
             .saturating_mul(64)
-            .min(litchi_iwa_common::WireLimits::MAX_FIELDS)
-            .max(1),
+            .clamp(1, litchi_iwa_common::WireLimits::MAX_FIELDS),
         package_bytes.max(payload.len()).max(1),
         64,
         total_bytes.saturating_mul(64).max(1),
