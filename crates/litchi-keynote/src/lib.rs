@@ -503,6 +503,10 @@ pub use limits::{
 };
 pub use litchi_core::Position;
 pub use litchi_iwa_common::chart::data::ChartData;
+pub use litchi_iwa_common::table::read::{
+    Comment as TableComment, CommentAuthor as TableCommentAuthor,
+    CommentReply as TableCommentReply, CommentTimestamp as TableCommentTimestamp,
+};
 /// Maximum canonical `Metadata/Properties.plist` bytes retained by
 /// archive-free [`Presentation`] ingress.
 pub use litchi_iwa_detect::MAX_PROPERTIES_BYTES as MAX_DOCUMENT_PROPERTIES_BYTES;
@@ -531,7 +535,6 @@ pub use package::{
     KEYNOTE_PHYSICAL_SORT_OWNER_ACTIVE, Package, PayloadLimitKind, ReadError, SaveError,
     SemanticPath, Stats, TextStorageFailure, WriteError,
 };
-
 pub use presentation::Presentation;
 pub use selector::{
     DrawableSelector, ReplySelector, SlideSelector, SlideSelectorError, SlideSelectorResult,

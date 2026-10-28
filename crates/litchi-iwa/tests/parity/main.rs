@@ -68,6 +68,7 @@ mod numbers_lifecycle_cases;
 mod numbers_media_add_cases;
 mod numbers_media_cases;
 mod numbers_owner_allocation;
+mod numbers_table_comment_cases;
 mod numbers_text_box_cases;
 mod numbers_text_box_list_cases;
 mod numbers_text_box_named_style_cases;

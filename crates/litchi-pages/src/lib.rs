@@ -93,6 +93,7 @@ pub use litchi_core::Position;
 pub use litchi_iwa_common::chart::arrangement::ChartArrangement;
 pub use litchi_iwa_common::chart::data::ChartData;
 pub use litchi_iwa_common::chart::metadata::ChartMetadata;
+pub use litchi_iwa_common::table::read::{Comment, CommentAuthor, CommentReply, CommentTimestamp};
 /// Maximum bytes retained for each canonical Pages metadata sidecar.
 pub use litchi_iwa_detect::MAX_PROPERTIES_BYTES as MAX_DOCUMENT_PROPERTIES_BYTES;
 pub use litchi_iwa_text::{TextPosition, TextSpan};
@@ -121,6 +122,8 @@ pub use package::{
     MAX_OBJECTS, Package, PackageError, PackageResult, SaveError, Stats, WriteError,
 };
 pub use section::{Section, SectionType};
-pub use selector::{BodyChartSelector, BodyTableSelector, DrawableSelector, ImageSelector};
+pub use selector::{
+    BodyChartSelector, BodyTableSelector, DrawableSelector, ImageSelector, ReplySelector,
+};
 pub use selector::{SectionSelector, SelectorError, SelectorResult};
 pub use table::merge::Region;

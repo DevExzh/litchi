@@ -12,6 +12,18 @@ pub use self::number_format::At;
 pub mod appearance;
 /// Archive-free values and comments returned by focused table reads.
 pub mod cells;
+/// Exact-source table-cell comment and direct-reply transactions.
+pub mod comments {
+    pub use crate::package::slide_table_comments::{
+        SlideTableCommentCommit as Commit, SlideTableCommentDiagnostics as Diagnostics,
+        SlideTableCommentEdit as Edit, SlideTableCommentError as Error,
+        SlideTableCommentLimitKind as LimitKind, SlideTableCommentPatch as Patch,
+        SlideTableCommentPath as Path,
+    };
+    pub use litchi_iwa_common::table::read::{
+        Comment, CommentAuthor, CommentReply, CommentTimestamp,
+    };
+}
 /// Checked row and column point-size values.
 pub mod dimension;
 /// Formula values shared through the neutral iWork semantic model.

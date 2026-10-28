@@ -74,6 +74,18 @@ pub mod read {
         TableRead,
     };
 }
+/// Exact-source table-cell comment and direct-reply transactions.
+pub mod comments {
+    pub use crate::package::body_table_comments::{
+        BodyTableCommentCommit as Commit, BodyTableCommentDiagnostics as Diagnostics,
+        BodyTableCommentEdit as Edit, BodyTableCommentError as Error,
+        BodyTableCommentLimitKind as LimitKind, BodyTableCommentPatch as Patch,
+        BodyTableCommentPath as Path,
+    };
+    pub use litchi_iwa_common::table::read::{
+        Comment, CommentAuthor, CommentReply, CommentTimestamp,
+    };
+}
 /// Validated, archive-free names for Pages body tables.
 pub mod name;
 /// Persisted row-order rules for a body-attached table.

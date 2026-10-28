@@ -23,6 +23,8 @@ pub(crate) mod body_table_appearance;
 pub(crate) mod body_table_catalog;
 pub(crate) mod body_table_cell_appearance;
 pub(crate) mod body_table_cell_format;
+mod body_table_comment_writer;
+pub(crate) mod body_table_comments;
 pub(crate) mod body_table_creation;
 pub(crate) mod body_table_deletion;
 pub(crate) mod body_table_dimension;

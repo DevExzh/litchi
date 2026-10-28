@@ -31,6 +31,9 @@ pub mod cell_appearance;
 
 pub mod hidden_axes;
 
+/// Format-neutral table-cell comment and direct-reply transaction kernel.
+pub mod comments;
+
 pub mod structure;
 
 /// A located native object: its messages and its position in the component
