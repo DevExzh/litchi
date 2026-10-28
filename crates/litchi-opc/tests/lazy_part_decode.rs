@@ -192,6 +192,20 @@ fn fallible_access_decodes_only_the_selected_owned_part() {
             .find(|part| part.partname().as_str() == BAD_URI)
             .is_some_and(|part| !part.payload_is_decoded())
     );
+
+    // The capacity view reads only what is decoded, and decodes nothing.
+    for part in package.iter_parts() {
+        let capacity = part.decoded_payload_capacity();
+        if part.partname().as_str() == GOOD_URI {
+            assert_eq!(capacity, Some(selected.blob_arc().capacity()));
+        } else {
+            assert_eq!(capacity, None);
+        }
+    }
+    assert_eq!(
+        package.deferred_decode_counters(),
+        Some((1, GOOD_PAYLOAD.len() as u64))
+    );
 }
 
 #[test]

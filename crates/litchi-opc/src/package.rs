@@ -634,7 +634,6 @@ impl OwnedContentTypes {
     clippy::module_name_repetitions,
     reason = "OpcPackage is the established public name for the package module's main type."
 )]
-#[derive(Clone)]
 pub struct OpcPackage {
     /// Read policy captured at ingress, retained for format-level edit checks.
     read_limits: SourceLimits,
@@ -716,6 +715,18 @@ pub struct OpcPackage {
     /// Source identity used to prove safe targeted publication.
     preservation: Option<Arc<PreservationProvenance>>,
 
+    /// Process-local identity of this package handle.  A clone receives a
+    /// fresh identity; the token is used by higher-level snapshots to prove
+    /// that a snapshot was captured from this exact package handle before
+    /// taking an optimized commit path.
+    package_identity: Arc<()>,
+
+    /// Monotonic mutation stamp paired with `package_identity`. Every
+    /// mutable package seam advances it before exposing the mutation, so a
+    /// snapshot can reject a same-handle package changed after capture
+    /// without rescanning its complete graph.
+    package_revision: u64,
+
     /// ZIP items the reader found but did not model as parts
     non_part_members: Vec<NonPartMember>,
 
@@ -731,6 +742,48 @@ pub struct OpcPackage {
     /// identifier, target, base and source, so no mutation needs to clear
     /// it; clones share it.
     main_partname: OnceLock<Arc<MainPartname>>,
+}
+
+/// Process-local proof that a snapshot belongs to one [`OpcPackage`] handle.
+///
+/// This is intentionally opaque: callers can obtain a proof only from an
+/// existing package and can ask that package to verify it.  It is not a
+/// content digest and never replaces the exact graph/byte checks performed by
+/// a patch when the proof is absent or stale.
+#[doc(hidden)]
+#[derive(Clone, Debug)]
+pub struct PackageIdentity(Arc<()>);
+
+impl Clone for OpcPackage {
+    fn clone(&self) -> Self {
+        Self {
+            read_limits: self.read_limits,
+            rels: self.rels.clone(),
+            parts: self.parts.clone(),
+            part_bytes: self.part_bytes,
+            source_xml_parts: self.source_xml_parts.clone(),
+            source_archive: self.source_archive.clone(),
+            source_limits: self.source_limits,
+            transfer_index: self.transfer_index.clone(),
+            source_relationships_xml: self.source_relationships_xml.clone(),
+            source_content_types_xml: self.source_content_types_xml.clone(),
+            source_content_types: self.source_content_types.clone(),
+            content_types_source_state: self.content_types_source_state.clone(),
+            exact_source_authorized: self.exact_source_authorized,
+            source_ingress: self.source_ingress,
+            signature_graph_tracked: self.signature_graph_tracked,
+            signature_policy_authorized: self.signature_policy_authorized,
+            signature_policy_required: self.signature_policy_required,
+            signature_api_authored: self.signature_api_authored,
+            preservation: self.preservation.clone(),
+            package_identity: Arc::new(()),
+            package_revision: self.package_revision,
+            non_part_members: self.non_part_members.clone(),
+            tolerance_report: self.tolerance_report.clone(),
+            save_options: self.save_options.clone(),
+            main_partname: self.main_partname.clone(),
+        }
+    }
 }
 
 /// A resolved main-document partname and the relationship inputs it was
@@ -802,11 +855,34 @@ impl OpcPackage {
             signature_policy_required: false,
             signature_api_authored: false,
             preservation: None,
+            package_identity: Arc::new(()),
+            package_revision: 0,
             non_part_members: Vec::new(),
             tolerance_report: ToleranceReport::default(),
             save_options: SaveOptions::default(),
             main_partname: OnceLock::new(),
         }
+    }
+
+    /// Capture an opaque identity proof for this package handle.
+    #[doc(hidden)]
+    #[must_use]
+    pub fn package_identity(&self) -> PackageIdentity {
+        PackageIdentity(Arc::clone(&self.package_identity))
+    }
+
+    /// Whether `proof` was captured from this exact package handle.
+    #[doc(hidden)]
+    #[must_use]
+    pub fn has_package_identity(&self, proof: &PackageIdentity) -> bool {
+        Arc::ptr_eq(&self.package_identity, &proof.0)
+    }
+
+    /// Return the mutation stamp paired with this package handle.
+    #[doc(hidden)]
+    #[must_use]
+    pub const fn package_revision(&self) -> u64 {
+        self.package_revision
     }
 
     /// Return the policy used to read this package.
@@ -4097,6 +4173,7 @@ impl OpcPackage {
     }
 
     fn revoke_exact_source(&mut self) {
+        self.package_revision = self.package_revision.wrapping_add(1);
         self.exact_source_authorized = false;
         if self.source_ingress || self.signature_api_authored {
             self.signature_policy_authorized = false;

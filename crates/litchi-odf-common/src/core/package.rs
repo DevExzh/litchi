@@ -60,7 +60,7 @@ pub fn is_signature_owner_path(path: &str) -> bool {
 )]
 pub struct Package<'data> {
     archive: Archive<'data>,
-    manifest: super::manifest::Manifest,
+    manifest: Arc<super::manifest::Manifest>,
     mimetype: String,
     password: Option<&'data str>,
     /// The LENIENCY_AUDIT F9.2 root media-type fallback this view adopted,
@@ -82,6 +82,19 @@ pub struct OwnedPackage {
     limits: SourceLimits,
     strict_package: bool,
     tolerance: ToleranceReport,
+    /// The `mimetype` member and the parsed manifest, read once: every
+    /// [`Self::package`] view (and so every `has_file`, `mimetype` and
+    /// `get_file`) used to read and strictly re-parse both (record 0377a).
+    /// The bytes are immutable and the parse depends only on them and the
+    /// retained limits, so clones share it.
+    meta: Arc<std::sync::OnceLock<Arc<PackageMeta>>>,
+}
+
+/// The parsed package metadata a [`Package`] view starts from.
+struct PackageMeta {
+    mimetype: String,
+    manifest: Arc<super::manifest::Manifest>,
+    manifest_root_fallback: Option<u16>,
 }
 
 /// Metadata facts captured by the retained strict package index.
@@ -1911,6 +1924,7 @@ impl OwnedPackage {
                 soapberry_zip::office::ArchiveValidationPolicy::StrictPackage
             ),
             tolerance,
+            meta: Arc::default(),
         };
         // A manifest without a usable root media type falls back to the
         // `mimetype` member (LENIENCY_AUDIT F9.2); every borrowed view adopts
@@ -1985,11 +1999,16 @@ impl OwnedPackage {
     /// Returns an error when the archive MIME type or manifest cannot be
     /// decoded.
     pub fn package(&self) -> Result<Package<'_>> {
-        Package::new_with_prepared(
-            Arc::clone(&self.index),
-            self.password.as_ref().map(|password| password.as_str()),
-            self.limits,
-        )
+        let password = self.password.as_ref().map(|password| password.as_str());
+        let archive = Archive::from_prepared(Arc::clone(&self.index));
+        let meta = match self.meta.get() {
+            Some(meta) => Arc::clone(meta),
+            None => {
+                let meta = Arc::new(Package::read_meta(&archive, self.limits)?);
+                Arc::clone(self.meta.get_or_init(|| meta))
+            },
+        };
+        Ok(Package::from_meta(archive, password, &meta))
     }
 
     /// Get the underlying data.
@@ -2002,6 +2021,7 @@ impl OwnedPackage {
             limits: _,
             strict_package: _,
             tolerance: _,
+            meta: _,
         } = self;
         match Arc::try_unwrap(index) {
             Ok(index) => {
@@ -2060,6 +2080,7 @@ impl OwnedPackage {
             limits: self.limits,
             strict_package: self.strict_package,
             tolerance: self.tolerance.clone(),
+            meta: Arc::clone(&self.meta),
         }
     }
 
@@ -2204,21 +2225,30 @@ impl<'data> Package<'data> {
         Self::from_archive(archive, password, SourceLimits::default())
     }
 
-    fn new_with_prepared(
-        index: PreparedArchive,
-        password: Option<&'data str>,
-        limits: SourceLimits,
-    ) -> Result<Self> {
-        let archive = Archive::from_prepared(index);
-
-        Self::from_archive(archive, password, limits)
-    }
-
     fn from_archive(
         archive: Archive<'data>,
         password: Option<&'data str>,
         limits: SourceLimits,
     ) -> Result<Self> {
+        let meta = Self::read_meta(&archive, limits)?;
+        Ok(Self::from_meta(archive, password, &meta))
+    }
+
+    fn from_meta(
+        archive: Archive<'data>,
+        password: Option<&'data str>,
+        meta: &PackageMeta,
+    ) -> Self {
+        Self {
+            archive,
+            manifest: Arc::clone(&meta.manifest),
+            mimetype: meta.mimetype.clone(),
+            password,
+            manifest_root_fallback: meta.manifest_root_fallback,
+        }
+    }
+
+    fn read_meta(archive: &Archive<'data>, limits: SourceLimits) -> Result<PackageMeta> {
         // Read MIME type from mimetype file
         let mimetype = archive
             .read_string_with_limit(
@@ -2249,11 +2279,9 @@ impl<'data> Package<'data> {
             manifest.mimetype.clone_from(&mimetype);
         }
 
-        Ok(Self {
-            archive,
-            manifest,
+        Ok(PackageMeta {
             mimetype,
-            password,
+            manifest: Arc::new(manifest),
             manifest_root_fallback: root_fallback,
         })
     }

@@ -45,7 +45,7 @@ pub(crate) use read::{
 };
 pub use transaction::{
     Change, Commit, Diagnostics, Edit, EditOptions, Error, Family, FamilyAdmission, LimitKind,
-    OwnerAdmission, Patch, Plan, Snapshot,
+    OwnerAdmission, Patch, Plan, Snapshot, publish_core_metadata,
 };
 #[cfg(test)]
 pub(crate) use write::write_core;
@@ -470,6 +470,33 @@ impl Slot {
             dirty: false,
             report,
         })
+    }
+
+    /// The slot of a package whose core part this crate has just written
+    /// from `metadata` (`None`: the part is absent), without decoding it
+    /// again (record 0377a). The writer's output conforms, so the tolerance
+    /// report is empty; debug builds check the round trip against `package`.
+    #[must_use]
+    pub fn published(package: &OpcPackage, metadata: Option<Metadata>) -> Self {
+        #[cfg(debug_assertions)]
+        {
+            let loaded = Self::load(package).ok();
+            debug_assert!(
+                loaded
+                    .as_ref()
+                    .is_some_and(|slot| slot.metadata == metadata && slot.report.is_clean()),
+                "a published core part must decode to the metadata it was written from"
+            );
+        }
+        #[cfg(not(debug_assertions))]
+        let _ = package;
+        Self {
+            #[cfg(test)]
+            source: None,
+            metadata,
+            dirty: false,
+            report: ToleranceReport::default(),
+        }
     }
 
     /// Reference-compatible repairs applied when this slot was loaded (see

@@ -358,6 +358,7 @@ pub(super) fn commit_removals(edit: Edit) -> Result<Commit> {
             authority: None,
             svg_read_guards: Box::new([]),
             svg_final_guards: Box::new([]),
+            retained: std::sync::OnceLock::new(),
         },
     })
 }
