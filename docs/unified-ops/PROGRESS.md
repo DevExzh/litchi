@@ -6810,3 +6810,18 @@ See [0063](0063-source-pptx-modern-comments.md).
   ledger rows migrate; shadow routes lacking a usable host fixture remain
   excluded. Two native queue entries cover the new read/edit families.
   Unified drawable-style dispatch remains a separate D7 follow-up.
+
+- Post-merge checks on `b2a2e4c8db` passed on unchanged clean source:
+  workspace all-target/all-feature compilation, all 20 locked offline fuzz
+  workspaces, crate boundaries and exit ledger.
+- Accepted W2-D `002099f522` (record 0381), synchronized to current trunk:
+  seventeen leaf-only Numbers comment-read tests now live with the Numbers
+  owner. Host differential/cost oracles and their fixtures remain in place
+  until W3. The relocated tests, focused Clippy, ledger and boundaries pass.
+  Integration also corrects the shared parity module's alphabetical order,
+  which the full-workspace formatting check exposed after W2-A. No runtime
+  behavior, fixture, native evidence or ledger disposition changes here.
+- Current ledger totals are 1,176 migrated, 40 retired and 1,012 host-only
+  rows. All 465 pending native entries still block W3. Cached-formula D7
+  dispatch is the remaining accepted slice before the next frozen gate;
+  chart-text and drawable-style unified dispatch remain follow-up work.
