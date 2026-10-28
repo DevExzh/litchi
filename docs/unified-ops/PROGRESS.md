@@ -6916,3 +6916,44 @@ See [0063](0063-source-pptx-modern-comments.md).
   checkouts with an external inventory. Integration source was unchanged by
   cleanup; future completed work packages receive the same ancestry and
   local-state checks before retirement.
+
+- Post-merge checks on `1e3978082b` passed on unchanged clean source:
+  workspace all-target/all-feature compilation, all 20 locked offline fuzz
+  workspaces, crate boundaries and exit ledger. The completed W1-G and
+  Numbers-proof worktrees and branches were then retired after artifact
+  preservation, bringing this continuation's cleanup to 35 worktrees and
+  29 branches.
+- Accepted W2-D `021bfd23ff` (code `3525ba2180`, record 0388), synchronized
+  with the comments integration. The Numbers hidden-axis create and visible
+  row/column insertion examples now live in the leaf crate and use focused
+  selectors and transactions. The insertion example checks 6×4 to 7×5
+  extents, shifted hidden indices and saved-file reopen. The host physical
+  deletion example remains byte-identical: clearing visibility is not a
+  replacement for deletion. Both examples build and run on the synchronized
+  source; strict scoped Clippy, formatting and repository guards pass.
+  No runtime, ledger, native-evidence or performance disposition changes.
+
+- Post-merge checks on `63f860e2e6` passed on unchanged clean source:
+  workspace all-target/all-feature compilation, all 20 locked offline fuzz
+  workspaces, crate boundaries and exit ledger.
+- Accepted W2-D `cdfad94023` (code `f10b03fc74`, record 0389), synchronized
+  with the example integration. Three focused Numbers duplication tests
+  supplement the four unchanged host provenance regressions. The leaf cases
+  retain formula-plus-cache inputs, verify cloned/source formula text and
+  values, storage independence, ordering, exact inverse, invalid-selector
+  transactionality and reopen behavior. The multi-table investigation found
+  that sheet duplication succeeds but a subsequent formula edit on the clone
+  refuses with `FormulaWork { observed: 3, maximum: 1 }`; replacing formulas
+  with numeric literals would hide that gap. The separate 0390 repair must
+  give AST nodes and resolved-owner registry entries independent ceilings.
+  This coverage slice does not change runtime behavior, remove host tests,
+  or claim that repair. Three focused tests, strict Clippy, formatting and
+  repository guards pass on the synchronized source.
+- Freeze the combined comments/examples/test candidate after its post-merge
+  checks. Rebuild every final qualification binary from that exact commit,
+  including `parity-host-oracle` for the four Numbers comment probes, and run
+  all 53 gate rows plus all 68 iWork routes and 14 FIN comparisons. Wall/CLI
+  qualification waits for the gate, builds and instruction captures to finish
+  and for a quiet interval. Chart-font admission/facades, the 0390 formula
+  repair and 0391 shared cell-text-style extraction remain isolated next-wave
+  work; their preparation results do not qualify this frozen candidate.
