@@ -490,18 +490,20 @@ fn style_effects() -> TestResult<Effects> {
 }
 
 fn style_stroke() -> TestResult<Stroke> {
-    Ok(Stroke::new(style_color()?, Width::new(3.0)?, Pattern::MediumDash))
+    Ok(Stroke::new(
+        style_color()?,
+        Width::new(3.0)?,
+        Pattern::MediumDash,
+    ))
 }
 
 #[inline(never)]
 fn w2a_host_route_3(route: &str, source: &[u8], sheet: u64, id: u64) -> TestResult<Vec<u8>> {
     let mut editor = numbers::Draft::from_bytes(source)?;
     match route {
-        "shape_style_fill_set" => editor.set_sheet_shape_fill(
-            sheet,
-            id,
-            &ShapeFill::Solid(style_color()?),
-        )?,
+        "shape_style_fill_set" => {
+            editor.set_sheet_shape_fill(sheet, id, &ShapeFill::Solid(style_color()?))?
+        },
         "shape_style_fill_reset" => drop(editor.reset_sheet_shape_fill(sheet, id)?),
         "shape_style_fill_read" => drop(editor.sheet_shape_fill(sheet, id)?),
         "shape_style_stroke_set" => editor.set_sheet_shape_stroke(sheet, id, style_stroke()?)?,
@@ -510,10 +512,14 @@ fn w2a_host_route_3(route: &str, source: &[u8], sheet: u64, id: u64) -> TestResu
         "shape_style_effects_set" => editor.set_sheet_shape_effects(sheet, id, style_effects()?)?,
         "shape_style_effects_reset" => drop(editor.reset_sheet_shape_effects(sheet, id)?),
         "shape_style_effects_read" => drop(editor.sheet_shape_effects(sheet, id)?),
-        "shape_style_layout_set" => editor.set_sheet_shape_text_layout(sheet, id, style_layout()?)?,
+        "shape_style_layout_set" => {
+            editor.set_sheet_shape_text_layout(sheet, id, style_layout()?)?
+        },
         "shape_style_layout_reset" => drop(editor.reset_sheet_shape_text_layout(sheet, id)?),
         "shape_style_layout_read" => drop(editor.sheet_shape_text_layout(sheet, id)?),
-        "text_box_style_columns_set" => editor.set_sheet_text_box_columns(sheet, id, &style_columns()?)?,
+        "text_box_style_columns_set" => {
+            editor.set_sheet_text_box_columns(sheet, id, &style_columns()?)?
+        },
         "text_box_style_columns_reset" => drop(editor.reset_sheet_text_box_columns(sheet, id)?),
         "text_box_style_columns_read" => drop(editor.sheet_text_box_columns(sheet, id)?),
         "text_box_style_layout_set" => {
@@ -607,13 +613,25 @@ fn w2a_leaf_route_3(route: &str, source: &[u8], selector: DrawableSelector) -> T
     Ok(bytes)
 }
 
+fn reset_setup_route(route: &str) -> Option<&'static str> {
+    match route {
+        "shape_style_fill_reset" => Some("shape_style_fill_set"),
+        "shape_style_stroke_reset" => Some("shape_style_stroke_set"),
+        "shape_style_effects_reset" => Some("shape_style_effects_set"),
+        "shape_style_layout_reset" => Some("shape_style_layout_set"),
+        "text_box_style_columns_reset" => Some("text_box_style_columns_set"),
+        "text_box_style_layout_reset" => Some("text_box_style_layout_set"),
+        _ => None,
+    }
+}
+
 /// Paired cost probe for the complete third W2-A facade slice. Select one
 /// route with `W2A_ROUTE`; otherwise run every route in a single ABBA pass.
 #[test]
 #[ignore = "performance probe; run explicitly under callgrind"]
 fn numbers_w2a_route_cost_abba_3() -> TestResult {
     let selected = std::env::var("W2A_ROUTE").ok();
-    let input = authored_fixture()?.bytes;
+    let source = authored_fixture()?.bytes;
     for (route, kind, index) in ROUTES_3 {
         if selected
             .as_deref()
@@ -621,7 +639,12 @@ fn numbers_w2a_route_cost_abba_3() -> TestResult {
         {
             continue;
         }
+        let input = source.clone();
         let (sheet, id) = host_drawable(&numbers::Draft::from_bytes(&input)?, *kind, *index)?;
+        let input = match reset_setup_route(route) {
+            Some(set_route) => w2a_host_route_3(set_route, &input, sheet, id)?,
+            None => input,
+        };
         let selector = DrawableSelector::of(*kind, *index);
         let a1 = black_box(w2a_host_route_3(route, &input, sheet, id)?);
         let b1 = black_box(w2a_leaf_route_3(route, &input, selector)?);
