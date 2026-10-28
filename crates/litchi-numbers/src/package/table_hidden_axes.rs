@@ -290,7 +290,7 @@ impl engine::Leaf for Leaf {
         }
         .ok_or(not_found)?;
         let target = super::table_headers::resolve::resolve_target(&self.0, sheet.index(), table)
-            .map_err(|_| engine::Error::InvalidSource)?;
+            .map_err(map_header_error)?;
         Ok(engine::Target {
             scope: sheet.index(),
             table_position: table,
@@ -314,7 +314,187 @@ impl engine::Leaf for Leaf {
         self.0
             .reopen_candidate(candidate)
             .map(Self)
-            .map_err(|_| engine::Error::Verification)
+            .map_err(map_package_error)
+    }
+}
+
+fn map_header_error(error: super::table_headers::Error) -> engine::Error {
+    use super::table_headers::{Error as HeaderError, Refusal as HeaderRefusal};
+    match error {
+        HeaderError::Refused(refusal) => engine::Error::Refused(match refusal {
+            HeaderRefusal::SheetNotFound | HeaderRefusal::TableNotFound => {
+                engine::Refusal::TableNotFound
+            },
+            HeaderRefusal::TableLocked { .. } => engine::Refusal::TableLocked,
+            HeaderRefusal::UnsupportedDependency { .. } => {
+                engine::Refusal::UnsupportedDependency
+            },
+            HeaderRefusal::UnsupportedSource => engine::Refusal::UnsupportedSource,
+            HeaderRefusal::InvalidSettings { .. } => return engine::Error::InvalidSource,
+        }),
+        HeaderError::InvalidSource { .. } => engine::Error::InvalidSource,
+        HeaderError::Limit {
+            kind,
+            observed,
+            maximum,
+            ..
+        } => engine::Error::Limit {
+            kind: map_header_limit_kind(kind),
+            observed,
+            maximum,
+        },
+        HeaderError::Allocation { amount, .. } => engine::Error::Allocation { amount },
+        HeaderError::Verification => engine::Error::Verification,
+        HeaderError::PatchConflict => engine::Error::PatchConflict,
+    }
+}
+
+const fn map_header_limit_kind(
+    kind: super::table_headers::LimitKind,
+) -> engine::LimitKind {
+    use super::table_headers::LimitKind as H;
+    use engine::LimitKind as E;
+    match kind {
+        H::InputBytes => E::InputBytes,
+        H::OutputBytes => E::OutputBytes,
+        H::Entries => E::Entries,
+        H::EntryBytes => E::EntryBytes,
+        H::TotalEntryBytes => E::TotalEntryBytes,
+        H::PackageBytes => E::PackageBytes,
+        H::PayloadBytes => E::PayloadBytes,
+        H::TotalPayloadBytes => E::TotalPayloadBytes,
+        H::PayloadObjects => E::PayloadObjects,
+        H::PayloadMessages => E::PayloadMessages,
+        H::PayloadItems => E::PayloadItems,
+        H::PayloadReferences => E::PayloadReferences,
+        H::WireBytes => E::WireBytes,
+        H::WireOutputBytes => E::WireOutputBytes,
+        H::WireFields => E::WireFields,
+        H::WireNesting => E::WireNesting,
+        H::WireWork => E::WireWork,
+        H::TransactionWork => E::TransactionWork,
+    }
+}
+
+fn map_package_error(error: crate::Error) -> engine::Error {
+    match error {
+        crate::Error::Archive(error) => map_archive_error(error),
+        crate::Error::Common(error) => map_common_error(error),
+        crate::Error::SemanticLimit {
+            kind,
+            observed,
+            maximum,
+            ..
+        } => engine::Error::Limit {
+            kind: map_semantic_limit_kind(kind),
+            observed: u64::try_from(observed).unwrap_or(u64::MAX),
+            maximum: u64::try_from(maximum).unwrap_or(u64::MAX),
+        },
+        crate::Error::InputTooLarge { observed, maximum } => engine::Error::Limit {
+            kind: engine::LimitKind::InputBytes,
+            observed,
+            maximum,
+        },
+        _ => engine::Error::InvalidSource,
+    }
+}
+
+fn map_archive_error(error: litchi_iwa_archive::Error) -> engine::Error {
+    match error {
+        litchi_iwa_archive::Error::Allocation { amount, .. } => {
+            engine::Error::Allocation { amount }
+        },
+        litchi_iwa_archive::Error::Limit {
+            kind,
+            observed,
+            maximum,
+        } => engine::Error::Limit {
+            kind: match kind {
+                litchi_iwa_archive::LimitKind::InputBytes => engine::LimitKind::InputBytes,
+                litchi_iwa_archive::LimitKind::OutputBytes => engine::LimitKind::OutputBytes,
+                litchi_iwa_archive::LimitKind::Entries => engine::LimitKind::Entries,
+                litchi_iwa_archive::LimitKind::MemberNameBytes
+                | litchi_iwa_archive::LimitKind::MetadataBytes => engine::LimitKind::PackageBytes,
+                litchi_iwa_archive::LimitKind::CompressedEntryBytes
+                | litchi_iwa_archive::LimitKind::EntryBytes => engine::LimitKind::EntryBytes,
+                litchi_iwa_archive::LimitKind::TotalBytes => engine::LimitKind::TotalEntryBytes,
+                litchi_iwa_archive::LimitKind::IwaStreamBytes => engine::LimitKind::PayloadBytes,
+                litchi_iwa_archive::LimitKind::IwaTotalBytes => {
+                    engine::LimitKind::TotalPayloadBytes
+                },
+            },
+            observed,
+            maximum,
+        },
+        litchi_iwa_archive::Error::Iwa(error) => map_core_error(error),
+        _ => engine::Error::InvalidSource,
+    }
+}
+
+fn map_core_error(error: litchi_iwa_core::Error) -> engine::Error {
+    match error {
+        litchi_iwa_core::Error::Limit {
+            kind,
+            observed,
+            maximum,
+        } => engine::Error::Limit {
+            kind: match kind {
+                litchi_iwa_core::LimitKind::Objects => engine::LimitKind::PayloadObjects,
+                litchi_iwa_core::LimitKind::Messages
+                | litchi_iwa_core::LimitKind::MessagesPerObject => {
+                    engine::LimitKind::PayloadMessages
+                },
+                litchi_iwa_core::LimitKind::HeaderNesting => engine::LimitKind::WireNesting,
+                litchi_iwa_core::LimitKind::HeaderFields
+                | litchi_iwa_core::LimitKind::MetadataItems
+                | litchi_iwa_core::LimitKind::SnappyFrames => engine::LimitKind::PayloadItems,
+                _ => engine::LimitKind::PayloadBytes,
+            },
+            observed: u64::try_from(observed).unwrap_or(u64::MAX),
+            maximum: u64::try_from(maximum).unwrap_or(u64::MAX),
+        },
+        litchi_iwa_core::Error::Allocation { requested, .. } => {
+            engine::Error::Allocation { amount: requested }
+        },
+        _ => engine::Error::InvalidSource,
+    }
+}
+
+fn map_common_error(error: litchi_iwa_common::Error) -> engine::Error {
+    match error {
+        litchi_iwa_common::Error::LimitExceeded {
+            kind,
+            observed,
+            limit,
+        } => engine::Error::Limit {
+            kind: match kind {
+                litchi_iwa_common::LimitKind::InputBytes => engine::LimitKind::WireBytes,
+                litchi_iwa_common::LimitKind::Fields => engine::LimitKind::WireFields,
+                litchi_iwa_common::LimitKind::OutputBytes => engine::LimitKind::WireOutputBytes,
+                litchi_iwa_common::LimitKind::Nesting => engine::LimitKind::WireNesting,
+                litchi_iwa_common::LimitKind::RewriteWork => engine::LimitKind::WireWork,
+                _ => engine::LimitKind::PayloadItems,
+            },
+            observed: u64::try_from(observed).unwrap_or(u64::MAX),
+            maximum: u64::try_from(limit).unwrap_or(u64::MAX),
+        },
+        litchi_iwa_common::Error::Allocation { amount, .. } => {
+            engine::Error::Allocation { amount }
+        },
+        _ => engine::Error::InvalidSource,
+    }
+}
+
+const fn map_semantic_limit_kind(kind: crate::SemanticLimitKind) -> engine::LimitKind {
+    use crate::SemanticLimitKind as S;
+    use engine::LimitKind as E;
+    match kind {
+        S::Objects => E::PayloadObjects,
+        S::References => E::PayloadReferences,
+        S::FormulaRenderDepth | S::FormulaDepth => E::WireNesting,
+        S::FormulaRenderWork | S::FormulaWork => E::WireWork,
+        S::OutputTextBytes | S::FormulaCategoryBytes | S::TextBytes => E::PayloadBytes,
+        S::Sheets | S::Tables | S::MaterializedCells => E::PayloadItems,
     }
 }
 

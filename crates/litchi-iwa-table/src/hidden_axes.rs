@@ -1620,6 +1620,7 @@ fn validate_range_coordinate(source: &[u8], budget: &mut impl Budget) -> Result<
         if !(1..=4).contains(&number)
             || field.wire_type() != 0
             || !field.key_is_canonical()
+            || !field.value_is_canonical()
             || std::mem::replace(&mut seen[(number - 1) as usize], true)
         {
             return Err(Error::InvalidSource);
@@ -4868,7 +4869,9 @@ mod owner_extent_tests {
     fn malformed_extents_are_invalid() {
         let missing_corner = field(2, &[0x08, 0, 0x10, 0, 0x18, 3]);
         let repeated_corner = field(2, &[0x08, 0, 0x08, 0, 0x18, 3, 0x20, 5]);
+        let noncanonical_value = field(2, &[0x08, 0x80, 0x00, 0x10, 0, 0x18, 3, 0x20, 5]);
         assert_eq!(validate(&missing_corner), Err(Error::InvalidSource));
         assert_eq!(validate(&repeated_corner), Err(Error::InvalidSource));
+        assert_eq!(validate(&noncanonical_value), Err(Error::InvalidSource));
     }
 }
