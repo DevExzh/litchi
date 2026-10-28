@@ -179,8 +179,9 @@ fn strict_next_list_id(data: &[u8]) -> TestResult<u32> {
         )
         .into());
     }
+    field.validate_canonical_key()?;
     let (value, width) = litchi_iwa_common::varint::decode_varint_from_bytes(field.payload())?;
-    if width != field.payload().len() {
+    if width != field.payload().len() || width != litchi_iwa_common::varint::encoded_len(value) {
         return Err("Numbers TableDataList next_list_id is not canonically encoded".into());
     }
     u32::try_from(value).map_err(|_| "Numbers TableDataList next_list_id exceeds u32".into())
@@ -626,6 +627,42 @@ fn duplicate_data_list_next(bytes: &[u8], key: &(String, u64, usize)) -> TestRes
     let current = tst::TableDataList::decode(located.payload.as_slice())?;
     let mut payload = located.payload.clone();
     append_varint_field(&mut payload, 2, u64::from(current.next_list_id))?;
+    workspace.replace(&located, payload, None)?;
+    workspace.into_bytes()
+}
+
+#[cfg(feature = "parity-host-oracle")]
+fn overlong_data_list_next(bytes: &[u8], key: &(String, u64, usize)) -> TestResult<Vec<u8>> {
+    let mut workspace = Workspace::open(bytes)?;
+    let located = workspace
+        .messages(6_005)?
+        .into_iter()
+        .find(|located| located.entry == key.0 && located.object == key.1 && located.index == key.2)
+        .ok_or_else(|| format!("Numbers list {key:?} disappeared"))?;
+    let view = WireView::parse(&located.payload, WireLimits::DEFAULT)?;
+    let next = view
+        .fields()
+        .find(|field| field.number() == 2)
+        .ok_or("Numbers selected list has no next_list_id field")?;
+    let (value, width) = litchi_iwa_common::varint::decode_varint_from_bytes(next.payload())?;
+    if next.wire_type() != 0 || width != next.payload().len() {
+        return Err("Numbers selected list next_list_id is not a scalar varint".into());
+    }
+    let mut overlong = litchi_iwa_common::varint::encode_varint(value);
+    let last = overlong
+        .last_mut()
+        .ok_or("canonical next_list_id encoding is empty")?;
+    *last |= 0x80;
+    overlong.push(0);
+    let mut payload = Vec::new();
+    for field in view.fields() {
+        if field.number() == 2 {
+            payload.extend_from_slice(field.key());
+            payload.extend_from_slice(&overlong);
+        } else {
+            payload.extend_from_slice(field.raw());
+        }
+    }
     workspace.replace(&located, payload, None)?;
     workspace.into_bytes()
 }
@@ -1259,6 +1296,13 @@ fn numbers_table_cell_comment_clear_policy_negative_controls() -> TestResult {
         assert_clear_list_policy(&input.bytes, &host, &duplicate_selected_counter, position())
             .is_err(),
         "clear policy accepted a duplicated selected next_list_id field"
+    );
+
+    let overlong_selected_counter = overlong_data_list_next(&leaf, &selected_key)?;
+    assert!(
+        assert_clear_list_policy(&input.bytes, &host, &overlong_selected_counter, position())
+            .is_err(),
+        "clear policy accepted an overlong selected next_list_id varint"
     );
 
     let selected_unknown_tail = append_data_list_unknown(&leaf, &selected_key)?;
