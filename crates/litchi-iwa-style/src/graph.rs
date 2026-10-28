@@ -54,6 +54,16 @@ pub trait Components {
     fn component(&self, index: usize) -> Option<(&str, &Archive)>;
 }
 
+/// Resource dimensions owned by graph-level bounded allocation adapters.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum GraphLimitKind {
+    /// Temporary scratch bytes reserved by a graph rewrite.
+    ScratchBytes,
+    /// Fallible allocation events admitted by a graph rewrite.
+    AllocationEvents,
+}
+
 impl Components for [(String, Archive)] {
     fn count(&self) -> usize {
         self.len()
@@ -85,6 +95,16 @@ pub enum Error {
     Wire(litchi_iwa_common::Error),
     /// A chart style codec failed.
     Codec(litchi_iwa_protos::chart_style_codec::Error),
+    /// A graph adapter exhausted a resource that the wire layer does not
+    /// model (for example scratch capacity or allocation events).
+    Limit {
+        /// Resource dimension.
+        kind: GraphLimitKind,
+        /// Attempted aggregate consumption.
+        observed: usize,
+        /// Configured maximum.
+        maximum: usize,
+    },
     /// A package metadata registry rewrite failed.
     Registry(RewriteError),
     /// Object `0` is missing (or the edit names no object).
@@ -103,6 +123,11 @@ impl fmt::Display for Error {
             Self::Archive(error) => write!(formatter, "IWA archive: {error}"),
             Self::Wire(error) => write!(formatter, "IWA wire: {error}"),
             Self::Codec(error) => write!(formatter, "chart style codec: {error}"),
+            Self::Limit {
+                kind,
+                observed,
+                maximum,
+            } => write!(formatter, "graph {kind:?} limit: {observed} > {maximum}"),
             Self::Registry(error) => write!(formatter, "package metadata: {error}"),
             Self::MissingObject(identifier) => write!(formatter, "object {identifier} is missing"),
             Self::AmbiguousObject(identifier) => {
