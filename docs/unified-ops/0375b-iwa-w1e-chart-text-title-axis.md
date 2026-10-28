@@ -293,8 +293,23 @@ The external evidence directory is
 including build, route stdout/stderr, callgrind, and annotation streams is
 24,706 bytes with SHA-256
 `3ece5ae7f940c51510f1e12c7b59e8d85059a00a72ae5baadb2a5286ee9a6751`.
-No evidence or binary was added to the repository, and no wall-clock result is
-claimed.
+No raw captures or binaries were added to the repository, and no wall-clock
+result is claimed.
+
+### 5.1 Current-source gate recheck
+
+The required source checks were rerun after the receipt commit, at checked
+HEAD `b571642f01ea30f13d21e99e3716c4160789d123` whose code is the measured
+merge source `4aa57b3c19c24ce625f31cdd5489ff0a1d39bc68`. All commands exited
+zero: Numbers and Pages all-feature hidden-item rustdoc JSON; Numbers minimal,
+Numbers full and Pages glossary profiles; the exit ledger and its unit suite;
+the crate-boundary checker and its unit suite; the no-`3rdparty` unit suite;
+and locked-offline `--all-targets --bins` checks for both affected fuzz
+workspaces. The exact commands, result paths and external log identities are
+in `docs/unified-ops/results/0375b/final-source-gates.json`. The 24-log
+manifest is `/tmp/litchi-w1e-final-gates-20261028/log-manifest.tsv`,
+2,244 bytes, SHA-256
+`1d0e7b87c3e58fc11a1b4dcd4fa196bb3d7aad5292b35443e1bf86d9eae7eaea`.
 
 ## 5. Native evidence and verification
 
