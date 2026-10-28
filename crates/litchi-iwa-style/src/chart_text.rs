@@ -501,7 +501,7 @@ fn base_report(payload: &[u8], fields: usize) -> Report {
     }
 }
 
-fn merge_decode_report<R: DecodeReportView>(
+fn merge_decode_report<R: DecodeReportView + Copy>(
     base: Report,
     report: R,
     text_bytes: Option<usize>,
@@ -807,8 +807,8 @@ fn map_axis_error(error: axis_codec::DecodeError) -> Error {
         .map_or(Error::InvalidSource, |amount| Error::Allocation { amount })
 }
 
-fn map_title_limit(limit: title_codec::DecodeLimit) -> Error {
-    match limit {
+fn map_title_limit(decode_limit: title_codec::DecodeLimit) -> Error {
+    match decode_limit {
         title_codec::DecodeLimit::Bytes { observed, maximum } => {
             limit(LimitKind::InputBytes, observed, maximum)
         },
@@ -833,8 +833,8 @@ fn map_title_limit(limit: title_codec::DecodeLimit) -> Error {
     }
 }
 
-fn map_axis_limit(limit: axis_codec::DecodeLimit) -> Error {
-    match limit {
+fn map_axis_limit(decode_limit: axis_codec::DecodeLimit) -> Error {
+    match decode_limit {
         axis_codec::DecodeLimit::Bytes { observed, maximum } => {
             limit(LimitKind::InputBytes, observed, maximum)
         },
@@ -878,7 +878,9 @@ fn limit(kind: LimitKind, observed: usize, maximum: usize) -> Error {
 
 #[cfg(test)]
 mod tests {
-    use super::{ChartTextKind, Error, LimitKind, Limits, decode, rewrite};
+    use super::{
+        ChartTextKind, Error, GENERATED_EXTENSION_FIELD, LimitKind, Limits, decode, rewrite,
+    };
     use litchi_iwa_common::chart::axis::Axis;
 
     fn varint(mut value: u64) -> Vec<u8> {
@@ -897,7 +899,7 @@ mod tests {
     }
 
     fn varint_field(number: u32, value: u64) -> Vec<u8> {
-        let mut output = varint((u64::from(number) << 3) | 0);
+        let mut output = varint(u64::from(number) << 3);
         output.extend(varint(value));
         output
     }

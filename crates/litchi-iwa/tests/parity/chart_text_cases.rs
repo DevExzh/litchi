@@ -7,15 +7,58 @@
 
 use litchi_iwa::numbers;
 use litchi_iwa::pages;
+use litchi_iwa::shapes::{DrawablePoint, DrawableSize};
+use litchi_iwa_common::chart::ChartData;
 use litchi_iwa_common::chart::axis::Axis;
+use litchi_iwa_common::chart::kind::Kind;
 use litchi_numbers::{ChartSelector, Package as NumbersPackage, SheetSelector};
 use litchi_pages::{BodyChartSelector, Package as PagesPackage};
 
 use crate::harness::{Case, Evidence, Fixture, Format, LeafRun, TestResult, Tier, fixture};
 use crate::leaf_bytes;
 
-const NUMBERS: &str = "iwork/numbers/chart-arrangement-native.numbers";
-const PAGES: &str = "iwork/pages/chart-arrangement-native.pages";
+const NUMBERS: &str = "iwork/numbers/chart-data-native.numbers";
+/// The native Numbers chart is followed by the host-created chart used by
+/// these mutation vectors. This matches the established chart-style parity
+/// setup; the arrangement fixture has a stale host UUID map.
+const NUMBERS_CHART: usize = 1;
+const PAGES_CHART: usize = 0;
+
+fn numbers_input() -> TestResult<(Fixture, u64, u64)> {
+    let native = fixture(NUMBERS)?;
+    let mut editor = numbers::Draft::from_bytes(&native.bytes)?;
+    let sheet = editor
+        .sheets()?
+        .first()
+        .ok_or("native Numbers sheet missing")?
+        .id();
+    let data = ChartData::new(
+        vec!["Region 1".to_owned(), "Region 2".to_owned()],
+        vec!["April".to_owned(), "May".to_owned(), "June".to_owned()],
+        vec![
+            vec![Some(17.0), Some(26.0), Some(53.0)],
+            vec![Some(55.0), Some(43.0), Some(70.0)],
+        ],
+    )?;
+    let chart = editor.add_sheet_chart(
+        sheet,
+        Kind::Column2d,
+        data,
+        DrawablePoint { x: 120.0, y: 140.0 },
+        DrawableSize {
+            width: 360.0,
+            height: 240.0,
+        },
+    )?;
+    Ok((
+        Fixture {
+            path: "chart-data-native.numbers + add_sheet_chart",
+            bytes: editor.to_bytes()?,
+        },
+        sheet,
+        chart.drawable_object_id,
+    ))
+}
 
 #[derive(Clone, Copy, Debug)]
 enum Property {
@@ -23,30 +66,37 @@ enum Property {
     Axis(Axis),
 }
 
-fn numbers_target(bytes: &[u8]) -> TestResult<(u64, u64)> {
-    let editor = numbers::Draft::from_bytes(bytes)?;
-    let sheet = editor
-        .sheets()?
-        .first()
-        .ok_or("native Numbers sheet missing")?;
+fn pages_input() -> TestResult<(Fixture, u64)> {
+    let mut editor = pages::Draft::create_with_text("W1-E chart text parity")?;
     let chart = editor
-        .sheet_charts(sheet.id())?
-        .first()
-        .ok_or("native Numbers chart missing")?
+        .add_body_chart(
+            "W1-E chart text parity".encode_utf16().count(),
+            Kind::Column2d,
+            ChartData::new(
+                vec!["Region 1".to_owned(), "Region 2".to_owned()],
+                vec!["April".to_owned(), "May".to_owned(), "June".to_owned()],
+                vec![
+                    vec![Some(17.0), Some(26.0), Some(53.0)],
+                    vec![Some(55.0), Some(43.0), Some(70.0)],
+                ],
+            )?,
+            DrawablePoint { x: 120.0, y: 140.0 },
+            DrawableSize {
+                width: 360.0,
+                height: 240.0,
+            },
+        )?
         .drawable_object_id;
-    Ok((sheet.id(), chart))
+    Ok((
+        Fixture {
+            path: "source-built: Pages chart title and axis parity",
+            bytes: editor.to_bytes()?,
+        },
+        chart,
+    ))
 }
 
-fn pages_target(bytes: &[u8]) -> TestResult<u64> {
-    pages::Draft::from_bytes(bytes)?
-        .body_charts()?
-        .first()
-        .map(|chart| chart.drawable_object_id)
-        .ok_or_else(|| "native Pages chart missing".into())
-}
-
-fn host_numbers(source: &[u8], property: Property) -> TestResult<Vec<u8>> {
-    let (sheet, chart) = numbers_target(source)?;
+fn host_numbers(source: &[u8], sheet: u64, chart: u64, property: Property) -> TestResult<Vec<u8>> {
     let mut editor = numbers::Draft::from_bytes(source)?;
     match property {
         Property::Title => editor.set_sheet_chart_title(sheet, chart, "W1-E title")?,
@@ -62,7 +112,10 @@ fn leaf_numbers(source: &[u8], property: Property) -> TestResult<LeafRun> {
     let (output, restored) = match property {
         Property::Title => {
             let commit = package
-                .edit_sheet_chart_title(SheetSelector::index(0), ChartSelector::index(0))?
+                .edit_sheet_chart_title(
+                    SheetSelector::index(0),
+                    ChartSelector::index(NUMBERS_CHART),
+                )?
                 .set("W1-E title")?
                 .commit()?;
             let restored = commit
@@ -77,7 +130,7 @@ fn leaf_numbers(source: &[u8], property: Property) -> TestResult<LeafRun> {
             let commit = package
                 .edit_sheet_chart_axis_title(
                     SheetSelector::index(0),
-                    ChartSelector::index(0),
+                    ChartSelector::index(NUMBERS_CHART),
                     axis,
                 )?
                 .set("W1-E axis title")?
@@ -97,19 +150,17 @@ fn leaf_numbers(source: &[u8], property: Property) -> TestResult<LeafRun> {
 fn read_numbers(source: &[u8], property: Property) -> TestResult<Option<String>> {
     let package = NumbersPackage::from_bytes(source)?;
     Ok(match property {
-        Property::Title => {
-            package.sheet_chart_title(SheetSelector::index(0), ChartSelector::index(0))?
-        },
+        Property::Title => package
+            .sheet_chart_title(SheetSelector::index(0), ChartSelector::index(NUMBERS_CHART))?,
         Property::Axis(axis) => package.sheet_chart_axis_title(
             SheetSelector::index(0),
-            ChartSelector::index(0),
+            ChartSelector::index(NUMBERS_CHART),
             axis,
         )?,
     })
 }
 
-fn host_pages(source: &[u8], property: Property) -> TestResult<Vec<u8>> {
-    let chart = pages_target(source)?;
+fn host_pages(source: &[u8], chart: u64, property: Property) -> TestResult<Vec<u8>> {
     let mut editor = pages::Draft::from_bytes(source)?;
     match property {
         Property::Title => editor.set_body_chart_title(chart, "W1-E title")?,
@@ -123,7 +174,7 @@ fn leaf_pages(source: &[u8], property: Property) -> TestResult<LeafRun> {
     let (output, restored) = match property {
         Property::Title => {
             let commit = package
-                .edit_body_chart_title(BodyChartSelector::index(0))?
+                .edit_body_chart_title(BodyChartSelector::index(PAGES_CHART))?
                 .set("W1-E title")?
                 .commit()?;
             let restored = commit
@@ -136,7 +187,7 @@ fn leaf_pages(source: &[u8], property: Property) -> TestResult<LeafRun> {
         },
         Property::Axis(axis) => {
             let commit = package
-                .edit_body_chart_axis_title(BodyChartSelector::index(0), axis)?
+                .edit_body_chart_axis_title(BodyChartSelector::index(PAGES_CHART), axis)?
                 .set("W1-E axis title")?
                 .commit()?;
             let restored = commit
@@ -154,13 +205,19 @@ fn leaf_pages(source: &[u8], property: Property) -> TestResult<LeafRun> {
 fn read_pages(source: &[u8], property: Property) -> TestResult<Option<String>> {
     let package = PagesPackage::from_bytes(source)?;
     Ok(match property {
-        Property::Title => package.body_chart_title(BodyChartSelector::index(0))?,
-        Property::Axis(axis) => package.body_chart_axis_title(BodyChartSelector::index(0), axis)?,
+        Property::Title => package.body_chart_title(BodyChartSelector::index(PAGES_CHART))?,
+        Property::Axis(axis) => {
+            package.body_chart_axis_title(BodyChartSelector::index(PAGES_CHART), axis)?
+        },
     })
 }
 
-fn host_numbers_remove(source: &[u8], property: Property) -> TestResult<Vec<u8>> {
-    let (sheet, chart) = numbers_target(source)?;
+fn host_numbers_remove(
+    source: &[u8],
+    sheet: u64,
+    chart: u64,
+    property: Property,
+) -> TestResult<Vec<u8>> {
     let mut editor = numbers::Draft::from_bytes(source)?;
     match property {
         Property::Title => {
@@ -180,12 +237,18 @@ fn leaf_numbers_remove(source: &[u8], property: Property) -> TestResult<LeafRun>
     match property {
         Property::Title => {
             let first = package
-                .edit_sheet_chart_title(SheetSelector::index(0), ChartSelector::index(0))?
+                .edit_sheet_chart_title(
+                    SheetSelector::index(0),
+                    ChartSelector::index(NUMBERS_CHART),
+                )?
                 .set("W1-E remove")?
                 .commit()?;
             let second = first
                 .package()
-                .edit_sheet_chart_title(SheetSelector::index(0), ChartSelector::index(0))?
+                .edit_sheet_chart_title(
+                    SheetSelector::index(0),
+                    ChartSelector::index(NUMBERS_CHART),
+                )?
                 .clear()?
                 .commit()?;
             let restored_first = second
@@ -203,7 +266,7 @@ fn leaf_numbers_remove(source: &[u8], property: Property) -> TestResult<LeafRun>
             let first = package
                 .edit_sheet_chart_axis_title(
                     SheetSelector::index(0),
-                    ChartSelector::index(0),
+                    ChartSelector::index(NUMBERS_CHART),
                     axis,
                 )?
                 .set("W1-E remove")?
@@ -212,7 +275,7 @@ fn leaf_numbers_remove(source: &[u8], property: Property) -> TestResult<LeafRun>
                 .package()
                 .edit_sheet_chart_axis_title(
                     SheetSelector::index(0),
-                    ChartSelector::index(0),
+                    ChartSelector::index(NUMBERS_CHART),
                     axis,
                 )?
                 .clear()?
@@ -231,8 +294,7 @@ fn leaf_numbers_remove(source: &[u8], property: Property) -> TestResult<LeafRun>
     }
 }
 
-fn host_pages_remove(source: &[u8], property: Property) -> TestResult<Vec<u8>> {
-    let chart = pages_target(source)?;
+fn host_pages_remove(source: &[u8], chart: u64, property: Property) -> TestResult<Vec<u8>> {
     let mut editor = pages::Draft::from_bytes(source)?;
     match property {
         Property::Title => {
@@ -252,12 +314,12 @@ fn leaf_pages_remove(source: &[u8], property: Property) -> TestResult<LeafRun> {
     match property {
         Property::Title => {
             let first = package
-                .edit_body_chart_title(BodyChartSelector::index(0))?
+                .edit_body_chart_title(BodyChartSelector::index(PAGES_CHART))?
                 .set("W1-E remove")?
                 .commit()?;
             let second = first
                 .package()
-                .edit_body_chart_title(BodyChartSelector::index(0))?
+                .edit_body_chart_title(BodyChartSelector::index(PAGES_CHART))?
                 .clear()?
                 .commit()?;
             let restored_first = second
@@ -273,12 +335,12 @@ fn leaf_pages_remove(source: &[u8], property: Property) -> TestResult<LeafRun> {
         },
         Property::Axis(axis) => {
             let first = package
-                .edit_body_chart_axis_title(BodyChartSelector::index(0), axis)?
+                .edit_body_chart_axis_title(BodyChartSelector::index(PAGES_CHART), axis)?
                 .set("W1-E remove")?
                 .commit()?;
             let second = first
                 .package()
-                .edit_body_chart_axis_title(BodyChartSelector::index(0), axis)?
+                .edit_body_chart_axis_title(BodyChartSelector::index(PAGES_CHART), axis)?
                 .clear()?
                 .commit()?;
             let restored_first = second
@@ -295,9 +357,9 @@ fn leaf_pages_remove(source: &[u8], property: Property) -> TestResult<LeafRun> {
     }
 }
 
-fn run_numbers_reads(input: &Fixture, property: Property) -> TestResult {
+fn run_numbers_reads(input: &Fixture, sheet: u64, chart: u64, property: Property) -> TestResult {
     let source = read_numbers(&input.bytes, property)?;
-    let host = host_numbers(&input.bytes, property)?;
+    let host = host_numbers(&input.bytes, sheet, chart, property)?;
     let leaf = leaf_numbers(&input.bytes, property)?.output;
     assert_eq!(
         read_numbers(&host, property)?,
@@ -307,9 +369,9 @@ fn run_numbers_reads(input: &Fixture, property: Property) -> TestResult {
     Ok(())
 }
 
-fn run_pages_reads(input: &Fixture, property: Property) -> TestResult {
+fn run_pages_reads(input: &Fixture, chart: u64, property: Property) -> TestResult {
     let source = read_pages(&input.bytes, property)?;
-    let host = host_pages(&input.bytes, property)?;
+    let host = host_pages(&input.bytes, chart, property)?;
     let leaf = leaf_pages(&input.bytes, property)?.output;
     assert_eq!(read_pages(&host, property)?, read_pages(&leaf, property)?);
     assert_eq!(source, read_pages(&input.bytes, property)?);
@@ -318,7 +380,7 @@ fn run_pages_reads(input: &Fixture, property: Property) -> TestResult {
 
 #[test]
 fn numbers_chart_title_and_axis_title_set_parity() -> TestResult {
-    let input = fixture(NUMBERS)?;
+    let (input, sheet, chart) = numbers_input()?;
     for property in [
         Property::Title,
         Property::Axis(Axis::Category),
@@ -331,7 +393,7 @@ fn numbers_chart_title_and_axis_title_set_parity() -> TestResult {
             Evidence::Queued,
             &input,
         )
-        .host(|source| host_numbers(source, property))
+        .host(move |source| host_numbers(source, sheet, chart, property))
         .leaf(|source| leaf_numbers(source, property))
         .read("numbers chart text", move |source| {
             read_numbers(source, property)
@@ -343,25 +405,27 @@ fn numbers_chart_title_and_axis_title_set_parity() -> TestResult {
 
 #[test]
 fn numbers_chart_title_and_axis_title_read_parity() -> TestResult {
-    let input = fixture(NUMBERS)?;
+    let _ = (Tier::A, Evidence::Queued);
+    let (input, sheet, chart) = numbers_input()?;
     for property in [
         Property::Title,
         Property::Axis(Axis::Category),
         Property::Axis(Axis::Value),
     ] {
-        run_numbers_reads(&input, property)?;
+        run_numbers_reads(&input, sheet, chart, property)?;
     }
     Ok(())
 }
 
 #[test]
 fn numbers_chart_title_and_axis_title_remove_parity() -> TestResult {
-    let input = fixture(NUMBERS)?;
+    let (mut input, sheet, chart) = numbers_input()?;
     for property in [
         Property::Title,
         Property::Axis(Axis::Category),
         Property::Axis(Axis::Value),
     ] {
+        input.bytes = host_numbers(&input.bytes, sheet, chart, property)?;
         Case::new(
             "numbers_chart_text_title_axis_remove_parity",
             Format::Numbers,
@@ -369,7 +433,7 @@ fn numbers_chart_title_and_axis_title_remove_parity() -> TestResult {
             Evidence::Queued,
             &input,
         )
-        .host(|source| host_numbers_remove(source, property))
+        .host(move |source| host_numbers_remove(source, sheet, chart, property))
         .leaf(|source| leaf_numbers_remove(source, property))
         .read("numbers chart text", move |source| {
             read_numbers(source, property)
@@ -381,7 +445,7 @@ fn numbers_chart_title_and_axis_title_remove_parity() -> TestResult {
 
 #[test]
 fn pages_chart_title_and_axis_title_set_parity() -> TestResult {
-    let input = fixture(PAGES)?;
+    let (input, chart) = pages_input()?;
     for property in [
         Property::Title,
         Property::Axis(Axis::Category),
@@ -394,7 +458,7 @@ fn pages_chart_title_and_axis_title_set_parity() -> TestResult {
             Evidence::Queued,
             &input,
         )
-        .host(|source| host_pages(source, property))
+        .host(move |source| host_pages(source, chart, property))
         .leaf(|source| leaf_pages(source, property))
         .read("pages chart text", move |source| {
             read_pages(source, property)
@@ -406,25 +470,27 @@ fn pages_chart_title_and_axis_title_set_parity() -> TestResult {
 
 #[test]
 fn pages_chart_title_and_axis_title_read_parity() -> TestResult {
-    let input = fixture(PAGES)?;
+    let _ = (Tier::A, Evidence::Queued);
+    let (input, chart) = pages_input()?;
     for property in [
         Property::Title,
         Property::Axis(Axis::Category),
         Property::Axis(Axis::Value),
     ] {
-        run_pages_reads(&input, property)?;
+        run_pages_reads(&input, chart, property)?;
     }
     Ok(())
 }
 
 #[test]
 fn pages_chart_title_and_axis_title_remove_parity() -> TestResult {
-    let input = fixture(PAGES)?;
+    let (mut input, chart) = pages_input()?;
     for property in [
         Property::Title,
         Property::Axis(Axis::Category),
         Property::Axis(Axis::Value),
     ] {
+        input.bytes = host_pages(&input.bytes, chart, property)?;
         Case::new(
             "pages_chart_text_title_axis_remove_parity",
             Format::Pages,
@@ -432,7 +498,7 @@ fn pages_chart_title_and_axis_title_remove_parity() -> TestResult {
             Evidence::Queued,
             &input,
         )
-        .host(|source| host_pages_remove(source, property))
+        .host(move |source| host_pages_remove(source, chart, property))
         .leaf(|source| leaf_pages_remove(source, property))
         .read("pages chart text", move |source| {
             read_pages(source, property)

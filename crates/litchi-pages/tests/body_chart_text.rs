@@ -1,7 +1,6 @@
 //! Focused selector and exact-no-op coverage for body-chart text facades.
 
 use litchi_iwa_common::chart::axis::Axis;
-use litchi_pages::chart::title;
 use litchi_pages::{BodyChartSelector, Package};
 
 const NATIVE: &[u8] =

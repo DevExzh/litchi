@@ -1,7 +1,8 @@
 # 0375b — W1-E slice: shared chart title and axis-title payload engine
 
-- Status: implementation slice on uo2/iwa-w1e; coordinator review and
-  runtime gates are pending.
+- Status: implementation slice on uo2/iwa-w1e; scoped branch gates pass,
+  while coordinator review, native evidence and final integrated gates are
+  pending.
 - Date: 2026-10-28.
 - Parent: 0375a (0375a-iwa-w1e-style-variation-write-engine.md), plan
   0363 (0363-iwa-monolith-exit-plan.md), parity harness and ledger
@@ -67,7 +68,13 @@ and caption implementations remain unchanged.
 crates/litchi-iwa/tests/parity/chart_text_cases.rs is the host-backed
 differential oracle. It covers title and both axis selections for Numbers and
 Pages, set/read/remove sequences, exact inverse restoration, strict leaf
-reopen, and semantic host-vs-leaf reads. The host remains authoritative; the
+reopen, and semantic host-vs-leaf reads. Numbers uses
+test-data/iwork/numbers/chart-data-native.numbers and adds the Column2d chart
+through the host before serializing the differential input. Pages uses a
+source-built Draft with a host-added body chart: the tracked native Pages
+chart-data fixture currently contains a malformed cross-component chart
+reference for host discovery, so it is retained for the native queue but not
+used as a false differential vector. The host remains authoritative; the
 cases are declared Evidence::Queued until native application evidence is
 recorded.
 
@@ -80,8 +87,10 @@ bounded graph algorithm and native evidence.
 crates/litchi-iwa/tests/parity/chart_text_cost.rs contains the source-bound
 host/leaf ABBA probe for Numbers and Pages title/category/value routes. It
 includes open, selector resolution, mutation, commit, candidate reopen and
-serialization on both routes. It has not been run on this branch while the
-coordinator quiet hold is active; no performance claim is made here.
+serialization on both routes. The ignored probe was run once as a functional
+smoke check (one passing test); it intentionally records no wall-clock data
+and does not qualify performance. Final integrated release-mode, pinned-CPU
+measurement remains required.
 
 The coordinator should run the final integrated candidate with release
 debug-info, CPU pinning and callgrind, collecting
@@ -97,7 +106,12 @@ rows are therefore queued in 0363, with pending results. The ledger and
 queue must not be treated as W3-ready until the coordinator records native
 evidence, final integrated parity and final performance.
 
-Scoped rustfmt, JSON validation, the API glossary registration, ledger rows,
-queue rows and git diff --check are source-level checks only. Cargo, Clippy,
-tests, rustdoc, boundary, fuzz locks and the full 53-row gate remain pending
-on the integrated trunk commit.
+Scoped verification on this worktree includes rustfmt, targeted Clippy,
+targeted rustdoc, the shared/Numbers/Pages unit tests, six host differential
+tests, the ignored full-facade cost-probe smoke test, JSON validation, API
+glossary registration, ledger and boundary checks, no-3rdparty checks,
+affected fuzz-lock cargo checks and git diff --check. These checks are
+source/branch evidence only: native queue rows remain pending, and the
+complete 53-row gate plus final performance qualification must run on the
+integrated trunk commit. No performance qualification is claimed from this
+slice.

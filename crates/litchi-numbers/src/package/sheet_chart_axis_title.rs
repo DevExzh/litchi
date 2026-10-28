@@ -5,7 +5,8 @@
 //! semantic-axis entry points at the Numbers boundary.
 
 pub use super::sheet_chart_text::{Commit, Diagnostics, Edit, Error, LimitKind, Patch, Refusal};
-pub use litchi_iwa_common::chart::axis::Axis;
+
+use litchi_iwa_common::chart::axis::Axis;
 
 use super::Package;
 use crate::selector::{ChartSelector, SheetSelector};

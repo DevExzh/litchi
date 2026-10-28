@@ -147,7 +147,7 @@ impl From<Refusal> for Error {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq)]
 struct Target {
     chart: ChartTarget,
     kind: Kind,
@@ -230,7 +230,7 @@ fn owns_reference(info: &litchi_iwa_core::MessageInfo, identifier: u64, field: u
         }
         fields = fields.saturating_add(objects);
     }
-    fields == 1
+    fields <= 1
 }
 
 fn read_payload(payload: &[u8], kind: Kind) -> Result<Option<Box<str>>, Error> {

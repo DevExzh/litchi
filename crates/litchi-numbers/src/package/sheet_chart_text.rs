@@ -23,9 +23,8 @@ use thiserror::Error as ThisError;
 
 use super::Package;
 use super::chart_arrangement::{
-    self, ChartBudget, ChartSelection, map_package_error, object_from_resolved,
-    select_chart_with_budget, selected_chart_payload, unique_typed_message,
-    validate_message_metadata,
+    self, ChartBudget, map_package_error, object_from_resolved, select_chart_with_budget,
+    selected_chart_payload, unique_typed_message, validate_message_metadata,
 };
 use crate::selector::{ChartSelector, SheetSelector};
 
@@ -358,7 +357,7 @@ fn owns_reference(info: &litchi_iwa_core::MessageInfo, identifier: u64, field: u
         }
         fields = fields.saturating_add(objects);
     }
-    fields == 1
+    fields <= 1
 }
 
 fn read_payload(payload: &[u8], kind: Kind) -> Result<Option<Box<str>>, Error> {
@@ -368,7 +367,7 @@ fn read_payload(payload: &[u8], kind: Kind) -> Result<Option<Box<str>>, Error> {
         chart_text::Limits::for_source(payload),
     )
     .map_err(map_chart_text_error)?;
-    Ok(snapshot.text().map(str::into))
+    Ok(snapshot.text().map(|text| text.into()))
 }
 
 fn rewrite_payload(payload: &[u8], kind: Kind, after: Option<&str>) -> Result<Vec<u8>, Error> {
@@ -562,14 +561,14 @@ fn map_arrangement_error(error: chart_arrangement::Error) -> Error {
 }
 
 fn publish(source: &Package, target: &Target, rewritten: Vec<u8>) -> Result<Package, Error> {
-    if !source.state.source.source_is_exact() {
-        return Err(Refusal::UnsupportedSource.into());
-    }
     let source_catalog = source
         .state
         .components
         .physical()
         .ok_or(Error::InvalidSource)?;
+    if !source_catalog.source_is_exact() {
+        return Err(Refusal::UnsupportedSource.into());
+    }
     let component = source
         .state
         .components
@@ -606,8 +605,9 @@ fn publish(source: &Package, target: &Target, rewritten: Vec<u8>) -> Result<Pack
     let prepared = source_catalog
         .prepare_reassembly_with_deletions(&edits, &[], source_catalog.limits())
         .map_err(map_archive_error)?;
+    let execution_limits = prepared.execution_requirements().exact_limits();
     let output = prepared
-        .execute(prepared.execution_requirements().exact_limits())
+        .execute(execution_limits)
         .map_err(map_archive_error)?;
     Package::from_owned_bytes_with_options(output, source.state.options)
         .map_err(|_| Error::Verification)
@@ -901,9 +901,9 @@ pub(super) fn read<'sheet>(
 }
 
 /// Begin a selected chart-text edit.
-pub(super) fn edit<'a>(
+pub(super) fn edit<'a, 'sheet>(
     package: &'a Package,
-    sheet: impl Into<SheetSelector<'a>>,
+    sheet: impl Into<SheetSelector<'sheet>>,
     chart: impl Into<ChartSelector>,
     kind: Kind,
 ) -> Result<Edit<'a>, Error> {
