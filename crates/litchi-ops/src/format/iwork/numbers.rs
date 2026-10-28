@@ -1247,6 +1247,16 @@ pub(crate) fn set(
     limits: &SemanticLimits,
 ) -> Result<Commit> {
     let targets = targets(file, target, limits)?;
+    let target_count = match &targets {
+        Targets::EmptyCell(_) => 1,
+        Targets::Nodes(nodes) => nodes.len(),
+    };
+    let admitted_operations = target_count.checked_mul(props.len()).unwrap_or(usize::MAX);
+    bound(
+        LimitKind::Operations,
+        admitted_operations,
+        limits.max_operations(),
+    )?;
     let cached_formula = match &targets {
         Targets::EmptyCell(_) => cached_formula_write(props)?,
         Targets::Nodes(nodes) if nodes.iter().any(|node| node.item().type_name() == "cell") => {

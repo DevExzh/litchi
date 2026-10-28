@@ -6,6 +6,8 @@
 #![cfg(feature = "numbers")]
 
 use litchi_core::FileFormat;
+use litchi_ops::error::Source;
+use litchi_ops::transaction::{Error as TransactionError, LimitKind, SemanticLimits};
 use litchi_ops::{BatchItem, BatchMode, Code, File, NewNode, Placement, Props, create, props};
 
 fn fixture(path: &str) -> std::path::PathBuf {
@@ -341,6 +343,82 @@ fn writes_cached_formulas_through_the_unified_route() {
         .apply(transaction.file())
         .expect("inverse");
     assert_eq!(restored.to_bytes().expect("restored bytes"), source_bytes);
+}
+
+#[test]
+fn cached_formula_repeated_casefolded_keys_keep_last_pair_and_reject_interleaved_value() {
+    let source = read("formula-budget-native.numbers");
+    let source_bytes = source.to_bytes().expect("source bytes");
+    let assignments = Props::from_props(props! {
+        "FoRmUlA" => "not a formula".to_owned(),
+        "cAcHeDvAlUe" => vec!["ignored cache".to_owned()],
+        "FORMULA" => "=B3+1".to_owned(),
+        "CACHEDVALUE" => 2.0,
+    })
+    .expect("properties");
+    assert_eq!(
+        assignments.get("formula").and_then(|value| value.as_text()),
+        Some("=B3+1")
+    );
+    assert!(matches!(
+        assignments.get("cachedValue"),
+        Some(litchi_ops::PropValue::Number(value)) if *value == 2.0
+    ));
+    let edited = source
+        .set("/sheet[1]/table[1]/C3", &assignments)
+        .expect("last case-folded formula/cache pair");
+    assert_eq!(
+        edited.to_bytes().expect("edited bytes"),
+        direct_cached_formula_route(&source_bytes),
+        "last case-folded formula/cache pair must win"
+    );
+
+    let interleaved = Props::from_props(props! {
+        "formula" => "=B3+1",
+        "cachedValue" => 2.0,
+        "VaLuE" => "interleaved value".to_owned(),
+    })
+    .expect("interleaved properties");
+    assert_eq!(
+        interleaved.get("value").and_then(|value| value.as_text()),
+        Some("interleaved value")
+    );
+    let error = source
+        .set("/sheet[1]/table[1]/C3", &interleaved)
+        .expect_err("a value and formula cache on one cell are not one leaf change");
+    assert_eq!(error.code(), Code::InvalidValue);
+    assert_eq!(source.to_bytes().expect("unchanged source"), source_bytes);
+}
+
+#[test]
+fn cached_formula_operation_limit_precedes_parse_and_cache_allocations() {
+    let source = read("formula-budget-native.numbers");
+    let before = source.to_bytes().expect("source bytes");
+    let limits = SemanticLimits::builder()
+        .max_operations(1)
+        .expect("one-operation limit")
+        .build()
+        .expect("valid limits");
+    let malformed_and_large = props! {
+        "formula" => format!("not a formula {}", "x".repeat(128 * 1024)),
+        "cachedValue" => "x".repeat(128 * 1024),
+    };
+    let error = source
+        .edit_with_options(
+            litchi_ops::EditOptions::new().semantic_limits(limits),
+            |edit| edit.set("/sheet[1]/table[1]/C3", malformed_and_large),
+        )
+        .expect_err("operation admission must precede formula/cache parsing");
+    assert_eq!(error.code(), Code::LimitExceeded);
+    assert!(matches!(
+        error.leaf(),
+        Source::Transaction(TransactionError::Limit {
+            kind: LimitKind::Operations,
+            observed: 2,
+            maximum: 1,
+        })
+    ));
+    assert_eq!(source.to_bytes().expect("unchanged source"), before);
 }
 
 /// Full `File` versus direct-leaf release instruction probe for one cached
