@@ -601,9 +601,9 @@ fn scan_reference(
 fn scan_stylesheet(
     stylesheet: &[u8],
     limits: RegistrationLimits,
-) -> RegistrationResult<RegistrationScan> {
-    let mut scan = RegistrationScan::empty();
-    let fields = registration_fields(stylesheet, limits, &mut scan)?;
+    scan: &mut RegistrationScan,
+) -> RegistrationResult<()> {
+    let fields = registration_fields(stylesheet, limits, scan)?;
     for field in fields {
         if field.wire_type() != 2
             || !matches!(
@@ -615,21 +615,21 @@ fn scan_stylesheet(
         }
         let payload = field.payload(stylesheet).map_err(map_wire_error)?;
         if field.number() == STYLESHEET_STYLES {
-            scan_reference(payload, limits, &mut scan)?;
+            scan_reference(payload, limits, scan)?;
         } else {
-            let children = registration_fields(payload, limits, &mut scan)?;
+            let children = registration_fields(payload, limits, scan)?;
             for child in children {
                 if child.number() == CHILDREN && child.wire_type() == 2 {
                     scan_reference(
                         child.payload(payload).map_err(map_wire_error)?,
                         limits,
-                        &mut scan,
+                        scan,
                     )?;
                 }
             }
         }
     }
-    Ok(scan)
+    Ok(())
 }
 
 fn bounded_copy(
@@ -775,6 +775,48 @@ fn encoded_message_len(number: u32, payload_len: usize) -> RegistrationResult<us
         .and_then(|value| value.checked_add(payload_len))
         .ok_or(RegistrationError::Invalid(
             "stylesheet output length overflow",
+        ))
+}
+
+fn stylesheet_writer_output_bound(
+    stylesheet: &[u8],
+    parent: u64,
+    style: u64,
+    parent_matches: usize,
+) -> RegistrationResult<usize> {
+    let reference_len = litchi_iwa_common::varint::encoded_len(REFERENCE_IDENTIFIER as u64)
+        .checked_add(litchi_iwa_common::varint::encoded_len(style))
+        .ok_or(RegistrationError::Invalid(
+            "stylesheet writer reference length overflow",
+        ))?;
+    let style_field = encoded_message_len(STYLESHEET_STYLES, reference_len)?;
+    let child_field = encoded_message_len(CHILDREN, reference_len)?;
+    let parent_change = if parent_matches == 0 {
+        let parent_ref = litchi_iwa_common::varint::encoded_len(REFERENCE_IDENTIFIER as u64)
+            .checked_add(litchi_iwa_common::varint::encoded_len(parent))
+            .ok_or(RegistrationError::Invalid(
+                "stylesheet parent reference length overflow",
+            ))?;
+        let entry = encoded_message_len(CHILDREN_PARENT, parent_ref)?
+            .checked_add(child_field)
+            .ok_or(RegistrationError::Invalid(
+                "stylesheet parent entry length overflow",
+            ))?;
+        encoded_message_len(STYLESHEET_PARENT_CHILDREN, entry)?
+    } else {
+        // The existing field is rewritten with one additional child. Allow
+        // for a changed length-prefix width as well as the new child field.
+        child_field.saturating_add(2)
+    };
+    stylesheet
+        .len()
+        .checked_add(style_field)
+        .ok_or(RegistrationError::Invalid(
+            "stylesheet writer output bound overflow",
+        ))?
+        .checked_add(parent_change)
+        .ok_or(RegistrationError::Invalid(
+            "stylesheet writer output bound overflow",
         ))
 }
 
@@ -926,7 +968,8 @@ fn bounded_register(
     style: u64,
     limits: RegistrationLimits,
 ) -> RegistrationResult<(Vec<u8>, RegistrationReport)> {
-    let mut scan = scan_stylesheet(stylesheet, limits)?;
+    let mut scan = RegistrationScan::empty();
+    scan_stylesheet(stylesheet, limits, &mut scan)?;
     let styles = bounded_repeated_payloads(stylesheet, STYLESHEET_STYLES, limits, &mut scan)?;
     for payload in &styles {
         if bounded_reference_identifier(payload, limits, &mut scan)? == style {
@@ -954,11 +997,55 @@ fn bounded_register(
         ));
     }
     // The shared text-wire writer preserves insertion-after-last-style and
-    // unknown/order bytes exactly. The preflight above validates ownership;
-    // this second scan admits the writer's nested traversal against residual
-    // input/field/work allowances before it allocates its candidate buffer.
-    scan_stylesheet(stylesheet, limits).map(|next| scan = next)?;
-    let wire_limits = registration_wire_limits(limits, &scan)?;
+    // unknown/order bytes exactly. Carry the existing ledger into a cloned
+    // writer admission pass; never replace it with a fresh scan.
+    let scan_before_writer = scan;
+    let mut admitted_scan = scan;
+    scan_stylesheet(stylesheet, limits, &mut admitted_scan)?;
+    let output_remaining = limits
+        .max_output_bytes
+        .checked_sub(scan_before_writer.output_bytes)
+        .ok_or(RegistrationError::Limit {
+            kind: RegistrationLimitKind::OutputBytes,
+            observed: scan_before_writer.output_bytes.saturating_add(1),
+            maximum: limits.max_output_bytes,
+        })?;
+    if output_remaining == 0 {
+        return Err(registration_limit(
+            RegistrationLimitKind::OutputBytes,
+            scan_before_writer.output_bytes.saturating_add(1),
+            limits.max_output_bytes,
+        ));
+    }
+    let wire_limits = registration_wire_limits(limits, &scan_before_writer)?
+        .with_output_bytes(output_remaining)
+        .map_err(map_wire_error)?;
+    let output_bound = stylesheet_writer_output_bound(stylesheet, parent, style, parent_matches)?;
+    registration_add(
+        &mut admitted_scan.output_bytes,
+        output_bound,
+        limits.max_output_bytes,
+        RegistrationLimitKind::OutputBytes,
+    )?;
+    registration_add(
+        &mut admitted_scan.work_bytes,
+        output_bound,
+        limits.max_work_bytes,
+        RegistrationLimitKind::Work,
+    )?;
+    registration_add(
+        &mut admitted_scan.allocations,
+        1,
+        limits.max_allocations,
+        RegistrationLimitKind::Allocations,
+    )?;
+    registration_add(
+        &mut admitted_scan.scratch_bytes,
+        stylesheet.len(),
+        limits.max_scratch_bytes,
+        RegistrationLimitKind::ScratchBytes,
+    )?;
+    scan = admitted_scan;
     let output =
         litchi_iwa_text_wire::stylesheet_with_style(stylesheet, style, Some(parent), wire_limits)
             .map_err(map_char_style_error)?;
@@ -999,7 +1086,8 @@ fn bounded_unregister(
     style: u64,
     limits: RegistrationLimits,
 ) -> RegistrationResult<(Vec<u8>, RegistrationReport)> {
-    let mut scan = scan_stylesheet(stylesheet, limits)?;
+    let mut scan = RegistrationScan::empty();
+    scan_stylesheet(stylesheet, limits, &mut scan)?;
     let styles = bounded_repeated_payloads(stylesheet, STYLESHEET_STYLES, limits, &mut scan)?;
     let mut listed = 0usize;
     let mut kept_styles = Vec::new();
