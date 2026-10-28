@@ -1308,6 +1308,9 @@ pub fn set(
         return Ok(budget.report(false));
     }
     let chart_location = workspace.locate(chart)?;
+    let chart_member_len = workspace.member(chart_location).len();
+    budget.allocation(1)?;
+    budget.scratch(chart_member_len)?;
     let chart_member = workspace.member(chart_location).to_owned();
     repoint(workspace, chart, &replacements, &mut budget)?;
     let last = additions.last().map(|addition| addition.identifier);
@@ -1458,10 +1461,15 @@ fn insert(
     info.versions = text_style::MESSAGE_VERSION.to_vec().into();
     info.object_references.extend(references);
     let style_location = workspace.locate(addition.stylesheet)?;
+    let style_member_len = workspace.member(style_location).len();
+    budget.allocation(1)?;
+    budget.scratch(style_member_len)?;
     workspace.insert(style_location, object)?;
     let style_member = workspace.member(style_location).to_owned();
+    budget.work(workspace.registry_inspection_work())?;
     if let Some(style_component) = workspace.component_for_member(&style_member)? {
         workspace.add_object_uuids(style_component, &[addition.identifier])?;
+        budget.work(workspace.registry_inspection_work())?;
         if let Some(owner) = workspace.component_for_member(chart_member)?
             && owner != style_component
         {
@@ -1474,10 +1482,23 @@ fn insert(
 /// Whether any object other than its stylesheet or child styles references
 /// `style` in its metadata.
 fn has_consumers(workspace: &Workspace<'_>, style: u64, budget: &mut Budget) -> Result<bool> {
-    for location in workspace.locations() {
+    for location in workspace.locations_iter() {
         budget.work(size_of::<u64>())?;
         for object in &workspace.archive_at(location)?.objects {
-            budget.work(object.messages.len().saturating_mul(size_of::<u64>()))?;
+            budget.work(
+                object
+                    .messages
+                    .len()
+                    .saturating_mul(size_of::<u64>())
+                    .saturating_add(
+                        object
+                            .archive_info
+                            .message_infos
+                            .iter()
+                            .map(|info| info.object_references.len())
+                            .sum::<usize>(),
+                    ),
+            )?;
             for (message, info) in object
                 .messages
                 .iter()
@@ -1507,31 +1528,49 @@ fn owner_reference_if_unused(
     style: u64,
     budget: &mut Budget,
 ) -> Result<()> {
+    budget.work(workspace.registry_inspection_work())?;
     let Some(style_component) = workspace.component_for_member(style_member)? else {
         return Ok(());
     };
+    budget.work(workspace.registry_inspection_work())?;
     let Some(owner) = workspace.component_for_member(chart_member)? else {
         return Ok(());
     };
     if owner == style_component {
         return Ok(());
     }
-    for location in workspace.locations() {
+    for location in workspace.locations_iter() {
+        let member = workspace.member(location);
+        budget.work(size_of::<u64>().saturating_add(member.len()))?;
+        budget.allocation(1)?;
+        budget.scratch(member.len())?;
+        let member = member.to_owned();
         budget.work(size_of::<u64>())?;
-        let member = workspace.member(location).to_owned();
-        if workspace.component_for_member(&member)? == Some(owner)
-            && workspace
-                .archive_at(location)?
-                .objects
+        budget.work(workspace.registry_inspection_work())?;
+        if workspace.component_for_member(&member)? != Some(owner) {
+            continue;
+        }
+        let archive = workspace.archive_at(location)?;
+        let mut found = false;
+        for object in &archive.objects {
+            let references = object
+                .archive_info
+                .message_infos
                 .iter()
-                .any(|object| {
-                    object
-                        .archive_info
-                        .message_infos
-                        .iter()
-                        .any(|info| info.object_references.contains(&style))
-                })
-        {
+                .map(|info| info.object_references.len())
+                .sum::<usize>();
+            budget.work(references)?;
+            if object
+                .archive_info
+                .message_infos
+                .iter()
+                .any(|info| info.object_references.contains(&style))
+            {
+                found = true;
+                break;
+            }
+        }
+        if found {
             return Ok(());
         }
     }
@@ -1555,6 +1594,9 @@ fn prune(
     for &style in previous {
         budget.work(size_of::<u64>())?;
         let location = workspace.locate(style)?;
+        let style_member_len = workspace.member(location).len();
+        budget.allocation(1)?;
+        budget.scratch(style_member_len)?;
         let style_member = workspace.member(location).to_owned();
         if font_only(workspace, style, budget)?.is_none()
             || has_consumers(workspace, style, budget)?
@@ -1602,9 +1644,11 @@ fn prune(
             field.object_references.retain(|id| *id != style);
         }
         workspace.remove(style)?;
+        budget.work(workspace.registry_inspection_work())?;
         if let Some(style_component) = workspace.component_for_member(&style_member)? {
             workspace.remove_object_uuids(style_component, &[style])?;
             workspace.remove_external_references_to(style_component, style)?;
+            budget.work(workspace.registry_inspection_work())?;
             if let Some(owner) = workspace.component_for_member(chart_member)?
                 && owner != style_component
             {

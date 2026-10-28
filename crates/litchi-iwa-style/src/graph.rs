@@ -438,6 +438,14 @@ impl<'s> Workspace<'s> {
             .collect()
     }
 
+    /// Borrow live component locations without allocating a collection.
+    pub(crate) fn locations_iter(&self) -> impl Iterator<Item = Location> + '_ {
+        (0..self.source.count())
+            .filter(|position| !self.deleted.contains(position))
+            .map(Location::Source)
+            .chain((0..self.created.len()).map(Location::Created))
+    }
+
     /// `(message index, payload)` of the unique `message_type` payload of
     /// object `identifier`.
     pub(crate) fn unique_payload(
@@ -732,6 +740,15 @@ impl<'s> Workspace<'s> {
             }
         }
         Ok(found)
+    }
+
+    /// Upper bound for one package-registry inspection used by adapters that
+    /// need to resolve a component repeatedly during a bounded graph walk.
+    pub(crate) fn registry_inspection_work(&self) -> usize {
+        self.registry_payload()
+            .ok()
+            .flatten()
+            .map_or(0, <[u8]>::len)
     }
 
     /// The effective locator of current component `component`.
