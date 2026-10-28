@@ -1029,6 +1029,15 @@ struct ExpandedAttributeName<'a> {
 
 pub(crate) fn validate_event_bytes(event: &Event<'_>, offset: u64) -> Result<()> {
     let bytes: &[u8] = event;
+    // ASCII tab, line feed, carriage return and 0x20..=0x7F are UTF-8 and
+    // XML 1.0 characters, so such an event (almost every event) passes
+    // without decoding (record 0377a); anything else takes the full check.
+    if bytes
+        .iter()
+        .all(|&byte| (0x20..0x80).contains(&byte) || matches!(byte, b'\t' | b'\n' | b'\r'))
+    {
+        return Ok(());
+    }
     let text = str::from_utf8(bytes)
         .map_err(|error| invalid_xml(offset, format!("XML is not UTF-8: {error}")))?;
     if text.chars().any(|character| !is_xml10_character(character)) {
@@ -1395,6 +1404,18 @@ pub(crate) fn validate_qname(bytes: &[u8], offset: u64, kind: &str) -> Result<()
 }
 
 pub(crate) fn validate_name(bytes: &[u8], offset: u64, kind: &str) -> Result<()> {
+    // An ASCII name needs no UTF-8 decoding; its bytes are its characters
+    // (record 0377a). The classification is the same as below.
+    if let Some((&first, rest)) = bytes.split_first()
+        && bytes.is_ascii()
+    {
+        if !is_xml_name_start(char::from(first))
+            || rest.iter().any(|&byte| !is_xml_name_char(char::from(byte)))
+        {
+            return Err(invalid_xml(offset, format!("malformed {kind} name")));
+        }
+        return Ok(());
+    }
     let text = str::from_utf8(bytes)
         .map_err(|error| invalid_xml(offset, format!("{kind} name is not UTF-8: {error}")))?;
     let mut chars = text.chars();
