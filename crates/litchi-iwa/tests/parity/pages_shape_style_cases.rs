@@ -15,7 +15,7 @@ use litchi_iwa_common::shape::shadow::{
 use litchi_iwa_common::shape::stroke::{Pattern, Width};
 use litchi_iwa_common::text::layout::{AutoSize, Inset, Insets, VerticalAlignment};
 use litchi_pages::drawable::style::{
-    Effects, Fill, Layout, Property, PropertyKind, Shadow, Stroke,
+    Effects, Endpoint, Endpoints, Fill, Layout, Property, PropertyKind, Shadow, Stroke,
 };
 use litchi_pages::{DrawableSelector, Package};
 
@@ -76,6 +76,9 @@ fn host_apply(editor: &mut pages::Draft, shape: u64, op: &Op) -> TestResult {
         Op::Set(Property::TextLayout(layout)) => {
             editor.set_body_shape_text_layout(shape, *layout)?;
         },
+        Op::Set(Property::LineEndpoints(endpoints)) => {
+            editor.set_body_line_endpoints(shape, *endpoints)?;
+        },
         Op::Set(_) => return Err("no host route".into()),
         Op::Reset(PropertyKind::Fill) => {
             let _ = editor.reset_body_shape_fill(shape)?;
@@ -93,6 +96,9 @@ fn host_apply(editor: &mut pages::Draft, shape: u64, op: &Op) -> TestResult {
             {
                 let _ = editor.reset_body_shape_text_layout(shape)?;
             };
+        },
+        Op::Reset(PropertyKind::LineEndpoints) => {
+            let _ = editor.reset_body_line_endpoints(shape)?;
         },
         Op::Reset(_) => return Err("no host route".into()),
     }
@@ -360,6 +366,149 @@ fn pages_body_shape_style_read_parity() -> TestResult {
         .drawable_object_id;
     assert_eq!(host_styles(&built.bytes, id)?, leaf_styles(&built.bytes)?);
     Ok(())
+}
+
+/// `path` with a straight line the host added at the start of the body.
+fn with_line(path: &'static str) -> TestResult<(Fixture, u64)> {
+    let mut editor = pages::Draft::from_bytes(&fixture(path)?.bytes)?;
+    let shape = editor
+        .add_body_line(
+            0,
+            DrawablePoint { x: 40.0, y: 60.0 },
+            DrawablePoint { x: 240.0, y: 160.0 },
+        )?
+        .drawable_object_id;
+    Ok((
+        Fixture {
+            path,
+            bytes: editor.to_bytes()?,
+        },
+        shape,
+    ))
+}
+
+fn line_case(name: &'static str, tier: Tier, before: &[Op], after: &[Op]) -> TestResult {
+    let (base, shape) = with_line(NATIVE)?;
+    let input = Fixture {
+        path: NATIVE,
+        bytes: host_route(&base.bytes, shape, before)?,
+    };
+    let host_ops = after.to_vec();
+    let leaf_ops = after.to_vec();
+    let mut case = Case::new(name, Format::Pages, tier, Evidence::Queued, &input);
+    if tier == Tier::B {
+        case = case.leaf_structural_metadata();
+    }
+    case.host(move |source| host_route(source, shape, &host_ops))
+        .leaf(move |source| leaf_route(source, &leaf_ops))
+        .read("host endpoints", move |bytes: &[u8]| {
+            Ok(format!(
+                "{:?}",
+                pages::Draft::from_bytes(bytes)?.body_line_endpoints(shape)?
+            ))
+        })
+        .read("leaf endpoints", |bytes: &[u8]| {
+            let package = Package::from_bytes(bytes)?;
+            let Property::LineEndpoints(endpoints) = package
+                .body_drawable_style(DrawableSelector::shape(0), PropertyKind::LineEndpoints)?
+            else {
+                return Err("not endpoints".into());
+            };
+            Ok(format!("{endpoints:?}"))
+        })
+        .run()?;
+    Ok(())
+}
+
+fn arrows() -> Op {
+    Op::Set(Property::LineEndpoints(Endpoints {
+        start: Endpoint::FilledCircle,
+        end: Endpoint::OpenArrow,
+    }))
+}
+
+/// Line endpoints on a new variation (a fresh registry UUID: tier B).
+#[test]
+fn pages_body_line_endpoints_set_parity() -> TestResult {
+    let _ = Evidence::Queued;
+    line_case(
+        "pages_body_line_endpoints_set_parity",
+        Tier::B,
+        &[],
+        &[arrows()],
+    )
+}
+
+/// Line endpoints rewritten in place, then reset (collapse), with the reads.
+#[test]
+fn pages_body_line_endpoints_reset_parity() -> TestResult {
+    let _ = Evidence::Queued;
+    line_case(
+        "pages_body_line_endpoints_reset_parity",
+        Tier::A,
+        &[arrows()],
+        &[Op::Set(Property::LineEndpoints(Endpoints {
+            start: Endpoint::Line,
+            end: Endpoint::FilledSquare,
+        }))],
+    )?;
+    line_case(
+        "pages_body_line_endpoints_reset_parity",
+        Tier::A,
+        &[arrows()],
+        &[Op::Reset(PropertyKind::LineEndpoints)],
+    )
+}
+
+#[test]
+#[ignore = "callgrind cost probe (record 0371)"]
+fn line_endpoints_set_cost_abba() -> TestResult {
+    let (input, shape) = with_line(NATIVE)?;
+    let ops = [arrows()];
+    crate::pages_cost_probes::abba(
+        &input,
+        |source| host_route(source, shape, &ops),
+        |source| Ok(leaf_bytes!(leaf_commit(source, &ops)?.package())),
+    )
+}
+
+#[test]
+#[ignore = "callgrind cost probe (record 0371)"]
+fn line_endpoints_reset_cost_abba() -> TestResult {
+    let (base, shape) = with_line(NATIVE)?;
+    let input = Fixture {
+        path: NATIVE,
+        bytes: host_route(&base.bytes, shape, &[arrows()])?,
+    };
+    let ops = [Op::Reset(PropertyKind::LineEndpoints)];
+    crate::pages_cost_probes::abba(
+        &input,
+        |source| host_route(source, shape, &ops),
+        |source| Ok(leaf_bytes!(leaf_commit(source, &ops)?.package())),
+    )
+}
+
+#[test]
+#[ignore = "callgrind cost probe (record 0371)"]
+fn line_endpoints_read_cost_abba() -> TestResult {
+    let (base, shape) = with_line(NATIVE)?;
+    let input = Fixture {
+        path: NATIVE,
+        bytes: host_route(&base.bytes, shape, &[arrows()])?,
+    };
+    crate::pages_cost_probes::abba(
+        &input,
+        |source| {
+            let endpoints = pages::Draft::from_bytes(source)?.body_line_endpoints(shape)?;
+            Ok(format!("{endpoints:?}").into_bytes())
+        },
+        |source| {
+            let package = Package::from_bytes(source)?;
+            let endpoints = package
+                .body_drawable_style(DrawableSelector::shape(0), PropertyKind::LineEndpoints)?;
+            Ok(format!("{endpoints:?}").into_bytes())
+        },
+    )
 }
 
 #[test]

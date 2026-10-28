@@ -23,7 +23,8 @@ pub mod values {
     };
 }
 /// Exact-source creation of a body table cloned from the document's first
-/// body table (record 0329).
+/// body table (record 0329), or of a populated copy of an existing body
+/// table (record 0371).
 pub mod creation {
     pub use crate::package::body_table_creation::{
         Commit, Diagnostics, Edit, Error, LimitKind, NewTable, Patch, Refusal,
