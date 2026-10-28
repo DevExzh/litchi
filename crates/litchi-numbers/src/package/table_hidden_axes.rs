@@ -376,6 +376,7 @@ fn map_package_error(error: crate::Error) -> engine::Error {
     match error {
         crate::Error::Archive(error) => map_archive_error(error),
         crate::Error::Common(error) => map_common_error(error),
+        crate::Error::Semantic(error) => map_workbook_error(error),
         crate::Error::SemanticLimit {
             kind,
             observed,
@@ -391,6 +392,27 @@ fn map_package_error(error: crate::Error) -> engine::Error {
             observed,
             maximum,
         },
+        _ => engine::Error::InvalidSource,
+    }
+}
+
+fn map_workbook_error(error: crate::workbook::Error) -> engine::Error {
+    match error {
+        crate::workbook::Error::TooManySheets { actual, limit }
+        | crate::workbook::Error::TooManyTables { actual, limit }
+        | crate::workbook::Error::TooManyMaterializedCells { actual, limit } => {
+            engine::Error::Limit {
+                kind: engine::LimitKind::PayloadItems,
+                observed: u64::try_from(actual).unwrap_or(u64::MAX),
+                maximum: u64::try_from(limit).unwrap_or(u64::MAX),
+            }
+        },
+        crate::workbook::Error::TextTooLarge { observed, limit } => engine::Error::Limit {
+            kind: engine::LimitKind::PayloadBytes,
+            observed: u64::try_from(observed).unwrap_or(u64::MAX),
+            maximum: u64::try_from(limit).unwrap_or(u64::MAX),
+        },
+        crate::workbook::Error::Allocation { amount } => engine::Error::Allocation { amount },
         _ => engine::Error::InvalidSource,
     }
 }
