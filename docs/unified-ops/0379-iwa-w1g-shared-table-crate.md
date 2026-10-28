@@ -1,11 +1,19 @@
 # 0379 — W1-G: the shared iWork table-family crate `litchi-iwa-table`
 
-- Status: group 1 (cell formats) landed on branch `uo2/iwa-w1g`, cut from
-  trunk `feat/unified-ops-api` at `ca202291ca`: the crate and the Numbers
-  move (`35908bbc0a`, merge-ready at `7ea1e295b1`), then the Pages and
-  Keynote families (this record's commit). Groups 2–5 (comments, rich text,
-  topology, conditional highlights) are not started (§5).
-- Date: 2026-10-26.
+- Status: groups 1 (cell formats) and 6 (hidden axes) landed on branch
+  `uo2/iwa-w1g`, cut from trunk `feat/unified-ops-api` at `ca202291ca`.
+  Group 1: the crate and the Numbers move (`35908bbc0a`, merge-ready at
+  `7ea1e295b1`), then the Pages and Keynote families (`73f6fa976a`).
+  Group 6 (§2a): the engine lift with the Pages owner (`e6e946e72b`), the
+  Keynote family (`c4a13cadfa`), then the engine changes, the host builder
+  change and the Numbers family (`3a9ef1b692`, `c0ec8404f2`,
+  `1544f10604`). Groups 2–5 (comments, rich text, topology, conditional
+  highlights) are not started (§5).
+- Date: 2026-10-26; group 6 completed 2026-10-27.
+- Review follow-up (`828d02cad9`): owner-extents coordinates require
+  canonical value varints, and the Numbers facade preserves typed resolver
+  and candidate-ingress limits/refusals. Numbers and Keynote hidden-axis
+  parity plus the focused engine and facade tests pass after this fix.
 - Plan: [0363](0363-iwa-monolith-exit-plan.md) (W1 table families, §3.2
   "one family taking a format enum"), the W1-A Numbers table records
   [0370](0370-iwa-w1a-numbers-tables.md)–[0370c](0370c-iwa-w1a-row-column-removal.md),
@@ -14,7 +22,9 @@
 - `performance_claim`: the Numbers format, control and Pop-Up Menu routes
   are unchanged under callgrind (+0.09%, −0.03%, +0.01%); the new Pages
   family runs 88.2% below its host route and the Keynote family 0.9% above
-  its host route (§4).
+  its host route (§4). Hidden axes (§2a): the engine lift leaves the Pages
+  route unchanged (+0.008%); the Keynote and Numbers families run 60.4%
+  and 18.1% below their host routes.
 
 ## 1. Why a new crate
 
@@ -201,9 +211,95 @@ the first slide table of `table-discovery.key` and
 
 Ledger: `set_slide_table_hidden_axes` (B) and `slide_table_hidden_axes`
 (A) migrate, with two macOS queue rows. The engine refuses
-`slide-table-read-native.key`'s table as an invalid source (§5).
+`slide-table-read-native.key`'s table as an invalid source: its formula
+owner has dependencies (§2a.3, §5).
 Callgrind (`keynote_hidden_axes_cost_abba`, host A B B A leaf): host
 852,289,662, leaf 337,487,517, **−60.4%**.
+
+### 2a.3 Numbers
+
+`litchi_numbers::table::hidden_axes` with `Package::{table_hidden_axes,
+edit_table_hidden_axes, apply_table_hidden_axes}`, the Keynote facade's
+shape over the sheet and table selectors (`table_headers::resolve` gives
+the model and drawable routes), keeping root previews as the Numbers
+cell-level families do.
+
+Two engine changes, both from the Numbers parity:
+
+- **Owners that record the table's extents.** A table owner's spanning
+  envelopes (`FormulaOwnerDependenciesArchive` fields 7 and 8) may hold
+  `total_range_for_table` and `body_range_for_table` and nothing else; the
+  engine used to refuse any non-empty envelope. Extents carry no
+  dependency and hidden axes leave the geometry alone, so they are now
+  admitted. A spanning reference (`coord_refers_to_spans`) or a repeated
+  extent is still `UnsupportedDependency`, a malformed range coordinate
+  `InvalidSource` (`owner_extent_tests`); every coordinate key and varint
+  must use canonical wire framing. The Numbers facade also preserves
+  resolver and candidate-ingress limit/refusal classifications at the engine
+  boundary.
+- **Identity allocation follows the host.** Owner creation allocates the
+  two filter sets before the two formula owners, as the host does (it was
+  the other way round); every `litchi-pages` test still passes.
+
+**Host builder change.** The host builder's `without_owner_extents` (the
+Pages bootstrap's workaround, record 0370i) is removed (`c0ec8404f2`): the
+host Pages builder now writes the owner extents that native files and the
+host Numbers builder store. Only the host Pages bootstrap of a first table
+uses it (`Builder::body_table`, and `Draft::add_table` on a table-less
+source-built document); the Keynote host builder has its own calculation
+archive. Checked against the parity harness's builder cases on the merged
+tree:
+
+- The harness has no tier-A builder case: the Pages and Numbers builder
+  cases are tier B and the Keynote builder comparison is an untiered
+  differential (record 0372). The leaf Pages builder (W1-B, record 0371)
+  has no `body_table` (a record 0371 gap), and the one Pages builder case,
+  `pages_builder_language_locale_parity`, builds without a table, so the
+  host route never bootstraps one.
+- No other parity case reaches the bootstrap. The table lifecycle cases
+  (`pages_body_table_add_parity`, tier B; `pages_body_table_remove_parity`,
+  tier A) run on `body-table-catalog-native.pages`, where the host clones
+  a native table, and the leaf table creation refuses a document without
+  a body table (`Refusal::NoTemplate`).
+- The Numbers builder cases (`numbers_builder_*_parity`) are unchanged:
+  the host Numbers builder always wrote the extents (0370i).
+- Every builder case and every `litchi-iwa` test passes on the merged
+  tree (§6), including the host tests that bootstrap a first Pages table
+  (`repeated_body_table_calls_append_independent_tables`,
+  `inserts_and_removes_first_table_without_a_template`, and the
+  `pages_drawable_comment_registry` and
+  `pages_source_built_stylesheet_closure` suites).
+
+When W1-B ports `body_table` or table creation on a table-less document,
+the host oracle it compares against writes the owner extents, as native
+files do.
+
+Parity (`numbers_hidden_axes_cases.rs`) on `basic.numbers`,
+`custom-number-native.numbers` and a host-built 6×4 workbook:
+
+| Test | Route | Tier |
+|---|---|---|
+| `numbers_table_hidden_axes_set_parity` | hide row 1 and column 0 on the natives; then hide more on each host output | B |
+| `numbers_table_hidden_axes_read_parity` | reads on the sources and the host's outputs | A |
+| `numbers_table_hidden_axes_clear_divergence_is_reported` | as Keynote | pinned |
+| `numbers_table_hidden_axes_creation_divergence_is_reported` | owner creation on the host-built workbook: the engine registers the new objects' UUIDs and writes empty filter offsets; the host does neither | pinned |
+
+Ledger: `set_table_hidden_axes` (B) and `table_hidden_axes` (A), two macOS
+queue rows. Callgrind (`numbers_hidden_axes_cost_abba`): host 62,615,742,
+leaf 51,289,709, **−18.1%**.
+
+**Why `slide-table-read-native.key` (and nine Numbers fixtures) stay
+refused.** The graph profiles are not the cause: every refused table has
+the same version tuples (`[1, 0, 5]` info, `[3, 2, 10]` model) as the
+admitted ones. The engine refuses them in
+`validate_native_formula_owner_metadata`: their formula owner references
+objects other than the table drawable, because the table holds formulas
+or feeds a chart (`slide-table-read-native.key`'s D2 = B2 + 1). The
+engine admits only owners whose dependency graph it proves empty, so a
+hidden-state change cannot leave a formula or chart dependency stale. Lifting
+that needs the formula-dependency engine (W1-F, record 0376) to re-plan the
+owner's spanning and cell dependencies under the new hidden state; it is a
+follow-up, not a profile calibration.
 
 ## 3. Tools and docs
 
@@ -250,6 +346,62 @@ family B, run A B B A, open + edit + commit + serialize), collected with
 The Keynote leaf route pays the slide-table selection proof and its
 inventory; it stays inside the 5% bar.
 
+### 4.1 Hidden-axis review rerun
+
+The review fix was measured again on source commit `d82fc08989`, based on
+merged candidate `4abb90f713`, after the canonical coordinate-value check and
+the lossless Numbers error mappings. The profiling binary was built from the
+same source bytes before the commit was created (the commit records the
+rustfmt-normalized mapping arms and the regression test) with the
+release-derived `profiling` profile
+(`lto = true`, debug information retained), then each probe ran on CPU 3 under
+`taskset`/callgrind with the host and leaf probes collected separately. The
+Numbers and Keynote probes used the prescribed A, B, B, A order; the Pages
+probe is a single focused facade route and therefore has no host-versus-leaf
+comparison.
+
+| Route | Host instructions | Leaf/focused instructions | Δ |
+|---|---:|---:|---:|
+| Numbers `numbers_hidden_axes_cost_abba` host/leaf probe | 62,529,923 | 51,213,830 | **−18.097%** |
+| Keynote `keynote_hidden_axes_cost_abba` host/leaf probe | 850,468,093 | 336,595,982 | **−60.422%** |
+| Pages `native_hidden_axes::hidden_axes_cost_probe` focused route | — | 34,078,005 | −0.100% vs the prior after probe |
+
+The Numbers and Keynote results are within the established cost bar. The
+Pages value is reported as an engine/facade probe only, not as host-vs-leaf
+parity or a qualification of the whole `File` stack. Raw callgrind output and
+the profiling binary remain outside the repository under
+`.coord/iwa-w1g/cg/`; the Numbers/Keynote profiling binary SHA-256 is
+`a13fceee820290d82e4f70a6fb0dd02f2a1a3164295874df55ca0fa711ffbbb5` and the
+Pages profiling binary SHA-256 is
+`31659bbaa0f9cdc44b427f3df59d4ad802ee7b0afbf7918807d51527a9786ebd`.
+
+The external artifact manifest is:
+
+| Artifact | Size | SHA-256 |
+|---|---:|---|
+| `/home/zhuhe/code/litchi-worktrees/uo2-iwa-w1g/target/profiling/deps/parity-15e248d1d90252bd` | 472,404,512 bytes | `a13fceee820290d82e4f70a6fb0dd02f2a1a3164295874df55ca0fa711ffbbb5` |
+| `/home/zhuhe/code/litchi-worktrees/uo2-iwa-w1g/target/profiling/deps/native_hidden_axes-007c6be3300edad5` | 34,327,072 bytes | `31659bbaa0f9cdc44b427f3df59d4ad802ee7b0afbf7918807d51527a9786ebd` |
+| `/home/zhuhe/code/litchi-worktrees/.coord/iwa-w1g/cg/current-numbers-host.out` | 465,419 bytes | `9c906f4b5a77a91933f8b28f2ff182567c7cb4c97b15864b93c36d506cfc5224` |
+| `/home/zhuhe/code/litchi-worktrees/.coord/iwa-w1g/cg/current-numbers-leaf.out` | 618,093 bytes | `aa13f8db95fbb50eff795e25c021d8a4be68209a07da2fa15664181da05acd5a` |
+| `/home/zhuhe/code/litchi-worktrees/.coord/iwa-w1g/cg/current-keynote-host.out` | 687,987 bytes | `655bdb7a7f8f28dd649ba8d378eb614169d6396bdbd3053444c5f3c4d37b341e` |
+| `/home/zhuhe/code/litchi-worktrees/.coord/iwa-w1g/cg/current-keynote-leaf.out` | 705,093 bytes | `394ab2d4fcbfa7cdda94dd6ed16c6738fb882550ddab3de82d35706a5cde7ec3` |
+| `/home/zhuhe/code/litchi-worktrees/.coord/iwa-w1g/cg/current-pages.out` | 599,645 bytes | `5baad48d0c85f6a81311c03e82f5cbd551e8da588ada687807b8623b0c499d1c` |
+
+The two binaries are in this worktree's untracked `target/`; the callgrind
+captures are in the external coordinator directory. None is repository
+evidence. To regenerate them, source `iwa-w1g/env.sh`, build with
+`CARGO_BUILD_JOBS=4 cargo test --profile profiling -p litchi-iwa --test parity
+--all-features --no-run --locked` and
+`CARGO_BUILD_JOBS=4 cargo test --profile profiling -p litchi-pages --test
+native_hidden_axes --no-run --locked`, then run each ignored test with
+`taskset -c 3 valgrind --tool=callgrind --quiet
+--callgrind-out-file=<external-output> --toggle-collect=<probe>
+<profiling-binary> --ignored --exact <test> --test-threads=1` in A, B, B, A
+order. The Numbers and Keynote test names are
+`numbers_hidden_axes_cases::numbers_hidden_axes_cost_abba` and
+`keynote_hidden_axes_cases::keynote_hidden_axes_cost_abba`; the Pages test is
+`hidden_axes_cost_probe`.
+
 ## 5. Gaps
 
 | Gap | Finding | Next step |
@@ -258,7 +410,8 @@ inventory; it stays inside the 5% bar.
 | Date and Time, Duration, Text on number cells | the host writes a number under a date or duration kind, which the engine reads as an invalid cell; the host refuses Text on a number cell (pinned by `*_divergence_is_reported`) | decide with the macOS run which shape native files store |
 | Custom, numeral system, controls, Pop-Up Menu for Pages and Keynote | read only; writes need the metadata transition and the control facade's publication | lift the Numbers control/Pop-Up Menu publication (`rewrite_transaction`, save tokens, preview policy) into the crate |
 | empty cells | the engine edits stored cells only (`CellNotFound` on an empty slot); the host first stores the cell | reuse `table_write` to store a style-only cell first |
-| Keynote hidden axes on `slide-table-read-native.key` | the engine's graph profiles (Pages-calibrated version tuples) refuse its table as an invalid source; the host edits it | classify the Keynote native profile with that fixture |
+| hidden axes on tables whose formula owner has dependencies (`slide-table-read-native.key`, nine Numbers fixtures) | refused (`InvalidSource`): the engine proves an empty dependency graph before changing hidden state (§2a.3); the host edits them | re-plan the owner's dependencies with the W1-F formula engine |
+| hidden-axis owner creation | the engine registers the new objects' UUIDs and writes empty filter offsets; the host does neither (pinned on Numbers) | macOS run decides |
 | clearing hidden axes | the engine keeps cleared state records, the host drops them (pinned) | macOS run decides |
 | groups 2–5 | cell comments (coordinator addition), cell rich text, topology orchestration and conditional highlights are not started | next W1-G slices, in that order |
 
@@ -293,3 +446,24 @@ nothing for every commit.
 The capability and registry goldens and the OfficeCLI corpus pass unchanged
 inside the litchi-ops chunks; no `litchi-ops` dispatch changed (owner
 decision D7), so they were not re-blessed.
+
+The table above is historical evidence from the earlier group-1 and group-6
+commits; it is not a complete gate for the current integrated tree.  The
+review follow-up was rerun on final source commit `86bd7f5e3a`, based on
+merged candidate `4abb90f713` (code fixes `828d02cad9` and `86bd7f5e3a`, with the current
+`feat/unified-ops-api` parent), as follows:
+
+- the owner-extents unit tests (including the non-canonical value-varint
+  refusal), Numbers hidden-axis facade tests (including the low-limit
+  candidate readback regression), and the active Numbers/Keynote parity
+  cases passed on that source tree;
+- `cargo fmt --all --check`, the focused `litchi-iwa-table`/`litchi-numbers`
+  Clippy gate, the exit-ledger check, crate-boundary and API-glossary checks,
+  the non-iWork gate, and the affected no-`3rdparty` tests were rerun on this
+  source tree;
+- the release callgrind ABBA run in §4.1 was built and measured on
+  `d82fc08989`, immediately before `86bd7f5e3a`; the latter only adds the
+  semantic workbook-limit mapper and is not exercised by those host/leaf
+  probes. It measured −18.097% for Numbers and −60.422% for Keynote, while
+  the Pages focused route was 34,078,005 instructions. These are slice
+  evidence, not the coordinator's final integrated-tree qualification.

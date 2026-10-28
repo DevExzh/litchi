@@ -1335,8 +1335,8 @@ numbers/editor/sheet_shapes/caption.rs	set_sheet_shape_title	1	numbers	drawable.
 numbers/editor/sheet_shapes/caption.rs	sheet_shape_title_caption	1	numbers	drawable.shape	host-only	litchi-numbers	-	-	-	-
 numbers/editor/table_delete.rs	remove_table_column	1	numbers	table.topology	migrated	litchi_numbers::Package::edit_table_topology	numbers_table_remove_column_parity	A	-	-
 numbers/editor/table_delete.rs	remove_table_row	1	numbers	table.topology	migrated	litchi_numbers::Package::edit_table_topology	numbers_table_remove_row_parity	A	-	-
-numbers/editor/table_hidden_axes.rs	set_table_hidden_axes	1	numbers	table.hidden_axes	host-only	litchi-numbers	-	-	-	-
-numbers/editor/table_hidden_axes.rs	table_hidden_axes	1	numbers	table.hidden_axes	host-only	litchi-numbers	-	-	-	-
+numbers/editor/table_hidden_axes.rs	set_table_hidden_axes	1	numbers	table.hidden_axes	migrated	litchi_numbers::Package::edit_table_hidden_axes	numbers_table_hidden_axes_set_parity	B	-	-
+numbers/editor/table_hidden_axes.rs	table_hidden_axes	1	numbers	table.hidden_axes	migrated	litchi_numbers::Package::table_hidden_axes	numbers_table_hidden_axes_read_parity	A	-	-
 numbers/editor/table_sort.rs	apply_table_sort_order	1	numbers	table.sort	host-only	litchi-numbers	-	-	-	-
 numbers/editor/table_sort.rs	apply_table_sort_order_to_rows	1	numbers	table.sort	host-only	litchi-numbers	-	-	-	-
 numbers/editor/table_sort.rs	clear_table_sort_order	1	numbers	table.sort	host-only	litchi-numbers	-	-	-	-

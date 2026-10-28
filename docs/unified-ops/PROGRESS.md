@@ -6606,3 +6606,29 @@ See [0063](0063-source-pptx-modern-comments.md).
   shared engines and W2 drawable/chart facades; W2-D test/example relocation;
   separate D7 unified dispatch/schema/capabilities; final parity/performance
   and native verification. Pending native routes still block W3 deletion.
+
+## Resumed slice review and integration (2026-10-28)
+
+- Accepted W1-G at `7a79bb5f0b` (record 0379): Numbers hidden axes over
+  the shared engine, canonical owner-extent validation, host Pages builder
+  extent correction, and typed resolver/candidate resource failures. The
+  low-limit regression confirms atomic refusal. Scoped engine/facade tests,
+  seven active parity cases, Clippy, formatting, rustdoc, glossary, ledger,
+  boundaries and the Numbers fuzz lock pass. Two Numbers ledger rows and
+  two pending native routes are added; this is not native acceptance.
+- W1-G's measured Numbers route uses 18.097% fewer instructions than the
+  host, and Keynote 60.422% fewer. Record 0379 binds the captures to
+  `d82fc08989` and distinguishes the later semantic-error mapping fix from
+  the measured source. Final integrated qualification remains pending.
+- Review returned W1-C `633e5d01e9`: a merged-table copy could publish an
+  unreadable merge owner; structural candidate reopen erased typed resource
+  errors; and removal parity needed complete surviving-content and
+  untouched-byte checks. The owner is repairing these before integration,
+  including the shared `TableLeaf` error seam and pinned orphan exceptions.
+- W1-A's proof-cache optimization is being qualified after moving admission
+  ahead of cold-cache construction. W1-F's uncached formula ledger claim is
+  being corrected because its initial oracle called the cached host setter.
+  These findings are acceptance conditions, not deferred post-merge fixes.
+- The separate 0377a performance owner is auditing and completing the
+  existing `uo2/fin-perf` changes alongside the five-agent iWork wave. The
+  final full gate has not yet run on this resumed integration.
