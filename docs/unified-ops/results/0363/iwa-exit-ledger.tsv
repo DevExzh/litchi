@@ -683,11 +683,11 @@ keynote/editor/slide_tables.rs	slide_table_cell_text_shadow	1	keynote	table.cell
 keynote/editor/slide_tables.rs	slide_table_cell_text_style	1	keynote	table.cell_rich_text	host-only	litchi-keynote	-	-	-	-
 keynote/editor/slide_tables.rs	slide_tables	1	keynote	table.lifecycle	host-only	litchi-keynote	-	-	-	-
 keynote/editor/slide_tables.rs	unmerge_slide_table_cells	1	keynote	table.merge	migrated	litchi_keynote::Package::edit_slide_table_merges	keynote_slide_table_unmerge_parity	A	-	-
-keynote/editor/slide_tables/comments.rs	add_slide_table_cell_comment_reply	1	keynote	table.cell_comment	migrated	litchi_keynote::Package::add_slide_table_cell_comment_reply	keynote_slide_table_comment_reply_add_parity	B	-	-
-keynote/editor/slide_tables/comments.rs	clear_slide_table_cell_comment	1	keynote	table.cell_comment	migrated	litchi_keynote::Package::clear_slide_table_cell_comment	keynote_slide_table_comment_clear_parity	B	-	-
-keynote/editor/slide_tables/comments.rs	remove_slide_table_cell_comment_reply	1	keynote	table.cell_comment	migrated	litchi_keynote::Package::remove_slide_table_cell_comment_reply	keynote_slide_table_comment_reply_remove_parity	B	-	-
-keynote/editor/slide_tables/comments.rs	set_slide_table_cell_comment	1	keynote	table.cell_comment	migrated	litchi_keynote::Package::set_slide_table_cell_comment	keynote_slide_table_comment_set_parity	B	-	-
-keynote/editor/slide_tables/comments.rs	set_slide_table_cell_comment_reply	1	keynote	table.cell_comment	migrated	litchi_keynote::Package::set_slide_table_cell_comment_reply	keynote_slide_table_comment_reply_set_parity	B	-	-
+keynote/editor/slide_tables/comments.rs	add_slide_table_cell_comment_reply	1	keynote	table.cell_comment	host-only	-	-	-	-	root-only shared slice; reply-thread lifecycle remains deferred
+keynote/editor/slide_tables/comments.rs	clear_slide_table_cell_comment	1	keynote	table.cell_comment	host-only	-	-	-	-	root clear with replies remains deferred; no full host coverage claim
+keynote/editor/slide_tables/comments.rs	remove_slide_table_cell_comment_reply	1	keynote	table.cell_comment	host-only	-	-	-	-	root-only shared slice; reply-thread lifecycle remains deferred
+keynote/editor/slide_tables/comments.rs	set_slide_table_cell_comment	1	keynote	table.cell_comment	host-only	-	-	-	-	root replacement with replies remains deferred; no full host coverage claim
+keynote/editor/slide_tables/comments.rs	set_slide_table_cell_comment_reply	1	keynote	table.cell_comment	host-only	-	-	-	-	root-only shared slice; reply-thread lifecycle remains deferred
 keynote/editor/slide_tables/comments.rs	slide_table_cell_comment	1	keynote	table.cell_comment	migrated	litchi_keynote::Package::slide_table_cell_comment	keynote_slide_table_comment_read_parity	A	-	-
 keynote/editor/slide_tables/comments.rs	slide_table_cell_comment_replies	1	keynote	table.cell_comment	migrated	litchi_keynote::Package::slide_table_cell_comment_replies	keynote_slide_table_comment_replies_read_parity	A	-	-
 keynote/editor/slide_tables/conditional_highlight.rs	clear_slide_table_cell_conditional_highlighting	1	keynote	table.conditional_highlight	host-only	litchi-keynote	-	-	-	-
@@ -793,15 +793,15 @@ numbers/editor/semantic/media.rs	replace_media	1	numbers	media.asset	migrated	li
 numbers/editor/semantic/media.rs	save	1	numbers	io	host-only	litchi-numbers	-	-	-	-
 numbers/editor/semantic/media.rs	sheet_media_assets	1	numbers	media.asset	migrated	litchi_numbers::Package::sheet_media_assets	numbers_media_assets_read_parity	A	-	-
 numbers/editor/semantic/media.rs	to_bytes	1	numbers	io	host-only	litchi-numbers	-	-	-	-
-numbers/editor/semantic/table.rs	add_cell_comment_reply	1	numbers	table.cell_comment	migrated	litchi_numbers::Package::add_table_cell_comment_reply	numbers_table_cell_comment_reply_add_parity	B	-	-
-numbers/editor/semantic/table.rs	cell_comment_replies	1	numbers	table.cell_comment	migrated	litchi_numbers::Package::table_cell_comment_replies	numbers_table_cell_comment_reply_add_parity	B	-	-
+numbers/editor/semantic/table.rs	add_cell_comment_reply	1	numbers	table.cell_comment	host-only	-	-	-	-	root-only shared slice; reply-thread lifecycle remains deferred
+numbers/editor/semantic/table.rs	cell_comment_replies	1	numbers	table.cell_comment	migrated	litchi_numbers::Package::table_cell_comment_replies	numbers_table_cell_comment_set_parity	B	-	-
 numbers/editor/semantic/table.rs	cell_conditional_highlight_rules	1	numbers	table.conditional_highlight	migrated	litchi_numbers::Package::table_cell_conditional_highlight	numbers_conditional_highlight_read_parity	A	-	-
 numbers/editor/semantic/table.rs	cell_conditional_highlighting	1	numbers	table.conditional_highlight	migrated	litchi_numbers::Package::table_cell_conditional_highlight	numbers_conditional_highlight_read_parity	A	-	-
 numbers/editor/semantic/table.rs	clear_cell_conditional_highlighting	1	numbers	table.conditional_highlight	migrated	litchi_numbers::Package::edit_table_cell_conditional_highlights	numbers_conditional_highlight_clear_parity	B	-	-
 numbers/editor/semantic/table.rs	clear_table_cell_border	1	numbers	table.cell_appearance	host-only	litchi-numbers	-	-	-	-
 numbers/editor/semantic/table.rs	merge_cells	1	numbers	table.merge	migrated	litchi_numbers::Package::edit_table_merges	numbers_table_merge_parity	A	-	-
 numbers/editor/semantic/table.rs	pivot_categories	1	numbers	table.pivot	host-only	litchi-numbers	-	-	-	-
-numbers/editor/semantic/table.rs	remove_cell_comment_reply	1	numbers	table.cell_comment	migrated	litchi_numbers::Package::remove_table_cell_comment_reply	numbers_table_cell_comment_reply_remove_parity	B	-	-
+numbers/editor/semantic/table.rs	remove_cell_comment_reply	1	numbers	table.cell_comment	host-only	-	-	-	-	root-only shared slice; reply-thread lifecycle remains deferred
 numbers/editor/semantic/table.rs	reset_table_cell_fill	1	numbers	table.cell_appearance	host-only	litchi-numbers	-	-	-	-
 numbers/editor/semantic/table.rs	reset_table_cell_layout	1	numbers	table.cell_appearance	host-only	litchi-numbers	-	-	-	-
 numbers/editor/semantic/table.rs	reset_table_cell_numeral_system_format	1	numbers	table.cell_format	migrated	litchi_numbers::Package::edit_table_cell_data_format	numbers_table_cell_numeral_system_format_parity	B	-	-
@@ -831,8 +831,8 @@ numbers/editor/semantic/table.rs	reset_table_cell_text_outline	1	numbers	table.c
 numbers/editor/semantic/table.rs	reset_table_cell_text_script	1	numbers	table.cell_rich_text	migrated	litchi_numbers::Package::edit_table_cell_text	numbers_cell_text_property_parity	B	-	-
 numbers/editor/semantic/table.rs	reset_table_cell_text_shadow	1	numbers	table.cell_rich_text	migrated	litchi_numbers::Package::edit_table_cell_text	numbers_cell_text_property_parity	B	-	-
 numbers/editor/semantic/table.rs	reset_table_cell_text_style	1	numbers	table.cell_rich_text	migrated	litchi_numbers::Package::edit_table_cell_text	numbers_cell_text_property_parity	B	-	-
-numbers/editor/semantic/table.rs	set_cell_comment	1	numbers	table.cell_comment	migrated	litchi_numbers::Package::set_table_cell_comment	numbers_table_cell_comment_set_parity	B	-	-
-numbers/editor/semantic/table.rs	set_cell_comment_reply	1	numbers	table.cell_comment	migrated	litchi_numbers::Package::set_table_cell_comment_reply	numbers_table_cell_comment_reply_set_parity	B	-	-
+numbers/editor/semantic/table.rs	set_cell_comment	1	numbers	table.cell_comment	host-only	-	-	-	-	root replacement with replies remains deferred; no full host coverage claim
+numbers/editor/semantic/table.rs	set_cell_comment_reply	1	numbers	table.cell_comment	host-only	-	-	-	-	root-only shared slice; reply-thread lifecycle remains deferred
 numbers/editor/semantic/table.rs	set_cell_conditional_highlighting	1	numbers	table.conditional_highlight	migrated	litchi_numbers::Package::edit_table_cell_conditional_highlights	numbers_conditional_highlight_set_parity	B	-	-
 numbers/editor/semantic/table.rs	set_table_cell_border	1	numbers	table.cell_appearance	host-only	litchi-numbers	-	-	-	-
 numbers/editor/semantic/table.rs	set_table_cell_data_format	1	numbers	table.cell_format	migrated	litchi_numbers::Package::edit_table_cell_data_format	numbers_table_cell_data_format_set_parity	B	-	-
@@ -1874,11 +1874,11 @@ pages/editor/section_content.rs	replace_body_text	1	pages	text.storage	migrated	
 pages/editor/section_content.rs	set_body_text	1	pages	text.storage	migrated	litchi_pages::Package::edit_body_text	pages_set_body_text_parity	A	-	-
 pages/editor/section_content.rs	update_body_bookmark	1	pages	text.bookmark	migrated	litchi_pages::Package::edit_body_bookmarks	pages_body_bookmark_update_parity	A	-	-
 pages/editor/section_content.rs	update_body_date_time_field	1	pages	text.date_time_field	migrated	litchi_pages::Package::edit_body_date_time_fields	pages_body_date_time_update_parity	A	-	-
-pages/editor/tables/comments.rs	add_table_cell_comment_reply	1	pages	table.cell_comment	migrated	litchi_pages::Package::add_body_table_cell_comment_reply	pages_body_table_comment_reply_add_parity	B	-	-
-pages/editor/tables/comments.rs	clear_table_cell_comment	1	pages	table.cell_comment	migrated	litchi_pages::Package::clear_body_table_cell_comment	pages_body_table_comment_clear_parity	B	-	-
-pages/editor/tables/comments.rs	remove_table_cell_comment_reply	1	pages	table.cell_comment	migrated	litchi_pages::Package::remove_body_table_cell_comment_reply	pages_body_table_comment_reply_remove_parity	B	-	-
-pages/editor/tables/comments.rs	set_table_cell_comment	1	pages	table.cell_comment	migrated	litchi_pages::Package::set_body_table_cell_comment	pages_body_table_comment_set_parity	B	-	-
-pages/editor/tables/comments.rs	set_table_cell_comment_reply	1	pages	table.cell_comment	migrated	litchi_pages::Package::set_body_table_cell_comment_reply	pages_body_table_comment_reply_set_parity	B	-	-
+pages/editor/tables/comments.rs	add_table_cell_comment_reply	1	pages	table.cell_comment	host-only	-	-	-	-	root-only shared slice; reply-thread lifecycle remains deferred
+pages/editor/tables/comments.rs	clear_table_cell_comment	1	pages	table.cell_comment	host-only	-	-	-	-	root clear with replies remains deferred; no full host coverage claim
+pages/editor/tables/comments.rs	remove_table_cell_comment_reply	1	pages	table.cell_comment	host-only	-	-	-	-	root-only shared slice; reply-thread lifecycle remains deferred
+pages/editor/tables/comments.rs	set_table_cell_comment	1	pages	table.cell_comment	host-only	-	-	-	-	root replacement with replies remains deferred; no full host coverage claim
+pages/editor/tables/comments.rs	set_table_cell_comment_reply	1	pages	table.cell_comment	host-only	-	-	-	-	root-only shared slice; reply-thread lifecycle remains deferred
 pages/editor/tables/comments.rs	table_cell_comment	1	pages	table.cell_comment	migrated	litchi_pages::Package::body_table_cells	pages_body_table_reads_parity	A	test-data/iwork/pages/body-table-cells-native-receipt.json	-
 pages/editor/tables/comments.rs	table_cell_comment_replies	1	pages	table.cell_comment	migrated	litchi_pages::Package::body_table_cells	pages_body_table_reads_parity	A	test-data/iwork/pages/body-table-cells-native-receipt.json	-
 pages/editor/tables/conditional_highlight.rs	clear_table_cell_conditional_highlighting	1	pages	table.conditional_highlight	host-only	litchi-pages	-	-	-	-

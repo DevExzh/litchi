@@ -400,6 +400,16 @@ pub enum LimitKind {
     TextBytes,
     /// Native references inspected.
     References,
+    /// Reply records inspected.
+    Replies,
+    /// Wire nesting inspected.
+    WireNesting,
+    /// Temporary rewrite scratch bytes retained.
+    ScratchBytes,
+    /// Candidate bytes retained by the codec.
+    RetainedBytes,
+    /// Logical allocations requested by the codec.
+    Allocations,
     /// Compressed IWA member bytes inspected or emitted.
     CompressedBytes,
 }
@@ -2063,6 +2073,9 @@ fn resolve_comment_native_with_mode(
     };
     let data_store = decoded.data_store;
     let tile_storage = decoded.tile_storage;
+    let data_store_comment_table_id = data_store
+        .comment_storage_table()
+        .map(|reference| reference.identifier());
     let tile_size = usize::try_from(
         tile_storage
             .tile_size()
@@ -2100,7 +2113,7 @@ fn resolve_comment_native_with_mode(
             tile: None,
             cell_bytes: None,
             comment_key: None,
-            comment_table_id: None,
+            comment_table_id: data_store_comment_table_id,
             replies: 0,
             reply_ids: Vec::new(),
         });
@@ -2149,7 +2162,7 @@ fn resolve_comment_native_with_mode(
             tile: Some(tile_route),
             cell_bytes: None,
             comment_key: None,
-            comment_table_id: None,
+            comment_table_id: data_store_comment_table_id,
             replies: 0,
             reply_ids: Vec::new(),
         });
@@ -2203,7 +2216,7 @@ fn resolve_comment_native_with_mode(
             tile: Some(tile_route),
             cell_bytes: None,
             comment_key: None,
-            comment_table_id: None,
+            comment_table_id: data_store_comment_table_id,
             replies: 0,
             reply_ids: Vec::new(),
         });
@@ -2226,7 +2239,7 @@ fn resolve_comment_native_with_mode(
             tile: Some(tile_route),
             cell_bytes: Some(copy_bytes(cell_source, path)?),
             comment_key: None,
-            comment_table_id: None,
+            comment_table_id: data_store_comment_table_id,
             replies: 0,
             reply_ids: Vec::new(),
         });
@@ -2234,10 +2247,8 @@ fn resolve_comment_native_with_mode(
     if comment_key == 0 {
         return Err(Error::InvalidSource { path: target.path });
     }
-    let comment_table_id = data_store
-        .comment_storage_table()
-        .map(|reference| reference.identifier())
-        .ok_or(Error::InvalidSource { path: target.path })?;
+    let comment_table_id =
+        data_store_comment_table_id.ok_or(Error::InvalidSource { path: target.path })?;
     if comment_table_id == 0 {
         return Err(Error::InvalidSource { path: target.path });
     }
@@ -2715,6 +2726,155 @@ fn map_comment_codec_error(error: comment_storage_codec::DecodeError, path: Path
     Error::InvalidSource { path }
 }
 
+fn commit_shared_root(edit: Edit<'_>, located: Located) -> Result<Commit, Error> {
+    let path = edit.target.path;
+    let native_operation = match edit.after.as_ref() {
+        Some(comment) => {
+            litchi_iwa_table::comments_native::RootOperation::Set(comment.text().into())
+        },
+        None => litchi_iwa_table::comments_native::RootOperation::Clear,
+    };
+    let selection = native_selection(edit.source, &located)?;
+    let mutation = litchi_iwa_table::comments_native::rewrite_root(
+        edit.source,
+        &selection,
+        &native_operation,
+        litchi_iwa_table::comments_native::Profile::NUMBERS,
+    )
+    .map_err(|fault| map_native_fault(fault, path))?;
+    let touched_components = mutation.touched_components();
+    let deleted_previews = mutation.deleted_previews();
+    let package = mutation.into_package();
+    let position = cell_position_for_path(path)?;
+    let readback = resolve_comment(
+        &package,
+        SheetSelector::index(path.sheet()),
+        TableSelector::index(path.table()),
+        position,
+    )?;
+    if readback.comment.as_ref().map(Comment::text) != edit.after.as_ref().map(Comment::text) {
+        return Err(Error::Verification);
+    }
+    let actual_after = readback.comment.clone();
+    let source_cell = located.cell_bytes.clone().unwrap_or_else(|| Arc::from([]));
+    let target_cell = readback
+        .cell_bytes
+        .clone()
+        .ok_or(Error::InvalidSource { path })?;
+    let source_catalog = physical_source(edit.source)?;
+    let source_previews = root_preview_deletions(source_catalog)?.len();
+    let source_owner = source_catalog.__source_owner();
+    let target_owner = physical_source(&package)?.__source_owner();
+    Ok(Commit {
+        package,
+        patch: Patch {
+            artifacts: OwnedExactArtifacts::new(source_owner, target_owner),
+            path,
+            before: edit.before,
+            after: actual_after,
+            source_cell,
+            target_cell,
+            source_previews,
+            target_previews: source_previews.saturating_sub(deleted_previews),
+            touched_components,
+        },
+        diagnostics: Diagnostics::published(touched_components, deleted_previews),
+    })
+}
+
+fn native_selection(
+    source: &Package,
+    located: &Located,
+) -> Result<litchi_iwa_table::comments_native::Selection, Error> {
+    let path = located.target.path;
+    let tile = located
+        .tile
+        .ok_or(Error::Refused(Refusal::UnsupportedDependency { path }))?;
+    if located
+        .entry
+        .as_ref()
+        .is_some_and(|entry| !entry.owner.supports_text_rewrite())
+    {
+        return Err(Error::Refused(Refusal::UnsupportedDependency { path }));
+    }
+    let model_component = source
+        .state
+        .components
+        .catalog()
+        .get_index(located.target.native.component_index)
+        .ok_or(Error::InvalidSource { path })?;
+    let tile_component = source
+        .state
+        .components
+        .catalog()
+        .get_index(tile.component_index)
+        .ok_or(Error::InvalidSource { path })?;
+    let tile_identifier = source
+        .state
+        .components
+        .catalog()
+        .get_index(tile.component_index)
+        .and_then(|component| component.archive().objects.get(tile.object_index))
+        .and_then(|object| object.archive_info.identifier)
+        .ok_or(Error::InvalidSource { path })?;
+    Ok(litchi_iwa_table::comments_native::Selection {
+        model_component: model_component.name().into(),
+        tile_component: tile_component.name().into(),
+        model_identifier: located.target.native.model_identifier,
+        model_message_index: located.target.native.message_index,
+        model_message_type: located.target.native.message_type,
+        tile_identifier,
+        tile_message_index: tile.message_index,
+        tile_message_type: tile.message_type,
+        tile_row: u32::try_from(located.target.row % located.target.tile_size)
+            .map_err(|_| Error::InvalidSource { path })?,
+        column: u32::try_from(located.target.column).map_err(|_| Error::InvalidSource { path })?,
+        table_columns: located.target.native.columns,
+        comment_key: located.comment_key,
+        list_identifier: located.comment_table_id,
+        root_identifier: located.entry.as_ref().map(|entry| entry.entry.storage_id),
+    })
+}
+
+fn map_native_fault(fault: litchi_iwa_table::comments_native::Fault, path: Path) -> Error {
+    use litchi_iwa_table::comments_native::{Fault, LimitKind as NativeLimitKind};
+    match fault {
+        Fault::Unsupported | Fault::Dependency => {
+            Error::Refused(Refusal::UnsupportedDependency { path })
+        },
+        Fault::Invalid => Error::InvalidSource { path },
+        Fault::Verification => Error::Verification,
+        Fault::Allocation { amount } => Error::Allocation { amount, path },
+        Fault::Limit {
+            kind,
+            observed,
+            maximum,
+        } => Error::Limit {
+            kind: match kind {
+                NativeLimitKind::PackageBytes => LimitKind::CompressedBytes,
+                // PayloadBytes is a byte ceiling at the shared native
+                // boundary.  Do not coerce it into work: a low payload-byte
+                // refusal must remain distinguishable from a work refusal.
+                NativeLimitKind::PayloadBytes => LimitKind::WireBytes,
+                NativeLimitKind::References => LimitKind::References,
+                NativeLimitKind::Replies => LimitKind::Replies,
+                NativeLimitKind::TextBytes => LimitKind::TextBytes,
+                NativeLimitKind::WireFields => LimitKind::WireFields,
+                NativeLimitKind::WireBytes => LimitKind::WireBytes,
+                NativeLimitKind::WireOutputBytes => LimitKind::OutputBytes,
+                NativeLimitKind::WireNesting => LimitKind::WireNesting,
+                NativeLimitKind::WireWork => LimitKind::WireWork,
+                NativeLimitKind::Allocations => LimitKind::Allocations,
+                NativeLimitKind::ScratchBytes => LimitKind::ScratchBytes,
+                NativeLimitKind::RetainedBytes => LimitKind::RetainedBytes,
+            },
+            observed: usize::try_from(observed).unwrap_or(usize::MAX),
+            maximum: usize::try_from(maximum).unwrap_or(usize::MAX),
+            path,
+        },
+    }
+}
+
 fn commit_edit(edit: Edit<'_>) -> Result<Commit, Error> {
     let source_catalog = physical_source(edit.source)?;
     let source_owner = source_catalog.__source_owner();
@@ -2735,7 +2895,7 @@ fn commit_edit(edit: Edit<'_>) -> Result<Commit, Error> {
             diagnostics: Diagnostics::unchanged(),
         });
     }
-    if edit.before.is_some() && edit.after.is_none() {
+    if edit.before.is_some() && edit.after.is_none() && edit.axis_removal {
         if !source_catalog.source_is_exact() {
             return Err(Error::Refused(Refusal::UnsupportedSource));
         }
@@ -2830,6 +2990,18 @@ fn commit_edit(edit: Edit<'_>) -> Result<Commit, Error> {
         return Err(Error::InvalidSource {
             path: edit.target.path,
         });
+    }
+    if !edit.axis_removal {
+        // The first shared native slice owns root-only lifecycle.  Preserve
+        // the established Numbers refusal for an ordinary replacement of a
+        // root that already has replies; a reply-bearing thread must not be
+        // silently rewritten through the scalar path.
+        if edit.before.is_some() && edit.after.is_some() && located.replies != 0 {
+            return Err(Error::Refused(Refusal::UnsupportedDependency {
+                path: edit.target.path,
+            }));
+        }
+        return commit_shared_root(edit, located);
     }
     if edit.after.is_some() && located.comment.is_none() {
         return comments_create::create_root_comment(

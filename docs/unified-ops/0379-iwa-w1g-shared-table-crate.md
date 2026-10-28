@@ -7,10 +7,13 @@
   Group 6 (§2a): the engine lift with the Pages owner (`e6e946e72b`), the
   Keynote family (`c4a13cadfa`), then the engine changes, the host builder
   change and the Numbers family (`3a9ef1b692`, `c0ec8404f2`,
-  `1544f10604`). Group 2 (table-cell comments) is now prepared on the
-  continuation branch; its scoped gates and native verification remain
-  pending (§2b, §6). Groups 3–5 (rich text, topology, conditional highlights)
-  are not started (§5).
+  `1544f10604`). Group 2 (table-cell comments) now has a root-only shared
+  engine and three facade slices on the continuation branch; focused code,
+  parity, fuzz-lock and documentation gates pass, while the current boundary
+  checker reports an unchanged pre-existing Keynote drawable-comment export
+  debt; final integrated performance and native verification remain pending
+  (§2b, §6). Groups 3–5 (rich text, topology, conditional highlights) are not
+  started (§5).
 - Date: 2026-10-28 continuation; group 6 completed 2026-10-27.
 - Review follow-up (`828d02cad9`): owner-extents coordinates require
   canonical value varints, and the Numbers facade preserves typed resolver
@@ -304,67 +307,60 @@ that needs the formula-dependency engine (W1-F, record 0376) to re-plan the
 owner's spanning and cell dependencies under the new hidden state; it is a
 follow-up, not a profile calibration.
 
-## 2b. Group 2: table-cell comments
+## 2b. Group 2: table-cell comments (root-only first slice)
 
-This continuation adds the bounded root-comment and direct-reply family for
-body/slide table cells. The format-neutral comment engine is
-`litchi_iwa_table::comments`: it owns the selector-free snapshot, the
-`Set`, `Clear`, `AddReply`, `SetReply` and
-`RemoveReply` operation algebra, missing-root/reply refusals, bounded
-text copying, and the exact-source reversible patch contract. Its
-`admit_graph` walk is the common bounded native preflight: it resolves the
-format-selected roots, follows object/data references with deduplication and
-depth ceilings, and charges the resulting graph work before either leaf
-allocates a copy-on-write archive. Native table-list keys, storage
-identifiers, component names and wire payloads remain in the leaf adapters.
+The continuation now lands one complete vertical slice: root `Set`/create and
+`Clear` rewrites for body and slide table cells. The shared implementation is
+`litchi_iwa_table::comments_native`, below the three leaf selector adapters.
+It owns the native table-list, tile-row, comment-storage, author and metadata
+transitions, including format profiles for Numbers (`ListKeys::Reuse`), Pages
+(`Append`) and Keynote (generated author and its native storage shape). The
+old Pages and Keynote writer copies are removed; Numbers also calls this
+engine for the focused root path. No facade passes native identifiers, ZIP
+paths or protobuf values through a supported signature.
 
-Pages and Keynote consume the kernel before their private copy-on-write native
-writers allocate or rewrite graph state. Their public surfaces are:
+Before mutation, `Working` admits bounded object/reference census maps and
+per-edge growth, then performs one graph walk. Comment-specific validation
+checks list ownership, author locality, reply counts, unknown references and
+the selected root. Prepared comment/table codecs replay their exact resource
+requirements before execution; row offsets, cell buffers, metadata fields and
+candidate bytes use checked or fallible reservations. Core compressed-byte,
+reference, work, allocation and retained-resource refusals remain typed at
+the leaf boundary. A candidate is reopened and read back before publication;
+exact-source patches, `inverse()`, byte-preserving no-ops and locality checks
+remain part of each facade contract.
 
-- `litchi_pages::Package::{body_table_cell_comment,
-  body_table_cell_comment_replies, edit_body_table_cell_comment,
-  apply_body_table_cell_comment, set_body_table_cell_comment,
-  clear_body_table_cell_comment, add_body_table_cell_comment_reply,
-  set_body_table_cell_comment_reply, remove_body_table_cell_comment_reply}`;
-- `litchi_keynote::Package::{slide_table_cell_comment,
-  slide_table_cell_comment_replies, edit_slide_table_cell_comment,
-  apply_slide_table_cell_comment, set_slide_table_cell_comment,
-  clear_slide_table_cell_comment, add_slide_table_cell_comment_reply,
-  set_slide_table_cell_comment_reply, remove_slide_table_cell_comment_reply}`.
+The public leaf surfaces retain their selector-first shape:
 
-Both adapters resolve only semantic table/slide/cell selectors and checked
-reply ordinals. A changed operation preflights the shared algebra, charges its
-format-specific bounded read/write ledger, rewrites the native graph, reopens
-the candidate, reads the selected thread back, and returns an exact-source
-patch with `inverse()` and exact no-op behavior. Missing roots/replies,
-protected tables, malformed or unsupported graph edges, non-exact sources,
-candidate conflicts, and finite-limit failures are terminal typed errors; no
-focused-route refusal falls through to the host.
+- Pages: `body_table_cell_comment`, `body_table_cell_comment_replies`,
+  `edit_body_table_cell_comment`, `apply_body_table_cell_comment`,
+  `set_body_table_cell_comment` and `clear_body_table_cell_comment`;
+- Keynote: the corresponding `slide_table_cell_comment*` methods; and
+- Numbers: `table_cell_comment_replies`, `set_table_cell_comment`,
+  `clear_table_cell_comment`, and the existing reply methods.
 
-Numbers retains its existing selector-first native adapter and exposes the
-same focused verbs through `litchi_numbers::Package`:
-`set_table_cell_comment`, `clear_table_cell_comment`,
-`add_table_cell_comment_reply`, `set_table_cell_comment_reply`,
-`remove_table_cell_comment_reply`, and
-`table_cell_comment_replies`. Its reply ordinal remains
-`CommentReplyIndex`; the new shared kernel is the semantic reference
-for the Pages and Keynote facades, while Numbers remains the format-specific
-donor until its existing native writer is further consolidated.
+Reply reads remain supported. Reply mutations remain explicit terminal
+`UnsupportedDependency` refusals in the Pages and Keynote focused route, and
+Numbers preserves its existing reply-bearing replacement refusal. Clearing or
+replacing a root that has replies is therefore not claimed as a complete host
+migration in this slice; the host-only ledger rows stay host-only until the
+reply-thread lifecycle is lifted. No refusal falls through to the legacy host.
 
-The focused differential cases are:
+The differential cases currently run are:
 
 | Format | Cases | Tier |
 |---|---|---|
-| Pages | `pages_body_table_comment_{set,clear,reply_add,reply_set,reply_remove}_parity` | B |
-| Keynote | `keynote_slide_table_comment_{set,clear,reply_add,reply_set,reply_remove}_parity`; `keynote_slide_table_comment_{read,replies_read}_parity` | B for mutations, A for reads |
-| Numbers | `numbers_table_cell_comment_{set,reply_add,reply_set,reply_remove}_parity` | B |
+| Pages | `pages_body_table_comment_set_parity`, `pages_body_table_comment_clear_parity` | B, root-only |
+| Keynote | `keynote_slide_table_comment_set_parity`, `keynote_slide_table_comment_clear_parity`, `keynote_slide_table_comment_read_parity`, `keynote_slide_table_comment_replies_read_parity` | B for root writes; A for reads |
+| Numbers | `numbers_table_cell_comment_set_parity` (including reply projection readback) | B, root-only |
 
-The Numbers reply projection is observed by the focused mutation cases; the
-legacy read-only selector assertions are being relocated by the separate W2-D
-owner, so this slice does not duplicate that destination test. The host
-remains the differential oracle. All 17 migrated rows (7 Keynote, 5 Numbers,
-5 Pages) have pending entries in [0363-mac-queue](0363-mac-queue.md); no E3/E4
-native claim is made.
+The host remains the differential oracle. The 17 table-comment ledger rows
+were reviewed: five focused read rows are migrated with these tests, while
+the twelve root/reply mutation rows remain `host-only` because reply-bearing
+threads are outside this profile. The 0363 macOS queue retains the routes as
+pending planning entries with that boundary called out; no E3/E4 native claim
+is made. Native-authored fixtures and synthetic/self-round-trip tests are not
+Apple open/save evidence.
 
 ## 3. Tools and docs
 
@@ -478,7 +474,7 @@ order. The Numbers and Keynote test names are
 | hidden axes on tables whose formula owner has dependencies (`slide-table-read-native.key`, nine Numbers fixtures) | refused (`InvalidSource`): the engine proves an empty dependency graph before changing hidden state (§2a.3); the host edits them | re-plan the owner's dependencies with the W1-F formula engine |
 | hidden-axis owner creation | the engine registers the new objects' UUIDs and writes empty filter offsets; the host does neither (pinned on Numbers) | macOS run decides |
 | clearing hidden axes | the engine keeps cleared state records, the host drops them (pinned) | macOS run decides |
-| group 2 | table-cell comments are prepared in the three leaf crates, with the shared semantic/graph preflight consumed by Pages and Keynote and Numbers retaining its bounded native adapter; scoped gates, final integrated performance and native verification are pending | finish the focused gates, measure the final integrated candidate, then clear the queued native routes |
+| group 2 | root-only table-cell comment Set/create/Clear uses the shared native graph/rewrite engine in all three leaves; reply-thread mutation rows remain host-only and all native evidence is pending | finish scoped Clippy/docs and final integrated performance, then lift replies and clear the queued native routes |
 | groups 3–5 | cell rich text, topology orchestration and conditional highlights are not started | next W1-G slices, in that order |
 
 ## 6. Verification
@@ -534,12 +530,23 @@ merged candidate `4abb90f713` (code fixes `828d02cad9` and `86bd7f5e3a`, with th
   the Pages focused route was 34,078,005 instructions. These are slice
   evidence, not the coordinator's final integrated-tree qualification.
 
-The current group-2 continuation is intentionally not represented as green
-verification: no Cargo build, test, Clippy, rustdoc, ledger gate, parity run,
-native receipt, or performance measurement was run while the coordinator's
-quiet hold was active. The source-only checks completed so far are rustfmt on
-the touched Rust, git diff --check, API-glossary JSON/profile registration,
-fixture and parity-name review, ownership/reference review, and repository
-size/binary policy scans. These checks are not a substitute for the
-coordinator's rustdoc and runtime gates; those scoped gates must run on the
-committed branch, with final performance repeated after all wave merges.
+The current group-2 checks are separate from the historical rows above. On the
+continuation source tree, after the admission, codec-limit, typed-error and
+reply-boundary repairs, the following passed: `cargo fmt --all --check`, a
+four-crate library compile (`litchi-iwa-table`, `litchi-pages`,
+`litchi-keynote`, `litchi-numbers`), the Numbers table-cell comment suite
+(31/31), the host-vs-leaf table-comment parity target (7/7), both affected
+fuzz-lock checks (`litchi-numbers/fuzz` and `litchi-pages/fuzz`), and
+`python3 tools/iwa_exit_ledger.py --check`. The same source tree also passed
+the four-crate all-targets/all-features Clippy gate (`-D warnings`), focused
+rustdoc (`RUSTDOCFLAGS=-Dwarnings`), `check_api_glossary.py`, and the affected
+no-`3rdparty` test. The current `check_crate_boundaries.py` run is not green:
+it reports the unchanged pre-existing export at
+`crates/litchi-keynote/src/lib.rs:506`
+(`litchi_iwa_common::table::read` under a focused drawable-comment public
+surface). This slice did not modify that file or export. The parity cases are
+Tier B for root writes and Tier A for reads, all with `Evidence::Queued`;
+they are differential proof, not Apple acceptance. No performance
+qualification or native E3/E4 receipt is claimed. The coordinator must repeat
+the full gate and final performance on one integrated trunk commit after this
+branch is reviewed.

@@ -3,16 +3,37 @@
 
 use litchi_iwa::keynote;
 use litchi_iwa_common::table::coordinate::At;
+use litchi_iwa_protos::{tsd, tsp};
 use litchi_keynote::slide::drawable::{Kind, TableCellValue};
 use litchi_keynote::{DrawableSelector, Package, SlideSelector, TableSelector};
+use prost::Message as _;
 
 use crate::harness::{Case, Evidence, Format, LeafRun, TestResult, Tier, fixture};
 use crate::keynote_drawable_cases::{leaf_position, leaf_run};
+use crate::known_fields::{Decoded, top_level_fields};
+use crate::leaf_bytes;
 
 const TABLE: &str = "iwork/keynote/table-discovery.key";
 const SLIDE: usize = 0;
-const COMMENT_ROW: usize = 1;
-const COMMENT_COLUMN: usize = 1;
+const COMMENT_ROW: usize = 0;
+const COMMENT_COLUMN: usize = 0;
+
+fn masked_comment_storage(data: &[u8]) -> Result<Decoded, prost::DecodeError> {
+    let mut message = tsd::CommentStorageArchive::decode(data)?;
+    if message.creation_date.is_some() {
+        message.creation_date = Some(tsp::Date { seconds: 0.0 });
+    }
+    if message.storage_uuid.is_some() {
+        message.storage_uuid = Some(tsp::Uuid { lower: 1, upper: 1 });
+    }
+    let mut decoded =
+        crate::known_fields::decode_as::<tsd::CommentStorageArchive>(&message.encode_to_vec())?;
+    decoded.unknown_fields = top_level_fields(data)
+        .difference(&top_level_fields(&decoded.canonical))
+        .copied()
+        .collect();
+    Ok(decoded)
+}
 
 fn comment_position() -> TestResult<At> {
     Ok(At::new(
@@ -24,9 +45,16 @@ fn comment_position() -> TestResult<At> {
 fn host_comment_thread(bytes: &[u8]) -> TestResult<String> {
     let editor = keynote::Draft::from_bytes(bytes)?;
     let model = host_model(&editor)?;
-    let comment = editor.slide_table_cell_comment(SLIDE, model, COMMENT_ROW, COMMENT_COLUMN)?;
-    let replies =
-        editor.slide_table_cell_comment_replies(SLIDE, model, COMMENT_ROW, COMMENT_COLUMN)?;
+    let comment = match editor.slide_table_cell_comment(SLIDE, model, COMMENT_ROW, COMMENT_COLUMN) {
+        Ok(comment) => comment,
+        Err(error) if error.to_string().contains("has no comment") => None,
+        Err(error) => return Err(error.into()),
+    };
+    let replies = if comment.is_some() {
+        editor.slide_table_cell_comment_replies(SLIDE, model, COMMENT_ROW, COMMENT_COLUMN)?
+    } else {
+        Vec::new()
+    };
     Ok(format!(
         "root={:?};replies={:?}",
         comment.as_ref().map(|value| value.comment.text.as_str()),
@@ -59,20 +87,31 @@ fn leaf_comment_thread(bytes: &[u8]) -> TestResult<String> {
 
 fn comment_case(
     name: &'static str,
+    tier: Tier,
+    evidence: Evidence,
     host: impl FnOnce(&mut keynote::Draft, u64) -> TestResult + 'static,
     leaf: impl FnOnce(Package, At) -> TestResult<LeafRun> + 'static,
 ) -> TestResult {
     let input = fixture(TABLE)?;
-    Case::new(name, Format::Keynote, Tier::B, Evidence::Queued, &input)
+    Case::new(name, Format::Keynote, tier, evidence, &input)
         .host(move |source| {
             let mut editor = keynote::Draft::from_bytes(source)?;
             let model = host_model(&editor)?;
             host(&mut editor, model)?;
-            Ok(editor.to_bytes()?)
+            let bytes = editor.to_bytes()?;
+            Ok(bytes)
         })
         .leaf(move |source| {
             let package = Package::from_bytes(source)?;
-            leaf(package, comment_position()?)
+            let result = leaf(package, comment_position()?)?;
+            Ok(result)
+        })
+        .known_fields(|known| {
+            known.with(
+                3_056,
+                "TSD.CommentStorageArchive (creation date and storage UUID masked)",
+                masked_comment_storage,
+            )
         })
         .leaf_structural_metadata()
         .read("host slide-table comment thread", host_comment_thread)
@@ -81,9 +120,9 @@ fn comment_case(
     Ok(())
 }
 
-fn comment_read_case(name: &'static str) -> TestResult {
+fn comment_read_case(name: &'static str, tier: Tier, evidence: Evidence) -> TestResult {
     let input = fixture(TABLE)?;
-    Case::new(name, Format::Keynote, Tier::A, Evidence::Queued, &input)
+    Case::new(name, Format::Keynote, tier, evidence, &input)
         .read_only()
         .host(|source| Ok(keynote::Draft::from_bytes(source)?.to_bytes()?))
         .leaf(|source| Ok(LeafRun::output(leaf_bytes!(Package::from_bytes(source)?))))
@@ -180,6 +219,8 @@ fn leaf_set(source: &[u8], cells: &[(u32, u32, TableCellValue)]) -> TestResult<L
 fn keynote_slide_table_comment_set_parity() -> TestResult {
     comment_case(
         "keynote_slide_table_comment_set_parity",
+        Tier::B,
+        Evidence::Queued,
         |editor, model| {
             editor.set_slide_table_cell_comment(
                 SLIDE,
@@ -199,7 +240,7 @@ fn keynote_slide_table_comment_set_parity() -> TestResult {
             )?;
             let restored = commit
                 .package()
-                .apply_slide_table_cell_comment(commit.patch().inverse())?;
+                .apply_slide_table_cell_comment(&commit.patch().inverse())?;
             Ok(LeafRun::with_inverse(
                 leaf_bytes!(commit.package()),
                 leaf_bytes!(restored.package()),
@@ -212,6 +253,8 @@ fn keynote_slide_table_comment_set_parity() -> TestResult {
 fn keynote_slide_table_comment_clear_parity() -> TestResult {
     comment_case(
         "keynote_slide_table_comment_clear_parity",
+        Tier::B,
+        Evidence::Queued,
         |editor, model| {
             editor.set_slide_table_cell_comment(
                 SLIDE,
@@ -219,13 +262,6 @@ fn keynote_slide_table_comment_clear_parity() -> TestResult {
                 COMMENT_ROW,
                 COMMENT_COLUMN,
                 "W1-G root",
-            )?;
-            editor.add_slide_table_cell_comment_reply(
-                SLIDE,
-                model,
-                COMMENT_ROW,
-                COMMENT_COLUMN,
-                "W1-G reply",
             )?;
             editor.clear_slide_table_cell_comment(SLIDE, model, COMMENT_ROW, COMMENT_COLUMN)?;
             Ok(())
@@ -237,26 +273,17 @@ fn keynote_slide_table_comment_clear_parity() -> TestResult {
                 position,
                 "W1-G root",
             )?;
-            let add = set.package().add_slide_table_cell_comment_reply(
-                SlideSelector::index(SLIDE),
-                TableSelector::index(0),
-                position,
-                "W1-G reply",
-            )?;
-            let clear = add.package().clear_slide_table_cell_comment(
+            let clear = set.package().clear_slide_table_cell_comment(
                 SlideSelector::index(SLIDE),
                 TableSelector::index(0),
                 position,
             )?;
             let undo_clear = clear
                 .package()
-                .apply_slide_table_cell_comment(clear.patch().inverse())?;
-            let undo_add = undo_clear
+                .apply_slide_table_cell_comment(&clear.patch().inverse())?;
+            let restored = undo_clear
                 .package()
-                .apply_slide_table_cell_comment(add.patch().inverse())?;
-            let restored = undo_add
-                .package()
-                .apply_slide_table_cell_comment(set.patch().inverse())?;
+                .apply_slide_table_cell_comment(&set.patch().inverse())?;
             Ok(LeafRun::with_inverse(
                 leaf_bytes!(clear.package()),
                 leaf_bytes!(restored.package()),
@@ -266,191 +293,21 @@ fn keynote_slide_table_comment_clear_parity() -> TestResult {
 }
 
 #[test]
-fn keynote_slide_table_comment_reply_add_parity() -> TestResult {
-    comment_case(
-        "keynote_slide_table_comment_reply_add_parity",
-        |editor, model| {
-            editor.set_slide_table_cell_comment(
-                SLIDE,
-                model,
-                COMMENT_ROW,
-                COMMENT_COLUMN,
-                "W1-G root",
-            )?;
-            editor.add_slide_table_cell_comment_reply(
-                SLIDE,
-                model,
-                COMMENT_ROW,
-                COMMENT_COLUMN,
-                "W1-G reply",
-            )?;
-            Ok(())
-        },
-        |package, position| {
-            let set = package.set_slide_table_cell_comment(
-                SlideSelector::index(SLIDE),
-                TableSelector::index(0),
-                position,
-                "W1-G root",
-            )?;
-            let add = set.package().add_slide_table_cell_comment_reply(
-                SlideSelector::index(SLIDE),
-                TableSelector::index(0),
-                position,
-                "W1-G reply",
-            )?;
-            let undo_add = add
-                .package()
-                .apply_slide_table_cell_comment(add.patch().inverse())?;
-            let restored = undo_add
-                .package()
-                .apply_slide_table_cell_comment(set.patch().inverse())?;
-            Ok(LeafRun::with_inverse(
-                leaf_bytes!(add.package()),
-                leaf_bytes!(restored.package()),
-            ))
-        },
-    )
-}
-
-#[test]
-fn keynote_slide_table_comment_reply_set_parity() -> TestResult {
-    comment_case(
-        "keynote_slide_table_comment_reply_set_parity",
-        |editor, model| {
-            editor.set_slide_table_cell_comment(
-                SLIDE,
-                model,
-                COMMENT_ROW,
-                COMMENT_COLUMN,
-                "W1-G root",
-            )?;
-            let reply = editor.add_slide_table_cell_comment_reply(
-                SLIDE,
-                model,
-                COMMENT_ROW,
-                COMMENT_COLUMN,
-                "W1-G reply",
-            )?;
-            editor.set_slide_table_cell_comment_reply(
-                SLIDE,
-                model,
-                COMMENT_ROW,
-                COMMENT_COLUMN,
-                reply,
-                "W1-G revised",
-            )?;
-            Ok(())
-        },
-        |package, position| {
-            let set = package.set_slide_table_cell_comment(
-                SlideSelector::index(SLIDE),
-                TableSelector::index(0),
-                position,
-                "W1-G root",
-            )?;
-            let add = set.package().add_slide_table_cell_comment_reply(
-                SlideSelector::index(SLIDE),
-                TableSelector::index(0),
-                position,
-                "W1-G reply",
-            )?;
-            let update = add.package().set_slide_table_cell_comment_reply(
-                SlideSelector::index(SLIDE),
-                TableSelector::index(0),
-                position,
-                litchi_keynote::ReplySelector::index(0),
-                "W1-G revised",
-            )?;
-            let undo_update = update
-                .package()
-                .apply_slide_table_cell_comment(update.patch().inverse())?;
-            let undo_add = undo_update
-                .package()
-                .apply_slide_table_cell_comment(add.patch().inverse())?;
-            let restored = undo_add
-                .package()
-                .apply_slide_table_cell_comment(set.patch().inverse())?;
-            Ok(LeafRun::with_inverse(
-                leaf_bytes!(update.package()),
-                leaf_bytes!(restored.package()),
-            ))
-        },
-    )
-}
-
-#[test]
-fn keynote_slide_table_comment_reply_remove_parity() -> TestResult {
-    comment_case(
-        "keynote_slide_table_comment_reply_remove_parity",
-        |editor, model| {
-            editor.set_slide_table_cell_comment(
-                SLIDE,
-                model,
-                COMMENT_ROW,
-                COMMENT_COLUMN,
-                "W1-G root",
-            )?;
-            let reply = editor.add_slide_table_cell_comment_reply(
-                SLIDE,
-                model,
-                COMMENT_ROW,
-                COMMENT_COLUMN,
-                "W1-G reply",
-            )?;
-            editor.remove_slide_table_cell_comment_reply(
-                SLIDE,
-                model,
-                COMMENT_ROW,
-                COMMENT_COLUMN,
-                reply,
-            )?;
-            Ok(())
-        },
-        |package, position| {
-            let set = package.set_slide_table_cell_comment(
-                SlideSelector::index(SLIDE),
-                TableSelector::index(0),
-                position,
-                "W1-G root",
-            )?;
-            let add = set.package().add_slide_table_cell_comment_reply(
-                SlideSelector::index(SLIDE),
-                TableSelector::index(0),
-                position,
-                "W1-G reply",
-            )?;
-            let remove = add.package().remove_slide_table_cell_comment_reply(
-                SlideSelector::index(SLIDE),
-                TableSelector::index(0),
-                position,
-                litchi_keynote::ReplySelector::index(0),
-            )?;
-            let undo_remove = remove
-                .package()
-                .apply_slide_table_cell_comment(remove.patch().inverse())?;
-            let undo_add = undo_remove
-                .package()
-                .apply_slide_table_cell_comment(add.patch().inverse())?;
-            let restored = undo_add
-                .package()
-                .apply_slide_table_cell_comment(set.patch().inverse())?;
-            Ok(LeafRun::with_inverse(
-                leaf_bytes!(remove.package()),
-                leaf_bytes!(restored.package()),
-            ))
-        },
-    )
-}
-
-#[test]
 fn keynote_slide_table_comment_read_parity() -> TestResult {
-    comment_read_case("keynote_slide_table_comment_read_parity")
+    comment_read_case(
+        "keynote_slide_table_comment_read_parity",
+        Tier::A,
+        Evidence::Queued,
+    )
 }
 
 #[test]
 fn keynote_slide_table_comment_replies_read_parity() -> TestResult {
-    comment_read_case("keynote_slide_table_comment_replies_read_parity")
+    comment_read_case(
+        "keynote_slide_table_comment_replies_read_parity",
+        Tier::A,
+        Evidence::Queued,
+    )
 }
 
 #[test]

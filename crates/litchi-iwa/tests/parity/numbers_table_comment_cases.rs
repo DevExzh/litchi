@@ -1,14 +1,10 @@
 //! Numbers table-cell comment mutation parity (wave W1-G, record 0379).
 //!
-//! The focused host routes still take a native table-model identity and reply
-//! storage identity; the leaf routes use only sheet/table positions, a checked
-//! cell coordinate, and a checked reply ordinal.  The fixture is native-authored
-//! and starts with one root at B2 and no direct replies.  Reply replacement and
-//! removal use a host-authored setup containing one reply so the compared
-//! operation itself remains a single bounded route.
+//! The first shared slice covers only root replacement.  Direct reply
+//! mutations remain an explicit host-only follow-up until their graph
+//! transitions are lifted into the shared native engine.
 
 use litchi_iwa::numbers;
-use litchi_numbers::cell::comment::CommentReplyIndex;
 use litchi_numbers::table::At;
 use litchi_numbers::{Package, SheetSelector, TableSelector};
 
@@ -23,9 +19,6 @@ const COLUMN: usize = 1;
 #[derive(Clone, Copy, Debug)]
 enum Operation {
     Set,
-    AddReply,
-    SetReply,
-    RemoveReply,
 }
 
 fn position() -> At {
@@ -69,31 +62,6 @@ fn host_route(source: &[u8], operation: Operation) -> TestResult<Vec<u8>> {
         Operation::Set => {
             editor.set_cell_comment(model, ROW, COLUMN, "W1-G revised root")?;
         },
-        Operation::AddReply => {
-            editor.add_cell_comment_reply(model, ROW, COLUMN, "W1-G added reply")?;
-        },
-        Operation::SetReply => {
-            let reply = editor
-                .cell_comment_replies(model, ROW, COLUMN)?
-                .into_iter()
-                .next()
-                .ok_or("host setup has no reply")?;
-            editor.set_cell_comment_reply(
-                model,
-                ROW,
-                COLUMN,
-                reply.storage_id.get(),
-                "W1-G revised reply",
-            )?;
-        },
-        Operation::RemoveReply => {
-            let reply = editor
-                .cell_comment_replies(model, ROW, COLUMN)?
-                .into_iter()
-                .next()
-                .ok_or("host setup has no reply")?;
-            editor.remove_cell_comment_reply(model, ROW, COLUMN, reply.storage_id.get())?;
-        },
     }
     Ok(editor.to_bytes()?)
 }
@@ -107,46 +75,24 @@ fn leaf_route(source: &[u8], operation: Operation) -> TestResult<LeafRun> {
             position(),
             "W1-G revised root",
         )?,
-        Operation::AddReply => package.add_table_cell_comment_reply(
-            SheetSelector::index(0),
-            TableSelector::index(0),
-            position(),
-            "W1-G added reply",
-        )?,
-        Operation::SetReply => package.set_table_cell_comment_reply(
-            SheetSelector::index(0),
-            TableSelector::index(0),
-            position(),
-            CommentReplyIndex::new(0),
-            "W1-G revised reply",
-        )?,
-        Operation::RemoveReply => package.remove_table_cell_comment_reply(
-            SheetSelector::index(0),
-            TableSelector::index(0),
-            position(),
-            CommentReplyIndex::new(0),
-        )?,
     };
     let restored = commit
         .package()
-        .apply_table_cell_comment(commit.patch().inverse())?;
+        .apply_table_cell_comment(&commit.patch().inverse())?;
     Ok(LeafRun::with_inverse(
         leaf_bytes!(commit.package()),
         leaf_bytes!(restored.package()),
     ))
 }
 
-fn reply_setup() -> TestResult<Fixture> {
-    let input = fixture(FIXTURE)?;
-    let bytes = host_route(&input.bytes, Operation::AddReply)?;
-    Ok(Fixture {
-        path: "iwork/numbers/comment-reader-native-created.numbers + host reply setup",
-        bytes,
-    })
-}
-
-fn run(name: &'static str, operation: Operation, input: &Fixture) -> TestResult {
-    Case::new(name, Format::Numbers, Tier::B, Evidence::Queued, input)
+fn run(
+    name: &'static str,
+    operation: Operation,
+    tier: Tier,
+    evidence: Evidence,
+    input: &Fixture,
+) -> TestResult {
+    Case::new(name, Format::Numbers, tier, evidence, input)
         .host(move |source| host_route(source, operation))
         .leaf(move |source| leaf_route(source, operation))
         .read("host table-cell replies", host_replies)
@@ -176,36 +122,8 @@ fn numbers_table_cell_comment_set_parity() -> TestResult {
     run(
         "numbers_table_cell_comment_set_parity",
         Operation::Set,
-        &input,
-    )
-}
-
-#[test]
-fn numbers_table_cell_comment_reply_add_parity() -> TestResult {
-    let input = fixture(FIXTURE)?;
-    run(
-        "numbers_table_cell_comment_reply_add_parity",
-        Operation::AddReply,
-        &input,
-    )
-}
-
-#[test]
-fn numbers_table_cell_comment_reply_set_parity() -> TestResult {
-    let input = reply_setup()?;
-    run(
-        "numbers_table_cell_comment_reply_set_parity",
-        Operation::SetReply,
-        &input,
-    )
-}
-
-#[test]
-fn numbers_table_cell_comment_reply_remove_parity() -> TestResult {
-    let input = reply_setup()?;
-    run(
-        "numbers_table_cell_comment_reply_remove_parity",
-        Operation::RemoveReply,
+        Tier::B,
+        Evidence::Queued,
         &input,
     )
 }

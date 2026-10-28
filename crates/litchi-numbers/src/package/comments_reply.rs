@@ -684,6 +684,7 @@ fn map_root_error(error: RootError, path: Path) -> Error {
                 RootLimitKind::TextBytes => LimitKind::TextBytes,
                 RootLimitKind::References => LimitKind::References,
                 RootLimitKind::CompressedBytes => LimitKind::CompressedBytes,
+                _ => LimitKind::Work,
             },
             observed,
             maximum,

@@ -3,7 +3,7 @@
 //! The semantic surface uses only a body-table selector, a checked cell
 //! position, and reply ordinals.  Native table-list keys, storage identities,
 //! UUID bindings, tile routes, and archive metadata stay inside the package
-//! adapter and its shared bounded comment writer.
+//! adapter and the shared native root-comment graph engine.
 
 use std::fmt;
 use std::sync::Arc;
@@ -14,11 +14,7 @@ use litchi_iwa_common::{decode_varint_from_bytes, table::coordinate::At};
 use litchi_iwa_core::ArchiveObject;
 use thiserror::Error;
 
-use super::{
-    Package, PackageError,
-    body_table_comment_writer::{self, CandidateAdmission, ReadBudget},
-    table_cells, table_lock,
-};
+use super::{Package, PackageError, table_cells, table_lock};
 use crate::ReplySelector;
 use crate::selector::BodyTableSelector;
 use litchi_iwa_common::table::read::{Comment, CommentReply};
@@ -91,6 +87,8 @@ pub enum BodyTableCommentLimitKind {
     ScratchBytes,
     /// Logical allocations requested.
     Allocations,
+    /// Candidate bytes retained by the codec.
+    RetainedBytes,
 }
 
 impl fmt::Display for BodyTableCommentLimitKind {
@@ -118,6 +116,7 @@ impl fmt::Display for BodyTableCommentLimitKind {
             Self::TextBytes => "text bytes",
             Self::ScratchBytes => "scratch bytes",
             Self::Allocations => "allocations",
+            Self::RetainedBytes => "retained bytes",
         })
     }
 }
@@ -154,7 +153,7 @@ pub enum BodyTableCommentError {
     #[error(
         "Pages body-table comments {kind} limit exceeded: observed {observed}, maximum {maximum}"
     )]
-    LimitExceeded {
+    Limit {
         /// Resource category.
         kind: BodyTableCommentLimitKind,
         /// Observed amount.
@@ -202,6 +201,10 @@ struct TableCommentSnapshot {
     comment: Option<Comment>,
 }
 
+#[allow(
+    dead_code,
+    reason = "reply variants remain explicit host-only refusals in this slice"
+)]
 #[derive(Debug, Clone)]
 enum Operation {
     Set(Box<str>),
@@ -211,12 +214,110 @@ enum Operation {
     RemoveReply { index: usize },
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct CandidateAdmission;
+
+impl CandidateAdmission {
+    const EMPTY: Self = Self;
+
+    fn charge(self, budget: &mut ReadBudget, bytes: usize) -> Result<(), BodyTableCommentError> {
+        budget.wire_work(bytes)
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+struct ReadBudget {
+    text_bytes: usize,
+    wire_work: usize,
+    max_text_bytes: usize,
+    max_wire_work: usize,
+}
+
+impl ReadBudget {
+    fn for_package(package: &Package) -> Result<Self, BodyTableCommentError> {
+        let limits = package.state.source.limits();
+        let maximum = limits.max_iwa_stream_bytes();
+        let source_bytes = package.source_bytes().len();
+        if source_bytes > usize::try_from(limits.max_input_bytes()).unwrap_or(usize::MAX) {
+            return Err(BodyTableCommentError::Limit {
+                kind: BodyTableCommentLimitKind::InputBytes,
+                observed: source_bytes as u64,
+                maximum: limits.max_input_bytes(),
+            });
+        }
+        Ok(Self {
+            text_bytes: 0,
+            wire_work: 0,
+            max_text_bytes: MAX_COMMENT_TEXT_BYTES,
+            max_wire_work: maximum.saturating_mul(64).max(source_bytes),
+        })
+    }
+
+    fn copy_text(&mut self, bytes: usize) -> Result<(), BodyTableCommentError> {
+        let observed = self
+            .text_bytes
+            .checked_add(bytes)
+            .ok_or(BodyTableCommentError::Limit {
+                kind: BodyTableCommentLimitKind::TextBytes,
+                observed: u64::MAX,
+                maximum: self.max_text_bytes as u64,
+            })?;
+        if observed > self.max_text_bytes {
+            return Err(BodyTableCommentError::Limit {
+                kind: BodyTableCommentLimitKind::TextBytes,
+                observed: observed as u64,
+                maximum: self.max_text_bytes as u64,
+            });
+        }
+        self.text_bytes = observed;
+        Ok(())
+    }
+
+    fn wire_work(&mut self, bytes: usize) -> Result<(), BodyTableCommentError> {
+        let observed = self
+            .wire_work
+            .checked_add(bytes)
+            .ok_or(BodyTableCommentError::Limit {
+                kind: BodyTableCommentLimitKind::WireWork,
+                observed: u64::MAX,
+                maximum: self.max_wire_work as u64,
+            })?;
+        if observed > self.max_wire_work {
+            return Err(BodyTableCommentError::Limit {
+                kind: BodyTableCommentLimitKind::WireWork,
+                observed: observed as u64,
+                maximum: self.max_wire_work as u64,
+            });
+        }
+        self.wire_work = observed;
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone)]
+struct TableCommentSelection {
+    component: Box<str>,
+    tile_component: Box<str>,
+    model_identifier: u64,
+    model_message_index: usize,
+    model_message_type: u32,
+    tile_identifier: u64,
+    tile_message_index: usize,
+    tile_message_type: u32,
+    tile_row: u32,
+    column: u32,
+    table_columns: u32,
+    comment_key: Option<u32>,
+    list_identifier: Option<u64>,
+    root_identifier: Option<u64>,
+}
+
 /// A mutable selector-first body-table cell comment edit.
 pub struct BodyTableCommentEdit<'a> {
     source: &'a Package,
     table: usize,
     cell: CellPosition,
-    selection: body_table_comment_writer::TableCommentSelection,
+    selection: TableCommentSelection,
     before: TableCommentSnapshot,
     budget: ReadBudget,
     operation: Option<Operation>,
@@ -639,137 +740,123 @@ fn commit_edit(
     edit: BodyTableCommentEdit<'_>,
 ) -> Result<BodyTableCommentCommit, BodyTableCommentError> {
     let source = edit.source;
-    let before = edit.before;
-    let Some(operation) = edit.operation else {
+    let before = edit.before.clone();
+    let Some(operation) = edit.operation.clone() else {
         return Ok(noop_commit(source, edit.table, edit.cell, before));
     };
     if operation_is_noop(&before, &operation) {
         return Ok(noop_commit(source, edit.table, edit.cell, before));
     }
-    // Validate the semantic operation through the format-neutral transaction
-    // kernel before the Pages-native graph writer allocates or rewrites any
-    // archive state.  The writer remains the Pages wire adapter; the shared
-    // kernel owns root/reply cardinality and terminal refusal semantics.
-    let shared_before = shared_snapshot(&before);
-    let shared_operation = shared_operation(&operation);
-    litchi_iwa_table::comments::apply_operation(&shared_before, &shared_operation)
-        .map_err(map_shared_error)?;
-    let operation = match operation {
-        Operation::Set(text) => body_table_comment_writer::TableCommentOperation::Set(text),
-        Operation::Clear => body_table_comment_writer::TableCommentOperation::Clear,
-        Operation::AddReply(text) => {
-            body_table_comment_writer::TableCommentOperation::AddReply(text)
-        },
-        Operation::SetReply { index, text } => {
-            body_table_comment_writer::TableCommentOperation::SetReply { index, text }
-        },
-        Operation::RemoveReply { index } => {
-            body_table_comment_writer::TableCommentOperation::RemoveReply { index }
+    if matches!(operation, Operation::Set(_) | Operation::Clear) {
+        return commit_shared_root(edit);
+    }
+    // Direct replies remain host-only until their shared graph transition is
+    // lifted; do not route them through the former Pages-local writer.
+    return Err(BodyTableCommentError::UnsupportedDependency);
+}
+
+fn commit_shared_root(
+    edit: BodyTableCommentEdit<'_>,
+) -> Result<BodyTableCommentCommit, BodyTableCommentError> {
+    let source = edit.source;
+    let before = edit.before.clone();
+    let operation = edit.operation.ok_or(BodyTableCommentError::Verification)?;
+    let native_operation = match &operation {
+        Operation::Set(text) => litchi_iwa_table::comments_native::RootOperation::Set(text.clone()),
+        Operation::Clear => litchi_iwa_table::comments_native::RootOperation::Clear,
+        Operation::AddReply(_) | Operation::SetReply { .. } | Operation::RemoveReply { .. } => {
+            return Err(BodyTableCommentError::UnsupportedDependency);
         },
     };
-    let mut budget = edit.budget;
-    let source_admission =
-        body_table_comment_writer::package_candidate_admission(source, &mut budget)?;
-    let output = body_table_comment_writer::execute_table_mutation(
+    let selection = litchi_iwa_table::comments_native::Selection {
+        model_component: edit.selection.component.clone(),
+        tile_component: edit.selection.tile_component.clone(),
+        model_identifier: edit.selection.model_identifier,
+        model_message_index: edit.selection.model_message_index,
+        model_message_type: edit.selection.model_message_type,
+        tile_identifier: edit.selection.tile_identifier,
+        tile_message_index: edit.selection.tile_message_index,
+        tile_message_type: edit.selection.tile_message_type,
+        tile_row: edit.selection.tile_row,
+        column: edit.selection.column,
+        table_columns: edit.selection.table_columns,
+        comment_key: edit.selection.comment_key,
+        list_identifier: edit.selection.list_identifier,
+        root_identifier: edit.selection.root_identifier,
+    };
+    let native = litchi_iwa_table::comments_native::rewrite_root(
         source,
-        &edit.selection,
-        &operation,
-        &mut budget,
-    )?;
-    let source_bytes = source.state.source.shared_source();
-    let target: Arc<[u8]> = Arc::from(output.bytes);
-    output
-        .candidate_admission
-        .charge(&mut budget, target.len())?;
-    let candidate = reopen(source, Arc::clone(&target))?;
+        &selection,
+        &native_operation,
+        litchi_iwa_table::comments_native::Profile::PAGES,
+    )
+    .map_err(map_native_fault)?;
+    let target = native.target();
+    let mut budget = edit.budget;
+    budget.wire_work(target.len()).map_err(map_writer_error)?;
+    let touched_components = native.touched_components();
+    let candidate = native.into_package();
     candidate.validate().map_err(map_reopen_package_error)?;
     let after = read_comment(&candidate, BodyTableSelector::index(edit.table), edit.cell)?;
-    let expected = expected_after(&before, &operation)?;
-    if !snapshot_matches(&after, &expected) {
+    let expected = match operation {
+        Operation::Set(text) => Some(Comment::new(text.as_ref())),
+        Operation::Clear => None,
+        Operation::AddReply(_) | Operation::SetReply { .. } | Operation::RemoveReply { .. } => {
+            return Err(BodyTableCommentError::UnsupportedDependency);
+        },
+    };
+    if !snapshot_matches(&after, &TableCommentSnapshot { comment: expected }) {
         return Err(BodyTableCommentError::Verification);
     }
-    budget.wire_work(source_bytes.len().saturating_add(target.len()))?;
+    let source_bytes = source.state.source.shared_source();
     Ok(BodyTableCommentCommit {
         package: candidate,
         patch: BodyTableCommentPatch {
-            artifacts: ExactArtifacts::new(source_bytes, target),
+            artifacts: ExactArtifacts::new(source_bytes, Arc::clone(&target)),
             path: BodyTableCommentPath {
                 table: edit.table,
                 cell: edit.cell,
             },
             before,
             after: TableCommentSnapshot { comment: after },
-            touched_components: output.touched_components,
-            source_admission,
-            target_admission: output.candidate_admission,
+            touched_components,
+            source_admission: CandidateAdmission::EMPTY,
+            target_admission: CandidateAdmission::EMPTY,
         },
-        diagnostics: BodyTableCommentDiagnostics::published(output.touched_components),
+        diagnostics: BodyTableCommentDiagnostics::published(touched_components),
     })
 }
 
-fn shared_snapshot(snapshot: &TableCommentSnapshot) -> litchi_iwa_table::comments::Snapshot {
-    let replies = snapshot
-        .comment
-        .as_ref()
-        .and_then(Comment::replies)
-        .map_or_else(Vec::new, ToOwned::to_owned);
-    litchi_iwa_table::comments::Snapshot::new(snapshot.comment.clone(), replies.into_boxed_slice())
-}
-
-fn shared_operation(operation: &Operation) -> litchi_iwa_table::comments::Operation {
-    match operation {
-        Operation::Set(text) => litchi_iwa_table::comments::Operation::Set(text.clone()),
-        Operation::Clear => litchi_iwa_table::comments::Operation::Clear,
-        Operation::AddReply(text) => litchi_iwa_table::comments::Operation::AddReply(text.clone()),
-        Operation::SetReply { index, text } => litchi_iwa_table::comments::Operation::SetReply {
-            index: *index,
-            text: text.clone(),
-        },
-        Operation::RemoveReply { index } => {
-            litchi_iwa_table::comments::Operation::RemoveReply { index: *index }
-        },
-    }
-}
-
-pub(super) fn map_shared_error(error: litchi_iwa_table::comments::Error) -> BodyTableCommentError {
-    use litchi_iwa_table::comments::{Error, Refusal};
-    match error {
-        Error::Refused(Refusal::CommentNotFound) => BodyTableCommentError::CommentNotFound,
-        Error::Refused(Refusal::ReplyNotFound { index }) => {
-            BodyTableCommentError::ReplyPositionNotFound {
-                position: litchi_core::Position::new(index),
-            }
-        },
-        Error::Limit {
+fn map_native_fault(fault: litchi_iwa_table::comments_native::Fault) -> BodyTableCommentError {
+    use litchi_iwa_table::comments_native::{Fault, LimitKind};
+    match fault {
+        Fault::Unsupported | Fault::Dependency => BodyTableCommentError::UnsupportedDependency,
+        Fault::Invalid => BodyTableCommentError::InvalidSource,
+        Fault::Verification => BodyTableCommentError::Verification,
+        Fault::Allocation { amount } => BodyTableCommentError::Allocation { amount },
+        Fault::Limit {
             kind,
             observed,
             maximum,
-        } => BodyTableCommentError::LimitExceeded {
-            kind: map_shared_limit(kind),
-            observed: usize::try_from(observed).unwrap_or(usize::MAX),
-            maximum: usize::try_from(maximum).unwrap_or(usize::MAX),
+        } => BodyTableCommentError::Limit {
+            kind: match kind {
+                LimitKind::PackageBytes => BodyTableCommentLimitKind::PackageBytes,
+                LimitKind::PayloadBytes => BodyTableCommentLimitKind::PayloadBytes,
+                LimitKind::References => BodyTableCommentLimitKind::References,
+                LimitKind::Replies => BodyTableCommentLimitKind::Replies,
+                LimitKind::TextBytes => BodyTableCommentLimitKind::TextBytes,
+                LimitKind::WireFields => BodyTableCommentLimitKind::WireFields,
+                LimitKind::WireBytes => BodyTableCommentLimitKind::WireBytes,
+                LimitKind::WireOutputBytes => BodyTableCommentLimitKind::WireOutputBytes,
+                LimitKind::WireNesting => BodyTableCommentLimitKind::WireNesting,
+                LimitKind::WireWork => BodyTableCommentLimitKind::WireWork,
+                LimitKind::Allocations => BodyTableCommentLimitKind::Allocations,
+                LimitKind::ScratchBytes => BodyTableCommentLimitKind::ScratchBytes,
+                LimitKind::RetainedBytes => BodyTableCommentLimitKind::RetainedBytes,
+            },
+            observed,
+            maximum,
         },
-        Error::Allocation { amount } => BodyTableCommentError::Allocation { amount },
-        Error::Refused(_) | Error::InvalidSource | Error::Verification | Error::PatchConflict => {
-            BodyTableCommentError::InvalidSource
-        },
-    }
-}
-
-const fn map_shared_limit(
-    kind: litchi_iwa_table::comments::LimitKind,
-) -> BodyTableCommentLimitKind {
-    use litchi_iwa_table::comments::LimitKind as Shared;
-    match kind {
-        Shared::InputBytes => BodyTableCommentLimitKind::InputBytes,
-        Shared::OutputBytes => BodyTableCommentLimitKind::OutputBytes,
-        Shared::PayloadBytes => BodyTableCommentLimitKind::PayloadBytes,
-        Shared::References => BodyTableCommentLimitKind::References,
-        Shared::Replies => BodyTableCommentLimitKind::Replies,
-        Shared::TextBytes => BodyTableCommentLimitKind::TextBytes,
-        Shared::WireFields => BodyTableCommentLimitKind::WireFields,
-        Shared::WireWork => BodyTableCommentLimitKind::WireWork,
-        Shared::Allocations => BodyTableCommentLimitKind::Allocations,
     }
 }
 
@@ -806,95 +893,6 @@ fn operation_is_noop(before: &TableCommentSnapshot, operation: &Operation) -> bo
             .is_some_and(|reply| reply.text() == text.as_ref()),
         _ => false,
     }
-}
-
-fn expected_after(
-    before: &TableCommentSnapshot,
-    operation: &body_table_comment_writer::TableCommentOperation,
-) -> Result<TableCommentSnapshot, BodyTableCommentError> {
-    let mut comment = before.comment.clone();
-    match operation {
-        body_table_comment_writer::TableCommentOperation::Set(text) => {
-            comment = Some(match comment.as_ref() {
-                Some(existing) if existing.replies().is_some() => Comment::with_replies(
-                    text.to_string(),
-                    existing.timestamp(),
-                    existing.author().cloned(),
-                    existing.replies().into_iter().flatten().cloned(),
-                ),
-                Some(existing) => Comment::with_metadata(
-                    text.to_string(),
-                    existing.timestamp(),
-                    existing.author().cloned(),
-                ),
-                None => Comment::new(text.to_string()),
-            });
-        },
-        body_table_comment_writer::TableCommentOperation::Clear => {
-            comment = None;
-        },
-        body_table_comment_writer::TableCommentOperation::AddReply(text) => {
-            let root = comment
-                .as_mut()
-                .ok_or(BodyTableCommentError::CommentNotFound)?;
-            let mut replies = root.replies().map_or_else(Vec::new, ToOwned::to_owned);
-            replies.push(CommentReply::with_metadata(
-                text.to_string(),
-                root.timestamp(),
-                root.author().cloned(),
-            ));
-            *root = Comment::with_replies(
-                root.text().to_owned(),
-                root.timestamp(),
-                root.author().cloned(),
-                replies,
-            );
-        },
-        body_table_comment_writer::TableCommentOperation::SetReply { index, text } => {
-            let root = comment
-                .as_mut()
-                .ok_or(BodyTableCommentError::CommentNotFound)?;
-            let replies = root.replies().ok_or(BodyTableCommentError::InvalidSource)?;
-            if *index >= replies.len() {
-                return Err(BodyTableCommentError::ReplyPositionNotFound {
-                    position: litchi_core::Position::new(*index),
-                });
-            }
-            let mut replies = replies.to_vec();
-            let old = &replies[*index];
-            replies[*index] = CommentReply::with_metadata(
-                text.to_string(),
-                old.timestamp(),
-                old.author().cloned(),
-            );
-            *root = Comment::with_replies(
-                root.text().to_owned(),
-                root.timestamp(),
-                root.author().cloned(),
-                replies,
-            );
-        },
-        body_table_comment_writer::TableCommentOperation::RemoveReply { index } => {
-            let root = comment
-                .as_mut()
-                .ok_or(BodyTableCommentError::CommentNotFound)?;
-            let replies = root.replies().ok_or(BodyTableCommentError::InvalidSource)?;
-            if *index >= replies.len() {
-                return Err(BodyTableCommentError::ReplyPositionNotFound {
-                    position: litchi_core::Position::new(*index),
-                });
-            }
-            let mut replies = replies.to_vec();
-            replies.remove(*index);
-            *root = Comment::with_replies(
-                root.text().to_owned(),
-                root.timestamp(),
-                root.author().cloned(),
-                replies,
-            );
-        },
-    }
-    Ok(TableCommentSnapshot { comment })
 }
 
 fn snapshot_matches(actual: &Option<Comment>, expected: &TableCommentSnapshot) -> bool {
@@ -947,7 +945,7 @@ fn read_comment(
 #[derive(Debug, Clone)]
 struct ResolvedSelection {
     table_position: usize,
-    selection: body_table_comment_writer::TableCommentSelection,
+    selection: TableCommentSelection,
 }
 
 fn resolve_selection(
@@ -1023,7 +1021,7 @@ fn resolve_selection(
         .ok_or(BodyTableCommentError::InvalidSource)?;
     Ok(ResolvedSelection {
         table_position: target.table_position,
-        selection: body_table_comment_writer::TableCommentSelection {
+        selection: TableCommentSelection {
             component: model_component.name().into(),
             tile_component: package
                 .state
@@ -1073,7 +1071,8 @@ fn read_tile_comment_key(
     column: u32,
     table_columns: u32,
 ) -> Result<Option<u32>, BodyTableCommentError> {
-    let view = WireView::parse(source).map_err(|_| BodyTableCommentError::InvalidSource)?;
+    let view = WireView::parse(source, litchi_iwa_common::WireLimits::DEFAULT)
+        .map_err(|_| BodyTableCommentError::InvalidSource)?;
     let mut found = None;
     for field in view
         .fields()
@@ -1082,8 +1081,8 @@ fn read_tile_comment_key(
         if field.wire_type() != 2 {
             return Err(BodyTableCommentError::InvalidSource);
         }
-        let row =
-            WireView::parse(field.payload()).map_err(|_| BodyTableCommentError::InvalidSource)?;
+        let row = WireView::parse(field.payload(), litchi_iwa_common::WireLimits::DEFAULT)
+            .map_err(|_| BodyTableCommentError::InvalidSource)?;
         let row_value = unique_varint(&row, ROW_INDEX_FIELD)?;
         if row_value != u64::from(row_index) {
             continue;
@@ -1107,7 +1106,8 @@ fn read_tile_row_comment_key(
     column: u32,
     table_columns: u32,
 ) -> Result<Option<u32>, BodyTableCommentError> {
-    let view = WireView::parse(source).map_err(|_| BodyTableCommentError::InvalidSource)?;
+    let view = WireView::parse(source, litchi_iwa_common::WireLimits::DEFAULT)
+        .map_err(|_| BodyTableCommentError::InvalidSource)?;
     let storage = unique_length(&view, ROW_STORAGE_FIELD)?;
     let offsets = unique_length(&view, ROW_OFFSETS_FIELD)?;
     let cell_count = usize::try_from(unique_varint(&view, ROW_CELL_COUNT_FIELD)?)
@@ -1165,8 +1165,11 @@ fn read_tile_row_comment_key(
     if start >= end || end > storage.payload().len() {
         return Err(BodyTableCommentError::InvalidSource);
     }
-    let cell = litchi_numbers_wire::BncCell::parse(&storage.payload()[start..end])
-        .map_err(|_| BodyTableCommentError::InvalidSource)?;
+    let cell = litchi_numbers_wire::BncCell::parse(
+        &storage.payload()[start..end],
+        &litchi_numbers_wire::Limits::DEFAULT,
+    )
+    .map_err(|_| BodyTableCommentError::InvalidSource)?;
     Ok(cell.comment_identifier())
 }
 
@@ -1184,8 +1187,8 @@ fn read_list_entry(
     if messages.len() != 1 {
         return Err(BodyTableCommentError::InvalidSource);
     }
-    let view =
-        WireView::parse(&messages[0].data).map_err(|_| BodyTableCommentError::InvalidSource)?;
+    let view = WireView::parse(&messages[0].data, litchi_iwa_common::WireLimits::DEFAULT)
+        .map_err(|_| BodyTableCommentError::InvalidSource)?;
     let list_type = unique_varint(&view, LIST_TYPE_FIELD)?;
     if list_type != COMMENT_LIST_TYPE {
         return Err(BodyTableCommentError::UnsupportedDependency);
@@ -1195,8 +1198,8 @@ fn read_list_entry(
         .fields()
         .filter(|field| field.number() == LIST_ENTRY_FIELD)
     {
-        let entry =
-            WireView::parse(field.payload()).map_err(|_| BodyTableCommentError::InvalidSource)?;
+        let entry = WireView::parse(field.payload(), litchi_iwa_common::WireLimits::DEFAULT)
+            .map_err(|_| BodyTableCommentError::InvalidSource)?;
         if entry.fields().any(|entry_field| {
             !matches!(
                 entry_field.number(),
@@ -1219,7 +1222,7 @@ fn read_list_entry(
         }
         let reference = unique_length(&entry, ENTRY_STORAGE_FIELD)?;
         result = Some(unique_varint(
-            &WireView::parse(reference.payload())
+            &WireView::parse(reference.payload(), litchi_iwa_common::WireLimits::DEFAULT)
                 .map_err(|_| BodyTableCommentError::InvalidSource)?,
             REFERENCE_IDENTIFIER_FIELD,
         )?);
@@ -1241,8 +1244,8 @@ fn validate_comment_list(package: &Package, identifier: u64) -> Result<(), BodyT
     if messages.len() != 1 {
         return Err(BodyTableCommentError::InvalidSource);
     }
-    let view =
-        WireView::parse(&messages[0].data).map_err(|_| BodyTableCommentError::InvalidSource)?;
+    let view = WireView::parse(&messages[0].data, litchi_iwa_common::WireLimits::DEFAULT)
+        .map_err(|_| BodyTableCommentError::InvalidSource)?;
     for field in view.fields() {
         if !matches!(
             field.number(),
@@ -1307,9 +1310,8 @@ fn copy_text(text: &str, budget: &mut ReadBudget) -> Result<Box<str>, BodyTableC
 }
 
 fn reopen(source: &Package, target: Arc<[u8]>) -> Result<Package, BodyTableCommentError> {
-    let catalog =
-        SourceCatalog::from_shared_bytes_with_limits(target, source.state.source.limits())
-            .map_err(map_reopen_archive_error)?;
+    let catalog = SourceCatalog::from_shared_bytes(target, source.state.source.limits())
+        .map_err(map_reopen_archive_error)?;
     Package::from_source_catalog(catalog).map_err(map_reopen_package_error)
 }
 
@@ -1319,7 +1321,7 @@ fn map_reopen_archive_error(error: litchi_iwa_archive::Error) -> BodyTableCommen
             kind,
             observed,
             maximum,
-        } => BodyTableCommentError::LimitExceeded {
+        } => BodyTableCommentError::Limit {
             kind: match kind {
                 litchi_iwa_archive::LimitKind::InputBytes => BodyTableCommentLimitKind::InputBytes,
                 litchi_iwa_archive::LimitKind::OutputBytes => {
@@ -1362,7 +1364,7 @@ fn map_reopen_core_error(error: litchi_iwa_core::Error) -> BodyTableCommentError
             kind,
             observed,
             maximum,
-        } => BodyTableCommentError::LimitExceeded {
+        } => BodyTableCommentError::Limit {
             kind: match kind {
                 litchi_iwa_core::LimitKind::Objects => BodyTableCommentLimitKind::PayloadObjects,
                 litchi_iwa_core::LimitKind::Messages
@@ -1392,7 +1394,7 @@ fn map_reopen_package_error(error: PackageError) -> BodyTableCommentError {
         PackageError::Archive(error) => map_reopen_archive_error(error),
         PackageError::Limit {
             observed, maximum, ..
-        } => BodyTableCommentError::LimitExceeded {
+        } => BodyTableCommentError::Limit {
             kind: BodyTableCommentLimitKind::WireWork,
             observed,
             maximum,
@@ -1404,7 +1406,7 @@ fn map_reopen_package_error(error: PackageError) -> BodyTableCommentError {
         | PackageError::SectionNamesTooLarge {
             observed,
             limit: maximum,
-        } => BodyTableCommentError::LimitExceeded {
+        } => BodyTableCommentError::Limit {
             kind: BodyTableCommentLimitKind::PayloadBytes,
             observed: observed as u64,
             maximum: maximum as u64,
@@ -1412,7 +1414,7 @@ fn map_reopen_package_error(error: PackageError) -> BodyTableCommentError {
         PackageError::ObjectLimit {
             observed,
             limit: maximum,
-        } => BodyTableCommentError::LimitExceeded {
+        } => BodyTableCommentError::Limit {
             kind: BodyTableCommentLimitKind::PayloadObjects,
             observed: observed as u64,
             maximum: maximum as u64,
@@ -1424,7 +1426,7 @@ fn map_reopen_package_error(error: PackageError) -> BodyTableCommentError {
         | PackageError::Semantic(crate::Error::TooManyBodyStorages {
             actual: observed,
             limit: maximum,
-        }) => BodyTableCommentError::LimitExceeded {
+        }) => BodyTableCommentError::Limit {
             kind: BodyTableCommentLimitKind::PayloadItems,
             observed: observed as u64,
             maximum: maximum as u64,
@@ -1432,7 +1434,7 @@ fn map_reopen_package_error(error: PackageError) -> BodyTableCommentError {
         PackageError::Semantic(crate::Error::TextTooLarge {
             observed,
             limit: maximum,
-        }) => BodyTableCommentError::LimitExceeded {
+        }) => BodyTableCommentError::Limit {
             kind: BodyTableCommentLimitKind::PayloadBytes,
             observed: observed as u64,
             maximum: maximum as u64,
@@ -1460,11 +1462,11 @@ fn map_cells_error(error: table_cells::Error) -> BodyTableCommentError {
         table_cells::Error::AmbiguousSelector => BodyTableCommentError::AmbiguousSelector,
         table_cells::Error::UnsupportedSource => BodyTableCommentError::UnsupportedSource,
         table_cells::Error::InvalidSource => BodyTableCommentError::InvalidSource,
-        table_cells::Error::LimitExceeded {
+        table_cells::Error::Limit {
             kind,
             observed,
             maximum,
-        } => BodyTableCommentError::LimitExceeded {
+        } => BodyTableCommentError::Limit {
             kind: map_cells_limit(kind),
             observed,
             maximum,
@@ -1473,33 +1475,33 @@ fn map_cells_error(error: table_cells::Error) -> BodyTableCommentError {
     }
 }
 
-fn map_lock_error(error: table_lock::BodyTableLockError) -> BodyTableCommentError {
+fn map_lock_error(error: table_lock::Error) -> BodyTableCommentError {
     match error {
-        table_lock::BodyTableLockError::TableNotFound => BodyTableCommentError::TableNotFound,
-        table_lock::BodyTableLockError::AmbiguousTableName => {
+        table_lock::Error::Refused(table_lock::Refusal::TableNotFound) => {
+            BodyTableCommentError::TableNotFound
+        },
+        table_lock::Error::Refused(table_lock::Refusal::AmbiguousTableName) => {
             BodyTableCommentError::AmbiguousTableName
         },
-        table_lock::BodyTableLockError::AmbiguousSelector => {
+        table_lock::Error::Refused(table_lock::Refusal::AmbiguousSelector) => {
             BodyTableCommentError::AmbiguousSelector
         },
-        table_lock::BodyTableLockError::UnsupportedSource => {
+        table_lock::Error::Refused(table_lock::Refusal::UnsupportedSource) => {
             BodyTableCommentError::UnsupportedSource
         },
-        table_lock::BodyTableLockError::InvalidSource => BodyTableCommentError::InvalidSource,
-        table_lock::BodyTableLockError::Verification => BodyTableCommentError::Verification,
-        table_lock::BodyTableLockError::PatchConflict => BodyTableCommentError::PatchConflict,
-        table_lock::BodyTableLockError::LimitExceeded {
+        table_lock::Error::InvalidSource => BodyTableCommentError::InvalidSource,
+        table_lock::Error::Verification => BodyTableCommentError::Verification,
+        table_lock::Error::PatchConflict => BodyTableCommentError::PatchConflict,
+        table_lock::Error::Limit {
             kind,
             observed,
             maximum,
-        } => BodyTableCommentError::LimitExceeded {
+        } => BodyTableCommentError::Limit {
             kind: map_lock_limit(kind),
             observed,
             maximum,
         },
-        table_lock::BodyTableLockError::Allocation { amount } => {
-            BodyTableCommentError::Allocation { amount }
-        },
+        table_lock::Error::Allocation { amount } => BodyTableCommentError::Allocation { amount },
     }
 }
 
@@ -1530,8 +1532,8 @@ const fn map_cells_limit(kind: table_cells::LimitKind) -> BodyTableCommentLimitK
     }
 }
 
-const fn map_lock_limit(kind: table_lock::BodyTableLockLimitKind) -> BodyTableCommentLimitKind {
-    use table_lock::BodyTableLockLimitKind as Lock;
+const fn map_lock_limit(kind: table_lock::LimitKind) -> BodyTableCommentLimitKind {
+    use table_lock::LimitKind as Lock;
     match kind {
         Lock::InputBytes => BodyTableCommentLimitKind::InputBytes,
         Lock::OutputBytes => BodyTableCommentLimitKind::OutputBytes,

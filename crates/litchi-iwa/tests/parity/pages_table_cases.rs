@@ -29,7 +29,11 @@ fn host_comment_thread(bytes: &[u8]) -> TestResult<String> {
     let editor = pages::Draft::from_bytes(bytes)?;
     let model = host_model(&editor)?;
     let comment = editor.table_cell_comment(model, COMMENT_ROW, COMMENT_COLUMN)?;
-    let replies = editor.table_cell_comment_replies(model, COMMENT_ROW, COMMENT_COLUMN)?;
+    let replies = if comment.is_some() {
+        editor.table_cell_comment_replies(model, COMMENT_ROW, COMMENT_COLUMN)?
+    } else {
+        Vec::new()
+    };
     Ok(format!(
         "root={:?};replies={:?}",
         comment.as_ref().map(|value| value.comment.text.as_str()),
@@ -44,7 +48,11 @@ fn leaf_comment_thread(bytes: &[u8]) -> TestResult<String> {
     let package = Package::from_bytes(bytes)?;
     let position = comment_position()?;
     let comment = package.body_table_cell_comment(TABLE, position)?;
-    let replies = package.body_table_cell_comment_replies(TABLE, position)?;
+    let replies = if comment.is_some() {
+        package.body_table_cell_comment_replies(TABLE, position)?
+    } else {
+        Box::new([])
+    };
     Ok(format!(
         "root={:?};replies={:?}",
         comment.as_ref().map(|value| value.text()),
@@ -54,11 +62,14 @@ fn leaf_comment_thread(bytes: &[u8]) -> TestResult<String> {
 
 fn comment_case(
     name: &'static str,
+    tier: Tier,
+    evidence: Evidence,
+    input_path: &'static str,
     host: impl FnOnce(&mut pages::Draft, u64) -> TestResult + 'static,
     leaf: impl FnOnce(Package, At) -> TestResult<LeafRun> + 'static,
 ) -> TestResult {
-    let input = fixture("iwork/pages/body-table-comment-hidden-native-saved.pages")?;
-    Case::new(name, Format::Pages, Tier::B, Evidence::Queued, &input)
+    let input = fixture(input_path)?;
+    Case::new(name, Format::Pages, tier, evidence, &input)
         .host(move |source| {
             let mut editor = pages::Draft::from_bytes(source)?;
             let model = host_model(&editor)?;
@@ -298,6 +309,9 @@ fn pages_body_table_reads_parity() -> TestResult {
 fn pages_body_table_comment_set_parity() -> TestResult {
     comment_case(
         "pages_body_table_comment_set_parity",
+        Tier::B,
+        Evidence::Queued,
+        "iwork/pages/body-table-comment-hidden-native-saved.pages",
         |editor, model| {
             editor.set_table_cell_comment(model, COMMENT_ROW, COMMENT_COLUMN, "W1-G root")?;
             Ok(())
@@ -306,7 +320,7 @@ fn pages_body_table_comment_set_parity() -> TestResult {
             let commit = package.set_body_table_cell_comment(TABLE, position, "W1-G root")?;
             let restored = commit
                 .package()
-                .apply_body_table_cell_comment(commit.patch().inverse())?;
+                .apply_body_table_cell_comment(&commit.patch().inverse())?;
             Ok(LeafRun::with_inverse(
                 leaf_bytes!(commit.package()),
                 leaf_bytes!(restored.package()),
@@ -319,159 +333,32 @@ fn pages_body_table_comment_set_parity() -> TestResult {
 fn pages_body_table_comment_clear_parity() -> TestResult {
     comment_case(
         "pages_body_table_comment_clear_parity",
+        Tier::B,
+        Evidence::Queued,
+        CELLS,
         |editor, model| {
             editor.set_table_cell_comment(model, COMMENT_ROW, COMMENT_COLUMN, "W1-G root")?;
-            editor.add_table_cell_comment_reply(
-                model,
-                COMMENT_ROW,
-                COMMENT_COLUMN,
-                "W1-G reply",
-            )?;
             editor.clear_table_cell_comment(model, COMMENT_ROW, COMMENT_COLUMN)?;
             Ok(())
         },
         |package, position| {
             let set = package.set_body_table_cell_comment(TABLE, position, "W1-G root")?;
-            let add =
-                set.package()
-                    .add_body_table_cell_comment_reply(TABLE, position, "W1-G reply")?;
-            let clear = add
+            let clear = set
                 .package()
                 .clear_body_table_cell_comment(TABLE, position)?;
-            let undo_clear = clear
+            // The fixture is intentionally rootless so host clear can run
+            // without crossing the deferred reply-thread boundary. Compose
+            // both exact inverses to restore the original source: clear's
+            // inverse restores the set candidate, then set's inverse restores
+            // the rootless fixture.
+            let restored_set = clear
                 .package()
-                .apply_body_table_cell_comment(clear.patch().inverse())?;
-            let undo_add = undo_clear
+                .apply_body_table_cell_comment(&clear.patch().inverse())?;
+            let restored = restored_set
                 .package()
-                .apply_body_table_cell_comment(add.patch().inverse())?;
-            let restored = undo_add
-                .package()
-                .apply_body_table_cell_comment(set.patch().inverse())?;
+                .apply_body_table_cell_comment(&set.patch().inverse())?;
             Ok(LeafRun::with_inverse(
                 leaf_bytes!(clear.package()),
-                leaf_bytes!(restored.package()),
-            ))
-        },
-    )
-}
-
-#[test]
-fn pages_body_table_comment_reply_add_parity() -> TestResult {
-    comment_case(
-        "pages_body_table_comment_reply_add_parity",
-        |editor, model| {
-            editor.set_table_cell_comment(model, COMMENT_ROW, COMMENT_COLUMN, "W1-G root")?;
-            editor.add_table_cell_comment_reply(
-                model,
-                COMMENT_ROW,
-                COMMENT_COLUMN,
-                "W1-G reply",
-            )?;
-            Ok(())
-        },
-        |package, position| {
-            let set = package.set_body_table_cell_comment(TABLE, position, "W1-G root")?;
-            let add =
-                set.package()
-                    .add_body_table_cell_comment_reply(TABLE, position, "W1-G reply")?;
-            let restored = add
-                .package()
-                .apply_body_table_cell_comment(add.patch().inverse())?
-                .package()
-                .apply_body_table_cell_comment(set.patch().inverse())?;
-            Ok(LeafRun::with_inverse(
-                leaf_bytes!(add.package()),
-                leaf_bytes!(restored.package()),
-            ))
-        },
-    )
-}
-
-#[test]
-fn pages_body_table_comment_reply_set_parity() -> TestResult {
-    comment_case(
-        "pages_body_table_comment_reply_set_parity",
-        |editor, model| {
-            editor.set_table_cell_comment(model, COMMENT_ROW, COMMENT_COLUMN, "W1-G root")?;
-            let reply = editor.add_table_cell_comment_reply(
-                model,
-                COMMENT_ROW,
-                COMMENT_COLUMN,
-                "W1-G reply",
-            )?;
-            editor.set_table_cell_comment_reply(
-                model,
-                COMMENT_ROW,
-                COMMENT_COLUMN,
-                reply,
-                "W1-G revised",
-            )?;
-            Ok(())
-        },
-        |package, position| {
-            let set = package.set_body_table_cell_comment(TABLE, position, "W1-G root")?;
-            let add =
-                set.package()
-                    .add_body_table_cell_comment_reply(TABLE, position, "W1-G reply")?;
-            let update = add.package().set_body_table_cell_comment_reply(
-                TABLE,
-                position,
-                litchi_pages::ReplySelector::index(0),
-                "W1-G revised",
-            )?;
-            let undo_update = update
-                .package()
-                .apply_body_table_cell_comment(update.patch().inverse())?;
-            let undo_add = undo_update
-                .package()
-                .apply_body_table_cell_comment(add.patch().inverse())?;
-            let restored = undo_add
-                .package()
-                .apply_body_table_cell_comment(set.patch().inverse())?;
-            Ok(LeafRun::with_inverse(
-                leaf_bytes!(update.package()),
-                leaf_bytes!(restored.package()),
-            ))
-        },
-    )
-}
-
-#[test]
-fn pages_body_table_comment_reply_remove_parity() -> TestResult {
-    comment_case(
-        "pages_body_table_comment_reply_remove_parity",
-        |editor, model| {
-            editor.set_table_cell_comment(model, COMMENT_ROW, COMMENT_COLUMN, "W1-G root")?;
-            let reply = editor.add_table_cell_comment_reply(
-                model,
-                COMMENT_ROW,
-                COMMENT_COLUMN,
-                "W1-G reply",
-            )?;
-            editor.remove_table_cell_comment_reply(model, COMMENT_ROW, COMMENT_COLUMN, reply)?;
-            Ok(())
-        },
-        |package, position| {
-            let set = package.set_body_table_cell_comment(TABLE, position, "W1-G root")?;
-            let add =
-                set.package()
-                    .add_body_table_cell_comment_reply(TABLE, position, "W1-G reply")?;
-            let remove = add.package().remove_body_table_cell_comment_reply(
-                TABLE,
-                position,
-                litchi_pages::ReplySelector::index(0),
-            )?;
-            let undo_remove = remove
-                .package()
-                .apply_body_table_cell_comment(remove.patch().inverse())?;
-            let undo_add = undo_remove
-                .package()
-                .apply_body_table_cell_comment(add.patch().inverse())?;
-            let restored = undo_add
-                .package()
-                .apply_body_table_cell_comment(set.patch().inverse())?;
-            Ok(LeafRun::with_inverse(
-                leaf_bytes!(remove.package()),
                 leaf_bytes!(restored.package()),
             ))
         },

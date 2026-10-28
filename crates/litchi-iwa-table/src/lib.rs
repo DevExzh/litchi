@@ -34,6 +34,14 @@ pub mod hidden_axes;
 /// Format-neutral table-cell comment and direct-reply transaction kernel.
 pub mod comments;
 
+/// Format-neutral native graph/rewrite engine for root table-cell comments.
+///
+/// The public facades only provide selector evidence and map the shared
+/// transaction result into their package error vocabulary.  All copy-on-write
+/// archive mutation lives here so the three owners cannot drift in their
+/// ownership, list-key, or locality rules.
+pub mod comments_native;
+
 pub mod structure;
 
 /// A located native object: its messages and its position in the component
