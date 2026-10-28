@@ -9,7 +9,8 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 
 use litchi_iwa_common::wire::{
-    WireView, append_length_delimited_field, patch_varint_field, repeated_length_delimited_payloads,
+    WireView, append_length_delimited_field, patch_varint_field,
+    repeated_length_delimited_payloads, rewrite_repeated_length_delimited_fields,
 };
 use litchi_iwa_common::{LimitKind, WireLimits};
 use litchi_iwa_text_wire::CharacterProperties;
@@ -83,6 +84,8 @@ pub enum Error {
     },
     /// The plan requires a leaf-supplied fresh identifier.
     NeedsIdentifier,
+    /// The request shape is left to the leaf compatibility publisher.
+    BatchUnsupported,
 }
 
 impl fmt::Display for Error {
@@ -110,6 +113,9 @@ impl fmt::Display for Error {
             },
             Self::NeedsIdentifier => {
                 formatter.write_str("cell text-style plan needs a fresh identifier")
+            },
+            Self::BatchUnsupported => {
+                formatter.write_str("cell text-style batch shape is not yet shared")
             },
         }
     }
@@ -590,16 +596,27 @@ pub enum Registration {
 pub struct Plan {
     /// Message payload rewrites, including the cell/tile/header payloads.
     pub rewrites: Vec<Rewrite>,
-    /// Optional new style variation.
-    pub insertion: Option<NewObject>,
+    /// New style variations.
+    pub insertions: Vec<NewObject>,
     /// Optional style object to remove after rewrites.
     pub removal: Option<u64>,
     /// Metadata registry operations.
     pub registrations: Vec<Registration>,
-    /// The style key to write to the selected cell (`None` removes it).
-    pub cell_key: Option<u32>,
-    /// The selected cell's model/coordinates, for leaf publication.
+    /// Cell keys to write after graph publication.
+    pub cell_updates: Vec<(Target, u32)>,
+    /// Whether this plan can be combined with sibling fresh-cell plans.
+    pub batch_compatible: bool,
+}
+
+/// One staged request passed to the batch planner.
+#[derive(Debug, Clone)]
+pub struct Request {
+    /// Selected cell.
     pub target: Target,
+    /// Requested direct character properties.
+    pub properties: CharacterProperties,
+    /// Leaf-supplied identifier when a fresh variation is needed.
+    pub fresh: Option<u64>,
 }
 
 /// Plan a direct CharacterProperties set. The caller supplies `fresh` only
@@ -663,8 +680,6 @@ pub fn plan_set(
                 add_references: Vec::new(),
                 remove_references: Vec::new(),
             }],
-            target,
-            cell_key: None,
             ..Plan::default()
         }));
     }
@@ -748,14 +763,14 @@ pub fn plan_set(
     }
     Ok(Some(Plan {
         rewrites,
-        insertion: Some(NewObject {
+        insertions: vec![NewObject {
             identifier: fresh,
             beside: stylesheet,
             message_type: PARAGRAPH_STYLE_MESSAGE_TYPE,
             versions: None,
             data,
             object_references: vec![parent],
-        }),
+        }],
         registrations: vec![
             Registration::Uuid { object: fresh },
             Registration::ExternalReference {
@@ -763,10 +778,127 @@ pub fn plan_set(
                 object: fresh,
             },
         ],
-        cell_key: Some(key),
-        target,
+        cell_updates: vec![(target, key)],
+        batch_compatible: old_key.is_none(),
         ..Plan::default()
     }))
+}
+
+/// Combine fresh-cell plans into one graph publication plan. Existing-key
+/// releases remain on the leaf compatibility publisher until their ordering is
+/// lifted without changing Numbers' staging semantics.
+pub fn plan_set_many(
+    source: &dyn TableSource,
+    requests: &[Request],
+) -> Result<Option<Plan>, Error> {
+    let mut plans = Vec::new();
+    for request in requests {
+        let Some(plan) = plan_set(source, request.target, &request.properties, request.fresh)?
+        else {
+            continue;
+        };
+        if !plan.batch_compatible {
+            return Err(Error::BatchUnsupported);
+        }
+        plans.push(plan);
+    }
+    if plans.is_empty() {
+        return Ok(None);
+    }
+    let mut combined = Plan::default();
+    for mut plan in plans {
+        if let Some((_, key)) = plan.cell_updates.last_mut() {
+            let collides = combined
+                .cell_updates
+                .iter()
+                .any(|(_, existing)| existing == key);
+            if collides {
+                let next = combined
+                    .cell_updates
+                    .iter()
+                    .map(|(_, existing)| *existing)
+                    .max()
+                    .unwrap_or(*key)
+                    .checked_add(1)
+                    .ok_or(invalid("batch style key overflow"))?;
+                let old = *key;
+                *key = next;
+                for rewrite in &mut plan.rewrites {
+                    if rewrite.message_type == LIST_MESSAGE_TYPE {
+                        rewrite.data = rewrite_list_key(&rewrite.data, old, next)?;
+                    }
+                }
+            }
+        }
+        combined.insertions.extend(plan.insertions);
+        combined.registrations.extend(plan.registrations);
+        combined.cell_updates.extend(plan.cell_updates);
+        for rewrite in plan.rewrites {
+            if let Some(existing) = combined.rewrites.iter_mut().find(|candidate| {
+                candidate.identifier == rewrite.identifier
+                    && candidate.message_type == rewrite.message_type
+            }) {
+                if rewrite.message_type == STYLESHEET_MESSAGE_TYPE {
+                    let insertion = combined
+                        .insertions
+                        .last()
+                        .ok_or(invalid("batch stylesheet insertion missing"))?;
+                    existing.data = litchi_iwa_text_wire::stylesheet_with_style(
+                        &existing.data,
+                        insertion.identifier,
+                        insertion.object_references.first().copied(),
+                        WireLimits::default(),
+                    )
+                    .map_err(|_| invalid("batch stylesheet variation encoding failed"))?;
+                    existing.add_references.push(insertion.identifier);
+                } else if rewrite.message_type == LIST_MESSAGE_TYPE {
+                    let key = combined
+                        .cell_updates
+                        .last()
+                        .map(|(_, key)| *key)
+                        .ok_or(invalid("batch list key missing"))?;
+                    let entry = repeated_length_delimited_payloads(&rewrite.data, 3)
+                        .map_err(map_wire)?
+                        .into_iter()
+                        .find(|entry| varint(entry, 1).ok() == Some(Some(u64::from(key))))
+                        .ok_or(invalid("batch style-list entry missing"))?;
+                    append_length_delimited_field(
+                        &mut existing.data,
+                        3,
+                        entry,
+                        WireLimits::default(),
+                    )
+                    .map_err(map_wire)?;
+                } else {
+                    return Err(Error::BatchUnsupported);
+                }
+            } else {
+                combined.rewrites.push(rewrite);
+            }
+        }
+    }
+    combined.batch_compatible = true;
+    Ok(Some(combined))
+}
+
+fn rewrite_list_key(data: &[u8], old: u32, new: u32) -> Result<Vec<u8>, Error> {
+    let entries = repeated_length_delimited_payloads(data, 3).map_err(map_wire)?;
+    let mut replacements = Vec::with_capacity(entries.len());
+    for entry in entries {
+        if varint(entry, 1)? == Some(u64::from(old)) {
+            replacements
+                .push(patch_varint_field(entry, 1, true, Some(u64::from(new))).map_err(map_wire)?);
+        } else {
+            replacements.push(entry.to_vec());
+        }
+    }
+    let mut output =
+        rewrite_repeated_length_delimited_fields(data, 3, &replacements).map_err(map_wire)?;
+    if varint(&output, 2)? == Some(u64::from(old).saturating_add(1)) {
+        output = patch_varint_field(&output, 2, true, Some(u64::from(new).saturating_add(1)))
+            .map_err(map_wire)?;
+    }
+    Ok(output)
 }
 
 fn with_paragraph_properties(mut data: Vec<u8>) -> Result<Vec<u8>, Error> {

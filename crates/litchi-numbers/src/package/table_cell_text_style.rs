@@ -487,17 +487,14 @@ fn publish(
     table: usize,
     cells: &[(At, CharacterProperties)],
 ) -> Result<structure::Published, Error> {
-    // The shared planner currently emits one-cell graph plans. Preserve the
-    // existing atomic multi-cell staging semantics while the batch plan is
-    // extracted as the next bounded step.
     if cells.len() > 1 {
         return publish_legacy(source, sheet, table, cells);
     }
     let mut working = Working::new(source)?;
     working.keep_previews();
     let target = topology::locate(&working, sheet, table).map_err(from_topology)?;
-    let mut transition = Transition::default();
-    for (position, properties) in cells {
+    if cells.len() == 1 {
+        let (position, properties) = &cells[0];
         let shared_target = shared::Target {
             model_identifier: target.model,
             row: position.row(),
@@ -512,9 +509,44 @@ fn publish(
             },
             Err(error) => return Err(from_shared(error)),
         };
-        let Some(plan) = plan else { continue };
+        let Some(plan) = plan else {
+            return working.publish(&Transition::default()).map_err(Error::from);
+        };
+        let mut transition = Transition::default();
         apply_shared_plan(&mut working, &mut transition, plan)?;
+        return working.publish(&transition).map_err(Error::from);
     }
+    let mut requests = Vec::new();
+    for (position, properties) in cells {
+        let shared_target = shared::Target {
+            model_identifier: target.model,
+            row: position.row(),
+            column: position.column(),
+        };
+        let fresh = match shared::plan_set(source, shared_target, properties, None) {
+            Ok(None) => None,
+            Ok(Some(_)) => None,
+            Err(shared::Error::NeedsIdentifier) => {
+                Some(*working.allocate(1)?.first().ok_or(Error::InvalidSource)?)
+            },
+            Err(error) => return Err(from_shared(error)),
+        };
+        requests.push(shared::Request {
+            target: shared_target,
+            properties: properties.clone(),
+            fresh,
+        });
+    }
+    let plan = match shared::plan_set_many(source, &requests) {
+        Ok(plan) => plan,
+        Err(shared::Error::BatchUnsupported) => return publish_legacy(source, sheet, table, cells),
+        Err(error) => return Err(from_shared(error)),
+    };
+    let Some(plan) = plan else {
+        return working.publish(&Transition::default()).map_err(Error::from);
+    };
+    let mut transition = Transition::default();
+    apply_shared_plan(&mut working, &mut transition, plan)?;
     working.publish(&transition).map_err(Error::from)
 }
 
@@ -560,7 +592,7 @@ fn apply_shared_plan(
             }
         }
     }
-    if let Some(insertion) = &plan.insertion {
+    for insertion in &plan.insertions {
         let parent = insertion
             .object_references
             .first()
@@ -602,8 +634,8 @@ fn apply_shared_plan(
             },
         }
     }
-    if let Some(key) = plan.cell_key {
-        write_shared_key(working, plan.target, key)?;
+    for (target, key) in &plan.cell_updates {
+        write_shared_key(working, *target, *key)?;
     }
     Ok(())
 }
