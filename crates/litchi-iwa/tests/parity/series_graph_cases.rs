@@ -384,7 +384,7 @@ fn engine_write(source: &[u8], chart: u64, values: &Values) -> TestResult<Vec<u8
                         .transpose()
                 })
                 .collect::<Result<Vec<_>, _>>()?;
-            series::set_symbols(&mut workspace, chart, family, &symbols, SYMBOL_TEST_LIMITS)?.0;
+            series::set_symbols(&mut workspace, chart, family, &symbols, SYMBOL_TEST_LIMITS)?;
         },
         Values::Trendlines(values) => {
             let trends = values

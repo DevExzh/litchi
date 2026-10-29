@@ -7448,3 +7448,23 @@ See [0063](0063-source-pptx-modern-comments.md).
   `is_empty`, preserving behavior. The exact failing Keynote configuration,
   direct strict Keynote Clippy and formatting pass. The complete 53-row gate
   and all final qualification restart on the repaired integrated source.
+
+- The repaired `6ecc4f14ba` candidate passed post-merge checks and the first
+  32 full-gate rows, including the formerly failing Clippy configurations.
+  Workspace Clippy row 32 then found a test-only discarded tuple-field
+  expression in the host parity harness. The run was stopped after 33 rows
+  (32 pass, one fail); workspace-test row 33 remained partial. All logs stay
+  tied to 6ecc. Repair `84618fd673` removes only that unused projection; the
+  exact full-workspace Clippy gate and formatting pass.
+- Six final-source iWork/D7 ELFs and all 119 tests/237 selected symbols passed
+  preflight on 6ecc. The instruction run was stopped after 37 first-group
+  routes/73 captures, with no completed-route failure; other groups had not
+  started. FIN's 14 rows/56 captures passed independent audit on 6ecc, with
+  maximum median ratio 1.028797 and maximum worst ratio 1.030563. These results
+  remain historical to 6ecc; no wall/CLI timing or native acceptance is
+  claimed. The next capture release waits for all 53 gate rows to pass on
+  the repaired integrated source, then requalifies the complete matrix.
+- The merged lint-repair worktree/branch was retired normally: 65 worktrees
+  and 58 branches removed. Measured logical cleanup totals 318,310,065,421
+  bytes (about 296.45 GiB), plus the separately noted approximate owner cache
+  removal; all qualified archives and raw evidence remain preserved.
