@@ -36,11 +36,11 @@ pub(super) fn open<T: ZipTail>(
         return Err(Error::unsupported_format(None));
     }
 
-    // iWork is the lowest-precedence ZIP family, but its central-directory
-    // marker is cheap to recognize.  On a genuine iWork package this avoids
-    // running the ODF and OOXML probes before the same prepared-source
-    // adoption that the normal fallback would use.  A package advertising an
-    // OOXML catalog or ODF mimetype stays on the documented precedence path.
+    // iWork is the lowest-precedence ZIP family, but its package marker is
+    // cheap to recognize. On a genuine iWork package this avoids running the
+    // ODF and OOXML probes before the same prepared-source adoption that the
+    // normal fallback would use. A package advertising an OOXML catalog or
+    // ODF mimetype stays on the documented precedence path.
     #[cfg(feature = "iwork-adapter")]
     let bytes = if likely_iwork_package(&bytes) {
         match crate::format::iwork::Iwork::detect_bytes(bytes, options)? {
@@ -147,15 +147,19 @@ fn likely_iwork_package(bytes: &[u8]) -> bool {
     const IWORK_DOCUMENT: &[u8] = b"Index/Document.iwa";
     const OOXML_CONTENT_TYPES: &[u8] = b"[Content_Types].xml";
     const ODF_MIMETYPE: &[u8] = b"mimetype";
-    bytes
-        .windows(IWORK_DOCUMENT.len())
-        .any(|window| window == IWORK_DOCUMENT)
-        && !bytes
-            .windows(OOXML_CONTENT_TYPES.len())
-            .any(|window| window == OOXML_CONTENT_TYPES)
-        && !bytes
-            .windows(ODF_MIMETYPE.len())
-            .any(|window| window == ODF_MIMETYPE)
+    let mut iwork = false;
+    let mut ooxml = false;
+    let mut odf = false;
+    for index in 0..bytes.len() {
+        let suffix = &bytes[index..];
+        iwork |= suffix.starts_with(IWORK_DOCUMENT);
+        ooxml |= suffix.starts_with(OOXML_CONTENT_TYPES);
+        odf |= suffix.starts_with(ODF_MIMETYPE);
+        if ooxml || odf {
+            return false;
+        }
+    }
+    iwork
 }
 
 /// Classify an in-memory ZIP: an ordinary ODF package first, then OOXML
