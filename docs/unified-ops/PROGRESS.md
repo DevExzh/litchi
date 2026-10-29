@@ -7130,3 +7130,10 @@ See [0063](0063-source-pptx-modern-comments.md).
   iWork/D7 matrices and full gate must be rerun on one frozen candidate.
   Nine unified native routes remain queued; this adds no E3/E4 evidence or
   additional leaf migration dispositions.
+
+- The D7 post-check on `738be22a1a` passed workspace compilation but found
+  one stale aggregate fuzz lock: enabling the existing `soapberry-zip`
+  dependency for iWork adds that dependency to `litchi`'s fuzz workspace.
+  Offline regeneration changes exactly that lock entry, and the affected
+  fuzz binaries compile. The failed post-check is preserved; the complete
+  post-merge checks are repeated on the lock repair.
