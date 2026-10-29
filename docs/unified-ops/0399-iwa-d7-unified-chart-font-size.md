@@ -147,8 +147,11 @@ then rechecks the same retained first-sheet node after selecting the second
 sheet.  The tracked generator recipe first seeds the charts through the public
 `litchi-iwa` editor and then uses direct `litchi-numbers` leaf transactions to
 make sheet 1 13pt and sheet 2 27pt.  Its manifest, source and exact command
-are recorded beside the fixture; the generated package is a focused
-identity/path control only and carries no native application acceptance claim.
+are recorded in the existing host crate and fixture receipt.  The recipe is
+available only through its recorded pre-W3 host commit; W3 intentionally
+removes it with `litchi-iwa`, while the fixture remains tracked.  The generated
+package is a focused identity/path control only and carries no native
+application acceptance claim.
 
 The post-sync focused suite is 10 passing tests and 9 intentionally ignored
 CPU-slot probes.  The current source-bound release/Callgrind qualification is
