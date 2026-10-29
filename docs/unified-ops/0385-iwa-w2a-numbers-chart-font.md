@@ -192,21 +192,23 @@ The previous 18-route qualification was withdrawn because its reset setup
 legs invoked the selected host wrapper and therefore recorded three host calls
 instead of two. The coordinator-authorized probe repair `dc585d05cd` was
 cherry-picked and resolved on this branch as source-only probe commit
-`2a5073093c48b540e1f6fcf14fbd82a6101db3a8`.
+`2a5073093c48b540e1f6fcf14fbd82a6101db3a8`; the chart-font reset setup was
+then isolated in source-only probe commit
+`59ffe48b3e0092840f68519571492a08b0fe5bfc`.
 
 The corrected source was built with `parity-host-oracle`, release LTO/debug
 settings, locked offline dependencies, four Cargo jobs and incremental
 compilation disabled:
 
 ```text
-source: 2a5073093c48b540e1f6fcf14fbd82a6101db3a8
+source: 59ffe48b3e0092840f68519571492a08b0fe5bfc
 binary: /home/zhuhe/code/litchi-worktrees/.coord/iwa-w2a-chart-font-perf-20261029-repaired/target/release/deps/parity-20d17b646a6d1747
-size: 213,510,504 bytes
-ELF SHA-256: e0cfd9c52111a165117db693c1dd5caa170c21a7005aa2cb118bc2236ca33239
-archive: /home/zhuhe/code/litchi-worktrees/.coord/iwa-w2a-chart-font-perf-20261029-repaired/parity-20d17b646a6d1747-release.tar
+size: 213,510,848 bytes
+ELF SHA-256: 4d099883840c20abf82fac49df88e1de574c6a58f34bdfdc76a7a552a122125c
+archive: /home/zhuhe/code/litchi-worktrees/.coord/iwa-w2a-chart-font-perf-20261029-repaired/parity-20d17b646a6d1747-reset-isolated-release.tar
 archive mode/size: 0444 / 213,514,240 bytes
-archive SHA-256: e27b66f868e462a8331d1839c0b7077bc6fc13c1586c44db916e111fefa392da
-tar member SHA-256: e0cfd9c52111a165117db693c1dd5caa170c21a7005aa2cb118bc2236ca33239
+archive SHA-256: 01d7c6b489205f5d23cbfc9576b5f7f511753933356b18c1ffdb60d31954abb9
+tar member SHA-256: 4d099883840c20abf82fac49df88e1de574c6a58f34bdfdc76a7a552a122125c
 ```
 
 The 24-route matrix combines the six chart-font routes and the 18 existing
@@ -214,15 +216,15 @@ style/layout routes. It used one fresh source per route, pinned CPU 7, and
 true host/leaf/leaf/host ABBA with exactly two selected calls per side:
 
 ```text
-manifest: /home/zhuhe/code/litchi-worktrees/.coord/iwa-w2a-chart-font-perf-20261029-repaired/manifest-24.json
-results: /home/zhuhe/code/litchi-worktrees/.coord/iwa-w2a-chart-font-perf-20261029-repaired/matrix24/results.json
-results SHA-256: 4a1abc7290457bfb07e86ca1d15dd087648828a5b16865930669f8cf6283a0d7
+manifest: /home/zhuhe/code/litchi-worktrees/.coord/iwa-w2a-chart-font-perf-20261029-repaired/manifest-24-reset-isolated.json
+results: /home/zhuhe/code/litchi-worktrees/.coord/iwa-w2a-chart-font-perf-20261029-repaired/matrix24-reset-isolated/results.json
+results SHA-256: 916982820dd0254d9b92f28142f62b81de0741413cdd21870700179e15d62fa8
 captures: 48 Callgrind files / 48 annotations / 48 stdout logs / 48 stderr logs
-raw Callgrind bytes: 22,409,946
+raw Callgrind bytes: 22,224,570
 full probe correctness (six font routes): `/home/zhuhe/code/litchi-worktrees/.coord/iwa-w2a-chart-font-perf-20261029-repaired/correctness-font-full.log` (SHA-256 `00b7f561a20a061eebdb2893f9ea16e5c5a584eac7daf297db24d13980133bc8`), stderr empty (`e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`)
 full probe correctness (18 style/layout routes): `/home/zhuhe/code/litchi-worktrees/.coord/iwa-w2a-chart-font-perf-20261029-repaired/correctness-style-full.log` (SHA-256 `1006202a0d367176831b9ac1fdb4e3318c91162a1da76e550dd081eae2bb9bb9`), stderr empty (`e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`)
-source-before SHA-256: 4b19387b94759f173815fdf526f82152f30d856099989a638d6fb24381f8ec15
-source-after SHA-256: 9e3e1ed65475e97a3eaba2bb0b40e54b9c20de6d680e52a67ec4f46b9b6c519a
+source-before SHA-256: df63cb852ca737c5e00325d166494d910392b38eb2b42b2514e78736c150f27e
+source-after SHA-256: 54882a78211ffbc616cfa6eaee0b7a88846852117d612d9277a60d9cf7104d84
 ```
 
 All 24 exact tests exited 0. Every leaf route was faster than its host
@@ -233,12 +235,12 @@ directory above. The six chart-font rows measured as follows:
 
 | Route | Host Ir | Leaf Ir | Leaf vs host |
 |---|---:|---:|---:|
-| `font_read` | 286,013,460 | 38,907,556 | −86.396600% |
-| `font_set` | 1,158,386,111 | 209,943,262 | −81.876228% |
-| `font_reset` | 816,491,725 | 158,468,718 | −80.591510% |
-| `size_read` | 175,323,796 | 36,839,361 | −78.987815% |
-| `size_set` | 822,844,239 | 203,824,687 | −75.229250% |
-| `size_reset` | 649,646,232 | 153,851,082 | −76.317713% |
+| `font_read` | 285,226,410 | 38,942,825 | −86.346697% |
+| `font_set` | 1,156,251,052 | 209,895,725 | −81.846873% |
+| `font_reset` | 237,782,057 | 158,574,727 | −33.310894% |
+| `size_read` | 175,678,958 | 36,851,199 | −79.023556% |
+| `size_set` | 823,495,243 | 203,858,328 | −75.244747% |
+| `size_reset` | 237,717,303 | 153,833,491 | −35.287214% |
 
 The 18 style/layout rows are the exact `ROUTES_3` set already listed in the
 shared-helper section below; their full values remain in the external matrix
@@ -251,8 +253,9 @@ row is 149,071,036 exact-symbol Ir versus 152,176,565 PROGRAM TOTALS Ir).
 This is retained as a failed audit receipt, not normalized:
 
 ```text
-validator receipt: /home/zhuhe/code/litchi-worktrees/.coord/iwa-w2a-chart-font-perf-20261029-repaired/matrix24/call-audit-derived.failure.json
-receipt SHA-256: 45e7a500080cf577222b2bee1f4727e5234f39fad5c4346f7cbfde7d93b8cb29
+validator receipt: /home/zhuhe/code/litchi-worktrees/.coord/iwa-w2a-chart-font-perf-20261029-repaired/matrix24-reset-isolated/call-audit-derived.failure.json
+receipt SHA-256: 226a8f4c7bdc28fc0c666a569d88c0965b2decbc001faa2ef44914ee38ff5740
+call-count receipt: /home/zhuhe/code/litchi-worktrees/.coord/iwa-w2a-chart-font-perf-20261029-repaired/matrix24-reset-isolated/call-count-receipt.json (SHA-256 `e19bbdae0c9bfd1869d39b41d7b9d638af154b15573ee2873b6e2e9ffff38108`); all 48 legs report exactly two selected wrapper calls
 synthetic validator log: /home/zhuhe/code/litchi-worktrees/.coord/iwa-w2a-chart-font-perf-20261029-repaired/derived-validator-selftest.log
 synthetic log SHA-256: a72c11d7f48cc0c1e4e659a05d8038b9d88d32ee36f9c71face0425df81f2914
 ```
