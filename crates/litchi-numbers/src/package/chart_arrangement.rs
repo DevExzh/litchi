@@ -524,6 +524,14 @@ impl ChartBudget {
             .with_input_bytes(physical)
             .and_then(|limits| limits.with_output_bytes(physical))
             .map_err(|_| Error::InvalidSource)?;
+        // Retained graph/header vectors are governed by the archive's checked
+        // header-memory policy, not by the compressed source-byte ceiling.
+        // Keep the physical ceiling as a floor for candidate buffers without
+        // inventing a source-size multiplier.
+        let retained = core
+            .max_header_memory_bytes()
+            .max(physical)
+            .clamp(1, WireLimits::MAX_INPUT_BYTES);
         let semantic = package.state.options.semantic();
         let max_allocations = semantic
             .max_objects()
@@ -538,8 +546,8 @@ impl ChartBudget {
             max_nesting: limits.max_nesting(),
             max_references: semantic.max_references(),
             max_allocations,
-            max_retained: physical,
-            max_scratch: physical,
+            max_retained: retained,
+            max_scratch: retained,
             max_registry_entries: semantic.max_references(),
             max_identifiers: semantic.max_objects(),
             input: 0,
