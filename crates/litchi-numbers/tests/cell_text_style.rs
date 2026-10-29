@@ -1001,6 +1001,41 @@ fn all_noop_text_style_batch_keeps_exact_source_and_watermark() -> TestResult {
     Ok(())
 }
 
+#[test]
+fn mixed_noop_batch_allocates_only_changed_style() -> TestResult {
+    let generated = shared_text_style_source()?;
+    let source = generated.bytes;
+    let first = At::new(generated.positions[0].0, generated.positions[0].1);
+    let second = At::new(generated.positions[1].0, generated.positions[1].1);
+    let package = Package::from_bytes(&source)?;
+    let first_before = cell_style_identity(&source, first)?;
+    let second_before = cell_style_identity(&source, second)?;
+    let noop = package.table_cell_text_style(0, 0, first)?;
+    let mut changed = CharacterProperties::new();
+    changed.size = Some(73.0);
+    let commit = package
+        .edit_table_cell_text_style(0, 0)?
+        .set(first, noop)?
+        .set(second, changed)?
+        .commit()?;
+    let output = bytes(commit.package())?;
+    assert_eq!(cell_style_identity(&output, first)?, first_before);
+    let second_after = cell_style_identity(&output, second)?;
+    assert_ne!(second_after.0, second_before.0);
+    assert_ne!(second_after.1, second_before.1);
+    assert_eq!(
+        Package::from_bytes(&output)?
+            .table_cell_text_style(0, 0, second)?
+            .size,
+        Some(73.0)
+    );
+    let restored = commit
+        .package()
+        .apply_table_cell_text_style(&commit.patch().inverse())?;
+    assert_eq!(bytes(restored.package())?, source);
+    Ok(())
+}
+
 /// Every stored cell of the corpus takes bold, or refuses typed.
 #[test]
 fn corpus_cells_take_bold_or_refuse_typed() -> TestResult {

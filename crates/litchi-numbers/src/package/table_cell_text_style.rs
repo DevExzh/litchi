@@ -266,6 +266,7 @@ impl Edit<'_> {
             self.limits,
         )?;
         let effective_values = if self.cells.len() == 1 {
+            limits.admit_allocations(1).map_err(from_shared)?;
             vec![text_style_with_limits(
                 &published.package,
                 self.sheet,
@@ -288,8 +289,20 @@ impl Edit<'_> {
             )?
         };
         for ((_, properties), effective) in self.cells.iter().zip(effective_values) {
+            limits
+                .admit_character_properties(properties)
+                .map_err(from_shared)?;
+            limits
+                .admit_character_properties(&effective)
+                .map_err(from_shared)?;
             let mut expected = properties.clone();
             expected.inherit(&effective);
+            limits
+                .admit_character_properties(&expected)
+                .map_err(from_shared)?;
+            limits
+                .admit_character_properties(&effective)
+                .map_err(from_shared)?;
             if with_flags_off(expected.clone()) != with_flags_off(effective.clone()) {
                 return Err(Error::Verification);
             }

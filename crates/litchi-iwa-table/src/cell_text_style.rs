@@ -2057,6 +2057,12 @@ fn plan_set_many_inner(
     mut allocator: Option<&mut dyn FnMut() -> Result<u64, Error>>,
     admit_requested: bool,
 ) -> Result<Option<Plan>, Error> {
+    if requests
+        .windows(2)
+        .any(|pair| pair[0].target.model_identifier != pair[1].target.model_identifier)
+    {
+        return Err(Error::BatchUnsupported);
+    }
     limits.charge_work(requests.len())?;
     limits.admit_allocations(requests.len())?;
     let batch_context = if prepare_batch {
