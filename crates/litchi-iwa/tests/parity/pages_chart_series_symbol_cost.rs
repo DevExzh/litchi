@@ -191,6 +191,64 @@ fn pages_symbols_leaf_route(source: &[u8], route: Route) -> TestResult<Vec<u8>> 
     }
 }
 
+#[inline(never)]
+fn pages_symbols_host_all_read(source: &[u8]) -> TestResult<Vec<u8>> {
+    pages_symbols_host_route(source, Route::AllRead)
+}
+
+#[inline(never)]
+fn pages_symbols_host_all_set(source: &[u8]) -> TestResult<Vec<u8>> {
+    pages_symbols_host_route(source, Route::AllSet)
+}
+
+#[inline(never)]
+fn pages_symbols_host_single_read(source: &[u8]) -> TestResult<Vec<u8>> {
+    pages_symbols_host_route(source, Route::SingleRead)
+}
+
+#[inline(never)]
+fn pages_symbols_host_single_set(source: &[u8]) -> TestResult<Vec<u8>> {
+    pages_symbols_host_route(source, Route::SingleSet)
+}
+
+#[inline(never)]
+fn pages_symbols_leaf_all_read(source: &[u8]) -> TestResult<Vec<u8>> {
+    pages_symbols_leaf_route(source, Route::AllRead)
+}
+
+#[inline(never)]
+fn pages_symbols_leaf_all_set(source: &[u8]) -> TestResult<Vec<u8>> {
+    pages_symbols_leaf_route(source, Route::AllSet)
+}
+
+#[inline(never)]
+fn pages_symbols_leaf_single_read(source: &[u8]) -> TestResult<Vec<u8>> {
+    pages_symbols_leaf_route(source, Route::SingleRead)
+}
+
+#[inline(never)]
+fn pages_symbols_leaf_single_set(source: &[u8]) -> TestResult<Vec<u8>> {
+    pages_symbols_leaf_route(source, Route::SingleSet)
+}
+
+fn host_route(source: &[u8], route: Route) -> TestResult<Vec<u8>> {
+    match route {
+        Route::AllRead => pages_symbols_host_all_read(source),
+        Route::AllSet => pages_symbols_host_all_set(source),
+        Route::SingleRead => pages_symbols_host_single_read(source),
+        Route::SingleSet => pages_symbols_host_single_set(source),
+    }
+}
+
+fn leaf_route(source: &[u8], route: Route) -> TestResult<Vec<u8>> {
+    match route {
+        Route::AllRead => pages_symbols_leaf_all_read(source),
+        Route::AllSet => pages_symbols_leaf_all_set(source),
+        Route::SingleRead => pages_symbols_leaf_single_read(source),
+        Route::SingleSet => pages_symbols_leaf_single_set(source),
+    }
+}
+
 /// Full-facade Pages symbol routes. Set `W2B_SYMBOL_ROUTE` to
 /// `all_symbols_read`, `all_symbols_set`, `single_symbol_read`, or
 /// `single_symbol_set` to isolate one route. Hide remains a parity control,
@@ -207,10 +265,10 @@ fn pages_chart_series_symbols_facade_cost_abba() -> TestResult {
         {
             continue;
         }
-        black_box(pages_symbols_host_route(&source, route)?);
-        black_box(pages_symbols_leaf_route(&source, route)?);
-        black_box(pages_symbols_leaf_route(&source, route)?);
-        black_box(pages_symbols_host_route(&source, route)?);
+        black_box(host_route(&source, route)?);
+        black_box(leaf_route(&source, route)?);
+        black_box(leaf_route(&source, route)?);
+        black_box(host_route(&source, route)?);
     }
     Ok(())
 }
