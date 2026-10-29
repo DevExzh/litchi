@@ -1,6 +1,9 @@
 use litchi_iwa_core::{Archive, ArchiveObject, Limits, RawMessage};
 
-use super::{FinishError, FinishLimitKind, FinishLimits, Workspace};
+use super::{
+    ConstructionError, ConstructionLimitKind, ConstructionLimits, FinishError, FinishLimitKind,
+    FinishLimits, Workspace,
+};
 
 fn object(identifier: u64, type_: u32, data: Vec<u8>) -> ArchiveObject {
     ArchiveObject::new(
@@ -164,4 +167,210 @@ fn bounded_finish_accounts_deleted_names_and_moves_insertions() {
         .expect("bounded deletion finish");
     assert!(changes.edits.is_empty());
     assert_eq!(changes.deletions, vec!["Index/Document.iwa"]);
+}
+
+#[test]
+fn bounded_finish_rejects_zero_work_and_copy_retention_before_allocating() {
+    let source = components();
+    let mut workspace = Workspace::new(&source, Limits::default()).expect("workspace");
+    workspace.object_mut(1).expect("object");
+    let requirements = workspace.finish_requirements().expect("requirements");
+
+    let zero_work = workspace.finish_bounded(FinishLimits::new(
+        requirements.work().saturating_sub(1),
+        requirements.allocations(),
+        requirements.retained_bytes(),
+        requirements.scratch_bytes(),
+    ));
+    assert!(matches!(
+        zero_work,
+        Err(FinishError::Limit {
+            kind: FinishLimitKind::Work,
+            ..
+        })
+    ));
+
+    let mut workspace = Workspace::new(&source, Limits::default()).expect("workspace");
+    workspace.object_mut(1).expect("object");
+    let requirements = workspace.finish_requirements().expect("requirements");
+    let zero_copy_retention = workspace.finish_bounded(FinishLimits::new(
+        requirements.work(),
+        requirements.allocations(),
+        requirements.retained_bytes().saturating_sub(1),
+        requirements.scratch_bytes(),
+    ));
+    assert!(matches!(
+        zero_copy_retention,
+        Err(FinishError::Limit {
+            kind: FinishLimitKind::RetainedBytes,
+            ..
+        })
+    ));
+}
+
+#[test]
+fn bounded_finish_rejects_requirement_arithmetic_overflow() {
+    let source = components();
+    let mut workspace = Workspace::new(&source, Limits::default()).expect("workspace");
+    workspace.finish.copy_bytes = usize::MAX;
+    workspace.finish.edit_count = 1;
+    assert!(matches!(
+        workspace.finish_requirements(),
+        Err(FinishError::Overflow(_))
+    ));
+}
+
+#[test]
+fn bounded_finish_moves_nonempty_insertions_without_copying_archive_buffers() {
+    let source = components();
+    let mut workspace = Workspace::new(&source, Limits::default()).expect("workspace");
+    let archive = Archive {
+        objects: vec![object(99, 7, vec![1, 2, 3, 4])],
+    };
+    let before = archive.objects[0].messages[0].data.as_ptr();
+    workspace
+        .create_member("Index/Created.iwa", archive, None)
+        .expect("insert member");
+    let requirements = workspace.finish_requirements().expect("requirements");
+    assert_eq!(requirements.insertion_count(), 1);
+    let (changes, _) = workspace
+        .finish_bounded(FinishLimits::new(
+            requirements.work(),
+            requirements.allocations(),
+            requirements.retained_bytes(),
+            requirements.scratch_bytes(),
+        ))
+        .expect("bounded insertion finish");
+    let after = changes.insertions[0].archive.objects[0].messages[0]
+        .data
+        .as_ptr();
+    assert_eq!(before, after);
+}
+
+#[test]
+fn bounded_workspace_construction_reports_and_checks_index_requirements() {
+    let source = components();
+    let requirements =
+        Workspace::construction_requirements(&source, ConstructionLimits::unlimited())
+            .expect("construction requirements");
+    assert_eq!(requirements.component_count(), 2);
+    assert_eq!(requirements.object_count(), 3);
+    assert!(requirements.source_work() > 5);
+    assert_eq!(requirements.index_allocations(), 2);
+    assert!(requirements.index_retained_bytes() > 0);
+    assert!(requirements.component_view_bytes() > 0);
+    assert_eq!(requirements.component_view_allocations(), 1);
+
+    let zero_work = Workspace::construction_requirements(
+        &source,
+        ConstructionLimits::new(
+            requirements.source_work().saturating_sub(1),
+            requirements.index_allocations(),
+            requirements.index_retained_bytes(),
+            requirements.index_scratch_bytes(),
+        ),
+    );
+    assert!(matches!(
+        zero_work,
+        Err(ConstructionError::Limit {
+            kind: ConstructionLimitKind::Work,
+            ..
+        })
+    ));
+
+    let zero_allocations = Workspace::construction_requirements(
+        &source,
+        ConstructionLimits::new(
+            requirements.source_work(),
+            requirements.index_allocations().saturating_sub(1),
+            requirements.index_retained_bytes(),
+            requirements.index_scratch_bytes(),
+        ),
+    );
+    assert!(matches!(
+        zero_allocations,
+        Err(ConstructionError::Limit {
+            kind: ConstructionLimitKind::Allocations,
+            ..
+        })
+    ));
+
+    let zero_retained = Workspace::construction_requirements(
+        &source,
+        ConstructionLimits::new(
+            requirements.source_work(),
+            requirements.index_allocations(),
+            requirements.index_retained_bytes().saturating_sub(1),
+            requirements.index_scratch_bytes(),
+        ),
+    );
+    assert!(matches!(
+        zero_retained,
+        Err(ConstructionError::Limit {
+            kind: ConstructionLimitKind::RetainedBytes,
+            ..
+        })
+    ));
+
+    let workspace = Workspace::new_bounded(
+        &source,
+        Limits::default(),
+        requirements,
+        ConstructionLimits::new(
+            requirements.source_work(),
+            requirements.index_allocations(),
+            requirements.index_retained_bytes(),
+            requirements.index_scratch_bytes(),
+        ),
+    )
+    .expect("bounded workspace");
+    assert_eq!(workspace.next_object_identifier().expect("identifier"), 10);
+}
+
+#[test]
+fn bounded_workspace_rejects_same_count_name_and_identifier_changes() {
+    let mut renamed = components();
+    let requirements =
+        Workspace::construction_requirements(&renamed, ConstructionLimits::unlimited())
+            .expect("requirements");
+    renamed[0].0 = "Index/Renamed.iwa".to_owned();
+    let error = Workspace::new_bounded(
+        &renamed,
+        Limits::default(),
+        requirements,
+        ConstructionLimits::unlimited(),
+    )
+    .expect_err("renamed source must not reuse a census");
+    assert!(matches!(error, ConstructionError::Graph(_)));
+
+    let mut reidentified = components();
+    let requirements =
+        Workspace::construction_requirements(&reidentified, ConstructionLimits::unlimited())
+            .expect("requirements");
+    reidentified[0].1.objects[0].archive_info.identifier = Some(999);
+    let error = Workspace::new_bounded(
+        &reidentified,
+        Limits::default(),
+        requirements,
+        ConstructionLimits::unlimited(),
+    )
+    .expect_err("reidentified source must not reuse a census");
+    assert!(matches!(error, ConstructionError::Graph(_)));
+}
+
+#[test]
+fn bounded_workspace_rejects_count_growth_before_index_population() {
+    let mut source = components();
+    let requirements =
+        Workspace::construction_requirements(&source, ConstructionLimits::unlimited())
+            .expect("requirements");
+    source[0].1.objects.push(object(99, 7, vec![1, 2, 3]));
+    let error = Workspace::new_bounded(
+        &source,
+        Limits::default(),
+        requirements,
+        ConstructionLimits::unlimited(),
+    )
+    .expect_err("grown source must not populate beyond reserved indexes");
+    assert!(matches!(error, ConstructionError::Graph(_)));
 }
