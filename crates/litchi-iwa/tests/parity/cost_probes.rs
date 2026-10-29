@@ -446,6 +446,7 @@ fn numbers_whole_cell_style_batch_1000_cost_abba() -> TestResult {
             "Index/CalculationEngine.iwa",
             "Index/DocumentStylesheet.iwa",
             "Index/Metadata.iwa",
+            "Index/Tables/HeaderStorageBucket-904855-2.iwa",
         ],
     )?;
     assert_untouched_member_preserved(
