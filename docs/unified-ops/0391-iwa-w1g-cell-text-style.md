@@ -3,7 +3,7 @@
 - Status: Numbers-first substrate and proof repair remain isolated on the WP.
   Pages and Keynote facades are not started, no ledger rows are migrated, and
   no native acceptance claim is active. The current code tip is
-  `43608b8faa`; release-mode instruction capture remains coordinator-gated and
+  `4f014f7463`; release-mode instruction capture remains coordinator-gated and
   has not started.
 - Source branch: `uo2/iwa-w1g-cell-text-style`, cut from frozen root
   `1e3978082bd8e576f0afeb7e3eebac1ca3908d86`, then synchronized with frozen
@@ -15,7 +15,8 @@
   `74651bb4ba`, planner/cache/probe repair `12f9de7115`, and verification
   budget plus mixed-no-op proof `ea9a17e04d`, direct watermark/cardinality
   proof `ee47ab4896`, reviewed shared tile-writer merge `7f69b0710a`, and
-  Numbers writer adoption `43608b8faa`. Earlier budget, parser,
+  Numbers writer adoption `43608b8faa`, and bounded shared table-fact
+  selection `4f014f7463`. Earlier budget, parser,
   exclusive-path, mutation-output and identity/unknown-preservation
   checkpoints remain in history.
 - Scope: shared `litchi-iwa-table::cell_text_style` graph reads and direct
