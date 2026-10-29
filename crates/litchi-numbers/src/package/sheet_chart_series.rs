@@ -17,7 +17,6 @@
 )]
 
 use std::fmt;
-use std::mem::size_of;
 
 use litchi_iwa_archive::package::{EntryEdit, EntryInsertion, OwnedExactArtifacts};
 use litchi_iwa_common::chart::error_bar::Series as ErrorBarSeries;
@@ -303,9 +302,6 @@ const CHART_ARCHIVE_FIELD: u32 = 10_000;
 const SERIES_DIRECTION_FIELD: u32 = 5;
 const SERIES_BY_ROW: u64 = 1;
 const SERIES_BY_COLUMN: u64 = 2;
-const GRAPH_INDEX_SLOT_BYTES: usize = 64;
-const GRAPH_AMBIGUOUS_SLOT_BYTES: usize = 32;
-const GRAPH_EXTRA_ALLOCATIONS: usize = 4;
 const MAX_STAGED_OPERATIONS: usize = 4;
 const SYMBOL_GENERATED_FIELDS: std::ops::RangeInclusive<u32> = 10_000..=10_003;
 
@@ -583,6 +579,41 @@ impl From<litchi_iwa_style::graph::FinishError> for Error {
                 maximum: maximum as u64,
             },
             litchi_iwa_style::graph::FinishError::Allocation { amount } => {
+                Error::Allocation { amount }
+            },
+            _ => Error::InvalidSource,
+        }
+    }
+}
+
+impl From<litchi_iwa_style::graph::ConstructionError> for Error {
+    fn from(error: litchi_iwa_style::graph::ConstructionError) -> Self {
+        match error {
+            litchi_iwa_style::graph::ConstructionError::Graph(error) => error.into(),
+            litchi_iwa_style::graph::ConstructionError::Limit {
+                kind,
+                observed,
+                maximum,
+            } => Error::Limit {
+                kind: match kind {
+                    litchi_iwa_style::graph::ConstructionLimitKind::Work => {
+                        LimitKind::Engine(engine::LimitKind::Work)
+                    },
+                    litchi_iwa_style::graph::ConstructionLimitKind::Allocations => {
+                        LimitKind::AllocationEvents
+                    },
+                    litchi_iwa_style::graph::ConstructionLimitKind::RetainedBytes => {
+                        LimitKind::Engine(engine::LimitKind::RetainedBytes)
+                    },
+                    litchi_iwa_style::graph::ConstructionLimitKind::ScratchBytes => {
+                        LimitKind::ScratchBytes
+                    },
+                    _ => return Error::InvalidSource,
+                },
+                observed: observed as u64,
+                maximum: maximum as u64,
+            },
+            litchi_iwa_style::graph::ConstructionError::Allocation { amount } => {
                 Error::Allocation { amount }
             },
             _ => Error::InvalidSource,
@@ -981,91 +1012,62 @@ fn map_metadata_error(error: &metadata_codec::DecodeError) -> Error {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
-struct GraphWorkspaceCost {
-    work: usize,
-    allocations: usize,
-    retained: usize,
-    scratch: usize,
+struct PreparedComponents<'a> {
+    components: Vec<LeafComponents<'a>>,
+    limits: litchi_iwa_core::Limits,
+    requirements: litchi_iwa_style::graph::ConstructionRequirements,
+    construction_limits: litchi_iwa_style::graph::ConstructionLimits,
 }
 
-fn graph_workspace_cost(package: &Package) -> Result<GraphWorkspaceCost, Error> {
-    let catalog = package.state.components.catalog();
-    let object_count = catalog.iter().try_fold(0usize, |count, component| {
-        count
-            .checked_add(component.archive().objects.len())
-            .ok_or(Error::InvalidSource)
-    })?;
-    let component_count = catalog.len();
-    let work = component_count
-        .checked_add(object_count)
-        .ok_or(Error::InvalidSource)?;
-    let allocations = component_count
-        .checked_add(object_count.checked_mul(2).ok_or(Error::InvalidSource)?)
-        .and_then(|value| value.checked_add(GRAPH_EXTRA_ALLOCATIONS))
-        .ok_or(Error::InvalidSource)?;
-    let scratch = component_count
-        .checked_mul(size_of::<(usize, usize)>())
-        .and_then(|value| {
-            value.checked_add(
-                object_count.checked_mul(GRAPH_INDEX_SLOT_BYTES + GRAPH_AMBIGUOUS_SLOT_BYTES)?,
-            )
-        })
-        .ok_or(Error::InvalidSource)?;
-    let retained = component_count
-        .checked_mul(size_of::<(&str, &Archive)>())
-        .and_then(|value| {
-            value.checked_add(
-                object_count
-                    .checked_mul(size_of::<(u64, usize)>())
-                    .and_then(|amount| {
-                        object_count
-                            .checked_mul(size_of::<u64>())
-                            .and_then(|other| amount.checked_add(other))
-                    })?,
-            )
-        })
-        .ok_or(Error::InvalidSource)?;
-    Ok(GraphWorkspaceCost {
-        work,
-        allocations,
-        retained,
-        scratch,
-    })
+impl PreparedComponents<'_> {
+    fn workspace(&self) -> Result<Workspace<'_>, Error> {
+        Workspace::new_bounded(
+            &self.components[0],
+            self.limits,
+            self.requirements,
+            self.construction_limits,
+        )
+        .map_err(Error::from)
+    }
 }
 
 fn prepare_components<'a>(
     package: &'a Package,
     budget: &mut ChartBudget,
-) -> Result<(LeafComponents<'a>, litchi_iwa_core::Limits), Error> {
-    admit_graph_workspace(package, budget)?;
-    let components = LeafComponents::new(package).map_err(Error::from)?;
+) -> Result<PreparedComponents<'a>, Error> {
+    let (view_allocations, view_retained) =
+        LeafComponents::view_requirements(package).map_err(Error::from)?;
+    budget
+        .preflight_allocations(view_allocations)
+        .map_err(map_arrangement)?;
+    budget
+        .preflight_retained(view_retained)
+        .map_err(map_arrangement)?;
+    budget
+        .allocations(view_allocations)
+        .map_err(map_arrangement)?;
+    budget.retained(view_retained).map_err(map_arrangement)?;
+    let mut components = Vec::new();
+    components
+        .try_reserve_exact(1)
+        .map_err(|_| Error::Allocation { amount: 1 })?;
+    components.push(LeafComponents::new(package).map_err(Error::from)?);
+    let construction_limits = budget.construction_limits().map_err(map_arrangement)?;
+    let requirements = Workspace::construction_requirements(&components[0], construction_limits)
+        .map_err(Error::from)?;
+    budget
+        .charge_construction(requirements, 2)
+        .map_err(map_arrangement)?;
     let limits = structure::exact_source(package)?
         .limits()
         .effective_archive_limits()
         .map_err(|error| structure::map_archive(&error))?;
-    Ok((components, limits))
-}
-
-fn admit_graph_workspace(package: &Package, budget: &mut ChartBudget) -> Result<(), Error> {
-    let cost = graph_workspace_cost(package)?;
-    budget.preflight_work(cost.work).map_err(map_arrangement)?;
-    budget
-        .preflight_allocations(cost.allocations)
-        .map_err(map_arrangement)?;
-    budget
-        .preflight_scratch(cost.scratch)
-        .map_err(map_arrangement)?;
-    budget
-        .preflight_retained(cost.retained)
-        .map_err(map_arrangement)?;
-    budget.work(cost.work).map_err(map_arrangement)?;
-    budget
-        .allocations(cost.allocations)
-        .map_err(map_arrangement)?;
-    budget.scratch(cost.scratch).map_err(map_arrangement)?;
-    budget.retained(cost.retained).map_err(map_arrangement)?;
-    Ok(())
+    Ok(PreparedComponents {
+        components,
+        limits,
+        requirements,
+        construction_limits,
+    })
 }
 
 fn publish_changes_exact(
@@ -1385,7 +1387,7 @@ fn read(
 ) -> Result<Property, Error> {
     let target = target(package, sheet, chart, budget)?;
     if let Some(style_kind) = kind.style() {
-        admit_graph_workspace(package, budget)?;
+        let _prepared = prepare_components(package, budget)?;
         let values = style::read(
             package,
             target.chart,
@@ -1396,8 +1398,8 @@ fn read(
         .map_err(from_style)?;
         return from_style_values(kind, values);
     }
-    let (components, limits) = prepare_components(package, budget)?;
-    let workspace = Workspace::new(&components, limits).map_err(Error::from)?;
+    let prepared = prepare_components(package, budget)?;
+    let workspace = prepared.workspace()?;
     let (chart, count) = (target.chart, target.series);
     Ok(match kind {
         PropertyKind::ConnectionLines => Property::ConnectionLines(engine::values(
@@ -1460,7 +1462,7 @@ fn apply_one(
         .into());
     }
     if let (Some(style_kind), Some(values)) = (property.kind().style(), property.style_values()) {
-        admit_graph_workspace(source, budget)?;
+        let _prepared = prepare_components(source, budget)?;
         let current = from_style_values(
             property.kind(),
             style::read(source, target.chart, target.kind, target.series, style_kind)
@@ -1475,8 +1477,8 @@ fn apply_one(
             .map_err(from_style)?;
         return publish_changes(published, sheet, chart, property.kind(), budget);
     }
-    let (components, limits) = prepare_components(source, budget)?;
-    let mut workspace = Workspace::new(&components, limits).map_err(Error::from)?;
+    let prepared = prepare_components(source, budget)?;
+    let mut workspace = prepared.workspace()?;
     let chart_id = target.chart;
     let mut symbol_scope = None;
     let changed = match property {

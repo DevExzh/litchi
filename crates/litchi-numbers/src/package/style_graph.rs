@@ -4,6 +4,7 @@
 //! engine's [`Components`], and a finished workspace's [`Changes`]
 //! republished through exact-source reassembly and a strict reopen.
 
+use std::mem::size_of;
 use std::sync::Arc;
 
 use litchi_iwa_archive::package::{EntryEdit, EntryInsertion};
@@ -31,11 +32,21 @@ pub(super) struct LeafComponents<'p> {
 }
 
 impl<'p> LeafComponents<'p> {
+    pub(super) fn view_requirements(package: &Package) -> FaultResult<(usize, usize)> {
+        structure::exact_source(package)?;
+        let count = package.state.components.catalog().len();
+        let bytes = count
+            .checked_mul(size_of::<(&str, &Archive)>())
+            .and_then(|value| value.checked_add(size_of::<LeafComponents<'_>>()));
+        let bytes = bytes.ok_or(Fault::Invalid)?;
+        Ok((usize::from(count != 0) + 1, bytes))
+    }
+
     pub(super) fn new(package: &'p Package) -> FaultResult<Self> {
         structure::exact_source(package)?;
         let mut components = Vec::new();
+        structure::reserve(&mut components, package.state.components.catalog().len())?;
         for component in package.state.components.catalog().iter() {
-            structure::reserve(&mut components, 1)?;
             components.push((component.name(), component.archive()));
         }
         Ok(Self { components })

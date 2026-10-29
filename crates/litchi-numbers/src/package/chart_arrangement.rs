@@ -943,6 +943,38 @@ impl ChartBudget {
         Ok(())
     }
 
+    pub(super) fn construction_limits(
+        &self,
+    ) -> Result<litchi_iwa_style::graph::ConstructionLimits, Error> {
+        Ok(litchi_iwa_style::graph::ConstructionLimits::new(
+            Self::remaining_axis(self.max_work, self.work, LimitKind::WireWork)?,
+            Self::remaining_axis(
+                self.max_allocations,
+                self.allocations,
+                LimitKind::Allocations,
+            )?,
+            Self::remaining_axis(self.max_retained, self.retained, LimitKind::RetainedBytes)?,
+            Self::remaining_axis(self.max_scratch, self.scratch, LimitKind::ScratchBytes)?,
+        ))
+    }
+
+    pub(super) fn charge_construction(
+        &mut self,
+        requirements: litchi_iwa_style::graph::ConstructionRequirements,
+        passes: usize,
+    ) -> Result<(), Error> {
+        self.work(
+            requirements
+                .source_work()
+                .checked_mul(passes)
+                .ok_or(Error::InvalidSource)?,
+        )?;
+        self.allocations(requirements.index_allocations())?;
+        self.retained(requirements.index_retained_bytes())?;
+        self.scratch(requirements.index_scratch_bytes())?;
+        Ok(())
+    }
+
     pub(super) fn residual_wire_limits(&self) -> Result<WireLimits, Error> {
         let residual = |maximum: usize, used: usize, kind| {
             let remaining = maximum.checked_sub(used).ok_or(Error::InvalidSource)?;
