@@ -7340,3 +7340,27 @@ See [0063](0063-source-pptx-modern-comments.md).
   Record 0406 is being implemented as one shared core substrate; all three
   owners will adopt it before refreshed qualification. Existing captures
   remain source-scoped, with no final integrated or native-acceptance claim.
+
+- The 0407 integration `cd2a55c33f` passed workspace compilation and all 20
+  locked fuzz checks before a daemon restart interrupted the boundary scan.
+  The boundary and ledger checks then completed on the same unchanged, clean
+  commit; original partial logs are preserved. Its worktree and branch were
+  retired normally, bringing cleanup to 59 worktrees and 52 branches. The
+  owner's approximately 2.1 GiB temporary cache removal is excluded from the
+  exact byte total because only an approximate size was retained.
+- Accepted shared substrate `152c00ec00` (record 0406). Archive and Snappy
+  preparation now expose typed visitor admission before source-derived
+  traversals, followed by execution-only resource requirements. Archive
+  execution uses one fallible codec projection with normalized message
+  scalars, preserves raw unknown headers, and validates duplicate identifiers
+  with a sorted tuple index. Callers must charge both execution byte-work and
+  the separate checked identifier-sort-work model. Snappy requirements cover
+  output, possible temporary frames and the locked backend's reusable 32 KiB
+  workspace. Existing serialization methods retain their behavior.
+- The 95-test core suite, strict Clippy, rustdoc, glossary, boundaries and
+  related scoped checks passed; independent review closed the shared source
+  contract. This is a substrate merge, with no facade, native or performance
+  qualification claim. Numbers, Pages and Keynote now adopt the shared API
+  in their isolated branches before new host differential and performance
+  qualification. The final 53-row gate remains pending on one integrated
+  candidate; the last fully qualified source remains `e0e297a82b`.
