@@ -13,7 +13,8 @@
   repair `76cfbf3afb`, current frozen-root merge `2eb913a401`, and prepared
   multi-stylesheet/segmented-list plus publication-admission closure
   `74651bb4ba`, planner/cache/probe repair `12f9de7115`, and verification
-  budget plus mixed-no-op proof `ea9a17e04d`. Earlier budget, parser,
+  budget plus mixed-no-op proof `ea9a17e04d`, and direct watermark/cardinality
+  proof `ee47ab4896`. Earlier budget, parser,
   exclusive-path, mutation-output and identity/unknown-preservation
   checkpoints remain in history.
 - Scope: shared `litchi-iwa-table::cell_text_style` graph reads and direct
