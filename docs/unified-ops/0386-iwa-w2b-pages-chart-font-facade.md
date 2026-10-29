@@ -22,7 +22,8 @@ the newly added Column2d chart at body-chart position zero. The facade proof
 covers direct host readback before the leaf read, font set/reset, point-size
 set/reset, preservation of the other property, exact inverse/no-op bytes, and
 candidate semantic readback. The existing native fixture's mixed-font and
-mixed-size chart remains a typed refusal control.
+mixed-size chart remains a typed refusal control; its native font read is a
+non-mutating accepted read control.
 
 All six facade routes are migrated in the exit ledger with Tier-A reads and
 Tier-B set/reset parity. The macOS mutation queue remains pending; its absence
@@ -80,7 +81,7 @@ The six ledger rows now bind to actual Pages host-vs-facade parity tests:
 `pages_body_chart_font_read_parity`, `pages_body_chart_font_set_parity`,
 `pages_body_chart_font_reset_parity`, and the corresponding three
 `pages_body_chart_font_size_*` tests. Reads are Tier A; set/reset routes are
-Tier B writes compare metadata UUIDs by the documented structural policy;
+Tier B. Tier-B writes compare metadata UUIDs by the documented structural policy;
 resets may reuse or collapse existing variations and do not inherently claim
 fresh UUID allocation. All six have pending native queue rows; no E3/E4
 evidence is claimed.
