@@ -12,7 +12,7 @@ use crate::node::{
     Children as ViewChildren, Format, NodePath, Preview, Project, Source, Value, ViewOptions,
 };
 
-fn chart_length(points: f32) -> Result<crate::value::Length> {
+pub(crate) fn chart_length(points: f32) -> Result<crate::value::Length> {
     let emu = f64::from(points) * 12_700.0;
     let rounded = emu.round();
     #[allow(

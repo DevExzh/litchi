@@ -506,6 +506,7 @@ pub(crate) fn chart_font_points(value: &PropValue<'_>) -> Result<f32> {
         )
         .with_property("font.size".to_owned()));
     }
+    super::node::chart_length(points)?;
     Ok(points)
 }
 

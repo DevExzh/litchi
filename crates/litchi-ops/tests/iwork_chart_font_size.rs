@@ -188,6 +188,21 @@ mod pages {
             .set(PATH, props! { "font.size" => "0pt" })
             .expect_err("zero size must refuse");
         assert_eq!(invalid.code(), litchi_ops::Code::InvalidValue);
+
+        let original = source().to_bytes().expect("Pages source bytes");
+        let extreme = source()
+            .set(
+                PATH,
+                props! {
+                    "font.size" => PropValue::from(litchi_ops::value::Length::from_emu(i64::MAX)),
+                },
+            )
+            .expect_err("unrepresentable EMU size must refuse before mutation");
+        assert!(matches!(
+            extreme.code(),
+            litchi_ops::Code::InvalidValue | litchi_ops::Code::LimitExceeded
+        ));
+        assert_eq!(source().to_bytes().expect("Pages source bytes"), original);
     }
 
     #[test]
