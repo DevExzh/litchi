@@ -55,7 +55,9 @@ use super::write::{
     Chain, Commit, LeafPatch, bound, destination, element_refusal, finish, key_refusal,
     leaf_refusal, node_at, refusal, resolve,
 };
-use super::{Flavor, Iwork, LeafError, Node, Owner, TreeBuilder, element, writable};
+use super::{
+    Flavor, Iwork, LeafError, Node, Owner, TreeBuilder, clearable_writable, element, writable,
+};
 use crate::Result;
 use crate::error::Code;
 use crate::new_node::NewNode;
@@ -125,7 +127,7 @@ pub(crate) const CELL_PROPS: &[PropSpec] = &[
     writable("value", ValueType::Scalar),
     writable("formula", ValueType::Text),
     set_only("cachedValue", ValueType::Scalar),
-    writable("comment", ValueType::Text),
+    clearable_writable("comment", ValueType::Text),
     PropSpec::new("merge", ValueType::Text),
     PropSpec::new("mergeAnchor", ValueType::Bool),
     set_only("numberFormat", ValueType::Text),

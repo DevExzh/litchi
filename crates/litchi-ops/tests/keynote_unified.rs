@@ -915,6 +915,82 @@ fn slide_table_cells_take_values() {
 }
 
 #[test]
+fn slide_table_cell_comments_round_trip_through_the_unified_route() {
+    let file = read("slide-table-read-native.key");
+    let cell = file
+        .query("tc")
+        .expect("query")
+        .filter_map(|node| node.ok())
+        .find(|node| {
+            let path = node.path().to_string();
+            prop(&file, &path, "comment").is_some()
+        })
+        .expect("a native cell comment")
+        .path()
+        .to_string();
+    let original = file.to_bytes().expect("source bytes");
+    let existing = prop(&file, &cell, "comment").expect("comment text");
+
+    let same = file
+        .set(&cell, props! { "comment" => existing.as_str() })
+        .expect("same comment");
+    assert_eq!(same.to_bytes().expect("same bytes"), original);
+
+    let commit = file
+        .edit(|tx| tx.set(&cell, props! { "comment" => "D7 unified Keynote root" }))
+        .expect("set comment");
+    let edited = reopen(commit.file());
+    assert_eq!(
+        prop(&edited, &cell, "comment").as_deref(),
+        Some("D7 unified Keynote root")
+    );
+    let cleared = edited
+        .set(&cell, props! { "comment" => litchi_ops::PropValue::Null })
+        .expect("clear comment");
+    assert_eq!(prop(&reopen(&cleared), &cell, "comment"), None);
+    let restored = commit
+        .patch()
+        .inverse()
+        .apply(commit.file())
+        .expect("inverse");
+    assert_eq!(restored.to_bytes().expect("inverse bytes"), original);
+
+    let error = file
+        .set(
+            "/slide[999]/table[1]/tr[1]/tc[1]",
+            props! { "comment" => "must refuse" },
+        )
+        .expect_err("missing slide");
+    assert_eq!(error.code(), Code::PathNotFound);
+    assert_eq!(file.to_bytes().expect("source unchanged"), original);
+    let other = file
+        .query("tc")
+        .expect("query")
+        .filter_map(|node| node.ok())
+        .map(|node| node.path().to_string())
+        .find(|path| path != &cell)
+        .expect("another cell");
+    assert_eq!(
+        prop(&edited, &other, "text"),
+        prop(&file, &other, "text"),
+        "comment write stays local"
+    );
+}
+
+#[test]
+fn keynote_cell_comment_schema_is_clearable() {
+    let property = litchi_ops::schema(FileFormat::Keynote)
+        .element("cell")
+        .expect("cell schema")
+        .property("comment")
+        .expect("comment schema");
+    assert!(property.get());
+    assert!(property.set());
+    assert!(property.clearable());
+    assert!(!property.add());
+}
+
+#[test]
 fn movies_and_audio_are_removed() {
     for name in [
         "media-lifecycle-audio-remove-native.key",

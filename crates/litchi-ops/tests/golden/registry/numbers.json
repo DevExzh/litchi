@@ -192,6 +192,7 @@
         },
         "comment": {
           "type": "string",
+          "clearable": true,
           "add": false,
           "set": true,
           "get": true

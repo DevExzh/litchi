@@ -18,7 +18,9 @@ use litchi_keynote::slide::drawable::{
     Created, Geometry, NewTable, Preset, Style, TableCellValue, TextSpan as DrawableSpan,
 };
 use litchi_keynote::slide::placeholder::Kind as Role;
-use litchi_keynote::{DrawableSelector, Package, SlideSelector, TextPosition, TextSpan};
+use litchi_keynote::{
+    DrawableSelector, Package, SlideSelector, TableSelector, TextPosition, TextSpan,
+};
 
 use super::super::write::{
     Chain, Commit, LeafPatch, bound, destination, element_refusal, finish, key_refusal,
@@ -154,6 +156,8 @@ pub(super) struct Pending {
     styles: BTreeMap<(usize, usize, usize, usize), (Style, usize)>,
     /// Table cells: (slide, drawable, row, column) → (value, item).
     cells: BTreeMap<(usize, usize, u32, u32), (TableCellValue, usize)>,
+    /// Root table-cell comments: (slide, table, row, column) → (text, item).
+    comments: BTreeMap<(usize, usize, u32, u32), (Option<String>, usize)>,
     /// Placeholder visibility: (slide, TITLE or BODY) → (hidden, item).
     visibility: BTreeMap<(usize, usize), (bool, usize)>,
     /// What the sets of each staged text touched (record 0314).
@@ -983,6 +987,12 @@ impl Pending {
                 item.type_name() == "table" && item.leaf()[3] as usize == drawable
             })
             .ok_or_else(|| refusal(Code::PathNotFound, "the cell's table is missing"))?;
+        let table_ordinal = file
+            .kids(slide_at)
+            .iter()
+            .filter(|&child| file.item(child).type_name() == "table")
+            .position(|child| child == table)
+            .ok_or_else(|| refusal(Code::InternalError, "the cell's table ordinal is missing"))?;
         let row_at = file
             .kids(table)
             .iter()
@@ -995,6 +1005,18 @@ impl Pending {
             .filter(|&child| file.item(child).type_name() == "tc")
             .position(|child| child == node.at())
             .ok_or_else(|| refusal(Code::InternalError, "the cell is not in its row"))?;
+        if key.eq_ignore_ascii_case("comment") {
+            self.comments.insert(
+                (
+                    slide,
+                    table_ordinal,
+                    u32::try_from(row).unwrap_or(u32::MAX),
+                    u32::try_from(column).unwrap_or(u32::MAX),
+                ),
+                (super::super::write::text(value, "comment")?, index),
+            );
+            return Ok(());
+        }
         let cell = table_cell_value(key, value)?;
         self.cells.insert(
             (
@@ -1037,6 +1059,7 @@ impl Pending {
                 let value = paragraph_text(value)?;
                 self.stage_paragraph(file, text, line, value, index)?;
             },
+            ("tc", "comment") => self.stage_cell(file, node, key, value, index)?,
             ("placeholder" | "shape" | "picture", "x" | "y" | "width" | "height" | "rotation") => {
                 if drawable == NONE {
                     return Err(refusal(
@@ -1226,6 +1249,25 @@ impl Pending {
             let (package, patch) = commit.into_parts();
             push(chain, package, Patch::Drawables(patch));
         }
+        for ((slide, table, row, column), (comment, index)) in std::mem::take(&mut self.comments) {
+            let error = |error| (failure(LeafError::KeynoteTableComments(error)), Some(index));
+            let cell = litchi_keynote::slide::table::cells::At::new(row, column);
+            let edit = chain
+                .package
+                .edit_slide_table_cell_comment(
+                    SlideSelector::index(slide),
+                    TableSelector::index(table),
+                    cell,
+                )
+                .map_err(error)?;
+            let commit = match comment {
+                Some(comment) => edit.set(&comment).map_err(error)?.commit(),
+                None => edit.clear().map_err(error)?.commit(),
+            }
+            .map_err(error)?;
+            let patch = commit.patch().clone();
+            push(chain, commit.into_package(), Patch::TableComments(patch));
+        }
         for (text, (value, index)) in texts {
             let at = |error| (error, Some(index));
             match text.container {
@@ -1305,6 +1347,7 @@ impl Pending {
         self.removals.clear();
         self.styles.clear();
         self.cells.clear();
+        self.comments.clear();
         self.adds.clear();
         self.groups.clear();
         Ok(published)

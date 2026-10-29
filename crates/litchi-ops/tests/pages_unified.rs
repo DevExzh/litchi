@@ -41,6 +41,32 @@ fn reopen(file: &File) -> File {
     open_bytes(file.to_bytes().expect("publish")).expect("reopen")
 }
 
+fn pages_comment_input() -> File {
+    // The tracked Pages table fixture has the required table topology but no
+    // root comment.  Author one through the leaf's semantic transaction so
+    // the unified test exercises a populated, reply-free source; host-vs-leaf
+    // differential coverage remains in the iWork parity cases.
+    let source = std::fs::read(fixture("pages/body-table-cells-native.pages"))
+        .expect("read Pages comment source");
+    let package = litchi_pages::Package::from_bytes(&source).expect("open Pages source");
+    let commit = package
+        .edit_body_table_cell_comment(
+            litchi_pages::BodyTableSelector::index(0),
+            litchi_pages::table::format::At::new(1, 1),
+        )
+        .expect("select Pages comment cell")
+        .set("D7 native Pages root")
+        .expect("author Pages root")
+        .commit()
+        .expect("commit Pages root");
+    let mut bytes = Vec::new();
+    commit
+        .package()
+        .write_to(&mut bytes)
+        .expect("serialize Pages comment source");
+    open_bytes(bytes).expect("open authored Pages source")
+}
+
 fn paragraphs(file: &File) -> Vec<String> {
     file.query("p")
         .expect("query")
@@ -217,6 +243,89 @@ fn tables_read_cells_and_remove() {
         .parse()
         .expect("count");
     assert_eq!(left + 1, tables.parse::<usize>().expect("count"));
+}
+
+#[test]
+fn body_table_cell_comments_round_trip_through_the_unified_route() {
+    let file = pages_comment_input();
+    let cell = file
+        .query("tc")
+        .expect("query")
+        .filter_map(|node| node.ok())
+        .find(|node| {
+            let path = node.path().to_string();
+            prop(&file, &path, "comment").is_some()
+        })
+        .expect("a native cell comment")
+        .path()
+        .to_string();
+    let original = file.to_bytes().expect("source bytes");
+    let existing = prop(&file, &cell, "comment").expect("comment text");
+
+    // A repeated root-comment write is an exact no-op, including the ZIP.
+    let same = file
+        .set(&cell, props! { "comment" => existing.as_str() })
+        .expect("same comment");
+    assert_eq!(same.to_bytes().expect("same bytes"), original);
+
+    let commit = file
+        .edit(|tx| tx.set(&cell, props! { "comment" => "D7 unified Pages root" }))
+        .expect("set comment");
+    let edited = reopen(commit.file());
+    assert_eq!(
+        prop(&edited, &cell, "comment").as_deref(),
+        Some("D7 unified Pages root")
+    );
+
+    // Null is the canonical clear operation.  The inverse is source-bound
+    // and restores the exact package, including untouched comment metadata.
+    let cleared = edited
+        .set(&cell, props! { "comment" => litchi_ops::PropValue::Null })
+        .expect("clear comment");
+    assert_eq!(prop(&reopen(&cleared), &cell, "comment"), None);
+    let restored = commit
+        .patch()
+        .inverse()
+        .apply(commit.file())
+        .expect("inverse");
+    assert_eq!(restored.to_bytes().expect("inverse bytes"), original);
+
+    // A selector outside the table is a terminal focused-route refusal.
+    let error = file
+        .set(
+            "/body/tbl[999]/tr[1]/tc[1]",
+            props! { "comment" => "must refuse" },
+        )
+        .expect_err("missing table");
+    assert_eq!(error.code(), Code::PathNotFound);
+
+    // The source handle and an unrelated cell remain unchanged.
+    assert_eq!(file.to_bytes().expect("source unchanged"), original);
+    let other = file
+        .query("tc")
+        .expect("query")
+        .filter_map(|node| node.ok())
+        .map(|node| node.path().to_string())
+        .find(|path| path != &cell)
+        .expect("another cell");
+    assert_eq!(
+        prop(&edited, &other, "text"),
+        prop(&file, &other, "text"),
+        "comment write stays local"
+    );
+}
+
+#[test]
+fn pages_cell_comment_schema_is_clearable() {
+    let property = litchi_ops::schema(FileFormat::Pages)
+        .element("cell")
+        .expect("cell schema")
+        .property("comment")
+        .expect("comment schema");
+    assert!(property.get());
+    assert!(property.set());
+    assert!(property.clearable());
+    assert!(!property.add());
 }
 
 #[test]
