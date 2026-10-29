@@ -131,7 +131,25 @@ impl From<litchi_iwa_style::graph::Error> for Error {
     fn from(error: litchi_iwa_style::graph::Error) -> Self {
         match &error {
             litchi_iwa_style::graph::Error::Invalid(_) => Refusal::UnsupportedStyle.into(),
-            _ => numbers_style_graph::fault(&error).into(),
+            _ => match numbers_style_graph::fault(&error) {
+                numbers_style_graph::StyleGraphFault::Shared(fault) => fault.into(),
+                numbers_style_graph::StyleGraphFault::Limit {
+                    kind,
+                    observed,
+                    maximum,
+                } => Error::Limit {
+                    kind: match kind {
+                        litchi_iwa_style::graph::GraphLimitKind::ScratchBytes => {
+                            LimitKind::ScratchBytes
+                        },
+                        litchi_iwa_style::graph::GraphLimitKind::AllocationEvents => {
+                            LimitKind::AllocationEvents
+                        },
+                    },
+                    observed,
+                    maximum,
+                },
+            },
         }
     }
 }

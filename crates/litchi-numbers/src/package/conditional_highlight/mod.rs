@@ -208,6 +208,8 @@ fn from_cells(error: cells::Error) -> Error {
                 K::PackageBytes => LimitKind::PackageBytes,
                 K::PayloadBytes => LimitKind::PayloadBytes,
                 K::Identifiers => LimitKind::Identifiers,
+                K::ScratchBytes => LimitKind::ScratchBytes,
+                K::AllocationEvents => LimitKind::AllocationEvents,
                 K::Wire(kind) => LimitKind::Wire(kind),
             },
             observed,
