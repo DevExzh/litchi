@@ -817,6 +817,8 @@ pub fn effective(
             return Err(invalid("character-style parent cycle"));
         }
         let payload = style_payload(source, identifier, limits)?;
+        limits.charge_work(payload.len())?;
+        limits.admit_allocations(1)?;
         properties.inherit(
             &litchi_iwa_text_wire::character_style_properties(payload, wire)
                 .map_err(|_| invalid("malformed character-style properties"))?,
@@ -1026,6 +1028,7 @@ pub fn plan_set(
             .is_some_and(|entry| entry.refcount == 1)
     }) && style_is_exclusive(source, parent, table.style_list, limits)?;
     if exclusive {
+        limits.admit_allocations(1)?;
         let data = litchi_iwa_text_wire::character_style_variation(
             Some(parent),
             stylesheet,
@@ -1047,6 +1050,7 @@ pub fn plan_set(
         }));
     }
     let fresh = fresh.ok_or(Error::NeedsIdentifier)?;
+    limits.admit_allocations(2)?;
     let data =
         litchi_iwa_text_wire::character_style_variation(Some(parent), stylesheet, &reduced, wire)
             .map_err(|_| invalid("character-style variation encoding failed"))?;
@@ -1058,6 +1062,7 @@ pub fn plan_set(
             .map_err(|_| invalid("stylesheet variation encoding failed"))?;
     let key = list.next_key()?;
     let next = key.checked_add(1).ok_or(invalid("style key overflow"))?;
+    limits.admit_allocations(1)?;
     let mut list_data =
         patch_varint_field(&list.root_data, 2, true, Some(u64::from(next))).map_err(map_wire)?;
     let mut entry = Vec::new();
@@ -1283,6 +1288,7 @@ pub fn plan_set_many(
             .and_then(|key| key.checked_add(1))
             .and_then(|key| u32::try_from(key).ok())
             .unwrap_or(list.next);
+        limits.admit_allocations(1)?;
         root_data =
             patch_varint_field(&root_data, 2, true, Some(u64::from(next))).map_err(map_wire)?;
         for entry in &list_entries {
@@ -1354,15 +1360,18 @@ fn rewrite_list_key(data: &[u8], old: u32, new: u32, limits: &Limits) -> Result<
     limits.reserve(&mut replacements, entries.len())?;
     for entry in entries {
         if varint(entry, 1, limits)? == Some(u64::from(old)) {
+            limits.admit_allocations(1)?;
             replacements
                 .push(patch_varint_field(entry, 1, true, Some(u64::from(new))).map_err(map_wire)?);
         } else {
             replacements.push(limits.copy(entry)?);
         }
     }
+    limits.admit_allocations(1)?;
     let mut output =
         rewrite_repeated_length_delimited_fields(data, 3, &replacements).map_err(map_wire)?;
     if varint(&output, 2, limits)? == Some(u64::from(old).saturating_add(1)) {
+        limits.admit_allocations(1)?;
         output = patch_varint_field(&output, 2, true, Some(u64::from(new).saturating_add(1)))
             .map_err(map_wire)?;
     }
@@ -1371,6 +1380,7 @@ fn rewrite_list_key(data: &[u8], old: u32, new: u32, limits: &Limits) -> Result<
 
 fn with_paragraph_properties(mut data: Vec<u8>, limits: &Limits) -> Result<Vec<u8>, Error> {
     if bytes(&data, PARAGRAPH_PROPERTIES_FIELD, limits)?.is_none() {
+        limits.admit_allocations(1)?;
         append_length_delimited_field(&mut data, PARAGRAPH_PROPERTIES_FIELD, &[], limits.wire)
             .map_err(map_wire)?;
     }
