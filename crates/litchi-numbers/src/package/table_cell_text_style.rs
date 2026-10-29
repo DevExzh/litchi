@@ -23,8 +23,9 @@
 use std::fmt;
 
 use litchi_iwa_core::RawMessage;
-use litchi_iwa_table::cell_text_style as shared;
+use litchi_iwa_table::{cell_text_style as shared, cell_text_style_writer as writer};
 use litchi_iwa_text_wire::CharacterProperties;
+use litchi_numbers_wire::Limits as BncLimits;
 use thiserror::Error as ThisError;
 
 use super::Package;
@@ -34,8 +35,7 @@ use super::structure::{
     references,
 };
 use super::table_topology::wire::{
-    bytes_field, push_bytes_field, rebuild, repeated_bytes, single_bytes, single_reference,
-    single_varint,
+    push_bytes_field, repeated_bytes, single_bytes, single_reference, single_varint,
 };
 use super::table_topology::{
     self as topology, LIST_MESSAGE_TYPE, LIST_SEGMENT_MESSAGE_TYPE, TILE_MESSAGE_TYPE, storage,
@@ -718,14 +718,7 @@ fn apply_shared_plan(
             },
         }
     }
-    if plan.cell_updates.len() > 1 && !write_shared_keys(working, &plan.cell_updates, limits)? {
-        for (target, key) in &plan.cell_updates {
-            write_shared_key(working, *target, *key, limits)?;
-        }
-    } else if plan.cell_updates.len() == 1 {
-        let (target, key) = plan.cell_updates[0];
-        write_shared_key(working, target, key, limits)?;
-    }
+    write_style_keys(working, &plan.cell_updates, limits)?;
     Ok(())
 }
 
@@ -768,227 +761,79 @@ fn admit_publication(plan: &shared::Plan, limits: &shared::Limits) -> Result<(),
     limits.admit_work(work).map_err(from_shared)
 }
 
-/// Apply one prepared batch of existing-cell key changes with one immutable
-/// tile/row index per touched tile.  `false` is a preflight refusal (for
-/// example an empty slot); callers then use the existing materializing path
-/// before any batch mutation has occurred.
-fn write_shared_keys(
+/// Publish all cell-key updates through the shared bounded tile writer. The
+/// writer owns existing-cell, empty-slot and missing-row handling under the
+/// same staged-to-readback transaction ledger.
+fn write_style_keys(
     working: &mut Working<'_>,
     updates: &[(shared::Target, u32)],
     limits: &shared::Limits,
-) -> Result<bool, Error> {
+) -> Result<(), Error> {
     let Some((first_target, _)) = updates.first().copied() else {
-        return Ok(true);
+        return Ok(());
     };
     if updates
         .iter()
         .any(|(target, _)| target.model_identifier != first_target.model_identifier)
     {
-        return Ok(false);
+        return Err(Error::Refused(Refusal::UnsupportedDependency));
     }
-    limits
-        .admit_work(updates.len().saturating_mul(8))
-        .map_err(from_shared)?;
-    limits
-        .admit_allocations(updates.len())
-        .map_err(from_shared)?;
     let (_, model) = topology::message(working, first_target.model_identifier, &[6_001])?;
+    let geometry = topology::geometry(model).map_err(from_topology)?;
     let store = single_bytes(model, 4)?.ok_or(Error::InvalidSource)?;
-    limits.admit_copies(store.len()).map_err(from_shared)?;
-    limits.admit_allocations(1).map_err(from_shared)?;
-    let store = store.to_vec();
-    let (tiles, tile_size) = topology::tiles(&store).map_err(from_topology)?;
+    let (tiles, tile_size) = topology::tiles(store).map_err(from_topology)?;
     if tile_size == 0 {
         return Err(Error::InvalidSource);
     }
-
-    // Group by the native tile object and local row.  The vectors are bounded
-    // by the already staged update count, and all updates are preflighted
-    // before any tile is replaced.
-    let mut groups: Vec<(u64, Vec<(u32, u32, u32)>)> = Vec::new();
+    let mut groups: Vec<(u64, Vec<writer::Update>)> = Vec::new();
     limits.reserve(&mut groups, 1).map_err(from_shared)?;
     for (target, key) in updates {
+        if target.row >= geometry.rows || target.column >= geometry.columns {
+            return Err(Error::Refused(Refusal::CellNotFound));
+        }
         let tile_key = u64::from(target.row) / tile_size;
         let local =
             u32::try_from(u64::from(target.row) % tile_size).map_err(|_| Error::InvalidSource)?;
-        let Some((_, tile)) = tiles
+        let tile = tiles
             .iter()
             .find(|(candidate, _)| u64::from(*candidate) == tile_key)
-        else {
-            return Ok(false);
+            .map(|(_, identifier)| *identifier)
+            .ok_or(Error::Refused(Refusal::UnsupportedSource))?;
+        let update = writer::Update {
+            row: local,
+            column: target.column,
+            key: Some(*key),
         };
         if let Some((_, rows)) = groups
             .iter_mut()
-            .find(|(identifier, _)| *identifier == *tile)
+            .find(|(identifier, _)| *identifier == tile)
         {
             limits.reserve(rows, 1).map_err(from_shared)?;
-            rows.push((local, target.column, *key));
+            rows.push(update);
         } else {
             let mut rows = Vec::new();
             limits.reserve(&mut rows, 1).map_err(from_shared)?;
-            rows.push((local, target.column, *key));
+            rows.push(update);
             limits.reserve(&mut groups, 1).map_err(from_shared)?;
-            groups.push((*tile, rows));
+            groups.push((tile, rows));
         }
     }
-
-    for (tile, rows) in &groups {
-        let (_, tile_data) = topology::message(working, *tile, &[TILE_MESSAGE_TYPE])?;
-        let mut found_rows = Vec::new();
-        limits
-            .reserve(&mut found_rows, rows.len())
-            .map_err(from_shared)?;
-        for row in repeated_bytes(tile_data, 5)? {
-            let local = single_varint(row, 1)?.ok_or(Error::InvalidSource)? as u32;
-            if rows.iter().any(|(wanted, _, _)| *wanted == local) {
-                if !found_rows.contains(&local) {
-                    limits.reserve(&mut found_rows, 1).map_err(from_shared)?;
-                    found_rows.push(local);
-                }
-                limits.admit_work(row.len()).map_err(from_shared)?;
-                limits.admit_allocations(1).map_err(from_shared)?;
-                let cells = storage::bnc_cells(row).map_err(|_| Error::InvalidSource)?;
-                let targeted = rows
-                    .iter()
-                    .filter(|(wanted, _, _)| *wanted == local)
-                    .count();
-                limits.admit_allocations(targeted).map_err(from_shared)?;
-                limits.admit_allocations(targeted).map_err(from_shared)?;
-                limits.admit_allocations(2).map_err(from_shared)?;
-                for (_, column, _) in rows.iter().filter(|(wanted, _, _)| *wanted == local) {
-                    let Some((_, cell)) = cells.iter().find(|(candidate, _)| candidate == column)
-                    else {
-                        return Ok(false);
-                    };
-                    limits.admit_work(cell.len()).map_err(from_shared)?;
-                    limits
-                        .admit_allocations(litchi_numbers_wire::MAX_OWNED_BNC_PARSE_ALLOCATIONS)
-                        .map_err(from_shared)?;
-                    limits.admit_copies(cell.len()).map_err(from_shared)?;
-                    limits
-                        .admit_output(cell.len().saturating_add(16))
-                        .map_err(from_shared)?;
-                }
-            }
-        }
-        if rows
-            .iter()
-            .any(|(wanted, _, _)| !found_rows.contains(wanted))
-        {
-            return Ok(false);
-        }
-    }
-
+    let bnc_limits = BncLimits::from_wire_limits(limits.wire);
     for (tile, rows) in groups {
         let (tile_index, tile_data) = topology::message(working, tile, &[TILE_MESSAGE_TYPE])?;
-        let output_bound = tile_data
-            .len()
-            .saturating_add(rows.len().saturating_mul(16));
-        limits.admit_allocations(1).map_err(from_shared)?;
-        limits.admit_work(tile_data.len()).map_err(from_shared)?;
-        limits.admit_copies(output_bound).map_err(from_shared)?;
-        limits.admit_output(output_bound).map_err(from_shared)?;
-        let rewritten = rebuild(tile_data, |field| {
-            if field.number != 5 {
-                return Ok(None);
-            }
-            let local = single_varint(field.payload, 1)
-                .map_err(|_| Fault::Invalid)?
-                .ok_or(Fault::Invalid)? as u32;
-            if !rows.iter().any(|(wanted, _, _)| *wanted == local) {
-                return Ok(None);
-            }
-            let mut row = field.payload.to_vec();
-            for (_, column, key) in rows.iter().filter(|(wanted, _, _)| *wanted == local) {
-                let cell = storage::bnc_cells(&row)
-                    .map_err(|_| Fault::Invalid)?
-                    .into_iter()
-                    .find(|(candidate, _)| *candidate == *column)
-                    .map(|(_, bytes)| bytes)
-                    .ok_or(Fault::Invalid)?;
-                let limits = crate::cell::wire::limits_for_source(cell);
-                let mut decoded = litchi_numbers_wire::BncCell::parse(cell, &limits)
-                    .map_err(|_| Fault::Invalid)?;
-                decoded.set_text_style_identifier(Some(*key));
-                let encoded =
-                    crate::cell::wire::encode(&decoded, &limits).map_err(|_| Fault::Invalid)?;
-                row = storage::replace_cell(&row, *column, &encoded)
-                    .map_err(|_| Fault::Invalid)?
-                    .ok_or(Fault::Invalid)?;
-            }
-            bytes_field(5, &row).map(Some)
-        })?;
-        replace_message(working, tile, tile_index, rewritten)?;
-    }
-    Ok(true)
-}
-
-fn write_shared_key(
-    working: &mut Working<'_>,
-    target: shared::Target,
-    key: u32,
-    transaction_limits: &shared::Limits,
-) -> Result<(), Error> {
-    let (_, model) = topology::message(working, target.model_identifier, &[6_001])?;
-    let geometry = topology::geometry(model).map_err(from_topology)?;
-    let store = single_bytes(model, 4)?.ok_or(Error::InvalidSource)?;
-    transaction_limits
-        .admit_copies(store.len())
+        let write = writer::set_text_style_keys(
+            tile_data,
+            geometry.columns,
+            &rows,
+            writer::RowPlacement::FieldOrder,
+            limits,
+            &bnc_limits,
+        )
         .map_err(from_shared)?;
-    transaction_limits
-        .admit_allocations(1)
-        .map_err(from_shared)?;
-    let store = store.to_vec();
-    let position = At::new(target.row, target.column);
-    let Some(located) = locate_cell(working, &store, position)? else {
-        let mut cell = litchi_numbers_wire::BncCell::minimal();
-        cell.set_text_style_identifier(Some(key));
-        return materialize_cell(working, &store, geometry.columns, position, &cell);
-    };
-    transaction_limits
-        .admit_work(located.bytes.len())
-        .map_err(from_shared)?;
-    transaction_limits
-        .admit_allocations(litchi_numbers_wire::MAX_OWNED_BNC_PARSE_ALLOCATIONS)
-        .map_err(from_shared)?;
-    transaction_limits
-        .admit_copies(located.bytes.len())
-        .map_err(from_shared)?;
-    transaction_limits
-        .admit_output(located.bytes.len().saturating_add(16))
-        .map_err(from_shared)?;
-    let limits = crate::cell::wire::limits_for_source(&located.bytes);
-    let mut cell = litchi_numbers_wire::BncCell::parse(&located.bytes, &limits)
-        .map_err(|_| Error::InvalidSource)?;
-    cell.set_text_style_identifier(Some(key));
-    let encoded = crate::cell::wire::encode(&cell, &limits).map_err(|_| Error::InvalidSource)?;
-    let (_, tile_data) = topology::message(working, located.tile, &[TILE_MESSAGE_TYPE])?;
-    let output_bound = tile_data.len().saturating_add(encoded.len());
-    transaction_limits
-        .admit_allocations(2)
-        .map_err(from_shared)?;
-    transaction_limits
-        .admit_work(tile_data.len())
-        .map_err(from_shared)?;
-    transaction_limits
-        .admit_copies(output_bound)
-        .map_err(from_shared)?;
-    transaction_limits
-        .admit_output(output_bound)
-        .map_err(from_shared)?;
-    let mut field_index = 0_usize;
-    let rewritten = rebuild(tile_data, |field| {
-        let this = field_index;
-        field_index += 1;
-        if this != located.row_field {
-            return Ok(None);
+        if write.changed() {
+            replace_message(working, tile, tile_index, write.into_tile())?;
         }
-        let row = storage::replace_cell(field.payload, position.column(), &encoded)
-            .map_err(Fault::from)?
-            .ok_or(Fault::Invalid)?;
-        bytes_field(5, &row).map(Some)
-    })?;
-    replace_message(working, located.tile, located.tile_index, rewritten)?;
+    }
     Ok(())
 }
 
