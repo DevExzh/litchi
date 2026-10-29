@@ -59,6 +59,10 @@ pub enum LimitKind {
     PayloadBytes,
     /// Native references.
     PayloadReferences,
+    /// Native metadata items such as registry entries.
+    PayloadItems,
+    /// Native object identifiers allocated or released.
+    PayloadObjects,
     /// Wire fields.
     WireFields,
     /// Wire nesting depth.
@@ -90,6 +94,8 @@ impl fmt::Display for LimitKind {
             Self::OutputBytes => formatter.write_str("output bytes"),
             Self::PayloadBytes => formatter.write_str("payload bytes"),
             Self::PayloadReferences => formatter.write_str("payload references"),
+            Self::PayloadItems => formatter.write_str("payload items"),
+            Self::PayloadObjects => formatter.write_str("payload objects"),
             Self::WireFields => formatter.write_str("wire fields"),
             Self::WireNesting => formatter.write_str("wire nesting"),
             Self::WireWork => formatter.write_str("wire work"),

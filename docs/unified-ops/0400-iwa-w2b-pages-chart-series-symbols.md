@@ -1,11 +1,10 @@
 # 0400 — W2-B Pages chart-series symbols facade
 
 - Status: boundary-adoption checkpoint on `uo2/iwa-w2b-series-symbols`,
-  synchronized with coordinator trunk `59a501492cb58a538085280e383007ca4d39dad7`
-  and shared admission helper tip `7eaececb6e8307528a73c3da50ba42ca9fef5255`.
+  synchronized with coordinator trunk `c0c10b86ce82151b730a7e6ee00615f7232d7f74`
+  and shared admission helper tip `73b7bf0027a0770a098c82369abd4adff7156706`.
   Coordinator integration, final performance qualification and native
-  verification remain pending. The shared helper currently has a candidate
-  reopen defect for newly allocated styled overrides (see Verification).
+  verification remain pending.
 - Scope: Pages body-chart series symbol visibility, shape and optional point
   size through the selector-first facade. Keynote, Numbers, chart fonts,
   chart text, series fills/strokes and `litchi-ops` dispatch are outside this
@@ -83,11 +82,8 @@ only; their native routes remain pending in
 ## Verification checkpoint
 
 Scoped Pages compilation and strict Clippy pass with the frozen lockfile, four
-Cargo jobs, incremental disabled and debug info disabled; the five production
-locality-negative tests pass. The read-only Pages parity case passes. The three
-mutation parity cases currently stop at candidate reopen because the adopted
-shared helper emits a `TSS.StyleArchive` parent as a bare varint instead of a
-field-5 stylesheet reference; no mutation parity, performance or native claim
-is made until the F-owned helper repair is integrated. Coordinator integration,
-the remaining parity cases, final performance capture and native evidence
-remain pending.
+Cargo jobs, incremental disabled and debug info disabled; all four Pages
+series-symbol parity cases and the five production locality-negative tests
+pass. The shared helper's field-5 parent encoding, hard caps and registry-cache
+accounting are included in the adopted F tip. Coordinator integration, final
+performance capture and native evidence remain pending.
