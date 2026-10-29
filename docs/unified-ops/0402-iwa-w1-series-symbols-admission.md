@@ -66,8 +66,18 @@ workspace index construction: those source/index costs remain an explicit
 pre-admission responsibility of each format caller and must not be charged
 again as finalization work.
 
+`Workspace::construction_requirements` and `Workspace::new_bounded` now
+provide the complementary source/index seam. The nonallocating census
+reports component/object work, graph-index allocation/retention envelopes,
+and caller-owned borrowed-component view bytes separately; the bounded
+builder reserves both indexes before population and revalidates the census.
+Legacy `Workspace::new` remains unchanged.
+
 Implementation commits: `bd2d138a07`, overflow-checked follow-up
-`c50fcaf8db`, and final lint/documentation fix `54ebd2782f` (on top of
+`c50fcaf8db`, final lint/documentation fix `54ebd2782f`, focused ceiling
+evidence `f2eae5798d`, bounded construction `f9512e398f`, census identity
+guard `0975944a5a`, and the exact source-fingerprint follow-up `635509e3ff`
+(on top of
 coordinator freeze merge `2f1f7a8a78`).
 
 ## Correctness and evidence boundary
@@ -84,7 +94,7 @@ is an explicit follow-up gap, not a full Numbers facade-ledger qualification.
 
 ## Verification
 
-- `cargo test --offline -p litchi-iwa-style --lib`: 32 passed.
+- `cargo test --offline -p litchi-iwa-style --lib`: 38 passed.
 - `cargo test --offline -p litchi-iwa --test parity chart_font_cases -- --nocapture`:
   29 passed, 13 ignored; Numbers, Pages, and Keynote chart-font parity and
   low-budget controls pass.
