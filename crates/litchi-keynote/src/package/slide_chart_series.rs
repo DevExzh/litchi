@@ -67,8 +67,20 @@ pub enum LimitKind {
     WireBytes,
     /// Package entries, objects and messages.
     Entries,
+    /// Bytes in one package member, IWA object, or message.
+    EntryBytes,
+    /// Aggregate package or IWA bytes.
+    TotalBytes,
+    /// Semantic slides visited by the shared chart selector.
+    Slides,
     /// Graph references.
     References,
+    /// Font-name or other semantic text bytes retained by the selector.
+    TextBytes,
+    /// Series-style registry entries rewritten.
+    RegistryEntries,
+    /// Package-wide object identifiers allocated or released.
+    Identifiers,
     /// Parsed wire fields.
     WireFields,
     /// Maximum protobuf nesting depth.
@@ -92,7 +104,13 @@ impl fmt::Display for LimitKind {
             Self::OutputBytes => "output bytes",
             Self::WireBytes => "wire bytes",
             Self::Entries => "entries",
+            Self::EntryBytes => "entry bytes",
+            Self::TotalBytes => "total bytes",
+            Self::Slides => "slides",
             Self::References => "references",
+            Self::TextBytes => "text bytes",
+            Self::RegistryEntries => "registry entries",
+            Self::Identifiers => "identifiers",
             Self::WireFields => "wire fields",
             Self::WireNesting => "wire nesting",
             Self::WireWork => "wire work",
@@ -304,18 +322,18 @@ fn map_axis_support_error(error: AxisSupportError) -> Error {
                 chart_axis_support::AxisSupportLimitKind::InputBytes => LimitKind::InputBytes,
                 chart_axis_support::AxisSupportLimitKind::OutputBytes => LimitKind::OutputBytes,
                 chart_axis_support::AxisSupportLimitKind::WireBytes => LimitKind::WireBytes,
-                chart_axis_support::AxisSupportLimitKind::Entries
-                | chart_axis_support::AxisSupportLimitKind::EntryBytes
-                | chart_axis_support::AxisSupportLimitKind::TotalBytes
-                | chart_axis_support::AxisSupportLimitKind::Slides
-                | chart_axis_support::AxisSupportLimitKind::TextStorages
+                chart_axis_support::AxisSupportLimitKind::Entries => LimitKind::Entries,
+                chart_axis_support::AxisSupportLimitKind::EntryBytes => LimitKind::EntryBytes,
+                chart_axis_support::AxisSupportLimitKind::TotalBytes => LimitKind::TotalBytes,
+                chart_axis_support::AxisSupportLimitKind::Slides => LimitKind::Slides,
+                chart_axis_support::AxisSupportLimitKind::TextStorages
                 | chart_axis_support::AxisSupportLimitKind::TextFragments => LimitKind::Entries,
                 chart_axis_support::AxisSupportLimitKind::References => LimitKind::References,
-                chart_axis_support::AxisSupportLimitKind::TextBytes => LimitKind::WireBytes,
+                chart_axis_support::AxisSupportLimitKind::TextBytes => LimitKind::TextBytes,
                 chart_axis_support::AxisSupportLimitKind::WireFields => LimitKind::WireFields,
                 chart_axis_support::AxisSupportLimitKind::WireNesting => LimitKind::WireNesting,
                 chart_axis_support::AxisSupportLimitKind::WireWork => LimitKind::WireWork,
-                chart_axis_support::AxisSupportLimitKind::TitleBytes => LimitKind::WireBytes,
+                chart_axis_support::AxisSupportLimitKind::TitleBytes => LimitKind::SelectorBytes,
             },
             observed,
             maximum,
@@ -578,11 +596,11 @@ fn map_transaction_error(error: TransactionError) -> Error {
                 super::slide_table_core::LimitKind::WireNesting => LimitKind::WireNesting,
                 super::slide_table_core::LimitKind::References => LimitKind::References,
                 super::slide_table_core::LimitKind::Entries
-                | super::slide_table_core::LimitKind::EntryBytes
-                | super::slide_table_core::LimitKind::TotalBytes
                 | super::slide_table_core::LimitKind::Components
                 | super::slide_table_core::LimitKind::PayloadObjects
                 | super::slide_table_core::LimitKind::PayloadMessages => LimitKind::Entries,
+                super::slide_table_core::LimitKind::EntryBytes => LimitKind::EntryBytes,
+                super::slide_table_core::LimitKind::TotalBytes => LimitKind::TotalBytes,
             },
             observed,
             maximum,
@@ -785,7 +803,7 @@ fn map_registry_error(error: litchi_iwa_protos::package_metadata_codec::RewriteE
 
 fn map_core_limit(kind: litchi_iwa_core::LimitKind) -> LimitKind {
     match kind {
-        litchi_iwa_core::LimitKind::ArchiveBytes => LimitKind::Entries,
+        litchi_iwa_core::LimitKind::ArchiveBytes => LimitKind::TotalBytes,
         litchi_iwa_core::LimitKind::Objects
         | litchi_iwa_core::LimitKind::Messages
         | litchi_iwa_core::LimitKind::MessagesPerObject
@@ -823,11 +841,11 @@ fn map_font_error(error: slide_chart_font::Error) -> Error {
                 slide_chart_font::LimitKind::InputBytes => LimitKind::InputBytes,
                 slide_chart_font::LimitKind::OutputBytes => LimitKind::OutputBytes,
                 slide_chart_font::LimitKind::WireBytes => LimitKind::WireBytes,
-                slide_chart_font::LimitKind::Entries
-                | slide_chart_font::LimitKind::EntryBytes
-                | slide_chart_font::LimitKind::TotalBytes
-                | slide_chart_font::LimitKind::Slides
-                | slide_chart_font::LimitKind::Identifiers => LimitKind::Entries,
+                slide_chart_font::LimitKind::Entries => LimitKind::Entries,
+                slide_chart_font::LimitKind::EntryBytes => LimitKind::EntryBytes,
+                slide_chart_font::LimitKind::TotalBytes => LimitKind::TotalBytes,
+                slide_chart_font::LimitKind::Slides => LimitKind::Slides,
+                slide_chart_font::LimitKind::Identifiers => LimitKind::Identifiers,
                 slide_chart_font::LimitKind::References => LimitKind::References,
                 slide_chart_font::LimitKind::WireFields => LimitKind::WireFields,
                 slide_chart_font::LimitKind::WireNesting => LimitKind::WireNesting,
@@ -836,7 +854,7 @@ fn map_font_error(error: slide_chart_font::Error) -> Error {
                 slide_chart_font::LimitKind::RetainedBytes => LimitKind::RetainedBytes,
                 slide_chart_font::LimitKind::ScratchBytes => LimitKind::ScratchBytes,
                 slide_chart_font::LimitKind::SelectorBytes => LimitKind::SelectorBytes,
-                slide_chart_font::LimitKind::TextBytes => LimitKind::WireBytes,
+                slide_chart_font::LimitKind::TextBytes => LimitKind::TextBytes,
             },
             observed,
             maximum,
@@ -865,10 +883,9 @@ fn map_series_error(error: engine::SymbolError) -> Error {
                 engine::LimitKind::Allocations => LimitKind::Allocations,
                 engine::LimitKind::RetainedBytes => LimitKind::RetainedBytes,
                 engine::LimitKind::ScratchBytes => LimitKind::ScratchBytes,
-                engine::LimitKind::References | engine::LimitKind::RegistryEntries => {
-                    LimitKind::References
-                },
-                engine::LimitKind::Identifiers => LimitKind::Entries,
+                engine::LimitKind::References => LimitKind::References,
+                engine::LimitKind::RegistryEntries => LimitKind::RegistryEntries,
+                engine::LimitKind::Identifiers => LimitKind::Identifiers,
                 _ => LimitKind::WireWork,
             },
             observed: observed as u64,
@@ -1464,5 +1481,161 @@ impl Package {
             patch: patch.clone(),
             diagnostics: Diagnostics::published(0),
         })
+    }
+}
+
+#[cfg(test)]
+mod limit_mapping_tests {
+    use super::*;
+
+    fn assert_limit(error: Error, kind: LimitKind, observed: u64, maximum: u64) {
+        assert_eq!(
+            error,
+            Error::Limit {
+                kind,
+                observed,
+                maximum,
+            }
+        );
+    }
+
+    #[test]
+    fn preserves_archive_and_snappy_units_and_values() {
+        const OBSERVED: usize = 17;
+        const MAXIMUM: usize = 11;
+
+        assert_limit(
+            map_graph(graph::Error::Archive(litchi_iwa_core::Error::Limit {
+                kind: litchi_iwa_core::LimitKind::ArchiveBytes,
+                observed: OBSERVED,
+                maximum: MAXIMUM,
+            })),
+            LimitKind::TotalBytes,
+            OBSERVED as u64,
+            MAXIMUM as u64,
+        );
+        assert_limit(
+            map_graph(graph::Error::Archive(litchi_iwa_core::Error::Limit {
+                kind: litchi_iwa_core::LimitKind::SnappyFrames,
+                observed: OBSERVED,
+                maximum: MAXIMUM,
+            })),
+            LimitKind::WireWork,
+            OBSERVED as u64,
+            MAXIMUM as u64,
+        );
+    }
+
+    #[test]
+    fn preserves_shared_font_and_transaction_byte_units_and_values() {
+        const OBSERVED: u64 = 23;
+        const MAXIMUM: u64 = 19;
+
+        for (kind, expected) in [
+            (
+                chart_axis_support::AxisSupportLimitKind::EntryBytes,
+                LimitKind::EntryBytes,
+            ),
+            (
+                chart_axis_support::AxisSupportLimitKind::TotalBytes,
+                LimitKind::TotalBytes,
+            ),
+            (
+                chart_axis_support::AxisSupportLimitKind::Slides,
+                LimitKind::Slides,
+            ),
+            (
+                chart_axis_support::AxisSupportLimitKind::TextBytes,
+                LimitKind::TextBytes,
+            ),
+            (
+                chart_axis_support::AxisSupportLimitKind::TitleBytes,
+                LimitKind::SelectorBytes,
+            ),
+        ] {
+            assert_limit(
+                map_axis_support_error(AxisSupportError::LimitExceeded {
+                    kind,
+                    observed: OBSERVED,
+                    maximum: MAXIMUM,
+                }),
+                expected,
+                OBSERVED,
+                MAXIMUM,
+            );
+        }
+
+        for kind in [
+            slide_chart_font::LimitKind::EntryBytes,
+            slide_chart_font::LimitKind::TotalBytes,
+            slide_chart_font::LimitKind::Identifiers,
+            slide_chart_font::LimitKind::TextBytes,
+        ] {
+            let expected = match kind {
+                slide_chart_font::LimitKind::EntryBytes => LimitKind::EntryBytes,
+                slide_chart_font::LimitKind::TotalBytes => LimitKind::TotalBytes,
+                slide_chart_font::LimitKind::Identifiers => LimitKind::Identifiers,
+                slide_chart_font::LimitKind::TextBytes => LimitKind::TextBytes,
+                _ => unreachable!(),
+            };
+            assert_limit(
+                map_font_error(slide_chart_font::Error::Limit {
+                    kind,
+                    observed: OBSERVED,
+                    maximum: MAXIMUM,
+                }),
+                expected,
+                OBSERVED,
+                MAXIMUM,
+            );
+        }
+
+        for kind in [
+            super::super::slide_table_core::LimitKind::EntryBytes,
+            super::super::slide_table_core::LimitKind::TotalBytes,
+        ] {
+            let expected = match kind {
+                super::super::slide_table_core::LimitKind::EntryBytes => LimitKind::EntryBytes,
+                super::super::slide_table_core::LimitKind::TotalBytes => LimitKind::TotalBytes,
+                _ => unreachable!(),
+            };
+            assert_limit(
+                map_transaction_error(TransactionError::Limit {
+                    kind,
+                    observed: OBSERVED,
+                    maximum: MAXIMUM,
+                }),
+                expected,
+                OBSERVED,
+                MAXIMUM,
+            );
+        }
+    }
+
+    #[test]
+    fn preserves_series_registry_and_identifier_units_and_values() {
+        const OBSERVED: usize = 29;
+        const MAXIMUM: usize = 23;
+
+        assert_limit(
+            map_series_error(engine::SymbolError::Limit {
+                kind: engine::LimitKind::RegistryEntries,
+                observed: OBSERVED,
+                maximum: MAXIMUM,
+            }),
+            LimitKind::RegistryEntries,
+            OBSERVED as u64,
+            MAXIMUM as u64,
+        );
+        assert_limit(
+            map_series_error(engine::SymbolError::Limit {
+                kind: engine::LimitKind::Identifiers,
+                observed: OBSERVED,
+                maximum: MAXIMUM,
+            }),
+            LimitKind::Identifiers,
+            OBSERVED as u64,
+            MAXIMUM as u64,
+        );
     }
 }
