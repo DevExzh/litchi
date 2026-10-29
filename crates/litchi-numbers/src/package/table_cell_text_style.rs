@@ -195,6 +195,7 @@ pub struct Edit<'a> {
     rows: u32,
     columns: u32,
     cells: Vec<(At, CharacterProperties)>,
+    limits: shared::Limits,
 }
 
 impl fmt::Debug for Edit<'_> {
@@ -222,7 +223,13 @@ impl Edit<'_> {
         if position.row() >= self.rows || position.column() >= self.columns {
             return Err(Error::Refused(Refusal::CellNotFound));
         }
+        self.limits
+            .admit_character_properties(&properties)
+            .map_err(from_shared)?;
         if let Some((_, staged)) = self.cells.iter_mut().find(|(cell, _)| *cell == position) {
+            self.limits
+                .admit_character_properties(staged)
+                .map_err(from_shared)?;
             let mut merged = properties;
             merged.inherit(staged);
             *staged = merged;
@@ -494,6 +501,9 @@ fn publish(
         .reserve(&mut requests, cells.len())
         .map_err(from_shared)?;
     for (position, properties) in cells {
+        limits
+            .admit_character_properties(properties)
+            .map_err(from_shared)?;
         let shared_target = shared::Target {
             model_identifier: target.model,
             row: position.row(),
@@ -876,6 +886,7 @@ impl Package {
             rows: leaf.row_count(),
             columns: leaf.column_count(),
             cells: Vec::new(),
+            limits: shared::Limits::from_source(self).map_err(from_shared)?,
         })
     }
 

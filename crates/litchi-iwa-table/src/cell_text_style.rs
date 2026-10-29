@@ -347,6 +347,19 @@ impl Limits {
         Ok(())
     }
 
+    /// Admit the owned values copied while staging or inheriting character
+    /// properties. Primitive scalar fields do not allocate; font names do.
+    pub fn admit_character_properties(
+        &self,
+        properties: &CharacterProperties,
+    ) -> Result<(), Error> {
+        if let Some(font_name) = properties.font_name.as_deref() {
+            self.admit_allocations(1)?;
+            self.admit_copies(font_name.len())?;
+        }
+        Ok(())
+    }
+
     /// Reserve a bounded collection growth before pushing or extending it.
     pub fn reserve<T>(&self, values: &mut Vec<T>, additional: usize) -> Result<(), Error> {
         let spare = values.capacity().saturating_sub(values.len());
@@ -421,18 +434,35 @@ fn map_wire(error: litchi_iwa_common::Error) -> Error {
 }
 
 fn view<'a>(data: &'a [u8], limits: &Limits) -> Result<WireView<'a>, Error> {
-    if data.len() > limits.wire.max_input_bytes() {
+    let remaining_input = limits.remaining_input.get();
+    let remaining_fields = limits.remaining_fields.get();
+    let remaining_work = limits.remaining_work.get();
+    if data.len() > remaining_input {
         return Err(Error::Limit {
             kind: LimitKind::InputBytes,
             observed: data.len() as u64,
-            maximum: limits.wire.max_input_bytes() as u64,
+            maximum: remaining_input as u64,
+        });
+    }
+    if remaining_fields == 0 && !data.is_empty() {
+        return Err(Error::Limit {
+            kind: LimitKind::Fields,
+            observed: 1,
+            maximum: 0,
+        });
+    }
+    if remaining_work == 0 && !data.is_empty() {
+        return Err(Error::Limit {
+            kind: LimitKind::RewriteWork,
+            observed: 1,
+            maximum: 0,
         });
     }
     let raw_limits = RawWireLimits::new(
-        data.len().max(1),
-        limits.wire.max_fields(),
+        remaining_input.max(1),
+        remaining_fields.max(1),
         limits.wire.max_nesting(),
-        limits.wire.max_rewrite_work(),
+        remaining_work.max(1),
     )
     .map_err(map_wire)?;
     let mut fields = RawWireFields::new(data, raw_limits);
@@ -440,7 +470,7 @@ fn view<'a>(data: &'a [u8], limits: &Limits) -> Result<WireView<'a>, Error> {
     limits.charge_input(data.len())?;
     limits.charge_fields(fields.fields())?;
     limits.charge_work(fields.work())?;
-    limits.admit_allocations(1)?;
+    limits.admit_allocations(fields.fields())?;
     WireView::parse(data, limits.wire).map_err(map_wire)
 }
 
@@ -651,22 +681,72 @@ fn locate_cell(
     Ok(None)
 }
 
-fn bnc_limits(data: &[u8]) -> BncLimits {
+fn bnc_limits(data: &[u8], limits: &Limits) -> Result<BncLimits, Error> {
     if data.is_empty() {
-        return BncLimits::DEFAULT;
+        return Ok(BncLimits::from_wire_limits(limits.wire));
     }
-    BncLimits::DEFAULT
+    if data.len() > limits.wire.max_input_bytes() {
+        return Err(Error::Limit {
+            kind: LimitKind::InputBytes,
+            observed: data.len() as u64,
+            maximum: limits.wire.max_input_bytes() as u64,
+        });
+    }
+    BncLimits::from_wire_limits(limits.wire)
         .with_input_bytes(data.len())
-        .and_then(|v| v.with_tail_bytes(data.len()))
-        .unwrap_or(BncLimits::DEFAULT)
+        .and_then(|value| {
+            value.with_tail_bytes(
+                data.len()
+                    .min(limits.wire.max_input_bytes())
+                    .min(BncLimits::MAX_TAIL_BYTES),
+            )
+        })
+        .and_then(|value| {
+            value.with_items(
+                limits
+                    .wire
+                    .max_rewrite_work()
+                    .min(BncLimits::MAX_ITEMS)
+                    .max(1),
+            )
+        })
+        .map_err(|_| invalid("invalid BNC operation limits"))
+}
+
+fn map_bnc(error: litchi_numbers_wire::Error) -> Error {
+    match error {
+        litchi_numbers_wire::Error::LimitExceeded {
+            kind,
+            observed,
+            maximum,
+        } => Error::Limit {
+            kind: match kind {
+                litchi_numbers_wire::LimitKind::InputBytes
+                | litchi_numbers_wire::LimitKind::TailBytes => LimitKind::InputBytes,
+                litchi_numbers_wire::LimitKind::OutputBytes => LimitKind::OutputBytes,
+                litchi_numbers_wire::LimitKind::Fields => LimitKind::Fields,
+                litchi_numbers_wire::LimitKind::Items => LimitKind::RewriteWork,
+                _ => LimitKind::RewriteWork,
+            },
+            observed: observed as u64,
+            maximum: maximum as u64,
+        },
+        litchi_numbers_wire::Error::Allocation { requested } => {
+            Error::Allocation { amount: requested }
+        },
+        litchi_numbers_wire::Error::InvalidFormat(_)
+        | litchi_numbers_wire::Error::ParseError(_) => invalid("malformed BNC cell"),
+        _ => invalid("malformed BNC cell"),
+    }
 }
 
 fn style_key(cell: Option<&[u8]>, limits: &Limits) -> Result<Option<u32>, Error> {
     let Some(cell) = cell else { return Ok(None) };
     limits.charge_work(cell.len())?;
-    limits.admit_allocations(1)?;
-    let cell =
-        BncCell::parse(cell, &bnc_limits(cell)).map_err(|_| invalid("malformed BNC cell"))?;
+    limits.admit_allocations(litchi_numbers_wire::MAX_OWNED_BNC_PARSE_ALLOCATIONS)?;
+    limits.admit_copies(cell.len())?;
+    let bnc_limits = bnc_limits(cell, limits)?;
+    let cell = BncCell::parse(cell, &bnc_limits).map_err(map_bnc)?;
     Ok(cell.text_style_identifier())
 }
 
@@ -823,10 +903,13 @@ pub fn effective(
         let payload = style_payload(source, identifier, limits)?;
         limits.charge_work(payload.len())?;
         limits.admit_allocations(1)?;
-        properties.inherit(
-            &litchi_iwa_text_wire::character_style_properties(payload, wire)
-                .map_err(|_| invalid("malformed character-style properties"))?,
-        );
+        let decoded = litchi_iwa_text_wire::character_style_properties(payload, wire)
+            .map_err(|_| invalid("malformed character-style properties"))?;
+        limits.admit_character_properties(&decoded)?;
+        limits.admit_character_properties(&properties)?;
+        properties.inherit(&decoded);
+        limits.charge_work(payload.len())?;
+        limits.admit_allocations(1)?;
         current = litchi_iwa_text_wire::character_style_parent(payload, wire)
             .map_err(|_| invalid("malformed character-style parent"))?;
     }
@@ -1020,6 +1103,7 @@ pub fn plan_set(
         },
     };
     let inherited = effective(source, parent, limits)?;
+    limits.admit_character_properties(requested)?;
     let reduced = minimal(requested, &inherited);
     if reduced == CharacterProperties::new() {
         return Ok(None);
@@ -1404,6 +1488,8 @@ fn style_is_exclusive(
             if identifier == style || identifier == list {
                 continue;
             }
+            limits.charge_work(object.messages.len())?;
+            limits.charge_work(object.archive_info.message_infos.len())?;
             for info in &object.archive_info.message_infos {
                 let mut references = info.object_references.len();
                 for field in &info.field_infos {
@@ -1469,8 +1555,23 @@ mod tests {
 
         fn resolve_object(
             &self,
-            _identifier: u64,
+            identifier: u64,
         ) -> Result<Option<crate::ResolvedObject<'_>>, crate::ResolveError> {
+            for (component_index, component) in self.catalog.components().iter().enumerate() {
+                if let Some((object_index, object)) = component
+                    .archive()
+                    .objects
+                    .iter()
+                    .enumerate()
+                    .find(|(_, object)| object.archive_info.identifier == Some(identifier))
+                {
+                    return Ok(Some(crate::ResolvedObject {
+                        messages: &object.messages,
+                        component_index,
+                        object_index,
+                    }));
+                }
+            }
             Ok(None)
         }
 
@@ -1492,8 +1593,17 @@ mod tests {
     }
 
     fn limited_source(max_objects: usize, max_references: usize) -> LimitedSource {
+        limited_source_at("basic.numbers", max_objects, max_references)
+    }
+
+    fn limited_source_at(
+        filename: &str,
+        max_objects: usize,
+        max_references: usize,
+    ) -> LimitedSource {
         let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../../test-data/iwork/numbers/basic.numbers");
+            .join("../../test-data/iwork/numbers")
+            .join(filename);
         let bytes = std::fs::read(path).expect("text-style fixture");
         LimitedSource {
             catalog: litchi_iwa_archive::SourceCatalog::from_bytes(
@@ -1550,7 +1660,7 @@ mod tests {
 
     #[test]
     fn low_wire_field_budget_refuses_before_view_allocation() {
-        let source = limited_source(1_000_000, 1_000_000);
+        let source = limited_source_at("shared-model-native.numbers", 1_000_000, 1_000_000);
         let limits = Limits::from_source(&source).expect("source limits");
         limits.remaining_fields.set(0);
         assert!(matches!(
