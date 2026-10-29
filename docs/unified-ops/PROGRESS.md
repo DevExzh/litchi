@@ -7431,3 +7431,20 @@ See [0063](0063-source-pptx-modern-comments.md).
   qualify this integration. Native verification and remaining host capabilities
   still block W3. The last fully qualified source remains `e0e297a82b` until
   these final integrated checks complete.
+
+- Pages integration `5ab49d0a99` passed workspace compilation, all 20 locked
+  fuzz checks, boundaries, ledger and clean-source checks. Its merged worktree
+  and branch were retired, with archived outputs/ELFs/captures/receipts
+  preserved. Cleanup totals are 64 worktrees and 57 branches; measured logical
+  cache removal totals 317,479,621,747 bytes (about 295.68 GiB), excluding the
+  separately noted approximate 2.1 GiB owner cache removal.
+- Final 5ab qualification stopped after 25 completed gate rows: 22 passed and
+  rows 01, 02 and 23 reported the same Keynote `clippy::len_zero` issue.
+  Operations-test row 25 was interrupted without a terminal row result.
+  All partial logs are retained; no final capture was started. Three iWork
+  ELFs and one FIN ELF completed before their build groups were stopped;
+  those archives remain explicitly source-bound to 5ab and historical.
+- Accepted repair `9fb59ba374`: replace the zero-length comparison with
+  `is_empty`, preserving behavior. The exact failing Keynote configuration,
+  direct strict Keynote Clippy and formatting pass. The complete 53-row gate
+  and all final qualification restart on the repaired integrated source.
