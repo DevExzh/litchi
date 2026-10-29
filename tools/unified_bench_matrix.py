@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate the unified-vs-leaf benchmark matrix (records 0289, 0294, 0306, 0310, 0315, 0326, 0337, 0340, 0344).
+"""Generate the unified-vs-leaf benchmark matrix (records 0289, 0294, 0306, 0310, 0315, 0326, 0337, 0340, 0344, 0391).
 
 The matrix collects every paired measurement recorded by the unified
 operations records from 0249 on (`docs/unified-ops/02[4-9]*.md`, `03*.md`)
@@ -3750,6 +3750,70 @@ def p0375b():
     return out
 
 
+@needs("0391")
+def p0391():
+    """Accepted scoped W1-G whole-cell Numbers instruction routes.
+
+    The 595 direct semantic reads in the record are compatibility proof, not
+    cost rows.  Only the three dedicated whole-cell routes below contribute
+    instruction rows, and they remain source-bound until the coordinator
+    requalifies the integrated trunk.
+    """
+    path = RES / "0391" / "whole-cell-text-style.json"
+    data = load_json(path)
+    source = data.get("source_commit")
+    if (not isinstance(source, str) or not re.fullmatch(r"[0-9a-f]{40}", source)
+            or data.get("source_clean") is not True):
+        raise SystemExit("0391 invalid source identity")
+    proof = data.get("compatibility_proof", {})
+    if proof.get("direct_semantic_reads") != 595 or proof.get("nature") != (
+            "Compatibility/read correctness coverage, not an instruction-cost route"):
+        raise SystemExit("0391 compatibility proof is not the recorded 595-read scope")
+    policy = data.get("policy", {})
+    if policy.get("ratio") != "leaf/host inclusive Callgrind Ir" or policy.get("max_ratio") != 1.05:
+        raise SystemExit("0391 instruction policy changed")
+    routes = data.get("routes")
+    if not isinstance(routes, list) or len(routes) != 3:
+        raise SystemExit("0391 requires exactly three whole-cell routes")
+    expected = {
+        "w1g_cell_text_style_single": ("set", "1 cell"),
+        "w1g_cell_text_style_exclusive_repeat": ("set", "1 cell repeated"),
+        "w1g_cell_text_style_batch_1000": ("batch", "50x20 / 1,000 cells"),
+    }
+    out = []
+    seen = set()
+    for route in routes:
+        route_id = route.get("id")
+        if route_id in seen or route_id not in expected:
+            raise SystemExit(f"0391 invalid or duplicate route: {route_id}")
+        seen.add(route_id)
+        operation, size = expected[route_id]
+        if (route.get("operation"), route.get("size")) != (operation, size):
+            raise SystemExit(f"0391 route shape changed: {route_id}")
+        host = route.get("host_ir")
+        leaf = route.get("leaf_ir")
+        calls = route.get("calls_per_side")
+        ratio = route.get("ratio")
+        if (type(host) is not int or type(leaf) is not int or host <= 0 or leaf <= 0
+                or calls != 2 or type(ratio) not in (int, float) or ratio <= 0
+                or abs(ratio - leaf / host) > 1e-12
+                or route.get("status") != "meets"):
+            raise SystemExit(f"0391 invalid instruction result: {route_id}")
+        out.append(row(
+            "0391", "numbers", operation, route["scenario"], size,
+            leaf, host, [leaf / host], regression("0391"),
+            f"w1g_cell_text_style:{route_id}:ir", src([path]),
+            stage=f"source-bound {source[:10]}",
+            comparison="leaf/host (Callgrind Ir)", unit="Ir",
+            explanation=(
+                "Accepted scoped Numbers whole-cell route on clean source "
+                f"{source[:10]}; final integrated-trunk requalification and "
+                "native acceptance remain pending.")))
+    if seen != set(expected):
+        raise SystemExit("0391 route set is incomplete")
+    return out
+
+
 @needs("0377")
 def p0377():
     """Record 0377: unified-fin-perf (one source built on the baseline with
@@ -3952,7 +4016,7 @@ PARSERS = [p0250, p0251, p0251f, p0252, p0253, p0254, p0255, p0256, p0258, p0259
            p0328, p0329, p0330, p0333, p0335, p0336, p0337, p0338, p0340, p0342, p0345, p0346,
            p0347, p0348, p0355, p0355a, p0356, p0356a, p0356b, p0356c, p0357, p0357a, p0357b, p0358, p0358a,
            p0359, p0359a, p0359b, p0359qb, p0359qc, p0359qd, p0359r, p0359ra, p0359rb, p0359rc,
-           p0359rd, p0359re, p0359qe, p0360b, p0361, p0361a, p0362, p0362ya, p0362yb, p0362yc, p0362yd, p0362ye, p0375b, p0377, p0377a]
+           p0359rd, p0359re, p0359qe, p0360b, p0361, p0361a, p0362, p0362ya, p0362yb, p0362yc, p0362yd, p0362ye, p0375b, p0377, p0377a, p0391]
 
 
 
