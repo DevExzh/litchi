@@ -6993,3 +6993,35 @@ See [0063](0063-source-pptx-modern-comments.md).
   includes the separately reviewed 0390 formula-owner admission repair, then
   receives fresh post-merge checks, all 53 gate rows, 69 iWork instruction
   routes (137 captures), 14 FIN comparisons and the quiet wall/CLI interval.
+
+- Post-merge checks on `24ecfb5437` passed on unchanged clean source:
+  workspace all-target/all-feature compilation, all 20 locked offline fuzz
+  workspaces, crate boundaries and exit ledger. The completed repair and
+  independent proof worktrees/branches were retired with evidence retained,
+  bringing this continuation's cleanup to 39 worktrees and 33 branches.
+- Accepted 0390 `cd74237036`, synchronized with the comments repair.
+  Formula AST nodes and resolved-owner entries now have independent ceilings.
+  A one-node numeric formula no longer fails merely because its cloned table
+  uses a three-entry owner registry. Lowered owner ceilings are rechecked at
+  plan execution and registry reuse before callbacks; cache admission uses
+  the reference budget, and Numbers/Pages/Keynote merge adapters retain typed
+  owner-entry limits. The source-built multi-table formula edit now passes
+  with exact inverse, formula/cache readback and unrelated-table preservation.
+  The four original host provenance regressions remain intact.
+- Post-sync validation passed: 39 formula-codec, 49 formula-cache, 16 wire
+  merge, four duplication, 16 authoring, five formula-parity, eleven Pages
+  merge and four Keynote merge tests, plus the owner-workflow smoke, strict
+  scoped Clippy, formatting, boundary/ledger and repository guards. Four
+  release instruction routes passed on measured source `2e1a7a3f6a`, with
+  archived binary identity, eight capture/log hashes and exact probe
+  attribution independently verified. The owner-admission route measures two
+  formula writes, sheet duplication, a cloned formula/cache edit and final
+  serialization; its source builder is outside measurement. No native or
+  unified-`File` performance claim is inferred from this slice.
+- Freeze this combined repair candidate after post-merge checks for a fresh
+  complete 53-row gate, all 69 iWork routes (137 captures), all 14 FIN
+  comparisons and then quiet wall/CLI measurements. The 295b failures and
+  passing instruction receipts remain preserved as historical evidence.
+  Ledger/native totals remain unchanged; W3 is still blocked. Chart-font
+  facades and cell-text-style extraction remain separate work packages until
+  their full contracts, proofs and performance are accepted.
