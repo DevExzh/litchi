@@ -1,4 +1,4 @@
-use std::mem::size_of;
+use std::{fmt, mem::size_of};
 
 use snap::raw::{Decoder, Encoder, decompress_len, max_compress_len};
 
@@ -165,6 +165,92 @@ pub struct SnappyCompressionRequirements {
     work_bytes: usize,
     allocation_events: usize,
 }
+
+/// One allocation-free traversal admitted while preparing Snappy geometry.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct SnappyCompressionPreparationChunk {
+    kind: SnappyCompressionPreparationKind,
+    elements: usize,
+    traversal_bytes: usize,
+}
+
+impl SnappyCompressionPreparationChunk {
+    #[must_use]
+    pub const fn kind(self) -> SnappyCompressionPreparationKind {
+        self.kind
+    }
+
+    #[must_use]
+    pub const fn elements(self) -> usize {
+        self.elements
+    }
+
+    #[must_use]
+    pub const fn traversal_bytes(self) -> usize {
+        self.traversal_bytes
+    }
+}
+
+/// Geometry phase admitted before the Snappy backend is inspected.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum SnappyCompressionPreparationKind {
+    StreamBounds,
+    FrameGeometry,
+}
+
+/// Typed visitor for Snappy preparation work admission.
+pub trait SnappyCompressionPreparationVisitor {
+    type Error;
+
+    fn admit(
+        &mut self,
+        chunk: SnappyCompressionPreparationChunk,
+    ) -> std::result::Result<(), Self::Error>;
+}
+
+impl<F, E> SnappyCompressionPreparationVisitor for F
+where
+    F: FnMut(SnappyCompressionPreparationChunk) -> std::result::Result<(), E>,
+{
+    type Error = E;
+
+    fn admit(&mut self, chunk: SnappyCompressionPreparationChunk) -> std::result::Result<(), E> {
+        self(chunk)
+    }
+}
+
+/// Failure from Snappy preparation work admission.
+#[derive(Debug)]
+#[non_exhaustive]
+pub enum SnappyCompressionPreparationError<E> {
+    Admission(E),
+    ArithmeticOverflow { resource: &'static str },
+    Core(Error),
+}
+
+impl<E> From<Error> for SnappyCompressionPreparationError<E> {
+    fn from(error: Error) -> Self {
+        Self::Core(error)
+    }
+}
+
+pub type SnappyCompressionPreparationResult<T, E> =
+    std::result::Result<T, SnappyCompressionPreparationError<E>>;
+
+impl<E: fmt::Display> fmt::Display for SnappyCompressionPreparationError<E> {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Admission(error) => write!(formatter, "Snappy admission failed: {error}"),
+            Self::ArithmeticOverflow { resource } => {
+                write!(formatter, "Snappy preparation {resource} overflow")
+            },
+            Self::Core(error) => write!(formatter, "Snappy preparation failed: {error}"),
+        }
+    }
+}
+
+impl<E: std::error::Error + 'static> std::error::Error for SnappyCompressionPreparationError<E> {}
 
 impl SnappyCompressionRequirements {
     #[must_use]
@@ -339,15 +425,21 @@ impl SnappyStream {
     /// any source bytes. `admit_work` is called with one phase unit before
     /// frame-bound computation and once before each frame's backend geometry
     /// calculation. The returned requirements describe execution-only work.
-    pub fn prepare_compression<F>(
+    pub fn prepare_compression<V>(
         input_len: usize,
         limits: SnappyLimits,
-        mut admit_work: F,
-    ) -> Result<SnappyCompressionPlan>
+        visitor: &mut V,
+    ) -> SnappyCompressionPreparationResult<SnappyCompressionPlan, V::Error>
     where
-        F: FnMut(usize) -> Result<()>,
+        V: SnappyCompressionPreparationVisitor,
     {
-        admit_work(1)?;
+        visitor
+            .admit(SnappyCompressionPreparationChunk {
+                kind: SnappyCompressionPreparationKind::StreamBounds,
+                elements: usize::from(input_len != 0),
+                traversal_bytes: input_len,
+            })
+            .map_err(SnappyCompressionPreparationError::Admission)?;
         let output_capacity_bytes = Self::maximum_compressed_len(input_len, limits)?;
         let chunk_size = Self::WRITE_CHUNK_SIZE.min(limits.max_uncompressed_chunk);
         let frame_count = if input_len == 0 {
@@ -363,8 +455,14 @@ impl SnappyStream {
         let mut remaining = input_len;
         let mut uses_encoder_workspace = false;
         while remaining != 0 {
-            admit_work(1)?;
             let chunk_len = remaining.min(chunk_size);
+            visitor
+                .admit(SnappyCompressionPreparationChunk {
+                    kind: SnappyCompressionPreparationKind::FrameGeometry,
+                    elements: 1,
+                    traversal_bytes: chunk_len,
+                })
+                .map_err(SnappyCompressionPreparationError::Admission)?;
             if chunk_len >= 17 {
                 let mut table_size = 256usize;
                 while table_size < (1usize << 14) && table_size < chunk_len {
@@ -684,8 +782,27 @@ fn check(kind: LimitKind, value: usize, maximum: usize) -> Result<()> {
 mod tests {
     use snap::raw::max_compress_len;
 
-    use super::{FRAME_HEADER_BYTES, SnappyStream};
+    use super::{
+        FRAME_HEADER_BYTES, SnappyCompressionPlan, SnappyCompressionPreparationChunk,
+        SnappyCompressionPreparationError, SnappyStream,
+    };
     use crate::{Error, LimitKind, SnappyLimits};
+
+    fn prepared_compression(
+        input_len: usize,
+        limits: SnappyLimits,
+    ) -> crate::Result<SnappyCompressionPlan> {
+        let mut visitor = |_chunk: SnappyCompressionPreparationChunk| Ok::<(), Error>(());
+        SnappyStream::prepare_compression(input_len, limits, &mut visitor).map_err(|error| {
+            match error {
+                SnappyCompressionPreparationError::Core(error)
+                | SnappyCompressionPreparationError::Admission(error) => error,
+                SnappyCompressionPreparationError::ArithmeticOverflow { resource } => {
+                    Error::invalid_archive(0, resource)
+                },
+            }
+        })
+    }
 
     #[test]
     fn admitted_frame_still_validates_raw_snappy_payload() -> crate::Result<()> {
@@ -898,7 +1015,7 @@ mod tests {
 
     #[test]
     fn prepared_compression_matches_legacy_and_binds_input_length() -> crate::Result<()> {
-        let empty = SnappyStream::prepare_compression(0, SnappyLimits::default(), |_| Ok(()))?;
+        let empty = prepared_compression(0, SnappyLimits::default())?;
         assert_eq!(empty.requirements().allocation_events(), 0);
         assert_eq!(empty.requirements().encoder_workspace_bytes(), 0);
         assert!(empty.execute(&[])?.is_empty());
@@ -907,7 +1024,7 @@ mod tests {
             .map(|index| (index as u8).wrapping_mul(13))
             .collect::<Vec<_>>();
         let limits = SnappyLimits::new(4096, input.len())?;
-        let plan = SnappyStream::prepare_compression(input.len(), limits, |_| Ok(()))?;
+        let plan = prepared_compression(input.len(), limits)?;
         let requirements = plan.requirements();
         assert_eq!(requirements.input_bytes(), input.len());
         assert_eq!(requirements.frame_count(), 17);
@@ -921,8 +1038,7 @@ mod tests {
         );
 
         assert!(matches!(
-            SnappyStream::prepare_compression(input.len(), limits, |_| Ok(()))?
-                .execute(&input[..input.len() - 1]),
+            prepared_compression(input.len(), limits)?.execute(&input[..input.len() - 1]),
             Err(Error::InvalidArchive {
                 reason: "prepared Snappy input length changed",
                 ..
@@ -937,7 +1053,7 @@ mod tests {
         let base_limits = SnappyLimits::new(4096, input.len())?;
         let legacy = SnappyStream::compress(&input, base_limits)?;
         let tight_limits = base_limits.with_compressed_stream_bytes(legacy.len())?;
-        let plan = SnappyStream::prepare_compression(input.len(), tight_limits, |_| Ok(()))?;
+        let plan = prepared_compression(input.len(), tight_limits)?;
         assert!(plan.requirements().temporary_frame_capacity_bytes() > 0);
         let prepared = plan.execute(&input)?;
         assert_eq!(prepared, SnappyStream::compress(&input, tight_limits)?);
@@ -950,11 +1066,21 @@ mod tests {
 
     #[test]
     fn prepared_compression_honors_work_admission_before_frame_scan() {
-        let error = SnappyStream::prepare_compression(32, SnappyLimits::default(), |units| {
-            Err(Error::allocation("test preparation ledger", units))
-        })
+        let error = SnappyStream::prepare_compression(
+            32,
+            SnappyLimits::default(),
+            &mut |chunk: SnappyCompressionPreparationChunk| {
+                Err(Error::allocation(
+                    "test preparation ledger",
+                    chunk.traversal_bytes(),
+                ))
+            },
+        )
         .expect_err("preparation work refusal");
-        assert!(matches!(error, Error::Allocation { requested: 1, .. }));
+        assert!(matches!(
+            error,
+            SnappyCompressionPreparationError::Admission(Error::Allocation { .. })
+        ));
     }
 
     #[test]

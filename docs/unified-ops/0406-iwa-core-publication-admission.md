@@ -10,20 +10,26 @@
 
 ## Public substrate
 
-`Archive::prepare_encoding(limits, admit_work)` performs allocation-free framing, metadata,
-retained-header, and aggregate-limit checks and returns
-`ArchiveEncodingPlan`. `ArchiveEncodingPlan::requirements()` exposes source-
+`Archive::prepare_encoding(limits, &mut visitor)` performs allocation-free
+framing, metadata, retained-header, and aggregate-limit checks and returns
+`ArchiveEncodingPlan`. The typed `ArchiveEncodingPreparationVisitor` receives
+source-derived collection chunks, including checked traversal bytes, before
+each preparation walk; `ArchiveEncodingPreparationError::Admission(E)` keeps
+the format owner's error type intact. `ArchiveEncodingPlan::requirements()` exposes source-
 derived output, payload/header, work, scratch, retained, identifier-index,
-message/object, and allocation-event quantities. `execute()` reserves the exact
+compatibility-projection, message/object, and allocation-event quantities.
+`execute()` reserves the exact
 identifier index and output, performs duplicate-ID validation, projects headers,
 and emits bytes without falling back to the legacy host route. The immutable
 archive borrow prevents a prepared plan from becoming stale. Legacy
 `Archive::to_bytes` and `Archive::encoded_len` remain unchanged.
 
-`SnappyStream::prepare_compression(input_len, limits, admit_work)` returns
-`SnappyCompressionPlan`. The callback is invoked in one phase unit before each
-bounded preparation traversal; its failures are terminal. Its requirements
-include output capacity, frame count, possible fallback frame capacity, the real `snap 1.1.2` encoder table
+`SnappyStream::prepare_compression(input_len, limits, &mut visitor)` returns
+`SnappyCompressionPlan`. The typed
+`SnappyCompressionPreparationVisitor` receives source-derived stream/frame
+geometry chunks before each bounded preparation traversal; its failures are
+terminal and typed. Its requirements include output capacity, frame count,
+possible fallback frame capacity, the real `snap 1.1.2` encoder table
 workspace, per-frame table-reset work, and bounded allocation events.
 `execute(data)` checks the admitted input length and uses the existing framing
 algorithm. The fallback capacity is explicitly an upper bound because the
@@ -57,8 +63,11 @@ requires format-owner adoption and final host-vs-leaf/full-File requalification.
 - Staged repository size and binary guards — required before commit; no
   performance evidence or binaries are added.
 
-The core slice does not alter facade budgets. Format owners must charge
-preparation callback units during planning, then charge the returned execution
+Prepared Archive execution uses the existing fallible neutral-to-codec
+projection, normalizes MessageInfo scalars in that codec value, and never
+performs an infallible `ArchiveInfo::clone`. The core slice does not alter
+facade budgets. Format owners must charge
+preparation visitor chunks during planning, then charge the returned execution
 requirements once before calling `execute`, preserve their own candidate
 readback/unknown-content checks, and rerun their direct host-vs-leaf gates on
 the final integrated source.
