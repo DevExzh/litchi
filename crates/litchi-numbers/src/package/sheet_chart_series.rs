@@ -1058,7 +1058,7 @@ fn prepare_components<'a>(
     let requirements = Workspace::construction_requirements(&components[0], construction_limits)
         .map_err(Error::from)?;
     budget
-        .charge_construction(requirements, 2)
+        .charge_construction(requirements)
         .map_err(map_arrangement)?;
     let limits = structure::exact_source(package)?
         .limits()

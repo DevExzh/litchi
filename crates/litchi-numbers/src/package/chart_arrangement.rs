@@ -961,14 +961,9 @@ impl ChartBudget {
     pub(super) fn charge_construction(
         &mut self,
         requirements: litchi_iwa_style::graph::ConstructionRequirements,
-        passes: usize,
     ) -> Result<(), Error> {
-        self.work(
-            requirements
-                .source_work()
-                .checked_mul(passes)
-                .ok_or(Error::InvalidSource)?,
-        )?;
+        self.preflight_work(requirements.total_work())?;
+        self.work(requirements.total_work())?;
         self.allocations(requirements.index_allocations())?;
         self.retained(requirements.index_retained_bytes())?;
         self.scratch(requirements.index_scratch_bytes())?;
