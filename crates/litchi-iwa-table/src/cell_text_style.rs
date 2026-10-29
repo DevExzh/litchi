@@ -9,11 +9,8 @@ use std::cell::Cell;
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 
+use litchi_iwa_common::wire::WireView;
 use litchi_iwa_common::wire::{RawWireFields, RawWireLimits};
-use litchi_iwa_common::wire::{
-    WireView, append_length_delimited_field, patch_varint_field,
-    rewrite_repeated_length_delimited_fields,
-};
 use litchi_iwa_common::{LimitKind, WireLimits};
 use litchi_iwa_text_wire::CharacterProperties;
 use litchi_numbers_wire::{BncCell, Limits as BncLimits, table_topology::storage};
@@ -1523,11 +1520,17 @@ fn plan_set_inner(
         patch_varint_bounded(&list.root_data, 2, true, Some(u64::from(next)), limits)?;
     let mut entry = Vec::new();
     limits.admit_allocations(2)?;
+    entry
+        .try_reserve(32)
+        .map_err(|_| Error::Allocation { amount: 32 })?;
     litchi_iwa_common::varint::encode_varint_into(&mut entry, 1_u64 << 3);
     litchi_iwa_common::varint::encode_varint_into(&mut entry, u64::from(key));
     litchi_iwa_common::varint::encode_varint_into(&mut entry, 2_u64 << 3);
     litchi_iwa_common::varint::encode_varint_into(&mut entry, 1);
     let mut reference_payload = Vec::new();
+    reference_payload
+        .try_reserve(16)
+        .map_err(|_| Error::Allocation { amount: 16 })?;
     litchi_iwa_common::varint::encode_varint_into(&mut reference_payload, 1_u64 << 3);
     litchi_iwa_common::varint::encode_varint_into(&mut reference_payload, fresh);
     append_field_bounded(&mut entry, 4, &reference_payload, limits)?;
@@ -1557,6 +1560,7 @@ fn plan_set_inner(
     let mut releases = Vec::new();
     limits.reserve(&mut releases, if old_key.is_some() { 1 } else { 0 })?;
     if let Some(old) = old_key {
+        limits.admit_allocations(1)?;
         let mut remaining = BTreeMap::from([(old, 1_u32)]);
         let owner = list.entry(old)?.owner;
         releases.push((owner, old));
@@ -1668,6 +1672,7 @@ pub fn plan_set_many(
     limits.reserve(&mut list_entries, requests.len())?;
     let mut list_identifier = None;
     let mut list_type = None;
+    limits.admit_allocations(requests.len().saturating_mul(2))?;
     let mut release_counts: BTreeMap<u64, BTreeMap<u32, u32>> = BTreeMap::new();
     for mut plan in plans {
         if let Some((_, key)) = plan.cell_updates.last_mut() {
@@ -1880,7 +1885,46 @@ fn patch_varint_bounded(
     limits: &Limits,
 ) -> Result<Vec<u8>, Error> {
     let _wire = limits.prepare_output(data.len().saturating_add(11))?;
-    patch_varint_field(data, field, required, value).map_err(map_wire)
+    let parsed = view(data, limits)?;
+    let mut matching = None;
+    for candidate in parsed.fields() {
+        if candidate.number() != field {
+            continue;
+        }
+        if matching.is_some() {
+            return Err(invalid("a singular varint field repeats"));
+        }
+        matching = Some(candidate);
+    }
+    if matching.is_none() == required {
+        return Err(invalid("singular varint field changed during mutation"));
+    }
+    if let Some(candidate) = matching {
+        if candidate.wire_type() != 0 {
+            return Err(invalid("singular field is not a varint"));
+        }
+    }
+    limits.charge_work(parsed.len())?;
+    let mut output = Vec::new();
+    output
+        .try_reserve_exact(data.len().saturating_add(11))
+        .map_err(|_| Error::Allocation {
+            amount: data.len().saturating_add(11),
+        })?;
+    for candidate in parsed.fields() {
+        if candidate.number() != field {
+            output.extend_from_slice(candidate.raw());
+        } else if let Some(value) = value {
+            output.extend_from_slice(candidate.key());
+            litchi_iwa_common::varint::encode_varint_into(&mut output, value);
+        }
+    }
+    if matching.is_none() {
+        if let Some(value) = value {
+            append_raw_field(&mut output, field, 0, &encode_varint(value));
+        }
+    }
+    Ok(output)
 }
 
 fn append_field_bounded(
@@ -1889,9 +1933,9 @@ fn append_field_bounded(
     payload: &[u8],
     limits: &Limits,
 ) -> Result<(), Error> {
-    let wire =
+    let _wire =
         limits.prepare_output(data.len().saturating_add(bytes_bound(field, payload.len())))?;
-    append_length_delimited_field(data, field, payload, wire).map_err(map_wire)
+    append_field_prepared(data, field, payload, limits)
 }
 
 fn rewrite_repeated_bounded(
@@ -1904,7 +1948,86 @@ fn rewrite_repeated_bounded(
         .iter()
         .fold(0_usize, |total, value| total.saturating_add(value.len()));
     let _wire = limits.prepare_output(data.len().saturating_add(replacement_bytes))?;
-    rewrite_repeated_length_delimited_fields(data, field, replacements).map_err(map_wire)
+    let parsed = view(data, limits)?;
+    let mut matches = 0_usize;
+    for candidate in parsed.fields() {
+        if candidate.number() == field {
+            if candidate.wire_type() != 2 {
+                return Err(invalid("repeated field is not length-delimited"));
+            }
+            matches = matches.saturating_add(1);
+        }
+    }
+    limits.charge_work(parsed.len())?;
+    let retained = parsed.len().checked_sub(matches).ok_or(Error::Limit {
+        kind: LimitKind::Fields,
+        observed: u64::MAX,
+        maximum: limits.max_references as u64,
+    })?;
+    limits.charge_fields(retained.saturating_add(replacements.len()))?;
+    let mut output = Vec::new();
+    output
+        .try_reserve_exact(data.len().saturating_add(replacement_bytes))
+        .map_err(|_| Error::Allocation {
+            amount: data.len().saturating_add(replacement_bytes),
+        })?;
+    let mut index = 0_usize;
+    let mut found = false;
+    for candidate in parsed.fields() {
+        if candidate.number() != field {
+            output.extend_from_slice(candidate.raw());
+            continue;
+        }
+        found = true;
+        if let Some(replacement) = replacements.get(index) {
+            append_raw_field(&mut output, field, 2, replacement);
+        }
+        index = index.saturating_add(1);
+    }
+    if !found {
+        for replacement in replacements {
+            append_raw_field(&mut output, field, 2, replacement);
+        }
+    } else if index < replacements.len() {
+        for replacement in &replacements[index..] {
+            append_raw_field(&mut output, field, 2, replacement);
+        }
+    }
+    Ok(output)
+}
+
+fn encode_varint(value: u64) -> Vec<u8> {
+    let mut output = Vec::new();
+    litchi_iwa_common::varint::encode_varint_into(&mut output, value);
+    output
+}
+
+fn append_raw_field(output: &mut Vec<u8>, field: u32, wire_type: u8, payload: &[u8]) {
+    litchi_iwa_common::varint::encode_varint_into(
+        output,
+        (u64::from(field) << 3) | u64::from(wire_type),
+    );
+    if wire_type == 2 {
+        litchi_iwa_common::varint::encode_varint_into(output, payload.len() as u64);
+    }
+    output.extend_from_slice(payload);
+}
+
+fn append_field_prepared(
+    data: &mut Vec<u8>,
+    field: u32,
+    payload: &[u8],
+    limits: &Limits,
+) -> Result<(), Error> {
+    let parsed = view(data, limits)?;
+    limits.charge_work(parsed.len())?;
+    limits.admit_allocations(1)?;
+    data.try_reserve(bytes_bound(field, payload.len()))
+        .map_err(|_| Error::Allocation {
+            amount: bytes_bound(field, payload.len()),
+        })?;
+    append_raw_field(data, field, 2, payload);
+    Ok(())
 }
 
 fn character_properties_bound(properties: &CharacterProperties) -> usize {
@@ -2010,9 +2133,7 @@ fn encode_stylesheet_variation(
 
 fn with_paragraph_properties(mut data: Vec<u8>, limits: &Limits) -> Result<Vec<u8>, Error> {
     if bytes(&data, PARAGRAPH_PROPERTIES_FIELD, limits)?.is_none() {
-        limits.admit_allocations(1)?;
-        append_length_delimited_field(&mut data, PARAGRAPH_PROPERTIES_FIELD, &[], limits.wire)
-            .map_err(map_wire)?;
+        append_field_prepared(&mut data, PARAGRAPH_PROPERTIES_FIELD, &[], limits)?;
     }
     Ok(data)
 }
