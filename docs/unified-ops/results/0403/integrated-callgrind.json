@@ -1,0 +1,94 @@
+{
+  "schema": "iwork-numbers-symbols-facade-callgrind-v1",
+  "source_commit": "3f8d3974f033aeba0da7071fac860f43f687acf8",
+  "source_clean": true,
+  "policy": {
+    "ratio": "leaf/host inclusive Callgrind Ir",
+    "max_ratio": 1.05,
+    "cpu": 7,
+    "calls_per_side": 2,
+    "wall_time_claim": false,
+    "annotation": "callgrind_annotate --auto=no --inclusive=yes --threshold=100 --show-percs=yes"
+  },
+  "binary": {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-w2a-symbols-facade-3f8d3974f0/bin/parity-8ccb274458659a4c",
+    "mode": "0555",
+    "bytes": 218219888,
+    "sha256": "e12b50050d21db555b30da70a96693df661c2626058cddd27641a917484d2016"
+  },
+  "plan": {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-w2a-symbols-facade-3f8d3974f0/callgrind-plan-v2.json",
+    "sha256": "8a860afdc8d584d12e75dd8bbcff92201642a7701e59ab218af155b82e28dc7f"
+  },
+  "validator": {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/resume-20261028/perf/iwork-probe-isolation-final/validate_call_audit.py",
+    "sha256": "c0637e4304f5fdbfae6fca6b0e9a9c17f7d10cb9a56c7df6846951fa4bdf6b8e"
+  },
+  "receipt": {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-w2a-symbols-facade-3f8d3974f0/capture-v2/c063-validator-receipt-v2.json",
+    "sha256": "dfead0ac01bca1270a8a9f21415f4612833cfc2b91bd8b8a23484efca695478f"
+  },
+  "artifact_root": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-w2a-symbols-facade-3f8d3974f0/capture-v2",
+  "routes": [
+    {
+      "id": "numbers_symbols_all_read",
+      "operation": "read",
+      "scenario": "Property::Symbols all chart symbols",
+      "size": "all",
+      "host_ir": 87270496,
+      "leaf_ir": 35327070,
+      "ratio": 0.404799693129,
+      "calls_per_side": 2,
+      "status": "meets",
+      "symbols": {
+        "host": "numbers_symbols_host_read_all",
+        "leaf": "numbers_symbols_leaf_read_all"
+      }
+    },
+    {
+      "id": "numbers_symbols_all_set",
+      "operation": "set",
+      "scenario": "Property::Symbols all chart symbols",
+      "size": "all",
+      "host_ir": 453443977,
+      "leaf_ir": 192326456,
+      "ratio": 0.424146015286,
+      "calls_per_side": 2,
+      "status": "meets",
+      "symbols": {
+        "host": "numbers_symbols_host_set_all",
+        "leaf": "numbers_symbols_leaf_set_all"
+      }
+    },
+    {
+      "id": "numbers_symbols_single_read",
+      "operation": "read",
+      "scenario": "Property::Symbols single chart symbol",
+      "size": "1",
+      "host_ir": 87286348,
+      "leaf_ir": 35336201,
+      "ratio": 0.404830787513,
+      "calls_per_side": 2,
+      "status": "meets",
+      "symbols": {
+        "host": "numbers_symbols_host_read_single",
+        "leaf": "numbers_symbols_leaf_read_single"
+      }
+    },
+    {
+      "id": "numbers_symbols_single_set",
+      "operation": "set",
+      "scenario": "Property::Symbols single chart symbol",
+      "size": "1",
+      "host_ir": 485713245,
+      "leaf_ir": 191016617,
+      "ratio": 0.393270348228,
+      "calls_per_side": 2,
+      "status": "meets",
+      "symbols": {
+        "host": "numbers_symbols_host_set_single",
+        "leaf": "numbers_symbols_leaf_set_single"
+      }
+    }
+  ]
+}
