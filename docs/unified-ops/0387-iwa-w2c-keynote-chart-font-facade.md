@@ -126,26 +126,30 @@ cargo test --release --locked --offline -p litchi-iwa \
   --features parity-host-oracle --test parity --no-run
 ```
 
-Source `c3937337473bee2a985a27fb8ffa2407489c85f7` has tree
-`3d8d374faa096b9401630ee17a651dff94e533f2`; `Cargo.lock` is 139901 bytes with
+Source `f875e5c3c9199930286c3295c67a42befd5e70b7` has tree
+`25de453444c2d9791dacfe3fd699d21e393223db`; `Cargo.lock` is 139901 bytes with
 SHA-256 `f7cca120269bcdaaad88f826299ccc51564bcc73985091446d8acc23b0b845bb`.
 The archived/staged release binary is 214039104 bytes with SHA-256
 `8871832870087b200d22336f8116662e7898c3c63e79aad3dd41476cb7cc78e5`.
 The external run receipt is
-`/home/zhuhe/code/litchi-worktrees/.coord/resume-20261029/perf/runs/keynote-chart-font-c393733747-cpu5/results.json`;
+`/home/zhuhe/code/litchi-worktrees/.coord/resume-20261029/perf/runs/keynote-chart-font-f875e5c3c9-cpu5/results.json`;
+its SHA-256 is
+`24740463740b65be29dd53a5df66c1ebbe88164de2b3869e00eb0347ada4a1c1` and the
+artifact index SHA-256 is
+`aede7d3abf82ecf9c5952e45a5cb3b98944f1bf10abe992844b40d542839e77c`;
 the raw selected-call audit is
 `/home/zhuhe/code/litchi-worktrees/.coord/resume-20261029/perf/keynote-chart-font-six-call-audit.json`
 and its validation SHA-256 is
-`cfe00af029ba89b459f512996528fa7e38eccee75ce5180fe54bca1b3015fcb8`.
+`2a1336821da846a6c0a808974660b9f98754b9610a0f4e97a6aee389ef670cd0`.
 
 | Route | Host Ir | Leaf Ir | Leaf/host slowdown |
 |---|---:|---:|---:|
-| font read | 708844182 | 55822162 | -92.125% |
-| font set | 1848047571 | 477285284 | -74.174% |
-| font reset | 661845491 | 320765426 | -51.535% |
-| point-size read | 597024810 | 55237459 | -90.748% |
-| point-size set | 1504019373 | 469878883 | -68.758% |
-| point-size reset | 661947717 | 315429478 | -52.348% |
+| font read | 708614338 | 55828718 | -92.121% |
+| font set | 1848774983 | 477377895 | -74.179% |
+| font reset | 661952308 | 320762546 | -51.543% |
+| point-size read | 596540266 | 55209214 | -90.745% |
+| point-size set | 1504233570 | 469959135 | -68.758% |
+| point-size reset | 661942039 | 315323675 | -52.364% |
 
 Scoped evidence on the current branch (source repair `6ac2c0efcd`):
 
