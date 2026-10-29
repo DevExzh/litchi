@@ -4,7 +4,7 @@
   on the isolated WP, pending coordinator/W2-A independent review. Pages and
   Keynote facades are not started, no ledger rows are migrated, and no
   performance or native acceptance claim is active. The current code tip is
-  `ef2187916d`; this record is on the final clean handoff commit.
+  `daed5d99c3`; this record is on the final clean handoff commit.
 - Source branch: `uo2/iwa-w1g-cell-text-style`, cut from frozen root
   `1e3978082bd8e576f0afeb7e3eebac1ca3908d86`, then synchronized with frozen
   trunk 24ecfb543748885192b8fb5273abb54e669764c6.
@@ -15,7 +15,8 @@
   `126b1dd7ce`, repeated-parser accounting `3a8313257c`, terminal-error plus
   exclusive-path repair `f616f4315e`, and mutation-output admission
   `a6f1723ac4` plus bounded wire rewrite/batch closure `2e4a784a99` and
-  identity/unknown-preservation proof `ef2187916d`.
+  identity/unknown-preservation proof `ef2187916d`, and paragraph-field
+  precondition proof `daed5d99c3`.
 - Scope: shared `litchi-iwa-table::cell_text_style` graph reads and direct
   `CharacterProperties` planning, plus the Numbers read and single-cell
   adapter path. Existing public Numbers selectors and vocabulary remain
@@ -103,8 +104,9 @@ its ownership control confirms an incoming model reference blocks in-place
 rewrite. Batch publication uses fresh derivations while repeated single-cell
 updates reuse the existing style object with its actual parent chain.
 The package proof mutates an otherwise exclusive style with unknown root and
-unrelated paragraph data; the canonical-shape gate derives a fresh style and
-the old object bytes survive exact inverse/readback.
+unrelated paragraph data (asserting both the nonempty paragraph field and root
+unknown field); the canonical-shape gate derives a fresh style and the old
+object bytes survive exact inverse/readback.
 
 Before Pages/Keynote work begins, the coordinator must independently review
 the nested budget/admission contract and run final integrated qualification.
