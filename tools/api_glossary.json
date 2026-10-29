@@ -26026,6 +26026,7 @@
         "litchi_pages::chart::data",
         "litchi_pages::chart::title",
         "litchi_pages::chart::axis_title",
+        "litchi_pages::chart::series",
         "litchi_pages::drawable::order",
         "litchi_pages::image::adjustments",
         "litchi_pages::table::appearance::transaction",
@@ -26078,6 +26079,10 @@
         {
           "method": "litchi_pages::Package::apply_body_chart_axis_title",
           "ok": "litchi_pages::chart::axis_title::Commit"
+        },
+        {
+          "method": "litchi_pages::Package::apply_body_chart_series",
+          "ok": "litchi_pages::chart::series::Commit"
         },
         {
           "method": "litchi_pages::Package::apply_body_drawable_order",
