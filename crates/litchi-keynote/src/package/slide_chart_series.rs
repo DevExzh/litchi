@@ -1407,7 +1407,7 @@ fn publish_series_with_prepared_policy(
     let collection_allocations = usize::from(edit_capacity != 0) * 3
         + usize::from(insertion_capacity != 0) * 3
         + usize::from(deletion_capacity != 0)
-        + usize::from(catalog.package().len() != 0);
+        + usize::from(!catalog.package().is_empty());
     let name_bytes = changes
         .edits
         .iter()
