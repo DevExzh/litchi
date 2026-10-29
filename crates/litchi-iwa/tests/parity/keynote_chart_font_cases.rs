@@ -340,58 +340,87 @@ fn keynote_slide_chart_font_low_text_budget_refuses_before_graph_work() -> TestR
     Ok(())
 }
 
-/// Full Keynote facade routes for the six migrated host verbs.  The
-/// coordinator runs this ignored probe under the pinned release ABBA policy;
-/// no wall-clock claim is made by the parity suite itself.
+fn run_chart_font_write_cost(change: Change, setup: Option<Change>) -> TestResult {
+    let mut input = input(Format::Keynote, Kind::Column2d)?;
+    let chart = input.chart;
+    if let Some(setup) = setup {
+        input.fixture.bytes = host_write(&input.fixture.bytes, chart, &setup)?;
+    }
+    let source = input.fixture.bytes.as_slice();
+    std::hint::black_box(host_write(source, chart, &change)?);
+    std::hint::black_box(leaf_write(source, &change)?);
+    std::hint::black_box(leaf_write(source, &change)?);
+    std::hint::black_box(host_write(source, chart, &change)?);
+    Ok(())
+}
+
+fn run_chart_font_read_cost(change: Change) -> TestResult {
+    let mut input = input(Format::Keynote, Kind::Column2d)?;
+    let chart = input.chart;
+    input.fixture.bytes = host_write(&input.fixture.bytes, chart, &change)?;
+    let source = input.fixture.bytes.as_slice();
+    std::hint::black_box(host_read(source, chart)?);
+    std::hint::black_box(leaf_read(source)?);
+    std::hint::black_box(leaf_read(source)?);
+    std::hint::black_box(host_read(source, chart)?);
+    Ok(())
+}
+
+/// Each ignored probe isolates one route for the coordinator's pinned release
+/// ABBA measurement. Reset/setup authoring happens before the captured route.
 #[test]
 #[ignore = "coordinator release ABBA cost probe"]
-fn keynote_chart_font_facade_cost_abba() -> TestResult {
-    for change in [
+fn keynote_chart_font_set_cost_abba() -> TestResult {
+    run_chart_font_write_cost(
         Change::Font(EngineFont {
             font: Font::named("AvenirNext-DemiBold")?,
             bold: true,
             italic: false,
         }),
-        Change::Size(TextPointSize::from_points(17.0)?),
+        None,
+    )
+}
+
+#[test]
+#[ignore = "coordinator release ABBA cost probe"]
+fn keynote_chart_font_size_set_cost_abba() -> TestResult {
+    run_chart_font_write_cost(Change::Size(TextPointSize::from_points(17.0)?), None)
+}
+
+#[test]
+#[ignore = "coordinator release ABBA cost probe"]
+fn keynote_chart_font_reset_cost_abba() -> TestResult {
+    run_chart_font_write_cost(
         Change::ResetFont,
+        Some(Change::Font(EngineFont {
+            font: Font::named("AvenirNext-DemiBold")?,
+            bold: true,
+            italic: false,
+        })),
+    )
+}
+
+#[test]
+#[ignore = "coordinator release ABBA cost probe"]
+fn keynote_chart_font_size_reset_cost_abba() -> TestResult {
+    run_chart_font_write_cost(
         Change::ResetSize,
-    ] {
-        let mut input = input(Format::Keynote, Kind::Column2d)?;
-        let chart = input.chart;
-        if matches!(change, Change::ResetFont | Change::ResetSize) {
-            let pre = match change {
-                Change::ResetFont => Change::Font(EngineFont {
-                    font: Font::named("AvenirNext-DemiBold")?,
-                    bold: true,
-                    italic: false,
-                }),
-                Change::ResetSize => Change::Size(TextPointSize::from_points(17.0)?),
-                _ => unreachable!(),
-            };
-            input.fixture.bytes = host_write(&input.fixture.bytes, chart, &pre)?;
-        }
-        let source = input.fixture.bytes.as_slice();
-        std::hint::black_box(host_write(source, chart, &change)?);
-        std::hint::black_box(leaf_write(source, &change)?);
-        std::hint::black_box(leaf_write(source, &change)?);
-        std::hint::black_box(host_write(source, chart, &change)?);
-    }
-    for change in [
-        Change::Font(EngineFont {
-            font: Font::named("Georgia")?,
-            bold: false,
-            italic: true,
-        }),
-        Change::Size(TextPointSize::from_points(17.0)?),
-    ] {
-        let mut input = input(Format::Keynote, Kind::Column2d)?;
-        let chart = input.chart;
-        input.fixture.bytes = host_write(&input.fixture.bytes, chart, &change)?;
-        let source = input.fixture.bytes.as_slice();
-        std::hint::black_box(host_read(source, chart)?);
-        std::hint::black_box(leaf_read(source)?);
-        std::hint::black_box(leaf_read(source)?);
-        std::hint::black_box(host_read(source, chart)?);
-    }
-    Ok(())
+        Some(Change::Size(TextPointSize::from_points(17.0)?)),
+    )
+}
+
+#[test]
+#[ignore = "coordinator release ABBA cost probe"]
+fn keynote_chart_font_read_cost_abba() -> TestResult {
+    run_chart_font_read_cost(Change::Font(EngineFont {
+        font: Font::named("Georgia")?,
+        bold: false,
+        italic: true,
+    }))
+}
+
+#[test]
+#[ignore = "coordinator release ABBA cost probe"]
+fn keynote_chart_font_size_read_cost_abba() -> TestResult {
+    run_chart_font_read_cost(Change::Size(TextPointSize::from_points(17.0)?))
 }

@@ -23,12 +23,14 @@ use litchi_iwa_archive::{
     SourceCatalog,
     package::{EntryEdit, EntryInsertion, ExactArtifacts},
 };
-use litchi_iwa_core::{Archive, SnappyStream};
+#[cfg(test)]
+use litchi_iwa_core::Limits as CoreLimits;
+use litchi_iwa_core::{Archive, ArchiveObject, RawMessage, SnappyStream};
 use litchi_iwa_core::{
-    ArchiveObject, ArchiveReferenceKind, ArchiveReferenceOccurrence, ArchiveReferencePolicy,
+    ArchiveReferenceKind, ArchiveReferenceOccurrence, ArchiveReferencePolicy,
     ArchiveReferenceVisitor,
 };
-use litchi_iwa_protos::chart_style_codec::{self as chart_codec, Limits as ChartCodecLimits};
+use litchi_iwa_protos::chart_style_codec::Limits as ChartCodecLimits;
 use litchi_iwa_style::{
     chart_font::{self as engine, Change as EngineChange},
     graph::{self, Components, Workspace},
@@ -627,6 +629,7 @@ impl<'a> FontEdit<'a> {
             self.chart.as_selector(),
             true,
             budget,
+            fields,
         )?;
         let before = read_font_with_budget(
             self.source,
@@ -720,7 +723,8 @@ impl<'a> FontEdit<'a> {
             return Err(Refusal::UnsupportedSource.into());
         }
         self.source.validate().map_err(map_read_error)?;
-        let current = positional_selection(self.source, &source_selection, &mut budget)?;
+        let current =
+            positional_selection(self.source, &source_selection, &mut budget, &mut fields)?;
         if !same_selection(&source_selection, &current)
             || read_font_with_budget(
                 self.source,
@@ -769,7 +773,8 @@ impl<'a> FontEdit<'a> {
                 diagnostics: Diagnostics::unchanged(),
             });
         }
-        let candidate_selection = positional_selection(&candidate, &source_selection, &mut budget)?;
+        let candidate_selection =
+            positional_selection(&candidate, &source_selection, &mut budget, &mut fields)?;
         let after = read_font_with_budget(
             &candidate,
             candidate_selection.chart_identifier,
@@ -868,6 +873,7 @@ impl<'a> FontSizeEdit<'a> {
             self.chart.as_selector(),
             true,
             budget,
+            fields,
         )?;
         let before = read_size_with_budget(
             self.source,
@@ -961,7 +967,8 @@ impl<'a> FontSizeEdit<'a> {
             return Err(Refusal::UnsupportedSource.into());
         }
         self.source.validate().map_err(map_read_error)?;
-        let current = positional_selection(self.source, &source_selection, &mut budget)?;
+        let current =
+            positional_selection(self.source, &source_selection, &mut budget, &mut fields)?;
         if !same_selection(&source_selection, &current)
             || read_size_with_budget(
                 self.source,
@@ -1002,7 +1009,8 @@ impl<'a> FontSizeEdit<'a> {
                 diagnostics: Diagnostics::unchanged(),
             });
         }
-        let candidate_selection = positional_selection(&candidate, &source_selection, &mut budget)?;
+        let candidate_selection =
+            positional_selection(&candidate, &source_selection, &mut budget, &mut fields)?;
         let after = read_size_with_budget(
             &candidate,
             candidate_selection.chart_identifier,
@@ -1059,6 +1067,7 @@ impl Package {
             chart_selector.into(),
             true,
             &mut budget,
+            &mut fields,
         )?;
         read_font_with_budget(
             self,
@@ -1103,6 +1112,7 @@ impl Package {
                 non_style_component_name: String::new(),
             },
             &mut budget,
+            &mut fields,
         )?;
         if selection.chart_identifier != patch.chart_identifier
             || selection.slide_identifier != patch.slide_identifier
@@ -1133,7 +1143,8 @@ impl Package {
                 .map_err(map_read_error)?;
         candidate.validate().map_err(map_read_error)?;
         verify_locality_members(self, &candidate, &patch.plan, &mut budget)?;
-        let candidate_selection = positional_selection(&candidate, &selection, &mut budget)?;
+        let candidate_selection =
+            positional_selection(&candidate, &selection, &mut budget, &mut fields)?;
         if !same_selection(&selection, &candidate_selection)
             || read_font_with_budget(
                 &candidate,
@@ -1168,6 +1179,7 @@ impl Package {
             chart_selector.into(),
             true,
             &mut budget,
+            &mut fields,
         )?;
         read_size_with_budget(
             self,
@@ -1215,6 +1227,7 @@ impl Package {
                 non_style_component_name: String::new(),
             },
             &mut budget,
+            &mut fields,
         )?;
         if selection.chart_identifier != patch.chart_identifier
             || selection.slide_identifier != patch.slide_identifier
@@ -1245,7 +1258,8 @@ impl Package {
                 .map_err(map_read_error)?;
         candidate.validate().map_err(map_read_error)?;
         verify_locality_members(self, &candidate, &patch.plan, &mut budget)?;
-        let candidate_selection = positional_selection(&candidate, &selection, &mut budget)?;
+        let candidate_selection =
+            positional_selection(&candidate, &selection, &mut budget, &mut fields)?;
         if !same_selection(&selection, &candidate_selection)
             || read_size_with_budget(
                 &candidate,
@@ -1310,8 +1324,9 @@ fn select_chart_transaction(
     chart: ChartSelector<'_>,
     mutation_guards: bool,
     budget: &mut TransactionBudget,
+    fields: &mut FieldLedger,
 ) -> Result<ChartSelection, Error> {
-    let mut graph_budget = ChartFontSelectionBudget { budget };
+    let mut graph_budget = ChartFontSelectionBudget { budget, fields };
     slide_chart_title::select_chart_with_budget(
         package,
         slide,
@@ -1324,6 +1339,7 @@ fn select_chart_transaction(
 
 struct ChartFontSelectionBudget<'a> {
     budget: &'a mut TransactionBudget,
+    fields: &'a mut FieldLedger,
 }
 
 fn map_selection_budget_result(
@@ -1357,6 +1373,7 @@ impl AxisSupportBudget for ChartFontSelectionBudget<'_> {
     }
 
     fn charge_wire_vector(&mut self, payload: usize) -> Result<(), AxisSupportError> {
+        let field_capacity = payload.max(1);
         let bytes = payload
             .checked_add(
                 payload
@@ -1368,11 +1385,14 @@ impl AxisSupportBudget for ChartFontSelectionBudget<'_> {
             self.budget
                 .work(bytes)
                 .and_then(|_| self.budget.scratch(bytes))
-                .and_then(|_| self.budget.allocations(1)),
+                .and_then(|_| self.budget.allocations(field_capacity)),
         )
     }
 
     fn finish_wire_scan(&mut self, fields: usize) -> Result<(), AxisSupportError> {
+        self.fields
+            .charge(fields)
+            .map_err(map_selection_budget_error)?;
         map_selection_budget_result(self.budget.work(fields))
     }
 
@@ -1383,7 +1403,7 @@ impl AxisSupportBudget for ChartFontSelectionBudget<'_> {
         map_selection_budget_result(
             self.budget
                 .scratch(bytes.max(1))
-                .and_then(|_| self.budget.allocations(1)),
+                .and_then(|_| self.budget.allocations(capacity.max(1))),
         )
     }
 
@@ -1425,27 +1445,65 @@ impl AxisSupportBudget for ChartFontSelectionBudget<'_> {
 
     fn metadata_options(
         &self,
-        _package: &Package,
+        package: &Package,
     ) -> Result<litchi_iwa_protos::package_metadata_codec::RewriteOptions, AxisSupportError> {
-        Err(AxisSupportError::InvalidSource)
+        let wire = self
+            .budget
+            .residual(package)
+            .map_err(map_transaction_error)
+            .map_err(map_selection_budget_error)?;
+        let recursion =
+            u32::try_from(wire.max_nesting()).map_err(|_| AxisSupportError::InvalidSource)?;
+        Ok(
+            litchi_iwa_protos::package_metadata_codec::RewriteOptions::new(
+                wire.max_input_bytes(),
+                wire.max_output_bytes(),
+                self.fields
+                    .remaining()
+                    .map_err(map_selection_budget_error)?,
+                wire.max_rewrite_work(),
+                recursion,
+                package.state.source.components().len().max(1),
+                self.budget
+                    .remaining_references()
+                    .map_err(map_transaction_error)
+                    .map_err(map_selection_budget_error)?,
+                self.budget
+                    .remaining_allocations()
+                    .map_err(map_transaction_error)
+                    .map_err(map_selection_budget_error)?,
+            ),
+        )
     }
 
     fn charge_metadata_report(
         &mut self,
         report: litchi_iwa_protos::package_metadata_codec::RewriteReport,
     ) -> Result<(), AxisSupportError> {
-        let work = report
-            .input_bytes()
-            .checked_add(report.output_bytes())
-            .and_then(|value| value.checked_add(report.fields()))
-            .and_then(|value| value.checked_add(report.work_bytes()))
-            .and_then(|value| value.checked_add(report.components_scanned()))
-            .ok_or(AxisSupportError::InvalidSource)?;
         map_selection_budget_result(
             self.budget
-                .work(work)
-                .and_then(|_| self.budget.references(report.references_scanned())),
+                .input(report.input_bytes())
+                .and_then(|_| self.budget.output(report.output_bytes()))
+                .and_then(|_| self.budget.work(report.work_bytes()))
+                .and_then(|_| self.budget.components(report.components_scanned()))
+                .and_then(|_| {
+                    self.budget.references(
+                        report
+                            .references_scanned()
+                            .checked_add(report.source_references_scanned())
+                            .ok_or(TransactionError::InvalidSource)?,
+                    )
+                })
+                .and_then(|_| self.budget.allocations(report.allocations()))
+                .and_then(|_| self.budget.retained(report.retained_bytes()))
+                .and_then(|_| self.budget.scratch(report.scratch_bytes()))
+                .and_then(|_| self.budget.nesting(report.max_depth() as usize)),
         )
+        .and_then(|_| {
+            self.fields
+                .charge(report.fields())
+                .map_err(map_selection_budget_error)
+        })
     }
 }
 
@@ -1483,6 +1541,7 @@ fn positional_selection(
     package: &Package,
     expected: &ChartSelection,
     budget: &mut TransactionBudget,
+    fields: &mut FieldLedger,
 ) -> Result<ChartSelection, Error> {
     select_chart_transaction(
         package,
@@ -1490,6 +1549,7 @@ fn positional_selection(
         ChartSelector::index(expected.chart_position.get()),
         true,
         budget,
+        fields,
     )
 }
 
@@ -1595,7 +1655,7 @@ fn write_graph(
     if touched == 0 {
         return Err(Error::InvalidSource);
     }
-    let plan = mutation_plan(package, chart, &changes)?;
+    let plan = mutation_plan(package, chart, &changes, budget)?;
     let candidate = publish(package, changes, budget, &plan)?;
     Ok((candidate, true, touched, reset_expectation, plan))
 }
@@ -1613,11 +1673,15 @@ struct FieldLedger {
 impl FieldLedger {
     fn new(package: &Package) -> Result<Self, Error> {
         let wire = package.wire_limits().map_err(map_wire_error)?;
+        // Selector resolution, graph mutation, reset readback, candidate
+        // reopening, and inverse/locality proofs share this bounded field
+        // ledger. Keep the multiplier finite and below the common wire hard
+        // ceiling; each phase still charges its actual report.
         let maximum = wire
             .max_fields()
-            .checked_mul(8)
+            .checked_mul(256)
             .ok_or(Error::InvalidSource)?
-            .min(ChartCodecLimits::DEFAULT.max_fields());
+            .min(litchi_iwa_common::WireLimits::MAX_FIELDS);
         Ok(Self { used: 0, maximum })
     }
 
@@ -1738,10 +1802,13 @@ fn engine_limits(
 ) -> Result<engine::Limits, Error> {
     let wire = budget.residual(package).map_err(map_transaction_error)?;
     let max_nesting = u32::try_from(wire.max_nesting()).map_err(|_| Error::InvalidSource)?;
-    let codec = ChartCodecLimits::DEFAULT;
+    let codec = residual_chart_codec_limits(wire, fields.remaining()?)?;
     Ok(engine::Limits::new(
         wire.max_input_bytes().min(codec.max_bytes()),
-        fields.remaining()?.min(codec.max_fields()),
+        fields
+            .remaining()?
+            .min(codec.max_fields())
+            .min(litchi_iwa_common::WireLimits::MAX_FIELDS),
         wire.max_output_bytes().min(codec.max_bytes()),
         max_nesting,
         wire.max_rewrite_work(),
@@ -1752,6 +1819,23 @@ fn engine_limits(
         budget.remaining_retained().map_err(map_transaction_error)?,
         budget.remaining_scratch().map_err(map_transaction_error)?,
     ))
+}
+
+fn residual_chart_codec_limits(
+    wire: litchi_iwa_common::WireLimits,
+    field_budget: usize,
+) -> Result<ChartCodecLimits, Error> {
+    const HARD_MAX_BYTES: usize = 256 * 1024 * 1024;
+    const HARD_MAX_FIELDS: usize = 16 * 1024 * 1024;
+    let bytes = wire
+        .max_input_bytes()
+        .min(wire.max_output_bytes())
+        .clamp(1, HARD_MAX_BYTES);
+    let fields = field_budget.clamp(1, HARD_MAX_FIELDS);
+    ChartCodecLimits::default()
+        .with_max_bytes(bytes)
+        .map_err(map_codec_error)
+        .and_then(|limits| limits.with_max_fields(fields).map_err(map_codec_error))
 }
 
 fn charge_engine_report(
@@ -1885,12 +1969,118 @@ impl ArchiveReferenceVisitor for ObjectReferenceCollector {
     }
 }
 
+struct StrictMetadataVisitor;
+
+impl ArchiveReferenceVisitor for StrictMetadataVisitor {
+    fn visit_reference(
+        &mut self,
+        _occurrence: ArchiveReferenceOccurrence,
+    ) -> litchi_iwa_core::Result<()> {
+        Ok(())
+    }
+}
+
+fn inspect_archive_metadata_strict(
+    package: &Package,
+    object: &ArchiveObject,
+    budget: &mut TransactionBudget,
+) -> Result<(), Error> {
+    let header = usize::try_from(object.header_length).map_err(|_| Error::InvalidSource)?;
+    budget
+        .work(
+            header
+                .checked_add(object.messages.len())
+                .ok_or(Error::InvalidSource)?,
+        )
+        .and_then(|_| budget.allocations(1))
+        .and_then(|_| budget.scratch(header))
+        .map_err(map_transaction_error)?;
+    let mut visitor = StrictMetadataVisitor;
+    object
+        .inspect_references_with_policy(
+            &mut visitor,
+            ArchiveReferencePolicy::RejectUnknownMetadata,
+            graph_limits(package)?,
+        )
+        .map(|_| ())
+        .map_err(map_core_error)
+}
+
+fn parse_locality_fields(
+    payload: &[u8],
+    limits: litchi_iwa_common::WireLimits,
+    budget: &mut TransactionBudget,
+) -> Result<Vec<litchi_iwa_common::wire::WireField>, Error> {
+    let span = payload.len().max(1);
+    let scratch = span
+        .checked_mul(size_of::<litchi_iwa_common::wire::WireField>())
+        .ok_or(Error::InvalidSource)?;
+    budget
+        .input(payload.len())
+        .and_then(|_| budget.work(span))
+        .and_then(|_| budget.scratch(scratch))
+        .and_then(|_| budget.allocations(1))
+        .map_err(map_transaction_error)?;
+    let fields =
+        litchi_iwa_common::wire::parse_wire_fields(payload, limits).map_err(map_wire_error)?;
+    Ok(fields)
+}
+
+fn raw_fields_except<'a>(
+    fields: &[litchi_iwa_common::wire::WireField],
+    payload: &'a [u8],
+    excluded: u32,
+    budget: &mut TransactionBudget,
+) -> Result<Vec<&'a [u8]>, Error> {
+    let capacity = fields.len();
+    let scratch = capacity
+        .checked_mul(size_of::<&'a [u8]>())
+        .ok_or(Error::InvalidSource)?;
+    budget
+        .allocations(1)
+        .and_then(|_| budget.scratch(scratch))
+        .map_err(map_transaction_error)?;
+    let mut raw = Vec::new();
+    raw.try_reserve_exact(capacity)
+        .map_err(|_| Error::Allocation { amount: capacity })?;
+    for field in fields.iter().filter(|field| field.number() != excluded) {
+        raw.push(field.raw(payload).map_err(map_wire_error)?);
+    }
+    Ok(raw)
+}
+
+fn raw_fields_except_numbers<'a>(
+    fields: &[litchi_iwa_common::wire::WireField],
+    payload: &'a [u8],
+    excluded: &[u32],
+    budget: &mut TransactionBudget,
+) -> Result<Vec<&'a [u8]>, Error> {
+    let capacity = fields.len();
+    let scratch = capacity
+        .checked_mul(size_of::<&'a [u8]>())
+        .ok_or(Error::InvalidSource)?;
+    budget
+        .allocations(1)
+        .and_then(|_| budget.scratch(scratch))
+        .map_err(map_transaction_error)?;
+    let mut raw = Vec::new();
+    raw.try_reserve_exact(capacity)
+        .map_err(|_| Error::Allocation { amount: capacity })?;
+    for field in fields
+        .iter()
+        .filter(|field| !excluded.contains(&field.number()))
+    {
+        raw.push(field.raw(payload).map_err(map_wire_error)?);
+    }
+    Ok(raw)
+}
+
 fn wire_reference_id(
     payload: &[u8],
     limits: litchi_iwa_common::WireLimits,
+    budget: &mut TransactionBudget,
 ) -> Result<Option<u64>, Error> {
-    let fields =
-        litchi_iwa_common::wire::parse_wire_fields(payload, limits).map_err(map_wire_error)?;
+    let fields = parse_locality_fields(payload, limits, budget)?;
     let Some(field) = fields.iter().rev().find(|field| field.number() == 1) else {
         return Ok(None);
     };
@@ -1906,23 +2096,50 @@ fn wire_reference_id(
 }
 
 fn payload_object_references(
-    message: &litchi_iwa_core::RawMessage,
+    message: &RawMessage,
     limits: litchi_iwa_common::WireLimits,
+    budget: &mut TransactionBudget,
 ) -> Result<Vec<u64>, Error> {
-    if message.type_ == CHART_MESSAGE_TYPE {
-        let references = chart_codec::references(&message.data, ChartCodecLimits::DEFAULT)
-            .map_err(map_codec_error)?;
-        return Ok(references.paragraph_styles().to_vec());
+    if !matches!(
+        message.type_,
+        CHART_MESSAGE_TYPE | PARAGRAPH_STYLE_MESSAGE_TYPE | STYLESHEET_MESSAGE_TYPE
+    ) {
+        return Ok(Vec::new());
     }
-    let fields = litchi_iwa_common::wire::parse_wire_fields(&message.data, limits)
-        .map_err(map_wire_error)?;
+    let reference_capacity = message.data.len().max(1);
+    let reference_scratch = reference_capacity
+        .checked_mul(size_of::<u64>())
+        .ok_or(Error::InvalidSource)?;
+    budget
+        .allocations(1)
+        .and_then(|_| budget.scratch(reference_scratch))
+        .map_err(map_transaction_error)?;
     let mut references = Vec::new();
+    references
+        .try_reserve_exact(reference_capacity)
+        .map_err(|_| Error::Allocation {
+            amount: reference_capacity,
+        })?;
+    if message.type_ == CHART_MESSAGE_TYPE {
+        let fields = parse_locality_fields(&message.data, limits, budget)?;
+        for extension in fields.iter().filter(|field| field.number() == 10_000) {
+            let extension = extension.payload(&message.data).map_err(map_wire_error)?;
+            let extension_fields = parse_locality_fields(extension, limits, budget)?;
+            for styles in extension_fields.iter().filter(|field| field.number() == 20) {
+                let reference = styles.payload(extension).map_err(map_wire_error)?;
+                if let Some(identifier) = wire_reference_id(reference, limits, budget)? {
+                    references.push(identifier);
+                }
+            }
+        }
+        return Ok(references);
+    }
+    let fields = parse_locality_fields(&message.data, limits, budget)?;
     match message.type_ {
         PARAGRAPH_STYLE_MESSAGE_TYPE => {
             for field in fields.iter().filter(|field| field.number() == 1) {
                 let parent = field.payload(&message.data).map_err(map_wire_error)?;
-                let parent_fields = litchi_iwa_common::wire::parse_wire_fields(parent, limits)
-                    .map_err(map_wire_error)?;
+                let parent_fields = parse_locality_fields(parent, limits, budget)?;
                 for link in parent_fields
                     .iter()
                     .filter(|field| matches!(field.number(), 3 | 5))
@@ -1930,9 +2147,11 @@ fn payload_object_references(
                     if link.wire_type() != 2 {
                         return Err(Error::InvalidSource);
                     }
-                    if let Some(identifier) =
-                        wire_reference_id(link.payload(parent).map_err(map_wire_error)?, limits)?
-                    {
+                    if let Some(identifier) = wire_reference_id(
+                        link.payload(parent).map_err(map_wire_error)?,
+                        limits,
+                        budget,
+                    )? {
                         references.push(identifier);
                     }
                 }
@@ -1943,14 +2162,14 @@ fn payload_object_references(
                 if let Some(identifier) = wire_reference_id(
                     field.payload(&message.data).map_err(map_wire_error)?,
                     limits,
+                    budget,
                 )? {
                     references.push(identifier);
                 }
             }
             for field in fields.iter().filter(|field| field.number() == 5) {
                 let payload = field.payload(&message.data).map_err(map_wire_error)?;
-                let entries = litchi_iwa_common::wire::parse_wire_fields(payload, limits)
-                    .map_err(map_wire_error)?;
+                let entries = parse_locality_fields(payload, limits, budget)?;
                 for entry in entries
                     .iter()
                     .filter(|entry| entry.number() == 1 || entry.number() == 2)
@@ -1958,9 +2177,11 @@ fn payload_object_references(
                     if entry.wire_type() != 2 {
                         return Err(Error::InvalidSource);
                     }
-                    if let Some(identifier) =
-                        wire_reference_id(entry.payload(payload).map_err(map_wire_error)?, limits)?
-                    {
+                    if let Some(identifier) = wire_reference_id(
+                        entry.payload(payload).map_err(map_wire_error)?,
+                        limits,
+                        budget,
+                    )? {
                         references.push(identifier);
                     }
                 }
@@ -1976,13 +2197,60 @@ fn reachable_objects(
     root_identifier: u64,
     budget: &mut TransactionBudget,
 ) -> Result<HashSet<u64>, Error> {
-    let mut pending = vec![root_identifier];
-    if root_identifier != 2 && package_object(package, 2).is_some() {
-        pending.push(2);
+    let object_capacity = package.state.total_objects.max(1);
+    let mut payload_bytes = 0usize;
+    let mut metadata_references = 0usize;
+    for component in package.state.source.components().iter() {
+        for object in &component.archive().objects {
+            for message in &object.messages {
+                payload_bytes = payload_bytes
+                    .checked_add(message.data.len())
+                    .ok_or(Error::InvalidSource)?;
+            }
+            for message in &object.archive_info.message_infos {
+                metadata_references = metadata_references
+                    .checked_add(message.object_references.len())
+                    .ok_or(Error::InvalidSource)?;
+                for field in &message.field_infos {
+                    metadata_references = metadata_references
+                        .checked_add(field.object_references.len())
+                        .ok_or(Error::InvalidSource)?;
+                }
+            }
+        }
     }
+    let pending_capacity = object_capacity
+        .checked_add(payload_bytes)
+        .and_then(|value| value.checked_add(metadata_references))
+        .ok_or(Error::InvalidSource)?;
+    let scratch = object_capacity
+        .checked_add(pending_capacity)
+        .and_then(|value| value.checked_mul(size_of::<u64>()))
+        .ok_or(Error::InvalidSource)?;
+    budget
+        .work(
+            object_capacity
+                .checked_add(payload_bytes)
+                .and_then(|value| value.checked_add(metadata_references))
+                .ok_or(Error::InvalidSource)?,
+        )
+        .and_then(|_| budget.allocations(2))
+        .and_then(|_| budget.scratch(scratch))
+        .map_err(map_transaction_error)?;
+    let mut pending = Vec::new();
+    pending
+        .try_reserve_exact(pending_capacity)
+        .map_err(|_| Error::Allocation {
+            amount: pending_capacity,
+        })?;
+    pending.push(root_identifier);
     let mut reachable = HashSet::new();
+    reachable
+        .try_reserve(object_capacity)
+        .map_err(|_| Error::Allocation {
+            amount: object_capacity,
+        })?;
     let limits = graph_limits(package)?;
-    let wire_limits = package.wire_limits().map_err(map_wire_error)?;
     while let Some(identifier) = pending.pop() {
         if !reachable.insert(identifier) {
             continue;
@@ -2026,7 +2294,23 @@ fn reachable_objects(
             .and_then(|_| budget.allocations(1))
             .and_then(|_| budget.scratch(scratch))
             .map_err(map_transaction_error)?;
+        budget
+            .allocations(1)
+            .and_then(|_| {
+                budget.scratch(
+                    reference_capacity
+                        .checked_mul(size_of::<u64>())
+                        .ok_or(TransactionError::InvalidSource)?,
+                )
+            })
+            .map_err(map_transaction_error)?;
         let mut references = ObjectReferenceCollector::default();
+        references
+            .identifiers
+            .try_reserve_exact(reference_capacity)
+            .map_err(|_| Error::Allocation {
+                amount: reference_capacity,
+            })?;
         object
             .inspect_references_with_policy(
                 &mut references,
@@ -2035,8 +2319,9 @@ fn reachable_objects(
             )
             .map_err(map_core_error)?;
         let mut payload_references = Vec::new();
+        let wire_limits = budget.residual(package).map_err(map_transaction_error)?;
         for message in &object.messages {
-            payload_references.extend(payload_object_references(message, wire_limits)?);
+            payload_references.extend(payload_object_references(message, wire_limits, budget)?);
         }
         budget
             .work(payload_references.len())
@@ -2064,20 +2349,59 @@ fn verify_locality_members(
         .len()
         .checked_add(candidate_catalog.source_bytes().len())
         .ok_or(Error::InvalidSource)?;
+    budget.work(locality_work).map_err(map_transaction_error)?;
+    let set_capacity = plan
+        .members
+        .len()
+        .checked_add(plan.deleted_members.len())
+        .and_then(|value| value.checked_add(plan.object_ids.len()))
+        .ok_or(Error::InvalidSource)?;
+    let set_scratch = plan
+        .members
+        .len()
+        .checked_mul(size_of::<&str>())
+        .and_then(|value| {
+            value.checked_add(plan.deleted_members.len().checked_mul(size_of::<&str>())?)
+        })
+        .and_then(|value| value.checked_add(plan.object_ids.len().checked_mul(size_of::<u64>())?))
+        .ok_or(Error::InvalidSource)?;
     budget
-        .work(locality_work)
-        .and_then(|_| budget.allocations(2))
+        .work(set_capacity)
+        .and_then(|_| budget.allocations(3))
+        .and_then(|_| budget.scratch(set_scratch))
         .map_err(map_transaction_error)?;
-    let changed_members: HashSet<&str> = plan.members.iter().map(String::as_str).collect();
-    let deleted_members: HashSet<&str> = plan.deleted_members.iter().map(String::as_str).collect();
-    let allowed_objects: HashSet<u64> = plan.object_ids.iter().copied().collect();
+    let mut changed_members = HashSet::new();
+    changed_members
+        .try_reserve(plan.members.len())
+        .map_err(|_| Error::Allocation {
+            amount: plan.members.len(),
+        })?;
+    changed_members.extend(plan.members.iter().map(String::as_str));
+    let mut deleted_members = HashSet::new();
+    deleted_members
+        .try_reserve(plan.deleted_members.len())
+        .map_err(|_| Error::Allocation {
+            amount: plan.deleted_members.len(),
+        })?;
+    deleted_members.extend(plan.deleted_members.iter().map(String::as_str));
+    let mut allowed_objects = HashSet::new();
+    allowed_objects
+        .try_reserve(plan.object_ids.len())
+        .map_err(|_| Error::Allocation {
+            amount: plan.object_ids.len(),
+        })?;
+    allowed_objects.extend(plan.object_ids.iter().copied());
     let source_reachable = reachable_objects(source, plan.root_identifier, budget)?;
     let candidate_reachable = reachable_objects(candidate, plan.root_identifier, budget)?;
     for identifier in &allowed_objects {
-        if package_object(source, *identifier).is_some() && !source_reachable.contains(identifier) {
+        if *identifier != 2
+            && package_object(source, *identifier).is_some()
+            && !source_reachable.contains(identifier)
+        {
             return Err(Error::InvalidSource);
         }
-        if package_object(candidate, *identifier).is_some()
+        if *identifier != 2
+            && package_object(candidate, *identifier).is_some()
             && !candidate_reachable.contains(identifier)
         {
             return Err(Error::InvalidSource);
@@ -2170,6 +2494,17 @@ fn verify_locality_members(
             if source_object.messages.len() != candidate_object.messages.len() {
                 return Err(Error::InvalidSource);
             }
+            inspect_archive_metadata_strict(source, source_object, budget)?;
+            inspect_archive_metadata_strict(candidate, candidate_object, budget)?;
+            if !archive_metadata_preserved(
+                source_object,
+                candidate_object,
+                &allowed_objects,
+                &source_reachable,
+                &candidate_reachable,
+            ) {
+                return Err(Error::InvalidSource);
+            }
             for (index, source_message) in source_object.messages.iter().enumerate() {
                 let candidate_message = candidate_object
                     .messages
@@ -2178,10 +2513,13 @@ fn verify_locality_members(
                 if candidate_message.type_ != source_message.type_
                     || (!is_chart_font_rewritable_type(source_message.type_)
                         && candidate_message != source_message)
-                    || (source_message.type_ == CHART_MESSAGE_TYPE
-                        && !chart_unknown_fields_preserved(
+                    || (is_chart_font_rewritable_type(source_message.type_)
+                        && !message_unknown_fields_preserved(
+                            source_message.type_,
                             source_message.data.as_slice(),
                             candidate_message.data.as_slice(),
+                            budget.residual(source).map_err(map_transaction_error)?,
+                            budget,
                         )?)
                 {
                     return Err(Error::InvalidSource);
@@ -2255,58 +2593,167 @@ fn central_record_preserved(
         && source_record[46..] == candidate_record[46..]
 }
 
-fn chart_unknown_fields_preserved(source: &[u8], candidate: &[u8]) -> Result<bool, Error> {
-    let limits = litchi_iwa_common::WireLimits::default();
-    let source_fields =
-        litchi_iwa_common::wire::parse_wire_fields(source, limits).map_err(map_wire_error)?;
-    let candidate_fields =
-        litchi_iwa_common::wire::parse_wire_fields(candidate, limits).map_err(map_wire_error)?;
-    let source_unknown: Vec<&[u8]> = source_fields
+fn references_transition_preserved(
+    source: &[u64],
+    candidate: &[u64],
+    allowed: &HashSet<u64>,
+    source_reachable: &HashSet<u64>,
+    candidate_reachable: &HashSet<u64>,
+) -> bool {
+    source.iter().all(|identifier| {
+        candidate.contains(identifier)
+            || allowed.contains(identifier)
+            || source_reachable.contains(identifier)
+            || !candidate_reachable.contains(identifier)
+    }) && candidate.iter().all(|identifier| {
+        source.contains(identifier)
+            || allowed.contains(identifier)
+            || source_reachable.contains(identifier)
+    })
+}
+
+fn archive_metadata_preserved(
+    source: &ArchiveObject,
+    candidate: &ArchiveObject,
+    allowed: &HashSet<u64>,
+    source_reachable: &HashSet<u64>,
+    candidate_reachable: &HashSet<u64>,
+) -> bool {
+    if source.archive_info.should_merge != candidate.archive_info.should_merge
+        || source.archive_info.message_infos.len() != candidate.archive_info.message_infos.len()
+    {
+        return false;
+    }
+    for (source_info, candidate_info) in source
+        .archive_info
+        .message_infos
         .iter()
-        .filter(|field| field.number() != 10_000)
-        .map(|field| field.raw(source).map_err(map_wire_error))
-        .collect::<Result<_, _>>()?;
-    let candidate_unknown: Vec<&[u8]> = candidate_fields
-        .iter()
-        .filter(|field| field.number() != 10_000)
-        .map(|field| field.raw(candidate).map_err(map_wire_error))
-        .collect::<Result<_, _>>()?;
+        .zip(&candidate.archive_info.message_infos)
+    {
+        if source_info.type_ != candidate_info.type_
+            || source_info.versions != candidate_info.versions
+            || source_info.field_infos.len() != candidate_info.field_infos.len()
+            || source_info.data_references != candidate_info.data_references
+            || source_info.base_message_index != candidate_info.base_message_index
+            || source_info.diff_merge_version != candidate_info.diff_merge_version
+            || source_info.diff_field_path != candidate_info.diff_field_path
+            || source_info.fields_to_remove != candidate_info.fields_to_remove
+            || source_info.diff_read_version != candidate_info.diff_read_version
+            || !references_transition_preserved(
+                &source_info.object_references,
+                &candidate_info.object_references,
+                allowed,
+                source_reachable,
+                candidate_reachable,
+            )
+        {
+            return false;
+        }
+        for (source_field, candidate_field) in source_info
+            .field_infos
+            .iter()
+            .zip(&candidate_info.field_infos)
+        {
+            if source_field.path != candidate_field.path
+                || source_field.r#type != candidate_field.r#type
+                || source_field.unknown_field_rule != candidate_field.unknown_field_rule
+                || source_field.data_references != candidate_field.data_references
+                || source_field.known_field_rule != candidate_field.known_field_rule
+                || source_field.known_field_version != candidate_field.known_field_version
+                || source_field.known_field_feature_identifier
+                    != candidate_field.known_field_feature_identifier
+                || !references_transition_preserved(
+                    &source_field.object_references,
+                    &candidate_field.object_references,
+                    allowed,
+                    source_reachable,
+                    candidate_reachable,
+                )
+            {
+                return false;
+            }
+        }
+    }
+    true
+}
+
+fn message_unknown_fields_preserved(
+    message_type: u32,
+    source: &[u8],
+    candidate: &[u8],
+    limits: litchi_iwa_common::WireLimits,
+    budget: &mut TransactionBudget,
+) -> Result<bool, Error> {
+    match message_type {
+        CHART_MESSAGE_TYPE => chart_unknown_fields_preserved(source, candidate, limits, budget),
+        PARAGRAPH_STYLE_MESSAGE_TYPE => {
+            wire_unknown_fields_preserved(source, candidate, limits, &[1, 10, 11, 12], budget)
+        },
+        STYLESHEET_MESSAGE_TYPE => {
+            wire_unknown_fields_preserved(source, candidate, limits, &[1, 5], budget)
+        },
+        PACKAGE_METADATA_MESSAGE_TYPE => {
+            wire_unknown_fields_preserved(source, candidate, limits, &[1, 3, 8, 11], budget)
+        },
+        _ => Ok(true),
+    }
+}
+
+fn wire_unknown_fields_preserved(
+    source: &[u8],
+    candidate: &[u8],
+    limits: litchi_iwa_common::WireLimits,
+    known_fields: &[u32],
+    budget: &mut TransactionBudget,
+) -> Result<bool, Error> {
+    let source_fields = parse_locality_fields(source, limits, budget)?;
+    let candidate_fields = parse_locality_fields(candidate, limits, budget)?;
+    Ok(
+        raw_fields_except_numbers(&source_fields, source, known_fields, budget)?
+            == raw_fields_except_numbers(&candidate_fields, candidate, known_fields, budget)?,
+    )
+}
+
+fn chart_unknown_fields_preserved(
+    source: &[u8],
+    candidate: &[u8],
+    limits: litchi_iwa_common::WireLimits,
+    budget: &mut TransactionBudget,
+) -> Result<bool, Error> {
+    let source_fields = parse_locality_fields(source, limits, budget)?;
+    let candidate_fields = parse_locality_fields(candidate, limits, budget)?;
+    let source_unknown = raw_fields_except(&source_fields, source, 10_000, budget)?;
+    let candidate_unknown = raw_fields_except(&candidate_fields, candidate, 10_000, budget)?;
     if source_unknown != candidate_unknown {
         return Ok(false);
     }
-    let source_extensions: Vec<&[u8]> = source_fields
+    let mut source_extensions = source_fields
         .iter()
-        .filter(|field| field.number() == 10_000)
-        .map(|field| field.payload(source).map_err(map_wire_error))
-        .collect::<Result<_, _>>()?;
-    let candidate_extensions: Vec<&[u8]> = candidate_fields
+        .filter(|field| field.number() == 10_000);
+    let mut candidate_extensions = candidate_fields
         .iter()
-        .filter(|field| field.number() == 10_000)
-        .map(|field| field.payload(candidate).map_err(map_wire_error))
-        .collect::<Result<_, _>>()?;
-    if source_extensions.len() != candidate_extensions.len() {
-        return Ok(false);
-    }
-    for (source_extension, candidate_extension) in
-        source_extensions.into_iter().zip(candidate_extensions)
-    {
-        let source_fields = litchi_iwa_common::wire::parse_wire_fields(source_extension, limits)
-            .map_err(map_wire_error)?;
-        let candidate_fields =
-            litchi_iwa_common::wire::parse_wire_fields(candidate_extension, limits)
-                .map_err(map_wire_error)?;
-        let source_unknown: Vec<&[u8]> = source_fields
-            .iter()
-            .filter(|field| field.number() != 20)
-            .map(|field| field.raw(source_extension).map_err(map_wire_error))
-            .collect::<Result<_, _>>()?;
-        let candidate_unknown: Vec<&[u8]> = candidate_fields
-            .iter()
-            .filter(|field| field.number() != 20)
-            .map(|field| field.raw(candidate_extension).map_err(map_wire_error))
-            .collect::<Result<_, _>>()?;
-        if source_unknown != candidate_unknown {
-            return Ok(false);
+        .filter(|field| field.number() == 10_000);
+    loop {
+        let source_extension = source_extensions.next();
+        let candidate_extension = candidate_extensions.next();
+        match (source_extension, candidate_extension) {
+            (None, None) => break,
+            (Some(_), None) | (None, Some(_)) => return Ok(false),
+            (Some(source_extension), Some(candidate_extension)) => {
+                let source_extension = source_extension.payload(source).map_err(map_wire_error)?;
+                let candidate_extension = candidate_extension
+                    .payload(candidate)
+                    .map_err(map_wire_error)?;
+                let source_fields = parse_locality_fields(source_extension, limits, budget)?;
+                let candidate_fields = parse_locality_fields(candidate_extension, limits, budget)?;
+                let source_unknown =
+                    raw_fields_except(&source_fields, source_extension, 20, budget)?;
+                let candidate_unknown =
+                    raw_fields_except(&candidate_fields, candidate_extension, 20, budget)?;
+                if source_unknown != candidate_unknown {
+                    return Ok(false);
+                }
+            },
         }
     }
     Ok(true)
@@ -2316,10 +2763,73 @@ fn mutation_plan(
     package: &Package,
     root_identifier: u64,
     changes: &graph::Changes,
+    budget: &mut TransactionBudget,
 ) -> Result<MutationPlan, Error> {
+    let member_capacity = changes
+        .edits
+        .len()
+        .checked_add(changes.insertions.len())
+        .and_then(|value| value.checked_add(changes.deletions.len()))
+        .ok_or(Error::InvalidSource)?;
+    let mut object_capacity = 0usize;
+    let mut name_bytes = 0usize;
+    for (name, archive) in &changes.edits {
+        name_bytes = name_bytes
+            .checked_add(name.len())
+            .and_then(|value| value.checked_add(1))
+            .ok_or(Error::InvalidSource)?;
+        object_capacity = object_capacity
+            .checked_add(archive.objects.len())
+            .ok_or(Error::InvalidSource)?;
+    }
+    for insertion in &changes.insertions {
+        name_bytes = name_bytes
+            .checked_add(insertion.name.len())
+            .and_then(|value| value.checked_add(1))
+            .ok_or(Error::InvalidSource)?;
+        object_capacity = object_capacity
+            .checked_add(insertion.archive.objects.len())
+            .ok_or(Error::InvalidSource)?;
+    }
+    for name in &changes.deletions {
+        name_bytes = name_bytes
+            .checked_add(name.len())
+            .and_then(|value| value.checked_add(1))
+            .ok_or(Error::InvalidSource)?;
+    }
+    let scratch = member_capacity
+        .checked_mul(size_of::<String>())
+        .and_then(|value| value.checked_add(object_capacity.checked_mul(size_of::<u64>())?))
+        .ok_or(Error::InvalidSource)?;
+    budget
+        .work(
+            name_bytes
+                .checked_add(object_capacity)
+                .ok_or(Error::InvalidSource)?,
+        )
+        .and_then(|_| budget.allocations(member_capacity.max(1).saturating_add(3)))
+        .and_then(|_| budget.retained(name_bytes))
+        .and_then(|_| budget.scratch(name_bytes))
+        .and_then(|_| budget.scratch(scratch))
+        .map_err(map_transaction_error)?;
     let mut members = HashSet::new();
     let mut deleted_members = HashSet::new();
     let mut object_ids = HashSet::new();
+    members
+        .try_reserve(member_capacity)
+        .map_err(|_| Error::Allocation {
+            amount: member_capacity,
+        })?;
+    deleted_members
+        .try_reserve(changes.deletions.len())
+        .map_err(|_| Error::Allocation {
+            amount: changes.deletions.len(),
+        })?;
+    object_ids
+        .try_reserve(object_capacity)
+        .map_err(|_| Error::Allocation {
+            amount: object_capacity,
+        })?;
     for (name, archive) in &changes.edits {
         members.insert(name.clone());
         let source_archive = package
@@ -2368,9 +2878,30 @@ fn mutation_plan(
         members.insert(name.clone());
         deleted_members.insert(name.clone());
     }
-    let mut members: Vec<_> = members.into_iter().collect();
-    let mut deleted_members: Vec<_> = deleted_members.into_iter().collect();
-    let mut object_ids: Vec<_> = object_ids.into_iter().collect();
+    let mut members_vec = Vec::new();
+    members_vec
+        .try_reserve_exact(members.len())
+        .map_err(|_| Error::Allocation {
+            amount: members.len(),
+        })?;
+    members_vec.extend(members);
+    let mut deleted_members_vec = Vec::new();
+    deleted_members_vec
+        .try_reserve_exact(deleted_members.len())
+        .map_err(|_| Error::Allocation {
+            amount: deleted_members.len(),
+        })?;
+    deleted_members_vec.extend(deleted_members);
+    let mut object_ids_vec = Vec::new();
+    object_ids_vec
+        .try_reserve_exact(object_ids.len())
+        .map_err(|_| Error::Allocation {
+            amount: object_ids.len(),
+        })?;
+    object_ids_vec.extend(object_ids);
+    let mut members = members_vec;
+    let mut deleted_members = deleted_members_vec;
+    let mut object_ids = object_ids_vec;
     members.sort_unstable();
     deleted_members.sort_unstable();
     object_ids.sort_unstable();
@@ -2889,4 +3420,289 @@ fn map_wire_error(error: litchi_iwa_common::Error) -> Error {
 
 fn usize_to_u64(value: usize) -> u64 {
     u64::try_from(value).unwrap_or(u64::MAX)
+}
+
+#[cfg(test)]
+mod locality_tests {
+    use super::*;
+
+    const SOURCE: &[u8] = include_bytes!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../test-data/iwork/keynote/chart-data-edited-native.key"
+    ));
+
+    fn package_bytes(package: &Package) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
+        let mut bytes = Vec::new();
+        package.write_to(&mut bytes)?;
+        Ok(bytes)
+    }
+
+    fn chart_root(package: &Package) -> Result<u64, Box<dyn std::error::Error>> {
+        package
+            .state
+            .source
+            .components()
+            .iter()
+            .flat_map(|component| component.archive().objects.iter())
+            .find(|object| {
+                object
+                    .messages
+                    .iter()
+                    .any(|message| message.type_ == CHART_MESSAGE_TYPE)
+            })
+            .and_then(|object| object.archive_info.identifier)
+            .ok_or_else(|| "chart root is absent".into())
+    }
+
+    fn locality_plan(
+        package: &Package,
+        member: &str,
+        root_identifier: u64,
+    ) -> Result<MutationPlan, Box<dyn std::error::Error>> {
+        let component = package
+            .state
+            .source
+            .components()
+            .get(member)
+            .ok_or("requested member is absent")?;
+        let mut object_ids = Vec::new();
+        object_ids.try_reserve_exact(component.archive().objects.len())?;
+        for object in &component.archive().objects {
+            object_ids.push(object.archive_info.identifier.ok_or("object has no id")?);
+        }
+        Ok(MutationPlan {
+            root_identifier,
+            members: vec![member.to_owned()].into_boxed_slice(),
+            deleted_members: Box::default(),
+            object_ids: object_ids.into_boxed_slice(),
+        })
+    }
+
+    fn tamper_archive_member(
+        package: &Package,
+        message_type: u32,
+        mutate: impl FnOnce(&mut Archive) -> Result<(), Box<dyn std::error::Error>>,
+    ) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
+        let catalog = physical_catalog(package)?;
+        let archive_limits = catalog.limits().effective_archive_limits()?;
+        let snappy_limits = catalog.limits().snappy_limits()?;
+        for entry in catalog.package().iter() {
+            if !entry.name().ends_with(".iwa") {
+                continue;
+            }
+            let decompressed = SnappyStream::decompress(entry.data(), snappy_limits)?;
+            let mut archive = Archive::parse(decompressed.as_bytes(), archive_limits)?;
+            if !archive.objects.iter().any(|object| {
+                object
+                    .messages
+                    .iter()
+                    .any(|message| message.type_ == message_type)
+            }) {
+                continue;
+            }
+            mutate(&mut archive)?;
+            let rewritten = archive.to_bytes(archive_limits)?;
+            let compressed = SnappyStream::compress(&rewritten, snappy_limits)?;
+            return Ok(catalog.package().reassemble_to_bytes(
+                &[EntryEdit::new(entry.name(), &compressed)],
+                catalog.limits(),
+            )?);
+        }
+        Err("requested message type is absent".into())
+    }
+
+    fn member_with_message(
+        package: &Package,
+        message_type: u32,
+    ) -> Result<String, Box<dyn std::error::Error>> {
+        let catalog = physical_catalog(package)?;
+        let archive_limits = catalog.limits().effective_archive_limits()?;
+        let snappy_limits = catalog.limits().snappy_limits()?;
+        for entry in catalog.package().iter() {
+            if !entry.name().ends_with(".iwa") {
+                continue;
+            }
+            let decompressed = SnappyStream::decompress(entry.data(), snappy_limits)?;
+            let archive = Archive::parse(decompressed.as_bytes(), archive_limits)?;
+            if archive.objects.iter().any(|object| {
+                object
+                    .messages
+                    .iter()
+                    .any(|message| message.type_ == message_type)
+            }) {
+                return Ok(entry.name().to_owned());
+            }
+        }
+        Err("requested message type is absent".into())
+    }
+
+    fn append_unknown_message_field(
+        archive: &mut Archive,
+        message_type: u32,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        for object in &mut archive.objects {
+            for (index, message) in object.messages.iter_mut().enumerate() {
+                if message.type_ != message_type {
+                    continue;
+                }
+                message.data.extend_from_slice(&[0x98, 0x06, 0x01]);
+                object.archive_info.message_infos[index].length =
+                    u32::try_from(message.data.len())?;
+                return Ok(());
+            }
+        }
+        Err("requested message type is absent".into())
+    }
+
+    fn append_unplanned_object(archive: &mut Archive) -> Result<(), Box<dyn std::error::Error>> {
+        let identifier = archive
+            .objects
+            .iter()
+            .filter_map(|object| object.archive_info.identifier)
+            .max()
+            .ok_or("archive has no objects")?
+            .checked_add(1)
+            .ok_or("object identifier overflow")?;
+        archive.objects.push(ArchiveObject::new(
+            identifier,
+            vec![RawMessage {
+                type_: 9_999,
+                data: vec![1],
+            }],
+            CoreLimits::default(),
+        )?);
+        Ok(())
+    }
+
+    fn mutate_central_version(
+        mut bytes: Vec<u8>,
+        member: &str,
+    ) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
+        let signature = b"PK\x01\x02";
+        let member = member.as_bytes();
+        let mut offset = 0;
+        while let Some(relative) = bytes[offset..]
+            .windows(signature.len())
+            .position(|window| window == signature)
+        {
+            let start = offset + relative;
+            if start + 46 > bytes.len() {
+                break;
+            }
+            let name_length = usize::from(u16::from_le_bytes(
+                bytes[start + 28..start + 30].try_into()?,
+            ));
+            let extra_length = usize::from(u16::from_le_bytes(
+                bytes[start + 30..start + 32].try_into()?,
+            ));
+            let comment_length = usize::from(u16::from_le_bytes(
+                bytes[start + 32..start + 34].try_into()?,
+            ));
+            let name_start = start + 46;
+            let name_end = name_start + name_length;
+            if name_end > bytes.len() {
+                break;
+            }
+            if &bytes[name_start..name_end] == member {
+                bytes[start + 4] ^= 1;
+                return Ok(bytes);
+            }
+            offset = name_end
+                .checked_add(extra_length)
+                .and_then(|value| value.checked_add(comment_length))
+                .ok_or("central directory overflow")?;
+        }
+        Err("requested ZIP member is absent".into())
+    }
+
+    fn assert_locality_refused(
+        source: &Package,
+        plan: &MutationPlan,
+        bytes: &[u8],
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let candidate = Package::from_bytes(bytes)?;
+        let mut budget = transaction_budget(source)?;
+        admit_transaction(source, &mut budget)?;
+        let result = verify_locality_members(source, &candidate, plan, &mut budget);
+        assert!(
+            result.is_err(),
+            "locality verifier unexpectedly accepted: {result:?}"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn locality_verifier_rejects_unplanned_member_object_unknown_and_zip_metadata()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let source = Package::from_bytes(SOURCE)?;
+        let chart_member = member_with_message(&source, CHART_MESSAGE_TYPE)?;
+        let chart_plan = locality_plan(&source, &chart_member, chart_root(&source)?)?;
+        let candidate_bytes = package_bytes(&source)?;
+        let catalog = SourceCatalog::from_bytes(&candidate_bytes, Default::default())?;
+        let extra_member = catalog
+            .package()
+            .reassemble_with_insertions_to_bytes(
+                &[EntryInsertion::new(
+                    "Data/unplanned-chart-font.bin",
+                    b"unplanned",
+                )],
+                catalog.limits(),
+            )
+            .map_err(|error| format!("insert member: {error}"))?;
+        assert_locality_refused(&source, &chart_plan, &extra_member)
+            .map_err(|error| format!("extra member: {error}"))?;
+
+        let extra_object =
+            tamper_archive_member(&source, CHART_MESSAGE_TYPE, append_unplanned_object)
+                .map_err(|error| format!("tamper object: {error}"))?;
+        assert_locality_refused(&source, &chart_plan, &extra_object)
+            .map_err(|error| format!("extra object: {error}"))?;
+
+        let stylesheet_member = member_with_message(&source, STYLESHEET_MESSAGE_TYPE)?;
+        let stylesheet_plan = locality_plan(&source, &stylesheet_member, chart_root(&source)?)?;
+        let unknown_stylesheet =
+            tamper_archive_member(&source, STYLESHEET_MESSAGE_TYPE, |archive| {
+                append_unknown_message_field(archive, STYLESHEET_MESSAGE_TYPE)
+            })
+            .map_err(|error| format!("tamper stylesheet: {error}"))?;
+        assert_locality_refused(&source, &stylesheet_plan, &unknown_stylesheet)
+            .map_err(|error| format!("unknown stylesheet: {error}"))?;
+
+        for message_type in [PARAGRAPH_STYLE_MESSAGE_TYPE, PACKAGE_METADATA_MESSAGE_TYPE] {
+            let message_member = member_with_message(&source, message_type)?;
+            let message_plan = locality_plan(&source, &message_member, chart_root(&source)?)?;
+            let unknown_message = tamper_archive_member(&source, message_type, |archive| {
+                append_unknown_message_field(archive, message_type)
+            })?;
+            assert_locality_refused(&source, &message_plan, &unknown_message)?;
+        }
+
+        let metadata_tamper = mutate_central_version(candidate_bytes, &chart_member)?;
+        assert_locality_refused(&source, &chart_plan, &metadata_tamper)
+            .map_err(|error| format!("ZIP metadata: {error}"))?;
+        Ok(())
+    }
+
+    #[test]
+    fn selector_field_admission_precedes_scan_work() -> Result<(), Box<dyn std::error::Error>> {
+        let package = Package::from_bytes(SOURCE)?;
+        let mut transaction = transaction_budget(&package)?;
+        let mut fields = FieldLedger {
+            used: 0,
+            maximum: 1,
+        };
+        let mut selector = ChartFontSelectionBudget {
+            budget: &mut transaction,
+            fields: &mut fields,
+        };
+        assert!(matches!(
+            selector.finish_wire_scan(2),
+            Err(AxisSupportError::LimitExceeded {
+                kind: chart_axis_support::AxisSupportLimitKind::WireFields,
+                ..
+            })
+        ));
+        assert_eq!(fields.used, 0);
+        Ok(())
+    }
 }
