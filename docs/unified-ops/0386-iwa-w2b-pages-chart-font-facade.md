@@ -100,15 +100,15 @@ After pinning the probe helper symbols with `#[inline(never)]` and narrowing
 the host read wrappers to the matching single property, the final
 source-bound binary was rebuilt and archived before execution:
 
-- prior source/binary: `e481893f62ead345a501e240a2529a746029f32d`,
-  `pages-parity-0ce5798ee9`, SHA-256
-  `867984d1aebcdcffd4c917db550a00922439b83cb3978fcb85d4f10cbb0b4f86`
-- measured source: `df94ce2af672e6b31da6d9636bbb04e736b275b1`
-- measured binary: `/home/zhuhe/code/litchi-worktrees/.coord/fullmeasuredSHA/bin/pages-parity-df94ce2af6`
-- measured binary: 40,124,560 bytes, SHA-256
+- prior source/binary: `df94ce2af672e6b31da6d9636bbb04e736b275b1`,
+  `pages-parity-df94ce2af6`, SHA-256
   `5fd933c7814b28abf3eb5eb8472fce9b983e336d92a2d44a78e8e93586278418`
+- measured source: `4fc75709351f7120ae69b81749e371c0880ced69`
+- measured binary: `/home/zhuhe/code/litchi-worktrees/.coord/fullmeasuredSHA/bin/pages-parity-4fc7570935`
+- measured binary: 40,204,912 bytes, SHA-256
+  `085f9695d9c5257cfffd36d930d143c6ada46edb2ced55c03a7d3bd57d851751`
 - build: `cargo test -p litchi-iwa --test parity --release --no-run --jobs 2`
-- capture root: `/home/zhuhe/code/litchi-worktrees/.coord/fullmeasuredSHA/pages-cpu5-df94ce2af6`
+- capture root: `/home/zhuhe/code/litchi-worktrees/.coord/fullmeasuredSHA/pages-cpu5-4fc7570935`
 - manifest: `manifest.tsv`; `taskset -c 5 valgrind --tool=callgrind`
   captured each exact ignored test twice, with the matching host or leaf
   symbol toggle. Every capture had exit 0, one matching test pass, and
@@ -116,12 +116,12 @@ source-bound binary was rebuilt and archived before execution:
 
 | Route | Host Ir | Leaf Ir | Leaf minus host |
 | --- | ---: | ---: | ---: |
-| font read | 898,884,002 | 34,425,867 | −96.170155% |
-| font set | 2,149,581,687 | 206,203,494 | −90.407273% |
-| font reset | 839,515,670 | 203,391,343 | −75.772776% |
-| size read | 794,827,415 | 33,812,877 | −95.745884% |
-| size set | 2,042,720,958 | 207,685,215 | −89.832913% |
-| size reset | 839,627,842 | 202,134,003 | −75.925762% |
+| font read | 898,916,519 | 34,436,620 | −96.169097% |
+| font set | 2,149,780,108 | 206,210,943 | −90.407812% |
+| font reset | 839,640,525 | 203,434,948 | −75.771185% |
+| size read | 794,606,892 | 33,806,009 | −95.745568% |
+| size set | 2,042,698,375 | 207,741,540 | −89.830043% |
+| size reset | 839,519,660 | 202,101,798 | −75.926496% |
 
 The six tests execute explicit host/leaf/leaf/host ABBA calls, with host
 setup outside the measured route; reset setup uses the direct host writer and
@@ -132,6 +132,9 @@ coordinator's integrated final qualification and native queue policy.
 
 The superseded `pages-cpu5-c3dd90d7dc` capture set is retained externally as
 non-qualifying history because its generic host read wrapper inspected both
-font and size while the leaf read inspected one property.
+font and size while the leaf read inspected one property. The prior
+source-bound `pages-cpu5-df94ce2af6` set remains preserved as historical
+source evidence; the 4fc757 final set is the qualifying current-source receipt
+after the six parity-test additions.
 
 No raw captures or binaries were added.
