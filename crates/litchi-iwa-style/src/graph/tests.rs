@@ -324,6 +324,7 @@ fn bounded_workspace_construction_reports_and_checks_index_requirements() {
         ),
     )
     .expect("bounded workspace");
+    assert_eq!(workspace.source_work(), 0);
     assert_eq!(workspace.next_object_identifier().expect("identifier"), 10);
 }
 

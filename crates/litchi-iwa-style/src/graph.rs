@@ -1075,7 +1075,7 @@ impl<'s> Workspace<'s> {
             registry_root: RefCell::new(None),
             finish: FinishLedger::default(),
             uuid_seed: 0,
-            source_work,
+            source_work: 0,
         })
     }
 
@@ -1166,10 +1166,12 @@ impl<'s> Workspace<'s> {
         }
     }
 
-    /// Estimate the bounded traversal and metadata work performed while the
-    /// workspace indexes its source components.  Format owners charge this
-    /// before invoking a style engine so the graph scan cannot escape the
-    /// engine's operation budget.
+    /// Constructor scan work for the legacy [`Self::new`] path.
+    ///
+    /// A workspace built with [`Self::new_bounded`] has already exposed both
+    /// construction passes through [`ConstructionRequirements::source_work`]
+    /// and therefore reports zero here; bounded callers must not charge the
+    /// construction census a third time as engine work.
     #[must_use]
     pub(crate) fn source_work(&self) -> usize {
         self.source_work
