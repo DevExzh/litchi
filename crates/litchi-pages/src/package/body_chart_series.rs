@@ -348,6 +348,7 @@ fn map_arrangement_error(error: arrangement::Error) -> Error {
 
 fn map_archive_error(error: litchi_iwa_archive::Error) -> Error {
     match error {
+        litchi_iwa_archive::Error::Iwa(error) => map_core_error(error),
         litchi_iwa_archive::Error::Limit {
             kind,
             observed,
@@ -546,6 +547,22 @@ fn map_package_error(error: PackageError) -> Error {
         PackageError::ObjectLimit { observed, limit } => Error::Limit {
             kind: LimitKind::PayloadObjects,
             observed: observed as u64,
+            maximum: limit as u64,
+        },
+        PackageError::SectionNamesTooLarge { observed, limit }
+        | PackageError::Semantic(crate::Error::TextTooLarge { observed, limit }) => {
+            Error::Limit {
+                kind: LimitKind::PayloadBytes,
+                observed: observed as u64,
+                maximum: limit as u64,
+            }
+        }
+        PackageError::Semantic(
+            crate::Error::TooManySections { actual, limit }
+            | crate::Error::TooManyBodyStorages { actual, limit },
+        ) => Error::Limit {
+            kind: LimitKind::PayloadItems,
+            observed: actual as u64,
             maximum: limit as u64,
         },
         PackageError::Allocation { amount } => Error::Allocation { amount },
@@ -2786,6 +2803,64 @@ mod tests {
                 kind: LimitKind::PayloadBytes,
                 observed: 2,
                 maximum: 1,
+            }
+        ));
+        assert!(matches!(
+            map_archive_error(litchi_iwa_archive::Error::Iwa(
+                litchi_iwa_core::Error::Limit {
+                    kind: litchi_iwa_core::LimitKind::ObjectBytes,
+                    observed: 8,
+                    maximum: 4,
+                },
+            )),
+            Error::Limit {
+                kind: LimitKind::Archive(litchi_iwa_core::LimitKind::ObjectBytes),
+                observed: 8,
+                maximum: 4,
+            }
+        ));
+        assert!(matches!(
+            map_package_error(PackageError::SectionNamesTooLarge {
+                observed: 12,
+                limit: 10,
+            }),
+            Error::Limit {
+                kind: LimitKind::PayloadBytes,
+                observed: 12,
+                maximum: 10,
+            }
+        ));
+        assert!(matches!(
+            map_package_error(PackageError::Semantic(crate::Error::TooManySections {
+                actual: 7,
+                limit: 6,
+            })),
+            Error::Limit {
+                kind: LimitKind::PayloadItems,
+                observed: 7,
+                maximum: 6,
+            }
+        ));
+        assert!(matches!(
+            map_package_error(PackageError::Semantic(crate::Error::TooManyBodyStorages {
+                actual: 9,
+                limit: 8,
+            })),
+            Error::Limit {
+                kind: LimitKind::PayloadItems,
+                observed: 9,
+                maximum: 8,
+            }
+        ));
+        assert!(matches!(
+            map_package_error(PackageError::Semantic(crate::Error::TextTooLarge {
+                observed: 11,
+                limit: 10,
+            })),
+            Error::Limit {
+                kind: LimitKind::PayloadBytes,
+                observed: 11,
+                maximum: 10,
             }
         ));
     }
