@@ -474,7 +474,7 @@ fn pages_facade_font_set_cost_instruction() -> TestResult {
 #[ignore = "release instruction probe; run in the coordinator CPU-3 slot"]
 fn pages_facade_font_reset_cost_instruction() -> TestResult {
     let (source, target, chart) = pages_facade_fixture()?;
-    let source = pages_facade_host_route(&source, target, chart, &georgia()?)?;
+    let source = host_write(&source, target, chart, &georgia()?)?;
     std::hint::black_box(pages_facade_host_route(
         &source,
         target,
@@ -519,7 +519,7 @@ fn pages_facade_size_set_cost_instruction() -> TestResult {
 #[ignore = "release instruction probe; run in the coordinator CPU-3 slot"]
 fn pages_facade_size_reset_cost_instruction() -> TestResult {
     let (source, target, chart) = pages_facade_fixture()?;
-    let source = pages_facade_host_route(&source, target, chart, &size(23.0)?)?;
+    let source = host_write(&source, target, chart, &size(23.0)?)?;
     std::hint::black_box(pages_facade_host_route(
         &source,
         target,
