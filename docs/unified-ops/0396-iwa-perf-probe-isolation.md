@@ -21,8 +21,10 @@ one-call exception. This WP repairs:
 - six W2-A reset routes, whose reset setup called selected
   `w2a_host_route_3` and recorded three host calls instead of two.
 
-Each setup path now calls an uninstrumented `*_impl` function. The exact
-selected wrappers remain the ABBA calls only.
+Each setup path now calls an uninstrumented setup function. The exact
+selected wrappers remain the ABBA calls only; setup names deliberately do not
+contain the selected wrapper symbol, so historical wildcard toggles cannot
+collect setup.
 
 ## External audit validator
 
@@ -35,6 +37,19 @@ untouched; the validator writes only a new external receipt.
 
 External validator SHA-256:
 `56cf47937fade54867c6393bb5d6a561bcb943a01514e152e165d60f3988667f`.
+
+New measurement-pipeline copies require `--call-audit` in measurement mode,
+strip it before delegating to the historical parser, and validate the raw audit
+against the normalized manifest after the parent run succeeds:
+
+- 69-route runner:
+  `iwork-owner-probe-final/qualify_iwork_owner.py`, SHA-256
+  `4898d5d5308f9059897be7f68e40a0c0dacafc0f034834087103c132f6fc7c8d`;
+- 87-route runner:
+  `iwork-chart-font-probe-final/qualify_iwork_chart_font.py`, SHA-256
+  `881b8cabd750f60ce53ab4c29ba916c1b937ec5e42ea484ab7ee516407c92699`.
+
+Historical runners and manifests remain the immutable parents of these copies.
 
 No capture, timing, binary, native, or performance result is claimed by this
 record. Final qualification must run on the repaired source after coordinator

@@ -498,7 +498,7 @@ fn style_stroke() -> TestResult<Stroke> {
 }
 
 #[inline(never)]
-fn w2a_host_route_3_impl(route: &str, source: &[u8], sheet: u64, id: u64) -> TestResult<Vec<u8>> {
+fn w2a_reset_setup(route: &str, source: &[u8], sheet: u64, id: u64) -> TestResult<Vec<u8>> {
     let mut editor = numbers::Draft::from_bytes(source)?;
     match route {
         "shape_style_fill_set" => {
@@ -536,7 +536,7 @@ fn w2a_host_route_3_impl(route: &str, source: &[u8], sheet: u64, id: u64) -> Tes
 /// preparation does not add a third selected host call.
 #[inline(never)]
 fn w2a_host_route_3(route: &str, source: &[u8], sheet: u64, id: u64) -> TestResult<Vec<u8>> {
-    w2a_host_route_3_impl(route, source, sheet, id)
+    w2a_reset_setup(route, source, sheet, id)
 }
 
 #[inline(never)]
@@ -649,7 +649,7 @@ fn numbers_w2a_route_cost_abba_3() -> TestResult {
         let input = source.clone();
         let (sheet, id) = host_drawable(&numbers::Draft::from_bytes(&input)?, *kind, *index)?;
         let input = match reset_setup_route(route) {
-            Some(set_route) => w2a_host_route_3_impl(set_route, &input, sheet, id)?,
+            Some(set_route) => w2a_reset_setup(set_route, &input, sheet, id)?,
             None => input,
         };
         let selector = DrawableSelector::of(*kind, *index);

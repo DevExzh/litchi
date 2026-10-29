@@ -218,7 +218,7 @@ fn host_refresh_keynote(source: &[u8]) -> TestResult<Vec<u8>> {
 }
 
 #[inline(never)]
-fn leaf_refresh_keynote_impl(source: &[u8], drawable: usize) -> TestResult<Vec<u8>> {
+fn refresh_keynote_setup(source: &[u8], drawable: usize) -> TestResult<Vec<u8>> {
     let package = litchi_keynote::Package::from_bytes(source)?;
     let mut edit = package.edit_slide_drawables();
     edit.set_table_cell(
@@ -235,7 +235,7 @@ fn leaf_refresh_keynote_impl(source: &[u8], drawable: usize) -> TestResult<Vec<u
 /// directly so setup does not contaminate the selected callgrind symbol.
 #[inline(never)]
 fn leaf_refresh_keynote(source: &[u8], drawable: usize) -> TestResult<Vec<u8>> {
-    leaf_refresh_keynote_impl(source, drawable)
+    refresh_keynote_setup(source, drawable)
 }
 
 #[inline(never)]
@@ -270,7 +270,7 @@ fn formula_refresh_cost_abba() -> TestResult {
     let keynote_input = fixture(KEYNOTE)?;
     let pages_input = fixture(PAGES)?;
     let drawable = (0..64)
-        .find(|drawable| leaf_refresh_keynote_impl(&keynote_input.bytes, *drawable).is_ok())
+        .find(|drawable| refresh_keynote_setup(&keynote_input.bytes, *drawable).is_ok())
         .ok_or("no table drawable")?;
     for leg in [false, true, true, false] {
         if leg {
