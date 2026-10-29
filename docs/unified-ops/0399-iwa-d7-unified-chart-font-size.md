@@ -3,7 +3,11 @@
 ## Status and scope
 
 This is a bounded D7 dispatch slice on `uo2/iwa-d7-chart-font-size`, cut from
-`e0e297a82b0a534dfd5611ced3a9811851edbf76`.  It exposes only the migrated
+`e0e297a82b0a534dfd5611ced3a9811851edbf76`.  The implementation and generated
+capability snapshots are in `4e88658a06`; the worktree was then synchronized
+with coordinator trunk `bc9a37fd75977b01ab3f24cabfdc4b2fe977c4bc` at
+`c1fb64d102f3794e815a632e208bf6ab33a6bf24` (the merge contains no D7 runtime
+changes).  It exposes only the migrated
 chart point-size family through `litchi-ops`:
 
 * Pages: `/body/chart[N]` → `font.size`;
@@ -38,7 +42,8 @@ Runtime/schema/dispatch ownership is limited to:
 * `crates/litchi-ops/src/format/iwork/{pages,keynote,numbers}.rs`;
 * `crates/litchi-ops/src/format/iwork/{keynote/write,write,node,tree,error}.rs`;
 * `crates/litchi-ops/src/path/vocabulary.rs` (Numbers chart path spelling);
-* `crates/litchi-ops/tests/iwork_chart_font_size.rs`.
+* `crates/litchi-ops/tests/iwork_chart_font_size.rs`;
+* `crates/litchi-ops/tests/golden/capabilities/{pages,keynote,numbers}.json`.
 
 Leaf/shared chart-font crates are read-only dependencies for this slice.  No
 ledger row is flipped by this record.  The coordinator owns `PROGRESS.md`,
@@ -48,12 +53,23 @@ integration and the final gate.
 
 The source tests cover populated common fixtures, direct unified-vs-leaf reads,
 set/reset, exact source preservation, invalid zero values and reopened
-readback.  Ignored wrappers are registered for nine full-file routes:
-Pages/Keynote/Numbers × read/set/reset.  Qualification remains pending the
-coordinator's release build and pinned-CPU ABBA run for every route, with
-setup outside the selected symbols, exact single-test success, positive
-inclusive attribution, exact call counts and the prescribed <=1.05 route
-ratio.  No build, test or capture was run on this held source.
+readback.  The all-feature run passed 3 active tests and intentionally left the
+9 full-file ABBA wrappers ignored.  The generated capability reports were
+regenerated and the all-feature capability suite passed (11 tests).
+
+The final synchronized source passed `cargo fmt --all -- --check`, strict
+all-feature Clippy for `litchi-ops`, the focused chart-font-size and capability
+tests, the ledger check, the 70-package crate-boundary check, and the
+no-3rdparty reference check.  Feature-specific Clippy (no-format, Pages,
+Keynote and Numbers), rustdoc (Pages, Keynote, Numbers and all-features), and
+the affected glossary profiles (`ops-iwork` and `ops-all`) also passed.  Logs
+are retained outside the checkout under
+`.coord/d7-chart-font-size-validation/logs/`.
+
+Qualification remains pending the coordinator's release build and pinned-CPU
+ABBA run for every route, with setup outside the selected symbols, exact
+single-test success, positive inclusive attribution, exact call counts and the
+prescribed <=1.05 route ratio.
 
 Native mutation evidence is absent.  The nine D7 queue rows appended for this
 slice remain `pending`; no E3/E4 claim is made.  Existing W2-A/W2-B/W2-C leaf
