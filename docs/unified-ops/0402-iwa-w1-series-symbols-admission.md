@@ -11,6 +11,9 @@
 - Adoption repair: `ed50c20a25528f8a0a9aecb2a1ca32dfb778b02b` fixes the styled-parent reference framing and
   residual wire-field/work hard-ceiling clamp; the final tip includes this
   repair.
+- Final hard-axis repair: `1e1e56651c4fa3e5795e31267c7e6c58980afae9` clamps residual input, nesting, codec
+  bytes, fields, and wire work to hard ceilings after zero-exhaustion checks;
+  the large-profile regression proves no hidden quota headroom.
 - Scope: shared chart-series symbol read/write admission, Numbers mechanical
   caller adoption, and the direct shared-engine parity caller. Pages and
   Keynote facade adoption remain owned by their work packages.
