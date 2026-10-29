@@ -2450,13 +2450,13 @@ fn apply_patch(package: &Package, patch: &Patch) -> Result<Commit, Error> {
     .map_err(map_archive_error)?;
     charge_candidate_plan(&candidate_plan, &mut budget)?;
     budget
-        .candidate_reopen(target_owner.as_ref().len())
-        .map_err(map_arrangement_error)?;
-    let candidate_bytes = Arc::<[u8]>::from(target_owner.as_ref());
-    budget
         .output(target_owner.as_ref().len())
         .and_then(|_| budget.scratch(target_owner.as_ref().len()))
         .map_err(map_arrangement_error)?;
+    budget
+        .candidate_reopen(target_owner.as_ref().len())
+        .map_err(map_arrangement_error)?;
+    let candidate_bytes = Arc::<[u8]>::from(target_owner.as_ref());
     let candidate = reopen_series_candidate(package, candidate_bytes)?;
     let verified = target_with_metadata(
         &candidate,
