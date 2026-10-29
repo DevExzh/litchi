@@ -959,6 +959,7 @@ fn apply_one(
     let (components, limits) = prepare_components(source, budget)?;
     let mut workspace = Workspace::new(&components, limits).map_err(Error::from)?;
     let chart_id = target.chart;
+    let mut symbol_scope = None;
     let changed = match property {
         Property::ConnectionLines(values) => {
             engine::set_values(&mut workspace, chart_id, &lines(target.kind)?, values)?
@@ -979,6 +980,7 @@ fn apply_one(
                 limits,
             )
             .map_err(Error::from)?;
+            symbol_scope = report.scope().cloned();
             budget
                 .charge_series_report(report)
                 .map_err(map_arrangement)?;
@@ -1008,6 +1010,9 @@ fn apply_one(
     if !changed || changes.is_empty() {
         return Ok(None);
     }
+    if let Some(scope) = symbol_scope.as_ref() {
+        validate_symbol_scope(scope, target.chart, source, &changes)?;
+    }
     let plan = admit_candidate(source, &changes, budget)?;
     let published = style_graph::publish(source, changes).map_err(Error::from)?;
     if published.package.source_bytes().len() > plan.output_bytes {
@@ -1018,6 +1023,76 @@ fn apply_one(
         });
     }
     publish_changes(Some(published), sheet, chart, property.kind(), budget)
+}
+
+fn validate_symbol_scope(
+    scope: &engine::MutationScope,
+    chart: u64,
+    source: &Package,
+    changes: &litchi_iwa_style::graph::Changes,
+) -> Result<(), Error> {
+    if scope.selected_chart() != chart {
+        return Err(Error::Verification);
+    }
+    let edited_outside_scope = changes.edits.iter().any(|(name, archive)| {
+        if !scope
+            .allowed_members()
+            .iter()
+            .any(|allowed| allowed == name)
+        {
+            return true;
+        }
+        let Some(original) = source
+            .state
+            .components
+            .catalog()
+            .iter()
+            .find(|component| component.name() == name)
+            .map(|component| component.archive())
+        else {
+            return true;
+        };
+        archive.objects.iter().any(|object| {
+            let Some(identifier) = object.archive_info.identifier else {
+                return true;
+            };
+            let unchanged = original
+                .objects
+                .iter()
+                .find(|candidate| candidate.archive_info.identifier == Some(identifier))
+                .is_some_and(|candidate| candidate == object);
+            if unchanged {
+                return false;
+            }
+            scope.allowed_objects().contains(&identifier)
+                && object
+                    .messages
+                    .iter()
+                    .all(|message| scope.allowed_message_types().contains(&message.type_))
+        })
+    });
+    let inserted_outside_scope = changes.insertions.iter().any(|insertion| {
+        !scope
+            .planned_new_members()
+            .iter()
+            .any(|allowed| allowed == &insertion.name)
+            || insertion.archive.objects.iter().any(|object| {
+                object
+                    .archive_info
+                    .identifier
+                    .is_none_or(|identifier| !scope.planned_new_objects().contains(&identifier))
+            })
+    });
+    let deleted_outside_scope = changes.deletions.iter().any(|name| {
+        !scope
+            .planned_removed_members()
+            .iter()
+            .any(|removed| removed == name)
+    });
+    if edited_outside_scope || inserted_outside_scope || deleted_outside_scope {
+        return Err(Error::Verification);
+    }
+    Ok(())
 }
 
 fn publish_changes(

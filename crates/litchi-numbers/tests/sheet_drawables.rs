@@ -536,5 +536,28 @@ fn chart_series_values_round_trip_and_name_every_series() -> TestResult {
         .package()
         .apply_sheet_chart_series(&commit.patch().inverse())?;
     assert_eq!(bytes(restored.package())?, source);
+
+    Ok(())
+}
+
+#[test]
+fn chart_series_reference_ceiling_is_typed_before_graph_publication() -> TestResult {
+    use litchi_numbers::sheet::chart::series::{Error as SeriesError, PropertyKind};
+    use litchi_numbers::{OpenOptions, SemanticLimits};
+
+    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../test-data/iwork/numbers/chart-data-native.numbers");
+    let bytes = std::fs::read(path)?;
+    let semantic = SemanticLimits::builder().max_references(1)?.build()?;
+    let package = match Package::from_bytes_with_options(
+        &bytes,
+        OpenOptions::new().semantic_limits(semantic),
+    ) {
+        Ok(package) => package,
+        Err(litchi_numbers::Error::SemanticLimit { .. }) => return Ok(()),
+        Err(error) => return Err(error.into()),
+    };
+    let result = package.sheet_chart_series(0, 0, PropertyKind::ErrorBars);
+    assert!(matches!(result, Err(SeriesError::Limit { .. })));
     Ok(())
 }
