@@ -99,6 +99,25 @@ explicitly with `--profile iwa-table`, `--profile numbers-minimal`, and
 `--profile numbers-full`; all three passed. The coordinator should retain the
 full-workspace command output/exit receipt with the integrated handoff.
 
+## Current-source instruction qualification
+
+The authorized 12-route matrix was rerun on source
+`67427c20f10dc51f45e772f08da6c1763a04505d` using the feature-enabled release
+parity test binary. The immutable binary is external at
+`/home/zhuhe/code/litchi-worktrees/.coord/iwa-w1g-comments-final-67427c20f10dc51f45e772f08da6c1763a04505d/bin/parity-67427c20f10dc51f45e772f08da6c1763a04505d`, size 41,380,128 bytes, SHA-256 `bf8ff72a505f712b5886faba58200582da8881c2ca3159ccb56dc76b0c860ae1`. The build receipt and runner result are in the same external directory; the runner used CPU 3, Callgrind ABBA, release mode, and fresh external output `measure-12-final`.
+
+All 12 routes passed, yielding 24 callgrind captures and 36 exact-test logs; every route stayed within the 5% slowdown bar:
+
+| Route family | Host Ir | Leaf Ir | Delta |
+|---|---:|---:|---:|
+| Keynote set/read/create/clear | 658,091,493 / 20,345,349 / 904,991,498 / 58,125,869 | 417,208,237 / 8,042,759 / 429,841,475 / 41,952,904 | −36.603% / −60.469% / −52.503% / −27.824% |
+| Pages set/read/create/clear | 2,591,604,039 / 1,234,965,546 / 2,735,193,618 / 2,741,075,485 | 90,331,205 / 33,549,613 / 99,981,254 / 165,487,524 | −96.514% / −97.283% / −96.345% / −93.963% |
+| Numbers set/read/create/clear | 73,280,745 / 3,711,055 / 169,352,648 / 128,335,767 | 74,009,105 / 2,967,400 / 82,626,646 / 118,322,350 | +0.994% / −20.039% / −51.210% / −7.803% |
+
+These are engine/facade instruction-cost measurements, not Apple native
+acceptance evidence. Final integrated-trunk requalification remains
+coordinator-owned.
+
 ## Evidence boundaries and remaining qualification
 
 This repair has no native E3/E4 evidence and makes no new host/leaf
