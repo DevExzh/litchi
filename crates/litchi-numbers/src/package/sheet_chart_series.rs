@@ -17,8 +17,10 @@
 )]
 
 use std::fmt;
+use std::mem::size_of;
 
 use litchi_iwa_archive::package::{EntryEdit, EntryInsertion, OwnedExactArtifacts};
+use litchi_iwa_archive::unstable::{CandidateIngressCharge, CandidateIngressError};
 use litchi_iwa_common::chart::error_bar::Series as ErrorBarSeries;
 use litchi_iwa_common::chart::kind::Kind as ChartKind;
 use litchi_iwa_common::chart::pie::{LabelDistance, LabelVisibility, WedgeExplosion};
@@ -976,6 +978,99 @@ fn map_arrangement(error: arrangement::Error) -> Error {
     }
 }
 
+fn map_candidate_archive_error(error: litchi_iwa_archive::Error) -> Error {
+    match error {
+        litchi_iwa_archive::Error::Limit {
+            observed, maximum, ..
+        } => Error::Limit {
+            kind: LimitKind::PackageBytes,
+            observed,
+            maximum,
+        },
+        litchi_iwa_archive::Error::Allocation { amount, .. } => Error::Allocation { amount },
+        litchi_iwa_archive::Error::Iwa(error) => Error::from(structure::map_core(&error)),
+        litchi_iwa_archive::Error::Reassembly(_) => Refusal::UnsupportedSource.into(),
+        _ => Error::Verification,
+    }
+}
+
+fn map_candidate_common_error(error: litchi_iwa_common::Error) -> Error {
+    match error {
+        litchi_iwa_common::Error::LimitExceeded {
+            kind,
+            observed,
+            limit,
+        } => Error::Limit {
+            kind: match kind {
+                litchi_iwa_common::LimitKind::InputBytes => LimitKind::PayloadBytes,
+                litchi_iwa_common::LimitKind::OutputBytes => {
+                    LimitKind::Engine(engine::LimitKind::OutputBytes)
+                },
+                litchi_iwa_common::LimitKind::Fields => {
+                    LimitKind::Engine(engine::LimitKind::Fields)
+                },
+                litchi_iwa_common::LimitKind::Nesting => {
+                    LimitKind::Engine(engine::LimitKind::Nesting)
+                },
+                litchi_iwa_common::LimitKind::RewriteWork => {
+                    LimitKind::Engine(engine::LimitKind::Work)
+                },
+                litchi_iwa_common::LimitKind::TableRows
+                | litchi_iwa_common::LimitKind::TableColumns
+                | litchi_iwa_common::LimitKind::TableCells
+                | litchi_iwa_common::LimitKind::MaterializedCells => {
+                    LimitKind::Engine(engine::LimitKind::Fields)
+                },
+            },
+            observed: observed as u64,
+            maximum: limit as u64,
+        },
+        litchi_iwa_common::Error::Allocation { amount, .. } => Error::Allocation { amount },
+        _ => Error::Verification,
+    }
+}
+
+fn map_candidate_package_error(error: super::Error) -> Error {
+    match error {
+        super::Error::Archive(error) => map_candidate_archive_error(error),
+        super::Error::Common(error) => map_candidate_common_error(error),
+        super::Error::SemanticLimit {
+            kind,
+            observed,
+            maximum,
+            ..
+        } => Error::Limit {
+            kind: match kind {
+                crate::SemanticLimitKind::Objects => LimitKind::Identifiers,
+                crate::SemanticLimitKind::References => {
+                    LimitKind::Engine(engine::LimitKind::References)
+                },
+                _ => LimitKind::PayloadBytes,
+            },
+            observed: observed as u64,
+            maximum: maximum as u64,
+        },
+        super::Error::InputTooLarge { observed, maximum } => Error::Limit {
+            kind: LimitKind::PackageBytes,
+            observed,
+            maximum,
+        },
+        super::Error::UnexpectedFormat { .. } | super::Error::InvalidLimit { .. } => {
+            Refusal::UnsupportedSource.into()
+        },
+        _ => Error::Verification,
+    }
+}
+
+fn map_candidate_ingress_error(error: CandidateIngressError<arrangement::Error>) -> Error {
+    match error {
+        CandidateIngressError::Physical(error) => map_candidate_archive_error(error),
+        CandidateIngressError::Admission(error) => map_arrangement(error),
+        CandidateIngressError::CloneArithmetic { .. } => Error::InvalidSource,
+        _ => Error::InvalidSource,
+    }
+}
+
 fn map_metadata_error(error: &metadata_codec::DecodeError) -> Error {
     let Some(limit) = error.resource_limit() else {
         return Error::InvalidSource;
@@ -1089,7 +1184,7 @@ fn publish_changes_exact(
     let mut retained_bound = 0usize;
     let mut scratch_bound = 0usize;
     let mut work_bound = 0usize;
-    let mut member_count = 0usize;
+    let mut changed_member_count = 0usize;
     let mut bounds = |_name: &str, archive: &Archive| -> Result<(), Error> {
         let encoded = archive
             .encoded_len(archive_limits)
@@ -1108,7 +1203,9 @@ fn publish_changes_exact(
             .checked_add(encoded)
             .and_then(|value| value.checked_add(compressed))
             .ok_or(Error::InvalidSource)?;
-        member_count = member_count.checked_add(1).ok_or(Error::InvalidSource)?;
+        changed_member_count = changed_member_count
+            .checked_add(1)
+            .ok_or(Error::InvalidSource)?;
         Ok(())
     };
     for (name, archive) in &changes.edits {
@@ -1117,11 +1214,53 @@ fn publish_changes_exact(
     for insertion in &changes.insertions {
         bounds(&insertion.name, &insertion.archive)?;
     }
-    let vector_allocations = member_count
+    let member_count = catalog.package().len();
+    let edit_capacity = changes.edits.len();
+    let insertion_capacity = changes.insertions.len();
+    let deletion_capacity = changes.deletions.len();
+    let collection_scratch = edit_capacity
+        .checked_mul(size_of::<(&str, Vec<u8>)>())
+        .and_then(|value| value.checked_add(edit_capacity.checked_mul(size_of::<EntryEdit<'_>>())?))
+        .and_then(|value| value.checked_add(member_count.checked_mul(size_of::<&str>())?))
+        .and_then(|value| {
+            value.checked_add(insertion_capacity.checked_mul(size_of::<(
+                &str,
+                Vec<u8>,
+                Option<usize>,
+            )>())?)
+        })
+        .and_then(|value| {
+            value.checked_add(insertion_capacity.checked_mul(size_of::<EntryInsertion<'_>>())?)
+        })
+        .and_then(|value| value.checked_add(deletion_capacity.checked_mul(size_of::<&str>())?))
+        .ok_or(Error::InvalidSource)?;
+    let collection_allocations = [
+        edit_capacity,
+        member_count,
+        insertion_capacity,
+        edit_capacity,
+        insertion_capacity,
+        deletion_capacity,
+    ]
+    .into_iter()
+    .filter(|capacity| *capacity != 0)
+    .count();
+    let name_scan_work = member_count
+        .checked_add(
+            insertion_capacity
+                .checked_mul(member_count)
+                .ok_or(Error::InvalidSource)?,
+        )
+        .ok_or(Error::InvalidSource)?;
+    work_bound = work_bound
+        .checked_add(name_scan_work)
+        .ok_or(Error::InvalidSource)?;
+    let vector_allocations = changed_member_count
         .checked_mul(2)
         .and_then(|value| value.checked_add(changes.edits.len()))
         .and_then(|value| value.checked_add(changes.insertions.len()))
         .and_then(|value| value.checked_add(changes.deletions.len()))
+        .and_then(|value| value.checked_add(collection_allocations))
         .and_then(|value| value.checked_add(3))
         .ok_or(Error::InvalidSource)?;
     budget
@@ -1129,6 +1268,9 @@ fn publish_changes_exact(
         .map_err(map_arrangement)?;
     budget
         .preflight_scratch(scratch_bound)
+        .map_err(map_arrangement)?;
+    budget
+        .preflight_scratch(collection_scratch)
         .map_err(map_arrangement)?;
     budget
         .preflight_retained(retained_bound)
@@ -1140,12 +1282,15 @@ fn publish_changes_exact(
         .map_err(map_arrangement)?;
     budget.retained(retained_bound).map_err(map_arrangement)?;
     budget.scratch(scratch_bound).map_err(map_arrangement)?;
+    budget
+        .scratch(collection_scratch)
+        .map_err(map_arrangement)?;
 
     let mut edited = Vec::new();
     edited
-        .try_reserve_exact(changes.edits.len())
+        .try_reserve_exact(edit_capacity)
         .map_err(|_| Error::Allocation {
-            amount: changes.edits.len(),
+            amount: edit_capacity,
         })?;
     for (name, archive) in &changes.edits {
         let bytes = archive
@@ -1155,12 +1300,20 @@ fn publish_changes_exact(
             .map_err(|error| structure::map_core(&error))?;
         edited.push((name.as_str(), compressed));
     }
-    let names: Vec<&str> = catalog.package().iter().map(|entry| entry.name()).collect();
+    let mut names = Vec::new();
+    names
+        .try_reserve_exact(member_count)
+        .map_err(|_| Error::Allocation {
+            amount: member_count,
+        })?;
+    for entry in catalog.package().iter() {
+        names.push(entry.name());
+    }
     let mut inserted = Vec::new();
     inserted
-        .try_reserve_exact(changes.insertions.len())
+        .try_reserve_exact(insertion_capacity)
         .map_err(|_| Error::Allocation {
-            amount: changes.insertions.len(),
+            amount: insertion_capacity,
         })?;
     for insertion in &changes.insertions {
         let position = match &insertion.before {
@@ -1180,26 +1333,52 @@ fn publish_changes_exact(
             .map_err(|error| structure::map_core(&error))?;
         inserted.push((insertion.name.as_str(), compressed, position));
     }
-    let edits: Vec<EntryEdit<'_>> = edited
-        .iter()
-        .map(|(name, data)| EntryEdit::new(name, data))
-        .collect();
-    let insertions: Vec<EntryInsertion<'_>> = inserted
-        .iter()
-        .map(|(name, data, position)| match position {
+    let mut edits = Vec::new();
+    edits
+        .try_reserve_exact(edit_capacity)
+        .map_err(|_| Error::Allocation {
+            amount: edit_capacity,
+        })?;
+    for (name, data) in &edited {
+        edits.push(EntryEdit::new(name, data));
+    }
+    let mut insertions = Vec::new();
+    insertions
+        .try_reserve_exact(insertion_capacity)
+        .map_err(|_| Error::Allocation {
+            amount: insertion_capacity,
+        })?;
+    for (name, data, position) in &inserted {
+        insertions.push(match position {
             Some(position) => EntryInsertion::at(*position, name, data),
             None => EntryInsertion::new(name, data),
-        })
-        .collect();
-    let deletions: Vec<&str> = changes.deletions.iter().map(String::as_str).collect();
+        });
+    }
+    let mut deletions = Vec::new();
+    deletions
+        .try_reserve_exact(deletion_capacity)
+        .map_err(|_| Error::Allocation {
+            amount: deletion_capacity,
+        })?;
+    for deletion in &changes.deletions {
+        deletions.push(deletion.as_str());
+    }
     let prepared = catalog
-        .prepare_reassembly_with_changes(
+        .__prepare_reassembly_with_changes_admitted(
             &insertions,
             &edits,
             &deletions,
-            package.state.options.archive(),
+            catalog.limits(),
+            &mut |charge: CandidateIngressCharge| {
+                budget.preflight_work(charge.traversal_bytes())?;
+                budget.preflight_retained(charge.retained_bytes())?;
+                budget.preflight_allocations(charge.allocations())?;
+                budget.work(charge.traversal_bytes())?;
+                budget.retained(charge.retained_bytes())?;
+                budget.allocations(charge.allocations())
+            },
         )
-        .map_err(|error| structure::map_archive(&error))?;
+        .map_err(map_candidate_ingress_error)?;
     let requirements = prepared.execution_requirements();
     budget.reassembly(requirements).map_err(map_arrangement)?;
     budget
@@ -1209,7 +1388,7 @@ fn publish_changes_exact(
         .execute(requirements.exact_limits())
         .map_err(|error| structure::map_archive(&error))?;
     let candidate = Package::from_owned_bytes_with_options(output, package.state.options)
-        .map_err(|_| Error::Verification)?;
+        .map_err(map_candidate_package_error)?;
     verify_member_locality(package, &candidate, changes, budget)?;
     Ok(Published {
         package: candidate,
@@ -1224,8 +1403,8 @@ fn verify_member_locality(
     changes: &litchi_iwa_style::graph::Changes,
     budget: &mut ChartBudget,
 ) -> Result<(), Error> {
-    let source_catalog = structure::exact_source(source).map_err(|_| Error::Verification)?;
-    let candidate_catalog = structure::exact_source(candidate).map_err(|_| Error::Verification)?;
+    let source_catalog = structure::exact_source(source).map_err(Error::from)?;
+    let candidate_catalog = structure::exact_source(candidate).map_err(Error::from)?;
     let mut work = 0usize;
     for entry in source_catalog
         .package()
@@ -1330,7 +1509,7 @@ fn apply_series_patch(package: &Package, patch: &Patch) -> Result<Commit, Error>
         patch.artifacts.target_owner(),
         package.state.options,
     )
-    .map_err(|_| Error::Verification)?;
+    .map_err(map_candidate_package_error)?;
     let selected = target(&candidate, patch.sheet, patch.chart, &mut budget)?;
     if selected.chart != patch.chart_identifier {
         return Err(Error::PatchConflict);
