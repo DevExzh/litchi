@@ -117,6 +117,10 @@ path = "examples/edit_numbers_hidden_table_topology.rs"
 name = "edit_sheet_drawable_comment"
 path = "examples/edit_sheet_drawable_comment.rs"
 
+[[example]]
+name = "create_numbers_sparse_table"
+path = "examples/create_numbers_sparse_table.rs"
+
 [features]
 default = []
 internal-iwork-source = []
