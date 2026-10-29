@@ -157,6 +157,7 @@ fn aggregate(
         limits.admit_work(sort_work)?;
     }
     deltas.sort_unstable_by_key(|(index, _)| *index);
+    limits.admit_work(deltas.len())?;
     let mut write = 0;
     for read in 0..deltas.len() {
         let (index, delta) = deltas[read];
@@ -194,6 +195,9 @@ pub fn materialized_deltas(
         return Ok(MaterializedHeaderDeltas::default());
     }
 
+    // The count pass and the coordinate/materialization pass are distinct
+    // bounded traversals.  Keep both debits so a caller cannot spend one
+    // pass's budget on the other.
     limits.admit_work(updates.len())?;
     let mut coordinates = Vec::new();
     limits.reserve(&mut coordinates, updates.len())?;
@@ -202,6 +206,7 @@ pub fn materialized_deltas(
         .zip(previous)
         .filter(|(update, before)| before.is_none() && update.key.is_some())
         .count();
+    limits.admit_work(updates.len())?;
     let mut rows = Vec::new();
     let mut columns = Vec::new();
     limits.reserve(&mut rows, materialized)?;
@@ -217,7 +222,14 @@ pub fn materialized_deltas(
             columns.push((update.column, 1));
         }
     }
+    let coordinate_sort_work = checked_mul(
+        coordinates.len(),
+        usize::BITS as usize,
+        "header coordinate sort work overflow",
+    )?;
+    limits.admit_work(coordinate_sort_work)?;
     coordinates.sort_unstable();
+    limits.admit_work(coordinates.len())?;
     if coordinates.windows(2).any(|pair| pair[0] == pair[1]) {
         return Err(invalid("duplicate style update coordinate"));
     }
@@ -275,7 +287,6 @@ fn rewrite_one(
     if deltas.is_empty() {
         return Err(invalid("empty header rewrite"));
     }
-    let wire = limits.residual_wire()?;
     let census = census_bucket(bucket, limits)?;
     let growth = checked_mul(
         deltas.len(),
@@ -291,7 +302,10 @@ fn rewrite_one(
     limits.admit_output(output_bound)?;
     limits.admit_copies(output_bound)?;
     limits.admit_allocations(1)?;
-    let profile = WireProfile::from_wire_limits(wire);
+    // The preflight and all wrapper-owned execution debits above consume the
+    // residual profile.  Recompute it at the exact call boundary so the raw
+    // helper cannot validate against stale ceilings.
+    let profile = WireProfile::from_wire_limits(limits.residual_wire()?);
     table_write::header_adjust_many(bucket, deltas, &profile).map_err(map_table_write)
 }
 
@@ -352,9 +366,15 @@ mod tests {
         // residual profile.
         let source = test_source();
         let limits = cell_text_style::Limits::from_source(&source).expect("limits");
+        let before = limits.report().work;
         let deltas = materialized_deltas(&updates, &previous, 256, &limits).expect("deltas");
+        let after = limits.report().work;
+        assert!(after >= before + updates.len() * 2);
         assert_eq!(deltas.rows(), &[(258, 2)]);
         assert_eq!(deltas.columns(), &[(3, 1), (4, 1)]);
+        let second = materialized_deltas(&updates, &previous, 256, &limits).expect("deltas");
+        assert_eq!(second, deltas);
+        assert!(limits.report().work > after);
     }
 
     #[test]
