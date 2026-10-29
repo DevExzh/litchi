@@ -154,8 +154,7 @@ fn whole_cell_style_properties(
     properties
 }
 
-#[inline(never)]
-fn host_whole_cell_style_single(source: &[u8]) -> TestResult<Vec<u8>> {
+fn host_whole_cell_style_single_setup(source: &[u8]) -> TestResult<Vec<u8>> {
     let mut editor = numbers::Draft::from_bytes(source)?;
     let model = crate::numbers_cases::host_first_table_model_id(&editor)?;
     let style =
@@ -165,8 +164,7 @@ fn host_whole_cell_style_single(source: &[u8]) -> TestResult<Vec<u8>> {
     Ok(editor.to_bytes()?)
 }
 
-#[inline(never)]
-fn leaf_whole_cell_style_single(source: &[u8]) -> TestResult<Vec<u8>> {
+fn leaf_whole_cell_style_single_setup(source: &[u8]) -> TestResult<Vec<u8>> {
     let package = litchi_numbers::Package::from_bytes(source)?;
     let properties = whole_cell_style_properties(18.0, true, false);
     let commit = package
@@ -176,8 +174,7 @@ fn leaf_whole_cell_style_single(source: &[u8]) -> TestResult<Vec<u8>> {
     Ok(leaf_bytes!(commit.package()))
 }
 
-#[inline(never)]
-fn host_whole_cell_style_exclusive_repeat(source: &[u8]) -> TestResult<Vec<u8>> {
+fn host_whole_cell_style_exclusive_repeat_setup(source: &[u8]) -> TestResult<Vec<u8>> {
     let mut editor = numbers::Draft::from_bytes(source)?;
     let model = crate::numbers_cases::host_first_table_model_id(&editor)?;
     let style =
@@ -187,8 +184,7 @@ fn host_whole_cell_style_exclusive_repeat(source: &[u8]) -> TestResult<Vec<u8>> 
     Ok(editor.to_bytes()?)
 }
 
-#[inline(never)]
-fn leaf_whole_cell_style_exclusive_repeat(source: &[u8]) -> TestResult<Vec<u8>> {
+fn leaf_whole_cell_style_exclusive_repeat_setup(source: &[u8]) -> TestResult<Vec<u8>> {
     let package = litchi_numbers::Package::from_bytes(source)?;
     let properties = whole_cell_style_properties(21.0, false, true);
     let commit = package
@@ -198,8 +194,10 @@ fn leaf_whole_cell_style_exclusive_repeat(source: &[u8]) -> TestResult<Vec<u8>> 
     Ok(leaf_bytes!(commit.package()))
 }
 
-#[inline(never)]
-fn host_whole_cell_style_batch_1000(source: &[u8], cells: &[(u32, u32)]) -> TestResult<Vec<u8>> {
+fn host_whole_cell_style_batch_1000_setup(
+    source: &[u8],
+    cells: &[(u32, u32)],
+) -> TestResult<Vec<u8>> {
     let mut editor = numbers::Draft::from_bytes(source)?;
     let model = crate::numbers_cases::host_first_table_model_id(&editor)?;
     let style =
@@ -211,8 +209,10 @@ fn host_whole_cell_style_batch_1000(source: &[u8], cells: &[(u32, u32)]) -> Test
     Ok(editor.to_bytes()?)
 }
 
-#[inline(never)]
-fn leaf_whole_cell_style_batch_1000(source: &[u8], cells: &[(u32, u32)]) -> TestResult<Vec<u8>> {
+fn leaf_whole_cell_style_batch_1000_setup(
+    source: &[u8],
+    cells: &[(u32, u32)],
+) -> TestResult<Vec<u8>> {
     let package = litchi_numbers::Package::from_bytes(source)?;
     let properties = whole_cell_style_properties(19.0, true, false);
     let mut edit = package.edit_table_cell_text_style(0usize, 0usize)?;
@@ -225,23 +225,82 @@ fn leaf_whole_cell_style_batch_1000(source: &[u8], cells: &[(u32, u32)]) -> Test
     Ok(leaf_bytes!(edit.commit()?.package()))
 }
 
+fn leaf_whole_cell_style_batch_1000_proof(
+    source: &[u8],
+    cells: &[(u32, u32)],
+) -> TestResult<Vec<u8>> {
+    let package = litchi_numbers::Package::from_bytes(source)?;
+    let properties = whole_cell_style_properties(19.0, true, false);
+    let mut edit = package.edit_table_cell_text_style(0usize, 0usize)?;
+    for &(row, column) in cells {
+        edit = edit.set(
+            litchi_numbers::table::At::new(row, column),
+            properties.clone(),
+        )?;
+    }
+    let commit = edit.commit()?;
+    let output = leaf_bytes!(commit.package());
+    let restored = commit
+        .package()
+        .apply_table_cell_text_style(&commit.patch().inverse())?;
+    assert_eq!(leaf_bytes!(restored.package()), source);
+    Ok(output)
+}
+
+#[inline(never)]
+fn host_whole_cell_style_single(source: &[u8]) -> TestResult<Vec<u8>> {
+    host_whole_cell_style_single_setup(source)
+}
+
+#[inline(never)]
+fn leaf_whole_cell_style_single(source: &[u8]) -> TestResult<Vec<u8>> {
+    leaf_whole_cell_style_single_setup(source)
+}
+
+#[inline(never)]
+fn host_whole_cell_style_exclusive_repeat(source: &[u8]) -> TestResult<Vec<u8>> {
+    host_whole_cell_style_exclusive_repeat_setup(source)
+}
+
+#[inline(never)]
+fn leaf_whole_cell_style_exclusive_repeat(source: &[u8]) -> TestResult<Vec<u8>> {
+    leaf_whole_cell_style_exclusive_repeat_setup(source)
+}
+
+#[inline(never)]
+fn host_whole_cell_style_batch_1000(source: &[u8], cells: &[(u32, u32)]) -> TestResult<Vec<u8>> {
+    host_whole_cell_style_batch_1000_setup(source, cells)
+}
+
+#[inline(never)]
+fn leaf_whole_cell_style_batch_1000(source: &[u8], cells: &[(u32, u32)]) -> TestResult<Vec<u8>> {
+    leaf_whole_cell_style_batch_1000_setup(source, cells)
+}
+
 fn assert_whole_cell_style_output(
-    _source: &[u8],
-    output: &[u8],
+    host_output: &[u8],
+    leaf_output: &[u8],
     cells: &[(u32, u32)],
     size: f32,
     bold: bool,
     italic: bool,
 ) -> TestResult {
-    let package = litchi_numbers::Package::from_bytes(output)?;
-    let reopened = litchi_numbers::Package::from_bytes(output)?;
+    let host = litchi_numbers::Package::from_bytes(host_output)?;
+    let leaf = litchi_numbers::Package::from_bytes(leaf_output)?;
+    let reopened = litchi_numbers::Package::from_bytes(leaf_output)?;
     for &(row, column) in cells {
-        for candidate in [&package, &reopened] {
+        let host_properties = host.table_cell_text_style(
+            0usize,
+            0usize,
+            litchi_numbers::table::At::new(row, column),
+        )?;
+        for candidate in [&leaf, &reopened] {
             let properties = candidate.table_cell_text_style(
                 0usize,
                 0usize,
                 litchi_numbers::table::At::new(row, column),
             )?;
+            assert_eq!(properties, host_properties);
             assert_eq!(properties.size, Some(size));
             if bold {
                 assert_eq!(properties.bold, Some(true));
@@ -251,6 +310,56 @@ fn assert_whole_cell_style_output(
             }
         }
     }
+    Ok(())
+}
+
+fn assert_untouched_member_preserved(
+    source: &[u8],
+    output: &[u8],
+    excluded: &[&str],
+) -> TestResult {
+    let source = Catalog::from_bytes(source, ArchiveLimits::default())?;
+    let output = Catalog::from_bytes(output, ArchiveLimits::default())?;
+    for entry in source.iter() {
+        if excluded.contains(&entry.name()) {
+            continue;
+        }
+        let other = output
+            .iter()
+            .find(|candidate| candidate.name() == entry.name())
+            .ok_or("untouched member disappeared")?;
+        assert_eq!(
+            other.data(),
+            entry.data(),
+            "member changed: {}",
+            entry.name()
+        );
+    }
+    Ok(())
+}
+
+fn assert_batch_style_identity(output: &[u8]) -> TestResult {
+    let catalog = Catalog::from_bytes(output, ArchiveLimits::default())?;
+    let entry = catalog
+        .iter()
+        .find(|entry| entry.name() == "Index/Tables/DataList-904496-2.iwa")
+        .ok_or("style-list member missing")?;
+    let bytes = SnappyStream::decompress(entry.data(), Default::default())?;
+    let archive = Archive::parse(bytes.as_bytes(), Default::default())?;
+    let message = archive
+        .objects
+        .iter()
+        .flat_map(|object| object.messages.iter())
+        .find(|message| message.type_ == 6_005)
+        .ok_or("style-list payload missing")?;
+    let list = tst::TableDataList::decode(message.data.as_slice())?;
+    assert!(!list.entries.iter().any(|entry| entry.key == 1));
+    let fresh = list
+        .entries
+        .iter()
+        .filter(|entry| entry.key >= 2 && entry.refcount == 1)
+        .count();
+    assert_eq!(fresh, 1_000);
     Ok(())
 }
 
@@ -282,10 +391,9 @@ fn leaf_whole_cell_style_inverse(
 fn numbers_whole_cell_style_single_cost_abba() -> TestResult {
     let input = fixture("iwork/numbers/basic.numbers")?;
     let cells = [(1, 1)];
-    let host_setup = host_whole_cell_style_single(&input.bytes)?;
-    let leaf_setup = leaf_whole_cell_style_single(&input.bytes)?;
-    assert_whole_cell_style_output(&input.bytes, &host_setup, &cells, 18.0, true, false)?;
-    assert_whole_cell_style_output(&input.bytes, &leaf_setup, &cells, 18.0, true, false)?;
+    let host_setup = host_whole_cell_style_single_setup(&input.bytes)?;
+    let leaf_setup = leaf_whole_cell_style_single_setup(&input.bytes)?;
+    assert_whole_cell_style_output(&host_setup, &leaf_setup, &cells, 18.0, true, false)?;
     let _ = leaf_whole_cell_style_inverse(
         &input.bytes,
         &cells,
@@ -304,11 +412,10 @@ fn numbers_whole_cell_style_single_cost_abba() -> TestResult {
 fn numbers_whole_cell_style_exclusive_repeat_cost_abba() -> TestResult {
     let input = fixture("iwork/numbers/basic.numbers")?;
     let cells = [(1, 1)];
-    let seeded = host_whole_cell_style_single(&input.bytes)?;
-    let host_setup = host_whole_cell_style_exclusive_repeat(&seeded)?;
-    let leaf_setup = leaf_whole_cell_style_exclusive_repeat(&seeded)?;
-    assert_whole_cell_style_output(&seeded, &host_setup, &cells, 21.0, false, true)?;
-    assert_whole_cell_style_output(&seeded, &leaf_setup, &cells, 21.0, false, true)?;
+    let seeded = host_whole_cell_style_single_setup(&input.bytes)?;
+    let host_setup = host_whole_cell_style_exclusive_repeat_setup(&seeded)?;
+    let leaf_setup = leaf_whole_cell_style_exclusive_repeat_setup(&seeded)?;
+    assert_whole_cell_style_output(&host_setup, &leaf_setup, &cells, 21.0, false, true)?;
     let _ = leaf_whole_cell_style_inverse(
         &seeded,
         &cells,
@@ -327,29 +434,33 @@ fn numbers_whole_cell_style_exclusive_repeat_cost_abba() -> TestResult {
 fn numbers_whole_cell_style_batch_1000_cost_abba() -> TestResult {
     let fixture = shared_1000_cell_style_fixture()?;
     assert_eq!(fixture.cells.len(), 1_000);
-    let host_setup = host_whole_cell_style_batch_1000(&fixture.bytes, &fixture.cells)?;
-    let leaf_setup = leaf_whole_cell_style_batch_1000(&fixture.bytes, &fixture.cells)?;
-    assert_whole_cell_style_output(
+    let host_setup = host_whole_cell_style_batch_1000_setup(&fixture.bytes, &fixture.cells)?;
+    let leaf_setup = leaf_whole_cell_style_batch_1000_proof(&fixture.bytes, &fixture.cells)?;
+    assert_whole_cell_style_output(&host_setup, &leaf_setup, &fixture.cells, 19.0, true, false)?;
+    assert_untouched_member_preserved(
         &fixture.bytes,
         &host_setup,
-        &fixture.cells,
-        19.0,
-        true,
-        false,
+        &[
+            "Index/Tables/Tile.iwa",
+            "Index/Tables/DataList-904496-2.iwa",
+            "Index/CalculationEngine.iwa",
+            "Index/DocumentStylesheet.iwa",
+            "Index/Metadata.iwa",
+        ],
     )?;
-    assert_whole_cell_style_output(
+    assert_untouched_member_preserved(
         &fixture.bytes,
         &leaf_setup,
-        &fixture.cells,
-        19.0,
-        true,
-        false,
+        &[
+            "Index/Tables/Tile.iwa",
+            "Index/Tables/DataList-904496-2.iwa",
+            "Index/CalculationEngine.iwa",
+            "Index/DocumentStylesheet.iwa",
+            "Index/Metadata.iwa",
+        ],
     )?;
-    let _ = leaf_whole_cell_style_inverse(
-        &fixture.bytes,
-        &fixture.cells,
-        whole_cell_style_properties(19.0, true, false),
-    )?;
+    assert_batch_style_identity(&host_setup)?;
+    assert_batch_style_identity(&leaf_setup)?;
     black_box(host_whole_cell_style_batch_1000(
         &fixture.bytes,
         &fixture.cells,
@@ -836,29 +947,6 @@ fn shared_1000_cell_style_fixture() -> TestResult<WholeCellFixture> {
     let stylesheet_member = style_payload_member.clone();
     let stylesheet_compressed = style_payload_compressed.clone();
 
-    let metadata_entry = catalog
-        .iter()
-        .find(|entry| entry.name() == "Index/Metadata.iwa")
-        .ok_or("missing metadata member")?;
-    let metadata_member = metadata_entry.name().to_owned();
-    let metadata_bytes = SnappyStream::decompress(metadata_entry.data(), Default::default())?;
-    let mut metadata_archive = Archive::parse(metadata_bytes.as_bytes(), Default::default())?;
-    let metadata_message = metadata_archive
-        .objects
-        .iter_mut()
-        .flat_map(|object| object.messages.iter_mut())
-        .find(|message| message.type_ == 11_006)
-        .ok_or("missing metadata payload")?;
-    let mut metadata =
-        litchi_iwa_protos::tsp::PackageMetadata::decode(metadata_message.data.as_slice())?;
-    let revision = metadata.revision.get_or_insert_with(Default::default);
-    revision.identifier = Some("r".repeat(20_000));
-    metadata_message.data = metadata.encode_to_vec();
-    let metadata_compressed = SnappyStream::compress(
-        &metadata_archive.to_bytes(Default::default())?,
-        Default::default(),
-    )?;
-
     let tile_entry = catalog
         .iter()
         .find(|entry| {
@@ -1017,7 +1105,6 @@ fn shared_1000_cell_style_fixture() -> TestResult<WholeCellFixture> {
         ));
     }
     edits.push(EntryEdit::new(&stylesheet_member, &stylesheet_compressed));
-    edits.push(EntryEdit::new(&metadata_member, &metadata_compressed));
     edits.push(EntryEdit::new(&tile_member, &tile_compressed));
     edits.push(EntryEdit::new(&model_member, &model_compressed));
     let bytes = catalog.reassemble_to_bytes(&edits, ArchiveLimits::default())?;

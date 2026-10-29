@@ -614,10 +614,8 @@ fn publish(
                     fresh,
                 });
             }
-            let fallback_plan =
-                shared::plan_set_many_unprepared(source, &fallback_requests, &fallback_limits)
-                    .map_err(from_shared)?;
-            fallback_plan
+            shared::plan_set_many_unprepared(source, &fallback_requests, &fallback_limits)
+                .map_err(from_shared)?
         },
         Err(error) => return Err(from_shared(error)),
     };

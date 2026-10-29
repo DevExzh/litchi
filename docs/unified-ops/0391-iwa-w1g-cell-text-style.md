@@ -132,13 +132,15 @@ The current source contains three dedicated, non-inline ignored routes in
   and a host loop over the same cells.
 
 The source builder is outside the measured wrappers. It retains a valid
-Numbers registry, uses the modern tile storage fields, preserves a bounded
-known metadata revision payload, and leaves the selected cells/style graph
-source-relative. Each route performs host/leaf reopen/readback, locality and
-inverse checks before its exact host/leaf/leaf/host wrapper calls. The batch
-route now prepares the shared table/tile/style graph once, batches tile-key
-publication and batches readback preparation; it completed the 1,000-cell
-correctness route on this source. The final explicit run on this source was:
+Numbers registry, uses the modern tile storage fields, and leaves the
+selected cells/style graph source-relative. Metadata output admission now
+pre-charges bounded registry growth for the batch instead of relying on
+fixture-sized quota padding. Each route performs host/leaf reopen/readback,
+locality, refcount/identity, and inverse checks before its exact
+host/leaf/leaf/host wrapper calls. The batch route now prepares the shared
+table/tile/style graph once, batches tile-key publication and batches
+readback preparation; it completed the 1,000-cell correctness route on this
+source. The final explicit run on this source was:
 
 ```text
 cargo test --offline -p litchi-iwa --test parity \

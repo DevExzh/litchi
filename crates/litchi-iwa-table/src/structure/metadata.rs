@@ -16,7 +16,8 @@ use litchi_iwa_protos::package_metadata_codec::{
     ExternalReferenceAddition, ExternalReferenceDescriptor, ExternalReferenceRemoval,
     ObjectUuidAddition, ObjectUuidDescriptor, ObjectUuidRemoval, PackageMetadataVisitor,
     RemovalBatch, RemovalSaveTokenBatch, RewriteError, RewriteLimit, RewriteOptions,
-    SaveTokenBatch, UuidBits, inspect_package_metadata_with_visitor, rewrite_package_metadata,
+    SaveTokenBatch, UuidBits, inspect_package_metadata_with_visitor,
+    prepare_package_metadata_rewrite, rewrite_package_metadata,
     rewrite_package_metadata_additions_and_save_tokens,
     rewrite_package_metadata_combined_additions_and_removals_and_save_tokens,
     rewrite_package_metadata_component_removals, rewrite_package_metadata_removals_and_save_tokens,
@@ -302,23 +303,29 @@ fn options(
     payload: usize,
     additions: usize,
 ) -> RewriteOptions {
-    let components = working.source().catalog().len().max(payload).max(1);
-    let output = payload.saturating_mul(2).saturating_add(4_096);
+    let components = working
+        .source()
+        .catalog()
+        .len()
+        .saturating_add(additions)
+        .max(1);
+    let output = working
+        .archive_limits()
+        .max_message_bytes()
+        .min(litchi_iwa_common::WireLimits::MAX_OUTPUT_BYTES);
+    let work = working
+        .archive_limits()
+        .max_header_memory_bytes()
+        .min(litchi_iwa_common::WireLimits::MAX_REWRITE_WORK)
+        .max(1);
     RewriteOptions::new(
         payload.max(1),
         output,
-        payload
-            .saturating_mul(4)
-            .saturating_add(additions.saturating_mul(16))
-            .max(64),
-        payload
-            .saturating_mul(256)
-            .saturating_add(
-                components
-                    .saturating_mul(additions.max(1))
-                    .saturating_mul(64),
-            )
-            .clamp(1, litchi_iwa_common::WireLimits::MAX_REWRITE_WORK),
+        working
+            .archive_limits()
+            .max_header_fields()
+            .min(litchi_iwa_common::WireLimits::MAX_FIELDS),
+        work,
         64,
         components.saturating_add(additions),
         working.source().max_references().max(1),
@@ -787,11 +794,11 @@ pub fn apply(
                 options,
             )
         } else if adds && !removes {
-            rewrite_package_metadata(
-                source,
-                Batch::new(current, last, &uuid_additions, &external_additions),
-                options,
-            )
+            let batch = Batch::new(current, last, &uuid_additions, &external_additions);
+            let prepared = prepare_package_metadata_rewrite(source, batch, options)
+                .map_err(|error| map_rewrite(&error))?;
+            let execution_limits = prepared.execution_requirements().exact_limits();
+            prepared.execute(execution_limits)
         } else {
             rewrite_package_metadata_combined_additions_and_removals_and_save_tokens(
                 source,
