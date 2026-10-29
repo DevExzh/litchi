@@ -1045,14 +1045,6 @@ fn strict_clear_reference_census<P: TableLeaf>(
             }
         }
     }
-    for identifier in visitor.references {
-        if identifier == 0 {
-            return Err(Fault::Invalid);
-        }
-        if working.locate(identifier)?.is_none() {
-            return Err(Fault::Dependency);
-        }
-    }
     if visitor.root_occurrences == 0 || visitor.unexpected_root {
         return Err(Fault::Dependency);
     }
