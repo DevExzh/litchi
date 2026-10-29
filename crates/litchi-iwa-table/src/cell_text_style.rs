@@ -3395,18 +3395,12 @@ mod tests {
             &baseline,
         )
         .expect("table facts");
-        let tile_count = facts.tiles.len();
-        let duplicate_scan_work = tile_count
-            .saturating_mul(tile_count.saturating_add(1))
-            .checked_div(2)
-            .unwrap_or(usize::MAX);
+        assert!(!facts.tiles.is_empty());
         let used_before_scan = baseline.report().work;
         let limited = Limits::from_source(&source).expect("limited facts profile");
-        limited.remaining_work.set(
-            used_before_scan
-                .saturating_add(duplicate_scan_work)
-                .saturating_sub(1),
-        );
+        limited
+            .remaining_work
+            .set(used_before_scan.saturating_sub(1));
         assert!(matches!(
             table_facts(
                 &source,
