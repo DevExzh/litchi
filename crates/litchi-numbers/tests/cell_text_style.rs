@@ -9,13 +9,15 @@ use litchi_iwa_archive::{
 };
 use litchi_iwa_common::{WireLimits, wire::WireView};
 use litchi_iwa_core::{Archive, SnappyStream};
-use litchi_iwa_protos::tst;
+use litchi_iwa_protos::{tsp, tst};
 use litchi_numbers::cell::text_style::{CharacterProperties, Error};
 use litchi_numbers::table::cells::Input;
 use litchi_numbers::{At, Package};
 use prost::Message as _;
 
 type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
+
+const PACKAGE_METADATA_MESSAGE_TYPE: u32 = 11_006;
 
 fn bytes(package: &Package) -> TestResult<Vec<u8>> {
     let mut output = Vec::new();
@@ -122,7 +124,7 @@ fn shared_text_style_source() -> TestResult<SharedTextStyleSource> {
     style_list.entries.push(tst::table_data_list::ListEntry {
         key: shared_key,
         refcount: 2,
-        reference: Some(litchi_iwa_protos::tsp::Reference {
+        reference: Some(tsp::Reference {
             identifier: style_id,
             ..Default::default()
         }),
@@ -355,6 +357,32 @@ fn style_entries(bytes: &[u8]) -> TestResult<Vec<(u32, u32)>> {
         }
     }
     Err("missing style-list payload".into())
+}
+
+fn metadata_last_object_identifier(bytes: &[u8]) -> TestResult<u64> {
+    let catalog = Catalog::from_bytes(bytes, ArchiveLimits::default())?;
+    let mut values = Vec::new();
+    for entry in catalog
+        .iter()
+        .filter(|entry| entry.name().ends_with(".iwa"))
+    {
+        let bytes = SnappyStream::decompress(entry.data(), Default::default())?;
+        let archive = Archive::parse(bytes.as_bytes(), Default::default())?;
+        for object in archive.objects {
+            for message in object.messages {
+                if message.type_ == PACKAGE_METADATA_MESSAGE_TYPE {
+                    values.push(
+                        tsp::PackageMetadata::decode(message.data.as_slice())?
+                            .last_object_identifier,
+                    );
+                }
+            }
+        }
+    }
+    match values.as_slice() {
+        [value] => Ok(*value),
+        _ => Err(format!("expected one package watermark, found {values:?}").into()),
+    }
 }
 
 fn paragraph_style_payload(bytes: &[u8], identifier: u64) -> TestResult<Vec<u8>> {
@@ -1010,6 +1038,8 @@ fn mixed_noop_batch_allocates_only_changed_style() -> TestResult {
     let package = Package::from_bytes(&source)?;
     let first_before = cell_style_identity(&source, first)?;
     let second_before = cell_style_identity(&source, second)?;
+    let source_entry_count = style_entries(&source)?.len();
+    let source_watermark = metadata_last_object_identifier(&source)?;
     let noop = package.table_cell_text_style(0, 0, first)?;
     let mut changed = CharacterProperties::new();
     changed.size = Some(73.0);
@@ -1020,6 +1050,13 @@ fn mixed_noop_batch_allocates_only_changed_style() -> TestResult {
         .commit()?;
     let output = bytes(commit.package())?;
     assert_eq!(cell_style_identity(&output, first)?, first_before);
+    assert_eq!(style_entries(&output)?.len(), source_entry_count + 1);
+    assert_eq!(
+        metadata_last_object_identifier(&output)?,
+        source_watermark
+            .checked_add(1)
+            .ok_or("watermark overflow")?
+    );
     let second_after = cell_style_identity(&output, second)?;
     assert_ne!(second_after.0, second_before.0);
     assert_ne!(second_after.1, second_before.1);
