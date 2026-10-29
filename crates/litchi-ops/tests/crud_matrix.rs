@@ -384,8 +384,12 @@ const SPECS: &[Spec] = &[
             "iwork/pages/basic.pages",
             // Record 0299: body tables, cells and anchored paragraphs.
             "iwork/pages/body-table-read-native.pages",
+            "iwork/pages/body-table-visible.pages",
             // Record 0309: a body table without formulas takes cell values.
             "iwork/pages/body-table-name-focused.pages",
+            // Record 0404: a native chart-grid fixture exercises the chart
+            // get/find/query/view/set checklist cells on a real chart node.
+            "iwork/pages/chart-grid-authored-native.pages",
         ],
     },
     Spec {
@@ -415,6 +419,9 @@ const SPECS: &[Spec] = &[
             "iwork/numbers/cell-value-native.numbers",
             "iwork/numbers/table-merges-native.numbers",
             "iwork/numbers/table-relocation-native.numbers",
+            // Record 0404: a native chart-grid fixture exercises the chart
+            // get/find/query/view/set checklist cells on a real chart node.
+            "iwork/numbers/chart-grid-authored-native.numbers",
         ],
     },
 ];
@@ -1135,8 +1142,8 @@ const RECIPES: &[Recipe] = &[
     },
     Recipe {
         format: "pages",
-        element: "tbl",
-        fixture: "iwork/pages/body-table-read-native.pages",
+        element: "table",
+        fixture: "iwork/pages/body-table-visible.pages",
         parent: "/body",
         props: &[("rows", "2"), ("cols", "2"), ("data", "a,b;c,d")],
         start: false,
@@ -1198,6 +1205,17 @@ const SEEDS: &[(&str, &[Step])] = &[
         ],
     ),
     ("ods", &[Step::Set("/Sheet1/A1:B2", &[("merge", "true")])]),
+    // Record 0404: seed a named, non-empty second section so the claimed
+    // section removal cell exercises a removable sibling, not the required
+    // first section or an empty section that Pages correctly refuses.
+    (
+        "pages",
+        &[
+            Step::Add("/body", "paragraph", &[("text", "Intro")]),
+            Step::Add("/", "section", &[("name", "Appendix")]),
+            Step::Set("/section[2]", &[("text", "Tail")]),
+        ],
+    ),
     // Record 0309: character properties are written on runs of text boxes.
     (
         "keynote",
@@ -1582,6 +1600,19 @@ fn try_set(
                 .collect()
         } else {
             now.clone().into_iter().collect::<Vec<_>>()
+        };
+        // The chart-grid fixtures intentionally start at 12pt. Use a known
+        // distinct point size so the new chart CRUD cell proves mutation,
+        // reopen and transaction paths rather than only a no-op admission.
+        let values = if changed && element.name() == "chart" && property.name() == "font.size" {
+            let target = if now.as_deref() == Some("17pt") {
+                "19pt"
+            } else {
+                "17pt"
+            };
+            vec![target.to_owned()]
+        } else {
+            values
         };
         for value in values {
             let props = Props::new().with(property.name(), value.as_str());
@@ -2088,7 +2119,10 @@ fn run_format(spec: &Spec) -> Report {
         } else {
             let mut errors = Errors::default();
             let mut removed = None;
-            for instance in found.iter().take(10) {
+            // Keep the scan bounded, but reach a later sibling when the
+            // first candidate is structurally non-removable (for example,
+            // Pages' required first section).
+            for instance in found.iter().take(24) {
                 let file = &fixtures[instance.fixture].file;
                 match guarded(|| file.remove(instance.path.as_str()))
                     .and_then(|file| republish(&file))
