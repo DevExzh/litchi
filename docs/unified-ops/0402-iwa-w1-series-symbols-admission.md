@@ -7,6 +7,7 @@
   admission-review findings; `c0dfabd11678fb90bb2aea8c333e8ee4df6915f4` adds the exact codec/registry
   requirements repair after coordinator trunk
   `59a501492cb58a538085280e383007ca4d39dad7`.
+- Final clean WP tip after formatting: `5385fd632c8a28d4217422dcedae1c3b74cc81ac`.
 - Scope: shared chart-series symbol read/write admission, Numbers mechanical
   caller adoption, and the direct shared-engine parity caller. Pages and
   Keynote facade adoption remain owned by their work packages.
