@@ -507,7 +507,9 @@ fn rewrite_row(
 ) -> Result<RowRewrite, Error> {
     let wire = bnc_limits.wire();
     let view = view(row, transaction)?;
-    charge_view_scans(&view, transaction, 5)?;
+    // Five schema lookups plus the sizing and emission walks below.  Admit
+    // every borrowed-view pass before the first lookup starts.
+    charge_view_scans(&view, transaction, 7)?;
     let row_number =
         one_varint(&view, ROW_INDEX_FIELD)?.ok_or_else(|| invalid("tile row index is missing"))?;
     let row_number = u32::try_from(row_number).map_err(|_| invalid("tile row index overflow"))?;
@@ -642,6 +644,10 @@ fn rewrite_row(
     let mut offsets_field = Vec::new();
     append_bytes(&mut offsets_field, ROW_OFFSETS_FIELD, &new_offsets, wire)?;
     replacements.push((ROW_OFFSETS_FIELD, offsets_field));
+    let field_lookup_work = view
+        .len()
+        .saturating_mul(replacements.len().saturating_add(2));
+    transaction.admit_work(field_lookup_work)?;
     let output_len = view
         .fields()
         .map(|field| {
@@ -711,6 +717,7 @@ pub fn set_text_style_keys(
         .map_err(|_| Error::Allocation {
             amount: updates.len(),
         })?;
+    transaction.admit_work(updates.len())?;
     for (index, update) in updates.iter().copied().enumerate() {
         if usize::try_from(update.column).map_err(|_| invalid("tile column overflow"))? >= columns {
             return Err(Error::Refused(
@@ -722,7 +729,6 @@ pub fn set_text_style_keys(
         }
         indexed.push(IndexedUpdate { index, update });
     }
-    transaction.admit_work(updates.len())?;
     indexed.sort_by_key(|item| (item.update.row, item.update.column));
     transaction.admit_work(updates.len().saturating_mul(usize::BITS as usize))?;
     if indexed.windows(2).any(|pair| {
@@ -734,6 +740,9 @@ pub fn set_text_style_keys(
     let wire = bnc_limits.wire();
     let root = view(tile, transaction)?;
     let bnc_limits = build_bnc_limits(&bnc_limits, columns.max(updates.len()))?;
+    // The root is walked for row counting, row rewrites, and capacity
+    // discovery before the changed/no-op decision is known.
+    charge_view_scans(&root, transaction, 3)?;
     transaction.admit_allocations(1)?;
     let mut previous = Vec::new();
     previous
@@ -795,9 +804,9 @@ pub fn set_text_style_keys(
             amount: updates.len(),
         })?;
     let mut index = 0usize;
-    transaction.admit_work(indexed.len())?;
     while index < indexed.len() {
         let row = indexed[index].update.row;
+        transaction.admit_work(indexed.len())?;
         let end = indexed[index..]
             .iter()
             .position(|item| item.update.row != row)
@@ -909,9 +918,16 @@ pub fn set_text_style_keys(
             changed: false,
         });
     }
-    charge_view_scans(&root, transaction, 1)?;
+    // The remaining root passes are: old row-count lookup, output sizing, and
+    // final emission.  Admit all three before any of them starts.
+    charge_view_scans(&root, transaction, 3)?;
     let old_numrows = one_varint(&root, TILE_NUM_ROWS_FIELD)?
         .ok_or_else(|| invalid("tile row count is missing"))?;
+    let row_lookup_work = rewrites
+        .len()
+        .saturating_mul(existing_rows.len())
+        .saturating_mul(2);
+    transaction.admit_work(row_lookup_work)?;
     transaction.admit_work(
         rewrites
             .len()
@@ -940,7 +956,14 @@ pub fn set_text_style_keys(
         )
     };
     let mut output_len = 0usize;
-    transaction.admit_work(root.len())?;
+    transaction.admit_work(
+        (root.len().saturating_add(1)).saturating_mul(
+            rewrites
+                .len()
+                .saturating_mul(4)
+                .saturating_add(existing_rows.len().saturating_mul(2)),
+        ),
+    )?;
     for field in root.fields() {
         let length = if field.number() == TILE_ROW_FIELD {
             let row_view = view(field.payload(), transaction)?;
@@ -965,7 +988,6 @@ pub fn set_text_style_keys(
             .checked_add(length)
             .ok_or_else(|| invalid("tile output length overflow"))?;
     }
-    transaction.admit_work(rewrites.len().saturating_add(existing_rows.len()))?;
     for rewrite in &rewrites {
         if !existing_rows.contains(&rewrite.row) {
             output_len = output_len
@@ -975,6 +997,7 @@ pub fn set_text_style_keys(
     }
     transaction.admit_output(output_len)?;
     transaction.admit_copies(output_len)?;
+    transaction.admit_work(output_len)?;
     transaction.admit_allocations(1)?;
     let mut output = Vec::new();
     output
@@ -1254,10 +1277,7 @@ mod tests {
 
     fn first_safe_update(tile: &[u8]) -> Update {
         let view = WireView::parse(tile, WireLimits::DEFAULT).expect("tile");
-        for field in view
-            .fields()
-            .filter(|field| field.number() == TILE_ROW_FIELD)
-        {
+        if let Some(field) = view.fields().find(|field| field.number() == TILE_ROW_FIELD) {
             let row_view = WireView::parse(field.payload(), WireLimits::DEFAULT).expect("row");
             let row = one_varint(&row_view, ROW_INDEX_FIELD)
                 .expect("row index")
@@ -1323,12 +1343,11 @@ mod tests {
                 cells
                     .into_iter()
                     .map(|cell| {
-                        cell.map(|bytes| {
+                        cell.and_then(|bytes| {
                             BncCell::parse(bytes, &BncLimits::DEFAULT)
                                 .expect("cell")
                                 .text_style_identifier()
                         })
-                        .flatten()
                     })
                     .collect(),
             ));
@@ -1607,6 +1626,48 @@ mod tests {
             .expect("narrow items");
         let bounded = build_bnc_limits(&narrow, 100).expect("intersected items");
         assert_eq!(bounded.max_items(), 1);
+    }
+
+    #[test]
+    fn cumulative_writer_work_refuses_one_unit_below_full_receipt() {
+        let source = tile(&[row(0, &[Some(&bnc(Some(3))), None], &[])], &[]);
+        let update = Update {
+            row: 0,
+            column: 0,
+            key: Some(7),
+        };
+        let full = transaction_limits();
+        let wire = BncLimits::from_wire_limits(full.wire);
+        set_text_style_keys(
+            &source,
+            2,
+            &[update],
+            RowPlacement::FieldOrder,
+            &full,
+            &wire,
+        )
+        .expect("full writer budget");
+        let used = full.report().work;
+        assert!(used > 1, "writer must charge multiple work units");
+
+        let limited = transaction_limits();
+        let leave = used - 1;
+        let debit = limited.max_work.saturating_sub(leave);
+        limited.admit_work(debit).expect("leave residual work");
+        assert!(matches!(
+            set_text_style_keys(
+                &source,
+                2,
+                &[update],
+                RowPlacement::FieldOrder,
+                &limited,
+                &wire,
+            ),
+            Err(Error::Limit {
+                kind: LimitKind::RewriteWork,
+                ..
+            })
+        ));
     }
 
     #[test]
