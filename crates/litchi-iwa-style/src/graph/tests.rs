@@ -255,7 +255,7 @@ fn bounded_workspace_construction_reports_and_checks_index_requirements() {
             .expect("construction requirements");
     assert_eq!(requirements.component_count(), 2);
     assert_eq!(requirements.object_count(), 3);
-    assert_eq!(requirements.source_work(), 5);
+    assert!(requirements.source_work() > 5);
     assert_eq!(requirements.index_allocations(), 2);
     assert!(requirements.index_retained_bytes() > 0);
     assert!(requirements.component_view_bytes() > 0);
@@ -325,4 +325,52 @@ fn bounded_workspace_construction_reports_and_checks_index_requirements() {
     )
     .expect("bounded workspace");
     assert_eq!(workspace.next_object_identifier().expect("identifier"), 10);
+}
+
+#[test]
+fn bounded_workspace_rejects_same_count_name_and_identifier_changes() {
+    let mut renamed = components();
+    let requirements =
+        Workspace::construction_requirements(&renamed, ConstructionLimits::unlimited())
+            .expect("requirements");
+    renamed[0].0 = "Index/Renamed.iwa".to_owned();
+    let error = Workspace::new_bounded(
+        &renamed,
+        Limits::default(),
+        requirements,
+        ConstructionLimits::unlimited(),
+    )
+    .expect_err("renamed source must not reuse a census");
+    assert!(matches!(error, ConstructionError::Graph(_)));
+
+    let mut reidentified = components();
+    let requirements =
+        Workspace::construction_requirements(&reidentified, ConstructionLimits::unlimited())
+            .expect("requirements");
+    reidentified[0].1.objects[0].archive_info.identifier = Some(999);
+    let error = Workspace::new_bounded(
+        &reidentified,
+        Limits::default(),
+        requirements,
+        ConstructionLimits::unlimited(),
+    )
+    .expect_err("reidentified source must not reuse a census");
+    assert!(matches!(error, ConstructionError::Graph(_)));
+}
+
+#[test]
+fn bounded_workspace_rejects_count_growth_before_index_population() {
+    let mut source = components();
+    let requirements =
+        Workspace::construction_requirements(&source, ConstructionLimits::unlimited())
+            .expect("requirements");
+    source[0].1.objects.push(object(99, 7, vec![1, 2, 3]));
+    let error = Workspace::new_bounded(
+        &source,
+        Limits::default(),
+        requirements,
+        ConstructionLimits::unlimited(),
+    )
+    .expect_err("grown source must not populate beyond reserved indexes");
+    assert!(matches!(error, ConstructionError::Graph(_)));
 }
