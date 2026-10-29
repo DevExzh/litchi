@@ -41,11 +41,11 @@ route-specific exemptions. Historical `--audit` input remains diagnostic-only;
 the new 69/87 runners derive validation from their own fresh output directory.
 
 External validator SHA-256:
-`64dd455f89805cef07a6a8951334345f04f1e81f638b0e1c6c338310211acd88`.
+`f02ac3354c747751f06cf15980d8613fcf74ab1b2699cf521f6b38ed783aa18d`.
 
 Synthetic derived-audit controls (`test_derived_call_audit.py`) pass positive,
 malformed-results, stale-source, and capture-hash-mismatch cases. Its SHA-256
-is `4e572387a53a08ee65a23c257231434b2826719338398ac346aa2d808eebfc4b`.
+is `ef3a1a926d021da80a50fd5071047b5a03e761d0b2fc537af1d3a5fa13d6119f`.
 
 New measurement-pipeline copies require `--call-audit` in measurement mode,
 strip it before delegating to the historical parser, and validate the raw audit
