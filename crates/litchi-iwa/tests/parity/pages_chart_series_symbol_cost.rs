@@ -21,19 +21,26 @@ const NATIVE: &str = "iwork/pages/chart-data-native.pages";
 
 #[derive(Clone, Copy)]
 enum Route {
-    Read,
-    Set,
-    Hide,
+    AllRead,
+    AllSet,
+    SingleRead,
+    SingleSet,
 }
 
 impl Route {
-    const ALL: [Self; 3] = [Self::Read, Self::Set, Self::Hide];
+    const ALL: [Self; 4] = [
+        Self::AllRead,
+        Self::AllSet,
+        Self::SingleRead,
+        Self::SingleSet,
+    ];
 
     const fn label(self) -> &'static str {
         match self {
-            Self::Read => "symbols_read",
-            Self::Set => "symbols_set",
-            Self::Hide => "symbols_hide",
+            Self::AllRead => "all_symbols_read",
+            Self::AllSet => "all_symbols_set",
+            Self::SingleRead => "single_symbol_read",
+            Self::SingleSet => "single_symbol_set",
         }
     }
 }
@@ -42,9 +49,6 @@ const VALUES: [Option<(SymbolShape, Option<f32>)>; 2] = [
     Some((SymbolShape::Diamond, Some(9.0))),
     Some((SymbolShape::Square, None)),
 ];
-const HIDDEN: [Option<(SymbolShape, Option<f32>)>; 2] =
-    [Some((SymbolShape::Square, Some(12.0))), None];
-
 fn data() -> TestResult<ChartData> {
     Ok(ChartData::new(
         vec!["Region 1".to_owned(), "Region 2".to_owned()],
@@ -133,11 +137,21 @@ fn pages_symbols_host_route(source: &[u8], route: Route) -> TestResult<Vec<u8>> 
     let mut editor = pages::Draft::from_bytes(source)?;
     let id = host_id(&editor)?;
     match route {
-        Route::Read => {
+        Route::AllRead => {
             let _ = black_box(editor.body_chart_series_symbols(id)?);
         },
-        Route::Set => editor.set_body_chart_series_symbols(id, &host_values(&VALUES)?)?,
-        Route::Hide => editor.set_body_chart_series_symbols(id, &host_values(&HIDDEN)?)?,
+        Route::AllSet => editor.set_body_chart_series_symbols(id, &host_values(&VALUES)?)?,
+        Route::SingleRead => {
+            let _ = black_box(
+                editor
+                    .body_chart_series_symbol(id, litchi_iwa::charts::Index::from_zero_based(0))?,
+            );
+        },
+        Route::SingleSet => editor.set_body_chart_series_symbol(
+            id,
+            litchi_iwa::charts::Index::from_zero_based(0),
+            host_values(&VALUES)?[0],
+        )?,
     }
     Ok(editor.to_bytes()?)
 }
@@ -145,30 +159,47 @@ fn pages_symbols_host_route(source: &[u8], route: Route) -> TestResult<Vec<u8>> 
 #[inline(never)]
 fn pages_symbols_leaf_route(source: &[u8], route: Route) -> TestResult<Vec<u8>> {
     let package = Package::from_bytes(source)?;
-    if matches!(route, Route::Read) {
-        black_box(package.body_chart_series(BodyChartSelector::index(0))?);
-        return Ok(leaf_bytes!(&package));
+    match route {
+        Route::AllRead => {
+            black_box(package.body_chart_series(BodyChartSelector::index(0))?);
+            Ok(leaf_bytes!(&package))
+        },
+        Route::SingleRead => {
+            let values = match package.body_chart_series(BodyChartSelector::index(0))? {
+                Property::Symbols(values) => values,
+                _ => return Err("unexpected Pages series property".into()),
+            };
+            black_box(values.first().copied());
+            Ok(leaf_bytes!(&package))
+        },
+        Route::AllSet => {
+            let mut edit = package.edit_body_chart_series(BodyChartSelector::index(0))?;
+            edit = edit.set(Property::Symbols(leaf_values(&VALUES)?))?;
+            Ok(leaf_bytes!(edit.commit()?.package()))
+        },
+        Route::SingleSet => {
+            let current = match package.body_chart_series(BodyChartSelector::index(0))? {
+                Property::Symbols(values) => values,
+                _ => return Err("unexpected Pages series property".into()),
+            };
+            let mut values = current;
+            values[0] = leaf_values(&VALUES)?[0];
+            let mut edit = package.edit_body_chart_series(BodyChartSelector::index(0))?;
+            edit = edit.set(Property::Symbols(values))?;
+            Ok(leaf_bytes!(edit.commit()?.package()))
+        },
     }
-    let values = if matches!(route, Route::Set) {
-        &VALUES
-    } else {
-        &HIDDEN
-    };
-    let mut edit = package.edit_body_chart_series(BodyChartSelector::index(0))?;
-    edit = edit.set(Property::Symbols(leaf_values(values)?))?;
-    Ok(leaf_bytes!(edit.commit()?.package()))
 }
 
-/// Full-facade Pages symbol routes.  Set `W2B_SYMBOL_ROUTE` to
-/// `symbols_read`, `symbols_set`, or `symbols_hide` to isolate one symbol.
+/// Full-facade Pages symbol routes. Set `W2B_SYMBOL_ROUTE` to
+/// `all_symbols_read`, `all_symbols_set`, `single_symbol_read`, or
+/// `single_symbol_set` to isolate one route. Hide remains a parity control,
+/// outside the measured wrappers.
 #[test]
 #[ignore = "full-facade release cost probe; run explicitly under callgrind"]
 fn pages_chart_series_symbols_facade_cost_abba() -> TestResult {
     let filter = std::env::var("W2B_SYMBOL_ROUTE").ok();
-    let mut source = input()?.bytes;
-    if filter.as_deref() == Some("symbols_hide") {
-        source = pages_symbols_host_route(&source, Route::Set)?;
-    }
+    let source = input()?.bytes;
     for route in Route::ALL {
         if filter
             .as_deref()
