@@ -51,6 +51,14 @@ against the normalized manifest after the parent run succeeds:
 
 Historical runners and manifests remain the immutable parents of these copies.
 
+After ownership acknowledgement, the cached-formula unified probe received a
+separate source commit `numbers_unified.rs` wrapper split: warm-up and output
+checks call setup implementations whose names cannot match the measured
+symbols, while the exact ABBA wrappers remain
+`numbers_unified::unified_cached_formula_route` and
+`numbers_unified::direct_cached_formula_route`. This is intentionally a
+separate follow-up commit so the E-owned comment proof can merge independently.
+
 No capture, timing, binary, native, or performance result is claimed by this
 record. Final qualification must run on the repaired source after coordinator
 review and integrated-source freeze.
