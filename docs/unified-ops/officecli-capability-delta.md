@@ -36,7 +36,7 @@ row has no disposition.
 | golden | `crates/litchi-ops/tests/golden/registry/pptx.json` | `6a20ea27b072892d6d6477ab362de4e9e11c2a6474dfa0acbe8a4941377a642e` |
 | golden | `crates/litchi-ops/tests/golden/registry/ppt.json` | `4d17817dc9d2dfe0013cc5b0e54c36ef7fccf98a7bbc3bce3c532336e56158e8` |
 | golden | `crates/litchi-ops/tests/golden/registry/keynote.json` | `104f4afa7068abc7bbe1d9e51861f007ee37cb23f5ff4fad6537de7fbcecff14` |
-| golden | `crates/litchi-ops/tests/golden/registry/numbers.json` | `c6a58cdfaf52bdd156c37f6e5d6b8e671ed25b5668a8a2d71016dc4b0a13de29` |
+| golden | `crates/litchi-ops/tests/golden/registry/numbers.json` | `b0411241d942372dd54a982c8586d54243512f594a1f2e06ceea28ff305acf60` |
 | golden | `crates/litchi-ops/tests/golden/registry/odb.json` | `6db2565f0802f112be6d3db035e0444e2e132d7c24546c7ff18ec004de4fada7` |
 | golden | `crates/litchi-ops/tests/golden/registry/odc.json` | `b3d7d096e06b8dd2300d8d27d56449e1cbba6976e302308f6cc47db1090bd8ee` |
 | golden | `crates/litchi-ops/tests/golden/registry/odf.json` | `7f3d45bc3a6a7be93cb0cf50617df4c59fe2c13236ce331e3142f38229005a41` |
