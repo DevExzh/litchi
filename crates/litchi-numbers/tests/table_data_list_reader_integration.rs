@@ -1712,6 +1712,21 @@ fn root_comment_clear_rejects_lossy_metadata_and_storage_object_rewrites() -> Te
         )?;
         Ok(archive.to_bytes(Default::default())?)
     })?;
+    let unknown_storage_field = rewrite_iwa_member(source, "Index/Document.iwa", |stream| {
+        let mut archive = Archive::parse(&stream, Default::default())?;
+        let storage = archive
+            .objects
+            .iter_mut()
+            .find(|object| object.archive_info.identifier == Some(51))
+            .ok_or_else(|| std::io::Error::other("fixture storage object is missing"))?;
+        let message = storage
+            .messages
+            .iter_mut()
+            .find(|message| message.type_ == COMMENT_STORAGE_MESSAGE_TYPE)
+            .ok_or_else(|| std::io::Error::other("fixture comment storage message is missing"))?;
+        litchi_iwa_common::wire::append_varint_field(&mut message.data, 99, 1)?;
+        Ok(archive.to_bytes(Default::default())?)
+    })?;
     let opaque_table_candidate = rewrite_iwa_member(source, "Index/Document.iwa", |stream| {
         let mut archive = Archive::parse(&stream, Default::default())?;
         archive.objects.push(object(99_998, 6_000, Vec::new())?);
@@ -1732,6 +1747,19 @@ fn root_comment_clear_rejects_lossy_metadata_and_storage_object_rewrites() -> Te
         ),
         (
             extra_storage_message,
+            TableCellCommentError::Refused(
+                litchi_numbers::cell::comment::Refusal::UnsupportedDependency {
+                    path: TableCellCommentPath::Cell {
+                        sheet: 0,
+                        table: 0,
+                        row: 1,
+                        column: 1,
+                    },
+                },
+            ),
+        ),
+        (
+            unknown_storage_field,
             TableCellCommentError::Refused(
                 litchi_numbers::cell::comment::Refusal::UnsupportedDependency {
                     path: TableCellCommentPath::Cell {

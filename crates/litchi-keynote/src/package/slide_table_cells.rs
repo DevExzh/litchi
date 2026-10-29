@@ -67,6 +67,11 @@ impl<'source> SelectedSlideTableStorage<'source> {
         self.data_store
     }
 
+    /// Borrow the validated sparse tile routes for a focused table writer.
+    pub(crate) fn tiles(&self) -> &[wire_cells::TileReference] {
+        &self.tiles
+    }
+
     #[must_use]
     pub(crate) fn dimensions(&self) -> wire_cells::TableDimensions {
         wire_cells::TableDimensions::new(

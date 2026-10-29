@@ -173,6 +173,11 @@ impl<'source> SelectedBodyTableStorage<'source> {
         self.data_store
     }
 
+    /// Borrow the validated sparse tile routes for a focused table writer.
+    pub(crate) fn tiles(&self) -> &[wire_cells::TileReference] {
+        &self.tiles
+    }
+
     /// Feed all selected cells to a Pages-owned semantic sink.
     pub(crate) fn read_into<Budget, Sink, Resolve>(
         &self,
@@ -1705,6 +1710,13 @@ fn map_formula_decode_error(error: litchi_iwa_protos::numbers_formula_codec::Dec
         Some(DecodeLimit::Work { observed, maximum })
         | Some(DecodeLimit::Nodes { observed, maximum }) => Error::Limit {
             kind: LimitKind::WireWork,
+            observed: usize_as_u64(observed),
+            maximum: usize_as_u64(maximum),
+        },
+        Some(DecodeLimit::Owners { observed, maximum }) => Error::Limit {
+            // The Pages compatibility reader exposes resolved owner entries
+            // through its existing payload-reference dimension.
+            kind: LimitKind::PayloadReferences,
             observed: usize_as_u64(observed),
             maximum: usize_as_u64(maximum),
         },

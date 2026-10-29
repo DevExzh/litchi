@@ -6867,3 +6867,161 @@ See [0063](0063-source-pptx-modern-comments.md).
   No API, ledger or native disposition changes. The next integrated source
   receives fresh post-merge checks, all 53 gate rows, the complete 56-route
   iWork and 14-comparison FIN instruction matrices, then quiet wall/CLI runs.
+
+- Post-merge checks on `9932c7d069` passed on unchanged clean source. Its long
+  gate was held to finish the in-flight W1-G comments slice before freezing
+  the combined candidate. The failed `177ef72ce0` gate and its passing
+  source-bound instruction receipts remain preserved; neither qualifies a
+  later source.
+- Accepted W1-G `fd204957f1` (record 0379), synchronized with `9932c7d069`.
+  Pages, Keynote and Numbers share the bounded root-comment rewrite engine.
+  Pages and Keynote expose the canonical read/edit/apply families, with
+  replies read from the returned comment snapshot. Existing Numbers APIs
+  remain intact. Resource limits retain their dimensions through parser,
+  codec, graph and candidate-readback adapters; focused refusals remain
+  terminal. Full reply-thread mutation and broader host profiles remain
+  explicit follow-ups.
+- Differential proof uses the independent Numbers legacy oracle, populated
+  direct reader comparisons, exact inverse/source checks, and scoped Tier B
+  policies. Pages fresh creation validates the host's generated local author
+  and existing author registry against the leaf's authorless profile; only
+  the selected new identities are normalized. Numbers clear validates the
+  selected list's source-derived counter policy. Existing roots, replies,
+  unrelated content and unknown bytes stay exact, with corruption controls
+  for references, metadata, nested fields and counter encodings. Nine
+  Numbers and six Pages focused checks pass, along with the Keynote slice
+  checks, strict scoped Clippy, default compilation, formatting, rustdoc,
+  all 73 glossary profiles, ledger, boundaries, no-`3rdparty` and all three
+  affected locked offline fuzz workspaces.
+- The twelve full-facade comment cost routes pass on measured source
+  `9d9666b782`: 24 CPU-3 Callgrind captures and 36 matching test logs, with
+  archived binary identity and exact inclusive probe attribution verified
+  independently by the coordinator. The worst slowdown is Numbers set at
+  +0.984293%; the other eleven routes use fewer instructions than the host.
+  Numbers create/clear measure forward publication without inverse work.
+  These results qualify the slice, not the subsequent integrated candidate
+  or the unified `File` stack.
+- The ledger now has 1,179 migrated, 43 retired and 1,009 host-only rows.
+  The comments family has five migrated reads, fourteen host-only mutation
+  rows and three retired oracle seams; the whole-ledger delta is three new
+  migrated reads and three retired seams. All 492 pending native routes
+  still block W3. Native-authored read receipts are not mutation acceptance.
+  The next frozen candidate will include the separately accepted W2-D
+  example/test slices, then receive all 53 gate rows, 68 iWork instruction
+  routes (135 captures), 14 FIN comparisons and a quiet wall/CLI interval.
+- At the user's request, the coordinator removed 33 clean inactive merged
+  worktrees and 27 merged local branches. Active checkouts, unmerged work and
+  eighteen historical worktrees with local changes were preserved. Release
+  artifacts, local locks and saved evidence were retained outside the retired
+  checkouts with an external inventory. Integration source was unchanged by
+  cleanup; future completed work packages receive the same ancestry and
+  local-state checks before retirement.
+
+- Post-merge checks on `1e3978082b` passed on unchanged clean source:
+  workspace all-target/all-feature compilation, all 20 locked offline fuzz
+  workspaces, crate boundaries and exit ledger. The completed W1-G and
+  Numbers-proof worktrees and branches were then retired after artifact
+  preservation, bringing this continuation's cleanup to 35 worktrees and
+  29 branches.
+- Accepted W2-D `021bfd23ff` (code `3525ba2180`, record 0388), synchronized
+  with the comments integration. The Numbers hidden-axis create and visible
+  row/column insertion examples now live in the leaf crate and use focused
+  selectors and transactions. The insertion example checks 6×4 to 7×5
+  extents, shifted hidden indices and saved-file reopen. The host physical
+  deletion example remains byte-identical: clearing visibility is not a
+  replacement for deletion. Both examples build and run on the synchronized
+  source; strict scoped Clippy, formatting and repository guards pass.
+  No runtime, ledger, native-evidence or performance disposition changes.
+
+- Post-merge checks on `63f860e2e6` passed on unchanged clean source:
+  workspace all-target/all-feature compilation, all 20 locked offline fuzz
+  workspaces, crate boundaries and exit ledger.
+- Accepted W2-D `cdfad94023` (code `f10b03fc74`, record 0389), synchronized
+  with the example integration. Three focused Numbers duplication tests
+  supplement the four unchanged host provenance regressions. The leaf cases
+  retain formula-plus-cache inputs, verify cloned/source formula text and
+  values, storage independence, ordering, exact inverse, invalid-selector
+  transactionality and reopen behavior. The multi-table investigation found
+  that sheet duplication succeeds but a subsequent formula edit on the clone
+  refuses with `FormulaWork { observed: 3, maximum: 1 }`; replacing formulas
+  with numeric literals would hide that gap. The separate 0390 repair must
+  give AST nodes and resolved-owner registry entries independent ceilings.
+  This coverage slice does not change runtime behavior, remove host tests,
+  or claim that repair. Three focused tests, strict Clippy, formatting and
+  repository guards pass on the synchronized source.
+- Freeze the combined comments/examples/test candidate after its post-merge
+  checks. Rebuild every final qualification binary from that exact commit,
+  including `parity-host-oracle` for the four Numbers comment probes, and run
+  all 53 gate rows plus all 68 iWork routes and 14 FIN comparisons. Wall/CLI
+  qualification waits for the gate, builds and instruction captures to finish
+  and for a quiet interval. Chart-font admission/facades, the 0390 formula
+  repair and 0391 shared cell-text-style extraction remain isolated next-wave
+  work; their preparation results do not qualify this frozen candidate.
+
+- Post-merge checks on `295b421bcd` passed, but its full gate failed leaf-test
+  row 30. Five existing Numbers comment tests exposed newly refused author,
+  corpus and metadata-mirror profiles, and a destructive clear which bypassed
+  the prior losslessness proof. The coordinator stopped the run during row 33:
+  33 rows completed, 32 passed, and row 30 failed. Logs and the partial receipt
+  remain external under `.coord/resume-20261028/full-295b421bcd/`; this is not
+  a full-gate green result. All 68 iWork instruction routes (135 captures) and
+  all 14 FIN comparisons (56 captures) passed on that exact source, but those
+  receipts do not qualify its repair. Wall/CLI timing was never launched.
+- Accepted comments repair `07b166c9b2` (runtime `67427c20f1`, records
+  0392/0393). All three format facades still use the shared writer. The repair
+  restores Numbers multicomponent roots, populated-list allocation, author
+  creation/reuse and source-shaped metadata mirrors. Destructive clears now
+  require strict archive-reference inspection, canonical storage/header and
+  model/tile validation, selected list/segment ownership and lossless mirror
+  updates. Unknown metadata cannot hide a surviving reference to the deleted
+  root. Unrelated unresolved known references remain allowed and byte-exact;
+  requiring the entire unrelated graph to resolve had incorrectly rejected a
+  native Keynote source.
+- The five original regressions pass unchanged. The six Numbers comment
+  suites pass (2/2/25/31/5/17), as do thirteen clear-safety controls covering
+  valid clear/inverse, unknown and known surviving references, opaque sibling
+  messages, unknown payloads, header mismatches and malformed table metadata.
+  Original Keynote, Pages and Numbers comment parity cases also pass (6/6/9).
+  Scoped Clippy, formatting, rustdoc, glossary, boundaries, ledger,
+  no-`3rdparty` and affected fuzz-lock checks pass. The corrected twelve-route
+  full-facade instruction matrix passes on `67427c20f1`, with 24 captures,
+  archived binary/source identities and exact probe attribution independently
+  checked. Numbers set is the worst delta at +0.993931%; the stricter Numbers
+  clear remains 7.803% below the host. Native acceptance remains pending.
+- Ledger and native dispositions are unchanged: 1,179 migrated, 43 retired,
+  1,009 host-only, and 492 pending native routes. The next candidate also
+  includes the separately reviewed 0390 formula-owner admission repair, then
+  receives fresh post-merge checks, all 53 gate rows, 69 iWork instruction
+  routes (137 captures), 14 FIN comparisons and the quiet wall/CLI interval.
+
+- Post-merge checks on `24ecfb5437` passed on unchanged clean source:
+  workspace all-target/all-feature compilation, all 20 locked offline fuzz
+  workspaces, crate boundaries and exit ledger. The completed repair and
+  independent proof worktrees/branches were retired with evidence retained,
+  bringing this continuation's cleanup to 39 worktrees and 33 branches.
+- Accepted 0390 `cd74237036`, synchronized with the comments repair.
+  Formula AST nodes and resolved-owner entries now have independent ceilings.
+  A one-node numeric formula no longer fails merely because its cloned table
+  uses a three-entry owner registry. Lowered owner ceilings are rechecked at
+  plan execution and registry reuse before callbacks; cache admission uses
+  the reference budget, and Numbers/Pages/Keynote merge adapters retain typed
+  owner-entry limits. The source-built multi-table formula edit now passes
+  with exact inverse, formula/cache readback and unrelated-table preservation.
+  The four original host provenance regressions remain intact.
+- Post-sync validation passed: 39 formula-codec, 49 formula-cache, 16 wire
+  merge, four duplication, 16 authoring, five formula-parity, eleven Pages
+  merge and four Keynote merge tests, plus the owner-workflow smoke, strict
+  scoped Clippy, formatting, boundary/ledger and repository guards. Four
+  release instruction routes passed on measured source `2e1a7a3f6a`, with
+  archived binary identity, eight capture/log hashes and exact probe
+  attribution independently verified. The owner-admission route measures two
+  formula writes, sheet duplication, a cloned formula/cache edit and final
+  serialization; its source builder is outside measurement. No native or
+  unified-`File` performance claim is inferred from this slice.
+- Freeze this combined repair candidate after post-merge checks for a fresh
+  complete 53-row gate, all 69 iWork routes (137 captures), all 14 FIN
+  comparisons and then quiet wall/CLI measurements. The 295b failures and
+  passing instruction receipts remain preserved as historical evidence.
+  Ledger/native totals remain unchanged; W3 is still blocked. Chart-font
+  facades and cell-text-style extraction remain separate work packages until
+  their full contracts, proofs and performance are accepted.

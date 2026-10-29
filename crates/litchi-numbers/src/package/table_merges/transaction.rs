@@ -901,6 +901,12 @@ fn map_header_error(error: super::super::table_headers::Error) -> TableMergesErr
                 LimitKind::WireFields => TableMergesLimitKind::WireFields,
                 LimitKind::WireNesting => TableMergesLimitKind::WireNesting,
                 LimitKind::WireWork => TableMergesLimitKind::WireWork,
+                // This legacy merge adapter exposes only its aggregate wire
+                // work budget; the focused table-header/comment routes keep
+                // these codec dimensions distinct before this boundary.
+                LimitKind::WireAllocations
+                | LimitKind::WireRetainedBytes
+                | LimitKind::WireScratchBytes => TableMergesLimitKind::WireWork,
                 LimitKind::TransactionWork => TableMergesLimitKind::WireWork,
             },
             observed,

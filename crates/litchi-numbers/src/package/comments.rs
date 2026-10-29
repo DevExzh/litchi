@@ -396,10 +396,42 @@ pub enum LimitKind {
     WireBytes,
     /// Protobuf rewrite work.
     WireWork,
+    /// Native objects inspected by the archive validator.
+    Objects,
+    /// Native messages inspected by the archive validator.
+    Messages,
+    /// Native messages per object inspected by the archive validator.
+    MessagesPerObject,
+    /// Native metadata items inspected by the archive validator.
+    MetadataItems,
+    /// Snappy frames inspected by the archive validator.
+    SnappyFrames,
+    /// Addressable table rows inspected.
+    TableRows,
+    /// Addressable table columns inspected.
+    TableColumns,
+    /// Addressable table cells inspected.
+    TableCells,
+    /// Materialized sparse table cells inspected.
+    MaterializedCells,
+    /// Repeated Numbers-wire items inspected.
+    Items,
     /// Comment text bytes retained or requested.
     TextBytes,
     /// Native references inspected.
     References,
+    /// Encoded native reference payload bytes inspected.
+    ReferenceBytes,
+    /// Reply records inspected.
+    Replies,
+    /// Wire nesting inspected.
+    WireNesting,
+    /// Temporary rewrite scratch bytes retained.
+    ScratchBytes,
+    /// Candidate bytes retained by the codec.
+    RetainedBytes,
+    /// Logical allocations requested by the codec.
+    Allocations,
     /// Compressed IWA member bytes inspected or emitted.
     CompressedBytes,
 }
@@ -1015,12 +1047,18 @@ impl Package {
             .resolve_ref_id(&self.state.components, list.identifier())
             .map_err(|_| Error::InvalidSource { path })?
             .ok_or(Error::InvalidSource { path })?;
-        let populated = resolved.messages.iter().any(|message| {
-            WireView::parse(message.data.as_slice(), WireLimits::DEFAULT).is_ok_and(|view| {
-                view.fields()
-                    .any(|field| field.number() == 3 || field.number() == 4)
-            })
-        });
+        let mut populated = false;
+        for message in resolved.messages {
+            let view = WireView::parse(message.data.as_slice(), WireLimits::DEFAULT)
+                .map_err(|error| map_wire_error(error, path))?;
+            if view
+                .fields()
+                .any(|field| field.number() == 3 || field.number() == 4)
+            {
+                populated = true;
+                break;
+            }
+        }
         if !populated {
             return Ok(Vec::new());
         }
@@ -1559,7 +1597,7 @@ fn comment_list_populated(source: &Package, sheet: usize, table: usize) -> Resul
         .ok_or(Error::InvalidSource { path })?;
     let field = |data: &[u8], number: u32| -> Result<Option<Vec<u8>>, Error> {
         let view = WireView::parse(data, WireLimits::DEFAULT)
-            .map_err(|_| Error::InvalidSource { path })?;
+            .map_err(|error| map_wire_error(error, path))?;
         Ok(view
             .fields()
             .find(|field| field.number() == number && field.wire_type() == 2)
@@ -1572,7 +1610,7 @@ fn comment_list_populated(source: &Package, sheet: usize, table: usize) -> Resul
         return Ok(false);
     };
     let view = WireView::parse(&reference, WireLimits::DEFAULT)
-        .map_err(|_| Error::InvalidSource { path })?;
+        .map_err(|error| map_wire_error(error, path))?;
     let identifier = view
         .fields()
         .find(|field| field.number() == 1 && field.wire_type() == 0)
@@ -1585,12 +1623,17 @@ fn comment_list_populated(source: &Package, sheet: usize, table: usize) -> Resul
         .resolve_ref_id(&source.state.components, identifier)
         .map_err(|_| Error::InvalidSource { path })?
         .ok_or(Error::InvalidSource { path })?;
-    Ok(resolved.messages.iter().any(|message| {
-        WireView::parse(message.data.as_slice(), WireLimits::DEFAULT).is_ok_and(|view| {
-            view.fields()
-                .any(|field| field.number() == 3 || field.number() == 4)
-        })
-    }))
+    for message in resolved.messages {
+        let view = WireView::parse(message.data.as_slice(), WireLimits::DEFAULT)
+            .map_err(|error| map_wire_error(error, path))?;
+        if view
+            .fields()
+            .any(|field| field.number() == 3 || field.number() == 4)
+        {
+            return Ok(true);
+        }
+    }
+    Ok(false)
 }
 
 fn resolve_comment<'sheet, 'table>(
@@ -1966,6 +2009,10 @@ fn table_info_error_is_resource(error: &table_info_codec::DecodeError) -> bool {
     error.field_limit_values().is_some()
         || error.work_limit_values().is_some()
         || error.wire_resource_limit().is_some()
+        || error.output_limit_values().is_some()
+        || error.allocation_limit_values().is_some()
+        || error.retained_limit_values().is_some()
+        || error.scratch_limit_values().is_some()
         || error.allocation_amount().is_some()
 }
 
@@ -1997,7 +2044,7 @@ fn map_comment_table_info_error(error: table_info_codec::DecodeError, path: Path
             path,
         },
         Some(table_info_codec::WireResourceLimit::Nesting { observed, maximum }) => Error::Limit {
-            kind: LimitKind::WireWork,
+            kind: LimitKind::WireNesting,
             observed: observed
                 .map(|value| usize::try_from(value).unwrap_or(usize::MAX))
                 .unwrap_or(usize::MAX),
@@ -2006,7 +2053,41 @@ fn map_comment_table_info_error(error: table_info_codec::DecodeError, path: Path
                 .unwrap_or(usize::MAX),
             path,
         },
-        _ => Error::InvalidSource { path },
+        _ => {
+            if let Some((observed, maximum)) = error.output_limit_values() {
+                return Error::Limit {
+                    kind: LimitKind::OutputBytes,
+                    observed,
+                    maximum,
+                    path,
+                };
+            }
+            if let Some((observed, maximum)) = error.allocation_limit_values() {
+                return Error::Limit {
+                    kind: LimitKind::Allocations,
+                    observed,
+                    maximum,
+                    path,
+                };
+            }
+            if let Some((observed, maximum)) = error.retained_limit_values() {
+                return Error::Limit {
+                    kind: LimitKind::RetainedBytes,
+                    observed,
+                    maximum,
+                    path,
+                };
+            }
+            if let Some((observed, maximum)) = error.scratch_limit_values() {
+                return Error::Limit {
+                    kind: LimitKind::ScratchBytes,
+                    observed,
+                    maximum,
+                    path,
+                };
+            }
+            Error::InvalidSource { path }
+        },
     }
 }
 
@@ -2063,6 +2144,9 @@ fn resolve_comment_native_with_mode(
     };
     let data_store = decoded.data_store;
     let tile_storage = decoded.tile_storage;
+    let data_store_comment_table_id = data_store
+        .comment_storage_table()
+        .map(|reference| reference.identifier());
     let tile_size = usize::try_from(
         tile_storage
             .tile_size()
@@ -2100,7 +2184,7 @@ fn resolve_comment_native_with_mode(
             tile: None,
             cell_bytes: None,
             comment_key: None,
-            comment_table_id: None,
+            comment_table_id: data_store_comment_table_id,
             replies: 0,
             reply_ids: Vec::new(),
         });
@@ -2149,7 +2233,7 @@ fn resolve_comment_native_with_mode(
             tile: Some(tile_route),
             cell_bytes: None,
             comment_key: None,
-            comment_table_id: None,
+            comment_table_id: data_store_comment_table_id,
             replies: 0,
             reply_ids: Vec::new(),
         });
@@ -2203,7 +2287,7 @@ fn resolve_comment_native_with_mode(
             tile: Some(tile_route),
             cell_bytes: None,
             comment_key: None,
-            comment_table_id: None,
+            comment_table_id: data_store_comment_table_id,
             replies: 0,
             reply_ids: Vec::new(),
         });
@@ -2215,7 +2299,7 @@ fn resolve_comment_native_with_mode(
         cell_source,
         &crate::cell::wire::limits_for_source(cell_source),
     )
-    .map_err(|_| Error::InvalidSource { path: target.path })?;
+    .map_err(|error| map_bnc_error(error, target.path))?;
     let Some(comment_key) = cell.comment_identifier() else {
         let path = target.path;
         return Ok(Located {
@@ -2226,7 +2310,7 @@ fn resolve_comment_native_with_mode(
             tile: Some(tile_route),
             cell_bytes: Some(copy_bytes(cell_source, path)?),
             comment_key: None,
-            comment_table_id: None,
+            comment_table_id: data_store_comment_table_id,
             replies: 0,
             reply_ids: Vec::new(),
         });
@@ -2234,10 +2318,8 @@ fn resolve_comment_native_with_mode(
     if comment_key == 0 {
         return Err(Error::InvalidSource { path: target.path });
     }
-    let comment_table_id = data_store
-        .comment_storage_table()
-        .map(|reference| reference.identifier())
-        .ok_or(Error::InvalidSource { path: target.path })?;
+    let comment_table_id =
+        data_store_comment_table_id.ok_or(Error::InvalidSource { path: target.path })?;
     if comment_table_id == 0 {
         return Err(Error::InvalidSource { path: target.path });
     }
@@ -2417,9 +2499,23 @@ fn map_table_codec_error(
             },
             numbers_table_cell_storage_codec::DecodeLimit::Nesting { observed, maximum } => {
                 Error::Limit {
-                    kind: LimitKind::WireWork,
+                    kind: LimitKind::WireNesting,
                     observed: usize::try_from(observed).unwrap_or(usize::MAX),
                     maximum: usize::try_from(maximum).unwrap_or(usize::MAX),
+                    path,
+                }
+            },
+            numbers_table_cell_storage_codec::DecodeLimit::Allocation { requested } => {
+                Error::Allocation {
+                    amount: requested,
+                    path,
+                }
+            },
+            numbers_table_cell_storage_codec::DecodeLimit::Retained { observed, maximum } => {
+                Error::Limit {
+                    kind: LimitKind::RetainedBytes,
+                    observed,
+                    maximum,
                     path,
                 }
             },
@@ -2679,11 +2775,31 @@ fn map_comment_codec_error(error: comment_storage_codec::DecodeError, path: Path
                 maximum,
                 path,
             },
+            comment_storage_codec::DecodeLimit::OutputBytes { observed, maximum } => Error::Limit {
+                kind: LimitKind::OutputBytes,
+                observed,
+                maximum,
+                path,
+            },
             comment_storage_codec::DecodeLimit::References { observed, maximum } => Error::Limit {
                 kind: LimitKind::References,
                 observed,
                 maximum,
                 path,
+            },
+            comment_storage_codec::DecodeLimit::Replies { observed, maximum } => Error::Limit {
+                kind: LimitKind::Replies,
+                observed,
+                maximum,
+                path,
+            },
+            comment_storage_codec::DecodeLimit::ReferenceBytes { observed, maximum } => {
+                Error::Limit {
+                    kind: LimitKind::ReferenceBytes,
+                    observed,
+                    maximum,
+                    path,
+                }
             },
             comment_storage_codec::DecodeLimit::Text { observed, maximum } => Error::Limit {
                 kind: LimitKind::TextBytes,
@@ -2704,15 +2820,193 @@ fn map_comment_codec_error(error: comment_storage_codec::DecodeError, path: Path
                 path,
             },
             comment_storage_codec::DecodeLimit::Nesting { observed, maximum } => Error::Limit {
-                kind: LimitKind::WireWork,
+                kind: LimitKind::WireNesting,
                 observed: usize::try_from(observed).unwrap_or(usize::MAX),
                 maximum: usize::try_from(maximum).unwrap_or(usize::MAX),
+                path,
+            },
+            comment_storage_codec::DecodeLimit::Allocations { observed, maximum } => Error::Limit {
+                kind: LimitKind::Allocations,
+                observed,
+                maximum,
+                path,
+            },
+            comment_storage_codec::DecodeLimit::Scratch { observed, maximum } => Error::Limit {
+                kind: LimitKind::ScratchBytes,
+                observed,
+                maximum,
+                path,
+            },
+            comment_storage_codec::DecodeLimit::Retained { observed, maximum } => Error::Limit {
+                kind: LimitKind::RetainedBytes,
+                observed,
+                maximum,
                 path,
             },
             _ => Error::InvalidSource { path },
         };
     }
     Error::InvalidSource { path }
+}
+
+fn commit_shared_root(edit: Edit<'_>, located: Located) -> Result<Commit, Error> {
+    let path = edit.target.path;
+    let native_operation = match edit.after.as_ref() {
+        Some(comment) => {
+            litchi_iwa_table::comments_native::RootOperation::Set(comment.text().into())
+        },
+        None => litchi_iwa_table::comments_native::RootOperation::Clear,
+    };
+    let selection = native_selection(edit.source, &located)?;
+    let mutation = litchi_iwa_table::comments_native::rewrite_root(
+        edit.source,
+        &selection,
+        &native_operation,
+        litchi_iwa_table::comments_native::Profile::NUMBERS,
+    )
+    .map_err(|fault| map_native_fault(fault, path))?;
+    let touched_components = mutation.touched_components();
+    let deleted_previews = mutation.deleted_previews();
+    let package = mutation.into_package();
+    let position = cell_position_for_path(path)?;
+    let readback = resolve_comment(
+        &package,
+        SheetSelector::index(path.sheet()),
+        TableSelector::index(path.table()),
+        position,
+    )?;
+    if readback.comment.as_ref().map(Comment::text) != edit.after.as_ref().map(Comment::text) {
+        return Err(Error::Verification);
+    }
+    let actual_after = readback.comment.clone();
+    let source_cell = located.cell_bytes.clone().unwrap_or_else(|| Arc::from([]));
+    let target_cell = readback
+        .cell_bytes
+        .clone()
+        .ok_or(Error::InvalidSource { path })?;
+    let source_catalog = physical_source(edit.source)?;
+    let source_previews = root_preview_deletions(source_catalog)?.len();
+    let source_owner = source_catalog.__source_owner();
+    let target_owner = physical_source(&package)?.__source_owner();
+    Ok(Commit {
+        package,
+        patch: Patch {
+            artifacts: OwnedExactArtifacts::new(source_owner, target_owner),
+            path,
+            before: edit.before,
+            after: actual_after,
+            source_cell,
+            target_cell,
+            source_previews,
+            target_previews: source_previews.saturating_sub(deleted_previews),
+            touched_components,
+        },
+        diagnostics: Diagnostics::published(touched_components, deleted_previews),
+    })
+}
+
+fn native_selection(
+    source: &Package,
+    located: &Located,
+) -> Result<litchi_iwa_table::comments_native::Selection, Error> {
+    let path = located.target.path;
+    let tile = located
+        .tile
+        .ok_or(Error::Refused(Refusal::UnsupportedDependency { path }))?;
+    if located
+        .entry
+        .as_ref()
+        .is_some_and(|entry| !entry.owner.supports_text_rewrite())
+    {
+        return Err(Error::Refused(Refusal::UnsupportedDependency { path }));
+    }
+    let model_component = source
+        .state
+        .components
+        .catalog()
+        .get_index(located.target.native.component_index)
+        .ok_or(Error::InvalidSource { path })?;
+    let tile_component = source
+        .state
+        .components
+        .catalog()
+        .get_index(tile.component_index)
+        .ok_or(Error::InvalidSource { path })?;
+    let tile_identifier = source
+        .state
+        .components
+        .catalog()
+        .get_index(tile.component_index)
+        .and_then(|component| component.archive().objects.get(tile.object_index))
+        .and_then(|object| object.archive_info.identifier)
+        .ok_or(Error::InvalidSource { path })?;
+    Ok(litchi_iwa_table::comments_native::Selection {
+        model_component: model_component.name().into(),
+        tile_component: tile_component.name().into(),
+        model_identifier: located.target.native.model_identifier,
+        model_message_index: located.target.native.message_index,
+        model_message_type: located.target.native.message_type,
+        tile_identifier,
+        tile_message_index: tile.message_index,
+        tile_message_type: tile.message_type,
+        tile_row: u32::try_from(located.target.row % located.target.tile_size)
+            .map_err(|_| Error::InvalidSource { path })?,
+        column: u32::try_from(located.target.column).map_err(|_| Error::InvalidSource { path })?,
+        table_columns: located.target.native.columns,
+        comment_key: located.comment_key,
+        list_identifier: located.comment_table_id,
+        root_identifier: located.entry.as_ref().map(|entry| entry.entry.storage_id),
+    })
+}
+
+fn map_native_fault(fault: litchi_iwa_table::comments_native::Fault, path: Path) -> Error {
+    use litchi_iwa_table::comments_native::{Fault, LimitKind as NativeLimitKind};
+    match fault {
+        Fault::Unsupported | Fault::Dependency => {
+            Error::Refused(Refusal::UnsupportedDependency { path })
+        },
+        Fault::Invalid => Error::InvalidSource { path },
+        Fault::Verification => Error::Verification,
+        Fault::Allocation { amount } => Error::Allocation { amount, path },
+        Fault::Limit {
+            kind,
+            observed,
+            maximum,
+        } => Error::Limit {
+            kind: match kind {
+                NativeLimitKind::InputBytes => LimitKind::WireBytes,
+                NativeLimitKind::PackageBytes => LimitKind::CompressedBytes,
+                // PayloadBytes is a byte ceiling at the shared native
+                // boundary.  Do not coerce it into work: a low payload-byte
+                // refusal must remain distinguishable from a work refusal.
+                NativeLimitKind::PayloadBytes => LimitKind::WireBytes,
+                NativeLimitKind::References => LimitKind::References,
+                NativeLimitKind::Replies => LimitKind::Replies,
+                NativeLimitKind::TextBytes => LimitKind::TextBytes,
+                NativeLimitKind::WireFields => LimitKind::WireFields,
+                NativeLimitKind::WireBytes => LimitKind::WireBytes,
+                NativeLimitKind::WireOutputBytes => LimitKind::OutputBytes,
+                NativeLimitKind::WireNesting => LimitKind::WireNesting,
+                NativeLimitKind::WireWork => LimitKind::WireWork,
+                NativeLimitKind::Objects => LimitKind::Objects,
+                NativeLimitKind::Messages => LimitKind::Messages,
+                NativeLimitKind::MessagesPerObject => LimitKind::MessagesPerObject,
+                NativeLimitKind::MetadataItems => LimitKind::MetadataItems,
+                NativeLimitKind::SnappyFrames => LimitKind::SnappyFrames,
+                NativeLimitKind::TableRows => LimitKind::TableRows,
+                NativeLimitKind::TableColumns => LimitKind::TableColumns,
+                NativeLimitKind::TableCells => LimitKind::TableCells,
+                NativeLimitKind::MaterializedCells => LimitKind::MaterializedCells,
+                NativeLimitKind::Items => LimitKind::Items,
+                NativeLimitKind::Allocations => LimitKind::Allocations,
+                NativeLimitKind::ScratchBytes => LimitKind::ScratchBytes,
+                NativeLimitKind::RetainedBytes => LimitKind::RetainedBytes,
+            },
+            observed: usize::try_from(observed).unwrap_or(usize::MAX),
+            maximum: usize::try_from(maximum).unwrap_or(usize::MAX),
+            path,
+        },
+    }
 }
 
 fn commit_edit(edit: Edit<'_>) -> Result<Commit, Error> {
@@ -2735,7 +3029,7 @@ fn commit_edit(edit: Edit<'_>) -> Result<Commit, Error> {
             diagnostics: Diagnostics::unchanged(),
         });
     }
-    if edit.before.is_some() && edit.after.is_none() {
+    if edit.before.is_some() && edit.after.is_none() && edit.axis_removal {
         if !source_catalog.source_is_exact() {
             return Err(Error::Refused(Refusal::UnsupportedSource));
         }
@@ -2830,6 +3124,18 @@ fn commit_edit(edit: Edit<'_>) -> Result<Commit, Error> {
         return Err(Error::InvalidSource {
             path: edit.target.path,
         });
+    }
+    if !edit.axis_removal {
+        // The first shared native slice owns root-only lifecycle.  Preserve
+        // the established Numbers refusal for an ordinary replacement of a
+        // root that already has replies; a reply-bearing thread must not be
+        // silently rewritten through the scalar path.
+        if edit.before.is_some() && edit.after.is_some() && located.replies != 0 {
+            return Err(Error::Refused(Refusal::UnsupportedDependency {
+                path: edit.target.path,
+            }));
+        }
+        return commit_shared_root(edit, located);
     }
     if edit.after.is_some() && located.comment.is_none() {
         return comments_create::create_root_comment(
@@ -3485,18 +3791,45 @@ fn map_wire_error(error: litchi_iwa_common::Error, path: Path) -> Error {
                 litchi_iwa_common::LimitKind::InputBytes => LimitKind::WireBytes,
                 litchi_iwa_common::LimitKind::Fields => LimitKind::WireFields,
                 litchi_iwa_common::LimitKind::OutputBytes => LimitKind::OutputBytes,
-                litchi_iwa_common::LimitKind::RewriteWork
-                | litchi_iwa_common::LimitKind::Nesting
-                | litchi_iwa_common::LimitKind::TableRows
-                | litchi_iwa_common::LimitKind::TableColumns
-                | litchi_iwa_common::LimitKind::TableCells
-                | litchi_iwa_common::LimitKind::MaterializedCells => LimitKind::WireWork,
+                litchi_iwa_common::LimitKind::RewriteWork => LimitKind::WireWork,
+                litchi_iwa_common::LimitKind::Nesting => LimitKind::WireNesting,
+                litchi_iwa_common::LimitKind::TableRows => LimitKind::TableRows,
+                litchi_iwa_common::LimitKind::TableColumns => LimitKind::TableColumns,
+                litchi_iwa_common::LimitKind::TableCells => LimitKind::TableCells,
+                litchi_iwa_common::LimitKind::MaterializedCells => LimitKind::MaterializedCells,
             },
             observed,
             maximum: limit,
             path,
         },
         litchi_iwa_common::Error::Allocation { amount, .. } => Error::Allocation { amount, path },
+        _ => Error::InvalidSource { path },
+    }
+}
+
+fn map_bnc_error(error: litchi_numbers_wire::Error, path: Path) -> Error {
+    match error {
+        litchi_numbers_wire::Error::LimitExceeded {
+            kind,
+            observed,
+            maximum,
+        } => Error::Limit {
+            kind: match kind {
+                litchi_numbers_wire::LimitKind::InputBytes => LimitKind::WireBytes,
+                litchi_numbers_wire::LimitKind::OutputBytes => LimitKind::OutputBytes,
+                litchi_numbers_wire::LimitKind::Fields => LimitKind::WireFields,
+                litchi_numbers_wire::LimitKind::TailBytes => LimitKind::WireBytes,
+                litchi_numbers_wire::LimitKind::Items => LimitKind::Items,
+                _ => return Error::InvalidSource { path },
+            },
+            observed,
+            maximum,
+            path,
+        },
+        litchi_numbers_wire::Error::Allocation { requested } => Error::Allocation {
+            amount: requested,
+            path,
+        },
         _ => Error::InvalidSource { path },
     }
 }
@@ -3517,20 +3850,20 @@ pub(super) fn map_core_error(error: litchi_iwa_core::Error, path: Path) -> Error
                 | litchi_iwa_core::LimitKind::SnappyCompressedStreamBytes => {
                     LimitKind::CompressedBytes
                 },
+                litchi_iwa_core::LimitKind::ArchiveBytes => LimitKind::CompressedBytes,
+                litchi_iwa_core::LimitKind::Objects => LimitKind::Objects,
+                litchi_iwa_core::LimitKind::Messages => LimitKind::Messages,
+                litchi_iwa_core::LimitKind::MessagesPerObject => LimitKind::MessagesPerObject,
                 litchi_iwa_core::LimitKind::HeaderFields => LimitKind::WireFields,
-                litchi_iwa_core::LimitKind::HeaderNesting
-                | litchi_iwa_core::LimitKind::Objects
-                | litchi_iwa_core::LimitKind::Messages
-                | litchi_iwa_core::LimitKind::MessagesPerObject
-                | litchi_iwa_core::LimitKind::MetadataItems
-                | litchi_iwa_core::LimitKind::SnappyFrames => LimitKind::References,
-                litchi_iwa_core::LimitKind::ArchiveBytes
-                | litchi_iwa_core::LimitKind::ObjectBytes
+                litchi_iwa_core::LimitKind::HeaderNesting => LimitKind::WireNesting,
+                litchi_iwa_core::LimitKind::MetadataItems => LimitKind::MetadataItems,
+                litchi_iwa_core::LimitKind::SnappyFrames => LimitKind::SnappyFrames,
+                litchi_iwa_core::LimitKind::ObjectBytes
                 | litchi_iwa_core::LimitKind::MessageBytes
-                | litchi_iwa_core::LimitKind::HeaderBytes
-                | litchi_iwa_core::LimitKind::HeaderMemoryBytes
                 | litchi_iwa_core::LimitKind::SnappyChunkBytes
                 | litchi_iwa_core::LimitKind::SnappyStreamBytes => LimitKind::WireBytes,
+                litchi_iwa_core::LimitKind::HeaderBytes => LimitKind::WireBytes,
+                litchi_iwa_core::LimitKind::HeaderMemoryBytes => LimitKind::ScratchBytes,
             },
             observed,
             maximum,
@@ -4212,7 +4545,7 @@ fn scan_global_comment_cells(
                     cell_source,
                     &crate::cell::wire::limits_for_source(cell_source),
                 )
-                .map_err(|_| Error::InvalidSource { path })?;
+                .map_err(|error| map_bnc_error(error, path))?;
                 let Some(comment_key) = cell.comment_identifier() else {
                     continue;
                 };

@@ -493,7 +493,7 @@ fn map_table_info_codec_error(error: table_info_codec::DecodeError) -> Error {
                 path: Path::Package,
             },
             table_info_codec::WireResourceLimit::Nesting { observed, maximum } => Error::Limit {
-                kind: super::LimitKind::WireWork,
+                kind: super::LimitKind::WireNesting,
                 observed: observed
                     .map(|value| usize::try_from(value).unwrap_or(usize::MAX))
                     .unwrap_or(usize::MAX),
@@ -508,6 +508,38 @@ fn map_table_info_codec_error(error: table_info_codec::DecodeError) -> Error {
     if let Some((observed, maximum)) = error.work_limit_values() {
         return Error::Limit {
             kind: super::LimitKind::WireWork,
+            observed,
+            maximum,
+            path: Path::Package,
+        };
+    }
+    if let Some((observed, maximum)) = error.output_limit_values() {
+        return Error::Limit {
+            kind: super::LimitKind::OutputBytes,
+            observed,
+            maximum,
+            path: Path::Package,
+        };
+    }
+    if let Some((observed, maximum)) = error.allocation_limit_values() {
+        return Error::Limit {
+            kind: super::LimitKind::Allocations,
+            observed,
+            maximum,
+            path: Path::Package,
+        };
+    }
+    if let Some((observed, maximum)) = error.retained_limit_values() {
+        return Error::Limit {
+            kind: super::LimitKind::RetainedBytes,
+            observed,
+            maximum,
+            path: Path::Package,
+        };
+    }
+    if let Some((observed, maximum)) = error.scratch_limit_values() {
+        return Error::Limit {
+            kind: super::LimitKind::ScratchBytes,
             observed,
             maximum,
             path: Path::Package,
@@ -577,9 +609,11 @@ const fn map_header_limit_kind(kind: table_headers::LimitKind) -> super::LimitKi
         | table_headers::LimitKind::PackageBytes
         | table_headers::LimitKind::Entries => super::LimitKind::WireBytes,
         table_headers::LimitKind::PayloadReferences => super::LimitKind::References,
-        table_headers::LimitKind::WireNesting | table_headers::LimitKind::WireWork => {
-            super::LimitKind::WireWork
-        },
+        table_headers::LimitKind::WireNesting => super::LimitKind::WireNesting,
+        table_headers::LimitKind::WireWork => super::LimitKind::WireWork,
+        table_headers::LimitKind::WireAllocations => super::LimitKind::Allocations,
+        table_headers::LimitKind::WireRetainedBytes => super::LimitKind::RetainedBytes,
+        table_headers::LimitKind::WireScratchBytes => super::LimitKind::ScratchBytes,
         table_headers::LimitKind::PayloadObjects
         | table_headers::LimitKind::PayloadMessages
         | table_headers::LimitKind::PayloadItems

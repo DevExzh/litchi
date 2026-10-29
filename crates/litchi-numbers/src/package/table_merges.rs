@@ -91,6 +91,8 @@ pub enum LimitKind {
     Scratch,
     /// Number of merged regions returned or staged.
     Regions,
+    /// Resolved formula-owner entries inspected by a merge formula.
+    OwnerEntries,
 }
 
 impl fmt::Display for LimitKind {
@@ -119,6 +121,7 @@ impl fmt::Display for LimitKind {
             Self::Retained => "retained bytes",
             Self::Scratch => "scratch bytes",
             Self::Regions => "regions",
+            Self::OwnerEntries => "formula owner entries",
         })
     }
 }
@@ -1238,6 +1241,13 @@ fn charge_attempted(budget: &mut Budget, error: &merge_wire::MergeReadError) {
 }
 
 fn map_merge_error(error: merge_wire::MergeReadError) -> Error {
+    if let Some(owner_limit) = error.owner_entries_limit() {
+        return Error::Limit {
+            kind: LimitKind::OwnerEntries,
+            observed: owner_limit.observed() as u64,
+            maximum: owner_limit.maximum() as u64,
+        };
+    }
     match error.error() {
         litchi_iwa_common::Error::LimitExceeded {
             kind,
