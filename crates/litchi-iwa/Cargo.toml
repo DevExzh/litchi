@@ -9,6 +9,10 @@ repository.workspace   = true
 rust-version.workspace = true
 publish = false
 
+[features]
+default = []
+parity-host-oracle = []
+
 [dependencies]
 chrono        = { workspace = true }
 litchi-core   = { workspace = true }
@@ -32,3 +36,7 @@ thiserror     = { workspace = true }
 
 [dev-dependencies]
 once_cell = { workspace = true }
+
+[[test]]
+name = "parity"
+path = "tests/parity/main.rs"

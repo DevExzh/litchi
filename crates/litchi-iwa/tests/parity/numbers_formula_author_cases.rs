@@ -11,6 +11,7 @@ use litchi_iwa_common::formula::{
 use litchi_iwa_protos::tst;
 use litchi_numbers::formula::{BinaryOperator, CachedValue, CellReference, Expression};
 use litchi_numbers::table::{At, cells::Storage};
+use litchi_numbers::{SheetSelector, TableSelector};
 use prost::Message;
 
 use crate::harness::{Case, Evidence, Fixture, Format, LeafRun, TestResult, Tier, fixture};
@@ -319,6 +320,93 @@ fn leaf_cost_route(source: &[u8], (r, c): (usize, usize), formula: Formula) -> T
     Ok(leaf_bytes!(commit.package()))
 }
 
+/// Build the source-owned multi-table workbook used by the owner-registry
+/// admission probe.  Source construction is outside the measured route; the
+/// probe measures only the host/leaf facade operation below.
+fn formula_owner_source() -> TestResult<Vec<u8>> {
+    let mut editor = numbers::Builder::new()
+        .sheet_name("Source")
+        .table_name("Alpha")
+        .table_dimensions(4, 4)
+        .build()?;
+    editor.add_empty_table(SheetSelector::index(0), "Beta", 4, 4)?;
+    Ok(editor.to_bytes()?)
+}
+
+#[inline(never)]
+fn host_formula_owner_admission_route(source: &[u8]) -> TestResult<Vec<u8>> {
+    let mut editor = numbers::Draft::from_bytes(source)?;
+    let tables = editor.tables()?;
+    let alpha = tables
+        .iter()
+        .find(|table| table.name == "Alpha")
+        .ok_or("owner-admission source has no Alpha table")?
+        .id();
+    let beta = tables
+        .iter()
+        .find(|table| table.name == "Beta")
+        .ok_or("owner-admission source has no Beta table")?
+        .id();
+    editor.set_formula_with_cached_value(
+        alpha,
+        0,
+        1,
+        FormulaExpression::Number(7.0),
+        FormulaCachedValue::number(7.0)?,
+    )?;
+    editor.set_formula_with_cached_value(
+        beta,
+        0,
+        1,
+        FormulaExpression::Number(11.0),
+        FormulaCachedValue::number(11.0)?,
+    )?;
+    let source_ids: Vec<u64> = editor
+        .tables()?
+        .into_iter()
+        .map(|table| table.id())
+        .collect();
+    editor.duplicate_sheet(SheetSelector::index(0))?;
+    let cloned_alpha = editor
+        .tables()?
+        .into_iter()
+        .find(|table| table.name == "Alpha" && !source_ids.contains(&table.id()))
+        .ok_or("owner-admission clone has no Alpha table")?;
+    editor.set_formula_with_cached_value(
+        cloned_alpha.id(),
+        0,
+        1,
+        FormulaExpression::Number(99.0),
+        FormulaCachedValue::number(99.0)?,
+    )?;
+    Ok(editor.to_bytes()?)
+}
+
+#[inline(never)]
+fn leaf_formula_owner_admission_route(source: &[u8]) -> TestResult<Vec<u8>> {
+    let package = litchi_numbers::Package::from_bytes(source)?;
+    let package = package
+        .edit_table_cells(SheetSelector::index(0), TableSelector::name("Alpha"))?
+        .set_formula_cached_a1("B1", Expression::number(7.0)?, CachedValue::number(7.0)?)?
+        .commit()?
+        .into_package();
+    let package = package
+        .edit_table_cells(SheetSelector::index(0), TableSelector::name("Beta"))?
+        .set_formula_cached_a1("B1", Expression::number(11.0)?, CachedValue::number(11.0)?)?
+        .commit()?
+        .into_package();
+    let duplicate = package
+        .edit_sheet_lifecycle()
+        .duplicate(SheetSelector::index(0))?
+        .commit()?;
+    let package = duplicate.into_package();
+    let commit = package
+        .edit_table_cells(SheetSelector::index(1), TableSelector::name("Alpha"))?
+        .set_formula_cached_a1("B1", Expression::number(99.0)?, CachedValue::number(99.0)?)?
+        .commit()?;
+    Ok(leaf_bytes!(commit.package()))
+}
+
 fn run(name: &'static str, input: &Fixture, cell: (usize, usize), formula: Formula) -> TestResult {
     let mut case = Case::new(name, Format::Numbers, Tier::B, Evidence::Queued, input)
         .leaf_structural_metadata()
@@ -516,6 +604,25 @@ fn numbers_table_formula_cached_cost_abba() -> TestResult {
             black_box(host_route(&input.bytes, (2, 2), CACHED)?);
         } else {
             black_box(leaf_cost_route(&input.bytes, (2, 2), CACHED)?);
+        }
+    }
+    Ok(())
+}
+
+/// Release-mode full-facade probe for a multi-owner formula edit after sheet
+/// duplication.  The host route calls the independent legacy Numbers writer;
+/// it does not invoke the focused leaf implementation.  The source-builder
+/// setup is outside the measured operation.  Run this in pinned-CPU ABBA
+/// callgrind mode after the owner-admission slice is integrated.
+#[test]
+#[ignore = "callgrind cost probe; run explicitly"]
+fn numbers_table_formula_owner_admission_cost_abba() -> TestResult {
+    let input = formula_owner_source()?;
+    for route in [0_u8, 1, 1, 0] {
+        if route == 0 {
+            black_box(host_formula_owner_admission_route(&input)?);
+        } else {
+            black_box(leaf_formula_owner_admission_route(&input)?);
         }
     }
     Ok(())

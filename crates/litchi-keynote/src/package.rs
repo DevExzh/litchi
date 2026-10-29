@@ -51,6 +51,7 @@ pub(crate) mod slide_table_cell_appearance;
 pub(crate) mod slide_table_cell_format;
 pub(crate) mod slide_table_cell_number_format;
 pub(crate) mod slide_table_cells;
+pub(crate) mod slide_table_comments;
 pub(crate) mod slide_table_core;
 pub(crate) mod slide_table_dimension;
 pub(crate) mod slide_table_headers;

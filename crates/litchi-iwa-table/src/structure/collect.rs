@@ -22,11 +22,85 @@ pub struct Census {
     inbound: HashMap<u64, Vec<u64>>,
 }
 
+/// Capacity admitted before the census starts walking object headers.
+///
+/// The source catalog has already passed archive ingress, so its object and
+/// reference ceilings are the finite upper bounds for this phase.  Admission
+/// only counts the catalog's object slots and reserves the two index maps;
+/// it does not inspect graph edges.  [`Census::new`] then performs the one
+/// edge walk using those pre-admitted maps and fallible per-edge growth.
+pub struct Admission {
+    outbound: HashMap<u64, Vec<u64>>,
+    inbound: HashMap<u64, Vec<u64>>,
+    max_references: usize,
+}
+
 impl Census {
+    /// Admit the bounded allocations needed by a source census.
+    ///
+    /// Counting object slots is deliberately separate from the edge walk:
+    /// the maps are reserved before any reference is traversed, while the
+    /// actual graph is still visited exactly once by [`Self::new`].
+    pub fn admit(working: &Working<'_, impl TableLeaf>) -> FaultResult<Admission> {
+        let mut object_count = 0_usize;
+        for component in working.source().catalog().iter() {
+            object_count = object_count
+                .checked_add(component.archive().objects.len())
+                .ok_or(Fault::Limit {
+                    kind: super::FaultLimit::Identifiers,
+                    observed: u64::MAX,
+                    maximum: u64::try_from(working.source().max_objects()).unwrap_or(u64::MAX),
+                })?;
+        }
+        // A source accepted by ingress cannot exceed this ceiling.  Keep the
+        // guard here as well because the census is also used by synthetic
+        // TableSource implementations in focused tests.
+        if object_count > working.source().max_objects() {
+            return Err(Fault::Limit {
+                kind: super::FaultLimit::Identifiers,
+                observed: u64::try_from(object_count).unwrap_or(u64::MAX),
+                maximum: u64::try_from(working.source().max_objects()).unwrap_or(u64::MAX),
+            });
+        }
+        let mut outbound = HashMap::new();
+        outbound
+            .try_reserve(object_count)
+            .map_err(|_| super::allocation(object_count))?;
+        let mut inbound = HashMap::new();
+        // A target can occur at most once per source reference.  Reserving
+        // the smaller of the object and reference ceilings avoids turning a
+        // large configurable reference limit into an eager unbounded map.
+        let inbound_capacity = object_count.min(working.source().max_references());
+        inbound
+            .try_reserve(inbound_capacity)
+            .map_err(|_| super::allocation(inbound_capacity))?;
+        Ok(Admission {
+            outbound,
+            inbound,
+            max_references: working.source().max_references(),
+        })
+    }
+
     /// Build the census of every object of `working`'s source.
+    ///
+    /// Callers that have already admitted a phase can use
+    /// [`Self::from_admission`] to make that ordering explicit.
     pub fn new(working: &Working<'_, impl TableLeaf>) -> FaultResult<Self> {
-        let mut outbound: HashMap<u64, Vec<u64>> = HashMap::new();
-        let mut inbound: HashMap<u64, Vec<u64>> = HashMap::new();
+        let admission = Self::admit(working)?;
+        Self::from_admission(working, admission)
+    }
+
+    /// Build the census after a caller has admitted its bounded phase.
+    pub fn from_admission(
+        working: &Working<'_, impl TableLeaf>,
+        admission: Admission,
+    ) -> FaultResult<Self> {
+        let Admission {
+            mut outbound,
+            mut inbound,
+            max_references,
+        } = admission;
+        let mut reference_count = 0_usize;
         for component in working.source().catalog().iter() {
             for object in &component.archive().objects {
                 let identifier = object.archive_info.identifier.ok_or(Fault::Invalid)?;
@@ -34,21 +108,56 @@ impl Census {
                 for info in &object.archive_info.message_infos {
                     for target in &info.object_references {
                         if !targets.contains(target) {
+                            reference_count =
+                                reference_count.checked_add(1).ok_or(Fault::Limit {
+                                    kind: super::FaultLimit::Identifiers,
+                                    observed: u64::MAX,
+                                    maximum: u64::try_from(max_references).unwrap_or(u64::MAX),
+                                })?;
+                            if reference_count > max_references {
+                                return Err(Fault::Limit {
+                                    kind: super::FaultLimit::Identifiers,
+                                    observed: u64::try_from(reference_count).unwrap_or(u64::MAX),
+                                    maximum: u64::try_from(max_references).unwrap_or(u64::MAX),
+                                });
+                            }
                             reserve(&mut targets, 1)?;
                             targets.push(*target);
                         }
                     }
+                    for field in &info.field_infos {
+                        for target in &field.object_references {
+                            if !targets.contains(target) {
+                                reference_count =
+                                    reference_count.checked_add(1).ok_or(Fault::Limit {
+                                        kind: super::FaultLimit::Identifiers,
+                                        observed: u64::MAX,
+                                        maximum: u64::try_from(max_references).unwrap_or(u64::MAX),
+                                    })?;
+                                if reference_count > max_references {
+                                    return Err(Fault::Limit {
+                                        kind: super::FaultLimit::Identifiers,
+                                        observed: u64::try_from(reference_count)
+                                            .unwrap_or(u64::MAX),
+                                        maximum: u64::try_from(max_references).unwrap_or(u64::MAX),
+                                    });
+                                }
+                                reserve(&mut targets, 1)?;
+                                targets.push(*target);
+                            }
+                        }
+                    }
                 }
                 for target in &targets {
+                    if !inbound.contains_key(target) {
+                        inbound.try_reserve(1).map_err(|_| super::allocation(1))?;
+                    }
                     let referrers = inbound.entry(*target).or_default();
                     if !referrers.contains(&identifier) {
                         reserve(referrers, 1)?;
                         referrers.push(identifier);
                     }
                 }
-                outbound
-                    .try_reserve(1)
-                    .map_err(|_error| super::allocation(1))?;
                 outbound.insert(identifier, targets);
             }
         }

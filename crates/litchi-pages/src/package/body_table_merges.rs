@@ -49,6 +49,8 @@ pub enum LimitKind {
     PayloadItems,
     /// Native object references inspected.
     PayloadReferences,
+    /// Resolved formula-owner entries inspected by a merge formula.
+    OwnerEntries,
     /// Strict merge-wire input bytes.
     WireBytes,
     /// Strict merge-wire output bytes (unused by this read).
@@ -76,6 +78,7 @@ impl fmt::Display for LimitKind {
             Self::PayloadMessages => "payload messages",
             Self::PayloadItems => "payload items",
             Self::PayloadReferences => "payload references",
+            Self::OwnerEntries => "formula owner entries",
             Self::WireBytes => "wire bytes",
             Self::WireOutputBytes => "wire output bytes",
             Self::WireFields => "wire fields",
@@ -332,6 +335,13 @@ fn read_limits(budget: &table_lock::WireBudget) -> Result<ReadLimits, Error> {
 }
 
 fn map_merge_error(error: table_merges::MergeReadError) -> Error {
+    if let Some(owner_limit) = error.owner_entries_limit() {
+        return Error::Limit {
+            kind: LimitKind::OwnerEntries,
+            observed: owner_limit.observed() as u64,
+            maximum: owner_limit.maximum() as u64,
+        };
+    }
     map_common_error(error.error().clone())
 }
 
