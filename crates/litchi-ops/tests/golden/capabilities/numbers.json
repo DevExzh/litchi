@@ -206,6 +206,10 @@
         {
           "element": "table",
           "pathSegment": "table"
+        },
+        {
+          "element": "chart",
+          "pathSegment": "chart"
         }
       ],
       "properties": {
@@ -503,6 +507,38 @@
         ]
       },
       "properties": {},
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "numbers",
+      "element": "chart",
+      "parent": "sheet",
+      "operations": {
+        "add": false,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/sheet[N]/chart[N]"
+        ]
+      },
+      "properties": {
+        "font.size": {
+          "type": "font-size",
+          "add": false,
+          "set": true,
+          "get": true
+        }
+      },
       "predicates": {
         "keys": [
           "style",

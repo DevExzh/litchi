@@ -156,6 +156,14 @@ pub(super) struct Pending {
     styles: BTreeMap<(usize, usize, usize, usize), (Style, usize)>,
     /// Table cells: (slide, drawable, row, column) → (value, item).
     cells: BTreeMap<(usize, usize, u32, u32), (TableCellValue, usize)>,
+    /// Chart point sizes: (slide, chart position) → (size, item).
+    chart_sizes: BTreeMap<
+        (usize, usize),
+        (
+            Option<litchi_keynote::chart::font::size::TextPointSize>,
+            usize,
+        ),
+    >,
     /// Root table-cell comments: (slide, table, row, column) → (text, item).
     comments: BTreeMap<(usize, usize, u32, u32), (Option<String>, usize)>,
     /// Placeholder visibility: (slide, TITLE or BODY) → (hidden, item).
@@ -568,6 +576,19 @@ fn paragraph_text(value: &PropValue<'_>) -> Result<String> {
     Ok(value)
 }
 
+fn chart_font_size(
+    value: &PropValue<'_>,
+) -> Result<litchi_keynote::chart::font::size::TextPointSize> {
+    let points = super::super::write::chart_font_points(value)?;
+    litchi_keynote::chart::font::size::TextPointSize::from_points(points).map_err(|_| {
+        refusal(
+            Code::InvalidValue,
+            "a chart font size must be positive and finite",
+        )
+        .with_property("font.size".to_owned())
+    })
+}
+
 /// The frame of an item: its `x`, `y`, `width`, `height` and `rotation`.
 fn frame_of(node: &Node<'_>) -> Option<Geometry> {
     let item = node.item();
@@ -609,6 +630,7 @@ impl Pending {
             && self.hidden.is_empty()
             && self.styles.is_empty()
             && self.cells.is_empty()
+            && self.chart_sizes.is_empty()
             && self.visibility.is_empty()
     }
 
@@ -1060,6 +1082,17 @@ impl Pending {
                 self.stage_paragraph(file, text, line, value, index)?;
             },
             ("tc", "comment") => self.stage_cell(file, node, key, value, index)?,
+            ("chart", "font.size") => {
+                self.chart_sizes.insert(
+                    (slide, line),
+                    (
+                        (!value.is_null())
+                            .then(|| chart_font_size(value))
+                            .transpose()?,
+                        index,
+                    ),
+                );
+            },
             ("placeholder" | "shape" | "picture", "x" | "y" | "width" | "height" | "rotation") => {
                 if drawable == NONE {
                     return Err(refusal(
@@ -1268,6 +1301,23 @@ impl Pending {
             let patch = commit.patch().clone();
             push(chain, commit.into_package(), Patch::TableComments(patch));
         }
+        for ((slide, chart), (size, index)) in std::mem::take(&mut self.chart_sizes) {
+            let error = |error| (failure(LeafError::KeynoteChartFont(error)), Some(index));
+            let edit = chain
+                .package
+                .edit_slide_chart_font_size(
+                    SlideSelector::index(slide),
+                    litchi_keynote::ChartSelector::index(chart),
+                )
+                .map_err(error)?;
+            let edit = match size {
+                Some(size) => edit.set(size),
+                None => edit.reset(),
+            };
+            let commit = edit.commit().map_err(error)?;
+            let patch = commit.patch().clone();
+            push(chain, commit.into_package(), Patch::ChartFontSize(patch));
+        }
         for (text, (value, index)) in texts {
             let at = |error| (error, Some(index));
             match text.container {
@@ -1347,6 +1397,7 @@ impl Pending {
         self.removals.clear();
         self.styles.clear();
         self.cells.clear();
+        self.chart_sizes.clear();
         self.comments.clear();
         self.adds.clear();
         self.groups.clear();
