@@ -568,6 +568,7 @@ fn preflight_character_parent(data: &[u8], limits: &Limits) -> Result<WireLimits
             if base_field.number() == 3 && base_field.wire_type() == 2 {
                 // reference_identifier() performs this source-bound view.
                 let _ = view(base_field.payload(), limits)?;
+                limits.charge_references(1)?;
             }
         }
     }
