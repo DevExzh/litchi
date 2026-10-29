@@ -731,6 +731,7 @@ pub fn set_text_style_keys(
     }
     indexed.sort_by_key(|item| (item.update.row, item.update.column));
     transaction.admit_work(updates.len().saturating_mul(usize::BITS as usize))?;
+    transaction.admit_work(updates.len())?;
     if indexed.windows(2).any(|pair| {
         pair[0].update.row == pair[1].update.row && pair[0].update.column == pair[1].update.column
     }) {
