@@ -1619,10 +1619,8 @@ fn validate_symbol_scope(
             {
                 return Err(Error::Verification);
             }
-            if let Some(original_object) = original_object.as_ref()
-                && !validate_symbol_object_metadata(original_object, object, scope)
-            {
-                return Err(Error::Verification);
+            if let Some(original_object) = original_object.as_ref() {
+                validate_symbol_object_metadata(original_object, object, scope, budget)?;
             }
             if original_object.is_none() && !validate_new_symbol_object_metadata(object, scope) {
                 return Err(Error::Verification);
@@ -1700,18 +1698,114 @@ fn scoped_reference_transition(
     source_kept.eq(candidate_existing)
 }
 
+#[derive(Clone, Copy)]
+enum HeaderLevel {
+    ArchiveInfo,
+    MessageInfo,
+    FieldInfo,
+    FieldPath,
+}
+
+fn header_known(level: HeaderLevel, number: u32) -> bool {
+    match level {
+        HeaderLevel::ArchiveInfo => matches!(number, 1..=3),
+        HeaderLevel::MessageInfo => matches!(number, 1..=6 | 8..=11),
+        HeaderLevel::FieldInfo => matches!(number, 1..=8),
+        HeaderLevel::FieldPath => number == 1,
+    }
+}
+
+fn header_nested(level: HeaderLevel, number: u32) -> Option<HeaderLevel> {
+    match (level, number) {
+        (HeaderLevel::ArchiveInfo, 2) => Some(HeaderLevel::MessageInfo),
+        (HeaderLevel::MessageInfo, 4) => Some(HeaderLevel::FieldInfo),
+        (HeaderLevel::MessageInfo, 9 | 10) => Some(HeaderLevel::FieldPath),
+        (HeaderLevel::FieldInfo, 1) => Some(HeaderLevel::FieldPath),
+        _ => None,
+    }
+}
+
+fn compare_header_unknowns(
+    source_bytes: &[u8],
+    candidate_bytes: &[u8],
+    level: HeaderLevel,
+    depth: usize,
+    budget: &mut ChartBudget,
+) -> Result<(), Error> {
+    let source_view =
+        parse_wire_view_with_budget(source_bytes, depth, budget).map_err(map_arrangement)?;
+    let candidate_view =
+        parse_wire_view_with_budget(candidate_bytes, depth, budget).map_err(map_arrangement)?;
+    let mut source_unknown = source_view
+        .fields()
+        .filter(|field| !header_known(level, field.number()));
+    let mut candidate_unknown = candidate_view
+        .fields()
+        .filter(|field| !header_known(level, field.number()));
+    loop {
+        match (source_unknown.next(), candidate_unknown.next()) {
+            (Some(source), Some(candidate)) if source.raw() == candidate.raw() => {},
+            (None, None) => break,
+            _ => return Err(Error::Verification),
+        }
+    }
+    for number in 1..=11 {
+        if !header_known(level, number) {
+            continue;
+        }
+        let mut source_fields = source_view
+            .fields()
+            .filter(|field| field.number() == number);
+        let mut candidate_fields = candidate_view
+            .fields()
+            .filter(|field| field.number() == number);
+        loop {
+            match (source_fields.next(), candidate_fields.next()) {
+                (Some(source), Some(candidate)) => {
+                    if let Some(nested) = header_nested(level, number) {
+                        let source_payload = source.payload();
+                        let candidate_payload = candidate.payload();
+                        compare_header_unknowns(
+                            source_payload,
+                            candidate_payload,
+                            nested,
+                            depth.saturating_add(1),
+                            budget,
+                        )?;
+                    }
+                },
+                (None, None) => break,
+                _ => return Err(Error::Verification),
+            }
+        }
+    }
+    Ok(())
+}
+
 fn validate_symbol_object_metadata(
     source: &litchi_iwa_core::ArchiveObject,
     candidate: &litchi_iwa_core::ArchiveObject,
     scope: &engine::MutationScope,
-) -> bool {
+    budget: &mut ChartBudget,
+) -> Result<(), Error> {
     if source.archive_info.should_merge != candidate.archive_info.should_merge
         || source.source_headers().is_some() != candidate.source_headers().is_some()
     {
-        return false;
+        return Err(Error::Verification);
+    }
+    if let (Some((source_header, _)), Some((candidate_header, _))) =
+        (source.source_headers(), candidate.source_headers())
+    {
+        compare_header_unknowns(
+            source_header,
+            candidate_header,
+            HeaderLevel::ArchiveInfo,
+            1,
+            budget,
+        )?;
     }
     if source.archive_info.message_infos.len() != candidate.archive_info.message_infos.len() {
-        return false;
+        return Err(Error::Verification);
     }
     for (index, (source_info, candidate_info)) in source
         .archive_info
@@ -1721,10 +1815,10 @@ fn validate_symbol_object_metadata(
         .enumerate()
     {
         let Some(source_message) = source.messages.get(index) else {
-            return false;
+            return Err(Error::Verification);
         };
         let Some(candidate_message) = candidate.messages.get(index) else {
-            return false;
+            return Err(Error::Verification);
         };
         let source_length = u32::try_from(source_message.data.len()).ok();
         let candidate_length = u32::try_from(candidate_message.data.len()).ok();
@@ -1749,7 +1843,7 @@ fn validate_symbol_object_metadata(
             )
             || source_info.field_infos.len() != candidate_info.field_infos.len()
         {
-            return false;
+            return Err(Error::Verification);
         }
         for (source_field, candidate_field) in source_info
             .field_infos
@@ -1774,11 +1868,11 @@ fn validate_symbol_object_metadata(
                     scope,
                 )
             {
-                return false;
+                return Err(Error::Verification);
             }
         }
     }
-    true
+    Ok(())
 }
 
 fn validate_new_symbol_object_metadata(
