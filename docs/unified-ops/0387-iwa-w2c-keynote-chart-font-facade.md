@@ -2,12 +2,12 @@
 
 - Status: bounded facade slice on `uo2/iwa-w2c-chart-font`, cut from frozen
   root `9932c7d0691b2c14bbbd11a2dea7df41f66308b6`, with the reviewed shared
-  substrate `faefe7303b` merged at branch tip `5f20266918`. The reviewed
-  selector/locality and admission/cost-probe repair is `6ac2c0efcd`. Coordinator
-  integration, native evidence and final integrated gates remain pending. The
-  six exit-ledger rows intentionally remain `host-only`; this record is not a
-  provisional migration state.
-- Date: 2026-10-28.
+  substrate `faefe7303b` and frozen trunk `1bc8f22499` merged at branch tip
+  `c3937337473bee2a985a27fb8ffa2407489c85f7`. The selector/locality and
+  admission/cost-probe repair is `6ac2c0efcd`. The six exit-ledger rows are now
+  migrated on this reviewed WP; coordinator integration, native evidence and
+  final integrated gates remain pending.
+- Date: 2026-10-29.
 - Plan: [0363](0363-iwa-monolith-exit-plan.md) W2-C; parity/evidence policy
   [0369](0369-iwa-exit-parity-harness-and-ledger.md); shared chart-font engine
   [0375a](0375a-iwa-w1e-style-variation-write-engine.md).
@@ -106,18 +106,46 @@ exact no-op bytes, no-op inverse, and typed out-of-range selector refusals.
 Native Apple acceptance is absent. The four focused Keynote facade queue rows
 in [0363-mac-queue.md](0363-mac-queue.md) remain `pending`; the existing two
 shared chart-font queue rows in that file also remain pending. No E3/E4 claim
-is made. The exit ledger remains host-only until the shared admission/error
-contract, focused gates and performance disposition are accepted.
+is made. The six ledger rows are migrated on Tier-A/B host differential proof,
+but their pending native queue entries still block W3.
 
 ## Performance and verification
 
 Six ignored full-facade probes isolate the coordinator's pinned release ABBA
 routes: `keynote_chart_font_{set,size_set,reset,size_reset,read,size_read}_cost_abba`.
 Each runs one host/leaf/leaf/host route; reset setup and read authoring happen
-outside the captured route. They were added for the ABBA slot but were not run
-while timing was held. No performance qualification or wall-clock claim is
-made here. Any later receipt must name the final integrated source SHA,
-release binary SHA-256, build command, exact test filter and route symbols.
+outside the captured route. On the clean frozen WP source, all 12 CPU-5
+Callgrind legs passed exact one-test execution, positive selected Ir equal to
+attribution Ir, and unchanged source/binary hashes. The release binary was
+built with:
+
+```text
+CARGO_INCREMENTAL=0 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0
+CARGO_PROFILE_RELEASE_DEBUG=1 CARGO_BUILD_JOBS=4 CARGO_NET_OFFLINE=true
+cargo test --release --locked --offline -p litchi-iwa \
+  --features parity-host-oracle --test parity --no-run
+```
+
+Source `c3937337473bee2a985a27fb8ffa2407489c85f7` has tree
+`3d8d374faa096b9401630ee17a651dff94e533f2`; `Cargo.lock` is 139901 bytes with
+SHA-256 `f7cca120269bcdaaad88f826299ccc51564bcc73985091446d8acc23b0b845bb`.
+The archived/staged release binary is 214039104 bytes with SHA-256
+`8871832870087b200d22336f8116662e7898c3c63e79aad3dd41476cb7cc78e5`.
+The external run receipt is
+`/home/zhuhe/code/litchi-worktrees/.coord/resume-20261029/perf/runs/keynote-chart-font-c393733747-cpu5/results.json`;
+the raw selected-call audit is
+`/home/zhuhe/code/litchi-worktrees/.coord/resume-20261029/perf/keynote-chart-font-six-call-audit.json`
+and its validation SHA-256 is
+`cfe00af029ba89b459f512996528fa7e38eccee75ce5180fe54bca1b3015fcb8`.
+
+| Route | Host Ir | Leaf Ir | Leaf/host slowdown |
+|---|---:|---:|---:|
+| font read | 708844182 | 55822162 | -92.125% |
+| font set | 1848047571 | 477285284 | -74.174% |
+| font reset | 661845491 | 320765426 | -51.535% |
+| point-size read | 597024810 | 55237459 | -90.748% |
+| point-size set | 1504019373 | 469878883 | -68.758% |
+| point-size reset | 661947717 | 315429478 | -52.348% |
 
 Scoped evidence on the current branch (source repair `6ac2c0efcd`):
 
@@ -129,16 +157,19 @@ Scoped evidence on the current branch (source repair `6ac2c0efcd`):
 | focused `keynote_chart_font` parity/control filter | 10 passed, 6 ignored isolated ABBA probes |
 | eight Keynote facade parity/control cases within that filter | 8 passed |
 | shared chart-font admission filter | 7 passed |
-| `cargo test -p litchi-keynote --lib` | 334 passed, 1 ignored (335 discovered, including the new admission control) |
+| `cargo test -p litchi-keynote --lib` | 335 passed, 1 ignored |
 | production locality negative controls (unit) | 1 passed: extra member/object, non-chart unknown payload, ZIP metadata |
 | low text-budget and stale-patch controls | passed |
 | zero/exact/cumulative locality fields and allocation controls | passed |
 | `python3 tools/check_crate_boundaries.py` | pass; 70 packages, 313 declarations, 12 explicit debt items |
-| `python3 tools/iwa_exit_ledger.py --check` | pass; six chart-font rows intentionally host-only |
-| Keynote minimal/full API glossary profiles | pass; 267/266 banned names, 51 families and 51 result contracts each |
+| `python3 tools/iwa_exit_ledger.py --check` | pass; six chart-font rows migrated, native queue still pending |
+| Keynote minimal/full API glossary profiles | pass; 267/266 banned names, 52 families and 52 result contracts each |
 | `cargo rustdoc -p litchi-keynote --lib --locked --offline -- -D warnings` | pass |
 | crate-boundary/non-iWork/no-`3rdparty`/ledger tooling tests | 1,221 passed; gate-runner fuzz-lock tests 5 passed |
 | no-op, inverse and typed-refusal controls | passed |
+| release parity build with `parity-host-oracle` | pass; exact source/binary receipt above |
+| CPU-5 Callgrind six-route facade matrix | 12/12 legs passed; all six within 5%, no wall-clock claim |
+| selected-call audit | pass; 6 routes, 12 legs, exactly 2 calls and 1 wrapper symbol per side |
 | native evidence / queue | pending; no claim |
 | performance | held for coordinator; no claim |
 
