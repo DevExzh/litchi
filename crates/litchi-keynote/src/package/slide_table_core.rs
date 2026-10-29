@@ -262,6 +262,15 @@ impl Budget {
         })
     }
 
+    /// Preserve the default wire-work ceiling while admitting the caller's
+    /// source-derived registry headroom introduced by a bounded shared engine.
+    /// Caller-selected narrower ceilings remain authoritative.
+    pub(crate) fn admit_default_work_headroom(&mut self, amount: usize) {
+        if self.max_work == WireLimits::MAX_REWRITE_WORK {
+            self.max_work = self.max_work.saturating_add(amount);
+        }
+    }
+
     fn add(current: &mut usize, amount: usize, maximum: usize, kind: LimitKind) -> Result<()> {
         let observed = current.checked_add(amount).ok_or(Error::InvalidSource)?;
         if observed > maximum {

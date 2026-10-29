@@ -649,8 +649,10 @@ impl SymbolBudget {
             self.limits.max_input_bytes,
             self.input_bytes,
         )?;
-        let fields = Self::remaining(LimitKind::Fields, self.limits.max_fields, self.fields)?;
-        let work = Self::remaining(LimitKind::Work, self.limits.max_work_bytes, self.work_bytes)?;
+        let fields = Self::remaining(LimitKind::Fields, self.limits.max_fields, self.fields)?
+            .min(WireLimits::MAX_FIELDS);
+        let work = Self::remaining(LimitKind::Work, self.limits.max_work_bytes, self.work_bytes)?
+            .min(WireLimits::MAX_REWRITE_WORK);
         WireLimits::DEFAULT
             .with_input_bytes(input)
             .and_then(|limits| limits.with_fields(fields))
@@ -3739,13 +3741,22 @@ fn bounded_style_parent_payload(
     let mut style = Vec::new();
     if let Some(identifier) = stylesheet {
         budget.preflight_allocations(1)?;
+        budget.preflight_retained(16)?;
+        budget.allocations(1)?;
+        budget.retained(16)?;
+        style
+            .try_reserve_exact(16)
+            .map_err(|_| SymbolError::Allocation { amount: 16 })?;
+        budget.preflight_allocations(1)?;
         budget.preflight_retained(11)?;
         budget.allocations(1)?;
         budget.retained(11)?;
-        style
+        let mut reference = Vec::new();
+        reference
             .try_reserve_exact(11)
             .map_err(|_| SymbolError::Allocation { amount: 11 })?;
-        push_varint_field(&mut style, REFERENCE_IDENTIFIER_FIELD, identifier);
+        push_varint_field(&mut reference, REFERENCE_IDENTIFIER_FIELD, identifier);
+        push_message_field(&mut style, STYLE_STYLESHEET_FIELD, &reference);
     }
     let bound = style.len().saturating_add(16);
     budget.preflight_allocations(1)?;

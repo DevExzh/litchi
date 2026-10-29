@@ -482,18 +482,6 @@ fn admit_workspace(package: &Package, budget: &mut TransactionBudget) -> Result<
         .map_err(map_transaction_error)
 }
 
-fn admit_symbol_result(series: usize, budget: &mut TransactionBudget) -> Result<(), Error> {
-    let bytes = series
-        .checked_mul(size_of::<Option<Symbol>>())
-        .ok_or(Error::InvalidSource)?;
-    budget
-        .allocations(1)
-        .and_then(|_| budget.retained(bytes))
-        .and_then(|_| budget.scratch(bytes))
-        .and_then(|_| budget.work(series))
-        .map_err(map_transaction_error)
-}
-
 fn map_transaction_error(error: TransactionError) -> Error {
     match error {
         TransactionError::Limit {
@@ -755,10 +743,105 @@ fn map_font_error(error: slide_chart_font::Error) -> Error {
     }
 }
 
+fn map_series_error(error: engine::SymbolError) -> Error {
+    match error {
+        engine::SymbolError::Graph(error) => map_graph(error),
+        engine::SymbolError::Limit {
+            kind,
+            observed,
+            maximum,
+        } => Error::Limit {
+            kind: match kind {
+                engine::LimitKind::InputBytes => LimitKind::InputBytes,
+                engine::LimitKind::Fields => LimitKind::WireFields,
+                engine::LimitKind::OutputBytes => LimitKind::OutputBytes,
+                engine::LimitKind::Nesting => LimitKind::WireNesting,
+                engine::LimitKind::Work => LimitKind::WireWork,
+                engine::LimitKind::Allocations => LimitKind::Allocations,
+                engine::LimitKind::RetainedBytes => LimitKind::RetainedBytes,
+                engine::LimitKind::ScratchBytes => LimitKind::ScratchBytes,
+                engine::LimitKind::References | engine::LimitKind::RegistryEntries => {
+                    LimitKind::References
+                },
+                engine::LimitKind::Identifiers => LimitKind::Entries,
+                _ => LimitKind::WireWork,
+            },
+            observed: observed as u64,
+            maximum: maximum as u64,
+        },
+        engine::SymbolError::Allocation { amount } => Error::Allocation { amount },
+        engine::SymbolError::Invalid("a series style is shared by several charts") => {
+            Refusal::UnsupportedDependency.into()
+        },
+        engine::SymbolError::Invalid(_) => Error::InvalidSource,
+        engine::SymbolError::IdentifierOverflow => Refusal::UnsupportedDependency.into(),
+        _ => Error::InvalidSource,
+    }
+}
+
+fn series_limits(
+    package: &Package,
+    budget: &TransactionBudget,
+    fields: &FieldLedger,
+) -> Result<engine::Limits, Error> {
+    const CHART_CODEC_MAX_BYTES: usize = 256 * 1024 * 1024;
+    const CHART_CODEC_MAX_FIELDS: usize = litchi_iwa_common::WireLimits::MAX_FIELDS;
+    let wire = budget.residual(package).map_err(map_transaction_error)?;
+    let max_fields = fields
+        .remaining()
+        .map_err(map_font_error)?
+        .min(wire.max_fields())
+        .clamp(1, CHART_CODEC_MAX_FIELDS);
+    let max_input_bytes = wire.max_input_bytes().clamp(1, CHART_CODEC_MAX_BYTES);
+    let max_output_bytes = wire.max_output_bytes().clamp(1, CHART_CODEC_MAX_BYTES);
+    let references = budget
+        .remaining_references()
+        .map_err(map_transaction_error)?;
+    Ok(engine::Limits::new(
+        max_input_bytes,
+        max_fields,
+        max_output_bytes,
+        u32::try_from(wire.max_nesting()).map_err(|_| Error::InvalidSource)?,
+        wire.max_rewrite_work(),
+        budget
+            .remaining_allocations()
+            .map_err(map_transaction_error)?,
+        budget.remaining_retained().map_err(map_transaction_error)?,
+        budget.remaining_scratch().map_err(map_transaction_error)?,
+        references,
+        references,
+        references,
+    ))
+}
+
+fn charge_series_report(
+    budget: &mut TransactionBudget,
+    fields: &mut FieldLedger,
+    report: engine::Report,
+) -> Result<(), Error> {
+    let references = report
+        .references()
+        .checked_add(report.registry_entries())
+        .and_then(|value| value.checked_add(report.identifiers()))
+        .ok_or(Error::InvalidSource)?;
+    budget
+        .input(report.input_bytes())
+        .and_then(|_| budget.output(report.output_bytes()))
+        .and_then(|_| budget.work(report.work_bytes()))
+        .and_then(|_| budget.allocations(report.allocations()))
+        .and_then(|_| budget.retained(report.retained_bytes()))
+        .and_then(|_| budget.scratch(report.scratch_bytes()))
+        .and_then(|_| budget.references(references))
+        .and_then(|_| budget.nesting(report.max_depth() as usize))
+        .map_err(map_transaction_error)?;
+    fields.charge(report.fields()).map_err(map_font_error)
+}
+
 fn publish_changes(
     source: &Package,
     changes: graph::Changes,
     selected_chart: u64,
+    scope: &engine::MutationScope,
     budget: &mut TransactionBudget,
     fields: &mut FieldLedger,
 ) -> Result<(Package, usize, slide_chart_font::MutationPlan), Error> {
@@ -768,8 +851,6 @@ fn publish_changes(
         .checked_add(changes.insertions.len())
         .and_then(|count| count.checked_add(changes.deletions.len()))
         .ok_or(Error::InvalidSource)?;
-    let plan = slide_chart_font::mutation_plan_for_series(source, selected_chart, &changes, budget)
-        .map_err(map_font_error)?;
     let extra_deletions = match &source.state.source {
         PhysicalSource::Package(catalog) => {
             super::rendering_invalidation::root_preview_deletions(catalog.package())
@@ -777,6 +858,15 @@ fn publish_changes(
         },
         PhysicalSource::Semantic(_) => return Err(Refusal::UnsupportedSource.into()),
     };
+    let plan = slide_chart_font::mutation_plan_for_series_scope(
+        source,
+        selected_chart,
+        &changes,
+        scope,
+        extra_deletions.names(),
+        budget,
+    )
+    .map_err(map_font_error)?;
     let candidate = slide_chart_font::publish_with_policy(
         source,
         changes,
@@ -975,7 +1065,14 @@ impl<'a> Edit<'a> {
         if staged.len() != series {
             return Err(Refusal::SeriesCount.into());
         }
-        let before = read_symbols(self.source, selection, family, series, &mut budget)?;
+        let before = read_symbols(
+            self.source,
+            selection,
+            family,
+            series,
+            &mut budget,
+            &mut fields,
+        )?;
         let Property::Symbols(staged_values) = &staged;
         if before.as_slice() == staged_values.as_slice() {
             let source = physical_source(self.source)?;
@@ -1002,15 +1099,19 @@ impl<'a> Edit<'a> {
         let components = PackageComponents(self.source);
         let mut workspace =
             Workspace::new(&components, graph_limits(self.source)?).map_err(map_graph)?;
-        let changed = engine::set_symbols(
+        let limits = series_limits(self.source, &budget, &fields)?;
+        let (changed, report) = engine::set_symbols(
             &mut workspace,
             selection.identifier,
             family,
             match &staged {
                 Property::Symbols(values) => values,
             },
+            limits,
         )
-        .map_err(map_graph)?;
+        .map_err(map_series_error)?;
+        let scope = report.scope().cloned().ok_or(Error::Verification)?;
+        charge_series_report(&mut budget, &mut fields, report)?;
         if !changed {
             return Err(Error::InvalidSource);
         }
@@ -1018,6 +1119,7 @@ impl<'a> Edit<'a> {
             self.source,
             workspace.finish(),
             selection.identifier,
+            &scope,
             &mut budget,
             &mut fields,
         )?;
@@ -1033,7 +1135,14 @@ impl<'a> Edit<'a> {
         if candidate_family != family || candidate_series != series {
             return Err(Error::Verification);
         }
-        let after = read_symbols(&candidate, candidate_selection, family, series, &mut budget)?;
+        let after = read_symbols(
+            &candidate,
+            candidate_selection,
+            family,
+            series,
+            &mut budget,
+            &mut fields,
+        )?;
         if after.as_slice() != staged_values.as_slice() {
             return Err(Error::Verification);
         }
@@ -1060,12 +1169,17 @@ fn read_symbols(
     family: SymbolFamily,
     series: usize,
     budget: &mut TransactionBudget,
+    fields: &mut FieldLedger,
 ) -> Result<Vec<Option<Symbol>>, Error> {
-    admit_symbol_result(series, budget)?;
     admit_workspace(package, budget)?;
     let components = PackageComponents(package);
     let workspace = Workspace::new(&components, graph_limits(package)?).map_err(map_graph)?;
-    engine::symbols(&workspace, selection.identifier, family, series).map_err(map_graph)
+    let limits = series_limits(package, budget, fields)?;
+    let (values, report) =
+        engine::symbols(&workspace, selection.identifier, family, series, limits)
+            .map_err(map_series_error)?;
+    charge_series_report(budget, fields, report)?;
+    Ok(values)
 }
 
 fn physical_source(package: &Package) -> Result<Arc<[u8]>, Error> {
@@ -1092,6 +1206,7 @@ impl Package {
             family,
             series,
             &mut budget,
+            &mut fields,
         )?))
     }
 
@@ -1144,7 +1259,14 @@ impl Package {
             &mut fields,
         )?;
         let (family, series) = family_and_count(&candidate, selection, &mut budget)?;
-        let after = read_symbols(&candidate, selection, family, series, &mut budget)?;
+        let after = read_symbols(
+            &candidate,
+            selection,
+            family,
+            series,
+            &mut budget,
+            &mut fields,
+        )?;
         let Property::Symbols(expected) = &patch.after;
         if after.as_slice() != expected.as_slice() {
             return Err(Error::Verification);

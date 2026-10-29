@@ -308,12 +308,41 @@ pub(super) struct MutationPlan {
     deleted_members: Box<[String]>,
     object_ids: Box<[u64]>,
     enforce_reachability: bool,
+    allowed_message_types: Box<[u32]>,
+    allowed_fields: Box<[u32]>,
+    planned_new_objects: Box<[u64]>,
+    planned_removed_objects: Box<[u64]>,
+    planned_new_members: Box<[String]>,
+    planned_removed_members: Box<[String]>,
 }
 
 pub(super) fn inverse_mutation_plan(plan: &MutationPlan) -> MutationPlan {
     let mut inverse = plan.clone();
     inverse.deleted_members = Box::default();
+    std::mem::swap(
+        &mut inverse.planned_new_objects,
+        &mut inverse.planned_removed_objects,
+    );
+    std::mem::swap(
+        &mut inverse.planned_new_members,
+        &mut inverse.planned_removed_members,
+    );
     inverse
+}
+
+fn plan_allows_message(plan: &MutationPlan, message_type: u32, fallback: fn(u32) -> bool) -> bool {
+    if plan.allowed_message_types.is_empty() {
+        fallback(message_type)
+    } else {
+        plan.allowed_message_types.contains(&message_type)
+    }
+}
+
+fn plan_allows_fields(plan: &MutationPlan, fields: &[u32]) -> bool {
+    plan.allowed_fields.is_empty()
+        || fields
+            .iter()
+            .all(|field| plan.allowed_fields.contains(field))
 }
 
 /// The fully verified result of one immutable chart-font transaction.
@@ -1707,7 +1736,10 @@ fn write_graph(
 }
 
 fn transaction_budget(package: &Package) -> Result<TransactionBudget, Error> {
-    TransactionBudget::new(package).map_err(map_transaction_error)
+    let mut budget = TransactionBudget::new(package).map_err(map_transaction_error)?;
+    budget
+        .admit_default_work_headroom(package.state.source.shared_source().len().saturating_mul(8));
+    Ok(budget)
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -1731,7 +1763,7 @@ impl FieldLedger {
         Ok(Self { used: 0, maximum })
     }
 
-    fn remaining(self) -> Result<usize, Error> {
+    pub(super) fn remaining(self) -> Result<usize, Error> {
         self.maximum
             .checked_sub(self.used)
             .filter(|remaining| *remaining > 0)
@@ -1742,7 +1774,7 @@ impl FieldLedger {
             })
     }
 
-    fn charge(&mut self, amount: usize) -> Result<(), Error> {
+    pub(super) fn charge(&mut self, amount: usize) -> Result<(), Error> {
         let observed = self.used.checked_add(amount).ok_or(Error::Limit {
             kind: LimitKind::WireFields,
             observed: u64::MAX,
@@ -2619,10 +2651,9 @@ pub(super) fn verify_locality_members(
                 continue;
             }
             if !allowed_objects.contains(&identifier)
-                || !source_object
-                    .messages
-                    .first()
-                    .is_some_and(|message| is_rewritable_type(message.type_))
+                || !source_object.messages.first().is_some_and(|message| {
+                    plan_allows_message(plan, message.type_, is_rewritable_type)
+                })
             {
                 return Err(Error::InvalidSource);
             }
@@ -2645,7 +2676,15 @@ pub(super) fn verify_locality_members(
                     .messages
                     .get(index)
                     .ok_or(Error::InvalidSource)?;
+                if candidate_message.data != source_message.data
+                    && !plan_allows_message(plan, source_message.type_, is_rewritable_type)
+                {
+                    return Err(Error::Verification);
+                }
                 let unknowns_preserved = if is_rewritable_type(source_message.type_) {
+                    if !plan_allows_fields(plan, chart_extension_fields) {
+                        return Err(Error::Verification);
+                    }
                     message_unknown_fields_preserved(
                         source_message.type_,
                         source_message.data.as_slice(),
@@ -2654,6 +2693,7 @@ pub(super) fn verify_locality_members(
                         budget,
                         fields,
                         chart_extension_fields,
+                        &plan.allowed_fields,
                     )?
                 } else {
                     true
@@ -2826,6 +2866,7 @@ fn message_unknown_fields_preserved(
     budget: &mut TransactionBudget,
     fields: &mut FieldLedger,
     chart_extension_fields: &[u32],
+    allowed_fields: &[u32],
 ) -> Result<bool, Error> {
     match message_type {
         CHART_MESSAGE_TYPE => chart_unknown_fields_preserved(
@@ -2847,9 +2888,14 @@ fn message_unknown_fields_preserved(
         STYLESHEET_MESSAGE_TYPE => {
             wire_unknown_fields_preserved(source, candidate, limits, &[1, 5], budget, fields)
         },
-        5_028 | 5_029 => {
-            series_style_unknown_fields_preserved(source, candidate, limits, budget, fields)
-        },
+        5_028 | 5_029 => series_style_unknown_fields_preserved(
+            source,
+            candidate,
+            limits,
+            budget,
+            fields,
+            allowed_fields,
+        ),
         OBJECT_CONTAINER_MESSAGE_TYPE => {
             wire_unknown_fields_preserved(source, candidate, limits, &[1, 2], budget, fields)
         },
@@ -2866,6 +2912,7 @@ fn series_style_unknown_fields_preserved(
     limits: litchi_iwa_common::WireLimits,
     budget: &mut TransactionBudget,
     fields: &mut FieldLedger,
+    allowed_fields: &[u32],
 ) -> Result<bool, Error> {
     let source_fields = parse_locality_fields(source, limits, budget, fields)?;
     let candidate_fields = parse_locality_fields(candidate, limits, budget, fields)?;
@@ -2890,14 +2937,14 @@ fn series_style_unknown_fields_preserved(
         (Some(source), Some(candidate)) => {
             let source_fields = parse_locality_fields(source, limits, budget, fields)?;
             let candidate_fields = parse_locality_fields(candidate, limits, budget, fields)?;
+            let excluded = if allowed_fields.is_empty() {
+                SERIES_SYMBOL_FIELDS
+            } else {
+                allowed_fields
+            };
             Ok(
-                raw_fields_except_numbers(&source_fields, source, SERIES_SYMBOL_FIELDS, budget)?
-                    == raw_fields_except_numbers(
-                        &candidate_fields,
-                        candidate,
-                        SERIES_SYMBOL_FIELDS,
-                        budget,
-                    )?,
+                raw_fields_except_numbers(&source_fields, source, excluded, budget)?
+                    == raw_fields_except_numbers(&candidate_fields, candidate, excluded, budget)?,
             )
         },
     }
@@ -3128,97 +3175,86 @@ fn mutation_plan(
         deleted_members: deleted_members.into_boxed_slice(),
         object_ids: object_ids.into_boxed_slice(),
         enforce_reachability: true,
+        ..MutationPlan::default()
     })
 }
 
-/// Build a source/request-derived locality plan for a chart-family rewrite.
-///
-/// Unlike the historical chart-font plan, this variant does not inspect a
-/// candidate diff to discover authorization.  The graph request already
-/// names every edited/inserted/deleted member; all object identifiers carried
-/// by those request archives form the bounded mutation scope.  The locality
-/// verifier still requires unchanged object/message metadata and unknown wire
-/// fields to remain byte-identical, so a touched member cannot authorize an
-/// unrelated mutation merely by being in the same archive.
-pub(super) fn mutation_plan_for_series(
+/// Build a source/request-derived locality plan from the shared series scope.
+/// The graph request supplies the changed members while the engine scope
+/// supplies the selected objects, message types, fields, and planned
+/// insertions/removals. No candidate diff is used as authorization.
+pub(super) fn mutation_plan_for_series_scope(
     package: &Package,
     root_identifier: u64,
     changes: &graph::Changes,
+    scope: &litchi_iwa_style::series::MutationScope,
+    extra_deletions: &[&str],
     budget: &mut TransactionBudget,
 ) -> Result<MutationPlan, Error> {
-    let preview_plan = match &package.state.source {
-        PhysicalSource::Package(catalog) => {
-            super::rendering_invalidation::root_preview_deletions(catalog.package())
-                .map_err(|_| Error::InvalidSource)?
-        },
-        PhysicalSource::Semantic(_) => return Err(Refusal::UnsupportedSource.into()),
-    };
     let member_capacity = changes
         .edits
         .len()
         .checked_add(changes.insertions.len())
         .and_then(|value| value.checked_add(changes.deletions.len()))
-        .and_then(|value| value.checked_add(preview_plan.len()))
+        .and_then(|value| value.checked_add(extra_deletions.len()))
         .ok_or(Error::InvalidSource)?;
-    let mut object_capacity = 0usize;
-    let mut name_bytes = 0usize;
-    for (name, archive) in &changes.edits {
-        name_bytes = name_bytes
-            .checked_add(name.len())
-            .and_then(|value| value.checked_add(1))
-            .ok_or(Error::InvalidSource)?;
-        object_capacity = object_capacity
-            .checked_add(archive.objects.len())
-            .ok_or(Error::InvalidSource)?;
-        let source = package
-            .state
-            .source
-            .components()
-            .get(name)
-            .ok_or(Error::InvalidSource)?;
-        object_capacity = object_capacity
-            .checked_add(source.archive().objects.len())
-            .ok_or(Error::InvalidSource)?;
-    }
-    for insertion in &changes.insertions {
-        name_bytes = name_bytes
-            .checked_add(insertion.name.len())
-            .and_then(|value| value.checked_add(1))
-            .ok_or(Error::InvalidSource)?;
-        object_capacity = object_capacity
-            .checked_add(insertion.archive.objects.len())
-            .ok_or(Error::InvalidSource)?;
-    }
-    for name in &changes.deletions {
-        name_bytes = name_bytes
-            .checked_add(name.len())
-            .and_then(|value| value.checked_add(1))
-            .ok_or(Error::InvalidSource)?;
-        if let Some(component) = package.state.source.components().get(name) {
-            object_capacity = object_capacity
-                .checked_add(component.archive().objects.len())
-                .ok_or(Error::InvalidSource)?;
-        }
-    }
-    for name in preview_plan.names() {
-        name_bytes = name_bytes
-            .checked_add(name.len())
-            .and_then(|value| value.checked_add(1))
-            .ok_or(Error::InvalidSource)?;
-    }
-    let set_scratch = member_capacity
-        .checked_mul(size_of::<String>())
+    let object_capacity = scope
+        .allowed_objects()
+        .len()
+        .checked_add(scope.planned_new_objects().len())
+        .and_then(|value| value.checked_add(scope.planned_removed_objects().len()))
+        .and_then(|value| {
+            value.checked_add(
+                scope
+                    .allowed_members()
+                    .iter()
+                    .filter_map(|member| package.state.source.components().get(member))
+                    .flat_map(|component| component.archive().objects.iter())
+                    .filter(|object| {
+                        object
+                            .messages
+                            .iter()
+                            .any(|message| message.type_ == PACKAGE_METADATA_MESSAGE_TYPE)
+                    })
+                    .count(),
+            )
+        })
+        .ok_or(Error::InvalidSource)?;
+    let name_bytes = changes
+        .edits
+        .iter()
+        .map(|(name, _)| name.len())
+        .chain(
+            changes
+                .insertions
+                .iter()
+                .map(|insertion| insertion.name.len()),
+        )
+        .chain(changes.deletions.iter().map(String::len))
+        .chain(extra_deletions.iter().map(|name| name.len()))
+        .chain(scope.allowed_members().iter().map(String::len))
+        .chain(scope.planned_new_members().iter().map(String::len))
+        .chain(scope.planned_removed_members().iter().map(String::len))
+        .try_fold(0usize, |total, bytes| total.checked_add(bytes))
+        .ok_or(Error::InvalidSource)?;
+    let int_scratch = scope
+        .allowed_message_types()
+        .len()
+        .checked_mul(size_of::<u32>())
+        .and_then(|value| {
+            value.checked_add(scope.allowed_fields().len().checked_mul(size_of::<u32>())?)
+        })
         .and_then(|value| value.checked_add(object_capacity.checked_mul(size_of::<u64>())?))
         .ok_or(Error::InvalidSource)?;
     budget
         .work(
             name_bytes
-                .checked_add(object_capacity)
+                .checked_add(int_scratch)
                 .ok_or(Error::InvalidSource)?,
         )
-        .and_then(|_| budget.allocations(member_capacity.max(1).saturating_add(3)))
+        .and_then(|_| budget.allocations(member_capacity.max(1).saturating_add(4)))
         .and_then(|_| budget.retained(name_bytes))
-        .and_then(|_| budget.scratch(set_scratch))
+        .and_then(|_| budget.scratch(int_scratch))
         .map_err(map_transaction_error)?;
 
     let mut members = Vec::new();
@@ -3233,11 +3269,14 @@ pub(super) fn mutation_plan_for_series(
             changes
                 .deletions
                 .len()
-                .checked_add(preview_plan.len())
+                .checked_add(extra_deletions.len())
                 .ok_or(Error::InvalidSource)?,
         )
         .map_err(|_| Error::Allocation {
-            amount: changes.deletions.len().saturating_add(preview_plan.len()),
+            amount: changes
+                .deletions
+                .len()
+                .saturating_add(extra_deletions.len()),
         })?;
     let mut object_ids = Vec::new();
     object_ids
@@ -3245,35 +3284,100 @@ pub(super) fn mutation_plan_for_series(
         .map_err(|_| Error::Allocation {
             amount: object_capacity,
         })?;
-    for (name, archive) in &changes.edits {
+    let mut allowed_message_types = Vec::new();
+    allowed_message_types
+        .try_reserve_exact(scope.allowed_message_types().len())
+        .map_err(|_| Error::Allocation {
+            amount: scope.allowed_message_types().len(),
+        })?;
+    allowed_message_types.extend_from_slice(scope.allowed_message_types());
+    let mut allowed_fields = Vec::new();
+    allowed_fields
+        .try_reserve_exact(scope.allowed_fields().len())
+        .map_err(|_| Error::Allocation {
+            amount: scope.allowed_fields().len(),
+        })?;
+    allowed_fields.extend_from_slice(scope.allowed_fields());
+    let mut planned_new_objects = Vec::new();
+    planned_new_objects
+        .try_reserve_exact(scope.planned_new_objects().len())
+        .map_err(|_| Error::Allocation {
+            amount: scope.planned_new_objects().len(),
+        })?;
+    planned_new_objects.extend_from_slice(scope.planned_new_objects());
+    let mut planned_removed_objects = Vec::new();
+    planned_removed_objects
+        .try_reserve_exact(scope.planned_removed_objects().len())
+        .map_err(|_| Error::Allocation {
+            amount: scope.planned_removed_objects().len(),
+        })?;
+    planned_removed_objects.extend_from_slice(scope.planned_removed_objects());
+    let mut planned_new_members = Vec::new();
+    planned_new_members
+        .try_reserve_exact(scope.planned_new_members().len())
+        .map_err(|_| Error::Allocation {
+            amount: scope.planned_new_members().len(),
+        })?;
+    planned_new_members.extend(scope.planned_new_members().iter().cloned());
+    let mut planned_removed_members = Vec::new();
+    planned_removed_members
+        .try_reserve_exact(scope.planned_removed_members().len())
+        .map_err(|_| Error::Allocation {
+            amount: scope.planned_removed_members().len(),
+        })?;
+    planned_removed_members.extend(scope.planned_removed_members().iter().cloned());
+
+    let member_allowed = |name: &str| {
+        scope.allowed_members().iter().any(|member| member == name)
+            || scope
+                .planned_new_members()
+                .iter()
+                .any(|member| member == name)
+            || scope
+                .planned_removed_members()
+                .iter()
+                .any(|member| member == name)
+            || extra_deletions.contains(&name)
+    };
+    if changes.edits.iter().any(|(name, _)| !member_allowed(name))
+        || changes
+            .insertions
+            .iter()
+            .any(|insertion| !member_allowed(&insertion.name))
+        || changes.deletions.iter().any(|name| !member_allowed(name))
+    {
+        return Err(Error::Verification);
+    }
+
+    for (name, _) in &changes.edits {
         members.push(name.clone());
-        for object in &archive.objects {
-            object_ids.push(object.archive_info.identifier.ok_or(Error::InvalidSource)?);
-        }
-        if let Some(source) = package.state.source.components().get(name) {
-            for object in &source.archive().objects {
-                object_ids.push(object.archive_info.identifier.ok_or(Error::InvalidSource)?);
-            }
-        }
     }
     for insertion in &changes.insertions {
         members.push(insertion.name.clone());
-        for object in &insertion.archive.objects {
-            object_ids.push(object.archive_info.identifier.ok_or(Error::InvalidSource)?);
-        }
     }
     for name in &changes.deletions {
         members.push(name.clone());
         deleted_members.push(name.clone());
-        if let Some(component) = package.state.source.components().get(name) {
-            for object in &component.archive().objects {
-                object_ids.push(object.archive_info.identifier.ok_or(Error::InvalidSource)?);
-            }
-        }
     }
-    for name in preview_plan.names() {
+    for name in extra_deletions {
         members.push((*name).to_owned());
         deleted_members.push((*name).to_owned());
+    }
+    object_ids.extend_from_slice(scope.allowed_objects());
+    object_ids.extend_from_slice(scope.planned_new_objects());
+    object_ids.extend_from_slice(scope.planned_removed_objects());
+    for member in scope.allowed_members() {
+        if let Some(component) = package.state.source.components().get(member) {
+            for object in &component.archive().objects {
+                if object
+                    .messages
+                    .iter()
+                    .any(|message| message.type_ == PACKAGE_METADATA_MESSAGE_TYPE)
+                {
+                    object_ids.push(object.archive_info.identifier.ok_or(Error::InvalidSource)?);
+                }
+            }
+        }
     }
     members.sort_unstable();
     members.dedup();
@@ -3287,6 +3391,12 @@ pub(super) fn mutation_plan_for_series(
         deleted_members: deleted_members.into_boxed_slice(),
         object_ids: object_ids.into_boxed_slice(),
         enforce_reachability: false,
+        allowed_message_types: allowed_message_types.into_boxed_slice(),
+        allowed_fields: allowed_fields.into_boxed_slice(),
+        planned_new_objects: planned_new_objects.into_boxed_slice(),
+        planned_removed_objects: planned_removed_objects.into_boxed_slice(),
+        planned_new_members: planned_new_members.into_boxed_slice(),
+        planned_removed_members: planned_removed_members.into_boxed_slice(),
     })
 }
 
@@ -3997,6 +4107,7 @@ mod locality_tests {
             deleted_members: Box::default(),
             object_ids: object_ids.into_boxed_slice(),
             enforce_reachability: true,
+            ..MutationPlan::default()
         })
     }
 
