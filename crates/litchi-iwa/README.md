@@ -2649,7 +2649,11 @@ Populated tables can be duplicated with independent storage and CalculationEngin
 owner families. Formula hosts, table UUID references, dependency tiles, package
 UUID registries, and cross-component references are remapped transactionally;
 unsupported advanced dependency state is rejected without modifying the editor.
-See `duplicate_numbers_table`.
+See the focused [`duplicate_numbers_table`](../litchi-numbers/examples/duplicate_numbers_table.rs),
+[`add_numbers_table`](../litchi-numbers/examples/add_numbers_table.rs),
+[`resize_numbers_table`](../litchi-numbers/examples/resize_numbers_table.rs), and
+[`remove_numbers_table`](../litchi-numbers/examples/remove_numbers_table.rs)
+examples for selector-first lifecycle commands.
 
 Pages body tables and Keynote slide tables can use the same native graph clone
 without first saving or opening a template document. Pages inserts the copied
