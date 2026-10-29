@@ -2024,6 +2024,10 @@ fn parse_locality_fields(
         .map_err(map_transaction_error)?;
     let view = litchi_iwa_common::wire::WireView::parse(payload, limits).map_err(map_wire_error)?;
     field_ledger.charge(view.fields().count())?;
+    budget
+        .input(payload.len())
+        .and_then(|_| budget.work(span))
+        .map_err(map_transaction_error)?;
     let fields =
         litchi_iwa_common::wire::parse_wire_fields(payload, limits).map_err(map_wire_error)?;
     Ok(fields)
@@ -2133,6 +2137,7 @@ fn payload_object_references(
             for styles in extension_fields.iter().filter(|field| field.number() == 20) {
                 let reference = styles.payload(extension).map_err(map_wire_error)?;
                 if let Some(identifier) = wire_reference_id(reference, limits, budget, fields)? {
+                    budget.references(1).map_err(map_transaction_error)?;
                     references.push(identifier);
                 }
             }
@@ -2158,6 +2163,7 @@ fn payload_object_references(
                         budget,
                         fields,
                     )? {
+                        budget.references(1).map_err(map_transaction_error)?;
                         references.push(identifier);
                     }
                 }
@@ -2171,6 +2177,7 @@ fn payload_object_references(
                     budget,
                     fields,
                 )? {
+                    budget.references(1).map_err(map_transaction_error)?;
                     references.push(identifier);
                 }
             }
@@ -2190,6 +2197,7 @@ fn payload_object_references(
                         budget,
                         fields,
                     )? {
+                        budget.references(1).map_err(map_transaction_error)?;
                         references.push(identifier);
                     }
                 }
@@ -2305,6 +2313,7 @@ fn reachable_objects(
             .map_err(map_transaction_error)?;
         budget
             .allocations(1)
+            .and_then(|_| budget.references(reference_capacity))
             .and_then(|_| {
                 budget.scratch(
                     reference_capacity
@@ -2358,10 +2367,6 @@ fn reachable_objects(
         }
         budget
             .work(payload_references.len())
-            .and_then(|_| budget.references(payload_references.len()))
-            .map_err(map_transaction_error)?;
-        budget
-            .references(references.identifiers.len())
             .map_err(map_transaction_error)?;
         pending.extend(references.identifiers);
         pending.extend(payload_references);
