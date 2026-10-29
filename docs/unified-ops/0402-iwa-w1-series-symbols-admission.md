@@ -50,6 +50,25 @@ and uses package-metadata inspection requirements rather than registry-byte
 multipliers. Existing chart-font consumers retain a compatibility work getter
 backed by the same exact inspection requirements.
 
+## Bounded workspace finalization seam
+
+`Workspace::finish_requirements` now exposes source-relative counts for the
+changed/deleted entries, owned member-name copy bytes, final vectors,
+retained bytes, and traversal work without allocating or rescanning member
+names. `Workspace::finish_bounded` checks a caller residual
+`FinishLimits`, uses fallible exact reservations for both `Changes` vectors
+and owned names, moves existing archives/insertions without copying, and
+returns a `FinishReport`. The historical `finish` method delegates through
+an unlimited profile for unchanged consumers.
+
+The seam deliberately does not absorb facade-owned `LeafComponents` or
+workspace index construction: those source/index costs remain an explicit
+pre-admission responsibility of each format caller and must not be charged
+again as finalization work.
+
+Implementation commit: `bd2d138a07` (on top of coordinator freeze merge
+`2f1f7a8a78`).
+
 ## Correctness and evidence boundary
 
 The bounded path preserves unknown fields, exact no-op behavior, shared-owner
@@ -64,7 +83,7 @@ is an explicit follow-up gap, not a full Numbers facade-ledger qualification.
 
 ## Verification
 
-- `cargo test --offline -p litchi-iwa-style --lib`: 30 passed.
+- `cargo test --offline -p litchi-iwa-style --lib`: 32 passed.
 - `cargo test --offline -p litchi-iwa --test parity chart_font_cases -- --nocapture`:
   29 passed, 13 ignored; Numbers, Pages, and Keynote chart-font parity and
   low-budget controls pass.
