@@ -456,7 +456,7 @@ fn pages_probe_source(name: &str) -> Vec<u8> {
 }
 
 #[inline(never)]
-fn unified_pages_comment_read_route(source: &[u8]) -> Option<String> {
+fn unified_pages_comment_read_impl(source: &[u8]) -> Option<String> {
     prop(
         &open_bytes(source.to_vec()).expect("unified Pages source"),
         PAGES_COMMENT_CELL,
@@ -465,7 +465,7 @@ fn unified_pages_comment_read_route(source: &[u8]) -> Option<String> {
 }
 
 #[inline(never)]
-fn direct_pages_comment_read_route(source: &[u8]) -> Option<String> {
+fn direct_pages_comment_read_impl(source: &[u8]) -> Option<String> {
     litchi_pages::Package::from_bytes(source)
         .expect("direct Pages source")
         .body_table_cell_comment(
@@ -477,7 +477,7 @@ fn direct_pages_comment_read_route(source: &[u8]) -> Option<String> {
 }
 
 #[inline(never)]
-fn unified_pages_comment_create_route(source: &[u8]) -> Vec<u8> {
+fn unified_pages_comment_create_impl(source: &[u8]) -> Vec<u8> {
     open_bytes(source.to_vec())
         .expect("unified Pages source")
         .set(
@@ -490,7 +490,7 @@ fn unified_pages_comment_create_route(source: &[u8]) -> Vec<u8> {
 }
 
 #[inline(never)]
-fn direct_pages_comment_create_route(source: &[u8]) -> Vec<u8> {
+fn direct_pages_comment_create_impl(source: &[u8]) -> Vec<u8> {
     let commit = litchi_pages::Package::from_bytes(source)
         .expect("direct Pages source")
         .edit_body_table_cell_comment(
@@ -511,7 +511,7 @@ fn direct_pages_comment_create_route(source: &[u8]) -> Vec<u8> {
 }
 
 #[inline(never)]
-fn unified_pages_comment_replace_route(source: &[u8]) -> Vec<u8> {
+fn unified_pages_comment_replace_impl(source: &[u8]) -> Vec<u8> {
     open_bytes(source.to_vec())
         .expect("unified Pages source")
         .set(
@@ -524,7 +524,7 @@ fn unified_pages_comment_replace_route(source: &[u8]) -> Vec<u8> {
 }
 
 #[inline(never)]
-fn direct_pages_comment_replace_route(source: &[u8]) -> Vec<u8> {
+fn direct_pages_comment_replace_impl(source: &[u8]) -> Vec<u8> {
     let commit = litchi_pages::Package::from_bytes(source)
         .expect("direct Pages source")
         .edit_body_table_cell_comment(
@@ -545,7 +545,7 @@ fn direct_pages_comment_replace_route(source: &[u8]) -> Vec<u8> {
 }
 
 #[inline(never)]
-fn unified_pages_comment_clear_route(source: &[u8]) -> Vec<u8> {
+fn unified_pages_comment_clear_impl(source: &[u8]) -> Vec<u8> {
     open_bytes(source.to_vec())
         .expect("unified Pages source")
         .set(
@@ -558,7 +558,7 @@ fn unified_pages_comment_clear_route(source: &[u8]) -> Vec<u8> {
 }
 
 #[inline(never)]
-fn direct_pages_comment_clear_route(source: &[u8]) -> Vec<u8> {
+fn direct_pages_comment_clear_impl(source: &[u8]) -> Vec<u8> {
     let commit = litchi_pages::Package::from_bytes(source)
         .expect("direct Pages source")
         .edit_body_table_cell_comment(
@@ -578,13 +578,55 @@ fn direct_pages_comment_clear_route(source: &[u8]) -> Vec<u8> {
     bytes
 }
 
+#[inline(never)]
+fn unified_pages_comment_read_route(source: &[u8]) -> Option<String> {
+    unified_pages_comment_read_impl(source)
+}
+
+#[inline(never)]
+fn direct_pages_comment_read_route(source: &[u8]) -> Option<String> {
+    direct_pages_comment_read_impl(source)
+}
+
+#[inline(never)]
+fn unified_pages_comment_create_route(source: &[u8]) -> Vec<u8> {
+    unified_pages_comment_create_impl(source)
+}
+
+#[inline(never)]
+fn direct_pages_comment_create_route(source: &[u8]) -> Vec<u8> {
+    direct_pages_comment_create_impl(source)
+}
+
+#[inline(never)]
+fn unified_pages_comment_replace_route(source: &[u8]) -> Vec<u8> {
+    unified_pages_comment_replace_impl(source)
+}
+
+#[inline(never)]
+fn direct_pages_comment_replace_route(source: &[u8]) -> Vec<u8> {
+    direct_pages_comment_replace_impl(source)
+}
+
+#[inline(never)]
+fn unified_pages_comment_clear_route(source: &[u8]) -> Vec<u8> {
+    unified_pages_comment_clear_impl(source)
+}
+
+#[inline(never)]
+fn direct_pages_comment_clear_route(source: &[u8]) -> Vec<u8> {
+    direct_pages_comment_clear_impl(source)
+}
+
 fn pages_comment_route_check(
     source: &[u8],
     unified: fn(&[u8]) -> Vec<u8>,
     direct: fn(&[u8]) -> Vec<u8>,
+    warmup_unified: fn(&[u8]) -> Vec<u8>,
+    warmup_direct: fn(&[u8]) -> Vec<u8>,
 ) {
-    let expected = direct(source);
-    assert_eq!(unified(source), expected, "unified/direct output");
+    let expected = warmup_direct(source);
+    assert_eq!(warmup_unified(source), expected, "unified/direct output");
     for route in [0_u8, 1, 1, 0] {
         let output = if route == 0 {
             unified(source)
@@ -600,8 +642,8 @@ fn pages_comment_route_check(
 #[ignore = "release callgrind ABBA probe; run explicitly"]
 fn pages_comment_read_full_file_cost_abba() {
     let source = pages_probe_source("pages/body-table-comment-hidden-native-saved.pages");
-    let expected = direct_pages_comment_read_route(&source);
-    assert_eq!(unified_pages_comment_read_route(&source), expected);
+    let expected = direct_pages_comment_read_impl(&source);
+    assert_eq!(unified_pages_comment_read_impl(&source), expected);
     assert_eq!(
         source,
         pages_probe_source("pages/body-table-comment-hidden-native-saved.pages")
@@ -625,6 +667,8 @@ fn pages_comment_create_full_file_cost_abba() {
         &source,
         unified_pages_comment_create_route,
         direct_pages_comment_create_route,
+        unified_pages_comment_create_impl,
+        direct_pages_comment_create_impl,
     );
 }
 
@@ -636,6 +680,8 @@ fn pages_comment_replace_full_file_cost_abba() {
         &source,
         unified_pages_comment_replace_route,
         direct_pages_comment_replace_route,
+        unified_pages_comment_replace_impl,
+        direct_pages_comment_replace_impl,
     );
 }
 
@@ -647,6 +693,8 @@ fn pages_comment_clear_full_file_cost_abba() {
         &source,
         unified_pages_comment_clear_route,
         direct_pages_comment_clear_route,
+        unified_pages_comment_clear_impl,
+        direct_pages_comment_clear_impl,
     );
 }
 

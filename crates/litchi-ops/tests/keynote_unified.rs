@@ -1120,7 +1120,7 @@ fn keynote_probe_source(name: &str) -> Vec<u8> {
 }
 
 #[inline(never)]
-fn unified_keynote_comment_read_route(source: &[u8]) -> Option<String> {
+fn unified_keynote_comment_read_impl(source: &[u8]) -> Option<String> {
     prop(
         &open_bytes(source.to_vec()).expect("unified Keynote source"),
         KEYNOTE_COMMENT_CELL,
@@ -1129,7 +1129,7 @@ fn unified_keynote_comment_read_route(source: &[u8]) -> Option<String> {
 }
 
 #[inline(never)]
-fn direct_keynote_comment_read_route(source: &[u8]) -> Option<String> {
+fn direct_keynote_comment_read_impl(source: &[u8]) -> Option<String> {
     litchi_keynote::Package::from_bytes(source)
         .expect("direct Keynote source")
         .slide_table_cell_comment(
@@ -1142,7 +1142,7 @@ fn direct_keynote_comment_read_route(source: &[u8]) -> Option<String> {
 }
 
 #[inline(never)]
-fn unified_keynote_comment_create_route(source: &[u8]) -> Vec<u8> {
+fn unified_keynote_comment_create_impl(source: &[u8]) -> Vec<u8> {
     open_bytes(source.to_vec())
         .expect("unified Keynote source")
         .set(
@@ -1155,7 +1155,7 @@ fn unified_keynote_comment_create_route(source: &[u8]) -> Vec<u8> {
 }
 
 #[inline(never)]
-fn direct_keynote_comment_create_route(source: &[u8]) -> Vec<u8> {
+fn direct_keynote_comment_create_impl(source: &[u8]) -> Vec<u8> {
     let commit = litchi_keynote::Package::from_bytes(source)
         .expect("direct Keynote source")
         .edit_slide_table_cell_comment(
@@ -1177,7 +1177,7 @@ fn direct_keynote_comment_create_route(source: &[u8]) -> Vec<u8> {
 }
 
 #[inline(never)]
-fn unified_keynote_comment_replace_route(source: &[u8]) -> Vec<u8> {
+fn unified_keynote_comment_replace_impl(source: &[u8]) -> Vec<u8> {
     open_bytes(source.to_vec())
         .expect("unified Keynote source")
         .set(
@@ -1190,7 +1190,7 @@ fn unified_keynote_comment_replace_route(source: &[u8]) -> Vec<u8> {
 }
 
 #[inline(never)]
-fn direct_keynote_comment_replace_route(source: &[u8]) -> Vec<u8> {
+fn direct_keynote_comment_replace_impl(source: &[u8]) -> Vec<u8> {
     let commit = litchi_keynote::Package::from_bytes(source)
         .expect("direct Keynote source")
         .edit_slide_table_cell_comment(
@@ -1212,7 +1212,7 @@ fn direct_keynote_comment_replace_route(source: &[u8]) -> Vec<u8> {
 }
 
 #[inline(never)]
-fn unified_keynote_comment_clear_route(source: &[u8]) -> Vec<u8> {
+fn unified_keynote_comment_clear_impl(source: &[u8]) -> Vec<u8> {
     open_bytes(source.to_vec())
         .expect("unified Keynote source")
         .set(
@@ -1225,7 +1225,7 @@ fn unified_keynote_comment_clear_route(source: &[u8]) -> Vec<u8> {
 }
 
 #[inline(never)]
-fn direct_keynote_comment_clear_route(source: &[u8]) -> Vec<u8> {
+fn direct_keynote_comment_clear_impl(source: &[u8]) -> Vec<u8> {
     let commit = litchi_keynote::Package::from_bytes(source)
         .expect("direct Keynote source")
         .edit_slide_table_cell_comment(
@@ -1246,13 +1246,55 @@ fn direct_keynote_comment_clear_route(source: &[u8]) -> Vec<u8> {
     bytes
 }
 
+#[inline(never)]
+fn unified_keynote_comment_read_route(source: &[u8]) -> Option<String> {
+    unified_keynote_comment_read_impl(source)
+}
+
+#[inline(never)]
+fn direct_keynote_comment_read_route(source: &[u8]) -> Option<String> {
+    direct_keynote_comment_read_impl(source)
+}
+
+#[inline(never)]
+fn unified_keynote_comment_create_route(source: &[u8]) -> Vec<u8> {
+    unified_keynote_comment_create_impl(source)
+}
+
+#[inline(never)]
+fn direct_keynote_comment_create_route(source: &[u8]) -> Vec<u8> {
+    direct_keynote_comment_create_impl(source)
+}
+
+#[inline(never)]
+fn unified_keynote_comment_replace_route(source: &[u8]) -> Vec<u8> {
+    unified_keynote_comment_replace_impl(source)
+}
+
+#[inline(never)]
+fn direct_keynote_comment_replace_route(source: &[u8]) -> Vec<u8> {
+    direct_keynote_comment_replace_impl(source)
+}
+
+#[inline(never)]
+fn unified_keynote_comment_clear_route(source: &[u8]) -> Vec<u8> {
+    unified_keynote_comment_clear_impl(source)
+}
+
+#[inline(never)]
+fn direct_keynote_comment_clear_route(source: &[u8]) -> Vec<u8> {
+    direct_keynote_comment_clear_impl(source)
+}
+
 fn keynote_comment_route_check(
     source: &[u8],
     unified: fn(&[u8]) -> Vec<u8>,
     direct: fn(&[u8]) -> Vec<u8>,
+    warmup_unified: fn(&[u8]) -> Vec<u8>,
+    warmup_direct: fn(&[u8]) -> Vec<u8>,
 ) {
-    let expected = direct(source);
-    assert_eq!(unified(source), expected, "unified/direct output");
+    let expected = warmup_direct(source);
+    assert_eq!(warmup_unified(source), expected, "unified/direct output");
     for route in [0_u8, 1, 1, 0] {
         let output = if route == 0 {
             unified(source)
@@ -1268,8 +1310,8 @@ fn keynote_comment_route_check(
 #[ignore = "release callgrind ABBA probe; run explicitly"]
 fn keynote_comment_read_full_file_cost_abba() {
     let source = keynote_probe_source("slide-table-read-native.key");
-    let expected = direct_keynote_comment_read_route(&source);
-    assert_eq!(unified_keynote_comment_read_route(&source), expected);
+    let expected = direct_keynote_comment_read_impl(&source);
+    assert_eq!(unified_keynote_comment_read_impl(&source), expected);
     for route in [0_u8, 1, 1, 0] {
         let output = if route == 0 {
             unified_keynote_comment_read_route(&source)
@@ -1289,6 +1331,8 @@ fn keynote_comment_create_full_file_cost_abba() {
         &source,
         unified_keynote_comment_create_route,
         direct_keynote_comment_create_route,
+        unified_keynote_comment_create_impl,
+        direct_keynote_comment_create_impl,
     );
 }
 
@@ -1300,6 +1344,8 @@ fn keynote_comment_replace_full_file_cost_abba() {
         &source,
         unified_keynote_comment_replace_route,
         direct_keynote_comment_replace_route,
+        unified_keynote_comment_replace_impl,
+        direct_keynote_comment_replace_impl,
     );
 }
 
@@ -1311,6 +1357,8 @@ fn keynote_comment_clear_full_file_cost_abba() {
         &source,
         unified_keynote_comment_clear_route,
         direct_keynote_comment_clear_route,
+        unified_keynote_comment_clear_impl,
+        direct_keynote_comment_clear_impl,
     );
 }
 
