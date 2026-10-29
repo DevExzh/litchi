@@ -1,0 +1,67 @@
+{
+  "schema": "iwa-w2c-keynote-chart-series-callgrind-v1",
+  "source_commit": "babab049dfd5094f9bcc555e4d2beae7799a9fac",
+  "source_clean": true,
+  "binary_sha256": "b13f21e620dc53ce8a70fa01efcc9aecbe6a84395949837fc6f21636ba9f7757",
+  "binary_bytes": 216072352,
+  "policy": {
+    "ratio": "leaf/host inclusive Callgrind Ir",
+    "max_ratio": 1.05,
+    "cpu": 3,
+    "calls_per_side": 2,
+    "wall_time_claim": false,
+    "native_claim": false,
+    "validator_sha256": "c0637e4304f5fdbfae6fca6b0e9a9c17f7d10cb9a56c7df6846951fa4bdf6b8e",
+    "validator_receipt_sha256": "e22ada00b65934f4de5b561767175d4a12537da635e4a051c2b4bf9688f89f0d"
+  },
+  "receipt": {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-w2c-series-typed-errors-perf-babab049dfd5094f9bcc555e4d2beae7799a9fac/final-capture-receipt-v2.txt",
+    "sha256": "7f1d3772d6b0c75b9b7ac8ba8eac7d5ed87df5b298fb6bd4c53bffba7d8de0e5"
+  },
+  "routes": [
+    {
+      "id": "full_symbols_read",
+      "operation": "get",
+      "size": "chart-data-native.key",
+      "host_ir": 436815648,
+      "leaf_ir": 53349671,
+      "ratio": 0.122133149864,
+      "calls_per_side": 2,
+      "status": "meets",
+      "projection": "leaf all-series read"
+    },
+    {
+      "id": "full_symbols_set",
+      "operation": "set",
+      "size": "chart-data-native.key",
+      "host_ir": 1466263335,
+      "leaf_ir": 250642786,
+      "ratio": 0.170939816892,
+      "calls_per_side": 2,
+      "status": "meets",
+      "projection": "leaf all-series set"
+    },
+    {
+      "id": "single_symbol_read",
+      "operation": "get",
+      "size": "chart-data-native.key",
+      "host_ir": 436829776,
+      "leaf_ir": 53328583,
+      "ratio": 0.122080924722,
+      "calls_per_side": 2,
+      "status": "meets",
+      "projection": "leaf full-family read then index projection"
+    },
+    {
+      "id": "single_symbol_set",
+      "operation": "set",
+      "size": "chart-data-native.key",
+      "host_ir": 1765373125,
+      "leaf_ir": 253297208,
+      "ratio": 0.143480833832,
+      "calls_per_side": 2,
+      "status": "meets",
+      "projection": "leaf full-family read-modify-set"
+    }
+  ]
+}

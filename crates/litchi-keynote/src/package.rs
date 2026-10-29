@@ -28,6 +28,7 @@ pub(crate) mod slide_chart_font;
 pub(crate) mod slide_chart_legend;
 pub(crate) mod slide_chart_lifecycle;
 pub(crate) mod slide_chart_metadata;
+pub(crate) mod slide_chart_series;
 pub(crate) mod slide_chart_title;
 pub(crate) mod slide_chart_value_axis;
 pub(crate) mod slide_creation;

@@ -3881,6 +3881,70 @@ def p0399():
     return out
 
 
+@needs("0401")
+def p0401():
+    """Accepted scoped W2-C Keynote chart-series instruction routes."""
+    path = RES / "0401" / "keynote-chart-series-callgrind.json"
+    data = load_json(path)
+    source = data.get("source_commit")
+    if (not isinstance(source, str) or not re.fullmatch(r"[0-9a-f]{40}", source)
+            or data.get("source_clean") is not True):
+        raise SystemExit("0401 invalid source identity")
+    policy = data.get("policy", {})
+    if (policy.get("ratio") != "leaf/host inclusive Callgrind Ir"
+            or policy.get("max_ratio") != 1.05
+            or policy.get("cpu") != 3
+            or policy.get("calls_per_side") != 2
+            or policy.get("wall_time_claim") is not False
+            or policy.get("native_claim") is not False):
+        raise SystemExit("0401 instruction policy changed")
+    routes = data.get("routes")
+    if not isinstance(routes, list) or len(routes) != 4:
+        raise SystemExit("0401 requires exactly four chart-series routes")
+    expected = {
+        "full_symbols_read": ("get", "all-series symbols read"),
+        "full_symbols_set": ("set", "all-series symbols set"),
+        "single_symbol_read": ("get", "one-series symbol read"),
+        "single_symbol_set": ("set", "one-series symbol set"),
+    }
+    out = []
+    seen = set()
+    for route in routes:
+        route_id = route.get("id")
+        if route_id in seen or route_id not in expected:
+            raise SystemExit(f"0401 invalid or duplicate route: {route_id}")
+        seen.add(route_id)
+        operation, label = expected[route_id]
+        host = route.get("host_ir")
+        leaf = route.get("leaf_ir")
+        ratio = route.get("ratio")
+        if (route.get("operation"), route.get("calls_per_side")) != (
+                operation, policy["calls_per_side"]):
+            raise SystemExit(f"0401 route shape changed: {route_id}")
+        if (type(host) is not int or type(leaf) is not int
+                or host <= 0 or leaf <= 0
+                or type(ratio) not in (int, float)
+                or abs(ratio - leaf / host) > 1e-12
+                or ratio > policy["max_ratio"]
+                or route.get("status") != "meets"):
+            raise SystemExit(f"0401 invalid instruction result: {route_id}")
+        projection = route.get("projection", "")
+        out.append(row(
+            "0401", "keynote", operation, label, route.get("size", ""),
+            leaf, host, [ratio], regression("0401"),
+            f"w2c_chart_series:{route_id}:ir", src([path]),
+            stage=f"source-bound {source[:10]}",
+            comparison="leaf/host (inclusive Callgrind Ir)", unit="Ir",
+            explanation=(
+                "Accepted source-scoped Keynote chart-series instruction route; "
+                f"{projection} Raw selected-call, full-function, PROGRAM TOTALS "
+                "and threshold-100 annotation checks passed. No wall-time or "
+                "native acceptance claim.")))
+    if seen != set(expected):
+        raise SystemExit("0401 route set is incomplete")
+    return out
+
+
 @needs("0403")
 def p0403():
     """Current-source Numbers ``Property::Symbols`` facade instruction routes.
@@ -4160,7 +4224,7 @@ PARSERS = [p0250, p0251, p0251f, p0252, p0253, p0254, p0255, p0256, p0258, p0259
            p0328, p0329, p0330, p0333, p0335, p0336, p0337, p0338, p0340, p0342, p0345, p0346,
            p0347, p0348, p0355, p0355a, p0356, p0356a, p0356b, p0356c, p0357, p0357a, p0357b, p0358, p0358a,
            p0359, p0359a, p0359b, p0359qb, p0359qc, p0359qd, p0359r, p0359ra, p0359rb, p0359rc,
-           p0359rd, p0359re, p0359qe, p0360b, p0361, p0361a, p0362, p0362ya, p0362yb, p0362yc, p0362yd, p0362ye, p0375b, p0377, p0377a, p0391, p0399, p0403]
+           p0359rd, p0359re, p0359qe, p0360b, p0361, p0361a, p0362, p0362ya, p0362yb, p0362yc, p0362yd, p0362ye, p0375b, p0377, p0377a, p0391, p0399, p0401, p0403]
 
 
 

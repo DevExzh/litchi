@@ -25,7 +25,7 @@ use litchi_iwa_archive::{
 };
 #[cfg(test)]
 use litchi_iwa_core::Limits as CoreLimits;
-use litchi_iwa_core::{Archive, ArchiveObject, RawMessage, SnappyStream};
+use litchi_iwa_core::{Archive, ArchiveObject, MessageInfo, RawMessage, SnappyStream};
 use litchi_iwa_core::{
     ArchiveReferenceKind, ArchiveReferenceOccurrence, ArchiveReferencePolicy,
     ArchiveReferenceVisitor,
@@ -52,6 +52,10 @@ const CHART_MESSAGE_TYPE: u32 = 5_021;
 const PARAGRAPH_STYLE_MESSAGE_TYPE: u32 = 2_022;
 const STYLESHEET_MESSAGE_TYPE: u32 = 401;
 const PACKAGE_METADATA_MESSAGE_TYPE: u32 = 11_006;
+const OBJECT_CONTAINER_MESSAGE_TYPE: u32 = 11_008;
+const SERIES_SYMBOL_FIELDS: &[u32] = &[
+    32, 33, 34, 35, 36, 47, 48, 49, 50, 51, 70, 71, 72, 73, 74, 160, 163, 181,
+];
 
 /// A chart's effective font identity and face traits.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
@@ -162,6 +166,10 @@ pub enum Refusal {
     /// The selected chart style is not safe for this focused route.
     #[error("the selected Keynote chart style is not supported by the chart-font route")]
     UnsupportedStyle,
+    /// A changed object carries retained ArchiveInfo provenance that this
+    /// facade cannot prove safe to rewrite.
+    #[error("the selected Keynote chart object has unsupported ArchiveInfo provenance")]
+    UnsupportedArchiveInfo,
     /// An exact-name slide or chart selector was ambiguous.
     #[error("the Keynote chart-font selector is ambiguous")]
     AmbiguousSelector,
@@ -200,7 +208,9 @@ impl Refusal {
     pub const fn kind(&self) -> litchi_core::edit::RefusalKind {
         use litchi_core::edit::RefusalKind;
         match self {
-            Self::UnsupportedSource | Self::UnsupportedStyle => RefusalKind::UnsupportedContent,
+            Self::UnsupportedSource | Self::UnsupportedStyle | Self::UnsupportedArchiveInfo => {
+                RefusalKind::UnsupportedContent
+            },
             Self::AmbiguousSelector | Self::EmptySlideName | Self::EmptyChartName => {
                 RefusalKind::InvalidValue
             },
@@ -298,11 +308,48 @@ impl Diagnostics {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
-struct MutationPlan {
+pub(super) struct MutationPlan {
     root_identifier: u64,
     members: Box<[String]>,
     deleted_members: Box<[String]>,
     object_ids: Box<[u64]>,
+    allowed_reference_ids: Box<[u64]>,
+    enforce_reachability: bool,
+    allowed_message_types: Box<[u32]>,
+    allowed_fields: Box<[u32]>,
+    planned_new_objects: Box<[u64]>,
+    planned_removed_objects: Box<[u64]>,
+    planned_new_members: Box<[String]>,
+    planned_removed_members: Box<[String]>,
+}
+
+pub(super) fn inverse_mutation_plan(plan: &MutationPlan) -> MutationPlan {
+    let mut inverse = plan.clone();
+    inverse.deleted_members = Box::default();
+    std::mem::swap(
+        &mut inverse.planned_new_objects,
+        &mut inverse.planned_removed_objects,
+    );
+    std::mem::swap(
+        &mut inverse.planned_new_members,
+        &mut inverse.planned_removed_members,
+    );
+    inverse
+}
+
+fn plan_allows_message(plan: &MutationPlan, message_type: u32, fallback: fn(u32) -> bool) -> bool {
+    if plan.allowed_message_types.is_empty() {
+        fallback(message_type)
+    } else {
+        plan.allowed_message_types.contains(&message_type)
+    }
+}
+
+fn plan_allows_fields(plan: &MutationPlan, fields: &[u32]) -> bool {
+    plan.allowed_fields.is_empty()
+        || fields
+            .iter()
+            .all(|field| plan.allowed_fields.contains(field))
 }
 
 /// The fully verified result of one immutable chart-font transaction.
@@ -1142,7 +1189,15 @@ impl Package {
             Package::from_source_with_options(patch.artifacts.target(), self.state.options)
                 .map_err(map_read_error)?;
         candidate.validate().map_err(map_read_error)?;
-        verify_locality_members(self, &candidate, &patch.plan, &mut budget, &mut fields)?;
+        verify_locality_members(
+            self,
+            &candidate,
+            &patch.plan,
+            &mut budget,
+            &mut fields,
+            is_chart_font_rewritable_type,
+            &[20],
+        )?;
         let candidate_selection =
             positional_selection(&candidate, &selection, &mut budget, &mut fields)?;
         if !same_selection(&selection, &candidate_selection)
@@ -1257,7 +1312,15 @@ impl Package {
             Package::from_source_with_options(patch.artifacts.target(), self.state.options)
                 .map_err(map_read_error)?;
         candidate.validate().map_err(map_read_error)?;
-        verify_locality_members(self, &candidate, &patch.plan, &mut budget, &mut fields)?;
+        verify_locality_members(
+            self,
+            &candidate,
+            &patch.plan,
+            &mut budget,
+            &mut fields,
+            is_chart_font_rewritable_type,
+            &[20],
+        )?;
         let candidate_selection =
             positional_selection(&candidate, &selection, &mut budget, &mut fields)?;
         if !same_selection(&selection, &candidate_selection)
@@ -1337,7 +1400,26 @@ fn select_chart_transaction(
     .map_err(map_axis_error)
 }
 
-struct ChartFontSelectionBudget<'a> {
+/// Shared budget-aware chart selection for adjacent chart-family owners.
+/// Callers retain the same transaction budget and field ledger through the
+/// selector, metadata and candidate phases; no fresh selector profile is
+/// substituted at this seam.
+pub(super) fn select_chart_for_series(
+    package: &Package,
+    slide: SlideSelector<'_>,
+    chart: ChartSelector<'_>,
+    budget: &mut super::slide_table_core::Budget,
+    fields: &mut FieldLedger,
+) -> Result<ChartSelection, AxisSupportError> {
+    let mut graph_budget = ChartFontSelectionBudget { budget, fields };
+    slide_chart_title::select_chart_with_budget(package, slide, chart, true, &mut graph_budget)
+}
+
+pub(super) fn field_ledger_for_series(package: &Package) -> Result<FieldLedger, AxisSupportError> {
+    FieldLedger::new(package).map_err(map_selection_budget_error)
+}
+
+pub(super) struct ChartFontSelectionBudget<'a> {
     budget: &'a mut TransactionBudget,
     fields: &'a mut FieldLedger,
 }
@@ -1402,8 +1484,8 @@ impl AxisSupportBudget for ChartFontSelectionBudget<'_> {
             .ok_or(AxisSupportError::InvalidSource)?;
         map_selection_budget_result(
             self.budget
-                .scratch(bytes.max(1))
-                .and_then(|_| self.budget.allocations(capacity.max(1))),
+                .scratch(bytes)
+                .and_then(|_| self.budget.allocations(capacity)),
         )
     }
 
@@ -1463,7 +1545,7 @@ impl AxisSupportBudget for ChartFontSelectionBudget<'_> {
                     .map_err(map_selection_budget_error)?,
                 wire.max_rewrite_work(),
                 recursion,
-                package.state.source.components().len().max(1),
+                package.state.source.components().len(),
                 self.budget
                     .remaining_references()
                     .map_err(map_transaction_error)
@@ -1665,7 +1747,7 @@ fn transaction_budget(package: &Package) -> Result<TransactionBudget, Error> {
 }
 
 #[derive(Debug, Clone, Copy)]
-struct FieldLedger {
+pub(super) struct FieldLedger {
     used: usize,
     maximum: usize,
 }
@@ -1685,7 +1767,7 @@ impl FieldLedger {
         Ok(Self { used: 0, maximum })
     }
 
-    fn remaining(self) -> Result<usize, Error> {
+    pub(super) fn remaining(self) -> Result<usize, Error> {
         self.maximum
             .checked_sub(self.used)
             .filter(|remaining| *remaining > 0)
@@ -1696,7 +1778,7 @@ impl FieldLedger {
             })
     }
 
-    fn charge(&mut self, amount: usize) -> Result<(), Error> {
+    pub(super) fn charge(&mut self, amount: usize) -> Result<(), Error> {
         let observed = self.used.checked_add(amount).ok_or(Error::Limit {
             kind: LimitKind::WireFields,
             observed: u64::MAX,
@@ -1857,7 +1939,7 @@ fn charge_engine_report(
     text.charge(report.text_bytes())
 }
 
-fn preflight_candidate(
+pub(super) fn preflight_candidate(
     package: &Package,
     candidate_bytes: usize,
     inserted_components: usize,
@@ -2414,26 +2496,28 @@ fn reachable_objects(
     Ok(reachable)
 }
 
-fn verify_locality_members(
+/// Admit the fixed locality-verifier census before the candidate package is
+/// opened.  The verifier only borrows these catalogs and plan-owned sets, but
+/// their byte traversal and collection reservations still belong to the same
+/// transaction ledger as candidate ingress.
+pub(super) fn preflight_locality_verification(
     source: &Package,
-    candidate: &Package,
+    candidate_bytes: usize,
     plan: &MutationPlan,
     budget: &mut TransactionBudget,
-    fields: &mut FieldLedger,
 ) -> Result<(), Error> {
     let source_catalog = physical_catalog(source)?;
-    let candidate_catalog = physical_catalog(candidate)?;
     let locality_work = source_catalog
         .source_bytes()
         .len()
-        .checked_add(candidate_catalog.source_bytes().len())
+        .checked_add(candidate_bytes)
         .ok_or(Error::InvalidSource)?;
-    budget.work(locality_work).map_err(map_transaction_error)?;
     let set_capacity = plan
         .members
         .len()
         .checked_add(plan.deleted_members.len())
         .and_then(|value| value.checked_add(plan.object_ids.len()))
+        .and_then(|value| value.checked_add(plan.allowed_reference_ids.len()))
         .ok_or(Error::InvalidSource)?;
     let set_scratch = plan
         .members
@@ -2443,12 +2527,106 @@ fn verify_locality_members(
             value.checked_add(plan.deleted_members.len().checked_mul(size_of::<&str>())?)
         })
         .and_then(|value| value.checked_add(plan.object_ids.len().checked_mul(size_of::<u64>())?))
+        .and_then(|value| {
+            value.checked_add(
+                plan.allowed_reference_ids
+                    .len()
+                    .checked_mul(size_of::<u64>())?,
+            )
+        })
         .ok_or(Error::InvalidSource)?;
+    let mut probe_work = 0usize;
+    let mut probe_allocations = 0usize;
+    let mut probe_retained = 0usize;
+    for member in &plan.members {
+        let Some(component) = source.state.source.components().get(member) else {
+            continue;
+        };
+        for object in &component.archive().objects {
+            let (work, allocations, retained) = archive_info_probe_cost(object)?;
+            probe_work = probe_work
+                .checked_add(work.checked_mul(2).ok_or(Error::InvalidSource)?)
+                .ok_or(Error::InvalidSource)?;
+            probe_allocations = probe_allocations
+                .checked_add(allocations.checked_mul(2).ok_or(Error::InvalidSource)?)
+                .ok_or(Error::InvalidSource)?;
+            probe_retained = probe_retained
+                .checked_add(retained.checked_mul(2).ok_or(Error::InvalidSource)?)
+                .ok_or(Error::InvalidSource)?;
+        }
+    }
     budget
-        .work(set_capacity)
+        .work(locality_work)
+        .and_then(|_| budget.work(set_capacity))
+        .and_then(|_| budget.work(probe_work))
         .and_then(|_| budget.allocations(3))
+        .and_then(|_| budget.allocations(probe_allocations))
+        .and_then(|_| budget.retained(probe_retained))
+        .and_then(|_| budget.retained(candidate_bytes))
         .and_then(|_| budget.scratch(set_scratch))
-        .map_err(map_transaction_error)?;
+        .map_err(map_transaction_error)
+}
+
+fn archive_info_probe_cost(object: &ArchiveObject) -> Result<(usize, usize, usize), Error> {
+    let payload_bytes = object
+        .messages
+        .iter()
+        .map(|message| message.data.len())
+        .try_fold(0usize, |total, bytes| total.checked_add(bytes))
+        .ok_or(Error::InvalidSource)?;
+    let message_count = object.messages.len();
+    let work = payload_bytes
+        .checked_add(message_count)
+        .ok_or(Error::InvalidSource)?;
+    let allocations = message_count
+        .checked_mul(2)
+        .and_then(|value| value.checked_add(2))
+        .ok_or(Error::InvalidSource)?;
+    let message_memory = size_of::<RawMessage>()
+        .checked_add(size_of::<MessageInfo>())
+        .ok_or(Error::InvalidSource)?;
+    let retained = payload_bytes
+        .checked_add(
+            message_count
+                .checked_mul(message_memory)
+                .ok_or(Error::InvalidSource)?,
+        )
+        .and_then(|value| value.checked_add(size_of::<ArchiveObject>()))
+        .ok_or(Error::InvalidSource)?;
+    Ok((work, allocations, retained))
+}
+
+fn archive_info_provenance_supported(
+    object: &ArchiveObject,
+    limits: litchi_iwa_core::Limits,
+) -> Result<bool, Error> {
+    let identifier = object.archive_info.identifier.ok_or(Error::InvalidSource)?;
+    let mut messages = Vec::new();
+    messages
+        .try_reserve_exact(object.messages.len())
+        .map_err(|_| Error::Allocation {
+            amount: object.messages.len(),
+        })?;
+    messages.extend(object.messages.iter().cloned());
+    let mut canonical = ArchiveObject::new(identifier, messages, limits).map_err(map_core_error)?;
+    canonical.archive_info = object.archive_info.clone();
+    canonical.header_length = object.header_length;
+    canonical.data_length = object.data_length;
+    Ok(canonical.same_content_ignoring_offsets(object))
+}
+
+pub(super) fn verify_locality_members(
+    source: &Package,
+    candidate: &Package,
+    plan: &MutationPlan,
+    budget: &mut TransactionBudget,
+    fields: &mut FieldLedger,
+    is_rewritable_type: fn(u32) -> bool,
+    chart_extension_fields: &[u32],
+) -> Result<(), Error> {
+    let source_catalog = physical_catalog(source)?;
+    let candidate_catalog = physical_catalog(candidate)?;
+    let archive_limits = graph_limits(source)?;
     let mut changed_members = HashSet::new();
     changed_members
         .try_reserve(plan.members.len())
@@ -2470,20 +2648,35 @@ fn verify_locality_members(
             amount: plan.object_ids.len(),
         })?;
     allowed_objects.extend(plan.object_ids.iter().copied());
-    let source_reachable = reachable_objects(source, plan.root_identifier, budget, fields)?;
-    let candidate_reachable = reachable_objects(candidate, plan.root_identifier, budget, fields)?;
-    for identifier in &allowed_objects {
-        if *identifier != 2
-            && package_object(source, *identifier).is_some()
-            && !source_reachable.contains(identifier)
-        {
-            return Err(Error::InvalidSource);
-        }
-        if *identifier != 2
-            && package_object(candidate, *identifier).is_some()
-            && !candidate_reachable.contains(identifier)
-        {
-            return Err(Error::InvalidSource);
+    let mut allowed_references = HashSet::new();
+    allowed_references
+        .try_reserve(plan.allowed_reference_ids.len())
+        .map_err(|_| Error::Allocation {
+            amount: plan.allowed_reference_ids.len(),
+        })?;
+    allowed_references.extend(plan.allowed_reference_ids.iter().copied());
+    let (source_reachable, candidate_reachable) = if plan.enforce_reachability {
+        (
+            reachable_objects(source, plan.root_identifier, budget, fields)?,
+            reachable_objects(candidate, plan.root_identifier, budget, fields)?,
+        )
+    } else {
+        (HashSet::new(), HashSet::new())
+    };
+    if plan.enforce_reachability {
+        for identifier in &allowed_objects {
+            if *identifier != 2
+                && package_object(source, *identifier).is_some()
+                && !source_reachable.contains(identifier)
+            {
+                return Err(Error::InvalidSource);
+            }
+            if *identifier != 2
+                && package_object(candidate, *identifier).is_some()
+                && !candidate_reachable.contains(identifier)
+            {
+                return Err(Error::InvalidSource);
+            }
         }
     }
 
@@ -2562,11 +2755,17 @@ fn verify_locality_members(
             if source_object.same_content_ignoring_offsets(candidate_object) {
                 continue;
             }
+            let source_provenance =
+                archive_info_provenance_supported(source_object, archive_limits)?;
+            let candidate_provenance =
+                archive_info_provenance_supported(candidate_object, archive_limits)?;
+            if !source_provenance || !candidate_provenance {
+                return Err(Refusal::UnsupportedArchiveInfo.into());
+            }
             if !allowed_objects.contains(&identifier)
-                || !source_object
-                    .messages
-                    .first()
-                    .is_some_and(|message| is_chart_font_rewritable_type(message.type_))
+                || !source_object.messages.first().is_some_and(|message| {
+                    plan_allows_message(plan, message.type_, is_rewritable_type)
+                })
             {
                 return Err(Error::InvalidSource);
             }
@@ -2575,13 +2774,7 @@ fn verify_locality_members(
             }
             inspect_archive_metadata_strict(source, source_object, budget)?;
             inspect_archive_metadata_strict(candidate, candidate_object, budget)?;
-            if !archive_metadata_preserved(
-                source_object,
-                candidate_object,
-                &allowed_objects,
-                &source_reachable,
-                &candidate_reachable,
-            ) {
+            if !archive_metadata_preserved(source_object, candidate_object, &allowed_references) {
                 return Err(Error::InvalidSource);
             }
             for (index, source_message) in source_object.messages.iter().enumerate() {
@@ -2589,18 +2782,32 @@ fn verify_locality_members(
                     .messages
                     .get(index)
                     .ok_or(Error::InvalidSource)?;
+                if candidate_message.data != source_message.data
+                    && !plan_allows_message(plan, source_message.type_, is_rewritable_type)
+                {
+                    return Err(Error::Verification);
+                }
+                let unknowns_preserved = if is_rewritable_type(source_message.type_) {
+                    if !plan_allows_fields(plan, chart_extension_fields) {
+                        return Err(Error::Verification);
+                    }
+                    message_unknown_fields_preserved(
+                        source_message.type_,
+                        source_message.data.as_slice(),
+                        candidate_message.data.as_slice(),
+                        budget.residual(source).map_err(map_transaction_error)?,
+                        budget,
+                        fields,
+                        chart_extension_fields,
+                        &plan.allowed_fields,
+                    )?
+                } else {
+                    true
+                };
                 if candidate_message.type_ != source_message.type_
-                    || (!is_chart_font_rewritable_type(source_message.type_)
+                    || (!is_rewritable_type(source_message.type_)
                         && candidate_message != source_message)
-                    || (is_chart_font_rewritable_type(source_message.type_)
-                        && !message_unknown_fields_preserved(
-                            source_message.type_,
-                            source_message.data.as_slice(),
-                            candidate_message.data.as_slice(),
-                            budget.residual(source).map_err(map_transaction_error)?,
-                            budget,
-                            fields,
-                        )?)
+                    || !unknowns_preserved
                 {
                     return Err(Error::InvalidSource);
                 }
@@ -2677,27 +2884,19 @@ fn references_transition_preserved(
     source: &[u64],
     candidate: &[u64],
     allowed: &HashSet<u64>,
-    source_reachable: &HashSet<u64>,
-    candidate_reachable: &HashSet<u64>,
 ) -> bool {
-    source.iter().all(|identifier| {
-        candidate.contains(identifier)
-            || allowed.contains(identifier)
-            || source_reachable.contains(identifier)
-            || !candidate_reachable.contains(identifier)
-    }) && candidate.iter().all(|identifier| {
-        source.contains(identifier)
-            || allowed.contains(identifier)
-            || source_reachable.contains(identifier)
-    })
+    source
+        .iter()
+        .all(|identifier| candidate.contains(identifier) || allowed.contains(identifier))
+        && candidate
+            .iter()
+            .all(|identifier| source.contains(identifier) || allowed.contains(identifier))
 }
 
 fn archive_metadata_preserved(
     source: &ArchiveObject,
     candidate: &ArchiveObject,
     allowed: &HashSet<u64>,
-    source_reachable: &HashSet<u64>,
-    candidate_reachable: &HashSet<u64>,
 ) -> bool {
     if source.archive_info.should_merge != candidate.archive_info.should_merge
         || source.archive_info.message_infos.len() != candidate.archive_info.message_infos.len()
@@ -2723,8 +2922,6 @@ fn archive_metadata_preserved(
                 &source_info.object_references,
                 &candidate_info.object_references,
                 allowed,
-                source_reachable,
-                candidate_reachable,
             )
         {
             return false;
@@ -2746,8 +2943,6 @@ fn archive_metadata_preserved(
                     &source_field.object_references,
                     &candidate_field.object_references,
                     allowed,
-                    source_reachable,
-                    candidate_reachable,
                 )
             {
                 return false;
@@ -2764,11 +2959,18 @@ fn message_unknown_fields_preserved(
     limits: litchi_iwa_common::WireLimits,
     budget: &mut TransactionBudget,
     fields: &mut FieldLedger,
+    chart_extension_fields: &[u32],
+    allowed_fields: &[u32],
 ) -> Result<bool, Error> {
     match message_type {
-        CHART_MESSAGE_TYPE => {
-            chart_unknown_fields_preserved(source, candidate, limits, budget, fields)
-        },
+        CHART_MESSAGE_TYPE => chart_unknown_fields_preserved(
+            source,
+            candidate,
+            limits,
+            budget,
+            fields,
+            chart_extension_fields,
+        ),
         PARAGRAPH_STYLE_MESSAGE_TYPE => wire_unknown_fields_preserved(
             source,
             candidate,
@@ -2780,10 +2982,65 @@ fn message_unknown_fields_preserved(
         STYLESHEET_MESSAGE_TYPE => {
             wire_unknown_fields_preserved(source, candidate, limits, &[1, 5], budget, fields)
         },
+        5_028 | 5_029 => series_style_unknown_fields_preserved(
+            source,
+            candidate,
+            limits,
+            budget,
+            fields,
+            allowed_fields,
+        ),
+        OBJECT_CONTAINER_MESSAGE_TYPE => {
+            wire_unknown_fields_preserved(source, candidate, limits, &[1, 2], budget, fields)
+        },
         PACKAGE_METADATA_MESSAGE_TYPE => {
             wire_unknown_fields_preserved(source, candidate, limits, &[1, 3, 8, 11], budget, fields)
         },
         _ => Ok(true),
+    }
+}
+
+fn series_style_unknown_fields_preserved(
+    source: &[u8],
+    candidate: &[u8],
+    limits: litchi_iwa_common::WireLimits,
+    budget: &mut TransactionBudget,
+    fields: &mut FieldLedger,
+    allowed_fields: &[u32],
+) -> Result<bool, Error> {
+    let source_fields = parse_locality_fields(source, limits, budget, fields)?;
+    let candidate_fields = parse_locality_fields(candidate, limits, budget, fields)?;
+    if raw_fields_except(&source_fields, source, 10_000, budget)?
+        != raw_fields_except(&candidate_fields, candidate, 10_000, budget)?
+    {
+        return Ok(false);
+    }
+    let source_extension = source_fields
+        .iter()
+        .find(|field| field.number() == 10_000)
+        .map(|field| field.payload(source).map_err(map_wire_error))
+        .transpose()?;
+    let candidate_extension = candidate_fields
+        .iter()
+        .find(|field| field.number() == 10_000)
+        .map(|field| field.payload(candidate).map_err(map_wire_error))
+        .transpose()?;
+    match (source_extension, candidate_extension) {
+        (None, None) => Ok(true),
+        (Some(_), None) | (None, Some(_)) => Ok(false),
+        (Some(source), Some(candidate)) => {
+            let source_fields = parse_locality_fields(source, limits, budget, fields)?;
+            let candidate_fields = parse_locality_fields(candidate, limits, budget, fields)?;
+            let excluded = if allowed_fields.is_empty() {
+                SERIES_SYMBOL_FIELDS
+            } else {
+                allowed_fields
+            };
+            Ok(
+                raw_fields_except_numbers(&source_fields, source, excluded, budget)?
+                    == raw_fields_except_numbers(&candidate_fields, candidate, excluded, budget)?,
+            )
+        },
     }
 }
 
@@ -2809,6 +3066,7 @@ fn chart_unknown_fields_preserved(
     limits: litchi_iwa_common::WireLimits,
     budget: &mut TransactionBudget,
     fields: &mut FieldLedger,
+    chart_extension_fields: &[u32],
 ) -> Result<bool, Error> {
     let source_fields = parse_locality_fields(source, limits, budget, fields)?;
     let candidate_fields = parse_locality_fields(candidate, limits, budget, fields)?;
@@ -2838,10 +3096,18 @@ fn chart_unknown_fields_preserved(
                     parse_locality_fields(source_extension, limits, budget, fields)?;
                 let candidate_fields =
                     parse_locality_fields(candidate_extension, limits, budget, fields)?;
-                let source_unknown =
-                    raw_fields_except(&source_fields, source_extension, 20, budget)?;
-                let candidate_unknown =
-                    raw_fields_except(&candidate_fields, candidate_extension, 20, budget)?;
+                let source_unknown = raw_fields_except_numbers(
+                    &source_fields,
+                    source_extension,
+                    chart_extension_fields,
+                    budget,
+                )?;
+                let candidate_unknown = raw_fields_except_numbers(
+                    &candidate_fields,
+                    candidate_extension,
+                    chart_extension_fields,
+                    budget,
+                )?;
                 if source_unknown != candidate_unknown {
                     return Ok(false);
                 }
@@ -2864,6 +3130,7 @@ fn mutation_plan(
         .and_then(|value| value.checked_add(changes.deletions.len()))
         .ok_or(Error::InvalidSource)?;
     let mut object_capacity = 0usize;
+    let mut reference_capacity = 0usize;
     let mut name_bytes = 0usize;
     for (name, archive) in &changes.edits {
         name_bytes = name_bytes
@@ -2873,6 +3140,39 @@ fn mutation_plan(
         object_capacity = object_capacity
             .checked_add(archive.objects.len())
             .ok_or(Error::InvalidSource)?;
+        let source_archive = package
+            .state
+            .source
+            .components()
+            .get(name)
+            .ok_or(Error::InvalidSource)?
+            .archive();
+        for object in &source_archive.objects {
+            let references = object
+                .archive_info
+                .message_infos
+                .iter()
+                .map(|message| {
+                    message
+                        .object_references
+                        .len()
+                        .checked_add(
+                            message
+                                .field_infos
+                                .iter()
+                                .map(|field| field.object_references.len())
+                                .try_fold(0usize, |sum, count| sum.checked_add(count))
+                                .ok_or(Error::InvalidSource)?,
+                        )
+                        .ok_or(Error::InvalidSource)
+                })
+                .try_fold(0usize, |sum, count| {
+                    count.and_then(|count| sum.checked_add(count).ok_or(Error::InvalidSource))
+                })?;
+            reference_capacity = reference_capacity
+                .checked_add(references)
+                .ok_or(Error::InvalidSource)?;
+        }
     }
     for insertion in &changes.insertions {
         name_bytes = name_bytes
@@ -2892,6 +3192,7 @@ fn mutation_plan(
     let scratch = member_capacity
         .checked_mul(size_of::<String>())
         .and_then(|value| value.checked_add(object_capacity.checked_mul(size_of::<u64>())?))
+        .and_then(|value| value.checked_add(reference_capacity.checked_mul(size_of::<u64>())?))
         .ok_or(Error::InvalidSource)?;
     budget
         .work(
@@ -2899,7 +3200,7 @@ fn mutation_plan(
                 .checked_add(object_capacity)
                 .ok_or(Error::InvalidSource)?,
         )
-        .and_then(|_| budget.allocations(member_capacity.max(1).saturating_add(3)))
+        .and_then(|_| budget.allocations(member_capacity.max(1).saturating_add(4)))
         .and_then(|_| budget.retained(name_bytes))
         .and_then(|_| budget.scratch(name_bytes))
         .and_then(|_| budget.scratch(scratch))
@@ -2907,6 +3208,7 @@ fn mutation_plan(
     let mut members = HashSet::new();
     let mut deleted_members = HashSet::new();
     let mut object_ids = HashSet::new();
+    let mut allowed_reference_ids = Vec::new();
     members
         .try_reserve(member_capacity)
         .map_err(|_| Error::Allocation {
@@ -2921,6 +3223,15 @@ fn mutation_plan(
         .try_reserve(object_capacity)
         .map_err(|_| Error::Allocation {
             amount: object_capacity,
+        })?;
+    allowed_reference_ids
+        .try_reserve_exact(
+            reference_capacity
+                .checked_add(object_capacity)
+                .ok_or(Error::InvalidSource)?,
+        )
+        .map_err(|_| Error::Allocation {
+            amount: reference_capacity.saturating_add(object_capacity),
         })?;
     for (name, archive) in &changes.edits {
         members.insert(name.clone());
@@ -2942,6 +3253,24 @@ fn mutation_plan(
                 .all(|object| object.archive_info.identifier != Some(id))
             {
                 object_ids.insert(id);
+            }
+            for message in &source_object.archive_info.message_infos {
+                allowed_reference_ids.extend(
+                    message
+                        .object_references
+                        .iter()
+                        .copied()
+                        .filter(|identifier| *identifier != 0),
+                );
+                for field in &message.field_infos {
+                    allowed_reference_ids.extend(
+                        field
+                            .object_references
+                            .iter()
+                            .copied()
+                            .filter(|identifier| *identifier != 0),
+                    );
+                }
             }
         }
         for candidate_object in &archive.objects {
@@ -2966,6 +3295,7 @@ fn mutation_plan(
             object_ids.insert(object.archive_info.identifier.ok_or(Error::InvalidSource)?);
         }
     }
+    allowed_reference_ids.extend(object_ids.iter().copied());
     for name in &changes.deletions {
         members.insert(name.clone());
         deleted_members.insert(name.clone());
@@ -2997,11 +3327,248 @@ fn mutation_plan(
     members.sort_unstable();
     deleted_members.sort_unstable();
     object_ids.sort_unstable();
+    allowed_reference_ids.sort_unstable();
+    allowed_reference_ids.dedup();
     Ok(MutationPlan {
         root_identifier,
         members: members.into_boxed_slice(),
         deleted_members: deleted_members.into_boxed_slice(),
         object_ids: object_ids.into_boxed_slice(),
+        allowed_reference_ids: allowed_reference_ids.into_boxed_slice(),
+        enforce_reachability: true,
+        ..MutationPlan::default()
+    })
+}
+
+/// Build a source/request-derived locality plan from the shared series scope.
+/// The graph request supplies the changed members while the engine scope
+/// supplies the selected objects, message types, fields, and planned
+/// insertions/removals. No candidate diff is used as authorization.
+pub(super) fn mutation_plan_for_series_scope(
+    package: &Package,
+    root_identifier: u64,
+    changes: &graph::Changes,
+    scope: &litchi_iwa_style::series::MutationScope,
+    extra_deletions: &[&str],
+    budget: &mut TransactionBudget,
+) -> Result<MutationPlan, Error> {
+    let member_capacity = changes
+        .edits
+        .len()
+        .checked_add(changes.insertions.len())
+        .and_then(|value| value.checked_add(changes.deletions.len()))
+        .and_then(|value| value.checked_add(extra_deletions.len()))
+        .ok_or(Error::InvalidSource)?;
+    let object_capacity = scope
+        .allowed_objects()
+        .len()
+        .checked_add(scope.planned_new_objects().len())
+        .and_then(|value| value.checked_add(scope.planned_removed_objects().len()))
+        .and_then(|value| {
+            value.checked_add(
+                scope
+                    .allowed_members()
+                    .iter()
+                    .filter_map(|member| package.state.source.components().get(member))
+                    .flat_map(|component| component.archive().objects.iter())
+                    .filter(|object| {
+                        object
+                            .messages
+                            .iter()
+                            .any(|message| message.type_ == PACKAGE_METADATA_MESSAGE_TYPE)
+                    })
+                    .count(),
+            )
+        })
+        .ok_or(Error::InvalidSource)?;
+    let name_bytes = changes
+        .edits
+        .iter()
+        .map(|(name, _)| name.len())
+        .chain(
+            changes
+                .insertions
+                .iter()
+                .map(|insertion| insertion.name.len()),
+        )
+        .chain(changes.deletions.iter().map(String::len))
+        .chain(extra_deletions.iter().map(|name| name.len()))
+        .chain(scope.allowed_members().iter().map(String::len))
+        .chain(scope.planned_new_members().iter().map(String::len))
+        .chain(scope.planned_removed_members().iter().map(String::len))
+        .try_fold(0usize, |total, bytes| total.checked_add(bytes))
+        .ok_or(Error::InvalidSource)?;
+    let int_scratch = scope
+        .allowed_message_types()
+        .len()
+        .checked_mul(size_of::<u32>())
+        .and_then(|value| {
+            value.checked_add(scope.allowed_fields().len().checked_mul(size_of::<u32>())?)
+        })
+        .and_then(|value| value.checked_add(object_capacity.checked_mul(size_of::<u64>())?))
+        .and_then(|value| value.checked_add(object_capacity.checked_mul(size_of::<u64>())?))
+        .ok_or(Error::InvalidSource)?;
+    budget
+        .work(
+            name_bytes
+                .checked_add(int_scratch)
+                .ok_or(Error::InvalidSource)?,
+        )
+        .and_then(|_| budget.allocations(member_capacity.max(1).saturating_add(5)))
+        .and_then(|_| budget.retained(name_bytes))
+        .and_then(|_| budget.scratch(int_scratch))
+        .map_err(map_transaction_error)?;
+
+    let mut members = Vec::new();
+    members
+        .try_reserve_exact(member_capacity)
+        .map_err(|_| Error::Allocation {
+            amount: member_capacity,
+        })?;
+    let mut deleted_members = Vec::new();
+    deleted_members
+        .try_reserve_exact(
+            changes
+                .deletions
+                .len()
+                .checked_add(extra_deletions.len())
+                .ok_or(Error::InvalidSource)?,
+        )
+        .map_err(|_| Error::Allocation {
+            amount: changes
+                .deletions
+                .len()
+                .saturating_add(extra_deletions.len()),
+        })?;
+    let mut object_ids = Vec::new();
+    object_ids
+        .try_reserve_exact(object_capacity)
+        .map_err(|_| Error::Allocation {
+            amount: object_capacity,
+        })?;
+    let mut allowed_reference_ids = Vec::new();
+    allowed_reference_ids
+        .try_reserve_exact(object_capacity)
+        .map_err(|_| Error::Allocation {
+            amount: object_capacity,
+        })?;
+    let mut allowed_message_types = Vec::new();
+    allowed_message_types
+        .try_reserve_exact(scope.allowed_message_types().len())
+        .map_err(|_| Error::Allocation {
+            amount: scope.allowed_message_types().len(),
+        })?;
+    allowed_message_types.extend_from_slice(scope.allowed_message_types());
+    let mut allowed_fields = Vec::new();
+    allowed_fields
+        .try_reserve_exact(scope.allowed_fields().len())
+        .map_err(|_| Error::Allocation {
+            amount: scope.allowed_fields().len(),
+        })?;
+    allowed_fields.extend_from_slice(scope.allowed_fields());
+    let mut planned_new_objects = Vec::new();
+    planned_new_objects
+        .try_reserve_exact(scope.planned_new_objects().len())
+        .map_err(|_| Error::Allocation {
+            amount: scope.planned_new_objects().len(),
+        })?;
+    planned_new_objects.extend_from_slice(scope.planned_new_objects());
+    let mut planned_removed_objects = Vec::new();
+    planned_removed_objects
+        .try_reserve_exact(scope.planned_removed_objects().len())
+        .map_err(|_| Error::Allocation {
+            amount: scope.planned_removed_objects().len(),
+        })?;
+    planned_removed_objects.extend_from_slice(scope.planned_removed_objects());
+    let mut planned_new_members = Vec::new();
+    planned_new_members
+        .try_reserve_exact(scope.planned_new_members().len())
+        .map_err(|_| Error::Allocation {
+            amount: scope.planned_new_members().len(),
+        })?;
+    planned_new_members.extend(scope.planned_new_members().iter().cloned());
+    let mut planned_removed_members = Vec::new();
+    planned_removed_members
+        .try_reserve_exact(scope.planned_removed_members().len())
+        .map_err(|_| Error::Allocation {
+            amount: scope.planned_removed_members().len(),
+        })?;
+    planned_removed_members.extend(scope.planned_removed_members().iter().cloned());
+
+    let member_allowed = |name: &str| {
+        scope.allowed_members().iter().any(|member| member == name)
+            || scope
+                .planned_new_members()
+                .iter()
+                .any(|member| member == name)
+            || scope
+                .planned_removed_members()
+                .iter()
+                .any(|member| member == name)
+            || extra_deletions.contains(&name)
+    };
+    if changes.edits.iter().any(|(name, _)| !member_allowed(name))
+        || changes
+            .insertions
+            .iter()
+            .any(|insertion| !member_allowed(&insertion.name))
+        || changes.deletions.iter().any(|name| !member_allowed(name))
+    {
+        return Err(Error::Verification);
+    }
+
+    for (name, _) in &changes.edits {
+        members.push(name.clone());
+    }
+    for insertion in &changes.insertions {
+        members.push(insertion.name.clone());
+    }
+    for name in &changes.deletions {
+        members.push(name.clone());
+        deleted_members.push(name.clone());
+    }
+    for name in extra_deletions {
+        members.push((*name).to_owned());
+        deleted_members.push((*name).to_owned());
+    }
+    object_ids.extend_from_slice(scope.allowed_objects());
+    object_ids.extend_from_slice(scope.planned_new_objects());
+    object_ids.extend_from_slice(scope.planned_removed_objects());
+    for member in scope.allowed_members() {
+        if let Some(component) = package.state.source.components().get(member) {
+            for object in &component.archive().objects {
+                if object
+                    .messages
+                    .iter()
+                    .any(|message| message.type_ == PACKAGE_METADATA_MESSAGE_TYPE)
+                {
+                    object_ids.push(object.archive_info.identifier.ok_or(Error::InvalidSource)?);
+                }
+            }
+        }
+    }
+    allowed_reference_ids.extend(object_ids.iter().copied());
+    members.sort_unstable();
+    members.dedup();
+    deleted_members.sort_unstable();
+    deleted_members.dedup();
+    object_ids.sort_unstable();
+    object_ids.dedup();
+    allowed_reference_ids.sort_unstable();
+    allowed_reference_ids.dedup();
+    Ok(MutationPlan {
+        root_identifier,
+        members: members.into_boxed_slice(),
+        deleted_members: deleted_members.into_boxed_slice(),
+        object_ids: object_ids.into_boxed_slice(),
+        allowed_reference_ids: allowed_reference_ids.into_boxed_slice(),
+        enforce_reachability: false,
+        allowed_message_types: allowed_message_types.into_boxed_slice(),
+        allowed_fields: allowed_fields.into_boxed_slice(),
+        planned_new_objects: planned_new_objects.into_boxed_slice(),
+        planned_removed_objects: planned_removed_objects.into_boxed_slice(),
+        planned_new_members: planned_new_members.into_boxed_slice(),
+        planned_removed_members: planned_removed_members.into_boxed_slice(),
     })
 }
 
@@ -3022,6 +3589,35 @@ fn publish(
     fields: &mut FieldLedger,
     plan: &MutationPlan,
 ) -> Result<Package, Error> {
+    publish_with_policy(
+        package,
+        changes,
+        budget,
+        fields,
+        plan,
+        &[],
+        is_chart_font_rewritable_type,
+        &[20],
+    )
+}
+
+/// Publish a graph change for an adjacent chart-family owner while reusing
+/// the chart-font transaction's exact archive/reassembly and locality seam.
+///
+/// The caller supplies the route's explicit deletion set (for example root
+/// preview members) and message policy.  The helper remains private to the
+/// package module; the public chart-font facade continues to use
+/// [`publish`] unchanged.
+pub(super) fn publish_with_policy(
+    package: &Package,
+    changes: graph::Changes,
+    budget: &mut TransactionBudget,
+    fields: &mut FieldLedger,
+    plan: &MutationPlan,
+    extra_deletions: &[&str],
+    is_rewritable_type: fn(u32) -> bool,
+    chart_extension_fields: &[u32],
+) -> Result<Package, Error> {
     let catalog = physical_catalog(package)?;
     let archive_limits = catalog
         .limits()
@@ -3033,7 +3629,11 @@ fn publish(
         .map_err(map_archive_error)?;
     let edit_capacity = changes.edits.len();
     let insertion_capacity = changes.insertions.len();
-    let deletion_capacity = changes.deletions.len();
+    let deletion_capacity = changes
+        .deletions
+        .len()
+        .checked_add(extra_deletions.len())
+        .ok_or(Error::InvalidSource)?;
     let collection_scratch = edit_capacity
         .checked_mul(size_of::<(&str, Vec<u8>)>())
         .and_then(|value| value.checked_add(edit_capacity.checked_mul(size_of::<EntryEdit<'_>>())?))
@@ -3052,9 +3652,24 @@ fn publish(
         })
         .and_then(|value| value.checked_add(deletion_capacity.checked_mul(size_of::<&str>())?))
         .ok_or(Error::InvalidSource)?;
+    let name_bytes = changes
+        .edits
+        .iter()
+        .map(|(name, _)| name.len())
+        .chain(
+            changes
+                .insertions
+                .iter()
+                .map(|insertion| insertion.name.len()),
+        )
+        .chain(changes.deletions.iter().map(String::len))
+        .chain(extra_deletions.iter().map(|name| name.len()))
+        .try_fold(0usize, |total, bytes| total.checked_add(bytes))
+        .ok_or(Error::InvalidSource)?;
     budget
         .allocations(6)
         .and_then(|_| budget.scratch(collection_scratch))
+        .and_then(|_| budget.work(name_bytes))
         .map_err(map_transaction_error)?;
     let mut edited = Vec::new();
     edited
@@ -3131,18 +3746,75 @@ fn publish(
             amount: deletion_capacity,
         })?;
     deletions.extend(changes.deletions.iter().map(String::as_str));
-    let edited_bytes = edited
-        .iter()
-        .map(|(_, data)| data.len())
-        .chain(inserted.iter().map(|(_, data, _)| data.len()))
-        .try_fold(0usize, |total, bytes| total.checked_add(bytes))
-        .ok_or(Error::InvalidSource)?;
+    for name in extra_deletions {
+        if !deletions.contains(name) {
+            deletions.push(name);
+        }
+    }
+    let output = reassemble_prepared_payloads(package, budget, &insertions, &edits, &deletions)?;
+    let output_len = output.len();
+    preflight_locality_verification(package, output_len, plan, budget)?;
+    preflight_candidate(package, output_len, changes.insertions.len(), budget)?;
+    let candidate = Package::from_source_with_options(output.into(), package.state.options)
+        .map_err(map_read_error)?;
+    candidate.validate().map_err(map_read_error)?;
+    verify_locality_members(
+        package,
+        &candidate,
+        plan,
+        budget,
+        fields,
+        is_rewritable_type,
+        chart_extension_fields,
+    )?;
+    Ok(candidate)
+}
+
+/// Reassemble already-prepared chart-family payloads through the shared
+/// locality and candidate-verification seam. The chart-series owner uses
+/// this after its private Archive/Snappy preparation policy; chart-font keeps
+/// its legacy serializer policy unchanged.
+pub(super) fn reassemble_prepared_payloads<'a>(
+    package: &Package,
+    budget: &mut TransactionBudget,
+    insertions: &[EntryInsertion<'a>],
+    edits: &[EntryEdit<'a>],
+    deletions: &[&'a str],
+) -> Result<Vec<u8>, Error> {
+    let catalog = physical_catalog(package)?;
+    let mut admit_reassembly = |charge: litchi_iwa_archive::unstable::CandidateIngressCharge| {
+        budget
+            .retained(charge.retained_bytes())
+            .and_then(|_| budget.work(charge.traversal_bytes()))
+            .and_then(|_| budget.allocations(charge.allocations()))
+            .map_err(map_transaction_error)
+    };
+    let preparation = catalog
+        .__admit_reassembly_preparation(
+            insertions,
+            edits,
+            deletions,
+            catalog.limits(),
+            &mut admit_reassembly,
+        )
+        .map_err(|error| match error {
+            litchi_iwa_archive::unstable::CandidateIngressError::Physical(error) => {
+                map_archive_error(error)
+            },
+            litchi_iwa_archive::unstable::CandidateIngressError::Admission(error) => error,
+            litchi_iwa_archive::unstable::CandidateIngressError::CloneArithmetic { .. } => {
+                Error::InvalidSource
+            },
+            _ => Error::InvalidSource,
+        })?;
     budget
-        .preflight_reassembly(catalog, edited_bytes, changes.deletions.len())
+        .entries(preparation.physical_entries())
+        .and_then(|_| budget.entry_bytes(catalog.source_bytes().len()))
+        .and_then(|_| budget.total_bytes(catalog.source_bytes().len()))
         .map_err(map_transaction_error)?;
     let prepared = catalog
         .package()
-        .prepare_reassembly_with_changes(&insertions, &edits, &deletions, catalog.limits())
+        .prepare_reassembly_with_changes(insertions, edits, deletions, catalog.limits())
         .map_err(map_archive_error)?;
     let requirements = prepared.execution_requirements();
     budget
@@ -3151,13 +3823,7 @@ fn publish(
     let output = prepared
         .execute(requirements.exact_limits())
         .map_err(map_archive_error)?;
-    let output_len = output.len();
-    preflight_candidate(package, output_len, changes.insertions.len(), budget)?;
-    let candidate = Package::from_source_with_options(output.into(), package.state.options)
-        .map_err(map_read_error)?;
-    candidate.validate().map_err(map_read_error)?;
-    verify_locality_members(package, &candidate, plan, budget, fields)?;
-    Ok(candidate)
+    Ok(output)
 }
 
 fn map_selector_error(error: SelectorError) -> Error {
@@ -3629,6 +4295,8 @@ mod locality_tests {
             members: vec![member.to_owned()].into_boxed_slice(),
             deleted_members: Box::default(),
             object_ids: object_ids.into_boxed_slice(),
+            enforce_reachability: true,
+            ..MutationPlan::default()
         })
     }
 
@@ -3778,7 +4446,15 @@ mod locality_tests {
         let mut budget = transaction_budget(source)?;
         let mut fields = FieldLedger::new(source)?;
         admit_transaction(source, &mut budget)?;
-        let result = verify_locality_members(source, &candidate, plan, &mut budget, &mut fields);
+        let result = verify_locality_members(
+            source,
+            &candidate,
+            plan,
+            &mut budget,
+            &mut fields,
+            is_chart_font_rewritable_type,
+            &[20],
+        );
         assert!(
             result.is_err(),
             "locality verifier unexpectedly accepted: {result:?}"
