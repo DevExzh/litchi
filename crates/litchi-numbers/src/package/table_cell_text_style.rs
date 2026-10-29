@@ -778,6 +778,7 @@ fn write_style_keys(
     let Some((first_target, _)) = updates.first().copied() else {
         return Ok(());
     };
+    limits.admit_work(updates.len()).map_err(from_shared)?;
     if updates
         .iter()
         .any(|(target, _)| target.model_identifier != first_target.model_identifier)
@@ -793,6 +794,13 @@ fn write_style_keys(
         column_headers,
         tiles,
     } = facts;
+    limits.admit_work(updates.len()).map_err(from_shared)?;
+    limits
+        .admit_work(updates.len().saturating_mul(tiles.len()))
+        .map_err(from_shared)?;
+    limits
+        .admit_work(updates.len().saturating_mul(updates.len()))
+        .map_err(from_shared)?;
     let mut groups: Vec<(u64, Vec<writer::Update>)> = Vec::new();
     limits.reserve(&mut groups, 1).map_err(from_shared)?;
     for (target, key) in updates {
@@ -827,6 +835,9 @@ fn write_style_keys(
         }
     }
     let bnc_limits = BncLimits::from_wire_limits(limits.wire);
+    limits
+        .admit_work(groups.len().saturating_mul(tiles.len()))
+        .map_err(from_shared)?;
     for (tile, rows) in groups {
         let (tile_index, tile_data) = topology::message(working, tile, &[TILE_MESSAGE_TYPE])?;
         let write = writer::set_text_style_keys(
@@ -867,6 +878,9 @@ fn rewrite_materialized_headers(
         return Ok(());
     }
     let row_groups = materialized_header_groups(row_headers, column_headers, deltas, limits)?;
+    limits
+        .admit_work(row_groups.len().saturating_mul(row_headers.len()))
+        .map_err(from_shared)?;
     for (bucket, bucket_deltas) in row_groups {
         let row_identifier = row_headers
             .iter()
@@ -885,11 +899,8 @@ fn rewrite_materialized_headers(
         let column_identifier =
             column_headers.ok_or(Error::Refused(Refusal::UnsupportedDependency))?;
         let column_deltas = deltas.columns_only(limits).map_err(from_shared)?;
-        let (index, payload) = topology::message(
-            working,
-            column_identifier,
-            &[HEADER_BUCKET_MESSAGE_TYPE],
-        )?;
+        let (index, payload) =
+            topology::message(working, column_identifier, &[HEADER_BUCKET_MESSAGE_TYPE])?;
         let rewrite = headers::rewrite_header_buckets(&[], payload, &column_deltas, limits)
             .map_err(from_shared)?;
         let (_, column) = rewrite.into_parts();
@@ -907,6 +918,9 @@ fn materialized_header_groups(
 ) -> Result<Vec<(u64, headers::MaterializedHeaderDeltas)>, Error> {
     let groups = deltas
         .split_rows_by_bucket(SHARED_HEADER_BUCKET_ROWS, limits)
+        .map_err(from_shared)?;
+    limits
+        .admit_work(groups.len().saturating_mul(row_headers.len()))
         .map_err(from_shared)?;
     if groups.iter().any(|(bucket, _)| {
         !row_headers

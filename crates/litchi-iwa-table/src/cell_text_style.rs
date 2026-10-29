@@ -830,10 +830,7 @@ pub fn table_facts(
             let bucket = u32::try_from(bucket)
                 .map_err(|_| invalid("row-header bucket index exceeds u32"))?;
             limits.admit_work(buckets.len().saturating_add(1))?;
-            if buckets
-                .iter()
-                .any(|(_, existing)| *existing == identifier)
-            {
+            if buckets.iter().any(|(_, existing)| *existing == identifier) {
                 return Err(invalid("row-header object reference repeats"));
             }
             buckets.push((bucket, identifier));
@@ -858,8 +855,15 @@ pub fn table_facts(
     if tile_size == 0 {
         return Err(invalid("tile size is zero"));
     }
+    let tile_entries = repeated_payloads(tile_storage, 1, limits)?;
+    let tile_count = tile_entries.len();
+    let duplicate_scan_work = tile_count
+        .saturating_mul(tile_count.saturating_add(1))
+        .checked_div(2)
+        .unwrap_or(usize::MAX);
+    limits.admit_work(duplicate_scan_work)?;
     let mut tiles = Vec::new();
-    for entry in repeated_payloads(tile_storage, 1, limits)? {
+    for entry in tile_entries {
         limits.reserve(&mut tiles, 1)?;
         let key = u32::try_from(varint(entry, 1, limits)?.ok_or(invalid("tile key missing"))?)
             .map_err(|_| invalid("tile key exceeds u32"))?;
@@ -3013,7 +3017,8 @@ mod tests {
     use super::{
         Error, LIST_MESSAGE_TYPE, LimitKind, Limits, Request, StyleList, TABLE_MODEL_MESSAGE_TYPE,
         TILE_MESSAGE_TYPE, Table, TableSource, Target, locate_cell, plan_set, plan_set_many,
-        preflight_character_properties, style_is_exclusive, style_key, stylesheet_of, varint, view,
+        preflight_character_properties, style_is_exclusive, style_key, stylesheet_of, table_facts,
+        varint, view,
     };
     use litchi_iwa_text_wire::CharacterProperties;
 
@@ -3358,6 +3363,62 @@ mod tests {
             Err(Error::Limit {
                 kind: LimitKind::RewriteWork,
                 maximum: _,
+                ..
+            })
+        ));
+    }
+
+    #[test]
+    fn table_fact_tile_duplicate_scan_is_cumulatively_admitted() {
+        let source = limited_source(1_000_000, 1_000_000);
+        let model = source
+            .catalog()
+            .iter()
+            .flat_map(|component| component.archive().objects.iter())
+            .find_map(|object| {
+                object
+                    .messages
+                    .iter()
+                    .any(|message| message.type_ == TABLE_MODEL_MESSAGE_TYPE)
+                    .then_some(object.archive_info.identifier)
+                    .flatten()
+            })
+            .expect("table model");
+        let baseline = Limits::from_source(&source).expect("baseline limits");
+        let facts = table_facts(
+            &source,
+            Target {
+                model_identifier: model,
+                row: 0,
+                column: 0,
+            },
+            &baseline,
+        )
+        .expect("table facts");
+        let tile_count = facts.tiles.len();
+        let duplicate_scan_work = tile_count
+            .saturating_mul(tile_count.saturating_add(1))
+            .checked_div(2)
+            .unwrap_or(usize::MAX);
+        let used_before_scan = baseline.report().work;
+        let limited = Limits::from_source(&source).expect("limited facts profile");
+        limited.remaining_work.set(
+            used_before_scan
+                .saturating_add(duplicate_scan_work)
+                .saturating_sub(1),
+        );
+        assert!(matches!(
+            table_facts(
+                &source,
+                Target {
+                    model_identifier: model,
+                    row: 0,
+                    column: 0,
+                },
+                &limited,
+            ),
+            Err(Error::Limit {
+                kind: LimitKind::RewriteWork,
                 ..
             })
         ));

@@ -92,11 +92,7 @@ impl MaterializedHeaderDeltas {
         limits.admit_work(self.columns.len())?;
         let mut columns = Vec::new();
         limits.reserve(&mut columns, self.columns.len())?;
-        limits.admit_copies(
-            self.columns
-                .len()
-                .saturating_mul(size_of::<(u32, i64)>()),
-        )?;
+        limits.admit_copies(self.columns.len().saturating_mul(size_of::<(u32, i64)>()))?;
         columns.extend_from_slice(&self.columns);
         Ok(Self {
             rows: Vec::new(),
