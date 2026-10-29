@@ -24,7 +24,11 @@ use litchi_iwa_archive::{
     package::{EntryEdit, EntryInsertion, ExactArtifacts},
 };
 use litchi_iwa_core::{Archive, SnappyStream};
-use litchi_iwa_protos::chart_style_codec::Limits as ChartCodecLimits;
+use litchi_iwa_core::{
+    ArchiveObject, ArchiveReferenceKind, ArchiveReferenceOccurrence, ArchiveReferencePolicy,
+    ArchiveReferenceVisitor,
+};
+use litchi_iwa_protos::chart_style_codec::{self as chart_codec, Limits as ChartCodecLimits};
 use litchi_iwa_style::{
     chart_font::{self as engine, Change as EngineChange},
     graph::{self, Components, Workspace},
@@ -33,9 +37,11 @@ pub use litchi_iwa_text::character::TextPointSize;
 pub use litchi_iwa_text::font::{Font, NameError as FontNameError};
 use thiserror::Error as ThisError;
 
-use super::chart_axis_support::{self, AxisSupportError, AxisSupportSelectorError};
+use super::chart_axis_support::{
+    self, AxisSupportBudget, AxisSupportError, AxisSupportSelectorError,
+};
 use super::edit::{OwnedChartSelector, OwnedSlideSelector, SelectorError};
-use super::slide_chart_title::{self, ChartGraphScanBudget, ChartSelection};
+use super::slide_chart_title::{self, ChartSelection};
 use super::slide_table_core::{Budget as TransactionBudget, Error as TransactionError};
 use super::{Package, PayloadLimitKind, PhysicalSource, ReadError, SemanticLimitKind};
 use crate::{ChartSelector, SlideSelector};
@@ -289,6 +295,14 @@ impl Diagnostics {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+struct MutationPlan {
+    root_identifier: u64,
+    members: Box<[String]>,
+    deleted_members: Box<[String]>,
+    object_ids: Box<[u64]>,
+}
+
 /// The fully verified result of one immutable chart-font transaction.
 #[must_use = "a Keynote chart-font commit contains the validated package snapshot"]
 #[derive(Debug)]
@@ -382,6 +396,7 @@ pub struct FontPatch {
     touched_components: usize,
     before: ChartFont,
     after: ChartFont,
+    plan: MutationPlan,
 }
 
 impl fmt::Debug for FontPatch {
@@ -451,6 +466,7 @@ impl FontPatch {
             touched_components: self.touched_components,
             before: self.after.clone(),
             after: self.before.clone(),
+            plan: self.plan.clone(),
         }
     }
 }
@@ -466,6 +482,7 @@ pub struct FontSizePatch {
     touched_components: usize,
     before: TextPointSize,
     after: TextPointSize,
+    plan: MutationPlan,
 }
 
 impl fmt::Debug for FontSizePatch {
@@ -535,6 +552,7 @@ impl FontSizePatch {
             touched_components: self.touched_components,
             before: self.after,
             after: self.before,
+            plan: self.plan.clone(),
         }
     }
 }
@@ -692,6 +710,7 @@ impl<'a> FontEdit<'a> {
                         touched_components: 0,
                         before: before.clone(),
                         after: before,
+                        plan: MutationPlan::default(),
                     },
                     diagnostics: Diagnostics::unchanged(),
                 });
@@ -725,7 +744,7 @@ impl<'a> FontEdit<'a> {
             }),
             FontOperation::Reset => EngineChange::ResetFont,
         };
-        let (candidate, changed, touched_components, reset_expectation) = write_graph(
+        let (candidate, changed, touched_components, reset_expectation, plan) = write_graph(
             self.source,
             current.chart_identifier,
             &change,
@@ -745,6 +764,7 @@ impl<'a> FontEdit<'a> {
                     touched_components: 0,
                     before: before.clone(),
                     after: before,
+                    plan: MutationPlan::default(),
                 },
                 diagnostics: Diagnostics::unchanged(),
             });
@@ -777,6 +797,7 @@ impl<'a> FontEdit<'a> {
                 touched_components,
                 before,
                 after,
+                plan,
             },
             diagnostics: Diagnostics::published(touched_components),
         })
@@ -930,6 +951,7 @@ impl<'a> FontSizeEdit<'a> {
                         touched_components: 0,
                         before,
                         after: before,
+                        plan: MutationPlan::default(),
                     },
                     diagnostics: Diagnostics::unchanged(),
                 });
@@ -955,7 +977,7 @@ impl<'a> FontSizeEdit<'a> {
             FontSizeOperation::Set(value) => EngineChange::Size(value),
             FontSizeOperation::Reset => EngineChange::ResetSize,
         };
-        let (candidate, changed, touched_components, reset_expectation) = write_graph(
+        let (candidate, changed, touched_components, reset_expectation, plan) = write_graph(
             self.source,
             current.chart_identifier,
             &change,
@@ -975,6 +997,7 @@ impl<'a> FontSizeEdit<'a> {
                     touched_components: 0,
                     before,
                     after: before,
+                    plan: MutationPlan::default(),
                 },
                 diagnostics: Diagnostics::unchanged(),
             });
@@ -1012,6 +1035,7 @@ impl<'a> FontSizeEdit<'a> {
                 touched_components,
                 before,
                 after,
+                plan,
             },
             diagnostics: Diagnostics::published(touched_components),
         })
@@ -1108,20 +1132,7 @@ impl Package {
             Package::from_source_with_options(patch.artifacts.target(), self.state.options)
                 .map_err(map_read_error)?;
         candidate.validate().map_err(map_read_error)?;
-        let candidate_catalog = physical_catalog(&candidate)?;
-        let changed_members: HashSet<&str> = catalog
-            .package()
-            .iter()
-            .filter(|entry| {
-                candidate_catalog
-                    .package()
-                    .iter()
-                    .find(|candidate_entry| candidate_entry.name() == entry.name())
-                    .is_some_and(|candidate_entry| candidate_entry.data() != entry.data())
-            })
-            .map(|entry| entry.name())
-            .collect();
-        verify_locality_members(self, &candidate, &changed_members, &HashSet::new())?;
+        verify_locality_members(self, &candidate, &patch.plan, &mut budget)?;
         let candidate_selection = positional_selection(&candidate, &selection, &mut budget)?;
         if !same_selection(&selection, &candidate_selection)
             || read_font_with_budget(
@@ -1233,20 +1244,7 @@ impl Package {
             Package::from_source_with_options(patch.artifacts.target(), self.state.options)
                 .map_err(map_read_error)?;
         candidate.validate().map_err(map_read_error)?;
-        let candidate_catalog = physical_catalog(&candidate)?;
-        let changed_members: HashSet<&str> = catalog
-            .package()
-            .iter()
-            .filter(|entry| {
-                candidate_catalog
-                    .package()
-                    .iter()
-                    .find(|candidate_entry| candidate_entry.name() == entry.name())
-                    .is_some_and(|candidate_entry| candidate_entry.data() != entry.data())
-            })
-            .map(|entry| entry.name())
-            .collect();
-        verify_locality_members(self, &candidate, &changed_members, &HashSet::new())?;
+        verify_locality_members(self, &candidate, &patch.plan, &mut budget)?;
         let candidate_selection = positional_selection(&candidate, &selection, &mut budget)?;
         if !same_selection(&selection, &candidate_selection)
             || read_size_with_budget(
@@ -1313,19 +1311,7 @@ fn select_chart_transaction(
     mutation_guards: bool,
     budget: &mut TransactionBudget,
 ) -> Result<ChartSelection, Error> {
-    // Charge the package ledger before entering the shared chart graph scan.
-    // The chart-title budget then applies its per-field/reference checks to
-    // the same bounded operation instead of the historical uncharged route.
-    let scan = package
-        .state
-        .source
-        .components()
-        .len()
-        .checked_add(package.state.total_objects)
-        .and_then(|value| value.checked_mul(usize::from(mutation_guards) + 1))
-        .ok_or(Error::InvalidSource)?;
-    budget.work(scan).map_err(map_transaction_error)?;
-    let mut graph_budget = ChartGraphScanBudget::new(package).map_err(map_chart_title_error)?;
+    let mut graph_budget = ChartFontSelectionBudget { budget };
     slide_chart_title::select_chart_with_budget(
         package,
         slide,
@@ -1334,6 +1320,163 @@ fn select_chart_transaction(
         &mut graph_budget,
     )
     .map_err(map_axis_error)
+}
+
+struct ChartFontSelectionBudget<'a> {
+    budget: &'a mut TransactionBudget,
+}
+
+fn map_selection_budget_result(
+    operation: Result<(), TransactionError>,
+) -> Result<(), AxisSupportError> {
+    operation
+        .map_err(map_transaction_error)
+        .map_err(map_selection_budget_error)
+}
+
+impl AxisSupportBudget for ChartFontSelectionBudget<'_> {
+    fn charge_selection_scans(
+        &mut self,
+        package: &Package,
+        mutation_guards: bool,
+    ) -> Result<(), AxisSupportError> {
+        let passes = usize::from(mutation_guards) + 1;
+        let amount = package
+            .state
+            .source
+            .components()
+            .len()
+            .checked_add(package.state.total_objects)
+            .and_then(|value| value.checked_mul(passes))
+            .ok_or(AxisSupportError::InvalidSource)?;
+        map_selection_budget_result(self.budget.work(amount))
+    }
+
+    fn charge_input(&mut self, amount: usize) -> Result<(), AxisSupportError> {
+        map_selection_budget_result(self.budget.input(amount))
+    }
+
+    fn charge_wire_vector(&mut self, payload: usize) -> Result<(), AxisSupportError> {
+        let bytes = payload
+            .checked_add(
+                payload
+                    .checked_mul(size_of::<litchi_iwa_common::wire::WireField>())
+                    .ok_or(AxisSupportError::InvalidSource)?,
+            )
+            .ok_or(AxisSupportError::InvalidSource)?;
+        map_selection_budget_result(
+            self.budget
+                .work(bytes)
+                .and_then(|_| self.budget.scratch(bytes))
+                .and_then(|_| self.budget.allocations(1)),
+        )
+    }
+
+    fn finish_wire_scan(&mut self, fields: usize) -> Result<(), AxisSupportError> {
+        map_selection_budget_result(self.budget.work(fields))
+    }
+
+    fn charge_reference_vector(&mut self, capacity: usize) -> Result<(), AxisSupportError> {
+        let bytes = capacity
+            .checked_mul(size_of::<u64>())
+            .ok_or(AxisSupportError::InvalidSource)?;
+        map_selection_budget_result(
+            self.budget
+                .scratch(bytes.max(1))
+                .and_then(|_| self.budget.allocations(1)),
+        )
+    }
+
+    fn charge_references(&mut self, amount: usize) -> Result<(), AxisSupportError> {
+        map_selection_budget_result(self.budget.references(amount))
+    }
+
+    fn charge_scan_pass(
+        &mut self,
+        package: &Package,
+        retained_vectors: usize,
+    ) -> Result<(), AxisSupportError> {
+        let amount = package
+            .state
+            .source
+            .components()
+            .len()
+            .checked_add(package.state.total_objects)
+            .and_then(|value| value.checked_add(retained_vectors))
+            .ok_or(AxisSupportError::InvalidSource)?;
+        map_selection_budget_result(self.budget.work(amount))
+    }
+
+    fn charge_locality_scan(&mut self, package: &Package) -> Result<(), AxisSupportError> {
+        let amount = package
+            .state
+            .source
+            .components()
+            .len()
+            .checked_add(package.state.total_objects)
+            .and_then(|value| value.checked_mul(2))
+            .ok_or(AxisSupportError::InvalidSource)?;
+        map_selection_budget_result(self.budget.work(amount))
+    }
+
+    fn charge_work(&mut self, amount: usize) -> Result<(), AxisSupportError> {
+        map_selection_budget_result(self.budget.work(amount))
+    }
+
+    fn metadata_options(
+        &self,
+        _package: &Package,
+    ) -> Result<litchi_iwa_protos::package_metadata_codec::RewriteOptions, AxisSupportError> {
+        Err(AxisSupportError::InvalidSource)
+    }
+
+    fn charge_metadata_report(
+        &mut self,
+        report: litchi_iwa_protos::package_metadata_codec::RewriteReport,
+    ) -> Result<(), AxisSupportError> {
+        let work = report
+            .input_bytes()
+            .checked_add(report.output_bytes())
+            .and_then(|value| value.checked_add(report.fields()))
+            .and_then(|value| value.checked_add(report.work_bytes()))
+            .and_then(|value| value.checked_add(report.components_scanned()))
+            .ok_or(AxisSupportError::InvalidSource)?;
+        map_selection_budget_result(
+            self.budget
+                .work(work)
+                .and_then(|_| self.budget.references(report.references_scanned())),
+        )
+    }
+}
+
+fn map_selection_budget_error(error: Error) -> AxisSupportError {
+    match error {
+        Error::Limit {
+            kind,
+            observed,
+            maximum,
+        } => AxisSupportError::LimitExceeded {
+            kind: match kind {
+                LimitKind::InputBytes => chart_axis_support::AxisSupportLimitKind::InputBytes,
+                LimitKind::OutputBytes => chart_axis_support::AxisSupportLimitKind::OutputBytes,
+                LimitKind::WireBytes => chart_axis_support::AxisSupportLimitKind::WireBytes,
+                LimitKind::Entries => chart_axis_support::AxisSupportLimitKind::Entries,
+                LimitKind::EntryBytes => chart_axis_support::AxisSupportLimitKind::EntryBytes,
+                LimitKind::TotalBytes => chart_axis_support::AxisSupportLimitKind::TotalBytes,
+                LimitKind::Slides => chart_axis_support::AxisSupportLimitKind::Slides,
+                LimitKind::References => chart_axis_support::AxisSupportLimitKind::References,
+                LimitKind::WireFields => chart_axis_support::AxisSupportLimitKind::WireFields,
+                LimitKind::WireNesting => chart_axis_support::AxisSupportLimitKind::WireNesting,
+                LimitKind::WireWork => chart_axis_support::AxisSupportLimitKind::WireWork,
+                LimitKind::TextBytes => chart_axis_support::AxisSupportLimitKind::TextBytes,
+                _ => chart_axis_support::AxisSupportLimitKind::WireBytes,
+            },
+            observed,
+            maximum,
+        },
+        Error::Allocation { amount } => AxisSupportError::Allocation { amount },
+        _ => AxisSupportError::InvalidSource,
+    }
 }
 
 fn positional_selection(
@@ -1404,7 +1547,7 @@ fn write_graph(
     budget: &mut TransactionBudget,
     fields: &mut FieldLedger,
     text: &mut TextLedger,
-) -> Result<(Package, bool, usize, Option<ResetExpectation>), Error> {
+) -> Result<(Package, bool, usize, Option<ResetExpectation>, MutationPlan), Error> {
     admit_workspace(package, budget)?;
     let components = PackageComponents(package);
     let mut workspace =
@@ -1418,7 +1561,7 @@ fn write_graph(
     .map_err(map_engine_error)?;
     charge_engine_report(budget, fields, text, report)?;
     if !report.changed() {
-        return Ok((package.snapshot(), false, 0, None));
+        return Ok((package.snapshot(), false, 0, None, MutationPlan::default()));
     }
     let reset_expectation = match change {
         EngineChange::ResetFont => {
@@ -1452,8 +1595,9 @@ fn write_graph(
     if touched == 0 {
         return Err(Error::InvalidSource);
     }
-    let candidate = publish(package, changes, budget)?;
-    Ok((candidate, true, touched, reset_expectation))
+    let plan = mutation_plan(package, chart, &changes)?;
+    let candidate = publish(package, changes, budget, &plan)?;
+    Ok((candidate, true, touched, reset_expectation, plan))
 }
 
 fn transaction_budget(package: &Package) -> Result<TransactionBudget, Error> {
@@ -1714,29 +1858,251 @@ fn admit_archive_encoding(
         .map_err(map_transaction_error)
 }
 
-fn verify_locality(
-    source: &Package,
-    candidate: &Package,
-    changes: &graph::Changes,
-) -> Result<(), Error> {
-    let changed_members: HashSet<&str> = changes
-        .edits
+fn package_object(package: &Package, identifier: u64) -> Option<&ArchiveObject> {
+    package
+        .state
+        .source
+        .components()
         .iter()
-        .map(|(name, _)| name.as_str())
-        .chain(changes.insertions.iter().map(|entry| entry.name.as_str()))
-        .collect();
-    let deleted_members: HashSet<&str> = changes.deletions.iter().map(String::as_str).collect();
-    verify_locality_members(source, candidate, &changed_members, &deleted_members)
+        .find_map(|component| component.archive().object(identifier))
+}
+
+#[derive(Default)]
+struct ObjectReferenceCollector {
+    identifiers: Vec<u64>,
+}
+
+impl ArchiveReferenceVisitor for ObjectReferenceCollector {
+    fn visit_reference(
+        &mut self,
+        occurrence: ArchiveReferenceOccurrence,
+    ) -> litchi_iwa_core::Result<()> {
+        if occurrence.kind == ArchiveReferenceKind::Object && occurrence.referenced_identifier != 0
+        {
+            self.identifiers.push(occurrence.referenced_identifier);
+        }
+        Ok(())
+    }
+}
+
+fn wire_reference_id(
+    payload: &[u8],
+    limits: litchi_iwa_common::WireLimits,
+) -> Result<Option<u64>, Error> {
+    let fields =
+        litchi_iwa_common::wire::parse_wire_fields(payload, limits).map_err(map_wire_error)?;
+    let Some(field) = fields.iter().rev().find(|field| field.number() == 1) else {
+        return Ok(None);
+    };
+    if field.wire_type() != 0 {
+        return Err(Error::InvalidSource);
+    }
+    let bytes = field.payload(payload).map_err(map_wire_error)?;
+    let (value, width) =
+        litchi_iwa_common::decode_varint_from_bytes(bytes).map_err(|_| Error::InvalidSource)?;
+    (width == bytes.len())
+        .then_some(Some(value))
+        .ok_or(Error::InvalidSource)
+}
+
+fn payload_object_references(
+    message: &litchi_iwa_core::RawMessage,
+    limits: litchi_iwa_common::WireLimits,
+) -> Result<Vec<u64>, Error> {
+    if message.type_ == CHART_MESSAGE_TYPE {
+        let references = chart_codec::references(&message.data, ChartCodecLimits::DEFAULT)
+            .map_err(map_codec_error)?;
+        return Ok(references.paragraph_styles().to_vec());
+    }
+    let fields = litchi_iwa_common::wire::parse_wire_fields(&message.data, limits)
+        .map_err(map_wire_error)?;
+    let mut references = Vec::new();
+    match message.type_ {
+        PARAGRAPH_STYLE_MESSAGE_TYPE => {
+            for field in fields.iter().filter(|field| field.number() == 1) {
+                let parent = field.payload(&message.data).map_err(map_wire_error)?;
+                let parent_fields = litchi_iwa_common::wire::parse_wire_fields(parent, limits)
+                    .map_err(map_wire_error)?;
+                for link in parent_fields
+                    .iter()
+                    .filter(|field| matches!(field.number(), 3 | 5))
+                {
+                    if link.wire_type() != 2 {
+                        return Err(Error::InvalidSource);
+                    }
+                    if let Some(identifier) =
+                        wire_reference_id(link.payload(parent).map_err(map_wire_error)?, limits)?
+                    {
+                        references.push(identifier);
+                    }
+                }
+            }
+        },
+        STYLESHEET_MESSAGE_TYPE => {
+            for field in fields.iter().filter(|field| field.number() == 1) {
+                if let Some(identifier) = wire_reference_id(
+                    field.payload(&message.data).map_err(map_wire_error)?,
+                    limits,
+                )? {
+                    references.push(identifier);
+                }
+            }
+            for field in fields.iter().filter(|field| field.number() == 5) {
+                let payload = field.payload(&message.data).map_err(map_wire_error)?;
+                let entries = litchi_iwa_common::wire::parse_wire_fields(payload, limits)
+                    .map_err(map_wire_error)?;
+                for entry in entries
+                    .iter()
+                    .filter(|entry| entry.number() == 1 || entry.number() == 2)
+                {
+                    if entry.wire_type() != 2 {
+                        return Err(Error::InvalidSource);
+                    }
+                    if let Some(identifier) =
+                        wire_reference_id(entry.payload(payload).map_err(map_wire_error)?, limits)?
+                    {
+                        references.push(identifier);
+                    }
+                }
+            }
+        },
+        _ => {},
+    }
+    Ok(references)
+}
+
+fn reachable_objects(
+    package: &Package,
+    root_identifier: u64,
+    budget: &mut TransactionBudget,
+) -> Result<HashSet<u64>, Error> {
+    let mut pending = vec![root_identifier];
+    if root_identifier != 2 && package_object(package, 2).is_some() {
+        pending.push(2);
+    }
+    let mut reachable = HashSet::new();
+    let limits = graph_limits(package)?;
+    let wire_limits = package.wire_limits().map_err(map_wire_error)?;
+    while let Some(identifier) = pending.pop() {
+        if !reachable.insert(identifier) {
+            continue;
+        }
+        let object = match package_object(package, identifier) {
+            Some(object) => object,
+            None => return Err(Error::InvalidSource),
+        };
+        let reference_capacity = object
+            .archive_info
+            .message_infos
+            .iter()
+            .map(|message| {
+                message
+                    .object_references
+                    .len()
+                    .checked_add(
+                        message
+                            .field_infos
+                            .iter()
+                            .map(|field| field.object_references.len())
+                            .try_fold(0usize, |sum, count| sum.checked_add(count))
+                            .ok_or(Error::InvalidSource)?,
+                    )
+                    .ok_or(Error::InvalidSource)
+            })
+            .try_fold(0usize, |sum, count| {
+                count.and_then(|count| sum.checked_add(count).ok_or(Error::InvalidSource))
+            })?;
+        let work = object
+            .messages
+            .len()
+            .checked_add(reference_capacity)
+            .and_then(|value| value.checked_add(1))
+            .ok_or(Error::InvalidSource)?;
+        let scratch = reference_capacity
+            .checked_mul(size_of::<u64>())
+            .ok_or(Error::InvalidSource)?;
+        budget
+            .work(work)
+            .and_then(|_| budget.allocations(1))
+            .and_then(|_| budget.scratch(scratch))
+            .map_err(map_transaction_error)?;
+        let mut references = ObjectReferenceCollector::default();
+        object
+            .inspect_references_with_policy(
+                &mut references,
+                ArchiveReferencePolicy::KnownReferences,
+                limits,
+            )
+            .map_err(map_core_error)?;
+        let mut payload_references = Vec::new();
+        for message in &object.messages {
+            payload_references.extend(payload_object_references(message, wire_limits)?);
+        }
+        budget
+            .work(payload_references.len())
+            .and_then(|_| budget.references(payload_references.len()))
+            .map_err(map_transaction_error)?;
+        budget
+            .references(references.identifiers.len())
+            .map_err(map_transaction_error)?;
+        pending.extend(references.identifiers);
+        pending.extend(payload_references);
+    }
+    Ok(reachable)
 }
 
 fn verify_locality_members(
     source: &Package,
     candidate: &Package,
-    changed_members: &HashSet<&str>,
-    deleted_members: &HashSet<&str>,
+    plan: &MutationPlan,
+    budget: &mut TransactionBudget,
 ) -> Result<(), Error> {
     let source_catalog = physical_catalog(source)?;
     let candidate_catalog = physical_catalog(candidate)?;
+    let locality_work = source_catalog
+        .source_bytes()
+        .len()
+        .checked_add(candidate_catalog.source_bytes().len())
+        .ok_or(Error::InvalidSource)?;
+    budget
+        .work(locality_work)
+        .and_then(|_| budget.allocations(2))
+        .map_err(map_transaction_error)?;
+    let changed_members: HashSet<&str> = plan.members.iter().map(String::as_str).collect();
+    let deleted_members: HashSet<&str> = plan.deleted_members.iter().map(String::as_str).collect();
+    let allowed_objects: HashSet<u64> = plan.object_ids.iter().copied().collect();
+    let source_reachable = reachable_objects(source, plan.root_identifier, budget)?;
+    let candidate_reachable = reachable_objects(candidate, plan.root_identifier, budget)?;
+    for identifier in &allowed_objects {
+        if package_object(source, *identifier).is_some() && !source_reachable.contains(identifier) {
+            return Err(Error::InvalidSource);
+        }
+        if package_object(candidate, *identifier).is_some()
+            && !candidate_reachable.contains(identifier)
+        {
+            return Err(Error::InvalidSource);
+        }
+    }
+
+    for candidate_entry in candidate_catalog.package().iter() {
+        if source_catalog
+            .package()
+            .iter()
+            .all(|entry| entry.name() != candidate_entry.name())
+            && !changed_members.contains(candidate_entry.name())
+        {
+            return Err(Error::InvalidSource);
+        }
+    }
+    for name in &deleted_members {
+        if candidate_catalog
+            .package()
+            .iter()
+            .any(|entry| entry.name() == *name)
+        {
+            return Err(Error::InvalidSource);
+        }
+    }
 
     for source_entry in source_catalog.package().iter() {
         let name = source_entry.name();
@@ -1749,10 +2115,18 @@ fn verify_locality_members(
             .find(|entry| entry.name() == name)
             .ok_or(Error::InvalidSource)?;
         if !changed_members.contains(name) {
-            if source_entry.data() != candidate_entry.data() {
+            if source_entry.data() != candidate_entry.data()
+                || source_entry.raw_name() != candidate_entry.raw_name()
+                || source_entry.raw_record().local_record()
+                    != candidate_entry.raw_record().local_record()
+                || !central_record_preserved(source_entry, candidate_entry)
+            {
                 return Err(Error::InvalidSource);
             }
             continue;
+        }
+        if !zip_static_metadata_preserved(source_entry, candidate_entry) {
+            return Err(Error::InvalidSource);
         }
         let source_component = source
             .state
@@ -1777,11 +2151,7 @@ fn verify_locality_members(
                 .iter()
                 .find(|object| object.archive_info.identifier == Some(identifier))
             else {
-                if source_object
-                    .messages
-                    .first()
-                    .is_some_and(|message| is_chart_font_rewritable_type(message.type_))
-                {
+                if allowed_objects.contains(&identifier) {
                     continue;
                 }
                 return Err(Error::InvalidSource);
@@ -1789,28 +2159,227 @@ fn verify_locality_members(
             if source_object.same_content_ignoring_offsets(candidate_object) {
                 continue;
             }
-            if !source_object
-                .messages
-                .first()
-                .is_some_and(|message| is_chart_font_rewritable_type(message.type_))
+            if !allowed_objects.contains(&identifier)
+                || !source_object
+                    .messages
+                    .first()
+                    .is_some_and(|message| is_chart_font_rewritable_type(message.type_))
             {
                 return Err(Error::InvalidSource);
             }
+            if source_object.messages.len() != candidate_object.messages.len() {
+                return Err(Error::InvalidSource);
+            }
             for (index, source_message) in source_object.messages.iter().enumerate() {
-                if is_chart_font_rewritable_type(source_message.type_) {
-                    continue;
-                }
                 let candidate_message = candidate_object
                     .messages
                     .get(index)
                     .ok_or(Error::InvalidSource)?;
-                if candidate_message != source_message {
+                if candidate_message.type_ != source_message.type_
+                    || (!is_chart_font_rewritable_type(source_message.type_)
+                        && candidate_message != source_message)
+                    || (source_message.type_ == CHART_MESSAGE_TYPE
+                        && !chart_unknown_fields_preserved(
+                            source_message.data.as_slice(),
+                            candidate_message.data.as_slice(),
+                        )?)
+                {
                     return Err(Error::InvalidSource);
                 }
             }
         }
+        for candidate_object in &candidate_component.archive().objects {
+            if source_component.archive().objects.iter().all(|object| {
+                object.archive_info.identifier != candidate_object.archive_info.identifier
+            }) && !candidate_object
+                .archive_info
+                .identifier
+                .is_some_and(|id| allowed_objects.contains(&id))
+            {
+                return Err(Error::InvalidSource);
+            }
+        }
     }
     Ok(())
+}
+
+fn zip_static_metadata_preserved(
+    source: &litchi_iwa_archive::package::Entry,
+    candidate: &litchi_iwa_archive::package::Entry,
+) -> bool {
+    let source_local = source.metadata().local();
+    let candidate_local = candidate.metadata().local();
+    let source_central = source.metadata().central();
+    let candidate_central = candidate.metadata().central();
+    source.raw_name() == candidate.raw_name()
+        && central_static_metadata_preserved(source, candidate)
+        && source.is_opaque() == candidate.is_opaque()
+        && source_local.version_needed() == candidate_local.version_needed()
+        && source_local.flags() == candidate_local.flags()
+        && source_local.compression_method() == candidate_local.compression_method()
+        && source_local.last_modified() == candidate_local.last_modified()
+        && source_local.name() == candidate_local.name()
+        && source_local.extra() == candidate_local.extra()
+        && source_local.comment() == candidate_local.comment()
+        && source_central.version_needed() == candidate_central.version_needed()
+        && source_central.flags() == candidate_central.flags()
+        && source_central.compression_method() == candidate_central.compression_method()
+        && source_central.last_modified() == candidate_central.last_modified()
+        && source_central.name() == candidate_central.name()
+        && source_central.extra() == candidate_central.extra()
+        && source_central.comment() == candidate_central.comment()
+}
+
+fn central_static_metadata_preserved(
+    source: &litchi_iwa_archive::package::Entry,
+    candidate: &litchi_iwa_archive::package::Entry,
+) -> bool {
+    let source_record = source.raw_record().central_directory_record();
+    let candidate_record = candidate.raw_record().central_directory_record();
+    source_record.len() >= 46
+        && candidate_record.len() >= 46
+        && source_record[..16] == candidate_record[..16]
+        && source_record[34..42] == candidate_record[34..42]
+        && source_record[46..] == candidate_record[46..]
+}
+
+fn central_record_preserved(
+    source: &litchi_iwa_archive::package::Entry,
+    candidate: &litchi_iwa_archive::package::Entry,
+) -> bool {
+    let source_record = source.raw_record().central_directory_record();
+    let candidate_record = candidate.raw_record().central_directory_record();
+    source_record.len() >= 46
+        && candidate_record.len() >= 46
+        && source_record[..42] == candidate_record[..42]
+        && source_record[46..] == candidate_record[46..]
+}
+
+fn chart_unknown_fields_preserved(source: &[u8], candidate: &[u8]) -> Result<bool, Error> {
+    let limits = litchi_iwa_common::WireLimits::default();
+    let source_fields =
+        litchi_iwa_common::wire::parse_wire_fields(source, limits).map_err(map_wire_error)?;
+    let candidate_fields =
+        litchi_iwa_common::wire::parse_wire_fields(candidate, limits).map_err(map_wire_error)?;
+    let source_unknown: Vec<&[u8]> = source_fields
+        .iter()
+        .filter(|field| field.number() != 10_000)
+        .map(|field| field.raw(source).map_err(map_wire_error))
+        .collect::<Result<_, _>>()?;
+    let candidate_unknown: Vec<&[u8]> = candidate_fields
+        .iter()
+        .filter(|field| field.number() != 10_000)
+        .map(|field| field.raw(candidate).map_err(map_wire_error))
+        .collect::<Result<_, _>>()?;
+    if source_unknown != candidate_unknown {
+        return Ok(false);
+    }
+    let source_extensions: Vec<&[u8]> = source_fields
+        .iter()
+        .filter(|field| field.number() == 10_000)
+        .map(|field| field.payload(source).map_err(map_wire_error))
+        .collect::<Result<_, _>>()?;
+    let candidate_extensions: Vec<&[u8]> = candidate_fields
+        .iter()
+        .filter(|field| field.number() == 10_000)
+        .map(|field| field.payload(candidate).map_err(map_wire_error))
+        .collect::<Result<_, _>>()?;
+    if source_extensions.len() != candidate_extensions.len() {
+        return Ok(false);
+    }
+    for (source_extension, candidate_extension) in
+        source_extensions.into_iter().zip(candidate_extensions)
+    {
+        let source_fields = litchi_iwa_common::wire::parse_wire_fields(source_extension, limits)
+            .map_err(map_wire_error)?;
+        let candidate_fields =
+            litchi_iwa_common::wire::parse_wire_fields(candidate_extension, limits)
+                .map_err(map_wire_error)?;
+        let source_unknown: Vec<&[u8]> = source_fields
+            .iter()
+            .filter(|field| field.number() != 20)
+            .map(|field| field.raw(source_extension).map_err(map_wire_error))
+            .collect::<Result<_, _>>()?;
+        let candidate_unknown: Vec<&[u8]> = candidate_fields
+            .iter()
+            .filter(|field| field.number() != 20)
+            .map(|field| field.raw(candidate_extension).map_err(map_wire_error))
+            .collect::<Result<_, _>>()?;
+        if source_unknown != candidate_unknown {
+            return Ok(false);
+        }
+    }
+    Ok(true)
+}
+
+fn mutation_plan(
+    package: &Package,
+    root_identifier: u64,
+    changes: &graph::Changes,
+) -> Result<MutationPlan, Error> {
+    let mut members = HashSet::new();
+    let mut deleted_members = HashSet::new();
+    let mut object_ids = HashSet::new();
+    for (name, archive) in &changes.edits {
+        members.insert(name.clone());
+        let source_archive = package
+            .state
+            .source
+            .components()
+            .get(name)
+            .ok_or(Error::InvalidSource)?
+            .archive();
+        for source_object in &source_archive.objects {
+            let id = source_object
+                .archive_info
+                .identifier
+                .ok_or(Error::InvalidSource)?;
+            if archive
+                .objects
+                .iter()
+                .all(|object| object.archive_info.identifier != Some(id))
+            {
+                object_ids.insert(id);
+            }
+        }
+        for candidate_object in &archive.objects {
+            let id = candidate_object
+                .archive_info
+                .identifier
+                .ok_or(Error::InvalidSource)?;
+            let source_object = source_archive
+                .objects
+                .iter()
+                .find(|object| object.archive_info.identifier == Some(id));
+            if source_object
+                .is_none_or(|object| !object.same_content_ignoring_offsets(candidate_object))
+            {
+                object_ids.insert(id);
+            }
+        }
+    }
+    for insertion in &changes.insertions {
+        members.insert(insertion.name.clone());
+        for object in &insertion.archive.objects {
+            object_ids.insert(object.archive_info.identifier.ok_or(Error::InvalidSource)?);
+        }
+    }
+    for name in &changes.deletions {
+        members.insert(name.clone());
+        deleted_members.insert(name.clone());
+    }
+    let mut members: Vec<_> = members.into_iter().collect();
+    let mut deleted_members: Vec<_> = deleted_members.into_iter().collect();
+    let mut object_ids: Vec<_> = object_ids.into_iter().collect();
+    members.sort_unstable();
+    deleted_members.sort_unstable();
+    object_ids.sort_unstable();
+    Ok(MutationPlan {
+        root_identifier,
+        members: members.into_boxed_slice(),
+        deleted_members: deleted_members.into_boxed_slice(),
+        object_ids: object_ids.into_boxed_slice(),
+    })
 }
 
 const fn is_chart_font_rewritable_type(message_type: u32) -> bool {
@@ -1820,7 +2389,6 @@ const fn is_chart_font_rewritable_type(message_type: u32) -> bool {
             | PARAGRAPH_STYLE_MESSAGE_TYPE
             | STYLESHEET_MESSAGE_TYPE
             | PACKAGE_METADATA_MESSAGE_TYPE
-            | 5_022..=5_029
     )
 }
 
@@ -1828,6 +2396,7 @@ fn publish(
     package: &Package,
     changes: graph::Changes,
     budget: &mut TransactionBudget,
+    plan: &MutationPlan,
 ) -> Result<Package, Error> {
     let catalog = physical_catalog(package)?;
     let archive_limits = catalog
@@ -1902,7 +2471,7 @@ fn publish(
     let candidate = Package::from_source_with_options(output.into(), package.state.options)
         .map_err(map_read_error)?;
     candidate.validate().map_err(map_read_error)?;
-    verify_locality(package, &candidate, &changes)?;
+    verify_locality_members(package, &candidate, plan, budget)?;
     Ok(candidate)
 }
 
@@ -1949,7 +2518,7 @@ fn map_axis_error(error: AxisSupportError) -> Error {
                 chart_axis_support::AxisSupportLimitKind::References => LimitKind::References,
                 chart_axis_support::AxisSupportLimitKind::TextStorages
                 | chart_axis_support::AxisSupportLimitKind::TextFragments => LimitKind::Entries,
-                chart_axis_support::AxisSupportLimitKind::TextBytes => LimitKind::WireBytes,
+                chart_axis_support::AxisSupportLimitKind::TextBytes => LimitKind::TextBytes,
                 chart_axis_support::AxisSupportLimitKind::WireFields => LimitKind::WireFields,
                 chart_axis_support::AxisSupportLimitKind::WireNesting => LimitKind::WireNesting,
                 chart_axis_support::AxisSupportLimitKind::WireWork => LimitKind::WireWork,
@@ -1960,68 +2529,6 @@ fn map_axis_error(error: AxisSupportError) -> Error {
         },
         AxisSupportError::Allocation { amount } => Error::Allocation { amount },
         AxisSupportError::InvalidSource => Error::InvalidSource,
-    }
-}
-
-fn map_chart_title_error(error: slide_chart_title::Error) -> Error {
-    match error {
-        slide_chart_title::Error::Refused(crate::chart::title::Refusal::UnsupportedSource) => {
-            Refusal::UnsupportedSource.into()
-        },
-        slide_chart_title::Error::Refused(crate::chart::title::Refusal::AmbiguousSelector) => {
-            Refusal::AmbiguousSelector.into()
-        },
-        slide_chart_title::Error::Refused(crate::chart::title::Refusal::EmptySlideName) => {
-            Refusal::EmptySlideName.into()
-        },
-        slide_chart_title::Error::Refused(crate::chart::title::Refusal::SlideNameNotFound) => {
-            Refusal::SlideNameNotFound.into()
-        },
-        slide_chart_title::Error::Refused(
-            crate::chart::title::Refusal::SlidePositionNotFound { position },
-        ) => Refusal::SlidePositionNotFound { position }.into(),
-        slide_chart_title::Error::Refused(crate::chart::title::Refusal::ChartNameNotFound) => {
-            Refusal::ChartNameNotFound.into()
-        },
-        slide_chart_title::Error::Refused(
-            crate::chart::title::Refusal::ChartPositionNotFound { position },
-        ) => Refusal::ChartPositionNotFound { position }.into(),
-        slide_chart_title::Error::Refused(crate::chart::title::Refusal::EmptyChartName) => {
-            Refusal::EmptyChartName.into()
-        },
-        slide_chart_title::Error::Limit {
-            kind,
-            observed,
-            maximum,
-        } => Error::Limit {
-            kind: map_chart_title_limit(kind),
-            observed,
-            maximum,
-        },
-        slide_chart_title::Error::Allocation { amount } => Error::Allocation { amount },
-        slide_chart_title::Error::InvalidSource
-        | slide_chart_title::Error::Verification
-        | slide_chart_title::Error::PatchConflict => Error::InvalidSource,
-    }
-}
-
-fn map_chart_title_limit(kind: slide_chart_title::LimitKind) -> LimitKind {
-    use slide_chart_title::LimitKind as K;
-    match kind {
-        K::InputBytes => LimitKind::InputBytes,
-        K::OutputBytes => LimitKind::OutputBytes,
-        K::WireBytes => LimitKind::WireBytes,
-        K::Entries => LimitKind::Entries,
-        K::EntryBytes => LimitKind::EntryBytes,
-        K::TotalBytes => LimitKind::TotalBytes,
-        K::Slides => LimitKind::Slides,
-        K::References => LimitKind::References,
-        K::TextStorages => LimitKind::Entries,
-        K::TextFragments | K::TextBytes => LimitKind::WireBytes,
-        K::WireFields => LimitKind::WireFields,
-        K::WireNesting => LimitKind::WireNesting,
-        K::WireWork => LimitKind::WireWork,
-        K::TitleBytes | K::SelectorBytes => LimitKind::SelectorBytes,
     }
 }
 
