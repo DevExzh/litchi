@@ -84,6 +84,7 @@ impl PropSpec {
     }
 
     /// Mark this property as accepting `null` to clear its value.
+    #[cfg(any(feature = "pages", feature = "keynote", feature = "numbers"))]
     pub(crate) const fn clearable(mut self) -> Self {
         self.admission = self.admission.clearable();
         self

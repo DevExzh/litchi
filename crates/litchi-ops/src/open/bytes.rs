@@ -151,9 +151,6 @@ fn zip<T: ZipTail>(
     } else {
         bytes
     };
-    #[cfg(not(all(feature = "pages", feature = "keynote", feature = "numbers")))]
-    let bytes = bytes;
-
     #[cfg(any(feature = "odt", feature = "ods", feature = "odp", odf_objects))]
     let odf = litchi_odf_common::detect::packaged_mime(
         &bytes,

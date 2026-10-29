@@ -7130,3 +7130,26 @@ See [0063](0063-source-pptx-modern-comments.md).
   iWork/D7 matrices and full gate must be rerun on one frozen candidate.
   Nine unified native routes remain queued; this adds no E3/E4 evidence or
   additional leaf migration dispositions.
+
+- The D7 post-check on `738be22a1a` passed workspace compilation but found
+  one stale aggregate fuzz lock: enabling the existing `soapberry-zip`
+  dependency for iWork adds that dependency to `litchi`'s fuzz workspace.
+  Offline regeneration changes exactly that lock entry, and the affected
+  fuzz binaries compile. The failed post-check is preserved; the complete
+  post-merge checks are repeated on the lock repair.
+
+- Post-merge checks on `3ae36cdab6` passed, and the completed D7 worktree
+  and branch were retired. The inactive historical performance parent was
+  also removed after moving its detached child to `uo2-iwa-final-perf`:
+  50 worktrees and 43 branches removed, with evidence and the Pages stash
+  preserved.
+- The fresh 3ae full gate then exposed partial-feature Clippy failures:
+  a redundant byte binding outside all-iWork builds and unused clearable
+  helpers when no iWork format is enabled. The run was stopped after eighteen
+  rows (three pass, fifteen instances of these failures); its partial receipt
+  remains external. The narrow repair removes the redundant binding and
+  compiles the helpers only with their format consumers. Strict all-target
+  checks pass for no-format, XLSX, Pages, Keynote, Numbers and all-feature
+  builds, together with formatting. Partial 3ae binary preparation remains
+  historical; no captures or timing were launched. Full qualification must
+  restart on the repaired frozen candidate.

@@ -117,6 +117,7 @@ impl Admission {
     };
 
     /// Mark a writable property as accepting `null` to clear its value.
+    #[cfg(any(feature = "pages", feature = "keynote", feature = "numbers"))]
     pub(crate) const fn clearable(self) -> Self {
         Self {
             clear: true,
