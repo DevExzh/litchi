@@ -59,6 +59,11 @@ The final branch source was checked with:
 - `cargo check -p litchi-pages --lib --tests -p litchi-iwa --test parity --jobs 2`
 - `cargo clippy -p litchi-pages --lib --tests --all-features --jobs 2 -- -D warnings`
 - `cargo doc -p litchi-pages --no-deps --all-features`
+- `RUSTC_BOOTSTRAP=1 python3 tools/check_api_glossary.py --profile pages --target-dir /tmp/iwa-w2b-pages-glossary-Q7b8Be`
+- `python3 tools/iwa_exit_ledger.py --check`
+- `python3 tools/check_crate_boundaries.py`
+- `python3 -m unittest tools.test_gate_runner`
+- `cargo check --locked --manifest-path crates/litchi-pages/fuzz/Cargo.toml --bins`
 - `cargo test -p litchi-pages --lib body_chart_font -- --nocapture`
 - `cargo test -p litchi-iwa --test parity chart_font_cases:: -- --nocapture`
 - `cargo test -p litchi-pages --lib production_locality_preserves_unknown_changed_and_untouched_objects -- --nocapture`
@@ -68,5 +73,16 @@ the seven release/cost probes remain intentionally ignored for the
 coordinator's final CPU slot. The shared substrate and shape/adapter checks
 are recorded in their respective records; the coordinator must rerun the
 complete gate on one integrated commit.
+
+The source-bound release probe binary was built but not executed:
+
+- source `e481893f62ead345a501e240a2529a746029f32d`
+- command `cargo test -p litchi-iwa --test parity --release --no-run --jobs 2`
+- external immutable binary `/tmp/iwa-w2b-pages-facade-release-Fqz8mQ/parity-bf6f552e55aaee94`
+- 40,183,512 bytes, SHA-256
+  `89254437719e28057c018bf7ee237381b10bb9713ded92554d29bd40fa7ad474`
+
+No probe execution, wall timing, CPU capture, raw captures, or binaries were
+added to the repository.
 
 No raw captures or binaries were added.
