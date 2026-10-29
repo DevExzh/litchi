@@ -41,6 +41,14 @@ fn named_property(file: &File, path: &str, key: &str) -> Option<String> {
         .map(|property| property.to_string())
 }
 
+fn node_named_property(node: &litchi_ops::node::Node<'_>, key: &str) -> Option<String> {
+    node.view()
+        .format()
+        .expect("chart format")
+        .find(|property| property.key() == key)
+        .map(|property| property.to_string())
+}
+
 fn property(file: &File, path: &str) -> Option<String> {
     named_property(file, path, "font.size")
 }
@@ -49,6 +57,14 @@ fn format_values(file: &File, path: &str) -> Vec<(String, String)> {
     file.get(path)
         .expect("chart path")
         .view()
+        .format()
+        .expect("chart format")
+        .map(|property| (property.key().to_owned(), property.to_string()))
+        .collect()
+}
+
+fn node_format_values(node: &litchi_ops::node::Node<'_>) -> Vec<(String, String)> {
+    node.view()
         .format()
         .expect("chart format")
         .map(|property| (property.key().to_owned(), property.to_string()))
@@ -787,6 +803,16 @@ mod numbers {
     #[test]
     fn canonical_chart_path_scopes_numbers_sheet_cache() {
         let file = two_sheet_chart_source();
+        let first = file
+            .get("/sheet[1]/chart[1]")
+            .expect("first-sheet chart path");
+        let first_values = node_format_values(&first);
+        assert_eq!(first.path().to_string(), "/sheet[1]/chart[1]");
+        assert_eq!(points(node_named_property(&first, "font.size")), 13.0);
+
+        // Keep the first node alive while the second sheet initializes a
+        // different cache entry.  Distinct seeded sizes make accidental
+        // retargeting observable rather than merely comparing equal defaults.
         let second = file
             .get("/sheet[2]/chart[1]")
             .expect("second-sheet chart path");
@@ -796,33 +822,20 @@ mod numbers {
         assert_eq!(second.path().to_string(), "/sheet[2]/chart[1]");
         assert_eq!(second.path().to_string(), generic.path().to_string());
         assert_eq!(
-            format_values(&file, "/sheet[2]/chart[1]"),
+            node_format_values(&second),
             format_values(&file, "/sheet[2]/chart[last()]")
         );
-        assert_eq!(
-            points(property(&file, "/sheet[2]/chart[1]")),
-            points(property(&file, "/sheet[2]/chart[last()]"))
-        );
-
-        let first = file
-            .get("/sheet[1]/chart[1]")
-            .expect("first-sheet chart path");
-        let first_values = format_values(&file, "/sheet[1]/chart[1]");
-        assert_eq!(first.path().to_string(), "/sheet[1]/chart[1]");
+        assert_eq!(points(node_named_property(&second, "font.size")), 27.0);
         assert_ne!(first.path().to_string(), second.path().to_string());
+
+        // The same retained first node must still address sheet 1 and retain
+        // its original value after sheet 2's cache entry was built.
+        assert_eq!(points(node_named_property(&first, "font.size")), 13.0);
+        assert_eq!(node_format_values(&first), first_values);
         assert_eq!(
             first_values,
             format_values(&file, "/sheet[1]/chart[last()]")
         );
-        assert_eq!(
-            points(property(&file, "/sheet[1]/chart[1]")),
-            points(property(&file, "/sheet[1]/chart[last()]")),
-        );
-
-        // Selecting the second sheet must not invalidate or retarget the first
-        // sheet's already materialized node.
-        assert_eq!(first.path().to_string(), "/sheet[1]/chart[1]");
-        assert_eq!(format_values(&file, "/sheet[1]/chart[1]"), first_values);
     }
 
     #[inline(never)]
