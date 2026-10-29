@@ -2,7 +2,8 @@
 
 - Status: bounded D7 implementation slice on `uo2/iwa-d7-root-comments`, cut
   from coordinator root `1bc8f22499d2691e85ebed37686c8381f0c985da`; runtime,
-  tests, and proof repairs are committed at the handoff tip.
+  proof tests, and ignored cost probes are committed at
+  `e0622be0e300ca4e405790c4b309b8e230a6f63b`.
 - Scope: expose the existing focused root-comment leaf transactions through
   the selector-first `cell.comment` property on Pages and Keynote, and make
   the existing Numbers route truthfully declare `null` clearability.
@@ -45,6 +46,30 @@ No ledger rows were changed in this D7 dispatch slice. The nine unified
 Pages/Keynote/Numbers read, set, and null-clear routes were appended to
 `0363-mac-queue.md`; all remain pending. No native E3/E4 acceptance is
 claimed, and no raw captures or binaries were added.
+
+## Full-route cost probes
+
+Eight ignored probes now cover the full `File` route against the direct
+focused leaf route: Pages and Keynote each have read, rootless create, root
+replace, and root clear. Read probes compare the exact semantic text output;
+write probes compare the complete published bytes before any counted loop.
+The measured symbols include only `open_bytes` plus the selector-first File
+operation and its output, or `Package::from_bytes` plus the focused leaf
+operation and corresponding output. Fixture preparation, source hashes,
+warm-up equality, no-op/readback/inverse checks, and source immutability stay
+outside those symbols. Pages replacement/clear uses a root-only source
+authored from the tracked table fixture; Pages/Keynote creation uses a
+rootless stored cell. Numbers has no new performance claim because its D7
+change is schema-only; its existing comment read/set/create/clear regression
+remains required.
+
+Each capture must run release mode on a coordinator-pinned CPU with Callgrind,
+ABBA order `[unified, leaf, leaf, unified]`, one exact ignored test selected,
+exit 0, positive selected-symbol Ir, and immutable binary/source hashes. The
+instruction acceptance bar is candidate/direct `<= 1.05`; a 20-microsecond
+allowance requires separate valid wall-time evidence and is not inferred from
+Ir. Raw captures stay outside the repository and final qualification must use
+the integrated coordinator commit.
 
 ## Verification
 
