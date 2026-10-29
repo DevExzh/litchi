@@ -23,7 +23,7 @@ use litchi_keynote::{Package, SlideSelector, TableSelector};
 
 use super::tree::{ROOT, count, text};
 use super::write::leaf_refusal;
-use super::{Flavor, LeafError, TreeBuilder, element, writable};
+use super::{Flavor, LeafError, TreeBuilder, clearable_writable, element, writable};
 use crate::Result;
 use crate::error::Code;
 use crate::node::Value;
@@ -173,6 +173,7 @@ const ROW_PROPS: &[PropSpec] = &[];
 
 const CELL_PROPS: &[PropSpec] = &[
     writable("text", ValueType::Text),
+    clearable_writable("comment", ValueType::Text),
     PropSpec::new("type", ValueType::Text),
     {
         let mut spec = PropSpec::new("value", ValueType::Scalar);
@@ -467,6 +468,7 @@ pub(crate) enum Patch {
         litchi_keynote::slide::delete::Patch,
     ),
     Drawables(litchi_keynote::slide::drawable::Patch),
+    TableComments(litchi_keynote::slide::table::comments::Patch),
     Creation(litchi_keynote::slide::creation::Patch),
     Media(litchi_keynote::slide::media::lifecycle::Patch),
     Placeholder(litchi_keynote::slide::placeholder::Patch),
@@ -482,6 +484,7 @@ impl Patch {
             // A committed deletion always removes one slide.
             Self::Deletion(_) => false,
             Self::Drawables(patch) => patch.is_noop(),
+            Self::TableComments(patch) => patch.is_noop(),
             Self::Creation(patch) => patch.is_noop(),
             Self::Media(patch) => patch.is_noop(),
             Self::Placeholder(patch) => patch.is_noop(),
@@ -990,6 +993,17 @@ pub(crate) fn build_table(
         return tree.build();
     };
     let table = read.table();
+    let comments = read
+        .iter_comments()
+        .map(|comment| {
+            (
+                comment.position().row() as usize,
+                comment.position().column() as usize,
+                comment.comment().text().to_owned(),
+            )
+        })
+        .map(|(row, column, text)| ((row, column), text))
+        .collect::<std::collections::BTreeMap<_, _>>();
     let dimensions = table.dimensions();
     let (rows, columns) = (dimensions.rows(), dimensions.columns());
     tree.root()
@@ -1013,6 +1027,14 @@ pub(crate) fn build_table(
             tree.push(row_item, Kind::Cell)
                 .prop("text", text(shown.as_deref()))
                 .prop("type", text(value.map(value_type)))
+                .prop(
+                    "comment",
+                    text(
+                        comments
+                            .get(&(row as usize, column as usize))
+                            .map(String::as_str),
+                    ),
+                )
                 .text(shown.unwrap_or_default())
                 .leaf([slide, DRAWABLE, row as usize, drawable])
                 .done();

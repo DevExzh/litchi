@@ -637,6 +637,19 @@ fn cell_comments_are_read_set_added_and_removed() {
 }
 
 #[test]
+fn numbers_cell_comment_schema_is_clearable() {
+    let property = litchi_ops::schema(FileFormat::Numbers)
+        .element("cell")
+        .expect("cell schema")
+        .property("comment")
+        .expect("comment schema");
+    assert!(property.get());
+    assert!(property.set());
+    assert!(property.clearable());
+    assert!(!property.add());
+}
+
+#[test]
 fn adds_and_removes_merged_ranges() {
     let file = read("basic.numbers");
     let added = file

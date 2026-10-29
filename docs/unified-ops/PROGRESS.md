@@ -7106,3 +7106,27 @@ See [0063](0063-source-pptx-modern-comments.md).
   immutable binary independently checked. Raw totals and complete selected
   function attribution agree; the worst leaf/host ratio is 0.484571. This
   remains slice evidence until the final integrated candidate is measured.
+
+- Keynote post-merge checks on `76a9fbf1e7` passed. Pages and Keynote
+  worktrees/branches were then retired with all performance evidence and the
+  protected Pages stash retained: 48 worktrees and 42 branches removed.
+- Accepted D7 root-comment slice `e3082e03bc`, synchronized with all three
+  chart-font facades. Pages and Keynote expose selector-based `cell.comment`
+  read/create/replace/null-clear through the focused leaf routes; Numbers
+  declares its existing null-clear support in the schema. Focused errors
+  remain terminal in direct paths, and missing/ambiguous selectors retain
+  their classifications. Tests cover genuine rootless creation, reopen,
+  exact inverse/no-op, stale recipients, failed-batch atomicity and untouched
+  comment/reply/ZIP content.
+- A bounded central-directory marker probe avoids redundant iWork detection
+  work while preserving ODF/OOXML precedence and partial-feature behavior.
+  It checks actual record counts and directory size, never member payloads;
+  malformed/hybrid/decoy/understated-count and tight-limit controls pass.
+  Source `a24f121a14` passes all eight full-File/direct-leaf instruction
+  routes (16 captures), independently checked with 51 artifact/binary hashes,
+  exact two-call collection and complete function attribution. Worst
+  overhead is 2.418312%. Earlier contaminated and pre-fix captures remain
+  explicitly nonqualifying. The final integrated FIN/common-format matrix,
+  iWork/D7 matrices and full gate must be rerun on one frozen candidate.
+  Nine unified native routes remain queued; this adds no E3/E4 evidence or
+  additional leaf migration dispositions.

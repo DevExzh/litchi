@@ -910,6 +910,14 @@ pub(crate) const fn writable(
     spec
 }
 
+/// A readable text property whose `null` value clears the focused leaf state.
+pub(crate) const fn clearable_writable(
+    name: &'static str,
+    ty: crate::value::ValueType,
+) -> crate::node::spec::PropSpec {
+    writable(name, ty).clearable()
+}
+
 /// Runs `$body` with `$flavor` bound to the flavor type of `$format`.
 macro_rules! with_flavor {
     ($format:expr, $flavor:ident => $body:expr) => {

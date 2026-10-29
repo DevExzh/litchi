@@ -7,6 +7,9 @@
 
 #![cfg(feature = "keynote")]
 
+use std::collections::BTreeMap;
+use std::io::{Cursor, Read};
+
 use litchi_core::FileFormat;
 use litchi_ops::capabilities::{Capabilities, Verb};
 use litchi_ops::{BatchItem, BatchMode, Code, File, NewNode, Placement, create, open_bytes, props};
@@ -75,6 +78,18 @@ fn pt(points: i32) -> String {
 
 fn reopen(file: &File) -> File {
     open_bytes(file.to_bytes().expect("publish")).expect("reopen")
+}
+
+fn zip_members(bytes: &[u8]) -> BTreeMap<String, Vec<u8>> {
+    let mut archive = zip::ZipArchive::new(Cursor::new(bytes)).expect("zip");
+    (0..archive.len())
+        .map(|index| {
+            let mut entry = archive.by_index(index).expect("entry");
+            let mut bytes = Vec::new();
+            entry.read_to_end(&mut bytes).expect("entry bytes");
+            (entry.name().to_owned(), bytes)
+        })
+        .collect()
 }
 
 const BODY: &str = "/slide[2]/placeholder[body]";
@@ -911,6 +926,467 @@ fn slide_table_cells_take_values() {
     assert_eq!(
         prop(&reopen(&numeric), &cell, "type").as_deref(),
         Some("number")
+    );
+}
+
+#[test]
+fn slide_table_cell_comments_round_trip_through_the_unified_route() {
+    let file = read("slide-table-read-native.key");
+    let cell = file
+        .query("tc")
+        .expect("query")
+        .filter_map(|node| node.ok())
+        .find(|node| {
+            let path = node.path().to_string();
+            prop(&file, &path, "comment").is_some()
+        })
+        .expect("a native cell comment")
+        .path()
+        .to_string();
+    let original = file.to_bytes().expect("source bytes");
+    let existing = prop(&file, &cell, "comment").expect("comment text");
+
+    let same = file
+        .set(&cell, props! { "comment" => existing.as_str() })
+        .expect("same comment");
+    assert_eq!(same.to_bytes().expect("same bytes"), original);
+
+    let commit = file
+        .edit(|tx| tx.set(&cell, props! { "comment" => "D7 unified Keynote root" }))
+        .expect("set comment");
+    let edited = reopen(commit.file());
+    assert_eq!(
+        prop(&edited, &cell, "comment").as_deref(),
+        Some("D7 unified Keynote root")
+    );
+    let cleared = edited
+        .set(&cell, props! { "comment" => litchi_ops::PropValue::Null })
+        .expect("clear comment");
+    assert_eq!(prop(&reopen(&cleared), &cell, "comment"), None);
+    let restored = commit
+        .patch()
+        .inverse()
+        .apply(commit.file())
+        .expect("inverse");
+    assert_eq!(restored.to_bytes().expect("inverse bytes"), original);
+
+    let error = file
+        .set(
+            "/slide[999]/table[1]/tr[1]/tc[1]",
+            props! { "comment" => "must refuse" },
+        )
+        .expect_err("missing slide");
+    assert_eq!(error.code(), Code::PathNotFound);
+    assert_eq!(file.to_bytes().expect("source unchanged"), original);
+    let other = file
+        .query("tc")
+        .expect("query")
+        .filter_map(|node| node.ok())
+        .map(|node| node.path().to_string())
+        .find(|path| path != &cell)
+        .expect("another cell");
+    assert_eq!(
+        prop(&edited, &other, "text"),
+        prop(&file, &other, "text"),
+        "comment write stays local"
+    );
+}
+
+#[test]
+fn keynote_cell_comment_schema_is_clearable() {
+    let property = litchi_ops::schema(FileFormat::Keynote)
+        .element("cell")
+        .expect("cell schema")
+        .property("comment")
+        .expect("comment schema");
+    assert!(property.get());
+    assert!(property.set());
+    assert!(property.clearable());
+    assert!(!property.add());
+}
+
+#[test]
+fn slide_table_cell_comment_creates_a_root_from_a_rootless_file_cell() {
+    let file = read("table-discovery.key");
+    let cell = "/slide[1]/table[1]/tr[1]/tc[1]";
+    assert_eq!(prop(&file, cell, "comment"), None);
+    let original = file.to_bytes().expect("source bytes");
+    let added = file
+        .set(cell, props! { "comment" => "D7 Keynote created root" })
+        .expect("create root comment");
+    assert_eq!(
+        prop(&reopen(&added), cell, "comment").as_deref(),
+        Some("D7 Keynote created root")
+    );
+    let commit = file
+        .edit(|tx| tx.set(cell, props! { "comment" => "D7 Keynote inverse root" }))
+        .expect("create root in a transaction");
+    let restored = commit
+        .patch()
+        .inverse()
+        .apply(commit.file())
+        .expect("inverse root creation");
+    assert_eq!(restored.to_bytes().expect("inverse bytes"), original);
+}
+
+#[test]
+fn slide_table_cell_comment_fast_path_keeps_typed_refusals_and_source_bytes() {
+    let file = read("table-discovery.key");
+    let cell = "/slide[1]/table[1]/tr[1]/tc[1]";
+    let original = file.to_bytes().expect("source bytes");
+    let invalid_value = file
+        .set(
+            cell,
+            props! { "comment" => litchi_ops::PropValue::from(vec![String::from("not text")]) },
+        )
+        .expect_err("numeric comment is invalid");
+    assert_eq!(invalid_value.code(), Code::InvalidValue);
+    let out_of_range = file
+        .set(
+            "/slide[1]/table[1]/tr[999]/tc[1]",
+            props! { "comment" => "must refuse" },
+        )
+        .expect_err("out-of-range comment cell");
+    assert_eq!(out_of_range.code(), Code::InvalidInput);
+    assert_eq!(file.to_bytes().expect("source unchanged"), original);
+}
+
+#[test]
+fn slide_table_cell_comment_stale_recipient_and_batch_proofs_are_terminal_and_local() {
+    let file = read("slide-table-read-native.key");
+    let populated = "/slide[1]/table[1]/tr[2]/tc[4]";
+    let first = "/slide[1]/table[1]/tr[1]/tc[1]";
+    let second = "/slide[1]/table[1]/tr[1]/tc[2]";
+    assert!(prop(&file, populated, "comment").is_some());
+    assert!(prop(&file, first, "comment").is_none());
+    assert!(prop(&file, second, "comment").is_none());
+    let original = file.to_bytes().expect("source bytes");
+
+    let left = file
+        .edit(|tx| tx.set(first, props! { "comment" => "D7 stale left" }))
+        .expect("left edit");
+    let right = file
+        .edit(|tx| tx.set(first, props! { "comment" => "D7 stale right" }))
+        .expect("right edit");
+    let recipient = right.file().to_bytes().expect("recipient bytes");
+    let stale = left
+        .patch()
+        .apply(right.file())
+        .expect_err("stale patch recipient");
+    assert_eq!(stale.code(), Code::InvalidInput);
+    assert_eq!(
+        right.file().to_bytes().expect("recipient unchanged"),
+        recipient
+    );
+
+    let invalid = file
+        .edit(|tx| {
+            tx.set(first, props! { "comment" => "must not publish" })?;
+            tx.set(
+                "/slide[999]/table[1]/tr[1]/tc[1]",
+                props! { "comment" => "must refuse" },
+            )
+        })
+        .expect_err("batch failure is atomic");
+    assert_eq!(invalid.code(), Code::PathNotFound);
+    assert_eq!(file.to_bytes().expect("source unchanged"), original);
+
+    let before_comment = litchi_keynote::Package::from_bytes(&original)
+        .expect("leaf source")
+        .slide_table_cell_comment(
+            litchi_keynote::SlideSelector::index(0),
+            litchi_keynote::TableSelector::index(0),
+            litchi_keynote::slide::table::cells::At::new(1, 3),
+        )
+        .expect("untouched comment read")
+        .expect("untouched comment");
+    let batch = file
+        .edit(|tx| {
+            tx.set(first, props! { "comment" => "D7 batch one" })?;
+            tx.set(second, props! { "comment" => "D7 batch two" })
+        })
+        .expect("multi-cell batch");
+    let reopened = reopen(batch.file());
+    assert_eq!(
+        prop(&reopened, first, "comment").as_deref(),
+        Some("D7 batch one")
+    );
+    assert_eq!(
+        prop(&reopened, second, "comment").as_deref(),
+        Some("D7 batch two")
+    );
+    let after_bytes = reopened.to_bytes().expect("batch bytes");
+    let after_comment = litchi_keynote::Package::from_bytes(&after_bytes)
+        .expect("reopen leaf")
+        .slide_table_cell_comment(
+            litchi_keynote::SlideSelector::index(0),
+            litchi_keynote::TableSelector::index(0),
+            litchi_keynote::slide::table::cells::At::new(1, 3),
+        )
+        .expect("untouched comment reread")
+        .expect("untouched comment after batch");
+    assert_eq!(after_comment, before_comment, "untouched metadata/replies");
+    let before_members = zip_members(&original);
+    let after_members = zip_members(&after_bytes);
+    assert_eq!(
+        before_members.get("preview.jpg"),
+        after_members.get("preview.jpg"),
+        "untouched package member"
+    );
+}
+
+const KEYNOTE_COMMENT_CELL: &str = "/slide[1]/table[1]/tr[2]/tc[4]";
+
+fn keynote_probe_source(name: &str) -> Vec<u8> {
+    std::fs::read(fixture(name)).expect("probe source")
+}
+
+#[inline(never)]
+fn unified_keynote_comment_read_impl(source: &[u8]) -> Option<String> {
+    prop(
+        &open_bytes(source.to_vec()).expect("unified Keynote source"),
+        KEYNOTE_COMMENT_CELL,
+        "comment",
+    )
+}
+
+#[inline(never)]
+fn direct_keynote_comment_read_impl(source: &[u8]) -> Option<String> {
+    litchi_keynote::Package::from_bytes(source)
+        .expect("direct Keynote source")
+        .slide_table_cell_comment(
+            litchi_keynote::SlideSelector::index(0),
+            litchi_keynote::TableSelector::index(0),
+            litchi_keynote::slide::table::cells::At::new(1, 3),
+        )
+        .expect("direct Keynote comment read")
+        .map(|comment| comment.text().to_owned())
+}
+
+#[inline(never)]
+fn unified_keynote_comment_create_impl(source: &[u8]) -> Vec<u8> {
+    open_bytes(source.to_vec())
+        .expect("unified Keynote source")
+        .set(
+            "/slide[1]/table[1]/tr[1]/tc[1]",
+            props! { "comment" => "D7 Keynote measured create" },
+        )
+        .expect("unified Keynote create")
+        .to_bytes()
+        .expect("unified Keynote bytes")
+}
+
+#[inline(never)]
+fn direct_keynote_comment_create_impl(source: &[u8]) -> Vec<u8> {
+    let commit = litchi_keynote::Package::from_bytes(source)
+        .expect("direct Keynote source")
+        .edit_slide_table_cell_comment(
+            litchi_keynote::SlideSelector::index(0),
+            litchi_keynote::TableSelector::index(0),
+            litchi_keynote::slide::table::cells::At::new(0, 0),
+        )
+        .expect("direct Keynote target")
+        .set("D7 Keynote measured create")
+        .expect("direct Keynote create")
+        .commit()
+        .expect("direct Keynote commit");
+    let mut bytes = Vec::new();
+    commit
+        .package()
+        .write_to(&mut bytes)
+        .expect("direct Keynote bytes");
+    bytes
+}
+
+#[inline(never)]
+fn unified_keynote_comment_replace_impl(source: &[u8]) -> Vec<u8> {
+    open_bytes(source.to_vec())
+        .expect("unified Keynote source")
+        .set(
+            KEYNOTE_COMMENT_CELL,
+            props! { "comment" => "D7 Keynote measured replace" },
+        )
+        .expect("unified Keynote replace")
+        .to_bytes()
+        .expect("unified Keynote bytes")
+}
+
+#[inline(never)]
+fn direct_keynote_comment_replace_impl(source: &[u8]) -> Vec<u8> {
+    let commit = litchi_keynote::Package::from_bytes(source)
+        .expect("direct Keynote source")
+        .edit_slide_table_cell_comment(
+            litchi_keynote::SlideSelector::index(0),
+            litchi_keynote::TableSelector::index(0),
+            litchi_keynote::slide::table::cells::At::new(1, 3),
+        )
+        .expect("direct Keynote target")
+        .set("D7 Keynote measured replace")
+        .expect("direct Keynote replace")
+        .commit()
+        .expect("direct Keynote commit");
+    let mut bytes = Vec::new();
+    commit
+        .package()
+        .write_to(&mut bytes)
+        .expect("direct Keynote bytes");
+    bytes
+}
+
+#[inline(never)]
+fn unified_keynote_comment_clear_impl(source: &[u8]) -> Vec<u8> {
+    open_bytes(source.to_vec())
+        .expect("unified Keynote source")
+        .set(
+            KEYNOTE_COMMENT_CELL,
+            props! { "comment" => litchi_ops::PropValue::Null },
+        )
+        .expect("unified Keynote clear")
+        .to_bytes()
+        .expect("unified Keynote bytes")
+}
+
+#[inline(never)]
+fn direct_keynote_comment_clear_impl(source: &[u8]) -> Vec<u8> {
+    let commit = litchi_keynote::Package::from_bytes(source)
+        .expect("direct Keynote source")
+        .edit_slide_table_cell_comment(
+            litchi_keynote::SlideSelector::index(0),
+            litchi_keynote::TableSelector::index(0),
+            litchi_keynote::slide::table::cells::At::new(1, 3),
+        )
+        .expect("direct Keynote target")
+        .clear()
+        .expect("direct Keynote clear")
+        .commit()
+        .expect("direct Keynote commit");
+    let mut bytes = Vec::new();
+    commit
+        .package()
+        .write_to(&mut bytes)
+        .expect("direct Keynote bytes");
+    bytes
+}
+
+#[inline(never)]
+fn unified_keynote_comment_read_route(source: &[u8]) -> Option<String> {
+    unified_keynote_comment_read_impl(source)
+}
+
+#[inline(never)]
+fn direct_keynote_comment_read_route(source: &[u8]) -> Option<String> {
+    direct_keynote_comment_read_impl(source)
+}
+
+#[inline(never)]
+fn unified_keynote_comment_create_route(source: &[u8]) -> Vec<u8> {
+    unified_keynote_comment_create_impl(source)
+}
+
+#[inline(never)]
+fn direct_keynote_comment_create_route(source: &[u8]) -> Vec<u8> {
+    direct_keynote_comment_create_impl(source)
+}
+
+#[inline(never)]
+fn unified_keynote_comment_replace_route(source: &[u8]) -> Vec<u8> {
+    unified_keynote_comment_replace_impl(source)
+}
+
+#[inline(never)]
+fn direct_keynote_comment_replace_route(source: &[u8]) -> Vec<u8> {
+    direct_keynote_comment_replace_impl(source)
+}
+
+#[inline(never)]
+fn unified_keynote_comment_clear_route(source: &[u8]) -> Vec<u8> {
+    unified_keynote_comment_clear_impl(source)
+}
+
+#[inline(never)]
+fn direct_keynote_comment_clear_route(source: &[u8]) -> Vec<u8> {
+    direct_keynote_comment_clear_impl(source)
+}
+
+fn keynote_comment_route_check(
+    source: &[u8],
+    unified: fn(&[u8]) -> Vec<u8>,
+    direct: fn(&[u8]) -> Vec<u8>,
+    warmup_unified: fn(&[u8]) -> Vec<u8>,
+    warmup_direct: fn(&[u8]) -> Vec<u8>,
+) {
+    let expected = warmup_direct(source);
+    assert_eq!(warmup_unified(source), expected, "unified/direct output");
+    let output = unified(source);
+    assert_eq!(output, expected, "Keynote ABBA output");
+    std::hint::black_box(output);
+    let output = direct(source);
+    assert_eq!(output, expected, "Keynote ABBA output");
+    std::hint::black_box(output);
+    let output = direct(source);
+    assert_eq!(output, expected, "Keynote ABBA output");
+    std::hint::black_box(output);
+    let output = unified(source);
+    assert_eq!(output, expected, "Keynote ABBA output");
+    std::hint::black_box(output);
+}
+
+#[test]
+#[ignore = "release callgrind ABBA probe; run explicitly"]
+fn keynote_comment_read_full_file_cost_abba() {
+    let source = keynote_probe_source("slide-table-read-native.key");
+    let expected = direct_keynote_comment_read_impl(&source);
+    assert_eq!(unified_keynote_comment_read_impl(&source), expected);
+    let output = unified_keynote_comment_read_route(&source);
+    assert_eq!(output, expected, "Keynote read ABBA output");
+    std::hint::black_box(output);
+    let output = direct_keynote_comment_read_route(&source);
+    assert_eq!(output, expected, "Keynote read ABBA output");
+    std::hint::black_box(output);
+    let output = direct_keynote_comment_read_route(&source);
+    assert_eq!(output, expected, "Keynote read ABBA output");
+    std::hint::black_box(output);
+    let output = unified_keynote_comment_read_route(&source);
+    assert_eq!(output, expected, "Keynote read ABBA output");
+    std::hint::black_box(output);
+}
+
+#[test]
+#[ignore = "release callgrind ABBA probe; run explicitly"]
+fn keynote_comment_create_full_file_cost_abba() {
+    let source = keynote_probe_source("table-discovery.key");
+    keynote_comment_route_check(
+        &source,
+        unified_keynote_comment_create_route,
+        direct_keynote_comment_create_route,
+        unified_keynote_comment_create_impl,
+        direct_keynote_comment_create_impl,
+    );
+}
+
+#[test]
+#[ignore = "release callgrind ABBA probe; run explicitly"]
+fn keynote_comment_replace_full_file_cost_abba() {
+    let source = keynote_probe_source("slide-table-read-native.key");
+    keynote_comment_route_check(
+        &source,
+        unified_keynote_comment_replace_route,
+        direct_keynote_comment_replace_route,
+        unified_keynote_comment_replace_impl,
+        direct_keynote_comment_replace_impl,
+    );
+}
+
+#[test]
+#[ignore = "release callgrind ABBA probe; run explicitly"]
+fn keynote_comment_clear_full_file_cost_abba() {
+    let source = keynote_probe_source("slide-table-read-native.key");
+    keynote_comment_route_check(
+        &source,
+        unified_keynote_comment_clear_route,
+        direct_keynote_comment_clear_route,
+        unified_keynote_comment_clear_impl,
+        direct_keynote_comment_clear_impl,
     );
 }
 
