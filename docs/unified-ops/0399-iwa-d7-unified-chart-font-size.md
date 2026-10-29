@@ -113,7 +113,7 @@ The immutable binary is external at
 normalized manifest, raw captures, validator receipt and performance review
 are external under
 `.coord/d7-chart-font-size-opt-91b5/captures-91b5-cpu5/`; the review SHA-256
-is `c3afa2cd78276c1b3fa81b92143a85bbe0d68ee1e199fb027776cc186b4f6c6f`.
+is `343941dd6e2f80b28b840a5d0ac8f4b1a1c77a85e7a84f877f609d18fa4f71a8`.
 This is Callgrind instruction evidence only: it makes no wall-time or native
 acceptance claim.  The final integrated coordinator candidate must still be
 requalified after later merges; the earlier c762 matrix remains profiling
