@@ -1474,7 +1474,7 @@ fn validate_symbol_scope(
         else {
             return true;
         };
-        let changed_object_outside_scope = archive.objects.iter().any(|object| {
+        archive.objects.iter().any(|object| {
             let Some(identifier) = object.archive_info.identifier else {
                 return true;
             };
@@ -1545,8 +1545,7 @@ fn validate_symbol_scope(
                 .iter()
                 .all(|candidate| candidate.archive_info.identifier != Some(identifier))
                 && !scope.planned_removed_objects().contains(&identifier)
-        });
-        changed_object_outside_scope
+        })
     });
     let inserted_outside_scope = changes.insertions.iter().any(|insertion| {
         !scope
