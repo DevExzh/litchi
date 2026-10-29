@@ -1,13 +1,13 @@
 # 0391 — W1-G: shared whole-cell text-style substrate
 
-- Status: Numbers-first substrate and proof repair remain isolated on the WP.
-  Pages and Keynote facades are not started, no ledger rows are migrated, and
-  no native acceptance claim is active. The current code tip is
-  `4f014f7463`; release-mode instruction capture remains coordinator-gated and
-  has not started.
+- Status: Numbers-first substrate, bounded tile writer, and header-bucket
+  materialization repair remain isolated on the WP. Pages and Keynote facades
+  are not started, no ledger rows are migrated, and no native acceptance claim
+  is active. The current code tip is `7b8cf978fb`; release-mode instruction
+  capture remains coordinator-gated and has not started.
 - Source branch: `uo2/iwa-w1g-cell-text-style`, cut from frozen root
   `1e3978082bd8e576f0afeb7e3eebac1ca3908d86`, then synchronized with frozen
-  trunk `738be22a1a`.
+  trunk `e0e297a82b0a534dfd5611ced3a9811851edbf76`.
 - Continuation commits: the current WP includes F's reviewed metadata
   transition `b9337962b9` through merge `8662fa8ecd`, staged-budget/readback
   repair `76cfbf3afb`, current frozen-root merge `2eb913a401`, and prepared
@@ -15,8 +15,9 @@
   `74651bb4ba`, planner/cache/probe repair `12f9de7115`, and verification
   budget plus mixed-no-op proof `ea9a17e04d`, direct watermark/cardinality
   proof `ee47ab4896`, reviewed shared tile-writer merge `7f69b0710a`, and
-  Numbers writer adoption `43608b8faa`, and bounded shared table-fact
-  selection `4f014f7463`. Earlier budget, parser,
+  Numbers writer adoption `43608b8faa`, bounded shared table-fact selection
+  `4f014f7463`, reviewed header-helper merge `ea1bab6270`, and header-adapter
+  integration `7b8cf978fb`. Earlier budget, parser,
   exclusive-path, mutation-output and identity/unknown-preservation
   checkpoints remain in history.
 - Scope: shared `litchi-iwa-table::cell_text_style` graph reads and direct
@@ -70,9 +71,10 @@ out of scope.
 
 ## Ownership
 
-- W1-G owns `crates/litchi-iwa-table/src/cell_text_style.rs`, its crate export,
-  shared planner tests, and the Numbers adapter in
-  `crates/litchi-numbers/src/package/table_cell_text_style.rs`.
+- W1-G owns `crates/litchi-iwa-table/src/cell_text_style.rs`, the shared
+  `cell_text_style_headers` and tile-writer exports, shared planner tests, the
+  Numbers adapter in `crates/litchi-numbers/src/package/table_cell_text_style.rs`,
+  and its focused parity/cost controls.
 - Existing helper consumers (`table_cell_text`, `table_cell_list`,
   `storage_list`, `table_resize`, and conditional highlights) remain on the
   compatibility helpers until their common graph primitives are extracted in
@@ -82,7 +84,7 @@ out of scope.
 
 ## Verification and remaining work
 
-The current focused checks pass: 21 shared table unit tests (including
+The current focused checks pass: 60 shared table unit tests (including
 duplicate/unknown locality, nested-font pre-admission, residual BNC fields,
 zero ceilings and low field/work/allocation cases), nine Numbers
 `cell_text_style` tests, formatting, and strict Clippy for both crates. The
@@ -109,6 +111,17 @@ updates reuse the existing style object with its actual parent chain.
 All Numbers cell-key publication now routes through the shared bounded tile
 writer, including existing cells, empty slots and missing rows; the former
 default-limit/private writer paths are removed.
+The header adapter parses the DataStore row-header envelope into source-indexed
+bucket references, selects the checked global row bucket, and publishes row
+and column count deltas only when a previously absent cell is materialized with
+a style key. Existing cells and no-op updates leave both buckets byte-exact;
+missing bucket references do not trigger a fallback writer. The focused
+`cost_probes::numbers_whole_cell_style_materialization_header_controls` test
+decorates header buckets with a retained unknown field and exercises empty G22
+plus the first missing row in an existing tile. It compares both bucket counts
+and unknown fields, tile row/cell presence, host and leaf semantic styles, and
+the exact leaf inverse. The current-source log is retained at
+`/home/zhuhe/code/litchi-worktrees/.coord/iwa-w1g-header-7b8cf978fb/header-controls.out`.
 The package proof mutates an otherwise exclusive style with unknown root and
 unrelated paragraph data (asserting both the nonempty paragraph field and root
 unknown field); the canonical-shape gate derives a fresh style and the old
