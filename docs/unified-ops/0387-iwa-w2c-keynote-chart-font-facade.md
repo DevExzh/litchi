@@ -110,7 +110,7 @@ Scoped evidence on the current branch:
 | seven shared chart-font admission tests | 7 passed |
 | `python3 tools/check_crate_boundaries.py` | pass; 70 packages, 313 declarations, 12 explicit debt items |
 | `python3 tools/iwa_exit_ledger.py --check` | pass; six chart-font rows intentionally host-only |
-| `RUSTC_BOOTSTRAP=1 python3 tools/check_api_glossary.py --target-dir /tmp/iwa-w2c-glossary-20261028` | pass; 73 profiles, 3,957 banned names, 716 families, 729 result contracts |
+| `RUSTC_BOOTSTRAP=1 python3 tools/check_api_glossary.py --target-dir /tmp/iwa-w2c-glossary-20261029` | pass; 73 profiles, 3,957 banned names, 716 families, 729 result contracts |
 | `RUSTDOCFLAGS=-Dwarnings cargo doc --locked --no-deps -p litchi-keynote` | pass |
 | `python3 -m unittest tools.test_no_3rdparty_references tools.test_iwa_exit_ledger` | 17 passed |
 | no-op, inverse and typed-refusal controls | passed |
