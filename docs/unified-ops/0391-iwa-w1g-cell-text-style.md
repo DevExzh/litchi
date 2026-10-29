@@ -1,10 +1,10 @@
 # 0391 — W1-G: shared whole-cell text-style substrate
 
-- Status: in progress; Numbers-first substrate and proof repair are complete
-  on the isolated WP, pending coordinator/W2-A independent review. Pages and
-  Keynote facades are not started, no ledger rows are migrated, and no
-  performance or native acceptance claim is active. The current code tip is
-  `daed5d99c3`; this record is on the final clean handoff commit.
+- Status: Numbers-first substrate and proof repair are complete on the
+  isolated WP. Pages and Keynote facades are not started, no ledger rows are
+  migrated, and no native acceptance claim is active. The current code/probe
+  tip is `4dca2d60b6`; release-mode instruction capture remains coordinator-
+  gated and has not started.
 - Source branch: `uo2/iwa-w1g-cell-text-style`, cut from frozen root
   `1e3978082bd8e576f0afeb7e3eebac1ca3908d86`, then synchronized with frozen
   trunk 24ecfb543748885192b8fb5273abb54e669764c6.
@@ -118,3 +118,36 @@ Historical parity and corpus receipts from the pre-repair checkpoint are
 retained as context only and are not requalified evidence for this source.
 Native evidence, ledger migration, Pages/Keynote facade work and performance
 remain coordinator-owned follow-ups.
+
+## Whole-cell cost-route preparation
+
+The current source contains three dedicated, non-inline ignored routes in
+`crates/litchi-iwa/tests/parity/cost_probes.rs`:
+
+- `numbers_whole_cell_style_single_cost_abba`: one B2 whole-cell set;
+- `numbers_whole_cell_style_exclusive_repeat_cost_abba`: a source-authored
+  exclusive style followed by a repeated single-cell update;
+- `numbers_whole_cell_style_batch_1000_cost_abba`: a source-built 50×20 table
+  with 1,000 materialized cells sharing one style key, one batch leaf edit,
+  and a host loop over the same cells.
+
+The source builder is outside the measured wrappers. It retains a valid
+Numbers registry, uses the modern tile storage fields, preserves a bounded
+known metadata revision payload, and leaves the selected cells/style graph
+source-relative. Each route performs host/leaf reopen/readback, locality and
+inverse checks before its exact host/leaf/leaf/host wrapper calls. The batch
+route now prepares the shared table/tile/style graph once, batches tile-key
+publication and batches readback preparation; it completed the 1,000-cell
+correctness route on this source. The final explicit run on this source was:
+
+```text
+cargo test --offline -p litchi-iwa --test parity \
+  cost_probes::numbers_whole_cell_style_batch_1000_cost_abba \
+  -- --ignored --nocapture --test-threads=1
+```
+
+It passed in 416.09 s, including setup/correctness and the four ABBA calls;
+this is a correctness/probe-readiness receipt only, not a Callgrind or
+release-mode performance qualification. Immutable binaries, captures and
+instruction-count receipts are intentionally absent until the coordinator
+accepts this fixture/probe checkpoint and grants the CPU slot.
