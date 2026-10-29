@@ -3,7 +3,7 @@
 - Status: bounded facade slice on `uo2/iwa-w2c-chart-font`, cut from frozen
   root `9932c7d0691b2c14bbbd11a2dea7df41f66308b6`, with the reviewed shared
   substrate `faefe7303b` merged at branch tip `5f20266918`. The reviewed
-  selector/locality repair is `14d41ec0c2`. Coordinator
+  selector/locality and admission/cost-probe repair is `6ac2c0efcd`. Coordinator
   integration, native evidence and final integrated gates remain pending. The
   six exit-ledger rows intentionally remain `host-only`; this record is not a
   provisional migration state.
@@ -65,6 +65,15 @@ read the staged inherited effective value before publication and reject mixed
 or otherwise unmodelled reset results. Engine text-byte reports retain their
 `TextBytes` classification and accumulate across the transaction.
 
+Locality payload inspection uses a residual, non-allocating `RawWireFields`
+preflight, debits its measured input/work/field pass, and only then admits the
+single materializing field vector's cumulative fields, work, scratch and
+allocation event. The unit controls cover zero, exact and one-under cumulative
+field budgets plus exact and zero allocation residuals. The ignored release
+probes use dedicated `#[inline(never)]` host/leaf wrappers: setup, inverse
+application and output checks are outside the route, each read fetches one
+property, and each ABBA route executes exactly two selected calls per side.
+
 ## Differential proof and evidence boundary
 
 `crates/litchi-iwa/tests/parity/keynote_chart_font_cases.rs` owns the Keynote
@@ -110,19 +119,20 @@ while timing was held. No performance qualification or wall-clock claim is
 made here. Any later receipt must name the final integrated source SHA,
 release binary SHA-256, build command, exact test filter and route symbols.
 
-Scoped evidence on the current branch (source repair `14d41ec0c2`):
+Scoped evidence on the current branch (source repair `6ac2c0efcd`):
 
 | Check | Result |
 |---|---|
-| `cargo fmt --package litchi-keynote -- --check` | pass |
+| `cargo fmt --package litchi-keynote --package litchi-iwa -- --check` | pass |
 | `cargo check -p litchi-keynote --locked --offline` | pass |
-| strict Clippy (`cargo clippy -p litchi-keynote --lib -D warnings`) | pass; vendor warnings only |
+| strict Clippy (`cargo clippy -p litchi-keynote --lib --tests --locked --offline -- -D warnings`) | pass; vendor warnings only |
 | focused `keynote_chart_font` parity/control filter | 10 passed, 6 ignored isolated ABBA probes |
 | eight Keynote facade parity/control cases within that filter | 8 passed |
 | shared chart-font admission filter | 7 passed |
-| `cargo test -p litchi-keynote --lib` | 334 passed, 1 ignored |
+| `cargo test -p litchi-keynote --lib` | 334 passed, 1 ignored (335 discovered, including the new admission control) |
 | production locality negative controls (unit) | 1 passed: extra member/object, non-chart unknown payload, ZIP metadata |
 | low text-budget and stale-patch controls | passed |
+| zero/exact/cumulative locality fields and allocation controls | passed |
 | `python3 tools/check_crate_boundaries.py` | pass; 70 packages, 313 declarations, 12 explicit debt items |
 | `python3 tools/iwa_exit_ledger.py --check` | pass; six chart-font rows intentionally host-only |
 | Keynote minimal/full API glossary profiles | pass; 267/266 banned names, 51 families and 51 result contracts each |
