@@ -106,13 +106,13 @@ all-series route. The one-series set leaf wrapper performs a full-family read,
 modifies the selected index, then performs the full-family read-modify-set.
 
 The final source-scoped release Callgrind receipt is outside the repository at
-`/home/zhuhe/code/litchi-worktrees/.coord/iwa-w2c-series-limitunits-perf-62b34bc6f50a662e8fff65cad0d87cdf6e617ee7/`.
-It is bound to source `62b34bc6f50a662e8fff65cad0d87cdf6e617ee7`; its immutable
-ELF is 215,609,448 bytes, mode 0555, SHA-256
-`1fbba5fef9be21ec38db460d494695c7f8585947729a70e2ba016b4db122ef45`; the
+`/home/zhuhe/code/litchi-worktrees/.coord/iwa-w2c-series-typed-errors-perf-babab049dfd5094f9bcc555e4d2beae7799a9fac/`.
+It is bound to source `babab049dfd5094f9bcc555e4d2beae7799a9fac`; its immutable
+ELF is 216,072,352 bytes, mode 0555, SHA-256
+`b13f21e620dc53ce8a70fa01efcc9aecbe6a84395949837fc6f21636ba9f7757`; the
 c063 selected-call validator passed all eight legs. Leaf/host inclusive Ir
-ratios were: full read `0.122123442262`, full set `0.186178674250`, one-series
-read `0.122185980557`, and one-series set `0.156096950500`. These are
+ratios were: full read `0.122133149864`, full set `0.170939816892`, one-series
+read `0.122080924722`, and one-series set `0.143480833832`. These are
 source-scoped instruction diagnostics only: no wall-clock, native, or final
 integrated performance claim is made.
 

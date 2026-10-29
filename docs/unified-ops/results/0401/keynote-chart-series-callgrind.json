@@ -1,9 +1,9 @@
 {
   "schema": "iwa-w2c-keynote-chart-series-callgrind-v1",
-  "source_commit": "62b34bc6f50a662e8fff65cad0d87cdf6e617ee7",
+  "source_commit": "babab049dfd5094f9bcc555e4d2beae7799a9fac",
   "source_clean": true,
-  "binary_sha256": "1fbba5fef9be21ec38db460d494695c7f8585947729a70e2ba016b4db122ef45",
-  "binary_bytes": 215609448,
+  "binary_sha256": "b13f21e620dc53ce8a70fa01efcc9aecbe6a84395949837fc6f21636ba9f7757",
+  "binary_bytes": 216072352,
   "policy": {
     "ratio": "leaf/host inclusive Callgrind Ir",
     "max_ratio": 1.05,
@@ -11,20 +11,20 @@
     "calls_per_side": 2,
     "wall_time_claim": false,
     "native_claim": false,
-    "validator_sha256": "c2fec10a3b61b1d00f18556eb4df75cda46dde69875397fd0d9afd9734ebb3bd"
+    "validator_sha256": "e22ada00b65934f4de5b561767175d4a12537da635e4a051c2b4bf9688f89f0d"
   },
   "receipt": {
-    "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-w2c-series-limitunits-perf-62b34bc6f50a662e8fff65cad0d87cdf6e617ee7/final-capture-receipt-v2.txt",
-    "sha256": "1b810af6ded9d05e4e9aeb28268f73c5507dc969c0a06ca9f604678feeb33a62"
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-w2c-series-typed-errors-perf-babab049dfd5094f9bcc555e4d2beae7799a9fac/final-capture-receipt-v2.txt",
+    "sha256": "7f1d3772d6b0c75b9b7ac8ba8eac7d5ed87df5b298fb6bd4c53bffba7d8de0e5"
   },
   "routes": [
     {
       "id": "full_symbols_read",
       "operation": "get",
       "size": "chart-data-native.key",
-      "host_ir": 436837703,
-      "leaf_ir": 53348124,
-      "ratio": 0.122123442262,
+      "host_ir": 436815648,
+      "leaf_ir": 53349671,
+      "ratio": 0.122133149864,
       "calls_per_side": 2,
       "status": "meets",
       "projection": "leaf all-series read"
@@ -33,9 +33,9 @@
       "id": "full_symbols_set",
       "operation": "set",
       "size": "chart-data-native.key",
-      "host_ir": 1466327049,
-      "leaf_ir": 272998826,
-      "ratio": 0.186178674250,
+      "host_ir": 1466263335,
+      "leaf_ir": 250642786,
+      "ratio": 0.170939816892,
       "calls_per_side": 2,
       "status": "meets",
       "projection": "leaf all-series set"
@@ -44,9 +44,9 @@
       "id": "single_symbol_read",
       "operation": "get",
       "size": "chart-data-native.key",
-      "host_ir": 436665915,
-      "leaf_ir": 53354453,
-      "ratio": 0.122185980557,
+      "host_ir": 436829776,
+      "leaf_ir": 53328583,
+      "ratio": 0.122080924722,
       "calls_per_side": 2,
       "status": "meets",
       "projection": "leaf full-family read then index projection"
@@ -55,9 +55,9 @@
       "id": "single_symbol_set",
       "operation": "set",
       "size": "chart-data-native.key",
-      "host_ir": 1765565433,
-      "leaf_ir": 275599380,
-      "ratio": 0.156096950500,
+      "host_ir": 1765373125,
+      "leaf_ir": 253297208,
+      "ratio": 0.143480833832,
       "calls_per_side": 2,
       "status": "meets",
       "projection": "leaf full-family read-modify-set"
