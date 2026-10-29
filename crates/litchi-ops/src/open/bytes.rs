@@ -213,7 +213,12 @@ fn likely_iwork_package(bytes: &[u8]) -> bool {
     }
 
     let mut iwork = false;
+    let mut observed_entries = 0_u64;
     for entry in archive.entries() {
+        observed_entries = observed_entries.saturating_add(1);
+        if observed_entries > MAX_MARKER_ENTRIES {
+            return false;
+        }
         let Ok(entry) = entry else {
             // A malformed central record is left to the ordinary detector,
             // which owns the typed archive error and precedence behavior.
@@ -423,6 +428,45 @@ mod marker_tests {
             .write_all(b"Index/Document.iwa [Content_Types].xml mimetype")
             .expect("write ZIP member");
         let bytes = writer.finish().expect("finish ZIP").into_inner();
+        assert!(!likely_iwork_package(&bytes));
+    }
+
+    #[test]
+    fn marker_rejects_malformed_central_records() {
+        let mut bytes = archive(&["Index/Document.iwa"]);
+        let central_offset = {
+            let archive = soapberry_zip::ZipArchive::from_slice(&bytes).expect("locate ZIP");
+            usize::try_from(archive.directory_offset()).expect("central offset")
+        };
+        bytes[central_offset] ^= 0xff;
+        assert!(!likely_iwork_package(&bytes));
+    }
+
+    #[test]
+    fn marker_counts_central_records_when_the_eocd_hint_lies() {
+        const RECORDS: usize = 100_001;
+        let source = archive(&["Index/Document.iwa"]);
+        let source_archive = soapberry_zip::ZipArchive::from_slice(&source).expect("locate ZIP");
+        let central_start = usize::try_from(source_archive.directory_offset()).expect("central");
+        let central_end = usize::try_from(source_archive.head_eocd_offset()).expect("eocd");
+        let record = &source[central_start..central_end];
+        let mut bytes = Vec::with_capacity(
+            central_start
+                .saturating_add(record.len().saturating_mul(RECORDS))
+                .saturating_add(22),
+        );
+        bytes.extend_from_slice(&source[..central_start]);
+        for _ in 0..RECORDS {
+            bytes.extend_from_slice(record);
+        }
+        let eocd_start = bytes.len();
+        bytes.extend_from_slice(&source[central_end..]);
+        let central_size = u32::try_from(record.len().saturating_mul(RECORDS)).expect("size");
+        let central_start = u32::try_from(central_start).expect("offset");
+        bytes[eocd_start + 8..eocd_start + 10].copy_from_slice(&0_u16.to_le_bytes());
+        bytes[eocd_start + 10..eocd_start + 12].copy_from_slice(&0_u16.to_le_bytes());
+        bytes[eocd_start + 12..eocd_start + 16].copy_from_slice(&central_size.to_le_bytes());
+        bytes[eocd_start + 16..eocd_start + 20].copy_from_slice(&central_start.to_le_bytes());
         assert!(!likely_iwork_package(&bytes));
     }
 
