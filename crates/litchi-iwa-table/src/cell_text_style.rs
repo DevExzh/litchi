@@ -524,17 +524,35 @@ fn view<'a>(data: &'a [u8], limits: &Limits) -> Result<WireView<'a>, Error> {
     limits.charge_fields(fields.fields())?;
     limits.charge_work(fields.work())?;
     limits.admit_allocations(fields.fields())?;
+    // RawWireFields and WireView each walk the source.  The latter also
+    // materializes source-bound spans, so debit its independent input,
+    // field, and traversal work before invoking the parser.
+    limits.charge_input(data.len())?;
+    limits.charge_fields(fields.fields())?;
+    limits.charge_work(fields.fields())?;
     WireView::parse(data, wire).map_err(map_wire)
+}
+
+fn admit_decoder_view(data_len: usize, fields: usize, limits: &Limits) -> Result<(), Error> {
+    // litchi-iwa-text-wire's private Budget creates another WireView for each
+    // selected message.  Account for that complete pass and its span vector
+    // before the decoder starts.
+    limits.charge_input(data_len)?;
+    limits.charge_fields(fields)?;
+    limits.charge_work(fields)?;
+    limits.admit_allocations(fields)
 }
 
 fn preflight_character_properties(data: &[u8], limits: &Limits) -> Result<WireLimits, Error> {
     let wire = limits.residual_wire()?;
     let root = view(data, limits)?;
+    admit_decoder_view(data.len(), root.len(), limits)?;
     for field in root.fields() {
         if field.number() != 11 || field.wire_type() != 2 {
             continue;
         }
         let properties = view(field.payload(), limits)?;
+        admit_decoder_view(field.payload().len(), properties.len(), limits)?;
         for property in properties.fields() {
             match (property.number(), property.wire_type()) {
                 (5, 2) => {
@@ -547,7 +565,8 @@ fn preflight_character_properties(data: &[u8], limits: &Limits) -> Result<WireLi
                 (7, 2) => {
                     // The decoder descends into each colour message with a
                     // separate bounded view and span allocation.
-                    let _ = view(property.payload(), limits)?;
+                    let color = view(property.payload(), limits)?;
+                    admit_decoder_view(property.payload().len(), color.len(), limits)?;
                 },
                 _ => {},
             }
@@ -559,15 +578,18 @@ fn preflight_character_properties(data: &[u8], limits: &Limits) -> Result<WireLi
 fn preflight_character_parent(data: &[u8], limits: &Limits) -> Result<WireLimits, Error> {
     let wire = limits.residual_wire()?;
     let root = view(data, limits)?;
+    admit_decoder_view(data.len(), root.len(), limits)?;
     for field in root.fields() {
         if field.number() != 1 || field.wire_type() != 2 {
             continue;
         }
         let base = view(field.payload(), limits)?;
+        admit_decoder_view(field.payload().len(), base.len(), limits)?;
         for base_field in base.fields() {
             if base_field.number() == 3 && base_field.wire_type() == 2 {
                 // reference_identifier() performs this source-bound view.
-                let _ = view(base_field.payload(), limits)?;
+                let reference = view(base_field.payload(), limits)?;
+                admit_decoder_view(base_field.payload().len(), reference.len(), limits)?;
                 limits.charge_references(1)?;
             }
         }
@@ -2057,6 +2079,28 @@ mod tests {
             Err(Error::Limit {
                 kind: LimitKind::Fields,
                 maximum: _,
+                ..
+            })
+        ));
+    }
+
+    #[test]
+    fn decoder_and_wire_view_passes_consume_cumulative_limits() {
+        let source = limited_source(1_000_000, 1_000_000);
+        let limits = Limits::from_source(&source).expect("source limits");
+        // For `[8, 1]`, raw scan, WireView, and the text-wire decoder each
+        // consume one field; input/work have headroom so the second call
+        // fails specifically on the cumulative field ledger.
+        limits.remaining_input.set(100);
+        limits.remaining_fields.set(3);
+        limits.remaining_work.set(100);
+        let data = [8, 1];
+        assert!(preflight_character_properties(&data, &limits).is_ok());
+        assert!(matches!(
+            preflight_character_properties(&data, &limits),
+            Err(Error::Limit {
+                kind: LimitKind::Fields,
+                maximum: 0,
                 ..
             })
         ));
