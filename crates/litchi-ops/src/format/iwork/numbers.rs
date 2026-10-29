@@ -648,7 +648,11 @@ pub(crate) fn build_charts(package: &Package, sheet_index: usize) -> Result<supe
         return Ok(tree.build());
     };
     let sheet_item = tree
-        .push(super::tree::ROOT, Kind::Sheet)
+        .push_step(
+            super::tree::ROOT,
+            Kind::Sheet,
+            PathStep::at("sheet", Position::new(sheet_index)),
+        )
         .prop("name", text(Some(sheet.name())))
         .prop("tableCount", count(sheet.table_count()))
         .label(Some(sheet.name()))

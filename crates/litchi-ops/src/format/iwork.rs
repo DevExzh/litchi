@@ -496,7 +496,7 @@ impl Iwork {
         }
     }
 
-    pub(crate) fn checked_chart_tree(&self, selector: ChartPath) -> Result<(u32, &Tree)> {
+    fn checked_chart_tree(&self, selector: ChartPath) -> Result<(u32, &Tree)> {
         let (part, built) = self.checked_chart_built(selector)?;
         Ok((part, &built.tree))
     }

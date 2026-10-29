@@ -738,7 +738,11 @@ pub(crate) fn build_charts(package: &Package, slide_index: usize) -> Result<supe
         return Ok(tree.build());
     };
     let slide = tree
-        .push(ROOT, Kind::Slide)
+        .push_step(
+            ROOT,
+            Kind::Slide,
+            crate::node::PathStep::at("slide", litchi_core::Position::new(slide_index)),
+        )
         .leaf([slide_index, 0, 0, 0])
         .done();
     let drawables = package

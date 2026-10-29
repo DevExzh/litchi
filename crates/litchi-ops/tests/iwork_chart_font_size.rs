@@ -316,15 +316,33 @@ mod keynote {
     fn two_slide_source() -> File {
         let bytes = std::fs::read(fixture("keynote")).expect("read Keynote chart fixture");
         let package = litchi_keynote::Package::from_bytes(&bytes).expect("Keynote leaf source");
+        let layouts = package.slide_layouts().expect("read Keynote layouts");
+        let layout = layouts.first().expect("Keynote layout");
         let mut edit = package.edit_slide_creation();
-        edit.duplicate_slide(
-            litchi_keynote::SlideSelector::index(0),
-            litchi_core::Position::new(1),
-        )
-        .expect("duplicate chart slide");
+        edit.add_slide(layout, litchi_core::Position::new(1))
+            .expect("add second chart slide");
         let package = edit
             .commit()
-            .expect("duplicate chart slide commit")
+            .expect("add second chart slide commit")
+            .into_package();
+        let data = litchi_keynote::ChartData::new(
+            vec![String::from("Row")],
+            vec![String::from("Value")],
+            vec![vec![Some(1.0)]],
+        )
+        .expect("second chart data");
+        let mut charts = package.edit_slide_chart_lifecycle();
+        charts
+            .add(
+                litchi_keynote::SlideSelector::index(1),
+                litchi_keynote::chart::lifecycle::Kind::Column2d,
+                data,
+                litchi_keynote::slide::drawable::Geometry::new(72.0, 72.0, 240.0, 160.0),
+            )
+            .expect("add second-slide chart");
+        let package = charts
+            .commit()
+            .expect("add second-slide chart commit")
             .into_package();
         let mut bytes = Vec::new();
         package
@@ -623,6 +641,22 @@ mod numbers {
         read(fixture("numbers"))
     }
 
+    fn two_sheet_empty_source() -> File {
+        let package = litchi_numbers::Package::new();
+        let package = package
+            .edit_sheet_lifecycle()
+            .add("Sheet 2")
+            .expect("add second Numbers sheet")
+            .commit()
+            .expect("add second Numbers sheet commit")
+            .into_package();
+        let mut bytes = Vec::new();
+        package
+            .write_to(&mut bytes)
+            .expect("write two-sheet Numbers fixture");
+        open_bytes(bytes).expect("open two-sheet Numbers fixture")
+    }
+
     #[inline(never)]
     fn direct_set(source: &[u8]) -> Vec<u8> {
         let package = litchi_numbers::Package::from_bytes(source).expect("Numbers leaf source");
@@ -757,6 +791,15 @@ mod numbers {
             file.get("/sheet[1]/chart[999]").unwrap_err().code(),
             litchi_ops::Code::PathNotFound
         );
+    }
+
+    #[test]
+    fn canonical_chart_path_scopes_numbers_sheet_cache() {
+        let file = two_sheet_empty_source();
+        let fast = file.get("/sheet[2]/chart[1]").unwrap_err().code();
+        let generic = file.get("/sheet[2]/chart[last()]").unwrap_err().code();
+        assert_eq!(fast, litchi_ops::Code::PathNotFound);
+        assert_eq!(generic, litchi_ops::Code::PathNotFound);
     }
 
     #[inline(never)]
