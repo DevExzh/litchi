@@ -701,11 +701,11 @@ fn apply_shared_plan(
     }
     if plan.cell_updates.len() > 1 && !write_shared_keys(working, &plan.cell_updates, limits)? {
         for (target, key) in &plan.cell_updates {
-            write_shared_key(working, *target, *key)?;
+            write_shared_key(working, *target, *key, limits)?;
         }
     } else if plan.cell_updates.len() == 1 {
         let (target, key) = plan.cell_updates[0];
-        write_shared_key(working, target, key)?;
+        write_shared_key(working, target, key, limits)?;
     }
     Ok(())
 }
@@ -826,16 +826,29 @@ fn write_shared_keys(
                     limits.reserve(&mut found_rows, 1).map_err(from_shared)?;
                     found_rows.push(local);
                 }
-            }
-            for (wanted_row, column, _) in rows.iter().filter(|(wanted, _, _)| *wanted == local) {
-                let _ = wanted_row;
+                limits.admit_work(row.len()).map_err(from_shared)?;
                 limits.admit_allocations(1).map_err(from_shared)?;
-                if storage::bnc_cells(row)
-                    .map_err(|_| Error::InvalidSource)?
-                    .into_iter()
-                    .all(|(candidate, _)| candidate != *column)
-                {
-                    return Ok(false);
+                let cells = storage::bnc_cells(row).map_err(|_| Error::InvalidSource)?;
+                let targeted = rows
+                    .iter()
+                    .filter(|(wanted, _, _)| *wanted == local)
+                    .count();
+                limits.admit_allocations(targeted).map_err(from_shared)?;
+                limits.admit_allocations(targeted).map_err(from_shared)?;
+                limits.admit_allocations(2).map_err(from_shared)?;
+                for (_, column, _) in rows.iter().filter(|(wanted, _, _)| *wanted == local) {
+                    let Some((_, cell)) = cells.iter().find(|(candidate, _)| candidate == column)
+                    else {
+                        return Ok(false);
+                    };
+                    limits.admit_work(cell.len()).map_err(from_shared)?;
+                    limits
+                        .admit_allocations(litchi_numbers_wire::MAX_OWNED_BNC_PARSE_ALLOCATIONS)
+                        .map_err(from_shared)?;
+                    limits.admit_copies(cell.len()).map_err(from_shared)?;
+                    limits
+                        .admit_output(cell.len().saturating_add(16))
+                        .map_err(from_shared)?;
                 }
             }
         }
@@ -849,6 +862,13 @@ fn write_shared_keys(
 
     for (tile, rows) in groups {
         let (tile_index, tile_data) = topology::message(working, tile, &[TILE_MESSAGE_TYPE])?;
+        let output_bound = tile_data
+            .len()
+            .saturating_add(rows.len().saturating_mul(16));
+        limits.admit_allocations(1).map_err(from_shared)?;
+        limits.admit_work(tile_data.len()).map_err(from_shared)?;
+        limits.admit_copies(output_bound).map_err(from_shared)?;
+        limits.admit_output(output_bound).map_err(from_shared)?;
         let rewritten = rebuild(tile_data, |field| {
             if field.number != 5 {
                 return Ok(None);
@@ -859,19 +879,8 @@ fn write_shared_keys(
             if !rows.iter().any(|(wanted, _, _)| *wanted == local) {
                 return Ok(None);
             }
-            limits
-                .admit_copies(field.payload.len())
-                .map_err(|_| Fault::Allocation {
-                    amount: field.payload.len(),
-                })?;
-            limits
-                .admit_allocations(1)
-                .map_err(|_| Fault::Allocation { amount: 1 })?;
             let mut row = field.payload.to_vec();
             for (_, column, key) in rows.iter().filter(|(wanted, _, _)| *wanted == local) {
-                limits
-                    .admit_allocations(1)
-                    .map_err(|_| Fault::Allocation { amount: 1 })?;
                 let cell = storage::bnc_cells(&row)
                     .map_err(|_| Fault::Invalid)?
                     .into_iter()
@@ -899,24 +908,55 @@ fn write_shared_key(
     working: &mut Working<'_>,
     target: shared::Target,
     key: u32,
+    transaction_limits: &shared::Limits,
 ) -> Result<(), Error> {
     let (_, model) = topology::message(working, target.model_identifier, &[6_001])?;
     let geometry = topology::geometry(model).map_err(from_topology)?;
-    let store = single_bytes(model, 4)?
-        .ok_or(Error::InvalidSource)?
-        .to_vec();
+    let store = single_bytes(model, 4)?.ok_or(Error::InvalidSource)?;
+    transaction_limits
+        .admit_copies(store.len())
+        .map_err(from_shared)?;
+    transaction_limits
+        .admit_allocations(1)
+        .map_err(from_shared)?;
+    let store = store.to_vec();
     let position = At::new(target.row, target.column);
     let Some(located) = locate_cell(working, &store, position)? else {
         let mut cell = litchi_numbers_wire::BncCell::minimal();
         cell.set_text_style_identifier(Some(key));
         return materialize_cell(working, &store, geometry.columns, position, &cell);
     };
+    transaction_limits
+        .admit_work(located.bytes.len())
+        .map_err(from_shared)?;
+    transaction_limits
+        .admit_allocations(litchi_numbers_wire::MAX_OWNED_BNC_PARSE_ALLOCATIONS)
+        .map_err(from_shared)?;
+    transaction_limits
+        .admit_copies(located.bytes.len())
+        .map_err(from_shared)?;
+    transaction_limits
+        .admit_output(located.bytes.len().saturating_add(16))
+        .map_err(from_shared)?;
     let limits = crate::cell::wire::limits_for_source(&located.bytes);
     let mut cell = litchi_numbers_wire::BncCell::parse(&located.bytes, &limits)
         .map_err(|_| Error::InvalidSource)?;
     cell.set_text_style_identifier(Some(key));
     let encoded = crate::cell::wire::encode(&cell, &limits).map_err(|_| Error::InvalidSource)?;
     let (_, tile_data) = topology::message(working, located.tile, &[TILE_MESSAGE_TYPE])?;
+    let output_bound = tile_data.len().saturating_add(encoded.len());
+    transaction_limits
+        .admit_allocations(2)
+        .map_err(from_shared)?;
+    transaction_limits
+        .admit_work(tile_data.len())
+        .map_err(from_shared)?;
+    transaction_limits
+        .admit_copies(output_bound)
+        .map_err(from_shared)?;
+    transaction_limits
+        .admit_output(output_bound)
+        .map_err(from_shared)?;
     let mut field_index = 0_usize;
     let rewritten = rebuild(tile_data, |field| {
         let this = field_index;

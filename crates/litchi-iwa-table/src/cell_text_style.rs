@@ -393,6 +393,11 @@ impl Limits {
         self.charge_references(amount)
     }
 
+    /// Debit serialized bytes a leaf writer will emit after the shared plan.
+    pub fn admit_output(&self, amount: usize) -> Result<(), Error> {
+        self.charge_output(amount)
+    }
+
     /// Admit `amount` fallible collection allocations before the operation
     /// asks a decoder or publisher to reserve them.
     pub fn admit_allocations(&self, amount: usize) -> Result<(), Error> {
@@ -826,7 +831,12 @@ fn prepare_batch_context(
     }
     let mut styles = Vec::new();
     limits.reserve(&mut styles, keys.len())?;
-    limits.admit_work(keys.len().saturating_mul(keys.len().max(1)))?;
+    limits.charge_work(
+        keys.len()
+            .saturating_mul(keys.len().max(1))
+            .saturating_mul(2),
+    )?;
+    limits.charge_work(keys.len().saturating_mul(style_list.entries.len()))?;
     let mut effective_cache = Vec::new();
     let mut effective_path = BTreeSet::new();
     for key in keys.iter().flatten().copied() {
@@ -839,6 +849,7 @@ fn prepare_batch_context(
             .iter()
             .find(|style: &&BatchStyle| style.parent == parent)
         {
+            limits.admit_character_properties(&cached.inherited)?;
             (cached.inherited.clone(), cached.stylesheet)
         } else {
             (
@@ -1416,7 +1427,9 @@ fn effective_cached(
     path: &mut BTreeSet<u64>,
     depth: usize,
 ) -> Result<CharacterProperties, Error> {
+    limits.charge_work(cache.len().saturating_add(1))?;
     if let Some((_, properties)) = cache.iter().find(|(identifier, _)| *identifier == style) {
+        limits.admit_character_properties(properties)?;
         return Ok(properties.clone());
     }
     if depth >= limits.max_style_depth {
@@ -1503,13 +1516,14 @@ pub fn read_many(
     limits.reserve(&mut output, targets.len())?;
     for (index, target) in targets.iter().copied().enumerate() {
         let properties = if let Some(key) = context.keys[index] {
-            context
+            let inherited = &context
                 .styles
                 .iter()
                 .find(|style| style.key == key)
                 .ok_or(invalid("batch style facts missing"))?
-                .inherited
-                .clone()
+                .inherited;
+            limits.admit_character_properties(inherited)?;
+            inherited.clone()
         } else {
             let field = if target.row < context.table.geometry.header_rows {
                 25
@@ -1788,6 +1802,7 @@ fn plan_set_inner(
         }
     };
     let inherited = if let Some(style) = batch_style {
+        limits.admit_character_properties(&style.inherited)?;
         style.inherited.clone()
     } else {
         effective(source, parent, limits)?
@@ -1826,6 +1841,7 @@ fn plan_set_inner(
         // overlay_properties() clones the current effective font when it
         // builds the desired complete state for an in-place rewrite.
         limits.admit_character_properties(&inherited)?;
+        limits.admit_character_properties(requested)?;
         let desired = overlay_properties(&inherited, requested);
         let reduced = minimal_exact(&desired, &base);
         let data = encode_variation(actual_parent, stylesheet, &reduced, limits)?;
@@ -2143,6 +2159,14 @@ fn plan_set_many_inner(
                     limits.reserve(&mut stylesheet_identifiers, 1)?;
                     stylesheet_identifiers.push((rewrite.identifier, rewrite.message_type));
                 }
+                continue;
+            }
+            // Segment releases are reconstructed once from the immutable
+            // source list below, after all per-cell release counts have been
+            // accumulated.  Keeping the per-cell segment rewrites here would
+            // make a large batch look unsupported merely because two cells
+            // share one segmented list owner.
+            if prepare_batch && rewrite.message_type == LIST_SEGMENT_MESSAGE_TYPE {
                 continue;
             }
             if rewrite.message_type == LIST_MESSAGE_TYPE {
@@ -2640,20 +2664,32 @@ fn encode_stylesheet_batch(
     styles: &[(u64, u64)],
     limits: &Limits,
 ) -> Result<Vec<u8>, Error> {
-    let Some((_, parent)) = styles.first().copied() else {
+    if styles.is_empty() {
         return Err(invalid("empty stylesheet batch"));
-    };
-    if styles.iter().any(|(_, candidate)| *candidate != parent) {
-        return Err(Error::BatchUnsupported);
     }
     let fields = view(data, limits)?;
     let mut last_style = None;
-    let mut parent_entry = None;
+    let mut groups: Vec<(u64, Vec<u64>, Vec<u8>, Option<(usize, usize)>)> = Vec::new();
+    limits.reserve(&mut groups, styles.len())?;
+    for (style, parent) in styles {
+        let Some((_, children, _, _)) = groups.iter_mut().find(|group| group.0 == *parent) else {
+            limits.admit_allocations(2)?;
+            groups.push((*parent, Vec::new(), Vec::new(), None));
+            let (_, children, _, _) = groups.last_mut().ok_or(Error::Allocation { amount: 1 })?;
+            children
+                .try_reserve(1)
+                .map_err(|_| Error::Allocation { amount: 1 })?;
+            children.push(*style);
+            continue;
+        };
+        limits.reserve(children, 1)?;
+        children.push(*style);
+    }
     for (index, field) in fields.fields().enumerate() {
         if field.number() == 1 {
             last_style = Some(index);
         }
-        if field.number() != 5 || parent_entry.is_some() {
+        if field.number() != 5 || field.wire_type() != 2 {
             continue;
         }
         let nested = view(field.payload(), limits)?;
@@ -2663,28 +2699,34 @@ fn encode_stylesheet_batch(
             .map(|inner| varint(inner.payload(), 1, limits))
             .transpose()?
             .flatten();
-        if candidate == Some(parent) {
-            parent_entry = Some((index, field.payload().len()));
+        if let Some(parent) = candidate {
+            if let Some(group) = groups.iter_mut().find(|group| group.0 == parent) {
+                if group.3.replace((index, field.payload().len())).is_some() {
+                    return Err(invalid("stylesheet parent repeats"));
+                }
+            }
         }
     }
 
-    let mut added_children = Vec::new();
-    limits.admit_allocations(1)?;
-    limits.admit_allocations(styles.len())?;
-    added_children
-        .try_reserve(styles.len().saturating_mul(16))
-        .map_err(|_| Error::Allocation {
-            amount: styles.len().saturating_mul(16),
-        })?;
-    for (style, _) in styles {
-        let mut reference = Vec::new();
-        reference
-            .try_reserve(16)
-            .map_err(|_| Error::Allocation { amount: 16 })?;
-        let mut encoded = [0_u8; 10];
-        let value = litchi_iwa_common::varint::encode_varint_to_buffer(*style, &mut encoded);
-        append_raw_field(&mut reference, 1, 0, value);
-        append_raw_field(&mut added_children, 2, 2, &reference);
+    for group in &mut groups {
+        limits.admit_allocations(1)?;
+        group
+            .2
+            .try_reserve(group.1.len().saturating_mul(16))
+            .map_err(|_| Error::Allocation {
+                amount: group.1.len().saturating_mul(16),
+            })?;
+        for style in &group.1 {
+            let mut reference = Vec::new();
+            limits.admit_allocations(1)?;
+            reference
+                .try_reserve(16)
+                .map_err(|_| Error::Allocation { amount: 16 })?;
+            let mut encoded = [0_u8; 10];
+            let value = litchi_iwa_common::varint::encode_varint_to_buffer(*style, &mut encoded);
+            append_raw_field(&mut reference, 1, 0, value);
+            append_raw_field(&mut group.2, 2, 2, &reference);
+        }
     }
     let mut added_styles = Vec::new();
     limits.reserve(&mut added_styles, styles.len())?;
@@ -2703,42 +2745,53 @@ fn encode_stylesheet_batch(
         .iter()
         .map(|reference| bytes_bound(1, reference.len()))
         .sum::<usize>();
-    let parent_delta = if let Some((index, payload_len)) = parent_entry {
-        let field = fields
-            .get(index)
-            .ok_or(invalid("stylesheet field missing"))?;
-        bytes_bound(5, payload_len.saturating_add(added_children.len()))
-            .saturating_sub(field.raw().len())
-    } else {
-        let mut parent_reference = Vec::new();
-        let mut encoded = [0_u8; 10];
-        let value = litchi_iwa_common::varint::encode_varint_to_buffer(parent, &mut encoded);
-        append_raw_field(&mut parent_reference, 1, 0, value);
-        bytes_bound(
-            5,
-            parent_reference.len().saturating_add(added_children.len()),
-        )
-    };
+    let mut parent_delta = 0_usize;
+    for (parent, _, children, entry) in &groups {
+        if let Some((index, payload_len)) = entry {
+            let field = fields
+                .get(*index)
+                .ok_or(invalid("stylesheet field missing"))?;
+            parent_delta = parent_delta.saturating_add(
+                bytes_bound(5, payload_len.saturating_add(children.len()))
+                    .saturating_sub(field.raw().len()),
+            );
+        } else {
+            let parent_reference_len =
+                litchi_iwa_common::varint::encoded_len(u64::from(1_u32) << 3)
+                    .saturating_add(litchi_iwa_common::varint::encoded_len(*parent));
+            parent_delta = parent_delta.saturating_add(bytes_bound(
+                5,
+                parent_reference_len.saturating_add(children.len()),
+            ));
+        }
+    }
     let output_len = data
         .len()
         .saturating_add(style_bytes)
         .saturating_add(parent_delta);
     let _wire = limits.prepare_output(output_len)?;
-    limits.charge_fields(styles.len().saturating_mul(2))?;
-    limits.charge_work(styles.len().saturating_mul(2))?;
+    limits.charge_fields(styles.len().saturating_mul(2).saturating_add(groups.len()))?;
+    limits.charge_work(styles.len().saturating_mul(2).saturating_add(groups.len()))?;
     let mut output = Vec::new();
     output
         .try_reserve_exact(output_len)
         .map_err(|_| Error::Allocation { amount: output_len })?;
     for (index, field) in fields.fields().enumerate() {
-        if let Some((selected, _)) = parent_entry {
-            if selected == index {
-                let mut payload = field.payload().to_vec();
-                payload.extend_from_slice(&added_children);
-                append_raw_field(&mut output, 5, 2, &payload);
-            } else {
-                output.extend_from_slice(field.raw());
-            }
+        let group = groups
+            .iter()
+            .find(|group| group.3.is_some_and(|(selected, _)| selected == index));
+        if let Some((_, _, children, _)) = group {
+            limits.admit_allocations(1)?;
+            limits.admit_copies(field.payload().len())?;
+            let mut payload = Vec::new();
+            payload
+                .try_reserve(field.payload().len().saturating_add(children.len()))
+                .map_err(|_| Error::Allocation {
+                    amount: field.payload().len().saturating_add(children.len()),
+                })?;
+            payload.extend_from_slice(field.payload());
+            payload.extend_from_slice(children);
+            append_raw_field(&mut output, 5, 2, &payload);
         } else {
             output.extend_from_slice(field.raw());
         }
@@ -2753,12 +2806,21 @@ fn encode_stylesheet_batch(
             append_raw_field(&mut output, 1, 2, reference);
         }
     }
-    if parent_entry.is_none() {
+    for (parent, _, children, entry) in &groups {
+        if entry.is_some() {
+            continue;
+        }
+        limits.admit_allocations(1)?;
         let mut parent_reference = Vec::new();
+        parent_reference
+            .try_reserve(16_usize.saturating_add(children.len()))
+            .map_err(|_| Error::Allocation {
+                amount: 16_usize.saturating_add(children.len()),
+            })?;
         let mut encoded = [0_u8; 10];
-        let value = litchi_iwa_common::varint::encode_varint_to_buffer(parent, &mut encoded);
+        let value = litchi_iwa_common::varint::encode_varint_to_buffer(*parent, &mut encoded);
         append_raw_field(&mut parent_reference, 1, 0, value);
-        parent_reference.extend_from_slice(&added_children);
+        parent_reference.extend_from_slice(children);
         append_raw_field(&mut output, 5, 2, &parent_reference);
     }
     Ok(output)
