@@ -54,6 +54,15 @@ pub trait Components {
     fn component(&self, index: usize) -> Option<(&str, &Archive)>;
 }
 
+/// Resource dimensions owned by graph-level bounded allocation adapters.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum GraphLimitKind {
+    /// Temporary scratch bytes reserved by a graph rewrite.
+    ScratchBytes,
+    /// Fallible allocation events admitted by a graph rewrite.
+    AllocationEvents,
+}
+
 impl Components for [(String, Archive)] {
     fn count(&self) -> usize {
         self.len()
@@ -85,6 +94,16 @@ pub enum Error {
     Wire(litchi_iwa_common::Error),
     /// A chart style codec failed.
     Codec(litchi_iwa_protos::chart_style_codec::Error),
+    /// A graph adapter exhausted a resource that the wire layer does not
+    /// model (for example scratch capacity or allocation events).
+    Limit {
+        /// Resource dimension.
+        kind: GraphLimitKind,
+        /// Attempted aggregate consumption.
+        observed: usize,
+        /// Configured maximum.
+        maximum: usize,
+    },
     /// A package metadata registry rewrite failed.
     Registry(RewriteError),
     /// Object `0` is missing (or the edit names no object).
@@ -103,6 +122,11 @@ impl fmt::Display for Error {
             Self::Archive(error) => write!(formatter, "IWA archive: {error}"),
             Self::Wire(error) => write!(formatter, "IWA wire: {error}"),
             Self::Codec(error) => write!(formatter, "chart style codec: {error}"),
+            Self::Limit {
+                kind,
+                observed,
+                maximum,
+            } => write!(formatter, "graph {kind:?} limit: {observed} > {maximum}"),
             Self::Registry(error) => write!(formatter, "package metadata: {error}"),
             Self::MissingObject(identifier) => write!(formatter, "object {identifier} is missing"),
             Self::AmbiguousObject(identifier) => {
@@ -144,7 +168,7 @@ impl From<RewriteError> for Error {
 pub type Result<T> = std::result::Result<T, Error>;
 
 /// A member the edit creates.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 #[non_exhaustive]
 pub struct Insertion {
     /// The new member name.
@@ -193,6 +217,7 @@ pub struct Workspace<'s> {
     /// `(component, object, message)` of the registry payload.
     registry: Option<(usize, u64, usize)>,
     uuid_seed: u64,
+    source_work: usize,
 }
 
 impl fmt::Debug for Workspace<'_> {
@@ -217,10 +242,12 @@ impl<'s> Workspace<'s> {
         let mut index = HashMap::new();
         let mut ambiguous = HashSet::new();
         let mut registry = None;
+        let mut source_objects = 0usize;
         for position in 0..source.count() {
             let (name, archive) = source
                 .component(position)
                 .ok_or(Error::Invalid("a component vanished"))?;
+            source_objects = source_objects.saturating_add(archive.objects.len());
             for object in &archive.objects {
                 let identifier = object
                     .archive_info
@@ -245,6 +272,10 @@ impl<'s> Workspace<'s> {
                 }
             }
         }
+        // Workspace construction already owns the parsed component bytes;
+        // charge the bounded index census by component/object visits rather
+        // than re-billing every borrowed payload byte to each style read.
+        let source_work = source.count().saturating_add(source_objects);
         Ok(Self {
             source,
             limits,
@@ -255,6 +286,7 @@ impl<'s> Workspace<'s> {
             ambiguous,
             registry,
             uuid_seed: 0,
+            source_work,
         })
     }
 
@@ -262,6 +294,32 @@ impl<'s> Workspace<'s> {
     #[must_use]
     pub const fn limits(&self) -> Limits {
         self.limits
+    }
+
+    /// Clone the mutable graph staging state so a caller can publish no
+    /// partial changes when a later admission fails.
+    pub(crate) fn fork(&self) -> Self {
+        Self {
+            source: self.source,
+            limits: self.limits,
+            changed: self.changed.clone(),
+            created: self.created.clone(),
+            deleted: self.deleted.clone(),
+            index: self.index.clone(),
+            ambiguous: self.ambiguous.clone(),
+            registry: self.registry,
+            uuid_seed: self.uuid_seed,
+            source_work: self.source_work,
+        }
+    }
+
+    /// Estimate the bounded traversal and metadata work performed while the
+    /// workspace indexes its source components.  Format owners charge this
+    /// before invoking a style engine so the graph scan cannot escape the
+    /// engine's operation budget.
+    #[must_use]
+    pub(crate) fn source_work(&self) -> usize {
+        self.source_work
     }
 
     /// Finish the edit.
@@ -395,6 +453,14 @@ impl<'s> Workspace<'s> {
             .map(Location::Source)
             .chain((0..self.created.len()).map(Location::Created))
             .collect()
+    }
+
+    /// Borrow live component locations without allocating a collection.
+    pub(crate) fn locations_iter(&self) -> impl Iterator<Item = Location> + '_ {
+        (0..self.source.count())
+            .filter(|position| !self.deleted.contains(position))
+            .map(Location::Source)
+            .chain((0..self.created.len()).map(Location::Created))
     }
 
     /// `(message index, payload)` of the unique `message_type` payload of
@@ -691,6 +757,20 @@ impl<'s> Workspace<'s> {
             }
         }
         Ok(found)
+    }
+
+    /// Upper bound for one package-registry inspection used by adapters that
+    /// need to resolve a component repeatedly during a bounded graph walk.
+    pub(crate) fn registry_inspection_work(&self) -> usize {
+        self.registry_payload()
+            .ok()
+            .flatten()
+            .map_or(0, <[u8]>::len)
+    }
+
+    /// The current registry payload extent used by a bounded metadata plan.
+    pub(crate) fn registry_payload_len(&self) -> Result<usize> {
+        Ok(self.registry_payload()?.map_or(0, <[u8]>::len))
     }
 
     /// The effective locator of current component `component`.

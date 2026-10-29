@@ -5,6 +5,9 @@
 
 #![cfg(feature = "pages")]
 
+use std::collections::BTreeMap;
+use std::io::{Cursor, Read};
+
 use litchi_core::FileFormat;
 use litchi_ops::capabilities::{Capabilities, Verb};
 use litchi_ops::{Code, File, NewNode, Placement, create, open, open_bytes, props};
@@ -39,6 +42,44 @@ fn prop(file: &File, path: &str, key: &str) -> Option<String> {
 
 fn reopen(file: &File) -> File {
     open_bytes(file.to_bytes().expect("publish")).expect("reopen")
+}
+
+fn zip_members(bytes: &[u8]) -> BTreeMap<String, Vec<u8>> {
+    let mut archive = zip::ZipArchive::new(Cursor::new(bytes)).expect("zip");
+    (0..archive.len())
+        .map(|index| {
+            let mut entry = archive.by_index(index).expect("entry");
+            let mut bytes = Vec::new();
+            entry.read_to_end(&mut bytes).expect("entry bytes");
+            (entry.name().to_owned(), bytes)
+        })
+        .collect()
+}
+
+fn pages_comment_input() -> File {
+    // The tracked Pages table fixture has the required table topology but no
+    // root comment.  Author one through the leaf's semantic transaction so
+    // the unified test exercises a populated, reply-free source; host-vs-leaf
+    // differential coverage remains in the iWork parity cases.
+    let source = std::fs::read(fixture("pages/body-table-cells-native.pages"))
+        .expect("read Pages comment source");
+    let package = litchi_pages::Package::from_bytes(&source).expect("open Pages source");
+    let commit = package
+        .edit_body_table_cell_comment(
+            litchi_pages::BodyTableSelector::index(0),
+            litchi_pages::table::format::At::new(1, 1),
+        )
+        .expect("select Pages comment cell")
+        .set("D7 native Pages root")
+        .expect("author Pages root")
+        .commit()
+        .expect("commit Pages root");
+    let mut bytes = Vec::new();
+    commit
+        .package()
+        .write_to(&mut bytes)
+        .expect("serialize Pages comment source");
+    open_bytes(bytes).expect("open authored Pages source")
 }
 
 fn paragraphs(file: &File) -> Vec<String> {
@@ -217,6 +258,472 @@ fn tables_read_cells_and_remove() {
         .parse()
         .expect("count");
     assert_eq!(left + 1, tables.parse::<usize>().expect("count"));
+}
+
+#[test]
+fn body_table_cell_comments_round_trip_through_the_unified_route() {
+    let file = pages_comment_input();
+    let cell = file
+        .query("tc")
+        .expect("query")
+        .filter_map(|node| node.ok())
+        .find(|node| {
+            let path = node.path().to_string();
+            prop(&file, &path, "comment").is_some()
+        })
+        .expect("a native cell comment")
+        .path()
+        .to_string();
+    let original = file.to_bytes().expect("source bytes");
+    let existing = prop(&file, &cell, "comment").expect("comment text");
+
+    // A repeated root-comment write is an exact no-op, including the ZIP.
+    let same = file
+        .set(&cell, props! { "comment" => existing.as_str() })
+        .expect("same comment");
+    assert_eq!(same.to_bytes().expect("same bytes"), original);
+
+    let commit = file
+        .edit(|tx| tx.set(&cell, props! { "comment" => "D7 unified Pages root" }))
+        .expect("set comment");
+    let edited = reopen(commit.file());
+    assert_eq!(
+        prop(&edited, &cell, "comment").as_deref(),
+        Some("D7 unified Pages root")
+    );
+
+    // Null is the canonical clear operation.  The inverse is source-bound
+    // and restores the exact package, including untouched comment metadata.
+    let cleared = edited
+        .set(&cell, props! { "comment" => litchi_ops::PropValue::Null })
+        .expect("clear comment");
+    assert_eq!(prop(&reopen(&cleared), &cell, "comment"), None);
+    let restored = commit
+        .patch()
+        .inverse()
+        .apply(commit.file())
+        .expect("inverse");
+    assert_eq!(restored.to_bytes().expect("inverse bytes"), original);
+
+    // A selector outside the table is a terminal focused-route refusal.
+    let error = file
+        .set(
+            "/body/tbl[999]/tr[1]/tc[1]",
+            props! { "comment" => "must refuse" },
+        )
+        .expect_err("missing table");
+    assert_eq!(error.code(), Code::PathNotFound);
+
+    // The source handle and an unrelated cell remain unchanged.
+    assert_eq!(file.to_bytes().expect("source unchanged"), original);
+    let other = file
+        .query("tc")
+        .expect("query")
+        .filter_map(|node| node.ok())
+        .map(|node| node.path().to_string())
+        .find(|path| path != &cell)
+        .expect("another cell");
+    assert_eq!(
+        prop(&edited, &other, "text"),
+        prop(&file, &other, "text"),
+        "comment write stays local"
+    );
+}
+
+#[test]
+fn pages_cell_comment_schema_is_clearable() {
+    let property = litchi_ops::schema(FileFormat::Pages)
+        .element("cell")
+        .expect("cell schema")
+        .property("comment")
+        .expect("comment schema");
+    assert!(property.get());
+    assert!(property.set());
+    assert!(property.clearable());
+    assert!(!property.add());
+}
+
+#[test]
+fn body_table_cell_comment_creates_a_root_from_a_rootless_file_cell() {
+    let file = read("pages/body-table-cells-native.pages");
+    let cell = "/body/tbl[1]/tr[2]/tc[2]";
+    assert_eq!(prop(&file, cell, "comment"), None);
+    let original = file.to_bytes().expect("source bytes");
+    let added = file
+        .set(cell, props! { "comment" => "D7 Pages created root" })
+        .expect("create root comment");
+    assert_eq!(
+        prop(&reopen(&added), cell, "comment").as_deref(),
+        Some("D7 Pages created root")
+    );
+    let commit = file
+        .edit(|tx| tx.set(cell, props! { "comment" => "D7 Pages inverse root" }))
+        .expect("create root in a transaction");
+    let restored = commit
+        .patch()
+        .inverse()
+        .apply(commit.file())
+        .expect("inverse root creation");
+    assert_eq!(restored.to_bytes().expect("inverse bytes"), original);
+}
+
+#[test]
+fn body_table_cell_comment_fast_path_keeps_typed_refusals_and_source_bytes() {
+    let file = read("pages/body-table-cells-native.pages");
+    let cell = "/body/tbl[1]/tr[2]/tc[2]";
+    let original = file.to_bytes().expect("source bytes");
+    let invalid_value = file
+        .set(
+            cell,
+            props! { "comment" => litchi_ops::PropValue::from(vec![String::from("not text")]) },
+        )
+        .expect_err("numeric comment is invalid");
+    assert_eq!(invalid_value.code(), Code::InvalidValue);
+    let out_of_range = file
+        .set(
+            "/body/tbl[1]/tr[999]/tc[1]",
+            props! { "comment" => "must refuse" },
+        )
+        .expect_err("out-of-range comment cell");
+    assert_eq!(out_of_range.code(), Code::InvalidInput);
+    assert_eq!(file.to_bytes().expect("source unchanged"), original);
+}
+
+#[test]
+fn body_table_cell_comment_stale_recipient_and_batch_proofs_are_terminal_and_local() {
+    let file = read("pages/body-table-comment-hidden-native-saved.pages");
+    let populated = "/body/tbl[1]/tr[2]/tc[2]";
+    let first = "/body/tbl[1]/tr[1]/tc[1]";
+    let second = "/body/tbl[1]/tr[1]/tc[2]";
+    assert!(prop(&file, populated, "comment").is_some());
+    assert!(prop(&file, first, "comment").is_none());
+    assert!(prop(&file, second, "comment").is_none());
+    let original = file.to_bytes().expect("source bytes");
+
+    let left = file
+        .edit(|tx| tx.set(first, props! { "comment" => "D7 stale left" }))
+        .expect("left edit");
+    let right = file
+        .edit(|tx| tx.set(first, props! { "comment" => "D7 stale right" }))
+        .expect("right edit");
+    let recipient = right.file().to_bytes().expect("recipient bytes");
+    let stale = left
+        .patch()
+        .apply(right.file())
+        .expect_err("stale patch recipient");
+    assert_eq!(stale.code(), Code::InvalidInput);
+    assert_eq!(
+        right.file().to_bytes().expect("recipient unchanged"),
+        recipient
+    );
+
+    let invalid = file
+        .edit(|tx| {
+            tx.set(first, props! { "comment" => "must not publish" })?;
+            tx.set(
+                "/body/tbl[999]/tr[1]/tc[1]",
+                props! { "comment" => "must refuse" },
+            )
+        })
+        .expect_err("batch failure is atomic");
+    assert_eq!(invalid.code(), Code::PathNotFound);
+    assert_eq!(file.to_bytes().expect("source unchanged"), original);
+
+    let before_comment = litchi_pages::Package::from_bytes(&original)
+        .expect("leaf source")
+        .body_table_cell_comment(
+            litchi_pages::BodyTableSelector::index(0),
+            litchi_pages::table::format::At::new(1, 1),
+        )
+        .expect("untouched comment read")
+        .expect("untouched comment");
+    let batch = file
+        .edit(|tx| {
+            tx.set(first, props! { "comment" => "D7 batch one" })?;
+            tx.set(second, props! { "comment" => "D7 batch two" })
+        })
+        .expect("multi-cell batch");
+    let reopened = reopen(batch.file());
+    assert_eq!(
+        prop(&reopened, first, "comment").as_deref(),
+        Some("D7 batch one")
+    );
+    assert_eq!(
+        prop(&reopened, second, "comment").as_deref(),
+        Some("D7 batch two")
+    );
+    let after_bytes = reopened.to_bytes().expect("batch bytes");
+    let after_comment = litchi_pages::Package::from_bytes(&after_bytes)
+        .expect("reopen leaf")
+        .body_table_cell_comment(
+            litchi_pages::BodyTableSelector::index(0),
+            litchi_pages::table::format::At::new(1, 1),
+        )
+        .expect("untouched comment reread")
+        .expect("untouched comment after batch");
+    assert_eq!(after_comment, before_comment, "untouched metadata/replies");
+    let before_members = zip_members(&original);
+    let after_members = zip_members(&after_bytes);
+    assert_eq!(
+        before_members.get("preview.jpg"),
+        after_members.get("preview.jpg"),
+        "untouched package member"
+    );
+}
+
+const PAGES_COMMENT_CELL: &str = "/body/tbl[1]/tr[2]/tc[2]";
+
+fn pages_probe_source(name: &str) -> Vec<u8> {
+    std::fs::read(fixture(name)).expect("probe source")
+}
+
+#[inline(never)]
+fn unified_pages_comment_read_impl(source: &[u8]) -> Option<String> {
+    prop(
+        &open_bytes(source.to_vec()).expect("unified Pages source"),
+        PAGES_COMMENT_CELL,
+        "comment",
+    )
+}
+
+#[inline(never)]
+fn direct_pages_comment_read_impl(source: &[u8]) -> Option<String> {
+    litchi_pages::Package::from_bytes(source)
+        .expect("direct Pages source")
+        .body_table_cell_comment(
+            litchi_pages::BodyTableSelector::index(0),
+            litchi_pages::table::format::At::new(1, 1),
+        )
+        .expect("direct Pages comment read")
+        .map(|comment| comment.text().to_owned())
+}
+
+#[inline(never)]
+fn unified_pages_comment_create_impl(source: &[u8]) -> Vec<u8> {
+    open_bytes(source.to_vec())
+        .expect("unified Pages source")
+        .set(
+            PAGES_COMMENT_CELL,
+            props! { "comment" => "D7 Pages measured create" },
+        )
+        .expect("unified Pages create")
+        .to_bytes()
+        .expect("unified Pages bytes")
+}
+
+#[inline(never)]
+fn direct_pages_comment_create_impl(source: &[u8]) -> Vec<u8> {
+    let commit = litchi_pages::Package::from_bytes(source)
+        .expect("direct Pages source")
+        .edit_body_table_cell_comment(
+            litchi_pages::BodyTableSelector::index(0),
+            litchi_pages::table::format::At::new(1, 1),
+        )
+        .expect("direct Pages target")
+        .set("D7 Pages measured create")
+        .expect("direct Pages create")
+        .commit()
+        .expect("direct Pages commit");
+    let mut bytes = Vec::new();
+    commit
+        .package()
+        .write_to(&mut bytes)
+        .expect("direct Pages bytes");
+    bytes
+}
+
+#[inline(never)]
+fn unified_pages_comment_replace_impl(source: &[u8]) -> Vec<u8> {
+    open_bytes(source.to_vec())
+        .expect("unified Pages source")
+        .set(
+            PAGES_COMMENT_CELL,
+            props! { "comment" => "D7 Pages measured replace" },
+        )
+        .expect("unified Pages replace")
+        .to_bytes()
+        .expect("unified Pages bytes")
+}
+
+#[inline(never)]
+fn direct_pages_comment_replace_impl(source: &[u8]) -> Vec<u8> {
+    let commit = litchi_pages::Package::from_bytes(source)
+        .expect("direct Pages source")
+        .edit_body_table_cell_comment(
+            litchi_pages::BodyTableSelector::index(0),
+            litchi_pages::table::format::At::new(1, 1),
+        )
+        .expect("direct Pages target")
+        .set("D7 Pages measured replace")
+        .expect("direct Pages replace")
+        .commit()
+        .expect("direct Pages commit");
+    let mut bytes = Vec::new();
+    commit
+        .package()
+        .write_to(&mut bytes)
+        .expect("direct Pages bytes");
+    bytes
+}
+
+#[inline(never)]
+fn unified_pages_comment_clear_impl(source: &[u8]) -> Vec<u8> {
+    open_bytes(source.to_vec())
+        .expect("unified Pages source")
+        .set(
+            PAGES_COMMENT_CELL,
+            props! { "comment" => litchi_ops::PropValue::Null },
+        )
+        .expect("unified Pages clear")
+        .to_bytes()
+        .expect("unified Pages bytes")
+}
+
+#[inline(never)]
+fn direct_pages_comment_clear_impl(source: &[u8]) -> Vec<u8> {
+    let commit = litchi_pages::Package::from_bytes(source)
+        .expect("direct Pages source")
+        .edit_body_table_cell_comment(
+            litchi_pages::BodyTableSelector::index(0),
+            litchi_pages::table::format::At::new(1, 1),
+        )
+        .expect("direct Pages target")
+        .clear()
+        .expect("direct Pages clear")
+        .commit()
+        .expect("direct Pages commit");
+    let mut bytes = Vec::new();
+    commit
+        .package()
+        .write_to(&mut bytes)
+        .expect("direct Pages bytes");
+    bytes
+}
+
+#[inline(never)]
+fn unified_pages_comment_read_route(source: &[u8]) -> Option<String> {
+    unified_pages_comment_read_impl(source)
+}
+
+#[inline(never)]
+fn direct_pages_comment_read_route(source: &[u8]) -> Option<String> {
+    direct_pages_comment_read_impl(source)
+}
+
+#[inline(never)]
+fn unified_pages_comment_create_route(source: &[u8]) -> Vec<u8> {
+    unified_pages_comment_create_impl(source)
+}
+
+#[inline(never)]
+fn direct_pages_comment_create_route(source: &[u8]) -> Vec<u8> {
+    direct_pages_comment_create_impl(source)
+}
+
+#[inline(never)]
+fn unified_pages_comment_replace_route(source: &[u8]) -> Vec<u8> {
+    unified_pages_comment_replace_impl(source)
+}
+
+#[inline(never)]
+fn direct_pages_comment_replace_route(source: &[u8]) -> Vec<u8> {
+    direct_pages_comment_replace_impl(source)
+}
+
+#[inline(never)]
+fn unified_pages_comment_clear_route(source: &[u8]) -> Vec<u8> {
+    unified_pages_comment_clear_impl(source)
+}
+
+#[inline(never)]
+fn direct_pages_comment_clear_route(source: &[u8]) -> Vec<u8> {
+    direct_pages_comment_clear_impl(source)
+}
+
+fn pages_comment_route_check(
+    source: &[u8],
+    unified: fn(&[u8]) -> Vec<u8>,
+    direct: fn(&[u8]) -> Vec<u8>,
+    warmup_unified: fn(&[u8]) -> Vec<u8>,
+    warmup_direct: fn(&[u8]) -> Vec<u8>,
+) {
+    let expected = warmup_direct(source);
+    assert_eq!(warmup_unified(source), expected, "unified/direct output");
+    let output = unified(source);
+    assert_eq!(output, expected, "Pages ABBA output");
+    std::hint::black_box(output);
+    let output = direct(source);
+    assert_eq!(output, expected, "Pages ABBA output");
+    std::hint::black_box(output);
+    let output = direct(source);
+    assert_eq!(output, expected, "Pages ABBA output");
+    std::hint::black_box(output);
+    let output = unified(source);
+    assert_eq!(output, expected, "Pages ABBA output");
+    std::hint::black_box(output);
+}
+
+#[test]
+#[ignore = "release callgrind ABBA probe; run explicitly"]
+fn pages_comment_read_full_file_cost_abba() {
+    let source = pages_probe_source("pages/body-table-comment-hidden-native-saved.pages");
+    let expected = direct_pages_comment_read_impl(&source);
+    assert_eq!(unified_pages_comment_read_impl(&source), expected);
+    assert_eq!(
+        source,
+        pages_probe_source("pages/body-table-comment-hidden-native-saved.pages")
+    );
+    let output = unified_pages_comment_read_route(&source);
+    assert_eq!(output, expected, "Pages read ABBA output");
+    std::hint::black_box(output);
+    let output = direct_pages_comment_read_route(&source);
+    assert_eq!(output, expected, "Pages read ABBA output");
+    std::hint::black_box(output);
+    let output = direct_pages_comment_read_route(&source);
+    assert_eq!(output, expected, "Pages read ABBA output");
+    std::hint::black_box(output);
+    let output = unified_pages_comment_read_route(&source);
+    assert_eq!(output, expected, "Pages read ABBA output");
+    std::hint::black_box(output);
+}
+
+#[test]
+#[ignore = "release callgrind ABBA probe; run explicitly"]
+fn pages_comment_create_full_file_cost_abba() {
+    let source = pages_probe_source("pages/body-table-cells-native.pages");
+    pages_comment_route_check(
+        &source,
+        unified_pages_comment_create_route,
+        direct_pages_comment_create_route,
+        unified_pages_comment_create_impl,
+        direct_pages_comment_create_impl,
+    );
+}
+
+#[test]
+#[ignore = "release callgrind ABBA probe; run explicitly"]
+fn pages_comment_replace_full_file_cost_abba() {
+    let source = pages_comment_input().to_bytes().expect("root-only source");
+    pages_comment_route_check(
+        &source,
+        unified_pages_comment_replace_route,
+        direct_pages_comment_replace_route,
+        unified_pages_comment_replace_impl,
+        direct_pages_comment_replace_impl,
+    );
+}
+
+#[test]
+#[ignore = "release callgrind ABBA probe; run explicitly"]
+fn pages_comment_clear_full_file_cost_abba() {
+    let source = pages_comment_input().to_bytes().expect("root-only source");
+    pages_comment_route_check(
+        &source,
+        unified_pages_comment_clear_route,
+        direct_pages_comment_clear_route,
+        unified_pages_comment_clear_impl,
+        direct_pages_comment_clear_impl,
+    );
 }
 
 #[test]

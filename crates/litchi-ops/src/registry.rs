@@ -115,6 +115,14 @@ impl Admission {
         clear: false,
         gap: None,
     };
+
+    /// Mark a writable property as accepting `null` to clear its value.
+    pub(crate) const fn clearable(self) -> Self {
+        Self {
+            clear: true,
+            ..self
+        }
+    }
 }
 
 /// A registry alias with the canonical property name it resolves to.

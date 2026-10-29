@@ -34,7 +34,9 @@ use super::write::{
     Chain, Commit, LeafPatch, bound, element_refusal, finish, key_refusal, leaf_refusal, refusal,
     resolve,
 };
-use super::{Flavor, Iwork, LeafError, Node, Owner, TreeBuilder, element, writable};
+use super::{
+    Flavor, Iwork, LeafError, Node, Owner, TreeBuilder, clearable_writable, element, writable,
+};
 use crate::Result;
 use crate::error::Code;
 use crate::new_node::NewNode;
@@ -138,6 +140,7 @@ const ROW_PROPS: &[PropSpec] = &[PropSpec::new("cellCount", ValueType::Int)];
 
 const CELL_PROPS: &[PropSpec] = &[
     writable("text", ValueType::Text),
+    clearable_writable("comment", ValueType::Text),
     PropSpec::new("type", ValueType::Text),
     {
         let mut spec = PropSpec::new("value", ValueType::Scalar);
@@ -380,6 +383,7 @@ pub(crate) enum Patch {
     Metadata(litchi_pages::metadata::Patch),
     TextStyle(litchi_pages::section::text_style::Patch),
     TableValues(litchi_pages::table::values::Patch),
+    TableComments(litchi_pages::table::comments::Patch),
     SectionLifecycle(litchi_pages::section::lifecycle::Patch),
     TableDeletion(
         #[allow(
@@ -404,6 +408,7 @@ impl Patch {
             Self::Metadata(patch) => patch.is_noop(),
             Self::TextStyle(patch) => patch.is_noop(),
             Self::TableValues(patch) => patch.is_noop(),
+            Self::TableComments(patch) => patch.is_noop(),
             Self::SectionLifecycle(patch) => patch.is_noop(),
             Self::TableDeletion(_) => false,
             Self::TableCreation(patch) => patch.is_noop(),
@@ -608,11 +613,19 @@ pub(crate) fn build_table(
     let rows = usize::try_from(read.row_count()).unwrap_or(usize::MAX);
     let columns = usize::try_from(read.column_count()).unwrap_or(usize::MAX);
     let mut values: BTreeMap<(usize, usize), (String, &'static str)> = BTreeMap::new();
+    let mut comments: BTreeMap<(usize, usize), String> = BTreeMap::new();
     for cell in read.iter_cells() {
         let position = cell.position();
         values.insert(
             (position.row() as usize, position.column() as usize),
             (cell.value().to_string(), value_type(cell.value())),
+        );
+    }
+    for comment in read.iter_comments() {
+        let position = comment.position();
+        comments.insert(
+            (position.row() as usize, position.column() as usize),
+            comment.comment().text().to_owned(),
         );
     }
     tree.root()
@@ -631,9 +644,11 @@ pub(crate) fn build_table(
                 .map_or((String::new(), "empty"), |(value, kind)| {
                     (value.clone(), *kind)
                 });
+            let comment = comments.get(&(row, column)).map(String::as_str);
             tree.push(item, Kind::Cell)
                 .prop("text", text(Some(&value)))
                 .prop("type", text(Some(kind)))
+                .prop("comment", text(comment))
                 .text(value)
                 .leaf([index, row, column, 0])
                 .done();
@@ -742,6 +757,29 @@ fn commit_cells(
     Ok(())
 }
 
+fn commit_comments(
+    chain: &mut Chain<Package>,
+    table: usize,
+    comments: Vec<(u32, u32, Option<String>)>,
+) -> Result<()> {
+    let error = |error| failure(LeafError::PagesTableComments(error));
+    for (row, column, comment) in comments {
+        let cell = litchi_pages::table::format::At::new(row, column);
+        let edit = chain
+            .package
+            .edit_body_table_cell_comment(BodyTableSelector::index(table), cell)
+            .map_err(error)?;
+        let commit = match comment {
+            Some(comment) => edit.set(&comment).map_err(error)?.commit(),
+            None => edit.clear().map_err(error)?.commit(),
+        }
+        .map_err(error)?;
+        let patch = commit.patch().clone();
+        push(chain, commit.into_package(), Patch::TableComments(patch));
+    }
+    Ok(())
+}
+
 /// A one-value set of a body-table cell named by the direct path
 /// `/body/tbl[N]/tr[R]/tc[C]` (`table` for `tbl`; each of the last three
 /// steps with one positional index, `body` with none), committed without
@@ -794,8 +832,8 @@ fn direct_cell(
         .filter(|&child| file.kind_at(child) == ordinal)
         .nth(table)?;
     let index = file.stand_in(table_at).leaf()[0] as usize;
-    let value = table_value(key, value).ok()?;
     let mut chain = Chain::new(package.clone());
+    let value = table_value(key, value).ok()?;
     let values = vec![(u32::try_from(row).ok()?, u32::try_from(column).ok()?, value)];
     commit_cells(&mut chain, index, values).ok()?;
     finish(
@@ -809,6 +847,86 @@ fn direct_cell(
     .ok()
 }
 
+/// The comment-only direct-path setter. Unlike the legacy value fast path,
+/// focused comment errors must remain terminal and must not retry the generic
+/// tree route with a fresh budget.
+fn direct_comment(
+    file: &Iwork,
+    package: &Package,
+    target: &TargetArg<'_>,
+    props: &Props<'_>,
+    limits: &SemanticLimits,
+) -> Result<Option<Commit>> {
+    let mut entries = props.iter();
+    let (Some((key, value)), None) = (entries.next(), entries.next()) else {
+        return Ok(None);
+    };
+    if key.as_str() != "comment" {
+        return Ok(None);
+    }
+    let path = target.path().map(|target| target.path());
+    let Some(path) = path else {
+        return Ok(None);
+    };
+    let [body, table, row, column] = path.steps() else {
+        return Ok(None);
+    };
+    if !path.is_absolute()
+        || body.name() != "body"
+        || !body.predicates().is_empty()
+        || !matches!(table.name(), "tbl" | "table")
+        || row.name() != "tr"
+        || column.name() != "tc"
+    {
+        return Ok(None);
+    }
+    let [table, row, column] = [table, row, column].map(|step| step.index().map(Position::get));
+    let (Some(table), Some(row), Some(column)) = (table, row, column) else {
+        return Ok(None);
+    };
+    bound(LimitKind::ExpandedTargets, 1, limits.max_expanded_targets())?;
+    bound(LimitKind::Operations, 1, limits.max_operations())?;
+    file.checked_tree()?;
+    let ordinal = crate::path::navigate::ElementKind::ordinal(Kind::Body);
+    let Some(body_at) = file
+        .kids(super::At::ROOT)
+        .iter()
+        .find(|&child| file.kind_at(child) == ordinal)
+    else {
+        return Ok(None);
+    };
+    let ordinal = crate::path::navigate::ElementKind::ordinal(Kind::Table);
+    let Some(table_at) = file
+        .kids(body_at)
+        .iter()
+        .filter(|&child| file.kind_at(child) == ordinal)
+        .nth(table)
+    else {
+        return Ok(None);
+    };
+    let index = file.stand_in(table_at).leaf()[0] as usize;
+    let comment = super::write::text(value, "comment")?;
+    let mut chain = Chain::new(package.clone());
+    commit_comments(
+        &mut chain,
+        index,
+        vec![(
+            u32::try_from(row).map_err(|_| refusal(Code::OutOfRange, "row is too large"))?,
+            u32::try_from(column).map_err(|_| refusal(Code::OutOfRange, "column is too large"))?,
+            comment,
+        )],
+    )?;
+    finish(
+        file,
+        chain.changed,
+        Owner::Pages(chain.package),
+        chain.patches,
+        1,
+        limits,
+    )
+    .map(Some)
+}
+
 /// Set properties on every target.
 pub(crate) fn set(
     file: &Iwork,
@@ -820,6 +938,9 @@ pub(crate) fn set(
     if is_metadata(target) {
         return set_metadata(file, package, props, limits);
     }
+    if let Some(commit) = direct_comment(file, package, target, props, limits)? {
+        return Ok(commit);
+    }
     if let Some(commit) = direct_cell(file, package, target, props, limits) {
         return Ok(commit);
     }
@@ -829,6 +950,7 @@ pub(crate) fn set(
     let mut operations = 0_usize;
     let mut cells: BTreeMap<usize, Vec<(u32, u32, litchi_pages::table::values::Value)>> =
         BTreeMap::new();
+    let mut comments: BTreeMap<usize, Vec<(u32, u32, Option<String>)>> = BTreeMap::new();
     for node in &nodes {
         for (key, value) in props.iter() {
             operations += 1;
@@ -920,6 +1042,14 @@ pub(crate) fn set(
                         value,
                     ));
                 },
+                ("cell", "comment") => {
+                    let value = super::write::text(value, "comment")?;
+                    comments.entry(leaf[0]).or_default().push((
+                        u32::try_from(leaf[1]).unwrap_or(u32::MAX),
+                        u32::try_from(leaf[2]).unwrap_or(u32::MAX),
+                        value,
+                    ));
+                },
                 ("cell", _) => return Err(key_refusal(node, key)),
                 ("paragraph" | "section" | "header" | "footer" | "footnote", _) => {
                     return Err(key_refusal(node, key));
@@ -931,6 +1061,9 @@ pub(crate) fn set(
     pending.flush(&mut chain)?;
     for (table, values) in cells {
         commit_cells(&mut chain, table, values)?;
+    }
+    for (table, comments) in comments {
+        commit_comments(&mut chain, table, comments)?;
     }
     finish(
         file,

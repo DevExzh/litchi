@@ -7025,3 +7025,108 @@ See [0063](0063-source-pptx-modern-comments.md).
   Ledger/native totals remain unchanged; W3 is still blocked. Chart-font
   facades and cell-text-style extraction remain separate work packages until
   their full contracts, proofs and performance are accepted.
+
+- The complete 53-row gate on `1bc8f22499` finished with 49 passing rows.
+  Goldens (42), tooling (48), the benchmark matrix (51) and corpus
+  dispositions (52) failed because generated reports were stale: the
+  Numbers registry hash and missing ingestion of the existing 0375b
+  instruction evidence. All runtime tests, including 400 broad workspace
+  commands, Clippy, rustdoc, feature matrices and fuzz checks passed on that
+  same source. The failed full receipt is preserved externally; it is not a
+  green gate. Record 0397 refreshes the hash and parses all eighteen
+  historical chart-text comparisons without adding evidence exemptions or
+  claiming current performance qualification. Targeted generator and tooling
+  checks pass.
+- A raw call-count audit withdrew eight routes from the earlier automated
+  69-route instruction qualification: Keynote formula refresh included
+  discovery calls, six Numbers style resets included host setup, and the
+  unified cached-formula comparison included warm-ups. Record 0396 separates
+  those calls from the measured wrappers. New external qualification
+  revisions derive call counts and complete function costs from each run's
+  raw artifacts, with source/binary/hash binding and negative controls.
+  Historical captures remain intact. No repaired-source performance claim
+  is made by this test-only integration; the final candidate needs fresh
+  measurements. The 1bc FIN instruction receipt remains historical, and its
+  wall/CLI run was never launched.
+- Accepted W2-D 0394 `aa3844a4c6`: the Numbers drawable-comment example now
+  uses leaf selectors, set/clear transactions, saved-file reopen and exact
+  inverse checks. Its tracked fixture exercises successful set/clear and a
+  typed non-commentable table refusal. The equivalent host example is
+  removed; host tests and native provenance remain intact. No runtime,
+  migration-ledger or native-evidence disposition changes.
+
+- Post-merge checks on `1d44fac31f` passed: workspace all-target/all-feature
+  compilation, all twenty locked offline fuzz workspaces, boundaries and
+  ledger. The three completed worktrees/branches were retired with evidence
+  preserved, bringing this continuation's cleanup to 43 worktrees and
+  37 branches.
+- Accepted Numbers chart-font slice `9bb7564acf`, including the reviewed
+  shared chart-font/stylesheet admission substrate and typed graph-error
+  adapters. The selector-first font/size family preserves independent
+  staging, exact source/inverse/no-op behavior, candidate readback and
+  unknown-content locality. Six ledger rows move to the leaf; native
+  verification remains queued.
+- Corrected source `59ffe48b3e` passes all six font and eighteen existing
+  style/layout instruction comparisons: 48 captures, exactly two selected
+  calls per side, archived ELF identity and 241 artifact/binary hashes
+  independently checked. The worst leaf/host ratio is 0.691530. Raw
+  whole-function costs include all DWARF file contexts and equal the capture
+  totals; smaller per-file annotation rows caused the preserved historical
+  validator failure. No instructions or ratios were discounted. Final
+  integrated-source qualification remains required.
+
+- Post-merge checks on `222f90c0b4` passed, including all twenty locked
+  offline fuzz workspaces. The Numbers font and two admission worktrees and
+  branches were retired after artifact preservation: 46 worktrees and
+  40 branches removed in this continuation.
+- Accepted Pages font slice `a0d9fa8910`, synchronized with the Numbers
+  foundation. Font and point-size facades preserve exact snapshots, inverse,
+  no-op, typed refusals, candidate readback and changed/untouched unknown
+  fields. Six actual host-versus-facade parity bindings and pending native
+  routes are registered. Corrected source `4fc7570935` passes six full-facade
+  instruction routes (twelve captures), with one property per read and setup
+  excluded from reset measurements. The coordinator independently checked
+  artifact hashes, exact test execution, two calls per side and attribution.
+  Final integrated qualification and native verification remain required.
+
+- Pages post-merge validation on `a5e5db6ed6` passed on a clean unchanged
+  source. An earlier run was invalidated when the coordinator started the
+  next merge before its cleanliness check; that merge was aborted and the
+  rejected run retained separately. No results from that overlapping run
+  are used for acceptance.
+- Accepted Keynote chart-font slice `9e0c901985`, synchronized with the
+  Pages and Numbers integrations. Selection, graph mutation, locality and
+  readback share bounded admission; stored mutation plans constrain patch
+  application, unknown payloads and archive references stay protected, and
+  production negative controls reject unplanned members/objects and metadata
+  changes. Six focused parity bindings are migrated; native routes remain
+  pending.
+- Keynote source `f875e5c3c9` passes all six full-facade instruction routes:
+  twelve captures, two calls per side, 64 indexed artifact hashes and the
+  immutable binary independently checked. Raw totals and complete selected
+  function attribution agree; the worst leaf/host ratio is 0.484571. This
+  remains slice evidence until the final integrated candidate is measured.
+
+- Keynote post-merge checks on `76a9fbf1e7` passed. Pages and Keynote
+  worktrees/branches were then retired with all performance evidence and the
+  protected Pages stash retained: 48 worktrees and 42 branches removed.
+- Accepted D7 root-comment slice `e3082e03bc`, synchronized with all three
+  chart-font facades. Pages and Keynote expose selector-based `cell.comment`
+  read/create/replace/null-clear through the focused leaf routes; Numbers
+  declares its existing null-clear support in the schema. Focused errors
+  remain terminal in direct paths, and missing/ambiguous selectors retain
+  their classifications. Tests cover genuine rootless creation, reopen,
+  exact inverse/no-op, stale recipients, failed-batch atomicity and untouched
+  comment/reply/ZIP content.
+- A bounded central-directory marker probe avoids redundant iWork detection
+  work while preserving ODF/OOXML precedence and partial-feature behavior.
+  It checks actual record counts and directory size, never member payloads;
+  malformed/hybrid/decoy/understated-count and tight-limit controls pass.
+  Source `a24f121a14` passes all eight full-File/direct-leaf instruction
+  routes (16 captures), independently checked with 51 artifact/binary hashes,
+  exact two-call collection and complete function attribution. Worst
+  overhead is 2.418312%. Earlier contaminated and pre-fix captures remain
+  explicitly nonqualifying. The final integrated FIN/common-format matrix,
+  iWork/D7 matrices and full gate must be rerun on one frozen candidate.
+  Nine unified native routes remain queued; this adds no E3/E4 evidence or
+  additional leaf migration dispositions.

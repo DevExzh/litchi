@@ -4,10 +4,12 @@ from __future__ import annotations
 
 import csv
 import io
+import json
 import tempfile
 import unittest
 from contextlib import redirect_stderr
 from pathlib import Path
+from unittest.mock import patch
 
 from tools import unified_bench_matrix as matrix
 
@@ -94,6 +96,41 @@ class MissDispositions(unittest.TestCase):
         self.assertEqual(matrix.disposition(row("0338", "miss", "a fixed per-call cost")), "")
         with self.assertRaises(SystemExit):
             matrix.disposition(row("0338", "miss", "x", disposition="later"))
+
+
+class IWorkChartTextEvidence(unittest.TestCase):
+    def parse(self, routes):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            path = root / "0375b" / "integrated-callgrind.json"
+            path.parent.mkdir()
+            path.write_text(json.dumps({
+                "source_commit": "4aa57b3c19c24ce625f31cdd5489ff0a1d39bc68",
+                "routes": routes,
+            }))
+            with patch.object(matrix, "RES", root):
+                return matrix.p0375b()
+
+    def test_instruction_counts_keep_the_host_baseline_and_historical_scope(self):
+        rows = self.parse([{
+            "test": "numbers_chart_title_read_cost_abba",
+            "host_ir": 100, "leaf_ir": 95,
+        }])
+        self.assertEqual(len(rows), 1)
+        item = rows[0]
+        self.assertEqual((item["leaf"], item["unified"], item["ratio"]), (100, 95, .95))
+        self.assertEqual(item["unit"], "Ir")
+        self.assertEqual(item["comparison"], "leaf/host (Callgrind Ir)")
+        self.assertEqual(item["budget_value"], 1.05)
+        self.assertEqual(item["stage"], "integrated 4aa57b3c19")
+        self.assertIn("current-trunk", item["explanation"])
+
+    def test_invalid_or_duplicate_instruction_routes_are_rejected(self):
+        valid = {"test": "pages_chart_title_set_cost_abba", "host_ir": 100, "leaf_ir": 95}
+        for routes in ([valid, valid], [{**valid, "host_ir": 0}],
+                       [{**valid, "leaf_ir": -1}], [{**valid, "test": "unknown_cost_abba"}]):
+            with self.subTest(routes=routes), self.assertRaises(SystemExit):
+                self.parse(routes)
 
 
 class Committed(unittest.TestCase):

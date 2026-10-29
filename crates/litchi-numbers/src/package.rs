@@ -54,6 +54,7 @@ mod save;
 mod sheet;
 pub(crate) mod sheet_chart_axis;
 pub(crate) mod sheet_chart_axis_title;
+pub(crate) mod sheet_chart_font;
 pub(crate) mod sheet_chart_series;
 mod sheet_chart_series_style;
 pub(crate) mod sheet_chart_style;

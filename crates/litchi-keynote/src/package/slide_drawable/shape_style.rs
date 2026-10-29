@@ -194,6 +194,24 @@ fn refused() -> Error {
 fn from_engine(error: litchi_iwa_style::graph::Error) -> Error {
     match error {
         litchi_iwa_style::graph::Error::Invalid(_) => refused(),
+        litchi_iwa_style::graph::Error::Limit {
+            kind: litchi_iwa_style::graph::GraphLimitKind::ScratchBytes,
+            observed,
+            maximum,
+        } => Error::Limit {
+            kind: super::LimitKind::ScratchBytes,
+            observed: observed as u64,
+            maximum: maximum as u64,
+        },
+        litchi_iwa_style::graph::Error::Limit {
+            kind: litchi_iwa_style::graph::GraphLimitKind::AllocationEvents,
+            observed,
+            maximum,
+        } => Error::Limit {
+            kind: super::LimitKind::AllocationEvents,
+            observed: observed as u64,
+            maximum: maximum as u64,
+        },
         _ => Error::InvalidSource,
     }
 }

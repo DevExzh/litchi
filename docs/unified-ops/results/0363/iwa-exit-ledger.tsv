@@ -344,12 +344,12 @@ keynote/editor/slide_charts/depth_3d.rs	set_slide_chart_3d_depth	1	keynote	chart
 keynote/editor/slide_charts/depth_3d.rs	slide_chart_3d_depth	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
 keynote/editor/slide_charts/donut_inner_radius.rs	set_slide_chart_donut_inner_radius	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
 keynote/editor/slide_charts/donut_inner_radius.rs	slide_chart_donut_inner_radius	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_charts/font.rs	reset_slide_chart_font	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_charts/font.rs	reset_slide_chart_font_size	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_charts/font.rs	set_slide_chart_font	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_charts/font.rs	set_slide_chart_font_size	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_charts/font.rs	slide_chart_font	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_charts/font.rs	slide_chart_font_size	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
+keynote/editor/slide_charts/font.rs	reset_slide_chart_font	1	keynote	chart.style	migrated	litchi_keynote::Package::edit_slide_chart_font	keynote_slide_chart_font_reset_facade_parity	A	-	-
+keynote/editor/slide_charts/font.rs	reset_slide_chart_font_size	1	keynote	chart.style	migrated	litchi_keynote::Package::edit_slide_chart_font_size	keynote_slide_chart_font_size_reset_facade_parity	A	-	-
+keynote/editor/slide_charts/font.rs	set_slide_chart_font	1	keynote	chart.style	migrated	litchi_keynote::Package::edit_slide_chart_font	keynote_slide_chart_font_allocate_facade_parity	B	-	-
+keynote/editor/slide_charts/font.rs	set_slide_chart_font_size	1	keynote	chart.style	migrated	litchi_keynote::Package::edit_slide_chart_font_size	keynote_slide_chart_font_size_allocate_facade_parity	B	-	-
+keynote/editor/slide_charts/font.rs	slide_chart_font	1	keynote	chart.style	migrated	litchi_keynote::Package::slide_chart_font	keynote_slide_chart_font_read_facade_parity	A	-	-
+keynote/editor/slide_charts/font.rs	slide_chart_font_size	1	keynote	chart.style	migrated	litchi_keynote::Package::slide_chart_font_size	keynote_slide_chart_font_size_read_facade_parity	A	-	-
 keynote/editor/slide_charts/gaps.rs	set_slide_chart_gap_spacing	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
 keynote/editor/slide_charts/gaps.rs	slide_chart_gap_spacing	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
 keynote/editor/slide_charts/legend.rs	set_slide_chart_legend_fill	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
@@ -1129,12 +1129,12 @@ numbers/editor/sheet_charts/depth_3d.rs	set_sheet_chart_3d_depth	1	numbers	chart
 numbers/editor/sheet_charts/depth_3d.rs	sheet_chart_3d_depth	1	numbers	chart.style	migrated	litchi_numbers::Package::sheet_chart_style	numbers_sheet_chart_style_read_parity	A	-	-
 numbers/editor/sheet_charts/donut_inner_radius.rs	set_sheet_chart_donut_inner_radius	1	numbers	chart.style	migrated	litchi_numbers::sheet::chart::style::Edit::set	numbers_sheet_chart_style_set_parity	A	-	-
 numbers/editor/sheet_charts/donut_inner_radius.rs	sheet_chart_donut_inner_radius	1	numbers	chart.style	migrated	litchi_numbers::Package::sheet_chart_style	numbers_sheet_chart_style_read_parity	A	-	-
-numbers/editor/sheet_charts/font.rs	reset_sheet_chart_font	1	numbers	chart.style	host-only	litchi-numbers	-	-	-	-
-numbers/editor/sheet_charts/font.rs	reset_sheet_chart_font_size	1	numbers	chart.style	host-only	litchi-numbers	-	-	-	-
-numbers/editor/sheet_charts/font.rs	set_sheet_chart_font	1	numbers	chart.style	host-only	litchi-numbers	-	-	-	-
-numbers/editor/sheet_charts/font.rs	set_sheet_chart_font_size	1	numbers	chart.style	host-only	litchi-numbers	-	-	-	-
-numbers/editor/sheet_charts/font.rs	sheet_chart_font	1	numbers	chart.style	host-only	litchi-numbers	-	-	-	-
-numbers/editor/sheet_charts/font.rs	sheet_chart_font_size	1	numbers	chart.style	host-only	litchi-numbers	-	-	-	-
+numbers/editor/sheet_charts/font.rs	reset_sheet_chart_font	1	numbers	chart.style	migrated	litchi_numbers::Package::edit_sheet_chart_font	numbers_sheet_chart_font_reset_parity	A	-	W2-A 0385: native mutation verification queued in 0363-mac-queue.md
+numbers/editor/sheet_charts/font.rs	reset_sheet_chart_font_size	1	numbers	chart.style	migrated	litchi_numbers::Package::edit_sheet_chart_font	numbers_sheet_chart_font_size_reset_parity	A	-	W2-A 0385: native mutation verification queued in 0363-mac-queue.md
+numbers/editor/sheet_charts/font.rs	set_sheet_chart_font	1	numbers	chart.style	migrated	litchi_numbers::Package::edit_sheet_chart_font	numbers_sheet_chart_font_set_parity	B	-	W2-A 0385: native mutation verification queued in 0363-mac-queue.md
+numbers/editor/sheet_charts/font.rs	set_sheet_chart_font_size	1	numbers	chart.style	migrated	litchi_numbers::Package::edit_sheet_chart_font	numbers_sheet_chart_font_size_set_parity	B	-	W2-A 0385: native mutation verification queued in 0363-mac-queue.md
+numbers/editor/sheet_charts/font.rs	sheet_chart_font	1	numbers	chart.style	migrated	litchi_numbers::Package::sheet_chart_font	numbers_sheet_chart_font_readers_match_on_six_populated_vectors	A	-	W2-A 0385: native read/mutation verification queued in 0363-mac-queue.md
+numbers/editor/sheet_charts/font.rs	sheet_chart_font_size	1	numbers	chart.style	migrated	litchi_numbers::Package::sheet_chart_font	numbers_sheet_chart_font_readers_match_on_six_populated_vectors	A	-	W2-A 0385: native read/mutation verification queued in 0363-mac-queue.md
 numbers/editor/sheet_charts/gaps.rs	set_sheet_chart_gap_spacing	1	numbers	chart.style	migrated	litchi_numbers::sheet::chart::style::Edit::set	numbers_sheet_chart_options_set_parity	A	-	-
 numbers/editor/sheet_charts/gaps.rs	sheet_chart_gap_spacing	1	numbers	chart.style	migrated	litchi_numbers::Package::sheet_chart_style	numbers_sheet_chart_options_read_parity	A	-	-
 numbers/editor/sheet_charts/hidden_data.rs	set_sheet_chart_includes_hidden_data	1	numbers	chart.style	migrated	litchi_numbers::sheet::chart::style::Edit::set	numbers_sheet_chart_options_set_parity	A	-	-
@@ -1690,12 +1690,12 @@ pages/editor/charts/depth_3d.rs	body_chart_3d_depth	1	pages	chart.style	host-onl
 pages/editor/charts/depth_3d.rs	set_body_chart_3d_depth	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
 pages/editor/charts/donut_inner_radius.rs	body_chart_donut_inner_radius	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
 pages/editor/charts/donut_inner_radius.rs	set_body_chart_donut_inner_radius	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
-pages/editor/charts/font.rs	body_chart_font	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
-pages/editor/charts/font.rs	body_chart_font_size	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
-pages/editor/charts/font.rs	reset_body_chart_font	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
-pages/editor/charts/font.rs	reset_body_chart_font_size	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
-pages/editor/charts/font.rs	set_body_chart_font	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
-pages/editor/charts/font.rs	set_body_chart_font_size	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
+pages/editor/charts/font.rs	body_chart_font	1	pages	chart.style	migrated	litchi_pages::Package::body_chart_font	pages_body_chart_font_read_parity	A	-	host-vs-facade read parity; native mutation queue remains pending (0386)
+pages/editor/charts/font.rs	body_chart_font_size	1	pages	chart.style	migrated	litchi_pages::Package::body_chart_font_size	pages_body_chart_font_size_read_parity	A	-	host-vs-facade read parity; native mutation queue remains pending (0386)
+pages/editor/charts/font.rs	reset_body_chart_font	1	pages	chart.style	migrated	litchi_pages::Package::edit_body_chart_font	pages_body_chart_font_reset_parity	B	-	host-vs-facade reset parity; native mutation queue remains pending (0386)
+pages/editor/charts/font.rs	reset_body_chart_font_size	1	pages	chart.style	migrated	litchi_pages::Package::edit_body_chart_font_size	pages_body_chart_font_size_reset_parity	B	-	host-vs-facade reset parity; native mutation queue remains pending (0386)
+pages/editor/charts/font.rs	set_body_chart_font	1	pages	chart.style	migrated	litchi_pages::Package::edit_body_chart_font	pages_body_chart_font_set_parity	B	-	host-vs-facade set parity; native mutation queue remains pending (0386)
+pages/editor/charts/font.rs	set_body_chart_font_size	1	pages	chart.style	migrated	litchi_pages::Package::edit_body_chart_font_size	pages_body_chart_font_size_set_parity	B	-	host-vs-facade set parity; native mutation queue remains pending (0386)
 pages/editor/charts/gaps.rs	body_chart_gap_spacing	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
 pages/editor/charts/gaps.rs	set_body_chart_gap_spacing	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
 pages/editor/charts/legend.rs	body_chart_legend_fill	1	pages	chart.style	host-only	litchi-pages	-	-	-	-

@@ -364,6 +364,13 @@
           "set": true,
           "get": true
         },
+        "comment": {
+          "type": "string",
+          "clearable": true,
+          "add": false,
+          "set": true,
+          "get": true
+        },
         "type": {
           "type": "string",
           "add": false,

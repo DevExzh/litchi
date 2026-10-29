@@ -82,6 +82,12 @@ impl PropSpec {
             admission: crate::registry::Admission::NONE,
         }
     }
+
+    /// Mark this property as accepting `null` to clear its value.
+    pub(crate) const fn clearable(mut self) -> Self {
+        self.admission = self.admission.clearable();
+        self
+    }
 }
 
 /// Which verbs read and write a property: the `get`, `set` and `add` flags

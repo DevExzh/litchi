@@ -15,6 +15,8 @@ use litchi_iwa_style::chart_font::{self, Change, ChartFont};
 use litchi_iwa_style::graph::Workspace;
 use litchi_iwa_text::character::TextPointSize;
 use litchi_iwa_text::font::Font;
+use litchi_pages::chart::font::{Error as PagesChartFontError, Refusal as PagesChartFontRefusal};
+use litchi_pages::{BodyChartSelector, OpenOptions, Package as PagesPackage, SourceLimits};
 
 use crate::chart_style_cases::{Components, Target, input};
 use crate::harness::{Case, Evidence, Format, LeafRun, TestResult, Tier};
@@ -64,6 +66,7 @@ fn host_write(source: &[u8], target: Target, chart: u64, change: &Change) -> Tes
     })
 }
 
+#[inline(never)]
 fn host_read(bytes: &[u8], target: Target, chart: u64) -> TestResult<String> {
     Ok(match target {
         Target::Keynote { slide } => {
@@ -96,7 +99,35 @@ fn host_read(bytes: &[u8], target: Target, chart: u64) -> TestResult<String> {
 fn engine_write(source: &[u8], chart: u64, change: &Change) -> TestResult<Vec<u8>> {
     let components = Components::read(source)?;
     let mut workspace = Workspace::new(&components.archives, CoreLimits::default())?;
-    chart_font::set(&mut workspace, chart, change)?;
+    let payload = components
+        .objects()
+        .find(|object| object.archive_info.identifier == Some(chart))
+        .and_then(|object| {
+            object
+                .messages
+                .iter()
+                .find(|message| message.type_ == 5_021)
+                .map(|message| message.data.as_slice())
+        })
+        .ok_or("missing chart payload")?;
+    // The parity fixture exercises the complete graph route: source index,
+    // every paragraph-style walk, stylesheet registration and candidate
+    // readback. Its explicit work profile is intentionally wider than the
+    // payload-only convenience profile; production owners derive this same
+    // residual from their package admission budget.
+    let base = chart_font::Limits::for_source(payload);
+    let fixture_limits = chart_font::Limits::new(
+        base.max_input_bytes().saturating_mul(4),
+        base.max_fields().saturating_mul(4),
+        base.max_output_bytes(),
+        base.max_nesting(),
+        base.max_work_bytes().saturating_mul(256),
+        base.max_text_bytes(),
+        base.max_allocations(),
+        base.max_retained_bytes().saturating_mul(4),
+        base.max_scratch_bytes().saturating_mul(8),
+    );
+    chart_font::set(&mut workspace, chart, change, fixture_limits)?;
     publish_changes(source, &components, workspace.finish())
 }
 
@@ -145,6 +176,517 @@ fn georgia() -> TestResult<Change> {
 
 fn size(points: f32) -> TestResult<Change> {
     Ok(Change::Size(TextPointSize::from_points(points)?))
+}
+
+fn pages_leaf_bytes(package: &PagesPackage) -> TestResult<Vec<u8>> {
+    let mut bytes = Vec::new();
+    package.write_to(&mut bytes)?;
+    Ok(bytes)
+}
+
+fn pages_leaf_values(bytes: &[u8]) -> TestResult<(ChartFont, TextPointSize)> {
+    let package = PagesPackage::from_bytes(bytes)?;
+    // The host adds the populated Column2d chart at source position zero.
+    let selector = BodyChartSelector::index(0);
+    Ok((
+        package.body_chart_font(selector)?,
+        package.body_chart_font_size(selector)?,
+    ))
+}
+
+fn package_entries(bytes: &[u8]) -> TestResult<Vec<(String, Vec<u8>)>> {
+    let catalog = litchi_iwa_archive::package::Catalog::from_bytes(
+        bytes,
+        litchi_iwa_archive::Limits::default(),
+    )?;
+    Ok(catalog
+        .iter()
+        .map(|entry| (entry.name().to_owned(), entry.data().to_vec()))
+        .collect())
+}
+
+fn pages_facade_fixture() -> TestResult<(Vec<u8>, Target, u64)> {
+    let input = input(Format::Pages, Kind::Column2d)?;
+    let source = host_write(&input.fixture.bytes, input.target, input.chart, &avenir()?)?;
+    let source = host_write(&source, input.target, input.chart, &size(17.0)?)?;
+    Ok((source, input.target, input.chart))
+}
+
+fn pages_facade_source() -> TestResult<Vec<u8>> {
+    Ok(pages_facade_fixture()?.0)
+}
+
+fn facade_georgia() -> TestResult<ChartFont> {
+    Ok(ChartFont {
+        font: Font::named("Georgia")?,
+        bold: false,
+        italic: true,
+    })
+}
+
+#[test]
+fn pages_facade_font_read_populated_host_source() -> TestResult {
+    let host_input = input(Format::Pages, Kind::Column2d)?;
+    let source = pages_facade_source()?;
+    let host_source = host_write(
+        &host_input.fixture.bytes,
+        host_input.target,
+        host_input.chart,
+        &avenir()?,
+    )?;
+    let host_source = host_write(
+        &host_source,
+        host_input.target,
+        host_input.chart,
+        &size(17.0)?,
+    )?;
+    let host_readback = host_read(&host_source, host_input.target, host_input.chart)?;
+    assert!(host_readback.contains("AvenirNext-DemiBold"));
+    assert!(host_readback.contains("17"));
+    let (font, size) = pages_leaf_values(&source)?;
+    assert_eq!(font.font.name(), Some("AvenirNext-DemiBold"));
+    assert!(font.bold);
+    assert_eq!(size.points(), 17.0);
+    Ok(())
+}
+
+#[test]
+fn pages_facade_font_set_reset_inverse_noop() -> TestResult {
+    let source = pages_facade_source()?;
+    let package = PagesPackage::from_bytes(&source)?;
+    let selector = BodyChartSelector::index(0);
+    let wanted = facade_georgia()?;
+    let chart = input(Format::Pages, Kind::Column2d)?.chart;
+    let commit = package
+        .edit_body_chart_font(selector)?
+        .set_font(wanted.clone())?
+        .commit()?;
+    let changed = pages_leaf_bytes(commit.package())?;
+    let host_changed = host_write(&source, Target::Pages, chart, &Change::Font(wanted.clone()))?;
+    assert_eq!(
+        host_read(&host_changed, Target::Pages, chart)?,
+        host_read(&changed, Target::Pages, chart)?,
+        "Pages host and facade must agree after a font set"
+    );
+    assert!(matches!(
+        commit.package().apply_body_chart_font(commit.patch()),
+        Err(PagesChartFontError::PatchConflict)
+    ));
+    let (font, size) = pages_leaf_values(&changed)?;
+    assert_eq!(font, wanted);
+    assert_eq!(size.points(), 17.0);
+    let reset = commit
+        .package()
+        .edit_body_chart_font(selector)?
+        .reset_font()?
+        .commit()?;
+    let reset_bytes = pages_leaf_bytes(reset.package())?;
+    let host_seed = host_write(&source, Target::Pages, chart, &Change::Font(wanted.clone()))?;
+    let host_reset = host_write(&host_seed, Target::Pages, chart, &Change::ResetFont)?;
+    assert_eq!(
+        host_read(&host_reset, Target::Pages, chart)?,
+        host_read(&reset_bytes, Target::Pages, chart)?,
+        "Pages host and facade must agree after a font reset"
+    );
+    assert_eq!(pages_leaf_values(&reset_bytes)?.1.points(), 17.0);
+    let restored = reset
+        .package()
+        .apply_body_chart_font(&reset.patch().inverse())?;
+    assert_eq!(pages_leaf_bytes(restored.package())?, changed);
+    let noop = commit
+        .package()
+        .edit_body_chart_font(selector)?
+        .set_font(wanted)?
+        .commit()?;
+    assert!(noop.patch().is_noop());
+    assert_eq!(pages_leaf_bytes(noop.package())?, changed);
+    Ok(())
+}
+
+#[test]
+fn pages_facade_selector_budget_and_member_locality_controls() -> TestResult {
+    let source = pages_facade_source()?;
+    let package = PagesPackage::from_bytes(&source)?;
+    assert!(matches!(
+        package.body_chart_font(BodyChartSelector::index(99)),
+        Err(PagesChartFontError::Refused(
+            PagesChartFontRefusal::ChartNotFound { .. }
+        ))
+    ));
+
+    let low_options = OpenOptions::new().source_limits(
+        SourceLimits::builder()
+            .max_input_bytes(u64::try_from(source.len().saturating_add(32 * 1024))?)?
+            .build()?,
+    );
+    let low_package = PagesPackage::from_bytes_with_options(&source, low_options)?;
+    let low_error = low_package
+        .edit_body_chart_font(BodyChartSelector::index(0))?
+        .set_font(facade_georgia()?)?
+        .commit()
+        .expect_err("the exact source ceiling must reject projected output");
+    assert!(matches!(low_error, PagesChartFontError::Limit { .. }));
+
+    let commit = package
+        .edit_body_chart_font(BodyChartSelector::index(0))?
+        .set_font(facade_georgia()?)?
+        .commit()?;
+    let changed = pages_leaf_bytes(commit.package())?;
+    let before = package_entries(&source)?;
+    let after = package_entries(&changed)?;
+    assert_eq!(
+        before.iter().map(|(name, _)| name).collect::<Vec<_>>(),
+        after.iter().map(|(name, _)| name).collect::<Vec<_>>()
+    );
+    let differences = before
+        .iter()
+        .zip(&after)
+        .filter(|((before_name, before_bytes), (after_name, after_bytes))| {
+            before_name != after_name || before_bytes != after_bytes
+        })
+        .count();
+    assert!(differences > 0, "the mutation must have a changed member");
+    assert!(
+        differences < before.len(),
+        "untouched ZIP members must remain exact"
+    );
+    Ok(())
+}
+
+#[test]
+fn pages_facade_size_set_reset_inverse_noop() -> TestResult {
+    let source = pages_facade_source()?;
+    let package = PagesPackage::from_bytes(&source)?;
+    let selector = BodyChartSelector::index(0);
+    let wanted = TextPointSize::from_points(23.0)?;
+    let chart = input(Format::Pages, Kind::Column2d)?.chart;
+    let commit = package
+        .edit_body_chart_font_size(selector)?
+        .set_size(wanted)
+        .and_then(|edit| edit.commit())?;
+    let changed = pages_leaf_bytes(commit.package())?;
+    let host_changed = host_write(&source, Target::Pages, chart, &Change::Size(wanted))?;
+    assert_eq!(
+        host_read(&host_changed, Target::Pages, chart)?,
+        host_read(&changed, Target::Pages, chart)?,
+        "Pages host and facade must agree after a size set"
+    );
+    let (font, size) = pages_leaf_values(&changed)?;
+    assert_eq!(font.font.name(), Some("AvenirNext-DemiBold"));
+    assert_eq!(size.points(), 23.0);
+    let reset = commit
+        .package()
+        .edit_body_chart_font_size(selector)?
+        .reset_size()?
+        .commit()?;
+    let reset_bytes = pages_leaf_bytes(reset.package())?;
+    let host_seed = host_write(&source, Target::Pages, chart, &Change::Size(wanted))?;
+    let host_reset = host_write(&host_seed, Target::Pages, chart, &Change::ResetSize)?;
+    assert_eq!(
+        host_read(&host_reset, Target::Pages, chart)?,
+        host_read(&reset_bytes, Target::Pages, chart)?,
+        "Pages host and facade must agree after a size reset"
+    );
+    assert_eq!(pages_leaf_values(&reset_bytes)?.0, font);
+    let restored = reset
+        .package()
+        .apply_body_chart_font_size(&reset.patch().inverse())?;
+    assert_eq!(pages_leaf_bytes(restored.package())?, changed);
+    let noop = commit
+        .package()
+        .edit_body_chart_font_size(selector)?
+        .set_size(wanted)
+        .and_then(|edit| edit.commit())?;
+    assert!(noop.patch().is_noop());
+    Ok(())
+}
+
+fn pages_facade_read_parity_case(
+    name: &'static str,
+    font: bool,
+    tier: Tier,
+    evidence: Evidence,
+) -> TestResult {
+    let (source, _target, chart) = pages_facade_fixture()?;
+    if font {
+        let host = pages_facade_host_font_read_route(&source, chart)?;
+        let leaf = pages_facade_read_font_route(&source)?;
+        assert_eq!(host.font().name(), leaf.font.name());
+        assert_eq!(host.bold(), leaf.bold);
+        assert_eq!(host.italic(), leaf.italic);
+    } else {
+        let host = pages_facade_host_size_read_route(&source, chart)?;
+        let leaf = pages_facade_read_size_route(&source)?;
+        assert_eq!(host.points(), leaf.points());
+    }
+    let fixture = crate::harness::Fixture {
+        path: "iwork/pages/chart-data-native.pages",
+        bytes: source,
+    };
+    let host = move |bytes: &[u8]| {
+        if font {
+            pages_facade_host_font_read_route(bytes, chart)?;
+        } else {
+            pages_facade_host_size_read_route(bytes, chart)?;
+        }
+        Ok(bytes.to_vec())
+    };
+    let leaf = move |bytes: &[u8]| {
+        if font {
+            pages_facade_read_font_route(bytes)?;
+        } else {
+            pages_facade_read_size_route(bytes)?;
+        }
+        Ok(LeafRun::output(bytes.to_vec()))
+    };
+    Case::new(name, Format::Pages, tier, evidence, &fixture)
+        .host(host)
+        .leaf(leaf)
+        .read_only()
+        .run()?;
+    Ok(())
+}
+
+fn pages_facade_write_parity_case(
+    name: &'static str,
+    change: Change,
+    tier: Tier,
+    evidence: Evidence,
+) -> TestResult {
+    let (source, target, chart) = pages_facade_fixture()?;
+    let host_output = host_write(&source, target, chart, &change)?;
+    let leaf_output = pages_facade_write_route(&source, &change)?;
+    assert_eq!(
+        host_read(&host_output, target, chart)?,
+        host_read(&leaf_output, target, chart)?,
+        "Pages host and facade outputs must agree on chart-font readback"
+    );
+    let fixture = crate::harness::Fixture {
+        path: "iwork/pages/chart-data-native.pages",
+        bytes: source,
+    };
+    let host_change = change.clone();
+    let leaf_change = change;
+    Case::new(name, Format::Pages, tier, evidence, &fixture)
+        .host(move |bytes| host_write(bytes, target, chart, &host_change))
+        .leaf(move |bytes| {
+            Ok(LeafRun::output(pages_facade_write_route(
+                bytes,
+                &leaf_change,
+            )?))
+        })
+        .read("Pages host chart-font readback", move |bytes| {
+            host_read(bytes, target, chart)
+        })
+        .leaf_structural_metadata()
+        .run()?;
+    Ok(())
+}
+
+#[test]
+fn pages_body_chart_font_read_parity() -> TestResult {
+    pages_facade_read_parity_case(
+        "pages_body_chart_font_read_parity",
+        true,
+        Tier::A,
+        Evidence::Queued,
+    )
+}
+
+#[test]
+fn pages_body_chart_font_set_parity() -> TestResult {
+    pages_facade_write_parity_case(
+        "pages_body_chart_font_set_parity",
+        Change::Font(facade_georgia()?),
+        Tier::B,
+        Evidence::Queued,
+    )
+}
+
+#[test]
+fn pages_body_chart_font_reset_parity() -> TestResult {
+    pages_facade_write_parity_case(
+        "pages_body_chart_font_reset_parity",
+        Change::ResetFont,
+        Tier::B,
+        Evidence::Queued,
+    )
+}
+
+#[test]
+fn pages_body_chart_font_size_read_parity() -> TestResult {
+    pages_facade_read_parity_case(
+        "pages_body_chart_font_size_read_parity",
+        false,
+        Tier::A,
+        Evidence::Queued,
+    )
+}
+
+#[test]
+fn pages_body_chart_font_size_set_parity() -> TestResult {
+    pages_facade_write_parity_case(
+        "pages_body_chart_font_size_set_parity",
+        Change::Size(TextPointSize::from_points(23.0)?),
+        Tier::B,
+        Evidence::Queued,
+    )
+}
+
+#[test]
+fn pages_body_chart_font_size_reset_parity() -> TestResult {
+    pages_facade_write_parity_case(
+        "pages_body_chart_font_size_reset_parity",
+        Change::ResetSize,
+        Tier::B,
+        Evidence::Queued,
+    )
+}
+
+#[inline(never)]
+fn pages_facade_read_font_route(source: &[u8]) -> TestResult<ChartFont> {
+    Ok(PagesPackage::from_bytes(source)?.body_chart_font(BodyChartSelector::index(0))?)
+}
+
+#[inline(never)]
+fn pages_facade_read_size_route(source: &[u8]) -> TestResult<TextPointSize> {
+    Ok(PagesPackage::from_bytes(source)?.body_chart_font_size(BodyChartSelector::index(0))?)
+}
+
+#[inline(never)]
+fn pages_facade_write_route(source: &[u8], change: &Change) -> TestResult<Vec<u8>> {
+    let package = PagesPackage::from_bytes(source)?;
+    let selector = BodyChartSelector::index(0);
+    let commit = match change {
+        Change::Font(font) => package
+            .edit_body_chart_font(selector)?
+            .set_font(font.clone())?
+            .commit()?,
+        Change::Size(size) => package
+            .edit_body_chart_font_size(selector)?
+            .set_size(*size)?
+            .commit()?,
+        Change::ResetFont => package
+            .edit_body_chart_font(selector)?
+            .reset_font()?
+            .commit()?,
+        Change::ResetSize => package
+            .edit_body_chart_font_size(selector)?
+            .reset_size()?
+            .commit()?,
+        _ => return Err("unsupported chart-font facade probe change".into()),
+    };
+    pages_leaf_bytes(commit.package())
+}
+
+#[inline(never)]
+fn pages_facade_host_route(
+    source: &[u8],
+    target: Target,
+    chart: u64,
+    change: &Change,
+) -> TestResult<Vec<u8>> {
+    host_write(source, target, chart, change)
+}
+
+#[inline(never)]
+fn pages_facade_host_font_read_route(source: &[u8], chart: u64) -> TestResult<HostFont> {
+    Ok(pages::Draft::from_bytes(source)?.body_chart_font(chart)?)
+}
+
+#[inline(never)]
+fn pages_facade_host_size_read_route(source: &[u8], chart: u64) -> TestResult<ChartFontSize> {
+    Ok(pages::Draft::from_bytes(source)?.body_chart_font_size(chart)?)
+}
+
+#[test]
+#[ignore = "release instruction probe; run in the coordinator CPU-3 slot"]
+fn pages_facade_font_read_cost_instruction() -> TestResult {
+    let (source, _, chart) = pages_facade_fixture()?;
+    std::hint::black_box(pages_facade_host_font_read_route(&source, chart)?);
+    std::hint::black_box(pages_facade_read_font_route(&source)?);
+    std::hint::black_box(pages_facade_read_font_route(&source)?);
+    std::hint::black_box(pages_facade_host_font_read_route(&source, chart)?);
+    Ok(())
+}
+
+#[test]
+#[ignore = "release instruction probe; run in the coordinator CPU-3 slot"]
+fn pages_facade_font_set_cost_instruction() -> TestResult {
+    let (source, target, chart) = pages_facade_fixture()?;
+    let change = georgia()?;
+    std::hint::black_box(pages_facade_host_route(&source, target, chart, &change)?);
+    std::hint::black_box(pages_facade_write_route(&source, &change)?);
+    std::hint::black_box(pages_facade_write_route(&source, &change)?);
+    std::hint::black_box(pages_facade_host_route(&source, target, chart, &change)?);
+    Ok(())
+}
+
+#[test]
+#[ignore = "release instruction probe; run in the coordinator CPU-3 slot"]
+fn pages_facade_font_reset_cost_instruction() -> TestResult {
+    let (source, target, chart) = pages_facade_fixture()?;
+    let source = host_write(&source, target, chart, &georgia()?)?;
+    std::hint::black_box(pages_facade_host_route(
+        &source,
+        target,
+        chart,
+        &Change::ResetFont,
+    )?);
+    std::hint::black_box(pages_facade_write_route(&source, &Change::ResetFont)?);
+    std::hint::black_box(pages_facade_write_route(&source, &Change::ResetFont)?);
+    std::hint::black_box(pages_facade_host_route(
+        &source,
+        target,
+        chart,
+        &Change::ResetFont,
+    )?);
+    Ok(())
+}
+
+#[test]
+#[ignore = "release instruction probe; run in the coordinator CPU-3 slot"]
+fn pages_facade_size_read_cost_instruction() -> TestResult {
+    let (source, _, chart) = pages_facade_fixture()?;
+    std::hint::black_box(pages_facade_host_size_read_route(&source, chart)?);
+    std::hint::black_box(pages_facade_read_size_route(&source)?);
+    std::hint::black_box(pages_facade_read_size_route(&source)?);
+    std::hint::black_box(pages_facade_host_size_read_route(&source, chart)?);
+    Ok(())
+}
+
+#[test]
+#[ignore = "release instruction probe; run in the coordinator CPU-3 slot"]
+fn pages_facade_size_set_cost_instruction() -> TestResult {
+    let (source, target, chart) = pages_facade_fixture()?;
+    let change = size(23.0)?;
+    std::hint::black_box(pages_facade_host_route(&source, target, chart, &change)?);
+    std::hint::black_box(pages_facade_write_route(&source, &change)?);
+    std::hint::black_box(pages_facade_write_route(&source, &change)?);
+    std::hint::black_box(pages_facade_host_route(&source, target, chart, &change)?);
+    Ok(())
+}
+
+#[test]
+#[ignore = "release instruction probe; run in the coordinator CPU-3 slot"]
+fn pages_facade_size_reset_cost_instruction() -> TestResult {
+    let (source, target, chart) = pages_facade_fixture()?;
+    let source = host_write(&source, target, chart, &size(23.0)?)?;
+    std::hint::black_box(pages_facade_host_route(
+        &source,
+        target,
+        chart,
+        &Change::ResetSize,
+    )?);
+    std::hint::black_box(pages_facade_write_route(&source, &Change::ResetSize)?);
+    std::hint::black_box(pages_facade_write_route(&source, &Change::ResetSize)?);
+    std::hint::black_box(pages_facade_host_route(
+        &source,
+        target,
+        chart,
+        &Change::ResetSize,
+    )?);
+    Ok(())
 }
 
 #[test]
