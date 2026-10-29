@@ -388,6 +388,11 @@ impl Limits {
         )
     }
 
+    /// Debit references that a leaf publication will add to archive headers.
+    pub fn admit_references(&self, amount: usize) -> Result<(), Error> {
+        self.charge_references(amount)
+    }
+
     /// Admit `amount` fallible collection allocations before the operation
     /// asks a decoder or publisher to reserve them.
     pub fn admit_allocations(&self, amount: usize) -> Result<(), Error> {
@@ -1686,6 +1691,31 @@ pub fn plan_set(
         true,
         None,
         &mut allocator,
+        true,
+    )
+}
+
+/// Plan a set whose request-owned values were already admitted while an edit
+/// was staged.  This keeps the staging and commit phases on one cumulative
+/// budget without charging the same owned value a second time.
+pub fn plan_set_precharged(
+    source: &dyn TableSource,
+    target: Target,
+    requested: &CharacterProperties,
+    fresh: Option<u64>,
+    limits: &Limits,
+) -> Result<Option<Plan>, Error> {
+    let mut allocator = None;
+    plan_set_inner(
+        source,
+        target,
+        requested,
+        fresh,
+        limits,
+        true,
+        None,
+        &mut allocator,
+        false,
     )
 }
 
@@ -1698,6 +1728,7 @@ fn plan_set_inner(
     allow_exclusive: bool,
     batch: Option<(&BatchContext, usize)>,
     allocator: &mut Option<&mut dyn FnMut() -> Result<u64, Error>>,
+    admit_requested: bool,
 ) -> Result<Option<Plan>, Error> {
     limits.charge_work(1)?;
     let owned_table = if batch.is_none() {
@@ -1761,7 +1792,9 @@ fn plan_set_inner(
     } else {
         effective(source, parent, limits)?
     };
-    limits.admit_character_properties(requested)?;
+    if admit_requested {
+        limits.admit_character_properties(requested)?;
+    }
     let reduced = minimal(requested, &inherited);
     if reduced == CharacterProperties::new() {
         return Ok(None);
@@ -1955,7 +1988,7 @@ pub fn plan_set_many(
     requests: &[Request],
     limits: &Limits,
 ) -> Result<Option<Plan>, Error> {
-    plan_set_many_inner(source, requests, limits, true, None)
+    plan_set_many_inner(source, requests, limits, true, None, true)
 }
 
 /// Plan a bounded batch while allocating fresh identifiers only after the
@@ -1969,7 +2002,34 @@ pub fn plan_set_many_with_allocator(
     prepare_batch: bool,
     allocator: &mut dyn FnMut() -> Result<u64, Error>,
 ) -> Result<Option<Plan>, Error> {
-    plan_set_many_inner(source, requests, limits, prepare_batch, Some(allocator))
+    plan_set_many_inner(
+        source,
+        requests,
+        limits,
+        prepare_batch,
+        Some(allocator),
+        true,
+    )
+}
+
+/// Variant for a leaf edit that admitted each staged request before entering
+/// the shared planner.  Cloned request values are still admitted by the leaf
+/// before they are placed in the request vector.
+pub fn plan_set_many_with_allocator_precharged(
+    source: &dyn TableSource,
+    requests: &[Request],
+    limits: &Limits,
+    prepare_batch: bool,
+    allocator: &mut dyn FnMut() -> Result<u64, Error>,
+) -> Result<Option<Plan>, Error> {
+    plan_set_many_inner(
+        source,
+        requests,
+        limits,
+        prepare_batch,
+        Some(allocator),
+        false,
+    )
 }
 
 fn plan_set_many_inner(
@@ -1978,6 +2038,7 @@ fn plan_set_many_inner(
     limits: &Limits,
     prepare_batch: bool,
     mut allocator: Option<&mut dyn FnMut() -> Result<u64, Error>>,
+    admit_requested: bool,
 ) -> Result<Option<Plan>, Error> {
     limits.charge_work(requests.len())?;
     limits.admit_allocations(requests.len())?;
@@ -2015,6 +2076,7 @@ fn plan_set_many_inner(
             false,
             batch_context.as_ref().map(|context| (context, index)),
             &mut allocator,
+            admit_requested,
         )?
         else {
             continue;
@@ -2032,8 +2094,7 @@ fn plan_set_many_inner(
     limits.reserve(&mut list_entries, requests.len())?;
     let mut list_identifier = None;
     let mut list_type = None;
-    let mut stylesheet_identifier = None;
-    let mut stylesheet_type = None;
+    let mut stylesheet_identifiers = Vec::new();
     limits.admit_allocations(requests.len().saturating_mul(2))?;
     let mut release_counts: BTreeMap<u64, BTreeMap<u32, u32>> = BTreeMap::new();
     for mut plan in plans {
@@ -2075,12 +2136,13 @@ fn plan_set_many_inner(
         }
         for rewrite in plan.rewrites {
             if prepare_batch && rewrite.message_type == STYLESHEET_MESSAGE_TYPE {
-                if stylesheet_identifier.is_some_and(|identifier| identifier != rewrite.identifier)
+                if !stylesheet_identifiers
+                    .iter()
+                    .any(|(identifier, _)| *identifier == rewrite.identifier)
                 {
-                    return Err(Error::BatchUnsupported);
+                    limits.reserve(&mut stylesheet_identifiers, 1)?;
+                    stylesheet_identifiers.push((rewrite.identifier, rewrite.message_type));
                 }
-                stylesheet_identifier = Some(rewrite.identifier);
-                stylesheet_type = Some(rewrite.message_type);
                 continue;
             }
             if rewrite.message_type == LIST_MESSAGE_TYPE {
@@ -2140,7 +2202,7 @@ fn plan_set_many_inner(
             }
         }
     }
-    if let Some(stylesheet_identifier) = stylesheet_identifier {
+    for (stylesheet_identifier, stylesheet_type) in stylesheet_identifiers {
         let (_, stylesheet_data) = unique_payload(
             source,
             stylesheet_identifier,
@@ -2150,12 +2212,18 @@ fn plan_set_many_inner(
         let mut styles = Vec::new();
         limits.reserve(&mut styles, combined.insertions.len())?;
         for insertion in &combined.insertions {
+            if insertion.beside != stylesheet_identifier {
+                continue;
+            }
             let parent = insertion
                 .object_references
                 .first()
                 .copied()
                 .ok_or(invalid("batch stylesheet parent missing"))?;
             styles.push((insertion.identifier, parent));
+        }
+        if styles.is_empty() {
+            continue;
         }
         let data = encode_stylesheet_batch(stylesheet_data, &styles, limits)?;
         let mut add_references = Vec::new();
@@ -2164,7 +2232,7 @@ fn plan_set_many_inner(
         limits.reserve(&mut combined.rewrites, 1)?;
         combined.rewrites.push(Rewrite {
             identifier: stylesheet_identifier,
-            message_type: stylesheet_type.unwrap_or(STYLESHEET_MESSAGE_TYPE),
+            message_type: stylesheet_type,
             data,
             add_references,
             remove_references: Vec::new(),

@@ -238,6 +238,7 @@ impl Edit<'_> {
         if self.cells.len() >= litchi_iwa_table::TableSource::max_objects(self.source) {
             return Err(Error::Allocation { amount: 1 });
         }
+        self.limits.admit_allocations(1).map_err(from_shared)?;
         self.cells
             .try_reserve(1)
             .map_err(|_error| Error::Allocation { amount: 1 })?;
@@ -257,21 +258,26 @@ impl Edit<'_> {
         if self.cells.is_empty() {
             return Err(Error::Refused(Refusal::NoStagedOperation));
         }
-        let (published, limits) = publish(self.source, self.sheet, self.table, &self.cells)?;
+        let (published, limits) = publish(
+            self.source,
+            self.sheet,
+            self.table,
+            &self.cells,
+            self.limits,
+        )?;
         let effective_values = if self.cells.len() == 1 {
-            vec![text_style(
+            vec![text_style_with_limits(
                 &published.package,
                 self.sheet,
                 self.table,
                 self.cells[0].0,
+                &limits,
             )?]
         } else {
             let mut positions = Vec::new();
-            positions
-                .try_reserve(self.cells.len())
-                .map_err(|_| Error::Allocation {
-                    amount: self.cells.len(),
-                })?;
+            limits
+                .reserve(&mut positions, self.cells.len())
+                .map_err(from_shared)?;
             positions.extend(self.cells.iter().map(|(position, _)| *position));
             text_style_many_with_limits(
                 &published.package,
@@ -438,6 +444,16 @@ fn text_style(
     position: At,
 ) -> Result<CharacterProperties, Error> {
     let limits = shared::Limits::from_source(package).map_err(from_shared)?;
+    text_style_with_limits(package, sheet, table, position, &limits)
+}
+
+fn text_style_with_limits(
+    package: &Package,
+    sheet: usize,
+    table: usize,
+    position: At,
+    limits: &shared::Limits,
+) -> Result<CharacterProperties, Error> {
     let working = Working::new(package)?;
     let target = topology::locate(&working, sheet, table).map_err(from_topology)?;
     shared::read(
@@ -447,7 +463,7 @@ fn text_style(
             row: position.row(),
             column: position.column(),
         },
-        &limits,
+        limits,
     )
     .map_err(from_shared)
 }
@@ -462,11 +478,9 @@ fn text_style_many_with_limits(
     let working = Working::new(package)?;
     let target = topology::locate(&working, sheet, table).map_err(from_topology)?;
     let mut targets = Vec::new();
-    targets
-        .try_reserve(positions.len())
-        .map_err(|_| Error::Allocation {
-            amount: positions.len(),
-        })?;
+    limits
+        .reserve(&mut targets, positions.len())
+        .map_err(from_shared)?;
     targets.extend(positions.iter().map(|position| shared::Target {
         model_identifier: target.model,
         row: position.row(),
@@ -512,8 +526,8 @@ fn publish(
     sheet: usize,
     table: usize,
     cells: &[(At, CharacterProperties)],
+    limits: shared::Limits,
 ) -> Result<(structure::Published, shared::Limits), Error> {
-    let limits = shared::Limits::from_source(source).map_err(from_shared)?;
     let mut working = Working::new(source)?;
     working.keep_previews();
     let target = topology::locate(&working, sheet, table).map_err(from_topology)?;
@@ -524,16 +538,17 @@ fn publish(
             row: position.row(),
             column: position.column(),
         };
-        let plan = match shared::plan_set(source, shared_target, properties, None, &limits) {
-            Ok(plan) => plan,
-            Err(shared::Error::NeedsIdentifier) => {
-                limits.admit_allocations(1).map_err(from_shared)?;
-                let fresh = *working.allocate(1)?.first().ok_or(Error::InvalidSource)?;
-                shared::plan_set(source, shared_target, properties, Some(fresh), &limits)
-                    .map_err(from_shared)?
-            },
-            Err(error) => return Err(from_shared(error)),
-        };
+        let plan =
+            match shared::plan_set_precharged(source, shared_target, properties, None, &limits) {
+                Ok(plan) => plan,
+                Err(shared::Error::NeedsIdentifier) => {
+                    limits.admit_allocations(1).map_err(from_shared)?;
+                    let fresh = *working.allocate(1)?.first().ok_or(Error::InvalidSource)?;
+                    shared::plan_set(source, shared_target, properties, Some(fresh), &limits)
+                        .map_err(from_shared)?
+                },
+                Err(error) => return Err(from_shared(error)),
+            };
         let Some(plan) = plan else {
             return working
                 .publish(&Transition::default())
@@ -576,7 +591,7 @@ fn publish(
             .copied()
             .ok_or(shared::Error::InvalidSource("identifier allocation failed"))
     };
-    let plan = shared::plan_set_many_with_allocator(
+    let plan = shared::plan_set_many_with_allocator_precharged(
         source,
         &requests,
         &limits,
@@ -604,6 +619,7 @@ fn apply_shared_plan(
     plan: shared::Plan,
     limits: &shared::Limits,
 ) -> Result<(), Error> {
+    admit_publication(&plan, limits)?;
     let registry =
         metadata::registry(working)?.ok_or(Error::Refused(Refusal::UnsupportedSource))?;
     for rewrite in &plan.rewrites {
@@ -694,6 +710,45 @@ fn apply_shared_plan(
     Ok(())
 }
 
+/// Admit the second owned copy made when a neutral plan is published into the
+/// mutable Numbers working set.  The shared planner charges its own source
+/// graph and generated output; this boundary separately owns the copies held
+/// by `RawMessage`, `NewObject`, and the compatibility replacement path.
+fn admit_publication(plan: &shared::Plan, limits: &shared::Limits) -> Result<(), Error> {
+    let mut copied = 0_usize;
+    let mut allocations = 0_usize;
+    let mut references = 0_usize;
+    let mut work = 0_usize;
+    for rewrite in &plan.rewrites {
+        let copies = usize::from(
+            !(rewrite.add_references.is_empty() && rewrite.remove_references.is_empty()),
+        )
+        .saturating_add(1);
+        copied = copied.saturating_add(rewrite.data.len().saturating_mul(copies));
+        allocations = allocations.saturating_add(1);
+        references = references
+            .saturating_add(rewrite.add_references.len())
+            .saturating_add(rewrite.remove_references.len());
+        work = work.saturating_add(rewrite.data.len()).saturating_add(1);
+    }
+    for insertion in &plan.insertions {
+        copied = copied.saturating_add(insertion.data.len());
+        allocations = allocations.saturating_add(2);
+        references = references.saturating_add(insertion.object_references.len());
+        work = work.saturating_add(insertion.data.len()).saturating_add(1);
+    }
+    allocations = allocations
+        .saturating_add(plan.registrations.len())
+        .saturating_add(plan.cell_updates.len());
+    work = work
+        .saturating_add(plan.registrations.len())
+        .saturating_add(plan.cell_updates.len());
+    limits.admit_copies(copied).map_err(from_shared)?;
+    limits.admit_allocations(allocations).map_err(from_shared)?;
+    limits.admit_references(references).map_err(from_shared)?;
+    limits.admit_work(work).map_err(from_shared)
+}
+
 /// Apply one prepared batch of existing-cell key changes with one immutable
 /// tile/row index per touched tile.  `false` is a preflight refusal (for
 /// example an empty slot); callers then use the existing materializing path
@@ -719,9 +774,10 @@ fn write_shared_keys(
         .admit_allocations(updates.len())
         .map_err(from_shared)?;
     let (_, model) = topology::message(working, first_target.model_identifier, &[6_001])?;
-    let store = single_bytes(model, 4)?
-        .ok_or(Error::InvalidSource)?
-        .to_vec();
+    let store = single_bytes(model, 4)?.ok_or(Error::InvalidSource)?;
+    limits.admit_copies(store.len()).map_err(from_shared)?;
+    limits.admit_allocations(1).map_err(from_shared)?;
+    let store = store.to_vec();
     let (tiles, tile_size) = topology::tiles(&store).map_err(from_topology)?;
     if tile_size == 0 {
         return Err(Error::InvalidSource);
