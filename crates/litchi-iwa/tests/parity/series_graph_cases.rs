@@ -40,6 +40,20 @@ use litchi_iwa_style::series::{
     },
 };
 
+const SYMBOL_TEST_LIMITS: series::Limits = series::Limits::new(
+    256 * 1024 * 1024,
+    16 * 1024 * 1024,
+    256 * 1024 * 1024,
+    64,
+    256 * 1024 * 1024,
+    1_000_000,
+    256 * 1024 * 1024,
+    256 * 1024 * 1024,
+    1_000_000,
+    1_000_000,
+    1_000_000,
+);
+
 use crate::chart_style_cases::{Components, Target, input};
 use crate::harness::{Case, Evidence, Format, LeafRun, TestResult, Tier};
 
@@ -370,7 +384,7 @@ fn engine_write(source: &[u8], chart: u64, values: &Values) -> TestResult<Vec<u8
                         .transpose()
                 })
                 .collect::<Result<Vec<_>, _>>()?;
-            series::set_symbols(&mut workspace, chart, family, &symbols)?;
+            series::set_symbols(&mut workspace, chart, family, &symbols, SYMBOL_TEST_LIMITS)?.0;
         },
         Values::Trendlines(values) => {
             let trends = values
