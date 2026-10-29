@@ -6957,3 +6957,39 @@ See [0063](0063-source-pptx-modern-comments.md).
   and for a quiet interval. Chart-font admission/facades, the 0390 formula
   repair and 0391 shared cell-text-style extraction remain isolated next-wave
   work; their preparation results do not qualify this frozen candidate.
+
+- Post-merge checks on `295b421bcd` passed, but its full gate failed leaf-test
+  row 30. Five existing Numbers comment tests exposed newly refused author,
+  corpus and metadata-mirror profiles, and a destructive clear which bypassed
+  the prior losslessness proof. The coordinator stopped the run during row 33:
+  33 rows completed, 32 passed, and row 30 failed. Logs and the partial receipt
+  remain external under `.coord/resume-20261028/full-295b421bcd/`; this is not
+  a full-gate green result. All 68 iWork instruction routes (135 captures) and
+  all 14 FIN comparisons (56 captures) passed on that exact source, but those
+  receipts do not qualify its repair. Wall/CLI timing was never launched.
+- Accepted comments repair `07b166c9b2` (runtime `67427c20f1`, records
+  0392/0393). All three format facades still use the shared writer. The repair
+  restores Numbers multicomponent roots, populated-list allocation, author
+  creation/reuse and source-shaped metadata mirrors. Destructive clears now
+  require strict archive-reference inspection, canonical storage/header and
+  model/tile validation, selected list/segment ownership and lossless mirror
+  updates. Unknown metadata cannot hide a surviving reference to the deleted
+  root. Unrelated unresolved known references remain allowed and byte-exact;
+  requiring the entire unrelated graph to resolve had incorrectly rejected a
+  native Keynote source.
+- The five original regressions pass unchanged. The six Numbers comment
+  suites pass (2/2/25/31/5/17), as do thirteen clear-safety controls covering
+  valid clear/inverse, unknown and known surviving references, opaque sibling
+  messages, unknown payloads, header mismatches and malformed table metadata.
+  Original Keynote, Pages and Numbers comment parity cases also pass (6/6/9).
+  Scoped Clippy, formatting, rustdoc, glossary, boundaries, ledger,
+  no-`3rdparty` and affected fuzz-lock checks pass. The corrected twelve-route
+  full-facade instruction matrix passes on `67427c20f1`, with 24 captures,
+  archived binary/source identities and exact probe attribution independently
+  checked. Numbers set is the worst delta at +0.993931%; the stricter Numbers
+  clear remains 7.803% below the host. Native acceptance remains pending.
+- Ledger and native dispositions are unchanged: 1,179 migrated, 43 retired,
+  1,009 host-only, and 492 pending native routes. The next candidate also
+  includes the separately reviewed 0390 formula-owner admission repair, then
+  receives fresh post-merge checks, all 53 gate rows, 69 iWork instruction
+  routes (137 captures), 14 FIN comparisons and the quiet wall/CLI interval.

@@ -21,13 +21,16 @@ use litchi_iwa_common::WireLimits;
 use litchi_iwa_common::decode_varint_from_bytes;
 use litchi_iwa_common::wire::{self, WireView};
 use litchi_iwa_core::archive::{
-    FieldInfo, FieldObjectReferenceTransition, FieldPath, FieldType, ObjectReferenceTransition,
+    ArchiveReferenceKind, ArchiveReferenceOccurrence, ArchiveReferencePolicy,
+    ArchiveReferenceVisitor, FieldInfo, FieldObjectReferenceTransition, FieldPath, FieldType,
+    ObjectReferenceTransition,
 };
 use litchi_iwa_core::{ArchiveObject, RawMessage};
 use litchi_iwa_protos::comment_storage_codec::{
     self as comment_codec, CommentStorageLeafWrite, DateSnapshot, UuidSnapshot,
 };
 use litchi_iwa_protos::numbers_table_cell_storage_codec as table_codec;
+use litchi_iwa_protos::table_info_codec;
 
 use crate::structure::{self, Fault as StructureFault, TableLeaf, Working, metadata};
 
@@ -268,11 +271,13 @@ const TABLE_TILE_ROW_WIDE_OFFSETS_FIELD: u32 = 8;
 const TABLE_LIST_TYPE_FIELD: u32 = 1;
 const TABLE_LIST_NEXT_ID_FIELD: u32 = 2;
 const TABLE_LIST_ENTRY_FIELD: u32 = 3;
+const TABLE_LIST_SEGMENT_FIELD: u32 = 4;
 const TABLE_ENTRY_KEY_FIELD: u32 = 1;
 const TABLE_ENTRY_REFCOUNT_FIELD: u32 = 2;
 const TABLE_ENTRY_STORAGE_FIELD: u32 = 10;
 const TABLE_REFERENCE_IDENTIFIER_FIELD: u32 = 1;
 const TABLE_MODEL_COMMENT_PATH: [u32; 2] = [4, 19];
+const TABLE_INFO_MESSAGE_TYPE: u32 = 6_000;
 const TABLE_DATA_LIST_MESSAGE_TYPE: u32 = 6_005;
 const COMMENT_STORAGE_MESSAGE_TYPE: u32 = 3_056;
 const ANNOTATION_AUTHOR_MESSAGE_TYPE: u32 = 212;
@@ -619,8 +624,12 @@ pub fn rewrite_root<P: TableLeaf>(
                         author_storage_component.as_deref(),
                     )?;
                 }
-                let mut author =
-                    plan_author(&working, selection, profile.generate_author_if_missing)?;
+                let mut author = plan_author(
+                    &working,
+                    selection,
+                    profile.generate_author_if_missing,
+                    profile.update_author_storage,
+                )?;
                 let allocation_count = 1_usize
                     .saturating_add(if author.new_author { 1 } else { 0 })
                     .saturating_add(if author.new_storage { 1 } else { 0 });
@@ -672,6 +681,7 @@ pub fn rewrite_root<P: TableLeaf>(
         },
         RootOperation::Clear => {
             let root = selection.root_identifier.ok_or(Fault::Invalid)?;
+            validate_clear_source(&working, selection, root)?;
             ensure_unique_root(&working, &census, selection, root)?;
             let author = ensure_empty_thread(&working, root)?;
             detach_root(&mut working, selection, root)?;
@@ -859,6 +869,531 @@ fn ensure_unique_root<P: TableLeaf>(
     Ok(())
 }
 
+/// Admit the exact graph shape required by a destructive root clear.
+///
+/// The shared writer must not treat a readable comment payload as proof that
+/// deleting its object is lossless.  In particular, an unknown sibling
+/// message or a mismatched ArchiveInfo entry could carry bytes which the
+/// focused route does not own.  The native Numbers writer also refuses an
+/// unparseable/empty table-info candidate elsewhere in the package instead of
+/// silently deleting a selected root from an ambiguous document graph.
+fn validate_clear_source<P: TableLeaf>(
+    working: &Working<'_, P>,
+    selection: &Selection,
+    root: u64,
+) -> FaultResult<()> {
+    strict_clear_reference_census(working, selection, root)?;
+    let object = working.object(root)?;
+    if object.messages.len() != 1 || object.archive_info.message_infos.len() != 1 {
+        return Err(Fault::Dependency);
+    }
+    let message = object.messages.first().ok_or(Fault::Invalid)?;
+    if message.type_ != COMMENT_STORAGE_MESSAGE_TYPE {
+        return Err(Fault::Invalid);
+    }
+    let info = object
+        .archive_info
+        .message_infos
+        .first()
+        .ok_or(Fault::Invalid)?;
+    if info.type_ != message.type_ || usize::try_from(info.length).ok() != Some(message.data.len())
+    {
+        return Err(Fault::Invalid);
+    }
+    let snapshot = comment_codec::decode_comment_storage_archive(
+        message.data.as_slice(),
+        comment_codec::DecodeOptions::new(
+            message.data.len().max(1),
+            message.data.len().saturating_mul(4).max(1),
+            message.data.len().saturating_mul(64).max(1),
+            64,
+            working.source().max_references(),
+            MAX_COMMENT_TEXT_BYTES,
+        ),
+    )
+    .map_err(map_comment_decode_error)?;
+    let mut expected = Vec::new();
+    if let Some(author) = snapshot.author() {
+        if author.identifier() == 0 {
+            return Err(Fault::Invalid);
+        }
+        structure::reserve(&mut expected, 1)?;
+        expected.push(author.identifier());
+    }
+    validate_comment_message_header(object, 0, &expected)?;
+    validate_selected_list_header(working, selection)?;
+    validate_clear_table_payloads(working)?;
+    validate_metadata_ownership(working, selection, root)?;
+    for component in working.component_names() {
+        for candidate in &working.archive(&component)?.objects {
+            for candidate_message in candidate
+                .messages
+                .iter()
+                .filter(|candidate_message| candidate_message.type_ == TABLE_INFO_MESSAGE_TYPE)
+            {
+                let view = WireView::parse(candidate_message.data.as_slice(), WireLimits::DEFAULT)
+                    .map_err(map_wire_error)?;
+                if view.fields().next().is_none() {
+                    return Err(Fault::Invalid);
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
+/// Run the deletion-grade archive census before any clear mutation is staged.
+///
+/// `structure::collect::Census` is intentionally a cheap ownership index for
+/// ordinary table transactions.  A destructive comment clear needs the
+/// stronger core policy: every archive header is inspected with
+/// `RejectUnknownMetadata`, every object reference resolves, and the selected
+/// root is owned only by the selected comment list message.  The finite
+/// occurrence/header bounds are admitted before the strict walk so malformed
+/// or low-limit sources do not receive an uncharged package scan.
+fn strict_clear_reference_census<P: TableLeaf>(
+    working: &Working<'_, P>,
+    selection: &Selection,
+    root: u64,
+) -> FaultResult<()> {
+    let limits = working.archive_limits();
+    let maximum_objects = working.source().max_objects();
+    let maximum_references = working.source().max_references();
+    let mut objects = 0usize;
+    let mut references = 0usize;
+    let mut work = 0usize;
+    for component in working.component_names() {
+        for object in &working.archive(&component)?.objects {
+            objects = objects.checked_add(1).ok_or(Fault::Limit {
+                kind: LimitKind::Objects,
+                observed: u64::MAX,
+                maximum: maximum_objects as u64,
+            })?;
+            if objects > maximum_objects {
+                return Err(Fault::Limit {
+                    kind: LimitKind::Objects,
+                    observed: objects as u64,
+                    maximum: maximum_objects as u64,
+                });
+            }
+            validate_archive_header_shape(object)?;
+            references = references
+                .checked_add(reference_occurrence_count(object))
+                .ok_or(Fault::Limit {
+                    kind: LimitKind::References,
+                    observed: u64::MAX,
+                    maximum: maximum_references as u64,
+                })?;
+            if references > maximum_references {
+                return Err(Fault::Limit {
+                    kind: LimitKind::References,
+                    observed: references as u64,
+                    maximum: maximum_references as u64,
+                });
+            }
+            let header_bytes = usize::try_from(object.header_length).map_err(|_| Fault::Invalid)?;
+            work = work
+                .checked_add(header_bytes.saturating_mul(4))
+                .ok_or(Fault::Limit {
+                    kind: LimitKind::WireWork,
+                    observed: u64::MAX,
+                    maximum: WireLimits::MAX_REWRITE_WORK as u64,
+                })?;
+            if work > WireLimits::MAX_REWRITE_WORK {
+                return Err(Fault::Limit {
+                    kind: LimitKind::WireWork,
+                    observed: work as u64,
+                    maximum: WireLimits::MAX_REWRITE_WORK as u64,
+                });
+            }
+        }
+    }
+
+    let mut visitor = ClearReferenceVisitor {
+        root,
+        allowed_object: selection.list_identifier.ok_or(Fault::Invalid)?,
+        allowed_message: comment_list_message_index(
+            working.object(selection.list_identifier.ok_or(Fault::Invalid)?)?,
+            TABLE_DATA_LIST_MESSAGE_TYPE,
+        )?,
+        root_occurrences: 0,
+        unexpected_root: false,
+        references: Vec::new(),
+    };
+    structure::reserve(&mut visitor.references, references)?;
+    let mut inspected = 0usize;
+    for component in working.component_names() {
+        for object in &working.archive(&component)?.objects {
+            let count = object
+                .inspect_references_with_policy(
+                    &mut visitor,
+                    ArchiveReferencePolicy::RejectUnknownMetadata,
+                    limits,
+                )
+                .map_err(|_| Fault::Dependency)?;
+            inspected = inspected.checked_add(count).ok_or(Fault::Limit {
+                kind: LimitKind::References,
+                observed: u64::MAX,
+                maximum: maximum_references as u64,
+            })?;
+            if inspected > maximum_references {
+                return Err(Fault::Limit {
+                    kind: LimitKind::References,
+                    observed: inspected as u64,
+                    maximum: maximum_references as u64,
+                });
+            }
+        }
+    }
+    if visitor.root_occurrences == 0 || visitor.unexpected_root {
+        return Err(Fault::Dependency);
+    }
+    Ok(())
+}
+
+struct ClearReferenceVisitor {
+    root: u64,
+    allowed_object: u64,
+    allowed_message: usize,
+    root_occurrences: usize,
+    unexpected_root: bool,
+    references: Vec<u64>,
+}
+
+impl ArchiveReferenceVisitor for ClearReferenceVisitor {
+    fn visit_reference(
+        &mut self,
+        occurrence: ArchiveReferenceOccurrence,
+    ) -> litchi_iwa_core::Result<()> {
+        if occurrence.kind == ArchiveReferenceKind::Object {
+            self.references.push(occurrence.referenced_identifier);
+            if occurrence.referenced_identifier == self.root {
+                self.root_occurrences = self.root_occurrences.saturating_add(1);
+                self.unexpected_root |= occurrence.object_identifier != self.allowed_object
+                    || occurrence.message_index != self.allowed_message;
+            }
+        }
+        Ok(())
+    }
+}
+
+fn reference_occurrence_count(object: &ArchiveObject) -> usize {
+    object
+        .archive_info
+        .message_infos
+        .iter()
+        .map(|info| {
+            info.object_references
+                .len()
+                .saturating_add(info.data_references.len())
+                .saturating_add(
+                    info.field_infos
+                        .iter()
+                        .map(|field| {
+                            field
+                                .object_references
+                                .len()
+                                .saturating_add(field.data_references.len())
+                        })
+                        .fold(0usize, usize::saturating_add),
+                )
+        })
+        .fold(0usize, usize::saturating_add)
+}
+
+fn validate_archive_header_shape(object: &ArchiveObject) -> FaultResult<()> {
+    if object.archive_info.message_infos.len() != object.messages.len() {
+        return Err(Fault::Invalid);
+    }
+    for (message, info) in object
+        .messages
+        .iter()
+        .zip(&object.archive_info.message_infos)
+    {
+        if info.type_ != message.type_
+            || usize::try_from(info.length).ok() != Some(message.data.len())
+        {
+            return Err(Fault::Invalid);
+        }
+    }
+    Ok(())
+}
+
+fn validate_comment_message_header(
+    object: &ArchiveObject,
+    message_index: usize,
+    expected: &[u64],
+) -> FaultResult<()> {
+    validate_archive_header_shape(object)?;
+    if object.archive_info.should_merge == Some(true) {
+        return Err(Fault::Invalid);
+    }
+    let info = object
+        .archive_info
+        .message_infos
+        .get(message_index)
+        .ok_or(Fault::Invalid)?;
+    if info.base_message_index.is_some()
+        || !info.diff_merge_version.is_empty()
+        || info.diff_field_path.is_some()
+        || !info.fields_to_remove.is_empty()
+        || !info.diff_read_version.is_empty()
+    {
+        return Err(Fault::Invalid);
+    }
+    if info.object_references != expected {
+        return Err(Fault::Dependency);
+    }
+    let mut field_references = Vec::new();
+    structure::reserve(&mut field_references, expected.len())?;
+    for field in &info.field_infos {
+        if !field.object_references.is_empty()
+            && (field.effective_type() != FieldType::ObjectReference
+                || field.path.path.as_slice() != [3])
+        {
+            return Err(Fault::Dependency);
+        }
+        for identifier in &field.object_references {
+            field_references.push(*identifier);
+        }
+    }
+    if !field_references.is_empty() && field_references != expected {
+        return Err(Fault::Dependency);
+    }
+    Ok(())
+}
+
+fn list_storage_references<P: TableLeaf>(
+    working: &Working<'_, P>,
+    list: u64,
+) -> FaultResult<Vec<u64>> {
+    let object = working.object(list)?;
+    let message_index = comment_list_message_index(object, TABLE_DATA_LIST_MESSAGE_TYPE)?;
+    let message = object.messages.get(message_index).ok_or(Fault::Invalid)?;
+    let view =
+        WireView::parse(message.data.as_slice(), WireLimits::DEFAULT).map_err(map_wire_error)?;
+    let mut references = Vec::new();
+    for field in view.fields() {
+        match field.number() {
+            TABLE_LIST_ENTRY_FIELD => {
+                let entry = decode_entry(field.payload())?;
+                if references.contains(&entry.storage) {
+                    return Err(Fault::Dependency);
+                }
+                structure::reserve(&mut references, 1)?;
+                references.push(entry.storage);
+            },
+            TABLE_LIST_SEGMENT_FIELD => {
+                if field.wire_type() != 2 {
+                    return Err(Fault::Invalid);
+                }
+                let nested = WireView::parse(field.payload(), WireLimits::DEFAULT)
+                    .map_err(map_wire_error)?;
+                let mut identifier = None;
+                for child in nested.fields() {
+                    if child.number() != TABLE_REFERENCE_IDENTIFIER_FIELD
+                        || child.wire_type() != 0
+                        || identifier.is_some()
+                    {
+                        return Err(Fault::Invalid);
+                    }
+                    identifier = Some(read_varint(child.payload())?);
+                }
+                let identifier = identifier.ok_or(Fault::Invalid)?;
+                if identifier == 0 || references.contains(&identifier) {
+                    return Err(Fault::Dependency);
+                }
+                structure::reserve(&mut references, 1)?;
+                references.push(identifier);
+            },
+            _ => {},
+        }
+    }
+    Ok(references)
+}
+
+fn validate_selected_list_header<P: TableLeaf>(
+    working: &Working<'_, P>,
+    selection: &Selection,
+) -> FaultResult<()> {
+    let list = selection.list_identifier.ok_or(Fault::Invalid)?;
+    let object = working.object(list)?;
+    let message_index = comment_list_message_index(object, TABLE_DATA_LIST_MESSAGE_TYPE)?;
+    let expected = list_storage_references(working, list)?;
+    let info = object
+        .archive_info
+        .message_infos
+        .get(message_index)
+        .ok_or(Fault::Invalid)?;
+    if info.object_references != expected {
+        return Err(Fault::Dependency);
+    }
+    let mut field_references = Vec::new();
+    let mut field_ordinal = 0usize;
+    for field in &info.field_infos {
+        if field.object_references.is_empty() {
+            continue;
+        }
+        if field.effective_type() != FieldType::ObjectReference
+            || field.object_references.len() != 1
+        {
+            return Err(Fault::Dependency);
+        }
+        let identifier = field.object_references[0];
+        if field.path.path.as_slice().first() == Some(&TABLE_LIST_ENTRY_FIELD)
+            && field.path.path.len() == 2
+        {
+            let key = field.path.path[1];
+            let entry = list_entry(working, list, key)?;
+            if entry.storage != identifier {
+                return Err(Fault::Dependency);
+            }
+        } else if field.path.path.len() != 1
+            || field.path.path[0]
+                != u32::try_from(field_ordinal.saturating_add(1)).unwrap_or(u32::MAX)
+        {
+            return Err(Fault::Dependency);
+        }
+        field_references.push(identifier);
+        field_ordinal = field_ordinal.saturating_add(1);
+    }
+    if !field_references.is_empty() && field_references != expected {
+        return Err(Fault::Dependency);
+    }
+    Ok(())
+}
+
+fn validate_metadata_ownership<P: TableLeaf>(
+    working: &Working<'_, P>,
+    selection: &Selection,
+    root: u64,
+) -> FaultResult<()> {
+    let Some(registry) = metadata::registry(working)? else {
+        return Ok(());
+    };
+    let root_component = working.locate(root)?.ok_or(Fault::Invalid)?;
+    let component = registry.component_for_entry(&root_component)?;
+    let mut uuid_binding = None;
+    for binding in registry
+        .uuids
+        .iter()
+        .filter(|binding| binding.object == root)
+    {
+        if uuid_binding.replace(binding).is_some() || binding.component != component.identifier {
+            return Err(Fault::Dependency);
+        }
+    }
+    if registry.externals.iter().any(|edge| edge.object == root)
+        || registry
+            .data_references
+            .iter()
+            .any(|edge| edge.object == root)
+    {
+        return Err(Fault::Dependency);
+    }
+    let _ = selection;
+    Ok(())
+}
+
+fn validate_clear_table_payloads<P: TableLeaf>(working: &Working<'_, P>) -> FaultResult<()> {
+    for component in working.component_names() {
+        for object in &working.archive(&component)?.objects {
+            for message in &object.messages {
+                match message.type_ {
+                    TABLE_INFO_MESSAGE_TYPE => {
+                        table_info_codec::decode_table_info(
+                            &message.data,
+                            table_info_codec::DecodeOptions::for_source(&message.data),
+                        )
+                        .map_err(map_table_info_error)?;
+                    },
+                    6_001 => {
+                        table_codec::decode_table_model_with_report(
+                            &message.data,
+                            clear_table_decode_options(working, &message.data),
+                        )
+                        .map_err(map_table_decode_error)?;
+                    },
+                    6_002 => {
+                        table_codec::decode_tile_with_report(
+                            &message.data,
+                            clear_table_decode_options(working, &message.data),
+                        )
+                        .map_err(map_table_decode_error)?;
+                    },
+                    TABLE_DATA_LIST_MESSAGE_TYPE | 6_201 => {
+                        table_codec::decode_table_data_list_with_report(
+                            &message.data,
+                            clear_table_decode_options(working, &message.data),
+                        )
+                        .map_err(map_table_decode_error)?;
+                    },
+                    6_011 => {
+                        table_codec::decode_table_data_list_segment_with_report(
+                            &message.data,
+                            clear_table_decode_options(working, &message.data),
+                        )
+                        .map_err(map_table_decode_error)?;
+                    },
+                    _ => {},
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
+fn clear_table_decode_options<P: TableLeaf>(
+    working: &Working<'_, P>,
+    source: &[u8],
+) -> table_codec::DecodeOptions {
+    let bytes = source.len().max(1);
+    table_codec::DecodeOptions::new(
+        bytes,
+        bytes.saturating_mul(8).max(1),
+        bytes.saturating_mul(128).max(1),
+        64,
+        working.source().max_references(),
+        MAX_COMMENT_TEXT_BYTES,
+    )
+}
+
+fn map_table_info_error(error: table_info_codec::DecodeError) -> Fault {
+    if let Some((observed, maximum)) = error.field_limit_values() {
+        return Fault::Limit {
+            kind: LimitKind::WireFields,
+            observed: observed as u64,
+            maximum: maximum as u64,
+        };
+    }
+    if let Some((observed, maximum)) = error.work_limit_values() {
+        return Fault::Limit {
+            kind: LimitKind::WireWork,
+            observed: observed as u64,
+            maximum: maximum as u64,
+        };
+    }
+    if let Some(limit) = error.wire_resource_limit() {
+        return match limit {
+            table_info_codec::WireResourceLimit::Bytes { observed, maximum } => Fault::Limit {
+                kind: LimitKind::WireBytes,
+                observed: observed.unwrap_or(usize::MAX) as u64,
+                maximum: maximum.unwrap_or(usize::MAX) as u64,
+            },
+            table_info_codec::WireResourceLimit::Nesting { observed, maximum } => Fault::Limit {
+                kind: LimitKind::WireNesting,
+                observed: observed.unwrap_or(u32::MAX) as u64,
+                maximum: maximum.unwrap_or(u32::MAX) as u64,
+            },
+            _ => Fault::Invalid,
+        };
+    }
+    if let Some(amount) = error.allocation_amount() {
+        return Fault::Allocation { amount };
+    }
+    Fault::Invalid
+}
+
 fn ensure_empty_thread<P: TableLeaf>(
     working: &Working<'_, P>,
     root: u64,
@@ -871,6 +1406,7 @@ fn ensure_empty_thread<P: TableLeaf>(
         .ok_or(Fault::Invalid)?
         .data
         .as_slice();
+    validate_clear_comment_storage_payload(source)?;
     let options = comment_codec::DecodeOptions::new(
         source.len().max(1),
         source.len().saturating_mul(4).max(1),
@@ -886,6 +1422,20 @@ fn ensure_empty_thread<P: TableLeaf>(
         return Err(Fault::Dependency);
     }
     Ok(snapshot.author().map(|author| author.identifier()))
+}
+
+/// A clear deletes the complete storage object rather than rewriting one
+/// selected field.  Unknown top-level payload fields would therefore be
+/// silently lost; the text/reply routes may preserve such bytes, but this
+/// destructive route must refuse them before publication.
+fn validate_clear_comment_storage_payload(data: &[u8]) -> FaultResult<()> {
+    let view = WireView::parse(data, WireLimits::DEFAULT).map_err(map_wire_error)?;
+    for field in view.fields() {
+        if !matches!(field.number(), 1..=5) || field.wire_type() != 2 {
+            return Err(Fault::Dependency);
+        }
+    }
+    Ok(())
 }
 
 fn remove_generated_author_if_unshared<P: TableLeaf>(
@@ -1027,10 +1577,12 @@ fn validate_existing_comment_list<P: TableLeaf>(
         }
     }
     for root in roots {
-        let root_component = working.locate(root)?.ok_or(Fault::Dependency)?;
-        if root_component != model_component {
-            return Err(Fault::Unsupported);
-        }
+        // Numbers stores the comment-list roots in its DataList component,
+        // while the selected table model is commonly in CalculationEngine.
+        // The list entry and Census ownership checks establish the selected
+        // root's identity; requiring the root to share the model component
+        // rejects the native multi-component profile before its graph can be
+        // validated.
         validate_existing_comment_graph(working, root, model_component, author_storage_component)?;
     }
     Ok(())
@@ -1250,6 +1802,7 @@ fn plan_author<P: TableLeaf>(
     working: &Working<'_, P>,
     selection: &Selection,
     generate_author_if_missing: bool,
+    prefer_new_generated_author: bool,
 ) -> FaultResult<AuthorPlan> {
     let mut generated = None;
     for component in working.component_names() {
@@ -1341,7 +1894,9 @@ fn plan_author<P: TableLeaf>(
                 return Err(Fault::Dependency);
             }
         }
-        if let Some(&author_identifier) = references.first() {
+        if let Some(&author_identifier) = references.first()
+            && !(generate_author_if_missing && prefer_new_generated_author && references.len() > 1)
+        {
             // Native Pages/Keynote creation reuses the first registered
             // author.  Numbers fixtures with an empty registry take the
             // generated-author path below; an existing registry is reused by
@@ -1781,7 +2336,11 @@ fn append_author_storage<P: TableLeaf>(
         info.field_infos.push(field);
         return Ok(());
     }
-    if info.object_references == present && info.field_infos.is_empty() {
+    // Native multi-author registries often carry the references only in the
+    // payload and deliberately omit the ArchiveInfo mirror.  Numbers' old
+    // writer preserved that header shape while appending the new author; it
+    // must not be rejected merely because the wire and header views differ.
+    if info.object_references.is_empty() && info.field_infos.is_empty() {
         object
             .replace_message_preserving_header(
                 message_index,
@@ -1892,9 +2451,14 @@ fn append_list<P: TableLeaf>(
     let next = unique_field(&view, TABLE_LIST_NEXT_ID_FIELD)?
         .ok_or(Fault::Invalid)
         .and_then(|field| read_varint(field.payload()))?;
+    // `Reuse` governs the first key in a newly-created Numbers list.  An
+    // existing list still allocates from its source-authoritative watermark;
+    // reusing key 2 here collides with the native list's first entry whenever
+    // the selected table already has comments.
     let key = match policy {
-        ListKeys::Append => u32::try_from(next.max(2)).map_err(|_| Fault::Invalid)?,
-        ListKeys::Reuse => 2,
+        ListKeys::Append | ListKeys::Reuse => {
+            u32::try_from(next.max(2)).map_err(|_| Fault::Invalid)?
+        },
     };
     if view
         .fields()
@@ -1992,6 +2556,22 @@ fn update_list_metadata<P: TableLeaf>(
     let component = working.locate(list)?.ok_or(Fault::Invalid)?;
     let message_index =
         comment_list_message_index(working.object(list)?, TABLE_DATA_LIST_MESSAGE_TYPE)?;
+    let source_message = working
+        .object(list)?
+        .messages
+        .get(message_index)
+        .ok_or(Fault::Invalid)?;
+    let source_view = WireView::parse(source_message.data.as_slice(), WireLimits::DEFAULT)
+        .map_err(map_wire_error)?;
+    let mut entry_storages = Vec::new();
+    for field in source_view
+        .fields()
+        .filter(|field| field.number() == TABLE_LIST_ENTRY_FIELD)
+    {
+        let entry = decode_entry(field.payload())?;
+        structure::reserve(&mut entry_storages, 1)?;
+        entry_storages.push((entry.key, entry.storage));
+    }
     let limits = working.archive_limits();
     let archive = working.archive_mut(&component)?;
     let object = archive.object_mut(list).ok_or(Fault::Invalid)?;
@@ -2005,54 +2585,88 @@ fn update_list_metadata<P: TableLeaf>(
         .iter()
         .filter(|identifier| **identifier == root)
         .count();
-    let path = vec![TABLE_LIST_ENTRY_FIELD, key];
-    let mut field_index = None;
-    for (index, field) in info.field_infos.iter().enumerate() {
-        if field.path.path == path && field_index.replace(index).is_some() {
-            return Err(Fault::Dependency);
-        }
-    }
-    // Older host-authored table-list headers carry only the aggregate object
-    // references and no per-field inventory.  The wire list above is still
-    // unambiguous (the selected key/storage/refcount were checked), so keep
-    // that header shape losslessly instead of manufacturing a field path the
-    // source never had.
-    if info.field_infos.is_empty() {
-        if adding {
-            if occurrences != 0 {
-                return Err(Fault::Dependency);
-            }
-            info.object_references.push(root);
-        } else {
-            if occurrences != 1 {
-                return Err(Fault::Dependency);
-            }
-            info.object_references
-                .retain(|identifier| *identifier != root);
-        }
-        return Ok(());
-    }
     if adding {
-        if occurrences != 0 || field_index.is_some() {
+        if occurrences != 0 {
             return Err(Fault::Dependency);
         }
         info.object_references.push(root);
-        let mut field = FieldInfo::new(FieldPath { path }, limits).map_err(map_core_error)?;
-        field.r#type = Some(FieldType::ObjectReference);
-        field.object_references.push(root);
-        info.field_infos.push(field);
+        // A native list with only aggregate references intentionally keeps
+        // that header shape.  A list which already carries FieldInfo mirrors,
+        // and a brand-new list, gain one exact entry for the appended root.
+        if !info.field_infos.is_empty() || occurrences == 0 && info.object_references.len() == 1 {
+            let mut field = FieldInfo::new(
+                FieldPath {
+                    path: vec![TABLE_LIST_ENTRY_FIELD, key],
+                },
+                limits,
+            )
+            .map_err(map_core_error)?;
+            field.r#type = Some(FieldType::ObjectReference);
+            field.object_references.push(root);
+            info.field_infos.push(field);
+        }
     } else {
-        if occurrences != 1 || field_index.is_none() {
+        if occurrences != 1 {
             return Err(Fault::Dependency);
         }
         info.object_references
             .retain(|identifier| *identifier != root);
-        let index = field_index.ok_or(Fault::Invalid)?;
-        let field = info.field_infos.get(index).ok_or(Fault::Invalid)?;
-        if field.object_references.as_slice() != [root] {
-            return Err(Fault::Dependency);
+        if !info.field_infos.is_empty() {
+            // Host headers differ: some identify the entry by [3,key], while
+            // older synthetic/native saves expose an ordered generic
+            // FieldInfo mirror.  Authorize only the selected keyed/ordinal
+            // mirror; an unrelated FieldInfo that happens to contain `root`
+            // is a dependency, never a reason to delete that field.
+            let mut match_index = None;
+            let mut generic_ordinal = 0usize;
+            for (index, field) in info.field_infos.iter().enumerate() {
+                if field.object_references.is_empty() {
+                    continue;
+                }
+                if field.effective_type() != FieldType::ObjectReference
+                    || field.object_references.len() != 1
+                {
+                    return Err(Fault::Dependency);
+                }
+                let identifier = field.object_references[0];
+                if field.path.path.first() == Some(&TABLE_LIST_ENTRY_FIELD)
+                    && field.path.path.len() == 2
+                {
+                    let field_key = field.path.path[1];
+                    if field_key == key {
+                        if identifier != root {
+                            return Err(Fault::Dependency);
+                        }
+                        if match_index.replace(index).is_some() {
+                            return Err(Fault::Dependency);
+                        }
+                    } else {
+                        let field_entry = entry_storages
+                            .iter()
+                            .find(|(entry_key, _)| *entry_key == field_key)
+                            .ok_or(Fault::Dependency)?;
+                        if field_entry.1 != identifier {
+                            return Err(Fault::Dependency);
+                        }
+                    }
+                } else {
+                    let expected_path = u32::try_from(generic_ordinal.saturating_add(1))
+                        .map_err(|_| Fault::Invalid)?;
+                    if field.path.path.as_slice() != [expected_path] {
+                        return Err(Fault::Dependency);
+                    }
+                    if identifier == root {
+                        if match_index.replace(index).is_some() {
+                            return Err(Fault::Dependency);
+                        }
+                    }
+                    generic_ordinal = generic_ordinal.saturating_add(1);
+                }
+            }
+            if let Some(index) = match_index {
+                info.field_infos.remove(index);
+            }
         }
-        info.field_infos.remove(index);
     }
     Ok(())
 }
