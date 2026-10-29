@@ -7315,3 +7315,52 @@ See [0063](0063-source-pptx-modern-comments.md).
   resource kinds in its new error adapters. Earlier scoped measurements
   remain tied to their measured source; runtime repairs require fresh
   qualification before integration. Native verification still blocks W3.
+
+- The 0405 integration `7606f8315d` passed workspace compilation, all 20
+  locked fuzz-workspace checks, crate boundaries, the exit ledger, and exact
+  clean-source checks. Its worktree and branch were retired normally: 58
+  worktrees and 51 branches removed. Another 3,607,666,229 logical bytes of
+  inactive target files were removed, bringing measured logical cleanup to
+  190,584,517,593 bytes (about 177.50 GiB); four retained output hashes match.
+- Accepted W2-D `f39527b256` (record 0407): Numbers sheet add, duplicate and
+  remove examples now use leaf lifecycle transactions, semantic selectors,
+  persisted readback and exact inverse checks. All three fixture runs and
+  scoped checks passed, including the completed boundary audit. Coordinator
+  wording clarifies that final-sheet CLI validation is separate from errors
+  propagated by the leaf. No runtime, ledger or native route changed.
+- The refreshed branch audit found no additional safely merged inactive
+  candidates. Active work packages, dirty donors and qualification baselines
+  remain protected; the per-worktree/branch manifest is external under
+  `.coord/branch-worktree-audit-7606-20261029/`.
+- Numbers and Keynote symbol captures on `c768523ebd` and `62b34bc6f5` pass
+  their four-route instruction checks. Pages scoped caller repairs are
+  reviewed at `4dc656ff2b`. These slices remain unmerged: review exposed
+  shared serialization allocations before facade admission, including the
+  archive identifier index/header projection and Snappy temporary buffers.
+  Record 0406 is being implemented as one shared core substrate; all three
+  owners will adopt it before refreshed qualification. Existing captures
+  remain source-scoped, with no final integrated or native-acceptance claim.
+
+- The 0407 integration `cd2a55c33f` passed workspace compilation and all 20
+  locked fuzz checks before a daemon restart interrupted the boundary scan.
+  The boundary and ledger checks then completed on the same unchanged, clean
+  commit; original partial logs are preserved. Its worktree and branch were
+  retired normally, bringing cleanup to 59 worktrees and 52 branches. The
+  owner's approximately 2.1 GiB temporary cache removal is excluded from the
+  exact byte total because only an approximate size was retained.
+- Accepted shared substrate `152c00ec00` (record 0406). Archive and Snappy
+  preparation now expose typed visitor admission before source-derived
+  traversals, followed by execution-only resource requirements. Archive
+  execution uses one fallible codec projection with normalized message
+  scalars, preserves raw unknown headers, and validates duplicate identifiers
+  with a sorted tuple index. Callers must charge both execution byte-work and
+  the separate checked identifier-sort-work model. Snappy requirements cover
+  output, possible temporary frames and the locked backend's reusable 32 KiB
+  workspace. Existing serialization methods retain their behavior.
+- The 95-test core suite, strict Clippy, rustdoc, glossary, boundaries and
+  related scoped checks passed; independent review closed the shared source
+  contract. This is a substrate merge, with no facade, native or performance
+  qualification claim. Numbers, Pages and Keynote now adopt the shared API
+  in their isolated branches before new host differential and performance
+  qualification. The final 53-row gate remains pending on one integrated
+  candidate; the last fully qualified source remains `e0e297a82b`.
