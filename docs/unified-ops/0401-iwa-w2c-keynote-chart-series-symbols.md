@@ -5,9 +5,10 @@
 This bounded W2-C slice owns the four Keynote host routes in
 `keynote/editor/slide_charts/series_symbol.rs`: all-series and one-series
 symbol writes, plus the corresponding all-series and one-series reads. It is
-implemented on `uo2/iwa-w2c-series-symbols` from the coordinator root and is
-not an integration or W3 claim. Native mutation evidence remains pending in
-the macOS queue.
+implemented on `uo2/iwa-w2c-series-symbols` from the coordinator root. The
+source-scoped Callgrind qualification is complete for this leaf branch; native
+mutation evidence remains pending in the macOS queue, so this is not a W3 or
+native-acceptance claim.
 
 The slice does not change the shared `litchi_iwa_style::series` engine, Numbers,
 Pages, unified operations dispatch, or coordinator progress. Symbol fills,
@@ -38,10 +39,14 @@ preview invalidation); exact-source patches support `inverse()` and reject a
 different source. A set-to-current value is an exact byte no-op.
 
 The adapter derives a bounded transaction envelope from the existing Keynote
-budget, admits graph indexes and archive reassembly before their allocations,
-maps graph/archive ceilings to typed `Limit`/`Allocation` failures, and does
-not fall back to the legacy host route. The shared engine remains the
-implementation authority for mark/shape and inherited size behavior.
+budget, separately admits the borrowed leaf-component view and the shared
+graph construction census/index, and uses `Workspace::new_bounded` for every
+symbol read, write, and readback. Construction charges the external census
+plus the builder's two internal passes exactly; the bounded workspace exposes
+zero construction work to the engine report. Graph/archive ceilings map to
+typed `Limit`/`Allocation` failures, and the route does not fall back to the
+legacy host path. The shared engine remains the implementation authority for
+mark/shape and inherited size behavior.
 
 The package boundary reuses the private chart-font selection/publication seam:
 archive encoding uses exact encoded lengths and maximum Snappy bounds, ZIP
@@ -51,16 +56,11 @@ fields. Deferred selector-name ceilings remain typed as selector-byte limits;
 the malformed control now requires the precise `InvalidSource` refusal rather
 than accepting any generic refusal.
 
-The final budget review has one explicit shared-first blocker: the shared
-`litchi_iwa_style::series` entry points (`values`, `set_values`,
-`style_values`, `set_style_values`, `symbols`, and `set_symbols`) currently
-construct their vectors/maps and invoke `chart_style_codec::Limits::DEFAULT`
-without accepting a caller residual profile or returning a work/allocation
-report. The Keynote facade admits its package census, result vector and
-publication/locality passes, but does not claim that this engine-internal
-graph traversal is fully caller-budgeted. Closing that last guarantee requires
-a shared-series admission/report seam before performance qualification; this
-slice does not paper over it with a fixed multiplier or default replacement.
+The shared series entry points accept the caller residual profile and return a
+bounded report/scope. The Keynote facade charges that report once, then keeps
+publication, candidate reopen, locality, and patch application on the same
+transaction ledger. No default ceiling, fixed headroom, or legacy estimator is
+introduced at this boundary.
 
 ## Differential proof
 
@@ -83,7 +83,8 @@ the same populated, host-authored bytes; the generic parity harness's
 same-reader checks are supplementary. The controls cover exact forward and
 inverse patch application, stale `PatchConflict`, hide-all-series (`None`)
 readback, nonempty count mismatch, malformed chart payloads, low semantic
-budgets, shared series-style dependency refusal, and a host/leaf vector with
+budgets including the object-census ceiling, shared series-style dependency
+refusal, and a host/leaf vector with
 an injected unknown chart field plus explicit unrelated-member locality. Set
 vectors retain the host differential, strict candidate reopen, inverse patch
 and untouched-member checks. Tier-B differences are limited to
@@ -101,15 +102,26 @@ Setup and inverse/output checks are outside the measured wrappers; each route
 executes host/leaf/leaf/host with one selected operation per call. The
 one-series read wrapper calls the host's actual one-series reader and projects
 the selected element from the leaf family read; it is not an alias of the
-all-series route. The coordinator must run the release Callgrind qualification on the final
-integrated candidate. This slice makes no wall-clock or final integrated
-performance claim.
+all-series route. The one-series set leaf wrapper performs a full-family read,
+modifies the selected index, then performs the full-family read-modify-set.
+
+The final source-scoped release Callgrind receipt is outside the repository at
+`/home/zhuhe/code/litchi-worktrees/.coord/iwa-w2c-series-symbols-perf-67a46d94adfdb62b7b44f7183d0da4f8e9c7bbdc/`.
+Its immutable ELF is 215,673,840 bytes, mode 0555, SHA-256
+`afc79573bd08f61b2ab04f72224af965c75c3246a6b8bc918238b46597f20fdf`; the
+c063 selected-call validator passed all eight legs. Leaf/host inclusive Ir
+ratios were: full read `0.122132585060`, full set `0.186192090392`, one-series
+read `0.122170090040`, and one-series set `0.156058401196`. These are
+source-scoped instruction diagnostics only: no wall-clock, native, or final
+integrated performance claim is made.
 
 ## Scoped verification
 
-The focused parity filter now covers eight tests (four vectors, patch/no-op
-and refusal controls, malformed/low-budget, unknown/locality, and shared-style
-refusal), and the Keynote package crate compiled offline.
-The complete 53-row gate, final integrated requalification, native queue and
-coordinator merge remain pending.
+The focused parity filter covers eight series cases (four route vectors,
+patch/no-op and refusal controls, malformed/low-budget, unknown/locality, and
+shared-style refusal); the Keynote package crate and shared style unit suite
+compiled/tested offline. The four archived release smokes passed, and the
+focused chart-font admission/locality regressions remain green. The complete
+53-row gate, final integrated requalification, native queue and coordinator
+merge remain pending.
 
