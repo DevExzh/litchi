@@ -15,7 +15,8 @@ use litchi_iwa_style::chart_font::{self, Change, ChartFont};
 use litchi_iwa_style::graph::Workspace;
 use litchi_iwa_text::character::TextPointSize;
 use litchi_iwa_text::font::Font;
-use litchi_pages::{BodyChartSelector, Package as PagesPackage};
+use litchi_pages::chart::font::{Error as PagesChartFontError, Refusal as PagesChartFontRefusal};
+use litchi_pages::{BodyChartSelector, OpenOptions, Package as PagesPackage, SourceLimits};
 
 use crate::chart_style_cases::{Components, Target, input};
 use crate::harness::{Case, Evidence, Format, LeafRun, TestResult, Tier};
@@ -192,6 +193,17 @@ fn pages_leaf_values(bytes: &[u8]) -> TestResult<(ChartFont, TextPointSize)> {
     ))
 }
 
+fn package_entries(bytes: &[u8]) -> TestResult<Vec<(String, Vec<u8>)>> {
+    let catalog = litchi_iwa_archive::package::Catalog::from_bytes(
+        bytes,
+        litchi_iwa_archive::Limits::default(),
+    )?;
+    Ok(catalog
+        .iter()
+        .map(|entry| (entry.name().to_owned(), entry.data().to_vec()))
+        .collect())
+}
+
 fn pages_facade_fixture() -> TestResult<(Vec<u8>, Target, u64)> {
     let input = input(Format::Pages, Kind::Column2d)?;
     let source = host_write(&input.fixture.bytes, input.target, input.chart, &avenir()?)?;
@@ -243,11 +255,22 @@ fn pages_facade_font_set_reset_inverse_noop() -> TestResult {
     let package = PagesPackage::from_bytes(&source)?;
     let selector = BodyChartSelector::index(0);
     let wanted = facade_georgia()?;
+    let chart = input(Format::Pages, Kind::Column2d)?.chart;
     let commit = package
         .edit_body_chart_font(selector)?
         .set_font(wanted.clone())?
         .commit()?;
     let changed = pages_leaf_bytes(commit.package())?;
+    let host_changed = host_write(&source, Target::Pages, chart, &Change::Font(wanted.clone()))?;
+    assert_eq!(
+        host_read(&host_changed, Target::Pages, chart)?,
+        host_read(&changed, Target::Pages, chart)?,
+        "Pages host and facade must agree after a font set"
+    );
+    assert!(matches!(
+        commit.package().apply_body_chart_font(commit.patch()),
+        Err(PagesChartFontError::PatchConflict)
+    ));
     let (font, size) = pages_leaf_values(&changed)?;
     assert_eq!(font, wanted);
     assert_eq!(size.points(), 17.0);
@@ -257,6 +280,13 @@ fn pages_facade_font_set_reset_inverse_noop() -> TestResult {
         .reset_font()?
         .commit()?;
     let reset_bytes = pages_leaf_bytes(reset.package())?;
+    let host_seed = host_write(&source, Target::Pages, chart, &Change::Font(wanted.clone()))?;
+    let host_reset = host_write(&host_seed, Target::Pages, chart, &Change::ResetFont)?;
+    assert_eq!(
+        host_read(&host_reset, Target::Pages, chart)?,
+        host_read(&reset_bytes, Target::Pages, chart)?,
+        "Pages host and facade must agree after a font reset"
+    );
     assert_eq!(pages_leaf_values(&reset_bytes)?.1.points(), 17.0);
     let restored = reset
         .package()
@@ -273,16 +303,73 @@ fn pages_facade_font_set_reset_inverse_noop() -> TestResult {
 }
 
 #[test]
+fn pages_facade_selector_budget_and_member_locality_controls() -> TestResult {
+    let source = pages_facade_source()?;
+    let package = PagesPackage::from_bytes(&source)?;
+    assert!(matches!(
+        package.body_chart_font(BodyChartSelector::index(99)),
+        Err(PagesChartFontError::Refused(
+            PagesChartFontRefusal::ChartNotFound { .. }
+        ))
+    ));
+
+    let low_options = OpenOptions::new().source_limits(
+        SourceLimits::builder()
+            .max_input_bytes(u64::try_from(source.len().saturating_add(32 * 1024))?)?
+            .build()?,
+    );
+    let low_package = PagesPackage::from_bytes_with_options(&source, low_options)?;
+    let low_error = low_package
+        .edit_body_chart_font(BodyChartSelector::index(0))?
+        .set_font(facade_georgia()?)?
+        .commit()
+        .expect_err("the exact source ceiling must reject projected output");
+    assert!(matches!(low_error, PagesChartFontError::Limit { .. }));
+
+    let commit = package
+        .edit_body_chart_font(BodyChartSelector::index(0))?
+        .set_font(facade_georgia()?)?
+        .commit()?;
+    let changed = pages_leaf_bytes(commit.package())?;
+    let before = package_entries(&source)?;
+    let after = package_entries(&changed)?;
+    assert_eq!(
+        before.iter().map(|(name, _)| name).collect::<Vec<_>>(),
+        after.iter().map(|(name, _)| name).collect::<Vec<_>>()
+    );
+    let differences = before
+        .iter()
+        .zip(&after)
+        .filter(|((before_name, before_bytes), (after_name, after_bytes))| {
+            before_name != after_name || before_bytes != after_bytes
+        })
+        .count();
+    assert!(differences > 0, "the mutation must have a changed member");
+    assert!(
+        differences < before.len(),
+        "untouched ZIP members must remain exact"
+    );
+    Ok(())
+}
+
+#[test]
 fn pages_facade_size_set_reset_inverse_noop() -> TestResult {
     let source = pages_facade_source()?;
     let package = PagesPackage::from_bytes(&source)?;
     let selector = BodyChartSelector::index(0);
     let wanted = TextPointSize::from_points(23.0)?;
+    let chart = input(Format::Pages, Kind::Column2d)?.chart;
     let commit = package
         .edit_body_chart_font_size(selector)?
         .set_size(wanted)
         .and_then(|edit| edit.commit())?;
     let changed = pages_leaf_bytes(commit.package())?;
+    let host_changed = host_write(&source, Target::Pages, chart, &Change::Size(wanted))?;
+    assert_eq!(
+        host_read(&host_changed, Target::Pages, chart)?,
+        host_read(&changed, Target::Pages, chart)?,
+        "Pages host and facade must agree after a size set"
+    );
     let (font, size) = pages_leaf_values(&changed)?;
     assert_eq!(font.font.name(), Some("AvenirNext-DemiBold"));
     assert_eq!(size.points(), 23.0);
@@ -291,10 +378,15 @@ fn pages_facade_size_set_reset_inverse_noop() -> TestResult {
         .edit_body_chart_font_size(selector)?
         .reset_size()?
         .commit()?;
+    let reset_bytes = pages_leaf_bytes(reset.package())?;
+    let host_seed = host_write(&source, Target::Pages, chart, &Change::Size(wanted))?;
+    let host_reset = host_write(&host_seed, Target::Pages, chart, &Change::ResetSize)?;
     assert_eq!(
-        pages_leaf_values(&pages_leaf_bytes(reset.package())?)?.0,
-        font
+        host_read(&host_reset, Target::Pages, chart)?,
+        host_read(&reset_bytes, Target::Pages, chart)?,
+        "Pages host and facade must agree after a size reset"
     );
+    assert_eq!(pages_leaf_values(&reset_bytes)?.0, font);
     let restored = reset
         .package()
         .apply_body_chart_font_size(&reset.patch().inverse())?;

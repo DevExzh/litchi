@@ -29,6 +29,15 @@ integrated performance qualification and native mutation evidence. The Mac
 queue remains pending; synthetic/self-round-trip evidence does not claim
 native acceptance.
 
+The final scoped proof also compares host and facade reads after host-authored
+font/size setup, host and facade set/reset readback, and the preserved
+unmodified property. A stale exact-source patch is refused, an out-of-range
+selector is a typed `ChartNotFound`, and a tightened source ceiling returns a
+typed finite resource limit before publication. The mutation proof compares
+ordered ZIP member names and confirms both changed and untouched members; the
+production locality verifier additionally checks untouched objects and raw ZIP
+records.
+
 ## Gaps and boundaries
 
 - No native E3/E4 evidence is claimed; the routes remain queued in
@@ -41,9 +50,19 @@ native acceptance.
 
 ## Verification
 
-Scoped Pages checks and the host-authored facade parity tests are required
-before integration. The shared substrate/adapter gates are recorded in their
-respective W1-E and W2-B records; the coordinator must rerun the complete
-gate on one integrated commit.
+The final branch source was checked with:
+
+- `cargo fmt --all`
+- `cargo check -p litchi-pages --lib --tests -p litchi-iwa --test parity --jobs 2`
+- `cargo clippy -p litchi-pages --lib --tests --all-features --jobs 2 -- -D warnings`
+- `cargo doc -p litchi-pages --no-deps --all-features`
+- `cargo test -p litchi-pages --lib body_chart_font -- --nocapture`
+- `cargo test -p litchi-iwa --test parity chart_font_cases:: -- --nocapture`
+
+The Pages facade controls and the existing host-vs-leaf chart-font cases pass;
+the seven release/cost probes remain intentionally ignored for the
+coordinator's final CPU slot. The shared substrate and shape/adapter checks
+are recorded in their respective records; the coordinator must rerun the
+complete gate on one integrated commit.
 
 No raw captures or binaries were added.

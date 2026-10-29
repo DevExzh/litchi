@@ -542,6 +542,7 @@ pub(super) struct ArrangementBudget {
     max_references: usize,
     max_allocations: usize,
     max_retained: usize,
+    max_scratch: usize,
     input: usize,
     output: usize,
     fields: usize,
@@ -549,6 +550,8 @@ pub(super) struct ArrangementBudget {
     references: usize,
     allocations: usize,
     retained: usize,
+    scratch: usize,
+    pub(super) workspace_source_admitted: bool,
 }
 
 impl ArrangementBudget {
@@ -561,6 +564,7 @@ impl ArrangementBudget {
         let limits = WireLimits::default()
             .with_input_bytes(message.min(WireLimits::MAX_INPUT_BYTES))
             .and_then(|value| value.with_output_bytes(message.min(WireLimits::MAX_OUTPUT_BYTES)))
+            .and_then(|value| value.with_fields(WireLimits::MAX_FIELDS))
             .and_then(|value| {
                 value.with_rewrite_work(
                     message
@@ -586,6 +590,7 @@ impl ArrangementBudget {
             max_references: archive.max_metadata_items().saturating_mul(16).max(1),
             max_allocations: archive.max_metadata_items().saturating_mul(16).max(1),
             max_retained: max_output,
+            max_scratch: max_output,
             input: 0,
             output: 0,
             fields: 0,
@@ -593,6 +598,8 @@ impl ArrangementBudget {
             references: 0,
             allocations: 0,
             retained: 0,
+            scratch: 0,
+            workspace_source_admitted: false,
         })
     }
 
@@ -620,15 +627,6 @@ impl ArrangementBudget {
             amount,
             self.max_input,
             LimitKind::InputBytes,
-        )
-    }
-
-    fn output(&mut self, amount: usize) -> Result<(), Error> {
-        Self::add(
-            &mut self.output,
-            amount,
-            self.max_output,
-            LimitKind::OutputBytes,
         )
     }
 
@@ -669,6 +667,24 @@ impl ArrangementBudget {
             amount,
             self.max_retained,
             LimitKind::WireRetainedBytes,
+        )
+    }
+
+    pub(super) fn output(&mut self, amount: usize) -> Result<(), Error> {
+        Self::add(
+            &mut self.output,
+            amount,
+            self.max_output,
+            LimitKind::OutputBytes,
+        )
+    }
+
+    pub(super) fn scratch(&mut self, amount: usize) -> Result<(), Error> {
+        Self::add(
+            &mut self.scratch,
+            amount,
+            self.max_scratch,
+            LimitKind::WireScratchBytes,
         )
     }
 
@@ -790,6 +806,18 @@ impl ArrangementBudget {
             .ok_or(Error::InvalidSource)
     }
 
+    pub(super) fn residual_input_bytes(&self) -> Result<usize, Error> {
+        self.max_input
+            .checked_sub(self.input)
+            .ok_or(Error::InvalidSource)
+    }
+
+    pub(super) fn residual_work_bytes(&self) -> Result<usize, Error> {
+        self.max_work
+            .checked_sub(self.work)
+            .ok_or(Error::InvalidSource)
+    }
+
     pub(super) fn residual_allocations(&self) -> Result<usize, Error> {
         self.max_allocations
             .checked_sub(self.allocations)
@@ -799,6 +827,12 @@ impl ArrangementBudget {
     pub(super) fn residual_retained_bytes(&self) -> Result<usize, Error> {
         self.max_retained
             .checked_sub(self.retained)
+            .ok_or(Error::InvalidSource)
+    }
+
+    pub(super) fn residual_scratch_bytes(&self) -> Result<usize, Error> {
+        self.max_scratch
+            .checked_sub(self.scratch)
             .ok_or(Error::InvalidSource)
     }
 
@@ -929,7 +963,7 @@ impl ArrangementBudget {
         Ok(())
     }
 
-    fn preflight_output(&self, amount: usize) -> Result<(), Error> {
+    pub(super) fn preflight_output(&self, amount: usize) -> Result<(), Error> {
         let observed = self
             .output
             .checked_add(amount)
@@ -944,7 +978,22 @@ impl ArrangementBudget {
         Ok(())
     }
 
-    fn preflight_work(&self, amount: usize) -> Result<(), Error> {
+    pub(super) fn preflight_scratch(&self, amount: usize) -> Result<(), Error> {
+        let observed = self
+            .scratch
+            .checked_add(amount)
+            .ok_or(Error::InvalidSource)?;
+        if observed > self.max_scratch {
+            return Err(Error::Limit {
+                kind: LimitKind::WireScratchBytes,
+                observed: observed as u64,
+                maximum: self.max_scratch as u64,
+            });
+        }
+        Ok(())
+    }
+
+    pub(super) fn preflight_work(&self, amount: usize) -> Result<(), Error> {
         let observed = self.work.checked_add(amount).ok_or(Error::InvalidSource)?;
         if observed > self.max_work {
             return Err(Error::Limit {

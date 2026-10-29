@@ -11,7 +11,7 @@ use std::sync::Arc;
 
 use litchi_core::Position;
 use litchi_iwa_archive::package::{Entry, OwnedExactArtifacts, SharedBytes};
-use litchi_iwa_core::{Archive, ArchiveObject, RawMessage};
+use litchi_iwa_core::{Archive, ArchiveObject, RawMessage, SnappyStream};
 use litchi_iwa_style::chart_font::{self as engine, ChartFont};
 use litchi_iwa_style::graph::{self as style_graph, Components, Workspace};
 use litchi_iwa_text::character::TextPointSize;
@@ -56,6 +56,8 @@ pub enum LimitKind {
     Wire(litchi_iwa_common::LimitKind),
     /// Generated chart-style codec resource.
     Codec(litchi_iwa_protos::chart_style_codec::LimitKind),
+    /// Package-metadata registry rewrite resource.
+    Registry(litchi_iwa_protos::package_metadata_codec::RewriteLimit),
 }
 
 impl fmt::Display for LimitKind {
@@ -76,6 +78,7 @@ impl fmt::Display for LimitKind {
             Self::Package(kind) => write!(formatter, "package {kind:?}"),
             Self::Wire(kind) => write!(formatter, "wire {kind}"),
             Self::Codec(kind) => write!(formatter, "codec {kind:?}"),
+            Self::Registry(kind) => write!(formatter, "registry {kind:?}"),
         }
     }
 }
@@ -99,6 +102,9 @@ pub enum Refusal {
     /// The graph produced a publication shape this focused family does not own.
     #[error("the chart-font graph produced unsupported component changes")]
     UnsupportedPublication,
+    /// The package-wide object identifier space is exhausted.
+    #[error("the Pages chart-font object identifier space is exhausted")]
+    IdentifierOverflow,
 }
 
 impl Refusal {
@@ -111,7 +117,9 @@ impl Refusal {
             Self::UnsupportedSource | Self::WrongProperty | Self::NoStagedOperation => {
                 RefusalKind::UnsupportedOperation
             },
-            Self::UnsupportedPublication => RefusalKind::UnsupportedContent,
+            Self::UnsupportedPublication | Self::IdentifierOverflow => {
+                RefusalKind::UnsupportedContent
+            },
         }
     }
 }
@@ -281,9 +289,8 @@ fn map_engine_error(error: engine::Error) -> Error {
             maximum,
         },
         engine::Error::Allocation { amount } => Error::Allocation { amount },
-        engine::Error::Refused(_) | engine::Error::IdentifierOverflow => {
-            Refusal::UnsupportedPublication.into()
-        },
+        engine::Error::Refused(_) => Refusal::UnsupportedPublication.into(),
+        engine::Error::IdentifierOverflow => Refusal::IdentifierOverflow.into(),
         engine::Error::Graph(error) => match *error {
             style_graph::Error::Archive(error) => map_core_error(error),
             style_graph::Error::Wire(error) => match error {
@@ -314,6 +321,19 @@ fn map_engine_error(error: engine::Error) -> Error {
                 },
                 _ => Error::InvalidSource,
             },
+            style_graph::Error::Limit {
+                kind,
+                observed,
+                maximum,
+            } => Error::Limit {
+                kind: match kind {
+                    style_graph::GraphLimitKind::ScratchBytes => LimitKind::ScratchBytes,
+                    style_graph::GraphLimitKind::AllocationEvents => LimitKind::Allocations,
+                },
+                observed: observed as u64,
+                maximum: maximum as u64,
+            },
+            style_graph::Error::Registry(error) => map_registry_error(error),
             _ => Error::InvalidSource,
         },
         engine::Error::Codec(error) => match error {
@@ -348,6 +368,52 @@ fn map_engine_error(error: engine::Error) -> Error {
     }
 }
 
+fn map_registry_error(error: litchi_iwa_protos::package_metadata_codec::RewriteError) -> Error {
+    if let Some(limit) = error.resource_limit() {
+        let (observed, maximum) = match limit {
+            litchi_iwa_protos::package_metadata_codec::RewriteLimit::InputBytes {
+                observed,
+                maximum,
+            }
+            | litchi_iwa_protos::package_metadata_codec::RewriteLimit::OutputBytes {
+                observed,
+                maximum,
+            }
+            | litchi_iwa_protos::package_metadata_codec::RewriteLimit::Fields {
+                observed,
+                maximum,
+            }
+            | litchi_iwa_protos::package_metadata_codec::RewriteLimit::Work { observed, maximum }
+            | litchi_iwa_protos::package_metadata_codec::RewriteLimit::Components {
+                observed,
+                maximum,
+            }
+            | litchi_iwa_protos::package_metadata_codec::RewriteLimit::References {
+                observed,
+                maximum,
+            }
+            | litchi_iwa_protos::package_metadata_codec::RewriteLimit::Additions {
+                observed,
+                maximum,
+            } => (observed as u64, maximum as u64),
+            litchi_iwa_protos::package_metadata_codec::RewriteLimit::Nesting {
+                observed,
+                maximum,
+            } => (u64::from(observed), u64::from(maximum)),
+            _ => return Error::InvalidSource,
+        };
+        return Error::Limit {
+            kind: LimitKind::Registry(limit),
+            observed,
+            maximum,
+        };
+    }
+    if let Some(amount) = error.allocation_request() {
+        return Error::Allocation { amount };
+    }
+    Error::InvalidSource
+}
+
 fn archive_limits(package: &Package) -> Result<litchi_iwa_core::Limits, Error> {
     package
         .state
@@ -357,29 +423,62 @@ fn archive_limits(package: &Package) -> Result<litchi_iwa_core::Limits, Error> {
         .map_err(map_archive_error)
 }
 
-fn engine_limits(package: &Package, payload: &[u8]) -> Result<engine::Limits, Error> {
+fn engine_limits(package: &Package, budget: &ArrangementBudget) -> Result<engine::Limits, Error> {
     let physical = package.state.source.limits();
-    let archive = archive_limits(package)?;
-    let package_bytes = usize::try_from(physical.max_input_bytes()).unwrap_or(usize::MAX);
-    let total_bytes = usize::try_from(physical.max_total_bytes()).unwrap_or(usize::MAX);
-    let metadata = archive.max_metadata_items().max(1);
+    let package_bytes = usize::try_from(physical.max_input_bytes())
+        .map_err(|_| Error::InvalidSource)?
+        .max(1);
+    let total_bytes = usize::try_from(physical.max_total_bytes())
+        .map_err(|_| Error::InvalidSource)?
+        .max(1);
+    let wire = budget
+        .residual_wire_limits()
+        .map_err(map_arrangement_error)?;
+    let input = budget
+        .residual_input_bytes()
+        .map_err(map_arrangement_error)?
+        .min(package_bytes)
+        .min(litchi_iwa_protos::chart_style_codec::Limits::DEFAULT.max_bytes())
+        .max(1);
+    let output = budget
+        .residual_output_bytes()
+        .map_err(map_arrangement_error)?
+        .min(package_bytes)
+        .min(litchi_iwa_protos::chart_style_codec::Limits::DEFAULT.max_bytes())
+        .max(1);
+    let fields = wire
+        .max_fields()
+        .min(litchi_iwa_protos::chart_style_codec::Limits::DEFAULT.max_fields())
+        .max(1);
+    let work = budget
+        .residual_work_bytes()
+        .map_err(map_arrangement_error)?
+        .min(total_bytes.saturating_mul(32).max(1))
+        .max(1);
+    let allocations = budget
+        .residual_allocations()
+        .map_err(map_arrangement_error)?
+        .max(1);
+    let retained = budget
+        .residual_retained_bytes()
+        .map_err(map_arrangement_error)?
+        .min(package_bytes)
+        .max(1);
+    let scratch = budget
+        .residual_scratch_bytes()
+        .map_err(map_arrangement_error)?
+        .min(package_bytes)
+        .max(1);
     Ok(engine::Limits::new(
-        package_bytes.max(payload.len()).max(1),
-        metadata
-            .saturating_mul(64)
-            .min(litchi_iwa_common::WireLimits::MAX_FIELDS)
-            .min(litchi_iwa_protos::chart_style_codec::Limits::DEFAULT.max_fields())
-            .max(1),
-        package_bytes
-            .min(litchi_iwa_protos::chart_style_codec::Limits::DEFAULT.max_bytes())
-            .max(payload.len())
-            .max(1),
-        64,
-        total_bytes.saturating_mul(64).max(1),
-        payload.len().saturating_mul(8).max(1),
-        metadata.saturating_mul(32).max(8),
-        total_bytes.max(payload.len()).max(1),
-        total_bytes.max(payload.len()).max(1),
+        input,
+        fields,
+        output,
+        u32::try_from(wire.max_nesting()).map_err(|_| Error::InvalidSource)?,
+        work,
+        package_bytes.min(litchi_iwa_protos::chart_style_codec::Limits::DEFAULT.max_bytes()),
+        allocations,
+        retained,
+        scratch,
     ))
 }
 
@@ -400,25 +499,151 @@ fn map_archive_error(error: litchi_iwa_archive::Error) -> Error {
     }
 }
 
-fn target(package: &Package, selector: BodyChartSelector) -> Result<ChartTarget, Error> {
-    let mut budget = ArrangementBudget::new(package).map_err(map_arrangement_error)?;
-    arrangement::resolve_target(package, selector, &mut budget).map_err(map_arrangement_error)
+fn target_with_budget(
+    package: &Package,
+    selector: BodyChartSelector,
+    budget: &mut ArrangementBudget,
+) -> Result<ChartTarget, Error> {
+    arrangement::resolve_target(package, selector, budget).map_err(map_arrangement_error)
 }
 
-fn value(package: &Package, target: &ChartTarget, kind: Kind) -> Result<Value, Error> {
+fn charge_engine_report(
+    budget: &mut ArrangementBudget,
+    report: engine::Report,
+) -> Result<(), Error> {
+    budget
+        .input(report.input_bytes())
+        .map_err(map_arrangement_error)?;
+    budget
+        .output(report.output_bytes())
+        .map_err(map_arrangement_error)?;
+    budget
+        .fields(report.fields())
+        .map_err(map_arrangement_error)?;
+    budget
+        .work(report.work_bytes())
+        .map_err(map_arrangement_error)?;
+    budget
+        .allocations(report.allocations())
+        .map_err(map_arrangement_error)?;
+    budget
+        .retained(report.retained_bytes())
+        .map_err(map_arrangement_error)?;
+    budget
+        .scratch(report.scratch_bytes())
+        .map_err(map_arrangement_error)?;
+    Ok(())
+}
+
+fn admit_workspace(package: &Package, budget: &mut ArrangementBudget) -> Result<(), Error> {
+    let source_bytes = package.state.source.shared_source().len();
+    let objects = package.state.object_count.max(1);
+    if !budget.workspace_source_admitted {
+        budget.input(source_bytes).map_err(map_arrangement_error)?;
+        budget
+            .retained(source_bytes)
+            .map_err(map_arrangement_error)?;
+        budget.workspace_source_admitted = true;
+    }
+    budget.work(objects).map_err(map_arrangement_error)?;
+    budget.allocations(objects).map_err(map_arrangement_error)?;
+    budget
+        .scratch(objects.saturating_mul(size_of::<u64>() * 2))
+        .map_err(map_arrangement_error)?;
+    Ok(())
+}
+
+fn archive_rewrite_bound(package: &Package, archive: &Archive) -> Result<usize, Error> {
+    let encoded = archive
+        .encoded_len(archive_limits(package)?)
+        .map_err(map_core_error)?;
+    let compressed = package
+        .state
+        .source
+        .limits()
+        .snappy_limits()
+        .map_err(map_archive_error)?;
+    SnappyStream::maximum_compressed_len(encoded, compressed).map_err(map_core_error)
+}
+
+fn preflight_publication(
+    source: &Package,
+    edits: &[(String, Archive)],
+    budget: &ArrangementBudget,
+) -> Result<usize, Error> {
+    let projected = edits.iter().try_fold(
+        source.state.source.shared_source().len(),
+        |total, (name, archive)| {
+            let bound = archive_rewrite_bound(source, archive)?;
+            total
+                .checked_add(name.len())
+                .and_then(|total| total.checked_add(bound))
+                .ok_or(Error::InvalidSource)
+        },
+    )?;
+    budget
+        .preflight_output(projected)
+        .map_err(map_arrangement_error)?;
+    budget
+        .preflight_work(projected)
+        .map_err(map_arrangement_error)?;
+    budget
+        .preflight_allocations(edits.len().saturating_add(1))
+        .map_err(map_arrangement_error)?;
+    budget
+        .preflight_retained(projected)
+        .map_err(map_arrangement_error)?;
+    budget
+        .preflight_scratch(projected)
+        .map_err(map_arrangement_error)?;
+    Ok(projected)
+}
+
+fn charge_publication(
+    candidate: &Package,
+    edit_count: usize,
+    projected: usize,
+    budget: &mut ArrangementBudget,
+) -> Result<(), Error> {
+    let actual = candidate.state.source.shared_source().len();
+    if actual > projected {
+        return Err(Error::Verification);
+    }
+    budget.output(actual).map_err(map_arrangement_error)?;
+    budget.work(actual).map_err(map_arrangement_error)?;
+    budget
+        .allocations(edit_count.saturating_add(1))
+        .map_err(map_arrangement_error)?;
+    budget.retained(actual).map_err(map_arrangement_error)?;
+    budget.scratch(projected).map_err(map_arrangement_error)
+}
+
+fn value_with_budget(
+    package: &Package,
+    target: &ChartTarget,
+    kind: Kind,
+    budget: &mut ArrangementBudget,
+) -> Result<Value, Error> {
+    admit_workspace(package, budget)?;
     let components = PackageComponents(package);
     let limits = archive_limits(package)?;
     let workspace = Workspace::new(&components, limits).map_err(map_engine_graph_error)?;
-    let payload =
+    let _payload =
         arrangement::selected_chart_payload(package, target).map_err(map_arrangement_error)?;
-    let limits = engine_limits(package, payload)?;
+    let limits = engine_limits(package, budget)?;
     match kind {
-        Kind::Font => engine::font(&workspace, target.drawable_identifier.get(), limits)
-            .map(|(value, _report)| Value::Font(value))
-            .map_err(map_engine_error),
-        Kind::Size => engine::size(&workspace, target.drawable_identifier.get(), limits)
-            .map(|(value, _report)| Value::Size(value))
-            .map_err(map_engine_error),
+        Kind::Font => {
+            let result = engine::font(&workspace, target.drawable_identifier.get(), limits);
+            let (value, report) = result.map_err(map_engine_error)?;
+            charge_engine_report(budget, report)?;
+            Ok(Value::Font(value))
+        },
+        Kind::Size => {
+            let result = engine::size(&workspace, target.drawable_identifier.get(), limits);
+            let (value, report) = result.map_err(map_engine_error)?;
+            charge_engine_report(budget, report)?;
+            Ok(Value::Size(value))
+        },
     }
 }
 
@@ -456,6 +681,7 @@ pub struct Edit<'a> {
     target: ChartTarget,
     kind: Kind,
     before: Value,
+    budget: ArrangementBudget,
     change: Option<Change>,
 }
 
@@ -649,6 +875,7 @@ fn unchanged(source: &Package, target: ChartTarget, kind: Kind, value: Value) ->
 
 fn commit_edit(edit: Edit<'_>, change: Change) -> Result<Commit, Error> {
     let source = edit.source;
+    let mut budget = edit.budget;
     let before = edit.before;
     let requested = match (&change, edit.kind) {
         (Change::Set(value), Kind::Font) if matches!(value, Value::Font(_)) => Some(value.clone()),
@@ -664,9 +891,10 @@ fn commit_edit(edit: Edit<'_>, change: Change) -> Result<Commit, Error> {
     }
 
     let components = PackageComponents(source);
+    admit_workspace(source, &mut budget)?;
     let limits = archive_limits(source)?;
     let mut workspace = Workspace::new(&components, limits).map_err(map_engine_graph_error)?;
-    let payload =
+    let _payload =
         arrangement::selected_chart_payload(source, &edit.target).map_err(map_arrangement_error)?;
     let report = engine::set(
         &mut workspace,
@@ -678,9 +906,10 @@ fn commit_edit(edit: Edit<'_>, change: Change) -> Result<Commit, Error> {
             (Change::Reset, Kind::Size) => engine::Change::ResetSize,
             _ => return Err(Refusal::WrongProperty.into()),
         },
-        engine_limits(source, payload)?,
+        engine_limits(source, &budget)?,
     )
     .map_err(map_engine_error)?;
+    charge_engine_report(&mut budget, report)?;
     if !report.changed() {
         return Ok(unchanged(source, edit.target, edit.kind, before));
     }
@@ -688,6 +917,8 @@ fn commit_edit(edit: Edit<'_>, change: Change) -> Result<Commit, Error> {
     if !changes.insertions.is_empty() || !changes.deletions.is_empty() {
         return Err(Refusal::UnsupportedPublication.into());
     }
+    let edit_count = changes.edits.len();
+    let projected = preflight_publication(source, &changes.edits, &budget)?;
     let names = changes
         .edits
         .iter()
@@ -700,7 +931,8 @@ fn commit_edit(edit: Edit<'_>, change: Change) -> Result<Commit, Error> {
         .collect();
     let candidate =
         package_graph::publish_archives(source, archives).map_err(map_package_graph_error)?;
-    let after = value(&candidate, &edit.target, edit.kind)?;
+    charge_publication(&candidate, edit_count, projected, &mut budget)?;
+    let after = value_with_budget(&candidate, &edit.target, edit.kind, &mut budget)?;
     if requested
         .as_ref()
         .is_some_and(|requested| requested != &after)
@@ -708,7 +940,7 @@ fn commit_edit(edit: Edit<'_>, change: Change) -> Result<Commit, Error> {
         return Err(Error::Verification);
     }
     let changed_objects = changed_object_ids(source, &candidate, &names)?;
-    verify_locality(source, &candidate, &names, &changed_objects)?;
+    verify_locality(source, &candidate, &names, &changed_objects, &mut budget)?;
     let touched_components = names.len();
     let source_bytes = source.state.source.shared_source();
     let target_bytes = candidate.state.source.shared_source();
@@ -739,6 +971,7 @@ fn apply_patch(package: &Package, patch: &Patch, kind: Kind) -> Result<Commit, E
         return Err(Refusal::WrongProperty.into());
     }
     let mut budget = ArrangementBudget::new(package).map_err(map_arrangement_error)?;
+    admit_workspace(package, &mut budget)?;
     let source = package.state.source.shared_source();
     let source_owner = SharedBytes::from_shared_slice(Arc::clone(&source));
     budget
@@ -752,8 +985,14 @@ fn apply_patch(package: &Package, patch: &Patch, kind: Kind) -> Result<Commit, E
     if !patch.artifacts.authorizes_owner(&source_owner) {
         return Err(Error::PatchConflict);
     }
-    let current = target(package, BodyChartSelector::position(patch.position))?;
-    if !current.same_identity(&patch.target) || value(package, &current, kind)? != patch.before {
+    let current = target_with_budget(
+        package,
+        BodyChartSelector::position(patch.position),
+        &mut budget,
+    )?;
+    if !current.same_identity(&patch.target)
+        || value_with_budget(package, &current, kind, &mut budget)? != patch.before
+    {
         return Err(Error::PatchConflict);
     }
     if patch.is_noop() {
@@ -771,13 +1010,30 @@ fn apply_patch(package: &Package, patch: &Patch, kind: Kind) -> Result<Commit, E
     }
     let target_owner = patch.artifacts.target_owner();
     budget
+        .preflight_output(target_owner.as_ref().len())
+        .map_err(map_arrangement_error)?;
+    budget
+        .preflight_scratch(target_owner.as_ref().len())
+        .map_err(map_arrangement_error)?;
+    budget
         .candidate_reopen(target_owner.as_ref().len())
         .map_err(map_arrangement_error)?;
     let candidate_bytes = Arc::<[u8]>::from(target_owner.as_ref());
     let candidate =
         package_graph::reopen(package, candidate_bytes).map_err(map_package_graph_error)?;
-    let verified = target(&candidate, BodyChartSelector::position(patch.position))?;
-    if !verified.same_identity(&patch.target) || value(&candidate, &verified, kind)? != patch.after
+    budget
+        .output(target_owner.as_ref().len())
+        .map_err(map_arrangement_error)?;
+    budget
+        .scratch(target_owner.as_ref().len())
+        .map_err(map_arrangement_error)?;
+    let verified = target_with_budget(
+        &candidate,
+        BodyChartSelector::position(patch.position),
+        &mut budget,
+    )?;
+    if !verified.same_identity(&patch.target)
+        || value_with_budget(&candidate, &verified, kind, &mut budget)? != patch.after
     {
         return Err(Error::Verification);
     }
@@ -786,6 +1042,7 @@ fn apply_patch(package: &Package, patch: &Patch, kind: Kind) -> Result<Commit, E
         &candidate,
         &patch.changed_components,
         &patch.changed_objects,
+        &mut budget,
     )?;
     Ok(Commit {
         package: candidate,
@@ -803,7 +1060,9 @@ impl Package {
         &self,
         selector: impl Into<BodyChartSelector>,
     ) -> Result<ChartFont, Error> {
-        match value(self, &target(self, selector.into())?, Kind::Font)? {
+        let mut budget = ArrangementBudget::new(self).map_err(map_arrangement_error)?;
+        let target = target_with_budget(self, selector.into(), &mut budget)?;
+        match value_with_budget(self, &target, Kind::Font, &mut budget)? {
             Value::Font(font) => Ok(font),
             Value::Size(_) => Err(Error::InvalidSource),
         }
@@ -815,13 +1074,15 @@ impl Package {
         selector: impl Into<BodyChartSelector>,
     ) -> Result<Edit<'_>, Error> {
         let selector = selector.into();
-        let target = target(self, selector)?;
-        let before = value(self, &target, Kind::Font)?;
+        let mut budget = ArrangementBudget::new(self).map_err(map_arrangement_error)?;
+        let target = target_with_budget(self, selector, &mut budget)?;
+        let before = value_with_budget(self, &target, Kind::Font, &mut budget)?;
         Ok(Edit {
             source: self,
             target,
             kind: Kind::Font,
             before,
+            budget,
             change: None,
         })
     }
@@ -836,7 +1097,9 @@ impl Package {
         &self,
         selector: impl Into<BodyChartSelector>,
     ) -> Result<TextPointSize, Error> {
-        match value(self, &target(self, selector.into())?, Kind::Size)? {
+        let mut budget = ArrangementBudget::new(self).map_err(map_arrangement_error)?;
+        let target = target_with_budget(self, selector.into(), &mut budget)?;
+        match value_with_budget(self, &target, Kind::Size, &mut budget)? {
             Value::Size(size) => Ok(size),
             Value::Font(_) => Err(Error::InvalidSource),
         }
@@ -848,13 +1111,15 @@ impl Package {
         selector: impl Into<BodyChartSelector>,
     ) -> Result<Edit<'_>, Error> {
         let selector = selector.into();
-        let target = target(self, selector)?;
-        let before = value(self, &target, Kind::Size)?;
+        let mut budget = ArrangementBudget::new(self).map_err(map_arrangement_error)?;
+        let target = target_with_budget(self, selector, &mut budget)?;
+        let before = value_with_budget(self, &target, Kind::Size, &mut budget)?;
         Ok(Edit {
             source: self,
             target,
             kind: Kind::Size,
             before,
+            budget,
             change: None,
         })
     }
@@ -911,8 +1176,8 @@ fn verify_locality(
     candidate: &Package,
     changed_components: &[Arc<str>],
     changed_objects: &[(Arc<str>, Vec<u64>)],
+    budget: &mut ArrangementBudget,
 ) -> Result<(), Error> {
-    let mut budget = ArrangementBudget::new(source).map_err(map_arrangement_error)?;
     let source_entries = source.state.source.package();
     let candidate_entries = candidate.state.source.package();
     if source_entries.len() != candidate_entries.len() {
