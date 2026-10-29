@@ -288,6 +288,11 @@ fn rewrite_one(
         return Err(invalid("empty header rewrite"));
     }
     let census = census_bucket(bucket, limits)?;
+    // This is the profile reserved for the raw helper.  Capture it after
+    // preflight, before debiting the exact execution requirements below; the
+    // helper's own finite checks are covered by those debits and must not be
+    // given the further-depleted leftover profile.
+    let execution_wire = limits.residual_wire()?;
     let growth = checked_mul(
         deltas.len(),
         table_write::HEADER_BYTES,
@@ -302,10 +307,7 @@ fn rewrite_one(
     limits.admit_output(output_bound)?;
     limits.admit_copies(output_bound)?;
     limits.admit_allocations(1)?;
-    // The preflight and all wrapper-owned execution debits above consume the
-    // residual profile.  Recompute it at the exact call boundary so the raw
-    // helper cannot validate against stale ceilings.
-    let profile = WireProfile::from_wire_limits(limits.residual_wire()?);
+    let profile = WireProfile::from_wire_limits(execution_wire);
     table_write::header_adjust_many(bucket, deltas, &profile).map_err(map_table_write)
 }
 
