@@ -191,6 +191,28 @@ fn refusals_are_typed() -> TestResult {
     Ok(())
 }
 
+#[test]
+fn setting_effective_style_as_a_noop_preserves_exact_source() -> TestResult {
+    let package = Package::new()
+        .edit_table_cells(0, 0)?
+        .set(At::new(1, 1), Input::Text("source".into()))?
+        .commit()?
+        .into_package();
+    let source = bytes(&package)?;
+    let mut current = CharacterProperties::new();
+    current.bold = Some(false);
+    let commit = package
+        .edit_table_cell_text_style(0, 0)?
+        .set(At::new(1, 1), current)?
+        .commit()?;
+    assert_eq!(bytes(commit.package())?, source);
+    let restored = commit
+        .package()
+        .apply_table_cell_text_style(&commit.patch().inverse())?;
+    assert_eq!(bytes(restored.package())?, source);
+    Ok(())
+}
+
 /// Every stored cell of the corpus takes bold, or refuses typed.
 #[test]
 fn corpus_cells_take_bold_or_refuse_typed() -> TestResult {

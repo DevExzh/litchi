@@ -706,8 +706,7 @@ fn bnc_limits(data: &[u8], limits: &Limits) -> Result<BncLimits, Error> {
                 limits
                     .wire
                     .max_rewrite_work()
-                    .min(BncLimits::MAX_ITEMS)
-                    .max(1),
+                    .clamp(1, BncLimits::MAX_ITEMS),
             )
         })
         .map_err(|_| invalid("invalid BNC operation limits"))
@@ -1535,7 +1534,7 @@ fn style_is_exclusive(
 #[cfg(test)]
 mod tests {
     use super::minimal;
-    use super::{Error, Limits, TableSource, view};
+    use super::{Error, Limits, TableSource, varint, view};
     use litchi_iwa_text_wire::CharacterProperties;
 
     struct LimitedSource {
@@ -1697,5 +1696,28 @@ mod tests {
             view(&[8, 1], &limits),
             Err(Error::Allocation { amount: 1 })
         ));
+    }
+
+    #[test]
+    fn duplicate_singular_style_field_is_rejected_before_projection() {
+        let source = limited_source(1_000_000, 1_000_000);
+        let limits = Limits::from_source(&source).expect("source limits");
+        assert!(matches!(
+            varint(&[8, 1, 8, 2], 1, &limits),
+            Err(Error::InvalidSource(_))
+        ));
+    }
+
+    #[test]
+    fn unknown_style_field_remains_borrowed_and_semantically_local() {
+        let source = limited_source(1_000_000, 1_000_000);
+        let limits = Limits::from_source(&source).expect("source limits");
+        let data = [8, 1, 0x98, 6, 0x7b];
+        assert_eq!(varint(&data, 1, &limits).expect("known field"), Some(1));
+        let view = view(&data, &limits).expect("wire view");
+        assert_eq!(
+            view.fields().map(|field| field.raw()).collect::<Vec<_>>(),
+            vec![&data[..2], &data[2..]]
+        );
     }
 }
