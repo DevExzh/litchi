@@ -648,14 +648,19 @@ impl SymbolBudget {
             LimitKind::InputBytes,
             self.limits.max_input_bytes,
             self.input_bytes,
-        )?;
-        let fields = Self::remaining(LimitKind::Fields, self.limits.max_fields, self.fields)?;
-        let work = Self::remaining(LimitKind::Work, self.limits.max_work_bytes, self.work_bytes)?;
+        )?
+        .min(WireLimits::MAX_INPUT_BYTES);
+        let fields = Self::remaining(LimitKind::Fields, self.limits.max_fields, self.fields)?
+            .min(WireLimits::MAX_FIELDS);
+        let work = Self::remaining(LimitKind::Work, self.limits.max_work_bytes, self.work_bytes)?
+            .min(WireLimits::MAX_REWRITE_WORK);
         WireLimits::DEFAULT
             .with_input_bytes(input)
             .and_then(|limits| limits.with_fields(fields))
             .and_then(|limits| limits.with_rewrite_work(work))
-            .and_then(|limits| limits.with_nesting(self.limits.max_nesting as usize))
+            .and_then(|limits| {
+                limits.with_nesting((self.limits.max_nesting as usize).min(WireLimits::MAX_NESTING))
+            })
             .map_err(|error| SymbolError::Graph(Error::Wire(error)))
     }
 
@@ -669,8 +674,10 @@ impl SymbolBudget {
             LimitKind::OutputBytes,
             self.limits.max_output_bytes,
             self.output_bytes,
-        )?);
-        let fields = Self::remaining(LimitKind::Fields, self.limits.max_fields, self.fields)?;
+        )?)
+        .min(CodecLimits::DEFAULT.max_bytes());
+        let fields = Self::remaining(LimitKind::Fields, self.limits.max_fields, self.fields)?
+            .min(CodecLimits::DEFAULT.max_fields());
         CodecLimits::DEFAULT
             .with_max_bytes(bytes)
             .and_then(|limits| limits.with_max_fields(fields))
@@ -3739,13 +3746,22 @@ fn bounded_style_parent_payload(
     let mut style = Vec::new();
     if let Some(identifier) = stylesheet {
         budget.preflight_allocations(1)?;
+        budget.preflight_retained(16)?;
+        budget.allocations(1)?;
+        budget.retained(16)?;
+        style
+            .try_reserve_exact(16)
+            .map_err(|_| SymbolError::Allocation { amount: 16 })?;
+        budget.preflight_allocations(1)?;
         budget.preflight_retained(11)?;
         budget.allocations(1)?;
         budget.retained(11)?;
-        style
+        let mut reference = Vec::new();
+        reference
             .try_reserve_exact(11)
             .map_err(|_| SymbolError::Allocation { amount: 11 })?;
-        push_varint_field(&mut style, REFERENCE_IDENTIFIER_FIELD, identifier);
+        push_varint_field(&mut reference, REFERENCE_IDENTIFIER_FIELD, identifier);
+        push_message_field(&mut style, STYLE_STYLESHEET_FIELD, &reference);
     }
     let bound = style.len().saturating_add(16);
     budget.preflight_allocations(1)?;
@@ -5252,6 +5268,15 @@ mod symbol_tests {
         payload
     }
 
+    fn chart_payload_without_override() -> Vec<u8> {
+        let mut extension = Vec::new();
+        let style = reference(2);
+        push_message_field(&mut extension, 17, &style);
+        let mut payload = Vec::new();
+        push_message_field(&mut payload, codec::EXTENSION_FIELD, &extension);
+        payload
+    }
+
     fn object(identifier: u64, message_type: u32, payload: Vec<u8>) -> ArchiveObject {
         ArchiveObject::new(
             identifier,
@@ -5287,6 +5312,19 @@ mod symbol_tests {
         components
     }
 
+    fn fresh_components() -> Vec<(String, Archive)> {
+        vec![(
+            "Index/Chart.iwa".to_owned(),
+            Archive {
+                objects: vec![
+                    object(1, CHART_MESSAGE_TYPE, chart_payload_without_override()),
+                    object(2, SERIES_STYLE_MESSAGE_TYPE, style_payload()),
+                    object(3, STYLESHEET_MESSAGE_TYPE, Vec::new()),
+                ],
+            },
+        )]
+    }
+
     const fn limits(max_allocations: usize) -> Limits {
         Limits::new(
             256 * 1024,
@@ -5316,6 +5354,22 @@ mod symbol_tests {
             references,
             4 * 1024,
             4 * 1024,
+        )
+    }
+
+    const fn large_limits() -> Limits {
+        Limits::new(
+            usize::MAX,
+            usize::MAX,
+            usize::MAX,
+            u32::MAX,
+            usize::MAX,
+            usize::MAX,
+            usize::MAX,
+            usize::MAX,
+            usize::MAX,
+            usize::MAX,
+            usize::MAX,
         )
     }
 
@@ -5421,6 +5475,23 @@ mod symbol_tests {
     }
 
     #[test]
+    fn large_profile_clamps_wire_and_codec_hard_axes_without_headroom() {
+        let budget = SymbolBudget::new(large_limits());
+        let wire = budget.wire_limits().expect("wire hard caps");
+        assert_eq!(wire.max_input_bytes(), WireLimits::MAX_INPUT_BYTES);
+        assert_eq!(wire.max_fields(), WireLimits::MAX_FIELDS);
+        assert_eq!(wire.max_rewrite_work(), WireLimits::MAX_REWRITE_WORK);
+        assert_eq!(wire.max_nesting(), WireLimits::MAX_NESTING);
+        let codec = budget.codec_limits().expect("codec hard caps");
+        assert_eq!(codec.max_bytes(), CodecLimits::DEFAULT.max_bytes());
+        assert_eq!(codec.max_fields(), CodecLimits::DEFAULT.max_fields());
+        let components = components();
+        let workspace = Workspace::new(&components, CoreLimits::default()).expect("workspace");
+        let (_values, _report) =
+            symbols(&workspace, 1, FAMILY, 1, large_limits()).expect("large profile valid input");
+    }
+
+    #[test]
     fn codec_requirements_match_follow_on_reference_and_decode_passes() {
         let chart = chart_payload();
         let requirements = codec::reference_requirements(&chart, CodecLimits::DEFAULT)
@@ -5497,5 +5568,26 @@ mod symbol_tests {
             .1;
         assert_ne!(selected, 4);
         assert_eq!(unselected, 4);
+    }
+
+    #[test]
+    fn fresh_styled_symbol_allocation_is_bounded_and_readable() {
+        let components = fresh_components();
+        let mut workspace = Workspace::new(&components, CoreLimits::default()).expect("workspace");
+        let (changed, report) = set_symbols(&mut workspace, 1, FAMILY, &expected(), limits(4_096))
+            .expect("fresh styled symbol write");
+        assert!(changed);
+        assert!(report.changed());
+        let references = codec::references(
+            &workspace.object(1).expect("chart").messages[0].data,
+            CodecLimits::DEFAULT,
+        )
+        .expect("chart references");
+        assert!(
+            references
+                .series_non_styles()
+                .is_some_and(|sparse| sparse.entries().len() == 1)
+        );
+        assert!(workspace.object(4).is_ok());
     }
 }

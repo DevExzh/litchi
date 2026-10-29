@@ -18,6 +18,7 @@
 //! record. New object UUIDs are derived deterministically (record 0298
 //! §2.1) where the host draws random ones.
 
+use std::cell::RefCell;
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::fmt;
 
@@ -216,6 +217,8 @@ pub struct Workspace<'s> {
     ambiguous: HashSet<u64>,
     /// `(component, object, message)` of the registry payload.
     registry: Option<(usize, u64, usize)>,
+    registry_requirements: RefCell<Option<Option<registry_codec::RewriteReport>>>,
+    registry_root: RefCell<Option<Option<Root>>>,
     uuid_seed: u64,
     source_work: usize,
 }
@@ -285,6 +288,8 @@ impl<'s> Workspace<'s> {
             index,
             ambiguous,
             registry,
+            registry_requirements: RefCell::new(None),
+            registry_root: RefCell::new(None),
             uuid_seed: 0,
             source_work,
         })
@@ -308,6 +313,8 @@ impl<'s> Workspace<'s> {
             index: self.index.clone(),
             ambiguous: self.ambiguous.clone(),
             registry: self.registry,
+            registry_requirements: RefCell::new(None),
+            registry_root: RefCell::new(None),
             uuid_seed: self.uuid_seed,
             source_work: self.source_work,
         }
@@ -601,6 +608,8 @@ impl<'s> Workspace<'s> {
     }
 
     fn set_registry_payload(&mut self, data: Vec<u8>) -> Result<()> {
+        self.registry_requirements.borrow_mut().take();
+        self.registry_root.borrow_mut().take();
         let (position, object, message) = self
             .registry
             .ok_or(Error::Invalid("the package has no registry"))?;
@@ -651,7 +660,11 @@ impl<'s> Workspace<'s> {
     }
 
     fn inspect(&self) -> Result<Option<Root>> {
+        if let Some(cached) = self.registry_root.borrow().as_ref() {
+            return Ok(cached.clone());
+        }
         let Some(payload) = self.registry_payload()? else {
+            *self.registry_root.borrow_mut() = Some(None);
             return Ok(None);
         };
         let mut root = Root::default();
@@ -662,6 +675,7 @@ impl<'s> Workspace<'s> {
         )?;
         root.last_object_identifier = inspection.last_object_identifier();
         root.save_token = inspection.save_token();
+        *self.registry_root.borrow_mut() = Some(Some(root.clone()));
         Ok(Some(root))
     }
 
@@ -763,17 +777,31 @@ impl<'s> Workspace<'s> {
     pub(crate) fn registry_inspection_requirements(
         &self,
     ) -> Result<Option<registry_codec::RewriteReport>> {
+        if let Some(cached) = self.registry_requirements.borrow().as_ref() {
+            return Ok(*cached);
+        }
         let Some(payload) = self.registry_payload()? else {
+            *self.registry_requirements.borrow_mut() = Some(None);
             return Ok(None);
         };
-        Ok(Some(registry_codec::inspect_package_metadata_requirements(
+        let report = registry_codec::inspect_package_metadata_requirements(
             payload,
             self.registry_options(),
-        )?))
+        )?;
+        *self.registry_requirements.borrow_mut() = Some(Some(report));
+        Ok(Some(report))
     }
 
     /// Exact wire work required by one package-registry inspection.
     pub(crate) fn registry_inspection_work(&self) -> usize {
+        // Callers use this as the admission for the next `inspect`-backed
+        // lookup.  Once that lookup has populated the root cache, charging
+        // the full two-pass codec report again would account preparation as
+        // work that is not performed.  `set_registry_payload` clears both
+        // caches, so every changed registry state is admitted again.
+        if self.registry_root.borrow().is_some() {
+            return 0;
+        }
         self.registry_inspection_requirements()
             .ok()
             .flatten()
@@ -1112,7 +1140,7 @@ impl<'s> Workspace<'s> {
 }
 
 /// What one strict registry inspection reports.
-#[derive(Default)]
+#[derive(Default, Clone)]
 struct Root {
     last_object_identifier: u64,
     save_token: Option<u64>,

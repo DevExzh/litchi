@@ -8,6 +8,19 @@
   requirements repair after coordinator trunk
   `59a501492cb58a538085280e383007ca4d39dad7`.
 - Final clean WP tip after formatting: `5385fd632c8a28d4217422dcedae1c3b74cc81ac`.
+- Adoption repair: `ed50c20a25528f8a0a9aecb2a1ca32dfb778b02b` fixes the styled-parent reference framing and
+  residual wire-field/work hard-ceiling clamp; the final tip includes this
+  repair.
+- Final hard-axis repair: `1e1e56651c4fa3e5795e31267c7e6c58980afae9` clamps residual input, nesting, codec
+  bytes, fields, and wire work to hard ceilings after zero-exhaustion checks;
+  the large-profile regression proves no hidden quota headroom.
+- Adoption follow-up: `5888a2b4675e52aebe8e1182d49d20ea052b9de1` caches exact prepared registry inspection
+  requirements and the inspected registry root, invalidating both caches on
+  metadata changes. The final direct-engine fix does not alter facade budgets
+  or add default headroom. Commit `085eb46d55` adds the cache-accounting
+  repair: it charges the
+  compatibility work getter only for the next uncached inspection pass, while
+  metadata rewrites invalidate both caches.
 - Scope: shared chart-series symbol read/write admission, Numbers mechanical
   caller adoption, and the direct shared-engine parity caller. Pages and
   Keynote facade adoption remain owned by their work packages.
@@ -51,7 +64,12 @@ is an explicit follow-up gap, not a full Numbers facade-ledger qualification.
 
 ## Verification
 
-- `cargo test --offline -p litchi-iwa-style --lib`: 25 passed.
+- `cargo test --offline -p litchi-iwa-style --lib`: 30 passed.
+- `cargo test --offline -p litchi-iwa --test parity chart_font_cases -- --nocapture`:
+  29 passed, 13 ignored; Numbers, Pages, and Keynote chart-font parity and
+  low-budget controls pass.
+- `cargo test --offline -p litchi-numbers --test sheet_chart_font -- --nocapture`:
+  4 passed.
 - `cargo clippy --offline -p litchi-iwa-style --lib --all-features -- -D warnings`: pass.
 - `cargo check --offline -p litchi-numbers --lib`: pass.
 - `cargo clippy --offline -p litchi-numbers --lib --all-features -- -D warnings`: pass.
@@ -67,6 +85,9 @@ is an explicit follow-up gap, not a full Numbers facade-ledger qualification.
   planned-scope assertions.
 - Codec requirement/report regression: reference and decode preflight reports
   match their follow-on codec passes for fields and work.
+- Direct engine ABBA parity probe across Keynote, Numbers, and Pages:
+  `cargo test --offline -p litchi-iwa --test parity
+  series_graph_write_cost_abba -- --ignored --nocapture`: pass.
 
 No ledger, queue, progress, fixture, performance, native evidence, or
 generated binary changes are included.
