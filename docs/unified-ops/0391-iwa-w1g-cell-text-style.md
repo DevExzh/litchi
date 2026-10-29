@@ -3,7 +3,7 @@
 - Status: Numbers-first substrate, bounded tile writer, and header-bucket
   materialization repair remain isolated on the WP. Pages and Keynote facades
   are not started, no ledger rows are migrated, and no native acceptance claim
-  is active. The current code tip is `6d5f02c0a1`; release-mode instruction
+  is active. The current code tip is `6ec4e6becf`; release-mode instruction
   capture remains coordinator-gated and has not started.
 - Source branch: `uo2/iwa-w1g-cell-text-style`, cut from frozen root
   `1e3978082bd8e576f0afeb7e3eebac1ca3908d86`, then synchronized with frozen
@@ -18,7 +18,8 @@
   Numbers writer adoption `43608b8faa`, bounded shared table-fact selection
   `4f014f7463`, reviewed header-helper merge `ea1bab6270`, and header-adapter
   integration `7b8cf978fb`, row-header admission closure `d39eb1740c`, and
-  cross-bucket/missing-ownership closure `6d5f02c0a1`. Earlier budget, parser,
+  cross-bucket/missing-ownership closure `6d5f02c0a1`, and selection-scan
+  admission closure `6ec4e6becf`. Earlier budget, parser,
   exclusive-path, mutation-output and identity/unknown-preservation
   checkpoints remain in history.
 - Scope: shared `litchi-iwa-table::cell_text_style` graph reads and direct
@@ -130,6 +131,12 @@ a materialization count but lacks the corresponding row or column ownership
 reference is refused with `UnsupportedDependency`; it is not silently
 published through a tile-only fallback. The boundary and missing-ownership
 controls pass in the shared header tests and the Numbers adapter unit suite.
+The caller-side model, update, tile-index, tile-group, and row-bucket ownership
+comparisons now pre-admit their conservative cumulative work. The shared
+`table_fact_tile_duplicate_scan_is_cumulatively_admitted` regression exhausts
+the work ledger immediately before the tile duplicate scan and expects the
+typed work refusal; it was added during the coordinator's quiet hold and is
+awaiting the next released scoped run.
 The package proof mutates an otherwise exclusive style with unknown root and
 unrelated paragraph data (asserting both the nonempty paragraph field and root
 unknown field); the canonical-shape gate derives a fresh style and the old
