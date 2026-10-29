@@ -422,6 +422,8 @@ pub struct ConstructionRequirements {
     component_count: usize,
     object_count: usize,
     source_work: usize,
+    builder_work: usize,
+    total_work: usize,
     index_allocations: usize,
     index_retained_bytes: usize,
     index_scratch_bytes: usize,
@@ -444,6 +446,20 @@ impl ConstructionRequirements {
     #[must_use]
     pub const fn source_work(self) -> usize {
         self.source_work
+    }
+
+    /// Aggregate work for `new_bounded`: its internal identity re-census plus
+    /// the index population pass.
+    #[must_use]
+    pub const fn builder_work(self) -> usize {
+        self.builder_work
+    }
+
+    /// Aggregate work for one external census plus `new_bounded`'s two
+    /// internal passes.
+    #[must_use]
+    pub const fn total_work(self) -> usize {
+        self.total_work
     }
 
     #[must_use]
@@ -503,6 +519,25 @@ impl ConstructionRequirements {
             }
         }
         Ok(())
+    }
+
+    fn check_builder(
+        self,
+        limits: ConstructionLimits,
+    ) -> std::result::Result<(), ConstructionError> {
+        if self.builder_work > limits.max_work() {
+            return Err(ConstructionError::Limit {
+                kind: ConstructionLimitKind::Work,
+                observed: self.builder_work,
+                maximum: limits.max_work(),
+            });
+        }
+        self.check(ConstructionLimits::new(
+            limits.max_work(),
+            limits.max_allocations(),
+            limits.max_retained_bytes(),
+            limits.max_scratch_bytes(),
+        ))
     }
 }
 
@@ -784,9 +819,10 @@ impl fmt::Debug for Workspace<'_> {
 impl<'s> Workspace<'s> {
     /// Census the borrowed component view without allocating a graph index.
     ///
-    /// The caller supplies the residual census profile. The returned
-    /// `source_work` is the exact amount to charge for this pass and is also
-    /// the amount required by [`Self::new_bounded`] for its population pass.
+    /// The caller supplies the residual census profile. `source_work` is the
+    /// exact amount for this external census; `builder_work` covers the
+    /// builder's internal re-census plus population; `total_work` covers all
+    /// three actual passes.
     pub fn construction_requirements(
         source: &dyn Components,
         limits: ConstructionLimits,
@@ -900,6 +936,17 @@ impl<'s> Workspace<'s> {
             .ok_or(ConstructionError::Graph(Error::Invalid(
                 "component view bytes overflow",
             )))?;
+        let builder_work =
+            source_work
+                .checked_mul(2)
+                .ok_or(ConstructionError::Graph(Error::Invalid(
+                    "workspace builder work overflow",
+                )))?;
+        let total_work = source_work
+            .checked_add(builder_work)
+            .ok_or(ConstructionError::Graph(Error::Invalid(
+                "workspace construction work overflow",
+            )))?;
         let requirements = ConstructionRequirements {
             source_token: source_token(source),
             fingerprint_a,
@@ -907,6 +954,8 @@ impl<'s> Workspace<'s> {
             component_count,
             object_count,
             source_work,
+            builder_work,
+            total_work,
             index_allocations,
             index_retained_bytes,
             index_scratch_bytes: 0,
@@ -918,15 +967,24 @@ impl<'s> Workspace<'s> {
     }
 
     /// Build a workspace after a caller has admitted one exact construction
-    /// census. The source is rescanned to populate reserved indexes; no
-    /// index grows beyond the returned requirements.
+    /// census. The builder performs an internal identity re-census and then
+    /// a population pass; no index grows beyond the returned requirements.
     pub fn new_bounded(
         source: &'s dyn Components,
         limits: Limits,
         requirements: ConstructionRequirements,
         construction_limits: ConstructionLimits,
     ) -> std::result::Result<Self, ConstructionError> {
-        let current = Self::construction_requirements(source, construction_limits)?;
+        requirements.check_builder(construction_limits)?;
+        let current = Self::construction_requirements(
+            source,
+            ConstructionLimits::new(
+                construction_limits.max_work(),
+                construction_limits.max_allocations(),
+                construction_limits.max_retained_bytes(),
+                construction_limits.max_scratch_bytes(),
+            ),
+        )?;
         if current != requirements {
             return Err(ConstructionError::Graph(Error::Invalid(
                 "workspace source changed between census and build",
@@ -1070,7 +1128,7 @@ impl<'s> Workspace<'s> {
             registry_root: RefCell::new(None),
             finish: FinishLedger::default(),
             uuid_seed: 0,
-            source_work,
+            source_work: 0,
         })
     }
 
@@ -1161,10 +1219,12 @@ impl<'s> Workspace<'s> {
         }
     }
 
-    /// Estimate the bounded traversal and metadata work performed while the
-    /// workspace indexes its source components.  Format owners charge this
-    /// before invoking a style engine so the graph scan cannot escape the
-    /// engine's operation budget.
+    /// Constructor scan work for the legacy [`Self::new`] path.
+    ///
+    /// A workspace built with [`Self::new_bounded`] has already exposed its
+    /// external census and the builder's two passes through
+    /// [`ConstructionRequirements::total_work`] and therefore reports zero
+    /// here; bounded callers must not charge construction as engine work.
     #[must_use]
     pub(crate) fn source_work(&self) -> usize {
         self.source_work
