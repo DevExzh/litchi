@@ -2,11 +2,11 @@
 
 - Status: bounded facade slice on `uo2/iwa-w2c-chart-font`, cut from frozen
   root `9932c7d0691b2c14bbbd11a2dea7df41f66308b6`, with the reviewed shared
-  substrate `faefe7303b` and frozen trunk `1bc8f22499` merged at branch tip
-  `c3937337473bee2a985a27fb8ffa2407489c85f7`. The selector/locality and
-  admission/cost-probe repair is `6ac2c0efcd`. The six exit-ledger rows are now
-  migrated on this reviewed WP; coordinator integration, native evidence and
-  final integrated gates remain pending.
+  substrate `faefe7303b` and frozen trunk `1bc8f22499` merged before the final
+  source-bound candidate `f875e5c3c9199930286c3295c67a42befd5e70b7`. The
+  selector/locality and admission/cost-probe repair is `6ac2c0efcd`. The six
+  exit-ledger rows are now migrated on this reviewed WP; coordinator
+  integration, native evidence and final integrated gates remain pending.
 - Date: 2026-10-29.
 - Plan: [0363](0363-iwa-monolith-exit-plan.md) W2-C; parity/evidence policy
   [0369](0369-iwa-exit-parity-harness-and-ledger.md); shared chart-font engine
