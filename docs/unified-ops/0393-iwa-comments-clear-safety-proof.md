@@ -85,7 +85,7 @@ the source and receipt produced after this merge rather than conflated with the
 historical mixed result above.
 
 The repaired-source run after merging `6d45e19a61` completed all 13 cases on
-current WP tip `6eebe0bab3` (runtime source `67427c20f1`). The scoped command
+proof merge `6eebe0bab3` (runtime source `67427c20f1`). The scoped command
 was:
 
 ```text
