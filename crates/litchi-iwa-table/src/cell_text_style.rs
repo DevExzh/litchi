@@ -820,6 +820,8 @@ fn prepare_batch_context(
         keys.push(style_key(cell.as_deref(), limits)?);
     }
     let mut styles = Vec::new();
+    limits.reserve(&mut styles, keys.len())?;
+    limits.admit_work(keys.len().saturating_mul(keys.len().max(1)))?;
     let mut effective_cache = Vec::new();
     let mut effective_path = BTreeSet::new();
     for key in keys.iter().flatten().copied() {
@@ -1442,10 +1444,7 @@ fn effective_cached(
         properties.inherit(&inherited);
     }
     path.remove(&style);
-    limits.admit_allocations(1)?;
-    cache
-        .try_reserve(1)
-        .map_err(|_| Error::Allocation { amount: 1 })?;
+    limits.reserve(cache, 1)?;
     cache.push((style, properties.clone()));
     Ok(properties)
 }
@@ -2603,6 +2602,7 @@ fn encode_stylesheet_batch(
 
     let mut added_children = Vec::new();
     limits.admit_allocations(1)?;
+    limits.admit_allocations(styles.len())?;
     added_children
         .try_reserve(styles.len().saturating_mul(16))
         .map_err(|_| Error::Allocation {
@@ -2618,16 +2618,19 @@ fn encode_stylesheet_batch(
         append_raw_field(&mut reference, 1, 0, value);
         append_raw_field(&mut added_children, 2, 2, &reference);
     }
-    let added_styles = styles
-        .iter()
-        .map(|(style, _)| {
-            let mut reference = Vec::new();
-            let mut encoded = [0_u8; 10];
-            let value = litchi_iwa_common::varint::encode_varint_to_buffer(*style, &mut encoded);
-            append_raw_field(&mut reference, 1, 0, value);
-            reference
-        })
-        .collect::<Vec<_>>();
+    let mut added_styles = Vec::new();
+    limits.reserve(&mut added_styles, styles.len())?;
+    for (style, _) in styles {
+        limits.admit_allocations(1)?;
+        let mut reference = Vec::new();
+        reference
+            .try_reserve(16)
+            .map_err(|_| Error::Allocation { amount: 16 })?;
+        let mut encoded = [0_u8; 10];
+        let value = litchi_iwa_common::varint::encode_varint_to_buffer(*style, &mut encoded);
+        append_raw_field(&mut reference, 1, 0, value);
+        added_styles.push(reference);
+    }
     let style_bytes = added_styles
         .iter()
         .map(|reference| bytes_bound(1, reference.len()))
