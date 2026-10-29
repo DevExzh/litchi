@@ -206,6 +206,8 @@ fn view<'a>(data: &'a [u8], transaction: &Limits) -> Result<WireView<'a>, Error>
     transaction.charge_input(data.len())?;
     transaction.charge_fields(field_count)?;
     transaction.admit_work(raw_work)?;
+    transaction.charge_input(data.len())?;
+    transaction.charge_fields(field_count)?;
     transaction.admit_work(data.len())?;
     transaction.admit_allocations(field_count)?;
     let material = WireLimits::default()
@@ -317,8 +319,15 @@ fn append_varint(
 }
 
 fn build_bnc_limits(wire: &BncLimits, columns: usize) -> Result<BncLimits, Error> {
-    wire.with_items(columns.clamp(1, BncLimits::MAX_ITEMS))
-        .map_err(map_bnc_limits)
+    let items = wire.max_items().min(columns);
+    if items == 0 {
+        return Err(Error::Limit {
+            kind: LimitKind::RewriteWork,
+            observed: 1,
+            maximum: 0,
+        });
+    }
+    wire.with_items(items).map_err(map_bnc_limits)
 }
 
 fn intersect_bnc_limits(caller: &BncLimits, transaction: &Limits) -> Result<BncLimits, Error> {
@@ -713,7 +722,9 @@ pub fn set_text_style_keys(
         }
         indexed.push(IndexedUpdate { index, update });
     }
+    transaction.admit_work(updates.len())?;
     indexed.sort_by_key(|item| (item.update.row, item.update.column));
+    transaction.admit_work(updates.len().saturating_mul(usize::BITS as usize))?;
     if indexed.windows(2).any(|pair| {
         pair[0].update.row == pair[1].update.row && pair[0].update.column == pair[1].update.column
     }) {
@@ -723,8 +734,14 @@ pub fn set_text_style_keys(
     let wire = bnc_limits.wire();
     let root = view(tile, transaction)?;
     let bnc_limits = build_bnc_limits(&bnc_limits, columns.max(updates.len()))?;
-    transaction.admit_allocations(updates.len())?;
-    let mut previous = vec![None; updates.len()];
+    transaction.admit_allocations(1)?;
+    let mut previous = Vec::new();
+    previous
+        .try_reserve_exact(updates.len())
+        .map_err(|_| Error::Allocation {
+            amount: updates.len(),
+        })?;
+    previous.resize_with(updates.len(), || None);
     let row_count = root
         .fields()
         .filter(|field| field.number() == TILE_ROW_FIELD)
@@ -766,6 +783,7 @@ pub fn set_text_style_keys(
             rewrites.push(rewritten);
         }
     }
+    transaction.admit_work(existing_rows.len())?;
     if existing_rows.windows(2).any(|pair| pair[0] >= pair[1]) {
         return Err(invalid("tile rows are not strictly ordered"));
     }
@@ -777,12 +795,14 @@ pub fn set_text_style_keys(
             amount: updates.len(),
         })?;
     let mut index = 0usize;
+    transaction.admit_work(indexed.len())?;
     while index < indexed.len() {
         let row = indexed[index].update.row;
         let end = indexed[index..]
             .iter()
             .position(|item| item.update.row != row)
             .map_or(indexed.len(), |offset| index + offset);
+        transaction.admit_work(existing_rows.len())?;
         if !existing_rows.contains(&row) {
             transaction.admit_allocations(1)?;
             let mut group = Vec::new();
@@ -874,6 +894,7 @@ pub fn set_text_style_keys(
             previous[item.index] = None;
         }
     }
+    transaction.admit_work(rewrites.len())?;
     let mut changed = false;
     for rewrite in &rewrites {
         changed |= rewrite.changed;
@@ -891,6 +912,12 @@ pub fn set_text_style_keys(
     charge_view_scans(&root, transaction, 1)?;
     let old_numrows = one_varint(&root, TILE_NUM_ROWS_FIELD)?
         .ok_or_else(|| invalid("tile row count is missing"))?;
+    transaction.admit_work(
+        rewrites
+            .len()
+            .saturating_add(existing_rows.len())
+            .saturating_mul(2),
+    )?;
     let inserted_rows = rewrites
         .iter()
         .map(|rewrite| rewrite.row)
@@ -913,6 +940,7 @@ pub fn set_text_style_keys(
         )
     };
     let mut output_len = 0usize;
+    transaction.admit_work(root.len())?;
     for field in root.fields() {
         let length = if field.number() == TILE_ROW_FIELD {
             let row_view = view(field.payload(), transaction)?;
@@ -937,6 +965,7 @@ pub fn set_text_style_keys(
             .checked_add(length)
             .ok_or_else(|| invalid("tile output length overflow"))?;
     }
+    transaction.admit_work(rewrites.len().saturating_add(existing_rows.len()))?;
     for rewrite in &rewrites {
         if !existing_rows.contains(&rewrite.row) {
             output_len = output_len
@@ -961,6 +990,7 @@ pub fn set_text_style_keys(
     for field in root.fields() {
         if matches!(placement, RowPlacement::FieldOrder) && field.number() > TILE_ROW_FIELD {
             transaction.admit_allocations(1)?;
+            transaction.admit_work(rewrites.len().saturating_add(existing_rows.len()))?;
             let mut rows_to_insert = Vec::new();
             rows_to_insert
                 .try_reserve_exact(rewrites.len())
@@ -992,6 +1022,7 @@ pub fn set_text_style_keys(
                 .map_err(|_| invalid("tile row index overflow"))?;
             if matches!(placement, RowPlacement::FieldOrder) {
                 transaction.admit_allocations(1)?;
+                transaction.admit_work(rewrites.len().saturating_add(existing_rows.len()))?;
                 let mut rows_to_insert = Vec::new();
                 rows_to_insert
                     .try_reserve_exact(rewrites.len())
@@ -1029,6 +1060,7 @@ pub fn set_text_style_keys(
         }
     }
     transaction.admit_allocations(1)?;
+    transaction.admit_work(rewrites.len().saturating_add(existing_rows.len()))?;
     let mut rows_to_insert = Vec::new();
     rows_to_insert
         .try_reserve_exact(rewrites.len())
@@ -1536,6 +1568,45 @@ mod tests {
             )
             .is_err()
         );
+    }
+
+    #[test]
+    fn materialized_second_wire_pass_has_its_own_input_debit() {
+        let source = tile(&[row(0, &[Some(&bnc(Some(3))), None], &[])], &[]);
+        let transaction = transaction_limits();
+        let remaining = transaction.wire.max_input_bytes();
+        transaction
+            .charge_input(remaining.saturating_sub(source.len()))
+            .expect("leave exactly one raw-pass input budget");
+        let wire = BncLimits::from_wire_limits(transaction.wire);
+        assert!(matches!(
+            set_text_style_keys(
+                &source,
+                2,
+                &[Update {
+                    row: 0,
+                    column: 0,
+                    key: Some(7),
+                }],
+                RowPlacement::FieldOrder,
+                &transaction,
+                &wire,
+            ),
+            Err(Error::Limit {
+                kind: LimitKind::InputBytes,
+                ..
+            })
+        ));
+    }
+
+    #[test]
+    fn residual_bnc_item_cap_is_not_widened_by_target_columns() {
+        let transaction = transaction_limits();
+        let narrow = BncLimits::from_wire_limits(transaction.wire)
+            .with_items(1)
+            .expect("narrow items");
+        let bounded = build_bnc_limits(&narrow, 100).expect("intersected items");
+        assert_eq!(bounded.max_items(), 1);
     }
 
     #[test]
