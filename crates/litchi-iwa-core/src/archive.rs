@@ -9570,7 +9570,7 @@ where
         let compatibility_bytes = archive_info_codec_memory(&object.archive_info)?;
         let object_scratch = neutral_bytes
             .checked_add(compatibility_bytes)
-            .and_then(|value| value.checked_add(header_length))
+            .and_then(|value| value.checked_add(canonical_header_length))
             .ok_or_else(|| Error::invalid_archive(object_index, "encoding scratch overflow"))?;
         scratch_bytes = scratch_bytes
             .checked_add(object_scratch)
@@ -9589,7 +9589,7 @@ where
             .ok_or_else(|| Error::invalid_archive(object_index, "allocation count overflow"))?;
         allocation_events = allocation_events
             .checked_add(compatibility_allocations)
-            .and_then(|value| value.checked_add(usize::from(header_length != 0)))
+            .and_then(|value| value.checked_add(usize::from(canonical_header_length != 0)))
             .ok_or_else(|| Error::invalid_archive(object_index, "allocation count overflow"))?;
     }
 
