@@ -11,17 +11,25 @@
     reason = "The focused adapter keeps the semantic boundary beside its staged transaction."
 )]
 
+use std::collections::HashSet;
 use std::fmt;
 use std::mem::size_of;
 use std::sync::Arc;
 
 use litchi_iwa_archive::package::{EntryEdit, EntryInsertion, ExactArtifacts};
-use litchi_iwa_core::{Archive, ArchiveObject, Limits as ArchiveLimits, RawMessage, SnappyStream};
+use litchi_iwa_core::{
+    Archive, ArchiveObject, ArchiveReferenceKind, ArchiveReferenceOccurrence,
+    ArchiveReferencePolicy, ArchiveReferenceVisitor, Limits as ArchiveLimits, RawMessage,
+    SnappyStream,
+};
+use litchi_iwa_protos::chart_metadata_codec::{self, DecodeOptions};
+use litchi_iwa_protos::chart_style_codec::{self as chart_style_codec, Limits as ChartCodecLimits};
 use litchi_iwa_style::graph::{self, Components, Workspace};
 use litchi_iwa_style::series as engine;
 use thiserror::Error as ThisError;
 
-use super::slide_chart_title;
+use super::chart_axis_support::{self, AxisSupportError, AxisSupportSelectorError};
+use super::slide_chart_font::{self, FieldLedger};
 use super::slide_table_core::{Budget as TransactionBudget, Error as TransactionError};
 use super::{Package, PhysicalSource};
 use crate::{ChartSelector, SlideSelector};
@@ -258,9 +266,11 @@ fn select(
     package: &Package,
     slide: SlideSelector<'_>,
     chart: ChartSelector<'_>,
+    budget: &mut TransactionBudget,
+    fields: &mut FieldLedger,
 ) -> Result<Selection, Error> {
-    let selected =
-        slide_chart_title::select_chart(package, slide, chart, true).map_err(map_selection)?;
+    let selected = slide_chart_font::select_chart_for_series(package, slide, chart, budget, fields)
+        .map_err(map_axis_support_error)?;
     Ok(Selection {
         slide: selected.slide_position,
         chart: selected.chart_position,
@@ -268,54 +278,49 @@ fn select(
     })
 }
 
-fn map_selection(error: slide_chart_title::Error) -> Error {
+fn map_axis_support_error(error: AxisSupportError) -> Error {
     match error {
-        slide_chart_title::Error::Refused(refusal) => match refusal {
-            slide_chart_title::Refusal::UnsupportedSource => Refusal::UnsupportedSource.into(),
-            slide_chart_title::Refusal::AmbiguousSelector => Refusal::AmbiguousSelector.into(),
-            slide_chart_title::Refusal::EmptySlideName => Refusal::EmptySlideName.into(),
-            slide_chart_title::Refusal::SlideNameNotFound => Refusal::SlideNameNotFound.into(),
-            slide_chart_title::Refusal::SlidePositionNotFound { position } => {
+        AxisSupportError::Selector(selector) => match selector {
+            AxisSupportSelectorError::UnsupportedSource => Refusal::UnsupportedSource.into(),
+            AxisSupportSelectorError::AmbiguousSelector => Refusal::AmbiguousSelector.into(),
+            AxisSupportSelectorError::EmptySlideName => Refusal::EmptySlideName.into(),
+            AxisSupportSelectorError::SlideNameNotFound => Refusal::SlideNameNotFound.into(),
+            AxisSupportSelectorError::SlidePositionNotFound { position } => {
                 Refusal::SlidePositionNotFound { position }.into()
             },
-            slide_chart_title::Refusal::ChartNameNotFound => Refusal::ChartNameNotFound.into(),
-            slide_chart_title::Refusal::ChartPositionNotFound { position } => {
+            AxisSupportSelectorError::ChartNameNotFound => Refusal::ChartNameNotFound.into(),
+            AxisSupportSelectorError::ChartPositionNotFound { position } => {
                 Refusal::ChartPositionNotFound { position }.into()
             },
-            slide_chart_title::Refusal::EmptyChartName => Refusal::EmptyChartName.into(),
+            AxisSupportSelectorError::EmptyChartName => Refusal::EmptyChartName.into(),
         },
-        slide_chart_title::Error::Allocation { amount } => Error::Allocation { amount },
-        slide_chart_title::Error::Limit {
+        AxisSupportError::LimitExceeded {
             kind,
             observed,
             maximum,
         } => Error::Limit {
-            kind: map_title_limit(kind),
+            kind: match kind {
+                chart_axis_support::AxisSupportLimitKind::InputBytes => LimitKind::InputBytes,
+                chart_axis_support::AxisSupportLimitKind::OutputBytes => LimitKind::OutputBytes,
+                chart_axis_support::AxisSupportLimitKind::WireBytes => LimitKind::WireBytes,
+                chart_axis_support::AxisSupportLimitKind::Entries
+                | chart_axis_support::AxisSupportLimitKind::EntryBytes
+                | chart_axis_support::AxisSupportLimitKind::TotalBytes
+                | chart_axis_support::AxisSupportLimitKind::Slides
+                | chart_axis_support::AxisSupportLimitKind::TextStorages
+                | chart_axis_support::AxisSupportLimitKind::TextFragments => LimitKind::Entries,
+                chart_axis_support::AxisSupportLimitKind::References => LimitKind::References,
+                chart_axis_support::AxisSupportLimitKind::TextBytes => LimitKind::WireBytes,
+                chart_axis_support::AxisSupportLimitKind::WireFields => LimitKind::WireFields,
+                chart_axis_support::AxisSupportLimitKind::WireNesting => LimitKind::WireNesting,
+                chart_axis_support::AxisSupportLimitKind::WireWork => LimitKind::WireWork,
+                chart_axis_support::AxisSupportLimitKind::TitleBytes => LimitKind::WireBytes,
+            },
             observed,
             maximum,
         },
-        _ => Error::InvalidSource,
-    }
-}
-
-fn map_title_limit(kind: slide_chart_title::LimitKind) -> LimitKind {
-    use super::slide_chart_title::LimitKind as TitleLimitKind;
-    match kind {
-        TitleLimitKind::InputBytes => LimitKind::InputBytes,
-        TitleLimitKind::OutputBytes => LimitKind::OutputBytes,
-        TitleLimitKind::WireBytes => LimitKind::WireBytes,
-        TitleLimitKind::Entries
-        | TitleLimitKind::EntryBytes
-        | TitleLimitKind::TotalBytes
-        | TitleLimitKind::Slides
-        | TitleLimitKind::References
-        | TitleLimitKind::TextStorages
-        | TitleLimitKind::TextFragments => LimitKind::Entries,
-        TitleLimitKind::TextBytes => LimitKind::WireBytes,
-        TitleLimitKind::WireFields => LimitKind::WireFields,
-        TitleLimitKind::WireNesting => LimitKind::WireNesting,
-        TitleLimitKind::WireWork => LimitKind::WireWork,
-        TitleLimitKind::TitleBytes | TitleLimitKind::SelectorBytes => LimitKind::WireBytes,
+        AxisSupportError::Allocation { amount } => Error::Allocation { amount },
+        AxisSupportError::InvalidSource => Error::InvalidSource,
     }
 }
 
@@ -324,69 +329,95 @@ fn family_and_count(
     selection: Selection,
     budget: &mut TransactionBudget,
 ) -> Result<(SymbolFamily, usize), Error> {
-    budget
-        .preflight_semantic_scan(package)
-        .map_err(map_transaction_error)?;
-    let metadata = package
-        .slide_chart_metadata(
-            SlideSelector::position(selection.slide),
-            ChartSelector::position(selection.chart),
-        )
-        .map_err(map_metadata_error)?;
-    let family = SymbolFamily::for_chart_kind(metadata.kind()).ok_or(Refusal::UnsupportedKind)?;
-    Ok((family, metadata.series_count()))
+    let payload = package
+        .state
+        .source
+        .components()
+        .iter()
+        .find_map(|component| {
+            component
+                .archive()
+                .object(selection.identifier)
+                .and_then(|object| {
+                    object
+                        .messages
+                        .iter()
+                        .find(|message| message.type_ == 5_021)
+                        .map(|message| message.data.as_slice())
+                })
+        })
+        .ok_or(Error::InvalidSource)?;
+    let limits = budget.residual(package).map_err(map_transaction_error)?;
+    let maximum_depth = u32::try_from(limits.max_nesting()).map_err(|_| Error::InvalidSource)?;
+    let options = DecodeOptions::new(
+        payload.len().max(1).min(limits.max_input_bytes()),
+        limits.max_fields().max(1),
+        limits.max_rewrite_work().max(1),
+        maximum_depth,
+        limits.max_fields().clamp(1, 1_000_000),
+        limits.max_input_bytes().clamp(1, 64 * 1024 * 1024),
+    );
+    let (snapshot, report) =
+        match chart_metadata_codec::decode_modern_with_report(payload, &options) {
+            Ok(decoded) => decoded,
+            Err(error) => {
+                charge_metadata_report(budget, error.report())?;
+                return Err(map_chart_metadata_decode_error(error));
+            },
+        };
+    charge_metadata_report(budget, report)?;
+    let kind = litchi_iwa_common::chart::kind::Kind::from_native(snapshot.chart_type());
+    let family = SymbolFamily::for_chart_kind(kind).ok_or(Refusal::UnsupportedKind)?;
+    Ok((family, snapshot.series_count()))
 }
 
-fn map_metadata_error(error: super::slide_chart_metadata::Error) -> Error {
-    use super::slide_chart_metadata::{Error as MetadataError, LimitKind as MetadataLimitKind};
-    match error {
-        MetadataError::UnsupportedSource => Refusal::UnsupportedSource.into(),
-        MetadataError::AmbiguousSelector => Refusal::AmbiguousSelector.into(),
-        MetadataError::EmptySlideName => Refusal::EmptySlideName.into(),
-        MetadataError::SlideNameNotFound => Refusal::SlideNameNotFound.into(),
-        MetadataError::SlidePositionNotFound { position } => {
-            Refusal::SlidePositionNotFound { position }.into()
-        },
-        MetadataError::ChartNameNotFound => Refusal::ChartNameNotFound.into(),
-        MetadataError::ChartPositionNotFound { position } => {
-            Refusal::ChartPositionNotFound { position }.into()
-        },
-        MetadataError::EmptyChartName => Refusal::EmptyChartName.into(),
-        MetadataError::InvalidSource => Error::InvalidSource,
-        MetadataError::Limit {
-            kind,
-            observed,
-            maximum,
-        } => Error::Limit {
-            kind: match kind {
-                MetadataLimitKind::InputBytes
-                | MetadataLimitKind::PayloadBytes
-                | MetadataLimitKind::WireBytes
-                | MetadataLimitKind::WireRetainedBytes => LimitKind::WireBytes,
-                MetadataLimitKind::PayloadReferences | MetadataLimitKind::References => {
-                    LimitKind::References
-                },
-                MetadataLimitKind::WireFields => LimitKind::WireFields,
-                MetadataLimitKind::WireNesting => LimitKind::WireNesting,
-                MetadataLimitKind::WireWork => LimitKind::WireWork,
-                MetadataLimitKind::WireAllocations | MetadataLimitKind::Allocations => {
-                    LimitKind::Allocations
-                },
-                MetadataLimitKind::Entries
-                | MetadataLimitKind::EntryBytes
-                | MetadataLimitKind::TotalBytes
-                | MetadataLimitKind::Slides
-                | MetadataLimitKind::TextStorages
-                | MetadataLimitKind::TextFragments
-                | MetadataLimitKind::LabelCount => LimitKind::Entries,
-                MetadataLimitKind::RetainedBytes => LimitKind::RetainedBytes,
-                MetadataLimitKind::TextBytes => LimitKind::WireBytes,
-            },
-            observed,
-            maximum,
-        },
-        MetadataError::Allocation { amount } => Error::Allocation { amount },
+fn charge_metadata_report(
+    budget: &mut TransactionBudget,
+    report: chart_metadata_codec::DecodeReport,
+) -> Result<(), Error> {
+    budget
+        .input(report.source_bytes())
+        .and_then(|_| budget.fields(report.fields()))
+        .and_then(|_| budget.work(report.work_bytes()))
+        .and_then(|_| budget.allocations(report.allocations()))
+        .and_then(|_| budget.retained(report.retained_bytes()))
+        .and_then(|_| budget.nesting(report.max_depth() as usize))
+        .map_err(map_transaction_error)
+}
+
+fn map_chart_metadata_decode_error(error: chart_metadata_codec::DecodeError) -> Error {
+    if let Some(amount) = error.allocation_amount() {
+        return Error::Allocation { amount };
     }
+    if let Some((observed, maximum)) = error.input_limit_values() {
+        return Error::Limit {
+            kind: LimitKind::WireBytes,
+            observed: observed as u64,
+            maximum: maximum as u64,
+        };
+    }
+    if let Some((observed, maximum)) = error.field_limit_values() {
+        return Error::Limit {
+            kind: LimitKind::WireFields,
+            observed: observed as u64,
+            maximum: maximum as u64,
+        };
+    }
+    if let Some((observed, maximum)) = error.work_limit_values() {
+        return Error::Limit {
+            kind: LimitKind::WireWork,
+            observed: observed as u64,
+            maximum: maximum as u64,
+        };
+    }
+    if let Some((observed, maximum)) = error.depth_limit_values() {
+        return Error::Limit {
+            kind: LimitKind::WireNesting,
+            observed: observed as u64,
+            maximum: maximum as u64,
+        };
+    }
+    Error::InvalidSource
 }
 
 struct PackageComponents<'a>(&'a Package);
@@ -421,6 +452,10 @@ fn transaction_budget(package: &Package) -> Result<TransactionBudget, Error> {
         .inventory_components(package)
         .map_err(map_transaction_error)?;
     Ok(budget)
+}
+
+fn transaction_fields(package: &Package) -> Result<FieldLedger, Error> {
+    slide_chart_font::field_ledger_for_series(package).map_err(map_axis_support_error)
 }
 
 fn admit_workspace(package: &Package, budget: &mut TransactionBudget) -> Result<(), Error> {
@@ -582,23 +617,39 @@ fn map_wire_error(error: litchi_iwa_common::Error) -> Error {
     }
 }
 
-fn map_codec_error(error: litchi_iwa_protos::chart_style_codec::Error) -> Error {
+fn map_codec_error(error: chart_style_codec::Error) -> Error {
     match error {
-        litchi_iwa_protos::chart_style_codec::Error::Limit {
+        chart_style_codec::Error::Limit {
             kind,
             observed,
             maximum,
         } => Error::Limit {
             kind: match kind {
-                litchi_iwa_protos::chart_style_codec::LimitKind::Bytes => LimitKind::WireBytes,
-                litchi_iwa_protos::chart_style_codec::LimitKind::Fields => LimitKind::WireFields,
+                chart_style_codec::LimitKind::Bytes => LimitKind::WireBytes,
+                chart_style_codec::LimitKind::Fields => LimitKind::WireFields,
                 _ => LimitKind::WireWork,
             },
             observed: observed as u64,
             maximum: maximum as u64,
         },
-        litchi_iwa_protos::chart_style_codec::Error::Allocation { bytes } => {
-            Error::Allocation { amount: bytes }
+        chart_style_codec::Error::Allocation { bytes } => Error::Allocation { amount: bytes },
+        _ => Error::InvalidSource,
+    }
+}
+
+fn map_core_error(error: litchi_iwa_core::Error) -> Error {
+    match error {
+        litchi_iwa_core::Error::Limit {
+            kind,
+            observed,
+            maximum,
+        } => Error::Limit {
+            kind: map_core_limit(kind),
+            observed: observed as u64,
+            maximum: maximum as u64,
+        },
+        litchi_iwa_core::Error::Allocation { requested, .. } => {
+            Error::Allocation { amount: requested }
         },
         _ => Error::InvalidSource,
     }
@@ -694,6 +745,14 @@ fn planned_archive_bytes(archive: &Archive) -> Result<usize, Error> {
         })
 }
 
+fn planned_compressed_bytes(
+    archive: &Archive,
+    snappy_limits: litchi_iwa_core::SnappyLimits,
+) -> Result<usize, Error> {
+    let raw = planned_archive_bytes(archive)?;
+    SnappyStream::maximum_compressed_len(raw, snappy_limits).map_err(map_core_error)
+}
+
 fn publish_changes(
     source: &Package,
     changes: graph::Changes,
@@ -722,7 +781,7 @@ fn publish_changes(
             .edits
             .iter()
             .try_fold(catalog.source_bytes().len(), |total, (name, archive)| {
-                let archive_bytes = planned_archive_bytes(archive)?;
+                let archive_bytes = planned_compressed_bytes(archive, snappy_limits)?;
                 total
                     .checked_add(name.len())
                     .and_then(|total| total.checked_add(archive_bytes))
@@ -732,7 +791,7 @@ fn publish_changes(
         .insertions
         .iter()
         .try_fold(planned_bytes, |total, insertion| {
-            let archive_bytes = planned_archive_bytes(&insertion.archive)?;
+            let archive_bytes = planned_compressed_bytes(&insertion.archive, snappy_limits)?;
             total
                 .checked_add(insertion.name.len())
                 .and_then(|total| total.checked_add(archive_bytes))
@@ -853,6 +912,7 @@ fn publish_changes(
     if bytes_len == 0 {
         return Err(Error::Verification);
     }
+    verify_planned_locality(source, &candidate, &changes, selected_chart, budget)?;
     verify_chart_unknowns(source, &candidate, selected_chart, budget)?;
     verify_member_locality(source, &candidate, &changes)?;
     Ok((candidate, touched_components))
@@ -963,6 +1023,228 @@ fn verify_chart_unknowns(
         limits,
         budget,
     )
+}
+
+#[derive(Default)]
+struct ObjectReferenceCollector {
+    identifiers: Vec<u64>,
+}
+
+impl ArchiveReferenceVisitor for ObjectReferenceCollector {
+    fn visit_reference(
+        &mut self,
+        occurrence: ArchiveReferenceOccurrence,
+    ) -> litchi_iwa_core::Result<()> {
+        if occurrence.kind == ArchiveReferenceKind::Object && occurrence.referenced_identifier != 0
+        {
+            self.identifiers.push(occurrence.referenced_identifier);
+        }
+        Ok(())
+    }
+}
+
+fn package_object(package: &Package, identifier: u64) -> Option<&ArchiveObject> {
+    package
+        .state
+        .source
+        .components()
+        .iter()
+        .find_map(|component| component.archive().object(identifier))
+}
+
+fn reachable_objects(
+    package: &Package,
+    root: u64,
+    budget: &mut TransactionBudget,
+) -> Result<HashSet<u64>, Error> {
+    let mut pending = vec![root];
+    let mut reachable = HashSet::new();
+    reachable
+        .try_reserve(package.state.total_objects)
+        .map_err(|_| Error::Allocation {
+            amount: package.state.total_objects,
+        })?;
+    let limits = graph_limits(package)?;
+    while let Some(identifier) = pending.pop() {
+        if !reachable.insert(identifier) {
+            continue;
+        }
+        let object = package_object(package, identifier).ok_or(Error::InvalidSource)?;
+        let work =
+            object
+                .messages
+                .iter()
+                .try_fold(size_of::<ArchiveObject>(), |total, message| {
+                    total
+                        .checked_add(size_of::<RawMessage>())
+                        .and_then(|value| value.checked_add(message.data.len()))
+                        .ok_or(Error::InvalidSource)
+                })?;
+        budget
+            .work(work)
+            .and_then(|_| budget.allocations(1))
+            .and_then(|_| {
+                budget.scratch(
+                    object
+                        .messages
+                        .len()
+                        .checked_mul(size_of::<u64>())
+                        .ok_or(TransactionError::InvalidSource)?,
+                )
+            })
+            .map_err(map_transaction_error)?;
+        let mut references = ObjectReferenceCollector::default();
+        object
+            .inspect_references_with_policy(
+                &mut references,
+                ArchiveReferencePolicy::KnownReferences,
+                limits,
+            )
+            .map_err(map_core_error)?;
+        budget
+            .references(references.identifiers.len())
+            .and_then(|_| budget.work(references.identifiers.len()))
+            .map_err(map_transaction_error)?;
+        pending.extend(references.identifiers);
+    }
+    Ok(reachable)
+}
+
+fn reference_identifiers(payload: &[u8], field_number: u32) -> Result<Vec<u64>, Error> {
+    let fields = litchi_iwa_common::wire::parse_wire_fields(
+        payload,
+        litchi_iwa_common::WireLimits::default(),
+    )
+    .map_err(|_| Error::InvalidSource)?;
+    let mut identifiers = Vec::new();
+    for field in fields.iter().filter(|field| field.number() == field_number) {
+        let nested = field.payload(payload).map_err(|_| Error::InvalidSource)?;
+        let nested_fields = litchi_iwa_common::wire::parse_wire_fields(
+            nested,
+            litchi_iwa_common::WireLimits::default(),
+        )
+        .map_err(|_| Error::InvalidSource)?;
+        let Some(identifier) = nested_fields
+            .iter()
+            .find(|nested_field| nested_field.number() == 1 && nested_field.wire_type() == 0)
+            .map(|nested_field| {
+                litchi_iwa_common::decode_varint_from_bytes(
+                    &nested[nested_field.key_end()..nested_field.end()],
+                )
+                .map(|(value, _)| value)
+                .map_err(|_| Error::InvalidSource)
+            })
+            .transpose()?
+        else {
+            continue;
+        };
+        if identifier != 0 {
+            identifiers.push(identifier);
+        }
+    }
+    Ok(identifiers)
+}
+
+fn stylesheet_reachable_objects(package: &Package, chart: u64) -> Result<HashSet<u64>, Error> {
+    let mut pending =
+        chart_style_codec::references(chart_payload(package, chart)?, ChartCodecLimits::DEFAULT)
+            .map_err(|_| Error::InvalidSource)?
+            .series_theme_styles()
+            .to_vec();
+    let mut reachable = HashSet::new();
+    while let Some(identifier) = pending.pop() {
+        if identifier == 0 || !reachable.insert(identifier) {
+            continue;
+        }
+        let Some(object) = package_object(package, identifier) else {
+            return Err(Error::InvalidSource);
+        };
+        for message in &object.messages {
+            if message.type_ == 5_028 || message.type_ == 5_029 {
+                let parents = litchi_iwa_common::wire::parse_wire_fields(
+                    &message.data,
+                    litchi_iwa_common::WireLimits::default(),
+                )
+                .map_err(|_| Error::InvalidSource)?;
+                for parent in parents.iter().filter(|field| field.number() == 1) {
+                    let parent = parent
+                        .payload(&message.data)
+                        .map_err(|_| Error::InvalidSource)?;
+                    pending.extend(reference_identifiers(parent, 3)?);
+                    pending.extend(reference_identifiers(parent, 5)?);
+                }
+            }
+        }
+    }
+    Ok(reachable)
+}
+
+fn changed_object_ids(source: &Package, changes: &graph::Changes) -> Result<HashSet<u64>, Error> {
+    let mut changed = HashSet::new();
+    for (name, archive) in &changes.edits {
+        let source_archive = source
+            .state
+            .source
+            .components()
+            .get(name)
+            .ok_or(Error::InvalidSource)?
+            .archive();
+        for object in &source_archive.objects {
+            let identifier = object.archive_info.identifier.ok_or(Error::InvalidSource)?;
+            if archive
+                .objects
+                .iter()
+                .all(|candidate| candidate.archive_info.identifier != Some(identifier))
+            {
+                changed.insert(identifier);
+            }
+        }
+        for object in &archive.objects {
+            let identifier = object.archive_info.identifier.ok_or(Error::InvalidSource)?;
+            if source_archive
+                .object(identifier)
+                .is_none_or(|before| !before.same_content_ignoring_offsets(object))
+            {
+                changed.insert(identifier);
+            }
+        }
+    }
+    for insertion in &changes.insertions {
+        for object in &insertion.archive.objects {
+            changed.insert(object.archive_info.identifier.ok_or(Error::InvalidSource)?);
+        }
+    }
+    for name in &changes.deletions {
+        if let Some(component) = source.state.source.components().get(name) {
+            for object in &component.archive().objects {
+                changed.insert(object.archive_info.identifier.ok_or(Error::InvalidSource)?);
+            }
+        }
+    }
+    Ok(changed)
+}
+
+fn verify_planned_locality(
+    source: &Package,
+    candidate: &Package,
+    changes: &graph::Changes,
+    root: u64,
+    budget: &mut TransactionBudget,
+) -> Result<(), Error> {
+    let changed = changed_object_ids(source, changes)?;
+    let mut candidate_reachable = reachable_objects(candidate, root, budget)?;
+    candidate_reachable.extend(stylesheet_reachable_objects(candidate, root)?);
+    for identifier in changed {
+        if identifier == 2 {
+            continue;
+        }
+        if package_object(candidate, identifier).is_some()
+            && !candidate_reachable.contains(&identifier)
+        {
+            return Err(Error::Verification);
+        }
+    }
+    Ok(())
 }
 
 fn verify_member_locality(
@@ -1174,10 +1456,13 @@ impl<'a> Edit<'a> {
     pub fn commit(self) -> Result<Commit, Error> {
         let staged = self.staged.ok_or(Refusal::NoStagedOperation)?;
         let mut budget = transaction_budget(self.source)?;
+        let mut fields = transaction_fields(self.source)?;
         let selection = select(
             self.source,
             self.slide.as_selector(),
             self.chart.as_selector(),
+            &mut budget,
+            &mut fields,
         )?;
         let (family, series) = family_and_count(self.source, selection, &mut budget)?;
         if staged.len() != series {
@@ -1231,6 +1516,8 @@ impl<'a> Edit<'a> {
             &candidate,
             self.slide.as_selector(),
             self.chart.as_selector(),
+            &mut budget,
+            &mut fields,
         )?;
         let (candidate_family, candidate_series) =
             family_and_count(&candidate, candidate_selection, &mut budget)?;
@@ -1286,7 +1573,8 @@ impl Package {
         chart: impl Into<ChartSelector<'chart>>,
     ) -> Result<Property, Error> {
         let mut budget = transaction_budget(self)?;
-        let selection = select(self, slide.into(), chart.into())?;
+        let mut fields = transaction_fields(self)?;
+        let selection = select(self, slide.into(), chart.into(), &mut budget, &mut fields)?;
         let (family, series) = family_and_count(self, selection, &mut budget)?;
         Ok(Property::Symbols(read_symbols(
             self,
@@ -1309,6 +1597,7 @@ impl Package {
     /// Apply a patch only to its exact source package.
     pub fn apply_slide_chart_series(&self, patch: &Patch) -> Result<Commit, Error> {
         let mut budget = transaction_budget(self)?;
+        let mut fields = transaction_fields(self)?;
         let source = physical_source(self)?;
         if !patch.artifacts.authorizes_source(&source) {
             return Err(Error::PatchConflict);
@@ -1331,6 +1620,8 @@ impl Package {
             &candidate,
             SlideSelector::position(patch.slide),
             ChartSelector::position(patch.chart),
+            &mut budget,
+            &mut fields,
         )?;
         verify_chart_unknowns(self, &candidate, selection.identifier, &mut budget)?;
         let (family, series) = family_and_count(&candidate, selection, &mut budget)?;

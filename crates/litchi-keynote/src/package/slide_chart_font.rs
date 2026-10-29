@@ -1337,7 +1337,26 @@ fn select_chart_transaction(
     .map_err(map_axis_error)
 }
 
-struct ChartFontSelectionBudget<'a> {
+/// Shared budget-aware chart selection for adjacent chart-family owners.
+/// Callers retain the same transaction budget and field ledger through the
+/// selector, metadata and candidate phases; no fresh selector profile is
+/// substituted at this seam.
+pub(super) fn select_chart_for_series(
+    package: &Package,
+    slide: SlideSelector<'_>,
+    chart: ChartSelector<'_>,
+    budget: &mut super::slide_table_core::Budget,
+    fields: &mut FieldLedger,
+) -> Result<ChartSelection, AxisSupportError> {
+    let mut graph_budget = ChartFontSelectionBudget { budget, fields };
+    slide_chart_title::select_chart_with_budget(package, slide, chart, true, &mut graph_budget)
+}
+
+pub(super) fn field_ledger_for_series(package: &Package) -> Result<FieldLedger, AxisSupportError> {
+    FieldLedger::new(package).map_err(map_selection_budget_error)
+}
+
+pub(super) struct ChartFontSelectionBudget<'a> {
     budget: &'a mut TransactionBudget,
     fields: &'a mut FieldLedger,
 }
@@ -1665,7 +1684,7 @@ fn transaction_budget(package: &Package) -> Result<TransactionBudget, Error> {
 }
 
 #[derive(Debug, Clone, Copy)]
-struct FieldLedger {
+pub(super) struct FieldLedger {
     used: usize,
     maximum: usize,
 }
