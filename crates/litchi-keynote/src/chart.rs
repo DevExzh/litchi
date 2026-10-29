@@ -434,6 +434,13 @@ pub mod data {
     };
 }
 
+/// Exact-source per-series data-symbol transactions for one slide chart.
+pub mod series {
+    pub use crate::package::slide_chart_series::{
+        Commit, Diagnostics, Edit, Error, Patch, Property, Refusal,
+    };
+}
+
 /// Exact-source transactions for one slide chart's effective font identity
 /// and face traits.
 pub mod font {
