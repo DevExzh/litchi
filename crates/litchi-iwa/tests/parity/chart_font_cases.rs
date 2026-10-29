@@ -447,14 +447,24 @@ fn pages_facade_host_route(
     host_write(source, target, chart, change)
 }
 
+#[inline(never)]
+fn pages_facade_host_font_read_route(source: &[u8], chart: u64) -> TestResult<HostFont> {
+    Ok(pages::Draft::from_bytes(source)?.body_chart_font(chart)?)
+}
+
+#[inline(never)]
+fn pages_facade_host_size_read_route(source: &[u8], chart: u64) -> TestResult<ChartFontSize> {
+    Ok(pages::Draft::from_bytes(source)?.body_chart_font_size(chart)?)
+}
+
 #[test]
 #[ignore = "release instruction probe; run in the coordinator CPU-3 slot"]
 fn pages_facade_font_read_cost_instruction() -> TestResult {
-    let (source, target, chart) = pages_facade_fixture()?;
-    std::hint::black_box(host_read(&source, target, chart)?);
+    let (source, _, chart) = pages_facade_fixture()?;
+    std::hint::black_box(pages_facade_host_font_read_route(&source, chart)?);
     std::hint::black_box(pages_facade_read_font_route(&source)?);
     std::hint::black_box(pages_facade_read_font_route(&source)?);
-    std::hint::black_box(host_read(&source, target, chart)?);
+    std::hint::black_box(pages_facade_host_font_read_route(&source, chart)?);
     Ok(())
 }
 
@@ -495,11 +505,11 @@ fn pages_facade_font_reset_cost_instruction() -> TestResult {
 #[test]
 #[ignore = "release instruction probe; run in the coordinator CPU-3 slot"]
 fn pages_facade_size_read_cost_instruction() -> TestResult {
-    let (source, target, chart) = pages_facade_fixture()?;
-    std::hint::black_box(host_read(&source, target, chart)?);
+    let (source, _, chart) = pages_facade_fixture()?;
+    std::hint::black_box(pages_facade_host_size_read_route(&source, chart)?);
     std::hint::black_box(pages_facade_read_size_route(&source)?);
     std::hint::black_box(pages_facade_read_size_route(&source)?);
-    std::hint::black_box(host_read(&source, target, chart)?);
+    std::hint::black_box(pages_facade_host_size_read_route(&source, chart)?);
     Ok(())
 }
 
