@@ -707,24 +707,49 @@ impl SymbolBudget {
     }
 
     fn admit_registry_inspection(&mut self, workspace: &Workspace<'_>) -> SymbolResult<()> {
-        let bytes = workspace.registry_inspection_work();
-        if bytes == 0 {
+        let Some(report) = workspace
+            .registry_inspection_requirements()
+            .map_err(SymbolError::from)?
+        else {
             return Ok(());
-        }
-        let work = bytes.saturating_mul(4);
-        let retained = bytes.saturating_mul(2);
-        let output = bytes.saturating_add(256);
-        self.source(bytes)?;
-        self.fields(bytes)?;
-        self.work(work)?;
-        self.preflight_output(output)?;
-        self.output(output)?;
-        self.preflight_allocations(4)?;
-        self.preflight_retained(retained)?;
-        self.preflight_scratch(retained)?;
-        self.allocations(4)?;
-        self.retained(retained)?;
-        self.scratch(retained)?;
+        };
+        self.source(report.input_bytes())?;
+        self.output(report.output_bytes())?;
+        self.fields(report.fields())?;
+        self.work(report.work_bytes())?;
+        self.allocations(report.allocations())?;
+        self.retained(report.retained_bytes())?;
+        self.scratch(report.scratch_bytes())?;
+        self.references(report.references_scanned())?;
+        self.registry_entries(report.components_scanned())?;
+        self.preflight_allocations(1)?;
+        self.preflight_retained(report.references_scanned().saturating_mul(size_of::<u64>()))?;
+        self.preflight_scratch(report.references_scanned().saturating_mul(size_of::<u64>()))?;
+        self.allocations(1)?;
+        self.retained(report.references_scanned().saturating_mul(size_of::<u64>()))?;
+        self.scratch(report.references_scanned().saturating_mul(size_of::<u64>()))?;
+        Ok(())
+    }
+
+    fn preflight_codec_report(
+        &self,
+        report: litchi_iwa_protos::chart_style_codec::Report,
+    ) -> SymbolResult<()> {
+        self.preflight_allocations(report.allocations())?;
+        self.preflight_retained(report.input_bytes())?;
+        self.preflight_scratch(report.input_bytes())
+    }
+
+    fn charge_codec_report(
+        &mut self,
+        report: litchi_iwa_protos::chart_style_codec::Report,
+    ) -> SymbolResult<()> {
+        self.source(report.input_bytes())?;
+        self.fields(report.fields())?;
+        self.work(report.work_bytes())?;
+        self.allocations(report.allocations())?;
+        self.retained(report.input_bytes())?;
+        self.scratch(report.input_bytes())?;
         Ok(())
     }
 
@@ -1951,13 +1976,15 @@ pub mod property {
         let limits = budget.codec_limits()?;
         let _ = budget.parse_fields(payload, 1)?;
         let _ = budget.parse_fields(payload, 1)?;
-        budget.preflight_allocations(1)?;
-        budget.preflight_scratch(payload.len())?;
-        budget.allocations(1)?;
-        budget.scratch(payload.len())?;
-        Ok(codec::decode(payload, archive, limits)
-            .map_err(|error| SymbolError::Graph(Error::Codec(error)))?
-            .extension())
+        let requirements = codec::decode_requirements(payload, archive, limits)
+            .map_err(|error| SymbolError::Graph(Error::Codec(error)))?;
+        budget.preflight_codec_report(requirements)?;
+        budget.charge_codec_report(requirements)?;
+        let (properties, report) = codec::decode_with_report(payload, archive, limits)
+            .map_err(|error| SymbolError::Graph(Error::Codec(error)))?;
+        budget.preflight_codec_report(report)?;
+        budget.charge_codec_report(report)?;
+        Ok(properties.extension())
     }
 
     fn bounded_fields(
@@ -2436,8 +2463,12 @@ pub mod property {
             value: Option<&SymbolSize>,
             budget: &mut SymbolBudget,
         ) -> SymbolResult<Vec<u8>> {
-            let limits = budget.codec_limits()?;
             let _ = bounded_extension(payload, Archive::SeriesStyle, budget)?;
+            let limits = budget.codec_limits()?;
+            let requirements = codec::decode_requirements(payload, Archive::SeriesStyle, limits)
+                .map_err(|error| SymbolError::Graph(Error::Codec(error)))?;
+            budget.preflight_codec_report(requirements)?;
+            budget.charge_codec_report(requirements)?;
             let bound = payload.len().saturating_add(16);
             budget.preflight_output(bound)?;
             budget.preflight_retained(bound)?;
@@ -3111,15 +3142,17 @@ fn bounded_references(
     payload: &[u8],
     budget: &mut SymbolBudget,
 ) -> SymbolResult<codec::StyleReferences> {
+    let _ = budget.parse_fields(payload, 1)?;
+    let _ = budget.parse_fields(payload, 1)?;
     let limits = budget.codec_limits()?;
-    let _ = budget.parse_fields(payload, 1)?;
-    let _ = budget.parse_fields(payload, 1)?;
-    budget.preflight_allocations(12)?;
-    budget.preflight_scratch(payload.len())?;
-    budget.allocations(12)?;
-    budget.scratch(payload.len())?;
-    let references = codec::references(payload, limits)
+    let requirements = codec::reference_requirements(payload, limits)
         .map_err(|error| SymbolError::Graph(Error::Codec(error)))?;
+    budget.preflight_codec_report(requirements)?;
+    budget.charge_codec_report(requirements)?;
+    let (references, report) = codec::references_with_report(payload, limits)
+        .map_err(|error| SymbolError::Graph(Error::Codec(error)))?;
+    budget.preflight_codec_report(report)?;
+    budget.charge_codec_report(report)?;
     let count = references.chart_style().is_some() as usize
         + references.chart_non_style().is_some() as usize
         + references.legend_style().is_some() as usize
@@ -3181,19 +3214,7 @@ fn bounded_series_graph(
         ));
     }
     let (chart_message, payload) = bounded_chart_payload(workspace, chart, budget)?;
-    let limits = budget.codec_limits()?;
-    let _ = budget.parse_fields(payload, 1)?;
-    let _ = budget.parse_fields(payload, 1)?;
-    budget.preflight_allocations(12)?;
-    budget.preflight_scratch(payload.len())?;
-    budget.allocations(12)?;
-    budget.scratch(payload.len())?;
-    let references = codec::references(payload, limits)
-        .map_err(|error| SymbolError::Graph(Error::Codec(error)))?;
-    let reference_count = references
-        .series_non_styles()
-        .map_or(0, |sparse| sparse.entries().len());
-    budget.references(reference_count)?;
+    let references = bounded_references(payload, budget)?;
     budget.reserve::<Option<Slot>>(series_count, true)?;
     let mut slots: Vec<Option<Slot>> = Vec::new();
     slots
@@ -3828,6 +3849,14 @@ fn bounded_patch_chart_references(
     let limits = budget.codec_limits()?;
     let _ = budget.parse_fields(payload, 1)?;
     let _ = budget.parse_fields(payload, 1)?;
+    let requirements = codec::reference_requirements(payload, limits)
+        .map_err(|error| SymbolError::Graph(Error::Codec(error)))?;
+    budget.preflight_codec_report(requirements)?;
+    budget.charge_codec_report(requirements)?;
+    let (_, report) = codec::references_with_report(payload, limits)
+        .map_err(|error| SymbolError::Graph(Error::Codec(error)))?;
+    budget.preflight_codec_report(report)?;
+    budget.charge_codec_report(report)?;
     let bound = payload
         .len()
         .saturating_add(entries.len().saturating_mul(16));
@@ -4248,52 +4277,7 @@ fn bounded_insert_container(
             .ok_or(SymbolError::Invalid("a container member has no identifier"))?;
         identifiers.push(identifier);
     }
-    let mut container_data = Vec::new();
-    let container_size = 1usize
-        .saturating_add(1)
-        .saturating_add(litchi_iwa_common::varint::encoded_len(
-            PRIMARY_PACKAGE_IDENTIFIER,
-        ))
-        .saturating_add(
-            identifiers
-                .iter()
-                .map(|identifier| {
-                    let reference_size =
-                        1usize.saturating_add(litchi_iwa_common::varint::encoded_len(*identifier));
-                    1usize
-                        .saturating_add(litchi_iwa_common::varint::encoded_len(
-                            reference_size as u64,
-                        ))
-                        .saturating_add(reference_size)
-                })
-                .sum::<usize>(),
-        );
-    budget.preflight_output(container_size)?;
-    budget.preflight_retained(container_size)?;
-    budget.preflight_scratch(container_size)?;
-    budget.preflight_allocations(1)?;
-    budget.allocations(1)?;
-    budget.retained(container_size)?;
-    budget.scratch(container_size)?;
-    container_data
-        .try_reserve_exact(container_size)
-        .map_err(|_| SymbolError::Allocation {
-            amount: container_size,
-        })?;
-    push_varint_field(
-        &mut container_data,
-        CONTAINER_IDENTIFIER_FIELD,
-        PRIMARY_PACKAGE_IDENTIFIER,
-    );
-    for identifier in &identifiers {
-        let mut reference = Vec::new();
-        reference
-            .try_reserve_exact(1 + litchi_iwa_common::varint::encoded_len(*identifier))
-            .map_err(|_| SymbolError::Allocation { amount: 1 })?;
-        push_varint_field(&mut reference, REFERENCE_IDENTIFIER_FIELD, *identifier);
-        push_message_field(&mut container_data, CONTAINER_OBJECTS_FIELD, &reference);
-    }
-    budget.output(container_data.len())?;
+    let container_data = bounded_encode_container(&identifiers, budget)?;
     let mut container_object = ArchiveObject::new(
         container.component,
         vec![RawMessage {
@@ -4366,6 +4350,59 @@ fn bounded_insert_container(
     Ok(())
 }
 
+fn bounded_encode_container(
+    identifiers: &[u64],
+    budget: &mut SymbolBudget,
+) -> SymbolResult<Vec<u8>> {
+    let container_size = 1usize
+        .saturating_add(1)
+        .saturating_add(litchi_iwa_common::varint::encoded_len(
+            PRIMARY_PACKAGE_IDENTIFIER,
+        ))
+        .saturating_add(
+            identifiers
+                .iter()
+                .map(|identifier| {
+                    let reference_size =
+                        1usize.saturating_add(litchi_iwa_common::varint::encoded_len(*identifier));
+                    1usize
+                        .saturating_add(litchi_iwa_common::varint::encoded_len(
+                            reference_size as u64,
+                        ))
+                        .saturating_add(reference_size)
+                })
+                .sum::<usize>(),
+        );
+    budget.preflight_output(container_size)?;
+    budget.preflight_retained(container_size)?;
+    budget.preflight_scratch(container_size)?;
+    budget.preflight_allocations(1)?;
+    budget.allocations(1)?;
+    budget.retained(container_size)?;
+    budget.scratch(container_size)?;
+    let mut output = Vec::new();
+    output
+        .try_reserve_exact(container_size)
+        .map_err(|_| SymbolError::Allocation {
+            amount: container_size,
+        })?;
+    push_varint_field(
+        &mut output,
+        CONTAINER_IDENTIFIER_FIELD,
+        PRIMARY_PACKAGE_IDENTIFIER,
+    );
+    for identifier in identifiers {
+        let mut reference = Vec::new();
+        reference
+            .try_reserve_exact(1 + litchi_iwa_common::varint::encoded_len(*identifier))
+            .map_err(|_| SymbolError::Allocation { amount: 1 })?;
+        push_varint_field(&mut reference, REFERENCE_IDENTIFIER_FIELD, *identifier);
+        push_message_field(&mut output, CONTAINER_OBJECTS_FIELD, &reference);
+    }
+    budget.output(output.len())?;
+    Ok(output)
+}
+
 fn bounded_remove_from_container(
     workspace: &mut Workspace<'_>,
     location: Location,
@@ -4396,13 +4433,11 @@ fn bounded_remove_from_container(
             "an object container disagrees with its component",
         ));
     }
-    let rewritten_bound = members.len().saturating_mul(16).saturating_add(16);
-    if !members.is_empty() {
-        budget.preflight_output(rewritten_bound)?;
-        budget.preflight_retained(rewritten_bound)?;
-        budget.preflight_scratch(rewritten_bound)?;
-        budget.preflight_allocations(1)?;
-    }
+    let encoded = if members.is_empty() {
+        None
+    } else {
+        Some(bounded_encode_container(&members, budget)?)
+    };
     if members.is_empty() {
         if let Some(component) = component {
             let locator = workspace
@@ -4446,11 +4481,12 @@ fn bounded_remove_from_container(
     for &identifier in objects {
         workspace.remove(identifier).map_err(SymbolError::from)?;
     }
-    budget.allocations(1)?;
-    budget.retained(rewritten_bound)?;
-    budget.scratch(rewritten_bound)?;
     workspace
-        .replace_payload(container, message, encode_container(&members))
+        .replace_payload(
+            container,
+            message,
+            encoded.expect("nonempty container encoding"),
+        )
         .map_err(SymbolError::from)?;
     budget.registry_entries(objects.len())?;
     Ok(None)
@@ -5382,6 +5418,32 @@ mod symbol_tests {
             ));
             assert!(workspace.finish().is_empty());
         }
+    }
+
+    #[test]
+    fn codec_requirements_match_follow_on_reference_and_decode_passes() {
+        let chart = chart_payload();
+        let requirements = codec::reference_requirements(&chart, CodecLimits::DEFAULT)
+            .expect("reference requirements");
+        let (_, report) = codec::references_with_report(&chart, CodecLimits::DEFAULT)
+            .expect("reference report");
+        assert_eq!(requirements.fields(), report.fields());
+        assert_eq!(requirements.work_bytes(), report.work_bytes());
+        let payload = override_payload();
+        let requirements = codec::decode_requirements(
+            &payload,
+            codec::Archive::SeriesNonStyle,
+            CodecLimits::DEFAULT,
+        )
+        .expect("decode requirements");
+        let (_, report) = codec::decode_with_report(
+            &payload,
+            codec::Archive::SeriesNonStyle,
+            CodecLimits::DEFAULT,
+        )
+        .expect("decode report");
+        assert_eq!(requirements.fields(), report.fields());
+        assert_eq!(requirements.work_bytes(), report.work_bytes());
     }
 
     #[test]
