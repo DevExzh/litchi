@@ -64,6 +64,7 @@ mod pages {
         read(fixture("pages"))
     }
 
+    #[inline(never)]
     fn direct_set(source: &[u8]) -> Vec<u8> {
         let package = litchi_pages::Package::from_bytes(source).expect("Pages leaf source");
         let commit = package
@@ -81,6 +82,7 @@ mod pages {
         bytes
     }
 
+    #[inline(never)]
     fn direct_reset(source: &[u8]) -> Vec<u8> {
         let package = litchi_pages::Package::from_bytes(source).expect("Pages leaf source");
         let commit = package
@@ -238,6 +240,7 @@ mod keynote {
         read(fixture("keynote"))
     }
 
+    #[inline(never)]
     fn direct_set(source: &[u8]) -> Vec<u8> {
         let package = litchi_keynote::Package::from_bytes(source).expect("Keynote leaf source");
         let commit = package
@@ -254,6 +257,7 @@ mod keynote {
         bytes
     }
 
+    #[inline(never)]
     fn direct_reset(source: &[u8]) -> Vec<u8> {
         let package = litchi_keynote::Package::from_bytes(source).expect("Keynote leaf source");
         let commit = package
@@ -425,6 +429,7 @@ mod numbers {
         read(fixture("numbers"))
     }
 
+    #[inline(never)]
     fn direct_set(source: &[u8]) -> Vec<u8> {
         let package = litchi_numbers::Package::from_bytes(source).expect("Numbers leaf source");
         let mut edit = package
@@ -443,6 +448,7 @@ mod numbers {
         bytes
     }
 
+    #[inline(never)]
     fn direct_reset(source: &[u8]) -> Vec<u8> {
         let package = litchi_numbers::Package::from_bytes(source).expect("Numbers leaf source");
         let mut edit = package
