@@ -32,6 +32,9 @@ pub mod cell_appearance;
 /// Format-neutral whole-cell character-style graph planning.
 pub mod cell_text_style;
 
+/// Bounded batch publication of BNC text-style keys in tile payloads.
+pub mod cell_text_style_writer;
+
 pub mod hidden_axes;
 
 /// Format-neutral table-cell comment and direct-reply transaction kernel.
