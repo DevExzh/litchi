@@ -4,14 +4,15 @@
   on the isolated WP, pending coordinator/W2-A independent review. Pages and
   Keynote facades are not started, no ledger rows are migrated, and no
   performance or native acceptance claim is active. The current source tip is
-  `62e6b27aae`.
+  `126b1dd7ce`.
 - Source branch: `uo2/iwa-w1g-cell-text-style`, cut from frozen root
   `1e3978082bd8e576f0afeb7e3eebac1ca3908d86`, then synchronized with frozen
   trunk 24ecfb543748885192b8fb5273abb54e669764c6.
 - Continuation commits: trunk merge `d220cd76ed`, budget admission
   `beb878ea23`, codec-allocation pre-admission `36be343a42`, residual
   closure `3bfb0c6319`, proof checkpoint `d5abe8856a`, and final residual
-  preflight/proof repair `62e6b27aae`.
+  preflight/proof repair `62e6b27aae` plus parent-reference accounting
+  `126b1dd7ce`.
 - Scope: shared `litchi-iwa-table::cell_text_style` graph reads and direct
   `CharacterProperties` planning, plus the Numbers read and single-cell
   adapter path. Existing public Numbers selectors and vocabulary remain
