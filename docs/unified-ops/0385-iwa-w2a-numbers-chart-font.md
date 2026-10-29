@@ -246,25 +246,28 @@ The 18 style/layout rows are the exact `ROUTES_3` set already listed in the
 shared-helper section below; their full values remain in the external matrix
 receipt rather than being copied into a second hand-maintained table.
 
-The new derived raw-audit validator passed its synthetic controls, but it
-rejected the real matrix because the exact binary-path leaf symbol rows are
-below the Callgrind PROGRAM TOTALS context rows (for example, the first leaf
-row is 149,071,036 exact-symbol Ir versus 152,176,565 PROGRAM TOTALS Ir).
-This is retained as a failed audit receipt, not normalized:
+The new strict parser receipt below is retained as a failed historical
+diagnostic; it treated a smaller binary/file attribution row as the whole
+function. The coordinator's DWARF-aware audit instead sums the selected
+function's self and callee Ir across file contexts, without substituting or
+normalizing any PROGRAM TOTALS. It verifies all 241 hashed artifacts/binaries
+and exactly two selected calls on every leg:
 
 ```text
-validator receipt: /home/zhuhe/code/litchi-worktrees/.coord/iwa-w2a-chart-font-perf-20261029-repaired/matrix24-reset-isolated/call-audit-derived.failure.json
-receipt SHA-256: 226a8f4c7bdc28fc0c666a569d88c0965b2decbc001faa2ef44914ee38ff5740
-call-count receipt: /home/zhuhe/code/litchi-worktrees/.coord/iwa-w2a-chart-font-perf-20261029-repaired/matrix24-reset-isolated/call-count-receipt.json (SHA-256 `e19bbdae0c9bfd1869d39b41d7b9d638af154b15573ee2873b6e2e9ffff38108`); all 48 legs report exactly two selected wrapper calls
+coordinator audit: /home/zhuhe/code/litchi-worktrees/.coord/iwa-w2a-chart-font-perf-20261029-repaired/matrix24-reset-isolated/coordinator-derived-audit.json
+audit SHA-256: 380557ce35908ea36299b7a65432a95a758bced5b49a39678b32a997e73fed55
+coordinator review: /home/zhuhe/code/litchi-worktrees/.coord/iwa-w2a-chart-font-perf-20261029-repaired/matrix24-reset-isolated/coordinator-review.json
+review SHA-256: 57d6a6c23e73d73219fe7906e062f5899c889e568a01cd3c01035d98ac2fefaf
+call-count receipt: /home/zhuhe/code/litchi-worktrees/.coord/iwa-w2a-chart-font-perf-20261029-repaired/matrix24-reset-isolated/call-count-receipt.json (SHA-256 `e19bbdae0c9bfd1869d39b41d7b9d638af154b15573ee2873b6e2e9ffff38108`)
+historical strict-parser failure: /home/zhuhe/code/litchi-worktrees/.coord/iwa-w2a-chart-font-perf-20261029-repaired/matrix24-reset-isolated/call-audit-derived.failure.json (SHA-256 `226a8f4c7bdc28fc0c666a569d88c0965b2decbc001faa2ef44914ee38ff5740`)
 synthetic validator log: /home/zhuhe/code/litchi-worktrees/.coord/iwa-w2a-chart-font-perf-20261029-repaired/derived-validator-selftest.log
 synthetic log SHA-256: a72c11d7f48cc0c1e4e659a05d8038b9d88d32ee36f9c71face0425df81f2914
 ```
 
-Therefore this receipt establishes corrected workload, source/binary
-provenance and raw measurements, but does not claim final performance
-qualification until the coordinator resolves the exact-symbol/PROGRAM-TOTALS
-audit disposition. Native acceptance, ledger migration and final integrated
-gate claims remain absent.
+The coordinator audit passes the corrected slice with maximum leaf/host ratio
+`0.6915293508856026`. This is slice qualification only; native acceptance,
+ledger migration and final integrated-gate claims remain absent, and the final
+integrated candidate must be remeasured after trunk synchronization.
 
 ## Withdrawn historical instruction-count qualification
 
