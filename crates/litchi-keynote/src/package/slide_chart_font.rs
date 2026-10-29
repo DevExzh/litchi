@@ -13,6 +13,7 @@
     reason = "The package boundary redacts native graph failures."
 )]
 
+use std::collections::HashSet;
 use std::fmt;
 use std::mem::size_of;
 use std::sync::{Arc, OnceLock};
@@ -32,11 +33,17 @@ pub use litchi_iwa_text::character::TextPointSize;
 pub use litchi_iwa_text::font::{Font, NameError as FontNameError};
 use thiserror::Error as ThisError;
 
+use super::chart_axis_support::{self, AxisSupportError, AxisSupportSelectorError};
 use super::edit::{OwnedChartSelector, OwnedSlideSelector, SelectorError};
-use super::slide_chart_title::{self, ChartSelection};
+use super::slide_chart_title::{self, ChartGraphScanBudget, ChartSelection};
 use super::slide_table_core::{Budget as TransactionBudget, Error as TransactionError};
 use super::{Package, PayloadLimitKind, PhysicalSource, ReadError, SemanticLimitKind};
 use crate::{ChartSelector, SlideSelector};
+
+const CHART_MESSAGE_TYPE: u32 = 5_021;
+const PARAGRAPH_STYLE_MESSAGE_TYPE: u32 = 2_022;
+const STYLESHEET_MESSAGE_TYPE: u32 = 401;
+const PACKAGE_METADATA_MESSAGE_TYPE: u32 = 11_006;
 
 /// A chart's effective font identity and face traits.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
@@ -107,6 +114,8 @@ pub enum LimitKind {
     ScratchBytes,
     /// Caller bytes retained by deferred selectors.
     SelectorBytes,
+    /// Font-name bytes retained by the chart graph transaction.
+    TextBytes,
     /// Package-wide object identifiers.
     Identifiers,
 }
@@ -129,6 +138,7 @@ impl fmt::Display for LimitKind {
             Self::RetainedBytes => "retained bytes",
             Self::ScratchBytes => "scratch bytes",
             Self::SelectorBytes => "selector bytes",
+            Self::TextBytes => "text bytes",
             Self::Identifiers => "identifiers",
         })
     }
@@ -554,6 +564,12 @@ enum FontOperation {
     Reset,
 }
 
+#[derive(Clone, PartialEq)]
+enum ResetExpectation {
+    Font(ChartFont),
+    Size(TextPointSize),
+}
+
 impl<'a> FontEdit<'a> {
     fn new<'slide, 'chart>(
         source: &'a Package,
@@ -573,27 +589,34 @@ impl<'a> FontEdit<'a> {
     fn resolve(&self) -> Result<&(ChartSelection, ChartFont), Error> {
         let mut budget = transaction_budget(self.source)?;
         let mut fields = FieldLedger::new(self.source)?;
+        let mut text = TextLedger::new(self.source);
         admit_transaction(self.source, &mut budget)?;
-        self.resolve_with_budget(&mut budget, &mut fields)
+        self.resolve_with_budget(&mut budget, &mut fields, &mut text)
     }
 
     fn resolve_with_budget(
         &self,
         budget: &mut TransactionBudget,
         fields: &mut FieldLedger,
+        text: &mut TextLedger,
     ) -> Result<&(ChartSelection, ChartFont), Error> {
         if let Some(selection) = self.selection.get() {
             return Ok(selection);
         }
-        let selection = slide_chart_title::select_chart(
+        let selection = select_chart_transaction(
             self.source,
             self.slide.as_selector(),
             self.chart.as_selector(),
             true,
-        )
-        .map_err(map_chart_title_error)?;
-        let before =
-            read_font_with_budget(self.source, selection.chart_identifier, budget, fields)?;
+            budget,
+        )?;
+        let before = read_font_with_budget(
+            self.source,
+            selection.chart_identifier,
+            budget,
+            fields,
+            text,
+        )?;
         let _ = self.selection.set((selection, before));
         self.selection.get().ok_or(Error::InvalidSource)
     }
@@ -644,9 +667,11 @@ impl<'a> FontEdit<'a> {
     pub fn commit(self) -> Result<FontCommit, Error> {
         let mut budget = transaction_budget(self.source)?;
         let mut fields = FieldLedger::new(self.source)?;
+        let mut text = TextLedger::new(self.source);
         admit_transaction(self.source, &mut budget)?;
-        let (source_selection, before) =
-            self.resolve_with_budget(&mut budget, &mut fields)?.clone();
+        let (source_selection, before) = self
+            .resolve_with_budget(&mut budget, &mut fields, &mut text)?
+            .clone();
         let operation = self.after.clone().ok_or(Refusal::NoStagedOperation)?;
         let catalog = physical_catalog(self.source)?;
         let source_bytes = catalog.shared_source();
@@ -676,13 +701,14 @@ impl<'a> FontEdit<'a> {
             return Err(Refusal::UnsupportedSource.into());
         }
         self.source.validate().map_err(map_read_error)?;
-        let current = positional_selection(self.source, &source_selection)?;
+        let current = positional_selection(self.source, &source_selection, &mut budget)?;
         if !same_selection(&source_selection, &current)
             || read_font_with_budget(
                 self.source,
                 current.chart_identifier,
                 &mut budget,
                 &mut fields,
+                &mut text,
             )? != before
         {
             return Err(Error::InvalidSource);
@@ -699,12 +725,13 @@ impl<'a> FontEdit<'a> {
             }),
             FontOperation::Reset => EngineChange::ResetFont,
         };
-        let (candidate, changed, touched_components) = write_graph(
+        let (candidate, changed, touched_components, reset_expectation) = write_graph(
             self.source,
             current.chart_identifier,
             &change,
             &mut budget,
             &mut fields,
+            &mut text,
         )?;
         if !changed {
             return Ok(FontCommit {
@@ -722,15 +749,19 @@ impl<'a> FontEdit<'a> {
                 diagnostics: Diagnostics::unchanged(),
             });
         }
-        let candidate_selection = positional_selection(&candidate, &source_selection)?;
+        let candidate_selection = positional_selection(&candidate, &source_selection, &mut budget)?;
         let after = read_font_with_budget(
             &candidate,
             candidate_selection.chart_identifier,
             &mut budget,
             &mut fields,
+            &mut text,
         )?;
         if !same_selection(&source_selection, &candidate_selection)
             || expected.as_ref().is_some_and(|value| after != *value)
+            || reset_expectation.as_ref().is_some_and(
+                |value| !matches!(value, ResetExpectation::Font(expected) if after == *expected),
+            )
         {
             return Err(Error::Verification);
         }
@@ -796,27 +827,34 @@ impl<'a> FontSizeEdit<'a> {
     fn resolve(&self) -> Result<&(ChartSelection, TextPointSize), Error> {
         let mut budget = transaction_budget(self.source)?;
         let mut fields = FieldLedger::new(self.source)?;
+        let mut text = TextLedger::new(self.source);
         admit_transaction(self.source, &mut budget)?;
-        self.resolve_with_budget(&mut budget, &mut fields)
+        self.resolve_with_budget(&mut budget, &mut fields, &mut text)
     }
 
     fn resolve_with_budget(
         &self,
         budget: &mut TransactionBudget,
         fields: &mut FieldLedger,
+        text: &mut TextLedger,
     ) -> Result<&(ChartSelection, TextPointSize), Error> {
         if let Some(selection) = self.selection.get() {
             return Ok(selection);
         }
-        let selection = slide_chart_title::select_chart(
+        let selection = select_chart_transaction(
             self.source,
             self.slide.as_selector(),
             self.chart.as_selector(),
             true,
-        )
-        .map_err(map_chart_title_error)?;
-        let before =
-            read_size_with_budget(self.source, selection.chart_identifier, budget, fields)?;
+            budget,
+        )?;
+        let before = read_size_with_budget(
+            self.source,
+            selection.chart_identifier,
+            budget,
+            fields,
+            text,
+        )?;
         let _ = self.selection.set((selection, before));
         self.selection.get().ok_or(Error::InvalidSource)
     }
@@ -867,9 +905,11 @@ impl<'a> FontSizeEdit<'a> {
     pub fn commit(self) -> Result<FontSizeCommit, Error> {
         let mut budget = transaction_budget(self.source)?;
         let mut fields = FieldLedger::new(self.source)?;
+        let mut text = TextLedger::new(self.source);
         admit_transaction(self.source, &mut budget)?;
-        let (source_selection, before) =
-            self.resolve_with_budget(&mut budget, &mut fields)?.clone();
+        let (source_selection, before) = self
+            .resolve_with_budget(&mut budget, &mut fields, &mut text)?
+            .clone();
         let operation = self.after.ok_or(Refusal::NoStagedOperation)?;
         let catalog = physical_catalog(self.source)?;
         let source_bytes = catalog.shared_source();
@@ -899,13 +939,14 @@ impl<'a> FontSizeEdit<'a> {
             return Err(Refusal::UnsupportedSource.into());
         }
         self.source.validate().map_err(map_read_error)?;
-        let current = positional_selection(self.source, &source_selection)?;
+        let current = positional_selection(self.source, &source_selection, &mut budget)?;
         if !same_selection(&source_selection, &current)
             || read_size_with_budget(
                 self.source,
                 current.chart_identifier,
                 &mut budget,
                 &mut fields,
+                &mut text,
             )? != before
         {
             return Err(Error::InvalidSource);
@@ -914,12 +955,13 @@ impl<'a> FontSizeEdit<'a> {
             FontSizeOperation::Set(value) => EngineChange::Size(value),
             FontSizeOperation::Reset => EngineChange::ResetSize,
         };
-        let (candidate, changed, touched_components) = write_graph(
+        let (candidate, changed, touched_components, reset_expectation) = write_graph(
             self.source,
             current.chart_identifier,
             &change,
             &mut budget,
             &mut fields,
+            &mut text,
         )?;
         if !changed {
             return Ok(FontSizeCommit {
@@ -937,14 +979,18 @@ impl<'a> FontSizeEdit<'a> {
                 diagnostics: Diagnostics::unchanged(),
             });
         }
-        let candidate_selection = positional_selection(&candidate, &source_selection)?;
+        let candidate_selection = positional_selection(&candidate, &source_selection, &mut budget)?;
         let after = read_size_with_budget(
             &candidate,
             candidate_selection.chart_identifier,
             &mut budget,
             &mut fields,
+            &mut text,
         )?;
         if !same_selection(&source_selection, &candidate_selection)
+            || reset_expectation.as_ref().is_some_and(
+                |value| !matches!(value, ResetExpectation::Size(expected) if after == *expected),
+            )
             || (matches!(operation, FontSizeOperation::Set(_))
                 && after
                     != match operation {
@@ -979,14 +1025,24 @@ impl Package {
         slide_selector: impl Into<SlideSelector<'slide>>,
         chart_selector: impl Into<ChartSelector<'chart>>,
     ) -> Result<ChartFont, Error> {
-        let selection = slide_chart_title::select_chart(
+        let mut budget = transaction_budget(self)?;
+        let mut fields = FieldLedger::new(self)?;
+        let mut text = TextLedger::new(self);
+        admit_transaction(self, &mut budget)?;
+        let selection = select_chart_transaction(
             self,
             slide_selector.into(),
             chart_selector.into(),
             true,
+            &mut budget,
+        )?;
+        read_font_with_budget(
+            self,
+            selection.chart_identifier,
+            &mut budget,
+            &mut fields,
+            &mut text,
         )
-        .map_err(map_chart_title_error)?;
-        read_font(self, selection.chart_identifier)
     }
 
     /// Start an exact immutable edit of one selected slide chart's font.
@@ -1002,6 +1058,7 @@ impl Package {
     pub fn apply_slide_chart_font(&self, patch: &FontPatch) -> Result<FontCommit, Error> {
         let mut budget = transaction_budget(self)?;
         let mut fields = FieldLedger::new(self)?;
+        let mut text = TextLedger::new(self);
         admit_transaction(self, &mut budget)?;
         let catalog = physical_catalog(self)?;
         let source = catalog.shared_source();
@@ -1021,11 +1078,17 @@ impl Package {
                 slide_component_name: String::new(),
                 non_style_component_name: String::new(),
             },
+            &mut budget,
         )?;
         if selection.chart_identifier != patch.chart_identifier
             || selection.slide_identifier != patch.slide_identifier
-            || read_font_with_budget(self, selection.chart_identifier, &mut budget, &mut fields)?
-                != patch.before
+            || read_font_with_budget(
+                self,
+                selection.chart_identifier,
+                &mut budget,
+                &mut fields,
+                &mut text,
+            )? != patch.before
         {
             return Err(Error::PatchConflict);
         }
@@ -1045,13 +1108,28 @@ impl Package {
             Package::from_source_with_options(patch.artifacts.target(), self.state.options)
                 .map_err(map_read_error)?;
         candidate.validate().map_err(map_read_error)?;
-        let candidate_selection = positional_selection(&candidate, &selection)?;
+        let candidate_catalog = physical_catalog(&candidate)?;
+        let changed_members: HashSet<&str> = catalog
+            .package()
+            .iter()
+            .filter(|entry| {
+                candidate_catalog
+                    .package()
+                    .iter()
+                    .find(|candidate_entry| candidate_entry.name() == entry.name())
+                    .is_some_and(|candidate_entry| candidate_entry.data() != entry.data())
+            })
+            .map(|entry| entry.name())
+            .collect();
+        verify_locality_members(self, &candidate, &changed_members, &HashSet::new())?;
+        let candidate_selection = positional_selection(&candidate, &selection, &mut budget)?;
         if !same_selection(&selection, &candidate_selection)
             || read_font_with_budget(
                 &candidate,
                 candidate_selection.chart_identifier,
                 &mut budget,
                 &mut fields,
+                &mut text,
             )? != patch.after
         {
             return Err(Error::Verification);
@@ -1069,14 +1147,24 @@ impl Package {
         slide_selector: impl Into<SlideSelector<'slide>>,
         chart_selector: impl Into<ChartSelector<'chart>>,
     ) -> Result<TextPointSize, Error> {
-        let selection = slide_chart_title::select_chart(
+        let mut budget = transaction_budget(self)?;
+        let mut fields = FieldLedger::new(self)?;
+        let mut text = TextLedger::new(self);
+        admit_transaction(self, &mut budget)?;
+        let selection = select_chart_transaction(
             self,
             slide_selector.into(),
             chart_selector.into(),
             true,
+            &mut budget,
+        )?;
+        read_size_with_budget(
+            self,
+            selection.chart_identifier,
+            &mut budget,
+            &mut fields,
+            &mut text,
         )
-        .map_err(map_chart_title_error)?;
-        read_size(self, selection.chart_identifier)
     }
 
     /// Start an exact immutable edit of one selected slide chart's point size.
@@ -1095,6 +1183,7 @@ impl Package {
     ) -> Result<FontSizeCommit, Error> {
         let mut budget = transaction_budget(self)?;
         let mut fields = FieldLedger::new(self)?;
+        let mut text = TextLedger::new(self);
         admit_transaction(self, &mut budget)?;
         let catalog = physical_catalog(self)?;
         let source = catalog.shared_source();
@@ -1114,11 +1203,17 @@ impl Package {
                 slide_component_name: String::new(),
                 non_style_component_name: String::new(),
             },
+            &mut budget,
         )?;
         if selection.chart_identifier != patch.chart_identifier
             || selection.slide_identifier != patch.slide_identifier
-            || read_size_with_budget(self, selection.chart_identifier, &mut budget, &mut fields)?
-                != patch.before
+            || read_size_with_budget(
+                self,
+                selection.chart_identifier,
+                &mut budget,
+                &mut fields,
+                &mut text,
+            )? != patch.before
         {
             return Err(Error::PatchConflict);
         }
@@ -1138,13 +1233,28 @@ impl Package {
             Package::from_source_with_options(patch.artifacts.target(), self.state.options)
                 .map_err(map_read_error)?;
         candidate.validate().map_err(map_read_error)?;
-        let candidate_selection = positional_selection(&candidate, &selection)?;
+        let candidate_catalog = physical_catalog(&candidate)?;
+        let changed_members: HashSet<&str> = catalog
+            .package()
+            .iter()
+            .filter(|entry| {
+                candidate_catalog
+                    .package()
+                    .iter()
+                    .find(|candidate_entry| candidate_entry.name() == entry.name())
+                    .is_some_and(|candidate_entry| candidate_entry.data() != entry.data())
+            })
+            .map(|entry| entry.name())
+            .collect();
+        verify_locality_members(self, &candidate, &changed_members, &HashSet::new())?;
+        let candidate_selection = positional_selection(&candidate, &selection, &mut budget)?;
         if !same_selection(&selection, &candidate_selection)
             || read_size_with_budget(
                 &candidate,
                 candidate_selection.chart_identifier,
                 &mut budget,
                 &mut fields,
+                &mut text,
             )? != patch.after
         {
             return Err(Error::Verification);
@@ -1196,17 +1306,48 @@ fn owned_selectors(
     Ok((slide, chart))
 }
 
+fn select_chart_transaction(
+    package: &Package,
+    slide: SlideSelector<'_>,
+    chart: ChartSelector<'_>,
+    mutation_guards: bool,
+    budget: &mut TransactionBudget,
+) -> Result<ChartSelection, Error> {
+    // Charge the package ledger before entering the shared chart graph scan.
+    // The chart-title budget then applies its per-field/reference checks to
+    // the same bounded operation instead of the historical uncharged route.
+    let scan = package
+        .state
+        .source
+        .components()
+        .len()
+        .checked_add(package.state.total_objects)
+        .and_then(|value| value.checked_mul(usize::from(mutation_guards) + 1))
+        .ok_or(Error::InvalidSource)?;
+    budget.work(scan).map_err(map_transaction_error)?;
+    let mut graph_budget = ChartGraphScanBudget::new(package).map_err(map_chart_title_error)?;
+    slide_chart_title::select_chart_with_budget(
+        package,
+        slide,
+        chart,
+        mutation_guards,
+        &mut graph_budget,
+    )
+    .map_err(map_axis_error)
+}
+
 fn positional_selection(
     package: &Package,
     expected: &ChartSelection,
+    budget: &mut TransactionBudget,
 ) -> Result<ChartSelection, Error> {
-    slide_chart_title::select_chart(
+    select_chart_transaction(
         package,
         SlideSelector::position(expected.slide_position),
         ChartSelector::index(expected.chart_position.get()),
         true,
+        budget,
     )
-    .map_err(map_chart_title_error)
 }
 
 fn same_selection(expected: &ChartSelection, actual: &ChartSelection) -> bool {
@@ -1216,33 +1357,24 @@ fn same_selection(expected: &ChartSelection, actual: &ChartSelection) -> bool {
         && expected.chart_identifier == actual.chart_identifier
 }
 
-fn read_font(package: &Package, chart: u64) -> Result<ChartFont, Error> {
-    let mut budget = transaction_budget(package)?;
-    let mut fields = FieldLedger::new(package)?;
-    admit_transaction(package, &mut budget)?;
-    read_font_with_budget(package, chart, &mut budget, &mut fields)
-}
-
 fn read_font_with_budget(
     package: &Package,
     chart: u64,
     budget: &mut TransactionBudget,
     fields: &mut FieldLedger,
+    text: &mut TextLedger,
 ) -> Result<ChartFont, Error> {
     admit_workspace(package, budget)?;
     let components = PackageComponents(package);
     let workspace = Workspace::new(&components, graph_limits(package)?).map_err(map_graph_error)?;
-    let (value, report) = engine::font(&workspace, chart, engine_limits(package, budget, fields)?)
-        .map_err(map_engine_error)?;
-    charge_engine_report(budget, fields, report)?;
+    let (value, report) = engine::font(
+        &workspace,
+        chart,
+        engine_limits(package, budget, fields, text)?,
+    )
+    .map_err(map_engine_error)?;
+    charge_engine_report(budget, fields, text, report)?;
     Ok(ChartFont::new(value.font, value.bold, value.italic))
-}
-
-fn read_size(package: &Package, chart: u64) -> Result<TextPointSize, Error> {
-    let mut budget = transaction_budget(package)?;
-    let mut fields = FieldLedger::new(package)?;
-    admit_transaction(package, &mut budget)?;
-    read_size_with_budget(package, chart, &mut budget, &mut fields)
 }
 
 fn read_size_with_budget(
@@ -1250,13 +1382,18 @@ fn read_size_with_budget(
     chart: u64,
     budget: &mut TransactionBudget,
     fields: &mut FieldLedger,
+    text: &mut TextLedger,
 ) -> Result<TextPointSize, Error> {
     admit_workspace(package, budget)?;
     let components = PackageComponents(package);
     let workspace = Workspace::new(&components, graph_limits(package)?).map_err(map_graph_error)?;
-    let (value, report) = engine::size(&workspace, chart, engine_limits(package, budget, fields)?)
-        .map_err(map_engine_error)?;
-    charge_engine_report(budget, fields, report)?;
+    let (value, report) = engine::size(
+        &workspace,
+        chart,
+        engine_limits(package, budget, fields, text)?,
+    )
+    .map_err(map_engine_error)?;
+    charge_engine_report(budget, fields, text, report)?;
     Ok(value)
 }
 
@@ -1266,7 +1403,8 @@ fn write_graph(
     change: &EngineChange,
     budget: &mut TransactionBudget,
     fields: &mut FieldLedger,
-) -> Result<(Package, bool, usize), Error> {
+    text: &mut TextLedger,
+) -> Result<(Package, bool, usize, Option<ResetExpectation>), Error> {
     admit_workspace(package, budget)?;
     let components = PackageComponents(package);
     let mut workspace =
@@ -1275,20 +1413,47 @@ fn write_graph(
         &mut workspace,
         chart,
         change,
-        engine_limits(package, budget, fields)?,
+        engine_limits(package, budget, fields, text)?,
     )
     .map_err(map_engine_error)?;
-    charge_engine_report(budget, fields, report)?;
+    charge_engine_report(budget, fields, text, report)?;
     if !report.changed() {
-        return Ok((package.snapshot(), false, 0));
+        return Ok((package.snapshot(), false, 0, None));
     }
+    let reset_expectation = match change {
+        EngineChange::ResetFont => {
+            let (value, report) = engine::font(
+                &workspace,
+                chart,
+                engine_limits(package, budget, fields, text)?,
+            )
+            .map_err(map_engine_error)?;
+            charge_engine_report(budget, fields, text, report)?;
+            Some(ResetExpectation::Font(ChartFont::new(
+                value.font,
+                value.bold,
+                value.italic,
+            )))
+        },
+        EngineChange::ResetSize => {
+            let (value, report) = engine::size(
+                &workspace,
+                chart,
+                engine_limits(package, budget, fields, text)?,
+            )
+            .map_err(map_engine_error)?;
+            charge_engine_report(budget, fields, text, report)?;
+            Some(ResetExpectation::Size(value))
+        },
+        _ => None,
+    };
     let changes = workspace.finish();
     let touched = changes.edits.len() + changes.insertions.len() + changes.deletions.len();
     if touched == 0 {
         return Err(Error::InvalidSource);
     }
     let candidate = publish(package, changes, budget)?;
-    Ok((candidate, true, touched))
+    Ok((candidate, true, touched, reset_expectation))
 }
 
 fn transaction_budget(package: &Package) -> Result<TransactionBudget, Error> {
@@ -1341,6 +1506,49 @@ impl FieldLedger {
     }
 }
 
+#[derive(Debug, Clone, Copy)]
+struct TextLedger {
+    used: usize,
+    maximum: usize,
+}
+
+impl TextLedger {
+    fn new(package: &Package) -> Self {
+        Self {
+            used: 0,
+            maximum: package.semantic_limits().max_text_bytes(),
+        }
+    }
+
+    fn remaining(self) -> Result<usize, Error> {
+        self.maximum
+            .checked_sub(self.used)
+            .filter(|remaining| *remaining > 0)
+            .ok_or(Error::Limit {
+                kind: LimitKind::TextBytes,
+                observed: usize_to_u64(self.used.saturating_add(1)),
+                maximum: usize_to_u64(self.maximum),
+            })
+    }
+
+    fn charge(&mut self, amount: usize) -> Result<(), Error> {
+        let observed = self.used.checked_add(amount).ok_or(Error::Limit {
+            kind: LimitKind::TextBytes,
+            observed: u64::MAX,
+            maximum: usize_to_u64(self.maximum),
+        })?;
+        if observed > self.maximum {
+            return Err(Error::Limit {
+                kind: LimitKind::TextBytes,
+                observed: usize_to_u64(observed),
+                maximum: usize_to_u64(self.maximum),
+            });
+        }
+        self.used = observed;
+        Ok(())
+    }
+}
+
 /// Admit the package inventory before selector/graph work starts.  The chart
 /// engine receives only the residual profile from this same transaction
 /// ledger; it never gets a source-sized default profile.
@@ -1382,6 +1590,7 @@ fn engine_limits(
     package: &Package,
     budget: &TransactionBudget,
     fields: &FieldLedger,
+    text: &TextLedger,
 ) -> Result<engine::Limits, Error> {
     let wire = budget.residual(package).map_err(map_transaction_error)?;
     let max_nesting = u32::try_from(wire.max_nesting()).map_err(|_| Error::InvalidSource)?;
@@ -1392,7 +1601,7 @@ fn engine_limits(
         wire.max_output_bytes().min(codec.max_bytes()),
         max_nesting,
         wire.max_rewrite_work(),
-        package.semantic_limits().max_text_bytes(),
+        text.remaining()?,
         budget
             .remaining_allocations()
             .map_err(map_transaction_error)?,
@@ -1404,6 +1613,7 @@ fn engine_limits(
 fn charge_engine_report(
     budget: &mut TransactionBudget,
     fields: &mut FieldLedger,
+    text: &mut TextLedger,
     report: engine::Report,
 ) -> Result<(), Error> {
     budget
@@ -1415,7 +1625,8 @@ fn charge_engine_report(
         .and_then(|_| budget.scratch(report.scratch_bytes()))
         .and_then(|_| budget.nesting(report.max_depth() as usize))
         .map_err(map_transaction_error)?;
-    fields.charge(report.fields())
+    fields.charge(report.fields())?;
+    text.charge(report.text_bytes())
 }
 
 fn preflight_candidate(
@@ -1457,6 +1668,7 @@ fn preflight_candidate(
         .ok_or(Error::InvalidSource)?;
     budget
         .input(candidate_bytes)
+        .and_then(|_| budget.output(candidate_bytes))
         .and_then(|_| budget.work(work))
         .and_then(|_| budget.allocations(allocations))
         .and_then(|_| budget.retained(candidate_bytes))
@@ -1480,6 +1692,138 @@ fn physical_catalog(package: &Package) -> Result<&SourceCatalog, Error> {
     }
 }
 
+fn admit_archive_encoding(
+    archive: &Archive,
+    archive_limits: litchi_iwa_core::Limits,
+    snappy_limits: litchi_iwa_core::SnappyLimits,
+    budget: &mut TransactionBudget,
+) -> Result<(), Error> {
+    let encoded = archive
+        .encoded_len(archive_limits)
+        .map_err(map_core_error)?;
+    let compressed =
+        SnappyStream::maximum_compressed_len(encoded, snappy_limits).map_err(map_core_error)?;
+    let work = encoded
+        .checked_add(compressed)
+        .ok_or(Error::InvalidSource)?;
+    budget
+        .work(work)
+        .and_then(|_| budget.retained(work))
+        .and_then(|_| budget.scratch(work))
+        .and_then(|_| budget.allocations(2))
+        .map_err(map_transaction_error)
+}
+
+fn verify_locality(
+    source: &Package,
+    candidate: &Package,
+    changes: &graph::Changes,
+) -> Result<(), Error> {
+    let changed_members: HashSet<&str> = changes
+        .edits
+        .iter()
+        .map(|(name, _)| name.as_str())
+        .chain(changes.insertions.iter().map(|entry| entry.name.as_str()))
+        .collect();
+    let deleted_members: HashSet<&str> = changes.deletions.iter().map(String::as_str).collect();
+    verify_locality_members(source, candidate, &changed_members, &deleted_members)
+}
+
+fn verify_locality_members(
+    source: &Package,
+    candidate: &Package,
+    changed_members: &HashSet<&str>,
+    deleted_members: &HashSet<&str>,
+) -> Result<(), Error> {
+    let source_catalog = physical_catalog(source)?;
+    let candidate_catalog = physical_catalog(candidate)?;
+
+    for source_entry in source_catalog.package().iter() {
+        let name = source_entry.name();
+        if deleted_members.contains(name) {
+            continue;
+        }
+        let candidate_entry = candidate_catalog
+            .package()
+            .iter()
+            .find(|entry| entry.name() == name)
+            .ok_or(Error::InvalidSource)?;
+        if !changed_members.contains(name) {
+            if source_entry.data() != candidate_entry.data() {
+                return Err(Error::InvalidSource);
+            }
+            continue;
+        }
+        let source_component = source
+            .state
+            .source
+            .components()
+            .get(name)
+            .ok_or(Error::InvalidSource)?;
+        let candidate_component = candidate
+            .state
+            .source
+            .components()
+            .get(name)
+            .ok_or(Error::InvalidSource)?;
+        for source_object in &source_component.archive().objects {
+            let identifier = source_object
+                .archive_info
+                .identifier
+                .ok_or(Error::InvalidSource)?;
+            let Some(candidate_object) = candidate_component
+                .archive()
+                .objects
+                .iter()
+                .find(|object| object.archive_info.identifier == Some(identifier))
+            else {
+                if source_object
+                    .messages
+                    .first()
+                    .is_some_and(|message| is_chart_font_rewritable_type(message.type_))
+                {
+                    continue;
+                }
+                return Err(Error::InvalidSource);
+            };
+            if source_object.same_content_ignoring_offsets(candidate_object) {
+                continue;
+            }
+            if !source_object
+                .messages
+                .first()
+                .is_some_and(|message| is_chart_font_rewritable_type(message.type_))
+            {
+                return Err(Error::InvalidSource);
+            }
+            for (index, source_message) in source_object.messages.iter().enumerate() {
+                if is_chart_font_rewritable_type(source_message.type_) {
+                    continue;
+                }
+                let candidate_message = candidate_object
+                    .messages
+                    .get(index)
+                    .ok_or(Error::InvalidSource)?;
+                if candidate_message != source_message {
+                    return Err(Error::InvalidSource);
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
+const fn is_chart_font_rewritable_type(message_type: u32) -> bool {
+    matches!(
+        message_type,
+        CHART_MESSAGE_TYPE
+            | PARAGRAPH_STYLE_MESSAGE_TYPE
+            | STYLESHEET_MESSAGE_TYPE
+            | PACKAGE_METADATA_MESSAGE_TYPE
+            | 5_022..=5_029
+    )
+}
+
 fn publish(
     package: &Package,
     changes: graph::Changes,
@@ -1494,15 +1838,9 @@ fn publish(
         .limits()
         .snappy_limits()
         .map_err(map_archive_error)?;
-    budget
-        .preflight_reassembly(
-            catalog,
-            catalog.source_bytes().len(),
-            changes.deletions.len(),
-        )
-        .map_err(map_transaction_error)?;
     let mut edited = Vec::new();
     for (name, archive) in &changes.edits {
+        admit_archive_encoding(archive, archive_limits, snappy_limits, budget)?;
         let bytes = archive.to_bytes(archive_limits).map_err(map_core_error)?;
         let compressed = SnappyStream::compress(&bytes, snappy_limits).map_err(map_core_error)?;
         edited.push((name.as_str(), compressed));
@@ -1523,6 +1861,7 @@ fn publish(
             ),
             None => None,
         };
+        admit_archive_encoding(&insertion.archive, archive_limits, snappy_limits, budget)?;
         let bytes = insertion
             .archive
             .to_bytes(archive_limits)
@@ -1538,15 +1877,32 @@ fn publish(
         })
         .collect();
     let deletions: Vec<&str> = changes.deletions.iter().map(String::as_str).collect();
-    let output = catalog
+    let edited_bytes = edited
+        .iter()
+        .map(|(_, data)| data.len())
+        .chain(inserted.iter().map(|(_, data, _)| data.len()))
+        .try_fold(0usize, |total, bytes| total.checked_add(bytes))
+        .ok_or(Error::InvalidSource)?;
+    budget
+        .preflight_reassembly(catalog, edited_bytes, changes.deletions.len())
+        .map_err(map_transaction_error)?;
+    let prepared = catalog
         .package()
-        .reassemble_with_changes_to_bytes(&insertions, &edits, &deletions, catalog.limits())
+        .prepare_reassembly_with_changes(&insertions, &edits, &deletions, catalog.limits())
+        .map_err(map_archive_error)?;
+    let requirements = prepared.execution_requirements();
+    budget
+        .reassembly(requirements)
+        .map_err(map_transaction_error)?;
+    let output = prepared
+        .execute(requirements.exact_limits())
         .map_err(map_archive_error)?;
     let output_len = output.len();
     preflight_candidate(package, output_len, changes.insertions.len(), budget)?;
     let candidate = Package::from_source_with_options(output.into(), package.state.options)
         .map_err(map_read_error)?;
     candidate.validate().map_err(map_read_error)?;
+    verify_locality(package, &candidate, &changes)?;
     Ok(candidate)
 }
 
@@ -1558,6 +1914,52 @@ fn map_selector_error(error: SelectorError) -> Error {
             maximum: usize_to_u64(maximum),
         },
         SelectorError::Allocation { amount } => Error::Allocation { amount },
+    }
+}
+
+fn map_axis_error(error: AxisSupportError) -> Error {
+    match error {
+        AxisSupportError::Selector(selector) => match selector {
+            AxisSupportSelectorError::UnsupportedSource => Refusal::UnsupportedSource.into(),
+            AxisSupportSelectorError::AmbiguousSelector => Refusal::AmbiguousSelector.into(),
+            AxisSupportSelectorError::EmptySlideName => Refusal::EmptySlideName.into(),
+            AxisSupportSelectorError::SlideNameNotFound => Refusal::SlideNameNotFound.into(),
+            AxisSupportSelectorError::SlidePositionNotFound { position } => {
+                Refusal::SlidePositionNotFound { position }.into()
+            },
+            AxisSupportSelectorError::ChartNameNotFound => Refusal::ChartNameNotFound.into(),
+            AxisSupportSelectorError::ChartPositionNotFound { position } => {
+                Refusal::ChartPositionNotFound { position }.into()
+            },
+            AxisSupportSelectorError::EmptyChartName => Refusal::EmptyChartName.into(),
+        },
+        AxisSupportError::LimitExceeded {
+            kind,
+            observed,
+            maximum,
+        } => Error::Limit {
+            kind: match kind {
+                chart_axis_support::AxisSupportLimitKind::InputBytes => LimitKind::InputBytes,
+                chart_axis_support::AxisSupportLimitKind::OutputBytes => LimitKind::OutputBytes,
+                chart_axis_support::AxisSupportLimitKind::WireBytes => LimitKind::WireBytes,
+                chart_axis_support::AxisSupportLimitKind::Entries => LimitKind::Entries,
+                chart_axis_support::AxisSupportLimitKind::EntryBytes => LimitKind::EntryBytes,
+                chart_axis_support::AxisSupportLimitKind::TotalBytes => LimitKind::TotalBytes,
+                chart_axis_support::AxisSupportLimitKind::Slides => LimitKind::Slides,
+                chart_axis_support::AxisSupportLimitKind::References => LimitKind::References,
+                chart_axis_support::AxisSupportLimitKind::TextStorages
+                | chart_axis_support::AxisSupportLimitKind::TextFragments => LimitKind::Entries,
+                chart_axis_support::AxisSupportLimitKind::TextBytes => LimitKind::WireBytes,
+                chart_axis_support::AxisSupportLimitKind::WireFields => LimitKind::WireFields,
+                chart_axis_support::AxisSupportLimitKind::WireNesting => LimitKind::WireNesting,
+                chart_axis_support::AxisSupportLimitKind::WireWork => LimitKind::WireWork,
+                chart_axis_support::AxisSupportLimitKind::TitleBytes => LimitKind::SelectorBytes,
+            },
+            observed,
+            maximum,
+        },
+        AxisSupportError::Allocation { amount } => Error::Allocation { amount },
+        AxisSupportError::InvalidSource => Error::InvalidSource,
     }
 }
 
@@ -1682,7 +2084,7 @@ fn map_engine_error(error: engine::Error) -> Error {
                 engine::LimitKind::OutputBytes => LimitKind::OutputBytes,
                 engine::LimitKind::Nesting => LimitKind::WireNesting,
                 engine::LimitKind::Work => LimitKind::WireWork,
-                engine::LimitKind::TextBytes => LimitKind::SelectorBytes,
+                engine::LimitKind::TextBytes => LimitKind::TextBytes,
                 engine::LimitKind::Allocations => LimitKind::Allocations,
                 engine::LimitKind::RetainedBytes => LimitKind::RetainedBytes,
                 engine::LimitKind::ScratchBytes => LimitKind::ScratchBytes,

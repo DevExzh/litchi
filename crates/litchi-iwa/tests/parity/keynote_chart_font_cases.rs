@@ -13,7 +13,7 @@ use litchi_iwa_style::chart_font::{Change, ChartFont as EngineFont};
 use litchi_iwa_text::character::TextPointSize;
 use litchi_iwa_text::font::Font;
 use litchi_keynote::chart::font::{ChartFont, Error as FontError, Refusal as FontRefusal};
-use litchi_keynote::{ChartSelector, Package, SlideSelector};
+use litchi_keynote::{ChartSelector, OpenOptions, Package, SemanticLimits, SlideSelector};
 
 use crate::chart_style_cases::input;
 use crate::harness::{Case, Evidence, Format, LeafRun, TestResult, Tier};
@@ -303,6 +303,40 @@ fn keynote_slide_chart_font_noop_inverse_and_refusal_controls() -> TestResult {
             FontRefusal::ChartPositionNotFound { .. }
         ))
     ));
+
+    let changed = package
+        .edit_slide_chart_font(LEAF_SLIDE, LEAF_CHART)?
+        .set(ChartFont::named("Georgia", false, true)?)
+        .commit()?;
+    let stale_source = changed
+        .package()
+        .edit_slide_chart_font(LEAF_SLIDE, LEAF_CHART)?
+        .set(ChartFont::named("AvenirNext-DemiBold", true, false)?)
+        .commit()?;
+    assert!(matches!(
+        stale_source
+            .package()
+            .apply_slide_chart_font(changed.patch()),
+        Err(FontError::PatchConflict)
+    ));
+    Ok(())
+}
+
+#[test]
+fn keynote_slide_chart_font_low_text_budget_refuses_before_graph_work() -> TestResult {
+    let input = input(Format::Keynote, Kind::Column2d)?;
+    let semantic = SemanticLimits::builder().max_text_bytes(1)?.build()?;
+    let package = Package::from_bytes_with_options(
+        &input.fixture.bytes,
+        OpenOptions::new().semantic_limits(semantic),
+    )?;
+    assert!(matches!(
+        package.slide_chart_font(LEAF_SLIDE, LEAF_CHART),
+        Err(FontError::Limit {
+            kind: litchi_keynote::chart::font::LimitKind::TextBytes,
+            ..
+        })
+    ));
     Ok(())
 }
 
@@ -341,6 +375,23 @@ fn keynote_chart_font_facade_cost_abba() -> TestResult {
         std::hint::black_box(leaf_write(source, &change)?);
         std::hint::black_box(leaf_write(source, &change)?);
         std::hint::black_box(host_write(source, chart, &change)?);
+    }
+    for change in [
+        Change::Font(EngineFont {
+            font: Font::named("Georgia")?,
+            bold: false,
+            italic: true,
+        }),
+        Change::Size(TextPointSize::from_points(17.0)?),
+    ] {
+        let mut input = input(Format::Keynote, Kind::Column2d)?;
+        let chart = input.chart;
+        input.fixture.bytes = host_write(&input.fixture.bytes, chart, &change)?;
+        let source = input.fixture.bytes.as_slice();
+        std::hint::black_box(host_read(source, chart)?);
+        std::hint::black_box(leaf_read(source)?);
+        std::hint::black_box(leaf_read(source)?);
+        std::hint::black_box(host_read(source, chart)?);
     }
     Ok(())
 }

@@ -53,7 +53,13 @@ codec's published hard ceilings; it does not call `Limits::for_source` or
 replace a caller profile with a fresh source-sized default. Engine archive,
 wire, codec, graph-limit, allocation and identifier failures retain typed
 facade classifications. The shared substrate itself remains outside this
-work package.
+work package. Chart selection now enters the shared budget-aware selector,
+output-free reassembly requirements are admitted before final ZIP execution,
+and a source-relative locality verifier rejects changed unknown members,
+objects, or message content outside the chart-font rewrite set. Reset routes
+read the staged inherited effective value before publication and reject mixed
+or otherwise unmodelled reset results. Engine text-byte reports retain their
+`TextBytes` classification and accumulate across the transaction.
 
 ## Differential proof and evidence boundary
 
@@ -93,7 +99,8 @@ contract, focused gates and performance disposition are accepted.
 ## Performance and verification
 
 `keynote_chart_font_facade_cost_abba` is an ignored full-facade probe covering
-font/size set and reset in host/leaf/leaf/host order. It was added for the
+six routes: font/size set and reset plus independent populated font and
+point-size reads, each in host/leaf/leaf/host order. It was added for the
 coordinator's pinned release ABBA slot but was not run while timing was held;
 no performance qualification or wall-clock claim is made here. Any later
 receipt must name the final integrated source SHA, release binary SHA-256,
@@ -106,8 +113,9 @@ Scoped evidence on the current branch:
 | `cargo fmt --all -- --check` | pass |
 | `cargo check --locked -p litchi-keynote` | pass |
 | strict Clippy (`litchi-keynote`, parity test) | pass; vendor warnings only |
-| seven focused Keynote facade parity/control tests | 7 passed |
+| eight focused Keynote facade parity/control tests | 8 passed |
 | seven shared chart-font admission tests | 7 passed |
+| low text-budget and stale-patch controls | passed |
 | `python3 tools/check_crate_boundaries.py` | pass; 70 packages, 313 declarations, 12 explicit debt items |
 | `python3 tools/iwa_exit_ledger.py --check` | pass; six chart-font rows intentionally host-only |
 | `RUSTC_BOOTSTRAP=1 python3 tools/check_api_glossary.py --target-dir /tmp/iwa-w2c-glossary-20261029` | pass; 73 profiles, 3,957 banned names, 716 families, 729 result contracts |
