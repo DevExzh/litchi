@@ -20,11 +20,16 @@
     reason = "the focused transaction keeps its public types beside the staged rewrite"
 )]
 
-use std::collections::BTreeMap;
 use std::fmt;
 
 use litchi_iwa_core::RawMessage;
+use litchi_iwa_table::{
+    cell_text_style as shared, cell_text_style_headers as headers, cell_text_style_writer as writer,
+};
 use litchi_iwa_text_wire::CharacterProperties;
+use litchi_numbers_wire::{
+    Limits as BncLimits, table_topology::storage::HEADER_BUCKET_ROWS as SHARED_HEADER_BUCKET_ROWS,
+};
 use thiserror::Error as ThisError;
 
 use super::Package;
@@ -34,12 +39,10 @@ use super::structure::{
     references,
 };
 use super::table_topology::wire::{
-    bytes_field, push_bytes_field, push_varint_field, rebuild, repeated_bytes, single_bytes,
-    single_reference, single_varint, varint_field,
+    push_bytes_field, repeated_bytes, single_bytes, single_reference, single_varint,
 };
 use super::table_topology::{
-    self as topology, LIST_MESSAGE_TYPE, LIST_SEGMENT_MESSAGE_TYPE, TILE_MESSAGE_TYPE, lists,
-    storage,
+    self as topology, LIST_MESSAGE_TYPE, LIST_SEGMENT_MESSAGE_TYPE, TILE_MESSAGE_TYPE, storage,
 };
 use crate::selector::{SheetSelector, TableSelector};
 use crate::table::At;
@@ -51,12 +54,8 @@ const PARAGRAPH_STYLE_MESSAGE_TYPE: u32 = 2_022;
 /// `TST.HeaderStorageBucket`.
 const HEADER_BUCKET_MESSAGE_TYPE: u32 = 6_006;
 /// `TSS.StylesheetArchive`.
-const STYLESHEET_MESSAGE_TYPE: u32 = 401;
 /// `DataStore.styleTable`.
 const STYLE_LIST_FIELD: u32 = 5;
-/// The longest parent chain a cell's text style is resolved through.
-const MAX_STYLE_DEPTH: usize = 16;
-
 /// A typed, content-redacted cell text-style failure.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
@@ -162,6 +161,7 @@ pub(super) fn from_topology(error: topology::Error) -> Error {
     }
 }
 
+#[cfg(test)]
 fn from_style(error: litchi_iwa_text_wire::CharStyleError) -> Error {
     match error {
         litchi_iwa_text_wire::CharStyleError::Limit {
@@ -199,6 +199,7 @@ pub struct Edit<'a> {
     rows: u32,
     columns: u32,
     cells: Vec<(At, CharacterProperties)>,
+    limits: shared::Limits,
 }
 
 impl fmt::Debug for Edit<'_> {
@@ -226,12 +227,22 @@ impl Edit<'_> {
         if position.row() >= self.rows || position.column() >= self.columns {
             return Err(Error::Refused(Refusal::CellNotFound));
         }
+        self.limits
+            .admit_character_properties(&properties)
+            .map_err(from_shared)?;
         if let Some((_, staged)) = self.cells.iter_mut().find(|(cell, _)| *cell == position) {
+            self.limits
+                .admit_character_properties(staged)
+                .map_err(from_shared)?;
             let mut merged = properties;
             merged.inherit(staged);
             *staged = merged;
             return Ok(self);
         }
+        if self.cells.len() >= litchi_iwa_table::TableSource::max_objects(self.source) {
+            return Err(Error::Allocation { amount: 1 });
+        }
+        self.limits.admit_allocations(1).map_err(from_shared)?;
         self.cells
             .try_reserve(1)
             .map_err(|_error| Error::Allocation { amount: 1 })?;
@@ -251,12 +262,52 @@ impl Edit<'_> {
         if self.cells.is_empty() {
             return Err(Error::Refused(Refusal::NoStagedOperation));
         }
-        let published = publish(self.source, self.sheet, self.table, &self.cells)?;
-        for (position, properties) in &self.cells {
-            let effective = text_style(&published.package, self.sheet, self.table, *position)?;
+        let (published, limits) = publish(
+            self.source,
+            self.sheet,
+            self.table,
+            &self.cells,
+            self.limits,
+        )?;
+        let effective_values = if self.cells.len() == 1 {
+            limits.admit_allocations(1).map_err(from_shared)?;
+            vec![text_style_with_limits(
+                &published.package,
+                self.sheet,
+                self.table,
+                self.cells[0].0,
+                &limits,
+            )?]
+        } else {
+            let mut positions = Vec::new();
+            limits
+                .reserve(&mut positions, self.cells.len())
+                .map_err(from_shared)?;
+            positions.extend(self.cells.iter().map(|(position, _)| *position));
+            text_style_many_with_limits(
+                &published.package,
+                self.sheet,
+                self.table,
+                &positions,
+                &limits,
+            )?
+        };
+        for ((_, properties), effective) in self.cells.iter().zip(effective_values) {
+            limits
+                .admit_character_properties(properties)
+                .map_err(from_shared)?;
+            limits
+                .admit_character_properties(&effective)
+                .map_err(from_shared)?;
             let mut expected = properties.clone();
             expected.inherit(&effective);
-            if with_flags_off(expected) != with_flags_off(effective) {
+            limits
+                .admit_character_properties(&expected)
+                .map_err(from_shared)?;
+            limits
+                .admit_character_properties(&effective)
+                .map_err(from_shared)?;
+            if with_flags_off(expected.clone()) != with_flags_off(effective.clone()) {
                 return Err(Error::Verification);
             }
         }
@@ -403,42 +454,485 @@ pub(super) fn current_style(
     list_reference(working, list_data, key)?.ok_or(Error::InvalidSource)
 }
 
-/// The character properties the style `style` and its parent chain set.
-fn effective(working: &Working<'_>, style: u64) -> Result<CharacterProperties, Error> {
-    let wire = style_wire_limits(working)?;
-    let mut properties = CharacterProperties::new();
-    let mut current = Some(style);
-    for _ in 0..MAX_STYLE_DEPTH {
-        let Some(identifier) = current else { break };
-        let Ok(object) = working.object(identifier) else {
-            break;
-        };
-        let Some(message) = object
-            .messages
-            .iter()
-            .find(|message| message.type_ == PARAGRAPH_STYLE_MESSAGE_TYPE)
-        else {
-            break;
-        };
-        properties.inherit(
-            &litchi_iwa_text_wire::character_style_properties(&message.data, wire)
-                .map_err(from_style)?,
-        );
-        current = litchi_iwa_text_wire::character_style_parent(&message.data, wire)
-            .map_err(from_style)?;
-    }
-    Ok(properties)
-}
-
 fn text_style(
     package: &Package,
     sheet: usize,
     table: usize,
     position: At,
 ) -> Result<CharacterProperties, Error> {
+    let limits = shared::Limits::from_source(package).map_err(from_shared)?;
+    text_style_with_limits(package, sheet, table, position, &limits)
+}
+
+fn text_style_with_limits(
+    package: &Package,
+    sheet: usize,
+    table: usize,
+    position: At,
+    limits: &shared::Limits,
+) -> Result<CharacterProperties, Error> {
     let working = Working::new(package)?;
-    let style = current_style(&working, sheet, table, position)?;
-    effective(&working, style)
+    let target = topology::locate(&working, sheet, table).map_err(from_topology)?;
+    shared::read(
+        package,
+        shared::Target {
+            model_identifier: target.model,
+            row: position.row(),
+            column: position.column(),
+        },
+        limits,
+    )
+    .map_err(from_shared)
+}
+
+fn text_style_many_with_limits(
+    package: &Package,
+    sheet: usize,
+    table: usize,
+    positions: &[At],
+    limits: &shared::Limits,
+) -> Result<Vec<CharacterProperties>, Error> {
+    let working = Working::new(package)?;
+    let target = topology::locate(&working, sheet, table).map_err(from_topology)?;
+    let mut targets = Vec::new();
+    limits
+        .reserve(&mut targets, positions.len())
+        .map_err(from_shared)?;
+    targets.extend(positions.iter().map(|position| shared::Target {
+        model_identifier: target.model,
+        row: position.row(),
+        column: position.column(),
+    }));
+    shared::read_many(package, &targets, limits).map_err(from_shared)
+}
+
+fn from_shared(error: shared::Error) -> Error {
+    match error {
+        shared::Error::InvalidSource(_) => Error::InvalidSource,
+        shared::Error::Refused(refusal) => match refusal {
+            shared::Refusal::OutsideTable => Error::Refused(Refusal::CellNotFound),
+            shared::Refusal::UnsupportedStyleList | shared::Refusal::UnsupportedDependency => {
+                Error::Refused(Refusal::UnsupportedDependency)
+            },
+            shared::Refusal::UnsupportedSource => Error::Refused(Refusal::UnsupportedSource),
+            _ => Error::InvalidSource,
+        },
+        shared::Error::Limit {
+            kind,
+            observed,
+            maximum,
+        } => Error::Limit {
+            kind: LimitKind::Wire(kind),
+            observed,
+            maximum,
+        },
+        shared::Error::Allocation { amount } => Error::Allocation { amount },
+        shared::Error::NeedsIdentifier => Error::InvalidSource,
+        shared::Error::BatchUnsupported => Error::Refused(Refusal::UnsupportedDependency),
+        _ => Error::InvalidSource,
+    }
+}
+
+/// Apply the shared format-neutral style graph plan through Numbers'
+/// immutable working set and metadata publisher.  All graph decisions and
+/// payload construction come from `litchi-iwa-table`; this adapter owns only
+/// identifier allocation, archive headers, registry transitions and cell
+/// publication.
+fn publish(
+    source: &Package,
+    sheet: usize,
+    table: usize,
+    cells: &[(At, CharacterProperties)],
+    limits: shared::Limits,
+) -> Result<(structure::Published, shared::Limits), Error> {
+    let mut working = Working::new(source)?;
+    working.keep_previews();
+    let target = topology::locate(&working, sheet, table).map_err(from_topology)?;
+    if cells.len() == 1 {
+        let (position, properties) = &cells[0];
+        let shared_target = shared::Target {
+            model_identifier: target.model,
+            row: position.row(),
+            column: position.column(),
+        };
+        let plan =
+            match shared::plan_set_precharged(source, shared_target, properties, None, &limits) {
+                Ok(plan) => plan,
+                Err(shared::Error::NeedsIdentifier) => {
+                    limits.admit_allocations(1).map_err(from_shared)?;
+                    let fresh = *working.allocate(1)?.first().ok_or(Error::InvalidSource)?;
+                    shared::plan_set_precharged(
+                        source,
+                        shared_target,
+                        properties,
+                        Some(fresh),
+                        &limits,
+                    )
+                    .map_err(from_shared)?
+                },
+                Err(error) => return Err(from_shared(error)),
+            };
+        let Some(plan) = plan else {
+            return working
+                .publish(&Transition::default())
+                .map(|published| (published, limits))
+                .map_err(Error::from);
+        };
+        let mut transition = Transition::default();
+        apply_shared_plan(source, &mut working, &mut transition, plan, &limits)?;
+        return working
+            .publish(&transition)
+            .map(|published| (published, limits))
+            .map_err(Error::from);
+    }
+    let mut requests = Vec::new();
+    limits
+        .reserve(&mut requests, cells.len())
+        .map_err(from_shared)?;
+    for (position, properties) in cells {
+        limits
+            .admit_character_properties(properties)
+            .map_err(from_shared)?;
+        let shared_target = shared::Target {
+            model_identifier: target.model,
+            row: position.row(),
+            column: position.column(),
+        };
+        requests.push(shared::Request {
+            target: shared_target,
+            properties: properties.clone(),
+            fresh: None,
+        });
+    }
+    let prepare_batch = cells.len() >= 64;
+    let mut allocate = || {
+        limits.admit_allocations(1)?;
+        working
+            .allocate(1)
+            .map_err(|_| shared::Error::Allocation { amount: 1 })?
+            .first()
+            .copied()
+            .ok_or(shared::Error::InvalidSource("identifier allocation failed"))
+    };
+    let plan = shared::plan_set_many_with_allocator_precharged(
+        source,
+        &requests,
+        &limits,
+        prepare_batch,
+        &mut allocate,
+    )
+    .map_err(from_shared)?;
+    let Some(plan) = plan else {
+        return working
+            .publish(&Transition::default())
+            .map(|published| (published, limits))
+            .map_err(Error::from);
+    };
+    let mut transition = Transition::default();
+    apply_shared_plan(source, &mut working, &mut transition, plan, &limits)?;
+    working
+        .publish(&transition)
+        .map(|published| (published, limits))
+        .map_err(Error::from)
+}
+
+fn apply_shared_plan(
+    source: &Package,
+    working: &mut Working<'_>,
+    transition: &mut Transition,
+    plan: shared::Plan,
+    limits: &shared::Limits,
+) -> Result<(), Error> {
+    admit_publication(&plan, limits)?;
+    let registry =
+        metadata::registry(working)?.ok_or(Error::Refused(Refusal::UnsupportedSource))?;
+    for rewrite in &plan.rewrites {
+        let object = working.object(rewrite.identifier)?;
+        let index = structure::unique_message(object, &[rewrite.message_type])?;
+        if rewrite.add_references.is_empty() && rewrite.remove_references.is_empty() {
+            replace_message(working, rewrite.identifier, index, rewrite.data.clone())?;
+        } else {
+            match replace_with_references(
+                working,
+                rewrite.identifier,
+                index,
+                rewrite.data.clone(),
+                &rewrite.remove_references,
+                &rewrite.add_references,
+            ) {
+                Ok(()) => {},
+                Err(Fault::Invalid) => {
+                    replace_message(working, rewrite.identifier, index, rewrite.data.clone())?;
+                    let info = &mut working
+                        .object_mut(rewrite.identifier)?
+                        .archive_info
+                        .message_infos
+                        .get_mut(index)
+                        .ok_or(Fault::Invalid)?;
+                    info.object_references
+                        .retain(|reference| !rewrite.remove_references.contains(reference));
+                    for reference in &rewrite.add_references {
+                        if !info.object_references.contains(reference) {
+                            info.object_references.push(*reference);
+                        }
+                    }
+                },
+                Err(error) => return Err(error.into()),
+            }
+        }
+    }
+    for insertion in &plan.insertions {
+        let parent = insertion
+            .object_references
+            .first()
+            .copied()
+            .ok_or(Error::InvalidSource)?;
+        let template = working.object(parent)?;
+        let object = structure::new_object(
+            insertion.identifier,
+            Some(template),
+            insertion.message_type,
+            insertion.data.clone(),
+            insertion.object_references.clone(),
+            working.archive_limits(),
+        )?;
+        let entry = working
+            .locate(insertion.beside)?
+            .ok_or(Error::InvalidSource)?;
+        working.insert(&entry, object)?;
+    }
+    for registration in &plan.registrations {
+        match *registration {
+            shared::Registration::Uuid { object } => {
+                let entry = working.locate(object)?.ok_or(Error::InvalidSource)?;
+                let component = registry.component_for_entry(&entry)?.identifier;
+                let seed = metadata::identity_seed(working, object)?;
+                transition.register_uuid(&registry, component, object, seed)?;
+            },
+            shared::Registration::ExternalReference { from, object } => {
+                let from_entry = working.locate(from)?.ok_or(Error::InvalidSource)?;
+                let object_entry = working.locate(object)?.ok_or(Error::InvalidSource)?;
+                let from_component = registry.component_for_entry(&from_entry)?.identifier;
+                let object_component = registry.component_for_entry(&object_entry)?.identifier;
+                transition.reference(&registry, from_component, object_component, object)?;
+            },
+            shared::Registration::Removed { object } => {
+                transition.remove_objects(&registry, &[object])?;
+                transition.release_suffix(&[object])?;
+                working.remove(object)?;
+            },
+        }
+    }
+    write_style_keys(source, working, &plan.cell_updates, limits)?;
+    Ok(())
+}
+
+/// Admit the second owned copy made when a neutral plan is published into the
+/// mutable Numbers working set.  The shared planner charges its own source
+/// graph and generated output; this boundary separately owns the copies held
+/// by `RawMessage`, `NewObject`, and the compatibility replacement path.
+fn admit_publication(plan: &shared::Plan, limits: &shared::Limits) -> Result<(), Error> {
+    let mut copied = 0_usize;
+    let mut allocations = 0_usize;
+    let mut references = 0_usize;
+    let mut work = 0_usize;
+    for rewrite in &plan.rewrites {
+        let copies = usize::from(
+            !(rewrite.add_references.is_empty() && rewrite.remove_references.is_empty()),
+        )
+        .saturating_add(1);
+        copied = copied.saturating_add(rewrite.data.len().saturating_mul(copies));
+        allocations = allocations.saturating_add(1);
+        references = references
+            .saturating_add(rewrite.add_references.len())
+            .saturating_add(rewrite.remove_references.len());
+        work = work.saturating_add(rewrite.data.len()).saturating_add(1);
+    }
+    for insertion in &plan.insertions {
+        copied = copied.saturating_add(insertion.data.len());
+        allocations = allocations.saturating_add(2);
+        references = references.saturating_add(insertion.object_references.len());
+        work = work.saturating_add(insertion.data.len()).saturating_add(1);
+    }
+    allocations = allocations
+        .saturating_add(plan.registrations.len())
+        .saturating_add(plan.cell_updates.len());
+    work = work
+        .saturating_add(plan.registrations.len())
+        .saturating_add(plan.cell_updates.len());
+    limits.admit_copies(copied).map_err(from_shared)?;
+    limits.admit_allocations(allocations).map_err(from_shared)?;
+    limits.admit_references(references).map_err(from_shared)?;
+    limits.admit_work(work).map_err(from_shared)
+}
+
+/// Publish all cell-key updates through the shared bounded tile writer. The
+/// writer owns existing-cell, empty-slot and missing-row handling under the
+/// same staged-to-readback transaction ledger.
+fn write_style_keys(
+    source: &Package,
+    working: &mut Working<'_>,
+    updates: &[(shared::Target, u32)],
+    limits: &shared::Limits,
+) -> Result<(), Error> {
+    let Some((first_target, _)) = updates.first().copied() else {
+        return Ok(());
+    };
+    limits.admit_work(updates.len()).map_err(from_shared)?;
+    if updates
+        .iter()
+        .any(|(target, _)| target.model_identifier != first_target.model_identifier)
+    {
+        return Err(Error::Refused(Refusal::UnsupportedDependency));
+    }
+    let facts = shared::table_facts(source, first_target, limits).map_err(from_shared)?;
+    let shared::TableFacts {
+        rows: table_rows,
+        columns: table_columns,
+        tile_size,
+        row_headers,
+        column_headers,
+        tiles,
+    } = facts;
+    limits.admit_work(updates.len()).map_err(from_shared)?;
+    limits
+        .admit_work(updates.len().saturating_mul(tiles.len()))
+        .map_err(from_shared)?;
+    limits
+        .admit_work(updates.len().saturating_mul(updates.len()))
+        .map_err(from_shared)?;
+    let mut groups: Vec<(u64, Vec<writer::Update>)> = Vec::new();
+    limits.reserve(&mut groups, 1).map_err(from_shared)?;
+    for (target, key) in updates {
+        if target.row >= table_rows || target.column >= table_columns {
+            return Err(Error::Refused(Refusal::CellNotFound));
+        }
+        let tile_key = u64::from(target.row) / tile_size;
+        let local =
+            u32::try_from(u64::from(target.row) % tile_size).map_err(|_| Error::InvalidSource)?;
+        let tile = tiles
+            .iter()
+            .find(|(candidate, _)| u64::from(*candidate) == tile_key)
+            .map(|(_, identifier)| *identifier)
+            .ok_or(Error::Refused(Refusal::UnsupportedSource))?;
+        let update = writer::Update {
+            row: local,
+            column: target.column,
+            key: Some(*key),
+        };
+        if let Some((_, rows)) = groups
+            .iter_mut()
+            .find(|(identifier, _)| *identifier == tile)
+        {
+            limits.reserve(rows, 1).map_err(from_shared)?;
+            rows.push(update);
+        } else {
+            let mut rows = Vec::new();
+            limits.reserve(&mut rows, 1).map_err(from_shared)?;
+            rows.push(update);
+            limits.reserve(&mut groups, 1).map_err(from_shared)?;
+            groups.push((tile, rows));
+        }
+    }
+    let bnc_limits = BncLimits::from_wire_limits(limits.wire);
+    limits
+        .admit_work(groups.len().saturating_mul(tiles.len()))
+        .map_err(from_shared)?;
+    for (tile, rows) in groups {
+        let (tile_index, tile_data) = topology::message(working, tile, &[TILE_MESSAGE_TYPE])?;
+        let write = writer::set_text_style_keys(
+            tile_data,
+            table_columns,
+            &rows,
+            writer::RowPlacement::FieldOrder,
+            limits,
+            &bnc_limits,
+        )
+        .map_err(from_shared)?;
+        let tile_key = tiles
+            .iter()
+            .find(|(_, identifier)| *identifier == tile)
+            .map(|(key, _)| *key)
+            .ok_or(Error::InvalidSource)?;
+        let row_offset = tile_key
+            .checked_mul(u32::try_from(tile_size).map_err(|_| Error::InvalidSource)?)
+            .ok_or(Error::InvalidSource)?;
+        let deltas = headers::materialized_deltas(&rows, write.previous(), row_offset, limits)
+            .map_err(from_shared)?;
+        rewrite_materialized_headers(working, &row_headers, column_headers, &deltas, limits)?;
+        if write.changed() {
+            replace_message(working, tile, tile_index, write.into_tile())?;
+        }
+    }
+    Ok(())
+}
+
+fn rewrite_materialized_headers(
+    working: &mut Working<'_>,
+    row_headers: &[(u32, u64)],
+    column_headers: Option<u64>,
+    deltas: &headers::MaterializedHeaderDeltas,
+    limits: &shared::Limits,
+) -> Result<(), Error> {
+    if deltas.is_empty() {
+        return Ok(());
+    }
+    let row_groups = materialized_header_groups(row_headers, column_headers, deltas, limits)?;
+    limits
+        .admit_work(row_groups.len().saturating_mul(row_headers.len()))
+        .map_err(from_shared)?;
+    for (bucket, bucket_deltas) in row_groups {
+        let row_identifier = row_headers
+            .iter()
+            .find(|(candidate, _)| u64::from(*candidate) == bucket)
+            .map(|(_, identifier)| *identifier)
+            .ok_or(Error::Refused(Refusal::UnsupportedDependency))?;
+        let (index, payload) =
+            topology::message(working, row_identifier, &[HEADER_BUCKET_MESSAGE_TYPE])?;
+        let rewrite = headers::rewrite_header_buckets(payload, &[], &bucket_deltas, limits)
+            .map_err(from_shared)?;
+        let (row, _) = rewrite.into_parts();
+        let row = row.ok_or(Error::InvalidSource)?;
+        replace_message(working, row_identifier, index, row)?;
+    }
+    if !deltas.columns().is_empty() {
+        let column_identifier =
+            column_headers.ok_or(Error::Refused(Refusal::UnsupportedDependency))?;
+        let column_deltas = deltas.columns_only(limits).map_err(from_shared)?;
+        let (index, payload) =
+            topology::message(working, column_identifier, &[HEADER_BUCKET_MESSAGE_TYPE])?;
+        let rewrite = headers::rewrite_header_buckets(&[], payload, &column_deltas, limits)
+            .map_err(from_shared)?;
+        let (_, column) = rewrite.into_parts();
+        let column = column.ok_or(Error::InvalidSource)?;
+        replace_message(working, column_identifier, index, column)?;
+    }
+    Ok(())
+}
+
+fn materialized_header_groups(
+    row_headers: &[(u32, u64)],
+    column_headers: Option<u64>,
+    deltas: &headers::MaterializedHeaderDeltas,
+    limits: &shared::Limits,
+) -> Result<Vec<(u64, headers::MaterializedHeaderDeltas)>, Error> {
+    let groups = deltas
+        .split_rows_by_bucket(SHARED_HEADER_BUCKET_ROWS, limits)
+        .map_err(from_shared)?;
+    limits
+        .admit_work(groups.len().saturating_mul(row_headers.len()))
+        .map_err(from_shared)?;
+    if groups.iter().any(|(bucket, _)| {
+        !row_headers
+            .iter()
+            .any(|(candidate, _)| u64::from(*candidate) == *bucket)
+    }) {
+        return Err(Error::Refused(Refusal::UnsupportedDependency));
+    }
+    if !deltas.columns().is_empty() && column_headers.is_none() {
+        return Err(Error::Refused(Refusal::UnsupportedDependency));
+    }
+    Ok(groups)
 }
 
 /// `TSWP.ParagraphStyleArchive.para_properties`.
@@ -463,39 +957,6 @@ fn with_flags_off(mut properties: CharacterProperties) -> CharacterProperties {
         flag.get_or_insert(false);
     }
     properties
-}
-
-/// The overrides of `requested` that differ from `inherited`.
-fn minimal(
-    requested: &CharacterProperties,
-    inherited: &CharacterProperties,
-) -> CharacterProperties {
-    // An unset emphasis flag reads as off.
-    let flag = |value: Option<bool>| value.unwrap_or(false);
-    let mut output = CharacterProperties::new();
-    output.bold = requested
-        .bold
-        .filter(|value| flag(inherited.bold) != *value);
-    output.italic = requested
-        .italic
-        .filter(|value| flag(inherited.italic) != *value);
-    output.underline = requested
-        .underline
-        .filter(|value| flag(inherited.underline) != *value);
-    output.strikethrough = requested
-        .strikethrough
-        .filter(|value| flag(inherited.strikethrough) != *value);
-    output.size = requested
-        .size
-        .filter(|value| inherited.size != Some(*value));
-    output.font_name = requested
-        .font_name
-        .clone()
-        .filter(|value| inherited.font_name.as_ref() != Some(value));
-    output.color = requested
-        .color
-        .filter(|value| inherited.color != Some(*value));
-    output
 }
 
 /// The stylesheet a paragraph style belongs to (`super.stylesheet`).
@@ -546,236 +1007,10 @@ pub(super) fn replace_message(
     clippy::too_many_lines,
     reason = "one staged publication: styles, stylesheet, list, cells, registry"
 )]
-fn publish(
-    source: &Package,
-    sheet: usize,
-    table: usize,
-    cells: &[(At, CharacterProperties)],
-) -> Result<structure::Published, Error> {
-    let mut working = Working::new(source)?;
-    // A cell-level edit keeps the root previews, as the host does (record 0370).
-    working.keep_previews();
-    let wire = style_wire_limits(&working)?;
-    let target = topology::locate(&working, sheet, table).map_err(from_topology)?;
-    let (_, model) = topology::message(&working, target.model, &[6_001]).map_err(Error::from)?;
-    let model_columns = topology::geometry(model).map_err(from_topology)?.columns;
-    let store = single_bytes(model, 4)?
-        .ok_or(Error::InvalidSource)?
-        .to_vec();
-    let list = single_reference(&store, STYLE_LIST_FIELD)?
-        .ok_or(Error::Refused(Refusal::UnsupportedDependency))?;
-    let list_member = working.locate(list)?.ok_or(Error::InvalidSource)?;
-    let registry =
-        metadata::registry(&working)?.ok_or(Error::Refused(Refusal::UnsupportedSource))?;
-    let mut transition = Transition::default();
-
-    let mut list_data = topology::message(&working, list, &[LIST_MESSAGE_TYPE, 6_201])
-        .map_err(Error::from)?
-        .1
-        .to_vec();
-    let list_index = topology::message(&working, list, &[LIST_MESSAGE_TYPE, 6_201])
-        .map_err(Error::from)?
-        .0;
-    let mut releases: BTreeMap<u32, u32> = BTreeMap::new();
-    let mut appended: Vec<u64> = Vec::new();
-    let mut cell_updates: Vec<(At, u32)> = Vec::new();
-    for (position, properties) in cells {
-        // An empty cell takes a style-only cell, as the host editor
-        // materializes it (record 0370).
-        let old_key = match locate_cell(&working, &store, *position)? {
-            Some(located) => litchi_numbers_wire::BncCell::parse(
-                &located.bytes,
-                &crate::cell::wire::limits_for_source(&located.bytes),
-            )
-            .map_err(|_error| Error::InvalidSource)?
-            .text_style_identifier(),
-            None => None,
-        };
-        let current = current_style(&working, sheet, table, *position)?;
-        // A property equal to the inherited value stays inherited, as the
-        // host editor's minimal style variation leaves it (record 0370).
-        let inherited = effective(&working, current)?;
-        let properties = &minimal(properties, &inherited);
-        if properties.is_empty() {
-            continue;
-        }
-        // One variation per cell, as the host editor writes one per cell
-        // (record 0370); a later stage of the same cell already merged into
-        // this one.
-        let key = {
-            let stylesheet = stylesheet_of(&working, current)?;
-            let sheet_member = working.locate(stylesheet)?.ok_or(Error::InvalidSource)?;
-            if working.locate(current)?.as_deref() != Some(sheet_member.as_str()) {
-                return Err(Error::Refused(Refusal::UnsupportedDependency));
-            }
-            let identifier = *working.allocate(1)?.first().ok_or(Error::InvalidSource)?;
-            let data = litchi_iwa_text_wire::character_style_variation(
-                Some(current),
-                stylesheet,
-                properties,
-                wire,
-            )
-            .map_err(from_style)?;
-            // The variation states its (empty) paragraph properties, as the
-            // host editor's variation does (record 0370).
-            let data = with_paragraph_properties(data)?;
-            let template = working.object(current)?;
-            let object = structure::new_object(
-                identifier,
-                Some(template),
-                PARAGRAPH_STYLE_MESSAGE_TYPE,
-                data,
-                // Native styles list their parent, not their stylesheet
-                // back-reference (record 0370; every tracked native style).
-                vec![current],
-                working.archive_limits(),
-            )?;
-            working.insert(&sheet_member, object)?;
-            // The stylesheet lists the variation.
-            let (sheet_index, sheet_data) =
-                topology::message(&working, stylesheet, &[STYLESHEET_MESSAGE_TYPE])
-                    .map_err(Error::from)?;
-            let sheet_data = litchi_iwa_text_wire::stylesheet_with_style(
-                sheet_data,
-                identifier,
-                Some(current),
-                wire,
-            )
-            .map_err(from_style)?;
-            // Some native stylesheets carry field-local references their
-            // aggregate list does not repeat; the core refuses to transition
-            // such a header, so the payload is then replaced with the
-            // header kept as it is (the style list's entry declares the
-            // reference the census follows).
-            let declared = replace_with_references(
-                &mut working,
-                stylesheet,
-                sheet_index,
-                sheet_data.clone(),
-                &[],
-                &[identifier],
-            );
-            match declared {
-                Ok(()) => {},
-                Err(Fault::Invalid) => {
-                    replace_message(&mut working, stylesheet, sheet_index, sheet_data)?;
-                    // The aggregate list still names the new style, as the
-                    // host editor's stylesheet write does (record 0370).
-                    let object = working.object_mut(stylesheet)?;
-                    let references = &mut object
-                        .archive_info
-                        .message_infos
-                        .get_mut(sheet_index)
-                        .ok_or(Fault::Invalid)?
-                        .object_references;
-                    if !references.contains(&identifier) {
-                        references
-                            .try_reserve(1)
-                            .map_err(|_error| Error::Allocation { amount: 1 })?;
-                        references.push(identifier);
-                    }
-                },
-                Err(other) => return Err(other.into()),
-            }
-            let sheet_component = registry.component_for_entry(&sheet_member)?.identifier;
-            let list_component = registry.component_for_entry(&list_member)?.identifier;
-            let seed = metadata::identity_seed(&working, identifier)?;
-            transition.register_uuid(&registry, sheet_component, identifier, seed)?;
-            transition.reference(&registry, list_component, sheet_component, identifier)?;
-            // A new style-list entry for it.
-            let key = u32::try_from(single_varint(&list_data, 2)?.unwrap_or(1))
-                .map_err(|_error| Error::InvalidSource)?
-                .max(1);
-            let mut entry = Vec::new();
-            push_varint_field(&mut entry, 1, u64::from(key))?;
-            push_varint_field(&mut entry, 2, 0)?;
-            let mut reference = Vec::new();
-            push_varint_field(&mut reference, 1, identifier)?;
-            push_bytes_field(&mut entry, 4, &reference)?;
-            let mut rebuilt = rebuild(&list_data, |field| {
-                if field.number == 2 {
-                    return varint_field(2, u64::from(key) + 1).map(Some);
-                }
-                Ok(None)
-            })?;
-            if single_varint(&rebuilt, 2)?.is_none() {
-                return Err(Error::InvalidSource);
-            }
-            push_bytes_field(&mut rebuilt, 3, &entry)?;
-            list_data = rebuilt;
-            appended.push(identifier);
-            key
-        };
-        // One more reference to the entry.
-        list_data = rebuild(&list_data, |field| {
-            if field.number != 3 || single_varint(field.payload, 1)? != Some(u64::from(key)) {
-                return Ok(None);
-            }
-            let count = single_varint(field.payload, 2)?.unwrap_or(0);
-            let entry = rebuild(field.payload, |inner| {
-                if inner.number == 2 {
-                    return varint_field(2, count + 1).map(Some);
-                }
-                Ok(None)
-            })?;
-            bytes_field(3, &entry).map(Some)
-        })?;
-        if let Some(old) = old_key {
-            *releases.entry(old).or_insert(0) += 1;
-        }
-        cell_updates.push((*position, key));
-    }
-    // Release the cells' old keys (root entries only).
-    let mut remaining = releases;
-    let (released, pruned) = lists::release(&list_data, &mut remaining).map_err(Fault::from)?;
-    if !remaining.is_empty() {
-        return Err(Error::Refused(Refusal::UnsupportedDependency));
-    }
-    if let Some(released) = released {
-        list_data = released;
-    }
-    replace_with_references(
-        &mut working,
-        list,
-        list_index,
-        list_data,
-        &pruned,
-        &appended,
-    )?;
-
-    // Point each cell at its new key.
-    for (position, key) in cell_updates {
-        let Some(located) = locate_cell(&working, &store, position)? else {
-            materialize(&mut working, &store, model_columns, position, key)?;
-            continue;
-        };
-        let limits = crate::cell::wire::limits_for_source(&located.bytes);
-        let mut cell = litchi_numbers_wire::BncCell::parse(&located.bytes, &limits)
-            .map_err(|_error| Error::InvalidSource)?;
-        cell.set_text_style_identifier(Some(key));
-        let encoded =
-            crate::cell::wire::encode(&cell, &limits).map_err(|_| Error::InvalidSource)?;
-        let (_, tile_data) =
-            topology::message(&working, located.tile, &[TILE_MESSAGE_TYPE]).map_err(Error::from)?;
-        let mut field_index = 0_usize;
-        let rewritten = rebuild(tile_data, |field| {
-            let this = field_index;
-            field_index += 1;
-            if this != located.row_field {
-                return Ok(None);
-            }
-            let row = storage::replace_cell(field.payload, position.column(), &encoded)
-                .map_err(Fault::from)?
-                .ok_or(Fault::Invalid)?;
-            bytes_field(5, &row).map(Some)
-        })?;
-        replace_message(&mut working, located.tile, located.tile_index, rewritten)?;
-    }
-    Ok(working.publish(&transition)?)
-}
-
-/// Store a style-only cell for the empty cell at `position` (its row's and
-/// column's headers count it), pointing at text-style key `key`.
+#[allow(
+    dead_code,
+    reason = "replaced by the shared cell_text_style graph publisher during extraction"
+)]
 pub(super) fn materialize(
     working: &mut Working<'_>,
     store: &[u8],
@@ -919,6 +1154,7 @@ impl Package {
             rows: leaf.row_count(),
             columns: leaf.column_count(),
             cells: Vec::new(),
+            limits: shared::Limits::from_source(self).map_err(from_shared)?,
         })
     }
 
@@ -950,7 +1186,11 @@ impl Package {
 
 #[cfg(test)]
 mod wire_error_tests {
-    use super::{Error, LimitKind, from_style};
+    use super::{Error, LimitKind, from_style, materialized_header_groups};
+    use litchi_iwa_table::{
+        cell_text_style as shared, cell_text_style_headers as headers,
+        cell_text_style_writer as writer,
+    };
 
     #[test]
     fn character_style_resource_errors_survive_the_owner_boundary() {
@@ -974,6 +1214,23 @@ mod wire_error_tests {
         assert!(matches!(
             from_style(litchi_iwa_text_wire::CharStyleError::Invalid),
             Error::InvalidSource
+        ));
+    }
+
+    #[test]
+    fn materialization_without_header_ownership_is_typed() {
+        let package = super::Package::new();
+        let limits = shared::Limits::from_source(&package).expect("limits");
+        let updates = [writer::Update {
+            row: 0,
+            column: 0,
+            key: Some(1),
+        }];
+        let deltas = headers::materialized_deltas(&updates, &[None], 0, &limits)
+            .expect("materialized deltas");
+        assert!(matches!(
+            materialized_header_groups(&[], None, &deltas, &limits),
+            Err(Error::Refused(super::Refusal::UnsupportedDependency))
         ));
     }
 }
