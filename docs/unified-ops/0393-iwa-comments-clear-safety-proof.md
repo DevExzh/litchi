@@ -83,3 +83,18 @@ baselines and ten typed loss/refusal or reference-preservation controls. The
 full 13-case run is the current acceptance evidence; it must be reported with
 the source and receipt produced after this merge rather than conflated with the
 historical mixed result above.
+
+The repaired-source run after merging `6d45e19a61` completed all 13 cases on
+current WP tip `6eebe0bab3` (runtime source `67427c20f1`). The scoped command
+was:
+
+```text
+CARGO_BUILD_JOBS=2 CARGO_INCREMENTAL=0 CARGO_PROFILE_DEV_DEBUG=0 \
+CARGO_PROFILE_TEST_DEBUG=0 cargo test --offline -p litchi-iwa --test parity \
+comment_clear_safety_cases -- --nocapture --test-threads=1
+```
+
+The external raw receipt is
+`/home/zhuhe/code/litchi-worktrees/.coord/iwa-w1g-comments-gate-6eebe0bab3/gates/clear-safety-13.log`.
+It records 13 passed and 0 failed; this is focused parity proof only, with no
+native E3/E4 claim.

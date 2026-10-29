@@ -2,12 +2,15 @@
 
 - **Base:** `295b421bcd3d9ec0b0b9208e4039de22623685bc`
 - **Implementation commits:** `5fc2f905a0`, `56020e9214`, strict-clear
-  admission checkpoint `c4a823fc58`, mirror repair `9d0d581e8f`, and proof
-  merge `d34aacac9a` on `uo2/iwa-comments-gate-295b-repair`.
-- **Status:** the scoped Numbers/shared-engine repair and independent
-  Pages/Keynote/Numbers clear-safety proof are green on this unintegrated WP.
-  Coordinator review, final integrated performance, and native acceptance
-  remain pending.
+  admission checkpoint `c4a823fc58`, mirror repair `9d0d581e8f`, proof
+  merge `d34aacac9a`, and final runtime repair `67427c20f1`. The
+  proof-only follow-up `6d45e19a61` was merged as `6eebe0bab3` on
+  `uo2/iwa-comments-gate-295b-repair`.
+- **Status:** the scoped Numbers/shared-engine repair, 13-case
+  Pages/Keynote/Numbers clear-safety proof, original comment suites, scoped
+  gates, and current-source instruction qualification are green on this
+  clean WP. Coordinator integration, final integrated requalification, and
+  native acceptance remain pending.
 
 ## Scope and root causes
 
@@ -58,7 +61,7 @@ The original gate failures now pass without weakening the existing assertions:
 | `table_cell_comment_reply` | 31 passed |
 | `table_cell_comment_metadata_native` | 5 passed |
 | `numbers_focused_comment_reads` | 17 passed |
-| `litchi-iwa` clear-safety parity module | 11 passed |
+| `litchi-iwa` clear-safety parity module | 13 passed |
 
 The clear-loss controls retain their exact typed outcomes and source bytes:
 
@@ -93,15 +96,18 @@ per command):
   and `tools.test_no_3rdparty_references`;
 - locked Numbers and iwa-protos fuzz-workspace `cargo check --bins` checks.
 
-The full workspace glossary check completed against `target/api-glossary` with
-`RUSTC_BOOTSTRAP=1`. The affected generated documents were then checked
-explicitly with `--profile iwa-table`, `--profile numbers-minimal`, and
-`--profile numbers-full`; all three passed. The coordinator should retain the
-full-workspace command output/exit receipt with the integrated handoff.
+The affected generated documents were checked against `target/api-glossary`
+with `RUSTC_BOOTSTRAP=1` using `--profile iwa-table`,
+`--profile numbers-minimal`, and `--profile numbers-full`; all three passed.
+The current external receipts are under
+`/home/zhuhe/code/litchi-worktrees/.coord/iwa-w1g-comments-gate-6eebe0bab3/gates/`.
+The original six Numbers comment suites and the 13-case clear-safety run were
+rerun after the proof-only merge; their external receipts are
+`original-six/run.log` and `gates/clear-safety-13.log` in that directory.
 
 ## Current-source instruction qualification
 
-The authorized 12-route matrix was rerun on source
+The authorized 12-route matrix was rerun on runtime source
 `67427c20f10dc51f45e772f08da6c1763a04505d` using the feature-enabled release
 parity test binary. The immutable binary is external at
 `/home/zhuhe/code/litchi-worktrees/.coord/iwa-w1g-comments-final-67427c20f10dc51f45e772f08da6c1763a04505d/bin/parity-67427c20f10dc51f45e772f08da6c1763a04505d`, size 41,380,128 bytes, SHA-256 `bf8ff72a505f712b5886faba58200582da8881c2ca3159ccb56dc76b0c860ae1`. The build receipt and runner result are in the same external directory; the runner used CPU 3, Callgrind ABBA, release mode, and fresh external output `measure-12-final`.
@@ -114,15 +120,17 @@ All 12 routes passed, yielding 24 callgrind captures and 36 exact-test logs; eve
 | Pages set/read/create/clear | 2,591,604,039 / 1,234,965,546 / 2,735,193,618 / 2,741,075,485 | 90,331,205 / 33,549,613 / 99,981,254 / 165,487,524 | −96.514% / −97.283% / −96.345% / −93.963% |
 | Numbers set/read/create/clear | 73,280,745 / 3,711,055 / 169,352,648 / 128,335,767 | 74,009,105 / 2,967,400 / 82,626,646 / 118,322,350 | +0.994% / −20.039% / −51.210% / −7.803% |
 
-These are engine/facade instruction-cost measurements, not Apple native
-acceptance evidence. Final integrated-trunk requalification remains
-coordinator-owned.
+The later `6eebe0bab3` merge changes only proof tests and records; it does
+not change the runtime source bound to this matrix. These are
+engine/facade instruction-cost measurements, not Apple native acceptance
+evidence. Final integrated-trunk requalification remains coordinator-owned.
 
 ## Evidence boundaries and remaining qualification
 
-This repair has no native E3/E4 evidence and makes no new host/leaf
-performance claim. Existing comments performance captures predate this repair
-and do not qualify it. The coordinator must run the final host-vs-leaf
-instruction-cost matrix on the integrated candidate after the Pages/Keynote
-clear proof and any other wave merges, then update `PROGRESS.md` and perform
-the complete 53-row gate on one trunk commit.
+This repair has no native E3/E4 evidence. The current matrix above is the
+source-bound host-vs-leaf instruction-cost qualification for runtime
+`67427c20f1`; the earlier failed `b4fc6f2884` Keynote capture remains
+historical regression context and is not qualification evidence. The
+coordinator must run the final host-vs-leaf instruction-cost matrix again on
+the integrated candidate after all wave merges, then update `PROGRESS.md` and
+perform the complete 53-row gate on one trunk commit.
