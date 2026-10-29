@@ -4,7 +4,7 @@
   on the isolated WP, pending coordinator/W2-A independent review. Pages and
   Keynote facades are not started, no ledger rows are migrated, and no
   performance or native acceptance claim is active. The current code tip is
-  `126b1dd7ce`; this record is on the final clean handoff commit.
+  `3a8313257c`; this record is on the final clean handoff commit.
 - Source branch: `uo2/iwa-w1g-cell-text-style`, cut from frozen root
   `1e3978082bd8e576f0afeb7e3eebac1ca3908d86`, then synchronized with frozen
   trunk 24ecfb543748885192b8fb5273abb54e669764c6.
@@ -12,7 +12,7 @@
   `beb878ea23`, codec-allocation pre-admission `36be343a42`, residual
   closure `3bfb0c6319`, proof checkpoint `d5abe8856a`, and final residual
   preflight/proof repair `62e6b27aae` plus parent-reference accounting
-  `126b1dd7ce`.
+  `126b1dd7ce` and repeated-parser accounting `3a8313257c`.
 - Scope: shared `litchi-iwa-table::cell_text_style` graph reads and direct
   `CharacterProperties` planning, plus the Numbers read and single-cell
   adapter path. Existing public Numbers selectors and vocabulary remain
@@ -41,9 +41,12 @@ property and parent decoders now have separate source-bound nested preflights,
 including span allocations, aggregate nested work/input/fields, output/font
 buffers, and inherited-font copies. BNC style-key reads charge residual
 input/fields/work before `BncCell::parse`; exclusive-style metadata and
-reference traversals are charged on every pass and typed decoder failures are
-terminal. The Numbers adapter remains shared and maps `BatchUnsupported` to
-typed `UnsupportedDependency` without a legacy fallback.
+reference traversals are charged on every pass. Raw-wire scans, `WireView`
+passes, and the private text-wire decoder views each debit their own
+input/fields/work and span allocations; a cumulative regression fixes the
+boundary at the third parser pass. Typed decoder failures remain terminal.
+The Numbers adapter remains shared and maps `BatchUnsupported` to typed
+`UnsupportedDependency` without a legacy fallback.
 
 This is still a Numbers-only substrate slice: Pages/Keynote, ledger rows,
 native queue changes, timing and release-mode performance qualification remain
@@ -63,7 +66,7 @@ out of scope.
 
 ## Verification and remaining work
 
-The current scoped gates pass: 45 shared table unit tests (including
+The current scoped gates pass: 46 shared table unit tests (including
 duplicate/unknown locality, nested-font pre-admission, residual BNC fields,
 zero ceilings and low field/work/allocation cases), seven Numbers
 `cell_text_style` tests, formatting, strict Clippy for both crates, and the
