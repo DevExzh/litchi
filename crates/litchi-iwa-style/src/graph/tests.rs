@@ -1,6 +1,9 @@
 use litchi_iwa_core::{Archive, ArchiveObject, Limits, RawMessage};
 
-use super::{FinishError, FinishLimitKind, FinishLimits, Workspace};
+use super::{
+    ConstructionError, ConstructionLimitKind, ConstructionLimits, FinishError, FinishLimitKind,
+    FinishLimits, Workspace,
+};
 
 fn object(identifier: u64, type_: u32, data: Vec<u8>) -> ArchiveObject {
     ArchiveObject::new(
@@ -242,4 +245,84 @@ fn bounded_finish_moves_nonempty_insertions_without_copying_archive_buffers() {
         .data
         .as_ptr();
     assert_eq!(before, after);
+}
+
+#[test]
+fn bounded_workspace_construction_reports_and_checks_index_requirements() {
+    let source = components();
+    let requirements =
+        Workspace::construction_requirements(&source, ConstructionLimits::unlimited())
+            .expect("construction requirements");
+    assert_eq!(requirements.component_count(), 2);
+    assert_eq!(requirements.object_count(), 3);
+    assert_eq!(requirements.source_work(), 5);
+    assert_eq!(requirements.index_allocations(), 2);
+    assert!(requirements.index_retained_bytes() > 0);
+    assert!(requirements.component_view_bytes() > 0);
+    assert_eq!(requirements.component_view_allocations(), 1);
+
+    let zero_work = Workspace::construction_requirements(
+        &source,
+        ConstructionLimits::new(
+            requirements.source_work().saturating_sub(1),
+            requirements.index_allocations(),
+            requirements.index_retained_bytes(),
+            requirements.index_scratch_bytes(),
+        ),
+    );
+    assert!(matches!(
+        zero_work,
+        Err(ConstructionError::Limit {
+            kind: ConstructionLimitKind::Work,
+            ..
+        })
+    ));
+
+    let zero_allocations = Workspace::construction_requirements(
+        &source,
+        ConstructionLimits::new(
+            requirements.source_work(),
+            requirements.index_allocations().saturating_sub(1),
+            requirements.index_retained_bytes(),
+            requirements.index_scratch_bytes(),
+        ),
+    );
+    assert!(matches!(
+        zero_allocations,
+        Err(ConstructionError::Limit {
+            kind: ConstructionLimitKind::Allocations,
+            ..
+        })
+    ));
+
+    let zero_retained = Workspace::construction_requirements(
+        &source,
+        ConstructionLimits::new(
+            requirements.source_work(),
+            requirements.index_allocations(),
+            requirements.index_retained_bytes().saturating_sub(1),
+            requirements.index_scratch_bytes(),
+        ),
+    );
+    assert!(matches!(
+        zero_retained,
+        Err(ConstructionError::Limit {
+            kind: ConstructionLimitKind::RetainedBytes,
+            ..
+        })
+    ));
+
+    let workspace = Workspace::new_bounded(
+        &source,
+        Limits::default(),
+        requirements,
+        ConstructionLimits::new(
+            requirements.source_work(),
+            requirements.index_allocations(),
+            requirements.index_retained_bytes(),
+            requirements.index_scratch_bytes(),
+        ),
+    )
+    .expect("bounded workspace");
+    assert_eq!(workspace.next_object_identifier().expect("identifier"), 10);
 }
