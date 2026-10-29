@@ -1,10 +1,10 @@
 # 0403 — W2-A: Numbers chart-series caller budget
 
 - Status: Numbers chart-series caller-ledger repair is isolated on
-  `uo2/iwa-w2a-numbers-series-budget`; implementation checkpoint `7573d88827`
-  is followed by accepted shared styled-parent and residual hard-limit fixes
-  (`055b609ac1`, `701c2c3f37`) and the focused malformed-source regression
-  (`0bf1083940`). The branch still awaits coordinator integration.
+  `uo2/iwa-w2a-numbers-series-budget`; final handoff source is merged current
+  trunk tip `73133381c1`, containing implementation checkpoint `7573d88827`,
+  accepted shared styled-parent/residual hard-limit fixes (`055b609ac1`,
+  `701c2c3f37`), and the focused malformed-source regression (`0bf1083940`).
 - Scope: `crates/litchi-numbers/src/package/sheet_chart_series.rs`, the
   Numbers `ChartBudget` residual series seam in `chart_arrangement.rs`, typed
   mappings required by that seam, and focused Numbers chart-series tests.
@@ -62,12 +62,16 @@ Numbers-side gap but does not qualify the full Numbers facade or performance.
 
 ## Verification
 
-- `cargo check --offline -p litchi-numbers --lib` — pass before the final
-  focused rerun; repeat on the final integrated source.
-- `cargo test --offline -p litchi-numbers --test sheet_drawables chart_series_ -- --nocapture` — 3 passed after the accepted shared hard-limit fixes.
+- `cargo check --offline -p litchi-numbers --lib` — pass on `73133381c1`.
+- `cargo clippy --offline -p litchi-numbers --lib --all-features -- -D warnings` — pass on `73133381c1` (vendor warnings only).
+- `cargo doc --offline -p litchi-numbers --no-deps` — pass.
+- `cargo test --offline -p litchi-numbers --test sheet_drawables -- --test-threads=1` — 15 passed.
+- `cargo test --offline -p litchi-iwa-style symbol_tests --lib` — 8 passed.
 - `cargo fmt --all -- --check` — pass.
-- Full Clippy, rustdoc/glossary, ledger, boundary and affected-fuzz results
-  remain coordinator-owned handoff gates; this record does not pre-claim them.
+- `python3 tools/iwa_exit_ledger.py --check` — pass.
+- `python3 tools/check_crate_boundaries.py` — pass (70 packages, 314 dependency declarations).
+- No chart-series-specific fuzz target exists; workspace affected-fuzz locks and
+  the integrated full gate remain coordinator-owned.
 
 The coordinator owns the integrated workspace gate, affected fuzz locks,
 final facade performance qualification, native queue execution, and any
