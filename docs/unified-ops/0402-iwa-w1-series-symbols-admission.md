@@ -14,6 +14,10 @@
 - Final hard-axis repair: `1e1e56651c4fa3e5795e31267c7e6c58980afae9` clamps residual input, nesting, codec
   bytes, fields, and wire work to hard ceilings after zero-exhaustion checks;
   the large-profile regression proves no hidden quota headroom.
+- Adoption follow-up: `5888a2b4675e52aebe8e1182d49d20ea052b9de1` caches exact prepared registry inspection
+  requirements and the inspected registry root, invalidating both caches on
+  metadata changes. The final direct-engine fix does not alter facade budgets
+  or add default headroom.
 - Scope: shared chart-series symbol read/write admission, Numbers mechanical
   caller adoption, and the direct shared-engine parity caller. Pages and
   Keynote facade adoption remain owned by their work packages.
