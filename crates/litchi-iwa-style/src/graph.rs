@@ -932,6 +932,11 @@ impl<'s> Workspace<'s> {
                 "workspace source changed between census and build",
             )));
         }
+        if source.count() != requirements.component_count {
+            return Err(ConstructionError::Graph(Error::Invalid(
+                "workspace component count changed between census and build",
+            )));
+        }
         let mut index = HashMap::new();
         let mut ambiguous = HashSet::new();
         if requirements.object_count != 0 {
