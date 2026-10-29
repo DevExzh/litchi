@@ -516,6 +516,7 @@ fn unique_payload<'a>(
         .resolve_object(identifier)
         .map_err(|_| invalid("object index is inconsistent"))?
         .ok_or(invalid("referenced object is missing"))?;
+    limits.charge_work(object.messages.len())?;
     let mut found = None;
     for message in object.messages {
         if types.contains(&message.type_) {
@@ -635,6 +636,8 @@ fn locate_cell(
         .1;
     let (_, tile_data) = unique_payload(source, tile, &[TILE_MESSAGE_TYPE], limits)?;
     for row in repeated_payloads(tile_data, 5, limits)? {
+        limits.charge_work(row.len())?;
+        limits.admit_allocations(1)?;
         if varint(row, 1, limits)? != Some(local) {
             continue;
         }
@@ -813,6 +816,7 @@ pub fn effective(
     let mut seen = BTreeSet::new();
     for _ in 0..limits.max_style_depth {
         let Some(identifier) = current else { break };
+        limits.admit_allocations(1)?;
         if !seen.insert(identifier) {
             return Err(invalid("character-style parent cycle"));
         }
@@ -1399,6 +1403,19 @@ fn style_is_exclusive(
             let identifier = object.archive_info.identifier.unwrap_or_default();
             if identifier == style || identifier == list {
                 continue;
+            }
+            for info in &object.archive_info.message_infos {
+                let mut references = info.object_references.len();
+                for field in &info.field_infos {
+                    references = references
+                        .checked_add(field.object_references.len())
+                        .ok_or(Error::Limit {
+                            kind: LimitKind::Fields,
+                            observed: u64::MAX,
+                            maximum: limits.max_references as u64,
+                        })?;
+                }
+                limits.charge_references(references)?;
             }
             if object.archive_info.message_infos.iter().any(|info| {
                 info.object_references.contains(&style)
