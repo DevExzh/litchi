@@ -1,0 +1,66 @@
+{
+  "schema": "iwa-w2c-keynote-chart-series-callgrind-v1",
+  "source_commit": "67a46d94adfdb62b7b44f7183d0da4f8e9c7bbdc",
+  "source_clean": true,
+  "binary_sha256": "afc79573bd08f61b2ab04f72224af965c75c3246a6b8bc918238b46597f20fdf",
+  "binary_bytes": 215673840,
+  "policy": {
+    "ratio": "leaf/host inclusive Callgrind Ir",
+    "max_ratio": 1.05,
+    "cpu": 3,
+    "calls_per_side": 2,
+    "wall_time_claim": false,
+    "native_claim": false,
+    "validator_sha256": "9fbe8ea0596950dfb49918929fa78b15b6bea71d5cec39e9eaaa026ac576c5ee"
+  },
+  "receipt": {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-w2c-series-symbols-perf-67a46d94adfdb62b7b44f7183d0da4f8e9c7bbdc/final-capture-receipt.txt",
+    "sha256": "86a602caae1f5ff6fd3bd568617b1cae9c64b6522e520fb302f62dfb609267b2"
+  },
+  "routes": [
+    {
+      "id": "full_symbols_read",
+      "operation": "get",
+      "size": "chart-data-native.key",
+      "host_ir": 436806680,
+      "leaf_ir": 53348329,
+      "ratio": 0.122132585060,
+      "calls_per_side": 2,
+      "status": "meets",
+      "projection": "leaf all-series read"
+    },
+    {
+      "id": "full_symbols_set",
+      "operation": "set",
+      "size": "chart-data-native.key",
+      "host_ir": 1466348229,
+      "leaf_ir": 273022442,
+      "ratio": 0.186192090392,
+      "calls_per_side": 2,
+      "status": "meets",
+      "projection": "leaf all-series set"
+    },
+    {
+      "id": "single_symbol_read",
+      "operation": "get",
+      "size": "chart-data-native.key",
+      "host_ir": 436660536,
+      "leaf_ir": 53346857,
+      "ratio": 0.122170090040,
+      "calls_per_side": 2,
+      "status": "meets",
+      "projection": "leaf full-family read then index projection"
+    },
+    {
+      "id": "single_symbol_set",
+      "operation": "set",
+      "size": "chart-data-native.key",
+      "host_ir": 1765955539,
+      "leaf_ir": 275592198,
+      "ratio": 0.156058401196,
+      "calls_per_side": 2,
+      "status": "meets",
+      "projection": "leaf full-family read-modify-set"
+    }
+  ]
+}
