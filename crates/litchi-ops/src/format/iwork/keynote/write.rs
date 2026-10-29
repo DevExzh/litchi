@@ -1439,7 +1439,8 @@ fn direct_cell(
         return None;
     };
     let key = key.as_str();
-    if key != "text" && key != "value" {
+    let comment = key == "comment";
+    if !comment && key != "text" && key != "value" {
         return None;
     }
     let path = target.path()?.path();
@@ -1467,18 +1468,21 @@ fn direct_cell(
         .iter()
         .filter(|&child| file.kind_at(child) == ordinal)
         .nth(table)?;
-    let [slide, _, _, drawable] = file.stand_in(table_at).leaf().map(|value| value as usize);
-    let cell = table_cell_value(key, value).ok()?;
     let mut pending = Pending::default();
-    pending.cells.insert(
-        (
-            slide,
-            drawable,
-            u32::try_from(row).ok()?,
-            u32::try_from(column).ok()?,
-        ),
-        (cell, 0),
-    );
+    let row = u32::try_from(row).ok()?;
+    let column = u32::try_from(column).ok()?;
+    if comment {
+        pending.comments.insert(
+            (slide, table, row, column),
+            (super::super::write::text(value, "comment").ok()?, 0),
+        );
+    } else {
+        let [slide, _, _, drawable] = file.stand_in(table_at).leaf().map(|value| value as usize);
+        let cell = table_cell_value(key, value).ok()?;
+        pending
+            .cells
+            .insert((slide, drawable, row, column), (cell, 0));
+    }
     publish(file, package, pending, 1, limits)
         .ok()
         .map(|(commit, _)| commit)

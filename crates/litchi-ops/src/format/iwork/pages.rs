@@ -799,7 +799,8 @@ fn direct_cell(
         return None;
     };
     let key = key.as_str();
-    if key != "text" && key != "value" {
+    let comment = key == "comment";
+    if !comment && key != "text" && key != "value" {
         return None;
     }
     let path = target.path()?.path();
@@ -832,10 +833,16 @@ fn direct_cell(
         .filter(|&child| file.kind_at(child) == ordinal)
         .nth(table)?;
     let index = file.stand_in(table_at).leaf()[0] as usize;
-    let value = table_value(key, value).ok()?;
     let mut chain = Chain::new(package.clone());
-    let values = vec![(u32::try_from(row).ok()?, u32::try_from(column).ok()?, value)];
-    commit_cells(&mut chain, index, values).ok()?;
+    let row = u32::try_from(row).ok()?;
+    let column = u32::try_from(column).ok()?;
+    if comment {
+        let comment = super::write::text(value, "comment").ok()?;
+        commit_comments(&mut chain, index, vec![(row, column, comment)]).ok()?;
+    } else {
+        let value = table_value(key, value).ok()?;
+        commit_cells(&mut chain, index, vec![(row, column, value)]).ok()?;
+    }
     finish(
         file,
         chain.changed,
