@@ -280,6 +280,10 @@ pub struct MutationScope {
     allowed_members: Vec<String>,
     allowed_message_types: Vec<u32>,
     allowed_fields: Vec<u32>,
+    planned_new_objects: Vec<u64>,
+    planned_removed_objects: Vec<u64>,
+    planned_new_members: Vec<String>,
+    planned_removed_members: Vec<String>,
 }
 
 impl MutationScope {
@@ -306,6 +310,26 @@ impl MutationScope {
     #[must_use]
     pub fn allowed_fields(&self) -> &[u32] {
         &self.allowed_fields
+    }
+
+    #[must_use]
+    pub fn planned_new_objects(&self) -> &[u64] {
+        &self.planned_new_objects
+    }
+
+    #[must_use]
+    pub fn planned_removed_objects(&self) -> &[u64] {
+        &self.planned_removed_objects
+    }
+
+    #[must_use]
+    pub fn planned_new_members(&self) -> &[String] {
+        &self.planned_new_members
+    }
+
+    #[must_use]
+    pub fn planned_removed_members(&self) -> &[String] {
+        &self.planned_removed_members
     }
 }
 
@@ -669,6 +693,41 @@ impl SymbolBudget {
         Ok(())
     }
 
+    fn reserve_vec<T>(
+        &mut self,
+        values: &mut Vec<T>,
+        count: usize,
+        scratch: bool,
+    ) -> SymbolResult<()> {
+        self.reserve::<T>(count, scratch)?;
+        values
+            .try_reserve_exact(count)
+            .map_err(|_| SymbolError::Allocation { amount: count })?;
+        Ok(())
+    }
+
+    fn admit_registry_inspection(&mut self, workspace: &Workspace<'_>) -> SymbolResult<()> {
+        let bytes = workspace.registry_inspection_work();
+        if bytes == 0 {
+            return Ok(());
+        }
+        let work = bytes.saturating_mul(4);
+        let retained = bytes.saturating_mul(2);
+        let output = bytes.saturating_add(256);
+        self.source(bytes)?;
+        self.fields(bytes)?;
+        self.work(work)?;
+        self.preflight_output(output)?;
+        self.output(output)?;
+        self.preflight_allocations(4)?;
+        self.preflight_retained(retained)?;
+        self.preflight_scratch(retained)?;
+        self.allocations(4)?;
+        self.retained(retained)?;
+        self.scratch(retained)?;
+        Ok(())
+    }
+
     fn parse_fields(&mut self, source: &[u8], depth: u32) -> SymbolResult<Vec<wire::WireField>> {
         self.depth(depth)?;
         let limits = self.wire_limits()?;
@@ -718,6 +777,35 @@ impl SymbolBudget {
 
     fn set_scope(&mut self, scope: MutationScope) {
         self.scope = Some(scope);
+    }
+
+    fn planned_new_object(&mut self, identifier: u64) {
+        if let Some(scope) = self.scope.as_mut() {
+            scope.planned_new_objects.push(identifier);
+        }
+    }
+
+    fn planned_removed_object(&mut self, identifier: u64) {
+        if let Some(scope) = self.scope.as_mut() {
+            scope.planned_removed_objects.push(identifier);
+        }
+    }
+
+    fn planned_member(&mut self, new_member: bool, member: &str) -> SymbolResult<()> {
+        if self.scope.is_none() {
+            return Ok(());
+        }
+        self.preflight_allocations(1)?;
+        self.preflight_retained(member.len())?;
+        self.allocations(1)?;
+        self.retained(member.len())?;
+        let scope = self.scope.as_mut().expect("scope exists");
+        if new_member {
+            scope.planned_new_members.push(member.to_owned());
+        } else {
+            scope.planned_removed_members.push(member.to_owned());
+        }
+        Ok(())
     }
 }
 
@@ -953,7 +1041,7 @@ fn allocate(next: &mut u64) -> Result<u64> {
 /// How many chart payloads reference override `object`.
 fn owner_count(workspace: &Workspace<'_>, object: u64) -> Result<usize> {
     let mut owners = 0usize;
-    for location in workspace.locations() {
+    for location in workspace.locations_iter() {
         for candidate in &workspace.archive_at(location)?.objects {
             for message in &candidate.messages {
                 if message.type_ != CHART_MESSAGE_TYPE {
@@ -1767,7 +1855,7 @@ pub fn style_values<P: StyleProperty>(
 /// Refuse a write to a series style another chart also uses.
 fn ensure_exclusive(workspace: &Workspace<'_>, style: u64) -> Result<()> {
     let mut owners = 0usize;
-    for location in workspace.locations() {
+    for location in workspace.locations_iter() {
         for candidate in &workspace.archive_at(location)?.objects {
             for message in &candidate.messages {
                 if message.type_ != CHART_MESSAGE_TYPE {
@@ -1861,6 +1949,7 @@ pub mod property {
         budget: &mut SymbolBudget,
     ) -> SymbolResult<Option<&'a [u8]>> {
         let limits = budget.codec_limits()?;
+        let _ = budget.parse_fields(payload, 1)?;
         let _ = budget.parse_fields(payload, 1)?;
         budget.preflight_allocations(1)?;
         budget.preflight_scratch(payload.len())?;
@@ -3024,9 +3113,10 @@ fn bounded_references(
 ) -> SymbolResult<codec::StyleReferences> {
     let limits = budget.codec_limits()?;
     let _ = budget.parse_fields(payload, 1)?;
-    budget.preflight_allocations(1)?;
+    let _ = budget.parse_fields(payload, 1)?;
+    budget.preflight_allocations(12)?;
     budget.preflight_scratch(payload.len())?;
-    budget.allocations(1)?;
+    budget.allocations(12)?;
     budget.scratch(payload.len())?;
     let references = codec::references(payload, limits)
         .map_err(|error| SymbolError::Graph(Error::Codec(error)))?;
@@ -3093,9 +3183,10 @@ fn bounded_series_graph(
     let (chart_message, payload) = bounded_chart_payload(workspace, chart, budget)?;
     let limits = budget.codec_limits()?;
     let _ = budget.parse_fields(payload, 1)?;
-    budget.preflight_allocations(1)?;
+    let _ = budget.parse_fields(payload, 1)?;
+    budget.preflight_allocations(12)?;
     budget.preflight_scratch(payload.len())?;
-    budget.allocations(1)?;
+    budget.allocations(12)?;
     budget.scratch(payload.len())?;
     let references = codec::references(payload, limits)
         .map_err(|error| SymbolError::Graph(Error::Codec(error)))?;
@@ -3420,7 +3511,7 @@ fn bounded_mutation_scope(
         }
     }
     let mut allowed_members = Vec::new();
-    let member_capacity = graph.slots.iter().flatten().count().saturating_add(3);
+    let member_capacity = graph.slots.iter().flatten().count().saturating_add(5);
     budget.preflight_allocations(1)?;
     budget.preflight_retained(member_capacity.saturating_mul(size_of::<String>()))?;
     budget.allocations(1)?;
@@ -3450,6 +3541,18 @@ fn bounded_mutation_scope(
         add_member(slot.location)?;
     }
     add_member(workspace.locate(stylesheet).map_err(SymbolError::from)?)?;
+    if workspace.has_member(METADATA_MEMBER) {
+        let location = workspace
+            .member_location(METADATA_MEMBER)
+            .ok_or(SymbolError::Invalid("metadata member disappeared"))?;
+        add_member(location)?;
+    }
+    if workspace.has_member(DOCUMENT_METADATA_MEMBER) {
+        let location = workspace
+            .member_location(DOCUMENT_METADATA_MEMBER)
+            .ok_or(SymbolError::Invalid("document metadata member disappeared"))?;
+        add_member(location)?;
+    }
     let mut allowed_message_types = Vec::new();
     let message_types = [
         CHART_MESSAGE_TYPE,
@@ -3483,6 +3586,9 @@ fn bounded_mutation_scope(
         family.show_field(),
         family.type_field(),
         family.size_field(),
+        3,
+        6,
+        11,
     ];
     budget.reserve::<u32>(fields.len(), true)?;
     let mut allowed_fields = Vec::new();
@@ -3496,12 +3602,25 @@ fn bounded_mutation_scope(
             allowed_fields.push(field);
         }
     }
+    let planned_capacity = series_count.max(1);
+    let mut planned_new_objects = Vec::new();
+    let mut planned_removed_objects = Vec::new();
+    let mut planned_new_members = Vec::new();
+    let mut planned_removed_members = Vec::new();
+    budget.reserve_vec(&mut planned_new_objects, planned_capacity, true)?;
+    budget.reserve_vec(&mut planned_removed_objects, planned_capacity, true)?;
+    budget.reserve_vec(&mut planned_new_members, planned_capacity, true)?;
+    budget.reserve_vec(&mut planned_removed_members, planned_capacity, true)?;
     Ok(MutationScope {
         selected_chart: chart,
         allowed_objects,
         allowed_members,
         allowed_message_types,
         allowed_fields,
+        planned_new_objects,
+        planned_removed_objects,
+        planned_new_members,
+        planned_removed_members,
     })
 }
 
@@ -3648,7 +3767,7 @@ fn bounded_owner_count(
     budget: &mut SymbolBudget,
 ) -> SymbolResult<usize> {
     let mut owners = 0usize;
-    for location in workspace.locations() {
+    for location in workspace.locations_iter() {
         let archive = workspace.archive_at(location).map_err(SymbolError::from)?;
         budget.work(archive.objects.len())?;
         for candidate in &archive.objects {
@@ -3707,6 +3826,7 @@ fn bounded_patch_chart_references(
         .data
         .as_slice();
     let limits = budget.codec_limits()?;
+    let _ = budget.parse_fields(payload, 1)?;
     let _ = budget.parse_fields(payload, 1)?;
     let bound = payload
         .len()
@@ -3882,10 +4002,13 @@ fn bounded_register_styles(
     if let (Some(owner), Some(sheet)) = (owner_component, sheet_component)
         && owner != sheet
     {
+        budget.admit_registry_inspection(workspace)?;
+        budget.references(1)?;
         workspace
             .add_external_reference(owner, sheet, stylesheet)
             .map_err(SymbolError::from)?;
         for &style in styles {
+            budget.references(1)?;
             workspace
                 .add_external_reference(sheet, owner, style)
                 .map_err(SymbolError::from)?;
@@ -4007,7 +4130,9 @@ fn bounded_unregister_styles(
     if let (Some(owner), Some(sheet)) = (owner_component, sheet_component)
         && owner != sheet
     {
+        budget.admit_registry_inspection(workspace)?;
         for &style in styles {
+            budget.references(1)?;
             workspace
                 .remove_external_reference(sheet, owner, style)
                 .map_err(SymbolError::from)?;
@@ -4114,22 +4239,131 @@ fn bounded_insert_container(
     let identifiers_count = objects.len();
     budget.identifiers(identifiers_count.saturating_add(1))?;
     budget.registry_entries(identifiers_count.saturating_add(2))?;
-    budget.reserve::<u64>(identifiers_count, true)?;
+    let mut identifiers = Vec::new();
+    budget.reserve_vec(&mut identifiers, identifiers_count, true)?;
     for object in &objects {
-        object
+        let identifier = object
             .archive_info
             .identifier
             .ok_or(SymbolError::Invalid("a container member has no identifier"))?;
+        identifiers.push(identifier);
     }
-    let container_bytes = identifiers_count.saturating_mul(16).saturating_add(16);
-    budget.preflight_output(container_bytes)?;
-    budget.preflight_retained(container_bytes)?;
-    budget.preflight_scratch(container_bytes)?;
-    budget.preflight_allocations(2)?;
-    budget.allocations(2)?;
-    budget.retained(container_bytes)?;
-    budget.scratch(container_bytes)?;
-    insert_container(workspace, chart_member, container, objects).map_err(SymbolError::from)
+    let mut container_data = Vec::new();
+    let container_size = 1usize
+        .saturating_add(1)
+        .saturating_add(litchi_iwa_common::varint::encoded_len(
+            PRIMARY_PACKAGE_IDENTIFIER,
+        ))
+        .saturating_add(
+            identifiers
+                .iter()
+                .map(|identifier| {
+                    let reference_size =
+                        1usize.saturating_add(litchi_iwa_common::varint::encoded_len(*identifier));
+                    1usize
+                        .saturating_add(litchi_iwa_common::varint::encoded_len(
+                            reference_size as u64,
+                        ))
+                        .saturating_add(reference_size)
+                })
+                .sum::<usize>(),
+        );
+    budget.preflight_output(container_size)?;
+    budget.preflight_retained(container_size)?;
+    budget.preflight_scratch(container_size)?;
+    budget.preflight_allocations(1)?;
+    budget.allocations(1)?;
+    budget.retained(container_size)?;
+    budget.scratch(container_size)?;
+    container_data
+        .try_reserve_exact(container_size)
+        .map_err(|_| SymbolError::Allocation {
+            amount: container_size,
+        })?;
+    push_varint_field(
+        &mut container_data,
+        CONTAINER_IDENTIFIER_FIELD,
+        PRIMARY_PACKAGE_IDENTIFIER,
+    );
+    for identifier in &identifiers {
+        let mut reference = Vec::new();
+        reference
+            .try_reserve_exact(1 + litchi_iwa_common::varint::encoded_len(*identifier))
+            .map_err(|_| SymbolError::Allocation { amount: 1 })?;
+        push_varint_field(&mut reference, REFERENCE_IDENTIFIER_FIELD, *identifier);
+        push_message_field(&mut container_data, CONTAINER_OBJECTS_FIELD, &reference);
+    }
+    budget.output(container_data.len())?;
+    let mut container_object = ArchiveObject::new(
+        container.component,
+        vec![RawMessage {
+            type_: OBJECT_CONTAINER_MESSAGE_TYPE,
+            data: container_data,
+        }],
+        workspace.limits(),
+    )
+    .map_err(|error| SymbolError::Graph(Error::Archive(error)))?;
+    container_object.archive_info.message_infos[0].versions =
+        OBJECT_CONTAINER_VERSION.to_vec().into();
+    let mut archive_objects = Vec::new();
+    budget.reserve_vec(&mut archive_objects, objects.len().saturating_add(1), true)?;
+    archive_objects.push(container_object);
+    archive_objects.extend(objects);
+    let archive = Archive {
+        objects: archive_objects,
+    };
+    let anchor = if workspace.has_member(DOCUMENT_METADATA_MEMBER) {
+        DOCUMENT_METADATA_MEMBER
+    } else {
+        METADATA_MEMBER
+    };
+    let member_name = container.name.clone();
+    budget.retained(member_name.len().saturating_add(container.locator.len()))?;
+    workspace
+        .create_member(&member_name, archive, Some(anchor))
+        .map_err(SymbolError::from)?;
+    if !workspace.has_registry() {
+        return Ok(());
+    }
+    budget.admit_registry_inspection(workspace)?;
+    let mut registration = Vec::new();
+    registration
+        .try_reserve_exact(64)
+        .map_err(|_| SymbolError::Allocation { amount: 64 })?;
+    push_varint_field(&mut registration, 1, container.component);
+    push_message_field(&mut registration, 2, container.locator.as_bytes());
+    push_packed_field(&mut registration, 4, &OBJECT_CONTAINER_VERSION);
+    push_packed_field(&mut registration, 5, &OBJECT_CONTAINER_VERSION);
+    push_varint_field(&mut registration, 10, 0);
+    if let Some(token) = workspace.save_token().map_err(SymbolError::from)? {
+        push_varint_field(&mut registration, 12, token);
+    }
+    if workspace
+        .has_data_metadata_map()
+        .map_err(SymbolError::from)?
+    {
+        push_varint_field(&mut registration, 21, PRIMARY_PACKAGE_IDENTIFIER);
+    }
+    workspace
+        .add_component(container.component, &registration)
+        .map_err(SymbolError::from)?;
+    budget.admit_registry_inspection(workspace)?;
+    workspace
+        .add_object_uuids(container.component, &identifiers)
+        .map_err(SymbolError::from)?;
+    let source = workspace
+        .component_for_member(chart_member)
+        .map_err(SymbolError::from)?
+        .ok_or(SymbolError::Invalid(
+            "the chart component is not registered",
+        ))?;
+    for identifier in identifiers {
+        budget.references(1)?;
+        workspace
+            .add_external_reference(source, container.component, identifier)
+            .map_err(SymbolError::from)?;
+    }
+    Ok(())
 }
 
 fn bounded_remove_from_container(
@@ -4188,10 +4422,12 @@ fn bounded_remove_from_container(
         return Ok(Some(container));
     }
     if let Some(component) = component {
+        budget.admit_registry_inspection(workspace)?;
         let registered = workspace
             .component_uuid_objects(component)
             .map_err(SymbolError::from)?;
         let mut bound = Vec::new();
+        budget.reserve_vec(&mut bound, objects.len(), true)?;
         for &identifier in objects {
             if registered.contains(&identifier) {
                 bound.push(identifier);
@@ -4201,6 +4437,7 @@ fn bounded_remove_from_container(
             .remove_object_uuids(component, &bound)
             .map_err(SymbolError::from)?;
         for &identifier in objects {
+            budget.references(1)?;
             workspace
                 .remove_external_references_to(component, identifier)
                 .map_err(SymbolError::from)?;
@@ -4397,23 +4634,14 @@ fn bounded_set_values<P: BoundedProperty>(
     let mut next = workspace
         .next_object_identifier()
         .map_err(SymbolError::from)?;
-    budget.reserve::<Option<u64>>(graph.slots.len(), true)?;
     let mut final_ids = Vec::new();
-    final_ids
-        .try_reserve_exact(graph.slots.len())
-        .map_err(|_| SymbolError::Allocation {
-            amount: graph.slots.len(),
-        })?;
+    budget.reserve_vec(&mut final_ids, graph.slots.len(), true)?;
     final_ids.extend(
         graph
             .slots
             .iter()
             .map(|slot| slot.as_ref().map(|slot| slot.object)),
     );
-    budget.reserve::<(Slot, Vec<u8>)>(expected.len(), true)?;
-    budget.reserve::<Slot>(expected.len(), true)?;
-    budget.reserve::<ArchiveObject>(expected.len(), true)?;
-    budget.reserve::<u64>(expected.len(), true)?;
     let mut updates = Vec::new();
     let mut removals = Vec::new();
     let mut styled_creations = Vec::new();
@@ -4422,6 +4650,14 @@ fn bounded_set_values<P: BoundedProperty>(
     let mut created = Vec::new();
     let mut registrations: Vec<(Location, Vec<u64>)> = Vec::new();
     let mut unregistrations: Vec<(Location, Vec<u64>)> = Vec::new();
+    budget.reserve_vec(&mut updates, expected.len(), true)?;
+    budget.reserve_vec(&mut removals, expected.len(), true)?;
+    budget.reserve_vec(&mut styled_creations, expected.len(), true)?;
+    budget.reserve_vec(&mut chart_created, expected.len(), true)?;
+    budget.reserve_vec(&mut unstyled_creations, expected.len(), true)?;
+    budget.reserve_vec(&mut created, expected.len(), true)?;
+    budget.reserve_vec(&mut registrations, expected.len(), true)?;
+    budget.reserve_vec(&mut unregistrations, expected.len(), true)?;
     let mut container = None;
     for (index, ((slot, value), replacement)) in
         graph.slots.iter().zip(&current).zip(expected).enumerate()
@@ -4463,9 +4699,12 @@ fn bounded_set_values<P: BoundedProperty>(
                     base
                 };
                 if allocation == Base::Unstyled && container.is_none() {
-                    container = Some(bounded_reserve_container(workspace, &mut next, budget)?);
+                    let reserved = bounded_reserve_container(workspace, &mut next, budget)?;
+                    budget.planned_member(true, &reserved.name)?;
+                    container = Some(reserved);
                 }
                 let identifier = bounded_allocate(&mut next, budget)?;
+                budget.planned_new_object(identifier);
                 final_ids[index] = Some(identifier);
                 let object = bounded_new_override(identifier, patched, workspace, budget)?;
                 match allocation {
@@ -4492,6 +4731,7 @@ fn bounded_set_values<P: BoundedProperty>(
                         budget,
                     )?;
                 }
+                budget.planned_removed_object(slot.object);
                 removals.push(slot.clone());
             } else {
                 if needs_registration {
@@ -4516,9 +4756,12 @@ fn bounded_set_values<P: BoundedProperty>(
                 append_capabilities(&mut data);
             }
             if base == Base::Unstyled && container.is_none() {
-                container = Some(bounded_reserve_container(workspace, &mut next, budget)?);
+                let reserved = bounded_reserve_container(workspace, &mut next, budget)?;
+                budget.planned_member(true, &reserved.name)?;
+                container = Some(reserved);
             }
             let identifier = bounded_allocate(&mut next, budget)?;
+            budget.planned_new_object(identifier);
             final_ids[index] = Some(identifier);
             let object = bounded_new_override(identifier, data, workspace, budget)?;
             match base {
@@ -4542,18 +4785,14 @@ fn bounded_set_values<P: BoundedProperty>(
         bounded_unregister_styles(workspace, stylesheet, *location, styles, budget)?;
     }
     let mut removal_members = Vec::new();
-    budget.reserve::<(u64, String)>(removals.len(), true)?;
-    removal_members
-        .try_reserve_exact(removals.len())
-        .map_err(|_| SymbolError::Allocation {
-            amount: removals.len(),
-        })?;
+    budget.reserve_vec(&mut removal_members, removals.len(), true)?;
     for slot in &removals {
         let member = workspace.member(slot.location).to_owned();
         budget.retained(member.len())?;
         removal_members.push((slot.object, member));
     }
     let mut contained: Vec<(Location, Vec<u64>)> = Vec::new();
+    budget.reserve_vec(&mut contained, removals.len(), true)?;
     for slot in &removals {
         if bounded_container_of(
             workspace
@@ -4569,10 +4808,13 @@ fn bounded_set_values<P: BoundedProperty>(
         }
     }
     let mut released_containers = Vec::new();
+    budget.reserve_vec(&mut released_containers, removals.len(), true)?;
     for (location, objects) in contained {
+        let member = workspace.member(location).to_owned();
         if let Some(identifier) =
             bounded_remove_from_container(workspace, location, &objects, budget)?
         {
+            budget.planned_member(false, &member)?;
             released_containers.push(identifier);
         }
     }
@@ -4597,13 +4839,9 @@ fn bounded_set_values<P: BoundedProperty>(
         bounded_register_styles(workspace, stylesheet, *location, styles, budget)?;
     }
     let previous_count = graph.slots.iter().flatten().count();
-    budget.reserve::<u64>(previous_count, true)?;
-    let previous: Vec<u64> = graph
-        .slots
-        .iter()
-        .flatten()
-        .map(|slot| slot.object)
-        .collect();
+    let mut previous = Vec::new();
+    budget.reserve_vec(&mut previous, previous_count, true)?;
+    previous.extend(graph.slots.iter().flatten().map(|slot| slot.object));
     bounded_patch_chart_references(
         workspace,
         chart,
@@ -4613,11 +4851,13 @@ fn bounded_set_values<P: BoundedProperty>(
         budget,
     )?;
     let mut unbound: Vec<(u64, Vec<u64>)> = Vec::new();
+    budget.reserve_vec(&mut unbound, removals.len(), true)?;
     for (object, member) in &removal_members {
         if let Some(component) = workspace
             .component_for_member(member)
             .map_err(SymbolError::from)?
         {
+            budget.admit_registry_inspection(workspace)?;
             if workspace
                 .component_uuid_objects(component)
                 .map_err(SymbolError::from)?
@@ -4637,11 +4877,15 @@ fn bounded_set_values<P: BoundedProperty>(
             .component_for_member(&chart_member)
             .map_err(SymbolError::from)?
     {
+        budget.admit_registry_inspection(workspace)?;
+        budget.registry_entries(chart_created.len())?;
         workspace
             .add_object_uuids(component, &chart_created)
             .map_err(SymbolError::from)?;
     }
     if let Some(last) = created.last().copied() {
+        budget.admit_registry_inspection(workspace)?;
+        budget.registry_entries(1)?;
         workspace
             .set_last_object_identifier(last)
             .map_err(SymbolError::from)?;
@@ -4650,10 +4894,18 @@ fn bounded_set_values<P: BoundedProperty>(
         removals.len().saturating_add(released_containers.len()),
         true,
     )?;
-    let mut released: Vec<u64> = removals.iter().map(|slot| slot.object).collect();
+    let mut released = Vec::new();
+    budget.reserve_vec(
+        &mut released,
+        removals.len().saturating_add(released_containers.len()),
+        true,
+    )?;
+    released.extend(removals.iter().map(|slot| slot.object));
     released.extend(released_containers);
     if !released.is_empty() {
         budget.identifiers(released.len())?;
+        budget.admit_registry_inspection(workspace)?;
+        budget.registry_entries(1)?;
         workspace
             .release_identifier_suffix(&released)
             .map_err(SymbolError::from)?;
@@ -4674,7 +4926,7 @@ fn bounded_style_owner_count(
     budget: &mut SymbolBudget,
 ) -> SymbolResult<usize> {
     let mut owners = 0usize;
-    for location in workspace.locations() {
+    for location in workspace.locations_iter() {
         let archive = workspace.archive_at(location).map_err(SymbolError::from)?;
         for candidate in &archive.objects {
             for message in &candidate.messages {
@@ -4735,6 +4987,11 @@ where
 }
 
 /// Write all data symbols under one shared explicit residual profile.
+///
+/// The workspace is copy-on-write. A failure after a staged mark or style
+/// mutation can leave that private workspace changed, but no source bytes are
+/// published; callers must discard the failed workspace and retain the
+/// immutable source snapshot.
 pub fn set_symbols(
     workspace: &mut Workspace<'_>,
     chart: u64,
@@ -5010,6 +5267,22 @@ mod symbol_tests {
         )
     }
 
+    const fn limits_with(fields: usize, references: usize) -> Limits {
+        Limits::new(
+            256 * 1024,
+            fields,
+            256 * 1024,
+            16,
+            4 * 1024 * 1024,
+            4_096,
+            4 * 1024 * 1024,
+            4 * 1024 * 1024,
+            references,
+            4 * 1024,
+            4 * 1024,
+        )
+    }
+
     fn expected() -> Vec<Option<Symbol>> {
         vec![Some(Symbol {
             shape: SymbolShape::Diamond,
@@ -5093,6 +5366,25 @@ mod symbol_tests {
     }
 
     #[test]
+    fn zero_wire_fields_and_references_are_typed_before_write() {
+        for (limits, kind) in [
+            (limits_with(0, 4_096), LimitKind::Fields),
+            (limits_with(16 * 1024, 0), LimitKind::References),
+        ] {
+            let components = components();
+            let mut workspace =
+                Workspace::new(&components, CoreLimits::default()).expect("workspace");
+            let error = set_symbols(&mut workspace, 1, FAMILY, &expected(), limits)
+                .expect_err("zero ceiling must refuse");
+            assert!(matches!(
+                error,
+                SymbolError::Limit { kind: actual, .. } if actual == kind
+            ));
+            assert!(workspace.finish().is_empty());
+        }
+    }
+
+    #[test]
     fn exact_symbol_noop_reports_unchanged_after_first_write() {
         let components = components();
         let mut workspace = Workspace::new(&components, CoreLimits::default()).expect("workspace");
@@ -5109,7 +5401,7 @@ mod symbol_tests {
     fn shared_override_is_copied_and_unselected_chart_stays_exact() {
         let components = shared_components();
         let mut workspace = Workspace::new(&components, CoreLimits::default()).expect("workspace");
-        let (changed, _) = set_symbols(
+        let (changed, report) = set_symbols(
             &mut workspace,
             1,
             FAMILY,
@@ -5118,6 +5410,13 @@ mod symbol_tests {
         )
         .expect("shared override write");
         assert!(changed);
+        assert!(
+            !report
+                .scope()
+                .expect("mutation scope")
+                .planned_new_objects()
+                .is_empty()
+        );
         let chart_one = workspace.object(1).expect("selected chart");
         let chart_two = workspace.object(5).expect("unselected chart");
         let references_one = codec::references(&chart_one.messages[0].data, CodecLimits::DEFAULT)
