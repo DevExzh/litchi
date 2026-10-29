@@ -145,8 +145,9 @@ The focused runs passed: four Numbers public-contract tests, four
 host-vs-leaf differential tests, the six-vector direct-reader test and the
 ignored six-route probe. `cargo check --offline --locked -p litchi-numbers
 --all-features` and the parity-test target check also passed. These are scoped
-checks only; no full 53-row gate, native run, callgrind qualification or
-wall-clock 5%/20-microsecond claim is made.
+checks only; no full 53-row gate, native run or wall-clock 5%/20-microsecond
+claim is made. The current-branch release instruction qualification is
+recorded below.
 
 The post-preparation static gates also passed: `python3
 tools/check_crate_boundaries.py` reported 70 workspace packages and 313 valid
@@ -164,9 +165,9 @@ CARGO_BUILD_JOBS=2 CARGO_INCREMENTAL=0 \
 
 The full-facade probe's six routes are `font_read`, `font_set`, `font_reset`,
 `size_read`, `size_set` and `size_reset`, selected with `W2A_FONT_ROUTE`. The
-coordinator must run the release-mode pinned-CPU ABBA measurement and report
-engine/facade scope separately before accepting performance evidence. The
-probe's two direct `#[inline(never)]` route symbols are
+The release-mode pinned-CPU ABBA measurement below reports the full-facade
+scope separately from any engine-only measurement. The probe's two direct
+`#[inline(never)]` route symbols are
 `numbers_chart_font_host_route` and `numbers_chart_font_leaf_route`; a receipt
 must use their exact symbol rows rather than program totals or sums of inline
 duplicates. Later integrations invalidate any earlier performance
@@ -183,3 +184,53 @@ formatting/Clippy/docs, boundary/fuzz-lock checks and the final integrated
 native open/save/close/reopen verification. The branch must be synchronized
 with current trunk only after those checks are requested; this record does not
 authorize integration.
+
+## Release instruction-count qualification
+
+This is a qualification of the current isolated candidate only. The measured
+source tip is `fbc7c51866f119e733521f4bc92467a849385c71`, after merging the
+coordinator root `295b421bcd3d9ec0b0b9208e4039de22623685bc`; any later root
+merge invalidates this receipt. The release parity binary was built with one
+Cargo job, incremental compilation disabled, release debug information
+disabled, and `RUST_TEST_THREADS=1`:
+
+* binary: `/home/zhuhe/code/litchi-worktrees/.coord/iwa-w2a-chart-font-perf-target-20261029/release/deps/parity-9f6fee151a57f4bc`
+* binary size: 41,439,288 bytes; SHA-256 `258aaccd848ffde2069852ad8ed61f565170d9307d6046269c25f50474f3d9c3`
+* immutable binary archive: `/home/zhuhe/code/litchi-worktrees/.coord/iwa-w2a-chart-font-perf-20261029/parity-9f6fee151a57f4bc-release.tar`, mode `0444`, 41,441,280 bytes, SHA-256 `1325e220da1ab56c5b9548018298ab06906bf6a6183efd676e77ba14ebda2a05`
+
+Each route used one common prepared input for its host/leaf pair. Setup and
+reset seeding occurred before the measured forward route symbols; the measured
+ABBA order was host, leaf, leaf, host, with no inverse operation in the route.
+Each route was captured twice on pinned CPU 3, for 12 external Callgrind
+captures total. Instruction counts use only the exact direct
+`numbers_chart_font_host_route` and `numbers_chart_font_leaf_route` symbol
+rows, never `PROGRAM TOTALS`.
+
+| Route | Host Ir mean | Leaf Ir mean | Leaf vs host |
+|---|---:|---:|---:|
+| `font_read` | 285,250,784 | 38,891,554 | −86.365838% |
+| `font_set` | 1,157,293,982 | 209,840,963 | −81.867964% |
+| `font_reset` | 816,381,854 | 158,513,524 | −80.583409% |
+| `size_read` | 175,305,496 | 36,847,437 | −78.981014% |
+| `size_set` | 823,448,718 | 203,907,692 | −75.237354% |
+| `size_reset` | 649,320,992 | 153,778,446 | −76.317038% |
+
+All 12 Callgrind invocations exited 0, all route logs had an `ok` result and
+empty stderr, and every route is below the 5% slower bar. The external raw
+captures total 26,546,923 bytes. Their per-capture sizes and SHA-256 values,
+the two-repetition means, and the positive-exit markers are in
+`/home/zhuhe/code/litchi-worktrees/.coord/iwa-w2a-chart-font-perf-20261029/summary.tsv`
+(SHA-256 `a412373721c6f5ebabdfd079e204705c1225b651507ef8d016a918f66fdb26e1`).
+The representative exact annotation was saved as
+`font_read.rep1.annotate.txt` (SHA-256
+`08dd00f6d2457c7c8a5d65a6e4a5440ca4822b240d99712a11858bca0133abef`); it
+contains the separate host and leaf symbol rows alongside the program-total
+context, which was not used for qualification.
+
+The correctness positive run used the same release binary and exact parity
+filter `numbers_sheet_chart_font`; it exited 0 with 5 passed tests. Its log is
+`correctness-parity.log` (SHA-256
+`ec534079c4ed3b01595fba3bd74b4b2176c148608bfe330672f994b8a733c5a7`). This
+instruction-count result does not claim native acceptance, does not claim
+wall-clock performance, and does not migrate the six ledger rows; the native
+queue entries remain pending.
