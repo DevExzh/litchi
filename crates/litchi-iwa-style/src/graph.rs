@@ -416,6 +416,9 @@ impl ConstructionLimits {
 /// never charged by [`Workspace::new_bounded`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ConstructionRequirements {
+    source_token: usize,
+    fingerprint_a: u64,
+    fingerprint_b: u64,
     component_count: usize,
     object_count: usize,
     source_work: usize,
@@ -732,6 +735,23 @@ pub(crate) enum Location {
 const INDEX_SLOT_BYTES: usize = 64;
 const AMBIGUOUS_SLOT_BYTES: usize = 32;
 
+fn source_token(source: &dyn Components) -> usize {
+    let raw: *const dyn Components = source;
+    raw as *const () as usize
+}
+
+fn fingerprint_u64(first: &mut u64, second: &mut u64, value: u64) {
+    *first ^= value;
+    *first = first.wrapping_mul(0x1000_0000_01b3);
+    *second = second.rotate_left(13) ^ value.wrapping_mul(0x9e37_79b9_7f4a_7c15);
+}
+
+fn fingerprint_bytes(first: &mut u64, second: &mut u64, bytes: &[u8]) {
+    for byte in bytes {
+        fingerprint_u64(first, second, u64::from(*byte));
+    }
+}
+
 /// The staged state of one graph edit.
 pub struct Workspace<'s> {
     source: &'s dyn Components,
@@ -774,6 +794,8 @@ impl<'s> Workspace<'s> {
         let component_count = source.count();
         let mut object_count = 0usize;
         let mut source_work = 0usize;
+        let mut fingerprint_a = 0xcbf2_9ce4_8422_2325;
+        let mut fingerprint_b = 0x8422_2325_cbf2_9ce4;
         for position in 0..component_count {
             source_work =
                 source_work
@@ -788,18 +810,45 @@ impl<'s> Workspace<'s> {
                     maximum: limits.max_work(),
                 });
             }
-            let (_, archive) =
+            let (name, archive) =
                 source
                     .component(position)
                     .ok_or(ConstructionError::Graph(Error::Invalid(
                         "a component vanished during workspace census",
                     )))?;
+            fingerprint_u64(&mut fingerprint_a, &mut fingerprint_b, position as u64);
+            fingerprint_u64(&mut fingerprint_a, &mut fingerprint_b, name.len() as u64);
+            fingerprint_bytes(&mut fingerprint_a, &mut fingerprint_b, name.as_bytes());
+            fingerprint_u64(
+                &mut fingerprint_a,
+                &mut fingerprint_b,
+                archive.objects.len() as u64,
+            );
+            source_work = source_work
+                .checked_add(name.len())
+                .ok_or(ConstructionError::Graph(Error::Invalid(
+                    "workspace census work overflow",
+                )))?;
+            if source_work > limits.max_work() {
+                return Err(ConstructionError::Limit {
+                    kind: ConstructionLimitKind::Work,
+                    observed: source_work,
+                    maximum: limits.max_work(),
+                });
+            }
             for object in &archive.objects {
-                if object.archive_info.identifier.is_none() {
-                    return Err(ConstructionError::Graph(Error::Invalid(
+                let identifier = object
+                    .archive_info
+                    .identifier
+                    .ok_or(ConstructionError::Graph(Error::Invalid(
                         "an IWA object has no identifier",
-                    )));
-                }
+                    )))?;
+                fingerprint_u64(&mut fingerprint_a, &mut fingerprint_b, identifier);
+                fingerprint_u64(
+                    &mut fingerprint_a,
+                    &mut fingerprint_b,
+                    object.messages.len() as u64,
+                );
                 source_work =
                     source_work
                         .checked_add(1)
@@ -812,6 +861,25 @@ impl<'s> Workspace<'s> {
                         observed: source_work,
                         maximum: limits.max_work(),
                     });
+                }
+                source_work = source_work.checked_add(object.messages.len()).ok_or(
+                    ConstructionError::Graph(Error::Invalid("workspace census work overflow")),
+                )?;
+                if source_work > limits.max_work() {
+                    return Err(ConstructionError::Limit {
+                        kind: ConstructionLimitKind::Work,
+                        observed: source_work,
+                        maximum: limits.max_work(),
+                    });
+                }
+                for (message, raw) in object.messages.iter().enumerate() {
+                    fingerprint_u64(&mut fingerprint_a, &mut fingerprint_b, message as u64);
+                    fingerprint_u64(&mut fingerprint_a, &mut fingerprint_b, u64::from(raw.type_));
+                    fingerprint_u64(
+                        &mut fingerprint_a,
+                        &mut fingerprint_b,
+                        raw.data.len() as u64,
+                    );
                 }
                 object_count =
                     object_count
@@ -833,6 +901,9 @@ impl<'s> Workspace<'s> {
                 "component view bytes overflow",
             )))?;
         let requirements = ConstructionRequirements {
+            source_token: source_token(source),
+            fingerprint_a,
+            fingerprint_b,
             component_count,
             object_count,
             source_work,
@@ -855,10 +926,10 @@ impl<'s> Workspace<'s> {
         requirements: ConstructionRequirements,
         construction_limits: ConstructionLimits,
     ) -> std::result::Result<Self, ConstructionError> {
-        requirements.check(construction_limits)?;
-        if source.count() != requirements.component_count {
+        let current = Self::construction_requirements(source, construction_limits)?;
+        if current != requirements {
             return Err(ConstructionError::Graph(Error::Invalid(
-                "workspace component count changed between census and build",
+                "workspace source changed between census and build",
             )));
         }
         let mut index = HashMap::new();
@@ -878,7 +949,14 @@ impl<'s> Workspace<'s> {
         let mut registry = None;
         let mut source_objects = 0usize;
         let mut source_work = 0usize;
+        let mut fingerprint_a = 0xcbf2_9ce4_8422_2325;
+        let mut fingerprint_b = 0x8422_2325_cbf2_9ce4;
         for position in 0..requirements.component_count {
+            if source.count() != requirements.component_count {
+                return Err(ConstructionError::Graph(Error::Invalid(
+                    "workspace component count changed during build",
+                )));
+            }
             source_work =
                 source_work
                     .checked_add(1)
@@ -891,9 +969,27 @@ impl<'s> Workspace<'s> {
                     .ok_or(ConstructionError::Graph(Error::Invalid(
                         "a component vanished during workspace build",
                     )))?;
+            fingerprint_u64(&mut fingerprint_a, &mut fingerprint_b, position as u64);
+            fingerprint_u64(&mut fingerprint_a, &mut fingerprint_b, name.len() as u64);
+            fingerprint_bytes(&mut fingerprint_a, &mut fingerprint_b, name.as_bytes());
+            fingerprint_u64(
+                &mut fingerprint_a,
+                &mut fingerprint_b,
+                archive.objects.len() as u64,
+            );
+            source_work = source_work
+                .checked_add(name.len())
+                .ok_or(ConstructionError::Graph(Error::Invalid(
+                    "workspace build work overflow",
+                )))?;
             source_objects = source_objects.checked_add(archive.objects.len()).ok_or(
                 ConstructionError::Graph(Error::Invalid("workspace object count overflow")),
             )?;
+            if source_objects > requirements.object_count {
+                return Err(ConstructionError::Graph(Error::Invalid(
+                    "workspace object count grew during build",
+                )));
+            }
             for object in &archive.objects {
                 source_work =
                     source_work
@@ -907,6 +1003,24 @@ impl<'s> Workspace<'s> {
                     .ok_or(ConstructionError::Graph(Error::Invalid(
                         "an IWA object has no identifier",
                     )))?;
+                fingerprint_u64(&mut fingerprint_a, &mut fingerprint_b, identifier);
+                fingerprint_u64(
+                    &mut fingerprint_a,
+                    &mut fingerprint_b,
+                    object.messages.len() as u64,
+                );
+                source_work = source_work.checked_add(object.messages.len()).ok_or(
+                    ConstructionError::Graph(Error::Invalid("workspace build work overflow")),
+                )?;
+                for (message, raw) in object.messages.iter().enumerate() {
+                    fingerprint_u64(&mut fingerprint_a, &mut fingerprint_b, message as u64);
+                    fingerprint_u64(&mut fingerprint_a, &mut fingerprint_b, u64::from(raw.type_));
+                    fingerprint_u64(
+                        &mut fingerprint_a,
+                        &mut fingerprint_b,
+                        raw.data.len() as u64,
+                    );
+                }
                 if index
                     .insert(identifier, Location::Source(position))
                     .is_some()
@@ -926,7 +1040,12 @@ impl<'s> Workspace<'s> {
                 }
             }
         }
-        if source_objects != requirements.object_count || source_work != requirements.source_work {
+        if source_objects != requirements.object_count
+            || source_work != requirements.source_work
+            || source_token(source) != requirements.source_token
+            || fingerprint_a != requirements.fingerprint_a
+            || fingerprint_b != requirements.fingerprint_b
+        {
             return Err(ConstructionError::Graph(Error::Invalid(
                 "workspace source changed between census and build",
             )));
