@@ -123,6 +123,13 @@ plus the first missing row in an existing tile. It compares both bucket counts
 and unknown fields, tile row/cell presence, host and leaf semantic styles, and
 the exact leaf inverse. The current-source log is retained at
 `/home/zhuhe/code/litchi-worktrees/.coord/iwa-w1g-header-d39eb1740c/header-controls.out`.
+The shared header delta helper also partitions rows that cross the 65,536-row
+bucket boundary while retaining global row indices; the adapter rewrites each
+owned row bucket and publishes the column bucket once. A source that requires
+a materialization count but lacks the corresponding row or column ownership
+reference is refused with `UnsupportedDependency`; it is not silently
+published through a tile-only fallback. The boundary and missing-ownership
+controls pass in the shared header tests and the Numbers adapter unit suite.
 The package proof mutates an otherwise exclusive style with unknown root and
 unrelated paragraph data (asserting both the nonempty paragraph field and root
 unknown field); the canonical-shape gate derives a fresh style and the old

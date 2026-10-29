@@ -9,6 +9,7 @@
 
 use litchi_iwa_common::{LimitKind, wire::RawWireFields, wire::RawWireLimits};
 use litchi_numbers_wire::{Limits as WireProfile, table_write};
+use std::mem::size_of;
 
 use crate::{cell_text_style, cell_text_style_writer::Update};
 
@@ -37,6 +38,70 @@ impl MaterializedHeaderDeltas {
     #[must_use]
     pub const fn is_empty(&self) -> bool {
         self.rows.is_empty() && self.columns.is_empty()
+    }
+
+    /// Partition row deltas by their owning header bucket.
+    ///
+    /// The returned deltas contain rows only; column deltas are published
+    /// once by the package owner after all row buckets have been handled.
+    /// Every temporary vector and grouping comparison is charged to the
+    /// caller's residual ledger.
+    pub fn split_rows_by_bucket(
+        &self,
+        bucket_rows: u64,
+        limits: &cell_text_style::Limits,
+    ) -> Result<Vec<(u64, Self)>, cell_text_style::Error> {
+        if bucket_rows == 0 {
+            return Err(invalid("header bucket span is zero"));
+        }
+        let mut groups: Vec<(u64, Self)> = Vec::new();
+        for &(row, delta) in &self.rows {
+            let bucket = u64::from(row) / bucket_rows;
+            let comparisons = groups.len().saturating_add(1);
+            limits.admit_work(comparisons)?;
+            if let Some((_, group)) = groups
+                .iter_mut()
+                .find(|(candidate, _)| *candidate == bucket)
+            {
+                limits.reserve(&mut group.rows, 1)?;
+                limits.admit_copies(size_of::<(u32, i64)>())?;
+                group.rows.push((row, delta));
+            } else {
+                let mut rows = Vec::new();
+                limits.reserve(&mut rows, 1)?;
+                limits.admit_copies(size_of::<(u32, i64)>())?;
+                rows.push((row, delta));
+                limits.reserve(&mut groups, 1)?;
+                groups.push((
+                    bucket,
+                    Self {
+                        rows,
+                        columns: Vec::new(),
+                    },
+                ));
+            }
+        }
+        Ok(groups)
+    }
+
+    /// Copy only the column deltas for a standalone column-bucket rewrite.
+    pub fn columns_only(
+        &self,
+        limits: &cell_text_style::Limits,
+    ) -> Result<Self, cell_text_style::Error> {
+        limits.admit_work(self.columns.len())?;
+        let mut columns = Vec::new();
+        limits.reserve(&mut columns, self.columns.len())?;
+        limits.admit_copies(
+            self.columns
+                .len()
+                .saturating_mul(size_of::<(u32, i64)>()),
+        )?;
+        columns.extend_from_slice(&self.columns);
+        Ok(Self {
+            rows: Vec::new(),
+            columns,
+        })
     }
 }
 
@@ -387,6 +452,29 @@ mod tests {
         let limits = cell_text_style::Limits::from_source(&source).expect("limits");
         let deltas = materialized_deltas(&updates, &previous, 0, &limits).expect("deltas");
         assert!(deltas.is_empty());
+    }
+
+    #[test]
+    fn rows_crossing_bucket_boundaries_keep_global_indices_and_columns_once() {
+        let source = test_source();
+        let limits = cell_text_style::Limits::from_source(&source).expect("limits");
+        let deltas = MaterializedHeaderDeltas {
+            rows: vec![(65_535, 1), (65_536, 1)],
+            columns: vec![(3, 2)],
+        };
+        let groups = deltas
+            .split_rows_by_bucket(65_536, &limits)
+            .expect("row groups");
+        assert_eq!(groups.len(), 2);
+        assert_eq!(groups[0].0, 0);
+        assert_eq!(groups[0].1.rows(), &[(65_535, 1)]);
+        assert!(groups[0].1.columns().is_empty());
+        assert_eq!(groups[1].0, 1);
+        assert_eq!(groups[1].1.rows(), &[(65_536, 1)]);
+        assert!(groups[1].1.columns().is_empty());
+        let columns = deltas.columns_only(&limits).expect("columns");
+        assert!(columns.rows().is_empty());
+        assert_eq!(columns.columns(), &[(3, 2)]);
     }
 
     #[test]

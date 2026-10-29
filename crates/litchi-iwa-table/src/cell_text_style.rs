@@ -829,6 +829,13 @@ pub fn table_facts(
                 .ok_or(invalid("row-header reference identifier missing"))?;
             let bucket = u32::try_from(bucket)
                 .map_err(|_| invalid("row-header bucket index exceeds u32"))?;
+            limits.admit_work(buckets.len().saturating_add(1))?;
+            if buckets
+                .iter()
+                .any(|(_, existing)| *existing == identifier)
+            {
+                return Err(invalid("row-header object reference repeats"));
+            }
             buckets.push((bucket, identifier));
         }
         buckets
@@ -836,6 +843,15 @@ pub fn table_facts(
         Vec::new()
     };
     let column_headers = reference(&table.store, 2, limits)?;
+    if let Some(column_headers) = column_headers {
+        limits.admit_work(row_headers.len())?;
+        if row_headers
+            .iter()
+            .any(|(_, identifier)| *identifier == column_headers)
+        {
+            return Err(invalid("column-header object overlaps row headers"));
+        }
+    }
     let tile_storage =
         bytes(&table.store, STORE_TILES, limits)?.ok_or(invalid("tile storage missing"))?;
     let tile_size = varint(tile_storage, 2, limits)?.ok_or(invalid("tile size missing"))?;

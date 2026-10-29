@@ -848,52 +848,77 @@ fn write_style_keys(
             .ok_or(Error::InvalidSource)?;
         let deltas = headers::materialized_deltas(&rows, write.previous(), row_offset, limits)
             .map_err(from_shared)?;
-        let row_bucket = u64::from(row_offset) / SHARED_HEADER_BUCKET_ROWS;
-        if deltas
-            .rows()
-            .iter()
-            .any(|(row, _)| u64::from(*row) / SHARED_HEADER_BUCKET_ROWS != row_bucket)
-        {
-            return Err(Error::Refused(Refusal::UnsupportedDependency));
-        }
-        let row_headers = row_headers
-            .iter()
-            .find(|(bucket, _)| u64::from(*bucket) == row_bucket)
-            .map(|(_, identifier)| *identifier);
-        let header_rewrite = if deltas.is_empty() {
-            None
-        } else if let (Some(row_headers), Some(column_headers)) = (row_headers, column_headers) {
-            let (_, row_bucket) =
-                topology::message(working, row_headers, &[HEADER_BUCKET_MESSAGE_TYPE])?;
-            let (_, column_bucket) =
-                topology::message(working, column_headers, &[HEADER_BUCKET_MESSAGE_TYPE])?;
-            Some((
-                headers::rewrite_header_buckets(row_bucket, column_bucket, &deltas, limits)
-                    .map_err(from_shared)?,
-                row_headers,
-                column_headers,
-            ))
-        } else {
-            None
-        };
+        rewrite_materialized_headers(working, &row_headers, column_headers, &deltas, limits)?;
         if write.changed() {
             replace_message(working, tile, tile_index, write.into_tile())?;
         }
-        if let Some((rewrite, row_headers, column_headers)) = header_rewrite {
-            let (row, column) = rewrite.into_parts();
-            if let Some(row) = row {
-                let (index, _) =
-                    topology::message(working, row_headers, &[HEADER_BUCKET_MESSAGE_TYPE])?;
-                replace_message(working, row_headers, index, row)?;
-            }
-            if let Some(column) = column {
-                let (index, _) =
-                    topology::message(working, column_headers, &[HEADER_BUCKET_MESSAGE_TYPE])?;
-                replace_message(working, column_headers, index, column)?;
-            }
-        }
     }
     Ok(())
+}
+
+fn rewrite_materialized_headers(
+    working: &mut Working<'_>,
+    row_headers: &[(u32, u64)],
+    column_headers: Option<u64>,
+    deltas: &headers::MaterializedHeaderDeltas,
+    limits: &shared::Limits,
+) -> Result<(), Error> {
+    if deltas.is_empty() {
+        return Ok(());
+    }
+    let row_groups = materialized_header_groups(row_headers, column_headers, deltas, limits)?;
+    for (bucket, bucket_deltas) in row_groups {
+        let row_identifier = row_headers
+            .iter()
+            .find(|(candidate, _)| u64::from(*candidate) == bucket)
+            .map(|(_, identifier)| *identifier)
+            .ok_or(Error::Refused(Refusal::UnsupportedDependency))?;
+        let (index, payload) =
+            topology::message(working, row_identifier, &[HEADER_BUCKET_MESSAGE_TYPE])?;
+        let rewrite = headers::rewrite_header_buckets(payload, &[], &bucket_deltas, limits)
+            .map_err(from_shared)?;
+        let (row, _) = rewrite.into_parts();
+        let row = row.ok_or(Error::InvalidSource)?;
+        replace_message(working, row_identifier, index, row)?;
+    }
+    if !deltas.columns().is_empty() {
+        let column_identifier =
+            column_headers.ok_or(Error::Refused(Refusal::UnsupportedDependency))?;
+        let column_deltas = deltas.columns_only(limits).map_err(from_shared)?;
+        let (index, payload) = topology::message(
+            working,
+            column_identifier,
+            &[HEADER_BUCKET_MESSAGE_TYPE],
+        )?;
+        let rewrite = headers::rewrite_header_buckets(&[], payload, &column_deltas, limits)
+            .map_err(from_shared)?;
+        let (_, column) = rewrite.into_parts();
+        let column = column.ok_or(Error::InvalidSource)?;
+        replace_message(working, column_identifier, index, column)?;
+    }
+    Ok(())
+}
+
+fn materialized_header_groups(
+    row_headers: &[(u32, u64)],
+    column_headers: Option<u64>,
+    deltas: &headers::MaterializedHeaderDeltas,
+    limits: &shared::Limits,
+) -> Result<Vec<(u64, headers::MaterializedHeaderDeltas)>, Error> {
+    let groups = deltas
+        .split_rows_by_bucket(SHARED_HEADER_BUCKET_ROWS, limits)
+        .map_err(from_shared)?;
+    if groups.iter().any(|(bucket, _)| {
+        !row_headers
+            .iter()
+            .any(|(candidate, _)| u64::from(*candidate) == *bucket)
+    }) {
+        return Err(Error::Refused(Refusal::UnsupportedDependency));
+    }
+    if !deltas.columns().is_empty() && column_headers.is_none() {
+        return Err(Error::Refused(Refusal::UnsupportedDependency));
+    }
+    Ok(groups)
 }
 
 /// `TSWP.ParagraphStyleArchive.para_properties`.
@@ -1147,7 +1172,11 @@ impl Package {
 
 #[cfg(test)]
 mod wire_error_tests {
-    use super::{Error, LimitKind, from_style};
+    use super::{Error, LimitKind, from_style, materialized_header_groups};
+    use litchi_iwa_table::{
+        cell_text_style as shared, cell_text_style_headers as headers,
+        cell_text_style_writer as writer,
+    };
 
     #[test]
     fn character_style_resource_errors_survive_the_owner_boundary() {
@@ -1171,6 +1200,23 @@ mod wire_error_tests {
         assert!(matches!(
             from_style(litchi_iwa_text_wire::CharStyleError::Invalid),
             Error::InvalidSource
+        ));
+    }
+
+    #[test]
+    fn materialization_without_header_ownership_is_typed() {
+        let package = super::Package::new();
+        let limits = shared::Limits::from_source(&package).expect("limits");
+        let updates = [writer::Update {
+            row: 0,
+            column: 0,
+            key: Some(1),
+        }];
+        let deltas = headers::materialized_deltas(&updates, &[None], 0, &limits)
+            .expect("materialized deltas");
+        assert!(matches!(
+            materialized_header_groups(&[], None, &deltas, &limits),
+            Err(Error::Refused(super::Refusal::UnsupportedDependency))
         ));
     }
 }
