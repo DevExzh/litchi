@@ -7291,3 +7291,27 @@ See [0063](0063-source-pptx-modern-comments.md).
   thirteen Numbers digest entries. All four affected targets pass again with
   golden updates explicitly disabled. No production runtime or fixture bytes
   changed. Final qualification restarts on this integrated source.
+
+- The resumed `6adafb4f2d` full gate has 33 passing rows (00–32), but the
+  process and exec session are gone and workspace row 33 has no terminal
+  result. Its incomplete logs and continuation receipt remain preserved;
+  the actual runner exit is unavailable. No full qualification is claimed.
+  The next complete gate will run on one newly integrated candidate.
+- Accepted W2-D `9e8e539f2a` (source `1067c591a5`, record 0405): four
+  Numbers table lifecycle examples now use the leaf add, duplicate, resize
+  and remove routes. Historical CLI indices are resolved to sheet/table
+  selectors. Each command checks persisted readback and exact inverse
+  restoration; all four fixture runs and scoped gates passed. The host
+  examples were removed, with no host-oracle, ledger or native changes.
+- A further 20 inactive build-cache directories were removed: 39,063,860,126
+  logical bytes and 39,204,110,336 allocated bytes. The coordinator rehashed
+  all 641 unique protected evidence files successfully. Recorded logical
+  cleanup now totals 186,976,851,364 bytes (about 174.14 GiB); active worktrees,
+  qualified binaries, raw captures and source receipts remain preserved.
+  Cleanup receipts and the independent review remain outside the repository
+  under `.coord/disk-cleanup-*-20261029*`.
+- Chart-series symbols remain isolated for review: Numbers and Pages are
+  closing publication/admission gaps, and Keynote is preserving precise
+  resource kinds in its new error adapters. Earlier scoped measurements
+  remain tied to their measured source; runtime repairs require fresh
+  qualification before integration. Native verification still blocks W3.
