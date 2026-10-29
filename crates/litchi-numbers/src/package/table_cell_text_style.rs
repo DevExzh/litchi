@@ -257,7 +257,7 @@ impl Edit<'_> {
         if self.cells.is_empty() {
             return Err(Error::Refused(Refusal::NoStagedOperation));
         }
-        let published = publish(self.source, self.sheet, self.table, &self.cells)?;
+        let (published, limits) = publish(self.source, self.sheet, self.table, &self.cells)?;
         let effective_values = if self.cells.len() == 1 {
             vec![text_style(
                 &published.package,
@@ -273,7 +273,13 @@ impl Edit<'_> {
                     amount: self.cells.len(),
                 })?;
             positions.extend(self.cells.iter().map(|(position, _)| *position));
-            text_style_many(&published.package, self.sheet, self.table, &positions)?
+            text_style_many_with_limits(
+                &published.package,
+                self.sheet,
+                self.table,
+                &positions,
+                &limits,
+            )?
         };
         for ((_, properties), effective) in self.cells.iter().zip(effective_values) {
             let mut expected = properties.clone();
@@ -446,13 +452,13 @@ fn text_style(
     .map_err(from_shared)
 }
 
-fn text_style_many(
+fn text_style_many_with_limits(
     package: &Package,
     sheet: usize,
     table: usize,
     positions: &[At],
+    limits: &shared::Limits,
 ) -> Result<Vec<CharacterProperties>, Error> {
-    let limits = shared::Limits::from_source(package).map_err(from_shared)?;
     let working = Working::new(package)?;
     let target = topology::locate(&working, sheet, table).map_err(from_topology)?;
     let mut targets = Vec::new();
@@ -466,7 +472,7 @@ fn text_style_many(
         row: position.row(),
         column: position.column(),
     }));
-    shared::read_many(package, &targets, &limits).map_err(from_shared)
+    shared::read_many(package, &targets, limits).map_err(from_shared)
 }
 
 fn from_shared(error: shared::Error) -> Error {
@@ -506,7 +512,7 @@ fn publish(
     sheet: usize,
     table: usize,
     cells: &[(At, CharacterProperties)],
-) -> Result<structure::Published, Error> {
+) -> Result<(structure::Published, shared::Limits), Error> {
     let limits = shared::Limits::from_source(source).map_err(from_shared)?;
     let mut working = Working::new(source)?;
     working.keep_previews();
@@ -529,11 +535,17 @@ fn publish(
             Err(error) => return Err(from_shared(error)),
         };
         let Some(plan) = plan else {
-            return working.publish(&Transition::default()).map_err(Error::from);
+            return working
+                .publish(&Transition::default())
+                .map(|published| (published, limits))
+                .map_err(Error::from);
         };
         let mut transition = Transition::default();
-        apply_shared_plan(&mut working, &mut transition, plan)?;
-        return working.publish(&transition).map_err(Error::from);
+        apply_shared_plan(&mut working, &mut transition, plan, &limits)?;
+        return working
+            .publish(&transition)
+            .map(|published| (published, limits))
+            .map_err(Error::from);
     }
     let mut requests = Vec::new();
     limits
@@ -554,90 +566,43 @@ fn publish(
             fresh: None,
         });
     }
-    let mut targets = Vec::new();
-    targets
-        .try_reserve(requests.len())
-        .map_err(|_| Error::Allocation {
-            amount: requests.len(),
-        })?;
-    targets.extend(requests.iter().map(|request| request.target));
-    let current = shared::read_many(source, &targets, &limits).map_err(from_shared)?;
-    for (request, inherited) in requests.iter_mut().zip(current.iter()) {
-        if shared::minimal(&request.properties, inherited) != CharacterProperties::new() {
-            limits.admit_allocations(1).map_err(from_shared)?;
-            request.fresh = Some(*working.allocate(1)?.first().ok_or(Error::InvalidSource)?);
-        }
-    }
-    let plan = match shared::plan_set_many(source, &requests, &limits) {
-        Ok(plan) => plan,
-        Err(error)
-            if matches!(
-                &error,
-                shared::Error::BatchUnsupported
-                    | shared::Error::Refused(
-                        shared::Refusal::UnsupportedDependency
-                            | shared::Refusal::UnsupportedStyleList
-                    )
-            ) =>
-        {
-            let fallback_limits = shared::Limits::from_source(source).map_err(from_shared)?;
-            let mut fallback_requests = Vec::new();
-            fallback_requests
-                .try_reserve(cells.len())
-                .map_err(|_| Error::Allocation {
-                    amount: cells.len(),
-                })?;
-            for (position, properties) in cells {
-                fallback_limits
-                    .admit_character_properties(properties)
-                    .map_err(from_shared)?;
-                let shared_target = shared::Target {
-                    model_identifier: target.model,
-                    row: position.row(),
-                    column: position.column(),
-                };
-                let fresh = match shared::plan_set(
-                    source,
-                    shared_target,
-                    properties,
-                    None,
-                    &fallback_limits,
-                ) {
-                    Ok(None) => None,
-                    Ok(Some(plan)) if plan.insertions.is_empty() => {
-                        fallback_limits.admit_allocations(1).map_err(from_shared)?;
-                        Some(*working.allocate(1)?.first().ok_or(Error::InvalidSource)?)
-                    },
-                    Ok(Some(_)) => None,
-                    Err(shared::Error::NeedsIdentifier) => {
-                        fallback_limits.admit_allocations(1).map_err(from_shared)?;
-                        Some(*working.allocate(1)?.first().ok_or(Error::InvalidSource)?)
-                    },
-                    Err(error) => return Err(from_shared(error)),
-                };
-                fallback_requests.push(shared::Request {
-                    target: shared_target,
-                    properties: properties.clone(),
-                    fresh,
-                });
-            }
-            shared::plan_set_many_unprepared(source, &fallback_requests, &fallback_limits)
-                .map_err(from_shared)?
-        },
-        Err(error) => return Err(from_shared(error)),
+    let prepare_batch = cells.len() >= 64;
+    let mut allocate = || {
+        limits.admit_allocations(1)?;
+        working
+            .allocate(1)
+            .map_err(|_| shared::Error::Allocation { amount: 1 })?
+            .first()
+            .copied()
+            .ok_or(shared::Error::InvalidSource("identifier allocation failed"))
     };
+    let plan = shared::plan_set_many_with_allocator(
+        source,
+        &requests,
+        &limits,
+        prepare_batch,
+        &mut allocate,
+    )
+    .map_err(from_shared)?;
     let Some(plan) = plan else {
-        return working.publish(&Transition::default()).map_err(Error::from);
+        return working
+            .publish(&Transition::default())
+            .map(|published| (published, limits))
+            .map_err(Error::from);
     };
     let mut transition = Transition::default();
-    apply_shared_plan(&mut working, &mut transition, plan)?;
-    working.publish(&transition).map_err(Error::from)
+    apply_shared_plan(&mut working, &mut transition, plan, &limits)?;
+    working
+        .publish(&transition)
+        .map(|published| (published, limits))
+        .map_err(Error::from)
 }
 
 fn apply_shared_plan(
     working: &mut Working<'_>,
     transition: &mut Transition,
     plan: shared::Plan,
+    limits: &shared::Limits,
 ) -> Result<(), Error> {
     let registry =
         metadata::registry(working)?.ok_or(Error::Refused(Refusal::UnsupportedSource))?;
@@ -718,7 +683,7 @@ fn apply_shared_plan(
             },
         }
     }
-    if plan.cell_updates.len() > 1 && !write_shared_keys(working, &plan.cell_updates)? {
+    if plan.cell_updates.len() > 1 && !write_shared_keys(working, &plan.cell_updates, limits)? {
         for (target, key) in &plan.cell_updates {
             write_shared_key(working, *target, *key)?;
         }
@@ -736,6 +701,7 @@ fn apply_shared_plan(
 fn write_shared_keys(
     working: &mut Working<'_>,
     updates: &[(shared::Target, u32)],
+    limits: &shared::Limits,
 ) -> Result<bool, Error> {
     let Some((first_target, _)) = updates.first().copied() else {
         return Ok(true);
@@ -746,6 +712,12 @@ fn write_shared_keys(
     {
         return Ok(false);
     }
+    limits
+        .admit_work(updates.len().saturating_mul(8))
+        .map_err(from_shared)?;
+    limits
+        .admit_allocations(updates.len())
+        .map_err(from_shared)?;
     let (_, model) = topology::message(working, first_target.model_identifier, &[6_001])?;
     let store = single_bytes(model, 4)?
         .ok_or(Error::InvalidSource)?
@@ -759,6 +731,7 @@ fn write_shared_keys(
     // by the already staged update count, and all updates are preflighted
     // before any tile is replaced.
     let mut groups: Vec<(u64, Vec<(u32, u32, u32)>)> = Vec::new();
+    limits.reserve(&mut groups, 1).map_err(from_shared)?;
     for (target, key) in updates {
         let tile_key = u64::from(target.row) / tile_size;
         let local =
@@ -773,31 +746,34 @@ fn write_shared_keys(
             .iter_mut()
             .find(|(identifier, _)| *identifier == *tile)
         {
-            rows.try_reserve(1)
-                .map_err(|_| Error::Allocation { amount: 1 })?;
+            limits.reserve(rows, 1).map_err(from_shared)?;
             rows.push((local, target.column, *key));
         } else {
             let mut rows = Vec::new();
-            rows.try_reserve(1)
-                .map_err(|_| Error::Allocation { amount: 1 })?;
+            limits.reserve(&mut rows, 1).map_err(from_shared)?;
             rows.push((local, target.column, *key));
-            groups
-                .try_reserve(1)
-                .map_err(|_| Error::Allocation { amount: 1 })?;
+            limits.reserve(&mut groups, 1).map_err(from_shared)?;
             groups.push((*tile, rows));
         }
     }
 
     for (tile, rows) in &groups {
         let (_, tile_data) = topology::message(working, *tile, &[TILE_MESSAGE_TYPE])?;
-        let mut found_rows = std::collections::BTreeSet::new();
+        let mut found_rows = Vec::new();
+        limits
+            .reserve(&mut found_rows, rows.len())
+            .map_err(from_shared)?;
         for row in repeated_bytes(tile_data, 5)? {
             let local = single_varint(row, 1)?.ok_or(Error::InvalidSource)? as u32;
             if rows.iter().any(|(wanted, _, _)| *wanted == local) {
-                found_rows.insert(local);
+                if !found_rows.contains(&local) {
+                    limits.reserve(&mut found_rows, 1).map_err(from_shared)?;
+                    found_rows.push(local);
+                }
             }
             for (wanted_row, column, _) in rows.iter().filter(|(wanted, _, _)| *wanted == local) {
                 let _ = wanted_row;
+                limits.admit_allocations(1).map_err(from_shared)?;
                 if storage::bnc_cells(row)
                     .map_err(|_| Error::InvalidSource)?
                     .into_iter()
@@ -827,8 +803,19 @@ fn write_shared_keys(
             if !rows.iter().any(|(wanted, _, _)| *wanted == local) {
                 return Ok(None);
             }
+            limits
+                .admit_copies(field.payload.len())
+                .map_err(|_| Fault::Allocation {
+                    amount: field.payload.len(),
+                })?;
+            limits
+                .admit_allocations(1)
+                .map_err(|_| Fault::Allocation { amount: 1 })?;
             let mut row = field.payload.to_vec();
             for (_, column, key) in rows.iter().filter(|(wanted, _, _)| *wanted == local) {
+                limits
+                    .admit_allocations(1)
+                    .map_err(|_| Fault::Allocation { amount: 1 })?;
                 let cell = storage::bnc_cells(&row)
                     .map_err(|_| Fault::Invalid)?
                     .into_iter()

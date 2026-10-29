@@ -374,6 +374,11 @@ impl Limits {
         )
     }
 
+    /// Debit bounded writer/traversal work owned by a leaf publication phase.
+    pub fn admit_work(&self, amount: usize) -> Result<(), Error> {
+        self.charge_work(amount)
+    }
+
     fn charge_references(&self, amount: usize) -> Result<(), Error> {
         Self::charge(
             &self.remaining_references,
@@ -1672,7 +1677,17 @@ pub fn plan_set(
     fresh: Option<u64>,
     limits: &Limits,
 ) -> Result<Option<Plan>, Error> {
-    plan_set_inner(source, target, requested, fresh, limits, true, None)
+    let mut allocator = None;
+    plan_set_inner(
+        source,
+        target,
+        requested,
+        fresh,
+        limits,
+        true,
+        None,
+        &mut allocator,
+    )
 }
 
 fn plan_set_inner(
@@ -1683,6 +1698,7 @@ fn plan_set_inner(
     limits: &Limits,
     allow_exclusive: bool,
     batch: Option<(&BatchContext, usize)>,
+    allocator: &mut Option<&mut dyn FnMut() -> Result<u64, Error>>,
 ) -> Result<Option<Plan>, Error> {
     limits.charge_work(1)?;
     let owned_table = if batch.is_none() {
@@ -1796,7 +1812,13 @@ fn plan_set_inner(
             ..Plan::default()
         }));
     }
-    let fresh = fresh.ok_or(Error::NeedsIdentifier)?;
+    let fresh = match fresh {
+        Some(fresh) => fresh,
+        None => match allocator.as_mut() {
+            Some(allocate) => (**allocate)()?,
+            None => return Err(Error::NeedsIdentifier),
+        },
+    };
     let data = encode_variation(Some(parent), stylesheet, &reduced, limits)?;
     let (sheet_type, sheet_data) = if batch.is_some() {
         (STYLESHEET_MESSAGE_TYPE, Vec::new())
@@ -1934,18 +1956,21 @@ pub fn plan_set_many(
     requests: &[Request],
     limits: &Limits,
 ) -> Result<Option<Plan>, Error> {
-    plan_set_many_inner(source, requests, limits, true)
+    plan_set_many_inner(source, requests, limits, true, None)
 }
 
-/// Compatibility-preserving leaf batch planning path used only when the
-/// prepared shared profile refuses a graph shape.  It remains leaf-owned and
-/// typed; it never delegates to the host route.
-pub fn plan_set_many_unprepared(
+/// Plan a bounded batch while allocating fresh identifiers only after the
+/// shared graph has proven that a staged request is a real variation (rather
+/// than a semantic no-op).  Leaves own the identifier allocator; this helper
+/// only invokes it after the shared admission phase.
+pub fn plan_set_many_with_allocator(
     source: &dyn TableSource,
     requests: &[Request],
     limits: &Limits,
+    prepare_batch: bool,
+    allocator: &mut dyn FnMut() -> Result<u64, Error>,
 ) -> Result<Option<Plan>, Error> {
-    plan_set_many_inner(source, requests, limits, false)
+    plan_set_many_inner(source, requests, limits, prepare_batch, Some(allocator))
 }
 
 fn plan_set_many_inner(
@@ -1953,6 +1978,7 @@ fn plan_set_many_inner(
     requests: &[Request],
     limits: &Limits,
     prepare_batch: bool,
+    mut allocator: Option<&mut dyn FnMut() -> Result<u64, Error>>,
 ) -> Result<Option<Plan>, Error> {
     limits.charge_work(requests.len())?;
     limits.admit_allocations(requests.len())?;
@@ -1989,6 +2015,7 @@ fn plan_set_many_inner(
             limits,
             false,
             batch_context.as_ref().map(|context| (context, index)),
+            &mut allocator,
         )?
         else {
             continue;

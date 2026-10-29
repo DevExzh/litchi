@@ -980,6 +980,27 @@ fn setting_effective_style_as_a_noop_preserves_exact_source() -> TestResult {
     Ok(())
 }
 
+#[test]
+fn all_noop_text_style_batch_keeps_exact_source_and_watermark() -> TestResult {
+    let package = Package::new()
+        .edit_table_cells(0, 0)?
+        .set(At::new(1, 1), Input::Text("one".into()))?
+        .set(At::new(2, 1), Input::Text("two".into()))?
+        .commit()?
+        .into_package();
+    let mut first = CharacterProperties::new();
+    first.bold = Some(false);
+    let second = first.clone();
+    let source = bytes(&package)?;
+    let commit = package
+        .edit_table_cell_text_style(0, 0)?
+        .set(At::new(1, 1), first)?
+        .set(At::new(2, 1), second)?
+        .commit()?;
+    assert_eq!(bytes(commit.package())?, source);
+    Ok(())
+}
+
 /// Every stored cell of the corpus takes bold, or refuses typed.
 #[test]
 fn corpus_cells_take_bold_or_refuse_typed() -> TestResult {
