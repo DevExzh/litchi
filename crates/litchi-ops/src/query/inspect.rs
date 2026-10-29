@@ -23,6 +23,12 @@ use crate::path::navigate::{ElementKind, Navigate};
 /// enters, so the adapter decides how lazily each axis is read; the methods
 /// here read one node and never decode another part.
 pub(crate) trait Inspect<'f>: Navigate<'f> {
+    /// Whether property predicates should use the adapter's individual
+    /// property hook instead of materializing the cached aggregate format.
+    /// Object-tree iWork adapters opt in for lazy chart properties; all other
+    /// adapters retain the aggregate path and its allocation behavior.
+    const INDIVIDUAL_PROPERTIES: bool = false;
+
     /// The format's spec table (record 0010 §7.2). The walker prunes with
     /// each element's `children` list and compiles predicate keys against
     /// its `props`. The element of a kind sits at the kind's
@@ -210,6 +216,7 @@ impl<'f, N: Inspect<'f>> Inspect<'f> for &N {
     const SPEC: &'static FormatSpec<Self::Kind> = N::SPEC;
     const TOP: &'static [Self::Kind] = N::TOP;
     const PLACEHOLDER_SHAPES: bool = N::PLACEHOLDER_SHAPES;
+    const INDIVIDUAL_PROPERTIES: bool = N::INDIVIDUAL_PROPERTIES;
 
     fn kind(&self, node: &Self::Node) -> Self::Kind {
         (**self).kind(node)

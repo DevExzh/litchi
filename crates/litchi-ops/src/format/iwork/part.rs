@@ -234,6 +234,9 @@ impl Iwork {
     /// is one: its part is a table's.
     #[cfg(any(feature = "keynote", feature = "pages"))]
     fn held<'f>(&'f self, at: At, item: &'f Item) -> Option<(&'f Contents, u32)> {
+        if at.is_chart() {
+            return None;
+        }
         let part = item.part();
         if part == 0 {
             return None;
@@ -263,6 +266,9 @@ impl Iwork {
     /// table (record 0312). Its kind, ordinal, path, leaf positions and
     /// part are the element's; its properties and children may not be.
     pub(crate) fn stand_in(&self, at: At) -> &Item {
+        if at.is_chart() {
+            return self.chart_item(at);
+        }
         if at.part == 0 {
             return self.tree().item(at.index);
         }
@@ -311,6 +317,9 @@ impl Iwork {
 
     /// The kind ordinal of the item at `at`, without materializing it.
     pub(crate) fn kind_at(&self, at: At) -> u8 {
+        if at.is_chart() {
+            return self.chart_item(at).kind();
+        }
         if at.part != 0 {
             match *self.part(at.part) {
                 #[cfg(feature = "keynote")]
@@ -327,6 +336,9 @@ impl Iwork {
     /// The position of the item at `at` among its parent's children of its
     /// kind, without materializing it.
     pub(crate) fn ordinal_at(&self, at: At) -> u32 {
+        if at.is_chart() {
+            return self.chart_item(at).ordinal();
+        }
         if at.part != 0 {
             match *self.part(at.part) {
                 #[cfg(feature = "keynote")]
@@ -343,6 +355,9 @@ impl Iwork {
     /// The part holding the children of the item at `at` (0: its own),
     /// without materializing a slot item.
     fn child_part(&self, at: At) -> u32 {
+        if at.is_chart() {
+            return 0;
+        }
         #[cfg(feature = "keynote")]
         if at.part != 0
             && let Part::Slides(_) = self.part(at.part)
@@ -383,6 +398,12 @@ impl Iwork {
     /// tree first: Pages section headers and footers, Keynote character
     /// runs).
     pub(crate) fn kids(&self, at: At) -> Kids<'_> {
+        if at.is_chart() {
+            return Kids {
+                part: at.part,
+                list: List::Items(&[], 0),
+            };
+        }
         self.expand(at);
         #[cfg(any(feature = "keynote", feature = "pages"))]
         if !self.is_slot(at) {
