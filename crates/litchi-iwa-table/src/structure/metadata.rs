@@ -302,25 +302,32 @@ fn options(
     payload: usize,
     additions: usize,
 ) -> RewriteOptions {
-    let components = working.source().catalog().len().max(payload).max(1);
-    let output = payload.saturating_mul(2).saturating_add(4_096);
+    // These are caller/source ceilings, not estimates derived from the current
+    // payload.  The prepared codec phase computes the exact candidate size and
+    // execution requirements; this profile only prevents an unbounded scan or
+    // decode from being admitted while it prepares that transition.
+    let profile = working.source().archive_limits().archive_limits();
+    let message_bytes = profile
+        .max_message_bytes()
+        .clamp(1, litchi_iwa_common::WireLimits::MAX_OUTPUT_BYTES);
+    let fields = profile
+        .max_header_fields()
+        .clamp(1, litchi_iwa_common::WireLimits::MAX_FIELDS);
+    let work = profile
+        .max_header_memory_bytes()
+        .clamp(1, litchi_iwa_common::WireLimits::MAX_REWRITE_WORK);
+    let nesting = u32::try_from(profile.max_header_nesting()).unwrap_or(u32::MAX);
+    // Metadata can retain versioned/component records that are not one-to-one
+    // with physical catalog members.  The caller's semantic object ceiling is
+    // the finite admission dimension for that registry census.
+    let components = working.source().max_objects().max(1);
     RewriteOptions::new(
-        payload.max(1),
-        output,
-        payload
-            .saturating_mul(4)
-            .saturating_add(additions.saturating_mul(16))
-            .max(64),
-        payload
-            .saturating_mul(256)
-            .saturating_add(
-                components
-                    .saturating_mul(additions.max(1))
-                    .saturating_mul(64),
-            )
-            .clamp(1, litchi_iwa_common::WireLimits::MAX_REWRITE_WORK),
-        64,
-        components.saturating_add(additions),
+        payload.max(1).min(message_bytes),
+        message_bytes,
+        fields,
+        work,
+        nesting.max(1),
+        components,
         working.source().max_references().max(1),
         additions.max(1),
     )
