@@ -183,6 +183,9 @@ pub enum Error {
     /// A bounded allocation failed.
     #[error("could not allocate {amount} Pages body-chart series-symbol units")]
     Allocation { amount: usize },
+    /// A finite finalization arithmetic operation overflowed.
+    #[error("Pages body-chart series-symbol finalization overflow: {reason}")]
+    Overflow { reason: &'static str },
     /// Candidate semantic readback did not reproduce the requested vector.
     #[error("the edited Pages body-chart series symbols failed semantic verification")]
     Verification,
@@ -614,16 +617,21 @@ fn engine_limits(
 fn charge_engine_report(
     budget: &mut ArrangementBudget,
     report: &series_engine::Report,
+    workspace_work: usize,
 ) -> Result<(), Error> {
     let max_nesting = budget
         .residual_wire_limits()
         .map_err(map_arrangement_error)?
         .max_nesting();
+    let engine_work = report
+        .work_bytes()
+        .checked_sub(workspace_work)
+        .ok_or(Error::InvalidSource)?;
     budget
         .input(report.input_bytes())
         .and_then(|_| budget.output(report.output_bytes()))
         .and_then(|_| budget.fields(report.fields()))
-        .and_then(|_| budget.work(report.work_bytes()))
+        .and_then(|_| budget.work(engine_work))
         .and_then(|_| budget.allocations(report.allocations()))
         .and_then(|_| budget.retained(report.retained_bytes()))
         .and_then(|_| budget.scratch(report.scratch_bytes()))
@@ -644,7 +652,7 @@ fn charge_engine_report(
 fn map_finish_error(error: style_graph::FinishError) -> Error {
     match error {
         style_graph::FinishError::Graph(error) => map_graph_error(error),
-        style_graph::FinishError::Overflow(_) => Error::InvalidSource,
+        style_graph::FinishError::Overflow(reason) => Error::Overflow { reason },
         style_graph::FinishError::Limit {
             kind,
             observed,
@@ -716,7 +724,6 @@ fn target_with_budget(
 
 fn admit_workspace(package: &Package, budget: &mut ArrangementBudget) -> Result<(), Error> {
     let source_bytes = package.state.source.shared_source().len();
-    let objects = package.state.object_count.max(1);
     if !budget.workspace_source_admitted {
         budget.input(source_bytes).map_err(map_arrangement_error)?;
         budget
@@ -724,10 +731,72 @@ fn admit_workspace(package: &Package, budget: &mut ArrangementBudget) -> Result<
             .map_err(map_arrangement_error)?;
         budget.workspace_source_admitted = true;
     }
-    budget.work(objects).map_err(map_arrangement_error)?;
-    budget.allocations(objects).map_err(map_arrangement_error)?;
+    Ok(())
+}
+
+fn map_construction_error(error: style_graph::ConstructionError) -> Error {
+    match error {
+        style_graph::ConstructionError::Graph(error) => map_graph_error(error),
+        style_graph::ConstructionError::Limit {
+            kind,
+            observed,
+            maximum,
+        } => Error::Limit {
+            kind: match kind {
+                style_graph::ConstructionLimitKind::Work => LimitKind::WireWork,
+                style_graph::ConstructionLimitKind::Allocations => LimitKind::Allocations,
+                style_graph::ConstructionLimitKind::RetainedBytes => LimitKind::RetainedBytes,
+                style_graph::ConstructionLimitKind::ScratchBytes => LimitKind::ScratchBytes,
+                _ => LimitKind::WireWork,
+            },
+            observed: observed as u64,
+            maximum: maximum as u64,
+        },
+        style_graph::ConstructionError::Allocation { amount } => Error::Allocation { amount },
+        _ => Error::InvalidSource,
+    }
+}
+
+fn construction_limits(
+    budget: &ArrangementBudget,
+) -> Result<style_graph::ConstructionLimits, Error> {
+    Ok(style_graph::ConstructionLimits::new(
+        budget
+            .residual_work_bytes()
+            .map_err(map_arrangement_error)?,
+        budget
+            .residual_allocations()
+            .map_err(map_arrangement_error)?,
+        budget
+            .residual_retained_bytes()
+            .map_err(map_arrangement_error)?,
+        budget
+            .residual_scratch_bytes()
+            .map_err(map_arrangement_error)?,
+    ))
+}
+
+fn charge_workspace_construction(
+    budget: &mut ArrangementBudget,
+    requirements: style_graph::ConstructionRequirements,
+) -> Result<(), Error> {
+    let work = requirements
+        .source_work()
+        .checked_mul(2)
+        .ok_or(Error::Overflow {
+            reason: "workspace construction census/build work",
+        })?;
     budget
-        .scratch(objects.saturating_mul(size_of::<u64>() * 2))
+        .preflight_work(work)
+        .and_then(|_| budget.preflight_allocations(requirements.index_allocations()))
+        .and_then(|_| budget.preflight_retained(requirements.index_retained_bytes()))
+        .and_then(|_| budget.preflight_scratch(requirements.index_scratch_bytes()))
+        .map_err(map_arrangement_error)?;
+    budget
+        .work(work)
+        .and_then(|_| budget.allocations(requirements.index_allocations()))
+        .and_then(|_| budget.retained(requirements.index_retained_bytes()))
+        .and_then(|_| budget.scratch(requirements.index_scratch_bytes()))
         .map_err(map_arrangement_error)
 }
 
@@ -735,13 +804,21 @@ fn metadata_options(budget: &ArrangementBudget, source: &[u8]) -> Result<DecodeO
     let limits = budget
         .residual_wire_limits()
         .map_err(map_arrangement_error)?;
+    let input = positive_limit(
+        source.len().min(limits.max_input_bytes()),
+        LimitKind::InputBytes,
+    )?;
+    let fields = positive_limit(limits.max_fields(), LimitKind::WireFields)?;
+    let work = positive_limit(limits.max_rewrite_work(), LimitKind::WireWork)?;
+    let labels = positive_limit(limits.max_fields(), LimitKind::PayloadItems)?;
+    let text = positive_limit(limits.max_input_bytes(), LimitKind::PayloadBytes)?;
     Ok(DecodeOptions::new(
-        source.len().max(1).min(limits.max_input_bytes()),
-        limits.max_fields().max(1),
-        limits.max_rewrite_work().max(1),
+        input,
+        fields,
+        work,
         u32::try_from(limits.max_nesting()).map_err(|_| Error::InvalidSource)?,
-        limits.max_fields().clamp(1, 1_000_000),
-        limits.max_input_bytes().clamp(1, 64 * 1024 * 1024),
+        labels.min(1_000_000),
+        text.min(64 * 1024 * 1024),
     ))
 }
 
@@ -852,7 +929,12 @@ fn read_symbols(
     admit_workspace(package, budget)?;
     let components = PackageComponents(package);
     let limits = archive_limits(package)?;
-    let workspace = Workspace::new(&components, limits).map_err(map_graph_error)?;
+    let construction_limits = construction_limits(budget)?;
+    let construction = Workspace::construction_requirements(&components, construction_limits)
+        .map_err(map_construction_error)?;
+    charge_workspace_construction(budget, construction)?;
+    let workspace = Workspace::new_bounded(&components, limits, construction, construction_limits)
+        .map_err(map_construction_error)?;
     let engine_limits = engine_limits(package, budget)?;
     let (values, report) = series_engine::symbols(
         &workspace,
@@ -862,16 +944,7 @@ fn read_symbols(
         engine_limits,
     )
     .map_err(map_symbol_error)?;
-    charge_engine_report(budget, &report)?;
-    budget
-        .work(target.series.saturating_mul(size_of::<Symbol>()))
-        .map_err(map_arrangement_error)?;
-    budget
-        .allocations(usize::from(!values.is_empty()))
-        .map_err(map_arrangement_error)?;
-    budget
-        .retained(values.len().saturating_mul(size_of::<Option<Symbol>>()))
-        .map_err(map_arrangement_error)?;
+    charge_engine_report(budget, &report, construction.source_work())?;
     Ok(values)
 }
 
@@ -1060,7 +1133,7 @@ fn publish_changes(
         .checked_add(changes.insertions.len())
         .and_then(|value| value.checked_add(changes.deletions.len()))
         .ok_or(Error::InvalidSource)?;
-    let projected = preflight_publication(
+    preflight_publication(
         source,
         &changes.edits,
         &changes.insertions,
@@ -1166,9 +1239,9 @@ fn publish_changes(
         .and_then(|_| budget.retained(requirements.retained_bytes()))
         .and_then(|_| budget.scratch(requirements.scratch_bytes()))
         .map_err(map_arrangement_error)?;
-    if requirements.output_bytes() > projected {
-        return Err(Error::Verification);
-    }
+    // The prepared execution report is the exact ZIP-size authority. The
+    // earlier projection only admits the archive staging phase; it must not
+    // reject a valid insertion after preparation has already been admitted.
     let output = prepared
         .execute(requirements.exact_limits())
         .map_err(map_archive_error)?;
@@ -1196,6 +1269,23 @@ fn package_object(package: &Package, identifier: u64) -> Option<(&str, &ArchiveO
                 .object(identifier)
                 .map(|object| (component.name(), object))
         })
+}
+
+fn structural_scope_object(package: &Package, identifier: u64) -> bool {
+    let Some((component, object)) = package_object(package, identifier) else {
+        return false;
+    };
+    match component {
+        "Index/Document.iwa" if identifier == 1 => object
+            .messages
+            .iter()
+            .any(|message| message.type_ == ROOT_MESSAGE_TYPE),
+        "Index/Metadata.iwa" => object
+            .messages
+            .iter()
+            .any(|message| message.type_ == PACKAGE_METADATA_MESSAGE_TYPE),
+        _ => false,
+    }
 }
 
 fn add_planned_object(
@@ -1260,6 +1350,23 @@ fn mutation_plan(
     scope: &series_engine::MutationScope,
     budget: &mut ArrangementBudget,
 ) -> Result<MutationPlan, Error> {
+    let member_allowed = |name: &str| {
+        scope.allowed_members().iter().any(|member| member == name)
+            || scope
+                .planned_new_members()
+                .iter()
+                .any(|member| member == name)
+            || scope
+                .planned_removed_members()
+                .iter()
+                .any(|member| member == name)
+    };
+    let existing_allowed = |identifier: u64| {
+        scope.allowed_objects().contains(&identifier)
+            || scope.planned_removed_objects().contains(&identifier)
+            || structural_scope_object(source, identifier)
+    };
+    let new_allowed = |identifier: u64| scope.planned_new_objects().contains(&identifier);
     let mut objects = Vec::new();
     let source_object_count = scope
         .allowed_objects()
@@ -1291,28 +1398,55 @@ fn mutation_plan(
         add_planned_object(&mut objects, component, identifier, budget)?;
     }
     for (name, archive) in &changes.edits {
+        if !member_allowed(name) {
+            return Err(Error::Verification);
+        }
         for object in &archive.objects {
             let identifier = object.archive_info.identifier.ok_or(Error::Verification)?;
-            if package_object(source, identifier).is_none()
-                && object
+            if let Some((_, source_object)) = package_object(source, identifier)
+                && same_object_metadata(source_object, object)
+            {
+                continue;
+            }
+            if package_object(source, identifier).is_some() {
+                if !existing_allowed(identifier) {
+                    return Err(Error::Verification);
+                }
+                if structural_scope_object(source, identifier) {
+                    add_planned_object(&mut objects, name, identifier, budget)?;
+                }
+            } else if !new_allowed(identifier)
+                || !object
                     .messages
                     .iter()
                     .all(|message| scope.allowed_message_types().contains(&message.type_))
             {
+                return Err(Error::Verification);
+            } else {
                 add_planned_object(&mut objects, name, identifier, budget)?;
             }
         }
     }
     for insertion in &changes.insertions {
+        if !member_allowed(&insertion.name) {
+            return Err(Error::Verification);
+        }
         for object in &insertion.archive.objects {
             let identifier = object.archive_info.identifier.ok_or(Error::Verification)?;
-            if object
-                .messages
-                .iter()
-                .all(|message| scope.allowed_message_types().contains(&message.type_))
+            if !new_allowed(identifier)
+                || !object
+                    .messages
+                    .iter()
+                    .all(|message| scope.allowed_message_types().contains(&message.type_))
             {
-                add_planned_object(&mut objects, &insertion.name, identifier, budget)?;
+                return Err(Error::Verification);
             }
+            add_planned_object(&mut objects, &insertion.name, identifier, budget)?;
+        }
+    }
+    for name in components.iter().map(Arc::as_ref) {
+        if !member_allowed(name) {
+            return Err(Error::Verification);
         }
     }
     let mut scoped_components = Vec::new();
@@ -1570,31 +1704,6 @@ fn verify_locality(
     budget: &mut ArrangementBudget,
 ) -> Result<(), Error> {
     let changed = |name: &str| plan.components.iter().any(|item| item.as_ref() == name);
-    let auxiliary = |name: &str, identifier: u64| {
-        (name == litchi_iwa_style::graph::DOCUMENT_METADATA_MEMBER
-            || name == litchi_iwa_style::graph::METADATA_MEMBER)
-            || (name == "Index/Document.iwa" && identifier == 1)
-    };
-    let auxiliary_object = |name: &str,
-                            identifier: u64,
-                            before: Option<&ArchiveObject>,
-                            after: Option<&ArchiveObject>| {
-        auxiliary(name, identifier)
-            || (name == "Index/Document.iwa"
-                && before.is_some_and(|before| {
-                    after.is_some_and(|after| {
-                        before.messages == after.messages
-                            && same_archive_info_except_references(before, after, false, plan)
-                    })
-                }))
-            || (name == "Index/DocumentStylesheet.iwa"
-                && before.is_some_and(|before| {
-                    after.is_some_and(|after| {
-                        before.messages == after.messages
-                            && same_archive_info_except_references(before, after, false, plan)
-                    })
-                }))
-    };
     let source_entries = source.state.source.package();
     let candidate_entries = candidate.state.source.package();
     for before in source_entries.iter() {
@@ -1602,10 +1711,10 @@ fn verify_locality(
             .iter()
             .find(|item| item.name() == before.name());
         let Some(after) = after else {
-            if changed(before.name()) {
-                continue;
+            if !changed(before.name()) {
+                return Err(Error::Verification);
             }
-            return Err(Error::Verification);
+            continue;
         };
         budget
             .work(entry_work(before)?.saturating_add(entry_work(after)?))
@@ -1675,9 +1784,7 @@ fn verify_locality(
         for before in &component.archive().objects {
             let identifier = before.archive_info.identifier.ok_or(Error::Verification)?;
             let Some(after) = after_component.archive().object(identifier) else {
-                if !planned_contains(plan, name, identifier)
-                    && !auxiliary_object(name, identifier, Some(before), None)
-                {
+                if !planned_contains(plan, name, identifier) {
                     return Err(Error::Verification);
                 }
                 continue;
@@ -1685,17 +1792,18 @@ fn verify_locality(
             budget
                 .work(object_work(before)?.saturating_add(object_work(after)?))
                 .map_err(map_arrangement_error)?;
-            if !planned_contains(plan, name, identifier)
-                && !auxiliary_object(name, identifier, Some(before), Some(after))
-            {
+            let planned = planned_contains(plan, name, identifier);
+            let unchanged = same_object_metadata(before, after);
+            if !planned && !unchanged {
                 return Err(Error::Verification);
             }
-            if planned_contains(plan, name, identifier)
-                && !same_archive_info_except_references(before, after, true, plan)
-            {
+            if planned && !same_archive_info_except_references(before, after, true, plan) {
                 return Err(Error::Verification);
             }
-            if !same_object_metadata(before, after) {
+            if planned && !before.same_source_headers(after) {
+                return Err(Error::Verification);
+            }
+            if !unchanged {
                 verify_object_messages(before, after, family, plan, budget)?;
             }
         }
@@ -1703,7 +1811,6 @@ fn verify_locality(
             let identifier = after.archive_info.identifier.ok_or(Error::Verification)?;
             if component.archive().object(identifier).is_none()
                 && !planned_contains(plan, name, identifier)
-                && !auxiliary_object(name, identifier, None, Some(after))
             {
                 return Err(Error::Verification);
             }
@@ -1739,10 +1846,7 @@ fn object_work(object: &ArchiveObject) -> Result<usize, Error> {
 }
 
 fn same_object_metadata(before: &ArchiveObject, after: &ArchiveObject) -> bool {
-    before.archive_info == after.archive_info
-        && before.messages == after.messages
-        && before.header_length == after.header_length
-        && before.data_length == after.data_length
+    before.same_content_ignoring_offsets(after)
 }
 
 fn same_archive_info_except_references(
@@ -2048,7 +2152,13 @@ fn commit_edit(edit: Edit<'_>, change: Property) -> Result<Commit, Error> {
     admit_workspace(source, &mut budget)?;
     let components = PackageComponents(source);
     let limits = archive_limits(source)?;
-    let mut workspace = Workspace::new(&components, limits).map_err(map_graph_error)?;
+    let construction_limits = construction_limits(&budget)?;
+    let construction = Workspace::construction_requirements(&components, construction_limits)
+        .map_err(map_construction_error)?;
+    charge_workspace_construction(&mut budget, construction)?;
+    let mut workspace =
+        Workspace::new_bounded(&components, limits, construction, construction_limits)
+            .map_err(map_construction_error)?;
     let engine_limits = engine_limits(source, &budget)?;
     let (changed, report) = series_engine::set_symbols(
         &mut workspace,
@@ -2059,7 +2169,7 @@ fn commit_edit(edit: Edit<'_>, change: Property) -> Result<Commit, Error> {
     )
     .map_err(map_symbol_error)?;
     let scope = report.scope().cloned().ok_or(Error::Verification)?;
-    charge_engine_report(&mut budget, &report)?;
+    charge_engine_report(&mut budget, &report, construction.source_work())?;
     if !changed {
         return Ok(unchanged(source, edit.target, before));
     }
@@ -2228,14 +2338,12 @@ fn apply_patch(package: &Package, patch: &Patch) -> Result<Commit, Error> {
         .candidate_reopen(target_owner.as_ref().len())
         .map_err(map_arrangement_error)?;
     let candidate_bytes = Arc::<[u8]>::from(target_owner.as_ref());
-    let candidate =
-        package_graph::reopen(package, candidate_bytes).map_err(map_package_graph_error)?;
     budget
         .output(target_owner.as_ref().len())
+        .and_then(|_| budget.scratch(target_owner.as_ref().len()))
         .map_err(map_arrangement_error)?;
-    budget
-        .scratch(target_owner.as_ref().len())
-        .map_err(map_arrangement_error)?;
+    let candidate =
+        package_graph::reopen(package, candidate_bytes).map_err(map_package_graph_error)?;
     let verified = target_with_metadata(
         &candidate,
         BodyChartSelector::position(patch.position),
@@ -2512,6 +2620,45 @@ mod tests {
                 &package,
                 &candidate,
                 &plan,
+                SymbolFamily::Line2d,
+                &mut budget,
+            ),
+            Err(Error::Verification)
+        ));
+    }
+
+    #[test]
+    fn production_locality_rejects_unplanned_registry_object_mutation() {
+        let package = Package::from_bytes(NATIVE).expect("native Pages fixture");
+        let component = package
+            .state
+            .source
+            .components()
+            .iter()
+            .find(|component| component.name() == "Index/Metadata.iwa")
+            .expect("package metadata component");
+        let component_name = Arc::<str>::from(component.name());
+        let object_id = component.archive().objects[0]
+            .archive_info
+            .identifier
+            .expect("registry object identifier");
+        let mut archive = component.archive().clone();
+        let message = archive
+            .object_mut(object_id)
+            .expect("registry object")
+            .messages
+            .first_mut()
+            .expect("registry message");
+        append_unknown_marker(&mut message.data, 0xabad1dea);
+        let candidate =
+            package_graph::publish_archives(&package, vec![(Arc::clone(&component_name), archive)])
+                .expect("registry candidate publication");
+        let mut budget = ArrangementBudget::new(&package).expect("locality budget");
+        assert!(matches!(
+            verify_locality(
+                &package,
+                &candidate,
+                &empty_plan(),
                 SymbolFamily::Line2d,
                 &mut budget,
             ),

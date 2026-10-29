@@ -2,8 +2,8 @@
 
 - Status: boundary-adoption checkpoint on `uo2/iwa-w2b-series-symbols`,
   synchronized with coordinator trunk `c0c10b86ce82151b730a7e6ee00615f7232d7f74`
-  and shared admission/finalization helper tip
-  `60d2f93efeb9dd3645f95348bc0970bec43c6e15`.
+  and shared admission/finalization/construction helper tip
+  `38a0b13df37dc926d912fd8ba6c05b0ad418a9b3`.
   Coordinator integration, final performance qualification and native
   verification remain pending.
 - Scope: Pages body-chart series symbol visibility, shape and optional point
@@ -51,7 +51,9 @@ metadata, archive reference transitions and message unknowns are checked, and
 unrelated object/member mutations refuse. Staged workspace finalization uses
 `finish_requirements` plus residual `FinishLimits` and `finish_bounded`; the
 successful `FinishReport` is charged once after publication vectors are
-materialized.
+materialized. Workspace construction uses the shared source census and bounded
+`new_bounded` index path; census/build work and graph-index reservations are
+charged separately from the engine report.
 
 ## Differential proof
 
@@ -87,7 +89,8 @@ only; their native routes remain pending in
 
 Scoped Pages compilation and strict Clippy pass with the frozen lockfile, four
 Cargo jobs, incremental disabled and debug info disabled; all four Pages
-series-symbol parity cases and the five production locality-negative tests
-pass. The shared helper's field-5 parent encoding, hard caps and registry-cache
-accounting are included in the adopted F tip. Coordinator integration, final
-performance capture and native evidence remain pending.
+series-symbol parity cases and six production locality-negative tests pass,
+including an unplanned package-registry object mutation. The shared helper's
+field-5 parent encoding, hard caps, registry-cache accounting and bounded
+workspace construction are included in the adopted F tip. Coordinator
+integration, final performance capture and native evidence remain pending.
