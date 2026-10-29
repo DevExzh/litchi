@@ -69,6 +69,8 @@ pub enum LimitKind {
     AllocationEvents,
     /// A physical ZIP/archive ingress resource.
     Archive(litchi_iwa_archive::LimitKind),
+    /// A format-detection ingress resource.
+    Detection(litchi_iwa_detect::LimitKind),
     /// A shared wire resource retained without unit coercion.
     Wire(litchi_iwa_common::LimitKind),
     /// A Numbers semantic ingress resource retained without unit coercion.
@@ -84,6 +86,7 @@ impl Hash for LimitKind {
         std::mem::discriminant(self).hash(state);
         match self {
             Self::Archive(kind) => std::mem::discriminant(kind).hash(state),
+            Self::Detection(kind) => std::mem::discriminant(kind).hash(state),
             Self::Wire(kind) => std::mem::discriminant(kind).hash(state),
             Self::Semantic(kind) => std::mem::discriminant(kind).hash(state),
             Self::Core(kind) => std::mem::discriminant(kind).hash(state),
@@ -106,6 +109,7 @@ impl fmt::Display for LimitKind {
             Self::ScratchBytes => formatter.write_str("scratch bytes"),
             Self::AllocationEvents => formatter.write_str("allocation events"),
             Self::Archive(kind) => write!(formatter, "archive {kind}"),
+            Self::Detection(kind) => write!(formatter, "detection {kind}"),
             Self::Wire(kind) => write!(formatter, "wire {kind}"),
             Self::Semantic(kind) => write!(formatter, "semantic {kind}"),
             Self::Core(kind) => write!(formatter, "core {kind}"),
@@ -1060,7 +1064,60 @@ fn map_candidate_common_error(error: litchi_iwa_common::Error) -> Error {
 fn map_candidate_package_error(error: super::Error) -> Error {
     match error {
         super::Error::Archive(error) => map_candidate_archive_error(error),
+        super::Error::Detection(error) => match error {
+            litchi_iwa_detect::Error::LimitExceeded {
+                kind,
+                observed,
+                maximum,
+            } => Error::Limit {
+                kind: LimitKind::Detection(kind),
+                observed,
+                maximum,
+            },
+            litchi_iwa_detect::Error::IwaCore(error) => match error {
+                litchi_iwa_core::Error::Limit {
+                    kind,
+                    observed,
+                    maximum,
+                } => Error::Limit {
+                    kind: LimitKind::Core(kind),
+                    observed: observed as u64,
+                    maximum: maximum as u64,
+                },
+                litchi_iwa_core::Error::Allocation { requested, .. } => {
+                    Error::Allocation { amount: requested }
+                },
+                _ => Error::Verification,
+            },
+            litchi_iwa_detect::Error::IwaCommon(error) => map_candidate_common_error(error),
+            litchi_iwa_detect::Error::Allocation { amount } => Error::Allocation { amount },
+            _ => Error::Verification,
+        },
         super::Error::Common(error) => map_candidate_common_error(error),
+        super::Error::Semantic(error) => match error {
+            crate::workbook::Error::TooManySheets { actual, limit } => Error::Limit {
+                kind: LimitKind::Semantic(crate::SemanticLimitKind::Sheets),
+                observed: actual as u64,
+                maximum: limit as u64,
+            },
+            crate::workbook::Error::TooManyTables { actual, limit } => Error::Limit {
+                kind: LimitKind::Semantic(crate::SemanticLimitKind::Tables),
+                observed: actual as u64,
+                maximum: limit as u64,
+            },
+            crate::workbook::Error::TooManyMaterializedCells { actual, limit } => Error::Limit {
+                kind: LimitKind::Semantic(crate::SemanticLimitKind::MaterializedCells),
+                observed: actual as u64,
+                maximum: limit as u64,
+            },
+            crate::workbook::Error::TextTooLarge { observed, limit } => Error::Limit {
+                kind: LimitKind::Semantic(crate::SemanticLimitKind::OutputTextBytes),
+                observed: observed as u64,
+                maximum: limit as u64,
+            },
+            crate::workbook::Error::Allocation { amount } => Error::Allocation { amount },
+            _ => Error::Verification,
+        },
         super::Error::SemanticLimit {
             kind,
             observed,
