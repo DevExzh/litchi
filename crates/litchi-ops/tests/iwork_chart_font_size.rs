@@ -189,8 +189,9 @@ mod pages {
             .expect_err("zero size must refuse");
         assert_eq!(invalid.code(), litchi_ops::Code::InvalidValue);
 
-        let original = source().to_bytes().expect("Pages source bytes");
-        let extreme = source()
+        let file = source();
+        let original = file.to_bytes().expect("Pages source bytes");
+        let extreme = file
             .set(
                 PATH,
                 props! {
@@ -202,7 +203,7 @@ mod pages {
             extreme.code(),
             litchi_ops::Code::InvalidValue | litchi_ops::Code::LimitExceeded
         ));
-        assert_eq!(source().to_bytes().expect("Pages source bytes"), original);
+        assert_eq!(file.to_bytes().expect("Pages source bytes"), original);
     }
 
     #[test]
@@ -245,30 +246,34 @@ mod pages {
     #[ignore = "coordinator CPU slot: full-file ABBA qualification"]
     fn pages_chart_font_size_read_full_file_cost_abba() {
         let source = source().to_bytes().expect("Pages probe source");
-        let _ = unified_read_route(&source);
-        let _ = direct_read_route(&source);
-        let _ = direct_read_route(&source);
-        let _ = unified_read_route(&source);
+        let source = std::hint::black_box(source);
+        std::hint::black_box(unified_read_route(std::hint::black_box(&source)));
+        std::hint::black_box(direct_read_route(std::hint::black_box(&source)));
+        std::hint::black_box(direct_read_route(std::hint::black_box(&source)));
+        std::hint::black_box(unified_read_route(std::hint::black_box(&source)));
     }
 
     #[test]
     #[ignore = "coordinator CPU slot: full-file ABBA qualification"]
     fn pages_chart_font_size_set_full_file_cost_abba() {
         let source = source().to_bytes().expect("Pages probe source");
-        let _ = unified_set_route(&source);
-        let _ = direct_set(&source);
-        let _ = direct_set(&source);
-        let _ = unified_set_route(&source);
+        let source = std::hint::black_box(source);
+        std::hint::black_box(unified_set_route(std::hint::black_box(&source)));
+        std::hint::black_box(direct_set(std::hint::black_box(&source)));
+        std::hint::black_box(direct_set(std::hint::black_box(&source)));
+        std::hint::black_box(unified_set_route(std::hint::black_box(&source)));
     }
 
     #[test]
     #[ignore = "coordinator CPU slot: full-file ABBA qualification"]
     fn pages_chart_font_size_reset_full_file_cost_abba() {
-        let source = direct_set(&source().to_bytes().expect("Pages probe source"));
-        let _ = unified_reset_route(&source);
-        let _ = direct_reset(&source);
-        let _ = direct_reset(&source);
-        let _ = unified_reset_route(&source);
+        let source = std::hint::black_box(direct_set(std::hint::black_box(
+            &source().to_bytes().expect("Pages probe source"),
+        )));
+        std::hint::black_box(unified_reset_route(std::hint::black_box(&source)));
+        std::hint::black_box(direct_reset(std::hint::black_box(&source)));
+        std::hint::black_box(direct_reset(std::hint::black_box(&source)));
+        std::hint::black_box(unified_reset_route(std::hint::black_box(&source)));
     }
 }
 
@@ -470,30 +475,34 @@ mod keynote {
     #[ignore = "coordinator CPU slot: full-file ABBA qualification"]
     fn keynote_chart_font_size_read_full_file_cost_abba() {
         let source = source().to_bytes().expect("Keynote probe source");
-        let _ = unified_read_route(&source);
-        let _ = direct_read_route(&source);
-        let _ = direct_read_route(&source);
-        let _ = unified_read_route(&source);
+        let source = std::hint::black_box(source);
+        std::hint::black_box(unified_read_route(std::hint::black_box(&source)));
+        std::hint::black_box(direct_read_route(std::hint::black_box(&source)));
+        std::hint::black_box(direct_read_route(std::hint::black_box(&source)));
+        std::hint::black_box(unified_read_route(std::hint::black_box(&source)));
     }
 
     #[test]
     #[ignore = "coordinator CPU slot: full-file ABBA qualification"]
     fn keynote_chart_font_size_set_full_file_cost_abba() {
         let source = source().to_bytes().expect("Keynote probe source");
-        let _ = unified_set_route(&source);
-        let _ = direct_set(&source);
-        let _ = direct_set(&source);
-        let _ = unified_set_route(&source);
+        let source = std::hint::black_box(source);
+        std::hint::black_box(unified_set_route(std::hint::black_box(&source)));
+        std::hint::black_box(direct_set(std::hint::black_box(&source)));
+        std::hint::black_box(direct_set(std::hint::black_box(&source)));
+        std::hint::black_box(unified_set_route(std::hint::black_box(&source)));
     }
 
     #[test]
     #[ignore = "coordinator CPU slot: full-file ABBA qualification"]
     fn keynote_chart_font_size_reset_full_file_cost_abba() {
-        let source = direct_set(&source().to_bytes().expect("Keynote probe source"));
-        let _ = unified_reset_route(&source);
-        let _ = direct_reset(&source);
-        let _ = direct_reset(&source);
-        let _ = unified_reset_route(&source);
+        let source = std::hint::black_box(direct_set(std::hint::black_box(
+            &source().to_bytes().expect("Keynote probe source"),
+        )));
+        std::hint::black_box(unified_reset_route(std::hint::black_box(&source)));
+        std::hint::black_box(direct_reset(std::hint::black_box(&source)));
+        std::hint::black_box(direct_reset(std::hint::black_box(&source)));
+        std::hint::black_box(unified_reset_route(std::hint::black_box(&source)));
     }
 }
 
@@ -656,29 +665,33 @@ mod numbers {
     #[ignore = "coordinator CPU slot: full-file ABBA qualification"]
     fn numbers_chart_font_size_read_full_file_cost_abba() {
         let source = source().to_bytes().expect("Numbers probe source");
-        let _ = unified_read_route(&source);
-        let _ = direct_read_route(&source);
-        let _ = direct_read_route(&source);
-        let _ = unified_read_route(&source);
+        let source = std::hint::black_box(source);
+        std::hint::black_box(unified_read_route(std::hint::black_box(&source)));
+        std::hint::black_box(direct_read_route(std::hint::black_box(&source)));
+        std::hint::black_box(direct_read_route(std::hint::black_box(&source)));
+        std::hint::black_box(unified_read_route(std::hint::black_box(&source)));
     }
 
     #[test]
     #[ignore = "coordinator CPU slot: full-file ABBA qualification"]
     fn numbers_chart_font_size_set_full_file_cost_abba() {
         let source = source().to_bytes().expect("Numbers probe source");
-        let _ = unified_set_route(&source);
-        let _ = direct_set(&source);
-        let _ = direct_set(&source);
-        let _ = unified_set_route(&source);
+        let source = std::hint::black_box(source);
+        std::hint::black_box(unified_set_route(std::hint::black_box(&source)));
+        std::hint::black_box(direct_set(std::hint::black_box(&source)));
+        std::hint::black_box(direct_set(std::hint::black_box(&source)));
+        std::hint::black_box(unified_set_route(std::hint::black_box(&source)));
     }
 
     #[test]
     #[ignore = "coordinator CPU slot: full-file ABBA qualification"]
     fn numbers_chart_font_size_reset_full_file_cost_abba() {
-        let source = direct_set(&source().to_bytes().expect("Numbers probe source"));
-        let _ = unified_reset_route(&source);
-        let _ = direct_reset(&source);
-        let _ = direct_reset(&source);
-        let _ = unified_reset_route(&source);
+        let source = std::hint::black_box(direct_set(std::hint::black_box(
+            &source().to_bytes().expect("Numbers probe source"),
+        )));
+        std::hint::black_box(unified_reset_route(std::hint::black_box(&source)));
+        std::hint::black_box(direct_reset(std::hint::black_box(&source)));
+        std::hint::black_box(direct_reset(std::hint::black_box(&source)));
+        std::hint::black_box(unified_reset_route(std::hint::black_box(&source)));
     }
 }
