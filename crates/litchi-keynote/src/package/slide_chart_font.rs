@@ -1939,7 +1939,7 @@ fn charge_engine_report(
     text.charge(report.text_bytes())
 }
 
-fn preflight_candidate(
+pub(super) fn preflight_candidate(
     package: &Package,
     candidate_bytes: usize,
     inserted_components: usize,
@@ -2500,7 +2500,7 @@ fn reachable_objects(
 /// opened.  The verifier only borrows these catalogs and plan-owned sets, but
 /// their byte traversal and collection reservations still belong to the same
 /// transaction ledger as candidate ingress.
-fn preflight_locality_verification(
+pub(super) fn preflight_locality_verification(
     source: &Package,
     candidate_bytes: usize,
     plan: &MutationPlan,
@@ -3751,6 +3751,37 @@ pub(super) fn publish_with_policy(
             deletions.push(name);
         }
     }
+    publish_prepared_payloads(
+        package,
+        &changes,
+        budget,
+        fields,
+        plan,
+        is_rewritable_type,
+        chart_extension_fields,
+        &insertions,
+        &edits,
+        &deletions,
+    )
+}
+
+/// Reassemble already-prepared chart-family payloads through the shared
+/// locality and candidate-verification seam. The chart-series owner uses
+/// this after its private Archive/Snappy preparation policy; chart-font keeps
+/// its legacy serializer policy unchanged.
+pub(super) fn publish_prepared_payloads<'a>(
+    package: &Package,
+    changes: &graph::Changes,
+    budget: &mut TransactionBudget,
+    fields: &mut FieldLedger,
+    plan: &MutationPlan,
+    is_rewritable_type: fn(u32) -> bool,
+    chart_extension_fields: &[u32],
+    insertions: &[EntryInsertion<'a>],
+    edits: &[EntryEdit<'a>],
+    deletions: &[&'a str],
+) -> Result<Package, Error> {
+    let catalog = physical_catalog(package)?;
     let mut admit_reassembly = |charge: litchi_iwa_archive::unstable::CandidateIngressCharge| {
         budget
             .retained(charge.retained_bytes())
@@ -3760,9 +3791,9 @@ pub(super) fn publish_with_policy(
     };
     let preparation = catalog
         .__admit_reassembly_preparation(
-            &insertions,
-            &edits,
-            &deletions,
+            insertions,
+            edits,
+            deletions,
             catalog.limits(),
             &mut admit_reassembly,
         )
@@ -3783,7 +3814,7 @@ pub(super) fn publish_with_policy(
         .map_err(map_transaction_error)?;
     let prepared = catalog
         .package()
-        .prepare_reassembly_with_changes(&insertions, &edits, &deletions, catalog.limits())
+        .prepare_reassembly_with_changes(insertions, edits, deletions, catalog.limits())
         .map_err(map_archive_error)?;
     let requirements = prepared.execution_requirements();
     budget

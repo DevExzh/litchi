@@ -15,7 +15,7 @@ use std::fmt;
 use std::mem::size_of;
 use std::sync::Arc;
 
-use litchi_iwa_archive::package::ExactArtifacts;
+use litchi_iwa_archive::package::{EntryEdit, EntryInsertion, ExactArtifacts};
 use litchi_iwa_core::{Archive, Limits as ArchiveLimits};
 use litchi_iwa_protos::chart_metadata_codec::{self, DecodeOptions};
 use litchi_iwa_protos::chart_style_codec;
@@ -828,6 +828,29 @@ fn map_core_limit(kind: litchi_iwa_core::LimitKind) -> LimitKind {
     }
 }
 
+fn map_archive_error(error: litchi_iwa_archive::Error) -> Error {
+    match error {
+        litchi_iwa_archive::Error::Limit {
+            kind,
+            observed,
+            maximum,
+        } => Error::Limit {
+            kind: match kind {
+                litchi_iwa_archive::LimitKind::InputBytes => LimitKind::InputBytes,
+                litchi_iwa_archive::LimitKind::OutputBytes => LimitKind::OutputBytes,
+                litchi_iwa_archive::LimitKind::Entries => LimitKind::Entries,
+                litchi_iwa_archive::LimitKind::EntryBytes => LimitKind::EntryBytes,
+                litchi_iwa_archive::LimitKind::TotalBytes => LimitKind::TotalBytes,
+                _ => LimitKind::WireBytes,
+            },
+            observed,
+            maximum,
+        },
+        litchi_iwa_archive::Error::Allocation { amount, .. } => Error::Allocation { amount },
+        _ => Error::InvalidSource,
+    }
+}
+
 const fn is_series_rewritable_type(message_type: u32) -> bool {
     matches!(message_type, 401 | 5_021 | 5_028 | 5_029 | 11_006 | 11_008)
 }
@@ -1033,6 +1056,119 @@ fn finish_workspace(
     Ok(changes)
 }
 
+fn map_archive_preparation_error(
+    error: litchi_iwa_core::ArchiveEncodingPreparationError<Error>,
+) -> Error {
+    match error {
+        litchi_iwa_core::ArchiveEncodingPreparationError::Admission(error) => error,
+        litchi_iwa_core::ArchiveEncodingPreparationError::ArithmeticOverflow { .. } => {
+            Error::Overflow
+        },
+        litchi_iwa_core::ArchiveEncodingPreparationError::Core(error) => {
+            map_graph(graph::Error::Archive(error))
+        },
+        _ => Error::InvalidSource,
+    }
+}
+
+fn map_snappy_preparation_error(
+    error: litchi_iwa_core::SnappyCompressionPreparationError<Error>,
+) -> Error {
+    match error {
+        litchi_iwa_core::SnappyCompressionPreparationError::Admission(error) => error,
+        litchi_iwa_core::SnappyCompressionPreparationError::ArithmeticOverflow { .. } => {
+            Error::Overflow
+        },
+        litchi_iwa_core::SnappyCompressionPreparationError::Core(error) => {
+            map_graph(graph::Error::Archive(error))
+        },
+        _ => Error::InvalidSource,
+    }
+}
+
+fn charge_archive_preparation_chunk(
+    budget: &mut TransactionBudget,
+    chunk: litchi_iwa_core::ArchiveEncodingPreparationChunk,
+) -> Result<(), Error> {
+    budget
+        .work(chunk.traversal_bytes())
+        .map_err(map_transaction_error)
+}
+
+fn charge_snappy_preparation_chunk(
+    budget: &mut TransactionBudget,
+    chunk: litchi_iwa_core::SnappyCompressionPreparationChunk,
+) -> Result<(), Error> {
+    budget
+        .work(chunk.traversal_bytes())
+        .map_err(map_transaction_error)
+}
+
+struct PreparedPublication<'a> {
+    name: &'a str,
+    archive: litchi_iwa_core::ArchiveEncodingPlan<'a>,
+    snappy: litchi_iwa_core::SnappyCompressionPlan,
+    position: Option<usize>,
+}
+
+fn prepare_publication<'a>(
+    archive: &'a Archive,
+    name: &'a str,
+    position: Option<usize>,
+    archive_limits: ArchiveLimits,
+    snappy_limits: litchi_iwa_core::SnappyLimits,
+    budget: &mut TransactionBudget,
+) -> Result<PreparedPublication<'a>, Error> {
+    let mut archive_visitor = |chunk| charge_archive_preparation_chunk(budget, chunk);
+    let archive_plan = archive
+        .prepare_encoding(archive_limits, &mut archive_visitor)
+        .map_err(map_archive_preparation_error)?;
+    let archive_requirements = archive_plan.requirements();
+    budget
+        .work(archive_requirements.work_bytes())
+        .and_then(|_| budget.work(archive_requirements.identifier_sort_work()))
+        .and_then(|_| budget.allocations(archive_requirements.allocation_events()))
+        .and_then(|_| budget.retained(archive_requirements.retained_bytes()))
+        .and_then(|_| budget.scratch(archive_requirements.scratch_bytes()))
+        .map_err(map_transaction_error)?;
+
+    let mut snappy_visitor = |chunk| charge_snappy_preparation_chunk(budget, chunk);
+    let snappy_plan = litchi_iwa_core::SnappyStream::prepare_compression(
+        archive_requirements.encoded_bytes(),
+        snappy_limits,
+        &mut snappy_visitor,
+    )
+    .map_err(map_snappy_preparation_error)?;
+    let snappy_requirements = snappy_plan.requirements();
+    let snappy_scratch = snappy_requirements
+        .temporary_frame_capacity_bytes()
+        .checked_add(snappy_requirements.encoder_workspace_bytes())
+        .ok_or(Error::Overflow)?;
+    budget
+        .work(snappy_requirements.work_bytes())
+        .and_then(|_| budget.allocations(snappy_requirements.allocation_events()))
+        .and_then(|_| budget.retained(snappy_requirements.output_capacity_bytes()))
+        .and_then(|_| budget.scratch(snappy_scratch))
+        .map_err(map_transaction_error)?;
+    Ok(PreparedPublication {
+        name,
+        archive: archive_plan,
+        snappy: snappy_plan,
+        position,
+    })
+}
+
+fn execute_publication(prepared: PreparedPublication<'_>) -> Result<Vec<u8>, Error> {
+    let encoded = prepared
+        .archive
+        .execute()
+        .map_err(|error| map_graph(graph::Error::Archive(error)))?;
+    prepared
+        .snappy
+        .execute(&encoded)
+        .map_err(|error| map_graph(graph::Error::Archive(error)))
+}
+
 fn publish_changes(
     source: &Package,
     changes: graph::Changes,
@@ -1063,7 +1199,7 @@ fn publish_changes(
         budget,
     )
     .map_err(map_font_error)?;
-    let candidate = slide_chart_font::publish_with_policy(
+    let candidate = publish_series_with_prepared_policy(
         source,
         changes,
         budget,
@@ -1072,9 +1208,209 @@ fn publish_changes(
         extra_deletions.names(),
         is_series_rewritable_type,
         &[17, 19],
-    )
-    .map_err(map_font_error)?;
+    )?;
     Ok((candidate, touched_components, plan))
+}
+
+fn publish_series_with_prepared_policy(
+    package: &Package,
+    changes: graph::Changes,
+    budget: &mut TransactionBudget,
+    fields: &mut FieldLedger,
+    plan: &slide_chart_font::MutationPlan,
+    extra_deletions: &[&str],
+    is_rewritable_type: fn(u32) -> bool,
+    chart_extension_fields: &[u32],
+) -> Result<Package, Error> {
+    let catalog = match &package.state.source {
+        PhysicalSource::Package(catalog) => catalog,
+        PhysicalSource::Semantic(_) => return Err(Refusal::UnsupportedSource.into()),
+    };
+    let archive_limits = catalog
+        .limits()
+        .effective_archive_limits()
+        .map_err(map_archive_error)?;
+    let snappy_limits = catalog
+        .limits()
+        .snappy_limits()
+        .map_err(map_archive_error)?;
+    let edit_capacity = changes.edits.len();
+    let insertion_capacity = changes.insertions.len();
+    let deletion_capacity = changes
+        .deletions
+        .len()
+        .checked_add(extra_deletions.len())
+        .ok_or(Error::Overflow)?;
+    let collection_scratch = edit_capacity
+        .checked_mul(size_of::<(&str, Vec<u8>)>())
+        .and_then(|value| value.checked_add(edit_capacity.checked_mul(size_of::<EntryEdit<'_>>())?))
+        .and_then(|value| {
+            value.checked_add(catalog.package().len().checked_mul(size_of::<&str>())?)
+        })
+        .and_then(|value| {
+            value.checked_add(insertion_capacity.checked_mul(size_of::<(
+                &str,
+                Vec<u8>,
+                Option<usize>,
+            )>())?)
+        })
+        .and_then(|value| {
+            value.checked_add(insertion_capacity.checked_mul(size_of::<EntryInsertion<'_>>())?)
+        })
+        .and_then(|value| value.checked_add(deletion_capacity.checked_mul(size_of::<&str>())?))
+        .and_then(|value| {
+            value.checked_add(edit_capacity.checked_mul(size_of::<PreparedPublication<'_>>())?)
+        })
+        .and_then(|value| {
+            value.checked_add(insertion_capacity.checked_mul(size_of::<PreparedPublication<'_>>())?)
+        })
+        .ok_or(Error::Overflow)?;
+    let collection_allocations = usize::from(edit_capacity != 0) * 3
+        + usize::from(insertion_capacity != 0) * 3
+        + usize::from(deletion_capacity != 0)
+        + usize::from(catalog.package().len() != 0);
+    let name_bytes = changes
+        .edits
+        .iter()
+        .map(|(name, _)| name.len())
+        .chain(
+            changes
+                .insertions
+                .iter()
+                .map(|insertion| insertion.name.len()),
+        )
+        .chain(changes.deletions.iter().map(String::len))
+        .chain(extra_deletions.iter().map(|name| name.len()))
+        .try_fold(0usize, |total, bytes| total.checked_add(bytes))
+        .ok_or(Error::Overflow)?;
+    budget
+        .allocations(collection_allocations)
+        .and_then(|_| budget.scratch(collection_scratch))
+        .and_then(|_| budget.work(name_bytes))
+        .map_err(map_transaction_error)?;
+
+    let mut edited = Vec::new();
+    edited
+        .try_reserve_exact(edit_capacity)
+        .map_err(|_| Error::Allocation {
+            amount: edit_capacity,
+        })?;
+    let mut inserted = Vec::new();
+    inserted
+        .try_reserve_exact(insertion_capacity)
+        .map_err(|_| Error::Allocation {
+            amount: insertion_capacity,
+        })?;
+    let mut edits = Vec::new();
+    edits
+        .try_reserve_exact(edit_capacity)
+        .map_err(|_| Error::Allocation {
+            amount: edit_capacity,
+        })?;
+    let mut insertions = Vec::new();
+    insertions
+        .try_reserve_exact(insertion_capacity)
+        .map_err(|_| Error::Allocation {
+            amount: insertion_capacity,
+        })?;
+    let mut names = Vec::new();
+    names
+        .try_reserve_exact(catalog.package().len())
+        .map_err(|_| Error::Allocation {
+            amount: catalog.package().len(),
+        })?;
+    names.extend(catalog.package().iter().map(|entry| entry.name()));
+    let mut deletions = Vec::new();
+    deletions
+        .try_reserve_exact(deletion_capacity)
+        .map_err(|_| Error::Allocation {
+            amount: deletion_capacity,
+        })?;
+    deletions.extend(changes.deletions.iter().map(String::as_str));
+    for name in extra_deletions {
+        if !deletions.contains(name) {
+            deletions.push(name);
+        }
+    }
+
+    let mut prepared_edits = Vec::new();
+    prepared_edits
+        .try_reserve_exact(edit_capacity)
+        .map_err(|_| Error::Allocation {
+            amount: edit_capacity,
+        })?;
+    for (name, archive) in &changes.edits {
+        prepared_edits.push(prepare_publication(
+            archive,
+            name.as_str(),
+            None,
+            archive_limits,
+            snappy_limits,
+            budget,
+        )?);
+    }
+    let mut prepared_insertions = Vec::new();
+    prepared_insertions
+        .try_reserve_exact(insertion_capacity)
+        .map_err(|_| Error::Allocation {
+            amount: insertion_capacity,
+        })?;
+    for insertion in &changes.insertions {
+        let position = match insertion.before.as_deref() {
+            Some(before) => Some(
+                names
+                    .iter()
+                    .position(|name| *name == before)
+                    .ok_or(Error::InvalidSource)?,
+            ),
+            None => None,
+        };
+        prepared_insertions.push(prepare_publication(
+            &insertion.archive,
+            insertion.name.as_str(),
+            position,
+            archive_limits,
+            snappy_limits,
+            budget,
+        )?);
+    }
+
+    for prepared in prepared_edits {
+        let name = prepared.name;
+        edited.push((name, execute_publication(prepared)?));
+    }
+    edits.extend(
+        edited
+            .iter()
+            .map(|(name, data)| EntryEdit::new(name, data.as_slice())),
+    );
+    for prepared in prepared_insertions {
+        let name = prepared.name;
+        let position = prepared.position;
+        inserted.push((name, execute_publication(prepared)?, position));
+    }
+    insertions.extend(
+        inserted
+            .iter()
+            .map(|(name, data, position)| match position {
+                Some(position) => EntryInsertion::at(*position, name, data.as_slice()),
+                None => EntryInsertion::new(name, data.as_slice()),
+            }),
+    );
+
+    slide_chart_font::publish_prepared_payloads(
+        package,
+        &changes,
+        budget,
+        fields,
+        plan,
+        is_rewritable_type,
+        chart_extension_fields,
+        &insertions,
+        &edits,
+        &deletions,
+    )
+    .map_err(map_font_error)
 }
 
 /// A compact exact-source patch for one chart-series symbol value.
