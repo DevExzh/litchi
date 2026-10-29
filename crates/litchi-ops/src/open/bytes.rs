@@ -36,30 +36,6 @@ pub(super) fn open<T: ZipTail>(
         return Err(Error::unsupported_format(None));
     }
 
-    // iWork is the lowest-precedence ZIP family, but its package marker is
-    // cheap to recognize. On a genuine iWork package this avoids running the
-    // ODF and OOXML probes before the same prepared-source adoption that the
-    // normal fallback would use. A package advertising an OOXML catalog or
-    // ODF mimetype stays on the documented precedence path.
-    #[cfg(feature = "iwork-adapter")]
-    let bytes = if likely_iwork_package(&bytes) {
-        match crate::format::iwork::Iwork::detect_bytes(bytes, options)? {
-            crate::format::iwork::Detected::Opened(file) => return Ok(file.into_file()),
-            crate::format::iwork::Detected::Disabled(format) => {
-                return Err(Error::unsupported_format(Some(format)).with_suggestion(
-                    match format {
-                        FileFormat::Pages => "enable the `pages` cargo feature",
-                        FileFormat::Keynote => "enable the `keynote` cargo feature",
-                        _ => "enable the `numbers` cargo feature",
-                    },
-                ));
-            },
-            crate::format::iwork::Detected::Declined(bytes) => bytes,
-        }
-    } else {
-        bytes
-    };
-
     #[cfg(any(feature = "odt", feature = "ods", feature = "odp", odf_objects))]
     if let Some(format) =
         litchi_odf_common::detect::flat(&bytes, litchi_odf_common::detect::Limits::default())
@@ -140,26 +116,6 @@ pub(super) fn open<T: ZipTail>(
         return zip(bytes, options, &detection_limits, tail);
     }
     Err(Error::unsupported_format(None))
-}
-
-#[cfg(feature = "iwork-adapter")]
-fn likely_iwork_package(bytes: &[u8]) -> bool {
-    const IWORK_DOCUMENT: &[u8] = b"Index/Document.iwa";
-    const OOXML_CONTENT_TYPES: &[u8] = b"[Content_Types].xml";
-    const ODF_MIMETYPE: &[u8] = b"mimetype";
-    let mut iwork = false;
-    let mut ooxml = false;
-    let mut odf = false;
-    for index in 0..bytes.len() {
-        let suffix = &bytes[index..];
-        iwork |= suffix.starts_with(IWORK_DOCUMENT);
-        ooxml |= suffix.starts_with(OOXML_CONTENT_TYPES);
-        odf |= suffix.starts_with(ODF_MIMETYPE);
-        if ooxml || odf {
-            return false;
-        }
-    }
-    iwork
 }
 
 /// Classify an in-memory ZIP: an ordinary ODF package first, then OOXML
