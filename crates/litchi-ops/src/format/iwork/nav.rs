@@ -12,7 +12,7 @@ use super::children::Children;
 use super::node::Node;
 use crate::error::Result;
 use crate::node::spec::{FormatSpec, GapSpec};
-use crate::node::{Format, PathStep, Source};
+use crate::node::{Format, PathStep, Source, Value};
 use crate::path::navigate::{ElementKind, KindSet, Lookup, Navigate, Resolved, Select};
 use crate::query::inspect::Inspect;
 
@@ -180,6 +180,14 @@ impl<'f, F: Flavor> Inspect<'f> for Nav<'f, F> {
     fn format<'n>(&'n self, node: &'n Node<'f>) -> Result<Format<'n>> {
         let item = node.item();
         Ok(Format::new(item.props(), Source::Tree(item.values())))
+    }
+
+    fn prop<'n>(&'n self, node: &'n Node<'f>, index: usize) -> Result<Option<Value<'n>>> {
+        let Some(property) = node.item().props().get(index) else {
+            return Ok(None);
+        };
+        node.value(property.name)
+            .map(|value| value.map(Value::borrowed))
     }
 
     fn write_step(

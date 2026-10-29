@@ -1014,14 +1014,10 @@ pub(crate) fn empty_cell(file: &Iwork, path: &Path<'_>) -> Option<Address> {
 
 pub(crate) fn table_extent(table: &Node<'_>) -> Option<(u32, u32)> {
     let read = |key| {
-        table
-            .value(key)
-            .ok()
-            .flatten()
-            .and_then(|value| match value {
-                Value::Int(value) => u32::try_from(*value).ok(),
-                _ => None,
-            })
+        table.item().value(key).and_then(|value| match value {
+            Value::Int(value) => u32::try_from(*value).ok(),
+            _ => None,
+        })
     };
     Some((read("rowCount")?, read("columnCount")?))
 }

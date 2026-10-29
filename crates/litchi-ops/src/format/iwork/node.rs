@@ -108,7 +108,7 @@ impl<'f> Node<'f> {
     /// The value of property `key`, if set.
     pub fn value(&self, key: &str) -> Result<Option<&'f Value<'static>>> {
         let item = self.item();
-        if item.type_name() == "chart" {
+        if item.type_name() == "chart" && key == "font.size" {
             let values = self.chart_values(item)?;
             let index = item
                 .props()
@@ -305,5 +305,39 @@ mod tests {
             let expected = rounded.is_finite() && rounded > 0.0 && rounded < 2_f64.powi(63);
             assert_eq!(chart_length(points).is_ok(), expected, "{points:?}");
         }
+    }
+
+    #[cfg(feature = "keynote")]
+    #[test]
+    fn unrelated_chart_values_do_not_force_a_refused_font_read() {
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../test-data/iwork/keynote/chart-data-native.key");
+        let bytes = std::fs::read(path).expect("Keynote chart fixture");
+        let leaf = litchi_keynote::Package::from_bytes(&bytes).expect("Keynote leaf source");
+        assert!(matches!(
+            leaf.slide_chart_font_size(0usize, 0usize),
+            Err(litchi_keynote::chart::font::size::Error::InvalidSource)
+        ));
+
+        let file = crate::open_bytes(bytes).expect("unified Keynote source");
+        let crate::node::Node::Iwork(node) = file.get("/slide[1]/chart[1]").expect("chart path")
+        else {
+            panic!("expected iWork node");
+        };
+        assert_eq!(
+            node.value("name").expect("name read"),
+            node.item().value("name")
+        );
+        assert_eq!(node.value("x").expect("frame read"), node.item().value("x"));
+        assert_eq!(
+            node.value("zorder").expect("z-order read"),
+            node.item().value("zorder")
+        );
+        assert_eq!(
+            node.value("font.size")
+                .expect_err("font read must retain the typed refusal")
+                .code(),
+            Code::InvalidInput
+        );
     }
 }

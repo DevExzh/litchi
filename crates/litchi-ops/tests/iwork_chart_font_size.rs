@@ -64,6 +64,14 @@ mod pages {
         read(fixture("pages"))
     }
 
+    fn original_mixed_source() -> Vec<u8> {
+        std::fs::read(
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("../../test-data/iwork/pages/chart-data-native.pages"),
+        )
+        .expect("read original Pages chart fixture")
+    }
+
     #[inline(never)]
     fn direct_set(source: &[u8]) -> Vec<u8> {
         let package = litchi_pages::Package::from_bytes(source).expect("Pages leaf source");
@@ -180,6 +188,25 @@ mod pages {
             .set(PATH, props! { "font.size" => "0pt" })
             .expect_err("zero size must refuse");
         assert_eq!(invalid.code(), litchi_ops::Code::InvalidValue);
+    }
+
+    #[test]
+    fn original_mixed_chart_fixture_keeps_typed_leaf_refusal() {
+        let bytes = original_mixed_source();
+        let package = litchi_pages::Package::from_bytes(&bytes).expect("Pages leaf source");
+        assert!(matches!(
+            package.body_chart_font_size(litchi_pages::BodyChartSelector::index(0)),
+            Err(litchi_pages::chart::font::Error::InvalidSource)
+        ));
+
+        let file = open_bytes(bytes).expect("Pages unified source");
+        let error = file
+            .get(PATH)
+            .expect("Pages chart path")
+            .view()
+            .format()
+            .expect_err("unified chart projection must retain the typed refusal");
+        assert_eq!(error.code(), litchi_ops::Code::InvalidInput);
     }
 
     #[inline(never)]
@@ -369,6 +396,42 @@ mod keynote {
             .set(PATH, props! { "font.size" => "0pt" })
             .expect_err("zero size must refuse");
         assert_eq!(invalid.code(), litchi_ops::Code::InvalidValue);
+    }
+
+    #[test]
+    fn chart_font_size_queries_use_typed_property_reads() {
+        let changed = source()
+            .set(PATH, props! { "font.size" => "17pt" })
+            .expect("seed Keynote chart size");
+        let single = changed
+            .query("chart[font.size=17pt]")
+            .expect("single chart-size query")
+            .collect::<litchi_ops::Result<Vec<_>>>()
+            .expect("single chart-size query read");
+        assert_eq!(single.len(), 1);
+        let compound = changed
+            .query("chart[font.size=17pt][font.size!=18pt]")
+            .expect("compound chart-size query")
+            .collect::<litchi_ops::Result<Vec<_>>>()
+            .expect("compound chart-size query read");
+        assert_eq!(compound.len(), 1);
+
+        let refused = read(
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("../../test-data/iwork/keynote/chart-data-native.key"),
+        );
+        let frame_only = refused
+            .query("chart[zorder>=0]")
+            .expect("frame-only query")
+            .collect::<litchi_ops::Result<Vec<_>>>()
+            .expect("frame-only query must not read font.size");
+        assert_eq!(frame_only.len(), 1);
+        let font_error = refused
+            .query("chart[font.size=17pt]")
+            .expect("font query plan")
+            .collect::<litchi_ops::Result<Vec<_>>>()
+            .expect_err("font query retains the focused refusal");
+        assert_eq!(font_error.code(), litchi_ops::Code::InvalidInput);
     }
 
     #[inline(never)]

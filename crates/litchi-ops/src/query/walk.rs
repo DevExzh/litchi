@@ -39,7 +39,7 @@ use super::plan::{
     Chain, ExprNode, FastPlan, Plan, Positional, ScopePlan, Shortcut, Structural, Target,
 };
 use crate::error::{Code, Error, Result};
-use crate::node::{Format, Value};
+use crate::node::Value;
 use crate::path::PathArg;
 use crate::path::fence::Scope;
 use crate::path::navigate::{ElementKind, KindSet, Lookup, Navigate, Resolved, Select};
@@ -238,7 +238,7 @@ enum Verdict {
 struct Probe<'c> {
     text: Option<Option<Cow<'c, str>>>,
     style: Option<Option<Cow<'c, str>>>,
-    format: Option<Format<'c>>,
+    properties: Vec<(usize, Option<Value<'c>>)>,
 }
 
 impl<'c> Probe<'c> {
@@ -246,7 +246,7 @@ impl<'c> Probe<'c> {
         Self {
             text: None,
             style: None,
-            format: None,
+            properties: Vec::new(),
         }
     }
 
@@ -264,13 +264,18 @@ impl<'c> Probe<'c> {
         Ok(self.style.as_ref().and_then(|style| style.as_deref()))
     }
 
-    fn format<'f, N: Inspect<'f>>(&mut self, nav: &'c N, node: &'c N::Node) -> Result<&Format<'c>> {
-        if self.format.is_none() {
-            self.format = Some(nav.format(node)?);
+    fn prop<'f, N: Inspect<'f>>(
+        &mut self,
+        nav: &'c N,
+        node: &'c N::Node,
+        index: usize,
+    ) -> Result<Option<Value<'c>>> {
+        if let Some((_, value)) = self.properties.iter().find(|(cached, _)| *cached == index) {
+            return Ok(value.clone());
         }
-        self.format
-            .as_ref()
-            .ok_or_else(|| Error::new(Code::InternalError, "a property read was lost"))
+        let value = nav.prop(node, index)?;
+        self.properties.push((index, value.clone()));
+        Ok(value)
     }
 }
 
@@ -1304,7 +1309,7 @@ where
             else {
                 return Ok(false);
             };
-            let alt = probe.format(nav, candidate.node)?.get(usize::from(index));
+            let alt = probe.prop(nav, candidate.node, usize::from(index))?;
             if alt.is_some_and(|alt| !is_empty(&alt)) {
                 return Ok(false);
             }
@@ -1474,11 +1479,7 @@ where
         Ok(match target {
             Target::Absent(test) => test.eval(literal, None),
             Target::Prop { index, test } => {
-                let value = if cond.direct {
-                    nav.prop(candidate.node, usize::from(index))?
-                } else {
-                    probe.format(nav, candidate.node)?.get(usize::from(index))
-                };
+                let value = probe.prop(nav, candidate.node, usize::from(index))?;
                 test.eval(literal, value.as_ref().map(Value::as_scalar))
             },
             Target::Text(test) => {
@@ -1488,9 +1489,14 @@ where
                 test.eval(literal, Some(Scalar::Text(nav.type_name(candidate.node))))
             },
             Target::Style { prop, name, test } => {
-                let format = probe.format(nav, candidate.node)?;
-                let declared = prop.and_then(|index| format.get(usize::from(index)));
-                let display = name.and_then(|index| format.get(usize::from(index)));
+                let declared = prop
+                    .map(|index| probe.prop(nav, candidate.node, usize::from(index)))
+                    .transpose()?
+                    .flatten();
+                let display = name
+                    .map(|index| probe.prop(nav, candidate.node, usize::from(index)))
+                    .transpose()?
+                    .flatten();
                 let member = probe.style(nav, candidate.node)?;
                 let values = [
                     declared.as_ref().map(Value::as_scalar),
