@@ -30,6 +30,7 @@
 //! exposed only through [`field`](crate::chart_style_codec::field), for the owners' private adapters.
 
 use std::borrow::Cow;
+use std::cell::Cell;
 use std::fmt;
 
 /// Field number of the generated property extension in every style archive.
@@ -390,6 +391,50 @@ impl Default for Limits {
     }
 }
 
+/// Actual bounded work observed by one codec operation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct Report {
+    input_bytes: usize,
+    fields: usize,
+    work_bytes: usize,
+    allocations: usize,
+}
+
+impl Report {
+    const fn plus(self, other: Self) -> Self {
+        Self {
+            input_bytes: self.input_bytes.saturating_add(other.input_bytes),
+            fields: self.fields.saturating_add(other.fields),
+            work_bytes: self.work_bytes.saturating_add(other.work_bytes),
+            allocations: self.allocations.saturating_add(other.allocations),
+        }
+    }
+
+    /// Source bytes scanned by the codec.
+    #[must_use]
+    pub const fn input_bytes(self) -> usize {
+        self.input_bytes
+    }
+
+    /// Wire fields visited by the codec.
+    #[must_use]
+    pub const fn fields(self) -> usize {
+        self.fields
+    }
+
+    /// Aggregate wire work charged by the codec.
+    #[must_use]
+    pub const fn work_bytes(self) -> usize {
+        self.work_bytes
+    }
+
+    /// Logical collection allocations performed by the codec.
+    #[must_use]
+    pub const fn allocations(self) -> usize {
+        self.allocations
+    }
+}
+
 /// The resource a [`Error::Limit`] names.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
@@ -532,6 +577,8 @@ impl Field {
 pub(crate) struct Budget {
     fields: usize,
     maximum: usize,
+    scanned_bytes: usize,
+    allocations: usize,
 }
 
 impl Budget {
@@ -539,6 +586,30 @@ impl Budget {
         Self {
             fields: 0,
             maximum: limits.max_fields,
+            scanned_bytes: 0,
+            allocations: 0,
+        }
+    }
+
+    pub(crate) fn allocation(&mut self) {
+        self.allocations = self.allocations.saturating_add(1);
+    }
+
+    pub(crate) const fn report(&self) -> Report {
+        Report {
+            input_bytes: self.scanned_bytes,
+            fields: self.fields,
+            work_bytes: self.scanned_bytes,
+            allocations: self.allocations,
+        }
+    }
+
+    pub(crate) const fn combine(self, other: Self) -> Report {
+        Report {
+            input_bytes: self.scanned_bytes.saturating_add(other.scanned_bytes),
+            fields: self.fields.saturating_add(other.fields),
+            work_bytes: self.scanned_bytes.saturating_add(other.scanned_bytes),
+            allocations: self.allocations.saturating_add(other.allocations),
         }
     }
 
@@ -602,6 +673,7 @@ pub(crate) fn visit_fields(
     budget: &mut Budget,
     mut visit: impl FnMut(Field) -> Result<(), Error>,
 ) -> Result<(), Error> {
+    budget.scanned_bytes = budget.scanned_bytes.saturating_add(data.len());
     let mut offset = 0;
     while offset < data.len() {
         budget.charge()?;
@@ -740,6 +812,16 @@ pub struct Properties<'source> {
 /// an invalid payload or extension; [`Error::Limit`] when `limits` is
 /// exceeded.
 pub fn decode(source: &[u8], archive: Archive, limits: Limits) -> Result<Properties<'_>, Error> {
+    decode_with_report(source, archive, limits).map(|(properties, _)| properties)
+}
+
+/// Validate one style payload and return the borrowed properties plus exact
+/// codec scan requirements.
+pub fn decode_with_report(
+    source: &[u8],
+    archive: Archive,
+    limits: Limits,
+) -> Result<(Properties<'_>, Report), Error> {
     check_bytes(source.len(), limits)?;
     let mut budget = Budget::new(limits);
     let extension = locate_extension(source, &mut budget)?;
@@ -747,11 +829,24 @@ pub fn decode(source: &[u8], archive: Archive, limits: Limits) -> Result<Propert
     if let Some(extension) = extension {
         visit_fields(extension, &mut budget, |_| Ok(()))?;
     }
-    Ok(Properties {
-        archive,
-        extension,
-        limits,
-    })
+    let report = budget.report();
+    Ok((
+        Properties {
+            archive,
+            extension,
+            limits,
+        },
+        report,
+    ))
+}
+
+/// Preflight the exact wire scan required by [`decode`].
+pub fn decode_requirements(
+    source: &[u8],
+    archive: Archive,
+    limits: Limits,
+) -> Result<Report, Error> {
+    decode_with_report(source, archive, limits).map(|(_, report)| report)
 }
 
 impl<'source> Properties<'source> {
@@ -1928,6 +2023,119 @@ const SPARSE_ENTRIES_FIELD: u32 = 2;
 const SPARSE_ENTRY_INDEX_FIELD: u32 = 1;
 const SPARSE_ENTRY_REFERENCE_FIELD: u32 = 2;
 
+fn reference_requirements_message(data: &[u8], limits: Limits) -> Result<Report, Error> {
+    let mut budget = Budget::new(limits);
+    visit_fields(data, &mut budget, |_| Ok(()))?;
+    Ok(budget.report())
+}
+
+fn reference_requirements_entry(data: &[u8], limits: Limits) -> Result<Report, Error> {
+    let mut budget = Budget::new(limits);
+    let nested = Cell::new(Report::default());
+    visit_fields(data, &mut budget, |field| {
+        if field.number == SPARSE_ENTRY_REFERENCE_FIELD {
+            nested.set(
+                nested
+                    .get()
+                    .plus(reference_requirements_message(field.payload(data), limits)?),
+            );
+        }
+        Ok(())
+    })?;
+    Ok(budget.report().plus(nested.get()))
+}
+
+fn reference_requirements_sparse(data: &[u8], limits: Limits) -> Result<Report, Error> {
+    let mut budget = Budget::new(limits);
+    budget.allocation();
+    let nested = Cell::new(Report::default());
+    let mut entries_seen = false;
+    visit_fields(data, &mut budget, |field| {
+        if field.number != SPARSE_ENTRIES_FIELD {
+            return Ok(());
+        }
+        if !entries_seen {
+            entries_seen = true;
+            nested.set(nested.get().plus(Report {
+                allocations: 1,
+                ..Report::default()
+            }));
+        }
+        nested.set(
+            nested
+                .get()
+                .plus(reference_requirements_entry(field.payload(data), limits)?),
+        );
+        Ok(())
+    })?;
+    Ok(budget.report().plus(nested.get()))
+}
+
+/// Preflight the exact wire scans and logical collection allocations required
+/// by [`references`], without materializing its projected vectors.
+pub fn reference_requirements(chart_drawable: &[u8], limits: Limits) -> Result<Report, Error> {
+    check_bytes(chart_drawable.len(), limits)?;
+    let mut budget = Budget::new(limits);
+    let chart_field =
+        singular(chart_drawable, EXTENSION_FIELD, &mut budget)?.ok_or(Error::Malformed {
+            reason: "the chart drawable has no chart extension",
+        })?;
+    require_wire_type(&chart_field, WIRE_LENGTH_DELIMITED)?;
+    let chart = chart_field.payload(chart_drawable);
+    let nested = Cell::new(Report::default());
+    let mut repeated_seen = [false; 8];
+    budget.allocation();
+    visit_fields(chart, &mut budget, |field| {
+        match field.number {
+            CHART_STYLE_FIELD..=LEGEND_NON_STYLE_FIELD => {
+                nested.set(nested.get().plus(reference_requirements_message(
+                    field.payload(chart),
+                    limits,
+                )?));
+            },
+            VALUE_AXIS_STYLES_FIELD..=SERIES_THEME_STYLES_FIELD | PARAGRAPH_STYLES_FIELD => {
+                let slot = match field.number {
+                    VALUE_AXIS_STYLES_FIELD => 0,
+                    VALUE_AXIS_NON_STYLES_FIELD => 1,
+                    CATEGORY_AXIS_STYLES_FIELD => 2,
+                    CATEGORY_AXIS_NON_STYLES_FIELD => 3,
+                    SERIES_THEME_STYLES_FIELD => 4,
+                    _ => 5,
+                };
+                if !repeated_seen[slot] {
+                    repeated_seen[slot] = true;
+                    nested.set(nested.get().plus(Report {
+                        allocations: 1,
+                        ..Report::default()
+                    }));
+                }
+                nested.set(nested.get().plus(reference_requirements_message(
+                    field.payload(chart),
+                    limits,
+                )?));
+            },
+            SERIES_PRIVATE_STYLES_FIELD | SERIES_NON_STYLES_FIELD => {
+                let slot = (field.number - SERIES_PRIVATE_STYLES_FIELD) as usize + 6;
+                if !repeated_seen[slot] {
+                    repeated_seen[slot] = true;
+                    nested.set(nested.get().plus(Report {
+                        allocations: 1,
+                        ..Report::default()
+                    }));
+                }
+                nested.set(
+                    nested
+                        .get()
+                        .plus(reference_requirements_sparse(field.payload(chart), limits)?),
+                );
+            },
+            _ => {},
+        }
+        Ok(())
+    })?;
+    Ok(budget.report().plus(nested.get()))
+}
+
 /// Project the style references of one `TSCH.ChartDrawableArchive` payload.
 ///
 /// Only the chart extension's top-level fields and the reference messages are
@@ -1940,6 +2148,14 @@ const SPARSE_ENTRY_REFERENCE_FIELD: u32 = 2;
 /// chart extension, [`Error::DuplicateField`]/[`Error::WireType`] for an
 /// invalid reference, [`Error::Limit`] when `limits` is exceeded.
 pub fn references(chart_drawable: &[u8], limits: Limits) -> Result<StyleReferences, Error> {
+    references_with_report(chart_drawable, limits).map(|(references, _)| references)
+}
+
+/// Project chart references and return exact codec scan requirements.
+pub fn references_with_report(
+    chart_drawable: &[u8],
+    limits: Limits,
+) -> Result<(StyleReferences, Report), Error> {
     check_bytes(chart_drawable.len(), limits)?;
     let mut budget = Budget::new(limits);
     let chart =
@@ -1949,6 +2165,7 @@ pub fn references(chart_drawable: &[u8], limits: Limits) -> Result<StyleReferenc
     require_wire_type(&chart, WIRE_LENGTH_DELIMITED)?;
     let chart = chart.payload(chart_drawable);
     let mut references = StyleReferences::default();
+    budget.allocation();
     let mut singular_seen = [false; 4];
     let mut sparse_seen = [false; 2];
     let mut nested = Budget::new(limits);
@@ -2001,7 +2218,7 @@ pub fn references(chart_drawable: &[u8], limits: Limits) -> Result<StyleReferenc
         }
         Ok(())
     })?;
-    Ok(references)
+    Ok((references, budget.combine(nested)))
 }
 
 const CHART_LEGEND_FRAME_FIELD: u32 = 3;
@@ -2294,7 +2511,9 @@ fn reference(data: &[u8], field: &Field, budget: &mut Budget) -> Result<Option<u
 fn sparse_references(data: &[u8], budget: &mut Budget) -> Result<SparseReferences, Error> {
     let mut sparse = SparseReferences::default();
     let mut count_seen = false;
+    budget.allocation();
     let mut entries = Vec::new();
+    budget.allocation();
     visit_fields(data, budget, |field| {
         match field.number {
             SPARSE_COUNT_FIELD => {

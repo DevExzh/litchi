@@ -4,7 +4,10 @@
   coordinator source `bc9a37fd75977b01ab3f24cabfdc4b2fe977c4bc`.
 - Commits: `e57d0df0c7677ba6986a49dcf165eb6d4fd3f722` initial implementation;
   `212ba356d7b5904e988c4f636f2cc5ceedc50c10` closes the independent
-  admission-review findings.
+  admission-review findings; `c0dfabd11678fb90bb2aea8c333e8ee4df6915f4` adds the exact codec/registry
+  requirements repair after coordinator trunk
+  `59a501492cb58a538085280e383007ca4d39dad7`.
+- Final clean WP tip after formatting: `5385fd632c8a28d4217422dcedae1c3b74cc81ac`.
 - Scope: shared chart-series symbol read/write admission, Numbers mechanical
   caller adoption, and the direct shared-engine parity caller. Pages and
   Keynote facade adoption remain owned by their work packages.
@@ -27,6 +30,12 @@ The repair pass adds fallible reservations before every bounded collection
 growth, residual accounting for repeated wire preparse/codec passes, explicit
 registry inspection and cross-component-reference debits, and a bounded
 container writer instead of delegating to the legacy infallible helper.
+
+The second review replaces the remaining container-size estimate with exact
+varint sizing, exposes exact codec decode/reference requirements and reports,
+and uses package-metadata inspection requirements rather than registry-byte
+multipliers. Existing chart-font consumers retain a compatibility work getter
+backed by the same exact inspection requirements.
 
 ## Correctness and evidence boundary
 
@@ -56,6 +65,8 @@ is an explicit follow-up gap, not a full Numbers facade-ledger qualification.
 - The post-review focused symbol suite includes typed zero-field,
   zero-reference, and zero-allocation refusals plus shared-owner copying and
   planned-scope assertions.
+- Codec requirement/report regression: reference and decode preflight reports
+  match their follow-on codec passes for fields and work.
 
 No ledger, queue, progress, fixture, performance, native evidence, or
 generated binary changes are included.
