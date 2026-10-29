@@ -3718,6 +3718,38 @@ def p0377_explain(route, kind):
     return P0377_CODEGEN if kind.startswith("wall") else ""
 
 
+@needs("0375b")
+def p0375b():
+    """Historical full-facade chart-text instruction comparisons, not File timing."""
+    path = RES / "0375b" / "integrated-callgrind.json"
+    data = load_json(path)
+    out = []
+    seen = set()
+    for route in data["routes"]:
+        test = route["test"]
+        fmt = test.split("_", 1)[0]
+        operation = test.removesuffix("_cost_abba").rsplit("_", 1)[-1]
+        host, leaf = route["host_ir"], route["leaf_ir"]
+        if (test in seen or fmt not in ("numbers", "pages")
+                or operation not in ("read", "set", "clear")
+                or type(host) is not int or type(leaf) is not int
+                or host <= 0 or leaf <= 0):
+            raise SystemExit(f"0375b invalid or duplicate instruction route: {test}")
+        seen.add(test)
+        out.append(row(
+            "0375b", fmt, "get" if operation == "read" else "set",
+            test, "", host, leaf, [leaf / host], regression("0363"),
+            f"chart_text:{test}:ir", src([path]),
+            stage=f"integrated {data['source_commit'][:10]}",
+            comparison="leaf/host (Callgrind Ir)", unit="Ir",
+            explanation=(
+                "Historical source-bound full-facade instruction comparison; "
+                "baseline column is the legacy host, candidate column is the leaf. "
+                "No wall-time, unified File, native acceptance, or current-trunk "
+                "qualification is inferred.")))
+    return out
+
+
 @needs("0377")
 def p0377():
     """Record 0377: unified-fin-perf (one source built on the baseline with
@@ -3920,7 +3952,7 @@ PARSERS = [p0250, p0251, p0251f, p0252, p0253, p0254, p0255, p0256, p0258, p0259
            p0328, p0329, p0330, p0333, p0335, p0336, p0337, p0338, p0340, p0342, p0345, p0346,
            p0347, p0348, p0355, p0355a, p0356, p0356a, p0356b, p0356c, p0357, p0357a, p0357b, p0358, p0358a,
            p0359, p0359a, p0359b, p0359qb, p0359qc, p0359qd, p0359r, p0359ra, p0359rb, p0359rc,
-           p0359rd, p0359re, p0359qe, p0360b, p0361, p0361a, p0362, p0362ya, p0362yb, p0362yc, p0362yd, p0362ye, p0377, p0377a]
+           p0359rd, p0359re, p0359qe, p0360b, p0361, p0361a, p0362, p0362ya, p0362yb, p0362yc, p0362yd, p0362ye, p0375b, p0377, p0377a]
 
 
 

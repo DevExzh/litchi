@@ -7025,3 +7025,32 @@ See [0063](0063-source-pptx-modern-comments.md).
   Ledger/native totals remain unchanged; W3 is still blocked. Chart-font
   facades and cell-text-style extraction remain separate work packages until
   their full contracts, proofs and performance are accepted.
+
+- The complete 53-row gate on `1bc8f22499` finished with 49 passing rows.
+  Goldens (42), tooling (48), the benchmark matrix (51) and corpus
+  dispositions (52) failed because generated reports were stale: the
+  Numbers registry hash and missing ingestion of the existing 0375b
+  instruction evidence. All runtime tests, including 400 broad workspace
+  commands, Clippy, rustdoc, feature matrices and fuzz checks passed on that
+  same source. The failed full receipt is preserved externally; it is not a
+  green gate. Record 0397 refreshes the hash and parses all eighteen
+  historical chart-text comparisons without adding evidence exemptions or
+  claiming current performance qualification. Targeted generator and tooling
+  checks pass.
+- A raw call-count audit withdrew eight routes from the earlier automated
+  69-route instruction qualification: Keynote formula refresh included
+  discovery calls, six Numbers style resets included host setup, and the
+  unified cached-formula comparison included warm-ups. Record 0396 separates
+  those calls from the measured wrappers. New external qualification
+  revisions derive call counts and complete function costs from each run's
+  raw artifacts, with source/binary/hash binding and negative controls.
+  Historical captures remain intact. No repaired-source performance claim
+  is made by this test-only integration; the final candidate needs fresh
+  measurements. The 1bc FIN instruction receipt remains historical, and its
+  wall/CLI run was never launched.
+- Accepted W2-D 0394 `aa3844a4c6`: the Numbers drawable-comment example now
+  uses leaf selectors, set/clear transactions, saved-file reopen and exact
+  inverse checks. Its tracked fixture exercises successful set/clear and a
+  typed non-commentable table refusal. The equivalent host example is
+  removed; host tests and native provenance remain intact. No runtime,
+  migration-ledger or native-evidence disposition changes.

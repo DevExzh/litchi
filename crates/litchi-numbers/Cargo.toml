@@ -113,6 +113,10 @@ path = "examples/create_numbers_table_hidden_axes.rs"
 name = "edit_numbers_hidden_table_topology"
 path = "examples/edit_numbers_hidden_table_topology.rs"
 
+[[example]]
+name = "edit_sheet_drawable_comment"
+path = "examples/edit_sheet_drawable_comment.rs"
+
 [features]
 default = []
 internal-iwork-source = []
