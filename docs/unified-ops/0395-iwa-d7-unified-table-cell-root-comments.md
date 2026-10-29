@@ -94,7 +94,7 @@ The build log is external at
 The complete compact receipt, including all 16 raw capture/log/annotation
 hashes, is
 `/home/zhuhe/code/litchi-worktrees/.coord/d7-comments-perf-b6bbb77202/coordinator-review-a24f121a14.json`
-(SHA-256 `a40afa4d618c3579b8602151e25a2d2887e1c4fec347145fd3327ec149a9199b`).
+(SHA-256 `67c36d5fa19d8c4b8b53d36d53677ebe07104382bb285cfca3f2bbd38ca5b259`).
 The raw captures and threshold-100 inclusive annotations are under the same
 external directory in `callgrind-a24f121a14/`; the earlier d4 captures remain
 preserved as nonqualifying history because they predate the observed-record
