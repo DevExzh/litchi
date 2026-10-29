@@ -8,6 +8,9 @@
   requirements repair after coordinator trunk
   `59a501492cb58a538085280e383007ca4d39dad7`.
 - Final clean WP tip after formatting: `5385fd632c8a28d4217422dcedae1c3b74cc81ac`.
+- Adoption repair: `ed50c20a25528f8a0a9aecb2a1ca32dfb778b02b` fixes the styled-parent reference framing and
+  residual wire-field/work hard-ceiling clamp; the final tip includes this
+  repair.
 - Scope: shared chart-series symbol read/write admission, Numbers mechanical
   caller adoption, and the direct shared-engine parity caller. Pages and
   Keynote facade adoption remain owned by their work packages.
@@ -67,6 +70,9 @@ is an explicit follow-up gap, not a full Numbers facade-ledger qualification.
   planned-scope assertions.
 - Codec requirement/report regression: reference and decode preflight reports
   match their follow-on codec passes for fields and work.
+- Direct engine ABBA parity probe across Keynote, Numbers, and Pages:
+  `cargo test --offline -p litchi-iwa --test parity
+  series_graph_write_cost_abba -- --ignored --nocapture`: pass.
 
 No ledger, queue, progress, fixture, performance, native evidence, or
 generated binary changes are included.
