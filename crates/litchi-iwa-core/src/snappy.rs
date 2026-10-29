@@ -1,3 +1,5 @@
+use std::mem::size_of;
+
 use snap::raw::{Decoder, Encoder, decompress_len, max_compress_len};
 
 use crate::error::{Error, LimitKind, Result};
@@ -145,6 +147,111 @@ impl Default for SnappyLimits {
     }
 }
 
+/// Exact input-independent requirements for one Snappy compression route.
+///
+/// `output_capacity_bytes` is the checked upper bound already used by the
+/// encoder.  `temporary_frame_capacity_bytes` is a source-derived upper
+/// bound for the fallback `Encoder::compress_vec` buffers.  The latter is
+/// deliberately reported as a bound: whether a particular frame takes the
+/// fallback path depends on the compressed length of earlier frames.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct SnappyCompressionRequirements {
+    input_bytes: usize,
+    output_capacity_bytes: usize,
+    frame_count: usize,
+    temporary_frame_capacity_bytes: usize,
+    encoder_workspace_bytes: usize,
+    encoder_table_reset_work_bytes: usize,
+    work_bytes: usize,
+    allocation_events: usize,
+}
+
+impl SnappyCompressionRequirements {
+    #[must_use]
+    pub const fn input_bytes(self) -> usize {
+        self.input_bytes
+    }
+
+    #[must_use]
+    pub const fn output_capacity_bytes(self) -> usize {
+        self.output_capacity_bytes
+    }
+
+    #[must_use]
+    pub const fn frame_count(self) -> usize {
+        self.frame_count
+    }
+
+    /// Conservative total capacity of possible temporary raw Snappy frames.
+    /// The encoder may use less when earlier frames leave enough room in the
+    /// reserved output buffer.
+    #[must_use]
+    pub const fn temporary_frame_capacity_bytes(self) -> usize {
+        self.temporary_frame_capacity_bytes
+    }
+
+    /// Heap state allocated by the raw Snappy encoder when a chunk exceeds
+    /// its small stack table.  The encoder reuses this table across frames.
+    #[must_use]
+    pub const fn encoder_workspace_bytes(self) -> usize {
+        self.encoder_workspace_bytes
+    }
+
+    /// Bytes written while resetting the raw encoder's reusable hash table
+    /// across frames. This is work, not an additional retained allocation.
+    #[must_use]
+    pub const fn encoder_table_reset_work_bytes(self) -> usize {
+        self.encoder_table_reset_work_bytes
+    }
+
+    #[must_use]
+    pub const fn work_bytes(self) -> usize {
+        self.work_bytes
+    }
+
+    /// One output allocation plus one possible temporary allocation per frame.
+    /// This is an upper bound for the actual number of allocations.
+    #[must_use]
+    pub const fn allocation_events(self) -> usize {
+        self.allocation_events
+    }
+}
+
+/// Borrow-free prepared Snappy compression admission.
+///
+/// The plan binds the input length and limit profile.  `execute` therefore
+/// cannot accidentally replay a plan against a different length or a
+/// different budget, while the source bytes remain borrowed only for the
+/// actual encoding pass.  It binds the length, not the identity or contents
+/// of the borrowed slice.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct SnappyCompressionPlan {
+    input_len: usize,
+    limits: SnappyLimits,
+    requirements: SnappyCompressionRequirements,
+}
+
+impl SnappyCompressionPlan {
+    #[must_use]
+    pub const fn requirements(self) -> SnappyCompressionRequirements {
+        self.requirements
+    }
+
+    /// Execute the admitted compression against the exact input length used
+    /// during preparation.
+    pub fn execute(self, data: &[u8]) -> Result<Vec<u8>> {
+        if data.len() != self.input_len {
+            return Err(Error::invalid_archive(
+                0,
+                "prepared Snappy input length changed",
+            ));
+        }
+        let maximum_output = SnappyStream::maximum_compressed_len(data.len(), self.limits)?;
+        debug_assert_eq!(maximum_output, self.requirements.output_capacity_bytes);
+        SnappyStream::compress_inner(data, self.limits, maximum_output)
+    }
+}
+
 /// A decoded Apple IWA Snappy stream.
 ///
 /// IWA uses four-byte frame headers with a one-byte compressed-chunk marker and
@@ -226,6 +333,84 @@ impl SnappyStream {
                 .ok_or_else(|| Error::snappy("Snappy maximum stream length overflow"))?;
         }
         Ok(maximum.min(limits.max_compressed_stream))
+    }
+
+    /// Prepare a bounded compression route without allocating or retaining
+    /// any source bytes. `admit_work` is called with one phase unit before
+    /// frame-bound computation and once before each frame's backend geometry
+    /// calculation. The returned requirements describe execution-only work.
+    pub fn prepare_compression<F>(
+        input_len: usize,
+        limits: SnappyLimits,
+        mut admit_work: F,
+    ) -> Result<SnappyCompressionPlan>
+    where
+        F: FnMut(usize) -> Result<()>,
+    {
+        admit_work(1)?;
+        let output_capacity_bytes = Self::maximum_compressed_len(input_len, limits)?;
+        let chunk_size = Self::WRITE_CHUNK_SIZE.min(limits.max_uncompressed_chunk);
+        let frame_count = if input_len == 0 {
+            0
+        } else {
+            input_len
+                .checked_add(chunk_size - 1)
+                .ok_or_else(|| Error::snappy("Snappy frame count overflow"))?
+                / chunk_size
+        };
+        let mut temporary_frame_capacity_bytes = 0usize;
+        let mut encoder_table_reset_work_bytes = 0usize;
+        let mut remaining = input_len;
+        let mut uses_encoder_workspace = false;
+        while remaining != 0 {
+            admit_work(1)?;
+            let chunk_len = remaining.min(chunk_size);
+            if chunk_len >= 17 {
+                let mut table_size = 256usize;
+                while table_size < (1usize << 14) && table_size < chunk_len {
+                    table_size *= 2;
+                }
+                uses_encoder_workspace |= table_size > 1_024;
+                encoder_table_reset_work_bytes = encoder_table_reset_work_bytes
+                    .checked_add(table_size * size_of::<u16>())
+                    .ok_or_else(|| Error::snappy("Snappy table reset work overflow"))?;
+            }
+            temporary_frame_capacity_bytes = temporary_frame_capacity_bytes
+                .checked_add(max_compress_len(chunk_len))
+                .ok_or_else(|| Error::snappy("Snappy temporary capacity overflow"))?;
+            remaining -= chunk_len;
+        }
+        let encoder_workspace_bytes = if uses_encoder_workspace {
+            // snap::raw::Encoder uses one 2^14-entry u16 hash table for a
+            // block larger than its 2^10-entry stack table.
+            (1usize << 14) * size_of::<u16>()
+        } else {
+            0
+        };
+        let work_bytes = input_len
+            .checked_add(output_capacity_bytes)
+            .and_then(|value| value.checked_add(temporary_frame_capacity_bytes))
+            .and_then(|value| value.checked_add(encoder_workspace_bytes))
+            .and_then(|value| value.checked_add(encoder_table_reset_work_bytes))
+            .ok_or_else(|| Error::snappy("Snappy compression work overflow"))?;
+        let allocation_events = frame_count
+            .checked_add(usize::from(encoder_workspace_bytes != 0))
+            .and_then(|value| value.checked_add(usize::from(output_capacity_bytes != 0)))
+            .ok_or_else(|| Error::snappy("Snappy allocation count overflow"))?;
+        Ok(SnappyCompressionPlan {
+            input_len,
+            limits,
+            requirements: SnappyCompressionRequirements {
+                input_bytes: input_len,
+                output_capacity_bytes,
+                frame_count,
+                temporary_frame_capacity_bytes,
+                encoder_workspace_bytes,
+                encoder_table_reset_work_bytes,
+                work_bytes,
+                allocation_events,
+            },
+        })
     }
 
     /// Return the exact decoded length of one Apple IWA Snappy stream without
@@ -386,6 +571,10 @@ impl SnappyStream {
     /// ceiling, compression fails, or a checked allocation cannot be made.
     pub fn compress(data: &[u8], limits: SnappyLimits) -> Result<Vec<u8>> {
         let maximum_output = Self::maximum_compressed_len(data.len(), limits)?;
+        Self::compress_inner(data, limits, maximum_output)
+    }
+
+    fn compress_inner(data: &[u8], limits: SnappyLimits, maximum_output: usize) -> Result<Vec<u8>> {
         let mut output = Vec::new();
         output
             .try_reserve_exact(maximum_output)
@@ -705,6 +894,67 @@ mod tests {
             })
         ));
         Ok(())
+    }
+
+    #[test]
+    fn prepared_compression_matches_legacy_and_binds_input_length() -> crate::Result<()> {
+        let empty = SnappyStream::prepare_compression(0, SnappyLimits::default(), |_| Ok(()))?;
+        assert_eq!(empty.requirements().allocation_events(), 0);
+        assert_eq!(empty.requirements().encoder_workspace_bytes(), 0);
+        assert!(empty.execute(&[])?.is_empty());
+
+        let input = (0..(SnappyStream::WRITE_CHUNK_SIZE + 17))
+            .map(|index| (index as u8).wrapping_mul(13))
+            .collect::<Vec<_>>();
+        let limits = SnappyLimits::new(4096, input.len())?;
+        let plan = SnappyStream::prepare_compression(input.len(), limits, |_| Ok(()))?;
+        let requirements = plan.requirements();
+        assert_eq!(requirements.input_bytes(), input.len());
+        assert_eq!(requirements.frame_count(), 17);
+        assert!(
+            requirements.output_capacity_bytes() >= requirements.temporary_frame_capacity_bytes()
+        );
+        assert!(requirements.work_bytes() >= input.len());
+        assert_eq!(
+            plan.execute(&input)?,
+            SnappyStream::compress(&input, limits)?
+        );
+
+        assert!(matches!(
+            SnappyStream::prepare_compression(input.len(), limits, |_| Ok(()))?
+                .execute(&input[..input.len() - 1]),
+            Err(Error::InvalidArchive {
+                reason: "prepared Snappy input length changed",
+                ..
+            })
+        ));
+        Ok(())
+    }
+
+    #[test]
+    fn prepared_compression_preserves_tight_fallback_output() -> crate::Result<()> {
+        let input = vec![7u8; 3 * 4096 + 17];
+        let base_limits = SnappyLimits::new(4096, input.len())?;
+        let legacy = SnappyStream::compress(&input, base_limits)?;
+        let tight_limits = base_limits.with_compressed_stream_bytes(legacy.len())?;
+        let plan = SnappyStream::prepare_compression(input.len(), tight_limits, |_| Ok(()))?;
+        assert!(plan.requirements().temporary_frame_capacity_bytes() > 0);
+        let prepared = plan.execute(&input)?;
+        assert_eq!(prepared, SnappyStream::compress(&input, tight_limits)?);
+        assert_eq!(
+            SnappyStream::decompress(&prepared, tight_limits)?.as_bytes(),
+            input
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn prepared_compression_honors_work_admission_before_frame_scan() {
+        let error = SnappyStream::prepare_compression(32, SnappyLimits::default(), |units| {
+            Err(Error::allocation("test preparation ledger", units))
+        })
+        .expect_err("preparation work refusal");
+        assert!(matches!(error, Error::Allocation { requested: 1, .. }));
     }
 
     #[test]

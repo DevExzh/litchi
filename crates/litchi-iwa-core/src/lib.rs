@@ -15,9 +15,9 @@ mod snappy;
 pub use archive::{
     Archive, ArchiveCloneInventory, ArchiveCloneInventoryChunk, ArchiveCloneInventoryError,
     ArchiveCloneInventoryKind, ArchiveCloneInventoryResult, ArchiveCloneInventoryVisitor,
-    ArchiveInfo, ArchiveIngressRequirements, ArchiveObject, ArchiveReferenceKind,
-    ArchiveReferenceOccurrence, ArchiveReferencePolicy, ArchiveReferenceScope,
-    ArchiveReferenceVisitor, CanonicalFieldDataReferenceOperation,
+    ArchiveEncodingPlan, ArchiveEncodingRequirements, ArchiveInfo, ArchiveIngressRequirements,
+    ArchiveObject, ArchiveReferenceKind, ArchiveReferenceOccurrence, ArchiveReferencePolicy,
+    ArchiveReferenceScope, ArchiveReferenceVisitor, CanonicalFieldDataReferenceOperation,
     CanonicalFieldDataReferenceTransition, CanonicalObjectReferenceField,
     CanonicalObjectReferenceFields, DataReferenceTransition, FieldDataReferenceTransition,
     FieldInfo, FieldPath, FieldType, KnownFieldRule, MessageInfo, MessageInfoCollection,
@@ -25,4 +25,6 @@ pub use archive::{
 };
 pub use error::{Error, HeaderKind, HeaderOperation, LimitKind, Result};
 pub use limits::Limits;
-pub use snappy::{SnappyLimits, SnappyStream};
+pub use snappy::{
+    SnappyCompressionPlan, SnappyCompressionRequirements, SnappyLimits, SnappyStream,
+};

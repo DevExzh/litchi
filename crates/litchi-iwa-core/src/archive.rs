@@ -4079,6 +4079,104 @@ pub struct Archive {
     pub objects: Vec<ArchiveObject>,
 }
 
+/// Source-derived resource requirements for one prepared archive encoding.
+///
+/// The byte fields are cumulative ledger quantities: a caller that retains
+/// the output and charges all temporary projection buffers can use this value
+/// before execution.  No allocator-dependent capacity estimate is included;
+/// every collection quantity is derived from the immutable neutral metadata.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ArchiveEncodingRequirements {
+    encoded_bytes: usize,
+    object_count: usize,
+    message_count: usize,
+    header_bytes: usize,
+    payload_bytes: usize,
+    work_bytes: usize,
+    scratch_bytes: usize,
+    retained_bytes: usize,
+    identifier_index_entries: usize,
+    allocation_events: usize,
+}
+
+impl ArchiveEncodingRequirements {
+    #[must_use]
+    pub const fn encoded_bytes(self) -> usize {
+        self.encoded_bytes
+    }
+
+    #[must_use]
+    pub const fn object_count(self) -> usize {
+        self.object_count
+    }
+
+    #[must_use]
+    pub const fn message_count(self) -> usize {
+        self.message_count
+    }
+
+    #[must_use]
+    pub const fn header_bytes(self) -> usize {
+        self.header_bytes
+    }
+
+    #[must_use]
+    pub const fn payload_bytes(self) -> usize {
+        self.payload_bytes
+    }
+
+    #[must_use]
+    pub const fn work_bytes(self) -> usize {
+        self.work_bytes
+    }
+
+    #[must_use]
+    pub const fn scratch_bytes(self) -> usize {
+        self.scratch_bytes
+    }
+
+    #[must_use]
+    pub const fn retained_bytes(self) -> usize {
+        self.retained_bytes
+    }
+
+    #[must_use]
+    pub const fn identifier_index_entries(self) -> usize {
+        self.identifier_index_entries
+    }
+
+    /// Output, identifier-index, projection and header allocations counted by
+    /// the prepared execution path.  A zero-sized archive performs no heap
+    /// allocation.
+    #[must_use]
+    pub const fn allocation_events(self) -> usize {
+        self.allocation_events
+    }
+}
+
+/// Allocation-free archive serialization admission bound to an immutable
+/// archive and one validated limit profile.
+#[derive(Debug, Clone, Copy)]
+pub struct ArchiveEncodingPlan<'a> {
+    archive: &'a Archive,
+    limits: Limits,
+    requirements: ArchiveEncodingRequirements,
+}
+
+impl ArchiveEncodingPlan<'_> {
+    #[must_use]
+    pub const fn requirements(&self) -> ArchiveEncodingRequirements {
+        self.requirements
+    }
+
+    /// Execute the prepared route.  The borrowed archive cannot change while
+    /// this plan exists, so the source-derived requirements cannot become
+    /// stale between admission and publication.
+    pub fn execute(self) -> Result<Vec<u8>> {
+        encode_prepared_archive(self.archive, self.limits, self.requirements)
+    }
+}
+
 impl Archive {
     /// Construct an empty archive.
     #[must_use]
@@ -4112,6 +4210,35 @@ impl Archive {
         limits: Limits,
     ) -> Result<Self> {
         Self::parse_internal_with_limits(data, limits, Some(identifier))
+    }
+
+    /// Prepare an allocation-free, source-bound serialization route.
+    ///
+    /// Preparation validates identifiers, metadata, framing and retained raw
+    /// headers without materializing compatibility projections or output.
+    /// Identifier presence is checked during preparation; duplicate identity
+    /// is checked by the exact fallibly reserved index immediately before
+    /// execution so preparation itself remains allocation-free.
+    /// `admit_work` is called with one phase unit immediately before each
+    /// bounded metadata, retained-header, payload, and projection-sizing
+    /// traversal. Its error is returned unchanged. The returned requirements
+    /// describe execution-only projection and output quantities; callers must
+    /// not charge preparation units a second time from that report.
+    pub fn prepare_encoding<F>(
+        &self,
+        limits: Limits,
+        mut admit_work: F,
+    ) -> Result<ArchiveEncodingPlan<'_>>
+    where
+        F: FnMut(usize) -> Result<()>,
+    {
+        let requirements =
+            prepare_archive_encoding_requirements(&self.objects, limits, &mut admit_work)?;
+        Ok(ArchiveEncodingPlan {
+            archive: self,
+            limits,
+            requirements,
+        })
     }
 
     fn parse_internal_with_limits(
@@ -9262,9 +9389,17 @@ fn short_bytes_equal(left: &[u8], right: &[u8]) -> bool {
 }
 
 fn encoded_archive_len_preflight(objects: &[ArchiveObject], limits: Limits) -> Result<usize> {
+    let first_duplicate = first_duplicate_identifier(objects, limits)?;
+    encoded_archive_len_preflight_with_duplicate(objects, limits, first_duplicate)
+}
+
+fn encoded_archive_len_preflight_with_duplicate(
+    objects: &[ArchiveObject],
+    limits: Limits,
+    first_duplicate: Option<usize>,
+) -> Result<usize> {
     let mut archive_length = 0usize;
     let mut total_messages = 0usize;
-    let first_duplicate = first_duplicate_identifier(objects, limits)?;
 
     for (object_index, object) in objects.iter().enumerate() {
         if object_index >= limits.max_objects() {
@@ -9331,6 +9466,485 @@ fn encoded_archive_len_preflight(objects: &[ArchiveObject], limits: Limits) -> R
         )?;
     }
     Ok(archive_length)
+}
+
+fn prepare_archive_encoding_requirements<F>(
+    objects: &[ArchiveObject],
+    limits: Limits,
+    admit_work: &mut F,
+) -> Result<ArchiveEncodingRequirements>
+where
+    F: FnMut(usize) -> Result<()>,
+{
+    // Duplicate identity is checked by the exact fallibly reserved index in
+    // `encode_prepared_archive`. Preparation intentionally does not allocate
+    // an index just to run a second census; all other framing and metadata
+    // checks remain allocation-free here.
+    let mut archive_length = 0usize;
+    let mut header_bytes = 0usize;
+    let mut payload_bytes = 0usize;
+    let mut work_bytes = 0usize;
+    let mut scratch_bytes = 0usize;
+    let mut message_count = 0usize;
+    let mut total_messages = 0usize;
+    let mut allocation_events = 0usize;
+
+    for (object_index, object) in objects.iter().enumerate() {
+        if object_index >= limits.max_objects() {
+            return Err(limit(
+                LimitKind::Objects,
+                object_index.saturating_add(1),
+                limits.max_objects(),
+            ));
+        }
+        object.archive_info.identifier.ok_or_else(|| {
+            Error::invalid_archive(object_index, "object is missing its archive identifier")
+        })?;
+        if object.archive_info.message_infos.len() != object.messages.len() {
+            return Err(Error::invalid_archive(
+                object_index,
+                "message metadata and payload counts differ",
+            ));
+        }
+        admit_work(1)?;
+        let admission = check_archive_info_constructor(&object.archive_info, limits)?;
+        add_limited(
+            &mut total_messages,
+            object.messages.len(),
+            LimitKind::Messages,
+            limits.max_messages(),
+        )?;
+        admit_work(1)?;
+        let (canonical_header_length, header_length) =
+            retained_header_length_for_object(object, limits)?;
+        if admission.header_length != canonical_header_length {
+            return Err(Error::invalid_archive(
+                object_index,
+                "prepared ArchiveInfo length disagrees with canonical emission",
+            ));
+        }
+        check_header_length(canonical_header_length, limits)?;
+        check_header_length(header_length, limits)?;
+        header_bytes = header_bytes
+            .checked_add(header_length)
+            .ok_or_else(|| Error::invalid_archive(object_index, "header byte count overflow"))?;
+
+        admit_work(1)?;
+        let mut object_payload_bytes = 0usize;
+        for message in &object.messages {
+            check_message_length(message.data.len(), limits)?;
+            object_payload_bytes = object_payload_bytes
+                .checked_add(message.data.len())
+                .ok_or_else(|| {
+                    Error::invalid_archive(object_index, "payload byte count overflow")
+                })?;
+        }
+        payload_bytes = payload_bytes
+            .checked_add(object_payload_bytes)
+            .ok_or_else(|| Error::invalid_archive(object_index, "payload byte count overflow"))?;
+        message_count = message_count
+            .checked_add(object.messages.len())
+            .ok_or_else(|| Error::invalid_archive(object_index, "message count overflow"))?;
+
+        let object_length = varint_len(header_length)?
+            .checked_add(header_length)
+            .and_then(|length| length.checked_add(object_payload_bytes))
+            .ok_or_else(|| Error::invalid_archive(object_index, "object length overflow"))?;
+        if object_length > limits.max_object_bytes() {
+            return Err(limit(
+                LimitKind::ObjectBytes,
+                object_length,
+                limits.max_object_bytes(),
+            ));
+        }
+        add_limited(
+            &mut archive_length,
+            object_length,
+            LimitKind::ArchiveBytes,
+            limits.max_archive_bytes(),
+        )?;
+
+        admit_work(1)?;
+        let neutral_bytes = archive_info_clone_memory(&object.archive_info)?;
+        admit_work(1)?;
+        let compatibility_bytes = archive_info_codec_memory(&object.archive_info)?;
+        let object_scratch = neutral_bytes
+            .checked_add(compatibility_bytes)
+            .and_then(|value| value.checked_add(header_length))
+            .ok_or_else(|| Error::invalid_archive(object_index, "encoding scratch overflow"))?;
+        scratch_bytes = scratch_bytes
+            .checked_add(object_scratch)
+            .ok_or_else(|| Error::invalid_archive(object_index, "encoding scratch overflow"))?;
+        work_bytes = work_bytes
+            .checked_add(admission.header_memory)
+            .and_then(|value| value.checked_add(header_length))
+            .and_then(|value| value.checked_add(object_payload_bytes))
+            .ok_or_else(|| Error::invalid_archive(object_index, "encoding work overflow"))?;
+        admit_work(1)?;
+        let neutral_allocations = archive_info_clone_allocations(&object.archive_info)?;
+        admit_work(1)?;
+        let compatibility_allocations = archive_info_codec_allocations(&object.archive_info)?;
+        allocation_events = allocation_events
+            .checked_add(neutral_allocations)
+            .ok_or_else(|| Error::invalid_archive(object_index, "allocation count overflow"))?;
+        allocation_events = allocation_events
+            .checked_add(compatibility_allocations)
+            .and_then(|value| value.checked_add(usize::from(header_length != 0)))
+            .ok_or_else(|| Error::invalid_archive(object_index, "allocation count overflow"))?;
+    }
+
+    let encoded_bytes = archive_length;
+    let retained_bytes = encoded_bytes;
+    allocation_events = allocation_events
+        .checked_add(usize::from(encoded_bytes != 0))
+        .ok_or_else(|| Error::invalid_archive(0, "allocation count overflow"))?;
+    let identifier_index_entries = objects.len();
+    if identifier_index_entries != 0 {
+        allocation_events = allocation_events
+            .checked_add(1)
+            .ok_or_else(|| Error::invalid_archive(0, "allocation count overflow"))?;
+    }
+    let identifier_index_bytes = identifier_index_entries
+        .checked_mul(size_of::<(u64, usize)>())
+        .ok_or_else(|| Error::invalid_archive(0, "identifier index size overflow"))?;
+    scratch_bytes = scratch_bytes
+        .checked_add(identifier_index_bytes)
+        .ok_or_else(|| Error::invalid_archive(0, "encoding scratch overflow"))?;
+    work_bytes = work_bytes
+        .checked_add(identifier_index_entries)
+        .ok_or_else(|| Error::invalid_archive(0, "encoding work overflow"))?;
+    Ok(ArchiveEncodingRequirements {
+        encoded_bytes,
+        object_count: objects.len(),
+        message_count,
+        header_bytes,
+        payload_bytes,
+        work_bytes,
+        scratch_bytes,
+        retained_bytes,
+        identifier_index_entries,
+        allocation_events,
+    })
+}
+
+fn encode_prepared_archive(
+    archive: &Archive,
+    limits: Limits,
+    requirements: ArchiveEncodingRequirements,
+) -> Result<Vec<u8>> {
+    if archive.objects.len() != requirements.object_count {
+        return Err(Error::invalid_archive(
+            0,
+            "prepared archive object count changed",
+        ));
+    }
+    let mut identifiers = Vec::new();
+    identifiers
+        .try_reserve_exact(requirements.identifier_index_entries)
+        .map_err(|_| {
+            Error::allocation(
+                "prepared IWA archive identifiers",
+                requirements.identifier_index_entries * size_of::<(u64, usize)>(),
+            )
+        })?;
+    for (object_index, object) in archive.objects.iter().enumerate() {
+        let identifier = object.archive_info.identifier.ok_or_else(|| {
+            Error::invalid_archive(object_index, "object is missing its archive identifier")
+        })?;
+        identifiers.push((identifier, object_index));
+    }
+    identifiers.sort_unstable_by_key(|(identifier, _)| *identifier);
+    if let Some(pair) = identifiers.windows(2).find(|pair| pair[0].0 == pair[1].0) {
+        return Err(Error::invalid_archive(
+            pair[1].1,
+            "duplicate object identifier",
+        ));
+    }
+
+    let mut output = Vec::new();
+    output
+        .try_reserve_exact(requirements.encoded_bytes)
+        .map_err(|_| {
+            Error::allocation("IWA prepared archive output", requirements.encoded_bytes)
+        })?;
+    for (object_index, object) in archive.objects.iter().enumerate() {
+        let mut info = object.archive_info.clone();
+        for (message_info, message) in info.message_infos.iter_mut().zip(&object.messages) {
+            message_info.type_ = message.type_;
+            message_info.length = u32::try_from(message.data.len())
+                .map_err(|_| Error::invalid_archive(object_index, "message payload exceeds u32"))?;
+        }
+        let canonical_header = encode_archive_info(&info, limits)?;
+        let header = match object.source_headers() {
+            Some((original, canonical)) if canonical == canonical_header.as_slice() => original,
+            _ => canonical_header.as_slice(),
+        };
+        let header_length = header.len();
+        let prefix_length = varint_len(header_length)?;
+        let payload_length = object.messages.iter().try_fold(0usize, |total, message| {
+            total
+                .checked_add(message.data.len())
+                .ok_or_else(|| Error::invalid_archive(object_index, "payload length overflow"))
+        })?;
+        let object_length = prefix_length
+            .checked_add(header_length)
+            .and_then(|length| length.checked_add(payload_length))
+            .ok_or_else(|| Error::invalid_archive(object_index, "object length overflow"))?;
+        if object_length > limits.max_object_bytes() {
+            return Err(limit(
+                LimitKind::ObjectBytes,
+                object_length,
+                limits.max_object_bytes(),
+            ));
+        }
+        let next_length = output
+            .len()
+            .checked_add(object_length)
+            .ok_or_else(|| Error::invalid_archive(object_index, "archive length overflow"))?;
+        if next_length > limits.max_archive_bytes() {
+            return Err(limit(
+                LimitKind::ArchiveBytes,
+                next_length,
+                limits.max_archive_bytes(),
+            ));
+        }
+        let mut prefix = [0u8; MAX_VARINT_BYTES];
+        let prefix = encode_varint(
+            u64::try_from(header_length)
+                .map_err(|_| Error::invalid_archive(object_index, "header length exceeds u64"))?,
+            &mut prefix,
+        );
+        output.extend_from_slice(prefix);
+        output.extend_from_slice(header);
+        for message in &object.messages {
+            output.extend_from_slice(&message.data);
+        }
+    }
+    if output.len() != requirements.encoded_bytes {
+        return Err(Error::invalid_archive(
+            0,
+            "prepared archive output length changed",
+        ));
+    }
+    Ok(output)
+}
+
+fn add_memory_bytes(total: &mut usize, length: usize, element_size: usize) -> Result<()> {
+    let bytes = length
+        .checked_mul(element_size)
+        .ok_or_else(|| Error::invalid_archive(0, "encoding allocation size overflow"))?;
+    *total = checked_memory_add(*total, bytes)?;
+    Ok(())
+}
+
+fn add_allocation_count(total: &mut usize, present: bool) -> Result<()> {
+    if present {
+        *total = total
+            .checked_add(1)
+            .ok_or_else(|| Error::invalid_archive(0, "encoding allocation count overflow"))?;
+    }
+    Ok(())
+}
+
+fn field_path_clone_memory(path: &FieldPath) -> Result<usize> {
+    path.path
+        .len()
+        .checked_mul(size_of::<u32>())
+        .ok_or_else(|| Error::invalid_archive(0, "field path allocation size overflow"))
+}
+
+fn field_info_clone_memory(info: &FieldInfo) -> Result<usize> {
+    let mut total = size_of::<FieldInfo>();
+    total = checked_memory_add(total, field_path_clone_memory(&info.path)?)?;
+    add_memory_bytes(&mut total, info.object_references.len(), size_of::<u64>())?;
+    add_memory_bytes(&mut total, info.data_references.len(), size_of::<u64>())?;
+    add_memory_bytes(&mut total, info.known_field_version.len(), size_of::<u32>())?;
+    total = checked_memory_add(
+        total,
+        info.known_field_feature_identifier
+            .as_deref()
+            .map_or(0, str::len),
+    )?;
+    Ok(total)
+}
+
+fn message_info_clone_memory(info: &MessageInfo) -> Result<usize> {
+    let mut total = size_of::<MessageInfo>();
+    if info.versions.spilled() {
+        add_memory_bytes(&mut total, info.versions.len(), size_of::<u32>())?;
+    }
+    for field_info in &info.field_infos {
+        total = checked_memory_add(total, field_info_clone_memory(field_info)?)?;
+    }
+    add_memory_bytes(&mut total, info.object_references.len(), size_of::<u64>())?;
+    add_memory_bytes(&mut total, info.data_references.len(), size_of::<u64>())?;
+    add_memory_bytes(&mut total, info.diff_merge_version.len(), size_of::<u32>())?;
+    if let Some(path) = &info.diff_field_path {
+        total = checked_memory_add(total, field_path_clone_memory(path)?)?;
+    }
+    add_memory_bytes(
+        &mut total,
+        info.fields_to_remove.len(),
+        size_of::<FieldPath>(),
+    )?;
+    for path in &info.fields_to_remove {
+        total = checked_memory_add(total, field_path_clone_memory(path)?)?;
+    }
+    add_memory_bytes(&mut total, info.diff_read_version.len(), size_of::<u32>())?;
+    Ok(total)
+}
+
+fn archive_info_clone_memory(info: &ArchiveInfo) -> Result<usize> {
+    let mut total = size_of::<ArchiveInfo>();
+    for message_info in &info.message_infos {
+        total = checked_memory_add(total, message_info_clone_memory(message_info)?)?;
+    }
+    Ok(total)
+}
+
+fn field_info_codec_memory(info: &FieldInfo) -> Result<usize> {
+    let mut total = size_of::<archive_codec::FieldInfo>();
+    add_memory_bytes(&mut total, info.path.path.len(), size_of::<u32>())?;
+    add_memory_bytes(&mut total, info.object_references.len(), size_of::<u64>())?;
+    add_memory_bytes(&mut total, info.data_references.len(), size_of::<u64>())?;
+    add_memory_bytes(&mut total, info.known_field_version.len(), size_of::<u32>())?;
+    total = checked_memory_add(
+        total,
+        info.known_field_feature_identifier
+            .as_deref()
+            .map_or(0, str::len),
+    )?;
+    Ok(total)
+}
+
+fn message_info_codec_memory(info: &MessageInfo) -> Result<usize> {
+    let mut total = size_of::<archive_codec::MessageInfo>();
+    add_memory_bytes(&mut total, info.versions.len(), size_of::<u32>())?;
+    for field_info in &info.field_infos {
+        total = checked_memory_add(total, field_info_codec_memory(field_info)?)?;
+    }
+    add_memory_bytes(&mut total, info.object_references.len(), size_of::<u64>())?;
+    add_memory_bytes(&mut total, info.data_references.len(), size_of::<u64>())?;
+    add_memory_bytes(&mut total, info.diff_merge_version.len(), size_of::<u32>())?;
+    if let Some(path) = &info.diff_field_path {
+        add_memory_bytes(&mut total, path.path.len(), size_of::<u32>())?;
+    }
+    add_memory_bytes(
+        &mut total,
+        info.fields_to_remove.len(),
+        size_of::<archive_codec::FieldPath>(),
+    )?;
+    for path in &info.fields_to_remove {
+        add_memory_bytes(&mut total, path.path.len(), size_of::<u32>())?;
+    }
+    add_memory_bytes(&mut total, info.diff_read_version.len(), size_of::<u32>())?;
+    Ok(total)
+}
+
+fn archive_info_codec_memory(info: &ArchiveInfo) -> Result<usize> {
+    let mut total = size_of::<archive_codec::ArchiveInfo>();
+    for message_info in &info.message_infos {
+        total = checked_memory_add(total, message_info_codec_memory(message_info)?)?;
+    }
+    Ok(total)
+}
+
+fn field_info_clone_allocations(info: &FieldInfo) -> Result<usize> {
+    let mut total = 0usize;
+    add_allocation_count(&mut total, !info.path.path.is_empty())?;
+    add_allocation_count(&mut total, !info.object_references.is_empty())?;
+    add_allocation_count(&mut total, !info.data_references.is_empty())?;
+    add_allocation_count(&mut total, !info.known_field_version.is_empty())?;
+    add_allocation_count(
+        &mut total,
+        info.known_field_feature_identifier
+            .as_deref()
+            .is_some_and(|value| !value.is_empty()),
+    )?;
+    Ok(total)
+}
+
+fn message_info_clone_allocations(info: &MessageInfo) -> Result<usize> {
+    let mut total = 0usize;
+    add_allocation_count(&mut total, info.versions.spilled())?;
+    add_allocation_count(&mut total, !info.field_infos.is_empty())?;
+    for field_info in &info.field_infos {
+        total = total
+            .checked_add(field_info_clone_allocations(field_info)?)
+            .ok_or_else(|| Error::invalid_archive(0, "encoding allocation count overflow"))?;
+    }
+    add_allocation_count(&mut total, !info.object_references.is_empty())?;
+    add_allocation_count(&mut total, !info.data_references.is_empty())?;
+    add_allocation_count(&mut total, !info.diff_merge_version.is_empty())?;
+    if let Some(path) = &info.diff_field_path {
+        add_allocation_count(&mut total, !path.path.is_empty())?;
+    }
+    add_allocation_count(&mut total, !info.fields_to_remove.is_empty())?;
+    for path in &info.fields_to_remove {
+        add_allocation_count(&mut total, !path.path.is_empty())?;
+    }
+    add_allocation_count(&mut total, !info.diff_read_version.is_empty())?;
+    Ok(total)
+}
+
+fn archive_info_clone_allocations(info: &ArchiveInfo) -> Result<usize> {
+    let mut total = 0usize;
+    add_allocation_count(&mut total, !info.message_infos.is_empty())?;
+    for message_info in &info.message_infos {
+        total = total
+            .checked_add(message_info_clone_allocations(message_info)?)
+            .ok_or_else(|| Error::invalid_archive(0, "encoding allocation count overflow"))?;
+    }
+    Ok(total)
+}
+
+fn field_info_codec_allocations(info: &FieldInfo) -> Result<usize> {
+    let mut total = 0usize;
+    add_allocation_count(&mut total, !info.path.path.is_empty())?;
+    add_allocation_count(&mut total, !info.object_references.is_empty())?;
+    add_allocation_count(&mut total, !info.data_references.is_empty())?;
+    add_allocation_count(&mut total, !info.known_field_version.is_empty())?;
+    add_allocation_count(
+        &mut total,
+        info.known_field_feature_identifier
+            .as_deref()
+            .is_some_and(|value| !value.is_empty()),
+    )?;
+    Ok(total)
+}
+
+fn message_info_codec_allocations(info: &MessageInfo) -> Result<usize> {
+    let mut total = 0usize;
+    add_allocation_count(&mut total, !info.versions.is_empty())?;
+    add_allocation_count(&mut total, !info.field_infos.is_empty())?;
+    for field_info in &info.field_infos {
+        total = total
+            .checked_add(field_info_codec_allocations(field_info)?)
+            .ok_or_else(|| Error::invalid_archive(0, "encoding allocation count overflow"))?;
+    }
+    add_allocation_count(&mut total, !info.object_references.is_empty())?;
+    add_allocation_count(&mut total, !info.data_references.is_empty())?;
+    add_allocation_count(&mut total, !info.diff_merge_version.is_empty())?;
+    if let Some(path) = &info.diff_field_path {
+        add_allocation_count(&mut total, !path.path.is_empty())?;
+    }
+    add_allocation_count(&mut total, !info.fields_to_remove.is_empty())?;
+    for path in &info.fields_to_remove {
+        add_allocation_count(&mut total, !path.path.is_empty())?;
+    }
+    add_allocation_count(&mut total, !info.diff_read_version.is_empty())?;
+    Ok(total)
+}
+
+fn archive_info_codec_allocations(info: &ArchiveInfo) -> Result<usize> {
+    let mut total = 0usize;
+    add_allocation_count(&mut total, !info.message_infos.is_empty())?;
+    for message_info in &info.message_infos {
+        total = total
+            .checked_add(message_info_codec_allocations(message_info)?)
+            .ok_or_else(|| Error::invalid_archive(0, "encoding allocation count overflow"))?;
+    }
+    Ok(total)
 }
 
 fn canonical_archive_info_length_for_object(object: &ArchiveObject) -> Result<usize> {
@@ -10558,6 +11172,12 @@ mod tests {
             objects: vec![object],
         };
         let encoded = archive.to_bytes(Default::default())?;
+        assert_eq!(
+            archive
+                .prepare_encoding(Default::default(), |_| Ok(()))?
+                .execute()?,
+            encoded
+        );
         assert_eq!(archive.encoded_len(Default::default())?, encoded.len());
         assert_eq!(archive.encoded_len(Limits::default())?, encoded.len());
         let encoded_info = archive_info_to_codec(&archive.objects[0].archive_info)?;
@@ -10571,6 +11191,147 @@ mod tests {
             archive_info_encoded_len(&archive.objects[0].archive_info)?,
             codec_length
         );
+        Ok(())
+    }
+
+    #[test]
+    fn prepared_encoding_matches_legacy_for_large_archive() -> Result<()> {
+        let mut objects = Vec::new();
+        for identifier in 1..=33u64 {
+            objects.push(ArchiveObject::new(
+                identifier,
+                vec![RawMessage {
+                    type_: identifier as u32,
+                    data: vec![identifier as u8, 0x7f],
+                }],
+                Limits::default(),
+            )?);
+        }
+        let archive = Archive { objects };
+        let legacy = archive.to_bytes(Limits::default())?;
+        let plan = archive.prepare_encoding(Limits::default(), |_| Ok(()))?;
+        let requirements = plan.requirements();
+        assert_eq!(requirements.object_count(), 33);
+        assert_eq!(requirements.message_count(), 33);
+        assert_eq!(requirements.identifier_index_entries(), 33);
+        assert_eq!(requirements.encoded_bytes(), legacy.len());
+        assert!(requirements.scratch_bytes() > 33 * size_of::<u64>());
+        assert_eq!(plan.execute()?, legacy);
+        Ok(())
+    }
+
+    #[test]
+    fn prepared_encoding_preserves_unknown_retained_headers() -> Result<()> {
+        let mut object = ArchiveObject::new(
+            901,
+            vec![RawMessage {
+                type_: 7,
+                data: vec![1, 2, 3],
+            }],
+            Limits::default(),
+        )?;
+        let canonical = encode_archive_info(&object.archive_info, Limits::default())?;
+        let mut raw = canonical.clone();
+        raw.extend_from_slice(&[0xb5, 0x0c, 0x01, 0x02, 0x03]);
+        object.set_test_source_headers(
+            Some(raw.clone().into_boxed_slice()),
+            Some(canonical.into_boxed_slice()),
+        );
+        let archive = Archive {
+            objects: vec![object],
+        };
+        let legacy = archive.to_bytes(Limits::default())?;
+        let prepared = archive
+            .prepare_encoding(Limits::default(), |_| Ok(()))?
+            .execute()?;
+        assert_eq!(prepared, legacy);
+        let (header, _) = split_test_archive(&prepared)?;
+        assert!(header.starts_with(&raw));
+        Ok(())
+    }
+
+    #[test]
+    fn prepared_encoding_rejects_duplicate_and_tight_limits() -> Result<()> {
+        let mut duplicate_objects = Vec::new();
+        for identifier in 1..=33u64 {
+            duplicate_objects.push(ArchiveObject::new(
+                if identifier == 33 { 1 } else { identifier },
+                vec![RawMessage {
+                    type_: 1,
+                    data: vec![0xaa],
+                }],
+                Limits::default(),
+            )?);
+        }
+        let duplicate = Archive {
+            objects: duplicate_objects,
+        };
+        let duplicate_plan = duplicate.prepare_encoding(Limits::default(), |_| Ok(()))?;
+        assert!(matches!(
+            duplicate_plan.execute(),
+            Err(Error::InvalidArchive {
+                reason: "duplicate object identifier",
+                ..
+            })
+        ));
+
+        let two = Archive {
+            objects: vec![
+                ArchiveObject::new(
+                    1,
+                    vec![RawMessage {
+                        type_: 1,
+                        data: vec![1],
+                    }],
+                    Limits::default(),
+                )?,
+                ArchiveObject::new(
+                    2,
+                    vec![RawMessage {
+                        type_: 1,
+                        data: vec![2],
+                    }],
+                    Limits::default(),
+                )?,
+            ],
+        };
+        let one_object = Limits::default().with_objects(1)?;
+        assert!(matches!(
+            two.prepare_encoding(one_object, |_| Ok(())),
+            Err(Error::Limit {
+                kind: LimitKind::Objects,
+                observed: 2,
+                maximum: 1,
+            })
+        ));
+        assert!(matches!(
+            Limits::default().with_archive_bytes(0),
+            Err(Error::InvalidLimits { .. })
+        ));
+        Ok(())
+    }
+
+    #[test]
+    fn prepared_encoding_honors_work_admission_before_metadata() -> Result<()> {
+        let archive = Archive {
+            objects: vec![ArchiveObject::new(
+                11,
+                vec![RawMessage {
+                    type_: 1,
+                    data: vec![1, 2],
+                }],
+                Limits::default(),
+            )?],
+        };
+        let mut phases = 0usize;
+        let error = archive
+            .prepare_encoding(Limits::default(), |units| {
+                phases = phases.checked_add(units).unwrap();
+                Err(Error::allocation("test preparation ledger", units))
+            })
+            .expect_err("preparation work refusal");
+        assert_eq!(phases, 1);
+        assert!(matches!(error, Error::Allocation { requested: 1, .. }));
         Ok(())
     }
 
