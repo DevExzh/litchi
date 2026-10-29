@@ -12,6 +12,7 @@
 )]
 
 use std::fmt;
+use std::mem::size_of;
 use std::sync::Arc;
 
 use litchi_iwa_archive::package::ExactArtifacts;
@@ -420,20 +421,46 @@ fn map_chart_metadata_decode_error(error: chart_metadata_codec::DecodeError) -> 
     Error::InvalidSource
 }
 
-struct PackageComponents<'a>(&'a Package);
+struct LeafComponents<'a> {
+    components: Vec<(&'a str, &'a Archive)>,
+}
 
-impl Components for PackageComponents<'_> {
+impl<'a> LeafComponents<'a> {
+    fn view_requirements(package: &Package) -> Result<(usize, usize), Error> {
+        let count = package.state.source.components().len();
+        let bytes = count
+            .checked_mul(size_of::<(&str, &Archive)>())
+            .and_then(|value| value.checked_add(size_of::<Self>()))
+            .ok_or(Error::InvalidSource)?;
+        Ok((usize::from(count != 0).saturating_add(1), bytes))
+    }
+
+    fn new(package: &'a Package) -> Result<Self, Error> {
+        let count = package.state.source.components().len();
+        let mut components = Vec::new();
+        components
+            .try_reserve_exact(count)
+            .map_err(|_| Error::Allocation { amount: count })?;
+        for index in 0..count {
+            let component = package
+                .state
+                .source
+                .components()
+                .get_index(index)
+                .ok_or(Error::InvalidSource)?;
+            components.push((component.name(), component.archive()));
+        }
+        Ok(Self { components })
+    }
+}
+
+impl Components for LeafComponents<'_> {
     fn count(&self) -> usize {
-        self.0.state.source.components().len()
+        self.components.len()
     }
 
     fn component(&self, index: usize) -> Option<(&str, &Archive)> {
-        self.0
-            .state
-            .source
-            .components()
-            .get_index(index)
-            .map(|component| (component.name(), component.archive()))
+        self.components.get(index).copied()
     }
 }
 
@@ -458,31 +485,63 @@ fn transaction_fields(package: &Package) -> Result<FieldLedger, Error> {
     slide_chart_font::field_ledger_for_series(package).map_err(map_axis_support_error)
 }
 
-fn admit_workspace(package: &Package, budget: &mut TransactionBudget) -> Result<(), Error> {
+struct WorkspaceAdmission<'a> {
+    components: Box<LeafComponents<'a>>,
+    requirements: graph::ConstructionRequirements,
+    limits: graph::ConstructionLimits,
+}
+
+fn map_construction(error: graph::ConstructionError) -> Error {
+    match error {
+        graph::ConstructionError::Graph(error) => map_graph(error),
+        graph::ConstructionError::Limit {
+            kind,
+            observed,
+            maximum,
+        } => Error::Limit {
+            kind: match kind {
+                graph::ConstructionLimitKind::Work => LimitKind::WireWork,
+                graph::ConstructionLimitKind::Allocations => LimitKind::Allocations,
+                graph::ConstructionLimitKind::RetainedBytes => LimitKind::RetainedBytes,
+                graph::ConstructionLimitKind::ScratchBytes => LimitKind::ScratchBytes,
+                _ => return Error::InvalidSource,
+            },
+            observed: observed as u64,
+            maximum: maximum as u64,
+        },
+        graph::ConstructionError::Allocation { amount } => Error::Allocation { amount },
+        _ => Error::InvalidSource,
+    }
+}
+
+fn admit_workspace<'a>(
+    package: &'a Package,
+    budget: &mut TransactionBudget,
+) -> Result<WorkspaceAdmission<'a>, Error> {
     let components = package.state.source.components();
     let component_count = components.len();
     let object_count = package.state.total_objects;
-    let index_units = object_count
-        .checked_mul(4)
-        .and_then(|value| value.checked_add(component_count))
-        .ok_or(Error::InvalidSource)?;
-    let index_bytes = index_units
-        .checked_mul(size_of::<(u64, usize)>() * 2)
-        .ok_or(Error::InvalidSource)?;
+    let (view_allocations, view_retained) = LeafComponents::view_requirements(package)?;
+    budget
+        .allocations(view_allocations)
+        .and_then(|_| budget.retained(view_retained))
+        .map_err(map_transaction_error)?;
+    let components_view = Box::new(LeafComponents::new(package)?);
+    let construction_limits = budget
+        .construction_limits()
+        .map_err(map_transaction_error)?;
+    let requirements = Workspace::construction_requirements(&*components_view, construction_limits)
+        .map_err(map_construction)?;
     budget
         .components(component_count)
         .and_then(|_| budget.payload_objects(object_count))
-        .and_then(|_| {
-            budget.work(
-                component_count
-                    .checked_add(object_count)
-                    .ok_or(TransactionError::InvalidSource)?,
-            )
-        })
-        .and_then(|_| budget.allocations(index_units))
-        .and_then(|_| budget.retained(index_bytes))
-        .and_then(|_| budget.scratch(index_bytes))
+        .and_then(|_| budget.charge_construction(requirements, 2))
         .map_err(map_transaction_error)
+        .map(|()| WorkspaceAdmission {
+            components: components_view,
+            requirements,
+            limits: construction_limits,
+        })
 }
 
 fn map_transaction_error(error: TransactionError) -> Error {
@@ -1193,10 +1252,19 @@ impl<'a> Edit<'a> {
         budget
             .preflight_semantic_scan(self.source)
             .map_err(map_transaction_error)?;
-        admit_workspace(self.source, &mut budget)?;
-        let components = PackageComponents(self.source);
-        let mut workspace =
-            Workspace::new(&components, graph_limits(self.source)?).map_err(map_graph)?;
+        let admission = admit_workspace(self.source, &mut budget)?;
+        let WorkspaceAdmission {
+            components,
+            requirements,
+            limits,
+        } = admission;
+        let mut workspace = Workspace::new_bounded(
+            &*components,
+            graph_limits(self.source)?,
+            requirements,
+            limits,
+        )
+        .map_err(map_construction)?;
         let limits = series_limits(self.source, &budget, &fields)?;
         let (changed, report) = engine::set_symbols(
             &mut workspace,
@@ -1269,9 +1337,15 @@ fn read_symbols(
     budget: &mut TransactionBudget,
     fields: &mut FieldLedger,
 ) -> Result<Vec<Option<Symbol>>, Error> {
-    admit_workspace(package, budget)?;
-    let components = PackageComponents(package);
-    let workspace = Workspace::new(&components, graph_limits(package)?).map_err(map_graph)?;
+    let admission = admit_workspace(package, budget)?;
+    let WorkspaceAdmission {
+        components,
+        requirements,
+        limits,
+    } = admission;
+    let workspace =
+        Workspace::new_bounded(&*components, graph_limits(package)?, requirements, limits)
+            .map_err(map_construction)?;
     let limits = series_limits(package, budget, fields)?;
     let (values, report) =
         engine::symbols(&workspace, selection.identifier, family, series, limits)

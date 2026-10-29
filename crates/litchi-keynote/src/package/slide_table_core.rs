@@ -448,6 +448,34 @@ impl Budget {
         Self::remaining(self.scratch, self.max_scratch, LimitKind::Scratch)
     }
 
+    pub(crate) fn construction_limits(
+        &self,
+    ) -> Result<litchi_iwa_style::graph::ConstructionLimits> {
+        Ok(litchi_iwa_style::graph::ConstructionLimits::new(
+            self.remaining_work()?,
+            self.remaining_allocations()?,
+            self.remaining_retained()?,
+            self.remaining_scratch()?,
+        ))
+    }
+
+    pub(crate) fn charge_construction(
+        &mut self,
+        requirements: litchi_iwa_style::graph::ConstructionRequirements,
+        passes: usize,
+    ) -> Result<()> {
+        self.work(
+            requirements
+                .source_work()
+                .checked_mul(passes)
+                .ok_or(Error::InvalidSource)?,
+        )?;
+        self.allocations(requirements.index_allocations())?;
+        self.retained(requirements.index_retained_bytes())?;
+        self.scratch(requirements.index_scratch_bytes())?;
+        Ok(())
+    }
+
     /// Build one residual table-model policy for either a read or prepared
     /// rewrite.  Every allocation-bearing ceiling is derived from the same
     /// operation ledger; callers must not substitute a source-sized or
