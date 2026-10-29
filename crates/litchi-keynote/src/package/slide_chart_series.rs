@@ -194,6 +194,9 @@ pub enum Error {
     /// A bounded allocation failed.
     #[error("could not allocate {amount} Keynote chart-series units")]
     Allocation { amount: usize },
+    /// A finite finalization calculation overflowed before allocation.
+    #[error("Keynote chart-series finalization arithmetic overflow")]
+    Overflow,
     /// The reopened candidate failed semantic verification.
     #[error("the Keynote chart-series candidate failed verification")]
     Verification,
@@ -606,7 +609,7 @@ fn map_finish_error(error: graph::FinishError) -> Error {
             maximum: maximum as u64,
         },
         graph::FinishError::Allocation { amount } => Error::Allocation { amount },
-        graph::FinishError::Overflow(_) => Error::InvalidSource,
+        graph::FinishError::Overflow(_) => Error::Overflow,
         _ => Error::InvalidSource,
     }
 }
@@ -732,6 +735,9 @@ const fn is_series_rewritable_type(message_type: u32) -> bool {
 
 fn map_font_error(error: slide_chart_font::Error) -> Error {
     match error {
+        slide_chart_font::Error::Refused(slide_chart_font::Refusal::UnsupportedArchiveInfo) => {
+            Refusal::UnsupportedDependency.into()
+        },
         slide_chart_font::Error::Refused(_) => Refusal::UnsupportedSource.into(),
         slide_chart_font::Error::Limit {
             kind,
