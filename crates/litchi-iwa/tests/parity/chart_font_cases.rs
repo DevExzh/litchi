@@ -453,6 +453,8 @@ fn pages_facade_font_read_cost_instruction() -> TestResult {
     let (source, target, chart) = pages_facade_fixture()?;
     std::hint::black_box(host_read(&source, target, chart)?);
     std::hint::black_box(pages_facade_read_font_route(&source)?);
+    std::hint::black_box(pages_facade_read_font_route(&source)?);
+    std::hint::black_box(host_read(&source, target, chart)?);
     Ok(())
 }
 
@@ -463,6 +465,8 @@ fn pages_facade_font_set_cost_instruction() -> TestResult {
     let change = georgia()?;
     std::hint::black_box(pages_facade_host_route(&source, target, chart, &change)?);
     std::hint::black_box(pages_facade_write_route(&source, &change)?);
+    std::hint::black_box(pages_facade_write_route(&source, &change)?);
+    std::hint::black_box(pages_facade_host_route(&source, target, chart, &change)?);
     Ok(())
 }
 
@@ -478,6 +482,13 @@ fn pages_facade_font_reset_cost_instruction() -> TestResult {
         &Change::ResetFont,
     )?);
     std::hint::black_box(pages_facade_write_route(&source, &Change::ResetFont)?);
+    std::hint::black_box(pages_facade_write_route(&source, &Change::ResetFont)?);
+    std::hint::black_box(pages_facade_host_route(
+        &source,
+        target,
+        chart,
+        &Change::ResetFont,
+    )?);
     Ok(())
 }
 
@@ -487,6 +498,8 @@ fn pages_facade_size_read_cost_instruction() -> TestResult {
     let (source, target, chart) = pages_facade_fixture()?;
     std::hint::black_box(host_read(&source, target, chart)?);
     std::hint::black_box(pages_facade_read_size_route(&source)?);
+    std::hint::black_box(pages_facade_read_size_route(&source)?);
+    std::hint::black_box(host_read(&source, target, chart)?);
     Ok(())
 }
 
@@ -497,6 +510,8 @@ fn pages_facade_size_set_cost_instruction() -> TestResult {
     let change = size(23.0)?;
     std::hint::black_box(pages_facade_host_route(&source, target, chart, &change)?);
     std::hint::black_box(pages_facade_write_route(&source, &change)?);
+    std::hint::black_box(pages_facade_write_route(&source, &change)?);
+    std::hint::black_box(pages_facade_host_route(&source, target, chart, &change)?);
     Ok(())
 }
 
@@ -512,6 +527,13 @@ fn pages_facade_size_reset_cost_instruction() -> TestResult {
         &Change::ResetSize,
     )?);
     std::hint::black_box(pages_facade_write_route(&source, &Change::ResetSize)?);
+    std::hint::black_box(pages_facade_write_route(&source, &Change::ResetSize)?);
+    std::hint::black_box(pages_facade_host_route(
+        &source,
+        target,
+        chart,
+        &Change::ResetSize,
+    )?);
     Ok(())
 }
 
