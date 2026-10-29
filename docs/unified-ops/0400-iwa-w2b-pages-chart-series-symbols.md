@@ -1,11 +1,11 @@
 # 0400 — W2-B Pages chart-series symbols facade
 
-- Status: boundary-adoption checkpoint on `uo2/iwa-w2b-series-symbols`,
-  synchronized with coordinator trunk `c0c10b86ce82151b730a7e6ee00615f7232d7f74`
-  and shared admission/finalization/construction helper tip
-  `38a0b13df37dc926d912fd8ba6c05b0ad418a9b3`.
-  Coordinator integration, final performance qualification and native
-  verification remain pending.
+- Status: owner qualification handoff on `uo2/iwa-w2b-series-symbols`,
+  synchronized with the shared admission/finalization/construction substrate.
+  Runtime adoption, host differential parity and the final source-bound
+  Callgrind qualification are complete on source
+  `a06fd62966b6a8ec76e8073381ee95ca4bf8513d`; coordinator integration and
+  native verification remain pending.
 - Scope: Pages body-chart series symbol visibility, shape and optional point
   size through the selector-first facade. Keynote, Numbers, chart fonts,
   chart text, series fills/strokes and `litchi-ops` dispatch are outside this
@@ -67,17 +67,45 @@ chart. It contains:
   host-authored source;
 - exact inverse and untouched ZIP/object locality through the shared harness.
 - production locality controls rejecting an unplanned object mutation, a
-  changed unknown chart field, an extra ZIP member, ZIP metadata drift and
-  archive-object metadata drift.
+  changed unknown chart field, an extra ZIP member, unplanned member removal,
+  ZIP metadata drift, archive-object metadata drift and registry-object drift.
 
 The existing W1-E `series_graph_cases.rs` allocation/patch vectors remain
 engine differential evidence only; they do not qualify this full Pages facade.
 
 The ignored `pages_chart_series_symbol_cost.rs` probe has separate
-`#[inline(never)]` host and leaf wrappers for read, set and hide routes. Each
-route measures open, selector resolution, operation, candidate reopen/readback
-and serialization in host/leaf/leaf/host order. No performance result is
-claimed until pinned release Callgrind capture on the final integrated source.
+`#[inline(never)]` host and leaf wrappers for the four measured routes:
+`all_symbols_read`, `all_symbols_set`, `single_symbol_read` and
+`single_symbol_set`. Each route measures the full facade and executes its
+host/leaf/leaf/host ABBA sequence, with two calls to each selected wrapper.
+The source-bound CPU5 release capture and raw-call validator are recorded in
+`docs/unified-ops/results/0400/integrated-callgrind.json`; all four leaf/host
+instruction ratios are below the 1.05 admission bar. The raw captures and
+threshold-100 annotations remain outside the repository at
+`/home/zhuhe/code/litchi-worktrees/.coord/iwa-w2b-pages-symbols-final-0555-a06fd62966-cpu5`.
+
+### Final facade qualification
+
+| route | host Ir | leaf Ir | leaf/host | calls/side | status |
+| --- | ---: | ---: | ---: | ---: | --- |
+| all symbols read | 1,350,514,913 | 31,932,968 | 0.023645 | 2 | meets |
+| all symbols set | 2,795,747,961 | 181,301,099 | 0.064849 | 2 | meets |
+| single symbol read | 1,350,775,602 | 31,927,621 | 0.023637 | 2 | meets |
+| single symbol set | 3,321,533,012 | 179,613,478 | 0.054075 | 2 | meets |
+
+The receipt binds the archived release ELF SHA-256
+`991b304b3b258da6e76d9aa0205dda63929a36d14800ddd68020d6472f03614d`, source
+head, lockfile hash, CPU5 plan, raw artifacts and the c063 validator receipt.
+The executed capture filenames include the route-qualified
+`all_symbols_read`/`all_symbols_set` names; the output-name-only correction
+manifest is preserved at
+`/home/zhuhe/code/litchi-worktrees/.coord/iwa-w2b-pages-symbols-build-0555-a06fd62966/capture-correction-v2.json`
+(SHA-256
+`14f62c8d418b5216c384507422695f1ad0b832b64753fca506a89cacf9a19c02`). It
+binds the actual argv, environment, wrapper toggle, raw/log/status/annotation
+paths and hashes without changing the approved source, ELF or CPU settings.
+This is an instruction-count qualification only; it is not native application
+acceptance.
 
 Native Apple open/save/close/reopen evidence is absent. The four Pages ledger
 rows for `body_chart_series_{symbol,symbols}` and
@@ -89,8 +117,10 @@ only; their native routes remain pending in
 
 Scoped Pages compilation and strict Clippy pass with the frozen lockfile, four
 Cargo jobs, incremental disabled and debug info disabled; all four Pages
-series-symbol parity cases and six production locality-negative tests pass,
-including an unplanned package-registry object mutation. The shared helper's
+series-symbol parity cases and eight production locality/mapping tests pass,
+including unplanned package-registry object mutation. The shared helper's
 field-5 parent encoding, hard caps, registry-cache accounting and bounded
-workspace construction are included in the adopted F tip. Coordinator
-integration, final performance capture and native evidence remain pending.
+workspace construction are included in the adopted F tip. The shared core's
+95 tests, ledger check, crate-boundary check, no-3rdparty check and Pages
+glossary profile also pass. Coordinator integration and native evidence remain
+pending; no source or runtime changes were made for the performance capture.
