@@ -7,6 +7,7 @@ use litchi_iwa_archive::{
     Limits as ArchiveLimits,
     package::{Catalog, EntryEdit},
 };
+use litchi_iwa_common::{WireLimits, wire::WireView};
 use litchi_iwa_core::{Archive, SnappyStream};
 use litchi_iwa_protos::tst;
 use litchi_numbers::cell::text_style::{CharacterProperties, Error};
@@ -32,6 +33,14 @@ struct SharedTextStyleSource {
     bytes: Vec<u8>,
     key: u32,
     positions: [(u32, u32); 2],
+    style_id: u64,
+    style_payload: Vec<u8>,
+}
+
+fn append_wire_field(data: &mut Vec<u8>, field: u32, payload: &[u8]) {
+    litchi_iwa_common::varint::encode_varint_into(data, (u64::from(field) << 3) | 2);
+    litchi_iwa_common::varint::encode_varint_into(data, payload.len() as u64);
+    data.extend_from_slice(payload);
 }
 
 fn shared_text_style_source() -> TestResult<SharedTextStyleSource> {
@@ -127,6 +136,50 @@ fn shared_text_style_source() -> TestResult<SharedTextStyleSource> {
     }
     let style_compressed = SnappyStream::compress(
         &style_archive.to_bytes(Default::default())?,
+        Default::default(),
+    )?;
+    let style_object_entry = catalog
+        .iter()
+        .find(|entry| {
+            let Ok(bytes) = SnappyStream::decompress(entry.data(), Default::default()) else {
+                return false;
+            };
+            let Ok(archive) = Archive::parse(bytes.as_bytes(), Default::default()) else {
+                return false;
+            };
+            archive.objects.iter().any(|object| {
+                object.archive_info.identifier == Some(style_id)
+                    && object.messages.iter().any(|message| message.type_ == 2_022)
+            })
+        })
+        .ok_or("missing paragraph-style member")?;
+    let style_object_member = style_object_entry.name().to_owned();
+    if style_object_member == style_member {
+        return Err("style-list and paragraph-style members unexpectedly overlap".into());
+    }
+    let style_object_bytes =
+        SnappyStream::decompress(style_object_entry.data(), Default::default())?;
+    let mut style_object_archive =
+        Archive::parse(style_object_bytes.as_bytes(), Default::default())?;
+    let style_object = style_object_archive
+        .objects
+        .iter_mut()
+        .find(|object| object.archive_info.identifier == Some(style_id))
+        .ok_or("missing paragraph-style object")?;
+    let style_payload = style_object
+        .messages
+        .iter_mut()
+        .find(|message| message.type_ == 2_022)
+        .ok_or("missing paragraph-style payload")?;
+    let mut preserved_payload = style_payload.data.clone();
+    let existing_fields = WireView::parse(&preserved_payload, WireLimits::DEFAULT)?;
+    if !existing_fields.fields().any(|field| field.number() == 12) {
+        append_wire_field(&mut preserved_payload, 12, &[8, 1]);
+    }
+    append_wire_field(&mut preserved_payload, 99, b"unknown-style-tail");
+    style_payload.data = preserved_payload.clone();
+    let style_object_compressed = SnappyStream::compress(
+        &style_object_archive.to_bytes(Default::default())?,
         Default::default(),
     )?;
 
@@ -241,6 +294,7 @@ fn shared_text_style_source() -> TestResult<SharedTextStyleSource> {
     let bytes = catalog.reassemble_to_bytes(
         &[
             EntryEdit::new(&style_member, &style_compressed),
+            EntryEdit::new(&style_object_member, &style_object_compressed),
             EntryEdit::new("Index/Tables/Tile.iwa", &tile_compressed),
         ],
         ArchiveLimits::default(),
@@ -249,6 +303,8 @@ fn shared_text_style_source() -> TestResult<SharedTextStyleSource> {
         bytes,
         key: shared_key,
         positions,
+        style_id,
+        style_payload: preserved_payload,
     })
 }
 
@@ -299,6 +355,268 @@ fn style_entries(bytes: &[u8]) -> TestResult<Vec<(u32, u32)>> {
         }
     }
     Err("missing style-list payload".into())
+}
+
+fn paragraph_style_payload(bytes: &[u8], identifier: u64) -> TestResult<Vec<u8>> {
+    let catalog = Catalog::from_bytes(bytes, ArchiveLimits::default())?;
+    for entry in catalog
+        .iter()
+        .filter(|entry| entry.name().ends_with(".iwa"))
+    {
+        let bytes = SnappyStream::decompress(entry.data(), Default::default())?;
+        let archive = Archive::parse(bytes.as_bytes(), Default::default())?;
+        for object in &archive.objects {
+            if object.archive_info.identifier != Some(identifier) {
+                continue;
+            }
+            if let Some(message) = object
+                .messages
+                .iter()
+                .find(|message| message.type_ == 2_022)
+            {
+                return Ok(message.data.clone());
+            }
+        }
+    }
+    Err("missing paragraph-style payload".into())
+}
+
+fn mutate_paragraph_style_with_unknowns(
+    bytes: &[u8],
+    identifier: u64,
+) -> TestResult<(Vec<u8>, Vec<u8>)> {
+    let catalog = Catalog::from_bytes(bytes, ArchiveLimits::default())?;
+    let entry = catalog
+        .iter()
+        .find(|entry| {
+            let Ok(bytes) = SnappyStream::decompress(entry.data(), Default::default()) else {
+                return false;
+            };
+            let Ok(archive) = Archive::parse(bytes.as_bytes(), Default::default()) else {
+                return false;
+            };
+            archive.objects.iter().any(|object| {
+                object.archive_info.identifier == Some(identifier)
+                    && object.messages.iter().any(|message| message.type_ == 2_022)
+            })
+        })
+        .ok_or("missing paragraph-style member")?;
+    let member = entry.name().to_owned();
+    let bytes = SnappyStream::decompress(entry.data(), Default::default())?;
+    let mut archive = Archive::parse(bytes.as_bytes(), Default::default())?;
+    let object = archive
+        .objects
+        .iter_mut()
+        .find(|object| object.archive_info.identifier == Some(identifier))
+        .ok_or("missing paragraph-style object")?;
+    let message = object
+        .messages
+        .iter_mut()
+        .find(|message| message.type_ == 2_022)
+        .ok_or("missing paragraph-style payload")?;
+    let mut payload = message.data.clone();
+    if !WireView::parse(&payload, WireLimits::DEFAULT)?
+        .fields()
+        .any(|field| field.number() == 12)
+    {
+        append_wire_field(&mut payload, 12, &[8, 1]);
+    }
+    append_wire_field(&mut payload, 99, b"unknown-exclusive-tail");
+    message.data = payload.clone();
+    let compressed =
+        SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
+    let mutated = catalog.reassemble_to_bytes(
+        &[EntryEdit::new(&member, &compressed)],
+        ArchiveLimits::default(),
+    )?;
+    Ok((mutated, payload))
+}
+
+fn cell_style_identity(bytes: &[u8], position: At) -> TestResult<(u32, u64, Option<u64>)> {
+    const TABLE_MODEL: u32 = 6_001;
+    const TILE: u32 = 6_002;
+    const LIST: u32 = 6_005;
+    let catalog = Catalog::from_bytes(bytes, ArchiveLimits::default())?;
+    let mut model_id = None;
+    let mut style_list_id = None;
+    let mut tile_size = None;
+    let mut tile_refs = Vec::new();
+    for entry in catalog
+        .iter()
+        .filter(|entry| entry.name().ends_with(".iwa"))
+    {
+        let bytes = SnappyStream::decompress(entry.data(), Default::default())?;
+        let archive = Archive::parse(bytes.as_bytes(), Default::default())?;
+        for object in &archive.objects {
+            for message in &object.messages {
+                if message.type_ != TABLE_MODEL {
+                    continue;
+                }
+                let model = tst::TableModelArchive::decode(message.data.as_slice())?;
+                model_id = object.archive_info.identifier;
+                style_list_id = Some(model.base_data_store.style_table.identifier);
+                tile_size = model.base_data_store.tiles.tile_size;
+                tile_refs = model
+                    .base_data_store
+                    .tiles
+                    .tiles
+                    .iter()
+                    .map(|tile| (tile.tileid, tile.tile.identifier))
+                    .collect();
+            }
+        }
+    }
+    let _model_id = model_id.ok_or("missing table model")?;
+    let style_list_id = style_list_id.ok_or("missing style list")?;
+    let tile_size = tile_size.ok_or("missing tile size")?;
+    let tile_id = tile_refs
+        .iter()
+        .find(|(index, _)| *index == position.row() / tile_size)
+        .map(|(_, identifier)| *identifier)
+        .ok_or("missing selected tile")?;
+    let tile_entry = catalog
+        .iter()
+        .find(|entry| {
+            let Ok(bytes) = SnappyStream::decompress(entry.data(), Default::default()) else {
+                return false;
+            };
+            let Ok(archive) = Archive::parse(bytes.as_bytes(), Default::default()) else {
+                return false;
+            };
+            archive
+                .objects
+                .iter()
+                .any(|object| object.archive_info.identifier == Some(tile_id))
+        })
+        .ok_or("missing selected tile member")?;
+    let tile_bytes = SnappyStream::decompress(tile_entry.data(), Default::default())?;
+    let archive = Archive::parse(tile_bytes.as_bytes(), Default::default())?;
+    let tile_message = archive
+        .objects
+        .iter()
+        .flat_map(|object| object.messages.iter())
+        .find(|message| message.type_ == TILE)
+        .ok_or("missing selected tile payload")?;
+    let tile = tst::Tile::decode(tile_message.data.as_slice())?;
+    let row_index = position.row() % tile_size;
+    let row = tile
+        .row_infos
+        .iter()
+        .find(|row| row.tile_row_index == row_index)
+        .ok_or("missing selected tile row")?;
+    let storage = row
+        .cell_storage_buffer
+        .as_ref()
+        .ok_or("missing selected row storage")?;
+    let offsets = row
+        .cell_offsets
+        .as_ref()
+        .ok_or("missing selected row offsets")?;
+    let unit = if row.has_wide_offsets == Some(true) {
+        4
+    } else {
+        1
+    };
+    let column = usize::try_from(position.column())?;
+    let offset = column.checked_mul(2).ok_or("cell offset overflow")?;
+    let begin = usize::from(u16::from_le_bytes(
+        offsets
+            .get(offset..offset + 2)
+            .ok_or("cell offset missing")?
+            .try_into()?,
+    )) * unit;
+    if begin == usize::from(u16::MAX) * unit {
+        return Err("selected cell is not materialized".into());
+    }
+    let next = offsets
+        .chunks_exact(2)
+        .skip(column + 1)
+        .find_map(|pair| {
+            let value = u16::from_le_bytes([pair[0], pair[1]]);
+            (value != u16::MAX).then_some(usize::from(value) * unit)
+        })
+        .unwrap_or(storage.len());
+    let cell = storage
+        .get(begin..next)
+        .ok_or("selected cell span invalid")?;
+    let cell = litchi_numbers_wire::BncCell::parse(cell, &litchi_numbers_wire::Limits::DEFAULT)?;
+    let key = cell
+        .text_style_identifier()
+        .ok_or("selected cell has no text style key")?;
+
+    let style_entry = catalog
+        .iter()
+        .find(|entry| {
+            let Ok(bytes) = SnappyStream::decompress(entry.data(), Default::default()) else {
+                return false;
+            };
+            let Ok(archive) = Archive::parse(bytes.as_bytes(), Default::default()) else {
+                return false;
+            };
+            archive
+                .objects
+                .iter()
+                .any(|object| object.archive_info.identifier == Some(style_list_id))
+        })
+        .ok_or("missing style list member")?;
+    let list_bytes = SnappyStream::decompress(style_entry.data(), Default::default())?;
+    let list_archive = Archive::parse(list_bytes.as_bytes(), Default::default())?;
+    let list_message = list_archive
+        .objects
+        .iter()
+        .flat_map(|object| object.messages.iter())
+        .find(|message| message.type_ == LIST)
+        .ok_or("missing style list payload")?;
+    let list = tst::TableDataList::decode(list_message.data.as_slice())?;
+    let mut style_id = list
+        .entries
+        .iter()
+        .find(|entry| entry.key == key)
+        .and_then(|entry| entry.reference.as_ref())
+        .map(|reference| reference.identifier);
+    if style_id.is_none() {
+        for segment_ref in &list.segments {
+            let segment_id = segment_ref.identifier;
+            let Some(segment_entry) = catalog.iter().find(|entry| {
+                let Ok(bytes) = SnappyStream::decompress(entry.data(), Default::default()) else {
+                    return false;
+                };
+                let Ok(archive) = Archive::parse(bytes.as_bytes(), Default::default()) else {
+                    return false;
+                };
+                archive
+                    .objects
+                    .iter()
+                    .any(|object| object.archive_info.identifier == Some(segment_id))
+            }) else {
+                continue;
+            };
+            let bytes = SnappyStream::decompress(segment_entry.data(), Default::default())?;
+            let archive = Archive::parse(bytes.as_bytes(), Default::default())?;
+            let Some(message) = archive
+                .objects
+                .iter()
+                .flat_map(|object| object.messages.iter())
+                .find(|message| message.type_ == 6_201)
+            else {
+                continue;
+            };
+            let segment = tst::TableDataListSegment::decode(message.data.as_slice())?;
+            style_id = segment
+                .entries
+                .iter()
+                .find(|entry| entry.key == key)
+                .and_then(|entry| entry.reference.as_ref())
+                .map(|reference| reference.identifier);
+            if style_id.is_some() {
+                break;
+            }
+        }
+    }
+    let style_id = style_id.ok_or("missing selected style object")?;
+    let style_payload = paragraph_style_payload(bytes, style_id)?;
+    let parent = litchi_iwa_text_wire::character_style_parent(&style_payload, WireLimits::DEFAULT)?;
+    Ok((key, style_id, parent))
 }
 
 #[test]
@@ -407,6 +725,67 @@ fn shared_style_key_publishes_reopens_reads_and_reverses_exactly() -> TestResult
         package.table_cell_text_style(0, 0, second)?,
         "shared-key cells have the same direct read"
     );
+    let mut first_change = CharacterProperties::new();
+    first_change.size = Some(73.0);
+    let first_commit = package
+        .edit_table_cell_text_style(0, 0)?
+        .set(first, first_change)?
+        .commit()?;
+    let first_bytes = bytes(first_commit.package())?;
+    let first_identity = cell_style_identity(&first_bytes, first)?;
+    assert_ne!(
+        first_identity.2,
+        Some(first_identity.1),
+        "fresh style must not self-parent"
+    );
+    let first_reopened = Package::from_bytes(&first_bytes)?;
+    let mut second_change = CharacterProperties::new();
+    second_change.italic = Some(true);
+    let second_commit = first_reopened
+        .edit_table_cell_text_style(0, 0)?
+        .set(first, second_change)?
+        .commit()?;
+    let second_bytes = bytes(second_commit.package())?;
+    let second_identity = cell_style_identity(&second_bytes, first)?;
+    assert_eq!(
+        second_identity, first_identity,
+        "exclusive edit reuses key/object/parent"
+    );
+    let second_reopened = Package::from_bytes(&second_bytes)?;
+    let effective = second_reopened.table_cell_text_style(0, 0, first)?;
+    assert_eq!(effective.size, Some(73.0));
+    assert_eq!(effective.italic, Some(true));
+    let restored_first = second_commit
+        .package()
+        .apply_table_cell_text_style(&second_commit.patch().inverse())?;
+    assert_eq!(bytes(restored_first.package())?, first_bytes);
+    let (unknown_bytes, unknown_payload) =
+        mutate_paragraph_style_with_unknowns(&second_bytes, second_identity.1)?;
+    let unknown_package = Package::from_bytes(&unknown_bytes)?;
+    let mut unknown_change = CharacterProperties::new();
+    unknown_change.color = Some([12, 34, 56]);
+    let unknown_commit = unknown_package
+        .edit_table_cell_text_style(0, 0)?
+        .set(first, unknown_change)?
+        .commit()?;
+    let unknown_candidate_bytes = bytes(unknown_commit.package())?;
+    assert_eq!(
+        paragraph_style_payload(&unknown_candidate_bytes, second_identity.1)?,
+        unknown_payload,
+        "unknown/unrelated paragraph fields force fresh derivation and survive"
+    );
+    let unknown_identity = cell_style_identity(&unknown_candidate_bytes, first)?;
+    assert_ne!(unknown_identity.1, second_identity.1);
+    assert_eq!(
+        Package::from_bytes(&unknown_candidate_bytes)?
+            .table_cell_text_style(0, 0, first)?
+            .color,
+        Some([12, 34, 56])
+    );
+    let restored_unknown = unknown_commit
+        .package()
+        .apply_table_cell_text_style(&unknown_commit.patch().inverse())?;
+    assert_eq!(bytes(restored_unknown.package())?, unknown_bytes);
     let mut requested = CharacterProperties::new();
     requested.size = Some(73.0);
     let commit = package
@@ -415,6 +794,11 @@ fn shared_style_key_publishes_reopens_reads_and_reverses_exactly() -> TestResult
         .set(second, requested.clone())?
         .commit()?;
     let candidate_bytes = bytes(commit.package())?;
+    assert_eq!(
+        paragraph_style_payload(&candidate_bytes, generated.style_id)?,
+        generated.style_payload,
+        "unknown and unrelated paragraph fields on the shared owner survive safe derivation"
+    );
     assert!(
         !style_entries(&candidate_bytes)?
             .iter()

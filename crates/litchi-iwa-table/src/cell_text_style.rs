@@ -1065,7 +1065,7 @@ fn overlay_properties(
 
 fn canonical_variation_payload(data: &[u8], limits: &Limits) -> Result<bool, Error> {
     let root = view(data, limits)?;
-    if root.len() != 6 {
+    if root.len() != 4 {
         return Ok(false);
     }
     let mut fields = root.fields();
@@ -1110,27 +1110,6 @@ fn canonical_variation_payload(data: &[u8], limits: &Limits) -> Result<bool, Err
         return Ok(false);
     }
 
-    let Some(version) = fields.next() else {
-        return Ok(false);
-    };
-    if version.number() != 4 || version.wire_type() != 0 {
-        return Ok(false);
-    }
-    let (version_value, version_length) =
-        litchi_iwa_common::varint::decode_varint_from_bytes(version.payload())
-            .map_err(|_| invalid("malformed canonical style version"))?;
-    if version_value != 1 || version_length != version.payload().len() {
-        return Ok(false);
-    }
-    let Some(stylesheet) = fields.next() else {
-        return Ok(false);
-    };
-    if stylesheet.number() != 5
-        || stylesheet.wire_type() != 2
-        || !canonical_reference_payload(stylesheet.payload(), limits)?
-    {
-        return Ok(false);
-    }
     let Some(count_field) = fields.next() else {
         return Ok(false);
     };
@@ -1476,9 +1455,12 @@ fn plan_set_inner(
     let stylesheet = stylesheet_of(source, parent, limits)?;
     let exclusive = allow_exclusive
         && if let Some(key) = old_key {
-            list.entry(key)?.refcount == 1
-                && canonical_variation_payload(style_payload(source, parent, limits)?, limits)?
-                && style_is_exclusive(source, parent, table.style_list, stylesheet, limits)?
+            let refcount = list.entry(key)?.refcount == 1;
+            let canonical =
+                canonical_variation_payload(style_payload(source, parent, limits)?, limits)?;
+            let ownership = canonical
+                && style_is_exclusive(source, parent, table.style_list, stylesheet, limits)?;
+            refcount && ownership
         } else {
             false
         };
@@ -1921,7 +1903,9 @@ fn patch_varint_bounded(
     }
     if matching.is_none() {
         if let Some(value) = value {
-            append_raw_field(&mut output, field, 0, &encode_varint(value));
+            let mut encoded = [0_u8; 10];
+            let encoded = litchi_iwa_common::varint::encode_varint_to_buffer(value, &mut encoded);
+            append_raw_field(&mut output, field, 0, encoded);
         }
     }
     Ok(output)
@@ -1958,7 +1942,8 @@ fn rewrite_repeated_bounded(
             matches = matches.saturating_add(1);
         }
     }
-    limits.charge_work(parsed.len())?;
+    let excess = replacements.len().saturating_sub(matches);
+    limits.charge_work(parsed.len().saturating_add(excess))?;
     let retained = parsed.len().checked_sub(matches).ok_or(Error::Limit {
         kind: LimitKind::Fields,
         observed: u64::MAX,
@@ -1996,12 +1981,6 @@ fn rewrite_repeated_bounded(
     Ok(output)
 }
 
-fn encode_varint(value: u64) -> Vec<u8> {
-    let mut output = Vec::new();
-    litchi_iwa_common::varint::encode_varint_into(&mut output, value);
-    output
-}
-
 fn append_raw_field(output: &mut Vec<u8>, field: u32, wire_type: u8, payload: &[u8]) {
     litchi_iwa_common::varint::encode_varint_into(
         output,
@@ -2021,6 +2000,8 @@ fn append_field_prepared(
 ) -> Result<(), Error> {
     let parsed = view(data, limits)?;
     limits.charge_work(parsed.len())?;
+    limits.charge_fields(1)?;
+    limits.charge_work(1)?;
     limits.admit_allocations(1)?;
     data.try_reserve(bytes_bound(field, payload.len()))
         .map_err(|_| Error::Allocation {
