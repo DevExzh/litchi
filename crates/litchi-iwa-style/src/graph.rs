@@ -21,6 +21,7 @@
 use std::cell::RefCell;
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::fmt;
+use std::mem::size_of;
 
 use litchi_iwa_common::wire::{self, WireField};
 use litchi_iwa_common::{WireLimits, decode_varint_from_bytes};
@@ -192,11 +193,312 @@ pub struct Changes {
     pub deletions: Vec<String>,
 }
 
+#[derive(Debug, Default, Clone, Copy)]
+struct FinishLedger {
+    /// Every changed-map entry the finalizer must inspect, including entries
+    /// later hidden by a member deletion.
+    changed_entries_scanned: usize,
+    /// Live changed source members that become `Changes::edits` entries.
+    edit_count: usize,
+    /// Deleted source members that become owned deletion names.
+    deletion_count: usize,
+    /// Bytes copied into those owned deletion/edit names.
+    copy_bytes: usize,
+}
+
 impl Changes {
     /// Whether the edit changes nothing.
     #[must_use]
     pub fn is_empty(&self) -> bool {
         self.edits.is_empty() && self.insertions.is_empty() && self.deletions.is_empty()
+    }
+}
+
+/// A resource dimension owned by [`Workspace::finish_bounded`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum FinishLimitKind {
+    /// Bounded source-name and collection traversal work.
+    Work,
+    /// Fallible vector and owned-name allocation events.
+    Allocations,
+    /// Bytes retained by the returned change vectors and copied names.
+    RetainedBytes,
+    /// Temporary bytes retained while constructing the returned changes.
+    ScratchBytes,
+}
+
+impl fmt::Display for FinishLimitKind {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(match self {
+            Self::Work => "finish work",
+            Self::Allocations => "finish allocations",
+            Self::RetainedBytes => "finish retained bytes",
+            Self::ScratchBytes => "finish scratch bytes",
+        })
+    }
+}
+
+/// A typed failure from bounded workspace finalization.
+#[derive(Debug)]
+#[non_exhaustive]
+pub enum FinishError {
+    /// The staged workspace itself is invalid.
+    Graph(Error),
+    /// The caller's residual finalization profile was exhausted.
+    Limit {
+        /// Exhausted resource.
+        kind: FinishLimitKind,
+        /// Requested aggregate amount.
+        observed: usize,
+        /// Caller-supplied maximum.
+        maximum: usize,
+    },
+    /// A fallible vector or owned-name reservation failed.
+    Allocation {
+        /// Requested elements or bytes.
+        amount: usize,
+    },
+}
+
+impl fmt::Display for FinishError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Graph(error) => write!(formatter, "workspace finalization: {error}"),
+            Self::Limit {
+                kind,
+                observed,
+                maximum,
+            } => write!(formatter, "{kind} limit: {observed} > {maximum}"),
+            Self::Allocation { amount } => {
+                write!(formatter, "workspace finalization allocation: {amount}")
+            },
+        }
+    }
+}
+
+impl std::error::Error for FinishError {}
+
+impl From<Error> for FinishError {
+    fn from(error: Error) -> Self {
+        Self::Graph(error)
+    }
+}
+
+/// Residual limits for the final transfer from a staged workspace into
+/// [`Changes`].  Archive payloads are already owned by the workspace and are
+/// transferred without copying; this profile covers only the final vectors,
+/// copied member names, and their traversal.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct FinishLimits {
+    max_work: usize,
+    max_allocations: usize,
+    max_retained_bytes: usize,
+    max_scratch_bytes: usize,
+}
+
+impl FinishLimits {
+    /// Construct a residual finalization profile.
+    #[must_use]
+    pub const fn new(
+        max_work: usize,
+        max_allocations: usize,
+        max_retained_bytes: usize,
+        max_scratch_bytes: usize,
+    ) -> Self {
+        Self {
+            max_work,
+            max_allocations,
+            max_retained_bytes,
+            max_scratch_bytes,
+        }
+    }
+
+    /// An unbounded profile for legacy callers and tests.
+    #[must_use]
+    pub const fn unlimited() -> Self {
+        Self::new(usize::MAX, usize::MAX, usize::MAX, usize::MAX)
+    }
+
+    #[must_use]
+    pub const fn max_work(self) -> usize {
+        self.max_work
+    }
+
+    #[must_use]
+    pub const fn max_allocations(self) -> usize {
+        self.max_allocations
+    }
+
+    #[must_use]
+    pub const fn max_retained_bytes(self) -> usize {
+        self.max_retained_bytes
+    }
+
+    #[must_use]
+    pub const fn max_scratch_bytes(self) -> usize {
+        self.max_scratch_bytes
+    }
+}
+
+/// Exact source-derived requirements for one finalization pass.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct FinishRequirements {
+    changed_entries_scanned: usize,
+    edit_count: usize,
+    insertion_count: usize,
+    deletion_count: usize,
+    copy_bytes: usize,
+    work: usize,
+    allocations: usize,
+    retained_bytes: usize,
+    scratch_bytes: usize,
+    output_bytes: usize,
+}
+
+impl FinishRequirements {
+    #[must_use]
+    pub const fn changed_entries_scanned(self) -> usize {
+        self.changed_entries_scanned
+    }
+
+    #[must_use]
+    pub const fn edit_count(self) -> usize {
+        self.edit_count
+    }
+
+    #[must_use]
+    pub const fn insertion_count(self) -> usize {
+        self.insertion_count
+    }
+
+    #[must_use]
+    pub const fn deletion_count(self) -> usize {
+        self.deletion_count
+    }
+
+    /// Bytes copied from source member names into owned `Changes` names.
+    #[must_use]
+    pub const fn copy_bytes(self) -> usize {
+        self.copy_bytes
+    }
+
+    #[must_use]
+    pub const fn work(self) -> usize {
+        self.work
+    }
+
+    #[must_use]
+    pub const fn allocations(self) -> usize {
+        self.allocations
+    }
+
+    #[must_use]
+    pub const fn retained_bytes(self) -> usize {
+        self.retained_bytes
+    }
+
+    #[must_use]
+    pub const fn scratch_bytes(self) -> usize {
+        self.scratch_bytes
+    }
+
+    #[must_use]
+    pub const fn output_bytes(self) -> usize {
+        self.output_bytes
+    }
+
+    fn check(self, limits: FinishLimits) -> std::result::Result<(), FinishError> {
+        for (kind, observed, maximum) in [
+            (FinishLimitKind::Work, self.work, limits.max_work()),
+            (
+                FinishLimitKind::Allocations,
+                self.allocations,
+                limits.max_allocations(),
+            ),
+            (
+                FinishLimitKind::RetainedBytes,
+                self.retained_bytes,
+                limits.max_retained_bytes(),
+            ),
+            (
+                FinishLimitKind::ScratchBytes,
+                self.scratch_bytes,
+                limits.max_scratch_bytes(),
+            ),
+        ] {
+            if observed > maximum {
+                return Err(FinishError::Limit {
+                    kind,
+                    observed,
+                    maximum,
+                });
+            }
+        }
+        Ok(())
+    }
+}
+
+/// Actual resources consumed by one successful bounded finalization.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct FinishReport {
+    requirements: FinishRequirements,
+}
+
+impl FinishReport {
+    #[must_use]
+    pub const fn requirements(self) -> FinishRequirements {
+        self.requirements
+    }
+
+    #[must_use]
+    pub const fn changed_entries_scanned(self) -> usize {
+        self.requirements.changed_entries_scanned()
+    }
+
+    #[must_use]
+    pub const fn edit_count(self) -> usize {
+        self.requirements.edit_count()
+    }
+
+    #[must_use]
+    pub const fn insertion_count(self) -> usize {
+        self.requirements.insertion_count()
+    }
+
+    #[must_use]
+    pub const fn deletion_count(self) -> usize {
+        self.requirements.deletion_count()
+    }
+
+    #[must_use]
+    pub const fn copy_bytes(self) -> usize {
+        self.requirements.copy_bytes()
+    }
+
+    #[must_use]
+    pub const fn work(self) -> usize {
+        self.requirements.work()
+    }
+
+    #[must_use]
+    pub const fn allocations(self) -> usize {
+        self.requirements.allocations()
+    }
+
+    #[must_use]
+    pub const fn retained_bytes(self) -> usize {
+        self.requirements.retained_bytes()
+    }
+
+    #[must_use]
+    pub const fn scratch_bytes(self) -> usize {
+        self.requirements.scratch_bytes()
+    }
+
+    #[must_use]
+    pub const fn output_bytes(self) -> usize {
+        self.requirements.output_bytes()
     }
 }
 
@@ -219,6 +521,7 @@ pub struct Workspace<'s> {
     registry: Option<(usize, u64, usize)>,
     registry_requirements: RefCell<Option<Option<registry_codec::RewriteReport>>>,
     registry_root: RefCell<Option<Option<Root>>>,
+    finish: FinishLedger,
     uuid_seed: u64,
     source_work: usize,
 }
@@ -290,6 +593,7 @@ impl<'s> Workspace<'s> {
             registry,
             registry_requirements: RefCell::new(None),
             registry_root: RefCell::new(None),
+            finish: FinishLedger::default(),
             uuid_seed: 0,
             source_work,
         })
@@ -315,6 +619,7 @@ impl<'s> Workspace<'s> {
             registry: self.registry,
             registry_requirements: RefCell::new(None),
             registry_root: RefCell::new(None),
+            finish: self.finish,
             uuid_seed: self.uuid_seed,
             source_work: self.source_work,
         }
@@ -329,29 +634,113 @@ impl<'s> Workspace<'s> {
         self.source_work
     }
 
-    /// Finish the edit.
+    /// Exact requirements for transferring the staged workspace into
+    /// [`Changes`].  The ledger is updated as source members first become
+    /// copy-on-write entries or are deleted, so this query performs no
+    /// source-name scan and allocates nothing.
     #[must_use]
-    pub fn finish(self) -> Changes {
-        let mut edits = Vec::with_capacity(self.changed.len());
+    pub fn finish_requirements(&self) -> FinishRequirements {
+        let vector_allocations = usize::from(self.finish.edit_count != 0)
+            .saturating_add(usize::from(self.finish.deletion_count != 0));
+        let allocations = vector_allocations
+            .saturating_add(self.finish.edit_count)
+            .saturating_add(self.finish.deletion_count);
+        let vector_bytes = self
+            .finish
+            .edit_count
+            .saturating_mul(size_of::<(String, Archive)>());
+        let deletion_vector_bytes = self
+            .finish
+            .deletion_count
+            .saturating_mul(size_of::<String>());
+        let retained_bytes = vector_bytes
+            .saturating_add(deletion_vector_bytes)
+            .saturating_add(self.finish.copy_bytes);
+        let work = self
+            .finish
+            .changed_entries_scanned
+            .saturating_add(self.finish.deletion_count)
+            .saturating_add(self.finish.copy_bytes);
+        FinishRequirements {
+            changed_entries_scanned: self.finish.changed_entries_scanned,
+            edit_count: self.finish.edit_count,
+            insertion_count: self.created.len(),
+            deletion_count: self.finish.deletion_count,
+            copy_bytes: self.finish.copy_bytes,
+            work,
+            allocations,
+            retained_bytes,
+            scratch_bytes: 0,
+            output_bytes: 0,
+        }
+    }
+
+    /// Finish the edit under an explicit residual profile.
+    ///
+    /// The final vectors and copied source member names are reserved only
+    /// after the complete requirement check.  Existing archive payloads and
+    /// created insertions are moved from the workspace, not copied.  The
+    /// returned report is the exact logical footprint of this transfer and
+    /// is suitable for charging the caller's transaction ledger.
+    pub fn finish_bounded(
+        self,
+        limits: FinishLimits,
+    ) -> std::result::Result<(Changes, FinishReport), FinishError> {
+        let requirements = self.finish_requirements();
+        requirements.check(limits)?;
+
+        let mut edits = Vec::new();
+        edits
+            .try_reserve_exact(requirements.edit_count)
+            .map_err(|_| FinishError::Allocation {
+                amount: requirements.edit_count,
+            })?;
+        let mut deletions = Vec::new();
+        deletions
+            .try_reserve_exact(requirements.deletion_count)
+            .map_err(|_| FinishError::Allocation {
+                amount: requirements.deletion_count,
+            })?;
+
         for (position, archive) in self.changed {
             if self.deleted.contains(&position) {
                 continue;
             }
-            if let Some((name, _)) = self.source.component(position) {
-                edits.push((name.to_owned(), archive));
-            }
+            let (name, _) =
+                self.source
+                    .component(position)
+                    .ok_or(FinishError::Graph(Error::Invalid(
+                        "a changed component vanished during finalization",
+                    )))?;
+            edits.push((owned_name(name)?, archive));
         }
-        let deletions = self
-            .deleted
-            .iter()
-            .filter_map(|position| self.source.component(*position))
-            .map(|(name, _)| name.to_owned())
-            .collect();
-        Changes {
+        for position in self.deleted {
+            let (name, _) =
+                self.source
+                    .component(position)
+                    .ok_or(FinishError::Graph(Error::Invalid(
+                        "a deleted component vanished during finalization",
+                    )))?;
+            deletions.push(owned_name(name)?);
+        }
+        let changes = Changes {
             edits,
             insertions: self.created,
             deletions,
-        }
+        };
+        Ok((changes, FinishReport { requirements }))
+    }
+
+    /// Finish the edit using the historical infallible API.
+    ///
+    /// New bounded facades should use [`Self::finish_requirements`] followed
+    /// by [`Self::finish_bounded`] so finalization is admitted before names
+    /// and change vectors are allocated.
+    #[must_use]
+    pub fn finish(self) -> Changes {
+        self.finish_bounded(FinishLimits::unlimited())
+            .expect("unbounded workspace finalization")
+            .0
     }
 
     fn archive(&self, location: Location) -> Option<&Archive> {
@@ -368,11 +757,28 @@ impl<'s> Workspace<'s> {
         match location {
             Location::Source(position) => {
                 if !self.changed.contains_key(&position) {
-                    let (_, archive) = self
+                    let (name, archive) = self
                         .source
                         .component(position)
                         .ok_or(Error::Invalid("a component vanished"))?;
                     self.changed.insert(position, archive.clone());
+                    self.finish.changed_entries_scanned = self
+                        .finish
+                        .changed_entries_scanned
+                        .checked_add(1)
+                        .ok_or(Error::Invalid("finish entry count overflow"))?;
+                    if !self.deleted.contains(&position) {
+                        self.finish.edit_count = self
+                            .finish
+                            .edit_count
+                            .checked_add(1)
+                            .ok_or(Error::Invalid("finish edit count overflow"))?;
+                        self.finish.copy_bytes = self
+                            .finish
+                            .copy_bytes
+                            .checked_add(name.len())
+                            .ok_or(Error::Invalid("finish name bytes overflow"))?;
+                    }
                 }
                 self.changed
                     .get_mut(&position)
@@ -564,6 +970,14 @@ impl<'s> Workspace<'s> {
                 "a member created by the edit cannot be deleted",
             ));
         };
+        let was_deleted = self.deleted.contains(&position);
+        let was_changed = self.changed.contains_key(&position);
+        let name_len = self
+            .source
+            .component(position)
+            .ok_or(Error::Invalid("a component vanished"))?
+            .0
+            .len();
         let identifiers = self
             .archive_at(location)?
             .objects
@@ -573,7 +987,30 @@ impl<'s> Workspace<'s> {
         for identifier in identifiers {
             self.index.remove(&identifier);
         }
-        self.deleted.insert(position);
+        if self.deleted.insert(position) && !was_deleted {
+            if was_changed {
+                self.finish.edit_count = self
+                    .finish
+                    .edit_count
+                    .checked_sub(1)
+                    .ok_or(Error::Invalid("finish edit count underflow"))?;
+                self.finish.copy_bytes = self
+                    .finish
+                    .copy_bytes
+                    .checked_sub(name_len)
+                    .ok_or(Error::Invalid("finish name bytes underflow"))?;
+            }
+            self.finish.deletion_count = self
+                .finish
+                .deletion_count
+                .checked_add(1)
+                .ok_or(Error::Invalid("finish deletion count overflow"))?;
+            self.finish.copy_bytes = self
+                .finish
+                .copy_bytes
+                .checked_add(name_len)
+                .ok_or(Error::Invalid("finish name bytes overflow"))?;
+        }
         Ok(())
     }
 
@@ -1225,6 +1662,15 @@ pub(crate) fn unique_payload<'a>(
     }
     let index = found.ok_or(Error::Invalid(reason))?;
     Ok((index, object.messages[index].data.as_slice()))
+}
+
+fn owned_name(name: &str) -> std::result::Result<String, FinishError> {
+    let mut owned = String::new();
+    owned
+        .try_reserve_exact(name.len())
+        .map_err(|_| FinishError::Allocation { amount: name.len() })?;
+    owned.push_str(name);
+    Ok(owned)
 }
 
 fn mix(value: u64, salt: u64) -> u64 {

@@ -1,6 +1,6 @@
 use litchi_iwa_core::{Archive, ArchiveObject, Limits, RawMessage};
 
-use super::Workspace;
+use super::{FinishError, FinishLimitKind, FinishLimits, Workspace};
 
 fn object(identifier: u64, type_: u32, data: Vec<u8>) -> ArchiveObject {
     ArchiveObject::new(
@@ -94,4 +94,74 @@ fn registry_inspection_work_only_charges_an_uncached_state() {
         .set_last_object_identifier(10)
         .expect("watermark rewrite");
     assert!(workspace.registry_inspection_work() > 0);
+}
+
+#[test]
+fn bounded_finish_admits_name_copies_before_materializing_changes() {
+    let source = components();
+    let mut workspace = Workspace::new(&source, Limits::default()).expect("workspace");
+    workspace.object_mut(1).expect("object").messages[0]
+        .data
+        .push(0x10);
+    let requirements = workspace.finish_requirements();
+    assert_eq!(requirements.edit_count(), 1);
+    assert_eq!(requirements.deletion_count(), 0);
+    assert_eq!(requirements.copy_bytes(), "Index/Document.iwa".len());
+    assert!(requirements.retained_bytes() >= requirements.copy_bytes());
+
+    let refused = workspace.finish_bounded(FinishLimits::new(
+        requirements.work(),
+        requirements.allocations().saturating_sub(1),
+        requirements.retained_bytes(),
+        requirements.scratch_bytes(),
+    ));
+    assert!(matches!(
+        refused,
+        Err(FinishError::Limit {
+            kind: FinishLimitKind::Allocations,
+            ..
+        })
+    ));
+
+    let mut workspace = Workspace::new(&source, Limits::default()).expect("workspace");
+    workspace.object_mut(1).expect("object").messages[0]
+        .data
+        .push(0x10);
+    let requirements = workspace.finish_requirements();
+    let (changes, report) = workspace
+        .finish_bounded(FinishLimits::new(
+            requirements.work(),
+            requirements.allocations(),
+            requirements.retained_bytes(),
+            requirements.scratch_bytes(),
+        ))
+        .expect("bounded finish");
+    assert_eq!(report.copy_bytes(), requirements.copy_bytes());
+    assert_eq!(changes.edits.len(), 1);
+    assert_eq!(changes.edits[0].0, "Index/Document.iwa");
+}
+
+#[test]
+fn bounded_finish_accounts_deleted_names_and_moves_insertions() {
+    let source = components();
+    let mut workspace = Workspace::new(&source, Limits::default()).expect("workspace");
+    workspace.object_mut(1).expect("object");
+    workspace
+        .delete_member(super::Location::Source(0))
+        .expect("delete");
+    let requirements = workspace.finish_requirements();
+    assert_eq!(requirements.edit_count(), 0);
+    assert_eq!(requirements.deletion_count(), 1);
+    assert_eq!(requirements.insertion_count(), 0);
+    assert_eq!(requirements.copy_bytes(), "Index/Document.iwa".len());
+    let (changes, _) = workspace
+        .finish_bounded(FinishLimits::new(
+            requirements.work(),
+            requirements.allocations(),
+            requirements.retained_bytes(),
+            requirements.scratch_bytes(),
+        ))
+        .expect("bounded deletion finish");
+    assert!(changes.edits.is_empty());
+    assert_eq!(changes.deletions, vec!["Index/Document.iwa"]);
 }
