@@ -414,13 +414,24 @@ fn mutate_paragraph_style_with_unknowns(
         .iter_mut()
         .find(|message| message.type_ == 2_022)
         .ok_or("missing paragraph-style payload")?;
-    let mut payload = message.data.clone();
-    if !WireView::parse(&payload, WireLimits::DEFAULT)?
-        .fields()
-        .any(|field| field.number() == 12)
-    {
-        append_wire_field(&mut payload, 12, &[8, 1]);
+    let payload = message.data.clone();
+    let fields = WireView::parse(&payload, WireLimits::DEFAULT)?;
+    let mut rewritten = Vec::new();
+    let mut paragraph_seen = false;
+    for field in fields.fields() {
+        if field.number() == 12 {
+            paragraph_seen = true;
+            rewritten.extend_from_slice(field.key());
+            litchi_iwa_common::varint::encode_varint_into(&mut rewritten, 2);
+            rewritten.extend_from_slice(&[8, 1]);
+        } else {
+            rewritten.extend_from_slice(field.raw());
+        }
     }
+    if !paragraph_seen {
+        append_wire_field(&mut rewritten, 12, &[8, 1]);
+    }
+    let mut payload = rewritten;
     append_wire_field(&mut payload, 99, b"unknown-exclusive-tail");
     message.data = payload.clone();
     let compressed =
@@ -761,6 +772,19 @@ fn shared_style_key_publishes_reopens_reads_and_reverses_exactly() -> TestResult
     assert_eq!(bytes(restored_first.package())?, first_bytes);
     let (unknown_bytes, unknown_payload) =
         mutate_paragraph_style_with_unknowns(&second_bytes, second_identity.1)?;
+    let unknown_fields = WireView::parse(&unknown_payload, WireLimits::DEFAULT)?;
+    assert_eq!(
+        unknown_fields
+            .fields()
+            .find(|field| field.number() == 12)
+            .map(|field| field.payload()),
+        Some(&[8, 1][..]),
+        "unknown fixture has nonempty paragraph data"
+    );
+    assert!(
+        unknown_fields.fields().any(|field| field.number() == 99),
+        "unknown fixture has a root unknown field"
+    );
     let unknown_package = Package::from_bytes(&unknown_bytes)?;
     let mut unknown_change = CharacterProperties::new();
     unknown_change.color = Some([12, 34, 56]);
