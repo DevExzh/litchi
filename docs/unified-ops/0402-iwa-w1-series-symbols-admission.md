@@ -66,8 +66,8 @@ workspace index construction: those source/index costs remain an explicit
 pre-admission responsibility of each format caller and must not be charged
 again as finalization work.
 
-Implementation commit: `bd2d138a07` (on top of coordinator freeze merge
-`2f1f7a8a78`).
+Implementation commits: `bd2d138a07` plus the overflow-checked follow-up
+`c50fcaf8db` (on top of coordinator freeze merge `2f1f7a8a78`).
 
 ## Correctness and evidence boundary
 
