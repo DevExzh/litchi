@@ -19,6 +19,7 @@
 use std::fmt;
 use std::mem::size_of;
 
+use litchi_iwa_archive::package::{EntryEdit, EntryInsertion};
 use litchi_iwa_common::chart::error_bar::Series as ErrorBarSeries;
 use litchi_iwa_common::chart::kind::Kind as ChartKind;
 use litchi_iwa_common::chart::pie::{LabelDistance, LabelVisibility, WedgeExplosion};
@@ -741,29 +742,11 @@ fn admit_graph_workspace(package: &Package, budget: &mut ChartBudget) -> Result<
     Ok(())
 }
 
-#[derive(Debug, Clone, Copy)]
-struct CandidatePlan {
-    output_bytes: usize,
-    scratch_bytes: usize,
-    allocations: usize,
-}
-
-fn archive_compressed_bound(
-    archive: &Archive,
-    archive_limits: litchi_iwa_core::Limits,
-    snappy_limits: litchi_iwa_core::SnappyLimits,
-) -> Result<usize, Error> {
-    let encoded = archive
-        .encoded_len(archive_limits)
-        .map_err(|error| structure::map_core(&error))?;
-    Ok(SnappyStream::maximum_compressed_len(encoded, snappy_limits)
-        .map_err(|error| structure::map_core(&error))?)
-}
-
-fn candidate_plan(
+fn publish_changes_exact(
     package: &Package,
     changes: &litchi_iwa_style::graph::Changes,
-) -> Result<CandidatePlan, Error> {
+    budget: &mut ChartBudget,
+) -> Result<Published, Error> {
     let catalog = structure::exact_source(package)?;
     let archive_limits = catalog
         .limits()
@@ -773,74 +756,145 @@ fn candidate_plan(
         .limits()
         .snappy_limits()
         .map_err(|error| structure::map_archive(&error))?;
-    let mut output_bytes = package.source_bytes().len();
-    let mut compressed_bytes = 0usize;
-    let mut allocations = GRAPH_EXTRA_ALLOCATIONS;
-    let mut add_member = |name: &str, archive: &Archive| -> Result<(), Error> {
-        let compressed = archive_compressed_bound(archive, archive_limits, snappy_limits)?;
-        compressed_bytes = compressed_bytes
-            .checked_add(compressed)
+    let mut output_bound = package.source_bytes().len();
+    let mut retained_bound = 0usize;
+    let mut scratch_bound = 0usize;
+    let mut work_bound = 0usize;
+    let mut member_count = 0usize;
+    let mut bounds = |name: &str, archive: &Archive| -> Result<(), Error> {
+        let encoded = archive
+            .encoded_len(archive_limits)
+            .map_err(|error| structure::map_core(&error))?;
+        let compressed = SnappyStream::maximum_compressed_len(encoded, snappy_limits)
+            .map_err(|error| structure::map_core(&error))?;
+        let framing = name
+            .len()
+            .checked_mul(2)
+            .and_then(|value| value.checked_add(ZIP_MEMBER_OVERHEAD_BYTES))
             .ok_or(Error::InvalidSource)?;
-        output_bytes = output_bytes
+        output_bound = output_bound
             .checked_add(compressed)
-            .and_then(|value| {
-                value.checked_add(
-                    name.len()
-                        .checked_mul(2)
-                        .and_then(|value| value.checked_add(ZIP_MEMBER_OVERHEAD_BYTES))?,
-                )
-            })
+            .and_then(|value| value.checked_add(framing))
             .ok_or(Error::InvalidSource)?;
-        allocations = allocations.checked_add(1).ok_or(Error::InvalidSource)?;
+        retained_bound = retained_bound
+            .checked_add(encoded)
+            .and_then(|value| value.checked_add(compressed))
+            .ok_or(Error::InvalidSource)?;
+        scratch_bound = scratch_bound
+            .checked_add(encoded)
+            .and_then(|value| value.checked_add(compressed))
+            .ok_or(Error::InvalidSource)?;
+        work_bound = work_bound
+            .checked_add(encoded)
+            .and_then(|value| value.checked_add(compressed))
+            .ok_or(Error::InvalidSource)?;
+        member_count = member_count.checked_add(1).ok_or(Error::InvalidSource)?;
         Ok(())
     };
     for (name, archive) in &changes.edits {
-        add_member(name, archive)?;
+        bounds(name, archive)?;
     }
     for insertion in &changes.insertions {
-        add_member(&insertion.name, &insertion.archive)?;
+        bounds(&insertion.name, &insertion.archive)?;
     }
-    allocations = allocations
+    let vector_allocations = member_count
         .checked_add(changes.deletions.len())
+        .and_then(|value| value.checked_add(3))
         .ok_or(Error::InvalidSource)?;
-    Ok(CandidatePlan {
-        output_bytes,
-        scratch_bytes: output_bytes
-            .checked_add(compressed_bytes)
-            .ok_or(Error::InvalidSource)?,
-        allocations,
-    })
-}
+    budget
+        .preflight_output(output_bound)
+        .map_err(map_arrangement)?;
+    budget
+        .preflight_allocations(vector_allocations)
+        .map_err(map_arrangement)?;
+    budget
+        .preflight_scratch(scratch_bound)
+        .map_err(map_arrangement)?;
+    budget
+        .preflight_retained(retained_bound)
+        .map_err(map_arrangement)?;
+    budget.preflight_work(work_bound).map_err(map_arrangement)?;
+    budget.work(work_bound).map_err(map_arrangement)?;
+    budget
+        .allocations(vector_allocations)
+        .map_err(map_arrangement)?;
+    budget.retained(retained_bound).map_err(map_arrangement)?;
+    budget.scratch(scratch_bound).map_err(map_arrangement)?;
 
-fn admit_candidate(
-    package: &Package,
-    changes: &litchi_iwa_style::graph::Changes,
-    budget: &mut ChartBudget,
-) -> Result<CandidatePlan, Error> {
-    let plan = candidate_plan(package, changes)?;
+    let mut edited = Vec::new();
+    edited
+        .try_reserve_exact(changes.edits.len())
+        .map_err(|_| Error::Allocation {
+            amount: changes.edits.len(),
+        })?;
+    for (name, archive) in &changes.edits {
+        let bytes = archive
+            .to_bytes(archive_limits)
+            .map_err(|error| structure::map_core(&error))?;
+        let compressed = SnappyStream::compress(&bytes, snappy_limits)
+            .map_err(|error| structure::map_core(&error))?;
+        edited.push((name.as_str(), compressed));
+    }
+    let names: Vec<&str> = catalog.package().iter().map(|entry| entry.name()).collect();
+    let mut inserted = Vec::new();
+    inserted
+        .try_reserve_exact(changes.insertions.len())
+        .map_err(|_| Error::Allocation {
+            amount: changes.insertions.len(),
+        })?;
+    for insertion in &changes.insertions {
+        let position = match &insertion.before {
+            Some(before) => Some(
+                names
+                    .iter()
+                    .position(|name| name == before)
+                    .ok_or(Error::InvalidSource)?,
+            ),
+            None => None,
+        };
+        let bytes = insertion
+            .archive
+            .to_bytes(archive_limits)
+            .map_err(|error| structure::map_core(&error))?;
+        let compressed = SnappyStream::compress(&bytes, snappy_limits)
+            .map_err(|error| structure::map_core(&error))?;
+        inserted.push((insertion.name.as_str(), compressed, position));
+    }
+    let edits: Vec<EntryEdit<'_>> = edited
+        .iter()
+        .map(|(name, data)| EntryEdit::new(name, data))
+        .collect();
+    let insertions: Vec<EntryInsertion<'_>> = inserted
+        .iter()
+        .map(|(name, data, position)| match position {
+            Some(position) => EntryInsertion::at(*position, name, data),
+            None => EntryInsertion::new(name, data),
+        })
+        .collect();
+    let deletions: Vec<&str> = changes.deletions.iter().map(String::as_str).collect();
+    let prepared = catalog
+        .prepare_reassembly_with_changes(
+            &insertions,
+            &edits,
+            &deletions,
+            package.state.options.archive(),
+        )
+        .map_err(|_| Error::InvalidSource)?;
+    let requirements = prepared.execution_requirements();
+    budget.reassembly(requirements).map_err(map_arrangement)?;
     budget
-        .preflight_output(plan.output_bytes)
+        .candidate_reopen(requirements.output_bytes())
         .map_err(map_arrangement)?;
-    budget
-        .preflight_allocations(plan.allocations)
-        .map_err(map_arrangement)?;
-    budget
-        .preflight_scratch(plan.scratch_bytes)
-        .map_err(map_arrangement)?;
-    budget
-        .preflight_retained(plan.output_bytes)
-        .map_err(map_arrangement)?;
-    budget.output(plan.output_bytes).map_err(map_arrangement)?;
-    budget
-        .allocations(plan.allocations)
-        .map_err(map_arrangement)?;
-    budget
-        .scratch(plan.scratch_bytes)
-        .map_err(map_arrangement)?;
-    budget
-        .candidate_reopen(plan.output_bytes)
-        .map_err(map_arrangement)?;
-    Ok(plan)
+    let output = prepared
+        .execute(requirements.exact_limits())
+        .map_err(|_| Error::InvalidSource)?;
+    let candidate = Package::from_owned_bytes_with_options(output, package.state.options)
+        .map_err(|_| Error::Verification)?;
+    Ok(Published {
+        package: candidate,
+        touched_components: edits.len() + insertions.len() + deletions.len(),
+        deleted_previews: 0,
+    })
 }
 
 fn lines(kind: ChartKind) -> Result<ConnectionLines, Error> {
@@ -1013,15 +1067,7 @@ fn apply_one(
     if let Some(scope) = symbol_scope.as_ref() {
         validate_symbol_scope(scope, target.chart, source, &changes)?;
     }
-    let plan = admit_candidate(source, &changes, budget)?;
-    let published = style_graph::publish(source, changes).map_err(Error::from)?;
-    if published.package.source_bytes().len() > plan.output_bytes {
-        return Err(Error::Limit {
-            kind: LimitKind::Engine(engine::LimitKind::OutputBytes),
-            observed: published.package.source_bytes().len() as u64,
-            maximum: plan.output_bytes as u64,
-        });
-    }
+    let published = publish_changes_exact(source, &changes, budget)?;
     publish_changes(Some(published), sheet, chart, property.kind(), budget)
 }
 
