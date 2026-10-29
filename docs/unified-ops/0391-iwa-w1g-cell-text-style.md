@@ -3,7 +3,7 @@
 - Status: Numbers-first substrate and proof repair are complete on the
   isolated WP. Pages and Keynote facades are not started, no ledger rows are
   migrated, and no native acceptance claim is active. The current code/probe
-  tip is `4dca2d60b6`; release-mode instruction capture remains coordinator-
+  tip is `715f001da2`; release-mode instruction capture remains coordinator-
   gated and has not started.
 - Source branch: `uo2/iwa-w1g-cell-text-style`, cut from frozen root
   `1e3978082bd8e576f0afeb7e3eebac1ca3908d86`, then synchronized with frozen
@@ -133,9 +133,9 @@ The current source contains three dedicated, non-inline ignored routes in
 
 The source builder is outside the measured wrappers. It retains a valid
 Numbers registry, uses the modern tile storage fields, and leaves the
-selected cells/style graph source-relative. Metadata output admission now
-pre-charges bounded registry growth for the batch instead of relying on
-fixture-sized quota padding. Each route performs host/leaf reopen/readback,
+selected cells/style graph source-relative without quota-padding fixture
+members. Metadata growth admission is F-owned and remains pending review.
+Each route performs host/leaf reopen/readback,
 locality, refcount/identity, and inverse checks before its exact
 host/leaf/leaf/host wrapper calls. The batch route now prepares the shared
 table/tile/style graph once, batches tile-key publication and batches
@@ -148,8 +148,8 @@ cargo test --offline -p litchi-iwa --test parity \
   -- --ignored --nocapture --test-threads=1
 ```
 
-It passed in 416.09 s, including setup/correctness and the four ABBA calls;
-this is a correctness/probe-readiness receipt only, not a Callgrind or
-release-mode performance qualification. Immutable binaries, captures and
+The historical run passed in 416.09 s, including setup/correctness and the
+four ABBA calls, but predates the current budget/allocator repairs and is not
+current-source qualification. Immutable binaries, captures and
 instruction-count receipts are intentionally absent until the coordinator
 accepts this fixture/probe checkpoint and grants the CPU slot.
