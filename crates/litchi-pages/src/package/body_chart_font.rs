@@ -1431,7 +1431,7 @@ mod tests {
             .iter()
             .filter_map(|object| {
                 (!object.messages.is_empty())
-                    .then(|| object.archive_info.identifier)
+                    .then_some(object.archive_info.identifier)
                     .flatten()
             })
             .take(2)
