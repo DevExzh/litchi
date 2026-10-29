@@ -6,6 +6,9 @@
   deliberately excluded from this WP.
 - Base: frozen integrated candidate `1bc8f22499d2691e85ebed37686c8381f0c985da`.
 - Owned source: `formula_refresh_cases.rs` and `numbers_w2a_cost.rs`.
+- Source handoff commits: `dc585d05cd` (formula/W2-A wrapper isolation) and
+  `5d18c05ddb` (separate Numbers cached-formula wrapper isolation after the
+  temporary ownership transfer).
 
 ## Raw-audit findings
 
