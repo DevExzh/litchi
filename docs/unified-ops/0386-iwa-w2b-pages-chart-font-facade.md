@@ -58,8 +58,9 @@ The final branch source was checked with:
 - `cargo fmt --all`
 - `cargo check -p litchi-pages --lib --tests -p litchi-iwa --test parity --jobs 2`
 - `cargo clippy -p litchi-pages --lib --tests --all-features --jobs 2 -- -D warnings`
+- `cargo clippy -p litchi-iwa --test parity --all-features --jobs 2 -- -D warnings`
 - `cargo doc -p litchi-pages --no-deps --all-features`
-- `RUSTC_BOOTSTRAP=1 python3 tools/check_api_glossary.py --profile pages --target-dir /tmp/iwa-w2b-pages-glossary-Q7b8Be`
+- `RUSTC_BOOTSTRAP=1 python3 tools/check_api_glossary.py --profile pages --target-dir /tmp/iwa-w2b-pages-glossary-final-YGkyO1`
 - `python3 tools/iwa_exit_ledger.py --check`
 - `python3 tools/check_crate_boundaries.py`
 - `python3 -m unittest tools.test_gate_runner`
@@ -116,8 +117,10 @@ source-bound binary was rebuilt and archived before execution:
 | size reset | 839,627,842 | 202,134,003 | −75.925762% |
 
 The six tests execute explicit host/leaf/leaf/host ABBA calls, with host
-setup outside the measured route. This is instruction-count evidence only;
-there is no wall-time claim. The six ledger rows remain host-only pending the
+setup outside the measured route; reset setup uses the direct host writer and
+is not collected under the measured host symbol. Forward probes do not apply
+inverse patches. This is instruction-count evidence only; there is no
+wall-time claim. The six ledger rows remain host-only pending the
 coordinator's integrated final qualification and native queue policy.
 
 The superseded `pages-cpu5-c3dd90d7dc` capture set is retained externally as
