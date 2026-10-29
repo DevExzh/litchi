@@ -18,7 +18,10 @@ use litchi_iwa_archive::unstable::{
 use litchi_iwa_common::chart::kind::Kind as ChartKind;
 use litchi_iwa_common::chart::series::{Symbol, SymbolFamily};
 use litchi_iwa_common::wire::{WireFieldView, WireView};
-use litchi_iwa_core::{Archive, ArchiveObject, RawMessage, SnappyStream};
+use litchi_iwa_core::{
+    Archive, ArchiveEncodingPreparationChunk, ArchiveEncodingPreparationError, ArchiveObject,
+    RawMessage, SnappyCompressionPreparationChunk, SnappyCompressionPreparationError, SnappyStream,
+};
 use litchi_iwa_protos::chart_metadata_codec::{self, DecodeOptions};
 use litchi_iwa_protos::chart_style_codec;
 use litchi_iwa_style::graph::{self as style_graph, Components, Workspace};
@@ -550,13 +553,11 @@ fn map_package_error(error: PackageError) -> Error {
             maximum: limit as u64,
         },
         PackageError::SectionNamesTooLarge { observed, limit }
-        | PackageError::Semantic(crate::Error::TextTooLarge { observed, limit }) => {
-            Error::Limit {
-                kind: LimitKind::PayloadBytes,
-                observed: observed as u64,
-                maximum: limit as u64,
-            }
-        }
+        | PackageError::Semantic(crate::Error::TextTooLarge { observed, limit }) => Error::Limit {
+            kind: LimitKind::PayloadBytes,
+            observed: observed as u64,
+            maximum: limit as u64,
+        },
         PackageError::Semantic(
             crate::Error::TooManySections { actual, limit }
             | crate::Error::TooManyBodyStorages { actual, limit },
@@ -1017,19 +1018,6 @@ fn read_symbols(
     Ok(values)
 }
 
-fn archive_rewrite_bound(package: &Package, archive: &Archive) -> Result<usize, Error> {
-    let encoded = archive
-        .encoded_len(archive_limits(package)?)
-        .map_err(map_core_error)?;
-    let snappy = package
-        .state
-        .source
-        .limits()
-        .snappy_limits()
-        .map_err(map_archive_error)?;
-    SnappyStream::maximum_compressed_len(encoded, snappy).map_err(map_core_error)
-}
-
 fn preflight_publication(
     source: &Package,
     edits: &[(String, Archive)],
@@ -1037,39 +1025,6 @@ fn preflight_publication(
     deletions: &[String],
     budget: &mut ArrangementBudget,
 ) -> Result<(), Error> {
-    let mut transient = 0usize;
-    let mut archive_work = 0usize;
-    for (name, archive) in edits {
-        let encoded = archive
-            .encoded_len(archive_limits(source)?)
-            .map_err(map_core_error)?;
-        let bound = archive_rewrite_bound(source, archive)?;
-        transient = transient
-            .checked_add(encoded)
-            .and_then(|value| value.checked_add(bound))
-            .ok_or(Error::InvalidSource)?;
-        archive_work = archive_work
-            .checked_add(name.len())
-            .and_then(|value| value.checked_add(encoded))
-            .and_then(|value| value.checked_add(bound))
-            .ok_or(Error::InvalidSource)?;
-    }
-    for insertion in insertions {
-        let encoded = insertion
-            .archive
-            .encoded_len(archive_limits(source)?)
-            .map_err(map_core_error)?;
-        let bound = archive_rewrite_bound(source, &insertion.archive)?;
-        transient = transient
-            .checked_add(encoded)
-            .and_then(|value| value.checked_add(bound))
-            .ok_or(Error::InvalidSource)?;
-        archive_work = archive_work
-            .checked_add(insertion.name.len())
-            .and_then(|value| value.checked_add(encoded))
-            .and_then(|value| value.checked_add(bound))
-            .ok_or(Error::InvalidSource)?;
-    }
     let vector_caps = [
         (edits.len(), size_of::<(String, Vec<u8>)>()),
         (
@@ -1095,49 +1050,128 @@ fn preflight_publication(
                 .ok_or(Error::InvalidSource)
         })?;
     budget
-        .preflight_work(
-            archive_work
-                .checked_add(collection_bytes)
-                .ok_or(Error::InvalidSource)?,
-        )
+        .preflight_work(collection_bytes)
         .map_err(map_arrangement_error)?;
     budget
         .preflight_allocations(collection_units)
         .map_err(map_arrangement_error)?;
     budget
-        .preflight_retained(
-            transient
-                .checked_add(collection_bytes)
-                .ok_or(Error::InvalidSource)?,
-        )
+        .preflight_retained(collection_bytes)
         .map_err(map_arrangement_error)?;
     budget
-        .preflight_scratch(
-            transient
-                .checked_add(collection_bytes)
-                .ok_or(Error::InvalidSource)?,
-        )
+        .preflight_scratch(collection_bytes)
         .map_err(map_arrangement_error)?;
     budget
-        .work(
-            archive_work
-                .checked_add(collection_bytes)
-                .ok_or(Error::InvalidSource)?,
-        )
+        .work(collection_bytes)
         .map_err(map_arrangement_error)?;
-    let staging_bytes = transient
-        .checked_add(collection_bytes)
-        .ok_or(Error::InvalidSource)?;
     budget
         .allocations(collection_units)
         .map_err(map_arrangement_error)?;
     budget
-        .retained(staging_bytes)
+        .retained(collection_bytes)
         .map_err(map_arrangement_error)?;
     budget
-        .scratch(staging_bytes)
+        .scratch(collection_bytes)
         .map_err(map_arrangement_error)?;
     Ok(())
+}
+
+fn map_archive_encoding_preparation_error(error: ArchiveEncodingPreparationError<Error>) -> Error {
+    match error {
+        ArchiveEncodingPreparationError::Admission(error) => error,
+        ArchiveEncodingPreparationError::ArithmeticOverflow { resource } => {
+            Error::Overflow { reason: resource }
+        },
+        ArchiveEncodingPreparationError::Core(error) => map_core_error(error),
+        _ => Error::InvalidSource,
+    }
+}
+
+fn map_snappy_preparation_error(error: SnappyCompressionPreparationError<Error>) -> Error {
+    match error {
+        SnappyCompressionPreparationError::Admission(error) => error,
+        SnappyCompressionPreparationError::ArithmeticOverflow { resource } => {
+            Error::Overflow { reason: resource }
+        },
+        SnappyCompressionPreparationError::Core(error) => map_core_error(error),
+        _ => Error::InvalidSource,
+    }
+}
+
+fn prepare_archive_encoding<'archive>(
+    archive: &'archive Archive,
+    limits: litchi_iwa_core::Limits,
+    budget: &mut ArrangementBudget,
+) -> Result<litchi_iwa_core::ArchiveEncodingPlan<'archive>, Error> {
+    let mut visitor = |chunk: ArchiveEncodingPreparationChunk| {
+        budget
+            .work(chunk.traversal_bytes())
+            .map_err(map_arrangement_error)
+    };
+    archive
+        .prepare_encoding(limits, &mut visitor)
+        .map_err(map_archive_encoding_preparation_error)
+}
+
+fn charge_archive_encoding_requirements(
+    requirements: litchi_iwa_core::ArchiveEncodingRequirements,
+    budget: &mut ArrangementBudget,
+) -> Result<(), Error> {
+    budget
+        .work(requirements.work_bytes())
+        .and_then(|_| budget.work(requirements.identifier_sort_work()))
+        .and_then(|_| budget.allocations(requirements.allocation_events()))
+        .and_then(|_| budget.retained(requirements.retained_bytes()))
+        .and_then(|_| budget.scratch(requirements.scratch_bytes()))
+        .map_err(map_arrangement_error)
+}
+
+fn prepare_snappy_compression(
+    input_len: usize,
+    limits: litchi_iwa_core::SnappyLimits,
+    budget: &mut ArrangementBudget,
+) -> Result<litchi_iwa_core::SnappyCompressionPlan, Error> {
+    let mut visitor = |chunk: SnappyCompressionPreparationChunk| {
+        budget
+            .work(chunk.traversal_bytes())
+            .map_err(map_arrangement_error)
+    };
+    SnappyStream::prepare_compression(input_len, limits, &mut visitor)
+        .map_err(map_snappy_preparation_error)
+}
+
+fn charge_snappy_compression_requirements(
+    requirements: litchi_iwa_core::SnappyCompressionRequirements,
+    budget: &mut ArrangementBudget,
+) -> Result<(), Error> {
+    let scratch_bytes = requirements
+        .temporary_frame_capacity_bytes()
+        .checked_add(requirements.encoder_workspace_bytes())
+        .ok_or(Error::Overflow {
+            reason: "Snappy compression scratch overflow",
+        })?;
+    budget
+        .work(requirements.work_bytes())
+        .and_then(|_| budget.allocations(requirements.allocation_events()))
+        .and_then(|_| budget.retained(requirements.output_capacity_bytes()))
+        .and_then(|_| budget.scratch(scratch_bytes))
+        .map_err(map_arrangement_error)
+}
+
+fn encode_archive_for_publication(
+    archive: &Archive,
+    archive_limits: litchi_iwa_core::Limits,
+    snappy_limits: litchi_iwa_core::SnappyLimits,
+    budget: &mut ArrangementBudget,
+) -> Result<Vec<u8>, Error> {
+    let prepared = prepare_archive_encoding(archive, archive_limits, budget)?;
+    let requirements = prepared.requirements();
+    charge_archive_encoding_requirements(requirements, budget)?;
+    let encoded = prepared.execute().map_err(map_core_error)?;
+    let prepared = prepare_snappy_compression(encoded.len(), snappy_limits, budget)?;
+    let requirements = prepared.requirements();
+    charge_snappy_compression_requirements(requirements, budget)?;
+    prepared.execute(&encoded).map_err(map_core_error)
 }
 
 struct IngressBudget<'a>(&'a mut ArrangementBudget);
@@ -1209,8 +1243,8 @@ fn publish_changes(
             amount: changes.edits.len(),
         })?;
     for (name, archive) in changes.edits {
-        let encoded = archive.to_bytes(archive_limits).map_err(map_core_error)?;
-        let compressed = SnappyStream::compress(&encoded, snappy_limits).map_err(map_core_error)?;
+        let compressed =
+            encode_archive_for_publication(&archive, archive_limits, snappy_limits, budget)?;
         edited.push((name, compressed));
     }
 
@@ -1222,11 +1256,12 @@ fn publish_changes(
             amount: changes.insertions.len(),
         })?;
     for insertion in changes.insertions {
-        let encoded = insertion
-            .archive
-            .to_bytes(archive_limits)
-            .map_err(map_core_error)?;
-        let compressed = SnappyStream::compress(&encoded, snappy_limits).map_err(map_core_error)?;
+        let compressed = encode_archive_for_publication(
+            &insertion.archive,
+            archive_limits,
+            snappy_limits,
+            budget,
+        )?;
         inserted.push((insertion.name, compressed, insertion.before));
     }
 
