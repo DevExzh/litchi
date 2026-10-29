@@ -7256,3 +7256,12 @@ See [0063](0063-source-pptx-modern-comments.md).
   remain 1,197 migrated, 43 retired and 991 host-only. The shared series-symbol
   engine and its three caller facades remain separate work packages under
   admission/locality review and have not been integrated.
+
+- D7 post-merge checks on `c0c10b86ce` passed. Final qualification then found
+  one stale tracked lock in the standalone FIN harness: `litchi-iwa-table`
+  was missing its new `litchi-iwa-text-wire` dependency. Locked metadata
+  refused before FIN compilation. The c0 full gate was stopped after six
+  passing rows; its partial receipt and interrupted binary preparation remain
+  historical, with no captures. The repair adds only that dependency edge,
+  preserving every pinned version, and locked offline metadata passes. Fresh
+  integrated qualification restarts on the repaired commit.
