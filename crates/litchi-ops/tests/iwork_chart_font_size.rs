@@ -45,6 +45,16 @@ fn property(file: &File, path: &str) -> Option<String> {
     named_property(file, path, "font.size")
 }
 
+fn format_values(file: &File, path: &str) -> Vec<(String, String)> {
+    file.get(path)
+        .expect("chart path")
+        .view()
+        .format()
+        .expect("chart format")
+        .map(|property| (property.key().to_owned(), property.to_string()))
+        .collect()
+}
+
 fn points(value: Option<String>) -> f32 {
     value
         .expect("font.size property")
@@ -223,6 +233,22 @@ mod pages {
             .format()
             .expect_err("unified chart projection must retain the typed refusal");
         assert_eq!(error.code(), litchi_ops::Code::InvalidInput);
+    }
+
+    #[test]
+    fn canonical_chart_path_matches_generic_projection_and_missing_behavior() {
+        let file = source();
+        assert_eq!(
+            format_values(&file, PATH),
+            format_values(&file, "/body/chart[last()]")
+        );
+        let fast = file.get(PATH).expect("canonical chart path");
+        let generic = file.get("/body/chart[last()]").expect("generic chart path");
+        assert_eq!(fast.path().to_string(), generic.path().to_string());
+        assert_eq!(
+            file.get("/body/chart[999]").unwrap_err().code(),
+            litchi_ops::Code::PathNotFound
+        );
     }
 
     #[inline(never)]
@@ -454,6 +480,45 @@ mod keynote {
         assert_eq!(font_error.code(), litchi_ops::Code::InvalidInput);
     }
 
+    #[test]
+    fn canonical_chart_path_matches_generic_projection_and_missing_behavior() {
+        let file = source();
+        assert_eq!(
+            format_values(&file, PATH),
+            format_values(&file, "/slide[1]/chart[last()]")
+        );
+        let fast = file.get(PATH).expect("canonical chart path");
+        let generic = file
+            .get("/slide[1]/chart[last()]")
+            .expect("generic chart path");
+        assert_eq!(fast.path().to_string(), generic.path().to_string());
+
+        let refused = read(
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("../../test-data/iwork/keynote/chart-data-native.key"),
+        );
+        assert_eq!(
+            refused
+                .get(PATH)
+                .expect("fast chart path")
+                .view()
+                .format()
+                .unwrap_err()
+                .code(),
+            refused
+                .get("/slide[1]/chart[last()]")
+                .expect("generic chart path")
+                .view()
+                .format()
+                .unwrap_err()
+                .code()
+        );
+        assert_eq!(
+            file.get("/slide[1]/chart[999]").unwrap_err().code(),
+            litchi_ops::Code::PathNotFound
+        );
+    }
+
     #[inline(never)]
     fn unified_read_route(source: &[u8]) -> f32 {
         points(property(
@@ -632,6 +697,24 @@ mod numbers {
             .set(PATH, props! { "font.size" => "0pt" })
             .expect_err("zero size must refuse");
         assert_eq!(invalid.code(), litchi_ops::Code::InvalidValue);
+    }
+
+    #[test]
+    fn canonical_chart_path_matches_generic_projection_and_missing_behavior() {
+        let file = source();
+        assert_eq!(
+            format_values(&file, PATH),
+            format_values(&file, "/sheet[1]/chart[last()]")
+        );
+        let fast = file.get(PATH).expect("canonical chart path");
+        let generic = file
+            .get("/sheet[1]/chart[last()]")
+            .expect("generic chart path");
+        assert_eq!(fast.path().to_string(), generic.path().to_string());
+        assert_eq!(
+            file.get("/sheet[1]/chart[999]").unwrap_err().code(),
+            litchi_ops::Code::PathNotFound
+        );
     }
 
     #[inline(never)]

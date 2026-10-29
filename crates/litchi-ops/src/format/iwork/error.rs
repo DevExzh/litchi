@@ -36,6 +36,10 @@ pub enum LeafError {
     /// A Pages body-chart point-size transaction failed (D7-A).
     #[cfg(feature = "pages")]
     PagesChartFont(litchi_pages::chart::font::Error),
+    /// Reading a Pages body-chart inventory failed while resolving a
+    /// canonical chart path.
+    #[cfg(feature = "pages")]
+    PagesChartArrangement(litchi_pages::chart::arrangement::Error),
     /// A Pages body-table value transaction failed (record 0309).
     #[cfg(feature = "pages")]
     PagesTableValues(litchi_pages::table::values::Error),
@@ -128,6 +132,10 @@ pub enum LeafError {
     /// A Numbers sheet-chart point-size transaction failed (D7-A).
     #[cfg(feature = "numbers")]
     NumbersChartFont(litchi_numbers::sheet::chart::font::Error),
+    /// Reading a Numbers sheet's drawable inventory failed while resolving a
+    /// canonical chart path.
+    #[cfg(feature = "numbers")]
+    NumbersDrawables(litchi_numbers::sheet::drawable::Error),
     /// Saving a Numbers package directory failed (record 0306).
     #[cfg(feature = "numbers")]
     NumbersSave(litchi_numbers::SaveError),
@@ -151,6 +159,8 @@ impl fmt::Display for LeafError {
             Self::PagesTextStyle(error) => error.fmt(formatter),
             #[cfg(feature = "pages")]
             Self::PagesChartFont(error) => error.fmt(formatter),
+            #[cfg(feature = "pages")]
+            Self::PagesChartArrangement(error) => error.fmt(formatter),
             #[cfg(feature = "pages")]
             Self::PagesTableValues(error) => error.fmt(formatter),
             #[cfg(feature = "pages")]
@@ -212,6 +222,8 @@ impl fmt::Display for LeafError {
             #[cfg(feature = "numbers")]
             Self::NumbersChartFont(error) => error.fmt(formatter),
             #[cfg(feature = "numbers")]
+            Self::NumbersDrawables(error) => error.fmt(formatter),
+            #[cfg(feature = "numbers")]
             Self::NumbersSave(error) => error.fmt(formatter),
         }
     }
@@ -235,6 +247,8 @@ impl std::error::Error for LeafError {
             Self::PagesTextStyle(error) => Some(error),
             #[cfg(feature = "pages")]
             Self::PagesChartFont(error) => Some(error),
+            #[cfg(feature = "pages")]
+            Self::PagesChartArrangement(error) => Some(error),
             #[cfg(feature = "pages")]
             Self::PagesTableValues(error) => Some(error),
             #[cfg(feature = "pages")]
@@ -296,6 +310,8 @@ impl std::error::Error for LeafError {
             #[cfg(feature = "numbers")]
             Self::NumbersChartFont(error) => Some(error),
             #[cfg(feature = "numbers")]
+            Self::NumbersDrawables(error) => Some(error),
+            #[cfg(feature = "numbers")]
             Self::NumbersSave(error) => Some(error),
         }
     }
@@ -326,6 +342,8 @@ impl LeafError {
             Self::PagesTextStyle(error) => pages_text_style_code(error),
             #[cfg(feature = "pages")]
             Self::PagesChartFont(error) => pages_chart_font_code(error),
+            #[cfg(feature = "pages")]
+            Self::PagesChartArrangement(error) => pages_chart_arrangement_code(error),
             #[cfg(feature = "pages")]
             Self::PagesTableValues(error) => pages_table_values_code(error),
             #[cfg(feature = "pages")]
@@ -393,6 +411,8 @@ impl LeafError {
             Self::NumbersEdit(error) => error.code(),
             #[cfg(feature = "numbers")]
             Self::NumbersChartFont(error) => numbers_chart_font_code(error),
+            #[cfg(feature = "numbers")]
+            Self::NumbersDrawables(error) => numbers_drawables_code(error),
             #[cfg(feature = "keynote")]
             Self::KeynoteSave(error) => match error {
                 litchi_keynote::SaveError::Bundle(_) => Code::InvalidInput,
@@ -512,6 +532,18 @@ fn pages_text_style_code(error: &litchi_pages::section::text_style::Error) -> Co
 #[cfg(feature = "pages")]
 fn pages_chart_font_code(error: &litchi_pages::chart::font::Error) -> Code {
     use litchi_pages::chart::font::Error as E;
+    match error {
+        E::Refused(refusal) => refused(refusal.kind()),
+        E::Limit { .. } => Code::LimitExceeded,
+        E::InvalidSource | E::PatchConflict => Code::InvalidInput,
+        E::Allocation { .. } | E::Verification => Code::InternalError,
+        _ => Code::InternalError,
+    }
+}
+
+#[cfg(feature = "pages")]
+fn pages_chart_arrangement_code(error: &litchi_pages::chart::arrangement::Error) -> Code {
+    use litchi_pages::chart::arrangement::Error as E;
     match error {
         E::Refused(refusal) => refused(refusal.kind()),
         E::Limit { .. } => Code::LimitExceeded,
@@ -804,6 +836,17 @@ fn numbers_chart_font_code(error: &litchi_numbers::sheet::chart::font::Error) ->
         E::Limit { .. } => Code::LimitExceeded,
         E::InvalidSource | E::PatchConflict => Code::InvalidInput,
         E::Allocation { .. } | E::Verification => Code::InternalError,
+        _ => Code::InternalError,
+    }
+}
+
+#[cfg(feature = "numbers")]
+fn numbers_drawables_code(error: &litchi_numbers::sheet::drawable::Error) -> Code {
+    use litchi_numbers::sheet::drawable::Error as E;
+    match error {
+        E::Refused(refusal) => refused(refusal.kind()),
+        E::Limit { .. } => Code::LimitExceeded,
+        E::InvalidSource | E::PatchConflict => Code::InvalidInput,
         _ => Code::InternalError,
     }
 }

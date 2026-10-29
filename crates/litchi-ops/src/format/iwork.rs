@@ -103,6 +103,9 @@ struct State {
     /// Built on the first read: the open route decodes only what the leaf
     /// open decodes.
     tree: OnceLock<Built>,
+    /// A private chart-only tree used by the canonical chart paths. It keeps
+    /// the normal tree lazy without changing generic navigation semantics.
+    chart: OnceLock<Built>,
     /// The complete Pages tree, whose section headers and footers are built
     /// the first time a read reaches them (record 0299). Every item of
     /// `tree` keeps its index here, so nodes taken from either tree stay
@@ -324,6 +327,7 @@ impl Iwork {
         Self(Arc::new(State {
             owner,
             tree: OnceLock::new(),
+            chart: OnceLock::new(),
             #[cfg(feature = "pages")]
             full: OnceLock::new(),
             #[cfg(feature = "pages")]
@@ -405,6 +409,35 @@ impl Iwork {
             return full;
         }
         self.0.tree.get_or_init(|| Built::new(self.0.owner.tree()))
+    }
+
+    fn chart_built(&self) -> &Built {
+        self.0.chart.get_or_init(|| {
+            let built = match self.owner() {
+                #[cfg(feature = "pages")]
+                Owner::Pages(package) => pages::build_charts(package)
+                    .map(|tree| (tree, Vec::<Part>::new().into_boxed_slice())),
+                #[cfg(feature = "keynote")]
+                Owner::Keynote(package) => keynote::build_charts(package)
+                    .map(|tree| (tree, Vec::<Part>::new().into_boxed_slice())),
+                #[cfg(feature = "numbers")]
+                Owner::Numbers(package) => numbers::build_charts(package)
+                    .map(|tree| (tree, Vec::<Part>::new().into_boxed_slice())),
+            };
+            Built::new(built)
+        })
+    }
+
+    pub(crate) fn checked_chart_tree(&self) -> Result<&Tree> {
+        let built = self.chart_built();
+        match &built.error {
+            Some(error) => Err(error.clone()),
+            None => Ok(&built.tree),
+        }
+    }
+
+    pub(crate) fn chart_item(&self, at: At) -> &tree::Item {
+        self.chart_built().tree.item(at.index)
     }
 
     /// Complete the tree (views and whole-tree reads).
@@ -947,10 +980,86 @@ pub(crate) fn get<'f>(
     file: &'f Iwork,
     path: &crate::path::PathArg<'_>,
 ) -> Result<crate::node::Node<'f>> {
+    if let Some(selector) = chart_path(file.format(), path) {
+        let chart_tree = file.checked_chart_tree()?;
+        let found = chart_tree.items().iter().enumerate().find(|(_, item)| {
+            if item.type_name() != "chart" {
+                return false;
+            }
+            let leaf = item.leaf();
+            match selector {
+                ChartPath::Pages(chart) => leaf[0] as usize == chart,
+                ChartPath::Keynote { slide, chart } => {
+                    leaf[0] as usize == slide && leaf[2] as usize == chart
+                },
+                ChartPath::Numbers { sheet, chart } => {
+                    leaf[0] as usize == sheet && leaf[1] as usize == chart
+                },
+            }
+        });
+        if let Some((index, _)) = found {
+            return Ok(crate::node::Node::Iwork(Node::new(
+                file,
+                At::chart(u32::try_from(index).unwrap_or(u32::MAX)),
+            )));
+        }
+        return Err(
+            Error::new(crate::Code::PathNotFound, "requested chart was not found")
+                .with_format(file.format()),
+        );
+    }
     file.checked_tree()?;
     with_flavor!(file.format(), F => {
         crate::path::resolve::get(&Nav::<F>::new(file), path).map(crate::node::Node::Iwork)
     })
+}
+
+#[derive(Clone, Copy)]
+enum ChartPath {
+    Pages(usize),
+    Keynote { slide: usize, chart: usize },
+    Numbers { sheet: usize, chart: usize },
+}
+
+fn chart_path(format: FileFormat, path: &crate::path::PathArg<'_>) -> Option<ChartPath> {
+    if !path.is_absolute() {
+        return None;
+    }
+    let steps = path.path().steps();
+    let no_predicates = |step: &litchi_core::selector::Step<'_>| step.predicates().is_empty();
+    match (format, steps) {
+        (FileFormat::Pages, [body, chart])
+            if body.name() == "body"
+                && no_predicates(body)
+                && chart.name() == "chart"
+                && chart.predicates().len() == 1 =>
+        {
+            chart.index().map(|index| ChartPath::Pages(index.get()))
+        },
+        (FileFormat::Keynote, [slide, chart])
+            if slide.name() == "slide"
+                && chart.name() == "chart"
+                && slide.predicates().len() == 1
+                && chart.predicates().len() == 1 =>
+        {
+            Some(ChartPath::Keynote {
+                slide: slide.index()?.get(),
+                chart: chart.index()?.get(),
+            })
+        },
+        (FileFormat::Numbers, [sheet, chart])
+            if sheet.name() == "sheet"
+                && chart.name() == "chart"
+                && sheet.predicates().len() == 1
+                && chart.predicates().len() == 1 =>
+        {
+            Some(ChartPath::Numbers {
+                sheet: sheet.index()?.get(),
+                chart: chart.index()?.get(),
+            })
+        },
+        _ => None,
+    }
 }
 
 /// `File::find` over an iWork tree.

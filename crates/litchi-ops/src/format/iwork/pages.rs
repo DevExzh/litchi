@@ -506,6 +506,21 @@ pub(crate) fn build(package: &Package) -> (super::Tree, Box<[super::Part]>) {
     build_with(package, false)
 }
 
+/// Build only the structural body/chart projection used by the canonical
+/// chart path fast route. The ordinary tree remains unchanged for every other
+/// path, query and view.
+pub(crate) fn build_charts(package: &Package) -> Result<super::Tree> {
+    let mut tree = TreeBuilder::new(SPEC.elements, Pages::SINGLETONS);
+    let body = tree.push(ROOT, Kind::Body).done();
+    let charts = package.body_chart_arrangements().map_err(|error| {
+        leaf_refusal(LeafError::PagesChartArrangement(error), FileFormat::Pages)
+    })?;
+    for chart in 0..charts.len() {
+        tree.push(body, Kind::Chart).leaf([chart, 0, 0, 0]).done();
+    }
+    Ok(tree.build())
+}
+
 /// Build the complete tree of `package`, headers and footers included.
 /// Every item of [`build`]'s tree keeps its index: the regions are pushed
 /// last.

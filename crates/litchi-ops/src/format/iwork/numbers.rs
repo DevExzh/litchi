@@ -637,6 +637,37 @@ pub(crate) fn build(package: &Package) -> Result<(super::Tree, Box<[super::Part]
     Ok((tree.build(), parts.into_boxed_slice()))
 }
 
+/// Build only the structural sheet/chart projection used by the canonical
+/// chart path fast route. The ordinary workbook tree remains unchanged.
+pub(crate) fn build_charts(package: &Package) -> Result<super::Tree> {
+    let mut tree = TreeBuilder::new(SPEC.elements, Numbers::SINGLETONS);
+    let sheets = package.sheets();
+    tree.root().prop("sheetCount", count(sheets.len())).done();
+    for (sheet_index, sheet) in sheets.iter().enumerate() {
+        let sheet_item = tree
+            .push(super::tree::ROOT, Kind::Sheet)
+            .prop("name", text(Some(sheet.name())))
+            .prop("tableCount", count(sheet.table_count()))
+            .label(Some(sheet.name()))
+            .leaf([sheet_index, 0, 0, 0])
+            .done();
+        let drawables = package
+            .sheet_drawable_list(SheetSelector::index(sheet_index))
+            .map_err(|error| {
+                leaf_refusal(LeafError::NumbersDrawables(error), FileFormat::Numbers)
+            })?;
+        for drawable in drawables
+            .iter()
+            .filter(|drawable| drawable.kind() == litchi_numbers::sheet::drawable::Kind::Chart)
+        {
+            tree.push(sheet_item, Kind::Chart)
+                .leaf([sheet_index, drawable.kind_selector().as_index(), 0, 0])
+                .done();
+        }
+    }
+    Ok(tree.build())
+}
+
 /// The cells, merged ranges, rows and columns of one table, each tree item
 /// materialized the first time a read reaches it (record 0305): slot `i`
 /// below the cell count is the table's `i`-th stored cell in row-major

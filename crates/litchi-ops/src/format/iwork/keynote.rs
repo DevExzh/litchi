@@ -726,6 +726,37 @@ pub(crate) fn build(package: &Package) -> Result<(super::Tree, Box<[super::Part]
     Ok((tree.build(), parts.into_boxed_slice()))
 }
 
+/// Build only slide/chart structural items for the canonical chart path fast
+/// route. The ordinary slide tree remains the source of all other reads.
+pub(crate) fn build_charts(package: &Package) -> Result<super::Tree> {
+    let read = |error| leaf_refusal(LeafError::Keynote(error), FileFormat::Keynote);
+    let slides = package.slides().map_err(read)?;
+    let mut tree = TreeBuilder::new(SPEC.elements, Keynote::SINGLETONS);
+    tree.root().prop("slideCount", count(slides.len())).done();
+    for index in 0..slides.len() {
+        let slide = tree.push(ROOT, Kind::Slide).leaf([index, 0, 0, 0]).done();
+        let drawables = package
+            .slide_drawable_list(SlideSelector::index(index))
+            .map_err(|error| {
+                leaf_refusal(LeafError::KeynoteDrawables(error), FileFormat::Keynote)
+            })?;
+        let mut chart_position = 0;
+        for (position, drawable) in drawables.iter().enumerate() {
+            if drawable.kind() != DrawableKind::Chart {
+                continue;
+            }
+            frame(
+                tree.push(slide, Kind::Chart)
+                    .leaf([index, DRAWABLE, chart_position, position]),
+                Some(drawable),
+            )
+            .done();
+            chart_position += 1;
+        }
+    }
+    Ok(tree.build())
+}
+
 /// The canonical step of slide `index`.
 fn slide_step(index: usize) -> crate::node::PathStep<'static> {
     crate::node::PathStep::at(

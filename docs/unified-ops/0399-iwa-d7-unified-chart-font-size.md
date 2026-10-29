@@ -41,6 +41,18 @@ the same deferred path as `Node::view().format()`, so the two supported value
 views cannot disagree or hide a focused refusal.  The unified writer stages chart-size operations through each
 format's existing exact-source leaf patch and retains terminal errors.
 
+The accepted optimization adds a private chart-only tree cache for the three
+canonical chart paths.  Pages, Keynote and Numbers keep their ordinary tree
+and query/write routes unchanged; the fast route only constructs the chart
+structural projection needed to resolve `/body/chart[N]`,
+`/slide[N]/chart[N]` or `/sheet[N]/chart[N]`.  A recognized canonical path
+that is out of range returns `path_not_found` directly.  Unsupported path
+syntax still uses the generic navigator.  Inventory/build failures remain
+typed leaf errors, including the Pages arrangement and Numbers drawable
+inventory seams, rather than being turned into an empty projection.  Active
+tests compare the fast projection with the generic `chart[last()]` projection
+and retain the Keynote refused-font control.
+
 ## Owned paths
 
 Runtime/schema/dispatch ownership is limited to:
@@ -71,27 +83,28 @@ prove frame/name/z-order reads remain structural when its font graph refuses,
 and single, compound and frame-only query predicates use the same typed
 property path.
 
-The final all-feature run passed 5 active tests and intentionally left the 9
+The final all-feature run passed 8 active tests and intentionally left the 9
 full-file ABBA wrappers ignored.  The generated capability reports were
 regenerated and the all-feature capability suite passed (11 tests).
 
-The final synchronized source passed `cargo fmt --all -- --check`, strict
-all-feature Clippy for `litchi-ops`, the focused chart-font-size and capability
-tests, the Keynote node refusal unit, the ledger check, the 70-package
-crate-boundary check, and the no-3rdparty reference check.  Feature-specific
-Clippy (no-format, Pages, Keynote and Numbers), rustdoc (Pages, Keynote,
-Numbers and all-features), and the affected glossary profiles (`ops-iwork` and
-`ops-all`) also passed.  Logs are retained outside the checkout under
+The optimized source passed `cargo fmt --all -- --check`, strict all-feature
+Clippy for `litchi-ops`, the focused chart-font-size tests, rustdoc with
+warnings denied, the ledger check, the crate-boundary check, no-`3rdparty`
+references and the affected fuzz-lock inventory tests.  The affected glossary
+profiles (`ops-iwork` and `ops-all`) are run against the final committed tip;
+their receipts are retained outside the checkout under
 `.coord/d7-chart-font-size-validation/logs/`.
 
 The release binaries built from `9078ab5837d34d8c9baa18d54fce0903f5721017`
 and `a52c96dd7346a4d88793cde5c07d66150a8e3539` are archived externally, but
 are explicitly non-qualifying because subsequent query-scope repairs landed;
 they must not be used for capture.  Qualification remains pending a fresh
-coordinator release build from `cf9f3c1a8777b1798a728b772505415475634fed` and pinned-CPU
+coordinator release build from the optimized committed tip and pinned-CPU
 ABBA run for every route, with setup outside the selected symbols, exact
 single-test success, positive inclusive attribution, exact call counts and the
-prescribed <=1.05 route ratio.
+prescribed <=1.05 route ratio.  The earlier c762 matrix remains profiling
+history only; no performance result is extrapolated from it to this optimized
+source.
 
 Native mutation evidence is absent.  The nine D7 queue rows appended for this
 slice remain `pending`; no E3/E4 claim is made.  Existing W2-A/W2-B/W2-C leaf
