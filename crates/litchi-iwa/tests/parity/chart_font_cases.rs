@@ -208,7 +208,23 @@ fn facade_georgia() -> TestResult<ChartFont> {
 
 #[test]
 fn pages_facade_font_read_populated_host_source() -> TestResult {
+    let host_input = input(Format::Pages, Kind::Column2d)?;
     let source = pages_facade_source()?;
+    let host_source = host_write(
+        &host_input.fixture.bytes,
+        host_input.target,
+        host_input.chart,
+        &avenir()?,
+    )?;
+    let host_source = host_write(
+        &host_source,
+        host_input.target,
+        host_input.chart,
+        &size(17.0)?,
+    )?;
+    let host_readback = host_read(&host_source, host_input.target, host_input.chart)?;
+    assert!(host_readback.contains("AvenirNext-DemiBold"));
+    assert!(host_readback.contains("17"));
     let (font, size) = pages_leaf_values(&source)?;
     assert_eq!(font.font.name(), Some("AvenirNext-DemiBold"));
     assert!(font.bold);
