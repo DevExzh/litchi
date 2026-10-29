@@ -320,13 +320,18 @@ fn leaf_write(source: &[u8], values: &Values, one: Option<usize>) -> TestResult<
 }
 
 #[inline(never)]
-fn numbers_symbols_host_read_all(source: &[u8], sheet: u64, chart: u64) -> TestResult<Vec<u8>> {
+fn symbols_host_read_all_impl(source: &[u8], sheet: u64, chart: u64) -> TestResult<Vec<u8>> {
     let editor = numbers::Draft::from_bytes(source)?;
     Ok(format!("{:?}", editor.sheet_chart_series_symbols(sheet, chart)?).into_bytes())
 }
 
 #[inline(never)]
-fn numbers_symbols_leaf_read_all(source: &[u8], chart: usize) -> TestResult<Vec<u8>> {
+fn numbers_symbols_host_read_all(source: &[u8], sheet: u64, chart: u64) -> TestResult<Vec<u8>> {
+    symbols_host_read_all_impl(source, sheet, chart)
+}
+
+#[inline(never)]
+fn symbols_leaf_read_all_impl(source: &[u8], chart: usize) -> TestResult<Vec<u8>> {
     let package = Package::from_bytes(source)?;
     Ok(format!(
         "{:?}",
@@ -336,7 +341,12 @@ fn numbers_symbols_leaf_read_all(source: &[u8], chart: usize) -> TestResult<Vec<
 }
 
 #[inline(never)]
-fn numbers_symbols_host_read_single(source: &[u8], sheet: u64, chart: u64) -> TestResult<Vec<u8>> {
+fn numbers_symbols_leaf_read_all(source: &[u8], chart: usize) -> TestResult<Vec<u8>> {
+    symbols_leaf_read_all_impl(source, chart)
+}
+
+#[inline(never)]
+fn symbols_host_read_single_impl(source: &[u8], sheet: u64, chart: u64) -> TestResult<Vec<u8>> {
     let editor = numbers::Draft::from_bytes(source)?;
     Ok(format!(
         "{:?}",
@@ -346,7 +356,12 @@ fn numbers_symbols_host_read_single(source: &[u8], sheet: u64, chart: u64) -> Te
 }
 
 #[inline(never)]
-fn numbers_symbols_leaf_read_single(source: &[u8], chart: usize) -> TestResult<Vec<u8>> {
+fn numbers_symbols_host_read_single(source: &[u8], sheet: u64, chart: u64) -> TestResult<Vec<u8>> {
+    symbols_host_read_single_impl(source, sheet, chart)
+}
+
+#[inline(never)]
+fn symbols_leaf_read_single_impl(source: &[u8], chart: usize) -> TestResult<Vec<u8>> {
     let package = Package::from_bytes(source)?;
     let property = package.sheet_chart_series(0, chart, PropertyKind::Symbols)?;
     let Property::Symbols(values) = property else {
@@ -356,7 +371,12 @@ fn numbers_symbols_leaf_read_single(source: &[u8], chart: usize) -> TestResult<V
 }
 
 #[inline(never)]
-fn numbers_symbols_host_set_all(
+fn numbers_symbols_leaf_read_single(source: &[u8], chart: usize) -> TestResult<Vec<u8>> {
+    symbols_leaf_read_single_impl(source, chart)
+}
+
+#[inline(never)]
+fn symbols_host_set_all_impl(
     source: &[u8],
     sheet: u64,
     chart: u64,
@@ -368,7 +388,17 @@ fn numbers_symbols_host_set_all(
 }
 
 #[inline(never)]
-fn numbers_symbols_leaf_set_all(
+fn numbers_symbols_host_set_all(
+    source: &[u8],
+    sheet: u64,
+    chart: u64,
+    values: &[Option<ChartSeriesSymbol>],
+) -> TestResult<Vec<u8>> {
+    symbols_host_set_all_impl(source, sheet, chart, values)
+}
+
+#[inline(never)]
+fn symbols_leaf_set_all_impl(
     source: &[u8],
     chart: usize,
     property: &Property,
@@ -380,7 +410,16 @@ fn numbers_symbols_leaf_set_all(
 }
 
 #[inline(never)]
-fn numbers_symbols_host_set_single(
+fn numbers_symbols_leaf_set_all(
+    source: &[u8],
+    chart: usize,
+    property: &Property,
+) -> TestResult<Vec<u8>> {
+    symbols_leaf_set_all_impl(source, chart, property)
+}
+
+#[inline(never)]
+fn symbols_host_set_single_impl(
     source: &[u8],
     sheet: u64,
     chart: u64,
@@ -392,7 +431,17 @@ fn numbers_symbols_host_set_single(
 }
 
 #[inline(never)]
-fn numbers_symbols_leaf_set_single(
+fn numbers_symbols_host_set_single(
+    source: &[u8],
+    sheet: u64,
+    chart: u64,
+    value: Option<ChartSeriesSymbol>,
+) -> TestResult<Vec<u8>> {
+    symbols_host_set_single_impl(source, sheet, chart, value)
+}
+
+#[inline(never)]
+fn symbols_leaf_set_single_impl(
     source: &[u8],
     chart: usize,
     property: &Property,
@@ -403,6 +452,15 @@ fn numbers_symbols_leaf_set_single(
     let mut edit = package.edit_sheet_chart_series(0, chart)?;
     edit.set(current)?;
     Ok(leaf_bytes!(edit.commit()?.package()))
+}
+
+#[inline(never)]
+fn numbers_symbols_leaf_set_single(
+    source: &[u8],
+    chart: usize,
+    property: &Property,
+) -> TestResult<Vec<u8>> {
+    symbols_leaf_set_single_impl(source, chart, property)
 }
 
 /// Four complete host-vs-Numbers-facade routes for the actual Symbols family.
@@ -437,14 +495,14 @@ fn numbers_chart_series_symbols_facade_cost_abba() -> TestResult {
     // Uninstrumented proof/setup: both routes and the real allocate/patch/hide
     // controls finish before any measured wrapper call.
     for output in [
-        numbers_symbols_host_read_all(&source, sheet, chart)?,
-        numbers_symbols_leaf_read_all(&source, leaf_chart)?,
-        numbers_symbols_host_read_single(&source, sheet, chart)?,
-        numbers_symbols_leaf_read_single(&source, leaf_chart)?,
-        numbers_symbols_host_set_all(&source, sheet, chart, &host_values)?,
-        numbers_symbols_leaf_set_all(&source, leaf_chart, &property)?,
-        numbers_symbols_host_set_single(&source, sheet, chart, host_values[0])?,
-        numbers_symbols_leaf_set_single(&source, leaf_chart, &property)?,
+        symbols_host_read_all_impl(&source, sheet, chart)?,
+        symbols_leaf_read_all_impl(&source, leaf_chart)?,
+        symbols_host_read_single_impl(&source, sheet, chart)?,
+        symbols_leaf_read_single_impl(&source, leaf_chart)?,
+        symbols_host_set_all_impl(&source, sheet, chart, &host_values)?,
+        symbols_leaf_set_all_impl(&source, leaf_chart, &property)?,
+        symbols_host_set_single_impl(&source, sheet, chart, host_values[0])?,
+        symbols_leaf_set_single_impl(&source, leaf_chart, &property)?,
     ] {
         assert!(!output.is_empty());
     }
