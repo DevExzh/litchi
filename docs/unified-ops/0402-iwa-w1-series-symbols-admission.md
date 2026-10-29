@@ -67,7 +67,8 @@ pre-admission responsibility of each format caller and must not be charged
 again as finalization work.
 
 Implementation commits: `bd2d138a07`, overflow-checked follow-up
-`c50fcaf8db`, and final lint/documentation fix `54ebd2782f` (on top of
+`c50fcaf8db`, final lint/documentation fix `54ebd2782f`, and focused ceiling
+evidence `f2eae5798d` (on top of
 coordinator freeze merge `2f1f7a8a78`).
 
 ## Correctness and evidence boundary
@@ -84,7 +85,7 @@ is an explicit follow-up gap, not a full Numbers facade-ledger qualification.
 
 ## Verification
 
-- `cargo test --offline -p litchi-iwa-style --lib`: 32 passed.
+- `cargo test --offline -p litchi-iwa-style --lib`: 35 passed.
 - `cargo test --offline -p litchi-iwa --test parity chart_font_cases -- --nocapture`:
   29 passed, 13 ignored; Numbers, Pages, and Keynote chart-font parity and
   low-budget controls pass.
