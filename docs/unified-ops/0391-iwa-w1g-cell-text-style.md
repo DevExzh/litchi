@@ -3,7 +3,7 @@
 - Status: Numbers-first substrate, bounded tile writer, and header-bucket
   materialization repair remain isolated on the WP. Pages and Keynote facades
   are not started, no ledger rows are migrated, and no native acceptance claim
-  is active. The current code tip is `d39eb1740c`; release-mode instruction
+  is active. The current code tip is `6d5f02c0a1`; release-mode instruction
   capture remains coordinator-gated and has not started.
 - Source branch: `uo2/iwa-w1g-cell-text-style`, cut from frozen root
   `1e3978082bd8e576f0afeb7e3eebac1ca3908d86`, then synchronized with frozen
@@ -17,8 +17,8 @@
   proof `ee47ab4896`, reviewed shared tile-writer merge `7f69b0710a`, and
   Numbers writer adoption `43608b8faa`, bounded shared table-fact selection
   `4f014f7463`, reviewed header-helper merge `ea1bab6270`, and header-adapter
-  integration `7b8cf978fb`, and row-header admission closure `d39eb1740c`.
-  Earlier budget, parser,
+  integration `7b8cf978fb`, row-header admission closure `d39eb1740c`, and
+  cross-bucket/missing-ownership closure `6d5f02c0a1`. Earlier budget, parser,
   exclusive-path, mutation-output and identity/unknown-preservation
   checkpoints remain in history.
 - Scope: shared `litchi-iwa-table::cell_text_style` graph reads and direct
@@ -122,7 +122,7 @@ decorates header buckets with a retained unknown field and exercises empty G22
 plus the first missing row in an existing tile. It compares both bucket counts
 and unknown fields, tile row/cell presence, host and leaf semantic styles, and
 the exact leaf inverse. The current-source log is retained at
-`/home/zhuhe/code/litchi-worktrees/.coord/iwa-w1g-header-d39eb1740c/header-controls.out`.
+`/home/zhuhe/code/litchi-worktrees/.coord/iwa-w1g-header-6d5f02c0a1/header-controls.out`.
 The shared header delta helper also partitions rows that cross the 65,536-row
 bucket boundary while retaining global row indices; the adapter rewrites each
 owned row bucket and publishes the column bucket once. A source that requires
