@@ -8,7 +8,8 @@ capability snapshots are in `4e88658a06`; the worktree was then synchronized
 with coordinator trunk `bc9a37fd75977b01ab3f24cabfdc4b2fe977c4bc` at
 `c1fb64d102f3794e815a632e208bf6ab33a6bf24` (the merge contains no D7 runtime
 changes).  The subsequent refusal/query isolation repair is
-`6790af8a96f3e0b5e9fcb08141f78bf1a11897a2`.  It exposes only the migrated
+`6790af8a96f3e0b5e9fcb08141f78bf1a11897a2`, with the final narrow query seam
+in `c0c9b0d4e4d7fd56398cc8471627c2b6bdc1e15`.  It exposes only the migrated
 chart point-size family through `litchi-ops`:
 
 * Pages: `/body/chart[N]` → `font.size`;
@@ -43,7 +44,8 @@ Runtime/schema/dispatch ownership is limited to:
 * `crates/litchi-ops/src/format/iwork/{pages,keynote,numbers}.rs`;
 * `crates/litchi-ops/src/format/iwork/{keynote/write,write,node,tree,error}.rs`;
 * `crates/litchi-ops/src/format/iwork/{nav}.rs` and
-  `crates/litchi-ops/src/query/walk.rs` (private typed predicate seam);
+  `crates/litchi-ops/src/query/{inspect,walk}.rs` (a default-off private
+  typed predicate seam; only iWork opts in);
 * `crates/litchi-ops/src/path/vocabulary.rs` (Numbers chart path spelling);
 * `crates/litchi-ops/tests/iwork_chart_font_size.rs`;
 * `crates/litchi-ops/tests/golden/capabilities/{pages,keynote,numbers}.json`.
@@ -78,10 +80,11 @@ Numbers and all-features), and the affected glossary profiles (`ops-iwork` and
 `ops-all`) also passed.  Logs are retained outside the checkout under
 `.coord/d7-chart-font-size-validation/logs/`.
 
-The release binary built from `9078ab5837d34d8c9baa18d54fce0903f5721017` is
-archived externally, but is explicitly non-qualifying because the refusal/query
-repair landed afterward; it must not be used for capture.  Qualification
-remains pending a fresh coordinator release build and pinned-CPU
+The release binaries built from `9078ab5837d34d8c9baa18d54fce0903f5721017`
+and `a52c96dd7346a4d88793cde5c07d66150a8e3539` are archived externally, but
+are explicitly non-qualifying because subsequent query-scope repairs landed;
+they must not be used for capture.  Qualification remains pending a fresh
+coordinator release build from `c0c9b0d4e4d7fd56398cc8471627c2b6bdc1e15` and pinned-CPU
 ABBA run for every route, with setup outside the selected symbols, exact
 single-test success, positive inclusive attribution, exact call counts and the
 prescribed <=1.05 route ratio.
