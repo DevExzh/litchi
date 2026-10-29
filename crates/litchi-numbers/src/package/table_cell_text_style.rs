@@ -781,12 +781,17 @@ fn write_style_keys(
         return Err(Error::Refused(Refusal::UnsupportedDependency));
     }
     let facts = shared::table_facts(source, first_target, limits).map_err(from_shared)?;
-    let tiles = facts.tiles;
-    let tile_size = facts.tile_size;
+    let shared::TableFacts {
+        rows: table_rows,
+        columns: table_columns,
+        tile_size,
+        tiles,
+        ..
+    } = facts;
     let mut groups: Vec<(u64, Vec<writer::Update>)> = Vec::new();
     limits.reserve(&mut groups, 1).map_err(from_shared)?;
     for (target, key) in updates {
-        if target.row >= facts.rows || target.column >= facts.columns {
+        if target.row >= table_rows || target.column >= table_columns {
             return Err(Error::Refused(Refusal::CellNotFound));
         }
         let tile_key = u64::from(target.row) / tile_size;
@@ -821,7 +826,7 @@ fn write_style_keys(
         let (tile_index, tile_data) = topology::message(working, tile, &[TILE_MESSAGE_TYPE])?;
         let write = writer::set_text_style_keys(
             tile_data,
-            facts.columns,
+            table_columns,
             &rows,
             writer::RowPlacement::FieldOrder,
             limits,

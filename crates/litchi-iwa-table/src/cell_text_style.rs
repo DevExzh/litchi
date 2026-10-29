@@ -802,6 +802,10 @@ pub struct TableFacts {
     pub columns: u32,
     /// Rows per storage tile.
     pub tile_size: u64,
+    /// Row-header bucket object identifier.
+    pub row_headers: u64,
+    /// Column-header bucket object identifier.
+    pub column_headers: u64,
     /// Storage tile index and object identifier pairs.
     pub tiles: Vec<(u32, u64)>,
 }
@@ -815,6 +819,10 @@ pub fn table_facts(
     limits: &Limits,
 ) -> Result<TableFacts, Error> {
     let table = Table::read(source, target, limits)?;
+    let row_headers =
+        reference(&table.store, 1, limits)?.ok_or(invalid("row-header storage missing"))?;
+    let column_headers =
+        reference(&table.store, 2, limits)?.ok_or(invalid("column-header storage missing"))?;
     let tile_storage =
         bytes(&table.store, STORE_TILES, limits)?.ok_or(invalid("tile storage missing"))?;
     let tile_size = varint(tile_storage, 2, limits)?.ok_or(invalid("tile size missing"))?;
@@ -836,6 +844,8 @@ pub fn table_facts(
         rows: table.geometry.rows,
         columns: table.geometry.columns,
         tile_size,
+        row_headers,
+        column_headers,
         tiles,
     })
 }

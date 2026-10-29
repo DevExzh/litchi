@@ -446,7 +446,6 @@ fn numbers_whole_cell_style_batch_1000_cost_abba() -> TestResult {
             "Index/CalculationEngine.iwa",
             "Index/DocumentStylesheet.iwa",
             "Index/Metadata.iwa",
-            "Index/Tables/HeaderStorageBucket-904855-2.iwa",
         ],
     )?;
     assert_untouched_member_preserved(
@@ -1098,6 +1097,47 @@ fn shared_1000_cell_style_fixture() -> TestResult<WholeCellFixture> {
         &model_archive.to_bytes(Default::default())?,
         Default::default(),
     )?;
+    // The source-built tile contains all 1,000 cells, so keep its row-header
+    // bucket authoritative as well.  Otherwise the host route legitimately
+    // repairs stale header counts (and the leaf tile-only route does not),
+    // turning a fixture-integrity difference into a false locality failure.
+    let header_member = "Index/Tables/HeaderStorageBucket-904855-2.iwa";
+    let header_entry = catalog
+        .iter()
+        .find(|entry| entry.name() == header_member)
+        .ok_or("missing row-header bucket member")?;
+    let header_bytes = SnappyStream::decompress(header_entry.data(), Default::default())?;
+    let mut header_archive = Archive::parse(header_bytes.as_bytes(), Default::default())?;
+    let mut header_found = false;
+    for object in &mut header_archive.objects {
+        for message in &mut object.messages {
+            if message.type_ != 6_006 {
+                continue;
+            }
+            message.data = tst::HeaderStorageBucket {
+                bucket_hash_function: 1,
+                headers: (0..50)
+                    .map(|index| tst::header_storage_bucket::Header {
+                        index,
+                        size: 0.0,
+                        hiding_state: 0,
+                        number_of_cells: 20,
+                        cell_style: None,
+                        text_style: None,
+                    })
+                    .collect(),
+            }
+            .encode_to_vec();
+            header_found = true;
+        }
+    }
+    if !header_found {
+        return Err("row-header bucket payload missing".into());
+    }
+    let header_compressed = SnappyStream::compress(
+        &header_archive.to_bytes(Default::default())?,
+        Default::default(),
+    )?;
     let mut edits = vec![EntryEdit::new(&style_member, &style_compressed)];
     if style_payload_member != stylesheet_member {
         edits.push(EntryEdit::new(
@@ -1108,6 +1148,7 @@ fn shared_1000_cell_style_fixture() -> TestResult<WholeCellFixture> {
     edits.push(EntryEdit::new(&stylesheet_member, &stylesheet_compressed));
     edits.push(EntryEdit::new(&tile_member, &tile_compressed));
     edits.push(EntryEdit::new(&model_member, &model_compressed));
+    edits.push(EntryEdit::new(header_member, &header_compressed));
     let bytes = catalog.reassemble_to_bytes(&edits, ArchiveLimits::default())?;
     Ok(WholeCellFixture {
         bytes,
