@@ -12,7 +12,7 @@ use super::children::Children;
 use super::node::Node;
 use crate::error::Result;
 use crate::node::spec::{FormatSpec, GapSpec};
-use crate::node::{Format, PathStep, Source};
+use crate::node::{Format, PathStep, Source, Value};
 use crate::path::navigate::{ElementKind, KindSet, Lookup, Navigate, Resolved, Select};
 use crate::query::inspect::Inspect;
 
@@ -164,6 +164,7 @@ fn kind_of<F: Flavor>(node: &Node<'_>) -> F::Kind {
 impl<'f, F: Flavor> Inspect<'f> for Nav<'f, F> {
     const SPEC: &'static FormatSpec<F::Kind> = F::SPEC;
     const TOP: &'static [F::Kind] = F::TOP;
+    const INDIVIDUAL_PROPERTIES: bool = true;
 
     fn kind(&self, node: &Node<'f>) -> F::Kind {
         kind_of::<F>(node)
@@ -180,6 +181,14 @@ impl<'f, F: Flavor> Inspect<'f> for Nav<'f, F> {
     fn format<'n>(&'n self, node: &'n Node<'f>) -> Result<Format<'n>> {
         let item = node.item();
         Ok(Format::new(item.props(), Source::Tree(item.values())))
+    }
+
+    fn prop<'n>(&'n self, node: &'n Node<'f>, index: usize) -> Result<Option<Value<'n>>> {
+        let Some(property) = node.item().props().get(index) else {
+            return Ok(None);
+        };
+        node.value(property.name)
+            .map(|value| value.map(Value::borrowed))
     }
 
     fn write_step(
