@@ -2643,7 +2643,11 @@ Populated sheets can be duplicated adjacent to their source with preserved
 sheet settings, drawable order, table names and positions, local formula
 dependency graphs, and independently writable table and text-box storage.
 Unsupported drawable graphs and cross-table dependency edges fail before the
-editor is modified. See `duplicate_numbers_sheet`.
+editor is modified. See the focused
+[`duplicate_numbers_sheet`](../litchi-numbers/examples/duplicate_numbers_sheet.rs),
+[`add_numbers_sheet`](../litchi-numbers/examples/add_numbers_sheet.rs), and
+[`remove_numbers_sheet`](../litchi-numbers/examples/remove_numbers_sheet.rs)
+examples for selector-first lifecycle commands.
 
 Populated tables can be duplicated with independent storage and CalculationEngine
 owner families. Formula hosts, table UUID references, dependency tiles, package
