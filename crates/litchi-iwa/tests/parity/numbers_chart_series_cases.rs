@@ -5,6 +5,8 @@
 //! `litchi_numbers::Package::edit_sheet_chart_series` on W1-E's graph
 //! engine.
 
+use std::hint::black_box;
+
 use litchi_iwa::charts::{
     ChartPieLabelDistance, ChartPieWedgeExplosion, ChartPieWedgeIndex, ChartSeriesConnectionLine,
     ChartSeriesSymbol, ChartSeriesSymbolShape, ChartSeriesSymbolSize, ChartSeriesTrendline,
@@ -315,6 +317,212 @@ fn leaf_write(source: &[u8], values: &Values, one: Option<usize>) -> TestResult<
         leaf_bytes!(commit.package()),
         leaf_bytes!(restored.package()),
     ))
+}
+
+#[inline(never)]
+fn numbers_symbols_host_read_all(source: &[u8], sheet: u64, chart: u64) -> TestResult<Vec<u8>> {
+    let editor = numbers::Draft::from_bytes(source)?;
+    Ok(format!("{:?}", editor.sheet_chart_series_symbols(sheet, chart)?).into_bytes())
+}
+
+#[inline(never)]
+fn numbers_symbols_leaf_read_all(source: &[u8], chart: usize) -> TestResult<Vec<u8>> {
+    let package = Package::from_bytes(source)?;
+    Ok(format!(
+        "{:?}",
+        package.sheet_chart_series(0, chart, PropertyKind::Symbols)?
+    )
+    .into_bytes())
+}
+
+#[inline(never)]
+fn numbers_symbols_host_read_single(source: &[u8], sheet: u64, chart: u64) -> TestResult<Vec<u8>> {
+    let editor = numbers::Draft::from_bytes(source)?;
+    Ok(format!(
+        "{:?}",
+        editor.sheet_chart_series_symbol(sheet, chart, Index::from_zero_based(0))?
+    )
+    .into_bytes())
+}
+
+#[inline(never)]
+fn numbers_symbols_leaf_read_single(source: &[u8], chart: usize) -> TestResult<Vec<u8>> {
+    let package = Package::from_bytes(source)?;
+    let property = package.sheet_chart_series(0, chart, PropertyKind::Symbols)?;
+    let Property::Symbols(values) = property else {
+        return Err("Numbers Symbols reader returned another property".into());
+    };
+    Ok(format!("{:?}", values.first().ok_or("missing symbol series")?).into_bytes())
+}
+
+#[inline(never)]
+fn numbers_symbols_host_set_all(
+    source: &[u8],
+    sheet: u64,
+    chart: u64,
+    values: &[Option<ChartSeriesSymbol>],
+) -> TestResult<Vec<u8>> {
+    let mut editor = numbers::Draft::from_bytes(source)?;
+    editor.set_sheet_chart_series_symbols(sheet, chart, values)?;
+    Ok(editor.to_bytes()?)
+}
+
+#[inline(never)]
+fn numbers_symbols_leaf_set_all(
+    source: &[u8],
+    chart: usize,
+    property: &Property,
+) -> TestResult<Vec<u8>> {
+    let package = Package::from_bytes(source)?;
+    let mut edit = package.edit_sheet_chart_series(0, chart)?;
+    edit.set(property.clone())?;
+    Ok(leaf_bytes!(edit.commit()?.package()))
+}
+
+#[inline(never)]
+fn numbers_symbols_host_set_single(
+    source: &[u8],
+    sheet: u64,
+    chart: u64,
+    value: Option<ChartSeriesSymbol>,
+) -> TestResult<Vec<u8>> {
+    let mut editor = numbers::Draft::from_bytes(source)?;
+    editor.set_sheet_chart_series_symbol(sheet, chart, Index::from_zero_based(0), value)?;
+    Ok(editor.to_bytes()?)
+}
+
+#[inline(never)]
+fn numbers_symbols_leaf_set_single(
+    source: &[u8],
+    chart: usize,
+    property: &Property,
+) -> TestResult<Vec<u8>> {
+    let package = Package::from_bytes(source)?;
+    let mut current = package.sheet_chart_series(0, chart, PropertyKind::Symbols)?;
+    replace(&mut current, property, 0)?;
+    let mut edit = package.edit_sheet_chart_series(0, chart)?;
+    edit.set(current)?;
+    Ok(leaf_bytes!(edit.commit()?.package()))
+}
+
+/// Four complete host-vs-Numbers-facade routes for the actual Symbols family.
+/// Setup and allocation/patch/hide controls remain outside the captured
+/// wrappers. Select one route with `W2A_SYMBOL_ROUTE` for Callgrind.
+#[test]
+#[ignore = "coordinator release ABBA cost probe"]
+fn numbers_chart_series_symbols_facade_cost_abba() -> TestResult {
+    let values = Values::Symbols(
+        Kind::Line2d,
+        vec![
+            Some((SymbolShape::Diamond, Some(9.0))),
+            Some((SymbolShape::Square, None)),
+        ],
+    );
+    let input = chart_input(&values, &[])?;
+    let Target::Numbers { sheet } = input.target else {
+        return Err("not a Numbers target".into());
+    };
+    let source = input.fixture.bytes;
+    let chart = input.chart;
+    let leaf_chart = last_chart(&source)?;
+    let Values::Symbols(_, symbol_values) = &values else {
+        return Err("not Symbols values".into());
+    };
+    let host_values = symbol_values
+        .iter()
+        .copied()
+        .map(host_symbol)
+        .collect::<TestResult<Vec<_>>>()?;
+    let property = values.leaf()?;
+    // Uninstrumented proof/setup: both routes and the real allocate/patch/hide
+    // controls finish before any measured wrapper call.
+    for output in [
+        numbers_symbols_host_read_all(&source, sheet, chart)?,
+        numbers_symbols_leaf_read_all(&source, leaf_chart)?,
+        numbers_symbols_host_read_single(&source, sheet, chart)?,
+        numbers_symbols_leaf_read_single(&source, leaf_chart)?,
+        numbers_symbols_host_set_all(&source, sheet, chart, &host_values)?,
+        numbers_symbols_leaf_set_all(&source, leaf_chart, &property)?,
+        numbers_symbols_host_set_single(&source, sheet, chart, host_values[0])?,
+        numbers_symbols_leaf_set_single(&source, leaf_chart, &property)?,
+    ] {
+        assert!(!output.is_empty());
+    }
+    let hidden = Values::Symbols(Kind::Line2d, vec![None, None]);
+    let _ = host_write(&source, sheet, chart, &hidden, None)?;
+    let _ = leaf_write(&source, &hidden, None)?;
+    let patched = Values::Symbols(
+        Kind::Line2d,
+        vec![
+            Some((SymbolShape::Triangle, Some(11.0))),
+            Some((SymbolShape::Square, None)),
+        ],
+    );
+    let _ = host_write(&source, sheet, chart, &patched, None)?;
+    let _ = leaf_write(&source, &patched, None)?;
+
+    let selected = std::env::var("W2A_SYMBOL_ROUTE").ok();
+    for route in ["all_read", "all_set", "single_read", "single_set"] {
+        if selected.as_deref().is_some_and(|value| value != route) {
+            continue;
+        }
+        match route {
+            "all_read" => {
+                black_box(numbers_symbols_host_read_all(&source, sheet, chart)?);
+                black_box(numbers_symbols_leaf_read_all(&source, leaf_chart)?);
+                black_box(numbers_symbols_leaf_read_all(&source, leaf_chart)?);
+                black_box(numbers_symbols_host_read_all(&source, sheet, chart)?);
+            },
+            "all_set" => {
+                black_box(numbers_symbols_host_set_all(
+                    &source,
+                    sheet,
+                    chart,
+                    &host_values,
+                )?);
+                black_box(numbers_symbols_leaf_set_all(
+                    &source, leaf_chart, &property,
+                )?);
+                black_box(numbers_symbols_leaf_set_all(
+                    &source, leaf_chart, &property,
+                )?);
+                black_box(numbers_symbols_host_set_all(
+                    &source,
+                    sheet,
+                    chart,
+                    &host_values,
+                )?);
+            },
+            "single_read" => {
+                black_box(numbers_symbols_host_read_single(&source, sheet, chart)?);
+                black_box(numbers_symbols_leaf_read_single(&source, leaf_chart)?);
+                black_box(numbers_symbols_leaf_read_single(&source, leaf_chart)?);
+                black_box(numbers_symbols_host_read_single(&source, sheet, chart)?);
+            },
+            "single_set" => {
+                black_box(numbers_symbols_host_set_single(
+                    &source,
+                    sheet,
+                    chart,
+                    host_values[0],
+                )?);
+                black_box(numbers_symbols_leaf_set_single(
+                    &source, leaf_chart, &property,
+                )?);
+                black_box(numbers_symbols_leaf_set_single(
+                    &source, leaf_chart, &property,
+                )?);
+                black_box(numbers_symbols_host_set_single(
+                    &source,
+                    sheet,
+                    chart,
+                    host_values[0],
+                )?);
+            },
+            _ => unreachable!(),
+        }
+    }
+    Ok(())
 }
 
 /// Series `i` of `current` takes the value of `wanted`.
