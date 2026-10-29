@@ -76,7 +76,7 @@ fn host_font(font: &ChartFont) -> TestResult<HostFont> {
 }
 
 #[inline(never)]
-fn numbers_chart_font_host_route(
+fn numbers_chart_font_reset_setup(
     source: &[u8],
     sheet: u64,
     chart: u64,
@@ -110,6 +110,18 @@ fn numbers_chart_font_host_route(
         },
     }
     Ok(editor.to_bytes()?)
+}
+
+/// Counted host wrapper. Reset seeding calls the implementation directly so
+/// setup does not add a third selected host call.
+#[inline(never)]
+fn numbers_chart_font_host_route(
+    source: &[u8],
+    sheet: u64,
+    chart: u64,
+    route: Route,
+) -> TestResult<Vec<u8>> {
+    numbers_chart_font_reset_setup(source, sheet, chart, route)
 }
 
 #[inline(never)]
@@ -175,7 +187,7 @@ fn numbers_chart_font_facade_cost_abba() -> TestResult {
                 Route::SizeSet
             };
             input.fixture.bytes =
-                numbers_chart_font_host_route(&input.fixture.bytes, sheet, chart, seed)?;
+                numbers_chart_font_reset_setup(&input.fixture.bytes, sheet, chart, seed)?;
         }
         let source = input.fixture.bytes.as_slice();
         black_box(numbers_chart_font_host_route(source, sheet, chart, route)?);
