@@ -50,7 +50,7 @@ fn leaf_bytes(package: &litchi_numbers::Package) -> Vec<u8> {
 /// probe below toggles this function so dispatch, facade, leaf commit and
 /// serialization are all inside the measured region.
 #[inline(never)]
-fn unified_cached_formula_route(source: &[u8]) -> Vec<u8> {
+fn cached_formula_unified_setup(source: &[u8]) -> Vec<u8> {
     litchi_ops::open_bytes(source.to_vec())
         .expect("open unified source")
         .set(
@@ -65,7 +65,7 @@ fn unified_cached_formula_route(source: &[u8]) -> Vec<u8> {
 /// The direct leaf comparison route for the same single operation and source.
 /// Its output is compared with the full `File` route before the ABBA loop.
 #[inline(never)]
-fn direct_cached_formula_route(source: &[u8]) -> Vec<u8> {
+fn cached_formula_direct_setup(source: &[u8]) -> Vec<u8> {
     let expression =
         litchi_numbers::formula::Expression::parse("=B3+1").expect("formula expression");
     let cached = litchi_numbers::formula::CachedValue::number(2.0).expect("cached number");
@@ -82,6 +82,20 @@ fn direct_cached_formula_route(source: &[u8]) -> Vec<u8> {
         .expect("direct leaf cached commit")
         .into_package();
     leaf_bytes(&package)
+}
+
+/// Counted unified wrapper. The setup implementation has a distinct name so
+/// exact callgrind globs cannot collect warm-up or output checks.
+#[inline(never)]
+fn unified_cached_formula_route(source: &[u8]) -> Vec<u8> {
+    cached_formula_unified_setup(source)
+}
+
+/// Counted direct-leaf wrapper. The setup implementation has a distinct name
+/// so exact callgrind globs cannot collect warm-up or output checks.
+#[inline(never)]
+fn direct_cached_formula_route(source: &[u8]) -> Vec<u8> {
+    cached_formula_direct_setup(source)
 }
 
 #[test]
@@ -429,9 +443,9 @@ fn cached_formula_operation_limit_precedes_parse_and_cache_allocations() {
 fn cached_formula_full_file_cost_abba() {
     let source = std::fs::read(fixture("formula-budget-native.numbers"))
         .expect("read formula budget fixture");
-    let direct = direct_cached_formula_route(&source);
+    let direct = cached_formula_direct_setup(&source);
     assert_eq!(
-        unified_cached_formula_route(&source),
+        cached_formula_unified_setup(&source),
         direct,
         "full unified output must equal direct leaf output"
     );
