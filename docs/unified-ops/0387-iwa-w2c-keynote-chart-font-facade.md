@@ -1,12 +1,11 @@
 # 0387 — W2-C Keynote slide-chart font facade
 
 - Status: bounded facade slice on `uo2/iwa-w2c-chart-font`, cut from frozen
-  root `9932c7d0691b2c14bbbd11a2dea7df41f66308b6`, draft tip
-  `dbfe8cf7f6`. Coordinator integration,
-  shared-engine admission review, native evidence and final integrated gates
-  remain pending. The six exit-ledger rows intentionally remain `host-only`
-  until E's shared contract and the scoped qualification gates are accepted;
-  this record is not a provisional migration state.
+  root `9932c7d0691b2c14bbbd11a2dea7df41f66308b6`, with the reviewed shared
+  substrate `faefe7303b` merged at branch tip `5f20266918`. Coordinator
+  integration, native evidence and final integrated gates remain pending. The
+  six exit-ledger rows intentionally remain `host-only`; this record is not a
+  provisional migration state.
 - Date: 2026-10-28.
 - Plan: [0363](0363-iwa-monolith-exit-plan.md) W2-C; parity/evidence policy
   [0369](0369-iwa-exit-parity-harness-and-ledger.md); shared chart-font engine
@@ -45,12 +44,16 @@ and carry an exact-source patch with `inverse()`. A set-to-current-value is a
 byte-exact no-op. Patch application checks source authorization and preserves
 the original touched-component diagnostic count.
 
-The adapter currently awaits E's reviewed shared-engine admission/error seam.
-The branch must not be accepted as final until the shared route charges all
-pre-work before graph inspection/allocation and exposes typed archive, wire,
-codec, registry, limit and allocation failures. No broad `InvalidSource`
-mapping is evidence of that contract; the final adapter mapping is to be
-updated against E's approved API before integration.
+The adapter consumes E's reviewed shared-engine admission/error seam from
+`faefe7303b`: it derives an explicit residual chart-font profile from one
+package transaction budget, admits the graph index before `Workspace::new`,
+charges engine reports, preflights reassembly and candidate ingress, and
+keeps the same budget through candidate readback. It clamps only to the
+codec's published hard ceilings; it does not call `Limits::for_source` or
+replace a caller profile with a fresh source-sized default. Engine archive,
+wire, codec, graph-limit, allocation and identifier failures retain typed
+facade classifications. The shared substrate itself remains outside this
+work package.
 
 ## Differential proof and evidence boundary
 
@@ -104,6 +107,7 @@ Scoped evidence on the current branch:
 | `cargo check --locked -p litchi-keynote` | pass |
 | strict Clippy (`litchi-keynote`, parity test) | pass; vendor warnings only |
 | seven focused Keynote facade parity/control tests | 7 passed |
+| seven shared chart-font admission tests | 7 passed |
 | `python3 tools/check_crate_boundaries.py` | pass; 70 packages, 313 declarations, 12 explicit debt items |
 | `python3 tools/iwa_exit_ledger.py --check` | pass; six chart-font rows intentionally host-only |
 | `RUSTC_BOOTSTRAP=1 python3 tools/check_api_glossary.py --target-dir /tmp/iwa-w2c-glossary-20261028` | pass; 73 profiles, 3,957 banned names, 716 families, 729 result contracts |
