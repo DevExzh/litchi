@@ -303,6 +303,144 @@ fn source_built_duplicate_table_preserves_content_and_clones_storage() -> TestRe
 }
 
 #[test]
+fn source_built_multi_table_sheet_duplicate_keeps_each_table_and_storage_independent() -> TestResult
+{
+    let source = source_builder("Alpha")?;
+    let source = source
+        .edit_table_lifecycle(SheetSelector::index(0))?
+        .add("Beta", 4, 4)
+        .and_then(|edit| edit.commit())?
+        .into_package();
+    let source = set_number_formula(
+        &source,
+        SheetSelector::index(0),
+        TableSelector::name("Alpha"),
+        7.0,
+    )?;
+    let source = set_number_formula(
+        &source,
+        SheetSelector::index(0),
+        TableSelector::name("Beta"),
+        11.0,
+    )?;
+    let source_bytes = bytes(&source)?;
+    let source_alpha = stored_value(
+        &source,
+        SheetSelector::index(0),
+        TableSelector::name("Alpha"),
+    )?;
+    let source_beta = stored_value(
+        &source,
+        SheetSelector::index(0),
+        TableSelector::name("Beta"),
+    )?;
+    assert_formula_cell(
+        &source,
+        SheetSelector::index(0),
+        TableSelector::name("Alpha"),
+        "=7",
+    )?;
+    assert_formula_cell(
+        &source,
+        SheetSelector::index(0),
+        TableSelector::name("Beta"),
+        "=11",
+    )?;
+    assert_numeric_caches(&source, &[7.0, 11.0])?;
+
+    let duplicate = source
+        .edit_sheet_lifecycle()
+        .duplicate(SheetSelector::index(0))?
+        .commit()?;
+    let duplicated = duplicate.package();
+    assert_eq!(duplicated.sheets()[1].name(), "Source-1");
+    assert_eq!(table_names(duplicated, 1), ["Alpha", "Beta"]);
+    assert_eq!(
+        stored_value(
+            duplicated,
+            SheetSelector::index(1),
+            TableSelector::name("Alpha"),
+        )?,
+        source_alpha
+    );
+    assert_eq!(
+        stored_value(
+            duplicated,
+            SheetSelector::index(1),
+            TableSelector::name("Beta"),
+        )?,
+        source_beta
+    );
+    assert_formula_cell(
+        duplicated,
+        SheetSelector::index(1),
+        TableSelector::name("Alpha"),
+        "=7",
+    )?;
+    assert_numeric_caches(duplicated, &[7.0, 7.0, 11.0, 11.0])?;
+    let restored = duplicated.apply_sheet_lifecycle(&duplicate.patch().inverse())?;
+    assert_eq!(bytes(restored.package())?, source_bytes);
+
+    let changed = set_number_formula(
+        duplicated,
+        SheetSelector::index(1),
+        TableSelector::name("Alpha"),
+        99.0,
+    )?;
+    assert_eq!(
+        stored_value(
+            &changed,
+            SheetSelector::index(0),
+            TableSelector::name("Alpha"),
+        )?,
+        source_alpha,
+        "editing duplicated Alpha must preserve the source sheet"
+    );
+    assert_ne!(
+        stored_value(
+            &changed,
+            SheetSelector::index(1),
+            TableSelector::name("Alpha"),
+        )?,
+        source_alpha
+    );
+    assert_eq!(
+        stored_value(
+            &changed,
+            SheetSelector::index(1),
+            TableSelector::name("Beta"),
+        )?,
+        source_beta,
+        "duplicating Alpha must not alias duplicated Beta storage"
+    );
+    assert_formula_cell(
+        &changed,
+        SheetSelector::index(1),
+        TableSelector::name("Alpha"),
+        "=99",
+    )?;
+    assert_numeric_caches(&changed, &[7.0, 99.0, 11.0, 11.0])?;
+
+    let reopened = Package::from_bytes(&bytes(&changed)?)?;
+    assert_eq!(
+        stored_value(
+            &reopened,
+            SheetSelector::index(0),
+            TableSelector::name("Alpha"),
+        )?,
+        source_alpha
+    );
+    assert_formula_cell(
+        &reopened,
+        SheetSelector::index(1),
+        TableSelector::name("Alpha"),
+        "=99",
+    )?;
+    assert_numeric_caches(&reopened, &[7.0, 99.0, 11.0, 11.0])?;
+    Ok(())
+}
+
+#[test]
 fn source_built_sheet_duplicate_invalid_selector_is_transactional() -> TestResult {
     let package = source_builder("Alpha")?;
     let before = bytes(&package)?;

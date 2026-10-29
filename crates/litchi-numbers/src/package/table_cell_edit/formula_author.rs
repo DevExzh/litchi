@@ -944,7 +944,8 @@ fn prepare_authorized(
             32,
             as_usize(limits.formula_nodes, path)?,
             expression.owned_bytes().max(1),
-        );
+        )
+        .with_max_owner_entries(wire_owners.len());
         let context = FormulaWriteContext::new(
             owner.internal_owner,
             change.position().row(),
@@ -1350,6 +1351,12 @@ fn map_codec(error: codec::DecodeError, path: Path) -> Error {
         },
         Some(DecodeLimit::Nodes { observed, maximum }) => {
             (LimitKind::FormulaWork, observed, maximum)
+        },
+        Some(DecodeLimit::Owners { observed, maximum }) => {
+            // The transaction's existing References budget counts the
+            // source-resolved owner entries retained by formula authoring;
+            // this is not an AST-node observation.
+            (LimitKind::References, observed, maximum)
         },
         Some(DecodeLimit::Text { observed, maximum }) => {
             (LimitKind::OwnedValueBytes, observed, maximum)
