@@ -349,6 +349,19 @@ fn family_and_count(
         })
         .ok_or(Error::InvalidSource)?;
     let limits = budget.residual(package).map_err(map_transaction_error)?;
+    budget
+        .preflight_allocations(1)
+        .and_then(|_| budget.preflight_retained(payload.len()))
+        .and_then(|_| budget.preflight_scratch(payload.len()))
+        .map_err(map_transaction_error)?;
+    let text_maximum = package.semantic_limits().max_text_bytes();
+    if payload.len() > text_maximum {
+        return Err(Error::Limit {
+            kind: LimitKind::WireBytes,
+            observed: payload.len() as u64,
+            maximum: text_maximum as u64,
+        });
+    }
     let maximum_depth = u32::try_from(limits.max_nesting()).map_err(|_| Error::InvalidSource)?;
     let options = DecodeOptions::new(
         payload.len().max(1).min(limits.max_input_bytes()),
@@ -356,7 +369,10 @@ fn family_and_count(
         limits.max_rewrite_work().max(1),
         maximum_depth,
         limits.max_fields().clamp(1, 1_000_000),
-        limits.max_input_bytes().clamp(1, 64 * 1024 * 1024),
+        limits
+            .max_input_bytes()
+            .min(text_maximum)
+            .clamp(1, 64 * 1024 * 1024),
     );
     let (snapshot, report) =
         match chart_metadata_codec::decode_modern_with_report(payload, &options) {
@@ -535,7 +551,7 @@ fn admit_workspace<'a>(
     budget
         .components(component_count)
         .and_then(|_| budget.payload_objects(object_count))
-        .and_then(|_| budget.charge_construction(requirements, 2))
+        .and_then(|_| budget.charge_construction(requirements))
         .map_err(map_transaction_error)
         .map(|()| WorkspaceAdmission {
             components: components_view,

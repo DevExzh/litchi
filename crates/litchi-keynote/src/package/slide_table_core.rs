@@ -448,6 +448,21 @@ impl Budget {
         Self::remaining(self.scratch, self.max_scratch, LimitKind::Scratch)
     }
 
+    pub(crate) fn preflight_allocations(&self, amount: usize) -> Result<()> {
+        let mut probe = *self;
+        probe.allocations(amount)
+    }
+
+    pub(crate) fn preflight_retained(&self, amount: usize) -> Result<()> {
+        let mut probe = *self;
+        probe.retained(amount)
+    }
+
+    pub(crate) fn preflight_scratch(&self, amount: usize) -> Result<()> {
+        let mut probe = *self;
+        probe.scratch(amount)
+    }
+
     pub(crate) fn construction_limits(
         &self,
     ) -> Result<litchi_iwa_style::graph::ConstructionLimits> {
@@ -462,14 +477,8 @@ impl Budget {
     pub(crate) fn charge_construction(
         &mut self,
         requirements: litchi_iwa_style::graph::ConstructionRequirements,
-        passes: usize,
     ) -> Result<()> {
-        self.work(
-            requirements
-                .source_work()
-                .checked_mul(passes)
-                .ok_or(Error::InvalidSource)?,
-        )?;
+        self.work(requirements.total_work())?;
         self.allocations(requirements.index_allocations())?;
         self.retained(requirements.index_retained_bytes())?;
         self.scratch(requirements.index_scratch_bytes())?;
