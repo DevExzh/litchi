@@ -4205,6 +4205,7 @@ pub struct ArchiveEncodingRequirements {
     scratch_bytes: usize,
     retained_bytes: usize,
     identifier_index_entries: usize,
+    identifier_sort_work: usize,
     allocation_events: usize,
 }
 
@@ -4252,6 +4253,14 @@ impl ArchiveEncodingRequirements {
     #[must_use]
     pub const fn identifier_index_entries(self) -> usize {
         self.identifier_index_entries
+    }
+
+    /// Checked source-derived sort work for the exact `(identifier, index)`
+    /// tuple index used by prepared execution. The bound is `N * ceil(log2 N)`
+    /// sort levels, with zero work for zero or one entry.
+    #[must_use]
+    pub const fn identifier_sort_work(self) -> usize {
+        self.identifier_sort_work
     }
 
     /// Output, identifier-index, projection and header allocations counted by
@@ -9601,6 +9610,16 @@ fn encoded_archive_len_preflight_with_duplicate(
     Ok(archive_length)
 }
 
+fn identifier_sort_work(entries: usize) -> Result<usize> {
+    if entries <= 1 {
+        return Ok(0);
+    }
+    let levels = usize::BITS as usize - (entries - 1).leading_zeros() as usize;
+    entries
+        .checked_mul(levels)
+        .ok_or_else(|| Error::invalid_archive(0, "identifier sort work overflow"))
+}
+
 fn prepare_archive_encoding_requirements<V>(
     objects: &[ArchiveObject],
     limits: Limits,
@@ -9760,6 +9779,7 @@ where
         .checked_add(usize::from(encoded_bytes != 0))
         .ok_or_else(|| Error::invalid_archive(0, "allocation count overflow"))?;
     let identifier_index_entries = objects.len();
+    let identifier_sort_work_units = identifier_sort_work(identifier_index_entries)?;
     if identifier_index_entries != 0 {
         allocation_events = allocation_events
             .checked_add(1)
@@ -9784,6 +9804,7 @@ where
         scratch_bytes,
         retained_bytes,
         identifier_index_entries,
+        identifier_sort_work: identifier_sort_work_units,
         allocation_events,
     })
 }
@@ -9814,7 +9835,9 @@ fn encode_prepared_archive(
         })?;
         identifiers.push((identifier, object_index));
     }
-    identifiers.sort_unstable_by_key(|(identifier, _)| *identifier);
+    // Sort the complete tuple so equal identifiers retain source-index order;
+    // this makes the reported duplicate deterministic and source-relative.
+    identifiers.sort_unstable();
     if let Some(pair) = identifiers.windows(2).find(|pair| pair[0].0 == pair[1].0) {
         return Err(Error::invalid_archive(
             pair[1].1,
@@ -11279,6 +11302,7 @@ mod tests {
         assert_eq!(requirements.object_count(), 33);
         assert_eq!(requirements.message_count(), 33);
         assert_eq!(requirements.identifier_index_entries(), 33);
+        assert_eq!(requirements.identifier_sort_work(), 198);
         assert_eq!(requirements.encoded_bytes(), legacy.len());
         assert!(requirements.scratch_bytes() > 33 * size_of::<u64>());
         assert_eq!(plan.execute()?, legacy);
@@ -11364,8 +11388,8 @@ mod tests {
         assert!(matches!(
             duplicate_plan.execute(),
             Err(Error::InvalidArchive {
+                offset: 32,
                 reason: "duplicate object identifier",
-                ..
             })
         ));
 

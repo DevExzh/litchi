@@ -17,12 +17,16 @@ source-derived collection chunks, including checked traversal bytes, before
 each preparation walk; `ArchiveEncodingPreparationError::Admission(E)` keeps
 the format owner's error type intact. `ArchiveEncodingPlan::requirements()` exposes source-
 derived output, payload/header, work, scratch, retained, identifier-index,
-compatibility-projection, message/object, and allocation-event quantities.
+compatibility-projection, message/object, identifier-sort-work, and
+allocation-event quantities.
 `execute()` reserves the exact
 identifier index and output, performs duplicate-ID validation, projects headers,
 and emits bytes without falling back to the legacy host route. The immutable
 archive borrow prevents a prepared plan from becoming stale. Legacy
 `Archive::to_bytes` and `Archive::encoded_len` remain unchanged.
+The execution index sorts full `(identifier, source_index)` tuples; its
+requirements expose a checked `N * ceil(log2 N)` source-derived sort-work bound
+separately from byte retention.
 
 `SnappyStream::prepare_compression(input_len, limits, &mut visitor)` returns
 `SnappyCompressionPlan`. The typed

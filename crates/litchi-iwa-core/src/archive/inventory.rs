@@ -147,7 +147,7 @@ where
 /// `Admission` preserves the format owner's typed finite-budget error. The
 /// inventory's own arithmetic is allocation-free and can only fail with the
 /// checked-overflow variant.
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum ArchiveCloneInventoryError<E> {
     /// The visitor rejected the next collection before traversal.
