@@ -3931,7 +3931,7 @@ def p0401():
         projection = route.get("projection", "")
         out.append(row(
             "0401", "keynote", operation, label, route.get("size", ""),
-            host, leaf, [ratio], regression("0401"),
+            leaf, host, [ratio], regression("0401"),
             f"w2c_chart_series:{route_id}:ir", src([path]),
             stage=f"source-bound {source[:10]}",
             comparison="leaf/host (inclusive Callgrind Ir)", unit="Ir",
