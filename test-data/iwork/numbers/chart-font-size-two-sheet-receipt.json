@@ -4,7 +4,7 @@
   "size": 9594,
   "sha256": "578eb93d8df7ae35f6932599a8702b90a710dff9b22d55265fd7b39a701e5070",
   "source": "Synthetic host-package fixture generated with the tracked public litchi-iwa Numbers editor recipe",
-  "generator_source_commit": "87ad646775d1ba30049c55b99f8141e48829305c",
+  "generator_source_commit": "87ad646775372fb90367badb66ae0badc1bff08e",
   "generator_manifest": "test-data/iwork/numbers/chart-font-size-two-sheet-generator/Cargo.toml",
   "generator_source": "test-data/iwork/numbers/chart-font-size-two-sheet-generator/src/main.rs",
   "generator_command": "CARGO_TARGET_DIR=/tmp/litchi_numbers_two_sheet_gen/target cargo run --manifest-path test-data/iwork/numbers/chart-font-size-two-sheet-generator/Cargo.toml --offline --quiet -- /tmp/two-sheet-chart-font-size.numbers",
