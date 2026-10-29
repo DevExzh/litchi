@@ -1,3 +1,8 @@
+//! Generate the tracked two-sheet chart-font-size locality fixture.
+//!
+//! This host-owned recipe is retained only to make the focused migration test
+//! reproducible before W3 removes `litchi-iwa`.
+
 use std::{env, fs};
 
 use litchi_iwa::{
@@ -55,9 +60,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         },
     )?;
 
-    // Seed distinct values through the focused leaf transaction.  The ops
-    // test can therefore prove that a retained first-sheet node is not
-    // retargeted when the second-sheet cache entry is initialized later.
+    // Seed distinct values through the focused leaf transaction. The ops test
+    // can therefore prove that a retained first-sheet node is not retargeted
+    // when the second-sheet cache entry is initialized later.
     let source = editor.to_bytes()?;
     let source = set_size(&source, 0, 13.0)?;
     let source = set_size(&source, 1, 27.0)?;
