@@ -476,12 +476,11 @@ fn keynote_slide_chart_series_unknown_and_locality_parity() -> TestResult {
 fn keynote_slide_chart_series_malformed_and_low_budget_refuse() -> TestResult {
     let input = input(Format::Keynote, Kind::Line2d)?;
     let malformed = rewrite_chart_payload(&input.fixture.bytes, input.chart, vec![0xff])?;
-    if let Ok(package) = Package::from_bytes(&malformed) {
-        assert!(matches!(
-            package.slide_chart_series(LEAF_SLIDE, LEAF_CHART),
-            Err(Error::InvalidSource) | Err(Error::Refused(_))
-        ));
-    }
+    let package = Package::from_bytes(&malformed)?;
+    assert!(matches!(
+        package.slide_chart_series(LEAF_SLIDE, LEAF_CHART),
+        Err(Error::InvalidSource)
+    ));
 
     let limits = SemanticLimits::builder().max_references(1)?.build()?;
     let package = Package::from_bytes_with_options(

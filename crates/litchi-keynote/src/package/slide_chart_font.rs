@@ -52,6 +52,10 @@ const CHART_MESSAGE_TYPE: u32 = 5_021;
 const PARAGRAPH_STYLE_MESSAGE_TYPE: u32 = 2_022;
 const STYLESHEET_MESSAGE_TYPE: u32 = 401;
 const PACKAGE_METADATA_MESSAGE_TYPE: u32 = 11_006;
+const OBJECT_CONTAINER_MESSAGE_TYPE: u32 = 11_008;
+const SERIES_SYMBOL_FIELDS: &[u32] = &[
+    32, 33, 34, 35, 36, 47, 48, 49, 50, 51, 70, 71, 72, 73, 74, 160, 163, 181,
+];
 
 /// A chart's effective font identity and face traits.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
@@ -298,11 +302,18 @@ impl Diagnostics {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
-struct MutationPlan {
+pub(super) struct MutationPlan {
     root_identifier: u64,
     members: Box<[String]>,
     deleted_members: Box<[String]>,
     object_ids: Box<[u64]>,
+    enforce_reachability: bool,
+}
+
+pub(super) fn inverse_mutation_plan(plan: &MutationPlan) -> MutationPlan {
+    let mut inverse = plan.clone();
+    inverse.deleted_members = Box::default();
+    inverse
 }
 
 /// The fully verified result of one immutable chart-font transaction.
@@ -1142,7 +1153,15 @@ impl Package {
             Package::from_source_with_options(patch.artifacts.target(), self.state.options)
                 .map_err(map_read_error)?;
         candidate.validate().map_err(map_read_error)?;
-        verify_locality_members(self, &candidate, &patch.plan, &mut budget, &mut fields)?;
+        verify_locality_members(
+            self,
+            &candidate,
+            &patch.plan,
+            &mut budget,
+            &mut fields,
+            is_chart_font_rewritable_type,
+            &[20],
+        )?;
         let candidate_selection =
             positional_selection(&candidate, &selection, &mut budget, &mut fields)?;
         if !same_selection(&selection, &candidate_selection)
@@ -1257,7 +1276,15 @@ impl Package {
             Package::from_source_with_options(patch.artifacts.target(), self.state.options)
                 .map_err(map_read_error)?;
         candidate.validate().map_err(map_read_error)?;
-        verify_locality_members(self, &candidate, &patch.plan, &mut budget, &mut fields)?;
+        verify_locality_members(
+            self,
+            &candidate,
+            &patch.plan,
+            &mut budget,
+            &mut fields,
+            is_chart_font_rewritable_type,
+            &[20],
+        )?;
         let candidate_selection =
             positional_selection(&candidate, &selection, &mut budget, &mut fields)?;
         if !same_selection(&selection, &candidate_selection)
@@ -2433,12 +2460,14 @@ fn reachable_objects(
     Ok(reachable)
 }
 
-fn verify_locality_members(
+pub(super) fn verify_locality_members(
     source: &Package,
     candidate: &Package,
     plan: &MutationPlan,
     budget: &mut TransactionBudget,
     fields: &mut FieldLedger,
+    is_rewritable_type: fn(u32) -> bool,
+    chart_extension_fields: &[u32],
 ) -> Result<(), Error> {
     let source_catalog = physical_catalog(source)?;
     let candidate_catalog = physical_catalog(candidate)?;
@@ -2489,20 +2518,28 @@ fn verify_locality_members(
             amount: plan.object_ids.len(),
         })?;
     allowed_objects.extend(plan.object_ids.iter().copied());
-    let source_reachable = reachable_objects(source, plan.root_identifier, budget, fields)?;
-    let candidate_reachable = reachable_objects(candidate, plan.root_identifier, budget, fields)?;
-    for identifier in &allowed_objects {
-        if *identifier != 2
-            && package_object(source, *identifier).is_some()
-            && !source_reachable.contains(identifier)
-        {
-            return Err(Error::InvalidSource);
-        }
-        if *identifier != 2
-            && package_object(candidate, *identifier).is_some()
-            && !candidate_reachable.contains(identifier)
-        {
-            return Err(Error::InvalidSource);
+    let (source_reachable, candidate_reachable) = if plan.enforce_reachability {
+        (
+            reachable_objects(source, plan.root_identifier, budget, fields)?,
+            reachable_objects(candidate, plan.root_identifier, budget, fields)?,
+        )
+    } else {
+        (HashSet::new(), HashSet::new())
+    };
+    if plan.enforce_reachability {
+        for identifier in &allowed_objects {
+            if *identifier != 2
+                && package_object(source, *identifier).is_some()
+                && !source_reachable.contains(identifier)
+            {
+                return Err(Error::InvalidSource);
+            }
+            if *identifier != 2
+                && package_object(candidate, *identifier).is_some()
+                && !candidate_reachable.contains(identifier)
+            {
+                return Err(Error::InvalidSource);
+            }
         }
     }
 
@@ -2585,7 +2622,7 @@ fn verify_locality_members(
                 || !source_object
                     .messages
                     .first()
-                    .is_some_and(|message| is_chart_font_rewritable_type(message.type_))
+                    .is_some_and(|message| is_rewritable_type(message.type_))
             {
                 return Err(Error::InvalidSource);
             }
@@ -2608,18 +2645,23 @@ fn verify_locality_members(
                     .messages
                     .get(index)
                     .ok_or(Error::InvalidSource)?;
+                let unknowns_preserved = if is_rewritable_type(source_message.type_) {
+                    message_unknown_fields_preserved(
+                        source_message.type_,
+                        source_message.data.as_slice(),
+                        candidate_message.data.as_slice(),
+                        budget.residual(source).map_err(map_transaction_error)?,
+                        budget,
+                        fields,
+                        chart_extension_fields,
+                    )?
+                } else {
+                    true
+                };
                 if candidate_message.type_ != source_message.type_
-                    || (!is_chart_font_rewritable_type(source_message.type_)
+                    || (!is_rewritable_type(source_message.type_)
                         && candidate_message != source_message)
-                    || (is_chart_font_rewritable_type(source_message.type_)
-                        && !message_unknown_fields_preserved(
-                            source_message.type_,
-                            source_message.data.as_slice(),
-                            candidate_message.data.as_slice(),
-                            budget.residual(source).map_err(map_transaction_error)?,
-                            budget,
-                            fields,
-                        )?)
+                    || !unknowns_preserved
                 {
                     return Err(Error::InvalidSource);
                 }
@@ -2783,11 +2825,17 @@ fn message_unknown_fields_preserved(
     limits: litchi_iwa_common::WireLimits,
     budget: &mut TransactionBudget,
     fields: &mut FieldLedger,
+    chart_extension_fields: &[u32],
 ) -> Result<bool, Error> {
     match message_type {
-        CHART_MESSAGE_TYPE => {
-            chart_unknown_fields_preserved(source, candidate, limits, budget, fields)
-        },
+        CHART_MESSAGE_TYPE => chart_unknown_fields_preserved(
+            source,
+            candidate,
+            limits,
+            budget,
+            fields,
+            chart_extension_fields,
+        ),
         PARAGRAPH_STYLE_MESSAGE_TYPE => wire_unknown_fields_preserved(
             source,
             candidate,
@@ -2799,10 +2847,59 @@ fn message_unknown_fields_preserved(
         STYLESHEET_MESSAGE_TYPE => {
             wire_unknown_fields_preserved(source, candidate, limits, &[1, 5], budget, fields)
         },
+        5_028 | 5_029 => {
+            series_style_unknown_fields_preserved(source, candidate, limits, budget, fields)
+        },
+        OBJECT_CONTAINER_MESSAGE_TYPE => {
+            wire_unknown_fields_preserved(source, candidate, limits, &[1, 2], budget, fields)
+        },
         PACKAGE_METADATA_MESSAGE_TYPE => {
             wire_unknown_fields_preserved(source, candidate, limits, &[1, 3, 8, 11], budget, fields)
         },
         _ => Ok(true),
+    }
+}
+
+fn series_style_unknown_fields_preserved(
+    source: &[u8],
+    candidate: &[u8],
+    limits: litchi_iwa_common::WireLimits,
+    budget: &mut TransactionBudget,
+    fields: &mut FieldLedger,
+) -> Result<bool, Error> {
+    let source_fields = parse_locality_fields(source, limits, budget, fields)?;
+    let candidate_fields = parse_locality_fields(candidate, limits, budget, fields)?;
+    if raw_fields_except(&source_fields, source, 10_000, budget)?
+        != raw_fields_except(&candidate_fields, candidate, 10_000, budget)?
+    {
+        return Ok(false);
+    }
+    let source_extension = source_fields
+        .iter()
+        .find(|field| field.number() == 10_000)
+        .map(|field| field.payload(source).map_err(map_wire_error))
+        .transpose()?;
+    let candidate_extension = candidate_fields
+        .iter()
+        .find(|field| field.number() == 10_000)
+        .map(|field| field.payload(candidate).map_err(map_wire_error))
+        .transpose()?;
+    match (source_extension, candidate_extension) {
+        (None, None) => Ok(true),
+        (Some(_), None) | (None, Some(_)) => Ok(false),
+        (Some(source), Some(candidate)) => {
+            let source_fields = parse_locality_fields(source, limits, budget, fields)?;
+            let candidate_fields = parse_locality_fields(candidate, limits, budget, fields)?;
+            Ok(
+                raw_fields_except_numbers(&source_fields, source, SERIES_SYMBOL_FIELDS, budget)?
+                    == raw_fields_except_numbers(
+                        &candidate_fields,
+                        candidate,
+                        SERIES_SYMBOL_FIELDS,
+                        budget,
+                    )?,
+            )
+        },
     }
 }
 
@@ -2828,6 +2925,7 @@ fn chart_unknown_fields_preserved(
     limits: litchi_iwa_common::WireLimits,
     budget: &mut TransactionBudget,
     fields: &mut FieldLedger,
+    chart_extension_fields: &[u32],
 ) -> Result<bool, Error> {
     let source_fields = parse_locality_fields(source, limits, budget, fields)?;
     let candidate_fields = parse_locality_fields(candidate, limits, budget, fields)?;
@@ -2857,10 +2955,18 @@ fn chart_unknown_fields_preserved(
                     parse_locality_fields(source_extension, limits, budget, fields)?;
                 let candidate_fields =
                     parse_locality_fields(candidate_extension, limits, budget, fields)?;
-                let source_unknown =
-                    raw_fields_except(&source_fields, source_extension, 20, budget)?;
-                let candidate_unknown =
-                    raw_fields_except(&candidate_fields, candidate_extension, 20, budget)?;
+                let source_unknown = raw_fields_except_numbers(
+                    &source_fields,
+                    source_extension,
+                    chart_extension_fields,
+                    budget,
+                )?;
+                let candidate_unknown = raw_fields_except_numbers(
+                    &candidate_fields,
+                    candidate_extension,
+                    chart_extension_fields,
+                    budget,
+                )?;
                 if source_unknown != candidate_unknown {
                     return Ok(false);
                 }
@@ -3021,6 +3127,166 @@ fn mutation_plan(
         members: members.into_boxed_slice(),
         deleted_members: deleted_members.into_boxed_slice(),
         object_ids: object_ids.into_boxed_slice(),
+        enforce_reachability: true,
+    })
+}
+
+/// Build a source/request-derived locality plan for a chart-family rewrite.
+///
+/// Unlike the historical chart-font plan, this variant does not inspect a
+/// candidate diff to discover authorization.  The graph request already
+/// names every edited/inserted/deleted member; all object identifiers carried
+/// by those request archives form the bounded mutation scope.  The locality
+/// verifier still requires unchanged object/message metadata and unknown wire
+/// fields to remain byte-identical, so a touched member cannot authorize an
+/// unrelated mutation merely by being in the same archive.
+pub(super) fn mutation_plan_for_series(
+    package: &Package,
+    root_identifier: u64,
+    changes: &graph::Changes,
+    budget: &mut TransactionBudget,
+) -> Result<MutationPlan, Error> {
+    let preview_plan = match &package.state.source {
+        PhysicalSource::Package(catalog) => {
+            super::rendering_invalidation::root_preview_deletions(catalog.package())
+                .map_err(|_| Error::InvalidSource)?
+        },
+        PhysicalSource::Semantic(_) => return Err(Refusal::UnsupportedSource.into()),
+    };
+    let member_capacity = changes
+        .edits
+        .len()
+        .checked_add(changes.insertions.len())
+        .and_then(|value| value.checked_add(changes.deletions.len()))
+        .and_then(|value| value.checked_add(preview_plan.len()))
+        .ok_or(Error::InvalidSource)?;
+    let mut object_capacity = 0usize;
+    let mut name_bytes = 0usize;
+    for (name, archive) in &changes.edits {
+        name_bytes = name_bytes
+            .checked_add(name.len())
+            .and_then(|value| value.checked_add(1))
+            .ok_or(Error::InvalidSource)?;
+        object_capacity = object_capacity
+            .checked_add(archive.objects.len())
+            .ok_or(Error::InvalidSource)?;
+        let source = package
+            .state
+            .source
+            .components()
+            .get(name)
+            .ok_or(Error::InvalidSource)?;
+        object_capacity = object_capacity
+            .checked_add(source.archive().objects.len())
+            .ok_or(Error::InvalidSource)?;
+    }
+    for insertion in &changes.insertions {
+        name_bytes = name_bytes
+            .checked_add(insertion.name.len())
+            .and_then(|value| value.checked_add(1))
+            .ok_or(Error::InvalidSource)?;
+        object_capacity = object_capacity
+            .checked_add(insertion.archive.objects.len())
+            .ok_or(Error::InvalidSource)?;
+    }
+    for name in &changes.deletions {
+        name_bytes = name_bytes
+            .checked_add(name.len())
+            .and_then(|value| value.checked_add(1))
+            .ok_or(Error::InvalidSource)?;
+        if let Some(component) = package.state.source.components().get(name) {
+            object_capacity = object_capacity
+                .checked_add(component.archive().objects.len())
+                .ok_or(Error::InvalidSource)?;
+        }
+    }
+    for name in preview_plan.names() {
+        name_bytes = name_bytes
+            .checked_add(name.len())
+            .and_then(|value| value.checked_add(1))
+            .ok_or(Error::InvalidSource)?;
+    }
+    let set_scratch = member_capacity
+        .checked_mul(size_of::<String>())
+        .and_then(|value| value.checked_add(object_capacity.checked_mul(size_of::<u64>())?))
+        .ok_or(Error::InvalidSource)?;
+    budget
+        .work(
+            name_bytes
+                .checked_add(object_capacity)
+                .ok_or(Error::InvalidSource)?,
+        )
+        .and_then(|_| budget.allocations(member_capacity.max(1).saturating_add(3)))
+        .and_then(|_| budget.retained(name_bytes))
+        .and_then(|_| budget.scratch(set_scratch))
+        .map_err(map_transaction_error)?;
+
+    let mut members = Vec::new();
+    members
+        .try_reserve_exact(member_capacity)
+        .map_err(|_| Error::Allocation {
+            amount: member_capacity,
+        })?;
+    let mut deleted_members = Vec::new();
+    deleted_members
+        .try_reserve_exact(
+            changes
+                .deletions
+                .len()
+                .checked_add(preview_plan.len())
+                .ok_or(Error::InvalidSource)?,
+        )
+        .map_err(|_| Error::Allocation {
+            amount: changes.deletions.len().saturating_add(preview_plan.len()),
+        })?;
+    let mut object_ids = Vec::new();
+    object_ids
+        .try_reserve_exact(object_capacity)
+        .map_err(|_| Error::Allocation {
+            amount: object_capacity,
+        })?;
+    for (name, archive) in &changes.edits {
+        members.push(name.clone());
+        for object in &archive.objects {
+            object_ids.push(object.archive_info.identifier.ok_or(Error::InvalidSource)?);
+        }
+        if let Some(source) = package.state.source.components().get(name) {
+            for object in &source.archive().objects {
+                object_ids.push(object.archive_info.identifier.ok_or(Error::InvalidSource)?);
+            }
+        }
+    }
+    for insertion in &changes.insertions {
+        members.push(insertion.name.clone());
+        for object in &insertion.archive.objects {
+            object_ids.push(object.archive_info.identifier.ok_or(Error::InvalidSource)?);
+        }
+    }
+    for name in &changes.deletions {
+        members.push(name.clone());
+        deleted_members.push(name.clone());
+        if let Some(component) = package.state.source.components().get(name) {
+            for object in &component.archive().objects {
+                object_ids.push(object.archive_info.identifier.ok_or(Error::InvalidSource)?);
+            }
+        }
+    }
+    for name in preview_plan.names() {
+        members.push((*name).to_owned());
+        deleted_members.push((*name).to_owned());
+    }
+    members.sort_unstable();
+    members.dedup();
+    deleted_members.sort_unstable();
+    deleted_members.dedup();
+    object_ids.sort_unstable();
+    object_ids.dedup();
+    Ok(MutationPlan {
+        root_identifier,
+        members: members.into_boxed_slice(),
+        deleted_members: deleted_members.into_boxed_slice(),
+        object_ids: object_ids.into_boxed_slice(),
+        enforce_reachability: false,
     })
 }
 
@@ -3041,6 +3307,35 @@ fn publish(
     fields: &mut FieldLedger,
     plan: &MutationPlan,
 ) -> Result<Package, Error> {
+    publish_with_policy(
+        package,
+        changes,
+        budget,
+        fields,
+        plan,
+        &[],
+        is_chart_font_rewritable_type,
+        &[20],
+    )
+}
+
+/// Publish a graph change for an adjacent chart-family owner while reusing
+/// the chart-font transaction's exact archive/reassembly and locality seam.
+///
+/// The caller supplies the route's explicit deletion set (for example root
+/// preview members) and message policy.  The helper remains private to the
+/// package module; the public chart-font facade continues to use
+/// [`publish`] unchanged.
+pub(super) fn publish_with_policy(
+    package: &Package,
+    changes: graph::Changes,
+    budget: &mut TransactionBudget,
+    fields: &mut FieldLedger,
+    plan: &MutationPlan,
+    extra_deletions: &[&str],
+    is_rewritable_type: fn(u32) -> bool,
+    chart_extension_fields: &[u32],
+) -> Result<Package, Error> {
     let catalog = physical_catalog(package)?;
     let archive_limits = catalog
         .limits()
@@ -3052,7 +3347,11 @@ fn publish(
         .map_err(map_archive_error)?;
     let edit_capacity = changes.edits.len();
     let insertion_capacity = changes.insertions.len();
-    let deletion_capacity = changes.deletions.len();
+    let deletion_capacity = changes
+        .deletions
+        .len()
+        .checked_add(extra_deletions.len())
+        .ok_or(Error::InvalidSource)?;
     let collection_scratch = edit_capacity
         .checked_mul(size_of::<(&str, Vec<u8>)>())
         .and_then(|value| value.checked_add(edit_capacity.checked_mul(size_of::<EntryEdit<'_>>())?))
@@ -3071,9 +3370,24 @@ fn publish(
         })
         .and_then(|value| value.checked_add(deletion_capacity.checked_mul(size_of::<&str>())?))
         .ok_or(Error::InvalidSource)?;
+    let name_bytes = changes
+        .edits
+        .iter()
+        .map(|(name, _)| name.len())
+        .chain(
+            changes
+                .insertions
+                .iter()
+                .map(|insertion| insertion.name.len()),
+        )
+        .chain(changes.deletions.iter().map(String::len))
+        .chain(extra_deletions.iter().map(|name| name.len()))
+        .try_fold(0usize, |total, bytes| total.checked_add(bytes))
+        .ok_or(Error::InvalidSource)?;
     budget
         .allocations(6)
         .and_then(|_| budget.scratch(collection_scratch))
+        .and_then(|_| budget.work(name_bytes))
         .map_err(map_transaction_error)?;
     let mut edited = Vec::new();
     edited
@@ -3150,14 +3464,40 @@ fn publish(
             amount: deletion_capacity,
         })?;
     deletions.extend(changes.deletions.iter().map(String::as_str));
-    let edited_bytes = edited
-        .iter()
-        .map(|(_, data)| data.len())
-        .chain(inserted.iter().map(|(_, data, _)| data.len()))
-        .try_fold(0usize, |total, bytes| total.checked_add(bytes))
-        .ok_or(Error::InvalidSource)?;
+    for name in extra_deletions {
+        if !deletions.contains(name) {
+            deletions.push(name);
+        }
+    }
+    let mut admit_reassembly = |charge: litchi_iwa_archive::unstable::CandidateIngressCharge| {
+        budget
+            .retained(charge.retained_bytes())
+            .and_then(|_| budget.work(charge.traversal_bytes()))
+            .and_then(|_| budget.allocations(charge.allocations()))
+            .map_err(map_transaction_error)
+    };
+    let preparation = catalog
+        .__admit_reassembly_preparation(
+            &insertions,
+            &edits,
+            &deletions,
+            catalog.limits(),
+            &mut admit_reassembly,
+        )
+        .map_err(|error| match error {
+            litchi_iwa_archive::unstable::CandidateIngressError::Physical(error) => {
+                map_archive_error(error)
+            },
+            litchi_iwa_archive::unstable::CandidateIngressError::Admission(error) => error,
+            litchi_iwa_archive::unstable::CandidateIngressError::CloneArithmetic { .. } => {
+                Error::InvalidSource
+            },
+            _ => Error::InvalidSource,
+        })?;
     budget
-        .preflight_reassembly(catalog, edited_bytes, changes.deletions.len())
+        .entries(preparation.physical_entries())
+        .and_then(|_| budget.entry_bytes(catalog.source_bytes().len()))
+        .and_then(|_| budget.total_bytes(catalog.source_bytes().len()))
         .map_err(map_transaction_error)?;
     let prepared = catalog
         .package()
@@ -3175,7 +3515,15 @@ fn publish(
     let candidate = Package::from_source_with_options(output.into(), package.state.options)
         .map_err(map_read_error)?;
     candidate.validate().map_err(map_read_error)?;
-    verify_locality_members(package, &candidate, plan, budget, fields)?;
+    verify_locality_members(
+        package,
+        &candidate,
+        plan,
+        budget,
+        fields,
+        is_rewritable_type,
+        chart_extension_fields,
+    )?;
     Ok(candidate)
 }
 
@@ -3648,6 +3996,7 @@ mod locality_tests {
             members: vec![member.to_owned()].into_boxed_slice(),
             deleted_members: Box::default(),
             object_ids: object_ids.into_boxed_slice(),
+            enforce_reachability: true,
         })
     }
 
@@ -3797,7 +4146,15 @@ mod locality_tests {
         let mut budget = transaction_budget(source)?;
         let mut fields = FieldLedger::new(source)?;
         admit_transaction(source, &mut budget)?;
-        let result = verify_locality_members(source, &candidate, plan, &mut budget, &mut fields);
+        let result = verify_locality_members(
+            source,
+            &candidate,
+            plan,
+            &mut budget,
+            &mut fields,
+            is_chart_font_rewritable_type,
+            &[20],
+        );
         assert!(
             result.is_err(),
             "locality verifier unexpectedly accepted: {result:?}"

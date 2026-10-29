@@ -11,19 +11,13 @@
     reason = "The focused adapter keeps the semantic boundary beside its staged transaction."
 )]
 
-use std::collections::HashSet;
 use std::fmt;
-use std::mem::size_of;
 use std::sync::Arc;
 
-use litchi_iwa_archive::package::{EntryEdit, EntryInsertion, ExactArtifacts};
-use litchi_iwa_core::{
-    Archive, ArchiveObject, ArchiveReferenceKind, ArchiveReferenceOccurrence,
-    ArchiveReferencePolicy, ArchiveReferenceVisitor, Limits as ArchiveLimits, RawMessage,
-    SnappyStream,
-};
+use litchi_iwa_archive::package::ExactArtifacts;
+use litchi_iwa_core::{Archive, Limits as ArchiveLimits};
 use litchi_iwa_protos::chart_metadata_codec::{self, DecodeOptions};
-use litchi_iwa_protos::chart_style_codec::{self as chart_style_codec, Limits as ChartCodecLimits};
+use litchi_iwa_protos::chart_style_codec;
 use litchi_iwa_style::graph::{self, Components, Workspace};
 use litchi_iwa_style::series as engine;
 use thiserror::Error as ThisError;
@@ -86,6 +80,8 @@ pub enum LimitKind {
     RetainedBytes,
     /// Temporary graph scratch bytes.
     ScratchBytes,
+    /// Caller bytes retained by deferred selectors.
+    SelectorBytes,
 }
 
 impl fmt::Display for LimitKind {
@@ -102,6 +98,7 @@ impl fmt::Display for LimitKind {
             Self::Allocations => "allocations",
             Self::RetainedBytes => "retained bytes",
             Self::ScratchBytes => "scratch bytes",
+            Self::SelectorBytes => "selector bytes",
         })
     }
 }
@@ -542,6 +539,17 @@ fn map_transaction_error(error: TransactionError) -> Error {
     }
 }
 
+fn map_selector_error(error: super::edit::SelectorError) -> Error {
+    match error {
+        super::edit::SelectorError::Limit { observed, maximum } => Error::Limit {
+            kind: LimitKind::SelectorBytes,
+            observed: u64::try_from(observed).unwrap_or(u64::MAX),
+            maximum: u64::try_from(maximum).unwrap_or(u64::MAX),
+        },
+        super::edit::SelectorError::Allocation { amount } => Error::Allocation { amount },
+    }
+}
+
 fn map_graph(error: graph::Error) -> Error {
     match error {
         graph::Error::Limit {
@@ -637,24 +645,6 @@ fn map_codec_error(error: chart_style_codec::Error) -> Error {
     }
 }
 
-fn map_core_error(error: litchi_iwa_core::Error) -> Error {
-    match error {
-        litchi_iwa_core::Error::Limit {
-            kind,
-            observed,
-            maximum,
-        } => Error::Limit {
-            kind: map_core_limit(kind),
-            observed: observed as u64,
-            maximum: maximum as u64,
-        },
-        litchi_iwa_core::Error::Allocation { requested, .. } => {
-            Error::Allocation { amount: requested }
-        },
-        _ => Error::InvalidSource,
-    }
-}
-
 fn map_registry_error(error: litchi_iwa_protos::package_metadata_codec::RewriteError) -> Error {
     if let Some(amount) = error.allocation_request() {
         return Error::Allocation { amount };
@@ -724,33 +714,45 @@ fn map_core_limit(kind: litchi_iwa_core::LimitKind) -> LimitKind {
     }
 }
 
-fn planned_archive_bytes(archive: &Archive) -> Result<usize, Error> {
-    archive
-        .objects
-        .iter()
-        .try_fold(0_usize, |total, object: &ArchiveObject| {
-            let payload = object.messages.iter().try_fold(
-                0_usize,
-                |message_total, message: &RawMessage| {
-                    message_total
-                        .checked_add(message.data.len())
-                        .and_then(|value| value.checked_add(size_of::<RawMessage>()))
-                        .ok_or(Error::InvalidSource)
-                },
-            )?;
-            total
-                .checked_add(payload)
-                .and_then(|value| value.checked_add(size_of::<ArchiveObject>()))
-                .ok_or(Error::InvalidSource)
-        })
+const fn is_series_rewritable_type(message_type: u32) -> bool {
+    matches!(message_type, 401 | 5_021 | 5_028 | 5_029 | 11_006 | 11_008)
 }
 
-fn planned_compressed_bytes(
-    archive: &Archive,
-    snappy_limits: litchi_iwa_core::SnappyLimits,
-) -> Result<usize, Error> {
-    let raw = planned_archive_bytes(archive)?;
-    SnappyStream::maximum_compressed_len(raw, snappy_limits).map_err(map_core_error)
+fn map_font_error(error: slide_chart_font::Error) -> Error {
+    match error {
+        slide_chart_font::Error::Refused(_) => Refusal::UnsupportedSource.into(),
+        slide_chart_font::Error::Limit {
+            kind,
+            observed,
+            maximum,
+        } => Error::Limit {
+            kind: match kind {
+                slide_chart_font::LimitKind::InputBytes => LimitKind::InputBytes,
+                slide_chart_font::LimitKind::OutputBytes => LimitKind::OutputBytes,
+                slide_chart_font::LimitKind::WireBytes => LimitKind::WireBytes,
+                slide_chart_font::LimitKind::Entries
+                | slide_chart_font::LimitKind::EntryBytes
+                | slide_chart_font::LimitKind::TotalBytes
+                | slide_chart_font::LimitKind::Slides
+                | slide_chart_font::LimitKind::Identifiers => LimitKind::Entries,
+                slide_chart_font::LimitKind::References => LimitKind::References,
+                slide_chart_font::LimitKind::WireFields => LimitKind::WireFields,
+                slide_chart_font::LimitKind::WireNesting => LimitKind::WireNesting,
+                slide_chart_font::LimitKind::WireWork => LimitKind::WireWork,
+                slide_chart_font::LimitKind::Allocations => LimitKind::Allocations,
+                slide_chart_font::LimitKind::RetainedBytes => LimitKind::RetainedBytes,
+                slide_chart_font::LimitKind::ScratchBytes => LimitKind::ScratchBytes,
+                slide_chart_font::LimitKind::SelectorBytes => LimitKind::SelectorBytes,
+                slide_chart_font::LimitKind::TextBytes => LimitKind::WireBytes,
+            },
+            observed,
+            maximum,
+        },
+        slide_chart_font::Error::Allocation { amount } => Error::Allocation { amount },
+        slide_chart_font::Error::InvalidSource => Error::InvalidSource,
+        slide_chart_font::Error::Verification => Error::Verification,
+        slide_chart_font::Error::PatchConflict => Error::PatchConflict,
+    }
 }
 
 fn publish_changes(
@@ -758,532 +760,35 @@ fn publish_changes(
     changes: graph::Changes,
     selected_chart: u64,
     budget: &mut TransactionBudget,
-) -> Result<(Package, usize), Error> {
+    fields: &mut FieldLedger,
+) -> Result<(Package, usize, slide_chart_font::MutationPlan), Error> {
     let touched_components = changes
         .edits
         .len()
         .checked_add(changes.insertions.len())
         .and_then(|count| count.checked_add(changes.deletions.len()))
         .ok_or(Error::InvalidSource)?;
-    let catalog = match &source.state.source {
-        PhysicalSource::Package(catalog) => catalog,
+    let plan = slide_chart_font::mutation_plan_for_series(source, selected_chart, &changes, budget)
+        .map_err(map_font_error)?;
+    let extra_deletions = match &source.state.source {
+        PhysicalSource::Package(catalog) => {
+            super::rendering_invalidation::root_preview_deletions(catalog.package())
+                .map_err(|_| Error::InvalidSource)?
+        },
         PhysicalSource::Semantic(_) => return Err(Refusal::UnsupportedSource.into()),
     };
-    let archive_limits = source
-        .structure_archive_limits()
-        .map_err(|_| Error::InvalidSource)?;
-    let snappy_limits = catalog
-        .limits()
-        .snappy_limits()
-        .map_err(|_| Error::InvalidSource)?;
-    let planned_bytes =
-        changes
-            .edits
-            .iter()
-            .try_fold(catalog.source_bytes().len(), |total, (name, archive)| {
-                let archive_bytes = planned_compressed_bytes(archive, snappy_limits)?;
-                total
-                    .checked_add(name.len())
-                    .and_then(|total| total.checked_add(archive_bytes))
-                    .ok_or(Error::InvalidSource)
-            })?;
-    let planned_bytes = changes
-        .insertions
-        .iter()
-        .try_fold(planned_bytes, |total, insertion| {
-            let archive_bytes = planned_compressed_bytes(&insertion.archive, snappy_limits)?;
-            total
-                .checked_add(insertion.name.len())
-                .and_then(|total| total.checked_add(archive_bytes))
-                .ok_or(Error::InvalidSource)
-        })?;
-    budget
-        .preflight_reassembly(catalog, planned_bytes, changes.deletions.len())
-        .map_err(map_transaction_error)?;
-    let collection_allocations = changes
-        .edits
-        .len()
-        .checked_mul(2)
-        .and_then(|count| count.checked_add(changes.insertions.len().checked_mul(2)?))
-        .and_then(|count| count.checked_add(catalog.package().len()))
-        .and_then(|count| count.checked_add(changes.deletions.len()))
-        .ok_or(Error::InvalidSource)?;
-    let collection_name_bytes = changes
-        .edits
-        .iter()
-        .map(|(name, _)| name.len())
-        .chain(
-            changes
-                .insertions
-                .iter()
-                .map(|insertion| insertion.name.len()),
-        )
-        .chain(changes.deletions.iter().map(String::len))
-        .try_fold(0_usize, |total, bytes| total.checked_add(bytes))
-        .ok_or(Error::InvalidSource)?;
-    budget
-        .allocations(collection_allocations)
-        .and_then(|_| budget.work(collection_name_bytes))
-        .map_err(map_transaction_error)?;
-    let mut edited = Vec::new();
-    edited
-        .try_reserve_exact(changes.edits.len())
-        .map_err(|_| Error::Allocation {
-            amount: changes.edits.len(),
-        })?;
-    for (name, archive) in &changes.edits {
-        let bytes = archive
-            .to_bytes(archive_limits)
-            .map_err(|_| Error::InvalidSource)?;
-        let compressed =
-            SnappyStream::compress(&bytes, snappy_limits).map_err(|_| Error::InvalidSource)?;
-        edited.push((name.as_str(), compressed));
-    }
-    let mut edits = Vec::new();
-    edits
-        .try_reserve_exact(edited.len())
-        .map_err(|_| Error::Allocation {
-            amount: edited.len(),
-        })?;
-    edits.extend(
-        edited
-            .iter()
-            .map(|(name, bytes)| EntryEdit::new(name, bytes.as_slice())),
-    );
-    let mut inserted = Vec::new();
-    inserted
-        .try_reserve_exact(changes.insertions.len())
-        .map_err(|_| Error::Allocation {
-            amount: changes.insertions.len(),
-        })?;
-    for insertion in &changes.insertions {
-        let bytes = insertion
-            .archive
-            .to_bytes(archive_limits)
-            .map_err(|_| Error::InvalidSource)?;
-        let compressed =
-            SnappyStream::compress(&bytes, snappy_limits).map_err(|_| Error::InvalidSource)?;
-        inserted.push((
-            insertion.name.as_str(),
-            compressed,
-            insertion.before.as_deref(),
-        ));
-    }
-    let mut insertions = Vec::new();
-    insertions
-        .try_reserve_exact(inserted.len())
-        .map_err(|_| Error::Allocation {
-            amount: inserted.len(),
-        })?;
-    let names = catalog
-        .package()
-        .iter()
-        .map(|entry| entry.name())
-        .collect::<Vec<_>>();
-    for (name, bytes, before) in &inserted {
-        let insertion = match before {
-            Some(before) => {
-                let position = names
-                    .iter()
-                    .position(|candidate| *candidate == *before)
-                    .ok_or(Error::InvalidSource)?;
-                EntryInsertion::at(position, name, bytes.as_slice())
-            },
-            None => EntryInsertion::new(name, bytes.as_slice()),
-        };
-        insertions.push(insertion);
-    }
-    let deleted = changes
-        .deletions
-        .iter()
-        .map(String::as_str)
-        .collect::<Vec<_>>();
-    let bytes = source
-        .structure_reassemble(&insertions, &edits, &deleted)
-        .map_err(|_| Error::InvalidSource)?;
-    budget.output(bytes.len()).map_err(map_transaction_error)?;
-    budget
-        .preflight_candidate(source, bytes.len())
-        .map_err(map_transaction_error)?;
-    let bytes_len = bytes.len();
-    let candidate = source
-        .structure_reopen(bytes)
-        .map_err(|_| Error::Verification)?;
-    if bytes_len == 0 {
-        return Err(Error::Verification);
-    }
-    verify_planned_locality(source, &candidate, &changes, selected_chart, budget)?;
-    verify_chart_unknowns(source, &candidate, selected_chart, budget)?;
-    verify_member_locality(source, &candidate, &changes)?;
-    Ok((candidate, touched_components))
-}
-
-fn chart_payload(package: &Package, identifier: u64) -> Result<&[u8], Error> {
-    package
-        .state
-        .source
-        .components()
-        .iter()
-        .find_map(|component| {
-            component.archive().object(identifier).and_then(|object| {
-                object
-                    .messages
-                    .iter()
-                    .find(|message| message.type_ == 5_021)
-                    .map(|message| message.data.as_slice())
-            })
-        })
-        .ok_or(Error::Verification)
-}
-
-fn verify_wire_preservation(
-    source: &[u8],
-    candidate: &[u8],
-    excluded: impl Fn(u32) -> bool,
-    limits: litchi_iwa_common::WireLimits,
-    budget: &mut TransactionBudget,
-) -> Result<(), Error> {
-    let work = source
-        .len()
-        .checked_add(candidate.len())
-        .ok_or(Error::InvalidSource)?;
-    budget
-        .input(source.len())
-        .and_then(|_| budget.input(candidate.len()))
-        .and_then(|_| budget.work(work))
-        .map_err(map_transaction_error)?;
-    let source_fields = litchi_iwa_common::wire::parse_wire_fields(source, limits)
-        .map_err(|_| Error::InvalidSource)?;
-    let candidate_fields = litchi_iwa_common::wire::parse_wire_fields(candidate, limits)
-        .map_err(|_| Error::InvalidSource)?;
-    let fields = source_fields
-        .len()
-        .checked_add(candidate_fields.len())
-        .ok_or(Error::InvalidSource)?;
-    budget.fields(fields).map_err(map_transaction_error)?;
-    let mut source_iter = source_fields
-        .iter()
-        .filter(|field| !excluded(field.number()));
-    let mut candidate_iter = candidate_fields
-        .iter()
-        .filter(|field| !excluded(field.number()));
-    loop {
-        match (source_iter.next(), candidate_iter.next()) {
-            (None, None) => return Ok(()),
-            (Some(source_field), Some(candidate_field)) => {
-                if source_field.number() != candidate_field.number()
-                    || source_field.wire_type() != candidate_field.wire_type()
-                    || source_field.raw(source).map_err(|_| Error::InvalidSource)?
-                        != candidate_field
-                            .raw(candidate)
-                            .map_err(|_| Error::InvalidSource)?
-                {
-                    return Err(Error::Verification);
-                }
-            },
-            _ => return Err(Error::Verification),
-        }
-    }
-}
-
-fn verify_chart_unknowns(
-    source: &Package,
-    candidate: &Package,
-    identifier: u64,
-    budget: &mut TransactionBudget,
-) -> Result<(), Error> {
-    let source_payload = chart_payload(source, identifier)?;
-    let candidate_payload = chart_payload(candidate, identifier)?;
-    let limits = budget.residual(source).map_err(map_transaction_error)?;
-    verify_wire_preservation(
-        source_payload,
-        candidate_payload,
-        |number| number == 10_000,
-        limits,
+    let candidate = slide_chart_font::publish_with_policy(
+        source,
+        changes,
         budget,
-    )?;
-    let source_extension = litchi_iwa_common::wire::parse_wire_fields(source_payload, limits)
-        .map_err(|_| Error::InvalidSource)?
-        .into_iter()
-        .find(|field| field.number() == 10_000)
-        .ok_or(Error::InvalidSource)?
-        .payload(source_payload)
-        .map_err(|_| Error::InvalidSource)?;
-    let candidate_extension = litchi_iwa_common::wire::parse_wire_fields(candidate_payload, limits)
-        .map_err(|_| Error::InvalidSource)?
-        .into_iter()
-        .find(|field| field.number() == 10_000)
-        .ok_or(Error::InvalidSource)?
-        .payload(candidate_payload)
-        .map_err(|_| Error::InvalidSource)?;
-    verify_wire_preservation(
-        source_extension,
-        candidate_extension,
-        |number| number == 17 || number == 19,
-        limits,
-        budget,
+        fields,
+        &plan,
+        extra_deletions.names(),
+        is_series_rewritable_type,
+        &[17, 19],
     )
-}
-
-#[derive(Default)]
-struct ObjectReferenceCollector {
-    identifiers: Vec<u64>,
-}
-
-impl ArchiveReferenceVisitor for ObjectReferenceCollector {
-    fn visit_reference(
-        &mut self,
-        occurrence: ArchiveReferenceOccurrence,
-    ) -> litchi_iwa_core::Result<()> {
-        if occurrence.kind == ArchiveReferenceKind::Object && occurrence.referenced_identifier != 0
-        {
-            self.identifiers.push(occurrence.referenced_identifier);
-        }
-        Ok(())
-    }
-}
-
-fn package_object(package: &Package, identifier: u64) -> Option<&ArchiveObject> {
-    package
-        .state
-        .source
-        .components()
-        .iter()
-        .find_map(|component| component.archive().object(identifier))
-}
-
-fn reachable_objects(
-    package: &Package,
-    root: u64,
-    budget: &mut TransactionBudget,
-) -> Result<HashSet<u64>, Error> {
-    let mut pending = vec![root];
-    let mut reachable = HashSet::new();
-    reachable
-        .try_reserve(package.state.total_objects)
-        .map_err(|_| Error::Allocation {
-            amount: package.state.total_objects,
-        })?;
-    let limits = graph_limits(package)?;
-    while let Some(identifier) = pending.pop() {
-        if !reachable.insert(identifier) {
-            continue;
-        }
-        let object = package_object(package, identifier).ok_or(Error::InvalidSource)?;
-        let work =
-            object
-                .messages
-                .iter()
-                .try_fold(size_of::<ArchiveObject>(), |total, message| {
-                    total
-                        .checked_add(size_of::<RawMessage>())
-                        .and_then(|value| value.checked_add(message.data.len()))
-                        .ok_or(Error::InvalidSource)
-                })?;
-        budget
-            .work(work)
-            .and_then(|_| budget.allocations(1))
-            .and_then(|_| {
-                budget.scratch(
-                    object
-                        .messages
-                        .len()
-                        .checked_mul(size_of::<u64>())
-                        .ok_or(TransactionError::InvalidSource)?,
-                )
-            })
-            .map_err(map_transaction_error)?;
-        let mut references = ObjectReferenceCollector::default();
-        object
-            .inspect_references_with_policy(
-                &mut references,
-                ArchiveReferencePolicy::KnownReferences,
-                limits,
-            )
-            .map_err(map_core_error)?;
-        budget
-            .references(references.identifiers.len())
-            .and_then(|_| budget.work(references.identifiers.len()))
-            .map_err(map_transaction_error)?;
-        pending.extend(references.identifiers);
-    }
-    Ok(reachable)
-}
-
-fn reference_identifiers(payload: &[u8], field_number: u32) -> Result<Vec<u64>, Error> {
-    let fields = litchi_iwa_common::wire::parse_wire_fields(
-        payload,
-        litchi_iwa_common::WireLimits::default(),
-    )
-    .map_err(|_| Error::InvalidSource)?;
-    let mut identifiers = Vec::new();
-    for field in fields.iter().filter(|field| field.number() == field_number) {
-        let nested = field.payload(payload).map_err(|_| Error::InvalidSource)?;
-        let nested_fields = litchi_iwa_common::wire::parse_wire_fields(
-            nested,
-            litchi_iwa_common::WireLimits::default(),
-        )
-        .map_err(|_| Error::InvalidSource)?;
-        let Some(identifier) = nested_fields
-            .iter()
-            .find(|nested_field| nested_field.number() == 1 && nested_field.wire_type() == 0)
-            .map(|nested_field| {
-                litchi_iwa_common::decode_varint_from_bytes(
-                    &nested[nested_field.key_end()..nested_field.end()],
-                )
-                .map(|(value, _)| value)
-                .map_err(|_| Error::InvalidSource)
-            })
-            .transpose()?
-        else {
-            continue;
-        };
-        if identifier != 0 {
-            identifiers.push(identifier);
-        }
-    }
-    Ok(identifiers)
-}
-
-fn stylesheet_reachable_objects(package: &Package, chart: u64) -> Result<HashSet<u64>, Error> {
-    let mut pending =
-        chart_style_codec::references(chart_payload(package, chart)?, ChartCodecLimits::DEFAULT)
-            .map_err(|_| Error::InvalidSource)?
-            .series_theme_styles()
-            .to_vec();
-    let mut reachable = HashSet::new();
-    while let Some(identifier) = pending.pop() {
-        if identifier == 0 || !reachable.insert(identifier) {
-            continue;
-        }
-        let Some(object) = package_object(package, identifier) else {
-            return Err(Error::InvalidSource);
-        };
-        for message in &object.messages {
-            if message.type_ == 5_028 || message.type_ == 5_029 {
-                let parents = litchi_iwa_common::wire::parse_wire_fields(
-                    &message.data,
-                    litchi_iwa_common::WireLimits::default(),
-                )
-                .map_err(|_| Error::InvalidSource)?;
-                for parent in parents.iter().filter(|field| field.number() == 1) {
-                    let parent = parent
-                        .payload(&message.data)
-                        .map_err(|_| Error::InvalidSource)?;
-                    pending.extend(reference_identifiers(parent, 3)?);
-                    pending.extend(reference_identifiers(parent, 5)?);
-                }
-            }
-        }
-    }
-    Ok(reachable)
-}
-
-fn changed_object_ids(source: &Package, changes: &graph::Changes) -> Result<HashSet<u64>, Error> {
-    let mut changed = HashSet::new();
-    for (name, archive) in &changes.edits {
-        let source_archive = source
-            .state
-            .source
-            .components()
-            .get(name)
-            .ok_or(Error::InvalidSource)?
-            .archive();
-        for object in &source_archive.objects {
-            let identifier = object.archive_info.identifier.ok_or(Error::InvalidSource)?;
-            if archive
-                .objects
-                .iter()
-                .all(|candidate| candidate.archive_info.identifier != Some(identifier))
-            {
-                changed.insert(identifier);
-            }
-        }
-        for object in &archive.objects {
-            let identifier = object.archive_info.identifier.ok_or(Error::InvalidSource)?;
-            if source_archive
-                .object(identifier)
-                .is_none_or(|before| !before.same_content_ignoring_offsets(object))
-            {
-                changed.insert(identifier);
-            }
-        }
-    }
-    for insertion in &changes.insertions {
-        for object in &insertion.archive.objects {
-            changed.insert(object.archive_info.identifier.ok_or(Error::InvalidSource)?);
-        }
-    }
-    for name in &changes.deletions {
-        if let Some(component) = source.state.source.components().get(name) {
-            for object in &component.archive().objects {
-                changed.insert(object.archive_info.identifier.ok_or(Error::InvalidSource)?);
-            }
-        }
-    }
-    Ok(changed)
-}
-
-fn verify_planned_locality(
-    source: &Package,
-    candidate: &Package,
-    changes: &graph::Changes,
-    root: u64,
-    budget: &mut TransactionBudget,
-) -> Result<(), Error> {
-    let changed = changed_object_ids(source, changes)?;
-    let mut candidate_reachable = reachable_objects(candidate, root, budget)?;
-    candidate_reachable.extend(stylesheet_reachable_objects(candidate, root)?);
-    for identifier in changed {
-        if identifier == 2 {
-            continue;
-        }
-        if package_object(candidate, identifier).is_some()
-            && !candidate_reachable.contains(&identifier)
-        {
-            return Err(Error::Verification);
-        }
-    }
-    Ok(())
-}
-
-fn verify_member_locality(
-    source: &Package,
-    candidate: &Package,
-    changes: &graph::Changes,
-) -> Result<(), Error> {
-    let source_catalog = match &source.state.source {
-        PhysicalSource::Package(catalog) => catalog,
-        PhysicalSource::Semantic(_) => return Err(Refusal::UnsupportedSource.into()),
-    };
-    let candidate_catalog = match &candidate.state.source {
-        PhysicalSource::Package(catalog) => catalog,
-        PhysicalSource::Semantic(_) => return Err(Error::Verification),
-    };
-    for entry in source_catalog.package().iter() {
-        if matches!(
-            entry.name(),
-            "preview.jpg" | "preview-micro.jpg" | "preview-web.jpg"
-        ) {
-            continue;
-        }
-        let changed = changes.edits.iter().any(|(name, _)| name == entry.name())
-            || changes.deletions.iter().any(|name| name == entry.name());
-        if changed {
-            continue;
-        }
-        let Some(reopened) = candidate_catalog
-            .package()
-            .iter()
-            .find(|candidate| candidate.name() == entry.name())
-        else {
-            return Err(Error::Verification);
-        };
-        if reopened.data() != entry.data() {
-            return Err(Error::Verification);
-        }
-    }
-    Ok(())
+    .map_err(map_font_error)?;
+    Ok((candidate, touched_components, plan))
 }
 
 /// A compact exact-source patch for one chart-series symbol value.
@@ -1294,6 +799,7 @@ pub struct Patch {
     chart: Position,
     before: Property,
     after: Property,
+    plan: slide_chart_font::MutationPlan,
 }
 
 impl fmt::Debug for Patch {
@@ -1324,6 +830,7 @@ impl Patch {
             chart: self.chart,
             before: self.after.clone(),
             after: self.before.clone(),
+            plan: slide_chart_font::inverse_mutation_plan(&self.plan),
         }
     }
 
@@ -1431,10 +938,10 @@ impl<'a> Edit<'a> {
         let maximum = source.semantic_limits().max_text_bytes();
         let slide =
             super::edit::OwnedSlideSelector::from_selector(slide.into(), maximum, &mut retained)
-                .map_err(|_| Error::Allocation { amount: retained })?;
+                .map_err(map_selector_error)?;
         let chart =
             super::edit::OwnedChartSelector::from_selector(chart.into(), maximum, &mut retained)
-                .map_err(|_| Error::Allocation { amount: retained })?;
+                .map_err(map_selector_error)?;
         Ok(Self {
             source,
             slide,
@@ -1480,6 +987,7 @@ impl<'a> Edit<'a> {
                     chart: selection.chart,
                     before: Property::Symbols(before.clone()),
                     after: staged,
+                    plan: slide_chart_font::MutationPlan::default(),
                 },
                 diagnostics: Diagnostics::unchanged(),
             });
@@ -1506,11 +1014,12 @@ impl<'a> Edit<'a> {
         if !changed {
             return Err(Error::InvalidSource);
         }
-        let (candidate, touched_components) = publish_changes(
+        let (candidate, touched_components, plan) = publish_changes(
             self.source,
             workspace.finish(),
             selection.identifier,
             &mut budget,
+            &mut fields,
         )?;
         let candidate_selection = select(
             &candidate,
@@ -1538,6 +1047,7 @@ impl<'a> Edit<'a> {
                 chart: selection.chart,
                 before: Property::Symbols(before),
                 after: Property::Symbols(after),
+                plan,
             },
             diagnostics: Diagnostics::published(touched_components),
         })
@@ -1616,6 +1126,16 @@ impl Package {
         let candidate = self
             .structure_reopen(target)
             .map_err(|_| Error::Verification)?;
+        slide_chart_font::verify_locality_members(
+            self,
+            &candidate,
+            &patch.plan,
+            &mut budget,
+            &mut fields,
+            is_series_rewritable_type,
+            &[17, 19],
+        )
+        .map_err(map_font_error)?;
         let selection = select(
             &candidate,
             SlideSelector::position(patch.slide),
@@ -1623,7 +1143,6 @@ impl Package {
             &mut budget,
             &mut fields,
         )?;
-        verify_chart_unknowns(self, &candidate, selection.identifier, &mut budget)?;
         let (family, series) = family_and_count(&candidate, selection, &mut budget)?;
         let after = read_symbols(&candidate, selection, family, series, &mut budget)?;
         let Property::Symbols(expected) = &patch.after;

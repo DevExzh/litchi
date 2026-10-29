@@ -43,6 +43,14 @@ maps graph/archive ceilings to typed `Limit`/`Allocation` failures, and does
 not fall back to the legacy host route. The shared engine remains the
 implementation authority for mark/shape and inherited size behavior.
 
+The package boundary reuses the private chart-font selection/publication seam:
+archive encoding uses exact encoded lengths and maximum Snappy bounds, ZIP
+publication uses prepared reassembly requirements, and the candidate verifier
+checks raw ZIP headers/records, archive metadata and route-specific unknown
+fields. Deferred selector-name ceilings remain typed as selector-byte limits;
+the malformed control now requires the precise `InvalidSource` refusal rather
+than accepting any generic refusal.
+
 The final budget review has one explicit shared-first blocker: the shared
 `litchi_iwa_style::series` entry points (`values`, `set_values`,
 `style_values`, `set_style_values`, `symbols`, and `set_symbols`) currently
