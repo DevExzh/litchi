@@ -12,6 +12,8 @@ use litchi_numbers::sheet::drawable::{
     self, DrawableSelector, FlipAxis, Kind, MediaLoopMode, MediaPlaybackSettings, Point,
     Properties, properties,
 };
+#[path = "support/chart_arrangement_fixture.rs"]
+mod chart_arrangement_fixture;
 
 type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
 
@@ -559,5 +561,155 @@ fn chart_series_reference_ceiling_is_typed_before_graph_publication() -> TestRes
     };
     let result = package.sheet_chart_series(0, 0, PropertyKind::ErrorBars);
     assert!(matches!(result, Err(SeriesError::Limit { .. })));
+    Ok(())
+}
+
+#[test]
+fn chart_series_symbols_scope_reopen_inverse_and_noop() -> TestResult {
+    use litchi_numbers::sheet::chart::series::{
+        Error as SeriesError, Property, PropertyKind, SymbolShape,
+    };
+
+    let mut selected = None;
+    let mut fixture_source = None;
+    for name in [
+        "chart-grid-authored-native.numbers",
+        "chart-data-native.numbers",
+        "chart-data-edited-native.numbers",
+        "chart-grid-replaced-native.numbers",
+        "chart-arrangement-native.numbers",
+    ] {
+        let package = open(name)?;
+        match package.sheet_chart_series(0, 0, PropertyKind::Symbols) {
+            Ok(Property::Symbols(values)) => {
+                selected = Some((package, values));
+                break;
+            },
+            Ok(_) => return Err("symbols read returned another property kind".into()),
+            Err(SeriesError::Refused(_)) => continue,
+            Err(error) => return Err(error.into()),
+        }
+    }
+    if selected.is_none() {
+        let source = chart_arrangement_fixture::fixture()?;
+        let payload = chart_arrangement_fixture::chart_payload_from_source(&source, 0)?;
+        let archive_field = litchi_iwa_common::wire::WireView::parse(
+            &payload,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?
+        .fields()
+        .find(|field| field.number() == chart_arrangement_fixture::CHART_EXTENSION_FIELD)
+        .ok_or("missing chart archive extension")?;
+        let line_type = litchi_iwa_protos::tsch::ChartType::LineChartType2D as u64;
+        let mut rewritten_archive = Vec::new();
+        for field in litchi_iwa_common::wire::WireView::parse(
+            archive_field.payload(),
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?
+        .fields()
+        {
+            if field.number() == 1 {
+                litchi_iwa_common::wire::append_varint_field(&mut rewritten_archive, 1, line_type)?;
+            } else {
+                rewritten_archive.extend_from_slice(field.raw());
+            }
+        }
+        let mut rewritten = Vec::new();
+        for field in litchi_iwa_common::wire::WireView::parse(
+            &payload,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?
+        .fields()
+        {
+            if field.number() == chart_arrangement_fixture::CHART_EXTENSION_FIELD {
+                litchi_iwa_common::wire::append_length_delimited_field(
+                    &mut rewritten,
+                    chart_arrangement_fixture::CHART_EXTENSION_FIELD,
+                    &rewritten_archive,
+                    litchi_iwa_common::WireLimits::DEFAULT,
+                )?;
+            } else {
+                rewritten.extend_from_slice(field.raw());
+            }
+        }
+        let source = chart_arrangement_fixture::with_chart_payload(&source, 0, rewritten)?;
+        let source_package = Package::from_bytes(&source)?;
+        fixture_source = Some(source.clone());
+        selected = Some((
+            source_package,
+            match Package::from_bytes(&source)?.sheet_chart_series(0, 0, PropertyKind::Symbols) {
+                Ok(Property::Symbols(values)) => values,
+                Ok(_) => return Err("source-built symbols kind mismatch".into()),
+                Err(error) => return Err(format!("source-built symbols failed: {error:?}").into()),
+            },
+        ));
+    }
+    let Some((package, values)) = selected else {
+        return Err("no Numbers fixture exposes chart symbols".into());
+    };
+    let source = bytes(&package)?;
+    let mut edit = package
+        .edit_sheet_chart_series(0, 0)
+        .map_err(|error| format!("edit noop: {error:?}"))?;
+    edit.set(Property::Symbols(values.clone()))
+        .map_err(|error| format!("stage noop: {error:?}"))?;
+    let noop = edit
+        .commit()
+        .map_err(|error| format!("commit noop: {error:?}"))?;
+    assert!(!noop.diagnostics().changed());
+    assert_eq!(bytes(noop.package())?, source);
+
+    let mut changed = values;
+    if let Some(first) = changed.first_mut() {
+        *first = Some(litchi_iwa_common::chart::series::Symbol::automatic(
+            SymbolShape::Triangle,
+        ));
+    }
+    let mut edit = package
+        .edit_sheet_chart_series(0, 0)
+        .map_err(|error| format!("edit changed: {error:?}"))?;
+    edit.set(Property::Symbols(changed))
+        .map_err(|error| format!("stage changed: {error:?}"))?;
+    let commit = edit
+        .commit()
+        .map_err(|error| format!("commit changed: {error:?}"))?;
+    assert!(commit.diagnostics().changed());
+    if let Some(source) = fixture_source {
+        let candidate = bytes(commit.package())?;
+        assert_eq!(
+            chart_arrangement_fixture::component_stream(
+                &source,
+                chart_arrangement_fixture::UNRELATED_MEMBER,
+            )?,
+            chart_arrangement_fixture::component_stream(
+                &candidate,
+                chart_arrangement_fixture::UNRELATED_MEMBER,
+            )?
+        );
+        assert_eq!(
+            chart_arrangement_fixture::raw_drawable_fields(
+                &source,
+                0,
+                chart_arrangement_fixture::UNKNOWN_DRAWABLE_BYTES_FIELD,
+            )?,
+            chart_arrangement_fixture::raw_drawable_fields(
+                &candidate,
+                0,
+                chart_arrangement_fixture::UNKNOWN_DRAWABLE_BYTES_FIELD,
+            )?
+        );
+        let foreign = chart_arrangement_fixture::with_foreign_chart_non_style(&source)?;
+        let foreign_package = Package::from_bytes(&foreign)?;
+        assert!(
+            foreign_package
+                .sheet_chart_series(0, 0, PropertyKind::Symbols)
+                .is_err()
+        );
+    }
+    let restored = commit
+        .package()
+        .apply_sheet_chart_series(&commit.patch().inverse())
+        .map_err(|error| format!("apply inverse: {error:?}"))?;
+    assert_eq!(bytes(restored.package())?, source);
     Ok(())
 }

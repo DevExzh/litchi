@@ -515,30 +515,14 @@ impl ChartBudget {
         let core = archive
             .effective_archive_limits()
             .map_err(|_| Error::InvalidSource)?;
-        let source = core
-            .max_message_bytes()
+        let physical = usize::try_from(archive.max_input_bytes())
+            .map_err(|_| Error::InvalidSource)?
             .min(core.max_archive_bytes())
             .min(archive.max_iwa_stream_bytes())
             .clamp(1, WireLimits::MAX_INPUT_BYTES);
         let limits = WireLimits::default()
-            .with_input_bytes(source)
-            .and_then(|limits| {
-                limits.with_fields(source.saturating_mul(4).clamp(1, WireLimits::MAX_FIELDS))
-            })
-            .and_then(|limits| {
-                limits.with_output_bytes(
-                    source
-                        .saturating_add(64)
-                        .clamp(1, WireLimits::MAX_OUTPUT_BYTES),
-                )
-            })
-            .and_then(|limits| {
-                limits.with_rewrite_work(
-                    source
-                        .saturating_mul(8)
-                        .clamp(1, WireLimits::MAX_REWRITE_WORK),
-                )
-            })
+            .with_input_bytes(physical)
+            .and_then(|limits| limits.with_output_bytes(physical))
             .map_err(|_| Error::InvalidSource)?;
         let semantic = package.state.options.semantic();
         let max_allocations = semantic
@@ -546,17 +530,16 @@ impl ChartBudget {
             .checked_add(semantic.max_references())
             .and_then(|amount| amount.checked_add(MAX_TRANSACTION_ALLOCATIONS))
             .ok_or(Error::InvalidSource)?;
-        let aggregate = source.saturating_mul(8).max(source);
         Ok(Self {
-            max_input: aggregate,
-            max_output: aggregate,
+            max_input: physical,
+            max_output: physical,
             max_fields: limits.max_fields(),
-            max_work: limits.max_rewrite_work(),
+            max_work: WireLimits::MAX_REWRITE_WORK,
             max_nesting: limits.max_nesting(),
             max_references: semantic.max_references(),
             max_allocations,
-            max_retained: aggregate,
-            max_scratch: aggregate,
+            max_retained: physical,
+            max_scratch: physical,
             max_registry_entries: semantic.max_references(),
             max_identifiers: semantic.max_objects(),
             input: 0,
@@ -731,22 +714,49 @@ impl ChartBudget {
     /// Build a residual profile for one bounded chart-series operation.
     /// Selector and package work already charged to this ledger cannot be
     /// reacquired by the shared series engine.
-    pub(super) fn series_limits(&self) -> litchi_iwa_style::series::Limits {
-        let limits = self.chart_font_limits();
-        litchi_iwa_style::series::Limits::new(
-            limits.max_input_bytes(),
-            limits.max_fields(),
-            limits.max_output_bytes(),
-            limits.max_nesting(),
-            limits.max_work_bytes(),
-            limits.max_allocations(),
-            limits.max_retained_bytes(),
-            limits.max_scratch_bytes(),
-            self.max_references.saturating_sub(self.references),
-            self.max_registry_entries
-                .saturating_sub(self.registry_entries),
-            self.max_identifiers.saturating_sub(self.identifiers),
-        )
+    pub(super) fn series_limits(&self) -> Result<litchi_iwa_style::series::Limits, Error> {
+        let wire = self.residual_wire_limits()?;
+        let codec_max = MAX_CODEC_LIMIT.min(chart_style_codec::Limits::DEFAULT.max_bytes());
+        let residual = |maximum: usize, used: usize, kind| {
+            let remaining = maximum.checked_sub(used).ok_or(Error::InvalidSource)?;
+            if remaining == 0 {
+                return Err(Error::Limit {
+                    kind,
+                    observed: maximum.saturating_add(1) as u64,
+                    maximum: maximum as u64,
+                });
+            }
+            Ok(remaining)
+        };
+        Ok(litchi_iwa_style::series::Limits::new(
+            wire.max_input_bytes().min(codec_max),
+            wire.max_fields(),
+            residual(self.max_output, self.output, LimitKind::OutputBytes)?
+                .min(WireLimits::MAX_OUTPUT_BYTES)
+                .min(codec_max),
+            u32::try_from(wire.max_nesting()).map_err(|_| Error::InvalidSource)?,
+            wire.max_rewrite_work(),
+            residual(
+                self.max_allocations,
+                self.allocations,
+                LimitKind::Allocations,
+            )?,
+            residual(self.max_retained, self.retained, LimitKind::RetainedBytes)?
+                .min(WireLimits::MAX_INPUT_BYTES),
+            residual(self.max_scratch, self.scratch, LimitKind::ScratchBytes)?
+                .min(WireLimits::MAX_INPUT_BYTES),
+            residual(self.max_references, self.references, LimitKind::References)?,
+            residual(
+                self.max_registry_entries,
+                self.registry_entries,
+                LimitKind::Identifiers,
+            )?,
+            residual(
+                self.max_identifiers,
+                self.identifiers,
+                LimitKind::Identifiers,
+            )?,
+        ))
     }
 
     /// Charge one chart-font engine report into the same transaction ledger.
@@ -890,21 +900,23 @@ impl ChartBudget {
     }
 
     pub(super) fn residual_wire_limits(&self) -> Result<WireLimits, Error> {
-        let input = self
-            .max_input
-            .checked_sub(self.input)
-            .ok_or(Error::InvalidSource)?
-            .clamp(1, WireLimits::MAX_INPUT_BYTES);
-        let fields = self
-            .max_fields
-            .checked_sub(self.fields)
-            .ok_or(Error::InvalidSource)?
-            .clamp(1, WireLimits::MAX_FIELDS);
-        let work = self
-            .max_work
-            .checked_sub(self.work)
-            .ok_or(Error::InvalidSource)?
-            .clamp(1, WireLimits::MAX_REWRITE_WORK);
+        let residual = |maximum: usize, used: usize, kind| {
+            let remaining = maximum.checked_sub(used).ok_or(Error::InvalidSource)?;
+            if remaining == 0 {
+                return Err(Error::Limit {
+                    kind,
+                    observed: maximum.saturating_add(1) as u64,
+                    maximum: maximum as u64,
+                });
+            }
+            Ok(remaining)
+        };
+        let input = residual(self.max_input, self.input, LimitKind::WireBytes)?
+            .min(WireLimits::MAX_INPUT_BYTES);
+        let fields = residual(self.max_fields, self.fields, LimitKind::WireFields)?
+            .min(WireLimits::MAX_FIELDS);
+        let work = residual(self.max_work, self.work, LimitKind::WireWork)?
+            .min(WireLimits::MAX_REWRITE_WORK);
         // Nesting is a peak depth, not an aggregate quota.  A completed
         // parse therefore does not consume the configured depth available to
         // the next independent parse.
