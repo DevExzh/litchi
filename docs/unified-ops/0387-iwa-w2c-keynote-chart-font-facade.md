@@ -3,7 +3,7 @@
 - Status: bounded facade slice on `uo2/iwa-w2c-chart-font`, cut from frozen
   root `9932c7d0691b2c14bbbd11a2dea7df41f66308b6`, with the reviewed shared
   substrate `faefe7303b` merged at branch tip `5f20266918`. The reviewed
-  selector/locality repair is `76e52390f9`. Coordinator
+  selector/locality repair is `53b5e6fa93`. Coordinator
   integration, native evidence and final integrated gates remain pending. The
   six exit-ledger rows intentionally remain `host-only`; this record is not a
   provisional migration state.
@@ -102,24 +102,26 @@ contract, focused gates and performance disposition are accepted.
 
 ## Performance and verification
 
-`keynote_chart_font_facade_cost_abba` is an ignored full-facade probe covering
-six routes: font/size set and reset plus independent populated font and
-point-size reads, each in host/leaf/leaf/host order. It was added for the
-coordinator's pinned release ABBA slot but was not run while timing was held;
-no performance qualification or wall-clock claim is made here. Any later
-receipt must name the final integrated source SHA, release binary SHA-256,
-build command, exact test filter and route symbols.
+Six ignored full-facade probes isolate the coordinator's pinned release ABBA
+routes: `keynote_chart_font_{set,size_set,reset,size_reset,read,size_read}_cost_abba`.
+Each runs one host/leaf/leaf/host route; reset setup and read authoring happen
+outside the captured route. They were added for the ABBA slot but were not run
+while timing was held. No performance qualification or wall-clock claim is
+made here. Any later receipt must name the final integrated source SHA,
+release binary SHA-256, build command, exact test filter and route symbols.
 
-Scoped evidence on the current branch (source repair `76e52390f9`):
+Scoped evidence on the current branch (source repair `53b5e6fa93`):
 
 | Check | Result |
 |---|---|
 | `cargo fmt --package litchi-keynote -- --check` | pass |
 | `cargo check -p litchi-keynote --locked --offline` | pass |
 | strict Clippy (`cargo clippy -p litchi-keynote --lib -D warnings`) | pass; vendor warnings only |
-| focused `keynote_chart_font` parity/control filter | 10 passed, 1 ignored ABBA probe |
+| focused `keynote_chart_font` parity/control filter | 10 passed, 6 ignored isolated ABBA probes |
 | eight Keynote facade parity/control cases within that filter | 8 passed |
 | shared chart-font admission filter | 7 passed |
+| `cargo test -p litchi-keynote --lib` | 334 passed, 1 ignored |
+| production locality negative controls (unit) | 1 passed: extra member/object, non-chart unknown payload, ZIP metadata |
 | low text-budget and stale-patch controls | passed |
 | `python3 tools/check_crate_boundaries.py` | pass; 70 packages, 313 declarations, 12 explicit debt items |
 | `python3 tools/iwa_exit_ledger.py --check` | pass; six chart-font rows intentionally host-only |
