@@ -468,6 +468,47 @@ pub(crate) fn boolean(value: &PropValue<'_>, key: &'static str) -> Result<bool> 
         })
 }
 
+/// The positive point count carried by a unified chart-font-size write.
+///
+/// The focused chart-font leaves all use the same finite, positive
+/// point-size value. Keeping this coercion here makes the Pages,
+/// Keynote and Numbers dispatch arms share the same invalid/null boundary;
+/// no format is allowed to silently clamp or reinterpret a size.
+#[cfg(any(feature = "pages", feature = "keynote", feature = "numbers"))]
+pub(crate) fn chart_font_points(value: &PropValue<'_>) -> Result<f32> {
+    let points = value
+        .with_coerced(
+            ValueType::Length(crate::value::LengthSpec::FONT_SIZE),
+            |scalar| {
+                Ok(scalar.and_then(|scalar| match scalar {
+                    Scalar::Length(length) => Some(length.points()),
+                    Scalar::Number(value) => Some(value),
+                    #[allow(clippy::cast_precision_loss, reason = "point sizes are small")]
+                    Scalar::Int(value) => Some(value as f64),
+                    _ => None,
+                }))
+            },
+        )
+        .map_err(|error| error.with_property("font.size"))?
+        .ok_or_else(|| {
+            refusal(Code::InvalidValue, "a chart font size must be positive")
+                .with_property("font.size".to_owned())
+        })?;
+    #[allow(
+        clippy::cast_possible_truncation,
+        reason = "iWork stores chart font sizes as 32-bit floats"
+    )]
+    let points = points as f32;
+    if !points.is_finite() || points <= 0.0 {
+        return Err(refusal(
+            Code::InvalidValue,
+            "a chart font size must be positive and finite",
+        )
+        .with_property("font.size".to_owned()));
+    }
+    Ok(points)
+}
+
 /// The refusal of a key the element does not write.
 pub(crate) fn unwritable(element: &'static str, key: &str) -> Error {
     refusal(

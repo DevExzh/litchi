@@ -44,6 +44,9 @@ use litchi_numbers::cell::data_format::{
 };
 use litchi_numbers::cell::text_style::CharacterProperties;
 use litchi_numbers::formula::{CachedValue, Expression};
+use litchi_numbers::sheet::chart::font::{
+    Property as ChartFontProperty, PropertyKind as ChartFontPropertyKind,
+};
 use litchi_numbers::table::cells::{Change, Edit, Input};
 use litchi_numbers::table::merge::Region;
 use litchi_numbers::table::topology::{ColumnDeletion, ColumnInsertion, RowDeletion, RowInsertion};
@@ -79,6 +82,7 @@ kinds! {
         MergeCell => "mergeCell",
         Row => "row",
         Column => "col",
+        Chart => "chart",
     }
 }
 
@@ -139,6 +143,8 @@ pub(crate) const CELL_PROPS: &[PropSpec] = &[
     set_only("font.name", ValueType::Text),
     set_only("font.color", FONT_COLOR),
 ];
+
+const CHART_PROPS: &[PropSpec] = &[clearable_writable("font.size", FONT_SIZE)];
 
 /// A font size in points.
 const FONT_SIZE: ValueType = ValueType::Length(crate::value::LengthSpec::FONT_SIZE);
@@ -235,7 +241,7 @@ pub(crate) static SPEC: FormatSpec<Kind> = FormatSpec {
             "sheet",
             &["sheet"],
             &[Kind::Workbook],
-            &[Kind::Table],
+            &[Kind::Table, Kind::Chart],
             &["/sheet[N]", "/<sheet name>"],
             SHEET_PROPS,
         ),
@@ -284,6 +290,15 @@ pub(crate) static SPEC: FormatSpec<Kind> = FormatSpec {
             &["/sheet[N]/table[N]/col[N]"],
             &[],
         ),
+        element(
+            Kind::Chart,
+            "chart",
+            &["chart"],
+            &[Kind::Sheet],
+            &[],
+            &["/sheet[N]/chart[N]"],
+            CHART_PROPS,
+        ),
     ],
     gaps: &GAPS,
 };
@@ -302,7 +317,7 @@ impl Flavor for Numbers {
 
 /// The elements each write verb accepts.
 pub(crate) static WRITES: super::Writes = super::Writes {
-    settable: &["cell", "sheet", "table"],
+    settable: &["cell", "sheet", "table", "chart"],
     addable: &["col", "mergeCell", "row", "sheet", "table"],
     removable: &["cell", "col", "mergeCell", "row", "sheet", "table"],
     movable: &["sheet", "table"],
@@ -340,6 +355,8 @@ pub enum EditError {
     Topology(litchi_numbers::table::topology::Error),
     /// Cell character properties.
     TextStyle(litchi_numbers::cell::text_style::Error),
+    /// A sheet-chart point-size transaction (D7-A).
+    ChartFont(litchi_numbers::sheet::chart::font::Error),
     /// A cell comment (record 0318).
     Comment(litchi_numbers::cell::comment::Error),
 }
@@ -360,6 +377,7 @@ impl fmt::Display for EditError {
             Self::TableOrder(error) => error.fmt(formatter),
             Self::Topology(error) => error.fmt(formatter),
             Self::TextStyle(error) => error.fmt(formatter),
+            Self::ChartFont(error) => error.fmt(formatter),
             Self::Comment(error) => error.fmt(formatter),
         }
     }
@@ -381,6 +399,7 @@ impl EditError {
             Self::TableOrder(error) => error,
             Self::Topology(error) => error,
             Self::TextStyle(error) => error,
+            Self::ChartFont(error) => error,
             Self::Comment(error) => error,
         })
     }
@@ -448,6 +467,7 @@ impl EditError {
                 _ => family!(error, litchi_numbers::table::topology::Error),
             },
             Self::TextStyle(error) => family!(error, litchi_numbers::cell::text_style::Error),
+            Self::ChartFont(error) => family!(error, litchi_numbers::sheet::chart::font::Error),
             Self::Comment(error) => family!(error, litchi_numbers::cell::comment::Error),
         }
     }
@@ -477,6 +497,8 @@ pub(crate) enum Patch {
     Topology(litchi_numbers::table::topology::Patch),
     /// Cell character properties.
     TextStyle(litchi_numbers::cell::text_style::Patch),
+    /// A sheet-chart point-size set (D7-A).
+    ChartFontSize(litchi_numbers::sheet::chart::font::Patch),
     /// A cell comment set or cleared.
     Comment(litchi_numbers::cell::comment::Patch),
 }
@@ -495,6 +517,7 @@ impl Patch {
             Self::TableOrder(patch) => patch.is_noop(),
             Self::Topology(patch) => patch.is_noop(),
             Self::TextStyle(patch) => patch.is_noop(),
+            Self::ChartFontSize(patch) => patch.is_noop(),
             Self::Comment(patch) => patch.is_noop(),
         }
     }
@@ -574,6 +597,17 @@ pub(crate) fn build(package: &Package) -> Result<(super::Tree, Box<[super::Part]
             .label(Some(sheet.name()))
             .leaf([sheet_index, 0, 0, 0])
             .done();
+        if let Ok(drawables) = package.sheet_drawable_list(SheetSelector::index(sheet_index)) {
+            for drawable in drawables
+                .iter()
+                .filter(|drawable| drawable.kind() == litchi_numbers::sheet::drawable::Kind::Chart)
+            {
+                let chart = drawable.kind_selector().as_index();
+                tree.push(sheet_item, Kind::Chart)
+                    .leaf([sheet_index, chart, 0, 0])
+                    .done();
+            }
+        }
         for (table_index, table) in sheet.tables().enumerate() {
             let regions = package
                 .table_merges(
@@ -1226,6 +1260,19 @@ fn property_gap(element: &str, key: &str) -> Option<crate::Error> {
     })
 }
 
+fn chart_font_size(
+    value: &PropValue<'_>,
+) -> Result<litchi_numbers::sheet::chart::font::TextPointSize> {
+    let points = super::write::chart_font_points(value)?;
+    litchi_numbers::sheet::chart::font::TextPointSize::from_points(points).map_err(|_| {
+        refusal(
+            Code::InvalidValue,
+            "a chart font size must be positive and finite",
+        )
+        .with_property("font.size".to_owned())
+    })
+}
+
 /// The writes of one `set` call, grouped by leaf transaction.
 #[derive(Default)]
 struct Staged {
@@ -1237,6 +1284,12 @@ struct Staged {
     text_styles: BTreeMap<(usize, usize), Vec<(At, CharacterProperties)>>,
     /// Cell comments, in call order; `None` clears (record 0318).
     comments: Vec<(Address, Option<String>)>,
+    /// Chart point-size writes, in call order (D7-A).
+    chart_sizes: Vec<(
+        usize,
+        usize,
+        Option<litchi_numbers::sheet::chart::font::TextPointSize>,
+    )>,
 }
 
 /// Set properties on every target. Renames share one names transaction,
@@ -1338,6 +1391,15 @@ pub(crate) fn set(
                     let [sheet, table, _, _] = node.item().leaf().map(|value| value as usize);
                     match node.item().type_name() {
                         "cell" => stage_cell(&mut staged, cell_address(node), index, key, value)?,
+                        "chart" if key.eq_ignore_ascii_case("font.size") => {
+                            staged.chart_sizes.push((
+                                sheet,
+                                node.item().leaf()[1] as usize,
+                                (!value.is_null())
+                                    .then(|| chart_font_size(value))
+                                    .transpose()?,
+                            ));
+                        },
                         "sheet" if key.eq_ignore_ascii_case("name") => {
                             staged.renames_sheets.push((
                                 sheet,
@@ -1354,6 +1416,7 @@ pub(crate) fn set(
                         "sheet" | "table" | "workbook" | "mergeCell" => {
                             return Err(key_refusal(node, key));
                         },
+                        "chart" => return Err(key_refusal(node, key)),
                         _ => return Err(element_refusal("set", node)),
                     }
                 }
@@ -1408,7 +1471,7 @@ fn commit_staged(chain: &mut Chain<Package>, staged: Staged) -> Result<()> {
     }
     for ((sheet, table), cells) in staged.text_styles {
         let error = |error| edit_error(EditError::TextStyle(error));
-        let mut edit = chain
+        let edit = chain
             .package
             .edit_table_cell_text_style(SheetSelector::index(sheet), TableSelector::index(table))
             .map_err(error)?;
@@ -1418,6 +1481,27 @@ fn commit_staged(chain: &mut Chain<Package>, staged: Staged) -> Result<()> {
         let commit = edit.commit().map_err(error)?;
         let (next, patch) = commit.into_parts();
         push(chain, next, Patch::TextStyle(patch));
+    }
+    for (sheet, chart, size) in staged.chart_sizes {
+        let error = |error| edit_error(EditError::ChartFont(error));
+        let mut edit = chain
+            .package
+            .edit_sheet_chart_font(
+                SheetSelector::index(sheet),
+                litchi_numbers::ChartSelector::index(chart),
+            )
+            .map_err(error)?;
+        match size {
+            Some(size) => {
+                edit.set(ChartFontProperty::Size(size)).map_err(error)?;
+            },
+            None => {
+                edit.reset(ChartFontPropertyKind::Size).map_err(error)?;
+            },
+        }
+        let commit = edit.commit().map_err(error)?;
+        let patch = commit.patch().clone();
+        push(chain, commit.into_package(), Patch::ChartFontSize(patch));
     }
     for (address, format) in staged.formats {
         let sheet = SheetSelector::index(address.sheet);
@@ -2227,7 +2311,7 @@ pub(crate) fn remove(
                     .push(Change::clear(address.position()));
             },
             "mergeCell" => {
-                let range = match node.value("ref") {
+                let range = match node.value("ref")? {
                     Some(Value::Text(range)) => range.to_string(),
                     _ => return Err(element_refusal("remove", node)),
                 };

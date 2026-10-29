@@ -156,6 +156,17 @@ const FRAME_PROPS: &[PropSpec] = &[
     PropSpec::new("zorder", ValueType::Int),
 ];
 
+const CHART_PROPS: &[PropSpec] = &[
+    PropSpec::new("name", ValueType::Text),
+    PropSpec::new("x", POSITION),
+    PropSpec::new("y", POSITION),
+    PropSpec::new("width", EXTENT),
+    PropSpec::new("height", EXTENT),
+    PropSpec::new("rotation", ValueType::Number),
+    PropSpec::new("zorder", ValueType::Int),
+    clearable_writable("font.size", FONT_SIZE),
+];
+
 const TABLE_PROPS: &[PropSpec] = &[
     readable_add("name", ValueType::Text),
     readable_add("rows", ValueType::Int),
@@ -422,7 +433,7 @@ pub(crate) static SPEC: FormatSpec<Kind> = FormatSpec {
             &[Kind::Slide],
             &[],
             &["/slide[N]/chart[N]"],
-            FRAME_PROPS,
+            CHART_PROPS,
         ),
         element(
             Kind::Group,
@@ -468,6 +479,7 @@ pub(crate) enum Patch {
         litchi_keynote::slide::delete::Patch,
     ),
     Drawables(litchi_keynote::slide::drawable::Patch),
+    ChartFontSize(litchi_keynote::chart::font::size::Patch),
     TableComments(litchi_keynote::slide::table::comments::Patch),
     Creation(litchi_keynote::slide::creation::Patch),
     Media(litchi_keynote::slide::media::lifecycle::Patch),
@@ -484,6 +496,7 @@ impl Patch {
             // A committed deletion always removes one slide.
             Self::Deletion(_) => false,
             Self::Drawables(patch) => patch.is_noop(),
+            Self::ChartFontSize(patch) => patch.is_noop(),
             Self::TableComments(patch) => patch.is_noop(),
             Self::Creation(patch) => patch.is_noop(),
             Self::Media(patch) => patch.is_noop(),
@@ -503,6 +516,7 @@ pub(crate) static WRITES: super::Writes = super::Writes {
         "shape",
         "picture",
         "tc",
+        "chart",
     ],
     addable: &["slide", "paragraph", "shape", "picture", "table"],
     removable: &[
@@ -910,11 +924,17 @@ pub(crate) fn build_slide(
         let Some(kind) = element_of(drawable.kind()) else {
             continue;
         };
+        let chart_position = (kind == Kind::Chart).then(|| {
+            drawables[..position]
+                .iter()
+                .filter(|candidate| candidate.kind() == DrawableKind::Chart)
+                .count()
+        });
         let draft = tree
             .push(item, kind)
             .prop("name", text(drawable.name()))
             .label(drawable.name())
-            .leaf([index, DRAWABLE, 0, position]);
+            .leaf([index, DRAWABLE, chart_position.unwrap_or(0), position]);
         let draft = match kind {
             Kind::Shape => {
                 let value = drawable.text().unwrap_or_default();

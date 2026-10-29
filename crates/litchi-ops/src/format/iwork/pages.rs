@@ -27,7 +27,7 @@ use std::collections::BTreeMap;
 use litchi_core::{FileFormat, Position};
 use litchi_pages::header_footer::{HeaderFooterSelector, Kind as HeaderKind, Template};
 use litchi_pages::section::text_style::CharacterProperties;
-use litchi_pages::{BodyTableSelector, Package};
+use litchi_pages::{BodyChartSelector, BodyTableSelector, Package};
 
 use super::tree::{ROOT, count, text};
 use super::write::{
@@ -61,6 +61,7 @@ kinds! {
         Footer => "footer",
         Footnotes => "footnotes",
         Footnote => "footnote",
+        Chart => "chart",
     }
 }
 
@@ -152,6 +153,8 @@ const CELL_PROPS: &[PropSpec] = &[
         spec
     },
 ];
+
+const CHART_PROPS: &[PropSpec] = &[clearable_writable("font.size", FONT_SIZE)];
 
 const REGION_PROPS: &[PropSpec] = &[
     writable("text", ValueType::Text),
@@ -246,7 +249,7 @@ pub(crate) static SPEC: FormatSpec<Kind> = FormatSpec {
             "body",
             &["body"],
             &[Kind::Document],
-            &[Kind::Paragraph, Kind::Table],
+            &[Kind::Paragraph, Kind::Table, Kind::Chart],
             &["/body"],
             BODY_PROPS,
         ),
@@ -331,6 +334,15 @@ pub(crate) static SPEC: FormatSpec<Kind> = FormatSpec {
             &["/footnotes/footnote[N]"],
             FOOTNOTE_PROPS,
         ),
+        element(
+            Kind::Chart,
+            "chart",
+            &["chart"],
+            &[Kind::Body],
+            &[],
+            &["/body/chart[N]"],
+            CHART_PROPS,
+        ),
     ],
     gaps: &GAPS,
 };
@@ -350,7 +362,9 @@ impl Flavor for Pages {
 
 /// The elements `set` writes, `add` creates and `remove` deletes.
 pub(crate) static WRITES: super::Writes = super::Writes {
-    settable: &["p", "section", "tc", "header", "footer", "footnote"],
+    settable: &[
+        "p", "section", "tc", "header", "footer", "footnote", "chart",
+    ],
     addable: &["p", "footnote", "section", "tbl"],
     removable: &["p", "tbl", "footnote", "section"],
     movable: &["p"],
@@ -382,6 +396,7 @@ pub(crate) enum Patch {
     Footnotes(litchi_pages::footnote::body::transaction::Patch),
     Metadata(litchi_pages::metadata::Patch),
     TextStyle(litchi_pages::section::text_style::Patch),
+    ChartFontSize(litchi_pages::chart::font::Patch),
     TableValues(litchi_pages::table::values::Patch),
     TableComments(litchi_pages::table::comments::Patch),
     SectionLifecycle(litchi_pages::section::lifecycle::Patch),
@@ -407,6 +422,7 @@ impl Patch {
             Self::Footnotes(patch) => patch.is_noop(),
             Self::Metadata(patch) => patch.is_noop(),
             Self::TextStyle(patch) => patch.is_noop(),
+            Self::ChartFontSize(patch) => patch.is_noop(),
             Self::TableValues(patch) => patch.is_noop(),
             Self::TableComments(patch) => patch.is_noop(),
             Self::SectionLifecycle(patch) => patch.is_noop(),
@@ -450,6 +466,17 @@ fn visible(paragraph: &str) -> (String, usize) {
         paragraph.chars().filter(|c| !is_anchor(*c)).collect(),
         objects,
     )
+}
+
+fn chart_font_size(value: &PropValue<'_>) -> Result<litchi_pages::chart::font::TextPointSize> {
+    let points = super::write::chart_font_points(value)?;
+    litchi_pages::chart::font::TextPointSize::from_points(points).map_err(|_| {
+        refusal(
+            Code::InvalidValue,
+            "a chart font size must be positive and finite",
+        )
+        .with_property("font.size".to_owned())
+    })
 }
 
 fn template_name(template: Template) -> &'static str {
@@ -511,6 +538,11 @@ fn build_with(package: &Package, regions: bool) -> (super::Tree, Box<[super::Par
     }
     let parts = build_tables(package, &mut tree, body);
     let tables = parts.len();
+    if let Ok(charts) = package.body_chart_arrangements() {
+        for chart in 0..charts.len() {
+            tree.push(body, Kind::Chart).leaf([chart, 0, 0, 0]).done();
+        }
+    }
     let mut section_indices = Vec::with_capacity(section_items.len());
     for (index, name, value, lines) in section_items {
         let section = tree
@@ -967,6 +999,26 @@ pub(crate) fn set(
                     super::write::font_property(&mut properties, key, value, FONT_COLOR)?;
                     style_paragraph(&mut chain, leaf[SECTION], leaf[LINE], properties)?;
                 },
+                ("chart", "font.size") => {
+                    pending.flush(&mut chain)?;
+                    let error = |error| failure(LeafError::PagesChartFont(error));
+                    let edit = chain
+                        .package
+                        .edit_body_chart_font_size(BodyChartSelector::index(leaf[0]))
+                        .map_err(error)?;
+                    let edit = if value.is_null() {
+                        edit.reset_size().map_err(error)?
+                    } else {
+                        edit.set_size(chart_font_size(value)?).map_err(error)?
+                    };
+                    let commit = edit.commit().map_err(error)?;
+                    let patch = commit.patch().clone();
+                    push(
+                        &mut chain,
+                        commit.into_package(),
+                        Patch::ChartFontSize(patch),
+                    );
+                },
                 ("section", "text") => {
                     pending.flush(&mut chain)?;
                     let value = super::write::text(value, "text")?.unwrap_or_default();
@@ -1054,6 +1106,7 @@ pub(crate) fn set(
                 ("paragraph" | "section" | "header" | "footer" | "footnote", _) => {
                     return Err(key_refusal(node, key));
                 },
+                ("chart", _) => return Err(key_refusal(node, key)),
                 _ => return Err(element_refusal("set", node)),
             }
         }
