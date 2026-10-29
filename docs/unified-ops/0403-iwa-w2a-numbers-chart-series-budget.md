@@ -3,7 +3,7 @@
 - Status: Numbers chart-series caller-ledger repair is isolated on
   `uo2/iwa-w2a-numbers-series-budget`. The implementation and probe source
   used for scoped qualification is clean commit
-  `c768523ebd91a2c7affe7dc9432f92443f9ac1bd`; the probe-only tip isolates
+  `ff06bcf61b8ff4f06c7aab599af8f55c60878cc6`; the probe-only tip isolates
   correctness/setup helpers from the measured `#[inline(never)]` wrappers.
   The final source also includes the reviewed publication admission and
   typed candidate-error mapping repairs.
@@ -82,30 +82,30 @@ trunk.
 ## Source-bound performance qualification
 
 The four whole-facade `Property::Symbols` routes below were measured on the
-clean source `c768523ebd91a2c7affe7dc9432f92443f9ac1bd`, with CPU 7 and two
+clean source `ff06bcf61b8ff4f06c7aab599af8f55c60878cc6`, with CPU 7 and two
 selected-wrapper calls per host/leaf side. The comparison is inclusive
 Callgrind Ir, not wall time; all rows meet the 1.05 regression bar.
 
 | Route | Host Ir | Leaf Ir | Leaf/host |
 | --- | ---: | ---: | ---: |
-| all chart symbols read | 87,332,917 | 35,314,392 | 0.404365194855 |
-| all chart symbols set | 453,463,339 | 192,214,082 | 0.423880092322 |
-| single chart symbol read | 87,332,941 | 35,328,295 | 0.404524279103 |
-| single chart symbol set | 485,814,985 | 191,137,810 | 0.393437452326 |
+| all chart symbols read | 87,326,106 | 35,315,296 | 0.404407085322 |
+| all chart symbols set | 453,365,462 | 187,303,526 | 0.413140262546 |
+| single chart symbol read | 87,308,651 | 35,322,681 | 0.404572520540 |
+| single chart symbol set | 485,876,385 | 186,028,085 | 0.382871221453 |
 
 The immutable release-debug1 ELF is external at
-`/home/zhuhe/code/litchi-worktrees/.coord/iwa-w2a-symbols-facade-c768523ebd/bin/parity-8ccb274458659a4c`
-(mode 0555, 217,637,848 bytes, SHA-256
-`fd5f8d37bf78ab0b9521dc771cd2e93b0580a7b33a39ba46a01a9305e96eb8e1`).
+`/home/zhuhe/code/litchi-worktrees/.coord/iwa-w2a-symbols-facade-ff06bcf61b/bin/parity-8ccb274458659a4c`
+(mode 0555, 217,652,104 bytes, SHA-256
+`9545d118a7d9aace70f122981be65ee820fc2622db7817f43ddf4a5e2f1c27a1`).
 The clean-source build receipt is external at
 `.../build-receipt.json` (SHA-256
-`54c55dbae68c2b71cd8e18a8edb169937f06f2658bafa8e17a29e310b5578dd0`).
-The exact v3 plan is external at
-`.../callgrind-plan-v3.json` (SHA-256
-`d3a344e0a8ea721215c1780e6fb672e5122839106769a81c4ae6a49b533a9046`),
+`30abf04245c4fc7f2e8bcf732ef9aae4886c596357e31ce4ffb15cd61264a6a6`).
+The exact v4 plan is external at
+`.../callgrind-plan-v4.json` (SHA-256
+`6ebff8a5cf2c12975ec7d5473de62407d2ff93a0a84aa21fa26f148d73109d1b`),
 and the c063 raw-call receipt is
-`.../capture-v3/c063-validator-receipt-v3.json` (SHA-256
-`80c9699b6be20def9cd9cab7ce2034f90d34b843b1a2dd1ef367a6e29f4378ff`).
+`.../capture-v4/c063-validator-receipt-v4.json` (SHA-256
+`c94eaf2ca4f2346f39c99b7bb539ac0f6453baa4c6f6f2bef0c5a901e479e751`).
 The reduced four-row registry input is
 `docs/unified-ops/results/0403/integrated-callgrind.json`; raw profiles,
 annotations, logs and the binary are not committed. The c063 validator
@@ -114,16 +114,8 @@ annotations, logs and the binary are not committed. The c063 validator
 verified exact two-call selection, raw summary/function Ir, PROGRAM TOTALS,
 and threshold-100 inclusive annotations for all eight legs.
 
-The approved plan/manifest template retained its original `capture-v2`
-directory, while the executed argv and artifacts were stored under `capture-v3`.
-This output-directory-only correction is bound by the external
-`executed-capture-correction-v3.json` (SHA-256
-`d66a3fb801986885640a5880590edda0e8445ee9c9af8181e7b6904cdb09282f`); it
-verifies identical source, ELF, test argv, CPU, environment and selected
-symbols, so no recapture was needed.
-
-The earlier c3f8 capture set is retained externally as superseded historical
-evidence; it is not used for these rows. This is source-bound Numbers facade evidence only. Merging the slice into the
+Earlier c3f8/c768 capture sets are retained externally as superseded historical
+evidence; they are not used for these rows. This is source-bound Numbers facade evidence only. Merging the slice into the
 coordinator's current trunk invalidates this qualification; the coordinator
 must rerun the final integrated matrix. No wall-time, native acceptance, or
 E3/E4 claim is made.
@@ -138,7 +130,7 @@ E3/E4 claim is made.
 - `cargo test --offline -p litchi-iwa-style graph::tests --lib` — 13 passed, including registry-inspection cache reuse, bounded construction, and bounded finish admission.
 - `cargo test --offline -p litchi-iwa-style symbol_tests --lib` — 8 passed.
 - `cargo fmt --all -- --check` — pass.
-- `cargo test --release --locked --offline -p litchi-iwa --features parity-host-oracle --test parity --no-run` — pass for the final c768 source; all four route smokes exited 0.
+- `cargo test --release --locked --offline -p litchi-iwa --features parity-host-oracle --test parity --no-run` — pass for the final ff06 source; all four route smokes exited 0.
 - `python3 tools/unified_bench_matrix.py --check` — pass; the four source-bound 0403 rows are registered in the Numbers matrix.
 - `python3 tools/iwa_exit_ledger.py --check` — pass.
 - `python3 tools/check_crate_boundaries.py` — pass (70 packages, 314 dependency declarations).

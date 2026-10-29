@@ -1,6 +1,6 @@
 {
   "schema": "iwork-numbers-symbols-facade-callgrind-v1",
-  "source_commit": "c768523ebd91a2c7affe7dc9432f92443f9ac1bd",
+  "source_commit": "ff06bcf61b8ff4f06c7aab599af8f55c60878cc6",
   "source_clean": true,
   "policy": {
     "ratio": "leaf/host inclusive Callgrind Ir",
@@ -11,42 +11,37 @@
     "annotation": "callgrind_annotate --auto=no --inclusive=yes --threshold=100 --show-percs=yes"
   },
   "binary": {
-    "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-w2a-symbols-facade-c768523ebd/bin/parity-8ccb274458659a4c",
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-w2a-symbols-facade-ff06bcf61b/bin/parity-8ccb274458659a4c",
     "mode": "0555",
-    "bytes": 217637848,
-    "sha256": "fd5f8d37bf78ab0b9521dc771cd2e93b0580a7b33a39ba46a01a9305e96eb8e1"
+    "bytes": 217652104,
+    "sha256": "9545d118a7d9aace70f122981be65ee820fc2622db7817f43ddf4a5e2f1c27a1"
   },
   "plan": {
-    "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-w2a-symbols-facade-c768523ebd/callgrind-plan-v3.json",
-    "sha256": "d3a344e0a8ea721215c1780e6fb672e5122839106769a81c4ae6a49b533a9046"
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-w2a-symbols-facade-ff06bcf61b/callgrind-plan-v4.json",
+    "sha256": "6ebff8a5cf2c12975ec7d5473de62407d2ff93a0a84aa21fa26f148d73109d1b"
   },
   "validator": {
     "path": "/home/zhuhe/code/litchi-worktrees/.coord/resume-20261028/perf/iwork-probe-isolation-final/validate_call_audit.py",
     "sha256": "c0637e4304f5fdbfae6fca6b0e9a9c17f7d10cb9a56c7df6846951fa4bdf6b8e"
   },
   "receipt": {
-    "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-w2a-symbols-facade-c768523ebd/capture-v3/c063-validator-receipt-v3.json",
-    "sha256": "80c9699b6be20def9cd9cab7ce2034f90d34b843b1a2dd1ef367a6e29f4378ff"
-  },
-  "capture_correction": {
-    "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-w2a-symbols-facade-c768523ebd/executed-capture-correction-v3.json",
-    "sha256": "d66a3fb801986885640a5880590edda0e8445ee9c9af8181e7b6904cdb09282f",
-    "kind": "output-directory-only"
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-w2a-symbols-facade-ff06bcf61b/capture-v4/c063-validator-receipt-v4.json",
+    "sha256": "c94eaf2ca4f2346f39c99b7bb539ac0f6453baa4c6f6f2bef0c5a901e479e751"
   },
   "build": {
-    "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-w2a-symbols-facade-c768523ebd/build-receipt.json",
-    "sha256": "54c55dbae68c2b71cd8e18a8edb169937f06f2658bafa8e17a29e310b5578dd0"
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-w2a-symbols-facade-ff06bcf61b/build-receipt.json",
+    "sha256": "30abf04245c4fc7f2e8bcf732ef9aae4886c596357e31ce4ffb15cd61264a6a6"
   },
-  "artifact_root": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-w2a-symbols-facade-c768523ebd/capture-v3",
+  "artifact_root": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-w2a-symbols-facade-ff06bcf61b/capture-v4",
   "routes": [
     {
       "id": "numbers_symbols_all_read",
       "operation": "read",
       "scenario": "Property::Symbols all chart symbols",
       "size": "all",
-      "host_ir": 87332917,
-      "leaf_ir": 35314392,
-      "ratio": 0.404365194855,
+      "host_ir": 87326106,
+      "leaf_ir": 35315296,
+      "ratio": 0.404407085322,
       "calls_per_side": 2,
       "status": "meets",
       "symbols": {
@@ -59,9 +54,9 @@
       "operation": "set",
       "scenario": "Property::Symbols all chart symbols",
       "size": "all",
-      "host_ir": 453463339,
-      "leaf_ir": 192214082,
-      "ratio": 0.423880092322,
+      "host_ir": 453365462,
+      "leaf_ir": 187303526,
+      "ratio": 0.413140262546,
       "calls_per_side": 2,
       "status": "meets",
       "symbols": {
@@ -74,9 +69,9 @@
       "operation": "read",
       "scenario": "Property::Symbols single chart symbol",
       "size": "1",
-      "host_ir": 87332941,
-      "leaf_ir": 35328295,
-      "ratio": 0.404524279103,
+      "host_ir": 87308651,
+      "leaf_ir": 35322681,
+      "ratio": 0.40457252054,
       "calls_per_side": 2,
       "status": "meets",
       "symbols": {
@@ -89,9 +84,9 @@
       "operation": "set",
       "scenario": "Property::Symbols single chart symbol",
       "size": "1",
-      "host_ir": 485814985,
-      "leaf_ir": 191137810,
-      "ratio": 0.393437452326,
+      "host_ir": 485876385,
+      "leaf_ir": 186028085,
+      "ratio": 0.382871221453,
       "calls_per_side": 2,
       "status": "meets",
       "symbols": {
