@@ -7153,3 +7153,39 @@ See [0063](0063-source-pptx-modern-comments.md).
   builds, together with formatting. Partial 3ae binary preparation remains
   historical; no captures or timing were launched. Full qualification must
   restart on the repaired frozen candidate.
+
+- Frozen candidate `e0e297a82b` completed all 53 gate rows on one clean,
+  unchanged source. The coordinator and an independent reviewer checked
+  every terminal exit and the final receipt
+  (`9f59a794f90730590ea65f7d33fa82ffaa68d167fb716be5bceea3f6938a949a`).
+  Final instruction qualification also passed: 87 iWork routes / 173
+  captures, eight D7 comment routes / 16 captures, and fourteen FIN rows /
+  56 captures. Raw call counts, complete function attribution, source and
+  binary identities were independently verified. These results qualify
+  `e0e297a82b`, not later integration commits.
+- The same candidate passed seven quiet wall-time route budgets. CLI ABBA
+  capture, schema and noise validation passed; CLI ratios are diagnostic
+  only. The original timing launcher stopped before measurement because
+  GNU Awk rejected its variable name. New runner copies change only that
+  binding; the original failure remains preserved. The external timing
+  receipt is `.coord/resume-20261028/perf/final-e0e297a82b-timing-receipt.md`
+  (SHA-256 `87932702d02ffbb8e75b98a3cf54dcf371547c9e710f90644325c6615ecc99eb`);
+  the coordinator's independent review binds seventy artifacts and the
+  declared budgets. No native acceptance claim is added.
+- Owner-requested disk cleanup removed 68,822,855,363 logical bytes of
+  inactive build intermediates from eleven cache roots, preserving and
+  hash-checking 912 executables and dynamic libraries. Sources, locks, raw
+  evidence and active targets remain intact. The audited receipt is
+  `.coord/disk-cleanup-20261029/receipt.json`. Completed worktree retirement
+  had reached fifty worktrees and forty-three branches before this slice.
+- Accepted W2-D sparse-example slice `e410d50453` (record 0398). The leaf
+  command retains the actual 257-by-2 table and both original batches,
+  verifies three boundary values, both exact inverses and saved-file reopen,
+  and passes scoped checks. Only this command relocates; host differential
+  and native-provenance tests remain. Post-merge checks and retirement follow
+  this integration. The ledger remains 1,197 migrated, 43 retired and 991
+  host-only rows, with 517 native queue entries pending; W3 remains blocked.
+- The next owned slices are shared whole-cell styles plus the Numbers
+  adapter (0391), unified chart point size (0399), Pages chart-series symbols
+  (0400) and Keynote chart-series symbols (0401). Their branch-local checks
+  and measurements remain separate from the qualified e0e checkpoint.
