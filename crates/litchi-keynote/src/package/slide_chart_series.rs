@@ -587,6 +587,30 @@ fn map_graph(error: graph::Error) -> Error {
     }
 }
 
+fn map_finish_error(error: graph::FinishError) -> Error {
+    match error {
+        graph::FinishError::Graph(error) => map_graph(error),
+        graph::FinishError::Limit {
+            kind,
+            observed,
+            maximum,
+        } => Error::Limit {
+            kind: match kind {
+                graph::FinishLimitKind::Work => LimitKind::WireWork,
+                graph::FinishLimitKind::Allocations => LimitKind::Allocations,
+                graph::FinishLimitKind::RetainedBytes => LimitKind::RetainedBytes,
+                graph::FinishLimitKind::ScratchBytes => LimitKind::ScratchBytes,
+                _ => return Error::InvalidSource,
+            },
+            observed: observed as u64,
+            maximum: maximum as u64,
+        },
+        graph::FinishError::Allocation { amount } => Error::Allocation { amount },
+        graph::FinishError::Overflow(_) => Error::InvalidSource,
+        _ => Error::InvalidSource,
+    }
+}
+
 fn map_wire_error(error: litchi_iwa_common::Error) -> Error {
     match error {
         litchi_iwa_common::Error::LimitExceeded {
@@ -835,6 +859,74 @@ fn charge_series_report(
         .and_then(|_| budget.nesting(report.max_depth() as usize))
         .map_err(map_transaction_error)?;
     fields.charge(report.fields()).map_err(map_font_error)
+}
+
+fn finish_workspace(
+    workspace: Workspace<'_>,
+    budget: &mut TransactionBudget,
+) -> Result<graph::Changes, Error> {
+    let requirements = workspace.finish_requirements().map_err(map_finish_error)?;
+    let limits = graph::FinishLimits::new(
+        if requirements.work() == 0 {
+            0
+        } else {
+            budget.remaining_work().map_err(map_transaction_error)?
+        },
+        if requirements.allocations() == 0 {
+            0
+        } else {
+            budget
+                .remaining_allocations()
+                .map_err(map_transaction_error)?
+        },
+        if requirements.retained_bytes() == 0 {
+            0
+        } else {
+            budget.remaining_retained().map_err(map_transaction_error)?
+        },
+        if requirements.scratch_bytes() == 0 {
+            0
+        } else {
+            budget.remaining_scratch().map_err(map_transaction_error)?
+        },
+    );
+    for (kind, observed, maximum) in [
+        (LimitKind::WireWork, requirements.work(), limits.max_work()),
+        (
+            LimitKind::Allocations,
+            requirements.allocations(),
+            limits.max_allocations(),
+        ),
+        (
+            LimitKind::RetainedBytes,
+            requirements.retained_bytes(),
+            limits.max_retained_bytes(),
+        ),
+        (
+            LimitKind::ScratchBytes,
+            requirements.scratch_bytes(),
+            limits.max_scratch_bytes(),
+        ),
+    ] {
+        if observed > maximum {
+            return Err(Error::Limit {
+                kind,
+                observed: observed as u64,
+                maximum: maximum as u64,
+            });
+        }
+    }
+    let (changes, report) = workspace.finish_bounded(limits).map_err(map_finish_error)?;
+    // Component/index admission is charged by `admit_workspace`; this report
+    // covers only the final vectors, copied names, and their traversal.
+    budget
+        .output(report.output_bytes())
+        .and_then(|_| budget.work(report.work()))
+        .and_then(|_| budget.allocations(report.allocations()))
+        .and_then(|_| budget.retained(report.retained_bytes()))
+        .and_then(|_| budget.scratch(report.scratch_bytes()))
+        .map_err(map_transaction_error)?;
+    Ok(changes)
 }
 
 fn publish_changes(
@@ -1117,7 +1209,7 @@ impl<'a> Edit<'a> {
         }
         let (candidate, touched_components, plan) = publish_changes(
             self.source,
-            workspace.finish(),
+            finish_workspace(workspace, &mut budget)?,
             selection.identifier,
             &scope,
             &mut budget,
