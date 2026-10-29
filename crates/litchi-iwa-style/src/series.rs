@@ -5425,8 +5425,8 @@ mod symbol_tests {
         let chart = chart_payload();
         let requirements = codec::reference_requirements(&chart, CodecLimits::DEFAULT)
             .expect("reference requirements");
-        let (_, report) = codec::references_with_report(&chart, CodecLimits::DEFAULT)
-            .expect("reference report");
+        let (_, report) =
+            codec::references_with_report(&chart, CodecLimits::DEFAULT).expect("reference report");
         assert_eq!(requirements.fields(), report.fields());
         assert_eq!(requirements.work_bytes(), report.work_bytes());
         let payload = override_payload();
