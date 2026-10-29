@@ -517,6 +517,7 @@ fn pages_chart_font_code(error: &litchi_pages::chart::font::Error) -> Code {
         E::Limit { .. } => Code::LimitExceeded,
         E::InvalidSource | E::PatchConflict => Code::InvalidInput,
         E::Allocation { .. } | E::Verification => Code::InternalError,
+        _ => Code::InternalError,
     }
 }
 
@@ -740,6 +741,7 @@ fn keynote_chart_font_code(error: &litchi_keynote::chart::font::size::Error) -> 
         E::Limit { .. } => Code::LimitExceeded,
         E::InvalidSource | E::PatchConflict => Code::InvalidInput,
         E::Allocation { .. } | E::Verification => Code::InternalError,
+        _ => Code::InternalError,
     }
 }
 
@@ -802,6 +804,7 @@ fn numbers_chart_font_code(error: &litchi_numbers::sheet::chart::font::Error) ->
         E::Limit { .. } => Code::LimitExceeded,
         E::InvalidSource | E::PatchConflict => Code::InvalidInput,
         E::Allocation { .. } | E::Verification => Code::InternalError,
+        _ => Code::InternalError,
     }
 }
 

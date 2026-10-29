@@ -187,6 +187,12 @@ impl<'f> Node<'f> {
                             FileFormat::Numbers,
                         ))
                     },
+                    _ => Err(super::leaf_error(
+                        super::LeafError::NumbersChartFont(
+                            litchi_numbers::sheet::chart::font::Error::InvalidSource,
+                        ),
+                        FileFormat::Numbers,
+                    )),
                 }
             },
         }?;

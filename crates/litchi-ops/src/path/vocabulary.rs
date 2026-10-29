@@ -957,6 +957,7 @@ pub(crate) static NUMBERS: Vocabulary = Vocabulary {
     root: "workbook",
     aliases: &[
         ("cell", "cell"),
+        ("chart", "chart"),
         ("col", "col"),
         ("column", "col"),
         ("mergecell", "mergeCell"),
@@ -966,6 +967,7 @@ pub(crate) static NUMBERS: Vocabulary = Vocabulary {
     ],
     elements: &[
         ElementRule::new("cell"),
+        ElementRule::new("chart"),
         ElementRule::new("col"),
         ElementRule::new("mergeCell"),
         ElementRule::new("row"),
@@ -982,7 +984,7 @@ pub(crate) static NUMBERS: Vocabulary = Vocabulary {
             case: Caseless,
         }),
     ],
-    roots: "/<sheet name>, /sheet[N], /sheet[N]/table[N] (cells as /Sheet 1/Table 1/A1; merged ranges as /sheet[N]/table[N]/mergeCell[N]; rows and columns as /sheet[N]/table[N]/row[N] and col[N])",
+    roots: "/<sheet name>, /sheet[N], /sheet[N]/chart[N], /sheet[N]/table[N] (cells as /Sheet 1/Table 1/A1; merged ranges as /sheet[N]/table[N]/mergeCell[N]; rows and columns as /sheet[N]/table[N]/row[N] and col[N])",
     index: AliasIndex::EMPTY,
 }
 .indexed();

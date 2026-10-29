@@ -37,6 +37,7 @@ Runtime/schema/dispatch ownership is limited to:
 
 * `crates/litchi-ops/src/format/iwork/{pages,keynote,numbers}.rs`;
 * `crates/litchi-ops/src/format/iwork/{keynote/write,write,node,tree,error}.rs`;
+* `crates/litchi-ops/src/path/vocabulary.rs` (Numbers chart path spelling);
 * `crates/litchi-ops/tests/iwork_chart_font_size.rs`.
 
 Leaf/shared chart-font crates are read-only dependencies for this slice.  No

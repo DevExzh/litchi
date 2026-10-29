@@ -20,7 +20,7 @@ fn fixture(format: &str) -> PathBuf {
     std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../../test-data/iwork")
         .join(format)
-        .join(format!("chart-data-native.{extension}"))
+        .join(format!("chart-grid-authored-native.{extension}"))
 }
 
 fn read(path: PathBuf) -> File {
@@ -61,7 +61,7 @@ mod pages {
     const PATH: &str = "/body/chart[1]";
 
     fn source() -> File {
-        read(super::fixture("pages"))
+        read(fixture("pages"))
     }
 
     fn direct_set(source: &[u8]) -> Vec<u8> {
@@ -139,7 +139,10 @@ mod pages {
         assert_eq!(points(property(&reopen(&unified), PATH)), 17.0);
         assert_eq!(
             points(property(&reopen(&unified), PATH)),
-            points(property(&reopen(&open_bytes(direct).unwrap()), PATH))
+            points(property(
+                &reopen(&open_bytes(direct.clone()).unwrap()),
+                PATH
+            ))
         );
 
         let direct_restored = direct_reset(&direct);
@@ -232,7 +235,7 @@ mod keynote {
     const PATH: &str = "/slide[1]/chart[1]";
 
     fn source() -> File {
-        read(super::fixture("keynote"))
+        read(fixture("keynote"))
     }
 
     fn direct_set(source: &[u8]) -> Vec<u8> {
@@ -323,7 +326,10 @@ mod keynote {
         assert_eq!(points(property(&reopen(&unified), PATH)), 17.0);
         assert_eq!(
             points(property(&reopen(&unified), PATH)),
-            points(property(&reopen(&open_bytes(direct).unwrap()), PATH))
+            points(property(
+                &reopen(&open_bytes(direct.clone()).unwrap()),
+                PATH
+            ))
         );
 
         let direct_restored = direct_reset(&direct);
@@ -416,7 +422,7 @@ mod numbers {
     const PATH: &str = "/sheet[1]/chart[1]";
 
     fn source() -> File {
-        read(super::fixture("numbers"))
+        read(fixture("numbers"))
     }
 
     fn direct_set(source: &[u8]) -> Vec<u8> {
@@ -494,7 +500,10 @@ mod numbers {
         assert_eq!(points(property(&reopen(&unified), PATH)), 17.0);
         assert_eq!(
             points(property(&reopen(&unified), PATH)),
-            points(property(&reopen(&open_bytes(direct).unwrap()), PATH))
+            points(property(
+                &reopen(&open_bytes(direct.clone()).unwrap()),
+                PATH
+            ))
         );
 
         let direct_restored = direct_reset(&direct);
@@ -555,6 +564,7 @@ mod numbers {
             litchi_numbers::sheet::chart::font::Property::Font(_) => {
                 panic!("Numbers chart font read returned font for size route")
             },
+            _ => panic!("Numbers chart font read returned an unknown property"),
         }
     }
 

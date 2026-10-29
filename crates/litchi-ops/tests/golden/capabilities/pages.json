@@ -227,6 +227,10 @@
         {
           "element": "table",
           "pathSegment": "tbl"
+        },
+        {
+          "element": "chart",
+          "pathSegment": "chart"
         }
       ],
       "properties": {
@@ -694,6 +698,38 @@
           "type": "string",
           "add": false,
           "set": false,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "pages",
+      "element": "chart",
+      "parent": "body",
+      "operations": {
+        "add": false,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/body/chart[N]"
+        ]
+      },
+      "properties": {
+        "font.size": {
+          "type": "font-size",
+          "add": false,
+          "set": true,
           "get": true
         }
       },

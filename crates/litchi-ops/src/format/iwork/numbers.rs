@@ -1014,10 +1014,14 @@ pub(crate) fn empty_cell(file: &Iwork, path: &Path<'_>) -> Option<Address> {
 
 pub(crate) fn table_extent(table: &Node<'_>) -> Option<(u32, u32)> {
     let read = |key| {
-        table.value(key).and_then(|value| match value {
-            Value::Int(value) => u32::try_from(*value).ok(),
-            _ => None,
-        })
+        table
+            .value(key)
+            .ok()
+            .flatten()
+            .and_then(|value| match value {
+                Value::Int(value) => u32::try_from(*value).ok(),
+                _ => None,
+            })
     };
     Some((read("rowCount")?, read("columnCount")?))
 }
@@ -1471,7 +1475,7 @@ fn commit_staged(chain: &mut Chain<Package>, staged: Staged) -> Result<()> {
     }
     for ((sheet, table), cells) in staged.text_styles {
         let error = |error| edit_error(EditError::TextStyle(error));
-        let edit = chain
+        let mut edit = chain
             .package
             .edit_table_cell_text_style(SheetSelector::index(sheet), TableSelector::index(table))
             .map_err(error)?;

@@ -1084,7 +1084,7 @@
       "parent": "slide",
       "operations": {
         "add": false,
-        "set": false,
+        "set": true,
         "get": true,
         "query": true,
         "remove": false
@@ -1135,6 +1135,12 @@
           "type": "int",
           "add": false,
           "set": false,
+          "get": true
+        },
+        "font.size": {
+          "type": "font-size",
+          "add": false,
+          "set": true,
           "get": true
         }
       },
