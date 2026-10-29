@@ -641,20 +641,11 @@ mod numbers {
         read(fixture("numbers"))
     }
 
-    fn two_sheet_empty_source() -> File {
-        let package = litchi_numbers::Package::new();
-        let package = package
-            .edit_sheet_lifecycle()
-            .add("Sheet 2")
-            .expect("add second Numbers sheet")
-            .commit()
-            .expect("add second Numbers sheet commit")
-            .into_package();
-        let mut bytes = Vec::new();
-        package
-            .write_to(&mut bytes)
-            .expect("write two-sheet Numbers fixture");
-        open_bytes(bytes).expect("open two-sheet Numbers fixture")
+    fn two_sheet_chart_source() -> File {
+        read(
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("../../test-data/iwork/numbers/chart-font-size-two-sheet.numbers"),
+        )
     }
 
     #[inline(never)]
@@ -795,11 +786,43 @@ mod numbers {
 
     #[test]
     fn canonical_chart_path_scopes_numbers_sheet_cache() {
-        let file = two_sheet_empty_source();
-        let fast = file.get("/sheet[2]/chart[1]").unwrap_err().code();
-        let generic = file.get("/sheet[2]/chart[last()]").unwrap_err().code();
-        assert_eq!(fast, litchi_ops::Code::PathNotFound);
-        assert_eq!(generic, litchi_ops::Code::PathNotFound);
+        let file = two_sheet_chart_source();
+        let second = file
+            .get("/sheet[2]/chart[1]")
+            .expect("second-sheet chart path");
+        let generic = file
+            .get("/sheet[2]/chart[last()]")
+            .expect("second-sheet generic chart path");
+        assert_eq!(second.path().to_string(), "/sheet[2]/chart[1]");
+        assert_eq!(second.path().to_string(), generic.path().to_string());
+        assert_eq!(
+            format_values(&file, "/sheet[2]/chart[1]"),
+            format_values(&file, "/sheet[2]/chart[last()]")
+        );
+        assert_eq!(
+            points(property(&file, "/sheet[2]/chart[1]")),
+            points(property(&file, "/sheet[2]/chart[last()]"))
+        );
+
+        let first = file
+            .get("/sheet[1]/chart[1]")
+            .expect("first-sheet chart path");
+        let first_values = format_values(&file, "/sheet[1]/chart[1]");
+        assert_eq!(first.path().to_string(), "/sheet[1]/chart[1]");
+        assert_ne!(first.path().to_string(), second.path().to_string());
+        assert_eq!(
+            first_values,
+            format_values(&file, "/sheet[1]/chart[last()]")
+        );
+        assert_eq!(
+            points(property(&file, "/sheet[1]/chart[1]")),
+            points(property(&file, "/sheet[1]/chart[last()]")),
+        );
+
+        // Selecting the second sheet must not invalidate or retarget the first
+        // sheet's already materialized node.
+        assert_eq!(first.path().to_string(), "/sheet[1]/chart[1]");
+        assert_eq!(format_values(&file, "/sheet[1]/chart[1]"), first_values);
     }
 
     #[inline(never)]

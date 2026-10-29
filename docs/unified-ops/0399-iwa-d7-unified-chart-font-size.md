@@ -127,3 +127,28 @@ slice remain `pending`; no E3/E4 claim is made.  Existing W2-A/W2-B/W2-C leaf
 receipts and engine-only probes do not qualify these unified routes.
 
 No raw captures or binaries were added.
+
+## Per-container repair checkpoint
+
+The follow-up cache repair keeps one lazily initialized chart projection per
+body, slide or sheet.  The cache entry vector uses fallible reservation before
+initialization; a reservation failure is an internal allocation refusal rather
+than a partially initialized cache.  Keynote still calls the existing
+`Package::slides()` semantic catalog to establish the bounded entry count (the
+generic route already depends on that catalog); the optimization limits the
+additional chart inventory/tree work to the selected slide.  Numbers applies
+the same rule to the selected sheet.
+
+The second-container regression uses the tracked synthetic host-package
+fixture `test-data/iwork/numbers/chart-font-size-two-sheet.numbers` and its
+receipt.  It contains a real standalone chart on each sheet and compares the
+canonical and generic routes for path, complete format values and `font.size`,
+then rechecks the first-sheet node after selecting the second sheet.  The
+fixture was generated with the public `litchi-iwa` Numbers editor at the
+recorded source commit; it is a focused identity/path control only and carries
+no native application acceptance claim.
+
+The post-sync focused suite is 10 passing tests and 9 intentionally ignored
+CPU-slot probes.  The current source-bound release/Callgrind qualification is
+still pending coordinator review; the earlier `91b5c65f69` matrix remains
+profiling history only.

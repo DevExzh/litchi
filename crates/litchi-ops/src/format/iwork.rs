@@ -150,7 +150,13 @@ impl ChartCache {
             #[cfg(feature = "numbers")]
             Owner::Numbers(package) => package.sheets().len(),
         };
-        let mut entries = Vec::with_capacity(count);
+        let mut entries = Vec::new();
+        entries.try_reserve_exact(count).map_err(|_| {
+            Error::new(
+                crate::Code::InternalError,
+                "could not allocate the canonical chart-container cache",
+            )
+        })?;
         entries.extend((0..count).map(|_| OnceLock::new()));
         Ok(Self {
             entries: entries.into_boxed_slice(),
