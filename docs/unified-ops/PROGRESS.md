@@ -7074,3 +7074,35 @@ See [0063](0063-source-pptx-modern-comments.md).
   totals; smaller per-file annotation rows caused the preserved historical
   validator failure. No instructions or ratios were discounted. Final
   integrated-source qualification remains required.
+
+- Post-merge checks on `222f90c0b4` passed, including all twenty locked
+  offline fuzz workspaces. The Numbers font and two admission worktrees and
+  branches were retired after artifact preservation: 46 worktrees and
+  40 branches removed in this continuation.
+- Accepted Pages font slice `a0d9fa8910`, synchronized with the Numbers
+  foundation. Font and point-size facades preserve exact snapshots, inverse,
+  no-op, typed refusals, candidate readback and changed/untouched unknown
+  fields. Six actual host-versus-facade parity bindings and pending native
+  routes are registered. Corrected source `4fc7570935` passes six full-facade
+  instruction routes (twelve captures), with one property per read and setup
+  excluded from reset measurements. The coordinator independently checked
+  artifact hashes, exact test execution, two calls per side and attribution.
+  Final integrated qualification and native verification remain required.
+
+- Pages post-merge validation on `a5e5db6ed6` passed on a clean unchanged
+  source. An earlier run was invalidated when the coordinator started the
+  next merge before its cleanliness check; that merge was aborted and the
+  rejected run retained separately. No results from that overlapping run
+  are used for acceptance.
+- Accepted Keynote chart-font slice `9e0c901985`, synchronized with the
+  Pages and Numbers integrations. Selection, graph mutation, locality and
+  readback share bounded admission; stored mutation plans constrain patch
+  application, unknown payloads and archive references stay protected, and
+  production negative controls reject unplanned members/objects and metadata
+  changes. Six focused parity bindings are migrated; native routes remain
+  pending.
+- Keynote source `f875e5c3c9` passes all six full-facade instruction routes:
+  twelve captures, two calls per side, 64 indexed artifact hashes and the
+  immutable binary independently checked. Raw totals and complete selected
+  function attribution agree; the worst leaf/host ratio is 0.484571. This
+  remains slice evidence until the final integrated candidate is measured.
