@@ -137,6 +137,18 @@ path = "examples/resize_numbers_table.rs"
 name = "remove_numbers_table"
 path = "examples/remove_numbers_table.rs"
 
+[[example]]
+name = "add_numbers_sheet"
+path = "examples/add_numbers_sheet.rs"
+
+[[example]]
+name = "duplicate_numbers_sheet"
+path = "examples/duplicate_numbers_sheet.rs"
+
+[[example]]
+name = "remove_numbers_sheet"
+path = "examples/remove_numbers_sheet.rs"
+
 [features]
 default = []
 internal-iwork-source = []
