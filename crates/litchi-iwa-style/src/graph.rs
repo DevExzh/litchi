@@ -643,7 +643,7 @@ impl<'s> Workspace<'s> {
     /// [`Changes`].  The ledger is updated as source members first become
     /// copy-on-write entries or are deleted, so this query performs no
     /// source-name scan and allocates nothing.
-    #[must_use]
+    #[must_use = "inspect the bounded finalization requirements or handle overflow"]
     pub fn finish_requirements(&self) -> std::result::Result<FinishRequirements, FinishError> {
         let vector_allocations = usize::from(self.finish.edit_count != 0)
             .checked_add(usize::from(self.finish.deletion_count != 0))
