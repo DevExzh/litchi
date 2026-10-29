@@ -75,8 +75,9 @@ Legacy `Workspace::new` remains unchanged.
 
 Implementation commits: `bd2d138a07`, overflow-checked follow-up
 `c50fcaf8db`, final lint/documentation fix `54ebd2782f`, focused ceiling
-evidence `f2eae5798d`, bounded construction `f9512e398f`, and the census
-identity guard `0975944a5a` (on top of
+evidence `f2eae5798d`, bounded construction `f9512e398f`, census identity
+guard `0975944a5a`, and the exact source-fingerprint follow-up `635509e3ff`
+(on top of
 coordinator freeze merge `2f1f7a8a78`).
 
 ## Correctness and evidence boundary
@@ -93,7 +94,7 @@ is an explicit follow-up gap, not a full Numbers facade-ledger qualification.
 
 ## Verification
 
-- `cargo test --offline -p litchi-iwa-style --lib`: 36 passed.
+- `cargo test --offline -p litchi-iwa-style --lib`: 38 passed.
 - `cargo test --offline -p litchi-iwa --test parity chart_font_cases -- --nocapture`:
   29 passed, 13 ignored; Numbers, Pages, and Keynote chart-font parity and
   low-budget controls pass.
