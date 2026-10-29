@@ -75,6 +75,13 @@ coordinator's final CPU slot. The shared substrate and shape/adapter checks
 are recorded in their respective records; the coordinator must rerun the
 complete gate on one integrated commit.
 
+The six ledger rows now bind to actual Pages host-vs-facade parity tests:
+`pages_body_chart_font_read_parity`, `pages_body_chart_font_set_parity`,
+`pages_body_chart_font_reset_parity`, and the corresponding three
+`pages_body_chart_font_size_*` tests. Reads are Tier A; set/reset routes are
+Tier B for the documented fresh-UUID policy. All six have pending native queue
+rows; no E3/E4 evidence is claimed.
+
 An initial source-bound release probe binary was built but not executed; it
 was superseded by the final CPU5 source-bound build below:
 

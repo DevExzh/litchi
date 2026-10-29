@@ -401,6 +401,148 @@ fn pages_facade_size_set_reset_inverse_noop() -> TestResult {
     Ok(())
 }
 
+fn pages_facade_read_parity_case(
+    name: &'static str,
+    font: bool,
+    tier: Tier,
+    evidence: Evidence,
+) -> TestResult {
+    let (source, _target, chart) = pages_facade_fixture()?;
+    if font {
+        let host = pages_facade_host_font_read_route(&source, chart)?;
+        let leaf = pages_facade_read_font_route(&source)?;
+        assert_eq!(host.font().name(), leaf.font.name());
+        assert_eq!(host.bold(), leaf.bold);
+        assert_eq!(host.italic(), leaf.italic);
+    } else {
+        let host = pages_facade_host_size_read_route(&source, chart)?;
+        let leaf = pages_facade_read_size_route(&source)?;
+        assert_eq!(host.points(), leaf.points());
+    }
+    let fixture = crate::harness::Fixture {
+        path: "iwork/pages/chart-data-native.pages",
+        bytes: source,
+    };
+    let host = move |bytes: &[u8]| {
+        if font {
+            pages_facade_host_font_read_route(bytes, chart)?;
+        } else {
+            pages_facade_host_size_read_route(bytes, chart)?;
+        }
+        Ok(bytes.to_vec())
+    };
+    let leaf = move |bytes: &[u8]| {
+        if font {
+            pages_facade_read_font_route(bytes)?;
+        } else {
+            pages_facade_read_size_route(bytes)?;
+        }
+        Ok(LeafRun::output(bytes.to_vec()))
+    };
+    Case::new(name, Format::Pages, tier, evidence, &fixture)
+        .host(host)
+        .leaf(leaf)
+        .read_only()
+        .run()?;
+    Ok(())
+}
+
+fn pages_facade_write_parity_case(
+    name: &'static str,
+    change: Change,
+    tier: Tier,
+    evidence: Evidence,
+) -> TestResult {
+    let (source, target, chart) = pages_facade_fixture()?;
+    let host_output = host_write(&source, target, chart, &change)?;
+    let leaf_output = pages_facade_write_route(&source, &change)?;
+    assert_eq!(
+        host_read(&host_output, target, chart)?,
+        host_read(&leaf_output, target, chart)?,
+        "Pages host and facade outputs must agree on chart-font readback"
+    );
+    let fixture = crate::harness::Fixture {
+        path: "iwork/pages/chart-data-native.pages",
+        bytes: source,
+    };
+    let host_change = change.clone();
+    let leaf_change = change;
+    Case::new(name, Format::Pages, tier, evidence, &fixture)
+        .host(move |bytes| host_write(bytes, target, chart, &host_change))
+        .leaf(move |bytes| {
+            Ok(LeafRun::output(pages_facade_write_route(
+                bytes,
+                &leaf_change,
+            )?))
+        })
+        .read("Pages host chart-font readback", move |bytes| {
+            host_read(bytes, target, chart)
+        })
+        .leaf_structural_metadata()
+        .run()?;
+    Ok(())
+}
+
+#[test]
+fn pages_body_chart_font_read_parity() -> TestResult {
+    pages_facade_read_parity_case(
+        "pages_body_chart_font_read_parity",
+        true,
+        Tier::A,
+        Evidence::Queued,
+    )
+}
+
+#[test]
+fn pages_body_chart_font_set_parity() -> TestResult {
+    pages_facade_write_parity_case(
+        "pages_body_chart_font_set_parity",
+        Change::Font(facade_georgia()?),
+        Tier::B,
+        Evidence::Queued,
+    )
+}
+
+#[test]
+fn pages_body_chart_font_reset_parity() -> TestResult {
+    pages_facade_write_parity_case(
+        "pages_body_chart_font_reset_parity",
+        Change::ResetFont,
+        Tier::B,
+        Evidence::Queued,
+    )
+}
+
+#[test]
+fn pages_body_chart_font_size_read_parity() -> TestResult {
+    pages_facade_read_parity_case(
+        "pages_body_chart_font_size_read_parity",
+        false,
+        Tier::A,
+        Evidence::Queued,
+    )
+}
+
+#[test]
+fn pages_body_chart_font_size_set_parity() -> TestResult {
+    pages_facade_write_parity_case(
+        "pages_body_chart_font_size_set_parity",
+        Change::Size(TextPointSize::from_points(23.0)?),
+        Tier::B,
+        Evidence::Queued,
+    )
+}
+
+#[test]
+fn pages_body_chart_font_size_reset_parity() -> TestResult {
+    pages_facade_write_parity_case(
+        "pages_body_chart_font_size_reset_parity",
+        Change::ResetSize,
+        Tier::B,
+        Evidence::Queued,
+    )
+}
+
 #[inline(never)]
 fn pages_facade_read_font_route(source: &[u8]) -> TestResult<ChartFont> {
     Ok(PagesPackage::from_bytes(source)?.body_chart_font(BodyChartSelector::index(0))?)
