@@ -17,7 +17,10 @@
 - Adoption follow-up: `5888a2b4675e52aebe8e1182d49d20ea052b9de1` caches exact prepared registry inspection
   requirements and the inspected registry root, invalidating both caches on
   metadata changes. The final direct-engine fix does not alter facade budgets
-  or add default headroom.
+  or add default headroom. Commit `085eb46d55` adds the cache-accounting
+  repair: it charges the
+  compatibility work getter only for the next uncached inspection pass, while
+  metadata rewrites invalidate both caches.
 - Scope: shared chart-series symbol read/write admission, Numbers mechanical
   caller adoption, and the direct shared-engine parity caller. Pages and
   Keynote facade adoption remain owned by their work packages.
@@ -61,7 +64,12 @@ is an explicit follow-up gap, not a full Numbers facade-ledger qualification.
 
 ## Verification
 
-- `cargo test --offline -p litchi-iwa-style --lib`: 25 passed.
+- `cargo test --offline -p litchi-iwa-style --lib`: 30 passed.
+- `cargo test --offline -p litchi-iwa --test parity chart_font_cases -- --nocapture`:
+  29 passed, 13 ignored; Numbers, Pages, and Keynote chart-font parity and
+  low-budget controls pass.
+- `cargo test --offline -p litchi-numbers --test sheet_chart_font -- --nocapture`:
+  4 passed.
 - `cargo clippy --offline -p litchi-iwa-style --lib --all-features -- -D warnings`: pass.
 - `cargo check --offline -p litchi-numbers --lib`: pass.
 - `cargo clippy --offline -p litchi-numbers --lib --all-features -- -D warnings`: pass.
