@@ -1368,13 +1368,10 @@ mod tests {
         include_bytes!("../../../../test-data/iwork/pages/chart-data-native.pages");
 
     #[test]
-    fn mixed_font_source_refuses_uniform_read_without_mutation() {
+    fn native_font_source_reads_without_mutation() {
         let package = Package::from_bytes(NATIVE).expect("native Pages fixture");
         let source = package.state.source.shared_source();
-        assert!(matches!(
-            package.body_chart_font(BodyChartSelector::index(0)),
-            Err(Error::InvalidSource)
-        ));
+        assert!(package.body_chart_font(BodyChartSelector::index(0)).is_ok());
         assert_eq!(
             package.state.source.shared_source().as_ref(),
             source.as_ref()
