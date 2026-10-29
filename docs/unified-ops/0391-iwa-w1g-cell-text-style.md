@@ -1,22 +1,19 @@
 # 0391 — W1-G: shared whole-cell text-style substrate
 
-- Status: Numbers-first substrate and proof repair are complete on the
-  isolated WP. Pages and Keynote facades are not started, no ledger rows are
-  migrated, and no native acceptance claim is active. The current code/probe
-  tip is `715f001da2`; release-mode instruction capture remains coordinator-
-  gated and has not started.
+- Status: Numbers-first substrate and proof repair remain isolated on the WP.
+  Pages and Keynote facades are not started, no ledger rows are migrated, and
+  no native acceptance claim is active. The current code tip is
+  `74651bb4ba`; release-mode instruction capture remains coordinator-gated and
+  has not started.
 - Source branch: `uo2/iwa-w1g-cell-text-style`, cut from frozen root
   `1e3978082bd8e576f0afeb7e3eebac1ca3908d86`, then synchronized with frozen
-  trunk 24ecfb543748885192b8fb5273abb54e669764c6.
-- Continuation commits: trunk merge `d220cd76ed`, budget admission
-  `beb878ea23`, codec-allocation pre-admission `36be343a42`, residual
-  closure `3bfb0c6319`, proof checkpoint `d5abe8856a`, and final residual
-  preflight/proof repair `62e6b27aae` plus parent-reference accounting
-  `126b1dd7ce`, repeated-parser accounting `3a8313257c`, terminal-error plus
-  exclusive-path repair `f616f4315e`, and mutation-output admission
-  `a6f1723ac4` plus bounded wire rewrite/batch closure `2e4a784a99` and
-  identity/unknown-preservation proof `ef2187916d`, and paragraph-field
-  precondition proof `daed5d99c3`.
+  trunk `738be22a1a`.
+- Continuation commits: the current WP includes F's reviewed metadata
+  transition `b9337962b9` through merge `8662fa8ecd`, staged-budget/readback
+  repair `76cfbf3afb`, current frozen-root merge `2eb913a401`, and prepared
+  multi-stylesheet/segmented-list plus publication-admission closure
+  `74651bb4ba`. Earlier budget, parser, exclusive-path, mutation-output and
+  identity/unknown-preservation checkpoints remain in history.
 - Scope: shared `litchi-iwa-table::cell_text_style` graph reads and direct
   `CharacterProperties` planning, plus the Numbers read and single-cell
   adapter path. Existing public Numbers selectors and vocabulary remain
@@ -80,22 +77,22 @@ out of scope.
 
 ## Verification and remaining work
 
-The current scoped gates pass: 47 shared table unit tests (including
+The current focused checks pass: 13 shared table unit tests (including
 duplicate/unknown locality, nested-font pre-admission, residual BNC fields,
-zero ceilings and low field/work/allocation cases), seven Numbers
-`cell_text_style` tests, formatting, strict Clippy for both crates, and the
-affected fuzz locks. `python3 tools/test_no_3rdparty_references.py`,
-`python3 tools/iwa_exit_ledger.py --check`, and
-  `python3 tools/check_crate_boundaries.py`, the API glossary tests, and strict
-  rustdoc for the two affected crates also pass. The litchi fuzz lock
-records its existing `litchi-iwa-text-wire` dependency in this source commit;
-the generated fuzz targets are kept outside the checkout.
+zero ceilings and low field/work/allocation cases), eight Numbers
+`cell_text_style` tests, formatting, and strict Clippy for both crates. The
+workspace-level glossary, boundary, ledger and fuzz gates remain coordinator
+checks on the integrated candidate. The broader
+`test_no_3rdparty_references`, ledger, boundary, glossary, rustdoc and
+fuzz-lock results from the prior checkpoint are not reissued as current-source
+qualification here; the coordinator must rerun them on the integrated
+candidate. The generated fuzz targets remain outside the checkout.
 
-The current Numbers proof rerun passes the existing 17-property host
-set/reset/read vectors and the populated-reader differential: 595 direct
-semantic reads compare host and leaf values. The two focused parity cases pass
-on the current source. A source-built shared-key fixture now drives the actual
-Numbers publisher: two cells share one style key, both are changed, the
+The prior Numbers proof rerun covered the 17-property host set/reset/read
+vectors and the populated-reader differential (595 direct semantic reads);
+those receipts are historical until rerun on the integrated candidate. The
+current eight-case Numbers suite includes the shared-key publisher path: two
+cells share one style key, both are changed, the
 candidate is reopened and read directly, the old key is released, an
 unrelated cell remains unchanged, inverse bytes equal the source, and an
 effective-style no-op preserves candidate bytes. The shared planner test also
@@ -134,13 +131,15 @@ The current source contains three dedicated, non-inline ignored routes in
 The source builder is outside the measured wrappers. It retains a valid
 Numbers registry, uses the modern tile storage fields, and leaves the
 selected cells/style graph source-relative without quota-padding fixture
-members. Metadata growth admission is F-owned and remains pending review.
+members. The reviewed F metadata transition is present in this WP; final
+integrated qualification still owns the combined metadata/publication budget.
 Each route performs host/leaf reopen/readback,
 locality, refcount/identity, and inverse checks before its exact
 host/leaf/leaf/host wrapper calls. The batch route now prepares the shared
 table/tile/style graph once, batches tile-key publication and batches
-readback preparation; it completed the 1,000-cell correctness route on this
-source. The final explicit run on this source was:
+readback preparation. A temporary current-source leaf-only checkpoint passed
+the unpadded 1,000-cell route after `74651bb4ba`; the host loop has not been
+rerun after these repairs. The last explicit full route on this source was:
 
 ```text
 cargo test --offline -p litchi-iwa --test parity \
