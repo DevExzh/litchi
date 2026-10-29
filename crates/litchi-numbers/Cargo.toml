@@ -121,6 +121,22 @@ path = "examples/edit_sheet_drawable_comment.rs"
 name = "create_numbers_sparse_table"
 path = "examples/create_numbers_sparse_table.rs"
 
+[[example]]
+name = "add_numbers_table"
+path = "examples/add_numbers_table.rs"
+
+[[example]]
+name = "duplicate_numbers_table"
+path = "examples/duplicate_numbers_table.rs"
+
+[[example]]
+name = "resize_numbers_table"
+path = "examples/resize_numbers_table.rs"
+
+[[example]]
+name = "remove_numbers_table"
+path = "examples/remove_numbers_table.rs"
+
 [features]
 default = []
 internal-iwork-source = []
