@@ -7385,3 +7385,23 @@ See [0063](0063-source-pptx-modern-comments.md).
   Numbers symbol ledger dispositions remain unchanged and native evidence
   remains pending. Generic non-symbol series families are not claimed by
   this caller-proof slice.
+
+- Numbers integration `b843857a8f` passed workspace compilation, all 20
+  locked fuzz checks, boundaries, ledger and clean-source checks. The merged
+  Numbers and shared-symbol worktrees/branches were retired normally,
+  bringing totals to 62 worktrees and 55 branches. Their disposable caches
+  added 58,959,192,354 logical bytes to cleanup; the measured cumulative total
+  is 252,974,444,016 bytes (about 235.60 GiB). Qualified binaries, raw captures,
+  manifests and helper evidence remained hash-exact.
+- Accepted Keynote `27f088b40a` (record 0401), synchronized with b843 and
+  retaining the canonical shared graph plus the component-count guard and G
+  finish control. The selector-first symbol family uses prepared publication
+  admission, exact source patches and retained-Arc apply, with typed physical,
+  detection, semantic and payload errors. The existing font serializer path
+  retains its behavior through a shared reassembly helper.
+- Keynote's scoped source `babab049df` passed four instruction routes/eight
+  two-call captures, independently audited. Leaf/host ratios are 0.122133,
+  0.170940, 0.122081 and 0.143481. Registry columns correctly distinguish leaf
+  and host; the reduced receipt now labels validator-code and validator-output
+  hashes separately. Four Keynote ledger rows migrate with four native routes
+  still pending. No final integrated performance or native claim is made.

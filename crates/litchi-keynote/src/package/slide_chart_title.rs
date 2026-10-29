@@ -966,7 +966,7 @@ fn charge_selector_allocation(
     if bytes == 0 {
         budget.charge_reference_vector(0)
     } else {
-        budget.charge_reference_vector(units.max(1))
+        budget.charge_reference_vector(units)
     }
 }
 
@@ -2015,7 +2015,7 @@ impl AxisSupportBudget for ChartGraphScanBudget {
         let bytes = capacity
             .checked_mul(size_of::<u64>())
             .ok_or(AxisSupportError::InvalidSource)?;
-        self.charge(bytes.max(1))
+        self.charge(bytes)
             .map_err(chart_axis_support::map_chart_title_error)
     }
 
@@ -3080,13 +3080,11 @@ fn read_chart_title_with_budget(
     let worst_fields = extension
         .len()
         .checked_mul(4)
-        .ok_or(AxisSupportError::InvalidSource)?
-        .max(1);
+        .ok_or(AxisSupportError::InvalidSource)?;
     let worst_work = extension
         .len()
         .checked_mul(8)
-        .ok_or(AxisSupportError::InvalidSource)?
-        .max(1);
+        .ok_or(AxisSupportError::InvalidSource)?;
     budget.charge_input(extension.len())?;
     budget.finish_wire_scan(worst_fields)?;
     budget.charge_work(
