@@ -289,7 +289,7 @@ impl Limits {
         Ok(())
     }
 
-    fn charge_input(&self, amount: usize) -> Result<(), Error> {
+    pub(crate) fn charge_input(&self, amount: usize) -> Result<(), Error> {
         Self::charge(
             &self.remaining_input,
             self.wire.max_input_bytes(),
@@ -298,7 +298,7 @@ impl Limits {
         )
     }
 
-    fn charge_fields(&self, amount: usize) -> Result<(), Error> {
+    pub(crate) fn charge_fields(&self, amount: usize) -> Result<(), Error> {
         Self::charge(
             &self.remaining_fields,
             self.wire.max_fields(),
@@ -324,7 +324,7 @@ impl Limits {
         Ok(wire)
     }
 
-    fn residual_wire(&self) -> Result<WireLimits, Error> {
+    pub(crate) fn residual_wire(&self) -> Result<WireLimits, Error> {
         let input = self.remaining_input.get();
         let fields = self.remaining_fields.get();
         let output = self.remaining_output.get();
