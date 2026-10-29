@@ -75,7 +75,8 @@ Legacy `Workspace::new` remains unchanged.
 
 Implementation commits: `bd2d138a07`, overflow-checked follow-up
 `c50fcaf8db`, final lint/documentation fix `54ebd2782f`, focused ceiling
-evidence `f2eae5798d`, and bounded construction `f9512e398f` (on top of
+evidence `f2eae5798d`, bounded construction `f9512e398f`, and the census
+identity guard `0975944a5a` (on top of
 coordinator freeze merge `2f1f7a8a78`).
 
 ## Correctness and evidence boundary
