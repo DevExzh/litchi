@@ -3,9 +3,16 @@
 
 use std::path::PathBuf;
 
+use litchi_iwa_archive::{
+    Limits as ArchiveLimits,
+    package::{Catalog, EntryEdit},
+};
+use litchi_iwa_core::{Archive, SnappyStream};
+use litchi_iwa_protos::tst;
 use litchi_numbers::cell::text_style::{CharacterProperties, Error};
 use litchi_numbers::table::cells::Input;
 use litchi_numbers::{At, Package};
+use prost::Message as _;
 
 type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
 
@@ -19,6 +26,239 @@ fn bold() -> CharacterProperties {
     let mut properties = CharacterProperties::new();
     properties.bold = Some(true);
     properties
+}
+
+fn shared_text_style_source() -> TestResult<Vec<u8>> {
+    const TABLE_MODEL: u32 = 6_001;
+    const TILE: u32 = 6_002;
+    const LIST: u32 = 6_005;
+    let source = std::fs::read(
+        PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../../test-data/iwork/numbers/basic.numbers"),
+    )?;
+    let catalog = Catalog::from_bytes(&source, ArchiveLimits::default())?;
+    let mut style_list_id = None;
+    let mut style_id = None;
+    for entry in catalog
+        .iter()
+        .filter(|entry| entry.name().ends_with(".iwa"))
+    {
+        let bytes = SnappyStream::decompress(entry.data(), Default::default())?;
+        let archive = Archive::parse(bytes.as_bytes(), Default::default())?;
+        for object in &archive.objects {
+            for message in &object.messages {
+                if message.type_ == TABLE_MODEL {
+                    let model = tst::TableModelArchive::decode(message.data.as_slice())?;
+                    style_list_id = Some(model.base_data_store.style_table.identifier);
+                    style_id = Some(model.body_text_style.identifier);
+                }
+            }
+        }
+    }
+    let style_list_id = style_list_id.ok_or("missing style-list reference")?;
+    let style_id = style_id.ok_or("missing body text-style reference")?;
+    let style_entry = catalog
+        .iter()
+        .find(|entry| {
+            let Ok(bytes) = SnappyStream::decompress(entry.data(), Default::default()) else {
+                return false;
+            };
+            let Ok(archive) = Archive::parse(bytes.as_bytes(), Default::default()) else {
+                return false;
+            };
+            archive
+                .objects
+                .iter()
+                .any(|object| object.archive_info.identifier == Some(style_list_id))
+        })
+        .ok_or("missing style-list member")?;
+    let style_member = style_entry.name().to_owned();
+    let style_bytes = SnappyStream::decompress(style_entry.data(), Default::default())?;
+    let mut style_archive = Archive::parse(style_bytes.as_bytes(), Default::default())?;
+    let style_object = style_archive
+        .objects
+        .iter_mut()
+        .find(|object| object.archive_info.identifier == Some(style_list_id))
+        .ok_or("missing style-list object")?;
+    let style_message = style_object
+        .messages
+        .iter_mut()
+        .find(|message| message.type_ == LIST)
+        .ok_or("missing style-list payload")?;
+    let mut style_list = tst::TableDataList::decode(style_message.data.as_slice())?;
+    style_list.list_type = tst::table_data_list::ListType::Style as i32;
+    let shared_key = style_list
+        .entries
+        .iter()
+        .map(|entry| entry.key)
+        .max()
+        .unwrap_or(0)
+        .saturating_add(1);
+    style_list.next_list_id = shared_key.saturating_add(1);
+    style_list.entries.push(tst::table_data_list::ListEntry {
+        key: shared_key,
+        refcount: 2,
+        reference: Some(litchi_iwa_protos::tsp::Reference {
+            identifier: style_id,
+            ..Default::default()
+        }),
+        ..Default::default()
+    });
+    style_message.data = style_list.encode_to_vec();
+    if let Some(info) = style_object.archive_info.message_infos.first_mut() {
+        if !info.object_references.contains(&style_id) {
+            info.object_references.push(style_id);
+        }
+    }
+    let style_compressed = SnappyStream::compress(
+        &style_archive.to_bytes(Default::default())?,
+        Default::default(),
+    )?;
+
+    let tile_entry = catalog
+        .iter()
+        .find(|entry| entry.name() == "Index/Tables/Tile.iwa")
+        .ok_or("missing tile member")?;
+    let tile_bytes = SnappyStream::decompress(tile_entry.data(), Default::default())?;
+    let mut tile_archive = Archive::parse(tile_bytes.as_bytes(), Default::default())?;
+    let tile_message = tile_archive
+        .objects
+        .iter_mut()
+        .flat_map(|object| object.messages.iter_mut())
+        .find(|message| message.type_ == TILE)
+        .ok_or("missing tile payload")?;
+    let mut tile = tst::Tile::decode(tile_message.data.as_slice())?;
+    let mut changed = 0_usize;
+    for row in &mut tile.row_infos {
+        if changed == 2 || row.cell_count == 0 {
+            continue;
+        }
+        let Some(storage) = row.cell_storage_buffer.clone() else {
+            continue;
+        };
+        let Some(offsets) = row.cell_offsets.clone() else {
+            continue;
+        };
+        let unit = if row.has_wide_offsets == Some(true) {
+            4
+        } else {
+            1
+        };
+        let slots = offsets.len() / 2;
+        let present = (0..slots)
+            .filter(|index| {
+                u16::from_le_bytes([offsets[index * 2], offsets[index * 2 + 1]]) != u16::MAX
+            })
+            .collect::<Vec<_>>();
+        if present.is_empty() {
+            continue;
+        }
+        let mut cells = vec![None; slots];
+        for (position, index) in present.iter().enumerate() {
+            let begin = usize::from(u16::from_le_bytes([
+                offsets[index * 2],
+                offsets[index * 2 + 1],
+            ])) * unit;
+            let end = present
+                .get(position + 1)
+                .map(|next| {
+                    usize::from(u16::from_le_bytes([
+                        offsets[next * 2],
+                        offsets[next * 2 + 1],
+                    ])) * unit
+                })
+                .unwrap_or(storage.len());
+            cells[*index] = Some(storage.get(begin..end).ok_or("invalid tile span")?.to_vec());
+        }
+        let first = present[0];
+        let mut cell = litchi_numbers_wire::BncCell::parse(
+            cells[first].as_deref().ok_or("missing materialized cell")?,
+            &litchi_numbers_wire::Limits::DEFAULT,
+        )?;
+        cell.set_text_style_identifier(Some(shared_key));
+        cells[first] = Some(cell.encode(&litchi_numbers_wire::Limits::DEFAULT)?);
+        let mut rewritten_storage = Vec::new();
+        let mut rewritten_offsets = Vec::new();
+        for cell in cells {
+            if let Some(cell) = cell {
+                let offset = u16::try_from(rewritten_storage.len() / unit)?;
+                rewritten_offsets.extend_from_slice(&offset.to_le_bytes());
+                rewritten_storage.extend_from_slice(&cell);
+                while rewritten_storage.len() % unit != 0 {
+                    rewritten_storage.push(0);
+                }
+            } else {
+                rewritten_offsets.extend_from_slice(&u16::MAX.to_le_bytes());
+            }
+        }
+        row.cell_storage_buffer = Some(rewritten_storage.clone());
+        row.cell_offsets = Some(rewritten_offsets.clone());
+        row.cell_storage_buffer_pre_bnc = rewritten_storage;
+        row.cell_offsets_pre_bnc = rewritten_offsets;
+        changed += 1;
+    }
+    assert_eq!(changed, 2, "source helper needs two materialized rows");
+    tile_message.data = tile.encode_to_vec();
+    let tile_compressed = SnappyStream::compress(
+        &tile_archive.to_bytes(Default::default())?,
+        Default::default(),
+    )?;
+    Ok(catalog.reassemble_to_bytes(
+        &[
+            EntryEdit::new(&style_member, &style_compressed),
+            EntryEdit::new("Index/Tables/Tile.iwa", &tile_compressed),
+        ],
+        ArchiveLimits::default(),
+    )?)
+}
+
+fn style_entries(bytes: &[u8]) -> TestResult<Vec<(u32, u32)>> {
+    const TABLE_MODEL: u32 = 6_001;
+    const LIST: u32 = 6_005;
+    let catalog = Catalog::from_bytes(bytes, ArchiveLimits::default())?;
+    let mut style_list_id = None;
+    for entry in catalog
+        .iter()
+        .filter(|entry| entry.name().ends_with(".iwa"))
+    {
+        let bytes = SnappyStream::decompress(entry.data(), Default::default())?;
+        let archive = Archive::parse(bytes.as_bytes(), Default::default())?;
+        for object in &archive.objects {
+            for message in &object.messages {
+                if message.type_ == TABLE_MODEL {
+                    style_list_id = Some(
+                        tst::TableModelArchive::decode(message.data.as_slice())?
+                            .base_data_store
+                            .style_table
+                            .identifier,
+                    );
+                }
+            }
+        }
+    }
+    let style_list_id = style_list_id.ok_or("missing style-list reference")?;
+    for entry in catalog
+        .iter()
+        .filter(|entry| entry.name().ends_with(".iwa"))
+    {
+        let bytes = SnappyStream::decompress(entry.data(), Default::default())?;
+        let archive = Archive::parse(bytes.as_bytes(), Default::default())?;
+        for object in &archive.objects {
+            if object.archive_info.identifier != Some(style_list_id) {
+                continue;
+            }
+            for message in &object.messages {
+                if message.type_ == LIST {
+                    return Ok(tst::TableDataList::decode(message.data.as_slice())?
+                        .entries
+                        .into_iter()
+                        .map(|entry| (entry.key, entry.refcount))
+                        .collect());
+                }
+            }
+        }
+    }
+    Err("missing style-list payload".into())
 }
 
 #[test]
@@ -91,6 +331,70 @@ fn cells_take_text_styles_on_a_created_workbook() -> TestResult {
     assert_eq!(
         rewritten.table_cell_text_style(0, 0, At::new(2, 1))?.bold,
         Some(true)
+    );
+    Ok(())
+}
+
+#[test]
+fn shared_style_key_publishes_reopens_reads_and_reverses_exactly() -> TestResult {
+    let source = shared_text_style_source()?;
+    assert!(
+        style_entries(&source)?.contains(&(1, 2)),
+        "source helper must publish one shared key"
+    );
+    let package = Package::from_bytes(&source)?;
+    let first = At::new(1, 1);
+    let second = At::new(2, 1);
+    let sibling = At::new(1, 2);
+    let before_sibling = package.table_cell_text_style(0, 0, sibling)?;
+    assert_eq!(
+        package.table_cell_text_style(0, 0, first)?,
+        package.table_cell_text_style(0, 0, second)?,
+        "shared-key cells have the same direct read"
+    );
+    let mut requested = CharacterProperties::new();
+    requested.size = Some(73.0);
+    let commit = package
+        .edit_table_cell_text_style(0, 0)?
+        .set(first, requested.clone())?
+        .set(second, requested.clone())?
+        .commit()?;
+    let candidate_bytes = bytes(commit.package())?;
+    assert!(
+        !style_entries(&candidate_bytes)?
+            .iter()
+            .any(|(key, _)| *key == 1),
+        "the shared source key is released after both cells move"
+    );
+    let reopened = Package::from_bytes(&candidate_bytes)?;
+    for position in [first, second] {
+        assert_eq!(
+            reopened.table_cell_text_style(0, 0, position)?.size,
+            Some(73.0)
+        );
+    }
+    assert_eq!(
+        reopened.table_cell_text_style(0, 0, sibling)?,
+        before_sibling,
+        "an unrelated cell remains unchanged"
+    );
+    let restored = commit
+        .package()
+        .apply_table_cell_text_style(&commit.patch().inverse())?;
+    assert_eq!(
+        bytes(restored.package())?,
+        source,
+        "inverse is exact-source"
+    );
+    let current = reopened.table_cell_text_style(0, 0, first)?;
+    let noop = reopened
+        .edit_table_cell_text_style(0, 0)?
+        .set(first, current)?
+        .commit()?;
+    assert_eq!(
+        bytes(noop.package())?,
+        candidate_bytes,
+        "setting the effective style is an exact no-op"
     );
     Ok(())
 }

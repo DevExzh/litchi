@@ -35,7 +35,6 @@ const MODEL_HEADER_ROWS: u32 = 9;
 const MODEL_HEADER_COLUMNS: u32 = 10;
 const MODEL_FOOTER_ROWS: u32 = 11;
 const STORE_TILES: u32 = 3;
-const MAX_CHARACTER_STYLE_ALLOCATIONS: usize = 8;
 
 /// One table cell selected by a leaf facade.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
@@ -311,6 +310,15 @@ impl Limits {
         )
     }
 
+    fn charge_output(&self, amount: usize) -> Result<(), Error> {
+        Self::charge(
+            &self.remaining_output,
+            self.wire.max_output_bytes(),
+            amount,
+            LimitKind::OutputBytes,
+        )
+    }
+
     fn residual_wire(&self) -> Result<WireLimits, Error> {
         let input = self.remaining_input.get();
         let fields = self.remaining_fields.get();
@@ -519,33 +527,50 @@ fn view<'a>(data: &'a [u8], limits: &Limits) -> Result<WireView<'a>, Error> {
     WireView::parse(data, wire).map_err(map_wire)
 }
 
-fn preflight_codec(data: &[u8], limits: &Limits) -> Result<WireLimits, Error> {
+fn preflight_character_properties(data: &[u8], limits: &Limits) -> Result<WireLimits, Error> {
     let wire = limits.residual_wire()?;
-    if data.len() > limits.remaining_input.get() {
-        return Err(Error::Limit {
-            kind: LimitKind::InputBytes,
-            observed: data.len() as u64,
-            maximum: limits.remaining_input.get() as u64,
-        });
+    let root = view(data, limits)?;
+    for field in root.fields() {
+        if field.number() != 11 || field.wire_type() != 2 {
+            continue;
+        }
+        let properties = view(field.payload(), limits)?;
+        for property in properties.fields() {
+            match (property.number(), property.wire_type()) {
+                (5, 2) => {
+                    // character_style_properties() owns this String before
+                    // it returns, so reserve its resource units first.
+                    limits.charge_output(property.payload().len())?;
+                    limits.admit_allocations(1)?;
+                    limits.admit_copies(property.payload().len())?;
+                },
+                (7, 2) => {
+                    // The decoder descends into each colour message with a
+                    // separate bounded view and span allocation.
+                    let _ = view(property.payload(), limits)?;
+                },
+                _ => {},
+            }
+        }
     }
-    let raw_limits = RawWireLimits::new(
-        limits.remaining_input.get().max(1),
-        limits.remaining_fields.get().max(1),
-        wire.max_nesting(),
-        limits.remaining_work.get().max(1),
-    )
-    .map_err(map_wire)?;
-    let mut fields = RawWireFields::new(data, raw_limits);
-    while fields.next().map_err(map_wire)?.is_some() {}
-    limits.charge_input(data.len())?;
-    limits.charge_fields(fields.fields())?;
-    limits.charge_work(fields.work())?;
-    let nested_fields = data.len().saturating_sub(fields.fields());
-    let nested_work = data.len().saturating_sub(fields.work());
-    limits.charge_fields(nested_fields)?;
-    limits.charge_work(nested_work)?;
-    limits.admit_allocations(MAX_CHARACTER_STYLE_ALLOCATIONS)?;
-    limits.admit_copies(data.len())?;
+    Ok(wire)
+}
+
+fn preflight_character_parent(data: &[u8], limits: &Limits) -> Result<WireLimits, Error> {
+    let wire = limits.residual_wire()?;
+    let root = view(data, limits)?;
+    for field in root.fields() {
+        if field.number() != 1 || field.wire_type() != 2 {
+            continue;
+        }
+        let base = view(field.payload(), limits)?;
+        for base_field in base.fields() {
+            if base_field.number() == 3 && base_field.wire_type() == 2 {
+                // reference_identifier() performs this source-bound view.
+                let _ = view(base_field.payload(), limits)?;
+            }
+        }
+    }
     Ok(wire)
 }
 
@@ -791,11 +816,7 @@ fn bnc_limits(data: &[u8], limits: &Limits) -> Result<BncLimits, Error> {
     BncLimits::from_wire_limits(wire)
         .with_input_bytes(data.len())
         .and_then(|value| {
-            value.with_tail_bytes(
-                data.len()
-                    .min(wire.max_input_bytes())
-                    .min(BncLimits::MAX_TAIL_BYTES),
-            )
+            value.with_tail_bytes(wire.max_input_bytes().min(BncLimits::MAX_TAIL_BYTES))
         })
         .and_then(|value| value.with_items(wire.max_rewrite_work().clamp(1, BncLimits::MAX_ITEMS)))
         .map_err(|_| invalid("invalid BNC operation limits"))
@@ -830,7 +851,14 @@ fn map_bnc(error: litchi_numbers_wire::Error) -> Error {
 
 fn style_key(cell: Option<&[u8]>, limits: &Limits) -> Result<Option<u32>, Error> {
     let Some(cell) = cell else { return Ok(None) };
+    limits.charge_input(cell.len())?;
     limits.charge_work(cell.len())?;
+    let field_count = if cell.len() >= 12 {
+        u32::from_le_bytes([cell[8], cell[9], cell[10], cell[11]]).count_ones() as usize
+    } else {
+        0
+    };
+    limits.charge_fields(field_count)?;
     limits.admit_allocations(litchi_numbers_wire::MAX_OWNED_BNC_PARSE_ALLOCATIONS)?;
     limits.admit_copies(cell.len())?;
     let bnc_limits = bnc_limits(cell, limits)?;
@@ -988,13 +1016,17 @@ pub fn effective(
             return Err(invalid("character-style parent cycle"));
         }
         let payload = style_payload(source, identifier, limits)?;
-        let wire = preflight_codec(payload, limits)?;
+        let wire = preflight_character_properties(payload, limits)?;
         let decoded = litchi_iwa_text_wire::character_style_properties(payload, wire)
             .map_err(map_char_style)?;
-        limits.admit_character_properties(&decoded)?;
-        limits.admit_character_properties(&properties)?;
+        if properties.font_name.is_none() {
+            if let Some(font_name) = decoded.font_name.as_deref() {
+                limits.admit_allocations(1)?;
+                limits.admit_copies(font_name.len())?;
+            }
+        }
         properties.inherit(&decoded);
-        let parent_wire = preflight_codec(payload, limits)?;
+        let parent_wire = preflight_character_parent(payload, limits)?;
         current = litchi_iwa_text_wire::character_style_parent(payload, parent_wire)
             .map_err(map_char_style)?;
     }
@@ -1566,7 +1598,6 @@ fn style_is_exclusive(
     list: u64,
     limits: &Limits,
 ) -> Result<bool, Error> {
-    let mut found = false;
     for component in source.catalog().iter() {
         for object in &component.archive().objects {
             let identifier = object.archive_info.identifier.unwrap_or_default();
@@ -1574,9 +1605,23 @@ fn style_is_exclusive(
                 continue;
             }
             limits.charge_work(object.messages.len())?;
-            limits.charge_work(object.archive_info.message_infos.len())?;
+            // This metadata walk examines every message-info, field-info and
+            // reference once; the work charge covers the same traversal that
+            // the ownership predicate performs below.
+            let mut references = 0_usize;
+            let mut references_style = false;
             for info in &object.archive_info.message_infos {
-                let mut references = info.object_references.len();
+                limits.charge_work(1)?;
+                references =
+                    references
+                        .checked_add(info.object_references.len())
+                        .ok_or(Error::Limit {
+                            kind: LimitKind::Fields,
+                            observed: u64::MAX,
+                            maximum: limits.max_references as u64,
+                        })?;
+                limits.charge_work(info.object_references.len())?;
+                references_style |= info.object_references.contains(&style);
                 for field in &info.field_infos {
                     references = references
                         .checked_add(field.object_references.len())
@@ -1585,21 +1630,19 @@ fn style_is_exclusive(
                             observed: u64::MAX,
                             maximum: limits.max_references as u64,
                         })?;
+                    limits.charge_work(1)?;
+                    limits.charge_work(field.object_references.len())?;
+                    references_style |= field.object_references.contains(&style);
                 }
-                limits.charge_references(references)?;
             }
-            if object.archive_info.message_infos.iter().any(|info| {
-                info.object_references.contains(&style)
-                    || info
-                        .field_infos
-                        .iter()
-                        .any(|field| field.object_references.contains(&style))
-            }) {
+            limits.charge_references(references)?;
+            if references_style {
                 return Ok(false);
             }
+            limits.charge_work(object.messages.len())?;
             for message in &object.messages {
                 if message.type_ == PARAGRAPH_STYLE_MESSAGE_TYPE {
-                    let wire = preflight_codec(&message.data, limits)?;
+                    let wire = preflight_character_parent(&message.data, limits)?;
                     if litchi_iwa_text_wire::character_style_parent(&message.data, wire)
                         .map_err(map_char_style)?
                         == Some(style)
@@ -1608,17 +1651,27 @@ fn style_is_exclusive(
                     }
                 }
             }
-            found = true;
         }
     }
-    let _ = found;
     Ok(true)
 }
 
 #[cfg(test)]
 mod tests {
+    use litchi_iwa_archive::{
+        Limits as ArchiveLimits,
+        package::{Catalog, EntryEdit},
+    };
+    use litchi_iwa_core::{Archive, SnappyStream};
+    use litchi_iwa_protos::tst;
+    use prost::Message as _;
+
     use super::minimal;
-    use super::{Error, Limits, TableSource, varint, view};
+    use super::{
+        Error, LIST_MESSAGE_TYPE, LimitKind, Limits, Request, TABLE_MODEL_MESSAGE_TYPE,
+        TILE_MESSAGE_TYPE, Table, TableSource, Target, locate_cell, plan_set_many,
+        preflight_character_properties, style_key, varint, view,
+    };
     use litchi_iwa_text_wire::CharacterProperties;
 
     struct LimitedSource {
@@ -1699,6 +1752,202 @@ mod tests {
         }
     }
 
+    fn limited_source_bytes(
+        bytes: &[u8],
+        max_objects: usize,
+        max_references: usize,
+    ) -> LimitedSource {
+        LimitedSource {
+            catalog: litchi_iwa_archive::SourceCatalog::from_bytes(
+                bytes,
+                litchi_iwa_archive::Limits::default(),
+            )
+            .expect("catalog"),
+            max_objects,
+            max_references,
+        }
+    }
+
+    fn source_with_shared_style_key() -> Vec<u8> {
+        let source = std::fs::read(
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("../../test-data/iwork/numbers/basic.numbers"),
+        )
+        .expect("basic fixture");
+        let catalog = Catalog::from_bytes(&source, ArchiveLimits::default()).expect("catalog");
+        let mut style_list_id = None;
+        let mut style_id = None;
+        for entry in catalog
+            .iter()
+            .filter(|entry| entry.name().ends_with(".iwa"))
+        {
+            let bytes = SnappyStream::decompress(entry.data(), Default::default())
+                .expect("decompress component");
+            let archive = Archive::parse(bytes.as_bytes(), Default::default()).expect("archive");
+            for object in &archive.objects {
+                for message in &object.messages {
+                    if message.type_ == TABLE_MODEL_MESSAGE_TYPE {
+                        let model =
+                            tst::TableModelArchive::decode(message.data.as_slice()).expect("model");
+                        style_list_id = Some(model.base_data_store.style_table.identifier);
+                        style_id = Some(model.body_text_style.identifier);
+                    }
+                }
+            }
+        }
+        let style_list_id = style_list_id.expect("style-list reference");
+        let style_id = style_id.expect("body style reference");
+        let style_entry = catalog
+            .iter()
+            .find(|entry| {
+                let Ok(bytes) = SnappyStream::decompress(entry.data(), Default::default()) else {
+                    return false;
+                };
+                let Ok(archive) = Archive::parse(bytes.as_bytes(), Default::default()) else {
+                    return false;
+                };
+                archive
+                    .objects
+                    .iter()
+                    .any(|object| object.archive_info.identifier == Some(style_list_id))
+            })
+            .expect("style-list member");
+        let style_member = style_entry.name().to_owned();
+        let style_bytes = SnappyStream::decompress(style_entry.data(), Default::default())
+            .expect("decompress style member");
+        let mut style_archive =
+            Archive::parse(style_bytes.as_bytes(), Default::default()).expect("style archive");
+        let style_object = style_archive
+            .objects
+            .iter_mut()
+            .find(|object| object.archive_info.identifier == Some(style_list_id))
+            .expect("style-list object");
+        let style_message = style_object
+            .messages
+            .iter_mut()
+            .find(|message| message.type_ == LIST_MESSAGE_TYPE)
+            .expect("style-list message");
+        let mut style_list =
+            tst::TableDataList::decode(style_message.data.as_slice()).expect("style list");
+        style_list.list_type = tst::table_data_list::ListType::Style as i32;
+        let style_key = style_list
+            .entries
+            .iter()
+            .map(|entry| entry.key)
+            .max()
+            .unwrap_or(0)
+            .saturating_add(1);
+        style_list.next_list_id = style_key.saturating_add(1);
+        style_list.entries.push(tst::table_data_list::ListEntry {
+            key: style_key,
+            refcount: 2,
+            reference: Some(litchi_iwa_protos::tsp::Reference {
+                identifier: style_id,
+                ..Default::default()
+            }),
+            ..Default::default()
+        });
+        style_message.data = style_list.encode_to_vec();
+        if let Some(info) = style_object.archive_info.message_infos.first_mut() {
+            if !info.object_references.contains(&style_id) {
+                info.object_references.push(style_id);
+            }
+        }
+        let style_compressed = SnappyStream::compress(
+            &style_archive
+                .to_bytes(Default::default())
+                .expect("style encode"),
+            Default::default(),
+        )
+        .expect("compress style member");
+
+        let tile_entry = catalog
+            .iter()
+            .find(|entry| entry.name() == "Index/Tables/Tile.iwa")
+            .expect("tile fixture");
+        let tile_bytes = SnappyStream::decompress(tile_entry.data(), Default::default())
+            .expect("decompress tile");
+        let mut archive =
+            Archive::parse(tile_bytes.as_bytes(), Default::default()).expect("tile archive");
+        let tile_message = archive
+            .objects
+            .iter_mut()
+            .flat_map(|object| object.messages.iter_mut())
+            .find(|message| message.type_ == TILE_MESSAGE_TYPE)
+            .expect("tile message");
+        let mut tile = tst::Tile::decode(tile_message.data.as_slice()).expect("tile");
+        let mut changed_rows = 0;
+        for row in &mut tile.row_infos {
+            if changed_rows == 2 || row.cell_count == 0 {
+                continue;
+            }
+            let storage = row.cell_storage_buffer.clone().expect("storage");
+            let offsets = row.cell_offsets.clone().expect("offsets");
+            // `cell_count` counts materialized cells, while the sparse offset
+            // table spans the tile's full column range.
+            let count = offsets.len() / 2;
+            let present = (0..count)
+                .filter(|index| {
+                    u16::from_le_bytes([offsets[index * 2], offsets[index * 2 + 1]]) != u16::MAX
+                })
+                .collect::<Vec<_>>();
+            if present.is_empty() {
+                continue;
+            }
+            let mut cells = vec![None; count];
+            for (position, index) in present.iter().enumerate() {
+                let begin = u16::from_le_bytes([offsets[index * 2], offsets[index * 2 + 1]]);
+                let end = present
+                    .get(position + 1)
+                    .map(|next| u16::from_le_bytes([offsets[next * 2], offsets[next * 2 + 1]]))
+                    .unwrap_or(storage.len() as u16);
+                cells[*index] = Some(storage[usize::from(begin)..usize::from(end)].to_vec());
+            }
+            let mut decoded = litchi_numbers_wire::BncCell::parse(
+                cells[present[0]].as_ref().expect("cell"),
+                &litchi_numbers_wire::Limits::DEFAULT,
+            )
+            .expect("BNC cell");
+            decoded.set_text_style_identifier(Some(style_key));
+            cells[present[0]] = Some(
+                decoded
+                    .encode(&litchi_numbers_wire::Limits::DEFAULT)
+                    .expect("BNC encoding"),
+            );
+            let mut storage = Vec::new();
+            let mut offsets = Vec::new();
+            for cell in &cells {
+                if let Some(cell) = cell {
+                    offsets.extend_from_slice(&(storage.len() as u16).to_le_bytes());
+                    storage.extend_from_slice(cell);
+                } else {
+                    offsets.extend_from_slice(&u16::MAX.to_le_bytes());
+                }
+            }
+            row.cell_storage_buffer = Some(storage.clone());
+            row.cell_offsets = Some(offsets.clone());
+            row.cell_storage_buffer_pre_bnc = storage;
+            row.cell_offsets_pre_bnc = offsets;
+            changed_rows += 1;
+        }
+        assert_eq!(changed_rows, 2, "two materialized rows");
+        tile_message.data = tile.encode_to_vec();
+        let compressed = SnappyStream::compress(
+            &archive.to_bytes(Default::default()).expect("tile encode"),
+            Default::default(),
+        )
+        .expect("compress tile");
+        catalog
+            .reassemble_to_bytes(
+                &[
+                    EntryEdit::new(&style_member, &style_compressed),
+                    EntryEdit::new("Index/Tables/Tile.iwa", &compressed),
+                ],
+                ArchiveLimits::default(),
+            )
+            .expect("reassemble fixture")
+    }
+
     #[test]
     fn minimal_keeps_only_values_that_differ_from_inheritance() {
         let mut requested = CharacterProperties::new();
@@ -1734,7 +1983,7 @@ mod tests {
         assert!(matches!(
             Limits::from_source(&source),
             Err(Error::Limit {
-                kind: litchi_iwa_common::LimitKind::Fields,
+                kind: LimitKind::Fields,
                 observed: 1,
                 maximum: 0,
             })
@@ -1749,7 +1998,7 @@ mod tests {
         assert!(matches!(
             view(&[8, 1], &limits),
             Err(Error::Limit {
-                kind: litchi_iwa_common::LimitKind::Fields,
+                kind: LimitKind::Fields,
                 maximum: _,
                 ..
             })
@@ -1764,7 +2013,7 @@ mod tests {
         assert!(matches!(
             view(&[8, 1], &limits),
             Err(Error::Limit {
-                kind: litchi_iwa_common::LimitKind::RewriteWork,
+                kind: LimitKind::RewriteWork,
                 maximum: _,
                 ..
             })
@@ -1779,6 +2028,36 @@ mod tests {
         assert!(matches!(
             view(&[8, 1], &limits),
             Err(Error::Allocation { amount: 1 })
+        ));
+    }
+
+    #[test]
+    fn font_allocation_is_admitted_before_character_style_decode() {
+        let source = limited_source(1_000_000, 1_000_000);
+        let limits = Limits::from_source(&source).expect("source limits");
+        // Root and property WireView spans consume two admissions; the font
+        // String must be admitted before character_style_properties() owns it.
+        limits.remaining_allocations.set(2);
+        let data = [0x5a, 0x03, 0x2a, 0x01, b'A'];
+        assert!(matches!(
+            preflight_character_properties(&data, &limits),
+            Err(Error::Allocation { amount: 1 })
+        ));
+    }
+
+    #[test]
+    fn style_key_uses_residual_wire_fields_before_bnc_parse() {
+        let source = limited_source(1_000_000, 1_000_000);
+        let limits = Limits::from_source(&source).expect("source limits");
+        limits.remaining_fields.set(0);
+        let cell = [5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+        assert!(matches!(
+            style_key(Some(&cell), &limits),
+            Err(Error::Limit {
+                kind: LimitKind::Fields,
+                maximum: _,
+                ..
+            })
         ));
     }
 
@@ -1803,5 +2082,90 @@ mod tests {
             view.fields().map(|field| field.raw()).collect::<Vec<_>>(),
             vec![&data[..2], &data[2..]]
         );
+    }
+
+    #[test]
+    fn shared_style_key_batch_releases_shared_key_after_all_cells_move() {
+        let bytes = source_with_shared_style_key();
+        let source = limited_source_bytes(&bytes, 1_000_000, 1_000_000);
+        let limits = Limits::from_source(&source).expect("source limits");
+        let model = source
+            .catalog()
+            .iter()
+            .flat_map(|component| component.archive().objects.iter())
+            .find_map(|object| {
+                object
+                    .messages
+                    .iter()
+                    .any(|message| message.type_ == TABLE_MODEL_MESSAGE_TYPE)
+                    .then_some(object.archive_info.identifier)
+                    .flatten()
+            })
+            .expect("table model");
+        let table = Table::read(
+            &source,
+            Target {
+                model_identifier: model,
+                row: 0,
+                column: 0,
+            },
+            &limits,
+        )
+        .expect("table graph");
+        let mut positions = Vec::new();
+        for row in 0..table.geometry.rows {
+            for column in 0..table.geometry.columns {
+                let target = Target {
+                    model_identifier: model,
+                    row,
+                    column,
+                };
+                let Some(cell) = locate_cell(&source, &table, target, &limits).expect("cell")
+                else {
+                    continue;
+                };
+                if style_key(Some(&cell.bytes), &limits)
+                    .expect("style key")
+                    .is_some()
+                {
+                    positions.push((row, column));
+                }
+            }
+        }
+        assert!(
+            positions.len() >= 2,
+            "fixture did not retain two shared cells"
+        );
+        let mut properties = CharacterProperties::new();
+        properties.size = Some(73.0);
+        let requests = positions
+            .into_iter()
+            .take(2)
+            .enumerate()
+            .map(|(index, (row, column))| Request {
+                target: Target {
+                    model_identifier: model,
+                    row,
+                    column,
+                },
+                properties: properties.clone(),
+                fresh: Some(9_000_000 + index as u64),
+            })
+            .collect::<Vec<_>>();
+        let plan = plan_set_many(&source, &requests, &limits)
+            .expect("shared-key plan")
+            .expect("shared-key changes");
+        assert_eq!(plan.insertions.len(), 2);
+        let list_rewrite = plan
+            .rewrites
+            .iter()
+            .find(|rewrite| rewrite.message_type == LIST_MESSAGE_TYPE)
+            .expect("shared-key list rewrite");
+        let list = tst::TableDataList::decode(list_rewrite.data.as_slice()).expect("list rewrite");
+        assert!(
+            list.entries.iter().all(|entry| entry.key != 1),
+            "shared key remains after both cells move"
+        );
+        assert!(plan.batch_compatible);
     }
 }
