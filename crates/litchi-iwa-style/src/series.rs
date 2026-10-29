@@ -648,7 +648,8 @@ impl SymbolBudget {
             LimitKind::InputBytes,
             self.limits.max_input_bytes,
             self.input_bytes,
-        )?;
+        )?
+        .min(WireLimits::MAX_INPUT_BYTES);
         let fields = Self::remaining(LimitKind::Fields, self.limits.max_fields, self.fields)?
             .min(WireLimits::MAX_FIELDS);
         let work = Self::remaining(LimitKind::Work, self.limits.max_work_bytes, self.work_bytes)?
@@ -657,7 +658,9 @@ impl SymbolBudget {
             .with_input_bytes(input)
             .and_then(|limits| limits.with_fields(fields))
             .and_then(|limits| limits.with_rewrite_work(work))
-            .and_then(|limits| limits.with_nesting(self.limits.max_nesting as usize))
+            .and_then(|limits| {
+                limits.with_nesting((self.limits.max_nesting as usize).min(WireLimits::MAX_NESTING))
+            })
             .map_err(|error| SymbolError::Graph(Error::Wire(error)))
     }
 
@@ -671,8 +674,10 @@ impl SymbolBudget {
             LimitKind::OutputBytes,
             self.limits.max_output_bytes,
             self.output_bytes,
-        )?);
-        let fields = Self::remaining(LimitKind::Fields, self.limits.max_fields, self.fields)?;
+        )?)
+        .min(CodecLimits::DEFAULT.max_bytes());
+        let fields = Self::remaining(LimitKind::Fields, self.limits.max_fields, self.fields)?
+            .min(CodecLimits::DEFAULT.max_fields());
         CodecLimits::DEFAULT
             .with_max_bytes(bytes)
             .and_then(|limits| limits.with_max_fields(fields))
@@ -5352,6 +5357,22 @@ mod symbol_tests {
         )
     }
 
+    const fn large_limits() -> Limits {
+        Limits::new(
+            usize::MAX,
+            usize::MAX,
+            usize::MAX,
+            u32::MAX,
+            usize::MAX,
+            usize::MAX,
+            usize::MAX,
+            usize::MAX,
+            usize::MAX,
+            usize::MAX,
+            usize::MAX,
+        )
+    }
+
     fn expected() -> Vec<Option<Symbol>> {
         vec![Some(Symbol {
             shape: SymbolShape::Diamond,
@@ -5451,6 +5472,23 @@ mod symbol_tests {
             ));
             assert!(workspace.finish().is_empty());
         }
+    }
+
+    #[test]
+    fn large_profile_clamps_wire_and_codec_hard_axes_without_headroom() {
+        let budget = SymbolBudget::new(large_limits());
+        let wire = budget.wire_limits().expect("wire hard caps");
+        assert_eq!(wire.max_input_bytes(), WireLimits::MAX_INPUT_BYTES);
+        assert_eq!(wire.max_fields(), WireLimits::MAX_FIELDS);
+        assert_eq!(wire.max_rewrite_work(), WireLimits::MAX_REWRITE_WORK);
+        assert_eq!(wire.max_nesting(), WireLimits::MAX_NESTING);
+        let codec = budget.codec_limits().expect("codec hard caps");
+        assert_eq!(codec.max_bytes(), CodecLimits::DEFAULT.max_bytes());
+        assert_eq!(codec.max_fields(), CodecLimits::DEFAULT.max_fields());
+        let components = components();
+        let workspace = Workspace::new(&components, CoreLimits::default()).expect("workspace");
+        let (_values, _report) =
+            symbols(&workspace, 1, FAMILY, 1, large_limits()).expect("large profile valid input");
     }
 
     #[test]
