@@ -290,6 +290,219 @@ impl From<Error> for FinishError {
     }
 }
 
+/// A resource dimension owned by bounded workspace construction.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum ConstructionLimitKind {
+    /// Nonallocating component/object census and index population work.
+    Work,
+    /// HashMap/HashSet index reservations.
+    Allocations,
+    /// Logical retained bytes for the graph indexes.
+    RetainedBytes,
+    /// Temporary construction scratch bytes.
+    ScratchBytes,
+}
+
+impl fmt::Display for ConstructionLimitKind {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(match self {
+            Self::Work => "workspace construction work",
+            Self::Allocations => "workspace construction allocations",
+            Self::RetainedBytes => "workspace index retained bytes",
+            Self::ScratchBytes => "workspace construction scratch bytes",
+        })
+    }
+}
+
+/// A typed failure from bounded workspace construction.
+#[derive(Debug)]
+#[non_exhaustive]
+pub enum ConstructionError {
+    /// The source census or index invariants are invalid.
+    Graph(Error),
+    /// A construction residual was exhausted.
+    Limit {
+        /// Exhausted resource.
+        kind: ConstructionLimitKind,
+        /// Requested aggregate amount.
+        observed: usize,
+        /// Caller-supplied maximum.
+        maximum: usize,
+    },
+    /// An index reservation failed before source objects were indexed.
+    Allocation {
+        /// Requested entries.
+        amount: usize,
+    },
+}
+
+impl fmt::Display for ConstructionError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Graph(error) => write!(formatter, "workspace construction: {error}"),
+            Self::Limit {
+                kind,
+                observed,
+                maximum,
+            } => write!(formatter, "{kind} limit: {observed} > {maximum}"),
+            Self::Allocation { amount } => {
+                write!(formatter, "workspace index allocation: {amount}")
+            },
+        }
+    }
+}
+
+impl std::error::Error for ConstructionError {}
+
+/// Residual limits for one bounded workspace census or index build.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ConstructionLimits {
+    max_work: usize,
+    max_allocations: usize,
+    max_retained_bytes: usize,
+    max_scratch_bytes: usize,
+}
+
+impl ConstructionLimits {
+    /// Construct a residual construction profile.
+    #[must_use]
+    pub const fn new(
+        max_work: usize,
+        max_allocations: usize,
+        max_retained_bytes: usize,
+        max_scratch_bytes: usize,
+    ) -> Self {
+        Self {
+            max_work,
+            max_allocations,
+            max_retained_bytes,
+            max_scratch_bytes,
+        }
+    }
+
+    /// An unbounded profile for legacy tests.
+    #[must_use]
+    pub const fn unlimited() -> Self {
+        Self::new(usize::MAX, usize::MAX, usize::MAX, usize::MAX)
+    }
+
+    #[must_use]
+    pub const fn max_work(self) -> usize {
+        self.max_work
+    }
+
+    #[must_use]
+    pub const fn max_allocations(self) -> usize {
+        self.max_allocations
+    }
+
+    #[must_use]
+    pub const fn max_retained_bytes(self) -> usize {
+        self.max_retained_bytes
+    }
+
+    #[must_use]
+    pub const fn max_scratch_bytes(self) -> usize {
+        self.max_scratch_bytes
+    }
+}
+
+/// Exact structural requirements for one source census and graph-index build.
+///
+/// `component_view_bytes` and `component_view_allocations` describe the
+/// caller-owned borrowed `Vec<(&str, &Archive)>` adapter when a facade uses
+/// one. They are reported separately from the graph-owned indexes and are
+/// never charged by [`Workspace::new_bounded`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ConstructionRequirements {
+    component_count: usize,
+    object_count: usize,
+    source_work: usize,
+    index_allocations: usize,
+    index_retained_bytes: usize,
+    index_scratch_bytes: usize,
+    component_view_bytes: usize,
+    component_view_allocations: usize,
+}
+
+impl ConstructionRequirements {
+    #[must_use]
+    pub const fn component_count(self) -> usize {
+        self.component_count
+    }
+
+    #[must_use]
+    pub const fn object_count(self) -> usize {
+        self.object_count
+    }
+
+    /// Work for one nonallocating source census or one index population pass.
+    #[must_use]
+    pub const fn source_work(self) -> usize {
+        self.source_work
+    }
+
+    #[must_use]
+    pub const fn index_allocations(self) -> usize {
+        self.index_allocations
+    }
+
+    #[must_use]
+    pub const fn index_retained_bytes(self) -> usize {
+        self.index_retained_bytes
+    }
+
+    #[must_use]
+    pub const fn index_scratch_bytes(self) -> usize {
+        self.index_scratch_bytes
+    }
+
+    #[must_use]
+    pub const fn component_view_bytes(self) -> usize {
+        self.component_view_bytes
+    }
+
+    #[must_use]
+    pub const fn component_view_allocations(self) -> usize {
+        self.component_view_allocations
+    }
+
+    fn check(self, limits: ConstructionLimits) -> std::result::Result<(), ConstructionError> {
+        for (kind, observed, maximum) in [
+            (
+                ConstructionLimitKind::Work,
+                self.source_work,
+                limits.max_work(),
+            ),
+            (
+                ConstructionLimitKind::Allocations,
+                self.index_allocations,
+                limits.max_allocations(),
+            ),
+            (
+                ConstructionLimitKind::RetainedBytes,
+                self.index_retained_bytes,
+                limits.max_retained_bytes(),
+            ),
+            (
+                ConstructionLimitKind::ScratchBytes,
+                self.index_scratch_bytes,
+                limits.max_scratch_bytes(),
+            ),
+        ] {
+            if observed > maximum {
+                return Err(ConstructionError::Limit {
+                    kind,
+                    observed,
+                    maximum,
+                });
+            }
+        }
+        Ok(())
+    }
+}
+
 /// Residual limits for the final transfer from a staged workspace into
 /// [`Changes`].  Archive payloads are already owned by the workspace and are
 /// transferred without copying; this profile covers only the final vectors,
@@ -513,6 +726,12 @@ pub(crate) enum Location {
     Created(usize),
 }
 
+// These are logical accounting envelopes for the standard-library hash
+// indexes, deliberately independent of package/source byte size.  They are
+// shared with bounded callers rather than repeated as facade multipliers.
+const INDEX_SLOT_BYTES: usize = 64;
+const AMBIGUOUS_SLOT_BYTES: usize = 32;
+
 /// The staged state of one graph edit.
 pub struct Workspace<'s> {
     source: &'s dyn Components,
@@ -543,6 +762,194 @@ impl fmt::Debug for Workspace<'_> {
 }
 
 impl<'s> Workspace<'s> {
+    /// Census the borrowed component view without allocating a graph index.
+    ///
+    /// The caller supplies the residual census profile. The returned
+    /// `source_work` is the exact amount to charge for this pass and is also
+    /// the amount required by [`Self::new_bounded`] for its population pass.
+    pub fn construction_requirements(
+        source: &dyn Components,
+        limits: ConstructionLimits,
+    ) -> std::result::Result<ConstructionRequirements, ConstructionError> {
+        let component_count = source.count();
+        let mut object_count = 0usize;
+        let mut source_work = 0usize;
+        for position in 0..component_count {
+            source_work =
+                source_work
+                    .checked_add(1)
+                    .ok_or(ConstructionError::Graph(Error::Invalid(
+                        "workspace census work overflow",
+                    )))?;
+            if source_work > limits.max_work() {
+                return Err(ConstructionError::Limit {
+                    kind: ConstructionLimitKind::Work,
+                    observed: source_work,
+                    maximum: limits.max_work(),
+                });
+            }
+            let (_, archive) =
+                source
+                    .component(position)
+                    .ok_or(ConstructionError::Graph(Error::Invalid(
+                        "a component vanished during workspace census",
+                    )))?;
+            for object in &archive.objects {
+                if object.archive_info.identifier.is_none() {
+                    return Err(ConstructionError::Graph(Error::Invalid(
+                        "an IWA object has no identifier",
+                    )));
+                }
+                source_work =
+                    source_work
+                        .checked_add(1)
+                        .ok_or(ConstructionError::Graph(Error::Invalid(
+                            "workspace census work overflow",
+                        )))?;
+                if source_work > limits.max_work() {
+                    return Err(ConstructionError::Limit {
+                        kind: ConstructionLimitKind::Work,
+                        observed: source_work,
+                        maximum: limits.max_work(),
+                    });
+                }
+                object_count =
+                    object_count
+                        .checked_add(1)
+                        .ok_or(ConstructionError::Graph(Error::Invalid(
+                            "workspace object count overflow",
+                        )))?;
+            }
+        }
+        let index_allocations = usize::from(object_count != 0).saturating_mul(2);
+        let index_retained_bytes = object_count
+            .checked_mul(INDEX_SLOT_BYTES.saturating_add(AMBIGUOUS_SLOT_BYTES))
+            .ok_or(ConstructionError::Graph(Error::Invalid(
+                "workspace index bytes overflow",
+            )))?;
+        let component_view_bytes = component_count
+            .checked_mul(size_of::<(&str, &Archive)>())
+            .ok_or(ConstructionError::Graph(Error::Invalid(
+                "component view bytes overflow",
+            )))?;
+        let requirements = ConstructionRequirements {
+            component_count,
+            object_count,
+            source_work,
+            index_allocations,
+            index_retained_bytes,
+            index_scratch_bytes: 0,
+            component_view_bytes,
+            component_view_allocations: usize::from(component_count != 0),
+        };
+        requirements.check(limits)?;
+        Ok(requirements)
+    }
+
+    /// Build a workspace after a caller has admitted one exact construction
+    /// census. The source is rescanned to populate reserved indexes; no
+    /// index grows beyond the returned requirements.
+    pub fn new_bounded(
+        source: &'s dyn Components,
+        limits: Limits,
+        requirements: ConstructionRequirements,
+        construction_limits: ConstructionLimits,
+    ) -> std::result::Result<Self, ConstructionError> {
+        requirements.check(construction_limits)?;
+        let mut index = HashMap::new();
+        let mut ambiguous = HashSet::new();
+        if requirements.object_count != 0 {
+            index.try_reserve(requirements.object_count).map_err(|_| {
+                ConstructionError::Allocation {
+                    amount: requirements.object_count,
+                }
+            })?;
+            ambiguous
+                .try_reserve(requirements.object_count)
+                .map_err(|_| ConstructionError::Allocation {
+                    amount: requirements.object_count,
+                })?;
+        }
+        let mut registry = None;
+        let mut source_objects = 0usize;
+        let mut source_work = 0usize;
+        for position in 0..requirements.component_count {
+            source_work =
+                source_work
+                    .checked_add(1)
+                    .ok_or(ConstructionError::Graph(Error::Invalid(
+                        "workspace build work overflow",
+                    )))?;
+            let (name, archive) =
+                source
+                    .component(position)
+                    .ok_or(ConstructionError::Graph(Error::Invalid(
+                        "a component vanished during workspace build",
+                    )))?;
+            source_objects = source_objects.checked_add(archive.objects.len()).ok_or(
+                ConstructionError::Graph(Error::Invalid("workspace object count overflow")),
+            )?;
+            for object in &archive.objects {
+                source_work =
+                    source_work
+                        .checked_add(1)
+                        .ok_or(ConstructionError::Graph(Error::Invalid(
+                            "workspace build work overflow",
+                        )))?;
+                let identifier = object
+                    .archive_info
+                    .identifier
+                    .ok_or(ConstructionError::Graph(Error::Invalid(
+                        "an IWA object has no identifier",
+                    )))?;
+                if index
+                    .insert(identifier, Location::Source(position))
+                    .is_some()
+                {
+                    ambiguous.insert(identifier);
+                }
+                if name == METADATA_MEMBER {
+                    for (message, raw) in object.messages.iter().enumerate() {
+                        if raw.type_ == PACKAGE_METADATA_MESSAGE_TYPE
+                            && registry.replace((position, identifier, message)).is_some()
+                        {
+                            return Err(ConstructionError::Graph(Error::Invalid(
+                                "the package metadata component holds several registries",
+                            )));
+                        }
+                    }
+                }
+            }
+        }
+        if source_objects != requirements.object_count || source_work != requirements.source_work {
+            return Err(ConstructionError::Graph(Error::Invalid(
+                "workspace source changed between census and build",
+            )));
+        }
+        if source_work > construction_limits.max_work() {
+            return Err(ConstructionError::Limit {
+                kind: ConstructionLimitKind::Work,
+                observed: source_work,
+                maximum: construction_limits.max_work(),
+            });
+        }
+        Ok(Self {
+            source,
+            limits,
+            changed: BTreeMap::new(),
+            created: Vec::new(),
+            deleted: BTreeSet::new(),
+            index,
+            ambiguous,
+            registry,
+            registry_requirements: RefCell::new(None),
+            registry_root: RefCell::new(None),
+            finish: FinishLedger::default(),
+            uuid_seed: 0,
+            source_work,
+        })
+    }
+
     /// Stage an edit over `source` under the archive `limits`.
     ///
     /// # Errors
