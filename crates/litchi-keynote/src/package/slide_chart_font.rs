@@ -1736,10 +1736,7 @@ fn write_graph(
 }
 
 fn transaction_budget(package: &Package) -> Result<TransactionBudget, Error> {
-    let mut budget = TransactionBudget::new(package).map_err(map_transaction_error)?;
-    budget
-        .admit_default_work_headroom(package.state.source.shared_source().len().saturating_mul(8));
-    Ok(budget)
+    TransactionBudget::new(package).map_err(map_transaction_error)
 }
 
 #[derive(Debug, Clone, Copy)]
