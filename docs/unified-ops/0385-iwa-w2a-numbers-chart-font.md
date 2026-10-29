@@ -234,3 +234,97 @@ filter `numbers_sheet_chart_font`; it exited 0 with 5 passed tests. Its log is
 instruction-count result does not claim native acceptance, does not claim
 wall-clock performance, and does not migrate the six ledger rows; the native
 queue entries remain pending.
+
+## Shared-helper regression qualification
+
+The accepted facade also depends on the shared stylesheet registration path
+used by the already integrated 18-route W2-A style/layout slice in record
+0380. That dependency was requalified on the same measured code source
+`fbc7c51866f119e733521f4bc92467a849385c71` and the same release parity binary
+used above; the later documentation and ledger commits do not change that
+binary. The audited runner is
+`crates/litchi-iwa/tests/parity/numbers_w2a_cost.rs`, test
+`numbers_w2a_cost::numbers_w2a_route_cost_abba_3`, with the exact 18-entry
+`ROUTES_3` manifest:
+
+```text
+shape_style_fill_{set,reset,read}
+shape_style_stroke_{set,reset,read}
+shape_style_effects_{set,reset,read}
+shape_style_layout_{set,reset,read}
+text_box_style_columns_{set,reset,read}
+text_box_style_layout_{set,reset,read}
+```
+
+Each selected route used one common prepared input for the host/leaf pair,
+host/leaf/leaf/host ABBA, and no inverse operation in the measured forward
+route. Two captures per route were taken on pinned CPU 7, 36 captures total.
+Counts use only `w2a_host_route_3` and `w2a_leaf_route_3`, never program
+totals.
+
+The release binary was regenerated with this exact source/flag profile (the
+target, temporary and evidence directories are outside the checkout):
+
+```sh
+cd /home/zhuhe/code/litchi-worktrees/uo2-iwa-w2a-chart-font
+env -u LITCHI_BLESS -u LITCHI_CAPPED \
+  PATH=/home/zhuhe/code/litchi-worktrees/.coord/bin:$PATH \
+  LITCHI_MEM_MAX=20G CARGO_BUILD_JOBS=1 CARGO_INCREMENTAL=0 \
+  CARGO_PROFILE_RELEASE_DEBUG=0 CARGO_PROFILE_DEV_DEBUG=0 \
+  CARGO_PROFILE_TEST_DEBUG=0 CARGO_NET_OFFLINE=true RUST_TEST_THREADS=1 \
+  CARGO_TARGET_DIR=/home/zhuhe/code/litchi-worktrees/.coord/iwa-w2a-chart-font-perf-target-20261029 \
+  TMPDIR=/home/zhuhe/code/litchi-worktrees/.coord/iwa-w2a-chart-font-perf-tmp-20261029 \
+  cargo test --offline -p litchi-iwa --all-features --test parity \
+    --release --no-run
+```
+
+Each selected regression route used the following capture shape, with
+`W2A_ROUTE` set to one exact `ROUTES_3` entry and `rep1`/`rep2` as the two
+capture repetitions:
+
+```sh
+W2A_ROUTE="$route" taskset -c 7 valgrind --tool=callgrind --quiet \
+  --dump-instr=yes --collect-jumps=yes \
+  --callgrind-out-file="$evidence_dir/$route.$rep.callgrind" "$binary" \
+  --ignored --exact numbers_w2a_cost::numbers_w2a_route_cost_abba_3 \
+  --test-threads=1
+```
+
+| Route | Host Ir mean | Leaf Ir mean | Leaf vs host |
+|---|---:|---:|---:|
+| `shape_style_fill_set` | 257,969,442 | 152,237,222 | −40.986335% |
+| `shape_style_fill_reset` | 346,429,422 | 137,515,542 | −60.304890% |
+| `shape_style_fill_read` | 72,481,490 | 34,113,478 | −52.934911% |
+| `shape_style_stroke_set` | 258,011,774 | 152,280,444 | −40.979265% |
+| `shape_style_stroke_reset` | 346,371,434 | 137,620,428 | −60.267963% |
+| `shape_style_stroke_read` | 72,460,233 | 34,133,341 | −52.893691% |
+| `shape_style_effects_set` | 257,946,686 | 152,231,668 | −40.983282% |
+| `shape_style_effects_reset` | 346,306,383 | 137,629,550 | −60.257865% |
+| `shape_style_effects_read` | 72,463,821 | 34,131,404 | −52.898696% |
+| `shape_style_layout_set` | 257,981,914 | 152,301,842 | −40.964140% |
+| `shape_style_layout_reset` | 346,423,572 | 137,701,096 | −60.250656% |
+| `shape_style_layout_read` | 72,472,922 | 34,133,098 | −52.902275% |
+| `text_box_style_columns_set` | 221,812,232 | 152,208,272 | −31.379676% |
+| `text_box_style_columns_reset` | 310,034,750 | 137,526,288 | −55.641654% |
+| `text_box_style_columns_read` | 54,448,306 | 34,100,168 | −37.371479% |
+| `text_box_style_layout_set` | 221,787,714 | 152,219,502 | −31.367027% |
+| `text_box_style_layout_reset` | 310,003,414 | 137,654,109 | −55.595938% |
+| `text_box_style_layout_read` | 54,451,990 | 34,128,222 | −37.324196% |
+
+All 36 invocations exited 0; route stderr was empty and every selected test
+reported `ok`. The external regression captures total 80,056,587 bytes, with
+per-capture sizes and SHA-256 values in
+`/home/zhuhe/code/litchi-worktrees/.coord/iwa-w2a-style-regression-20261029/summary.tsv`
+(SHA-256 `6caab3d3f4d06a7c3aa3e3d5d19a6a4e0aaaf15214fd72a48484a4d2cdfe723d`).
+The positive exact test log is `correctness-18.log` (SHA-256
+`83c02acee0f9d1998b45327e2c21d96948ab3a856114c2e66cf77eef8e6f6aa2`), with
+empty stderr (SHA-256
+`e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`).
+
+The binary archive cited above is a mode-0444 tar container, so its container
+SHA-256 intentionally differs from the ELF SHA-256. `tar -xOf` over its sole
+member `parity-9f6fee151a57f4bc` produces the measured ELF SHA-256
+`258aaccd848ffde2069852ad8ed61f565170d9307d6046269c25f50474f3d9c3`, exactly
+matching the binary on disk. No wall-clock timing or native acceptance is
+claimed; the six chart-font ledger rows remain migrated with native evidence
+pending, and the shared-helper regression does not create E3/E4 evidence.
