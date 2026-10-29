@@ -11,7 +11,9 @@ changes).  The subsequent refusal/query isolation repair is
 `6790af8a96f3e0b5e9fcb08141f78bf1a11897a2`, with the final narrow query seam
 in `c0c9b0d4e4d7fd56398cc8471627c2b6bdc1e15`.  The final write-boundary
 representability check and exact-source extreme-size control are in
-`cda454ba33103d8583e1e2cd342dbe8cec13829d`.  This exposes only the migrated
+`cda454ba33103d8583e1e2cd342dbe8cec13829d`; the measured wrappers retain
+every ABBA input and output with `black_box` in `cf9f3c1a8777b1798a728b772505415475634fed`.
+This exposes only the migrated
 chart point-size family through `litchi-ops`:
 
 * Pages: `/body/chart[N]` → `font.size`;
@@ -86,7 +88,7 @@ The release binaries built from `9078ab5837d34d8c9baa18d54fce0903f5721017`
 and `a52c96dd7346a4d88793cde5c07d66150a8e3539` are archived externally, but
 are explicitly non-qualifying because subsequent query-scope repairs landed;
 they must not be used for capture.  Qualification remains pending a fresh
-coordinator release build from `cda454ba33103d8583e1e2cd342dbe8cec13829d` and pinned-CPU
+coordinator release build from `cf9f3c1a8777b1798a728b772505415475634fed` and pinned-CPU
 ABBA run for every route, with setup outside the selected symbols, exact
 single-test success, positive inclusive attribution, exact call counts and the
 prescribed <=1.05 route ratio.
