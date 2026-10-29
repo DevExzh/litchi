@@ -31,12 +31,18 @@ object identifiers, archive names, ZIP paths and protobuf values stay private.
 
 The adapter delegates graph work to
 `litchi_iwa_style::series::{symbols,set_symbols}` and the common
-`SymbolFamily`/`Symbol`/`SymbolSize` values. It admits the workspace census,
-series vector and publication capacity before graph work, preserves the
-transaction budget through candidate reopen/readback, and maps shared-style,
-series-count, unsupported-kind, allocation and resource failures to typed
-terminal results. Exact-source patches carry `inverse()`, exact no-op behavior,
-source authorization, candidate verification and source-relative locality.
+`SymbolFamily`/`Symbol`/`SymbolSize` values. Archive encoding and Snappy bounds,
+reassembly preparation/execution, and candidate ZIP ingress are admitted before
+their allocation-bearing phases; the same transaction budget continues through
+candidate reopen/readback. Shared-style, series-count, unsupported-kind,
+allocation, archive and resource failures retain typed terminal results.
+Exact-source patches carry `inverse()`, exact no-op behavior, source
+authorization, candidate verification and source-relative locality. Publication
+locality uses an explicit engine-declared mutation plan rather than deriving
+authorization from the observed candidate diff; its source/request scope is
+derived from the selected chart's style/non-style/stylesheet references and
+the engine's planned new/removal objects. Changed object metadata and message
+unknowns are checked, and unrelated object/member mutations refuse.
 
 ## Differential proof
 
@@ -49,6 +55,9 @@ chart. It contains:
 - read-only host-reader versus independent leaf-reader comparison on the same
   host-authored source;
 - exact inverse and untouched ZIP/object locality through the shared harness.
+- production locality controls rejecting an unplanned object mutation, a
+  changed unknown chart field, an extra ZIP member, ZIP metadata drift and
+  archive-object metadata drift.
 
 The existing W1-E `series_graph_cases.rs` allocation/patch vectors remain
 engine differential evidence only; they do not qualify this full Pages facade.
@@ -67,7 +76,10 @@ only; their native routes remain pending in
 
 ## Verification checkpoint
 
-Scoped Pages compilation and the dedicated parity target compile successfully
-with the frozen lockfile, four Cargo jobs, incremental disabled and debug info
-disabled. The four Pages series-symbol parity cases are the required next
-verification checkpoint before any release capture.
+Scoped Pages compilation, strict Clippy, rustdoc, glossary, ledger, boundary,
+non-iWork and fuzz-lock tooling checks pass with the frozen lockfile, four Cargo
+jobs, incremental disabled and debug info disabled. The four Pages
+series-symbol parity cases and the five production locality-negative tests pass.
+Release performance capture, native evidence and coordinator integration remain
+pending; the shared series-engine residual `Limits`/`Report` seam remains a
+separate F-owned dependency.

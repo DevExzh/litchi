@@ -9,11 +9,18 @@ use std::mem::size_of;
 use std::sync::Arc;
 
 use litchi_core::Position;
-use litchi_iwa_archive::package::{Entry, OwnedExactArtifacts, SharedBytes};
+use litchi_iwa_archive::package::{
+    Entry, EntryEdit, EntryInsertion, OwnedExactArtifacts, SharedBytes,
+};
+use litchi_iwa_archive::unstable::{
+    CandidateIngressCharge, CandidateIngressError, CandidateIngressPlan, CandidateIngressVisitor,
+};
 use litchi_iwa_common::chart::kind::Kind as ChartKind;
 use litchi_iwa_common::chart::series::{Symbol, SymbolFamily};
-use litchi_iwa_core::{Archive, ArchiveObject, RawMessage};
+use litchi_iwa_common::wire::{WireFieldView, WireView};
+use litchi_iwa_core::{Archive, ArchiveObject, RawMessage, SnappyStream};
 use litchi_iwa_protos::chart_metadata_codec::{self, DecodeOptions};
+use litchi_iwa_protos::chart_style_codec;
 use litchi_iwa_style::graph::{self as style_graph, Components, Workspace};
 use litchi_iwa_style::series as series_engine;
 use thiserror::Error as ThisError;
@@ -22,6 +29,21 @@ use super::Package;
 use super::body_chart_arrangement::{self as arrangement, ArrangementBudget, ChartTarget};
 use super::body_drawable_graph as package_graph;
 use crate::selector::BodyChartSelector;
+
+const CHART_MESSAGE_TYPE: u32 = 5_021;
+const SERIES_STYLE_MESSAGE_TYPE: u32 = 5_028;
+const SERIES_NON_STYLE_MESSAGE_TYPE: u32 = 5_029;
+const STYLESHEET_MESSAGE_TYPE: u32 = 401;
+const OBJECT_CONTAINER_MESSAGE_TYPE: u32 = 11_008;
+const PACKAGE_METADATA_MESSAGE_TYPE: u32 = 11_006;
+const ROOT_MESSAGE_TYPE: u32 = 10_000;
+const STYLE_EXTENSION_FIELD: u32 = 10_000;
+
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+struct MutationPlan {
+    components: Vec<Arc<str>>,
+    objects: Vec<(Arc<str>, Vec<u64>)>,
+}
 
 /// A finite resource charged by one Pages body-chart series-symbol operation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -54,7 +76,7 @@ pub enum LimitKind {
     /// Shared wire resource.
     Wire(litchi_iwa_common::LimitKind),
     /// Chart-style codec resource.
-    Codec(litchi_iwa_protos::chart_style_codec::LimitKind),
+    Codec(chart_style_codec::LimitKind),
     /// Package-metadata registry resource.
     Registry(litchi_iwa_protos::package_metadata_codec::RewriteLimit),
 }
@@ -283,9 +305,9 @@ fn map_arrangement_error(error: arrangement::Error) -> Error {
             maximum,
         },
         arrangement::Error::Allocation { amount } => Error::Allocation { amount },
-        arrangement::Error::InvalidSource
-        | arrangement::Error::Verification
-        | arrangement::Error::PatchConflict => Error::InvalidSource,
+        arrangement::Error::InvalidSource => Error::InvalidSource,
+        arrangement::Error::Verification => Error::Verification,
+        arrangement::Error::PatchConflict => Error::PatchConflict,
     }
 }
 
@@ -370,6 +392,22 @@ fn map_registry_error(error: litchi_iwa_protos::package_metadata_codec::RewriteE
     Error::InvalidSource
 }
 
+fn map_style_codec_error(error: chart_style_codec::Error) -> Error {
+    match error {
+        chart_style_codec::Error::Limit {
+            kind,
+            observed,
+            maximum,
+        } => Error::Limit {
+            kind: LimitKind::Codec(kind),
+            observed: observed as u64,
+            maximum: maximum as u64,
+        },
+        chart_style_codec::Error::Allocation { bytes } => Error::Allocation { amount: bytes },
+        _ => Error::InvalidSource,
+    }
+}
+
 fn map_graph_error(error: style_graph::Error) -> Error {
     match error {
         style_graph::Error::Archive(error) => map_core_error(error),
@@ -387,7 +425,7 @@ fn map_graph_error(error: style_graph::Error) -> Error {
             _ => Error::InvalidSource,
         },
         style_graph::Error::Codec(error) => match error {
-            litchi_iwa_protos::chart_style_codec::Error::Limit {
+            chart_style_codec::Error::Limit {
                 kind,
                 observed,
                 maximum,
@@ -396,9 +434,7 @@ fn map_graph_error(error: style_graph::Error) -> Error {
                 observed: observed as u64,
                 maximum: maximum as u64,
             },
-            litchi_iwa_protos::chart_style_codec::Error::Allocation { bytes } => {
-                Error::Allocation { amount: bytes }
-            },
+            chart_style_codec::Error::Allocation { bytes } => Error::Allocation { amount: bytes },
             _ => Error::InvalidSource,
         },
         style_graph::Error::Limit {
@@ -624,72 +660,312 @@ fn read_symbols(
 }
 
 fn archive_rewrite_bound(package: &Package, archive: &Archive) -> Result<usize, Error> {
-    archive
+    let encoded = archive
         .encoded_len(archive_limits(package)?)
-        .map_err(map_core_error)
+        .map_err(map_core_error)?;
+    let snappy = package
+        .state
+        .source
+        .limits()
+        .snappy_limits()
+        .map_err(map_archive_error)?;
+    SnappyStream::maximum_compressed_len(encoded, snappy).map_err(map_core_error)
 }
 
 fn preflight_publication(
     source: &Package,
     edits: &[(String, Archive)],
-    insertions: &[(String, Vec<u8>)],
-    budget: &ArrangementBudget,
+    insertions: &[style_graph::Insertion],
+    deletions: &[String],
+    budget: &mut ArrangementBudget,
 ) -> Result<usize, Error> {
     let mut projected = source.state.source.shared_source().len();
+    let mut transient = 0usize;
+    let mut archive_work = 0usize;
+    let archive_count = edits
+        .len()
+        .checked_add(insertions.len())
+        .ok_or(Error::InvalidSource)?;
     for (name, archive) in edits {
+        let encoded = archive
+            .encoded_len(archive_limits(source)?)
+            .map_err(map_core_error)?;
         let bound = archive_rewrite_bound(source, archive)?;
+        transient = transient
+            .checked_add(encoded)
+            .and_then(|value| value.checked_add(bound))
+            .ok_or(Error::InvalidSource)?;
+        archive_work = archive_work
+            .checked_add(name.len())
+            .and_then(|value| value.checked_add(encoded))
+            .and_then(|value| value.checked_add(bound))
+            .ok_or(Error::InvalidSource)?;
         projected = projected
             .checked_add(name.len())
             .and_then(|value| value.checked_add(bound))
             .ok_or(Error::InvalidSource)?;
     }
-    for (name, data) in insertions {
+    for insertion in insertions {
+        let encoded = insertion
+            .archive
+            .encoded_len(archive_limits(source)?)
+            .map_err(map_core_error)?;
+        let bound = archive_rewrite_bound(source, &insertion.archive)?;
+        transient = transient
+            .checked_add(encoded)
+            .and_then(|value| value.checked_add(bound))
+            .ok_or(Error::InvalidSource)?;
+        archive_work = archive_work
+            .checked_add(insertion.name.len())
+            .and_then(|value| value.checked_add(encoded))
+            .and_then(|value| value.checked_add(bound))
+            .ok_or(Error::InvalidSource)?;
         projected = projected
-            .checked_add(name.len())
-            .and_then(|value| value.checked_add(data.len()))
+            .checked_add(insertion.name.len())
+            .and_then(|value| value.checked_add(bound))
             .ok_or(Error::InvalidSource)?;
     }
+    let collection_units = archive_count
+        .checked_mul(3)
+        .and_then(|value| value.checked_add(source.state.source.package().len()))
+        .and_then(|value| value.checked_add(deletions.len()))
+        .ok_or(Error::InvalidSource)?;
+    let collection_bytes = archive_count
+        .checked_mul(size_of::<(String, Vec<u8>)>())
+        .and_then(|value| {
+            value.checked_add(
+                source
+                    .state
+                    .source
+                    .package()
+                    .len()
+                    .checked_mul(size_of::<&str>())?,
+            )
+        })
+        .and_then(|value| value.checked_add(deletions.len().checked_mul(size_of::<&str>())?))
+        .ok_or(Error::InvalidSource)?;
     budget
         .preflight_output(projected)
         .map_err(map_arrangement_error)?;
     budget
-        .preflight_work(projected)
-        .map_err(map_arrangement_error)?;
-    budget
-        .preflight_allocations(
-            edits
-                .len()
-                .saturating_add(insertions.len())
-                .saturating_add(1),
+        .preflight_work(
+            archive_work
+                .checked_add(collection_bytes)
+                .and_then(|value| value.checked_add(projected))
+                .ok_or(Error::InvalidSource)?,
         )
         .map_err(map_arrangement_error)?;
     budget
-        .preflight_retained(projected)
+        .preflight_allocations(collection_units)
         .map_err(map_arrangement_error)?;
     budget
-        .preflight_scratch(projected)
+        .preflight_retained(
+            transient
+                .checked_add(collection_bytes)
+                .and_then(|value| value.checked_add(projected))
+                .ok_or(Error::InvalidSource)?,
+        )
+        .map_err(map_arrangement_error)?;
+    budget
+        .preflight_scratch(
+            transient
+                .checked_add(collection_bytes)
+                .and_then(|value| value.checked_add(projected))
+                .ok_or(Error::InvalidSource)?,
+        )
+        .map_err(map_arrangement_error)?;
+    budget
+        .work(
+            archive_work
+                .checked_add(collection_bytes)
+                .ok_or(Error::InvalidSource)?,
+        )
+        .map_err(map_arrangement_error)?;
+    let staging_bytes = transient
+        .checked_add(collection_bytes)
+        .ok_or(Error::InvalidSource)?;
+    budget
+        .allocations(collection_units)
+        .map_err(map_arrangement_error)?;
+    budget
+        .retained(staging_bytes)
+        .map_err(map_arrangement_error)?;
+    budget
+        .scratch(staging_bytes)
         .map_err(map_arrangement_error)?;
     Ok(projected)
 }
 
-fn charge_publication(
-    candidate: &Package,
-    edit_count: usize,
-    insertion_count: usize,
-    projected: usize,
+struct IngressBudget<'a>(&'a mut ArrangementBudget);
+
+impl CandidateIngressVisitor for IngressBudget<'_> {
+    type Error = Error;
+
+    fn admit(&mut self, charge: CandidateIngressCharge) -> Result<(), Self::Error> {
+        self.0
+            .retained(charge.retained_bytes())
+            .and_then(|_| self.0.work(charge.traversal_bytes()))
+            .and_then(|_| self.0.allocations(charge.allocations()))
+            .map_err(map_arrangement_error)
+    }
+}
+
+fn map_candidate_ingress_error(error: CandidateIngressError<Error>) -> Error {
+    match error {
+        CandidateIngressError::Physical(error) => map_archive_error(error),
+        CandidateIngressError::Admission(error) => error,
+        CandidateIngressError::CloneArithmetic { .. } => Error::InvalidSource,
+        _ => Error::InvalidSource,
+    }
+}
+
+fn charge_candidate_plan(
+    plan: &CandidateIngressPlan<'_>,
     budget: &mut ArrangementBudget,
 ) -> Result<(), Error> {
-    let actual = candidate.state.source.shared_source().len();
-    if actual > projected {
+    let requirements = plan.requirements();
+    budget
+        .input(requirements.input_bytes())
+        .and_then(|_| budget.work(requirements.traversal_bytes()))
+        .and_then(|_| budget.allocations(requirements.allocations()))
+        .and_then(|_| budget.retained(requirements.retained_bytes()))
+        .map_err(map_arrangement_error)?;
+    Ok(())
+}
+
+fn publish_changes(
+    source: &Package,
+    changes: style_graph::Changes,
+    budget: &mut ArrangementBudget,
+) -> Result<(Package, usize), Error> {
+    let touched_components = changes
+        .edits
+        .len()
+        .checked_add(changes.insertions.len())
+        .and_then(|value| value.checked_add(changes.deletions.len()))
+        .ok_or(Error::InvalidSource)?;
+    let projected = preflight_publication(
+        source,
+        &changes.edits,
+        &changes.insertions,
+        &changes.deletions,
+        budget,
+    )?;
+    let archive_limits = archive_limits(source)?;
+    let snappy_limits = source
+        .state
+        .source
+        .limits()
+        .snappy_limits()
+        .map_err(map_archive_error)?;
+    let mut edited = Vec::new();
+    edited
+        .try_reserve_exact(changes.edits.len())
+        .map_err(|_| Error::Allocation {
+            amount: changes.edits.len(),
+        })?;
+    for (name, archive) in changes.edits {
+        let encoded = archive.to_bytes(archive_limits).map_err(map_core_error)?;
+        let compressed = SnappyStream::compress(&encoded, snappy_limits).map_err(map_core_error)?;
+        edited.push((name, compressed));
+    }
+
+    let catalog = &source.state.source;
+    let mut inserted = Vec::new();
+    inserted
+        .try_reserve_exact(changes.insertions.len())
+        .map_err(|_| Error::Allocation {
+            amount: changes.insertions.len(),
+        })?;
+    for insertion in changes.insertions {
+        let encoded = insertion
+            .archive
+            .to_bytes(archive_limits)
+            .map_err(map_core_error)?;
+        let compressed = SnappyStream::compress(&encoded, snappy_limits).map_err(map_core_error)?;
+        inserted.push((insertion.name, compressed, insertion.before));
+    }
+
+    let mut edits = Vec::new();
+    edits
+        .try_reserve_exact(edited.len())
+        .map_err(|_| Error::Allocation {
+            amount: edited.len(),
+        })?;
+    edits.extend(
+        edited
+            .iter()
+            .map(|(name, data)| EntryEdit::new(name.as_str(), data.as_slice())),
+    );
+
+    let mut insertions = Vec::new();
+    insertions
+        .try_reserve_exact(inserted.len())
+        .map_err(|_| Error::Allocation {
+            amount: inserted.len(),
+        })?;
+    let mut names = Vec::new();
+    names
+        .try_reserve_exact(catalog.package().len())
+        .map_err(|_| Error::Allocation {
+            amount: catalog.package().len(),
+        })?;
+    names.extend(catalog.package().iter().map(|entry| entry.name()));
+    for (name, data, before) in &inserted {
+        let insertion = match before.as_deref() {
+            Some(before) => {
+                let position = names
+                    .iter()
+                    .position(|candidate| *candidate == before)
+                    .ok_or(Error::InvalidSource)?;
+                EntryInsertion::at(position, name.as_str(), data.as_slice())
+            },
+            None => EntryInsertion::new(name.as_str(), data.as_slice()),
+        };
+        insertions.push(insertion);
+    }
+    let mut deletions = Vec::new();
+    deletions
+        .try_reserve_exact(changes.deletions.len())
+        .map_err(|_| Error::Allocation {
+            amount: changes.deletions.len(),
+        })?;
+    deletions.extend(changes.deletions.iter().map(String::as_str));
+
+    let mut ingress = IngressBudget(budget);
+    let prepared = catalog
+        .__prepare_reassembly_with_changes_admitted(
+            &insertions,
+            &edits,
+            &deletions,
+            catalog.limits(),
+            &mut ingress,
+        )
+        .map_err(map_candidate_ingress_error)?;
+    let requirements = prepared.execution_requirements();
+    budget
+        .output(requirements.output_bytes())
+        .and_then(|_| budget.work(requirements.output_bytes()))
+        .and_then(|_| budget.allocations(requirements.allocations()))
+        .and_then(|_| budget.retained(requirements.retained_bytes()))
+        .and_then(|_| budget.scratch(requirements.scratch_bytes()))
+        .map_err(map_arrangement_error)?;
+    if requirements.output_bytes() > projected {
         return Err(Error::Verification);
     }
-    budget.output(actual).map_err(map_arrangement_error)?;
-    budget.work(actual).map_err(map_arrangement_error)?;
+    let output = prepared
+        .execute(requirements.exact_limits())
+        .map_err(map_archive_error)?;
+    let candidate_plan =
+        litchi_iwa_archive::SourceCatalog::__candidate_ingress(&output, catalog.limits())
+            .map_err(map_archive_error)?;
+    charge_candidate_plan(&candidate_plan, budget)?;
     budget
-        .allocations(edit_count.saturating_add(insertion_count).saturating_add(1))
+        .candidate_reopen(output.len())
         .map_err(map_arrangement_error)?;
-    budget.retained(actual).map_err(map_arrangement_error)?;
-    budget.scratch(projected).map_err(map_arrangement_error)
+    let target = Arc::<[u8]>::from(output);
+    let candidate = package_graph::reopen(source, target).map_err(map_package_graph_error)?;
+    Ok((candidate, touched_components))
 }
 
 fn preflight_series_engine(
@@ -740,49 +1016,389 @@ fn charge_series_engine(
         .map_err(map_arrangement_error)
 }
 
-fn changed_object_ids(
-    source: &Package,
-    candidate: &Package,
-    changed_components: &[Arc<str>],
-) -> Result<Vec<(Arc<str>, Vec<u64>)>, Error> {
-    let mut result = Vec::new();
-    for name in changed_components {
-        let Some(before) = source.state.source.components().get(name.as_ref()) else {
-            continue;
-        };
-        let Some(after) = candidate.state.source.components().get(name.as_ref()) else {
-            continue;
-        };
-        let mut changed = Vec::new();
-        for object in &before.archive().objects {
-            let identifier = object.archive_info.identifier.ok_or(Error::Verification)?;
-            let differs = after
+fn package_object(package: &Package, identifier: u64) -> Option<(&str, &ArchiveObject)> {
+    package
+        .state
+        .source
+        .components()
+        .iter()
+        .find_map(|component| {
+            component
                 .archive()
                 .object(identifier)
-                .is_none_or(|other| !object.same_content_ignoring_offsets(other));
-            if differs {
-                changed.push(identifier);
-            }
+                .map(|object| (component.name(), object))
+        })
+}
+
+fn add_planned_object(
+    objects: &mut Vec<(Arc<str>, Vec<u64>)>,
+    component: &str,
+    identifier: u64,
+) -> Result<(), Error> {
+    if let Some((_, identifiers)) = objects
+        .iter_mut()
+        .find(|(name, _)| name.as_ref() == component)
+    {
+        if !identifiers.contains(&identifier) {
+            identifiers.push(identifier);
         }
-        for object in &after.archive().objects {
-            let identifier = object.archive_info.identifier.ok_or(Error::Verification)?;
-            if before.archive().object(identifier).is_none() {
-                changed.push(identifier);
-            }
-        }
-        result.push((Arc::clone(name), changed));
+    } else {
+        objects.push((Arc::from(component), vec![identifier]));
     }
-    Ok(result)
+    Ok(())
+}
+
+fn source_symbol_objects(
+    source: &Package,
+    target: &Target,
+    budget: &mut ArrangementBudget,
+) -> Result<Vec<(Arc<str>, Vec<u64>)>, Error> {
+    let payload = arrangement::selected_chart_payload(source, &target.chart)
+        .map_err(map_arrangement_error)?;
+    let codec_limits = budget
+        .reference_codec_limits(payload)
+        .map_err(map_arrangement_error)?;
+    budget
+        .work(payload.len())
+        .and_then(|_| budget.allocations(1))
+        .map_err(map_arrangement_error)?;
+    let references =
+        chart_style_codec::references(payload, codec_limits).map_err(map_style_codec_error)?;
+    let mut identifiers = Vec::new();
+    identifiers
+        .try_reserve(
+            1usize
+                .checked_add(references.series_theme_styles().len())
+                .and_then(|value| {
+                    value.checked_add(
+                        references
+                            .series_private_styles()
+                            .map_or(0, |styles| styles.entries().len()),
+                    )
+                })
+                .and_then(|value| {
+                    value.checked_add(
+                        references
+                            .series_non_styles()
+                            .map_or(0, |styles| styles.entries().len()),
+                    )
+                })
+                .ok_or(Error::InvalidSource)?,
+        )
+        .map_err(|_| Error::Allocation { amount: 1 })?;
+    identifiers.push(target.chart.drawable_identifier.get());
+    identifiers.extend(references.series_theme_styles());
+    if let Some(styles) = references.series_private_styles() {
+        identifiers.extend(styles.entries().iter().map(|(_, identifier)| *identifier));
+    }
+    if let Some(styles) = references.series_non_styles() {
+        identifiers.extend(styles.entries().iter().map(|(_, identifier)| *identifier));
+    }
+    let mut index = 0;
+    while index < identifiers.len() {
+        let identifier = identifiers[index];
+        index += 1;
+        let Some((_component, object)) = package_object(source, identifier) else {
+            return Err(Error::Verification);
+        };
+        let Some(message) = object
+            .messages
+            .iter()
+            .find(|message| message.type_ == SERIES_STYLE_MESSAGE_TYPE)
+        else {
+            continue;
+        };
+        let Some(parent) = chart_style_codec::parent(&message.data, codec_limits)
+            .map_err(map_style_codec_error)?
+        else {
+            continue;
+        };
+        if !identifiers.contains(&parent) {
+            identifiers.push(parent);
+        }
+    }
+    let mut grouped = Vec::new();
+    grouped
+        .try_reserve(identifiers.len())
+        .map_err(|_| Error::Allocation {
+            amount: identifiers.len(),
+        })?;
+    for identifier in identifiers {
+        let Some((component, _)) = package_object(source, identifier) else {
+            return Err(Error::Verification);
+        };
+        add_planned_object(&mut grouped, component, identifier)?;
+    }
+    if let Some(component) = source
+        .state
+        .source
+        .components()
+        .iter()
+        .find(|component| component.name() == "Index/DocumentStylesheet.iwa")
+    {
+        for object in &component.archive().objects {
+            if object
+                .messages
+                .iter()
+                .any(|message| message.type_ == STYLESHEET_MESSAGE_TYPE)
+            {
+                add_planned_object(
+                    &mut grouped,
+                    component.name(),
+                    object.archive_info.identifier.ok_or(Error::Verification)?,
+                )?;
+            }
+        }
+    }
+    Ok(grouped)
+}
+
+fn mutation_plan(
+    source: &Package,
+    target: &Target,
+    components: &[Arc<str>],
+    changes: &style_graph::Changes,
+    budget: &mut ArrangementBudget,
+) -> Result<MutationPlan, Error> {
+    let mut objects = source_symbol_objects(source, target, budget)?;
+    for (name, archive) in &changes.edits {
+        for object in &archive.objects {
+            let identifier = object.archive_info.identifier.ok_or(Error::Verification)?;
+            if package_object(source, identifier).is_none()
+                && object
+                    .messages
+                    .iter()
+                    .all(|message| allowed_message_type(message.type_))
+            {
+                add_planned_object(&mut objects, name, identifier)?;
+            }
+        }
+    }
+    for insertion in &changes.insertions {
+        for object in &insertion.archive.objects {
+            let identifier = object.archive_info.identifier.ok_or(Error::Verification)?;
+            if object
+                .messages
+                .iter()
+                .all(|message| allowed_message_type(message.type_))
+            {
+                add_planned_object(&mut objects, &insertion.name, identifier)?;
+            }
+        }
+    }
+    let component_bytes = components
+        .iter()
+        .try_fold(0usize, |total, component| {
+            total.checked_add(component.len())
+        })
+        .ok_or(Error::InvalidSource)?;
+    budget
+        .preflight_allocations(2)
+        .and_then(|_| budget.preflight_retained(component_bytes))
+        .map_err(map_arrangement_error)?;
+    budget.allocations(2).map_err(map_arrangement_error)?;
+    budget
+        .retained(component_bytes)
+        .map_err(map_arrangement_error)?;
+    let mut owned_components = Vec::new();
+    owned_components
+        .try_reserve_exact(components.len())
+        .map_err(|_| Error::Allocation {
+            amount: components.len(),
+        })?;
+    owned_components.extend(components.iter().cloned());
+    Ok(MutationPlan {
+        components: owned_components,
+        objects,
+    })
+}
+
+fn planned_contains(plan: &MutationPlan, component: &str, identifier: u64) -> bool {
+    plan.objects
+        .iter()
+        .any(|(name, ids)| name.as_ref() == component && ids.contains(&identifier))
+}
+
+fn allowed_message_type(message_type: u32) -> bool {
+    matches!(
+        message_type,
+        CHART_MESSAGE_TYPE
+            | SERIES_STYLE_MESSAGE_TYPE
+            | SERIES_NON_STYLE_MESSAGE_TYPE
+            | STYLESHEET_MESSAGE_TYPE
+            | OBJECT_CONTAINER_MESSAGE_TYPE
+            | PACKAGE_METADATA_MESSAGE_TYPE
+            | ROOT_MESSAGE_TYPE
+    )
+}
+
+fn unique_wire_field<'a>(
+    view: &'a WireView<'a>,
+    number: u32,
+) -> Result<Option<WireFieldView<'a>>, Error> {
+    let mut found = None;
+    for field in view.fields().filter(|field| field.number() == number) {
+        if found.replace(field).is_some() {
+            return Err(Error::Verification);
+        }
+    }
+    Ok(found)
+}
+
+fn same_wire_fields_except(
+    source: &WireView<'_>,
+    candidate: &WireView<'_>,
+    excluded: &[u32],
+    budget: &mut ArrangementBudget,
+) -> Result<(), Error> {
+    let mut source_fields = source
+        .fields()
+        .filter(|field| !excluded.contains(&field.number()));
+    let mut candidate_fields = candidate
+        .fields()
+        .filter(|field| !excluded.contains(&field.number()));
+    loop {
+        match (source_fields.next(), candidate_fields.next()) {
+            (None, None) => return Ok(()),
+            (Some(left), Some(right)) => {
+                budget
+                    .work(left.raw().len().saturating_add(right.raw().len()))
+                    .map_err(map_arrangement_error)?;
+                if left.raw() != right.raw() {
+                    return Err(Error::Verification);
+                }
+            },
+            _ => {
+                return Err(Error::Verification);
+            },
+        }
+    }
+}
+
+fn verify_message_unknowns(
+    message_type: u32,
+    source: &[u8],
+    candidate: &[u8],
+    family: SymbolFamily,
+    budget: &mut ArrangementBudget,
+) -> Result<(), Error> {
+    let source_view = budget.parse(source, 1).map_err(map_arrangement_error)?;
+    let candidate_view = budget.parse(candidate, 1).map_err(map_arrangement_error)?;
+    let outer_excluded: &[u32] = match message_type {
+        CHART_MESSAGE_TYPE | SERIES_STYLE_MESSAGE_TYPE | SERIES_NON_STYLE_MESSAGE_TYPE => {
+            &[STYLE_EXTENSION_FIELD]
+        },
+        STYLESHEET_MESSAGE_TYPE => &[1],
+        OBJECT_CONTAINER_MESSAGE_TYPE => &[2],
+        PACKAGE_METADATA_MESSAGE_TYPE => &[1, 3, 8, 10, 12],
+        ROOT_MESSAGE_TYPE => &[7, 9],
+        _ => return Err(Error::Verification),
+    };
+    same_wire_fields_except(&source_view, &candidate_view, outer_excluded, budget)?;
+    if message_type == PACKAGE_METADATA_MESSAGE_TYPE {
+        let mut source_components = source_view.fields().filter(|field| field.number() == 3);
+        let mut candidate_components = candidate_view.fields().filter(|field| field.number() == 3);
+        loop {
+            match (source_components.next(), candidate_components.next()) {
+                (None, None) => break,
+                (Some(source_component), Some(candidate_component)) => {
+                    let source_view = budget
+                        .parse(source_component.payload(), 2)
+                        .map_err(map_arrangement_error)?;
+                    let candidate_view = budget
+                        .parse(candidate_component.payload(), 2)
+                        .map_err(map_arrangement_error)?;
+                    same_wire_fields_except(&source_view, &candidate_view, &[6, 11], budget)?;
+                },
+                _ => return Err(Error::Verification),
+            }
+        }
+        return Ok(());
+    }
+    if !outer_excluded.contains(&STYLE_EXTENSION_FIELD) {
+        return Ok(());
+    }
+    match (
+        unique_wire_field(&source_view, STYLE_EXTENSION_FIELD)?,
+        unique_wire_field(&candidate_view, STYLE_EXTENSION_FIELD)?,
+    ) {
+        (None, None) => Ok(()),
+        (Some(source), Some(candidate)) => {
+            let source_view = budget
+                .parse(source.payload(), 2)
+                .map_err(map_arrangement_error)?;
+            let candidate_view = budget
+                .parse(candidate.payload(), 2)
+                .map_err(map_arrangement_error)?;
+            let excluded: &[u32] = match message_type {
+                CHART_MESSAGE_TYPE => &[19],
+                SERIES_NON_STYLE_MESSAGE_TYPE => &[family.show_field(), family.type_field()],
+                SERIES_STYLE_MESSAGE_TYPE => &[family.size_field()],
+                _ => &[],
+            };
+            same_wire_fields_except(&source_view, &candidate_view, excluded, budget)
+        },
+        _ => Err(Error::Verification),
+    }
+}
+
+fn verify_object_messages(
+    source: &ArchiveObject,
+    candidate: &ArchiveObject,
+    family: SymbolFamily,
+    budget: &mut ArrangementBudget,
+) -> Result<(), Error> {
+    if source.messages.len() != candidate.messages.len() {
+        return Err(Error::Verification);
+    }
+    for (before, after) in source.messages.iter().zip(&candidate.messages) {
+        if before.type_ != after.type_ {
+            return Err(Error::Verification);
+        }
+        if before.data == after.data {
+            continue;
+        }
+        if !allowed_message_type(before.type_) {
+            return Err(Error::Verification);
+        }
+        verify_message_unknowns(before.type_, &before.data, &after.data, family, budget)?;
+    }
+    Ok(())
 }
 
 fn verify_locality(
     source: &Package,
     candidate: &Package,
-    changed_components: &[Arc<str>],
-    changed_objects: &[(Arc<str>, Vec<u64>)],
+    plan: &MutationPlan,
+    family: SymbolFamily,
     budget: &mut ArrangementBudget,
 ) -> Result<(), Error> {
-    let changed = |name: &str| changed_components.iter().any(|item| item.as_ref() == name);
+    let changed = |name: &str| plan.components.iter().any(|item| item.as_ref() == name);
+    let auxiliary = |name: &str, identifier: u64| {
+        (name == litchi_iwa_style::graph::DOCUMENT_METADATA_MEMBER
+            || name == litchi_iwa_style::graph::METADATA_MEMBER)
+            || (name == "Index/Document.iwa" && identifier == 1)
+    };
+    let auxiliary_object = |name: &str,
+                            identifier: u64,
+                            before: Option<&ArchiveObject>,
+                            after: Option<&ArchiveObject>| {
+        auxiliary(name, identifier)
+            || (name == "Index/Document.iwa"
+                && before.is_some_and(|before| {
+                    after.is_some_and(|after| {
+                        before.messages == after.messages
+                            && same_archive_info_except_references(before, after, false)
+                    })
+                }))
+            || (name == "Index/DocumentStylesheet.iwa"
+                && before.is_some_and(|before| {
+                    after.is_some_and(|after| {
+                        before.messages == after.messages
+                            && same_archive_info_except_references(before, after, false)
+                    })
+                }))
+    };
     let source_entries = source.state.source.package();
     let candidate_entries = candidate.state.source.package();
     for before in source_entries.iter() {
@@ -854,20 +1470,18 @@ fn verify_locality(
                     .objects
                     .iter()
                     .zip(&after_component.archive().objects)
-                    .any(|(before, after)| !before.same_content_ignoring_offsets(after))
+                    .any(|(before, after)| !same_object_metadata(before, after))
             {
                 return Err(Error::Verification);
             }
             continue;
         }
-        let allowed = changed_objects
-            .iter()
-            .find(|(item, _)| item.as_ref() == name)
-            .map_or(&[][..], |(_, objects)| objects.as_slice());
         for before in &component.archive().objects {
             let identifier = before.archive_info.identifier.ok_or(Error::Verification)?;
             let Some(after) = after_component.archive().object(identifier) else {
-                if !allowed.contains(&identifier) {
+                if !planned_contains(plan, name, identifier)
+                    && !auxiliary_object(name, identifier, Some(before), None)
+                {
                     return Err(Error::Verification);
                 }
                 continue;
@@ -875,7 +1489,26 @@ fn verify_locality(
             budget
                 .work(object_work(before)?.saturating_add(object_work(after)?))
                 .map_err(map_arrangement_error)?;
-            if !allowed.contains(&identifier) && !before.same_content_ignoring_offsets(after) {
+            if !planned_contains(plan, name, identifier)
+                && !auxiliary_object(name, identifier, Some(before), Some(after))
+            {
+                return Err(Error::Verification);
+            }
+            if planned_contains(plan, name, identifier)
+                && !same_archive_info_except_references(before, after, true)
+            {
+                return Err(Error::Verification);
+            }
+            if !same_object_metadata(before, after) {
+                verify_object_messages(before, after, family, budget)?;
+            }
+        }
+        for after in &after_component.archive().objects {
+            let identifier = after.archive_info.identifier.ok_or(Error::Verification)?;
+            if component.archive().object(identifier).is_none()
+                && !planned_contains(plan, name, identifier)
+                && !auxiliary_object(name, identifier, None, Some(after))
+            {
                 return Err(Error::Verification);
             }
         }
@@ -907,6 +1540,55 @@ fn object_work(object: &ArchiveObject) -> Result<usize, Error> {
             .ok_or(Error::InvalidSource)?;
     }
     Ok(work)
+}
+
+fn same_object_metadata(before: &ArchiveObject, after: &ArchiveObject) -> bool {
+    before.archive_info == after.archive_info
+        && before.messages == after.messages
+        && before.header_length == after.header_length
+        && before.data_length == after.data_length
+}
+
+fn same_archive_info_except_references(
+    before: &ArchiveObject,
+    after: &ArchiveObject,
+    allow_message_lengths: bool,
+) -> bool {
+    if before.archive_info.identifier != after.archive_info.identifier
+        || before.archive_info.should_merge != after.archive_info.should_merge
+        || before.archive_info.message_infos.len() != after.archive_info.message_infos.len()
+    {
+        return false;
+    }
+    before
+        .archive_info
+        .message_infos
+        .iter()
+        .zip(&after.archive_info.message_infos)
+        .all(|(left, right)| {
+            left.type_ == right.type_
+                && left.versions == right.versions
+                && (allow_message_lengths || left.length == right.length)
+                && left.base_message_index == right.base_message_index
+                && left.diff_merge_version == right.diff_merge_version
+                && left.diff_field_path == right.diff_field_path
+                && left.fields_to_remove == right.fields_to_remove
+                && left.diff_read_version == right.diff_read_version
+                && left.field_infos.len() == right.field_infos.len()
+                && left
+                    .field_infos
+                    .iter()
+                    .zip(&right.field_infos)
+                    .all(|(left, right)| {
+                        left.path == right.path
+                            && left.r#type == right.r#type
+                            && left.unknown_field_rule == right.unknown_field_rule
+                            && left.known_field_rule == right.known_field_rule
+                            && left.known_field_version == right.known_field_version
+                            && left.known_field_feature_identifier
+                                == right.known_field_feature_identifier
+                    })
+        })
 }
 
 fn zip_record_equal_outside(before: &[u8], after: &[u8], excluded: &[(usize, usize)]) -> bool {
@@ -1007,7 +1689,7 @@ pub struct Patch {
     before: Vec<Option<Symbol>>,
     after: Vec<Option<Symbol>>,
     changed_components: Arc<[Arc<str>]>,
-    changed_objects: Vec<(Arc<str>, Vec<u64>)>,
+    plan: MutationPlan,
 }
 
 impl fmt::Debug for Patch {
@@ -1037,7 +1719,7 @@ impl Patch {
             before: self.after.clone(),
             after: self.before.clone(),
             changed_components: self.changed_components.clone(),
-            changed_objects: self.changed_objects.clone(),
+            plan: self.plan.clone(),
         }
     }
 }
@@ -1116,7 +1798,7 @@ fn unchanged(source: &Package, target: Target, before: Vec<Option<Symbol>>) -> C
             before: before.clone(),
             after: before,
             changed_components: Arc::from([]),
-            changed_objects: Vec::new(),
+            plan: MutationPlan::default(),
         },
         diagnostics: Diagnostics {
             changed: false,
@@ -1165,48 +1847,59 @@ fn commit_edit(edit: Edit<'_>, change: Property) -> Result<Commit, Error> {
         return Ok(unchanged(source, edit.target, before));
     }
 
-    let edit_count = changes.edits.len();
-    let insertion_count = changes.insertions.len();
-    let mut edits = changes.edits;
-    let mut insertion_data = Vec::with_capacity(insertion_count);
-    for insertion in changes.insertions {
-        let data = insertion
-            .archive
-            .to_bytes(archive_limits(source)?)
-            .map_err(map_core_error)?;
-        insertion_data.push((insertion.name, data));
-    }
-    let deletions = changes.deletions;
-    let projected = preflight_publication(source, &edits, &insertion_data, &budget)?;
-    let names = edits
+    let name_count = changes
+        .edits
+        .len()
+        .checked_add(changes.insertions.len())
+        .and_then(|value| value.checked_add(changes.deletions.len()))
+        .ok_or(Error::InvalidSource)?;
+    let name_bytes = changes
+        .edits
         .iter()
-        .map(|(name, _)| Arc::<str>::from(name.as_str()))
+        .map(|(name, _)| name.len())
         .chain(
-            insertion_data
+            changes
+                .insertions
                 .iter()
-                .map(|(name, _)| Arc::<str>::from(name.as_str())),
+                .map(|insertion| insertion.name.len()),
         )
-        .chain(deletions.iter().map(|name| Arc::<str>::from(name.as_str())))
-        .collect::<Vec<_>>();
-    let archives = std::mem::take(&mut edits)
-        .into_iter()
-        .map(|(name, archive)| (Arc::<str>::from(name), archive))
-        .collect::<Vec<_>>();
-    let insertion_refs = insertion_data
-        .iter()
-        .map(|(name, data)| (name.as_str(), data.as_slice()))
-        .collect::<Vec<_>>();
-    let deletion_refs = deletions.iter().map(String::as_str).collect::<Vec<_>>();
-    let candidate =
-        package_graph::publish_changes(source, archives, &insertion_refs, &[], &deletion_refs)
-            .map_err(map_package_graph_error)?;
-    charge_publication(
-        &candidate,
-        edit_count,
-        insertion_count,
-        projected,
-        &mut budget,
-    )?;
+        .chain(changes.deletions.iter().map(String::len))
+        .try_fold(0usize, |total, bytes| total.checked_add(bytes))
+        .ok_or(Error::InvalidSource)?;
+    budget
+        .preflight_allocations(name_count)
+        .and_then(|_| budget.preflight_retained(name_bytes))
+        .and_then(|_| budget.preflight_work(name_bytes))
+        .map_err(map_arrangement_error)?;
+    budget
+        .allocations(name_count)
+        .and_then(|_| budget.retained(name_bytes))
+        .and_then(|_| budget.work(name_bytes))
+        .map_err(map_arrangement_error)?;
+    let mut names = Vec::new();
+    names
+        .try_reserve_exact(name_count)
+        .map_err(|_| Error::Allocation { amount: name_count })?;
+    names.extend(
+        changes
+            .edits
+            .iter()
+            .map(|(name, _)| Arc::<str>::from(name.as_str()))
+            .chain(
+                changes
+                    .insertions
+                    .iter()
+                    .map(|insertion| Arc::<str>::from(insertion.name.as_str())),
+            )
+            .chain(
+                changes
+                    .deletions
+                    .iter()
+                    .map(|name| Arc::<str>::from(name.as_str())),
+            ),
+    );
+    let plan = mutation_plan(source, &edit.target, &names, &changes, &mut budget)?;
+    let (candidate, touched_components) = publish_changes(source, changes, &mut budget)?;
     let mut candidate_budget = budget;
     let candidate_target = target_with_metadata(
         &candidate,
@@ -1220,13 +1913,12 @@ fn commit_edit(edit: Edit<'_>, change: Property) -> Result<Commit, Error> {
     if after != *values {
         return Err(Error::Verification);
     }
-    let changed_objects = changed_object_ids(source, &candidate, &names)?;
     let target_bytes = Arc::clone(&candidate.state.source.shared_source());
     verify_locality(
         source,
         &candidate,
-        &names,
-        &changed_objects,
+        &plan,
+        edit.target.family,
         &mut candidate_budget,
     )?;
     Ok(Commit {
@@ -1241,11 +1933,11 @@ fn commit_edit(edit: Edit<'_>, change: Property) -> Result<Commit, Error> {
             before,
             after,
             changed_components: names.into(),
-            changed_objects,
+            plan,
         },
         diagnostics: Diagnostics {
             changed: true,
-            touched_components: edit_count,
+            touched_components,
         },
     })
 }
@@ -1299,6 +1991,12 @@ fn apply_patch(package: &Package, patch: &Patch) -> Result<Commit, Error> {
     budget
         .preflight_scratch(target_owner.as_ref().len())
         .map_err(map_arrangement_error)?;
+    let candidate_plan = litchi_iwa_archive::SourceCatalog::__candidate_ingress(
+        target_owner.as_ref(),
+        package.state.source.limits(),
+    )
+    .map_err(map_archive_error)?;
+    charge_candidate_plan(&candidate_plan, &mut budget)?;
     budget
         .candidate_reopen(target_owner.as_ref().len())
         .map_err(map_arrangement_error)?;
@@ -1327,8 +2025,8 @@ fn apply_patch(package: &Package, patch: &Patch) -> Result<Commit, Error> {
     verify_locality(
         package,
         &candidate,
-        &patch.changed_components,
-        &patch.changed_objects,
+        &patch.plan,
+        patch.target.family,
         &mut budget,
     )?;
     Ok(Commit {
@@ -1372,5 +2070,222 @@ impl Package {
     /// Apply a patch produced from this exact source package.
     pub fn apply_body_chart_series(&self, patch: &Patch) -> Result<Commit, Error> {
         apply_patch(self, patch)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const NATIVE: &[u8] =
+        include_bytes!("../../../../test-data/iwork/pages/chart-data-native.pages");
+
+    fn append_unknown_marker(data: &mut Vec<u8>, marker: u64) {
+        litchi_iwa_common::wire::append_varint_field(data, 12_345, marker)
+            .expect("bounded unknown marker");
+    }
+
+    fn empty_plan() -> MutationPlan {
+        MutationPlan::default()
+    }
+
+    #[test]
+    fn production_locality_rejects_unplanned_object_mutation() {
+        let package = Package::from_bytes(NATIVE).expect("native Pages fixture");
+        let component = package
+            .state
+            .source
+            .components()
+            .iter()
+            .find(|component| component.archive().objects.len() >= 2)
+            .expect("fixture component with two objects");
+        let component_name = Arc::<str>::from(component.name());
+        let ids = component
+            .archive()
+            .objects
+            .iter()
+            .filter_map(|object| object.archive_info.identifier)
+            .take(2)
+            .collect::<Vec<_>>();
+        let allowed = ids[0];
+        let unplanned = ids[1];
+        let mut archive = component.archive().clone();
+        let message = archive
+            .object_mut(unplanned)
+            .expect("unplanned object")
+            .messages
+            .first_mut()
+            .expect("unplanned message");
+        append_unknown_marker(&mut message.data, 0xfeed);
+        let candidate =
+            package_graph::publish_archives(&package, vec![(Arc::clone(&component_name), archive)])
+                .expect("candidate publication");
+        let plan = MutationPlan {
+            components: vec![Arc::clone(&component_name)],
+            objects: vec![(component_name, vec![allowed])],
+        };
+        let mut budget = ArrangementBudget::new(&package).expect("locality budget");
+        assert!(matches!(
+            verify_locality(
+                &package,
+                &candidate,
+                &plan,
+                SymbolFamily::Line2d,
+                &mut budget,
+            ),
+            Err(Error::Verification)
+        ));
+    }
+
+    #[test]
+    fn production_locality_rejects_changed_chart_unknown_field() {
+        let package = Package::from_bytes(NATIVE).expect("native Pages fixture");
+        let (component_name, chart_id) = package
+            .state
+            .source
+            .components()
+            .iter()
+            .find_map(|component| {
+                component
+                    .archive()
+                    .objects
+                    .iter()
+                    .find(|object| {
+                        object
+                            .messages
+                            .iter()
+                            .any(|message| message.type_ == CHART_MESSAGE_TYPE)
+                    })
+                    .and_then(|object| object.archive_info.identifier)
+                    .map(|identifier| (Arc::<str>::from(component.name()), identifier))
+            })
+            .expect("fixture chart object");
+        let mut archive = package
+            .state
+            .source
+            .components()
+            .get(component_name.as_ref())
+            .expect("chart component")
+            .archive()
+            .clone();
+        let message = archive
+            .object_mut(chart_id)
+            .expect("chart object")
+            .messages
+            .iter_mut()
+            .find(|message| message.type_ == CHART_MESSAGE_TYPE)
+            .expect("chart message");
+        append_unknown_marker(&mut message.data, 0xbeef);
+        let candidate =
+            package_graph::publish_archives(&package, vec![(Arc::clone(&component_name), archive)])
+                .expect("candidate publication");
+        let plan = MutationPlan {
+            components: vec![Arc::clone(&component_name)],
+            objects: vec![(component_name, vec![chart_id])],
+        };
+        let mut budget = ArrangementBudget::new(&package).expect("locality budget");
+        assert!(matches!(
+            verify_locality(
+                &package,
+                &candidate,
+                &plan,
+                SymbolFamily::Line2d,
+                &mut budget,
+            ),
+            Err(Error::Verification)
+        ));
+    }
+
+    #[test]
+    fn production_locality_rejects_extra_zip_member() {
+        let package = Package::from_bytes(NATIVE).expect("native Pages fixture");
+        let candidate = package_graph::publish_changes(
+            &package,
+            Vec::new(),
+            &[("Data/unplanned-series.bin", b"unused".as_slice())],
+            &[],
+            &[],
+        )
+        .expect("extra-member candidate publication");
+        let mut budget = ArrangementBudget::new(&package).expect("locality budget");
+        assert!(matches!(
+            verify_locality(
+                &package,
+                &candidate,
+                &empty_plan(),
+                SymbolFamily::Line2d,
+                &mut budget,
+            ),
+            Err(Error::Verification)
+        ));
+    }
+
+    #[test]
+    fn production_locality_rejects_zip_metadata_mutation() {
+        let package = Package::from_bytes(NATIVE).expect("native Pages fixture");
+        let entry = package
+            .state
+            .source
+            .package()
+            .iter()
+            .find(|entry| !entry.is_opaque())
+            .expect("decoded package member");
+        let central = entry.raw_record().central_directory_record();
+        let mut bytes = package.state.source.shared_source().to_vec();
+        let offset = bytes
+            .windows(central.len())
+            .position(|window| window == central)
+            .expect("central record in source bytes");
+        bytes[offset + 38] ^= 1;
+        let candidate = Package::from_bytes(&bytes).expect("metadata-tampered candidate");
+        let mut budget = ArrangementBudget::new(&package).expect("locality budget");
+        assert!(matches!(
+            verify_locality(
+                &package,
+                &candidate,
+                &empty_plan(),
+                SymbolFamily::Line2d,
+                &mut budget,
+            ),
+            Err(Error::Verification)
+        ));
+    }
+
+    #[test]
+    fn production_locality_rejects_archive_metadata_mutation() {
+        let package = Package::from_bytes(NATIVE).expect("native Pages fixture");
+        let component = package
+            .state
+            .source
+            .components()
+            .iter()
+            .find(|component| !component.archive().objects.is_empty())
+            .expect("fixture component");
+        let component_name = Arc::<str>::from(component.name());
+        let object_id = component.archive().objects[0]
+            .archive_info
+            .identifier
+            .expect("object identifier");
+        let mut archive = component.archive().clone();
+        let object = archive.object_mut(object_id).expect("metadata object");
+        object.archive_info.should_merge = Some(!object.archive_info.should_merge.unwrap_or(false));
+        let candidate =
+            package_graph::publish_archives(&package, vec![(Arc::clone(&component_name), archive)])
+                .expect("metadata candidate publication");
+        let plan = MutationPlan {
+            components: vec![Arc::clone(&component_name)],
+            objects: vec![(component_name, vec![object_id])],
+        };
+        let mut budget = ArrangementBudget::new(&package).expect("locality budget");
+        assert!(matches!(
+            verify_locality(
+                &package,
+                &candidate,
+                &plan,
+                SymbolFamily::Line2d,
+                &mut budget,
+            ),
+            Err(Error::Verification)
+        ));
     }
 }
