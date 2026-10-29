@@ -1126,7 +1126,6 @@ fn corpus_cells_take_bold_or_refuse_typed() -> TestResult {
             Err(error) => panic!("{}: {error:?}", path.display()),
         }
     }
-    eprintln!("styled {styled}; refused {refused:?}");
     assert!(styled >= 25, "only {styled} styled");
     Ok(())
 }

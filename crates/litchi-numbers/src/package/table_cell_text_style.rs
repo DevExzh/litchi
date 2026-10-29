@@ -23,9 +23,13 @@
 use std::fmt;
 
 use litchi_iwa_core::RawMessage;
-use litchi_iwa_table::{cell_text_style as shared, cell_text_style_writer as writer};
+use litchi_iwa_table::{
+    cell_text_style as shared, cell_text_style_headers as headers, cell_text_style_writer as writer,
+};
 use litchi_iwa_text_wire::CharacterProperties;
-use litchi_numbers_wire::Limits as BncLimits;
+use litchi_numbers_wire::{
+    Limits as BncLimits, table_topology::storage::HEADER_BUCKET_ROWS as SHARED_HEADER_BUCKET_ROWS,
+};
 use thiserror::Error as ThisError;
 
 use super::Package;
@@ -785,8 +789,9 @@ fn write_style_keys(
         rows: table_rows,
         columns: table_columns,
         tile_size,
+        row_headers,
+        column_headers,
         tiles,
-        ..
     } = facts;
     let mut groups: Vec<(u64, Vec<writer::Update>)> = Vec::new();
     limits.reserve(&mut groups, 1).map_err(from_shared)?;
@@ -833,8 +838,59 @@ fn write_style_keys(
             &bnc_limits,
         )
         .map_err(from_shared)?;
+        let tile_key = tiles
+            .iter()
+            .find(|(_, identifier)| *identifier == tile)
+            .map(|(key, _)| *key)
+            .ok_or(Error::InvalidSource)?;
+        let row_offset = tile_key
+            .checked_mul(u32::try_from(tile_size).map_err(|_| Error::InvalidSource)?)
+            .ok_or(Error::InvalidSource)?;
+        let deltas = headers::materialized_deltas(&rows, write.previous(), row_offset, limits)
+            .map_err(from_shared)?;
+        let row_bucket = u64::from(row_offset) / SHARED_HEADER_BUCKET_ROWS;
+        if deltas
+            .rows()
+            .iter()
+            .any(|(row, _)| u64::from(*row) / SHARED_HEADER_BUCKET_ROWS != row_bucket)
+        {
+            return Err(Error::Refused(Refusal::UnsupportedDependency));
+        }
+        let row_headers = row_headers
+            .iter()
+            .find(|(bucket, _)| u64::from(*bucket) == row_bucket)
+            .map(|(_, identifier)| *identifier);
+        let header_rewrite = if deltas.is_empty() {
+            None
+        } else if let (Some(row_headers), Some(column_headers)) = (row_headers, column_headers) {
+            let (_, row_bucket) =
+                topology::message(working, row_headers, &[HEADER_BUCKET_MESSAGE_TYPE])?;
+            let (_, column_bucket) =
+                topology::message(working, column_headers, &[HEADER_BUCKET_MESSAGE_TYPE])?;
+            Some((
+                headers::rewrite_header_buckets(row_bucket, column_bucket, &deltas, limits)
+                    .map_err(from_shared)?,
+                row_headers,
+                column_headers,
+            ))
+        } else {
+            None
+        };
         if write.changed() {
             replace_message(working, tile, tile_index, write.into_tile())?;
+        }
+        if let Some((rewrite, row_headers, column_headers)) = header_rewrite {
+            let (row, column) = rewrite.into_parts();
+            if let Some(row) = row {
+                let (index, _) =
+                    topology::message(working, row_headers, &[HEADER_BUCKET_MESSAGE_TYPE])?;
+                replace_message(working, row_headers, index, row)?;
+            }
+            if let Some(column) = column {
+                let (index, _) =
+                    topology::message(working, column_headers, &[HEADER_BUCKET_MESSAGE_TYPE])?;
+                replace_message(working, column_headers, index, column)?;
+            }
         }
     }
     Ok(())

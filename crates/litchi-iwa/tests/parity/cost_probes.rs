@@ -22,6 +22,8 @@ use litchi_iwa_archive::{
     Limits as ArchiveLimits,
     package::{Catalog, EntryEdit},
 };
+use litchi_iwa_common::wire::append_varint_field;
+use litchi_iwa_common::{WireLimits, wire::WireView};
 use litchi_iwa_protos::{tn, tsp, tss, tst, tswp};
 use litchi_numbers::table::topology::{ColumnInsertion, RowInsertion};
 use prost::Message as _;
@@ -162,6 +164,34 @@ fn prepare_w1g_host_whole_cell_style_single(source: &[u8]) -> TestResult<Vec<u8>
             .with_bold(true);
     editor.set_table_cell_text_style(model, 1, 1, style)?;
     Ok(editor.to_bytes()?)
+}
+
+fn host_w1g_whole_cell_style_at(source: &[u8], row: u32, column: u32) -> TestResult<Vec<u8>> {
+    let mut editor = numbers::Draft::from_bytes(source)?;
+    let model = crate::numbers_cases::host_first_table_model_id(&editor)?;
+    let style =
+        litchi_iwa::text::TextStyle::new(litchi_iwa::text::TextPointSize::from_points(18.0)?)
+            .with_bold(true);
+    editor.set_table_cell_text_style(model, row as usize, column as usize, style)?;
+    Ok(editor.to_bytes()?)
+}
+
+fn leaf_w1g_whole_cell_style_at(
+    source: &[u8],
+    row: u32,
+    column: u32,
+) -> TestResult<(Vec<u8>, Vec<u8>)> {
+    let package = litchi_numbers::Package::from_bytes(source)?;
+    let properties = whole_cell_style_properties(18.0, true, false);
+    let commit = package
+        .edit_table_cell_text_style(0usize, 0usize)?
+        .set(litchi_numbers::table::At::new(row, column), properties)?
+        .commit()?;
+    let output = leaf_bytes!(commit.package());
+    let restored = commit
+        .package()
+        .apply_table_cell_text_style(&commit.patch().inverse())?;
+    Ok((output, leaf_bytes!(restored.package())))
 }
 
 fn prepare_w1g_leaf_whole_cell_style_single(source: &[u8]) -> TestResult<Vec<u8>> {
@@ -336,6 +366,287 @@ fn assert_untouched_member_preserved(
         );
     }
     Ok(())
+}
+
+fn table_model(source: &[u8]) -> TestResult<(u64, tst::TableModelArchive)> {
+    let editor = numbers::Draft::from_bytes(source)?;
+    for name in editor.package().iwa_entry_names() {
+        let archive = editor.package().archive(name)?;
+        for object in archive.objects {
+            let Some(message) = object
+                .messages
+                .iter()
+                .find(|message| message.type_ == 6_001)
+            else {
+                continue;
+            };
+            let identifier = object
+                .archive_info
+                .identifier
+                .ok_or("table model has no id")?;
+            return Ok((
+                identifier,
+                tst::TableModelArchive::decode(message.data.as_slice())?,
+            ));
+        }
+    }
+    Err("table model missing".into())
+}
+
+fn object_message(source: &[u8], identifier: u64, message_type: u32) -> TestResult<Vec<u8>> {
+    let editor = numbers::Draft::from_bytes(source)?;
+    for name in editor.package().iwa_entry_names() {
+        let archive = editor.package().archive(name)?;
+        let Some(object) = archive
+            .objects
+            .into_iter()
+            .find(|object| object.archive_info.identifier == Some(identifier))
+        else {
+            continue;
+        };
+        let message = object
+            .messages
+            .into_iter()
+            .find(|message| message.type_ == message_type)
+            .ok_or("requested object message missing")?;
+        return Ok(message.data);
+    }
+    Err("requested object missing".into())
+}
+
+fn first_missing_row_existing_tile(source: &[u8]) -> TestResult<(u32, u32)> {
+    let (_, model) = table_model(source)?;
+    let rows = model.number_of_rows;
+    let tile_size = model
+        .base_data_store
+        .tiles
+        .tile_size
+        .ok_or("tile size missing")?;
+    for tile_ref in model.base_data_store.tiles.tiles {
+        let tile_key = tile_ref.tileid;
+        let tile =
+            tst::Tile::decode(object_message(source, tile_ref.tile.identifier, 6_002)?.as_slice())?;
+        for local in 0..tile_size {
+            let Some(row) = tile_key
+                .checked_mul(tile_size)
+                .and_then(|base| base.checked_add(local))
+            else {
+                continue;
+            };
+            if row >= rows {
+                break;
+            }
+            if tile
+                .row_infos
+                .iter()
+                .all(|candidate| candidate.tile_row_index != local)
+            {
+                return Ok((row, 0));
+            }
+        }
+    }
+    Err("source has no missing row in an existing tile".into())
+}
+
+#[derive(Debug, PartialEq, Eq)]
+struct HeaderAndTileProbe {
+    row_count: Option<u32>,
+    column_count: Option<u32>,
+    tile_num_cells: u32,
+    tile_numrows: u32,
+    target_row_present: bool,
+    target_cell_present: bool,
+    row_unknown_fields: Vec<Vec<u8>>,
+    column_unknown_fields: Vec<Vec<u8>>,
+}
+
+fn header_unknown_fields(payload: &[u8], index: u32) -> TestResult<Vec<Vec<u8>>> {
+    let bucket = WireView::parse(payload, WireLimits::DEFAULT)?;
+    let mut unknown = bucket
+        .fields()
+        .filter(|field| !matches!(field.number(), 1 | 2))
+        .map(|field| field.raw().to_vec())
+        .collect::<Vec<_>>();
+    for field in bucket.fields().filter(|field| field.number() == 2) {
+        let header = WireView::parse(field.payload(), WireLimits::DEFAULT)?;
+        let header_index = header
+            .fields()
+            .find(|candidate| candidate.number() == 1)
+            .map(|candidate| litchi_iwa_common::decode_varint_from_bytes(candidate.payload()))
+            .transpose()?
+            .map(|(value, _)| value);
+        if header_index == Some(u64::from(index)) {
+            unknown.extend(
+                header
+                    .fields()
+                    .filter(|candidate| candidate.number() > 6)
+                    .map(|candidate| candidate.raw().to_vec())
+                    .collect::<Vec<_>>(),
+            );
+            break;
+        }
+    }
+    Ok(unknown)
+}
+
+fn add_header_unknowns(source: &[u8]) -> TestResult<Vec<u8>> {
+    let catalog = Catalog::from_bytes(source, ArchiveLimits::default())?;
+    let mut replacements = Vec::new();
+    for entry in catalog
+        .iter()
+        .filter(|entry| entry.name().ends_with(".iwa"))
+    {
+        let bytes = SnappyStream::decompress(entry.data(), Default::default())?;
+        let mut archive = Archive::parse(bytes.as_bytes(), Default::default())?;
+        let mut changed = false;
+        for object in &mut archive.objects {
+            for message in &mut object.messages {
+                if message.type_ != 6_006 {
+                    continue;
+                }
+                append_varint_field(&mut message.data, 90, 0x51)?;
+                changed = true;
+            }
+        }
+        if changed {
+            let compressed =
+                SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
+            replacements.push((entry.name().to_owned(), compressed));
+        }
+    }
+    if replacements.is_empty() {
+        return Err("source has no header buckets to decorate".into());
+    }
+    let edits = replacements
+        .iter()
+        .map(|(name, bytes)| EntryEdit::new(name, bytes))
+        .collect::<Vec<_>>();
+    Ok(catalog.reassemble_to_bytes(&edits, ArchiveLimits::default())?)
+}
+
+fn header_and_tile_probe(source: &[u8], row: u32, column: u32) -> TestResult<HeaderAndTileProbe> {
+    let (_, model) = table_model(source)?;
+    let tile_size = model
+        .base_data_store
+        .tiles
+        .tile_size
+        .ok_or("tile size missing")?;
+    let tile_key = row / tile_size;
+    let tile_ref = model
+        .base_data_store
+        .tiles
+        .tiles
+        .iter()
+        .find(|tile| tile.tileid == tile_key)
+        .ok_or("selected tile reference missing")?;
+    let tile_payload = object_message(source, tile_ref.tile.identifier, 6_002)?;
+    let tile = tst::Tile::decode(tile_payload.as_slice())?;
+    let local = row % tile_size;
+    let target_row = tile
+        .row_infos
+        .iter()
+        .find(|candidate| candidate.tile_row_index == local);
+    let target_cell_present = target_row.is_some_and(|candidate| {
+        candidate
+            .cell_offsets
+            .as_deref()
+            .and_then(|offsets| offsets.get(column as usize * 2..column as usize * 2 + 2))
+            .is_some_and(|offset| offset != [0xff, 0xff])
+    });
+    let row_bucket_reference = model
+        .base_data_store
+        .row_headers
+        .buckets
+        .get(usize::try_from(
+            u64::from(row) / litchi_numbers_wire::table_topology::storage::HEADER_BUCKET_ROWS,
+        )?)
+        .ok_or("selected row bucket reference missing")?;
+    let column_bucket_reference = &model.base_data_store.column_headers;
+    let row_bucket = object_message(source, row_bucket_reference.identifier, 6_006)?;
+    let column_bucket = object_message(source, column_bucket_reference.identifier, 6_006)?;
+    let row_header = tst::HeaderStorageBucket::decode(row_bucket.as_slice())?
+        .headers
+        .into_iter()
+        .find(|header| header.index == row)
+        .map(|header| header.number_of_cells);
+    let column_header = tst::HeaderStorageBucket::decode(column_bucket.as_slice())?
+        .headers
+        .into_iter()
+        .find(|header| header.index == column)
+        .map(|header| header.number_of_cells);
+    Ok(HeaderAndTileProbe {
+        row_count: row_header,
+        column_count: column_header,
+        tile_num_cells: tile.num_cells,
+        tile_numrows: tile.numrows,
+        target_row_present: target_row.is_some(),
+        target_cell_present,
+        row_unknown_fields: header_unknown_fields(&row_bucket, row)?,
+        column_unknown_fields: header_unknown_fields(&column_bucket, column)?,
+    })
+}
+
+fn assert_w1g_materialization_case(source: &[u8], row: u32, column: u32) -> TestResult {
+    let source_probe = header_and_tile_probe(source, row, column)?;
+    assert!(!source_probe.target_cell_present);
+    let host = host_w1g_whole_cell_style_at(source, row, column)?;
+    let (leaf, restored) = leaf_w1g_whole_cell_style_at(source, row, column)?;
+    assert_eq!(
+        restored, source,
+        "leaf inverse must restore the exact source"
+    );
+    let host_probe = header_and_tile_probe(&host, row, column)?;
+    let leaf_probe = header_and_tile_probe(&leaf, row, column)?;
+    assert_eq!(
+        host_probe, leaf_probe,
+        "host/leaf storage materialization differs"
+    );
+    assert!(host_probe.target_row_present);
+    assert!(host_probe.target_cell_present);
+    assert!(host_probe.row_count.is_some_and(|count| count > 0));
+    assert!(host_probe.column_count.is_some_and(|count| count > 0));
+    assert!(host_probe.tile_numrows >= source_probe.tile_numrows);
+    for output in [&host, &leaf] {
+        let editor = numbers::Draft::from_bytes(output)?;
+        let model = crate::numbers_cases::host_first_table_model_id(&editor)?;
+        let style = editor.table_cell_text_style(model, row as usize, column as usize)?;
+        assert_eq!(style.point_size.points(), 18.0);
+        assert!(style.bold);
+        let package = litchi_numbers::Package::from_bytes(output)?;
+        let properties = package.table_cell_text_style(
+            0usize,
+            0usize,
+            litchi_numbers::table::At::new(row, column),
+        )?;
+        assert_eq!(properties.size, Some(18.0));
+        assert_eq!(properties.bold, Some(true));
+    }
+    assert_eq!(
+        host_probe.row_unknown_fields,
+        source_probe.row_unknown_fields
+    );
+    assert_eq!(
+        host_probe.column_unknown_fields,
+        source_probe.column_unknown_fields
+    );
+    Ok(())
+}
+
+/// Source-relative host/leaf controls for style-only materialization.  G22
+/// exercises an absent cell in an existing row; the second target is an
+/// absent row inside an existing tile.  Both controls compare row/column
+/// buckets, tile presence/counts, semantic host/leaf reads, unknown fields,
+/// and the exact leaf inverse.
+#[test]
+fn numbers_whole_cell_style_materialization_header_controls() -> TestResult {
+    let input = fixture("iwork/numbers/basic.numbers")?;
+    let source = add_header_unknowns(&input.bytes)?;
+    let source_probe = header_and_tile_probe(&source, 21, 6)?;
+    assert!(!source_probe.row_unknown_fields.is_empty());
+    assert!(!source_probe.column_unknown_fields.is_empty());
+    assert_w1g_materialization_case(&source, 21, 6)?;
+    let missing = first_missing_row_existing_tile(&source)?;
+    assert_w1g_materialization_case(&source, missing.0, missing.1)
 }
 
 fn assert_batch_style_identity(output: &[u8]) -> TestResult {

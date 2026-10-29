@@ -802,10 +802,10 @@ pub struct TableFacts {
     pub columns: u32,
     /// Rows per storage tile.
     pub tile_size: u64,
-    /// Row-header bucket object identifier.
-    pub row_headers: u64,
+    /// Row-header bucket indices and object identifiers, in source order.
+    pub row_headers: Vec<(u32, u64)>,
     /// Column-header bucket object identifier.
-    pub column_headers: u64,
+    pub column_headers: Option<u64>,
     /// Storage tile index and object identifier pairs.
     pub tiles: Vec<(u32, u64)>,
 }
@@ -819,10 +819,24 @@ pub fn table_facts(
     limits: &Limits,
 ) -> Result<TableFacts, Error> {
     let table = Table::read(source, target, limits)?;
-    let row_headers =
-        reference(&table.store, 1, limits)?.ok_or(invalid("row-header storage missing"))?;
-    let column_headers =
-        reference(&table.store, 2, limits)?.ok_or(invalid("column-header storage missing"))?;
+    let row_headers = bytes(&table.store, 1, limits)?
+        .map(|storage| {
+            repeated_payloads(storage, 2, limits)?
+                .into_iter()
+                .enumerate()
+                .map(|(bucket, reference)| {
+                    limits.charge_references(1)?;
+                    let identifier = varint(reference, 1, limits)?
+                        .ok_or(invalid("row-header reference identifier missing"))?;
+                    let bucket = u32::try_from(bucket)
+                        .map_err(|_| invalid("row-header bucket index exceeds u32"))?;
+                    Ok((bucket, identifier))
+                })
+                .collect::<Result<Vec<_>, Error>>()
+        })
+        .transpose()?
+        .unwrap_or_default();
+    let column_headers = reference(&table.store, 2, limits)?;
     let tile_storage =
         bytes(&table.store, STORE_TILES, limits)?.ok_or(invalid("tile storage missing"))?;
     let tile_size = varint(tile_storage, 2, limits)?.ok_or(invalid("tile size missing"))?;
