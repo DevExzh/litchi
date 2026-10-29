@@ -1,4 +1,4 @@
-# W2-B Pages chart-font facade (draft)
+# W2-B Pages chart-font facade
 
 ## Scope
 
@@ -24,10 +24,11 @@ set/reset, preservation of the other property, exact inverse/no-op bytes, and
 candidate semantic readback. The existing native fixture's mixed-font and
 mixed-size chart remains a typed refusal control.
 
-The six facade routes remain host-only in the exit ledger until the final
-integrated performance qualification and native mutation evidence. The Mac
-queue remains pending; synthetic/self-round-trip evidence does not claim
-native acceptance.
+All six facade routes are migrated in the exit ledger with Tier-A reads and
+Tier-B set/reset parity. The macOS mutation queue remains pending; its absence
+does not undo the migration, but it continues to block W3. Synthetic and
+self-round-trip evidence does not claim native acceptance, and final
+integrated performance qualification remains required.
 
 The final scoped proof also compares host and facade reads after host-authored
 font/size setup, host and facade set/reset readback, and the preserved
@@ -79,8 +80,10 @@ The six ledger rows now bind to actual Pages host-vs-facade parity tests:
 `pages_body_chart_font_read_parity`, `pages_body_chart_font_set_parity`,
 `pages_body_chart_font_reset_parity`, and the corresponding three
 `pages_body_chart_font_size_*` tests. Reads are Tier A; set/reset routes are
-Tier B for the documented fresh-UUID policy. All six have pending native queue
-rows; no E3/E4 evidence is claimed.
+Tier B writes compare metadata UUIDs by the documented structural policy;
+resets may reuse or collapse existing variations and do not inherently claim
+fresh UUID allocation. All six have pending native queue rows; no E3/E4
+evidence is claimed.
 
 An initial source-bound release probe binary was built but not executed; it
 was superseded by the final CPU5 source-bound build below:
@@ -127,8 +130,8 @@ The six tests execute explicit host/leaf/leaf/host ABBA calls, with host
 setup outside the measured route; reset setup uses the direct host writer and
 is not collected under the measured host symbol. Forward probes do not apply
 inverse patches. This is instruction-count evidence only; there is no
-wall-time claim. The six ledger rows remain host-only pending the
-coordinator's integrated final qualification and native queue policy.
+wall-time claim. The six migrated rows remain pending only for native queue
+verification and final integrated qualification.
 
 The superseded `pages-cpu5-c3dd90d7dc` capture set is retained externally as
 non-qualifying history because its generic host read wrapper inspected both
