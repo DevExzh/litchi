@@ -52,3 +52,11 @@ pub mod font {
     pub use litchi_iwa_style::chart_font::ChartFont;
     pub use litchi_iwa_text::character::TextPointSize;
 }
+
+/// Exact-source per-series symbol transactions of one rooted body chart.
+pub mod series {
+    pub use crate::package::body_chart_series::{
+        Commit, Diagnostics, Edit, Error, LimitKind, Patch, Property, PropertyKind, Refusal,
+    };
+    pub use litchi_iwa_common::chart::series::{Symbol, SymbolFamily, SymbolShape, SymbolSize};
+}

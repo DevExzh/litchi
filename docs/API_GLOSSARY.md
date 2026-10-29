@@ -2935,6 +2935,17 @@ is accepted; no legacy-host fallback is implied by a refusal.
 |---|---|---|
 | `litchi_numbers::sheet::chart::font::{Property, PropertyKind, Edit, Patch, Commit, Diagnostics, Error, LimitKind, Refusal, ChartFont, TextPointSize}` | Selector-first `Package::{sheet_chart_font, edit_sheet_chart_font, apply_sheet_chart_font}` for chart font identity/traits and point size; `Edit::{set, reset}` uses family-scoped reads, exact-source patches, inverse/no-op behavior and candidate readback. The facade does not expose native IDs, archives or protobuf values; mixed unrelated font/size state is not rejected merely because the other family is non-uniform. | ⏳ 0385: host differential and public-contract tests prepared; shared bounded-error contract, native queue, final performance and integrated gate pending |
 
+## W2-B Pages chart-series symbols (record 0400)
+
+The Pages facade is a thin selector adapter over the existing bounded
+`litchi_iwa_style::series::set_symbols` graph engine. Host single-series and
+all-series symbol setters collapse into one semantic vector property; native
+identifiers and archive values do not cross the public boundary.
+
+| Canonical name | Meaning | Status |
+|---|---|---|
+| `litchi_pages::chart::series::{Property, PropertyKind, Edit, Patch, Commit, Diagnostics, Error, LimitKind, Refusal, Symbol, SymbolShape, SymbolSize}` | Selector-first `Package::{body_chart_series, edit_body_chart_series, apply_body_chart_series}` for per-series visibility, shape and optional point size. `Property::Symbols(Vec<Option<Symbol>>)` is the sole write value; `Edit::set` preserves exact-source no-op/inverse/reopen/locality and maps unsupported kinds, series-count mismatch, shared styles and resource ceilings to typed refusals/errors. | ⏳ 0400: Pages host differential and scoped facade checks pass; native queue, full-facade performance and final integrated gate pending |
+
 ## iWork facade retirement and iWork open options (record 0306)
 
 | Canonical name | Banned | Status |

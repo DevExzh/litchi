@@ -1769,10 +1769,10 @@ pages/editor/charts/series_stroke.rs	body_chart_series_strokes	1	pages	chart.sty
 pages/editor/charts/series_stroke.rs	reset_body_chart_series_stroke	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
 pages/editor/charts/series_stroke.rs	set_body_chart_series_stroke	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
 pages/editor/charts/series_stroke.rs	set_body_chart_series_strokes	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
-pages/editor/charts/series_symbol.rs	body_chart_series_symbol	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
-pages/editor/charts/series_symbol.rs	body_chart_series_symbols	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
-pages/editor/charts/series_symbol.rs	set_body_chart_series_symbol	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
-pages/editor/charts/series_symbol.rs	set_body_chart_series_symbols	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
+pages/editor/charts/series_symbol.rs	body_chart_series_symbol	1	pages	chart.style	migrated	litchi_pages::Package::body_chart_series	pages_body_chart_series_symbols_read_parity	A	-	0400
+pages/editor/charts/series_symbol.rs	body_chart_series_symbols	1	pages	chart.style	migrated	litchi_pages::Package::body_chart_series	pages_body_chart_series_symbols_read_parity	A	-	0400
+pages/editor/charts/series_symbol.rs	set_body_chart_series_symbol	1	pages	chart.style	migrated	litchi_pages::chart::series::Edit::set	pages_body_chart_series_symbols_allocate_parity	B	-	0400
+pages/editor/charts/series_symbol.rs	set_body_chart_series_symbols	1	pages	chart.style	migrated	litchi_pages::chart::series::Edit::set	pages_body_chart_series_symbols_allocate_parity	B	-	0400
 pages/editor/charts/series_symbol_fill.rs	body_chart_series_symbol_fill	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
 pages/editor/charts/series_symbol_fill.rs	body_chart_series_symbol_fills	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
 pages/editor/charts/series_symbol_fill.rs	reset_body_chart_series_symbol_fill	1	pages	chart.style	host-only	litchi-pages	-	-	-	-

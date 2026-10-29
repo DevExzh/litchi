@@ -1,0 +1,81 @@
+{
+  "schema": "iwork-pages-chart-series-symbols-callgrind-v1",
+  "record": "0400",
+  "source": {
+    "head": "a06fd62966b6a8ec76e8073381ee95ca4bf8513d",
+    "clean": true,
+    "cargo_lock_sha256": "f1fcd168699797144b68e94ae186854c0974f7ce03f003baa4e33540d506907e",
+    "binary": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-w2b-pages-symbols-build-0555-a06fd62966/parity-0555-a06fd62966-release-debug1",
+    "binary_sha256": "991b304b3b258da6e76d9aa0205dda63929a36d14800ddd68020d6472f03614d"
+  },
+  "capture": {
+    "scope": "full-leaf-facade",
+    "cpu": 5,
+    "calls_each": 2,
+    "abba": "host/leaf/leaf/host",
+    "threshold": 100,
+    "validator": "validate_call_audit.py",
+    "validator_sha256": "c0637e4304f5fdbfae6fca6b0e9a9c17f7d10cb9a56c7df6846951fa4bdf6b8e",
+    "validator_receipt": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-w2b-pages-symbols-final-0555-a06fd62966-cpu5/c063-derived-receipt.json",
+    "validator_receipt_sha256": "159decf0ece7bbbc68c7e3c1a90e561b856422caa5442fe97edaa7894d5b77f5",
+    "capture_correction": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-w2b-pages-symbols-build-0555-a06fd62966/capture-correction-v2.json",
+    "capture_correction_sha256": "14f62c8d418b5216c384507422695f1ad0b832b64753fca506a89cacf9a19c02",
+    "route_count": 4,
+    "capture_count": 8
+  },
+  "routes": [
+    {
+      "id": "pages_w2b_chart_series_symbols_all_read",
+      "operation": "all_read",
+      "test": "pages_chart_series_symbol_cost::pages_chart_series_symbols_facade_cost_abba",
+      "host_ir": 1350514913,
+      "leaf_ir": 31932968,
+      "leaf_over_host": 0.023645031752418715,
+      "status": "meets",
+      "host_raw_sha256": "c46dd063229e3728dd479332aba26aa3ddc8e9b64ca126e2a0c1b8a1d580c457",
+      "leaf_raw_sha256": "091d65e60c1f3b6efd9c8eab6cc4ad057b5ebe168ff8c72719a162e55f31767a",
+      "host_annotation_sha256": "832aaa1194474b6b7c73acec085b0a68682fe15436e1987fc69fae7dbfd11181",
+      "leaf_annotation_sha256": "fa0638e7d217977c9aef590f6bccfe5bd5af48ae8a01d4e97f0cfb49ed5c75c0"
+    },
+    {
+      "id": "pages_w2b_chart_series_symbols_all_set",
+      "operation": "all_set",
+      "test": "pages_chart_series_symbol_cost::pages_chart_series_symbols_facade_cost_abba",
+      "host_ir": 2795747961,
+      "leaf_ir": 181301099,
+      "leaf_over_host": 0.0648488710459977,
+      "status": "meets",
+      "host_raw_sha256": "52e415f90108f41c1c3466076839cff75d444a73e529689f91a9cdd92deb3be6",
+      "leaf_raw_sha256": "167d95b42ab83e47e1ef7f080db8a6868383705f98c92e55ea93ea4e4ea2ae92",
+      "host_annotation_sha256": "9ea0cf3a359ba0b1d4accdaa6097054a0483ad066ecd4b3a04466349fc594428",
+      "leaf_annotation_sha256": "11072cfd84517143d11b9aaa30c7d92f1dfb526ad73db821c78a768bae04c5a7"
+    },
+    {
+      "id": "pages_w2b_chart_series_symbols_single_read",
+      "operation": "single_read",
+      "test": "pages_chart_series_symbol_cost::pages_chart_series_symbols_facade_cost_abba",
+      "host_ir": 1350775602,
+      "leaf_ir": 31927621,
+      "leaf_over_host": 0.02363650998191482,
+      "status": "meets",
+      "host_raw_sha256": "abe406c4ac766119cce17d697d0255a3d3f8f9227c748d8552baf87dd63fbf4c",
+      "leaf_raw_sha256": "9b632017b68b009ed32d991d79da38b1c80264529c3c3c73b10004a96d959a37",
+      "host_annotation_sha256": "64b99ca3ca36f4d772e8546500511935a1ec8f49f37bab8f9536a579aa465214",
+      "leaf_annotation_sha256": "3e7dccb4f0102d5339c999674141928ff0f03b207ada29240980e9c11b19a4bf"
+    },
+    {
+      "id": "pages_w2b_chart_series_symbols_single_set",
+      "operation": "single_set",
+      "test": "pages_chart_series_symbol_cost::pages_chart_series_symbols_facade_cost_abba",
+      "host_ir": 3321533012,
+      "leaf_ir": 179613478,
+      "leaf_over_host": 0.054075475797197944,
+      "status": "meets",
+      "host_raw_sha256": "af875f7a7d76d2ddd4c839d06b63161888e983456f0067e655b864e4a51bca9e",
+      "leaf_raw_sha256": "3e8d392ac3eb03463ae6ce28d5ecdd533f18ef508dcef2f090d036242c07badb",
+      "host_annotation_sha256": "9bf4554db2b843b05d05386bf05d065edcff5cb473d28b395d49f5442fda2d50",
+      "leaf_annotation_sha256": "d5f36aaaf98a5d1d73b52fb87ce66c229adf4914485694993de8f9f7edf77f7a"
+    }
+  ],
+  "native_evidence": "pending; route remains in docs/unified-ops/0363-mac-queue.md"
+}

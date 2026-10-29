@@ -3050,6 +3050,15 @@ impl ArchiveObject {
             && self.source_headers() == other.source_headers()
     }
 
+    /// Compare retained source and canonical `ArchiveInfo` headers without
+    /// comparing payloads or decoded metadata. Format owners use this when a
+    /// planned payload mutation must still preserve producer-authored header
+    /// bytes and unknown header fields.
+    #[must_use]
+    pub fn same_source_headers(&self, other: &Self) -> bool {
+        self.source_headers() == other.source_headers()
+    }
+
     /// Stream every aggregate and field-level object/data reference.
     ///
     /// The retained raw header is preflighted under the same rule used for

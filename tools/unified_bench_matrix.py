@@ -3881,6 +3881,74 @@ def p0399():
     return out
 
 
+@needs("0400")
+def p0400():
+    """Current-source Pages chart-series-symbol full-facade qualification."""
+    path = RES / "0400" / "integrated-callgrind.json"
+    data = load_json(path)
+    source = data.get("source", {})
+    source_head = source.get("head")
+    if (not isinstance(source_head, str)
+            or not re.fullmatch(r"[0-9a-f]{40}", source_head)
+            or source.get("clean") is not True):
+        raise SystemExit("0400 invalid source identity")
+    capture = data.get("capture", {})
+    if (capture.get("scope") != "full-leaf-facade"
+            or capture.get("cpu") != 5
+            or capture.get("calls_each") != 2
+            or capture.get("threshold") != 100
+            or capture.get("route_count") != 4
+            or capture.get("capture_count") != 8):
+        raise SystemExit("0400 instruction policy changed")
+    expected = {
+        "pages_w2b_chart_series_symbols_all_read":
+            ("get", "Property::Symbols all chart symbols", "all"),
+        "pages_w2b_chart_series_symbols_all_set":
+            ("set", "Property::Symbols all chart symbols", "all"),
+        "pages_w2b_chart_series_symbols_single_read":
+            ("get", "Property::Symbols single chart symbol", "1"),
+        "pages_w2b_chart_series_symbols_single_set":
+            ("set", "Property::Symbols single chart symbol", "1"),
+    }
+    routes = data.get("routes")
+    if not isinstance(routes, list) or len(routes) != len(expected):
+        raise SystemExit("0400 requires exactly four Pages Symbols routes")
+    out = []
+    seen = set()
+    for route in routes:
+        route_id = route.get("id")
+        if route_id in seen or route_id not in expected:
+            raise SystemExit(f"0400 invalid or duplicate route: {route_id}")
+        seen.add(route_id)
+        operation, scenario, size = expected[route_id]
+        receipt_operation = route_id.removeprefix("pages_w2b_chart_series_symbols_")
+        if route.get("operation") not in (None, operation, receipt_operation):
+            raise SystemExit(f"0400 route operation changed: {route_id}")
+        host = route.get("host_ir")
+        leaf = route.get("leaf_ir")
+        ratio = route.get("leaf_over_host")
+        if (type(host) is not int or type(leaf) is not int
+                or host <= 0 or leaf <= 0
+                or type(ratio) not in (int, float)
+                or abs(ratio - leaf / host) > 1e-12
+                or ratio > 1.05
+                or route.get("status") != "meets"):
+            raise SystemExit(f"0400 invalid instruction result: {route_id}")
+        out.append(row(
+            "0400", "pages", operation, scenario, size, leaf, host, [ratio],
+            regression("0400"), f"pages_symbols_facade:{route_id}:ir", src([path]),
+            stage=f"source-bound {source_head[:10]}",
+            comparison="leaf/host (inclusive Callgrind Ir)", unit="Ir",
+            explanation=(
+                "Accepted current-source Pages chart-series-symbol full-facade "
+                "route; raw selected calls, exact two-call policy, full-function "
+                "Ir, PROGRAM TOTALS and threshold-100 annotation agree. No "
+                "wall-time or native acceptance claim.")))
+    if seen != set(expected):
+        raise SystemExit("0400 route set is incomplete")
+    return out
+
+
 @needs("0401")
 def p0401():
     """Accepted scoped W2-C Keynote chart-series instruction routes."""
@@ -4224,7 +4292,7 @@ PARSERS = [p0250, p0251, p0251f, p0252, p0253, p0254, p0255, p0256, p0258, p0259
            p0328, p0329, p0330, p0333, p0335, p0336, p0337, p0338, p0340, p0342, p0345, p0346,
            p0347, p0348, p0355, p0355a, p0356, p0356a, p0356b, p0356c, p0357, p0357a, p0357b, p0358, p0358a,
            p0359, p0359a, p0359b, p0359qb, p0359qc, p0359qd, p0359r, p0359ra, p0359rb, p0359rc,
-           p0359rd, p0359re, p0359qe, p0360b, p0361, p0361a, p0362, p0362ya, p0362yb, p0362yc, p0362yd, p0362ye, p0375b, p0377, p0377a, p0391, p0399, p0401, p0403]
+           p0359rd, p0359re, p0359qe, p0360b, p0361, p0361a, p0362, p0362ya, p0362yb, p0362yc, p0362yd, p0362ye, p0375b, p0377, p0377a, p0391, p0399, p0400, p0401, p0403]
 
 
 

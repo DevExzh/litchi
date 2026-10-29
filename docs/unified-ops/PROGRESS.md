@@ -7405,3 +7405,29 @@ See [0063](0063-source-pptx-modern-comments.md).
   and host; the reduced receipt now labels validator-code and validator-output
   hashes separately. Four Keynote ledger rows migrate with four native routes
   still pending. No final integrated performance or native claim is made.
+
+- The Keynote integration `480eccdb4b` passed workspace compilation, all 20
+  locked fuzz checks, boundaries, ledger and clean-source checks. Its merged
+  worktree/branch and disposable caches were retired: 63 worktrees and 56
+  branches removed, with 306,018,771,828 measured logical bytes cleaned
+  (about 285.00 GiB). External Keynote binaries, raw captures and receipts
+  remained hash-exact.
+- Accepted Pages `a9f5f54ef2` (record 0400), synchronized with the integrated
+  Numbers/Keynote source. The symbol facade uses shared prepared serialization,
+  typed candidate reopen, precise planned-member/object checks and exact-source
+  inverse patches. Output/scratch admission precedes the apply target copy.
+  Existing locality, raw-header and low-budget controls remain green; all
+  three source-scoped symbol families now share the canonical engine.
+- Pages' measured source `a06fd62966` passed all four full-facade instruction
+  routes/eight two-call captures. Leaf/host ratios are 0.023645, 0.064849,
+  0.023637 and 0.054075. Independent review and coordinator artifact checks
+  passed; a retained correction manifest binds the actual capture filenames
+  without changing source, ELF, CPU, environment or selected wrappers.
+  Four Pages ledger rows migrate and the two canonical Pages native routes
+  remain queued. Unified operations exposure is still a separate D7 follow-up.
+- The integrated symbol wave now enters final qualification. Run all 53 gate
+  rows and final performance matrices on this one frozen source; do not combine
+  earlier commits' green rows or claim that the source-scoped measurements
+  qualify this integration. Native verification and remaining host capabilities
+  still block W3. The last fully qualified source remains `e0e297a82b` until
+  these final integrated checks complete.
