@@ -30,7 +30,10 @@ use litchi_iwa_common::chart::series::{
 };
 use litchi_iwa_common::chart::series_labels::Visibility;
 use litchi_iwa_common::shape::fill::Fill;
-use litchi_iwa_core::{Archive, RawMessage, SnappyStream};
+use litchi_iwa_core::{
+    Archive, ArchiveEncodingPreparationChunk, ArchiveEncodingPreparationError, RawMessage,
+    SnappyCompressionPreparationChunk, SnappyCompressionPreparationError, SnappyStream,
+};
 use litchi_iwa_protos::chart_metadata_codec as metadata_codec;
 use litchi_iwa_style::graph::Workspace;
 use litchi_iwa_style::series::{
@@ -1013,6 +1016,24 @@ fn map_arrangement(error: arrangement::Error) -> Error {
     }
 }
 
+fn map_candidate_core_error(error: litchi_iwa_core::Error) -> Error {
+    match error {
+        litchi_iwa_core::Error::Limit {
+            kind,
+            observed,
+            maximum,
+        } => Error::Limit {
+            kind: LimitKind::Core(kind),
+            observed: observed as u64,
+            maximum: maximum as u64,
+        },
+        litchi_iwa_core::Error::Allocation { requested, .. } => {
+            Error::Allocation { amount: requested }
+        },
+        _ => Error::Verification,
+    }
+}
+
 fn map_candidate_archive_error(error: litchi_iwa_archive::Error) -> Error {
     match error {
         litchi_iwa_archive::Error::Limit {
@@ -1025,21 +1046,7 @@ fn map_candidate_archive_error(error: litchi_iwa_archive::Error) -> Error {
             maximum,
         },
         litchi_iwa_archive::Error::Allocation { amount, .. } => Error::Allocation { amount },
-        litchi_iwa_archive::Error::Iwa(error) => match error {
-            litchi_iwa_core::Error::Limit {
-                kind,
-                observed,
-                maximum,
-            } => Error::Limit {
-                kind: LimitKind::Core(kind),
-                observed: observed as u64,
-                maximum: maximum as u64,
-            },
-            litchi_iwa_core::Error::Allocation { requested, .. } => {
-                Error::Allocation { amount: requested }
-            },
-            _ => Error::Verification,
-        },
+        litchi_iwa_archive::Error::Iwa(error) => map_candidate_core_error(error),
         litchi_iwa_archive::Error::Reassembly(_) => Refusal::UnsupportedSource.into(),
         _ => Error::Verification,
     }
@@ -1074,21 +1081,7 @@ fn map_candidate_package_error(error: super::Error) -> Error {
                 observed,
                 maximum,
             },
-            litchi_iwa_detect::Error::IwaCore(error) => match error {
-                litchi_iwa_core::Error::Limit {
-                    kind,
-                    observed,
-                    maximum,
-                } => Error::Limit {
-                    kind: LimitKind::Core(kind),
-                    observed: observed as u64,
-                    maximum: maximum as u64,
-                },
-                litchi_iwa_core::Error::Allocation { requested, .. } => {
-                    Error::Allocation { amount: requested }
-                },
-                _ => Error::Verification,
-            },
+            litchi_iwa_detect::Error::IwaCore(error) => map_candidate_core_error(error),
             litchi_iwa_detect::Error::IwaCommon(error) => map_candidate_common_error(error),
             litchi_iwa_detect::Error::Allocation { amount } => Error::Allocation { amount },
             _ => Error::Verification,
@@ -1206,6 +1199,103 @@ impl PreparedComponents<'_> {
     }
 }
 
+fn charge_preparation_chunk(
+    budget: &mut ChartBudget,
+    traversal_bytes: usize,
+    elements: usize,
+) -> Result<(), arrangement::Error> {
+    let work = traversal_bytes
+        .checked_add(elements)
+        .ok_or(arrangement::Error::InvalidSource)?;
+    budget.preflight_work(work)?;
+    budget.work(work)
+}
+
+fn map_archive_encoding_preparation_error(
+    error: ArchiveEncodingPreparationError<arrangement::Error>,
+) -> Error {
+    match error {
+        ArchiveEncodingPreparationError::Admission(error) => map_arrangement(error),
+        ArchiveEncodingPreparationError::Core(error) => map_candidate_core_error(error),
+        ArchiveEncodingPreparationError::ArithmeticOverflow { .. } => Error::Overflow,
+        _ => Error::Verification,
+    }
+}
+
+fn map_snappy_preparation_error(
+    error: SnappyCompressionPreparationError<arrangement::Error>,
+) -> Error {
+    match error {
+        SnappyCompressionPreparationError::Admission(error) => map_arrangement(error),
+        SnappyCompressionPreparationError::Core(error) => map_candidate_core_error(error),
+        SnappyCompressionPreparationError::ArithmeticOverflow { .. } => Error::Overflow,
+        _ => Error::Verification,
+    }
+}
+
+fn charge_archive_encoding_requirements(
+    budget: &mut ChartBudget,
+    requirements: litchi_iwa_core::ArchiveEncodingRequirements,
+) -> Result<(), arrangement::Error> {
+    let work = requirements
+        .work_bytes()
+        .checked_add(requirements.identifier_sort_work())
+        .ok_or(arrangement::Error::InvalidSource)?;
+    budget.preflight_work(work)?;
+    budget.preflight_allocations(requirements.allocation_events())?;
+    budget.preflight_retained(requirements.retained_bytes())?;
+    budget.preflight_scratch(requirements.scratch_bytes())?;
+    budget.work(work)?;
+    budget.allocations(requirements.allocation_events())?;
+    budget.retained(requirements.retained_bytes())?;
+    budget.scratch(requirements.scratch_bytes())
+}
+
+fn charge_snappy_compression_requirements(
+    budget: &mut ChartBudget,
+    requirements: litchi_iwa_core::SnappyCompressionRequirements,
+) -> Result<(), arrangement::Error> {
+    let scratch = requirements
+        .temporary_frame_capacity_bytes()
+        .checked_add(requirements.encoder_workspace_bytes())
+        .ok_or(arrangement::Error::InvalidSource)?;
+    budget.preflight_work(requirements.work_bytes())?;
+    budget.preflight_allocations(requirements.allocation_events())?;
+    budget.preflight_retained(requirements.output_capacity_bytes())?;
+    budget.preflight_scratch(scratch)?;
+    budget.work(requirements.work_bytes())?;
+    budget.allocations(requirements.allocation_events())?;
+    budget.retained(requirements.output_capacity_bytes())?;
+    budget.scratch(scratch)
+}
+
+fn encode_and_compress_member(
+    archive: &Archive,
+    archive_limits: litchi_iwa_core::Limits,
+    snappy_limits: litchi_iwa_core::SnappyLimits,
+    budget: &mut ChartBudget,
+) -> Result<Vec<u8>, Error> {
+    let mut archive_visitor = |chunk: ArchiveEncodingPreparationChunk| {
+        charge_preparation_chunk(budget, chunk.traversal_bytes(), chunk.elements())
+    };
+    let plan = archive
+        .prepare_encoding(archive_limits, &mut archive_visitor)
+        .map_err(map_archive_encoding_preparation_error)?;
+    charge_archive_encoding_requirements(budget, plan.requirements()).map_err(map_arrangement)?;
+    let bytes = plan.execute().map_err(map_candidate_core_error)?;
+    let mut snappy_visitor = |chunk: SnappyCompressionPreparationChunk| {
+        charge_preparation_chunk(budget, chunk.traversal_bytes(), chunk.elements())
+    };
+    let compression =
+        SnappyStream::prepare_compression(bytes.len(), snappy_limits, &mut snappy_visitor)
+            .map_err(map_snappy_preparation_error)?;
+    charge_snappy_compression_requirements(budget, compression.requirements())
+        .map_err(map_arrangement)?;
+    compression
+        .execute(&bytes)
+        .map_err(map_candidate_core_error)
+}
+
 fn prepare_components<'a>(
     package: &'a Package,
     budget: &mut ChartBudget,
@@ -1259,39 +1349,6 @@ fn publish_changes_exact(
         .limits()
         .snappy_limits()
         .map_err(|error| structure::map_archive(&error))?;
-    let mut retained_bound = 0usize;
-    let mut scratch_bound = 0usize;
-    let mut work_bound = 0usize;
-    let mut changed_member_count = 0usize;
-    let mut bounds = |_name: &str, archive: &Archive| -> Result<(), Error> {
-        let encoded = archive
-            .encoded_len(archive_limits)
-            .map_err(|error| structure::map_core(&error))?;
-        let compressed = SnappyStream::maximum_compressed_len(encoded, snappy_limits)
-            .map_err(|error| structure::map_core(&error))?;
-        retained_bound = retained_bound
-            .checked_add(encoded)
-            .and_then(|value| value.checked_add(compressed))
-            .ok_or(Error::InvalidSource)?;
-        scratch_bound = scratch_bound
-            .checked_add(encoded)
-            .and_then(|value| value.checked_add(compressed))
-            .ok_or(Error::InvalidSource)?;
-        work_bound = work_bound
-            .checked_add(encoded)
-            .and_then(|value| value.checked_add(compressed))
-            .ok_or(Error::InvalidSource)?;
-        changed_member_count = changed_member_count
-            .checked_add(1)
-            .ok_or(Error::InvalidSource)?;
-        Ok(())
-    };
-    for (name, archive) in &changes.edits {
-        bounds(name, archive)?;
-    }
-    for insertion in &changes.insertions {
-        bounds(&insertion.name, &insertion.archive)?;
-    }
     let member_count = catalog.package().len();
     let edit_capacity = changes.edits.len();
     let insertion_capacity = changes.insertions.len();
@@ -1330,36 +1387,19 @@ fn publish_changes_exact(
                 .ok_or(Error::InvalidSource)?,
         )
         .ok_or(Error::InvalidSource)?;
-    work_bound = work_bound
-        .checked_add(name_scan_work)
-        .ok_or(Error::InvalidSource)?;
-    let vector_allocations = changed_member_count
-        .checked_mul(2)
-        .and_then(|value| value.checked_add(changes.edits.len()))
-        .and_then(|value| value.checked_add(changes.insertions.len()))
-        .and_then(|value| value.checked_add(changes.deletions.len()))
-        .and_then(|value| value.checked_add(collection_allocations))
-        .and_then(|value| value.checked_add(3))
-        .ok_or(Error::InvalidSource)?;
     budget
-        .preflight_allocations(vector_allocations)
+        .preflight_work(name_scan_work)
         .map_err(map_arrangement)?;
+    budget.work(name_scan_work).map_err(map_arrangement)?;
     budget
-        .preflight_scratch(scratch_bound)
+        .preflight_allocations(collection_allocations)
         .map_err(map_arrangement)?;
     budget
         .preflight_scratch(collection_scratch)
         .map_err(map_arrangement)?;
     budget
-        .preflight_retained(retained_bound)
+        .allocations(collection_allocations)
         .map_err(map_arrangement)?;
-    budget.preflight_work(work_bound).map_err(map_arrangement)?;
-    budget.work(work_bound).map_err(map_arrangement)?;
-    budget
-        .allocations(vector_allocations)
-        .map_err(map_arrangement)?;
-    budget.retained(retained_bound).map_err(map_arrangement)?;
-    budget.scratch(scratch_bound).map_err(map_arrangement)?;
     budget
         .scratch(collection_scratch)
         .map_err(map_arrangement)?;
@@ -1371,11 +1411,8 @@ fn publish_changes_exact(
             amount: edit_capacity,
         })?;
     for (name, archive) in &changes.edits {
-        let bytes = archive
-            .to_bytes(archive_limits)
-            .map_err(|error| structure::map_core(&error))?;
-        let compressed = SnappyStream::compress(&bytes, snappy_limits)
-            .map_err(|error| structure::map_core(&error))?;
+        let compressed =
+            encode_and_compress_member(archive, archive_limits, snappy_limits, budget)?;
         edited.push((name.as_str(), compressed));
     }
     let mut names = Vec::new();
@@ -1403,12 +1440,8 @@ fn publish_changes_exact(
             ),
             None => None,
         };
-        let bytes = insertion
-            .archive
-            .to_bytes(archive_limits)
-            .map_err(|error| structure::map_core(&error))?;
-        let compressed = SnappyStream::compress(&bytes, snappy_limits)
-            .map_err(|error| structure::map_core(&error))?;
+        let compressed =
+            encode_and_compress_member(&insertion.archive, archive_limits, snappy_limits, budget)?;
         inserted.push((insertion.name.as_str(), compressed, position));
     }
     let mut edits = Vec::new();
