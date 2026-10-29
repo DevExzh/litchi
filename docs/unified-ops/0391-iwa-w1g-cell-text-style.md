@@ -3,7 +3,7 @@
 - Status: Numbers-first substrate and proof repair remain isolated on the WP.
   Pages and Keynote facades are not started, no ledger rows are migrated, and
   no native acceptance claim is active. The current code tip is
-  `ea9a17e04d`; release-mode instruction capture remains coordinator-gated and
+  `43608b8faa`; release-mode instruction capture remains coordinator-gated and
   has not started.
 - Source branch: `uo2/iwa-w1g-cell-text-style`, cut from frozen root
   `1e3978082bd8e576f0afeb7e3eebac1ca3908d86`, then synchronized with frozen
@@ -13,8 +13,9 @@
   repair `76cfbf3afb`, current frozen-root merge `2eb913a401`, and prepared
   multi-stylesheet/segmented-list plus publication-admission closure
   `74651bb4ba`, planner/cache/probe repair `12f9de7115`, and verification
-  budget plus mixed-no-op proof `ea9a17e04d`, and direct watermark/cardinality
-  proof `ee47ab4896`. Earlier budget, parser,
+  budget plus mixed-no-op proof `ea9a17e04d`, direct watermark/cardinality
+  proof `ee47ab4896`, reviewed shared tile-writer merge `7f69b0710a`, and
+  Numbers writer adoption `43608b8faa`. Earlier budget, parser,
   exclusive-path, mutation-output and identity/unknown-preservation
   checkpoints remain in history.
 - Scope: shared `litchi-iwa-table::cell_text_style` graph reads and direct
@@ -80,7 +81,7 @@ out of scope.
 
 ## Verification and remaining work
 
-The current focused checks pass: 13 shared table unit tests (including
+The current focused checks pass: 21 shared table unit tests (including
 duplicate/unknown locality, nested-font pre-admission, residual BNC fields,
 zero ceilings and low field/work/allocation cases), nine Numbers
 `cell_text_style` tests, formatting, and strict Clippy for both crates. The
@@ -104,6 +105,9 @@ checks the combined list rewrite removes the shared key after both releases;
 its ownership control confirms an incoming model reference blocks in-place
 rewrite. Batch publication uses fresh derivations while repeated single-cell
 updates reuse the existing style object with its actual parent chain.
+All Numbers cell-key publication now routes through the shared bounded tile
+writer, including existing cells, empty slots and missing rows; the former
+default-limit/private writer paths are removed.
 The package proof mutates an otherwise exclusive style with unknown root and
 unrelated paragraph data (asserting both the nonempty paragraph field and root
 unknown field); the canonical-shape gate derives a fresh style and the old
