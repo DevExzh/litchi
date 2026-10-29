@@ -1317,15 +1317,18 @@ fn keynote_comment_route_check(
 ) {
     let expected = warmup_direct(source);
     assert_eq!(warmup_unified(source), expected, "unified/direct output");
-    for route in [0_u8, 1, 1, 0] {
-        let output = if route == 0 {
-            unified(source)
-        } else {
-            direct(source)
-        };
-        assert_eq!(output, expected, "Keynote ABBA output");
-        std::hint::black_box(output);
-    }
+    let output = unified(source);
+    assert_eq!(output, expected, "Keynote ABBA output");
+    std::hint::black_box(output);
+    let output = direct(source);
+    assert_eq!(output, expected, "Keynote ABBA output");
+    std::hint::black_box(output);
+    let output = direct(source);
+    assert_eq!(output, expected, "Keynote ABBA output");
+    std::hint::black_box(output);
+    let output = unified(source);
+    assert_eq!(output, expected, "Keynote ABBA output");
+    std::hint::black_box(output);
 }
 
 #[test]
@@ -1334,15 +1337,18 @@ fn keynote_comment_read_full_file_cost_abba() {
     let source = keynote_probe_source("slide-table-read-native.key");
     let expected = direct_keynote_comment_read_impl(&source);
     assert_eq!(unified_keynote_comment_read_impl(&source), expected);
-    for route in [0_u8, 1, 1, 0] {
-        let output = if route == 0 {
-            unified_keynote_comment_read_route(&source)
-        } else {
-            direct_keynote_comment_read_route(&source)
-        };
-        assert_eq!(output, expected, "Keynote read ABBA output");
-        std::hint::black_box(output);
-    }
+    let output = unified_keynote_comment_read_route(&source);
+    assert_eq!(output, expected, "Keynote read ABBA output");
+    std::hint::black_box(output);
+    let output = direct_keynote_comment_read_route(&source);
+    assert_eq!(output, expected, "Keynote read ABBA output");
+    std::hint::black_box(output);
+    let output = direct_keynote_comment_read_route(&source);
+    assert_eq!(output, expected, "Keynote read ABBA output");
+    std::hint::black_box(output);
+    let output = unified_keynote_comment_read_route(&source);
+    assert_eq!(output, expected, "Keynote read ABBA output");
+    std::hint::black_box(output);
 }
 
 #[test]
