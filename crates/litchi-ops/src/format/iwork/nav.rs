@@ -164,6 +164,7 @@ fn kind_of<F: Flavor>(node: &Node<'_>) -> F::Kind {
 impl<'f, F: Flavor> Inspect<'f> for Nav<'f, F> {
     const SPEC: &'static FormatSpec<F::Kind> = F::SPEC;
     const TOP: &'static [F::Kind] = F::TOP;
+    const INDIVIDUAL_PROPERTIES: bool = true;
 
     fn kind(&self, node: &Node<'f>) -> F::Kind {
         kind_of::<F>(node)
