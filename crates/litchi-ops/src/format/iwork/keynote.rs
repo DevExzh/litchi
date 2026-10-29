@@ -156,6 +156,17 @@ const FRAME_PROPS: &[PropSpec] = &[
     PropSpec::new("zorder", ValueType::Int),
 ];
 
+const CHART_PROPS: &[PropSpec] = &[
+    PropSpec::new("name", ValueType::Text),
+    PropSpec::new("x", POSITION),
+    PropSpec::new("y", POSITION),
+    PropSpec::new("width", EXTENT),
+    PropSpec::new("height", EXTENT),
+    PropSpec::new("rotation", ValueType::Number),
+    PropSpec::new("zorder", ValueType::Int),
+    clearable_writable("font.size", FONT_SIZE),
+];
+
 const TABLE_PROPS: &[PropSpec] = &[
     readable_add("name", ValueType::Text),
     readable_add("rows", ValueType::Int),
@@ -422,7 +433,7 @@ pub(crate) static SPEC: FormatSpec<Kind> = FormatSpec {
             &[Kind::Slide],
             &[],
             &["/slide[N]/chart[N]"],
-            FRAME_PROPS,
+            CHART_PROPS,
         ),
         element(
             Kind::Group,
@@ -468,6 +479,7 @@ pub(crate) enum Patch {
         litchi_keynote::slide::delete::Patch,
     ),
     Drawables(litchi_keynote::slide::drawable::Patch),
+    ChartFontSize(litchi_keynote::chart::font::size::Patch),
     TableComments(litchi_keynote::slide::table::comments::Patch),
     Creation(litchi_keynote::slide::creation::Patch),
     Media(litchi_keynote::slide::media::lifecycle::Patch),
@@ -484,6 +496,7 @@ impl Patch {
             // A committed deletion always removes one slide.
             Self::Deletion(_) => false,
             Self::Drawables(patch) => patch.is_noop(),
+            Self::ChartFontSize(patch) => patch.is_noop(),
             Self::TableComments(patch) => patch.is_noop(),
             Self::Creation(patch) => patch.is_noop(),
             Self::Media(patch) => patch.is_noop(),
@@ -503,6 +516,7 @@ pub(crate) static WRITES: super::Writes = super::Writes {
         "shape",
         "picture",
         "tc",
+        "chart",
     ],
     addable: &["slide", "paragraph", "shape", "picture", "table"],
     removable: &[
@@ -712,6 +726,44 @@ pub(crate) fn build(package: &Package) -> Result<(super::Tree, Box<[super::Part]
     Ok((tree.build(), parts.into_boxed_slice()))
 }
 
+/// Build only one slide's chart structural items for the canonical chart path
+/// fast route. The ordinary slide tree remains the source of all other reads;
+/// unrelated slide inventories are never inspected.
+pub(crate) fn build_charts(package: &Package, slide_index: usize) -> Result<super::Tree> {
+    let read = |error| leaf_refusal(LeafError::Keynote(error), FileFormat::Keynote);
+    let slides = package.slides().map_err(read)?;
+    let mut tree = TreeBuilder::new(SPEC.elements, Keynote::SINGLETONS);
+    tree.root().prop("slideCount", count(slides.len())).done();
+    let Some(_) = slides.get(slide_index) else {
+        return Ok(tree.build());
+    };
+    let slide = tree
+        .push_step(
+            ROOT,
+            Kind::Slide,
+            crate::node::PathStep::at("slide", litchi_core::Position::new(slide_index)),
+        )
+        .leaf([slide_index, 0, 0, 0])
+        .done();
+    let drawables = package
+        .slide_drawable_list(SlideSelector::index(slide_index))
+        .map_err(|error| leaf_refusal(LeafError::KeynoteDrawables(error), FileFormat::Keynote))?;
+    let mut chart_position = 0;
+    for (position, drawable) in drawables.iter().enumerate() {
+        if drawable.kind() != DrawableKind::Chart {
+            continue;
+        }
+        frame(
+            tree.push(slide, Kind::Chart)
+                .leaf([slide_index, DRAWABLE, chart_position, position]),
+            Some(drawable),
+        )
+        .done();
+        chart_position += 1;
+    }
+    Ok(tree.build())
+}
+
 /// The canonical step of slide `index`.
 fn slide_step(index: usize) -> crate::node::PathStep<'static> {
     crate::node::PathStep::at(
@@ -910,11 +962,17 @@ pub(crate) fn build_slide(
         let Some(kind) = element_of(drawable.kind()) else {
             continue;
         };
+        let chart_position = (kind == Kind::Chart).then(|| {
+            drawables[..position]
+                .iter()
+                .filter(|candidate| candidate.kind() == DrawableKind::Chart)
+                .count()
+        });
         let draft = tree
             .push(item, kind)
             .prop("name", text(drawable.name()))
             .label(drawable.name())
-            .leaf([index, DRAWABLE, 0, position]);
+            .leaf([index, DRAWABLE, chart_position.unwrap_or(0), position]);
         let draft = match kind {
             Kind::Shape => {
                 let value = drawable.text().unwrap_or_default();

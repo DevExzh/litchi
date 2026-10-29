@@ -7221,3 +7221,38 @@ See [0063](0063-source-pptx-modern-comments.md).
   admission/report helper (0402), precise planned mutation scopes and caller
   boundary repairs before performance or integration acceptance. Scoped test
   results alone do not close these contracts.
+
+- Shared cell-style post-merge checks on `59a501492c` passed. Its worktree
+  and three adopted helper worktrees/branches were retired after confirming
+  that no active process or shared cache used them. Locks and qualified
+  external evidence remain preserved. The continuation has retired 55
+  worktrees and 48 branches; the two measured cleanup sweeps removed
+  91,347,047,643 logical bytes of inactive build artifacts (about 85.07 GiB).
+- Accepted D7 chart point-size slice `238c5b2d93` (0399), synchronized with
+  `59a501492c`. Pages, Keynote and Numbers expose `font.size` read/set/null
+  reset through focused leaf transactions. Typed per-key reads and queries
+  preserve terminal refusals without forcing font reads for existing frame
+  properties. Positive EMU conversion is checked after native-float conversion.
+  Canonical chart reads use stable caches for the selected container; generic
+  navigation remains available. The existing Keynote semantic slide projection
+  still supplies the container count; the optimization avoids additional
+  unrelated chart inventory and tree work.
+- Real second-container controls verify paths, distinct Numbers sizes and
+  retained node identity. The small two-sheet fixture has a tracked generator
+  in the migration host and no native-acceptance claim. The original chart-data
+  fixtures remain typed-refusal controls rather than being silently replaced.
+- Final scoped source `be2b784791` passes all nine full-File/direct-leaf
+  instruction routes on CPU 5. All eighteen captures execute exactly one test
+  and two measured wrapper calls; raw complete-function counts, program totals,
+  aggregate annotations, source and immutable-binary identities agree. An
+  independent reviewer rederived the audit and ratios; maximum overhead is
+  4.851510%, within the 5% bar. The prior read regressions and superseded cache
+  measurements remain historical. Nine reduced benchmark rows are registered;
+  no wall-time or final integrated performance claim is made from these results.
+- D7 scoped feature checks, tests, capabilities, rustdoc/glossary, ledger,
+  boundary, fixture/example, benchmark and repository guards pass. Post-merge
+  and final integrated qualification remain required. Nine native routes are
+  appended as pending, giving 526 pending queue rows; leaf ledger dispositions
+  remain 1,197 migrated, 43 retired and 991 host-only. The shared series-symbol
+  engine and its three caller facades remain separate work packages under
+  admission/locality review and have not been integrated.

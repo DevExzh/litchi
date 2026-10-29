@@ -7,6 +7,7 @@
 //! evolve independently (record 0296).
 
 use litchi_core::Position;
+use std::sync::OnceLock;
 
 use crate::node::spec::{ElementSpec, PropSpec};
 use crate::node::{PathStep, Value};
@@ -15,6 +16,12 @@ use crate::path::navigate::ElementKind;
 /// The index of the root item (of a part, its anchor: the item standing in
 /// for the eager item whose children the part holds).
 pub(crate) const ROOT: u32 = 0;
+
+/// Base namespace for the private chart-only path cache.  The cache reserves
+/// the high half of the part namespace; normal parts are assigned from one
+/// and can never reach this bounded synthetic range.
+pub(crate) const CHART_PART_BASE: u32 = u32::MAX;
+pub(crate) const CHART_PART_MIN: u32 = 1 << 31;
 
 /// Where an item lives: its part (0 for the tree built on the first read,
 /// `k` for the `k`-th lazily built part) and its index there.
@@ -31,6 +38,22 @@ impl At {
     pub(crate) const fn new(part: u32, index: u32) -> Self {
         Self { part, index }
     }
+
+    pub(crate) const fn chart(part: u32, index: u32) -> Self {
+        Self::new(part, index)
+    }
+
+    pub(crate) const fn is_chart(self) -> bool {
+        self.part >= CHART_PART_MIN
+    }
+
+    pub(crate) const fn chart_slot(self) -> Option<u32> {
+        if self.is_chart() {
+            Some(CHART_PART_BASE - self.part)
+        } else {
+            None
+        }
+    }
 }
 
 /// One element of the tree.
@@ -44,6 +67,11 @@ pub(crate) struct Item {
     props: &'static [PropSpec],
     /// Values aligned with `props`.
     values: Box<[Option<Value<'static>>]>,
+    /// Values whose focused leaf read is deferred until the node view asks
+    /// for them (currently chart font-size).  A failed focused read is not
+    /// cached: the caller receives its typed leaf error and no refusal is
+    /// flattened into an absent property.
+    lazy_values: OnceLock<Box<[Option<Value<'static>>]>>,
     /// The item's own text, if it has any.
     text: Option<String>,
     /// The name a bare `[NAME]` step (or a `[TOKEN]` step) matches.
@@ -76,6 +104,7 @@ impl Item {
             type_name: spec.name,
             props: spec.props,
             values: vec![None; spec.props.len()].into_boxed_slice(),
+            lazy_values: OnceLock::new(),
             text: None,
             label: None,
             children: Vec::new(),
@@ -110,6 +139,10 @@ impl Item {
 
     pub(crate) fn values(&self) -> &[Option<Value<'static>>] {
         &self.values
+    }
+
+    pub(crate) fn lazy_values(&self) -> &OnceLock<Box<[Option<Value<'static>>]>> {
+        &self.lazy_values
     }
 
     pub(crate) fn text(&self) -> Option<&str> {
@@ -174,6 +207,7 @@ impl Tree {
                 type_name: "",
                 props: &[],
                 values: Box::new([]),
+                lazy_values: OnceLock::new(),
                 text: None,
                 label: None,
                 children: Vec::new(),
@@ -246,6 +280,7 @@ impl<K: ElementKind> TreeBuilder<K> {
             type_name: spec.name,
             props: spec.props,
             values: vec![None; spec.props.len()].into_boxed_slice(),
+            lazy_values: OnceLock::new(),
             text: None,
             label: None,
             children: Vec::new(),
@@ -278,6 +313,7 @@ impl<K: ElementKind> TreeBuilder<K> {
             type_name: stand_in.type_name,
             props: stand_in.props,
             values: stand_in.values.clone(),
+            lazy_values: OnceLock::new(),
             text: stand_in.text.clone(),
             label: stand_in.label.clone(),
             children: Vec::new(),
@@ -374,6 +410,7 @@ impl<K: ElementKind> TreeBuilder<K> {
             type_name: spec.name,
             props: spec.props,
             values: vec![None; spec.props.len()].into_boxed_slice(),
+            lazy_values: OnceLock::new(),
             text: None,
             label: None,
             children: Vec::new(),

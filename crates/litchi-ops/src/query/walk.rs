@@ -272,6 +272,19 @@ impl<'c> Probe<'c> {
             .as_ref()
             .ok_or_else(|| Error::new(Code::InternalError, "a property read was lost"))
     }
+
+    fn property<'f, N: Inspect<'f>>(
+        &mut self,
+        nav: &'c N,
+        node: &'c N::Node,
+        index: usize,
+    ) -> Result<Option<Value<'c>>> {
+        if N::INDIVIDUAL_PROPERTIES {
+            nav.prop(node, index)
+        } else {
+            Ok(self.format(nav, node)?.get(index))
+        }
+    }
 }
 
 /// The bit of the kind with `ordinal`; none for an ordinal past 127, which
@@ -1304,7 +1317,7 @@ where
             else {
                 return Ok(false);
             };
-            let alt = probe.format(nav, candidate.node)?.get(usize::from(index));
+            let alt = probe.property(nav, candidate.node, usize::from(index))?;
             if alt.is_some_and(|alt| !is_empty(&alt)) {
                 return Ok(false);
             }
@@ -1474,7 +1487,7 @@ where
         Ok(match target {
             Target::Absent(test) => test.eval(literal, None),
             Target::Prop { index, test } => {
-                let value = if cond.direct {
+                let value = if cond.direct || N::INDIVIDUAL_PROPERTIES {
                     nav.prop(candidate.node, usize::from(index))?
                 } else {
                     probe.format(nav, candidate.node)?.get(usize::from(index))
@@ -1488,9 +1501,14 @@ where
                 test.eval(literal, Some(Scalar::Text(nav.type_name(candidate.node))))
             },
             Target::Style { prop, name, test } => {
-                let format = probe.format(nav, candidate.node)?;
-                let declared = prop.and_then(|index| format.get(usize::from(index)));
-                let display = name.and_then(|index| format.get(usize::from(index)));
+                let declared = prop
+                    .map(|index| probe.property(nav, candidate.node, usize::from(index)))
+                    .transpose()?
+                    .flatten();
+                let display = name
+                    .map(|index| probe.property(nav, candidate.node, usize::from(index)))
+                    .transpose()?
+                    .flatten();
                 let member = probe.style(nav, candidate.node)?;
                 let values = [
                     declared.as_ref().map(Value::as_scalar),
