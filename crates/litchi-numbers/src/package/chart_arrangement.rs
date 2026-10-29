@@ -626,6 +626,18 @@ impl ChartBudget {
         )
     }
 
+    fn remaining_axis(maximum: usize, used: usize, kind: LimitKind) -> Result<usize, Error> {
+        let remaining = maximum.checked_sub(used).ok_or(Error::InvalidSource)?;
+        if remaining == 0 {
+            return Err(Error::Limit {
+                kind,
+                observed: maximum.saturating_add(1) as u64,
+                maximum: maximum as u64,
+            });
+        }
+        Ok(remaining)
+    }
+
     pub(super) fn work(&mut self, amount: usize) -> Result<(), Error> {
         Self::add(&mut self.work, amount, self.max_work, LimitKind::WireWork)
     }
@@ -907,6 +919,19 @@ impl ChartBudget {
         Self::preflight(self.work, amount, self.max_work, LimitKind::WireWork)
     }
 
+    pub(super) fn finish_workspace(
+        &mut self,
+        requirements: litchi_iwa_style::graph::FinishRequirements,
+    ) -> Result<(), Error> {
+        self.preflight_work(requirements.work())?;
+        self.preflight_allocations(requirements.allocations())?;
+        self.preflight_retained(requirements.retained_bytes())?;
+        self.work(requirements.work())?;
+        self.allocations(requirements.allocations())?;
+        self.retained(requirements.retained_bytes())?;
+        Ok(())
+    }
+
     pub(super) fn residual_wire_limits(&self) -> Result<WireLimits, Error> {
         let residual = |maximum: usize, used: usize, kind| {
             let remaining = maximum.checked_sub(used).ok_or(Error::InvalidSource)?;
@@ -988,27 +1013,35 @@ impl ChartBudget {
 
     fn codec_options(&self, source: &[u8]) -> Result<DecodeOptions, Error> {
         let limits = self.residual_wire_limits()?;
+        Self::remaining_axis(
+            self.max_allocations,
+            self.allocations,
+            LimitKind::Allocations,
+        )?;
+        Self::remaining_axis(self.max_scratch, self.scratch, LimitKind::ScratchBytes)?;
         let depth = u32::try_from(limits.max_nesting().min(MAX_CODEC_NESTING as usize))
             .unwrap_or(MAX_CODEC_NESTING);
         let max_input = limits
             .max_input_bytes()
             .min(source.len().max(1))
             .min(MAX_CODEC_LIMIT);
-        let max_fields = limits.max_fields().clamp(1, MAX_CODEC_LIMIT);
-        let max_work = limits.max_rewrite_work().clamp(1, MAX_CODEC_LIMIT);
-        let max_output = limits.max_output_bytes().clamp(1, MAX_CODEC_LIMIT);
-        let max_allocations = self
-            .max_allocations
-            .saturating_sub(self.allocations)
-            .clamp(1, MAX_CODEC_LIMIT);
-        let max_retained = self
-            .max_retained
-            .saturating_sub(self.retained)
-            .clamp(1, MAX_CODEC_LIMIT);
-        let max_scratch = self
-            .max_scratch
-            .saturating_sub(self.scratch)
-            .clamp(1, MAX_CODEC_LIMIT);
+        let max_fields = limits.max_fields().min(MAX_CODEC_LIMIT);
+        let max_work = limits.max_rewrite_work().min(MAX_CODEC_LIMIT);
+        let max_output =
+            Self::remaining_axis(self.max_output, self.output, LimitKind::OutputBytes)?
+                .min(MAX_CODEC_LIMIT);
+        let max_allocations = Self::remaining_axis(
+            self.max_allocations,
+            self.allocations,
+            LimitKind::Allocations,
+        )?
+        .min(MAX_CODEC_LIMIT);
+        let max_retained =
+            Self::remaining_axis(self.max_retained, self.retained, LimitKind::RetainedBytes)?
+                .min(MAX_CODEC_LIMIT);
+        let max_scratch =
+            Self::remaining_axis(self.max_scratch, self.scratch, LimitKind::ScratchBytes)?
+                .min(MAX_CODEC_LIMIT);
         Ok(DecodeOptions::new(max_input, max_fields, max_work, depth)
             .with_max_output_bytes(max_output)
             .with_max_allocations(max_allocations)
@@ -1026,11 +1059,17 @@ impl ChartBudget {
         &self,
     ) -> Result<chart_metadata_codec::DecodeOptions, Error> {
         let limits = self.residual_wire_limits()?;
+        Self::remaining_axis(
+            self.max_allocations,
+            self.allocations,
+            LimitKind::Allocations,
+        )?;
+        Self::remaining_axis(self.max_scratch, self.scratch, LimitKind::ScratchBytes)?;
         let depth = u32::try_from(limits.max_nesting().min(MAX_CODEC_NESTING as usize))
             .unwrap_or(MAX_CODEC_NESTING);
-        let max_input = limits.max_input_bytes().clamp(1, MAX_CODEC_LIMIT);
-        let max_fields = limits.max_fields().clamp(1, MAX_CODEC_LIMIT);
-        let max_work = limits.max_rewrite_work().clamp(1, MAX_CODEC_LIMIT);
+        let max_input = limits.max_input_bytes().min(MAX_CODEC_LIMIT);
+        let max_fields = limits.max_fields().min(MAX_CODEC_LIMIT);
+        let max_work = limits.max_rewrite_work().min(MAX_CODEC_LIMIT);
         // Labels are projection output, not native graph edges. Keep their
         // codec ceiling independent from the selector's reference ledger;
         // the decoded strings and vector slots are charged separately by the
@@ -1038,11 +1077,10 @@ impl ChartBudget {
         let max_labels = limits
             .max_fields()
             .min(MAX_METADATA_LABEL_COUNT)
-            .clamp(1, MAX_CODEC_LIMIT);
-        let max_text = self
-            .max_retained
-            .saturating_sub(self.retained)
-            .clamp(1, MAX_CODEC_LIMIT);
+            .min(MAX_CODEC_LIMIT);
+        let max_text =
+            Self::remaining_axis(self.max_retained, self.retained, LimitKind::RetainedBytes)?
+                .min(MAX_CODEC_LIMIT);
         Ok(chart_metadata_codec::DecodeOptions::new(
             max_input, max_fields, max_work, depth, max_labels, max_text,
         ))
@@ -1084,20 +1122,25 @@ impl ChartBudget {
     /// rectangular allocation at the package boundary.
     pub(super) fn data_codec_options(&self) -> Result<chart_data_codec::DecodeOptions, Error> {
         let limits = self.residual_wire_limits()?;
+        Self::remaining_axis(
+            self.max_allocations,
+            self.allocations,
+            LimitKind::Allocations,
+        )?;
+        Self::remaining_axis(self.max_scratch, self.scratch, LimitKind::ScratchBytes)?;
         let depth = u32::try_from(limits.max_nesting().min(MAX_CODEC_NESTING as usize))
             .unwrap_or(MAX_CODEC_NESTING);
-        let max_input = limits.max_input_bytes().clamp(1, MAX_CODEC_LIMIT);
-        let max_fields = limits.max_fields().clamp(1, MAX_CODEC_LIMIT);
-        let max_work = limits.max_rewrite_work().clamp(1, MAX_CODEC_LIMIT);
-        let max_cells = limits.max_fields().clamp(1, MAX_CODEC_LIMIT);
+        let max_input = limits.max_input_bytes().min(MAX_CODEC_LIMIT);
+        let max_fields = limits.max_fields().min(MAX_CODEC_LIMIT);
+        let max_work = limits.max_rewrite_work().min(MAX_CODEC_LIMIT);
+        let max_cells = limits.max_fields().min(MAX_CODEC_LIMIT);
         let max_labels = limits
             .max_fields()
             .min(MAX_METADATA_LABEL_COUNT)
-            .clamp(1, MAX_CODEC_LIMIT);
-        let max_text = self
-            .max_retained
-            .saturating_sub(self.retained)
-            .clamp(1, MAX_CODEC_LIMIT);
+            .min(MAX_CODEC_LIMIT);
+        let max_text =
+            Self::remaining_axis(self.max_retained, self.retained, LimitKind::RetainedBytes)?
+                .min(MAX_CODEC_LIMIT);
         Ok(chart_data_codec::DecodeOptions::new(
             max_input, max_fields, max_work, depth, max_cells, max_labels, max_text,
         ))
@@ -1142,18 +1185,23 @@ impl ChartBudget {
         source: &[u8],
     ) -> Result<litchi_iwa_protos::keynote_chart_title_codec::DecodeOptions, Error> {
         let limits = self.residual_wire_limits()?;
+        Self::remaining_axis(
+            self.max_allocations,
+            self.allocations,
+            LimitKind::Allocations,
+        )?;
+        Self::remaining_axis(self.max_scratch, self.scratch, LimitKind::ScratchBytes)?;
         let depth = u32::try_from(limits.max_nesting().min(MAX_CODEC_NESTING as usize))
             .unwrap_or(MAX_CODEC_NESTING);
         let max_input = limits
             .max_input_bytes()
             .min(source.len().max(1))
             .min(MAX_CODEC_LIMIT);
-        let max_fields = limits.max_fields().clamp(1, MAX_CODEC_LIMIT);
-        let max_work = limits.max_rewrite_work().clamp(1, MAX_CODEC_LIMIT);
-        let max_text = self
-            .max_retained
-            .saturating_sub(self.retained)
-            .clamp(1, MAX_CODEC_LIMIT);
+        let max_fields = limits.max_fields().min(MAX_CODEC_LIMIT);
+        let max_work = limits.max_rewrite_work().min(MAX_CODEC_LIMIT);
+        let max_text =
+            Self::remaining_axis(self.max_retained, self.retained, LimitKind::RetainedBytes)?
+                .min(MAX_CODEC_LIMIT);
         Ok(
             litchi_iwa_protos::keynote_chart_title_codec::DecodeOptions::new(
                 max_input, max_fields, max_work, depth,
@@ -2602,7 +2650,7 @@ pub(super) fn root_preview_count(
     Ok(previews.into_iter().filter(|present| *present).count())
 }
 
-fn zip_entry_work(entry: &Entry, include_data: bool) -> Result<usize, Error> {
+pub(super) fn zip_entry_work(entry: &Entry, include_data: bool) -> Result<usize, Error> {
     let metadata = entry.metadata();
     let mut work = entry
         .name()
@@ -2639,7 +2687,7 @@ fn same_header_metadata(
         && left.comment() == right.comment()
 }
 
-fn same_entry_fixed_metadata(left: &Entry, right: &Entry) -> bool {
+pub(super) fn same_entry_fixed_metadata(left: &Entry, right: &Entry) -> bool {
     left.name() == right.name()
         && left.raw_name() == right.raw_name()
         && left.is_opaque() == right.is_opaque()
@@ -2709,7 +2757,7 @@ fn same_selected_central_record(left: &[u8], right: &[u8]) -> bool {
         && left[28..] == right[28..]
 }
 
-fn same_unselected_entry_records(left: &Entry, right: &Entry) -> bool {
+pub(super) fn same_unselected_entry_records(left: &Entry, right: &Entry) -> bool {
     if left.data() != right.data()
         || left.metadata() != right.metadata()
         || left.raw_record().local_record() != right.raw_record().local_record()

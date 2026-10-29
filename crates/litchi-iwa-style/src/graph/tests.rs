@@ -44,6 +44,22 @@ fn objects_are_copy_on_write_and_identifiers_are_fresh() {
 }
 
 #[test]
+fn finish_requirements_cover_change_vectors_and_member_names() {
+    let source = components();
+    let mut workspace = Workspace::new(&source, Limits::default()).expect("workspace");
+    workspace.remove(7).expect("remove");
+    let requirements = workspace
+        .finish_requirements()
+        .expect("finish requirements");
+    assert!(requirements.allocations() >= 2);
+    assert!(requirements.retained_bytes() >= "Index/Document.iwa".len());
+    assert!(requirements.work() > 0);
+    let changes = workspace.finish();
+    assert_eq!(changes.edits.len(), 1);
+    assert_eq!(changes.deletions.len(), 0);
+}
+
+#[test]
 fn the_watermark_is_raised_and_lowered() {
     let source = components();
     let mut workspace = Workspace::new(&source, Limits::default()).expect("workspace");

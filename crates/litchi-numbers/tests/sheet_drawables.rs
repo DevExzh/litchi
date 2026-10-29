@@ -686,6 +686,16 @@ fn chart_series_symbols_scope_reopen_inverse_and_noop() -> TestResult {
                 chart_arrangement_fixture::UNRELATED_MEMBER,
             )?
         );
+        let source_central = chart_arrangement_fixture::central_record(
+            &source,
+            chart_arrangement_fixture::UNRELATED_MEMBER,
+        )?;
+        let candidate_central = chart_arrangement_fixture::central_record(
+            &candidate,
+            chart_arrangement_fixture::UNRELATED_MEMBER,
+        )?;
+        assert_eq!(&source_central[..42], &candidate_central[..42]);
+        assert_eq!(&source_central[46..], &candidate_central[46..]);
         assert_eq!(
             chart_arrangement_fixture::raw_drawable_fields(
                 &source,
@@ -705,6 +715,67 @@ fn chart_series_symbols_scope_reopen_inverse_and_noop() -> TestResult {
                 .sheet_chart_series(0, 0, PropertyKind::Symbols)
                 .is_err()
         );
+        let foreign_style = chart_arrangement_fixture::with_foreign_chart_series_style(&source)?;
+        let foreign_style_package = Package::from_bytes(&foreign_style)?;
+        let mut foreign_edit = foreign_style_package.edit_sheet_chart_series(0, 0)?;
+        let mut foreign_values =
+            foreign_style_package.sheet_chart_series(0, 0, PropertyKind::Symbols)?;
+        let Property::Symbols(values) = &mut foreign_values else {
+            return Err("foreign style symbols kind mismatch".into());
+        };
+        if let Some(first) = values.first_mut() {
+            *first = Some(litchi_iwa_common::chart::series::Symbol::automatic(
+                SymbolShape::Triangle,
+            ));
+        }
+        foreign_edit.set(foreign_values)?;
+        let foreign_commit = foreign_edit
+            .commit()
+            .map_err(|error| format!("shared style commit: {error:?}"))?;
+        let foreign_candidate = bytes(foreign_commit.package())?;
+        assert_eq!(
+            chart_arrangement_fixture::object_message(
+                &source,
+                chart_arrangement_fixture::CALCULATION_MEMBER,
+                chart_arrangement_fixture::ids(1).drawable,
+                chart_arrangement_fixture::CHART_MESSAGE_TYPE,
+            )?,
+            chart_arrangement_fixture::object_message(
+                &foreign_candidate,
+                chart_arrangement_fixture::CALCULATION_MEMBER,
+                chart_arrangement_fixture::ids(1).drawable,
+                chart_arrangement_fixture::CHART_MESSAGE_TYPE,
+            )?
+        );
+
+        let source_limits = litchi_numbers::SourceLimits::builder()
+            .max_input_bytes(source.len() as u64)?
+            .build()?;
+        let limited = Package::from_bytes_with_options(
+            &source,
+            litchi_numbers::OpenOptions::new().source_limits(source_limits),
+        )?;
+        match limited.sheet_chart_series(0, 0, PropertyKind::Symbols) {
+            Err(SeriesError::Limit { .. }) => {
+                assert_eq!(bytes(&limited)?, source);
+            },
+            Ok(Property::Symbols(mut limited_values)) => {
+                if let Some(first) = limited_values.first_mut() {
+                    *first = Some(litchi_iwa_common::chart::series::Symbol::automatic(
+                        SymbolShape::Triangle,
+                    ));
+                }
+                let mut limited_edit = limited.edit_sheet_chart_series(0, 0)?;
+                limited_edit.set(Property::Symbols(limited_values))?;
+                assert!(matches!(
+                    limited_edit.commit(),
+                    Err(SeriesError::Limit { .. })
+                ));
+                assert_eq!(bytes(&limited)?, source);
+            },
+            Ok(_) => return Err("limited symbols kind mismatch".into()),
+            Err(error) => return Err(format!("unexpected low-limit error: {error:?}").into()),
+        }
     }
     let restored = commit
         .package()

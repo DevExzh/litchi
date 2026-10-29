@@ -949,6 +949,7 @@ fn map_metadata_error(error: &metadata_codec::DecodeError) -> Error {
 struct GraphWorkspaceCost {
     work: usize,
     allocations: usize,
+    retained: usize,
     scratch: usize,
 }
 
@@ -975,9 +976,24 @@ fn graph_workspace_cost(package: &Package) -> Result<GraphWorkspaceCost, Error> 
             )
         })
         .ok_or(Error::InvalidSource)?;
+    let retained = component_count
+        .checked_mul(size_of::<(&str, &Archive)>())
+        .and_then(|value| {
+            value.checked_add(
+                object_count
+                    .checked_mul(size_of::<(u64, usize)>())
+                    .and_then(|amount| {
+                        object_count
+                            .checked_mul(size_of::<u64>())
+                            .and_then(|other| amount.checked_add(other))
+                    })?,
+            )
+        })
+        .ok_or(Error::InvalidSource)?;
     Ok(GraphWorkspaceCost {
         work,
         allocations,
+        retained,
         scratch,
     })
 }
@@ -1004,11 +1020,15 @@ fn admit_graph_workspace(package: &Package, budget: &mut ChartBudget) -> Result<
     budget
         .preflight_scratch(cost.scratch)
         .map_err(map_arrangement)?;
+    budget
+        .preflight_retained(cost.retained)
+        .map_err(map_arrangement)?;
     budget.work(cost.work).map_err(map_arrangement)?;
     budget
         .allocations(cost.allocations)
         .map_err(map_arrangement)?;
     budget.scratch(cost.scratch).map_err(map_arrangement)?;
+    budget.retained(cost.retained).map_err(map_arrangement)?;
     Ok(())
 }
 
@@ -1139,7 +1159,7 @@ fn publish_changes_exact(
             &deletions,
             package.state.options.archive(),
         )
-        .map_err(|_| Error::InvalidSource)?;
+        .map_err(|error| structure::map_archive(&error))?;
     let requirements = prepared.execution_requirements();
     budget.reassembly(requirements).map_err(map_arrangement)?;
     budget
@@ -1147,7 +1167,7 @@ fn publish_changes_exact(
         .map_err(map_arrangement)?;
     let output = prepared
         .execute(requirements.exact_limits())
-        .map_err(|_| Error::InvalidSource)?;
+        .map_err(|error| structure::map_archive(&error))?;
     let candidate = Package::from_owned_bytes_with_options(output, package.state.options)
         .map_err(|_| Error::Verification)?;
     verify_member_locality(package, &candidate, changes, budget)?;
@@ -1167,36 +1187,70 @@ fn verify_member_locality(
     let source_catalog = structure::exact_source(source).map_err(|_| Error::Verification)?;
     let candidate_catalog = structure::exact_source(candidate).map_err(|_| Error::Verification)?;
     let mut work = 0usize;
-    for entry in source_catalog.package().iter() {
-        let changed = changes.edits.iter().any(|(name, _)| *name == entry.name())
-            || changes
-                .insertions
-                .iter()
-                .any(|insertion| insertion.name == entry.name())
-            || changes.deletions.iter().any(|name| name == entry.name());
-        if changed {
-            continue;
-        }
-        let target = candidate_catalog
-            .package()
-            .iter()
-            .find(|candidate| candidate.name() == entry.name())
-            .ok_or(Error::Verification)?;
+    for entry in source_catalog
+        .package()
+        .iter()
+        .chain(candidate_catalog.package().iter())
+    {
         work = work
-            .checked_add(entry.raw_name().len())
-            .and_then(|value| value.checked_add(entry.raw_record().local_record().len()))
-            .and_then(|value| value.checked_add(target.raw_record().local_record().len()))
+            .checked_add(arrangement::zip_entry_work(entry, true).map_err(map_arrangement)?)
             .ok_or(Error::InvalidSource)?;
-        if entry.raw_name() != target.raw_name()
-            || entry.raw_record().local_record() != target.raw_record().local_record()
-            || entry.raw_record().compressed_data() != target.raw_record().compressed_data()
-            || entry.metadata() != target.metadata()
-        {
-            return Err(Error::Verification);
-        }
     }
     budget.preflight_work(work).map_err(map_arrangement)?;
     budget.work(work).map_err(map_arrangement)?;
+
+    let source_changed = |name: &str| changes.edits.iter().any(|(edited, _)| edited == name);
+    let source_deleted = |name: &str| changes.deletions.iter().any(|deleted| deleted == name);
+    let source_inserted = |name: &str| {
+        changes
+            .insertions
+            .iter()
+            .any(|insertion| insertion.name == name)
+    };
+    let source_expected_count = source_catalog
+        .package()
+        .iter()
+        .filter(|entry| !source_deleted(entry.name()))
+        .count()
+        .checked_add(changes.insertions.len())
+        .ok_or(Error::InvalidSource)?;
+    if candidate_catalog.package().iter().count() != source_expected_count {
+        return Err(Error::Verification);
+    }
+    for entry in source_catalog.package().iter() {
+        let Some(target) = candidate_catalog
+            .package()
+            .iter()
+            .find(|candidate| candidate.name() == entry.name())
+        else {
+            if source_deleted(entry.name()) {
+                continue;
+            }
+            return Err(Error::Verification);
+        };
+        if source_deleted(entry.name()) {
+            return Err(Error::Verification);
+        }
+        if source_changed(entry.name()) {
+            if !arrangement::same_entry_fixed_metadata(entry, target) {
+                return Err(Error::Verification);
+            }
+        } else if !arrangement::same_unselected_entry_records(entry, target) {
+            return Err(Error::Verification);
+        }
+    }
+    for entry in candidate_catalog.package().iter() {
+        if source_catalog
+            .package()
+            .iter()
+            .any(|source| source.name() == entry.name())
+        {
+            continue;
+        }
+        if !source_inserted(entry.name()) {
+            return Err(Error::Verification);
+        }
+    }
     Ok(())
 }
 
@@ -1435,6 +1489,10 @@ fn apply_one(
         | Property::SymbolFills(_)
         | Property::SymbolOutlines(_) => return Err(Error::InvalidSource),
     };
+    let finish_requirements = workspace.finish_requirements().map_err(Error::from)?;
+    budget
+        .finish_workspace(finish_requirements)
+        .map_err(map_arrangement)?;
     let changes = workspace.finish();
     if !changed || changes.is_empty() {
         return Ok(None);
@@ -1456,13 +1514,13 @@ fn validate_symbol_scope(
     if scope.selected_chart() != chart {
         return Err(Error::Verification);
     }
-    let edited_outside_scope = changes.edits.iter().any(|(name, archive)| {
+    for (name, archive) in &changes.edits {
         if !scope
             .allowed_members()
             .iter()
             .any(|allowed| allowed == name)
         {
-            return true;
+            return Err(Error::Verification);
         }
         let Some(original) = source
             .state
@@ -1472,11 +1530,11 @@ fn validate_symbol_scope(
             .find(|component| component.name() == name)
             .map(|component| component.archive())
         else {
-            return true;
+            return Err(Error::Verification);
         };
-        archive.objects.iter().any(|object| {
+        for object in &archive.objects {
             let Some(identifier) = object.archive_info.identifier else {
-                return true;
+                return Err(Error::Verification);
             };
             let original_object = original
                 .objects
@@ -1486,7 +1544,7 @@ fn validate_symbol_scope(
                 .as_ref()
                 .is_some_and(|candidate| *candidate == object)
             {
-                return false;
+                continue;
             }
             let object_allowed = scope.allowed_objects().contains(&identifier)
                 || scope.planned_new_objects().contains(&identifier)
@@ -1503,7 +1561,7 @@ fn validate_symbol_scope(
                 .iter()
                 .all(|message| scope.allowed_message_types().contains(&message.type_));
             if !object_allowed || !messages_allowed {
-                return true;
+                return Err(Error::Verification);
             }
             if let Some(original_object) = original_object.as_ref()
                 && (original_object.messages.len() != object.messages.len()
@@ -1514,29 +1572,27 @@ fn validate_symbol_scope(
                             .any(|source| source.type_ == message.type_)
                     }))
             {
-                return true;
+                return Err(Error::Verification);
             }
             if let Some(original_object) = original_object.as_ref()
                 && !validate_symbol_object_metadata(original_object, object, scope)
             {
-                return true;
+                return Err(Error::Verification);
             }
-            object.messages.iter().any(|message| {
+            if original_object.is_none() && !validate_new_symbol_object_metadata(object, scope) {
+                return Err(Error::Verification);
+            }
+            for message in &object.messages {
                 let original_message = original_object.as_ref().and_then(|candidate| {
                     candidate
                         .messages
                         .iter()
                         .find(|source| source.type_ == message.type_)
                 });
-                let validation = validate_symbol_message(
-                    original_message,
-                    message,
-                    scope.allowed_fields(),
-                    budget,
-                );
-                validation.is_err()
-            })
-        }) || original.objects.iter().any(|original_object| {
+                validate_symbol_message(original_message, message, scope.allowed_fields(), budget)?;
+            }
+        }
+        if original.objects.iter().any(|original_object| {
             let Some(identifier) = original_object.archive_info.identifier else {
                 return true;
             };
@@ -1545,8 +1601,10 @@ fn validate_symbol_scope(
                 .iter()
                 .all(|candidate| candidate.archive_info.identifier != Some(identifier))
                 && !scope.planned_removed_objects().contains(&identifier)
-        })
-    });
+        }) {
+            return Err(Error::Verification);
+        }
+    }
     let inserted_outside_scope = changes.insertions.iter().any(|insertion| {
         !scope
             .planned_new_members()
@@ -1565,7 +1623,7 @@ fn validate_symbol_scope(
             .iter()
             .any(|removed| removed == name)
     });
-    if edited_outside_scope || inserted_outside_scope || deleted_outside_scope {
+    if inserted_outside_scope || deleted_outside_scope {
         return Err(Error::Verification);
     }
     Ok(())
@@ -1581,11 +1639,20 @@ fn scoped_reference_transition(
     candidate: &[u64],
     scope: &engine::MutationScope,
 ) -> bool {
-    candidate.iter().all(|identifier| {
+    if !candidate.iter().all(|identifier| {
         source.contains(identifier) || scope_allows_candidate_identifier(scope, *identifier)
-    }) && source.iter().all(|identifier| {
+    }) || !source.iter().all(|identifier| {
         candidate.contains(identifier) || scope.planned_removed_objects().contains(identifier)
-    })
+    }) {
+        return false;
+    }
+    let source_kept = source
+        .iter()
+        .filter(|identifier| candidate.contains(identifier));
+    let candidate_existing = candidate
+        .iter()
+        .filter(|identifier| source.contains(identifier));
+    source_kept.eq(candidate_existing)
 }
 
 fn validate_symbol_object_metadata(
@@ -1599,13 +1666,30 @@ fn validate_symbol_object_metadata(
     if source.archive_info.message_infos.len() != candidate.archive_info.message_infos.len() {
         return false;
     }
-    for (source_info, candidate_info) in source
+    for (index, (source_info, candidate_info)) in source
         .archive_info
         .message_infos
         .iter()
         .zip(&candidate.archive_info.message_infos)
+        .enumerate()
     {
+        let Some(source_message) = source.messages.get(index) else {
+            return false;
+        };
+        let Some(candidate_message) = candidate.messages.get(index) else {
+            return false;
+        };
+        let source_length = u32::try_from(source_message.data.len()).ok();
+        let candidate_length = u32::try_from(candidate_message.data.len()).ok();
         if source_info.type_ != candidate_info.type_
+            || source_info.length != source_length.unwrap_or(u32::MAX)
+            || candidate_info.length != candidate_length.unwrap_or(u32::MAX)
+            || source_info.versions != candidate_info.versions
+            || source_info.base_message_index != candidate_info.base_message_index
+            || source_info.diff_merge_version != candidate_info.diff_merge_version
+            || source_info.diff_field_path != candidate_info.diff_field_path
+            || source_info.fields_to_remove != candidate_info.fields_to_remove
+            || source_info.diff_read_version != candidate_info.diff_read_version
             || !scoped_reference_transition(
                 &source_info.object_references,
                 &candidate_info.object_references,
@@ -1626,6 +1710,12 @@ fn validate_symbol_object_metadata(
             .zip(&candidate_info.field_infos)
         {
             if source_field.path != candidate_field.path
+                || source_field.r#type != candidate_field.r#type
+                || source_field.unknown_field_rule != candidate_field.unknown_field_rule
+                || source_field.known_field_rule != candidate_field.known_field_rule
+                || source_field.known_field_version != candidate_field.known_field_version
+                || source_field.known_field_feature_identifier
+                    != candidate_field.known_field_feature_identifier
                 || !scoped_reference_transition(
                     &source_field.object_references,
                     &candidate_field.object_references,
@@ -1644,6 +1734,50 @@ fn validate_symbol_object_metadata(
     true
 }
 
+fn validate_new_symbol_object_metadata(
+    object: &litchi_iwa_core::ArchiveObject,
+    scope: &engine::MutationScope,
+) -> bool {
+    if object.archive_info.should_merge.is_some()
+        || object.archive_info.message_infos.len() != object.messages.len()
+    {
+        return false;
+    }
+    object
+        .messages
+        .iter()
+        .zip(&object.archive_info.message_infos)
+        .all(|(message, info)| {
+            u32::try_from(message.data.len()).ok() == Some(info.length)
+                && message.type_ == info.type_
+                && !info.versions.is_empty()
+                && info.base_message_index.is_none()
+                && info.diff_merge_version.is_empty()
+                && info.diff_field_path.is_none()
+                && info.fields_to_remove.is_empty()
+                && info.diff_read_version.is_empty()
+                && info.field_infos.is_empty()
+                && info
+                    .object_references
+                    .iter()
+                    .all(|identifier| scope_allows_candidate_identifier(scope, *identifier))
+                && info
+                    .data_references
+                    .iter()
+                    .all(|identifier| scope_allows_candidate_identifier(scope, *identifier))
+                && info.field_infos.iter().all(|field| {
+                    field
+                        .object_references
+                        .iter()
+                        .all(|identifier| scope_allows_candidate_identifier(scope, *identifier))
+                        && field
+                            .data_references
+                            .iter()
+                            .all(|identifier| scope_allows_candidate_identifier(scope, *identifier))
+                })
+        })
+}
+
 fn validate_symbol_message(
     original: Option<&RawMessage>,
     candidate: &RawMessage,
@@ -1651,59 +1785,36 @@ fn validate_symbol_message(
     budget: &mut ChartBudget,
 ) -> Result<(), Error> {
     let candidate_view =
-        parse_wire_view_with_budget(&candidate.data, 1, budget).map_err(|_| Error::Verification)?;
+        parse_wire_view_with_budget(&candidate.data, 1, budget).map_err(map_arrangement)?;
     let original_view = original
         .map(|message| parse_wire_view_with_budget(&message.data, 1, budget))
         .transpose()
-        .map_err(|_| Error::Verification)?;
+        .map_err(map_arrangement)?;
     let original_fields = original_view.as_ref().map_or(0, |view| view.len());
     let pair_work = candidate_view
         .len()
         .checked_mul(original_fields)
         .ok_or(Error::Verification)?;
-    budget
-        .preflight_work(pair_work)
-        .map_err(|_| Error::Verification)?;
-    budget.work(pair_work).map_err(|_| Error::Verification)?;
-    for field in candidate_view.fields() {
-        if allowed_fields.contains(&field.number())
-            || SYMBOL_GENERATED_FIELDS.contains(&field.number())
-        {
-            continue;
-        }
-        let Some(original_view) = original_view.as_ref() else {
-            return Err(Error::Verification);
-        };
-        let candidate_count = candidate_view
-            .fields()
-            .filter(|other| other.number() == field.number() && other.raw() == field.raw())
-            .count();
-        let original_count = original_view
-            .fields()
-            .filter(|other| other.number() == field.number() && other.raw() == field.raw())
-            .count();
-        if candidate_count > original_count {
-            return Err(Error::Verification);
-        }
-    }
-    if let Some(original_view) = original_view {
-        for field in original_view.fields() {
-            if allowed_fields.contains(&field.number())
-                || SYMBOL_GENERATED_FIELDS.contains(&field.number())
-            {
-                continue;
-            }
-            let original_count = original_view
-                .fields()
-                .filter(|other| other.number() == field.number() && other.raw() == field.raw())
-                .count();
-            let candidate_count = candidate_view
-                .fields()
-                .filter(|other| other.number() == field.number() && other.raw() == field.raw())
-                .count();
-            if original_count > candidate_count {
-                return Err(Error::Verification);
-            }
+    budget.preflight_work(pair_work).map_err(map_arrangement)?;
+    budget.work(pair_work).map_err(map_arrangement)?;
+    let mut candidate_unknown = candidate_view.fields().filter(|field| {
+        !allowed_fields.contains(&field.number())
+            && !SYMBOL_GENERATED_FIELDS.contains(&field.number())
+    });
+    let mut original_unknown = original_view.as_ref().map(|view| {
+        view.fields().filter(|field| {
+            !allowed_fields.contains(&field.number())
+                && !SYMBOL_GENERATED_FIELDS.contains(&field.number())
+        })
+    });
+    loop {
+        match (
+            candidate_unknown.next(),
+            original_unknown.as_mut().and_then(Iterator::next),
+        ) {
+            (Some(candidate), Some(original)) if candidate.raw() == original.raw() => {},
+            (None, None) => break,
+            _ => return Err(Error::Verification),
         }
     }
     Ok(())

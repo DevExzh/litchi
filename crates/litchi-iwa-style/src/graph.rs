@@ -21,6 +21,7 @@
 use std::cell::RefCell;
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::fmt;
+use std::mem::size_of;
 
 use litchi_iwa_common::wire::{self, WireField};
 use litchi_iwa_common::{WireLimits, decode_varint_from_bytes};
@@ -200,6 +201,37 @@ impl Changes {
     }
 }
 
+/// Bounded allocations and retained bytes required when a workspace is
+/// converted into [`Changes`].  Format owners charge this report before
+/// calling [`Workspace::finish`], whose vectors and member names are the last
+/// graph-side allocations before publication.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct FinishRequirements {
+    allocations: usize,
+    retained_bytes: usize,
+    work: usize,
+}
+
+impl FinishRequirements {
+    /// Number of vector and owned-name allocation events.
+    #[must_use]
+    pub const fn allocations(self) -> usize {
+        self.allocations
+    }
+
+    /// Bytes retained by the final change vectors and member names.
+    #[must_use]
+    pub const fn retained_bytes(self) -> usize {
+        self.retained_bytes
+    }
+
+    /// Finite work needed to enumerate changed/deleted members.
+    #[must_use]
+    pub const fn work(self) -> usize {
+        self.work
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub(crate) enum Location {
     Source(usize),
@@ -341,17 +373,70 @@ impl<'s> Workspace<'s> {
                 edits.push((name.to_owned(), archive));
             }
         }
-        let deletions = self
-            .deleted
-            .iter()
-            .filter_map(|position| self.source.component(*position))
-            .map(|(name, _)| name.to_owned())
-            .collect();
+        let mut deletions = Vec::with_capacity(self.deleted.len());
+        for position in &self.deleted {
+            if let Some((name, _)) = self.source.component(*position) {
+                deletions.push(name.to_owned());
+            }
+        }
         Changes {
             edits,
             insertions: self.created,
             deletions,
         }
+    }
+
+    /// Report the bounded work and allocations performed by [`Self::finish`].
+    pub fn finish_requirements(&self) -> Result<FinishRequirements> {
+        let changed = self
+            .changed
+            .keys()
+            .filter(|position| !self.deleted.contains(position))
+            .count();
+        let deleted = self.deleted.len();
+        let mut name_bytes = 0usize;
+        for position in self
+            .changed
+            .keys()
+            .filter(|position| !self.deleted.contains(position))
+        {
+            if let Some((name, _)) = self.source.component(*position) {
+                name_bytes = name_bytes
+                    .checked_add(name.len())
+                    .ok_or(Error::Invalid("workspace finish name bytes overflowed"))?;
+            }
+        }
+        for position in &self.deleted {
+            if let Some((name, _)) = self.source.component(*position) {
+                name_bytes = name_bytes
+                    .checked_add(name.len())
+                    .ok_or(Error::Invalid("workspace finish name bytes overflowed"))?;
+            }
+        }
+        let allocations = usize::from(changed != 0)
+            .checked_add(usize::from(deleted != 0))
+            .and_then(|value| value.checked_add(changed))
+            .and_then(|value| value.checked_add(deleted))
+            .ok_or(Error::Invalid(
+                "workspace finish allocation count overflowed",
+            ))?;
+        let retained_bytes = changed
+            .checked_mul(size_of::<(String, Archive)>())
+            .and_then(|value| {
+                deleted
+                    .checked_mul(size_of::<String>())
+                    .and_then(|other| value.checked_add(other))
+            })
+            .and_then(|value| value.checked_add(name_bytes))
+            .ok_or(Error::Invalid("workspace finish retained bytes overflowed"))?;
+        let work = changed
+            .checked_add(deleted)
+            .ok_or(Error::Invalid("workspace finish work overflowed"))?;
+        Ok(FinishRequirements {
+            allocations,
+            retained_bytes,
+            work,
+        })
     }
 
     fn archive(&self, location: Location) -> Option<&Archive> {
