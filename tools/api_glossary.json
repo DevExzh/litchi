@@ -26051,7 +26051,8 @@
         "litchi_pages::bookmark",
         "litchi_pages::date_time",
         "litchi_pages::number_attachment",
-        "litchi_pages::table::format"
+        "litchi_pages::table::format",
+        "litchi_pages::table::comments"
       ],
       "immutable_owners": [
         "litchi_pages::Package",
@@ -26189,6 +26190,10 @@
         {
           "method": "litchi_pages::Package::apply_body_table_cell_format",
           "ok": "litchi_pages::table::format::Commit"
+        },
+        {
+          "method": "litchi_pages::Package::apply_body_table_cell_comment",
+          "ok": "litchi_pages::table::comments::Commit"
         }
       ],
       "family_methods": true,
@@ -27612,7 +27617,8 @@
         "litchi_keynote::slide::media::lifecycle",
         "litchi_keynote::slide::table::format",
         "litchi_keynote::slide::table::hidden_axes::transaction",
-        "litchi_keynote::slide::table::lifecycle"
+        "litchi_keynote::slide::table::lifecycle",
+        "litchi_keynote::slide::table::comments"
       ],
       "immutable_owners": [
         "litchi_keynote::Package",
@@ -27823,6 +27829,10 @@
         {
           "method": "litchi_keynote::Package::apply_slide_table_lifecycle",
           "ok": "litchi_keynote::slide::table::lifecycle::Commit"
+        },
+        {
+          "method": "litchi_keynote::Package::apply_slide_table_cell_comment",
+          "ok": "litchi_keynote::slide::table::comments::Commit"
         }
       ]
     },
@@ -29237,7 +29247,8 @@
         "litchi_keynote::slide::media::lifecycle",
         "litchi_keynote::slide::table::format",
         "litchi_keynote::slide::table::hidden_axes::transaction",
-        "litchi_keynote::slide::table::lifecycle"
+        "litchi_keynote::slide::table::lifecycle",
+        "litchi_keynote::slide::table::comments"
       ],
       "immutable_owners": [
         "litchi_keynote::Package",
@@ -29448,6 +29459,10 @@
         {
           "method": "litchi_keynote::Package::apply_slide_table_lifecycle",
           "ok": "litchi_keynote::slide::table::lifecycle::Commit"
+        },
+        {
+          "method": "litchi_keynote::Package::apply_slide_table_cell_comment",
+          "ok": "litchi_keynote::slide::table::comments::Commit"
         }
       ]
     },

@@ -1,0 +1,86 @@
+//! Insert visible axes before hidden axes in a Numbers table.
+
+use std::path::PathBuf;
+
+use litchi_numbers::table::hidden_axes::HiddenAxes;
+use litchi_numbers::table::topology::{ColumnInsertion, RowInsertion};
+use litchi_numbers::{Package, SheetSelector, TableSelector};
+
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let mut arguments = std::env::args().skip(1);
+    let source =
+        PathBuf::from(arguments.next().ok_or(
+            "usage: edit_numbers_hidden_table_topology <source.numbers> <output.numbers>",
+        )?);
+    let output =
+        PathBuf::from(arguments.next().ok_or(
+            "usage: edit_numbers_hidden_table_topology <source.numbers> <output.numbers>",
+        )?);
+    if arguments.next().is_some() {
+        return Err("unexpected trailing arguments".into());
+    }
+
+    let initial = HiddenAxes::new([
+        litchi_numbers::table::hidden_axes::AxisIndex::row(2),
+        litchi_numbers::table::hidden_axes::AxisIndex::column(1),
+    ])?;
+    let shifted = HiddenAxes::new([
+        litchi_numbers::table::hidden_axes::AxisIndex::row(3),
+        litchi_numbers::table::hidden_axes::AxisIndex::column(2),
+    ])?;
+
+    let package = Package::open(&source)?;
+    let source_table = package
+        .table(SheetSelector::index(0), TableSelector::index(0))?
+        .ok_or("the source document has no table")?;
+    assert_eq!(
+        (
+            source_table.dimensions().rows(),
+            source_table.dimensions().columns()
+        ),
+        (6, 4)
+    );
+    assert_eq!(
+        package.table_hidden_axes(SheetSelector::index(0), TableSelector::index(0))?,
+        initial
+    );
+    let commit = package
+        .edit_table_topology(SheetSelector::index(0), TableSelector::index(0))?
+        .insert_row(RowInsertion::body(0))?
+        .insert_column(ColumnInsertion::body(0))?
+        .commit()?;
+    assert_eq!(
+        commit
+            .package()
+            .table_hidden_axes(SheetSelector::index(0), TableSelector::index(0))?,
+        shifted
+    );
+    let committed_table = commit
+        .package()
+        .table(SheetSelector::index(0), TableSelector::index(0))?
+        .ok_or("the committed document has no table")?;
+    assert_eq!(
+        (
+            committed_table.dimensions().rows(),
+            committed_table.dimensions().columns()
+        ),
+        (7, 5)
+    );
+    commit.package().save(&output)?;
+    let reopened = Package::open(&output)?;
+    assert_eq!(
+        reopened.table_hidden_axes(SheetSelector::index(0), TableSelector::index(0))?,
+        shifted
+    );
+    let reopened_table = reopened
+        .table(SheetSelector::index(0), TableSelector::index(0))?
+        .ok_or("the reopened document has no table")?;
+    assert_eq!(
+        (
+            reopened_table.dimensions().rows(),
+            reopened_table.dimensions().columns()
+        ),
+        (7, 5)
+    );
+    Ok(())
+}

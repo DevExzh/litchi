@@ -75,6 +75,12 @@ pub enum LimitKind {
     WireNesting,
     /// Aggregate strict wire work.
     WireWork,
+    /// Logical output allocations reserved by one strict codec operation.
+    WireAllocations,
+    /// Retained bytes charged by one strict codec operation.
+    WireRetainedBytes,
+    /// Scratch bytes charged by one strict codec operation.
+    WireScratchBytes,
     /// Aggregate focused transaction work.
     TransactionWork,
 }
@@ -1124,6 +1130,9 @@ const fn map_header_limit(kind: super::table_headers::LimitKind) -> LimitKind {
         Header::WireFields => LimitKind::WireFields,
         Header::WireNesting => LimitKind::WireNesting,
         Header::WireWork => LimitKind::WireWork,
+        Header::WireAllocations => LimitKind::WireAllocations,
+        Header::WireRetainedBytes => LimitKind::WireRetainedBytes,
+        Header::WireScratchBytes => LimitKind::WireScratchBytes,
         Header::TransactionWork => LimitKind::TransactionWork,
     }
 }
