@@ -165,3 +165,81 @@ fn bounded_finish_accounts_deleted_names_and_moves_insertions() {
     assert!(changes.edits.is_empty());
     assert_eq!(changes.deletions, vec!["Index/Document.iwa"]);
 }
+
+#[test]
+fn bounded_finish_rejects_zero_work_and_copy_retention_before_allocating() {
+    let source = components();
+    let mut workspace = Workspace::new(&source, Limits::default()).expect("workspace");
+    workspace.object_mut(1).expect("object");
+    let requirements = workspace.finish_requirements().expect("requirements");
+
+    let zero_work = workspace.finish_bounded(FinishLimits::new(
+        requirements.work().saturating_sub(1),
+        requirements.allocations(),
+        requirements.retained_bytes(),
+        requirements.scratch_bytes(),
+    ));
+    assert!(matches!(
+        zero_work,
+        Err(FinishError::Limit {
+            kind: FinishLimitKind::Work,
+            ..
+        })
+    ));
+
+    let mut workspace = Workspace::new(&source, Limits::default()).expect("workspace");
+    workspace.object_mut(1).expect("object");
+    let requirements = workspace.finish_requirements().expect("requirements");
+    let zero_copy_retention = workspace.finish_bounded(FinishLimits::new(
+        requirements.work(),
+        requirements.allocations(),
+        requirements.retained_bytes().saturating_sub(1),
+        requirements.scratch_bytes(),
+    ));
+    assert!(matches!(
+        zero_copy_retention,
+        Err(FinishError::Limit {
+            kind: FinishLimitKind::RetainedBytes,
+            ..
+        })
+    ));
+}
+
+#[test]
+fn bounded_finish_rejects_requirement_arithmetic_overflow() {
+    let source = components();
+    let mut workspace = Workspace::new(&source, Limits::default()).expect("workspace");
+    workspace.finish.copy_bytes = usize::MAX;
+    workspace.finish.edit_count = 1;
+    assert!(matches!(
+        workspace.finish_requirements(),
+        Err(FinishError::Overflow(_))
+    ));
+}
+
+#[test]
+fn bounded_finish_moves_nonempty_insertions_without_copying_archive_buffers() {
+    let source = components();
+    let mut workspace = Workspace::new(&source, Limits::default()).expect("workspace");
+    let archive = Archive {
+        objects: vec![object(99, 7, vec![1, 2, 3, 4])],
+    };
+    let before = archive.objects[0].messages[0].data.as_ptr();
+    workspace
+        .create_member("Index/Created.iwa", archive, None)
+        .expect("insert member");
+    let requirements = workspace.finish_requirements().expect("requirements");
+    assert_eq!(requirements.insertion_count(), 1);
+    let (changes, _) = workspace
+        .finish_bounded(FinishLimits::new(
+            requirements.work(),
+            requirements.allocations(),
+            requirements.retained_bytes(),
+            requirements.scratch_bytes(),
+        ))
+        .expect("bounded insertion finish");
+    let after = changes.insertions[0].archive.objects[0].messages[0]
+        .data
+        .as_ptr();
+    assert_eq!(before, after);
+}
