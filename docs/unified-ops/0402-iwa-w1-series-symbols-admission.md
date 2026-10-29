@@ -72,16 +72,19 @@ reports component/object work, graph-index allocation/retention envelopes,
 and caller-owned borrowed-component view bytes separately; the bounded
 builder reserves both indexes before population and revalidates the census.
 Legacy `Workspace::new` remains unchanged.
-For bounded workspaces, `source_work()` is zero after construction because
-the caller owns both census/population charges; the series engine report
-therefore does not bill a third constructor pass. Legacy workspaces retain
-their constructor scan charge.
+For bounded workspaces, the caller charges the external census once and
+passes the builder a residual for its internal re-census plus population
+passes (`builder_work = 2 * source_work`, `total_work = 3 * source_work`).
+`source_work()` is zero after construction, so the series engine report does
+not bill a fourth constructor pass. Legacy workspaces retain their
+constructor scan charge.
 
 Implementation commits: `bd2d138a07`, overflow-checked follow-up
 `c50fcaf8db`, final lint/documentation fix `54ebd2782f`, focused ceiling
 evidence `f2eae5798d`, bounded construction `f9512e398f`, census identity
-guard `0975944a5a`, exact source-fingerprint follow-up `635509e3ff`, and
-bounded-construction work ownership `50ef610823` (on top of
+guard `0975944a5a`, exact source-fingerprint follow-up `635509e3ff`, bounded-
+construction work ownership `50ef610823`, and three-pass accounting
+`76d9b15c28` (on top of
 coordinator freeze merge `2f1f7a8a78`).
 
 ## Correctness and evidence boundary
