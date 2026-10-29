@@ -47,7 +47,7 @@ requires format-owner adoption and final host-vs-leaf/full-File requalification.
 ## Verification
 
 - `cargo fmt --all` — pass.
-- `cargo test -p litchi-iwa-core --lib --offline` — pass (94 tests).
+- `cargo test -p litchi-iwa-core --lib --offline` — pass (95 tests).
 - `cargo clippy -p litchi-iwa-core --lib --tests --offline -- -D warnings` — pass.
 - `cargo doc -p litchi-iwa-core --no-deps --offline` — pass.
 - `python3 tools/check_api_glossary.py --profile iwa-core` — pass.

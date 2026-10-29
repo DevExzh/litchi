@@ -1969,16 +1969,25 @@ fn field_info_admission(info: &FieldInfo) -> Result<FieldInfoAdmission> {
 }
 
 fn message_info_admission(info: &MessageInfo, limits: Limits) -> Result<MessageInfoAdmission> {
-    let length = usize::try_from(info.length)
+    message_info_admission_with_values(info, info.type_, info.length, limits)
+}
+
+fn message_info_admission_with_values(
+    info: &MessageInfo,
+    type_: u32,
+    message_length: u32,
+    limits: Limits,
+) -> Result<MessageInfoAdmission> {
+    let length = usize::try_from(message_length)
         .map_err(|_| Error::invalid_archive(0, "message length exceeds usize"))?;
     check_message_length(length, limits)?;
 
-    let mut encoded_length = varint_field_length(1, u64::from(info.type_))?;
+    let mut encoded_length = varint_field_length(1, u64::from(type_))?;
     encoded_length =
         checked_encoded_add(encoded_length, packed_u32_field_length(2, &info.versions)?)?;
     encoded_length = checked_encoded_add(
         encoded_length,
-        varint_field_length(3, u64::from(info.length))?,
+        varint_field_length(3, u64::from(message_length))?,
     )?;
     let mut header_fields = 2usize;
     for present in [
@@ -2162,6 +2171,102 @@ fn check_archive_info_constructor(
     let mut encoded_messages_length = 0usize;
     for message_info in &info.message_infos {
         let admission = message_info_admission(message_info, limits)?;
+        encoded_messages_length = checked_encoded_add(
+            encoded_messages_length,
+            length_delimited_field_length(2, admission.encoded_length)?,
+        )?;
+        add_limited(
+            &mut metadata_items,
+            admission.metadata_items,
+            LimitKind::MetadataItems,
+            limits.max_metadata_items(),
+        )?;
+        header_fields = header_fields
+            .checked_add(admission.header_fields)
+            .ok_or_else(|| Error::invalid_archive(0, "ArchiveInfo field count overflow"))?;
+        header_nesting = header_nesting.max(
+            1usize
+                .checked_add(admission.header_nesting)
+                .ok_or_else(|| Error::invalid_archive(0, "ArchiveInfo nesting overflow"))?,
+        );
+        header_memory = checked_memory_add(header_memory, admission.header_memory)?;
+    }
+    let mut header_length = varint_field_length(
+        1,
+        info.identifier
+            .expect("archive identifier was checked above"),
+    )?;
+    header_length = checked_encoded_add(header_length, encoded_messages_length)?;
+    if let Some(should_merge) = info.should_merge {
+        header_length = checked_encoded_add(
+            header_length,
+            varint_field_length(3, u64::from(should_merge))?,
+        )?;
+    }
+    check_constructor_header(
+        header_length,
+        header_fields,
+        header_nesting,
+        header_memory,
+        metadata_items,
+        limits,
+    )?;
+    Ok(ArchiveInfoAdmission {
+        header_length,
+        header_fields,
+        header_nesting,
+        header_memory,
+        metadata_items,
+        message_count,
+    })
+}
+
+/// Admit the exact header that serialization will emit after replacing each
+/// MessageInfo's wire type and payload length from its current RawMessage.
+/// This mirrors `Archive::to_bytes` without cloning the metadata projection.
+fn check_archive_info_constructor_for_messages(
+    info: &ArchiveInfo,
+    messages: &[RawMessage],
+    limits: Limits,
+) -> Result<ArchiveInfoAdmission> {
+    if info.identifier.is_none() {
+        return Err(Error::invalid_archive(
+            0,
+            "object is missing its archive identifier",
+        ));
+    }
+    if info.message_infos.len() != messages.len() {
+        return Err(Error::invalid_archive(
+            0,
+            "message metadata and payload counts differ",
+        ));
+    }
+    let message_count = info.message_infos.len();
+    if message_count > limits.max_messages_per_object() {
+        return Err(limit(
+            LimitKind::MessagesPerObject,
+            message_count,
+            limits.max_messages_per_object(),
+        ));
+    }
+    let mut metadata_items = message_count;
+    let mut header_fields = usize::from(info.identifier.is_some());
+    header_fields = header_fields
+        .checked_add(message_count)
+        .and_then(|value| value.checked_add(usize::from(info.should_merge.is_some())))
+        .ok_or_else(|| Error::invalid_archive(0, "ArchiveInfo field count overflow"))?;
+    let mut header_nesting = usize::from(message_count != 0);
+    let mut header_memory = size_of::<ArchiveInfo>();
+    let mut encoded_messages_length = 0usize;
+    for (message_info, message) in info.message_infos.iter().zip(messages) {
+        let message_length = u32::try_from(message.data.len())
+            .map_err(|_| Error::invalid_archive(0, "message payload exceeds u32"))?;
+        let admission = message_info_admission_with_values(
+            message_info,
+            message.type_,
+            message_length,
+            limits,
+        )?;
         encoded_messages_length = checked_encoded_add(
             encoded_messages_length,
             length_delimited_field_length(2, admission.encoded_length)?,
@@ -9507,7 +9612,11 @@ where
             ));
         }
         admit_work(1)?;
-        let admission = check_archive_info_constructor(&object.archive_info, limits)?;
+        let admission = check_archive_info_constructor_for_messages(
+            &object.archive_info,
+            &object.messages,
+            limits,
+        )?;
         add_limited(
             &mut total_messages,
             object.messages.len(),
@@ -11232,7 +11341,7 @@ mod tests {
         )?;
         let canonical = encode_archive_info(&object.archive_info, Limits::default())?;
         let mut raw = canonical.clone();
-        raw.extend_from_slice(&[0xb5, 0x0c, 0x01, 0x02, 0x03]);
+        raw.extend_from_slice(&[0xb5, 0x0c, 0x01, 0x02, 0x03, 0x04]);
         object.set_test_source_headers(
             Some(raw.clone().into_boxed_slice()),
             Some(canonical.into_boxed_slice()),
@@ -11245,8 +11354,41 @@ mod tests {
             .prepare_encoding(Limits::default(), |_| Ok(()))?
             .execute()?;
         assert_eq!(prepared, legacy);
+        let reopened = Archive::parse(&prepared, Limits::default())?;
+        assert_eq!(reopened.to_bytes(Limits::default())?, prepared);
         let (header, _) = split_test_archive(&prepared)?;
         assert!(header.starts_with(&raw));
+        Ok(())
+    }
+
+    #[test]
+    fn prepared_encoding_sizes_normalized_message_scalars() -> Result<()> {
+        let mut object = ArchiveObject::new(
+            902,
+            vec![RawMessage {
+                type_: 0x1234,
+                data: vec![0x5a; 128],
+            }],
+            Limits::default(),
+        )?;
+        // The serializer intentionally takes these two scalars from the
+        // current payload. Keep stale metadata crossing the 127/128 wire
+        // boundary to prove admission sizes the normalized header without
+        // cloning a compatibility projection.
+        object.archive_info.message_infos[0].type_ = 1;
+        object.archive_info.message_infos[0].length = 127;
+        let archive = Archive {
+            objects: vec![object],
+        };
+        let legacy = archive.to_bytes(Limits::default())?;
+        let prepared = archive
+            .prepare_encoding(Limits::default(), |_| Ok(()))?
+            .execute()?;
+        assert_eq!(prepared, legacy);
+        assert_eq!(
+            Archive::parse(&prepared, Limits::default())?.to_bytes(Limits::default())?,
+            prepared
+        );
         Ok(())
     }
 
