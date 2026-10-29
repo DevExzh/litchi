@@ -2874,7 +2874,10 @@ impl ArchiveObject {
         self.validate_payloads(limits, cached_header_length)
     }
 
-    fn source_headers(&self) -> Option<(&[u8], &[u8])> {
+    /// Borrow retained raw and canonical headers for internal preservation checks.
+    /// This accessor performs no decoding or allocation.
+    #[doc(hidden)]
+    pub fn source_headers(&self) -> Option<(&[u8], &[u8])> {
         self.source_provenance.as_deref().map(|provenance| {
             (
                 provenance.original_header(),

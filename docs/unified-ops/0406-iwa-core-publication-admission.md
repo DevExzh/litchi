@@ -40,7 +40,7 @@ algorithm. The fallback capacity is explicitly an upper bound because the
 selected path depends on prior compressed frame lengths; empty input reports no
 heap output or encoder allocation.
 
-The encoder workspace figures follow the vendored dependency source used by
+The encoder workspace figures follow the dependency source used by
 the locked build (`snap 1.1.2`, `raw::Encoder::block_table`): a block needing
 more than the 1,024-entry stack table allocates one reusable 16,384-entry
 `u16` table (32 KiB), while each selected table slice is reset per frame.

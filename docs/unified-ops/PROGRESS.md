@@ -7364,3 +7364,24 @@ See [0063](0063-source-pptx-modern-comments.md).
   in their isolated branches before new host differential and performance
   qualification. The final 53-row gate remains pending on one integrated
   candidate; the last fully qualified source remains `e0e297a82b`.
+
+- The 0406 substrate integration `96728b1626` passed workspace compilation,
+  all 20 locked fuzz checks, boundaries, ledger and clean-source checks. Its
+  completed worktree and branch were retired normally: cleanup now totals
+  60 worktrees and 53 branches. The additional 3,430,734,069 logical cache
+  bytes bring the measured total to 194,015,251,662 bytes (about 180.69 GiB),
+  excluding the separately noted approximate sheet-example cache removal.
+- Accepted Numbers symbol caller `8f5a1c5a47` (record 0403), including the
+  canonical shared symbols engine and graph construction/finalization seams
+  from 0402. The route uses one residual ledger through selection, engine,
+  shared prepared serialization, ZIP publication, candidate ingress and
+  readback. Exact-source inverse/no-op and raw unknown-content controls pass;
+  new borrowed header provenance stays an internal physical-layer seam.
+- The final scoped Numbers source `ff06bcf61b` passed all four full-facade
+  instruction routes, with independent eight-leg, two-call validation. The
+  leaf/host ratios are 0.404407, 0.413140, 0.404573 and 0.382871. These
+  measurements do not qualify the integrated candidate; the final matrix
+  must be rerun after the remaining Pages/Keynote integrations. Existing
+  Numbers symbol ledger dispositions remain unchanged and native evidence
+  remains pending. Generic non-symbol series families are not claimed by
+  this caller-proof slice.
