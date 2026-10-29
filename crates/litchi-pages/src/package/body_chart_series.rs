@@ -45,6 +45,8 @@ struct MutationPlan {
     objects: Vec<(Arc<str>, Vec<u64>)>,
     allowed_message_types: Vec<u32>,
     allowed_fields: Vec<u32>,
+    planned_new_members: Vec<Arc<str>>,
+    planned_removed_members: Vec<Arc<str>>,
 }
 
 /// A finite resource charged by one Pages body-chart series-symbol operation.
@@ -485,7 +487,7 @@ fn map_symbol_error(error: series_engine::SymbolError) -> Error {
         },
         series_engine::SymbolError::Allocation { amount } => Error::Allocation { amount },
         series_engine::SymbolError::Invalid(_) => Error::InvalidSource,
-        series_engine::SymbolError::IdentifierOverflow => Error::InvalidSource,
+        series_engine::SymbolError::IdentifierOverflow => Refusal::UnsupportedPublication.into(),
         _ => Error::InvalidSource,
     }
 }
@@ -1346,6 +1348,35 @@ fn add_planned_object(
     Ok(())
 }
 
+fn add_planned_member(
+    members: &mut Vec<Arc<str>>,
+    name: &str,
+    budget: &mut ArrangementBudget,
+) -> Result<(), Error> {
+    if members.iter().any(|member| member.as_ref() == name) {
+        return Ok(());
+    }
+    let retained = name
+        .len()
+        .checked_add(size_of::<Arc<str>>())
+        .ok_or(Error::InvalidSource)?;
+    budget
+        .preflight_allocations(2)
+        .and_then(|_| budget.preflight_retained(retained))
+        .and_then(|_| budget.preflight_work(name.len()))
+        .map_err(map_arrangement_error)?;
+    budget
+        .allocations(2)
+        .and_then(|_| budget.retained(retained))
+        .and_then(|_| budget.work(name.len()))
+        .map_err(map_arrangement_error)?;
+    members
+        .try_reserve_exact(1)
+        .map_err(|_| Error::Allocation { amount: 1 })?;
+    members.push(Arc::from(name));
+    Ok(())
+}
+
 fn mutation_plan(
     source: &Package,
     components: &[Arc<str>],
@@ -1453,33 +1484,16 @@ fn mutation_plan(
         }
     }
     let mut scoped_components = Vec::new();
-    let component_names = scope
-        .allowed_members()
-        .iter()
-        .chain(scope.planned_new_members())
-        .chain(scope.planned_removed_members())
-        .map(String::as_str)
-        .chain(components.iter().map(Arc::as_ref));
-    for name in component_names {
-        if scoped_components
-            .iter()
-            .any(|item: &Arc<str>| item.as_ref() == name)
-        {
-            continue;
-        }
-        let retained = name.len().saturating_add(size_of::<Arc<str>>());
-        budget
-            .preflight_allocations(2)
-            .and_then(|_| budget.preflight_retained(retained))
-            .map_err(map_arrangement_error)?;
-        budget
-            .allocations(2)
-            .and_then(|_| budget.retained(retained))
-            .map_err(map_arrangement_error)?;
-        scoped_components
-            .try_reserve_exact(1)
-            .map_err(|_| Error::Allocation { amount: 1 })?;
-        scoped_components.push(Arc::from(name));
+    for name in components {
+        add_planned_member(&mut scoped_components, name, budget)?;
+    }
+    let mut planned_new_members = Vec::new();
+    for name in scope.planned_new_members() {
+        add_planned_member(&mut planned_new_members, name, budget)?;
+    }
+    let mut planned_removed_members = Vec::new();
+    for name in scope.planned_removed_members() {
+        add_planned_member(&mut planned_removed_members, name, budget)?;
     }
     budget
         .preflight_allocations(2)
@@ -1520,6 +1534,8 @@ fn mutation_plan(
         objects,
         allowed_message_types,
         allowed_fields,
+        planned_new_members,
+        planned_removed_members,
     })
 }
 
@@ -1534,6 +1550,18 @@ impl MutationPlan {
         self.objects
             .iter()
             .any(|(_, identifiers)| identifiers.contains(&identifier))
+    }
+
+    fn planned_new_member(&self, name: &str) -> bool {
+        self.planned_new_members
+            .iter()
+            .any(|member| member.as_ref() == name)
+    }
+
+    fn planned_removed_member(&self, name: &str) -> bool {
+        self.planned_removed_members
+            .iter()
+            .any(|member| member.as_ref() == name)
     }
 }
 
@@ -1714,7 +1742,7 @@ fn verify_locality(
             .iter()
             .find(|item| item.name() == before.name());
         let Some(after) = after else {
-            if !changed(before.name()) {
+            if !plan.planned_removed_member(before.name()) {
                 return Err(Error::Verification);
             }
             continue;
@@ -1757,7 +1785,7 @@ fn verify_locality(
         if source_entries
             .iter()
             .all(|before| before.name() != after.name())
-            && !changed(after.name())
+            && !plan.planned_new_member(after.name())
         {
             return Err(Error::Verification);
         }
@@ -1766,7 +1794,7 @@ fn verify_locality(
     for component in source.state.source.components().iter() {
         let name = component.name();
         let Some(after_component) = candidate.state.source.components().get(name) else {
-            if changed(name) {
+            if plan.planned_removed_member(name) {
                 continue;
             }
             return Err(Error::Verification);
@@ -2553,6 +2581,32 @@ mod tests {
             verify_locality(
                 &package,
                 &candidate,
+                &empty_plan(),
+                SymbolFamily::Line2d,
+                &mut budget,
+            ),
+            Err(Error::Verification)
+        ));
+    }
+
+    #[test]
+    fn production_locality_rejects_unplanned_member_removal() {
+        let package = Package::from_bytes(NATIVE).expect("native Pages fixture");
+        let removable = package
+            .state
+            .source
+            .package()
+            .iter()
+            .find(|entry| entry.name() != "Index/Document.iwa" && !entry.is_opaque())
+            .expect("removable decoded member");
+        let removed =
+            package_graph::publish_changes(&package, Vec::new(), &[], &[], &[removable.name()])
+                .expect("unplanned IWA removal");
+        let mut budget = ArrangementBudget::new(&package).expect("locality budget");
+        assert!(matches!(
+            verify_locality(
+                &package,
+                &removed,
                 &empty_plan(),
                 SymbolFamily::Line2d,
                 &mut budget,
