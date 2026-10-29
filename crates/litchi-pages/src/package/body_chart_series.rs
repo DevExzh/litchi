@@ -25,9 +25,10 @@ use litchi_iwa_style::graph::{self as style_graph, Components, Workspace};
 use litchi_iwa_style::series as series_engine;
 use thiserror::Error as ThisError;
 
-use super::Package;
 use super::body_chart_arrangement::{self as arrangement, ArrangementBudget, ChartTarget};
+#[cfg(test)]
 use super::body_drawable_graph as package_graph;
+use super::{Package, PackageError};
 use crate::selector::BodyChartSelector;
 
 const CHART_MESSAGE_TYPE: u32 = 5_021;
@@ -57,8 +58,20 @@ pub enum LimitKind {
     InputBytes,
     /// Complete rewritten package bytes.
     OutputBytes,
+    /// ZIP entries inspected or retained.
+    Entries,
+    /// One ZIP entry's bytes.
+    EntryBytes,
+    /// Aggregate ZIP entry bytes.
+    TotalEntryBytes,
+    /// ZIP metadata bytes.
+    PackageBytes,
     /// Native payload bytes.
     PayloadBytes,
+    /// Aggregate native payload bytes.
+    TotalPayloadBytes,
+    /// Native objects inspected.
+    PayloadMessages,
     /// Native references.
     PayloadReferences,
     /// Native metadata items such as registry entries.
@@ -94,7 +107,13 @@ impl fmt::Display for LimitKind {
         match self {
             Self::InputBytes => formatter.write_str("input bytes"),
             Self::OutputBytes => formatter.write_str("output bytes"),
+            Self::Entries => formatter.write_str("ZIP entries"),
+            Self::EntryBytes => formatter.write_str("ZIP entry bytes"),
+            Self::TotalEntryBytes => formatter.write_str("total ZIP entry bytes"),
+            Self::PackageBytes => formatter.write_str("package bytes"),
             Self::PayloadBytes => formatter.write_str("payload bytes"),
+            Self::TotalPayloadBytes => formatter.write_str("total payload bytes"),
+            Self::PayloadMessages => formatter.write_str("payload messages"),
             Self::PayloadReferences => formatter.write_str("payload references"),
             Self::PayloadItems => formatter.write_str("payload items"),
             Self::PayloadObjects => formatter.write_str("payload objects"),
@@ -275,27 +294,30 @@ impl Components for PackageComponents<'_> {
 
 fn map_arrangement_limit(kind: arrangement::LimitKind) -> LimitKind {
     match kind {
-        arrangement::LimitKind::InputBytes
-        | arrangement::LimitKind::PayloadBytes
-        | arrangement::LimitKind::TotalPayloadBytes => LimitKind::InputBytes,
+        arrangement::LimitKind::InputBytes => LimitKind::InputBytes,
+        arrangement::LimitKind::PayloadBytes => LimitKind::PayloadBytes,
+        arrangement::LimitKind::TotalPayloadBytes => LimitKind::TotalPayloadBytes,
         arrangement::LimitKind::PayloadReferences => LimitKind::PayloadReferences,
-        arrangement::LimitKind::WireBytes | arrangement::LimitKind::WireOutputBytes => {
-            LimitKind::InputBytes
+        arrangement::LimitKind::PayloadItems => LimitKind::PayloadItems,
+        arrangement::LimitKind::PayloadMessages => LimitKind::PayloadMessages,
+        arrangement::LimitKind::PayloadObjects => LimitKind::PayloadObjects,
+        arrangement::LimitKind::WireBytes => {
+            LimitKind::Wire(litchi_iwa_common::LimitKind::InputBytes)
         },
-        arrangement::LimitKind::WireFields
-        | arrangement::LimitKind::PayloadItems
-        | arrangement::LimitKind::PayloadMessages
-        | arrangement::LimitKind::PayloadObjects => LimitKind::WireFields,
+        arrangement::LimitKind::WireOutputBytes => {
+            LimitKind::Wire(litchi_iwa_common::LimitKind::OutputBytes)
+        },
+        arrangement::LimitKind::WireFields => LimitKind::WireFields,
         arrangement::LimitKind::WireNesting => LimitKind::WireNesting,
         arrangement::LimitKind::WireWork => LimitKind::WireWork,
         arrangement::LimitKind::WireAllocations => LimitKind::Allocations,
         arrangement::LimitKind::WireRetainedBytes => LimitKind::RetainedBytes,
         arrangement::LimitKind::WireScratchBytes => LimitKind::ScratchBytes,
-        arrangement::LimitKind::OutputBytes
-        | arrangement::LimitKind::Entries
-        | arrangement::LimitKind::EntryBytes
-        | arrangement::LimitKind::TotalEntryBytes
-        | arrangement::LimitKind::PackageBytes => LimitKind::OutputBytes,
+        arrangement::LimitKind::OutputBytes => LimitKind::OutputBytes,
+        arrangement::LimitKind::Entries => LimitKind::Entries,
+        arrangement::LimitKind::EntryBytes => LimitKind::EntryBytes,
+        arrangement::LimitKind::TotalEntryBytes => LimitKind::TotalEntryBytes,
+        arrangement::LimitKind::PackageBytes => LimitKind::PackageBytes,
     }
 }
 
@@ -479,7 +501,7 @@ fn map_symbol_error(error: series_engine::SymbolError) -> Error {
                         maximum,
                     },
                 ),
-                series_engine::LimitKind::Identifiers => LimitKind::PayloadReferences,
+                series_engine::LimitKind::Identifiers => LimitKind::PayloadObjects,
                 _ => LimitKind::WireWork,
             },
             observed: observed as u64,
@@ -492,28 +514,53 @@ fn map_symbol_error(error: series_engine::SymbolError) -> Error {
     }
 }
 
-fn map_package_graph_error(error: package_graph::GraphError) -> Error {
+fn map_package_error(error: PackageError) -> Error {
     match error {
-        package_graph::GraphError::InvalidSource => Error::InvalidSource,
-        package_graph::GraphError::Allocation { amount } => Error::Allocation { amount },
-        package_graph::GraphError::Limit {
+        PackageError::Archive(error) => map_archive_error(error),
+        PackageError::Limit {
             kind,
             observed,
             maximum,
         } => Error::Limit {
             kind: match kind {
-                package_graph::GraphLimit::InputBytes => LimitKind::InputBytes,
-                package_graph::GraphLimit::OutputBytes => LimitKind::OutputBytes,
-                package_graph::GraphLimit::WireFields => LimitKind::WireFields,
-                package_graph::GraphLimit::WireNesting => LimitKind::WireNesting,
-                package_graph::GraphLimit::WireWork => LimitKind::WireWork,
-                package_graph::GraphLimit::SemanticItems => LimitKind::PayloadBytes,
-                package_graph::GraphLimit::SemanticTextBytes => LimitKind::PayloadBytes,
+                crate::LimitKind::Source(kind) => match kind {
+                    crate::SourceLimitKind::InputBytes => LimitKind::InputBytes,
+                    crate::SourceLimitKind::Members => LimitKind::Entries,
+                    crate::SourceLimitKind::EntryBytes => LimitKind::EntryBytes,
+                    crate::SourceLimitKind::AggregateBytes => LimitKind::TotalEntryBytes,
+                    crate::SourceLimitKind::ComponentBytes => LimitKind::PayloadBytes,
+                },
+                crate::LimitKind::Semantic(kind) => match kind {
+                    crate::SemanticLimitKind::Sections => LimitKind::PayloadItems,
+                    crate::SemanticLimitKind::TextBytes => LimitKind::PayloadBytes,
+                },
             },
             observed,
             maximum,
         },
+        PackageError::PayloadLimit { observed, limit } => Error::Limit {
+            kind: LimitKind::PayloadBytes,
+            observed: observed as u64,
+            maximum: limit as u64,
+        },
+        PackageError::ObjectLimit { observed, limit } => Error::Limit {
+            kind: LimitKind::PayloadObjects,
+            observed: observed as u64,
+            maximum: limit as u64,
+        },
+        PackageError::Allocation { amount } => Error::Allocation { amount },
+        _ => Error::InvalidSource,
     }
+}
+
+fn reopen_series_candidate(source: &Package, target: Arc<[u8]>) -> Result<Package, Error> {
+    let catalog = source
+        .state
+        .source
+        .reopen(target)
+        .map_err(map_archive_error)?;
+    Package::from_source_catalog_with_semantic_limits(catalog, source.state.semantic_limits)
+        .map_err(map_package_error)
 }
 
 fn archive_limits(package: &Package) -> Result<litchi_iwa_core::Limits, Error> {
@@ -778,28 +825,16 @@ fn charge_workspace_construction(
     requirements: style_graph::ConstructionRequirements,
 ) -> Result<(), Error> {
     budget
-        .preflight_work(requirements.source_work())
+        .preflight_work(requirements.total_work())
         .and_then(|_| budget.preflight_allocations(requirements.index_allocations()))
         .and_then(|_| budget.preflight_retained(requirements.index_retained_bytes()))
         .and_then(|_| budget.preflight_scratch(requirements.index_scratch_bytes()))
         .map_err(map_arrangement_error)?;
     budget
-        .work(requirements.source_work())
+        .work(requirements.total_work())
         .and_then(|_| budget.allocations(requirements.index_allocations()))
         .and_then(|_| budget.retained(requirements.index_retained_bytes()))
         .and_then(|_| budget.scratch(requirements.index_scratch_bytes()))
-        .map_err(map_arrangement_error)
-}
-
-fn charge_workspace_builder(
-    budget: &mut ArrangementBudget,
-    requirements: style_graph::ConstructionRequirements,
-) -> Result<(), Error> {
-    budget
-        .preflight_work(requirements.builder_work())
-        .map_err(map_arrangement_error)?;
-    budget
-        .work(requirements.builder_work())
         .map_err(map_arrangement_error)
 }
 
@@ -871,6 +906,20 @@ fn map_metadata_error(error: chart_metadata_codec::DecodeError) -> Error {
             maximum: maximum as u64,
         };
     }
+    if let Some((observed, maximum)) = error.label_limit_values() {
+        return Error::Limit {
+            kind: LimitKind::PayloadItems,
+            observed: observed as u64,
+            maximum: maximum as u64,
+        };
+    }
+    if let Some((observed, maximum)) = error.text_limit_values() {
+        return Error::Limit {
+            kind: LimitKind::PayloadBytes,
+            observed: observed as u64,
+            maximum: maximum as u64,
+        };
+    }
     if let Some((observed, maximum)) = error.depth_limit_values() {
         return Error::Limit {
             kind: LimitKind::WireNesting,
@@ -936,10 +985,8 @@ fn read_symbols(
     let construction = Workspace::construction_requirements(&components, census_limits)
         .map_err(map_construction_error)?;
     charge_workspace_construction(budget, construction)?;
-    let builder_limits = construction_limits(budget)?;
-    let workspace = Workspace::new_bounded(&components, limits, construction, builder_limits)
+    let workspace = Workspace::new_bounded(&components, limits, construction, census_limits)
         .map_err(map_construction_error)?;
-    charge_workspace_builder(budget, construction)?;
     let engine_limits = engine_limits(package, budget)?;
     let (values, report) = series_engine::symbols(
         &workspace,
@@ -972,14 +1019,9 @@ fn preflight_publication(
     insertions: &[style_graph::Insertion],
     deletions: &[String],
     budget: &mut ArrangementBudget,
-) -> Result<usize, Error> {
-    let mut projected = source.state.source.shared_source().len();
+) -> Result<(), Error> {
     let mut transient = 0usize;
     let mut archive_work = 0usize;
-    let archive_count = edits
-        .len()
-        .checked_add(insertions.len())
-        .ok_or(Error::InvalidSource)?;
     for (name, archive) in edits {
         let encoded = archive
             .encoded_len(archive_limits(source)?)
@@ -992,10 +1034,6 @@ fn preflight_publication(
         archive_work = archive_work
             .checked_add(name.len())
             .and_then(|value| value.checked_add(encoded))
-            .and_then(|value| value.checked_add(bound))
-            .ok_or(Error::InvalidSource)?;
-        projected = projected
-            .checked_add(name.len())
             .and_then(|value| value.checked_add(bound))
             .ok_or(Error::InvalidSource)?;
     }
@@ -1014,38 +1052,35 @@ fn preflight_publication(
             .and_then(|value| value.checked_add(encoded))
             .and_then(|value| value.checked_add(bound))
             .ok_or(Error::InvalidSource)?;
-        projected = projected
-            .checked_add(insertion.name.len())
-            .and_then(|value| value.checked_add(bound))
-            .ok_or(Error::InvalidSource)?;
     }
-    let collection_units = archive_count
-        .checked_mul(3)
-        .and_then(|value| value.checked_add(source.state.source.package().len()))
-        .and_then(|value| value.checked_add(deletions.len()))
-        .ok_or(Error::InvalidSource)?;
-    let collection_bytes = archive_count
-        .checked_mul(size_of::<(String, Vec<u8>)>())
-        .and_then(|value| {
-            value.checked_add(
-                source
-                    .state
-                    .source
-                    .package()
-                    .len()
-                    .checked_mul(size_of::<&str>())?,
-            )
-        })
-        .and_then(|value| value.checked_add(deletions.len().checked_mul(size_of::<&str>())?))
-        .ok_or(Error::InvalidSource)?;
-    budget
-        .preflight_output(projected)
-        .map_err(map_arrangement_error)?;
+    let vector_caps = [
+        (edits.len(), size_of::<(String, Vec<u8>)>()),
+        (
+            insertions.len(),
+            size_of::<(String, Vec<u8>, Option<String>)>(),
+        ),
+        (edits.len(), size_of::<EntryEdit<'static>>()),
+        (insertions.len(), size_of::<EntryInsertion<'static>>()),
+        (source.state.source.package().len(), size_of::<&str>()),
+        (deletions.len(), size_of::<&str>()),
+    ];
+    let collection_units = vector_caps.iter().try_fold(0usize, |total, (count, _)| {
+        total
+            .checked_add(usize::from(*count != 0))
+            .ok_or(Error::InvalidSource)
+    })?;
+    let collection_bytes = vector_caps
+        .iter()
+        .try_fold(0usize, |total, (count, size)| {
+            count
+                .checked_mul(*size)
+                .and_then(|amount| total.checked_add(amount))
+                .ok_or(Error::InvalidSource)
+        })?;
     budget
         .preflight_work(
             archive_work
                 .checked_add(collection_bytes)
-                .and_then(|value| value.checked_add(projected))
                 .ok_or(Error::InvalidSource)?,
         )
         .map_err(map_arrangement_error)?;
@@ -1056,7 +1091,6 @@ fn preflight_publication(
         .preflight_retained(
             transient
                 .checked_add(collection_bytes)
-                .and_then(|value| value.checked_add(projected))
                 .ok_or(Error::InvalidSource)?,
         )
         .map_err(map_arrangement_error)?;
@@ -1064,7 +1098,6 @@ fn preflight_publication(
         .preflight_scratch(
             transient
                 .checked_add(collection_bytes)
-                .and_then(|value| value.checked_add(projected))
                 .ok_or(Error::InvalidSource)?,
         )
         .map_err(map_arrangement_error)?;
@@ -1087,7 +1120,7 @@ fn preflight_publication(
     budget
         .scratch(staging_bytes)
         .map_err(map_arrangement_error)?;
-    Ok(projected)
+    Ok(())
 }
 
 struct IngressBudget<'a>(&'a mut ArrangementBudget);
@@ -1258,7 +1291,7 @@ fn publish_changes(
         .candidate_reopen(output.len())
         .map_err(map_arrangement_error)?;
     let target = Arc::<[u8]>::from(output);
-    let candidate = package_graph::reopen(source, target).map_err(map_package_graph_error)?;
+    let candidate = reopen_series_candidate(source, target)?;
     Ok((candidate, touched_components))
 }
 
@@ -2187,10 +2220,8 @@ fn commit_edit(edit: Edit<'_>, change: Property) -> Result<Commit, Error> {
     let construction = Workspace::construction_requirements(&components, census_limits)
         .map_err(map_construction_error)?;
     charge_workspace_construction(&mut budget, construction)?;
-    let builder_limits = construction_limits(&budget)?;
-    let mut workspace = Workspace::new_bounded(&components, limits, construction, builder_limits)
+    let mut workspace = Workspace::new_bounded(&components, limits, construction, census_limits)
         .map_err(map_construction_error)?;
-    charge_workspace_builder(&mut budget, construction)?;
     let engine_limits = engine_limits(source, &budget)?;
     let (changed, report) = series_engine::set_symbols(
         &mut workspace,
@@ -2374,8 +2405,7 @@ fn apply_patch(package: &Package, patch: &Patch) -> Result<Commit, Error> {
         .output(target_owner.as_ref().len())
         .and_then(|_| budget.scratch(target_owner.as_ref().len()))
         .map_err(map_arrangement_error)?;
-    let candidate =
-        package_graph::reopen(package, candidate_bytes).map_err(map_package_graph_error)?;
+    let candidate = reopen_series_candidate(package, candidate_bytes)?;
     let verified = target_with_metadata(
         &candidate,
         BodyChartSelector::position(patch.position),
@@ -2721,6 +2751,42 @@ mod tests {
                 &mut budget,
             ),
             Err(Error::Verification)
+        ));
+    }
+
+    #[test]
+    fn production_limit_mapping_preserves_scoped_axes() {
+        assert_eq!(
+            map_arrangement_limit(arrangement::LimitKind::PayloadMessages),
+            LimitKind::PayloadMessages
+        );
+        assert_eq!(
+            map_arrangement_limit(arrangement::LimitKind::PayloadObjects),
+            LimitKind::PayloadObjects
+        );
+        assert_eq!(
+            map_arrangement_limit(arrangement::LimitKind::Entries),
+            LimitKind::Entries
+        );
+        assert_eq!(
+            map_arrangement_limit(arrangement::LimitKind::WireOutputBytes),
+            LimitKind::Wire(litchi_iwa_common::LimitKind::OutputBytes)
+        );
+        assert!(matches!(
+            map_symbol_error(series_engine::SymbolError::IdentifierOverflow),
+            Error::Refused(Refusal::UnsupportedPublication)
+        ));
+        assert!(matches!(
+            map_package_error(PackageError::Limit {
+                kind: crate::LimitKind::Semantic(crate::SemanticLimitKind::TextBytes),
+                observed: 2,
+                maximum: 1,
+            }),
+            Error::Limit {
+                kind: LimitKind::PayloadBytes,
+                observed: 2,
+                maximum: 1,
+            }
         ));
     }
 }
