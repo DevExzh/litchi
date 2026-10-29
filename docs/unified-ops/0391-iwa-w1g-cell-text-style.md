@@ -7,6 +7,9 @@
   Keynote facades are not started, no ledger rows are migrated, and no native
   acceptance claim is active. Final integrated-trunk requalification remains
   coordinator-owned.
+- Handoff tip: current trunk `bc9a37fd75` (the sparse-example relocation) is
+  merged into this WP as `c52439a057`; the runtime qualification and external
+  performance receipts remain explicitly bound to clean source `c9f74916c7`.
 - Source branch: `uo2/iwa-w1g-cell-text-style`, cut from frozen root
   `1e3978082bd8e576f0afeb7e3eebac1ca3908d86`, then synchronized with frozen
   trunk `e0e297a82b0a534dfd5611ced3a9811851edbf76`; the scoped evidence is
@@ -102,6 +105,15 @@ the checkout under `/home/zhuhe/code/litchi-worktrees/.coord/`.
 Workspace-level glossary, boundary, ledger, rustdoc and fuzz-lock gates remain
 coordinator checks on the integrated candidate; they are not inferred from
 this scoped record. The generated fuzz targets remain outside the checkout.
+
+After the current-trunk merge, `cargo fmt --all -- --check`, strict Clippy for
+`litchi-iwa-table` and `litchi-numbers`, the API glossary `numbers-minimal`
+and `numbers-full` profiles, the exit-ledger check, crate-boundary check (70
+packages, 314 internal declarations, 12 explicit debt items), example-target
+check, no-3rdparty suite (75 tests), and the benchmark-matrix check all pass.
+All 20 locked fuzz workspaces also pass in the external capped-target run
+`/home/zhuhe/code/litchi-worktrees/.coord/iwa-w1g-final-c9f74916c7/fuzz-locks-c52439a057.log`
+(SHA-256 `e410d50453aecc7cb1e2aad97aa9c405b111f0f22e05145363c22e0b1c07c287ad`).
 
 The Numbers compatibility proof covers the 17-property host set/reset/read
 vectors and the populated-reader differential (595 direct semantic reads).
