@@ -1,13 +1,16 @@
 # 0391 — W1-G: shared whole-cell text-style substrate
 
-- Status: Numbers-first substrate, bounded tile writer, and header-bucket
-  materialization repair remain isolated on the WP. Pages and Keynote facades
-  are not started, no ledger rows are migrated, and no native acceptance claim
-  is active. The current code tip is `33731d7056`; release-mode instruction
-  capture remains coordinator-gated and has not started.
+- Status: Numbers-first shared substrate, bounded tile writer, and
+  header-bucket materialization repair are complete and accepted as a scoped
+  source-bound slice at `c9f74916c7`. The three dedicated whole-cell Numbers
+  instruction routes passed the accepted Callgrind qualification. Pages and
+  Keynote facades are not started, no ledger rows are migrated, and no native
+  acceptance claim is active. Final integrated-trunk requalification remains
+  coordinator-owned.
 - Source branch: `uo2/iwa-w1g-cell-text-style`, cut from frozen root
   `1e3978082bd8e576f0afeb7e3eebac1ca3908d86`, then synchronized with frozen
-  trunk `e0e297a82b0a534dfd5611ced3a9811851edbf76`.
+  trunk `e0e297a82b0a534dfd5611ced3a9811851edbf76`; the scoped evidence is
+  bound to clean source `c9f74916c73772bc57b9218d99220170ddb7504d`.
 - Continuation commits: the current WP includes F's reviewed metadata
   transition `b9337962b9` through merge `8662fa8ecd`, staged-budget/readback
   repair `76cfbf3afb`, current frozen-root merge `2eb913a401`, and prepared
@@ -19,8 +22,9 @@
   `4f014f7463`, reviewed header-helper merge `ea1bab6270`, and header-adapter
   integration `7b8cf978fb`, row-header admission closure `d39eb1740c`, and
   cross-bucket/missing-ownership closure `6d5f02c0a1`, and selection-scan
-  admission closure `6ec4e6becf`, and regression arithmetic correction
-  `33731d7056`. Earlier budget, parser,
+  admission closure `6ec4e6becf`, regression arithmetic correction
+  `33731d7056`, and final source-bound documentation/probe binding
+  `c9f74916c7`. Earlier budget, parser,
   exclusive-path, mutation-output and identity/unknown-preservation
   checkpoints remain in history.
 - Scope: shared `litchi-iwa-table::cell_text_style` graph reads and direct
@@ -68,9 +72,11 @@ shared planner has an exact cumulative-output regression. In-place reuse is
 restricted to the canonical generated variation wire shape, so unknown or
 unrelated paragraph fields force safe fresh derivation rather than loss.
 
-This is still a Numbers-only substrate slice: Pages/Keynote, ledger rows,
-native queue changes, timing and release-mode performance qualification remain
-out of scope.
+This remains a Numbers-only substrate slice: Pages/Keynote facades, ledger
+rows, native queue changes, and unified `File` qualification remain out of
+scope. The accepted instruction qualification below measures the three
+dedicated whole-cell Numbers routes only; it does not qualify the integrated
+trunk or native application acceptance.
 
 ## Ownership
 
@@ -87,20 +93,20 @@ out of scope.
 
 ## Verification and remaining work
 
-The current focused checks pass: 60 shared table unit tests (including
+The current focused checks pass: 62 shared table unit tests (including
 duplicate/unknown locality, nested-font pre-admission, residual BNC fields,
 zero ceilings and low field/work/allocation cases), nine Numbers
-`cell_text_style` tests, formatting, and strict Clippy for both crates. The
-workspace-level glossary, boundary, ledger and fuzz gates remain coordinator
-checks on the integrated candidate. The broader
-`test_no_3rdparty_references`, ledger, boundary, glossary, rustdoc and
-fuzz-lock results from the prior checkpoint are not reissued as current-source
-qualification here; the coordinator must rerun them on the integrated
-candidate. The generated fuzz targets remain outside the checkout.
+`cell_text_style` tests, two Numbers header-policy tests, formatting, and
+strict Clippy for both crates. The current-source logs are retained outside
+the checkout under `/home/zhuhe/code/litchi-worktrees/.coord/`.
+Workspace-level glossary, boundary, ledger, rustdoc and fuzz-lock gates remain
+coordinator checks on the integrated candidate; they are not inferred from
+this scoped record. The generated fuzz targets remain outside the checkout.
 
-The prior Numbers proof rerun covered the 17-property host set/reset/read
-vectors and the populated-reader differential (595 direct semantic reads);
-those receipts are historical until rerun on the integrated candidate. The
+The Numbers compatibility proof covers the 17-property host set/reset/read
+vectors and the populated-reader differential (595 direct semantic reads).
+Those 595 reads are correctness/read coverage, not an instruction-cost route
+and are kept separate from the three whole-cell measurements below. The
 current nine-case Numbers suite includes the shared-key publisher path and
 the mixed no-op/changed batch control: two cells share one style key, both are
 changed, the
@@ -142,16 +148,42 @@ unrelated paragraph data (asserting both the nonempty paragraph field and root
 unknown field); the canonical-shape gate derives a fresh style and the old
 object bytes survive exact inverse/readback.
 
-Before Pages/Keynote work begins, the coordinator must independently review
-the nested budget/admission contract and run final integrated qualification.
-No wall-clock or instruction-cost result is claimed from this slice; timing
-remains held until the coordinator grants the slot. Only after that acceptance
-should the six Pages/Keynote facade rows and native queue entries be added.
+The coordinator accepted the nested budget/admission contract and the scoped
+source-bound instruction qualification. On pinned CPU 7, the immutable
+release-debug ELF was measured with two selected wrapper calls per side and
+the c063 fail-closed raw audit. The accepted inclusive leaf/host ratios are:
+
+- single set: `156,915,444 / 282,826,408 = 0.5548118548`;
+- repeated exclusive update: `136,936,777 / 205,615,736 = 0.6659839352`;
+- 50×20 shared-key batch: `3,832,042,990 / 461,133,960,244 = 0.008310042895`.
+
+All three are within the `1.05` instruction-cost bar. The batch annotation
+also retains its exact partial DWARF file-context attribution row
+(`3,827,066,960`) while the inclusive PROGRAM TOTALS remain the qualified
+`3,832,042,990`; no normalization or validator change was made. The result
+is a scoped Numbers whole-cell qualification, not a wall-clock claim, unified
+`File` qualification, integrated-trunk qualification, or native acceptance.
+The coordinator will requalify after merge, and Pages/Keynote facade rows and
+native queue entries remain later work.
 
 Historical parity and corpus receipts from the pre-repair checkpoint are
-retained as context only and are not requalified evidence for this source.
-Native evidence, ledger migration, Pages/Keynote facade work and performance
-remain coordinator-owned follow-ups.
+retained as context only. The current scoped evidence is external and bound
+to clean source `c9f74916c73772bc57b9218d99220170ddb7504d`:
+
+- normalized three-route manifest:
+  `/home/zhuhe/code/litchi-worktrees/.coord/iwa-w1g-final-c9f74916c7/measure-6cb1a8fcb7b86dbe9f46e86e535edd503f988b212e02490507c8ec0774294190/callgrind/manifest-3routes-c9f74916c7.json`
+  (SHA-256 `f2e6364501648516247f21532141474643296f2098a9194bd51d7008d253f14c`);
+- normalized results:
+  `/home/zhuhe/code/litchi-worktrees/.coord/iwa-w1g-final-c9f74916c7/measure-6cb1a8fcb7b86dbe9f46e86e535edd503f988b212e02490507c8ec0774294190/callgrind/results-3routes-c9f74916c7.json`
+  (SHA-256 `7e6975b99f292de8b9055c848c033dbbac8a792bf368bbf79d10b459c80cf039`);
+- c063 derived audit:
+  `/home/zhuhe/code/litchi-worktrees/.coord/iwa-w1g-final-c9f74916c7/measure-6cb1a8fcb7b86dbe9f46e86e535edd503f988b212e02490507c8ec0774294190/callgrind/derived-3routes-c9f74916c7.json`
+  (SHA-256 `52662a4a1d72632c88d0f819c826737c337c3c3eb7f68e80a0ffb7eb27e1999c`);
+- immutable release-debug ELF: 214,625,544 bytes, mode `0555`, SHA-256
+  `6cb1a8fcb7b86dbe9f46e86e535edd503f988b212e02490507c8ec0774294190`.
+
+Native evidence, ledger migration, Pages/Keynote facades and integrated
+requalification remain coordinator-owned follow-ups.
 
 ## Whole-cell cost-route preparation
 
@@ -168,15 +200,13 @@ The current source contains three dedicated, non-inline ignored routes in
 The source builder is outside the measured wrappers. It retains a valid
 Numbers registry, uses the modern tile storage fields, and leaves the
 selected cells/style graph source-relative without quota-padding fixture
-members. The reviewed F metadata transition is present in this WP; final
-integrated qualification still owns the combined metadata/publication budget.
-Each route performs host/leaf reopen/readback,
-locality, refcount/identity, and inverse checks before its exact
-host/leaf/leaf/host wrapper calls. The batch route now prepares the shared
-table/tile/style graph once, batches tile-key publication and batches
-readback preparation. A temporary current-source leaf-only checkpoint passed
-the unpadded 1,000-cell route after `74651bb4ba`; the host loop has not been
-rerun after these repairs. The last explicit full route on this source was:
+members. Each route performs host/leaf reopen/readback, locality,
+refcount/identity, and inverse checks before its exact host/leaf/leaf/host
+wrapper calls. The batch route prepares the shared table/tile/style graph
+once, batches tile-key publication, and batches readback preparation. The
+three routes were run from the immutable archived ELF on clean source
+`c9f74916c7`; their exact raw capture and test bindings are in the external
+manifest/results above.
 
 ```text
 cargo test --offline -p litchi-iwa --test parity \
@@ -184,8 +214,7 @@ cargo test --offline -p litchi-iwa --test parity \
   -- --ignored --nocapture --test-threads=1
 ```
 
-The historical run passed in 416.09 s, including setup/correctness and the
-four ABBA calls, but predates the current budget/allocator repairs and is not
-current-source qualification. Immutable binaries, captures and
-instruction-count receipts are intentionally absent until the coordinator
-accepts this fixture/probe checkpoint and grants the CPU slot.
+The earlier 416.09-second run is retained only as historical context and is
+not used for the accepted numbers above. Immutable binaries, captures and
+instruction-count receipts remain outside the repository; the final
+integrated candidate must be requalified after coordinator merge.

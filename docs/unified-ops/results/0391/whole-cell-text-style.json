@@ -1,0 +1,89 @@
+{
+  "record": "0391",
+  "status": "accepted scoped source-bound instruction qualification",
+  "source_commit": "c9f74916c73772bc57b9218d99220170ddb7504d",
+  "source_clean": true,
+  "scope": "Numbers whole-cell text-style facade routes only; no Pages/Keynote facade, unified File, or native acceptance claim",
+  "compatibility_proof": {
+    "direct_semantic_reads": 595,
+    "nature": "Compatibility/read correctness coverage, not an instruction-cost route",
+    "source_bound": true
+  },
+  "evidence": {
+    "external_root": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-w1g-final-c9f74916c7",
+    "manifest": {
+      "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-w1g-final-c9f74916c7/measure-6cb1a8fcb7b86dbe9f46e86e535edd503f988b212e02490507c8ec0774294190/callgrind/manifest-3routes-c9f74916c7.json",
+      "sha256": "f2e6364501648516247f21532141474643296f2098a9194bd51d7008d253f14c"
+    },
+    "results": {
+      "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-w1g-final-c9f74916c7/measure-6cb1a8fcb7b86dbe9f46e86e535edd503f988b212e02490507c8ec0774294190/callgrind/results-3routes-c9f74916c7.json",
+      "sha256": "7e6975b99f292de8b9055c848c033dbbac8a792bf368bbf79d10b459c80cf039"
+    },
+    "derived_audit": {
+      "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-w1g-final-c9f74916c7/measure-6cb1a8fcb7b86dbe9f46e86e535edd503f988b212e02490507c8ec0774294190/callgrind/derived-3routes-c9f74916c7.json",
+      "sha256": "52662a4a1d72632c88d0f819c826737c337c3c3eb7f68e80a0ffb7eb27e1999c"
+    },
+    "validator": {
+      "path": "/home/zhuhe/code/litchi-worktrees/.coord/resume-20261028/perf/iwork-probe-isolation-final/validate_call_audit.py",
+      "sha256": "c0637e4304f5fdbfae6fca6b0e9a9c17f7d10cb9a56c7df6846951fa4bdf6b8e"
+    },
+    "binary": {
+      "sha256": "6cb1a8fcb7b86dbe9f46e86e535edd503f988b212e02490507c8ec0774294190",
+      "bytes": 214625544,
+      "mode": "0555"
+    },
+    "coordinator_review": {
+      "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-w1g-final-c9f74916c7/coordinator-review.json",
+      "sha256": "e1c6eeed7ba89300797fc38d27529e54c3f66c7a46ead058f08baff38a43ac49"
+    }
+  },
+  "policy": {
+    "cpu": 7,
+    "ratio": "leaf/host inclusive Callgrind Ir",
+    "max_ratio": 1.05,
+    "wrapper_calls_per_side": 2,
+    "integrated_requalification": "pending after coordinator merge",
+    "native_acceptance": "pending; no E3/E4 claim"
+  },
+  "routes": [
+    {
+      "id": "w1g_cell_text_style_single",
+      "test": "cost_probes::numbers_whole_cell_style_single_cost_abba",
+      "operation": "set",
+      "scenario": "one B2 whole-cell text-style set",
+      "size": "1 cell",
+      "host_ir": 282826408,
+      "leaf_ir": 156915444,
+      "ratio": 0.5548118547685265,
+      "delta_percent": -44.51881452314736,
+      "calls_per_side": 2,
+      "status": "meets"
+    },
+    {
+      "id": "w1g_cell_text_style_exclusive_repeat",
+      "test": "cost_probes::numbers_whole_cell_style_exclusive_repeat_cost_abba",
+      "operation": "set",
+      "scenario": "repeated update of a source-authored exclusive style",
+      "size": "1 cell repeated",
+      "host_ir": 205615736,
+      "leaf_ir": 136936777,
+      "ratio": 0.6659839351984228,
+      "delta_percent": -33.40160648015772,
+      "calls_per_side": 2,
+      "status": "meets"
+    },
+    {
+      "id": "w1g_cell_text_style_batch_1000",
+      "test": "cost_probes::numbers_whole_cell_style_batch_1000_cost_abba",
+      "operation": "batch",
+      "scenario": "shared-key whole-cell style publication",
+      "size": "50x20 / 1,000 cells",
+      "host_ir": 461133960244,
+      "leaf_ir": 3832042990,
+      "ratio": 0.008310042895067518,
+      "delta_percent": -99.16899571049325,
+      "calls_per_side": 2,
+      "status": "meets"
+    }
+  ]
+}
