@@ -544,8 +544,14 @@ fn publish(
                 Err(shared::Error::NeedsIdentifier) => {
                     limits.admit_allocations(1).map_err(from_shared)?;
                     let fresh = *working.allocate(1)?.first().ok_or(Error::InvalidSource)?;
-                    shared::plan_set(source, shared_target, properties, Some(fresh), &limits)
-                        .map_err(from_shared)?
+                    shared::plan_set_precharged(
+                        source,
+                        shared_target,
+                        properties,
+                        Some(fresh),
+                        &limits,
+                    )
+                    .map_err(from_shared)?
                 },
                 Err(error) => return Err(from_shared(error)),
             };

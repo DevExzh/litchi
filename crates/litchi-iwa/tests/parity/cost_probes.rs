@@ -154,7 +154,7 @@ fn whole_cell_style_properties(
     properties
 }
 
-fn host_whole_cell_style_single_setup(source: &[u8]) -> TestResult<Vec<u8>> {
+fn prepare_w1g_host_whole_cell_style_single(source: &[u8]) -> TestResult<Vec<u8>> {
     let mut editor = numbers::Draft::from_bytes(source)?;
     let model = crate::numbers_cases::host_first_table_model_id(&editor)?;
     let style =
@@ -164,7 +164,7 @@ fn host_whole_cell_style_single_setup(source: &[u8]) -> TestResult<Vec<u8>> {
     Ok(editor.to_bytes()?)
 }
 
-fn leaf_whole_cell_style_single_setup(source: &[u8]) -> TestResult<Vec<u8>> {
+fn prepare_w1g_leaf_whole_cell_style_single(source: &[u8]) -> TestResult<Vec<u8>> {
     let package = litchi_numbers::Package::from_bytes(source)?;
     let properties = whole_cell_style_properties(18.0, true, false);
     let commit = package
@@ -174,7 +174,7 @@ fn leaf_whole_cell_style_single_setup(source: &[u8]) -> TestResult<Vec<u8>> {
     Ok(leaf_bytes!(commit.package()))
 }
 
-fn host_whole_cell_style_exclusive_repeat_setup(source: &[u8]) -> TestResult<Vec<u8>> {
+fn prepare_w1g_host_whole_cell_style_exclusive_repeat(source: &[u8]) -> TestResult<Vec<u8>> {
     let mut editor = numbers::Draft::from_bytes(source)?;
     let model = crate::numbers_cases::host_first_table_model_id(&editor)?;
     let style =
@@ -184,7 +184,7 @@ fn host_whole_cell_style_exclusive_repeat_setup(source: &[u8]) -> TestResult<Vec
     Ok(editor.to_bytes()?)
 }
 
-fn leaf_whole_cell_style_exclusive_repeat_setup(source: &[u8]) -> TestResult<Vec<u8>> {
+fn prepare_w1g_leaf_whole_cell_style_exclusive_repeat(source: &[u8]) -> TestResult<Vec<u8>> {
     let package = litchi_numbers::Package::from_bytes(source)?;
     let properties = whole_cell_style_properties(21.0, false, true);
     let commit = package
@@ -194,7 +194,7 @@ fn leaf_whole_cell_style_exclusive_repeat_setup(source: &[u8]) -> TestResult<Vec
     Ok(leaf_bytes!(commit.package()))
 }
 
-fn host_whole_cell_style_batch_1000_setup(
+fn prepare_w1g_host_whole_cell_style_batch_1000(
     source: &[u8],
     cells: &[(u32, u32)],
 ) -> TestResult<Vec<u8>> {
@@ -209,7 +209,7 @@ fn host_whole_cell_style_batch_1000_setup(
     Ok(editor.to_bytes()?)
 }
 
-fn leaf_whole_cell_style_batch_1000_setup(
+fn prepare_w1g_leaf_whole_cell_style_batch_1000(
     source: &[u8],
     cells: &[(u32, u32)],
 ) -> TestResult<Vec<u8>> {
@@ -225,7 +225,7 @@ fn leaf_whole_cell_style_batch_1000_setup(
     Ok(leaf_bytes!(edit.commit()?.package()))
 }
 
-fn leaf_whole_cell_style_batch_1000_proof(
+fn validate_w1g_leaf_whole_cell_style_batch_1000(
     source: &[u8],
     cells: &[(u32, u32)],
 ) -> TestResult<Vec<u8>> {
@@ -249,32 +249,32 @@ fn leaf_whole_cell_style_batch_1000_proof(
 
 #[inline(never)]
 fn host_whole_cell_style_single(source: &[u8]) -> TestResult<Vec<u8>> {
-    host_whole_cell_style_single_setup(source)
+    prepare_w1g_host_whole_cell_style_single(source)
 }
 
 #[inline(never)]
 fn leaf_whole_cell_style_single(source: &[u8]) -> TestResult<Vec<u8>> {
-    leaf_whole_cell_style_single_setup(source)
+    prepare_w1g_leaf_whole_cell_style_single(source)
 }
 
 #[inline(never)]
 fn host_whole_cell_style_exclusive_repeat(source: &[u8]) -> TestResult<Vec<u8>> {
-    host_whole_cell_style_exclusive_repeat_setup(source)
+    prepare_w1g_host_whole_cell_style_exclusive_repeat(source)
 }
 
 #[inline(never)]
 fn leaf_whole_cell_style_exclusive_repeat(source: &[u8]) -> TestResult<Vec<u8>> {
-    leaf_whole_cell_style_exclusive_repeat_setup(source)
+    prepare_w1g_leaf_whole_cell_style_exclusive_repeat(source)
 }
 
 #[inline(never)]
 fn host_whole_cell_style_batch_1000(source: &[u8], cells: &[(u32, u32)]) -> TestResult<Vec<u8>> {
-    host_whole_cell_style_batch_1000_setup(source, cells)
+    prepare_w1g_host_whole_cell_style_batch_1000(source, cells)
 }
 
 #[inline(never)]
 fn leaf_whole_cell_style_batch_1000(source: &[u8], cells: &[(u32, u32)]) -> TestResult<Vec<u8>> {
-    leaf_whole_cell_style_batch_1000_setup(source, cells)
+    prepare_w1g_leaf_whole_cell_style_batch_1000(source, cells)
 }
 
 fn assert_whole_cell_style_output(
@@ -391,8 +391,8 @@ fn leaf_whole_cell_style_inverse(
 fn numbers_whole_cell_style_single_cost_abba() -> TestResult {
     let input = fixture("iwork/numbers/basic.numbers")?;
     let cells = [(1, 1)];
-    let host_setup = host_whole_cell_style_single_setup(&input.bytes)?;
-    let leaf_setup = leaf_whole_cell_style_single_setup(&input.bytes)?;
+    let host_setup = prepare_w1g_host_whole_cell_style_single(&input.bytes)?;
+    let leaf_setup = prepare_w1g_leaf_whole_cell_style_single(&input.bytes)?;
     assert_whole_cell_style_output(&host_setup, &leaf_setup, &cells, 18.0, true, false)?;
     let _ = leaf_whole_cell_style_inverse(
         &input.bytes,
@@ -412,9 +412,9 @@ fn numbers_whole_cell_style_single_cost_abba() -> TestResult {
 fn numbers_whole_cell_style_exclusive_repeat_cost_abba() -> TestResult {
     let input = fixture("iwork/numbers/basic.numbers")?;
     let cells = [(1, 1)];
-    let seeded = host_whole_cell_style_single_setup(&input.bytes)?;
-    let host_setup = host_whole_cell_style_exclusive_repeat_setup(&seeded)?;
-    let leaf_setup = leaf_whole_cell_style_exclusive_repeat_setup(&seeded)?;
+    let seeded = prepare_w1g_host_whole_cell_style_single(&input.bytes)?;
+    let host_setup = prepare_w1g_host_whole_cell_style_exclusive_repeat(&seeded)?;
+    let leaf_setup = prepare_w1g_leaf_whole_cell_style_exclusive_repeat(&seeded)?;
     assert_whole_cell_style_output(&host_setup, &leaf_setup, &cells, 21.0, false, true)?;
     let _ = leaf_whole_cell_style_inverse(
         &seeded,
@@ -434,8 +434,8 @@ fn numbers_whole_cell_style_exclusive_repeat_cost_abba() -> TestResult {
 fn numbers_whole_cell_style_batch_1000_cost_abba() -> TestResult {
     let fixture = shared_1000_cell_style_fixture()?;
     assert_eq!(fixture.cells.len(), 1_000);
-    let host_setup = host_whole_cell_style_batch_1000_setup(&fixture.bytes, &fixture.cells)?;
-    let leaf_setup = leaf_whole_cell_style_batch_1000_proof(&fixture.bytes, &fixture.cells)?;
+    let host_setup = prepare_w1g_host_whole_cell_style_batch_1000(&fixture.bytes, &fixture.cells)?;
+    let leaf_setup = validate_w1g_leaf_whole_cell_style_batch_1000(&fixture.bytes, &fixture.cells)?;
     assert_whole_cell_style_output(&host_setup, &leaf_setup, &fixture.cells, 19.0, true, false)?;
     assert_untouched_member_preserved(
         &fixture.bytes,
@@ -856,10 +856,10 @@ fn shared_1000_cell_style_fixture() -> TestResult<WholeCellFixture> {
         ..Default::default()
     });
     style_message.data = style_list.encode_to_vec();
-    if let Some(info) = style_object.archive_info.message_infos.first_mut() {
-        if !info.object_references.contains(&style_id) {
-            info.object_references.push(style_id);
-        }
+    if let Some(info) = style_object.archive_info.message_infos.first_mut()
+        && !info.object_references.contains(&style_id)
+    {
+        info.object_references.push(style_id);
     }
     let style_compressed = SnappyStream::compress(
         &style_archive.to_bytes(Default::default())?,

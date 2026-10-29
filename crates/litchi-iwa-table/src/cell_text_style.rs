@@ -1462,6 +1462,7 @@ fn effective_cached(
         properties.inherit(&inherited);
     }
     path.remove(&style);
+    limits.admit_character_properties(&properties)?;
     limits.reserve(cache, 1)?;
     cache.push((style, properties.clone()));
     Ok(properties)
@@ -2131,7 +2132,11 @@ fn plan_set_many_inner(
                 let old = *key;
                 *key = next;
                 for rewrite in &mut plan.rewrites {
-                    if rewrite.message_type == LIST_MESSAGE_TYPE {
+                    if rewrite.message_type == LIST_MESSAGE_TYPE
+                        || batch_context
+                            .as_ref()
+                            .is_some_and(|context| context.style_list.root == rewrite.identifier)
+                    {
                         rewrite.data = rewrite_list_key(&rewrite.data, old, next, limits)?;
                     }
                 }
@@ -2151,6 +2156,10 @@ fn plan_set_many_inner(
                 .or_default() += 1;
         }
         for rewrite in plan.rewrites {
+            let is_root_list = prepare_batch
+                && batch_context
+                    .as_ref()
+                    .is_some_and(|context| context.style_list.root == rewrite.identifier);
             if prepare_batch && rewrite.message_type == STYLESHEET_MESSAGE_TYPE {
                 if !stylesheet_identifiers
                     .iter()
@@ -2166,10 +2175,10 @@ fn plan_set_many_inner(
             // accumulated.  Keeping the per-cell segment rewrites here would
             // make a large batch look unsupported merely because two cells
             // share one segmented list owner.
-            if prepare_batch && rewrite.message_type == LIST_SEGMENT_MESSAGE_TYPE {
+            if prepare_batch && rewrite.message_type == LIST_SEGMENT_MESSAGE_TYPE && !is_root_list {
                 continue;
             }
-            if rewrite.message_type == LIST_MESSAGE_TYPE {
+            if rewrite.message_type == LIST_MESSAGE_TYPE || is_root_list {
                 list_identifier.get_or_insert(rewrite.identifier);
                 list_type.get_or_insert(rewrite.message_type);
                 let key = combined
