@@ -554,6 +554,42 @@ impl From<litchi_iwa_style::graph::Error> for Error {
     }
 }
 
+impl From<litchi_iwa_style::graph::FinishError> for Error {
+    fn from(error: litchi_iwa_style::graph::FinishError) -> Self {
+        match error {
+            litchi_iwa_style::graph::FinishError::Graph(error) => error.into(),
+            litchi_iwa_style::graph::FinishError::Overflow(_) => Error::InvalidSource,
+            litchi_iwa_style::graph::FinishError::Limit {
+                kind,
+                observed,
+                maximum,
+            } => Error::Limit {
+                kind: match kind {
+                    litchi_iwa_style::graph::FinishLimitKind::Work => {
+                        LimitKind::Engine(engine::LimitKind::Work)
+                    },
+                    litchi_iwa_style::graph::FinishLimitKind::Allocations => {
+                        LimitKind::AllocationEvents
+                    },
+                    litchi_iwa_style::graph::FinishLimitKind::RetainedBytes => {
+                        LimitKind::Engine(engine::LimitKind::RetainedBytes)
+                    },
+                    litchi_iwa_style::graph::FinishLimitKind::ScratchBytes => {
+                        LimitKind::ScratchBytes
+                    },
+                    _ => return Error::InvalidSource,
+                },
+                observed: observed as u64,
+                maximum: maximum as u64,
+            },
+            litchi_iwa_style::graph::FinishError::Allocation { amount } => {
+                Error::Allocation { amount }
+            },
+            _ => Error::InvalidSource,
+        }
+    }
+}
+
 impl From<litchi_iwa_style::series::SymbolError> for Error {
     fn from(error: litchi_iwa_style::series::SymbolError) -> Self {
         match error {
@@ -1489,11 +1525,14 @@ fn apply_one(
         | Property::SymbolFills(_)
         | Property::SymbolOutlines(_) => return Err(Error::InvalidSource),
     };
-    let finish_requirements = workspace.finish_requirements().map_err(Error::from)?;
+    let finish_limits = budget.finish_limits().map_err(map_arrangement)?;
+    workspace.finish_requirements().map_err(Error::from)?;
+    let (changes, finish_report) = workspace
+        .finish_bounded(finish_limits)
+        .map_err(Error::from)?;
     budget
-        .finish_workspace(finish_requirements)
+        .charge_finish_report(finish_report)
         .map_err(map_arrangement)?;
-    let changes = workspace.finish();
     if !changed || changes.is_empty() {
         return Ok(None);
     }

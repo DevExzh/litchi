@@ -919,16 +919,27 @@ impl ChartBudget {
         Self::preflight(self.work, amount, self.max_work, LimitKind::WireWork)
     }
 
-    pub(super) fn finish_workspace(
+    pub(super) fn finish_limits(&self) -> Result<litchi_iwa_style::graph::FinishLimits, Error> {
+        Ok(litchi_iwa_style::graph::FinishLimits::new(
+            Self::remaining_axis(self.max_work, self.work, LimitKind::WireWork)?,
+            Self::remaining_axis(
+                self.max_allocations,
+                self.allocations,
+                LimitKind::Allocations,
+            )?,
+            Self::remaining_axis(self.max_retained, self.retained, LimitKind::RetainedBytes)?,
+            Self::remaining_axis(self.max_scratch, self.scratch, LimitKind::ScratchBytes)?,
+        ))
+    }
+
+    pub(super) fn charge_finish_report(
         &mut self,
-        requirements: litchi_iwa_style::graph::FinishRequirements,
+        report: litchi_iwa_style::graph::FinishReport,
     ) -> Result<(), Error> {
-        self.preflight_work(requirements.work())?;
-        self.preflight_allocations(requirements.allocations())?;
-        self.preflight_retained(requirements.retained_bytes())?;
-        self.work(requirements.work())?;
-        self.allocations(requirements.allocations())?;
-        self.retained(requirements.retained_bytes())?;
+        self.work(report.work())?;
+        self.allocations(report.allocations())?;
+        self.retained(report.retained_bytes())?;
+        self.scratch(report.scratch_bytes())?;
         Ok(())
     }
 
