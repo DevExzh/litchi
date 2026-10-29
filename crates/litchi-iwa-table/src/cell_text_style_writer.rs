@@ -6,7 +6,8 @@
 //! profile; this writer consumes both while rebuilding each affected row once.
 
 use litchi_iwa_common::wire::{
-    WireFieldView, WireView, append_length_delimited_field, append_varint_field, visit_wire_fields,
+    RawWireFields, RawWireLimits, WireFieldView, WireView, append_length_delimited_field,
+    append_varint_field,
 };
 use litchi_iwa_common::{LimitKind, WireLimits};
 use litchi_numbers_wire::{BncCell, Limits as BncLimits};
@@ -189,25 +190,33 @@ fn map_bnc_limits(error: litchi_numbers_wire::limits::Error) -> Error {
     }
 }
 
-fn preflight_fields(data: &[u8], limits: WireLimits, transaction: &Limits) -> Result<usize, Error> {
-    let mut count = 0usize;
-    visit_wire_fields(data, limits, |_field| {
-        count = count.saturating_add(1);
-        Ok(())
-    })
+fn view<'a>(data: &'a [u8], transaction: &Limits) -> Result<WireView<'a>, Error> {
+    let residual = transaction.residual_wire()?;
+    let raw_limits = RawWireLimits::new(
+        residual.max_input_bytes(),
+        residual.max_fields(),
+        residual.max_nesting(),
+        residual.max_rewrite_work(),
+    )
     .map_err(map_common)?;
+    let mut raw = RawWireFields::new(data, raw_limits);
+    while raw.next().map_err(map_common)?.is_some() {}
+    let field_count = raw.fields();
+    let raw_work = raw.work();
+    transaction.charge_input(data.len())?;
+    transaction.charge_fields(field_count)?;
+    transaction.admit_work(raw_work)?;
     transaction.admit_work(data.len())?;
-    transaction.admit_allocations(count)?;
-    Ok(count)
-}
-
-fn view<'a>(
-    data: &'a [u8],
-    limits: WireLimits,
-    transaction: &Limits,
-) -> Result<WireView<'a>, Error> {
-    preflight_fields(data, limits, transaction)?;
-    WireView::parse(data, limits).map_err(map_common)
+    transaction.admit_allocations(field_count)?;
+    let material = WireLimits::default()
+        .with_input_bytes(data.len().max(1))
+        .and_then(|limits| limits.with_fields(field_count.max(1)))
+        .and_then(|limits| limits.with_nesting(WireLimits::MAX_NESTING))
+        .and_then(|limits| {
+            limits.with_rewrite_work(field_count.clamp(1, WireLimits::MAX_REWRITE_WORK))
+        })
+        .map_err(map_common)?;
+    WireView::parse(data, material).map_err(map_common)
 }
 
 fn charge_view_scans(view: &WireView<'_>, transaction: &Limits, scans: usize) -> Result<(), Error> {
@@ -309,6 +318,37 @@ fn append_varint(
 
 fn build_bnc_limits(wire: &BncLimits, columns: usize) -> Result<BncLimits, Error> {
     wire.with_items(columns.clamp(1, BncLimits::MAX_ITEMS))
+        .map_err(map_bnc_limits)
+}
+
+fn intersect_bnc_limits(caller: &BncLimits, transaction: &Limits) -> Result<BncLimits, Error> {
+    let residual = transaction.residual_wire()?;
+    let caller_wire = caller.wire();
+    let wire = caller_wire
+        .with_input_bytes(
+            caller_wire
+                .max_input_bytes()
+                .min(residual.max_input_bytes()),
+        )
+        .and_then(|value| {
+            value.with_output_bytes(
+                caller_wire
+                    .max_output_bytes()
+                    .min(residual.max_output_bytes()),
+            )
+        })
+        .and_then(|value| value.with_fields(caller_wire.max_fields().min(residual.max_fields())))
+        .and_then(|value| {
+            value.with_rewrite_work(
+                caller_wire
+                    .max_rewrite_work()
+                    .min(residual.max_rewrite_work()),
+            )
+        })
+        .map_err(map_common)?;
+    BncLimits::from_wire_limits(wire)
+        .with_tail_bytes(caller.max_tail_bytes().min(residual.max_input_bytes()))
+        .and_then(|value| value.with_items(caller.max_items().min(residual.max_rewrite_work())))
         .map_err(map_bnc_limits)
 }
 
@@ -457,7 +497,7 @@ fn rewrite_row(
     previous: &mut [Option<Vec<u8>>],
 ) -> Result<RowRewrite, Error> {
     let wire = bnc_limits.wire();
-    let view = view(row, wire, transaction)?;
+    let view = view(row, transaction)?;
     charge_view_scans(&view, transaction, 5)?;
     let row_number =
         one_varint(&view, ROW_INDEX_FIELD)?.ok_or_else(|| invalid("tile row index is missing"))?;
@@ -679,9 +719,10 @@ pub fn set_text_style_keys(
     }) {
         return Err(invalid("duplicate tile cell update"));
     }
+    let bnc_limits = intersect_bnc_limits(bnc_limits, transaction)?;
     let wire = bnc_limits.wire();
-    let root = view(tile, wire, transaction)?;
-    let bnc_limits = build_bnc_limits(bnc_limits, columns.max(updates.len()))?;
+    let root = view(tile, transaction)?;
+    let bnc_limits = build_bnc_limits(&bnc_limits, columns.max(updates.len()))?;
     transaction.admit_allocations(updates.len())?;
     let mut previous = vec![None; updates.len()];
     let row_count = root
@@ -704,7 +745,7 @@ pub fn set_text_style_keys(
         .filter(|field| field.number() == TILE_ROW_FIELD)
     {
         let row = field.payload();
-        let row_view = view(row, wire, transaction)?;
+        let row_view = view(row, transaction)?;
         charge_view_scans(&row_view, transaction, 1)?;
         let row_number = one_varint(&row_view, ROW_INDEX_FIELD)?
             .ok_or_else(|| invalid("tile row index is missing"))?;
@@ -760,7 +801,7 @@ pub fn set_text_style_keys(
         .fields()
         .filter(|field| field.number() == TILE_ROW_FIELD)
     {
-        let row_view = view(field.payload(), wire, transaction)?;
+        let row_view = view(field.payload(), transaction)?;
         charge_view_scans(&row_view, transaction, 1)?;
         let offsets = one_bytes(&row_view, ROW_OFFSETS_FIELD)?
             .ok_or_else(|| invalid("tile row offsets are missing"))?;
@@ -874,7 +915,7 @@ pub fn set_text_style_keys(
     let mut output_len = 0usize;
     for field in root.fields() {
         let length = if field.number() == TILE_ROW_FIELD {
-            let row_view = view(field.payload(), wire, transaction)?;
+            let row_view = view(field.payload(), transaction)?;
             charge_view_scans(&row_view, transaction, 1)?;
             let row_number = one_varint(&row_view, ROW_INDEX_FIELD)?.unwrap_or(u64::MAX);
             if let Some(rewrite) = rewrites
@@ -945,7 +986,7 @@ pub fn set_text_style_keys(
             }
         }
         if field.number() == TILE_ROW_FIELD {
-            let row_view = view(field.payload(), wire, transaction)?;
+            let row_view = view(field.payload(), transaction)?;
             charge_view_scans(&row_view, transaction, 1)?;
             let row_number = u32::try_from(one_varint(&row_view, ROW_INDEX_FIELD)?.unwrap_or(0))
                 .map_err(|_| invalid("tile row index overflow"))?;
@@ -1404,6 +1445,97 @@ mod tests {
                 ..
             })
         ));
+    }
+
+    #[test]
+    fn transaction_ledgers_fail_closed_on_zero_residual_dimensions() {
+        let source = tile(&[row(0, &[Some(&bnc(Some(3))), None], &[])], &[]);
+        let update = Update {
+            row: 0,
+            column: 0,
+            key: Some(7),
+        };
+        let wire = BncLimits::from_wire_limits(transaction_limits().wire);
+
+        let transaction = transaction_limits();
+        transaction
+            .admit_work(transaction.max_work)
+            .expect("debit work");
+        assert!(matches!(
+            set_text_style_keys(
+                &source,
+                2,
+                &[update],
+                RowPlacement::FieldOrder,
+                &transaction,
+                &wire,
+            ),
+            Err(Error::Limit { .. })
+        ));
+
+        let transaction = transaction_limits();
+        transaction
+            .charge_fields(transaction.wire.max_fields())
+            .expect("debit fields");
+        assert!(
+            set_text_style_keys(
+                &source,
+                2,
+                &[update],
+                RowPlacement::FieldOrder,
+                &transaction,
+                &wire,
+            )
+            .is_err()
+        );
+
+        let transaction = transaction_limits();
+        transaction
+            .admit_allocations(transaction.max_allocations)
+            .expect("debit allocations");
+        assert!(
+            set_text_style_keys(
+                &source,
+                2,
+                &[update],
+                RowPlacement::FieldOrder,
+                &transaction,
+                &wire,
+            )
+            .is_err()
+        );
+
+        let transaction = transaction_limits();
+        transaction
+            .admit_copies(transaction.max_copies)
+            .expect("debit copies");
+        assert!(
+            set_text_style_keys(
+                &source,
+                2,
+                &[update],
+                RowPlacement::FieldOrder,
+                &transaction,
+                &wire,
+            )
+            .is_err()
+        );
+
+        let transaction = transaction_limits();
+        transaction
+            .admit_output(transaction.wire.max_output_bytes())
+            .expect("debit output");
+        assert!(
+            set_text_style_keys(
+                &source,
+                2,
+                &[update],
+                RowPlacement::FieldOrder,
+                &transaction,
+                &wire,
+            )
+            .is_err()
+        );
     }
 
     #[test]
