@@ -74,7 +74,8 @@ coordinator's final CPU slot. The shared substrate and shape/adapter checks
 are recorded in their respective records; the coordinator must rerun the
 complete gate on one integrated commit.
 
-The source-bound release probe binary was built but not executed:
+An initial source-bound release probe binary was built but not executed; it
+was superseded by the final CPU5 source-bound build below:
 
 - source `e481893f62ead345a501e240a2529a746029f32d`
 - command `cargo test -p litchi-iwa --test parity --release --no-run --jobs 2`
@@ -82,7 +83,40 @@ The source-bound release probe binary was built but not executed:
 - 40,183,512 bytes, SHA-256
   `89254437719e28057c018bf7ee237381b10bb9713ded92554d29bd40fa7ad474`
 
-No probe execution, wall timing, CPU capture, raw captures, or binaries were
-added to the repository.
+No raw captures or binaries were added to the repository. The final CPU5
+capture was instruction-count-only and is retained externally below.
+
+### CPU5 instruction qualification
+
+After pinning the probe helper symbols with `#[inline(never)]`, the final
+source-bound binary was rebuilt and archived before execution:
+
+- prior source/binary: `e481893f62ead345a501e240a2529a746029f32d`,
+  `pages-parity-0ce5798ee9`, SHA-256
+  `867984d1aebcdcffd4c917db550a00922439b83cb3978fcb85d4f10cbb0b4f86`
+- measured source: `c3dd90d7dc7de91326200471729b3b8e12a5da42`
+- measured binary: `/home/zhuhe/code/litchi-worktrees/.coord/fullmeasuredSHA/bin/pages-parity-c3dd90d7dc`
+- measured binary: 40,122,072 bytes, SHA-256
+  `7c1ccade1640baea94f1f327a718158f65da2e15500c6fbbb662cb1aaa35d7ac`
+- build: `cargo test -p litchi-iwa --test parity --release --no-run --jobs 2`
+- capture root: `/home/zhuhe/code/litchi-worktrees/.coord/fullmeasuredSHA/pages-cpu5-c3dd90d7dc`
+- manifest: `manifest.tsv`; `taskset -c 5 valgrind --tool=callgrind`
+  captured each exact ignored test twice, with the matching host or leaf
+  symbol toggle. Every capture had exit 0, one matching test pass, and
+  positive symbol Ir.
+
+| Route | Host Ir | Leaf Ir | Leaf minus host |
+| --- | ---: | ---: | ---: |
+| font read | 1,658,570,789 | 34,487,704 | −97.920637% |
+| font set | 2,149,725,478 | 206,192,863 | −90.408410% |
+| font reset | 1,914,342,996 | 203,436,287 | −89.373049% |
+| size read | 1,659,387,223 | 33,822,994 | −97.961718% |
+| size set | 2,042,812,143 | 207,761,686 | −89.829624% |
+| size reset | 1,861,018,959 | 202,191,477 | −89.135442% |
+
+The six tests execute explicit host/leaf/leaf/host ABBA calls, with host
+setup outside the measured route. This is instruction-count evidence only;
+there is no wall-time claim. The six ledger rows remain host-only pending the
+coordinator's integrated final qualification and native queue policy.
 
 No raw captures or binaries were added.
