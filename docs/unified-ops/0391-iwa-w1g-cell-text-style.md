@@ -3,12 +3,13 @@
 - Status: paused Numbers-first substrate under explicit budget/admission
   repair. Pages and Keynote facades are not started, no ledger rows are
   migrated, and no parity/performance/native acceptance claim is active. The
-  current clean tip is 36be343a42.
+  current clean tip is d5abe8856a.
 - Source branch: `uo2/iwa-w1g-cell-text-style`, cut from frozen root
   `1e3978082bd8e576f0afeb7e3eebac1ca3908d86`, then synchronized with frozen
   trunk 24ecfb543748885192b8fb5273abb54e669764c6.
 - Continuation commits: trunk merge `d220cd76ed`, budget admission
-  `beb878ea23`, and codec-allocation pre-admission `36be343a42`.
+  `beb878ea23`, codec-allocation pre-admission `36be343a42`, residual
+  closure `3bfb0c6319`, and proof checkpoint `d5abe8856a`.
 - Scope: shared `litchi-iwa-table::cell_text_style` graph reads and direct
   `CharacterProperties` planning, plus the Numbers read and single-cell
   adapter path. Existing public Numbers selectors and vocabulary remain
@@ -55,11 +56,22 @@ proof remains pending.
 
 ## Verification and remaining work
 
-The current smoke gates pass: 40 shared table unit tests (including three new
-low-field/work/allocation pre-admission cases), five Numbers
+The current smoke gates pass: 42 shared table unit tests (including duplicate,
+unknown-field and low-field/work/allocation pre-admission cases), six Numbers
 `cell_text_style` tests, formatting, scoped check, and strict Clippy for both
 crates. These are not the required 17-property host differential or full
 transaction proof.
+
+The current Numbers proof rerun also passes the existing 17-property host
+set/reset/read vectors and the populated-reader differential: 595 direct
+semantic reads compare host and leaf values. The shared wire controls cover
+duplicate singular fields, unknown-field retention/locality, zero ceilings,
+and low field/work/allocation refusals; the Numbers integration adds an exact
+source/no-op/inverse case. The remaining explicit proof gap is a multi-cell
+release from a pre-existing shared explicit style key. The tracked Numbers
+fixtures do not contain such a key, while the current parity batch creates one
+variation per cell, so this route is not claimed until a valid source-built
+shared-key fixture or equivalent bounded test input is supplied.
 
 Before Pages/Keynote work begins, requalify the shared substrate against the
 full Numbers 17-property parity/readback and release-mode facade matrix,
@@ -70,7 +82,7 @@ be added. Timing remains held until the coordinator grants the slot.
 
 Historical parity and corpus receipts from the pre-repair checkpoint are
 retained as context only and are not requalified evidence for this source.
-The next gate must add direct host-vs-shared reads for all 17 properties, an
-actual shared-key batch vector, unknown/locality and malformed-duplicate
-controls, cumulative/depth/zero-limit transactions, inverse/no-op and
-candidate reopen before any Pages/Keynote facade or ledger work.
+The next gate must add a valid shared-key batch vector, package-level
+malformed/duplicate and locality controls over the populated source, cumulative
+depth/zero-limit transaction evidence, and candidate reopen before any
+Pages/Keynote facade or ledger work.
