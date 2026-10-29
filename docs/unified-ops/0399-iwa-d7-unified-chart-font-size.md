@@ -86,7 +86,7 @@ prove frame/name/z-order reads remain structural when its font graph refuses,
 and single, compound and frame-only query predicates use the same typed
 property path.
 
-The final all-feature run passed 8 active tests and intentionally left the 9
+The final all-feature run passed 10 active tests and intentionally left the 9
 full-file ABBA wrappers ignored.  The generated capability reports were
 regenerated and the all-feature capability suite passed (11 tests).
 
