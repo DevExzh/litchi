@@ -3751,36 +3751,36 @@ pub(super) fn publish_with_policy(
             deletions.push(name);
         }
     }
-    publish_prepared_payloads(
+    let output = reassemble_prepared_payloads(package, budget, &insertions, &edits, &deletions)?;
+    let output_len = output.len();
+    preflight_locality_verification(package, output_len, plan, budget)?;
+    preflight_candidate(package, output_len, changes.insertions.len(), budget)?;
+    let candidate = Package::from_source_with_options(output.into(), package.state.options)
+        .map_err(map_read_error)?;
+    candidate.validate().map_err(map_read_error)?;
+    verify_locality_members(
         package,
-        &changes,
+        &candidate,
+        plan,
         budget,
         fields,
-        plan,
         is_rewritable_type,
         chart_extension_fields,
-        &insertions,
-        &edits,
-        &deletions,
-    )
+    )?;
+    Ok(candidate)
 }
 
 /// Reassemble already-prepared chart-family payloads through the shared
 /// locality and candidate-verification seam. The chart-series owner uses
 /// this after its private Archive/Snappy preparation policy; chart-font keeps
 /// its legacy serializer policy unchanged.
-pub(super) fn publish_prepared_payloads<'a>(
+pub(super) fn reassemble_prepared_payloads<'a>(
     package: &Package,
-    changes: &graph::Changes,
     budget: &mut TransactionBudget,
-    fields: &mut FieldLedger,
-    plan: &MutationPlan,
-    is_rewritable_type: fn(u32) -> bool,
-    chart_extension_fields: &[u32],
     insertions: &[EntryInsertion<'a>],
     edits: &[EntryEdit<'a>],
     deletions: &[&'a str],
-) -> Result<Package, Error> {
+) -> Result<Vec<u8>, Error> {
     let catalog = physical_catalog(package)?;
     let mut admit_reassembly = |charge: litchi_iwa_archive::unstable::CandidateIngressCharge| {
         budget
@@ -3823,22 +3823,7 @@ pub(super) fn publish_prepared_payloads<'a>(
     let output = prepared
         .execute(requirements.exact_limits())
         .map_err(map_archive_error)?;
-    let output_len = output.len();
-    preflight_locality_verification(package, output_len, plan, budget)?;
-    preflight_candidate(package, output_len, changes.insertions.len(), budget)?;
-    let candidate = Package::from_source_with_options(output.into(), package.state.options)
-        .map_err(map_read_error)?;
-    candidate.validate().map_err(map_read_error)?;
-    verify_locality_members(
-        package,
-        &candidate,
-        plan,
-        budget,
-        fields,
-        is_rewritable_type,
-        chart_extension_fields,
-    )?;
-    Ok(candidate)
+    Ok(output)
 }
 
 fn map_selector_error(error: SelectorError) -> Error {

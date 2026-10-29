@@ -14,8 +14,10 @@ use litchi_iwa_common::chart::kind::Kind;
 use litchi_iwa_common::chart::series::{Symbol, SymbolShape, SymbolSize};
 use litchi_iwa_common::varint::encode_varint_into;
 use litchi_iwa_protos::chart_style_codec::{self as chart_style_codec, Limits as ChartCodecLimits};
-use litchi_keynote::chart::series::{Error, Property, Refusal};
-use litchi_keynote::{ChartSelector, OpenOptions, Package, SemanticLimits, SlideSelector};
+use litchi_keynote::chart::series::{Error, LimitKind, Property, Refusal};
+use litchi_keynote::{
+    ChartSelector, OpenOptions, Package, SemanticLimits, SlideSelector, SourceLimits,
+};
 
 use crate::chart_style_cases::{Components, Input, input, publish};
 use crate::harness::{Case, Evidence, Format, LeafRun, TestResult, Tier};
@@ -426,6 +428,32 @@ fn keynote_slide_chart_series_noop_inverse_and_refusal_controls() -> TestResult 
         leaf_read(&leaf_bytes!(changed.package()))?,
         vec![None, None]
     );
+    let target_bytes = leaf_bytes!(changed.package());
+    if target_bytes.len() > input.fixture.bytes.len() {
+        let low_source = SourceLimits::builder()
+            .max_input_bytes(input.fixture.bytes.len() as u64)?
+            .build()?;
+        let limited = Package::from_bytes_with_options(
+            &input.fixture.bytes,
+            OpenOptions::new().source_limits(low_source),
+        )?;
+        assert!(matches!(
+            limited.apply_slide_chart_series(changed.patch()),
+            Err(Error::Limit {
+                kind: LimitKind::InputBytes,
+                observed,
+                maximum,
+            }) if observed > maximum
+        ));
+    }
+    let low_semantic = Package::from_bytes_with_options(
+        &input.fixture.bytes,
+        OpenOptions::new().semantic_limits(SemanticLimits::builder().max_references(1)?.build()?),
+    )?;
+    assert!(matches!(
+        low_semantic.apply_slide_chart_series(changed.patch()),
+        Err(Error::Limit { .. })
+    ));
     let restored = changed
         .package()
         .apply_slide_chart_series(&changed.patch().inverse())?;

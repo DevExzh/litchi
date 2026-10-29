@@ -26,7 +26,7 @@ use thiserror::Error as ThisError;
 use super::chart_axis_support::{self, AxisSupportError, AxisSupportSelectorError};
 use super::slide_chart_font::{self, FieldLedger};
 use super::slide_table_core::{Budget as TransactionBudget, Error as TransactionError};
-use super::{Package, PhysicalSource};
+use super::{Package, PayloadLimitKind, PhysicalSource, ReadError, SemanticLimitKind};
 use crate::{ChartSelector, SlideSelector};
 use litchi_core::Position;
 use litchi_iwa_common::chart::series::{Symbol, SymbolFamily};
@@ -851,6 +851,57 @@ fn map_archive_error(error: litchi_iwa_archive::Error) -> Error {
     }
 }
 
+fn map_read_error(error: ReadError) -> Error {
+    match error {
+        ReadError::SemanticLimit {
+            kind,
+            observed,
+            maximum,
+            ..
+        } => Error::Limit {
+            kind: match kind {
+                SemanticLimitKind::Objects => LimitKind::Entries,
+                SemanticLimitKind::Slides => LimitKind::Slides,
+                SemanticLimitKind::References => LimitKind::References,
+                SemanticLimitKind::TextStorages | SemanticLimitKind::TextFragments => {
+                    LimitKind::Entries
+                },
+                SemanticLimitKind::TextBytes => LimitKind::TextBytes,
+            },
+            observed: usize_to_u64(observed),
+            maximum: usize_to_u64(maximum),
+        },
+        ReadError::PayloadLimit {
+            kind,
+            observed,
+            maximum,
+            ..
+        } => Error::Limit {
+            kind: match kind {
+                PayloadLimitKind::Bytes => LimitKind::WireBytes,
+                PayloadLimitKind::Fields => LimitKind::WireFields,
+                PayloadLimitKind::Nesting => LimitKind::WireNesting,
+                PayloadLimitKind::Work => LimitKind::WireWork,
+            },
+            observed: usize_to_u64(observed),
+            maximum: usize_to_u64(maximum),
+        },
+        ReadError::Allocation { amount, .. } => Error::Allocation { amount },
+        ReadError::Archive(error) => map_archive_error(error),
+        ReadError::Io(_)
+        | ReadError::Detection(_)
+        | ReadError::UnexpectedFormat { .. }
+        | ReadError::InvalidFormat(_)
+        | ReadError::Decode(_)
+        | ReadError::TextStorage { .. }
+        | ReadError::Metadata(_) => Error::InvalidSource,
+    }
+}
+
+fn usize_to_u64(value: usize) -> u64 {
+    u64::try_from(value).unwrap_or(u64::MAX)
+}
+
 const fn is_series_rewritable_type(message_type: u32) -> bool {
     matches!(message_type, 401 | 5_021 | 5_028 | 5_029 | 11_006 | 11_008)
 }
@@ -1398,19 +1449,31 @@ fn publish_series_with_prepared_policy(
             }),
     );
 
-    slide_chart_font::publish_prepared_payloads(
+    let output = slide_chart_font::reassemble_prepared_payloads(
         package,
-        &changes,
         budget,
-        fields,
-        plan,
-        is_rewritable_type,
-        chart_extension_fields,
         &insertions,
         &edits,
         &deletions,
     )
-    .map_err(map_font_error)
+    .map_err(map_font_error)?;
+    let output_len = output.len();
+    slide_chart_font::preflight_locality_verification(package, output_len, plan, budget)
+        .map_err(map_font_error)?;
+    slide_chart_font::preflight_candidate(package, output_len, changes.insertions.len(), budget)
+        .map_err(map_font_error)?;
+    let candidate = package.structure_reopen(output).map_err(map_read_error)?;
+    slide_chart_font::verify_locality_members(
+        package,
+        &candidate,
+        plan,
+        budget,
+        fields,
+        is_rewritable_type,
+        chart_extension_fields,
+    )
+    .map_err(map_font_error)?;
+    Ok(candidate)
 }
 
 /// A compact exact-source patch for one chart-series symbol value.
@@ -1781,13 +1844,12 @@ impl Package {
                 diagnostics: Diagnostics::unchanged(),
             });
         }
-        let target = patch.artifacts.target().to_vec();
-        budget
-            .preflight_candidate(self, target.len())
-            .map_err(map_transaction_error)?;
+        let target = patch.artifacts.target();
+        slide_chart_font::preflight_candidate(self, target.len(), 0, &mut budget)
+            .map_err(map_font_error)?;
         let candidate = self
-            .structure_reopen(target)
-            .map_err(|_| Error::Verification)?;
+            .structure_reopen_shared(target)
+            .map_err(map_read_error)?;
         slide_chart_font::verify_locality_members(
             self,
             &candidate,
