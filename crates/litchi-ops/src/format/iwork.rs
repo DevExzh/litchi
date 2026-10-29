@@ -509,7 +509,7 @@ impl Iwork {
         let cache = self.chart_cache().expect("chart cache must initialize");
         let built = cache
             .entry(slot)
-            .and_then(OnceLock::get)
+            .and_then(|entry| entry.get())
             .and_then(|built| built.error.is_none().then_some(built))
             .expect("chart At must refer to an initialized chart entry");
         built.tree.item(at.index)
