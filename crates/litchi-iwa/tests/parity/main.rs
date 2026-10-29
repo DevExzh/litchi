@@ -27,6 +27,7 @@ mod chart_font_cases;
 mod chart_style_cases;
 mod chart_text_cases;
 mod chart_text_cost;
+mod comment_clear_safety_cases;
 mod cost_probes;
 mod formula_refresh_cases;
 mod harness;
