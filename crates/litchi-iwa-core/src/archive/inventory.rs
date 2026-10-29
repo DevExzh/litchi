@@ -16,7 +16,9 @@
 
 use std::{fmt, mem::size_of, result::Result};
 
-use super::{Archive, ArchiveInfo, ArchiveObject, FieldInfo, FieldPath, MessageInfo, RawMessage};
+use super::{
+    Archive, ArchiveInfo, ArchiveObject, Error, FieldInfo, FieldPath, MessageInfo, RawMessage,
+};
 
 /// One heap-backed collection visited while cloning a parsed archive.
 ///
@@ -172,6 +174,417 @@ impl<E: fmt::Display> fmt::Display for ArchiveCloneInventoryError<E> {
 }
 
 impl<E: std::error::Error + 'static> std::error::Error for ArchiveCloneInventoryError<E> {}
+
+/// One allocation-free traversal admitted while preparing archive encoding.
+///
+/// Unlike execution requirements, this chunk describes work performed before
+/// a compatibility projection or output buffer is allocated. The visitor is
+/// called before the corresponding collection or phase is inspected.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ArchiveEncodingPreparationChunk {
+    pub(crate) kind: ArchiveEncodingPreparationKind,
+    pub(crate) elements: usize,
+    pub(crate) traversal_bytes: usize,
+}
+
+impl ArchiveEncodingPreparationChunk {
+    #[must_use]
+    pub const fn kind(self) -> ArchiveEncodingPreparationKind {
+        self.kind
+    }
+
+    #[must_use]
+    pub const fn elements(self) -> usize {
+        self.elements
+    }
+
+    #[must_use]
+    pub const fn traversal_bytes(self) -> usize {
+        self.traversal_bytes
+    }
+}
+
+/// Collection or phase admitted before the prepared serializer reads it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum ArchiveEncodingPreparationKind {
+    Object,
+    ArchiveInfo,
+    MessageInfos,
+    MessageInfoVersions,
+    FieldInfos,
+    FieldPath,
+    ObjectReferences,
+    DataReferences,
+    DiffMergeVersions,
+    DiffFieldPath,
+    FieldsToRemove,
+    DiffReadVersions,
+    KnownFieldVersions,
+    FeatureIdentifier,
+    Messages,
+    MessagePayload,
+    OriginalHeader,
+    OriginalCanonicalHeader,
+    SemanticHeader,
+    RetainedHeader,
+    PayloadValidation,
+    CompatibilityProjectionSizing,
+    CompatibilityAllocationSizing,
+}
+
+/// Typed visitor for source-bound prepared-encoding work admission.
+pub trait ArchiveEncodingPreparationVisitor {
+    type Error;
+
+    /// Admit the next bounded collection or phase before it is traversed.
+    fn admit(
+        &mut self,
+        chunk: ArchiveEncodingPreparationChunk,
+    ) -> std::result::Result<(), Self::Error>;
+}
+
+impl<F, E> ArchiveEncodingPreparationVisitor for F
+where
+    F: FnMut(ArchiveEncodingPreparationChunk) -> std::result::Result<(), E>,
+{
+    type Error = E;
+
+    fn admit(&mut self, chunk: ArchiveEncodingPreparationChunk) -> std::result::Result<(), E> {
+        self(chunk)
+    }
+}
+
+/// Failure from a prepared-encoding work admission walk.
+#[derive(Debug)]
+#[non_exhaustive]
+pub enum ArchiveEncodingPreparationError<E> {
+    /// The format owner's typed residual-work ledger rejected a chunk.
+    Admission(E),
+    /// The physical source or internal accounting overflowed `usize`.
+    ArithmeticOverflow { resource: &'static str },
+    /// The physical archive admission itself rejected the immutable source.
+    Core(Error),
+}
+
+impl<E> From<Error> for ArchiveEncodingPreparationError<E> {
+    fn from(error: Error) -> Self {
+        Self::Core(error)
+    }
+}
+
+/// Result type for prepared-encoding admission with caller-defined errors.
+pub type ArchiveEncodingPreparationResult<T, E> = Result<T, ArchiveEncodingPreparationError<E>>;
+
+impl<E: fmt::Display> fmt::Display for ArchiveEncodingPreparationError<E> {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Admission(error) => write!(formatter, "encoding admission failed: {error}"),
+            Self::ArithmeticOverflow { resource } => {
+                write!(formatter, "encoding preparation {resource} overflow")
+            },
+            Self::Core(error) => write!(formatter, "encoding preparation failed: {error}"),
+        }
+    }
+}
+
+impl<E: std::error::Error + 'static> std::error::Error for ArchiveEncodingPreparationError<E> {}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub(super) struct ArchiveEncodingPreparationInventory {
+    pub(super) metadata_traversal_bytes: usize,
+    pub(super) payload_bytes: usize,
+    pub(super) payload_validation_bytes: usize,
+}
+
+impl ArchiveEncodingPreparationInventory {
+    fn add_bytes(slot: &mut usize, amount: usize) -> bool {
+        let Some(total) = slot.checked_add(amount) else {
+            return false;
+        };
+        *slot = total;
+        true
+    }
+
+    fn admit<E, V>(
+        &mut self,
+        visitor: &mut V,
+        kind: ArchiveEncodingPreparationKind,
+        elements: usize,
+        element_size: usize,
+        metadata: bool,
+    ) -> ArchiveEncodingPreparationResult<(), E>
+    where
+        V: ArchiveEncodingPreparationVisitor<Error = E>,
+    {
+        let bytes = elements.checked_mul(element_size).ok_or(
+            ArchiveEncodingPreparationError::ArithmeticOverflow {
+                resource: "preparation collection size",
+            },
+        )?;
+        visitor
+            .admit(ArchiveEncodingPreparationChunk {
+                kind,
+                elements,
+                traversal_bytes: bytes,
+            })
+            .map_err(ArchiveEncodingPreparationError::Admission)?;
+        if metadata {
+            if !Self::add_bytes(&mut self.metadata_traversal_bytes, bytes) {
+                return Err(ArchiveEncodingPreparationError::ArithmeticOverflow {
+                    resource: "metadata traversal bytes",
+                });
+            }
+        }
+        Ok(())
+    }
+
+    fn admit_bytes<E, V>(
+        &mut self,
+        visitor: &mut V,
+        kind: ArchiveEncodingPreparationKind,
+        bytes: usize,
+        metadata: bool,
+    ) -> ArchiveEncodingPreparationResult<(), E>
+    where
+        V: ArchiveEncodingPreparationVisitor<Error = E>,
+    {
+        visitor
+            .admit(ArchiveEncodingPreparationChunk {
+                kind,
+                elements: usize::from(bytes != 0),
+                traversal_bytes: bytes,
+            })
+            .map_err(ArchiveEncodingPreparationError::Admission)?;
+        if metadata {
+            if !Self::add_bytes(&mut self.metadata_traversal_bytes, bytes) {
+                return Err(ArchiveEncodingPreparationError::ArithmeticOverflow {
+                    resource: "metadata traversal bytes",
+                });
+            }
+        }
+        Ok(())
+    }
+}
+
+pub(super) fn admit_archive_encoding_object<V>(
+    object: &ArchiveObject,
+    visitor: &mut V,
+) -> ArchiveEncodingPreparationResult<ArchiveEncodingPreparationInventory, V::Error>
+where
+    V: ArchiveEncodingPreparationVisitor,
+{
+    let mut inventory = ArchiveEncodingPreparationInventory::default();
+    inventory.admit(
+        visitor,
+        ArchiveEncodingPreparationKind::Object,
+        1,
+        size_of::<ArchiveObject>(),
+        false,
+    )?;
+    visit_encoding_archive_info(&mut inventory, &object.archive_info, visitor)?;
+    inventory.admit(
+        visitor,
+        ArchiveEncodingPreparationKind::Messages,
+        object.messages.len(),
+        size_of::<RawMessage>(),
+        false,
+    )?;
+    inventory.payload_validation_bytes = object
+        .messages
+        .len()
+        .checked_mul(size_of::<RawMessage>())
+        .ok_or(ArchiveEncodingPreparationError::ArithmeticOverflow {
+            resource: "payload validation bytes",
+        })?;
+    for message in &object.messages {
+        inventory.admit_bytes(
+            visitor,
+            ArchiveEncodingPreparationKind::MessagePayload,
+            message.data.len(),
+            false,
+        )?;
+        if !ArchiveEncodingPreparationInventory::add_bytes(
+            &mut inventory.payload_bytes,
+            message.data.len(),
+        ) {
+            return Err(ArchiveEncodingPreparationError::ArithmeticOverflow {
+                resource: "payload bytes",
+            });
+        }
+    }
+    if let Some((original, canonical)) = object.source_headers() {
+        inventory.admit_bytes(
+            visitor,
+            ArchiveEncodingPreparationKind::OriginalHeader,
+            original.len(),
+            false,
+        )?;
+        inventory.admit_bytes(
+            visitor,
+            ArchiveEncodingPreparationKind::OriginalCanonicalHeader,
+            canonical.len(),
+            false,
+        )?;
+    }
+    Ok(inventory)
+}
+
+fn visit_encoding_archive_info<V>(
+    inventory: &mut ArchiveEncodingPreparationInventory,
+    info: &ArchiveInfo,
+    visitor: &mut V,
+) -> ArchiveEncodingPreparationResult<(), V::Error>
+where
+    V: ArchiveEncodingPreparationVisitor,
+{
+    inventory.admit(
+        visitor,
+        ArchiveEncodingPreparationKind::ArchiveInfo,
+        1,
+        size_of::<ArchiveInfo>(),
+        true,
+    )?;
+    inventory.admit(
+        visitor,
+        ArchiveEncodingPreparationKind::MessageInfos,
+        info.message_infos.len(),
+        size_of::<MessageInfo>(),
+        true,
+    )?;
+    for message in &info.message_infos {
+        visit_encoding_message_info(inventory, message, visitor)?;
+    }
+    Ok(())
+}
+
+fn visit_encoding_message_info<V>(
+    inventory: &mut ArchiveEncodingPreparationInventory,
+    message: &MessageInfo,
+    visitor: &mut V,
+) -> ArchiveEncodingPreparationResult<(), V::Error>
+where
+    V: ArchiveEncodingPreparationVisitor,
+{
+    inventory.admit(
+        visitor,
+        ArchiveEncodingPreparationKind::MessageInfoVersions,
+        message.versions.len(),
+        size_of::<u32>(),
+        true,
+    )?;
+    inventory.admit(
+        visitor,
+        ArchiveEncodingPreparationKind::FieldInfos,
+        message.field_infos.len(),
+        size_of::<FieldInfo>(),
+        true,
+    )?;
+    for field in &message.field_infos {
+        visit_encoding_field_info(inventory, field, visitor)?;
+    }
+    inventory.admit(
+        visitor,
+        ArchiveEncodingPreparationKind::ObjectReferences,
+        message.object_references.len(),
+        size_of::<u64>(),
+        true,
+    )?;
+    inventory.admit(
+        visitor,
+        ArchiveEncodingPreparationKind::DataReferences,
+        message.data_references.len(),
+        size_of::<u64>(),
+        true,
+    )?;
+    inventory.admit(
+        visitor,
+        ArchiveEncodingPreparationKind::DiffMergeVersions,
+        message.diff_merge_version.len(),
+        size_of::<u32>(),
+        true,
+    )?;
+    if let Some(path) = &message.diff_field_path {
+        inventory.admit(
+            visitor,
+            ArchiveEncodingPreparationKind::DiffFieldPath,
+            path.path.len(),
+            size_of::<u32>(),
+            true,
+        )?;
+    }
+    inventory.admit(
+        visitor,
+        ArchiveEncodingPreparationKind::FieldsToRemove,
+        message.fields_to_remove.len(),
+        size_of::<FieldPath>(),
+        true,
+    )?;
+    for path in &message.fields_to_remove {
+        inventory.admit(
+            visitor,
+            ArchiveEncodingPreparationKind::FieldPath,
+            path.path.len(),
+            size_of::<u32>(),
+            true,
+        )?;
+    }
+    inventory.admit(
+        visitor,
+        ArchiveEncodingPreparationKind::DiffReadVersions,
+        message.diff_read_version.len(),
+        size_of::<u32>(),
+        true,
+    )?;
+    Ok(())
+}
+
+fn visit_encoding_field_info<V>(
+    inventory: &mut ArchiveEncodingPreparationInventory,
+    field: &FieldInfo,
+    visitor: &mut V,
+) -> ArchiveEncodingPreparationResult<(), V::Error>
+where
+    V: ArchiveEncodingPreparationVisitor,
+{
+    inventory.admit(
+        visitor,
+        ArchiveEncodingPreparationKind::FieldPath,
+        field.path.path.len(),
+        size_of::<u32>(),
+        true,
+    )?;
+    inventory.admit(
+        visitor,
+        ArchiveEncodingPreparationKind::ObjectReferences,
+        field.object_references.len(),
+        size_of::<u64>(),
+        true,
+    )?;
+    inventory.admit(
+        visitor,
+        ArchiveEncodingPreparationKind::DataReferences,
+        field.data_references.len(),
+        size_of::<u64>(),
+        true,
+    )?;
+    inventory.admit(
+        visitor,
+        ArchiveEncodingPreparationKind::KnownFieldVersions,
+        field.known_field_version.len(),
+        size_of::<u32>(),
+        true,
+    )?;
+    if let Some(identifier) = field.known_field_feature_identifier.as_deref() {
+        inventory.admit_bytes(
+            visitor,
+            ArchiveEncodingPreparationKind::FeatureIdentifier,
+            identifier.len(),
+            true,
+        )?;
+    }
+    Ok(())
+}
 
 /// Exact deep-clone accounting for one parsed archive or object.
 ///
