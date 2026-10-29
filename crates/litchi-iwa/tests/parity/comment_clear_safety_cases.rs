@@ -42,6 +42,8 @@ enum StorageMutation {
 #[derive(Clone, Copy)]
 enum NumbersMutation {
     UnknownSurvivingReference,
+    KnownSurvivingReference,
+    KnownUnresolvedReference,
     SelectedStorageShouldMerge,
     MalformedTableInfo,
     OpaqueTableInfo,
@@ -233,6 +235,41 @@ fn rewrite_numbers_object_header(
     Ok(rewritten)
 }
 
+fn numbers_object_bytes(source: &[u8], identifier: u64) -> TestResult<Vec<u8>> {
+    let catalog = Catalog::from_bytes(source, Default::default())?;
+    let entry = catalog
+        .iter()
+        .find(|entry| entry.name() == NUMBERS_DOCUMENT_MEMBER)
+        .ok_or("Numbers comment fixture has no Document member")?;
+    let stream = SnappyStream::decompress(entry.data(), Default::default())?;
+    let archive = Archive::parse(stream.as_bytes(), Default::default())?;
+    let object = archive
+        .object(identifier)
+        .ok_or("Numbers raw object target is missing")?;
+    let start = usize::try_from(object.header_offset)?;
+    let payload_end = object
+        .data_offset
+        .checked_add(object.data_length)
+        .ok_or("Numbers raw object end overflow")?;
+    let end = usize::try_from(payload_end)?;
+    Ok(stream.as_bytes()[start..end].to_vec())
+}
+
+fn mutate_known_message_reference(source: &[u8], reference: u64) -> TestResult<Vec<u8>> {
+    rewrite_numbers_member(source, |stream| {
+        rewrite_numbers_object_header(&stream, 1, |header| {
+            let rewritten =
+                wire::transform_length_delimited_fields_at_path(header, &[2], |message| {
+                    let mut rewritten = message.to_vec();
+                    wire::append_varint_field(&mut rewritten, 5, reference)?;
+                    Ok::<Vec<u8>, litchi_iwa_common::Error>(rewritten)
+                })?;
+            *header = rewritten;
+            Ok(())
+        })
+    })
+}
+
 fn mutate_numbers_source(mutation: NumbersMutation) -> TestResult<Vec<u8>> {
     match mutation {
         NumbersMutation::UnknownSurvivingReference => {
@@ -249,6 +286,12 @@ fn mutate_numbers_source(mutation: NumbersMutation) -> TestResult<Vec<u8>> {
                     Ok(())
                 })
             })
+        },
+        NumbersMutation::KnownSurvivingReference => {
+            mutate_known_message_reference(NUMBERS_SOURCE, NUMBERS_ROOT_ID)
+        },
+        NumbersMutation::KnownUnresolvedReference => {
+            mutate_known_message_reference(NUMBERS_SOURCE, 99_996)
         },
         NumbersMutation::SelectedStorageShouldMerge => {
             rewrite_numbers_member(NUMBERS_SOURCE, |stream| {
@@ -331,6 +374,50 @@ fn assert_numbers_clear_refuses(source: &[u8], expected: fn(&NumbersCommentError
         NumbersPackage::from_bytes(source)?.table_cell_comment(&sheet, &table, position)?,
         Some(selected_before),
         "Numbers refusal changed the selected root"
+    );
+    Ok(())
+}
+
+fn assert_numbers_clear_allows_unresolved_reference(source: &[u8]) -> TestResult {
+    let package = NumbersPackage::from_bytes(source)?;
+    let before = numbers_bytes(&package)?;
+    assert_eq!(
+        before, source,
+        "Numbers mutation did not preserve source bytes"
+    );
+    let (sheet, table) = numbers_target(&package)?;
+    let position = At::new(1, 1);
+    let selected_before = package
+        .table_cell_comment(&sheet, &table, position)?
+        .ok_or("Numbers mutation lost the selected root before clear")?;
+    let unrelated_before = numbers_object_bytes(source, 1)?;
+    let clear = package.clear_table_cell_comment(&sheet, &table, position)?;
+    assert!(
+        clear
+            .package()
+            .table_cell_comment(&sheet, &table, position)?
+            .is_none(),
+        "unresolved unrelated references must not block selected-root clear"
+    );
+    let output = numbers_bytes(clear.package())?;
+    assert_eq!(
+        numbers_object_bytes(&output, 1)?,
+        unrelated_before,
+        "unrelated known MessageInfo reference object was rewritten"
+    );
+    assert_eq!(
+        clear
+            .package()
+            .table_cell_comment(&sheet, &table, position)?,
+        None
+    );
+    let restored = clear
+        .package()
+        .apply_table_cell_comment(&clear.patch().inverse())?;
+    assert_eq!(numbers_bytes(restored.package())?, source);
+    assert_eq!(
+        NumbersPackage::from_bytes(source)?.table_cell_comment(&sheet, &table, position)?,
+        Some(selected_before)
     );
     Ok(())
 }
@@ -545,6 +632,18 @@ fn numbers_root_clear_baseline_is_successful_and_reversible() -> TestResult {
 fn numbers_root_clear_refuses_unknown_surviving_archive_reference() -> TestResult {
     let corrupted = mutate_numbers_source(NumbersMutation::UnknownSurvivingReference)?;
     assert_numbers_clear_refuses(&corrupted, expect_numbers_unsupported)
+}
+
+#[test]
+fn numbers_root_clear_refuses_known_surviving_archive_reference() -> TestResult {
+    let corrupted = mutate_numbers_source(NumbersMutation::KnownSurvivingReference)?;
+    assert_numbers_clear_refuses(&corrupted, expect_numbers_unsupported)
+}
+
+#[test]
+fn numbers_root_clear_allows_known_unresolved_archive_reference() -> TestResult {
+    let corrupted = mutate_numbers_source(NumbersMutation::KnownUnresolvedReference)?;
+    assert_numbers_clear_allows_unresolved_reference(&corrupted)
 }
 
 #[test]

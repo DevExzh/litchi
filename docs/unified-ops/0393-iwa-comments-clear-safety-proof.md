@@ -10,12 +10,15 @@ tracked Pages and Keynote table fixtures. The baseline clear must publish, read
 back no root comment, and apply its inverse to restore the exact source bytes.
 Separate Pages/Keynote negative controls append either an opaque sibling
 message to the selected type-3056 object or an unknown payload field. Numbers
-controls additionally exercise a surviving unknown ArchiveInfo reference to
-the selected root, a selected-storage `should_merge` header mismatch, and a
-nonempty malformed type-6000 candidate. Each control requires the old typed
-refusal contract, unchanged serialized mutated bytes, and the selected
-semantic root still equal after reopening. A malformed metadata control is
-kept distinct from these proof cases.
+controls additionally exercise a surviving unknown ArchiveInfo reference, a
+known `MessageInfo.object_references` entry to the selected root, a known
+unresolved reference to a different identifier, a selected-storage
+`should_merge` header mismatch, and malformed type-6000 candidates. Each
+control requires the old typed refusal contract, unchanged serialized mutated
+bytes, and the selected semantic root still equal after reopening. The
+unresolved-reference control additionally requires the unrelated object bytes
+to remain exact. Malformed metadata controls stay distinct from these proof
+cases.
 
 ## Frozen-candidate result
 
@@ -62,3 +65,21 @@ The repaired run preserves source bytes and semantic roots on every refusal;
 the successful baselines reopen and invert byte-exactly. This remains parity
 proof only: no native E3/E4 acceptance or performance qualification is
 claimed.
+
+## Follow-up reference controls
+
+The follow-up proof-only commit `6d45e19a61` adds two Numbers controls for a
+known surviving archive reference and a known unresolved reference. Its
+historical run was against proof tip `d50d57d8c439d2891f81311383b95d30eeb3a663`
+and intentionally remained mixed: the eight pre-G mutation controls were red,
+while the new known-reference controls passed. The raw receipt is outside the
+repository at
+`/home/zhuhe/code/litchi-worktrees/.coord/resume-20261029/comments-clear-proof-followup-d50.log`
+(22,393 bytes, SHA-256
+`d9c264d7516cdef22f31f82bc7ad2dd5466ff40efe474db5dbecf8a055ba532c`).
+
+On the repaired source, the merged module contains 13 cases: three successful
+baselines and ten typed loss/refusal or reference-preservation controls. The
+full 13-case run is the current acceptance evidence; it must be reported with
+the source and receipt produced after this merge rather than conflated with the
+historical mixed result above.
