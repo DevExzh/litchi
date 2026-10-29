@@ -98,13 +98,26 @@ their receipts are retained outside the checkout under
 The release binaries built from `9078ab5837d34d8c9baa18d54fce0903f5721017`
 and `a52c96dd7346a4d88793cde5c07d66150a8e3539` are archived externally, but
 are explicitly non-qualifying because subsequent query-scope repairs landed;
-they must not be used for capture.  Qualification remains pending a fresh
-coordinator release build from the optimized committed tip and pinned-CPU
-ABBA run for every route, with setup outside the selected symbols, exact
-single-test success, positive inclusive attribution, exact call counts and the
-prescribed <=1.05 route ratio.  The earlier c762 matrix remains profiling
-history only; no performance result is extrapolated from it to this optimized
-source.
+they must not be used for capture.  A fresh source-bound CPU5 Callgrind run
+from `91b5c65f69` passed all nine full-file unified/direct routes (18 legs):
+each leg exited 0 with exactly one selected test pass, exactly two selected
+wrapper calls, and raw full-function Ir equal to summary/totals and the
+threshold-100 annotation.  The per-route unified/direct ratios were Pages
+read/set/reset `1.032334883/1.015490353/1.021376734`, Keynote
+read/set/reset `1.044168189/1.006126258/1.012796304`, and Numbers
+read/set/reset `1.008898928/1.000106772/1.006676784`; all are at most 1.05.
+The immutable binary is external at
+`.coord/d7-chart-font-size-opt-91b5/staged/iwork_chart_font_size-91b5c65f-2d2209d11c1bdcae`
+(357475520 bytes, SHA-256
+`ae6d9ffb102a73cf4d06f25c6d6a2c1ae9c029a30b5873fcdbdd7f3cc88d0955`).  The
+normalized manifest, raw captures, validator receipt and performance review
+are external under
+`.coord/d7-chart-font-size-opt-91b5/captures-91b5-cpu5/`; the review SHA-256
+is `c3afa2cd78276c1b3fa81b92143a85bbe0d68ee1e199fb027776cc186b4f6c6f`.
+This is Callgrind instruction evidence only: it makes no wall-time or native
+acceptance claim.  The final integrated coordinator candidate must still be
+requalified after later merges; the earlier c762 matrix remains profiling
+history only.
 
 Native mutation evidence is absent.  The nine D7 queue rows appended for this
 slice remain `pending`; no E3/E4 claim is made.  Existing W2-A/W2-B/W2-C leaf
