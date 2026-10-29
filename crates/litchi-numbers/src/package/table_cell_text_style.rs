@@ -780,12 +780,7 @@ fn write_style_keys(
     {
         return Err(Error::Refused(Refusal::UnsupportedDependency));
     }
-    let facts = shared::table_facts(
-        source,
-        first_target,
-        limits,
-    )
-    .map_err(from_shared)?;
+    let facts = shared::table_facts(source, first_target, limits).map_err(from_shared)?;
     let tiles = facts.tiles;
     let tile_size = facts.tile_size;
     let mut groups: Vec<(u64, Vec<writer::Update>)> = Vec::new();
