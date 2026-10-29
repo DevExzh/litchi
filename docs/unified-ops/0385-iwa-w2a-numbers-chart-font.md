@@ -165,8 +165,9 @@ CARGO_BUILD_JOBS=2 CARGO_INCREMENTAL=0 \
 
 The full-facade probe's six routes are `font_read`, `font_set`, `font_reset`,
 `size_read`, `size_set` and `size_reset`, selected with `W2A_FONT_ROUTE`. The
-The release-mode pinned-CPU ABBA measurement below reports the full-facade
-scope separately from any engine-only measurement. The probe's two direct
+corrected release qualification is recorded below; the historical instruction
+and shared-helper sections later in this record are explicitly withdrawn.
+The probe's two direct
 `#[inline(never)]` route symbols are
 `numbers_chart_font_host_route` and `numbers_chart_font_leaf_route`; a receipt
 must use their exact symbol rows rather than program totals or sums of inline
@@ -185,7 +186,88 @@ native open/save/close/reopen verification. The branch must be synchronized
 with current trunk only after those checks are requested; this record does not
 authorize integration.
 
-## Release instruction-count qualification
+## Corrected release ABBA requalification
+
+The previous 18-route qualification was withdrawn because its reset setup
+legs invoked the selected host wrapper and therefore recorded three host calls
+instead of two. The coordinator-authorized probe repair `dc585d05cd` was
+cherry-picked and resolved on this branch as source-only probe commit
+`2a5073093c48b540e1f6fcf14fbd82a6101db3a8`.
+
+The corrected source was built with `parity-host-oracle`, release LTO/debug
+settings, locked offline dependencies, four Cargo jobs and incremental
+compilation disabled:
+
+```text
+source: 2a5073093c48b540e1f6fcf14fbd82a6101db3a8
+binary: /home/zhuhe/code/litchi-worktrees/.coord/iwa-w2a-chart-font-perf-20261029-repaired/target/release/deps/parity-20d17b646a6d1747
+size: 213,510,504 bytes
+ELF SHA-256: e0cfd9c52111a165117db693c1dd5caa170c21a7005aa2cb118bc2236ca33239
+archive: /home/zhuhe/code/litchi-worktrees/.coord/iwa-w2a-chart-font-perf-20261029-repaired/parity-20d17b646a6d1747-release.tar
+archive mode/size: 0444 / 213,514,240 bytes
+archive SHA-256: e27b66f868e462a8331d1839c0b7077bc6fc13c1586c44db916e111fefa392da
+tar member SHA-256: e0cfd9c52111a165117db693c1dd5caa170c21a7005aa2cb118bc2236ca33239
+```
+
+The 24-route matrix combines the six chart-font routes and the 18 existing
+style/layout routes. It used one fresh source per route, pinned CPU 7, and
+true host/leaf/leaf/host ABBA with exactly two selected calls per side:
+
+```text
+manifest: /home/zhuhe/code/litchi-worktrees/.coord/iwa-w2a-chart-font-perf-20261029-repaired/manifest-24.json
+results: /home/zhuhe/code/litchi-worktrees/.coord/iwa-w2a-chart-font-perf-20261029-repaired/matrix24/results.json
+results SHA-256: 4a1abc7290457bfb07e86ca1d15dd087648828a5b16865930669f8cf6283a0d7
+captures: 48 Callgrind files / 48 annotations / 48 stdout logs / 48 stderr logs
+raw Callgrind bytes: 22,409,946
+full probe correctness (six font routes): `/home/zhuhe/code/litchi-worktrees/.coord/iwa-w2a-chart-font-perf-20261029-repaired/correctness-font-full.log` (SHA-256 `00b7f561a20a061eebdb2893f9ea16e5c5a584eac7daf297db24d13980133bc8`), stderr empty (`e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`)
+full probe correctness (18 style/layout routes): `/home/zhuhe/code/litchi-worktrees/.coord/iwa-w2a-chart-font-perf-20261029-repaired/correctness-style-full.log` (SHA-256 `1006202a0d367176831b9ac1fdb4e3318c91162a1da76e550dd081eae2bb9bb9`), stderr empty (`e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`)
+source-before SHA-256: 4b19387b94759f173815fdf526f82152f30d856099989a638d6fb24381f8ec15
+source-after SHA-256: 9e3e1ed65475e97a3eaba2bb0b40e54b9c20de6d680e52a67ec4f46b9b6c519a
+```
+
+All 24 exact tests exited 0. Every leaf route was faster than its host
+route; no optimization regression was found. The complete per-route
+host/leaf Ir, exact symbol rows, command lines, hashes and positive-test
+receipts are retained in `matrix24/results.json` and the external capture
+directory above. The six chart-font rows measured as follows:
+
+| Route | Host Ir | Leaf Ir | Leaf vs host |
+|---|---:|---:|---:|
+| `font_read` | 286,013,460 | 38,907,556 | −86.396600% |
+| `font_set` | 1,158,386,111 | 209,943,262 | −81.876228% |
+| `font_reset` | 816,491,725 | 158,468,718 | −80.591510% |
+| `size_read` | 175,323,796 | 36,839,361 | −78.987815% |
+| `size_set` | 822,844,239 | 203,824,687 | −75.229250% |
+| `size_reset` | 649,646,232 | 153,851,082 | −76.317713% |
+
+The 18 style/layout rows are the exact `ROUTES_3` set already listed in the
+shared-helper section below; their full values remain in the external matrix
+receipt rather than being copied into a second hand-maintained table.
+
+The new derived raw-audit validator passed its synthetic controls, but it
+rejected the real matrix because the exact binary-path leaf symbol rows are
+below the Callgrind PROGRAM TOTALS context rows (for example, the first leaf
+row is 149,071,036 exact-symbol Ir versus 152,176,565 PROGRAM TOTALS Ir).
+This is retained as a failed audit receipt, not normalized:
+
+```text
+validator receipt: /home/zhuhe/code/litchi-worktrees/.coord/iwa-w2a-chart-font-perf-20261029-repaired/matrix24/call-audit-derived.failure.json
+receipt SHA-256: 45e7a500080cf577222b2bee1f4727e5234f39fad5c4346f7cbfde7d93b8cb29
+synthetic validator log: /home/zhuhe/code/litchi-worktrees/.coord/iwa-w2a-chart-font-perf-20261029-repaired/derived-validator-selftest.log
+synthetic log SHA-256: a72c11d7f48cc0c1e4e659a05d8038b9d88d32ee36f9c71face0425df81f2914
+```
+
+Therefore this receipt establishes corrected workload, source/binary
+provenance and raw measurements, but does not claim final performance
+qualification until the coordinator resolves the exact-symbol/PROGRAM-TOTALS
+audit disposition. Native acceptance, ledger migration and final integrated
+gate claims remain absent.
+
+## Withdrawn historical instruction-count qualification
+
+Everything in this section is retained for provenance only and is superseded
+by the corrected CPU-7 matrix above. Its old totals must not be used for
+acceptance.
 
 This is a qualification of the current isolated candidate only. The measured
 source tip is `fbc7c51866f119e733521f4bc92467a849385c71`, after merging the
@@ -235,7 +317,11 @@ instruction-count result does not claim native acceptance, does not claim
 wall-clock performance, and does not migrate the six ledger rows; the native
 queue entries remain pending.
 
-## Shared-helper regression qualification
+## Withdrawn historical shared-helper regression qualification
+
+This section's old 18-route totals used the contaminated three-host-call
+reset workload and are withdrawn. The corrected 18-route values are included
+in the external 24-route matrix above.
 
 The accepted facade also depends on the shared stylesheet registration path
 used by the already integrated 18-route W2-A style/layout slice in record
