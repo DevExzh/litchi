@@ -17,6 +17,7 @@
 )]
 
 use std::fmt;
+use std::hash::{Hash, Hasher};
 use std::mem::size_of;
 
 use litchi_iwa_archive::package::{EntryEdit, EntryInsertion, OwnedExactArtifacts};
@@ -53,7 +54,7 @@ use super::style_graph::{self, LeafComponents};
 use crate::selector::{ChartSelector, SheetSelector};
 
 /// Resource category reported by the Numbers chart-series transaction.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum LimitKind {
     /// Complete source or candidate package bytes.
@@ -66,8 +67,34 @@ pub enum LimitKind {
     ScratchBytes,
     /// Fallible graph allocation events.
     AllocationEvents,
+    /// A physical ZIP/archive ingress resource.
+    Archive(litchi_iwa_archive::LimitKind),
+    /// A shared wire resource retained without unit coercion.
+    Wire(litchi_iwa_common::LimitKind),
+    /// A Numbers semantic ingress resource retained without unit coercion.
+    Semantic(crate::SemanticLimitKind),
+    /// A decoded IWA-core resource retained without unit coercion.
+    Core(litchi_iwa_core::LimitKind),
     /// A bounded shared series-engine axis.
     Engine(litchi_iwa_style::series::LimitKind),
+}
+
+impl Hash for LimitKind {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        std::mem::discriminant(self).hash(state);
+        match self {
+            Self::Archive(kind) => std::mem::discriminant(kind).hash(state),
+            Self::Wire(kind) => std::mem::discriminant(kind).hash(state),
+            Self::Semantic(kind) => std::mem::discriminant(kind).hash(state),
+            Self::Core(kind) => std::mem::discriminant(kind).hash(state),
+            Self::Engine(kind) => std::mem::discriminant(kind).hash(state),
+            Self::PackageBytes
+            | Self::PayloadBytes
+            | Self::Identifiers
+            | Self::ScratchBytes
+            | Self::AllocationEvents => {},
+        }
+    }
 }
 
 impl fmt::Display for LimitKind {
@@ -78,6 +105,10 @@ impl fmt::Display for LimitKind {
             Self::Identifiers => formatter.write_str("object identifiers"),
             Self::ScratchBytes => formatter.write_str("scratch bytes"),
             Self::AllocationEvents => formatter.write_str("allocation events"),
+            Self::Archive(kind) => write!(formatter, "archive {kind}"),
+            Self::Wire(kind) => write!(formatter, "wire {kind}"),
+            Self::Semantic(kind) => write!(formatter, "semantic {kind}"),
+            Self::Core(kind) => write!(formatter, "core {kind}"),
             Self::Engine(kind) => kind.fmt(formatter),
         }
     }
@@ -981,14 +1012,30 @@ fn map_arrangement(error: arrangement::Error) -> Error {
 fn map_candidate_archive_error(error: litchi_iwa_archive::Error) -> Error {
     match error {
         litchi_iwa_archive::Error::Limit {
-            observed, maximum, ..
+            kind,
+            observed,
+            maximum,
         } => Error::Limit {
-            kind: LimitKind::PackageBytes,
+            kind: LimitKind::Archive(kind),
             observed,
             maximum,
         },
         litchi_iwa_archive::Error::Allocation { amount, .. } => Error::Allocation { amount },
-        litchi_iwa_archive::Error::Iwa(error) => Error::from(structure::map_core(&error)),
+        litchi_iwa_archive::Error::Iwa(error) => match error {
+            litchi_iwa_core::Error::Limit {
+                kind,
+                observed,
+                maximum,
+            } => Error::Limit {
+                kind: LimitKind::Core(kind),
+                observed: observed as u64,
+                maximum: maximum as u64,
+            },
+            litchi_iwa_core::Error::Allocation { requested, .. } => {
+                Error::Allocation { amount: requested }
+            },
+            _ => Error::Verification,
+        },
         litchi_iwa_archive::Error::Reassembly(_) => Refusal::UnsupportedSource.into(),
         _ => Error::Verification,
     }
@@ -1001,27 +1048,7 @@ fn map_candidate_common_error(error: litchi_iwa_common::Error) -> Error {
             observed,
             limit,
         } => Error::Limit {
-            kind: match kind {
-                litchi_iwa_common::LimitKind::InputBytes => LimitKind::PayloadBytes,
-                litchi_iwa_common::LimitKind::OutputBytes => {
-                    LimitKind::Engine(engine::LimitKind::OutputBytes)
-                },
-                litchi_iwa_common::LimitKind::Fields => {
-                    LimitKind::Engine(engine::LimitKind::Fields)
-                },
-                litchi_iwa_common::LimitKind::Nesting => {
-                    LimitKind::Engine(engine::LimitKind::Nesting)
-                },
-                litchi_iwa_common::LimitKind::RewriteWork => {
-                    LimitKind::Engine(engine::LimitKind::Work)
-                },
-                litchi_iwa_common::LimitKind::TableRows
-                | litchi_iwa_common::LimitKind::TableColumns
-                | litchi_iwa_common::LimitKind::TableCells
-                | litchi_iwa_common::LimitKind::MaterializedCells => {
-                    LimitKind::Engine(engine::LimitKind::Fields)
-                },
-            },
+            kind: LimitKind::Wire(kind),
             observed: observed as u64,
             maximum: limit as u64,
         },
@@ -1040,13 +1067,7 @@ fn map_candidate_package_error(error: super::Error) -> Error {
             maximum,
             ..
         } => Error::Limit {
-            kind: match kind {
-                crate::SemanticLimitKind::Objects => LimitKind::Identifiers,
-                crate::SemanticLimitKind::References => {
-                    LimitKind::Engine(engine::LimitKind::References)
-                },
-                _ => LimitKind::PayloadBytes,
-            },
+            kind: LimitKind::Semantic(kind),
             observed: observed as u64,
             maximum: maximum as u64,
         },
