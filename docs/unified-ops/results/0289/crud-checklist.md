@@ -47,9 +47,9 @@ Evidence: `crud-adr0008.tsv`.
 | oth | 34 | 288 | 288 | 0 | 0 | 0 | 86 | 28 | 24 | ok | ok | ok |
 | odm | 34 | 288 | 288 | 0 | 0 | 0 | 86 | 28 | 24 | ok | ok | ok |
 | odf | 2 | 19 | 19 | 0 | 0 | 0 | 3 | 2 | 0 | ok | ok | ok |
-| pages | 11 | 91 | 91 | 0 | 0 | 0 | 30 | 2 | 14 | ok | ok | ok |
-| keynote | 16 | 132 | 132 | 0 | 0 | 0 | 44 | 16 | 4 | ok | ok | ok |
-| numbers | 7 | 61 | 61 | 0 | 0 | 0 | 16 | 4 | 6 | ok | ok | ok |
+| pages | 12 | 100 | 100 | 0 | 0 | 0 | 32 | 2 | 14 | ok | ok | ok |
+| keynote | 16 | 135 | 135 | 0 | 0 | 0 | 41 | 16 | 4 | ok | ok | ok |
+| numbers | 8 | 70 | 70 | 0 | 0 | 0 | 18 | 4 | 6 | ok | ok | ok |
 
 ## docx
 
@@ -677,11 +677,11 @@ Evidence: `crud-adr0008.tsv`.
 
 ## pages
 
-- fixtures: `create()`, `iwork/pages/body-sections-unicode.pages`, `iwork/pages/basic.pages`, `iwork/pages/body-table-read-native.pages`, `iwork/pages/body-table-name-focused.pages`, `create() + add paragraph`, `create() + add paragraph + add section`, `iwork/pages/body-table-read-native.pages + add table`, `create() + add paragraph + add footnote`
-- document views on `iwork/pages/body-sections-unicode.pages`: text ok, annotated ok, outline ok, stats ok, issues gap (unsupported_capability), forms gap (unsupported_capability), html gap (unsupported_capability), svg gap (unsupported_capability), screenshot gap (unsupported_capability), pdf gap (unsupported_capability)
-- ADR 0008 atomic failure: ok, `create() + add paragraph` batch [set /body/p[1] {"text":"Litchi"}, set /body/p[9999]] refused `path_not_found` naming item 1; snapshot, its file and two refused save destinations unchanged
-- ADR 0008 patch inverse: ok, `create() + add paragraph` set /body/p[1] {"text":"Litchi"}: the patch replays onto its source, the inverse restores the exact 5386 source bytes, the patch on its own result refuses `invalid_input`; a byte-identical reopened copy accepts (content-checked)
-- ADR 0008 composition: ok, `create() + add paragraph` set /body/p[1] {"text":"Litchi"} and set /body/p[2] {"text":"Lychee"} on two threads: both orders hold both values and give the same bytes; each patch on the other's result refuses `invalid_input`/`invalid_input`
+- fixtures: `create()`, `seed`, `iwork/pages/body-sections-unicode.pages`, `iwork/pages/basic.pages`, `iwork/pages/body-table-read-native.pages`, `iwork/pages/body-table-visible.pages`, `iwork/pages/body-table-name-focused.pages`, `iwork/pages/chart-grid-authored-native.pages`, `seed + add paragraph`, `seed + add paragraph + add section`, `iwork/pages/body-table-visible.pages + add table`, `seed + add paragraph + add footnote`
+- document views on `seed`: text ok, annotated ok, outline ok, stats ok, issues gap (unsupported_capability), forms gap (unsupported_capability), html gap (unsupported_capability), svg gap (unsupported_capability), screenshot gap (unsupported_capability), pdf gap (unsupported_capability)
+- ADR 0008 atomic failure: ok, `seed + add paragraph` batch [set /body/p[1] {"text":"Litchi"}, set /body/p[9999]] refused `path_not_found` naming item 1; snapshot, its file and two refused save destinations unchanged
+- ADR 0008 patch inverse: ok, `seed + add paragraph` set /body/p[1] {"text":"Litchi"}: the patch replays onto its source, the inverse restores the exact 5764 source bytes, the patch on its own result refuses `invalid_input`; a byte-identical reopened copy accepts (content-checked)
+- ADR 0008 composition: ok, `iwork/pages/body-table-visible.pages + add table` set /body/tbl[1]/tr[1]/tc[1] {"text":"Litchi"} and set /body/tbl[1]/tr[1]/tc[2] {"text":"Lychee"} on two threads: both orders hold both values and give the same document (text, node tree, both values; bytes differ in the order new strings, links or records are written); each patch on the other's result refuses `invalid_input`/`invalid_input`
 
 | element | get | find | query | view | set | add | remove | move | swap | edit | batch | create | save |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -696,6 +696,7 @@ Evidence: `crud-adr0008.tsv`.
 | footer | ok | ok | ok | ok | ok | n/a | n/a | refused | refused | ok | ok | ok | ok |
 | footnotes | ok | ok | ok | ok | n/a | n/a | n/a | no pair | no pair | n/a | n/a | ok | ok |
 | footnote | ok | ok | ok | ok | ok | ok | ok | refused | refused | ok | ok | ok | ok |
+| chart | ok | ok | ok | ok | ok | n/a | n/a | no pair | no pair | ok | ok | ok | ok |
 
 ## keynote
 
@@ -721,12 +722,12 @@ Evidence: `crud-adr0008.tsv`.
 | table | ok | ok | ok | ok | n/a | ok | n/a | ok | ok | n/a | n/a | ok | ok |
 | tr | ok | ok | ok | ok | n/a | n/a | n/a | refused | refused | n/a | n/a | ok | ok |
 | tc | ok | ok | ok | ok | ok | n/a | n/a | refused | refused | ok | ok | ok | ok |
-| chart | ok | ok | ok | ok | n/a | n/a | n/a | no pair | no pair | n/a | n/a | ok | ok |
+| chart | ok | ok | ok | ok | ok | n/a | n/a | no pair | no pair | ok | ok | ok | ok |
 | group | ok | ok | ok | ok | n/a | n/a | n/a | no pair | no pair | n/a | n/a | ok | ok |
 
 ## numbers
 
-- fixtures: `create()`, `iwork/numbers/basic.numbers`, `iwork/numbers/cell-value-native.numbers`, `iwork/numbers/table-merges-native.numbers`, `iwork/numbers/table-relocation-native.numbers`, `create() + add sheet`, `create() + add sheet + add table`, `create() + add mergeCell`, `create() + add sheet + add row`, `create() + add sheet + add col`
+- fixtures: `create()`, `iwork/numbers/basic.numbers`, `iwork/numbers/cell-value-native.numbers`, `iwork/numbers/table-merges-native.numbers`, `iwork/numbers/table-relocation-native.numbers`, `iwork/numbers/chart-grid-authored-native.numbers`, `create() + add sheet`, `create() + add sheet + add table`, `create() + add mergeCell`, `create() + add sheet + add row`, `create() + add sheet + add col`
 - document views on `iwork/numbers/basic.numbers`: text ok, annotated ok, outline ok, stats ok, issues gap (unsupported_capability), forms gap (unsupported_capability), html gap (unsupported_capability), svg gap (unsupported_capability), screenshot gap (unsupported_capability), pdf gap (unsupported_capability)
 - ADR 0008 atomic failure: ok, `create() + add sheet` batch [set /sheet[1] {"name":"Litchi"}, set /sheet[9999]] refused `path_not_found` naming item 1; snapshot, its file and two refused save destinations unchanged
 - ADR 0008 patch inverse: ok, `create() + add sheet` set /sheet[1] {"name":"Litchi"}: the patch replays onto its source, the inverse restores the exact 6299 source bytes, the patch on its own result refuses `invalid_input`; a byte-identical reopened copy accepts (content-checked)
@@ -741,4 +742,5 @@ Evidence: `crud-adr0008.tsv`.
 | mergeCell | ok | ok | ok | ok | n/a | ok | ok | no pair | no pair | n/a | n/a | ok | ok |
 | row | ok | ok | ok | ok | n/a | ok | ok | refused | refused | n/a | n/a | ok | ok |
 | col | ok | ok | ok | ok | n/a | ok | ok | refused | refused | n/a | n/a | ok | ok |
+| chart | ok | ok | ok | ok | ok | n/a | n/a | no pair | no pair | ok | ok | ok | ok |
 
