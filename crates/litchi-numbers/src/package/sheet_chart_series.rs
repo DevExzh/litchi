@@ -18,6 +18,7 @@
 
 use std::fmt;
 
+use litchi_iwa_common::WireLimits;
 use litchi_iwa_common::chart::error_bar::Series as ErrorBarSeries;
 use litchi_iwa_common::chart::kind::Kind as ChartKind;
 use litchi_iwa_common::chart::pie::{LabelDistance, LabelVisibility, WedgeExplosion};
@@ -44,7 +45,7 @@ use super::style_graph::{self, LeafComponents};
 use crate::selector::{ChartSelector, SheetSelector};
 use crate::sheet::drawable::DrawableSelector;
 
-structure::structural_family!("chart-series");
+structure::structural_family!("chart-series", Engine(litchi_iwa_style::series::LimitKind));
 
 /// `TSCH.ChartDrawableArchive` extension holding the `TSCH.ChartArchive`.
 const CHART_ARCHIVE_FIELD: u32 = 10_000;
@@ -333,6 +334,29 @@ impl From<litchi_iwa_style::graph::Error> for Error {
     }
 }
 
+impl From<litchi_iwa_style::series::SymbolError> for Error {
+    fn from(error: litchi_iwa_style::series::SymbolError) -> Self {
+        match error {
+            litchi_iwa_style::series::SymbolError::Graph(error) => error.into(),
+            litchi_iwa_style::series::SymbolError::Limit {
+                kind,
+                observed,
+                maximum,
+            } => Error::Limit {
+                kind: LimitKind::Engine(kind),
+                observed: observed as u64,
+                maximum: maximum as u64,
+            },
+            litchi_iwa_style::series::SymbolError::Allocation { amount } => {
+                Error::Allocation { amount }
+            },
+            litchi_iwa_style::series::SymbolError::Invalid(_)
+            | litchi_iwa_style::series::SymbolError::IdentifierOverflow => Error::InvalidSource,
+            _ => Error::InvalidSource,
+        }
+    }
+}
+
 /// Chart-series changes staged against one chart of an immutable package.
 pub struct Edit<'a> {
     source: &'a Package,
@@ -460,8 +484,7 @@ fn target(package: &Package, sheet: usize, chart: ChartSelector) -> Result<Targe
     let [archive] = archives.as_slice() else {
         return Err(Error::InvalidSource);
     };
-    let view =
-        litchi_iwa_common::wire::WireView::parse(archive, litchi_iwa_common::WireLimits::DEFAULT)?;
+    let view = litchi_iwa_common::wire::WireView::parse(archive, WireLimits::DEFAULT)?;
     let direction = graph::unique_field(&view, SERIES_DIRECTION_FIELD, 0)?
         .map(|field| litchi_iwa_common::decode_varint_from_bytes(field.payload()))
         .transpose()
@@ -508,6 +531,113 @@ fn symbols(kind: ChartKind) -> Result<SymbolFamily, Error> {
     Ok(SymbolFamily::for_chart_kind(kind).ok_or(Refusal::UnsupportedKind)?)
 }
 
+fn symbol_limits(package: &Package) -> Result<engine::Limits, Error> {
+    let physical = package
+        .profile()
+        .archive()
+        .effective_archive_limits()
+        .map_err(|_| Error::InvalidSource)?;
+    let source = physical
+        .max_message_bytes()
+        .min(physical.max_archive_bytes())
+        .clamp(1, WireLimits::MAX_INPUT_BYTES);
+    let semantic = package.profile().semantic();
+    let allocations = semantic
+        .max_objects()
+        .checked_add(semantic.max_references())
+        .and_then(|value| value.checked_add(1024))
+        .ok_or(Error::InvalidSource)?;
+    Ok(engine::Limits::new(
+        source,
+        source.clamp(1, WireLimits::MAX_FIELDS),
+        source,
+        WireLimits::MAX_NESTING as u32,
+        WireLimits::MAX_REWRITE_WORK,
+        allocations,
+        source,
+        source,
+        semantic.max_references(),
+        semantic.max_references(),
+        semantic.max_objects(),
+    ))
+}
+
+/// Validate the shared engine's actual report against the explicit Numbers
+/// profile. The legacy Numbers series transaction has no reusable residual
+/// ledger yet; this keeps the report typed and fail-closed until that caller
+/// budget is lifted into this family.
+fn validate_symbol_report(report: &engine::Report, limits: engine::Limits) -> Result<(), Error> {
+    let checks = [
+        (
+            engine::LimitKind::InputBytes,
+            report.input_bytes(),
+            limits.max_input_bytes(),
+        ),
+        (
+            engine::LimitKind::Fields,
+            report.fields(),
+            limits.max_fields(),
+        ),
+        (
+            engine::LimitKind::OutputBytes,
+            report.output_bytes(),
+            limits.max_output_bytes(),
+        ),
+        (
+            engine::LimitKind::Work,
+            report.work_bytes(),
+            limits.max_work_bytes(),
+        ),
+        (
+            engine::LimitKind::Allocations,
+            report.allocations(),
+            limits.max_allocations(),
+        ),
+        (
+            engine::LimitKind::RetainedBytes,
+            report.retained_bytes(),
+            limits.max_retained_bytes(),
+        ),
+        (
+            engine::LimitKind::ScratchBytes,
+            report.scratch_bytes(),
+            limits.max_scratch_bytes(),
+        ),
+        (
+            engine::LimitKind::References,
+            report.references(),
+            limits.max_references(),
+        ),
+        (
+            engine::LimitKind::RegistryEntries,
+            report.registry_entries(),
+            limits.max_registry_entries(),
+        ),
+        (
+            engine::LimitKind::Identifiers,
+            report.identifiers(),
+            limits.max_identifiers(),
+        ),
+    ];
+    for (kind, observed, maximum) in checks {
+        if observed > maximum {
+            return Err(Error::Limit {
+                kind: LimitKind::Engine(kind),
+                observed: observed as u64,
+                maximum: maximum as u64,
+            });
+        }
+    }
+    if report.max_depth() > limits.max_nesting() {
+        return Err(Error::Limit {
+            kind: LimitKind::Engine(engine::LimitKind::Nesting),
+            observed: report.max_depth() as u64,
+            maximum: limits.max_nesting() as u64,
+        });
+    }
+    Ok(())
+}
+
 fn value_labels(kind: ChartKind) -> Result<ValueLabels, Error> {
     Ok(ValueLabels::for_chart_kind(kind).ok_or(Refusal::UnsupportedKind)?)
 }
@@ -550,12 +680,13 @@ fn read(
         PropertyKind::LabelDistances => {
             Property::LabelDistances(engine::values(&workspace, chart, count, &LabelDistances)?)
         },
-        PropertyKind::Symbols => Property::Symbols(engine::symbols(
-            &workspace,
-            chart,
-            symbols(target.kind)?,
-            count,
-        )?),
+        PropertyKind::Symbols => {
+            let limits = symbol_limits(package)?;
+            let (values, report) =
+                engine::symbols(&workspace, chart, symbols(target.kind)?, count, limits)?;
+            validate_symbol_report(&report, limits)?;
+            Property::Symbols(values)
+        },
         PropertyKind::Trendlines => {
             Property::Trendlines(engine::values(&workspace, chart, count, &Trendlines)?)
         },
@@ -615,7 +746,11 @@ fn apply_one(
             engine::set_values(&mut workspace, chart, &LabelDistances, values)?
         },
         Property::Symbols(values) => {
-            engine::set_symbols(&mut workspace, chart, symbols(target.kind)?, values)?
+            let limits = symbol_limits(source)?;
+            let (changed, report) =
+                engine::set_symbols(&mut workspace, chart, symbols(target.kind)?, values, limits)?;
+            validate_symbol_report(&report, limits)?;
+            changed
         },
         Property::Trendlines(values) => {
             engine::set_values(&mut workspace, chart, &Trendlines, values)?

@@ -759,13 +759,25 @@ impl<'s> Workspace<'s> {
         Ok(found)
     }
 
-    /// Upper bound for one package-registry inspection used by adapters that
-    /// need to resolve a component repeatedly during a bounded graph walk.
+    /// Exact prepared requirements for one package-registry inspection.
+    pub(crate) fn registry_inspection_requirements(
+        &self,
+    ) -> Result<Option<registry_codec::RewriteReport>> {
+        let Some(payload) = self.registry_payload()? else {
+            return Ok(None);
+        };
+        Ok(Some(registry_codec::inspect_package_metadata_requirements(
+            payload,
+            self.registry_options(),
+        )?))
+    }
+
+    /// Exact wire work required by one package-registry inspection.
     pub(crate) fn registry_inspection_work(&self) -> usize {
-        self.registry_payload()
+        self.registry_inspection_requirements()
             .ok()
             .flatten()
-            .map_or(0, <[u8]>::len)
+            .map_or(0, |report| report.work_bytes())
     }
 
     /// The current registry payload extent used by a bounded metadata plan.
