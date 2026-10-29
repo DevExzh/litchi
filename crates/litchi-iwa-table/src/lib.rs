@@ -32,6 +32,9 @@ pub mod cell_appearance;
 /// Format-neutral whole-cell character-style graph planning.
 pub mod cell_text_style;
 
+/// Bounded row/column header-count publication for style-only cell materialization.
+pub mod cell_text_style_headers;
+
 /// Bounded batch publication of BNC text-style keys in tile payloads.
 pub mod cell_text_style_writer;
 
