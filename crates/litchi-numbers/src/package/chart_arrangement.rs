@@ -90,6 +90,8 @@ pub enum LimitKind {
     ScratchBytes,
     /// Native graph references inspected by the selector.
     References,
+    /// Object identifiers allocated by a bounded graph operation.
+    Identifiers,
     /// Compressed IWA member bytes inspected or emitted.
     CompressedBytes,
 }
@@ -106,6 +108,7 @@ impl fmt::Display for LimitKind {
             Self::RetainedBytes => "retained bytes",
             Self::ScratchBytes => "scratch bytes",
             Self::References => "references",
+            Self::Identifiers => "object identifiers",
             Self::CompressedBytes => "compressed bytes",
         })
     }
@@ -491,6 +494,8 @@ pub(super) struct ChartBudget {
     max_allocations: usize,
     max_retained: usize,
     max_scratch: usize,
+    max_registry_entries: usize,
+    max_identifiers: usize,
     input: usize,
     output: usize,
     fields: usize,
@@ -500,6 +505,8 @@ pub(super) struct ChartBudget {
     allocations: usize,
     retained: usize,
     scratch: usize,
+    registry_entries: usize,
+    identifiers: usize,
 }
 
 impl ChartBudget {
@@ -508,48 +515,41 @@ impl ChartBudget {
         let core = archive
             .effective_archive_limits()
             .map_err(|_| Error::InvalidSource)?;
-        let source = core
-            .max_message_bytes()
+        let physical = usize::try_from(archive.max_input_bytes())
+            .map_err(|_| Error::InvalidSource)?
             .min(core.max_archive_bytes())
             .min(archive.max_iwa_stream_bytes())
             .clamp(1, WireLimits::MAX_INPUT_BYTES);
         let limits = WireLimits::default()
-            .with_input_bytes(source)
-            .and_then(|limits| {
-                limits.with_fields(source.saturating_mul(4).clamp(1, WireLimits::MAX_FIELDS))
-            })
-            .and_then(|limits| {
-                limits.with_output_bytes(
-                    source
-                        .saturating_add(64)
-                        .clamp(1, WireLimits::MAX_OUTPUT_BYTES),
-                )
-            })
-            .and_then(|limits| {
-                limits.with_rewrite_work(
-                    source
-                        .saturating_mul(8)
-                        .clamp(1, WireLimits::MAX_REWRITE_WORK),
-                )
-            })
+            .with_input_bytes(physical)
+            .and_then(|limits| limits.with_output_bytes(physical))
             .map_err(|_| Error::InvalidSource)?;
+        // Retained graph/header vectors are governed by the archive's checked
+        // header-memory policy, not by the compressed source-byte ceiling.
+        // Keep the physical ceiling as a floor for candidate buffers without
+        // inventing a source-size multiplier.
+        let retained = core
+            .max_header_memory_bytes()
+            .max(physical)
+            .clamp(1, WireLimits::MAX_INPUT_BYTES);
         let semantic = package.state.options.semantic();
         let max_allocations = semantic
             .max_objects()
             .checked_add(semantic.max_references())
             .and_then(|amount| amount.checked_add(MAX_TRANSACTION_ALLOCATIONS))
             .ok_or(Error::InvalidSource)?;
-        let aggregate = source.saturating_mul(8).max(source);
         Ok(Self {
-            max_input: aggregate,
-            max_output: aggregate,
+            max_input: physical,
+            max_output: physical,
             max_fields: limits.max_fields(),
-            max_work: limits.max_rewrite_work(),
+            max_work: WireLimits::MAX_REWRITE_WORK,
             max_nesting: limits.max_nesting(),
             max_references: semantic.max_references(),
             max_allocations,
-            max_retained: aggregate,
-            max_scratch: aggregate,
+            max_retained: retained,
+            max_scratch: retained,
+            max_registry_entries: semantic.max_references(),
+            max_identifiers: semantic.max_objects(),
             input: 0,
             output: 0,
             fields: 0,
@@ -559,6 +559,8 @@ impl ChartBudget {
             allocations: 0,
             retained: 0,
             scratch: 0,
+            registry_entries: 0,
+            identifiers: 0,
         })
     }
 
@@ -624,6 +626,18 @@ impl ChartBudget {
         )
     }
 
+    fn remaining_axis(maximum: usize, used: usize, kind: LimitKind) -> Result<usize, Error> {
+        let remaining = maximum.checked_sub(used).ok_or(Error::InvalidSource)?;
+        if remaining == 0 {
+            return Err(Error::Limit {
+                kind,
+                observed: maximum.saturating_add(1) as u64,
+                maximum: maximum as u64,
+            });
+        }
+        Ok(remaining)
+    }
+
     pub(super) fn work(&mut self, amount: usize) -> Result<(), Error> {
         Self::add(&mut self.work, amount, self.max_work, LimitKind::WireWork)
     }
@@ -668,6 +682,24 @@ impl ChartBudget {
         )
     }
 
+    pub(super) fn registry_entries(&mut self, amount: usize) -> Result<(), Error> {
+        Self::add(
+            &mut self.registry_entries,
+            amount,
+            self.max_registry_entries,
+            LimitKind::References,
+        )
+    }
+
+    pub(super) fn identifiers(&mut self, amount: usize) -> Result<(), Error> {
+        Self::add(
+            &mut self.identifiers,
+            amount,
+            self.max_identifiers,
+            LimitKind::Identifiers,
+        )
+    }
+
     /// Residual chart-font engine limits after selector and package work
     /// already charged to this transaction.
     pub(super) fn chart_font_limits(&self) -> litchi_iwa_style::chart_font::Limits {
@@ -699,6 +731,54 @@ impl ChartBudget {
         )
     }
 
+    /// Build a residual profile for one bounded chart-series operation.
+    /// Selector and package work already charged to this ledger cannot be
+    /// reacquired by the shared series engine.
+    pub(super) fn series_limits(&self) -> Result<litchi_iwa_style::series::Limits, Error> {
+        let wire = self.residual_wire_limits()?;
+        let codec_max = MAX_CODEC_LIMIT.min(chart_style_codec::Limits::DEFAULT.max_bytes());
+        let residual = |maximum: usize, used: usize, kind| {
+            let remaining = maximum.checked_sub(used).ok_or(Error::InvalidSource)?;
+            if remaining == 0 {
+                return Err(Error::Limit {
+                    kind,
+                    observed: maximum.saturating_add(1) as u64,
+                    maximum: maximum as u64,
+                });
+            }
+            Ok(remaining)
+        };
+        Ok(litchi_iwa_style::series::Limits::new(
+            wire.max_input_bytes().min(codec_max),
+            wire.max_fields(),
+            residual(self.max_output, self.output, LimitKind::OutputBytes)?
+                .min(WireLimits::MAX_OUTPUT_BYTES)
+                .min(codec_max),
+            u32::try_from(wire.max_nesting()).map_err(|_| Error::InvalidSource)?,
+            wire.max_rewrite_work(),
+            residual(
+                self.max_allocations,
+                self.allocations,
+                LimitKind::Allocations,
+            )?,
+            residual(self.max_retained, self.retained, LimitKind::RetainedBytes)?
+                .min(WireLimits::MAX_INPUT_BYTES),
+            residual(self.max_scratch, self.scratch, LimitKind::ScratchBytes)?
+                .min(WireLimits::MAX_INPUT_BYTES),
+            residual(self.max_references, self.references, LimitKind::References)?,
+            residual(
+                self.max_registry_entries,
+                self.registry_entries,
+                LimitKind::Identifiers,
+            )?,
+            residual(
+                self.max_identifiers,
+                self.identifiers,
+                LimitKind::Identifiers,
+            )?,
+        ))
+    }
+
     /// Charge one chart-font engine report into the same transaction ledger.
     pub(super) fn charge_chart_font_report(
         &mut self,
@@ -719,6 +799,35 @@ impl ChartBudget {
         self.allocations(report.allocations())?;
         self.retained(report.retained_bytes())?;
         self.scratch(report.scratch_bytes())?;
+        self.nesting = self.nesting.max(depth);
+        Ok(())
+    }
+
+    /// Reconcile one shared chart-series engine report with this caller
+    /// ledger. The engine is given the residual profile above, so this is not
+    /// a fresh post-hoc profile check.
+    pub(super) fn charge_series_report(
+        &mut self,
+        report: litchi_iwa_style::series::Report,
+    ) -> Result<(), Error> {
+        let depth = usize::try_from(report.max_depth()).unwrap_or(usize::MAX);
+        if depth > self.max_nesting {
+            return Err(Error::Limit {
+                kind: LimitKind::WireNesting,
+                observed: depth as u64,
+                maximum: self.max_nesting as u64,
+            });
+        }
+        self.source(report.input_bytes())?;
+        self.output(report.output_bytes())?;
+        self.fields(report.fields())?;
+        self.work(report.work_bytes())?;
+        self.allocations(report.allocations())?;
+        self.retained(report.retained_bytes())?;
+        self.scratch(report.scratch_bytes())?;
+        self.references(report.references())?;
+        self.registry_entries(report.registry_entries())?;
+        self.identifiers(report.identifiers())?;
         self.nesting = self.nesting.max(depth);
         Ok(())
     }
@@ -810,22 +919,75 @@ impl ChartBudget {
         Self::preflight(self.work, amount, self.max_work, LimitKind::WireWork)
     }
 
+    pub(super) fn finish_limits(&self) -> Result<litchi_iwa_style::graph::FinishLimits, Error> {
+        Ok(litchi_iwa_style::graph::FinishLimits::new(
+            Self::remaining_axis(self.max_work, self.work, LimitKind::WireWork)?,
+            Self::remaining_axis(
+                self.max_allocations,
+                self.allocations,
+                LimitKind::Allocations,
+            )?,
+            Self::remaining_axis(self.max_retained, self.retained, LimitKind::RetainedBytes)?,
+            Self::remaining_axis(self.max_scratch, self.scratch, LimitKind::ScratchBytes)?,
+        ))
+    }
+
+    pub(super) fn charge_finish_report(
+        &mut self,
+        report: litchi_iwa_style::graph::FinishReport,
+    ) -> Result<(), Error> {
+        self.work(report.work())?;
+        self.allocations(report.allocations())?;
+        self.retained(report.retained_bytes())?;
+        self.scratch(report.scratch_bytes())?;
+        Ok(())
+    }
+
+    pub(super) fn construction_limits(
+        &self,
+    ) -> Result<litchi_iwa_style::graph::ConstructionLimits, Error> {
+        Ok(litchi_iwa_style::graph::ConstructionLimits::new(
+            Self::remaining_axis(self.max_work, self.work, LimitKind::WireWork)?,
+            Self::remaining_axis(
+                self.max_allocations,
+                self.allocations,
+                LimitKind::Allocations,
+            )?,
+            Self::remaining_axis(self.max_retained, self.retained, LimitKind::RetainedBytes)?,
+            Self::remaining_axis(self.max_scratch, self.scratch, LimitKind::ScratchBytes)?,
+        ))
+    }
+
+    pub(super) fn charge_construction(
+        &mut self,
+        requirements: litchi_iwa_style::graph::ConstructionRequirements,
+    ) -> Result<(), Error> {
+        self.preflight_work(requirements.total_work())?;
+        self.work(requirements.total_work())?;
+        self.allocations(requirements.index_allocations())?;
+        self.retained(requirements.index_retained_bytes())?;
+        self.scratch(requirements.index_scratch_bytes())?;
+        Ok(())
+    }
+
     pub(super) fn residual_wire_limits(&self) -> Result<WireLimits, Error> {
-        let input = self
-            .max_input
-            .checked_sub(self.input)
-            .ok_or(Error::InvalidSource)?
-            .clamp(1, WireLimits::MAX_INPUT_BYTES);
-        let fields = self
-            .max_fields
-            .checked_sub(self.fields)
-            .ok_or(Error::InvalidSource)?
-            .clamp(1, WireLimits::MAX_FIELDS);
-        let work = self
-            .max_work
-            .checked_sub(self.work)
-            .ok_or(Error::InvalidSource)?
-            .clamp(1, WireLimits::MAX_REWRITE_WORK);
+        let residual = |maximum: usize, used: usize, kind| {
+            let remaining = maximum.checked_sub(used).ok_or(Error::InvalidSource)?;
+            if remaining == 0 {
+                return Err(Error::Limit {
+                    kind,
+                    observed: maximum.saturating_add(1) as u64,
+                    maximum: maximum as u64,
+                });
+            }
+            Ok(remaining)
+        };
+        let input = residual(self.max_input, self.input, LimitKind::WireBytes)?
+            .min(WireLimits::MAX_INPUT_BYTES);
+        let fields = residual(self.max_fields, self.fields, LimitKind::WireFields)?
+            .min(WireLimits::MAX_FIELDS);
+        let work = residual(self.max_work, self.work, LimitKind::WireWork)?
+            .min(WireLimits::MAX_REWRITE_WORK);
         // Nesting is a peak depth, not an aggregate quota.  A completed
         // parse therefore does not consume the configured depth available to
         // the next independent parse.
@@ -889,27 +1051,35 @@ impl ChartBudget {
 
     fn codec_options(&self, source: &[u8]) -> Result<DecodeOptions, Error> {
         let limits = self.residual_wire_limits()?;
+        Self::remaining_axis(
+            self.max_allocations,
+            self.allocations,
+            LimitKind::Allocations,
+        )?;
+        Self::remaining_axis(self.max_scratch, self.scratch, LimitKind::ScratchBytes)?;
         let depth = u32::try_from(limits.max_nesting().min(MAX_CODEC_NESTING as usize))
             .unwrap_or(MAX_CODEC_NESTING);
         let max_input = limits
             .max_input_bytes()
             .min(source.len().max(1))
             .min(MAX_CODEC_LIMIT);
-        let max_fields = limits.max_fields().clamp(1, MAX_CODEC_LIMIT);
-        let max_work = limits.max_rewrite_work().clamp(1, MAX_CODEC_LIMIT);
-        let max_output = limits.max_output_bytes().clamp(1, MAX_CODEC_LIMIT);
-        let max_allocations = self
-            .max_allocations
-            .saturating_sub(self.allocations)
-            .clamp(1, MAX_CODEC_LIMIT);
-        let max_retained = self
-            .max_retained
-            .saturating_sub(self.retained)
-            .clamp(1, MAX_CODEC_LIMIT);
-        let max_scratch = self
-            .max_scratch
-            .saturating_sub(self.scratch)
-            .clamp(1, MAX_CODEC_LIMIT);
+        let max_fields = limits.max_fields().min(MAX_CODEC_LIMIT);
+        let max_work = limits.max_rewrite_work().min(MAX_CODEC_LIMIT);
+        let max_output =
+            Self::remaining_axis(self.max_output, self.output, LimitKind::OutputBytes)?
+                .min(MAX_CODEC_LIMIT);
+        let max_allocations = Self::remaining_axis(
+            self.max_allocations,
+            self.allocations,
+            LimitKind::Allocations,
+        )?
+        .min(MAX_CODEC_LIMIT);
+        let max_retained =
+            Self::remaining_axis(self.max_retained, self.retained, LimitKind::RetainedBytes)?
+                .min(MAX_CODEC_LIMIT);
+        let max_scratch =
+            Self::remaining_axis(self.max_scratch, self.scratch, LimitKind::ScratchBytes)?
+                .min(MAX_CODEC_LIMIT);
         Ok(DecodeOptions::new(max_input, max_fields, max_work, depth)
             .with_max_output_bytes(max_output)
             .with_max_allocations(max_allocations)
@@ -927,11 +1097,17 @@ impl ChartBudget {
         &self,
     ) -> Result<chart_metadata_codec::DecodeOptions, Error> {
         let limits = self.residual_wire_limits()?;
+        Self::remaining_axis(
+            self.max_allocations,
+            self.allocations,
+            LimitKind::Allocations,
+        )?;
+        Self::remaining_axis(self.max_scratch, self.scratch, LimitKind::ScratchBytes)?;
         let depth = u32::try_from(limits.max_nesting().min(MAX_CODEC_NESTING as usize))
             .unwrap_or(MAX_CODEC_NESTING);
-        let max_input = limits.max_input_bytes().clamp(1, MAX_CODEC_LIMIT);
-        let max_fields = limits.max_fields().clamp(1, MAX_CODEC_LIMIT);
-        let max_work = limits.max_rewrite_work().clamp(1, MAX_CODEC_LIMIT);
+        let max_input = limits.max_input_bytes().min(MAX_CODEC_LIMIT);
+        let max_fields = limits.max_fields().min(MAX_CODEC_LIMIT);
+        let max_work = limits.max_rewrite_work().min(MAX_CODEC_LIMIT);
         // Labels are projection output, not native graph edges. Keep their
         // codec ceiling independent from the selector's reference ledger;
         // the decoded strings and vector slots are charged separately by the
@@ -939,11 +1115,10 @@ impl ChartBudget {
         let max_labels = limits
             .max_fields()
             .min(MAX_METADATA_LABEL_COUNT)
-            .clamp(1, MAX_CODEC_LIMIT);
-        let max_text = self
-            .max_retained
-            .saturating_sub(self.retained)
-            .clamp(1, MAX_CODEC_LIMIT);
+            .min(MAX_CODEC_LIMIT);
+        let max_text =
+            Self::remaining_axis(self.max_retained, self.retained, LimitKind::RetainedBytes)?
+                .min(MAX_CODEC_LIMIT);
         Ok(chart_metadata_codec::DecodeOptions::new(
             max_input, max_fields, max_work, depth, max_labels, max_text,
         ))
@@ -985,20 +1160,25 @@ impl ChartBudget {
     /// rectangular allocation at the package boundary.
     pub(super) fn data_codec_options(&self) -> Result<chart_data_codec::DecodeOptions, Error> {
         let limits = self.residual_wire_limits()?;
+        Self::remaining_axis(
+            self.max_allocations,
+            self.allocations,
+            LimitKind::Allocations,
+        )?;
+        Self::remaining_axis(self.max_scratch, self.scratch, LimitKind::ScratchBytes)?;
         let depth = u32::try_from(limits.max_nesting().min(MAX_CODEC_NESTING as usize))
             .unwrap_or(MAX_CODEC_NESTING);
-        let max_input = limits.max_input_bytes().clamp(1, MAX_CODEC_LIMIT);
-        let max_fields = limits.max_fields().clamp(1, MAX_CODEC_LIMIT);
-        let max_work = limits.max_rewrite_work().clamp(1, MAX_CODEC_LIMIT);
-        let max_cells = limits.max_fields().clamp(1, MAX_CODEC_LIMIT);
+        let max_input = limits.max_input_bytes().min(MAX_CODEC_LIMIT);
+        let max_fields = limits.max_fields().min(MAX_CODEC_LIMIT);
+        let max_work = limits.max_rewrite_work().min(MAX_CODEC_LIMIT);
+        let max_cells = limits.max_fields().min(MAX_CODEC_LIMIT);
         let max_labels = limits
             .max_fields()
             .min(MAX_METADATA_LABEL_COUNT)
-            .clamp(1, MAX_CODEC_LIMIT);
-        let max_text = self
-            .max_retained
-            .saturating_sub(self.retained)
-            .clamp(1, MAX_CODEC_LIMIT);
+            .min(MAX_CODEC_LIMIT);
+        let max_text =
+            Self::remaining_axis(self.max_retained, self.retained, LimitKind::RetainedBytes)?
+                .min(MAX_CODEC_LIMIT);
         Ok(chart_data_codec::DecodeOptions::new(
             max_input, max_fields, max_work, depth, max_cells, max_labels, max_text,
         ))
@@ -1043,18 +1223,23 @@ impl ChartBudget {
         source: &[u8],
     ) -> Result<litchi_iwa_protos::keynote_chart_title_codec::DecodeOptions, Error> {
         let limits = self.residual_wire_limits()?;
+        Self::remaining_axis(
+            self.max_allocations,
+            self.allocations,
+            LimitKind::Allocations,
+        )?;
+        Self::remaining_axis(self.max_scratch, self.scratch, LimitKind::ScratchBytes)?;
         let depth = u32::try_from(limits.max_nesting().min(MAX_CODEC_NESTING as usize))
             .unwrap_or(MAX_CODEC_NESTING);
         let max_input = limits
             .max_input_bytes()
             .min(source.len().max(1))
             .min(MAX_CODEC_LIMIT);
-        let max_fields = limits.max_fields().clamp(1, MAX_CODEC_LIMIT);
-        let max_work = limits.max_rewrite_work().clamp(1, MAX_CODEC_LIMIT);
-        let max_text = self
-            .max_retained
-            .saturating_sub(self.retained)
-            .clamp(1, MAX_CODEC_LIMIT);
+        let max_fields = limits.max_fields().min(MAX_CODEC_LIMIT);
+        let max_work = limits.max_rewrite_work().min(MAX_CODEC_LIMIT);
+        let max_text =
+            Self::remaining_axis(self.max_retained, self.retained, LimitKind::RetainedBytes)?
+                .min(MAX_CODEC_LIMIT);
         Ok(
             litchi_iwa_protos::keynote_chart_title_codec::DecodeOptions::new(
                 max_input, max_fields, max_work, depth,
@@ -2503,7 +2688,7 @@ pub(super) fn root_preview_count(
     Ok(previews.into_iter().filter(|present| *present).count())
 }
 
-fn zip_entry_work(entry: &Entry, include_data: bool) -> Result<usize, Error> {
+pub(super) fn zip_entry_work(entry: &Entry, include_data: bool) -> Result<usize, Error> {
     let metadata = entry.metadata();
     let mut work = entry
         .name()
@@ -2540,7 +2725,7 @@ fn same_header_metadata(
         && left.comment() == right.comment()
 }
 
-fn same_entry_fixed_metadata(left: &Entry, right: &Entry) -> bool {
+pub(super) fn same_entry_fixed_metadata(left: &Entry, right: &Entry) -> bool {
     left.name() == right.name()
         && left.raw_name() == right.raw_name()
         && left.is_opaque() == right.is_opaque()
@@ -2548,7 +2733,7 @@ fn same_entry_fixed_metadata(left: &Entry, right: &Entry) -> bool {
         && same_header_metadata(left.metadata().central(), right.metadata().central())
 }
 
-fn same_selected_entry_records(left: &Entry, right: &Entry) -> bool {
+pub(super) fn same_selected_entry_records(left: &Entry, right: &Entry) -> bool {
     zip_local_header_preserved(
         left.raw_record().local_record(),
         right.raw_record().local_record(),
@@ -2556,6 +2741,20 @@ fn same_selected_entry_records(left: &Entry, right: &Entry) -> bool {
         left.raw_record().central_directory_record(),
         right.raw_record().central_directory_record(),
     )
+}
+
+pub(super) fn same_changed_entry_records(left: &Entry, right: &Entry) -> bool {
+    if !zip_local_header_preserved(
+        left.raw_record().local_record(),
+        right.raw_record().local_record(),
+    ) {
+        return false;
+    }
+    let left_central = left.raw_record().central_directory_record();
+    let right_central = right.raw_record().central_directory_record();
+    left_central.len() >= 46
+        && right_central.len() == left_central.len()
+        && zip_record_equal_outside(left_central, right_central, &[(16, 28), (42, 46)])
 }
 
 fn zip_local_header_preserved(left: &[u8], right: &[u8]) -> bool {
@@ -2610,7 +2809,7 @@ fn same_selected_central_record(left: &[u8], right: &[u8]) -> bool {
         && left[28..] == right[28..]
 }
 
-fn same_unselected_entry_records(left: &Entry, right: &Entry) -> bool {
+pub(super) fn same_unselected_entry_records(left: &Entry, right: &Entry) -> bool {
     if left.data() != right.data()
         || left.metadata() != right.metadata()
         || left.raw_record().local_record() != right.raw_record().local_record()

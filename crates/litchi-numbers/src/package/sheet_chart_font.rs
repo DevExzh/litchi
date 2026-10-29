@@ -437,6 +437,7 @@ fn map_arrangement(error: arrangement::Error) -> Error {
         } => Error::Limit {
             kind: match kind {
                 arrangement::LimitKind::References => LimitKind::PayloadReferences,
+                arrangement::LimitKind::Identifiers => LimitKind::Identifiers,
                 arrangement::LimitKind::WireBytes | arrangement::LimitKind::CompressedBytes => {
                     LimitKind::PayloadBytes
                 },

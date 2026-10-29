@@ -5583,6 +5583,23 @@ pub fn inspect_package_metadata_with_visitor<V: PackageMetadataVisitor>(
     })
 }
 
+/// Preflight the exact aggregate resources required to inspect package
+/// metadata without materializing visitor-owned component or UUID collections.
+pub fn inspect_package_metadata_requirements(
+    source: &[u8],
+    options: RewriteOptions,
+) -> Result<RewriteReport, RewriteError> {
+    let mut budget = Budget::new_inspection(source, options)?;
+    let mut noop = NoopVisitor;
+    let scalars = inspect_metadata_pass(source, options, &mut budget, &mut noop)?;
+    budget.preflight_repeat_from_zero()?;
+    let emitted_scalars = inspect_metadata_pass(source, options, &mut budget, &mut noop)?;
+    if emitted_scalars != scalars {
+        return Err(RewriteError::invalid(InvalidReason::Verification));
+    }
+    Ok(budget.report())
+}
+
 #[derive(Default, Clone, Copy)]
 struct SaveTokenMatch {
     identifier: usize,
