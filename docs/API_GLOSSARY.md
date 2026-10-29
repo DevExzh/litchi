@@ -2924,6 +2924,17 @@ authoring is explicitly deferred and Keynote keeps its native codec route.
 | `litchi_numbers::sheet::chart::{title, axis_title}::{Edit, Patch, Commit, Diagnostics, Error, LimitKind, Refusal}` | Registered selector-first families; `Package::{sheet_chart_title, edit_sheet_chart_title, apply_sheet_chart_title}` and `Package::{sheet_chart_axis_title, edit_sheet_chart_axis_title, apply_sheet_chart_axis_title}` | ⏳ 0375b: parity and native queue pending |
 | `litchi_pages::chart::{title, axis_title}::{Edit, Patch, Commit, Diagnostics, Error, LimitKind, Refusal}` | Registered selector-first families; `Package::{body_chart_title, edit_body_chart_title, apply_body_chart_title}` and `Package::{body_chart_axis_title, edit_body_chart_axis_title, apply_body_chart_axis_title}` | ⏳ 0375b: parity and native queue pending |
 
+## W2-A Numbers chart-font facade (record 0385)
+
+The Numbers chart-font facade is a thin selector adapter over the shared
+`litchi_iwa_style::chart_font` graph engine. Its admission and typed-error
+surface remains provisional until the shared chart-font bounded-limit contract
+is accepted; no legacy-host fallback is implied by a refusal.
+
+| Canonical name | Meaning | Status |
+|---|---|---|
+| `litchi_numbers::sheet::chart::font::{Property, PropertyKind, Edit, Patch, Commit, Diagnostics, Error, LimitKind, Refusal, ChartFont, TextPointSize}` | Selector-first `Package::{sheet_chart_font, edit_sheet_chart_font, apply_sheet_chart_font}` for chart font identity/traits and point size; `Edit::{set, reset}` uses family-scoped reads, exact-source patches, inverse/no-op behavior and candidate readback. The facade does not expose native IDs, archives or protobuf values; mixed unrelated font/size state is not rejected merely because the other family is non-uniform. | ⏳ 0385: host differential and public-contract tests prepared; shared bounded-error contract, native queue, final performance and integrated gate pending |
+
 ## iWork facade retirement and iWork open options (record 0306)
 
 | Canonical name | Banned | Status |

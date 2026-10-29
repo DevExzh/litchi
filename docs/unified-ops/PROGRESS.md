@@ -7054,3 +7054,23 @@ See [0063](0063-source-pptx-modern-comments.md).
   typed non-commentable table refusal. The equivalent host example is
   removed; host tests and native provenance remain intact. No runtime,
   migration-ledger or native-evidence disposition changes.
+
+- Post-merge checks on `1d44fac31f` passed: workspace all-target/all-feature
+  compilation, all twenty locked offline fuzz workspaces, boundaries and
+  ledger. The three completed worktrees/branches were retired with evidence
+  preserved, bringing this continuation's cleanup to 43 worktrees and
+  37 branches.
+- Accepted Numbers chart-font slice `9bb7564acf`, including the reviewed
+  shared chart-font/stylesheet admission substrate and typed graph-error
+  adapters. The selector-first font/size family preserves independent
+  staging, exact source/inverse/no-op behavior, candidate readback and
+  unknown-content locality. Six ledger rows move to the leaf; native
+  verification remains queued.
+- Corrected source `59ffe48b3e` passes all six font and eighteen existing
+  style/layout instruction comparisons: 48 captures, exactly two selected
+  calls per side, archived ELF identity and 241 artifact/binary hashes
+  independently checked. The worst leaf/host ratio is 0.691530. Raw
+  whole-function costs include all DWARF file contexts and equal the capture
+  totals; smaller per-file annotation rows caused the preserved historical
+  validator failure. No instructions or ratios were discounted. Final
+  integrated-source qualification remains required.

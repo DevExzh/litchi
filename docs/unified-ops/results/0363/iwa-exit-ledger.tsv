@@ -1129,12 +1129,12 @@ numbers/editor/sheet_charts/depth_3d.rs	set_sheet_chart_3d_depth	1	numbers	chart
 numbers/editor/sheet_charts/depth_3d.rs	sheet_chart_3d_depth	1	numbers	chart.style	migrated	litchi_numbers::Package::sheet_chart_style	numbers_sheet_chart_style_read_parity	A	-	-
 numbers/editor/sheet_charts/donut_inner_radius.rs	set_sheet_chart_donut_inner_radius	1	numbers	chart.style	migrated	litchi_numbers::sheet::chart::style::Edit::set	numbers_sheet_chart_style_set_parity	A	-	-
 numbers/editor/sheet_charts/donut_inner_radius.rs	sheet_chart_donut_inner_radius	1	numbers	chart.style	migrated	litchi_numbers::Package::sheet_chart_style	numbers_sheet_chart_style_read_parity	A	-	-
-numbers/editor/sheet_charts/font.rs	reset_sheet_chart_font	1	numbers	chart.style	host-only	litchi-numbers	-	-	-	-
-numbers/editor/sheet_charts/font.rs	reset_sheet_chart_font_size	1	numbers	chart.style	host-only	litchi-numbers	-	-	-	-
-numbers/editor/sheet_charts/font.rs	set_sheet_chart_font	1	numbers	chart.style	host-only	litchi-numbers	-	-	-	-
-numbers/editor/sheet_charts/font.rs	set_sheet_chart_font_size	1	numbers	chart.style	host-only	litchi-numbers	-	-	-	-
-numbers/editor/sheet_charts/font.rs	sheet_chart_font	1	numbers	chart.style	host-only	litchi-numbers	-	-	-	-
-numbers/editor/sheet_charts/font.rs	sheet_chart_font_size	1	numbers	chart.style	host-only	litchi-numbers	-	-	-	-
+numbers/editor/sheet_charts/font.rs	reset_sheet_chart_font	1	numbers	chart.style	migrated	litchi_numbers::Package::edit_sheet_chart_font	numbers_sheet_chart_font_reset_parity	A	-	W2-A 0385: native mutation verification queued in 0363-mac-queue.md
+numbers/editor/sheet_charts/font.rs	reset_sheet_chart_font_size	1	numbers	chart.style	migrated	litchi_numbers::Package::edit_sheet_chart_font	numbers_sheet_chart_font_size_reset_parity	A	-	W2-A 0385: native mutation verification queued in 0363-mac-queue.md
+numbers/editor/sheet_charts/font.rs	set_sheet_chart_font	1	numbers	chart.style	migrated	litchi_numbers::Package::edit_sheet_chart_font	numbers_sheet_chart_font_set_parity	B	-	W2-A 0385: native mutation verification queued in 0363-mac-queue.md
+numbers/editor/sheet_charts/font.rs	set_sheet_chart_font_size	1	numbers	chart.style	migrated	litchi_numbers::Package::edit_sheet_chart_font	numbers_sheet_chart_font_size_set_parity	B	-	W2-A 0385: native mutation verification queued in 0363-mac-queue.md
+numbers/editor/sheet_charts/font.rs	sheet_chart_font	1	numbers	chart.style	migrated	litchi_numbers::Package::sheet_chart_font	numbers_sheet_chart_font_readers_match_on_six_populated_vectors	A	-	W2-A 0385: native read/mutation verification queued in 0363-mac-queue.md
+numbers/editor/sheet_charts/font.rs	sheet_chart_font_size	1	numbers	chart.style	migrated	litchi_numbers::Package::sheet_chart_font	numbers_sheet_chart_font_readers_match_on_six_populated_vectors	A	-	W2-A 0385: native read/mutation verification queued in 0363-mac-queue.md
 numbers/editor/sheet_charts/gaps.rs	set_sheet_chart_gap_spacing	1	numbers	chart.style	migrated	litchi_numbers::sheet::chart::style::Edit::set	numbers_sheet_chart_options_set_parity	A	-	-
 numbers/editor/sheet_charts/gaps.rs	sheet_chart_gap_spacing	1	numbers	chart.style	migrated	litchi_numbers::Package::sheet_chart_style	numbers_sheet_chart_options_read_parity	A	-	-
 numbers/editor/sheet_charts/hidden_data.rs	set_sheet_chart_includes_hidden_data	1	numbers	chart.style	migrated	litchi_numbers::sheet::chart::style::Edit::set	numbers_sheet_chart_options_set_parity	A	-	-

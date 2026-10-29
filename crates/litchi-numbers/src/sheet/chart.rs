@@ -40,6 +40,16 @@ pub mod axis_title {
     pub use litchi_iwa_common::chart::axis::Axis;
 }
 
+/// Exact-source chart-font identity and point-size transactions:
+/// [`crate::Package::edit_sheet_chart_font`].
+pub mod font {
+    pub use crate::package::sheet_chart_font::{
+        Commit, Diagnostics, Edit, Error, LimitKind, Patch, Property, PropertyKind, Refusal,
+    };
+    pub use litchi_iwa_style::chart_font::ChartFont;
+    pub use litchi_iwa_text::character::TextPointSize;
+}
+
 /// Exact-source axis-style properties of a chart's primary value or
 /// category axis: [`crate::Package::edit_sheet_chart_axis`].
 pub mod axis {
