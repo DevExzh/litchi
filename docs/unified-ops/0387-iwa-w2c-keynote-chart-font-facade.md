@@ -2,7 +2,8 @@
 
 - Status: bounded facade slice on `uo2/iwa-w2c-chart-font`, cut from frozen
   root `9932c7d0691b2c14bbbd11a2dea7df41f66308b6`, with the reviewed shared
-  substrate `faefe7303b` merged at branch tip `5f20266918`. Coordinator
+  substrate `faefe7303b` merged at branch tip `5f20266918`. The reviewed
+  selector/locality repair is `76e52390f9`. Coordinator
   integration, native evidence and final integrated gates remain pending. The
   six exit-ledger rows intentionally remain `host-only`; this record is not a
   provisional migration state.
@@ -55,8 +56,11 @@ wire, codec, graph-limit, allocation and identifier failures retain typed
 facade classifications. The shared substrate itself remains outside this
 work package. Chart selection now enters the shared budget-aware selector,
 output-free reassembly requirements are admitted before final ZIP execution,
-and a source-relative locality verifier rejects changed unknown members,
-objects, or message content outside the chart-font rewrite set. Reset routes
+and a source-relative locality verifier uses the patch's stored selected-graph
+plan. It rejects extra/deleted members and objects, preserves untouched raw ZIP
+records (allowing only the reassembler's central-directory offset rewrite),
+checks static ZIP metadata on changed members, and preserves unknown fields in
+the chart extension. Reset routes
 read the staged inherited effective value before publication and reject mixed
 or otherwise unmodelled reset results. Engine text-byte reports retain their
 `TextBytes` classification and accumulate across the transaction.
@@ -106,21 +110,22 @@ no performance qualification or wall-clock claim is made here. Any later
 receipt must name the final integrated source SHA, release binary SHA-256,
 build command, exact test filter and route symbols.
 
-Scoped evidence on the current branch:
+Scoped evidence on the current branch (source repair `76e52390f9`):
 
 | Check | Result |
 |---|---|
-| `cargo fmt --all -- --check` | pass |
-| `cargo check --locked -p litchi-keynote` | pass |
-| strict Clippy (`litchi-keynote`, parity test) | pass; vendor warnings only |
-| eight focused Keynote facade parity/control tests | 8 passed |
-| seven shared chart-font admission tests | 7 passed |
+| `cargo fmt --package litchi-keynote -- --check` | pass |
+| `cargo check -p litchi-keynote --locked --offline` | pass |
+| strict Clippy (`cargo clippy -p litchi-keynote --lib -D warnings`) | pass; vendor warnings only |
+| focused `keynote_chart_font` parity/control filter | 10 passed, 1 ignored ABBA probe |
+| eight Keynote facade parity/control cases within that filter | 8 passed |
+| shared chart-font admission filter | 7 passed |
 | low text-budget and stale-patch controls | passed |
 | `python3 tools/check_crate_boundaries.py` | pass; 70 packages, 313 declarations, 12 explicit debt items |
 | `python3 tools/iwa_exit_ledger.py --check` | pass; six chart-font rows intentionally host-only |
-| `RUSTC_BOOTSTRAP=1 python3 tools/check_api_glossary.py --target-dir /tmp/iwa-w2c-glossary-20261029` | pass; 73 profiles, 3,957 banned names, 716 families, 729 result contracts |
-| `RUSTDOCFLAGS=-Dwarnings cargo doc --locked --no-deps -p litchi-keynote` | pass |
-| `python3 -m unittest tools.test_no_3rdparty_references tools.test_iwa_exit_ledger` | 17 passed |
+| Keynote minimal/full API glossary profiles | pass; 267/266 banned names, 51 families and 51 result contracts each |
+| `cargo rustdoc -p litchi-keynote --lib --locked --offline -- -D warnings` | pass |
+| crate-boundary/non-iWork/no-`3rdparty`/ledger tooling tests | 1,221 passed; gate-runner fuzz-lock tests 5 passed |
 | no-op, inverse and typed-refusal controls | passed |
 | native evidence / queue | pending; no claim |
 | performance | held for coordinator; no claim |
