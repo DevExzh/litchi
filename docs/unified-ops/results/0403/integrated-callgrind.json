@@ -28,6 +28,11 @@
     "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-w2a-symbols-facade-c768523ebd/capture-v3/c063-validator-receipt-v3.json",
     "sha256": "80c9699b6be20def9cd9cab7ce2034f90d34b843b1a2dd1ef367a6e29f4378ff"
   },
+  "capture_correction": {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-w2a-symbols-facade-c768523ebd/executed-capture-correction-v3.json",
+    "sha256": "d66a3fb801986885640a5880590edda0e8445ee9c9af8181e7b6904cdb09282f",
+    "kind": "output-directory-only"
+  },
   "build": {
     "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-w2a-symbols-facade-c768523ebd/build-receipt.json",
     "sha256": "54c55dbae68c2b71cd8e18a8edb169937f06f2658bafa8e17a29e310b5578dd0"

@@ -114,6 +114,14 @@ annotations, logs and the binary are not committed. The c063 validator
 verified exact two-call selection, raw summary/function Ir, PROGRAM TOTALS,
 and threshold-100 inclusive annotations for all eight legs.
 
+The approved plan/manifest template retained its original `capture-v2`
+directory, while the executed argv and artifacts were stored under `capture-v3`.
+This output-directory-only correction is bound by the external
+`executed-capture-correction-v3.json` (SHA-256
+`d66a3fb801986885640a5880590edda0e8445ee9c9af8181e7b6904cdb09282f`); it
+verifies identical source, ELF, test argv, CPU, environment and selected
+symbols, so no recapture was needed.
+
 The earlier c3f8 capture set is retained externally as superseded historical
 evidence; it is not used for these rows. This is source-bound Numbers facade evidence only. Merging the slice into the
 coordinator's current trunk invalidates this qualification; the coordinator
