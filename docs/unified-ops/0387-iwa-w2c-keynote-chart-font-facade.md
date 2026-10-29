@@ -3,7 +3,7 @@
 - Status: bounded facade slice on `uo2/iwa-w2c-chart-font`, cut from frozen
   root `9932c7d0691b2c14bbbd11a2dea7df41f66308b6`, with the reviewed shared
   substrate `faefe7303b` merged at branch tip `5f20266918`. The reviewed
-  selector/locality repair is `53b5e6fa93`. Coordinator
+  selector/locality repair is `378c0144ea`. Coordinator
   integration, native evidence and final integrated gates remain pending. The
   six exit-ledger rows intentionally remain `host-only`; this record is not a
   provisional migration state.
@@ -110,7 +110,7 @@ while timing was held. No performance qualification or wall-clock claim is
 made here. Any later receipt must name the final integrated source SHA,
 release binary SHA-256, build command, exact test filter and route symbols.
 
-Scoped evidence on the current branch (source repair `53b5e6fa93`):
+Scoped evidence on the current branch (source repair `378c0144ea`):
 
 | Check | Result |
 |---|---|
