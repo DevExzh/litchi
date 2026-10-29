@@ -540,6 +540,8 @@ pub(super) struct ArrangementBudget {
     max_work: usize,
     max_nesting: usize,
     max_references: usize,
+    max_registry_entries: usize,
+    max_identifiers: usize,
     max_allocations: usize,
     max_retained: usize,
     max_scratch: usize,
@@ -548,6 +550,8 @@ pub(super) struct ArrangementBudget {
     fields: usize,
     work: usize,
     references: usize,
+    registry_entries: usize,
+    identifiers: usize,
     allocations: usize,
     retained: usize,
     scratch: usize,
@@ -588,6 +592,8 @@ impl ArrangementBudget {
             max_work,
             max_nesting: limits.max_nesting(),
             max_references: archive.max_metadata_items().saturating_mul(16).max(1),
+            max_registry_entries: archive.max_metadata_items().saturating_mul(16).max(1),
+            max_identifiers: archive.max_metadata_items().saturating_mul(16).max(1),
             max_allocations: archive.max_metadata_items().saturating_mul(16).max(1),
             max_retained: max_output,
             max_scratch: max_output,
@@ -596,6 +602,8 @@ impl ArrangementBudget {
             fields: 0,
             work: 0,
             references: 0,
+            registry_entries: 0,
+            identifiers: 0,
             allocations: 0,
             retained: 0,
             scratch: 0,
@@ -649,6 +657,24 @@ impl ArrangementBudget {
             amount,
             self.max_references,
             LimitKind::PayloadReferences,
+        )
+    }
+
+    pub(super) fn registry_entries(&mut self, amount: usize) -> Result<(), Error> {
+        Self::add(
+            &mut self.registry_entries,
+            amount,
+            self.max_registry_entries,
+            LimitKind::PayloadItems,
+        )
+    }
+
+    pub(super) fn identifiers(&mut self, amount: usize) -> Result<(), Error> {
+        Self::add(
+            &mut self.identifiers,
+            amount,
+            self.max_identifiers,
+            LimitKind::PayloadObjects,
         )
     }
 
@@ -833,6 +859,24 @@ impl ArrangementBudget {
     pub(super) fn residual_scratch_bytes(&self) -> Result<usize, Error> {
         self.max_scratch
             .checked_sub(self.scratch)
+            .ok_or(Error::InvalidSource)
+    }
+
+    pub(super) fn residual_references(&self) -> Result<usize, Error> {
+        self.max_references
+            .checked_sub(self.references)
+            .ok_or(Error::InvalidSource)
+    }
+
+    pub(super) fn residual_registry_entries(&self) -> Result<usize, Error> {
+        self.max_registry_entries
+            .checked_sub(self.registry_entries)
+            .ok_or(Error::InvalidSource)
+    }
+
+    pub(super) fn residual_identifiers(&self) -> Result<usize, Error> {
+        self.max_identifiers
+            .checked_sub(self.identifiers)
             .ok_or(Error::InvalidSource)
     }
 

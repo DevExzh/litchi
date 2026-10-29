@@ -43,6 +43,8 @@ const STYLE_EXTENSION_FIELD: u32 = 10_000;
 struct MutationPlan {
     components: Vec<Arc<str>>,
     objects: Vec<(Arc<str>, Vec<u64>)>,
+    allowed_message_types: Vec<u32>,
+    allowed_fields: Vec<u32>,
 }
 
 /// A finite resource charged by one Pages body-chart series-symbol operation.
@@ -392,22 +394,6 @@ fn map_registry_error(error: litchi_iwa_protos::package_metadata_codec::RewriteE
     Error::InvalidSource
 }
 
-fn map_style_codec_error(error: chart_style_codec::Error) -> Error {
-    match error {
-        chart_style_codec::Error::Limit {
-            kind,
-            observed,
-            maximum,
-        } => Error::Limit {
-            kind: LimitKind::Codec(kind),
-            observed: observed as u64,
-            maximum: maximum as u64,
-        },
-        chart_style_codec::Error::Allocation { bytes } => Error::Allocation { amount: bytes },
-        _ => Error::InvalidSource,
-    }
-}
-
 fn map_graph_error(error: style_graph::Error) -> Error {
     match error {
         style_graph::Error::Archive(error) => map_core_error(error),
@@ -458,6 +444,43 @@ fn map_graph_error(error: style_graph::Error) -> Error {
     }
 }
 
+fn map_symbol_error(error: series_engine::SymbolError) -> Error {
+    match error {
+        series_engine::SymbolError::Graph(error) => map_graph_error(error),
+        series_engine::SymbolError::Limit {
+            kind,
+            observed,
+            maximum,
+        } => Error::Limit {
+            kind: match kind {
+                series_engine::LimitKind::InputBytes => LimitKind::InputBytes,
+                series_engine::LimitKind::Fields => LimitKind::WireFields,
+                series_engine::LimitKind::OutputBytes => LimitKind::OutputBytes,
+                series_engine::LimitKind::Nesting => LimitKind::WireNesting,
+                series_engine::LimitKind::Work => LimitKind::WireWork,
+                series_engine::LimitKind::Allocations => LimitKind::Allocations,
+                series_engine::LimitKind::RetainedBytes => LimitKind::RetainedBytes,
+                series_engine::LimitKind::ScratchBytes => LimitKind::ScratchBytes,
+                series_engine::LimitKind::References => LimitKind::PayloadReferences,
+                series_engine::LimitKind::RegistryEntries => LimitKind::Registry(
+                    litchi_iwa_protos::package_metadata_codec::RewriteLimit::Components {
+                        observed,
+                        maximum,
+                    },
+                ),
+                series_engine::LimitKind::Identifiers => LimitKind::PayloadReferences,
+                _ => LimitKind::WireWork,
+            },
+            observed: observed as u64,
+            maximum: maximum as u64,
+        },
+        series_engine::SymbolError::Allocation { amount } => Error::Allocation { amount },
+        series_engine::SymbolError::Invalid(_) => Error::InvalidSource,
+        series_engine::SymbolError::IdentifierOverflow => Error::InvalidSource,
+        _ => Error::InvalidSource,
+    }
+}
+
 fn map_package_graph_error(error: package_graph::GraphError) -> Error {
     match error {
         package_graph::GraphError::InvalidSource => Error::InvalidSource,
@@ -489,6 +512,127 @@ fn archive_limits(package: &Package) -> Result<litchi_iwa_core::Limits, Error> {
         .limits()
         .effective_archive_limits()
         .map_err(map_archive_error)
+}
+
+fn positive_limit(value: usize, kind: LimitKind) -> Result<usize, Error> {
+    if value == 0 {
+        return Err(Error::Limit {
+            kind,
+            observed: 1,
+            maximum: 0,
+        });
+    }
+    Ok(value)
+}
+
+fn engine_limits(
+    package: &Package,
+    budget: &ArrangementBudget,
+) -> Result<series_engine::Limits, Error> {
+    let physical = package.state.source.limits();
+    let package_bytes = usize::try_from(physical.max_input_bytes())
+        .map_err(|_| Error::InvalidSource)?
+        .max(1);
+    let total_bytes = usize::try_from(physical.max_total_bytes())
+        .map_err(|_| Error::InvalidSource)?
+        .max(1);
+    let wire = budget
+        .residual_wire_limits()
+        .map_err(map_arrangement_error)?;
+    let codec_max = chart_style_codec::Limits::DEFAULT.max_bytes();
+    let input = budget
+        .residual_input_bytes()
+        .map_err(map_arrangement_error)?
+        .min(package_bytes)
+        .min(litchi_iwa_common::WireLimits::MAX_INPUT_BYTES)
+        .min(codec_max);
+    let input = positive_limit(input, LimitKind::InputBytes)?;
+    let output = budget
+        .residual_output_bytes()
+        .map_err(map_arrangement_error)?
+        .min(package_bytes)
+        .min(codec_max);
+    let output = positive_limit(output, LimitKind::OutputBytes)?;
+    let fields = wire
+        .max_fields()
+        .min(chart_style_codec::Limits::DEFAULT.max_fields())
+        .min(litchi_iwa_common::WireLimits::MAX_FIELDS);
+    let fields = positive_limit(fields, LimitKind::WireFields)?;
+    let work = budget
+        .residual_work_bytes()
+        .map_err(map_arrangement_error)?
+        .min(total_bytes.saturating_mul(32).max(1))
+        .min(litchi_iwa_common::WireLimits::MAX_REWRITE_WORK);
+    let work = positive_limit(work, LimitKind::WireWork)?;
+    let allocations = budget
+        .residual_allocations()
+        .map_err(map_arrangement_error)?;
+    let allocations = positive_limit(allocations, LimitKind::Allocations)?;
+    let retained = budget
+        .residual_retained_bytes()
+        .map_err(map_arrangement_error)?
+        .min(package_bytes);
+    let retained = positive_limit(retained, LimitKind::RetainedBytes)?;
+    let scratch = budget
+        .residual_scratch_bytes()
+        .map_err(map_arrangement_error)?
+        .min(package_bytes);
+    let scratch = positive_limit(scratch, LimitKind::ScratchBytes)?;
+    let references = budget
+        .residual_references()
+        .map_err(map_arrangement_error)?;
+    let references = positive_limit(references, LimitKind::PayloadReferences)?;
+    let registry_entries = budget
+        .residual_registry_entries()
+        .map_err(map_arrangement_error)?;
+    let registry_entries = positive_limit(registry_entries, LimitKind::PayloadItems)?;
+    let identifiers = budget
+        .residual_identifiers()
+        .map_err(map_arrangement_error)?;
+    let identifiers = positive_limit(identifiers, LimitKind::PayloadObjects)?;
+    Ok(series_engine::Limits::new(
+        input,
+        fields,
+        output,
+        u32::try_from(wire.max_nesting()).map_err(|_| Error::InvalidSource)?,
+        work,
+        allocations,
+        retained,
+        scratch,
+        references,
+        registry_entries,
+        identifiers,
+    ))
+}
+
+fn charge_engine_report(
+    budget: &mut ArrangementBudget,
+    report: &series_engine::Report,
+) -> Result<(), Error> {
+    let max_nesting = budget
+        .residual_wire_limits()
+        .map_err(map_arrangement_error)?
+        .max_nesting();
+    budget
+        .input(report.input_bytes())
+        .and_then(|_| budget.output(report.output_bytes()))
+        .and_then(|_| budget.fields(report.fields()))
+        .and_then(|_| budget.work(report.work_bytes()))
+        .and_then(|_| budget.allocations(report.allocations()))
+        .and_then(|_| budget.retained(report.retained_bytes()))
+        .and_then(|_| budget.scratch(report.scratch_bytes()))
+        .and_then(|_| budget.references(report.references()))
+        .and_then(|_| budget.registry_entries(report.registry_entries()))
+        .and_then(|_| budget.identifiers(report.identifiers()))
+        .map_err(map_arrangement_error)?;
+    if report.max_depth() as usize > max_nesting {
+        return Err(Error::Limit {
+            kind: LimitKind::WireNesting,
+            observed: u64::from(report.max_depth()),
+            maximum: max_nesting as u64,
+        });
+    }
+    Ok(())
 }
 
 fn target_with_budget(
@@ -636,17 +780,18 @@ fn read_symbols(
 ) -> Result<Vec<Option<Symbol>>, Error> {
     admit_workspace(package, budget)?;
     let components = PackageComponents(package);
-    preflight_series_engine(package, target.series, budget)?;
     let limits = archive_limits(package)?;
     let workspace = Workspace::new(&components, limits).map_err(map_graph_error)?;
-    let values = series_engine::symbols(
+    let engine_limits = engine_limits(package, budget)?;
+    let (values, report) = series_engine::symbols(
         &workspace,
         target.chart.drawable_identifier.get(),
         target.family,
         target.series,
+        engine_limits,
     )
-    .map_err(map_graph_error)?;
-    charge_series_engine(package, target.series, budget)?;
+    .map_err(map_symbol_error)?;
+    charge_engine_report(budget, &report)?;
     budget
         .work(target.series.saturating_mul(size_of::<Symbol>()))
         .map_err(map_arrangement_error)?;
@@ -968,54 +1113,6 @@ fn publish_changes(
     Ok((candidate, touched_components))
 }
 
-fn preflight_series_engine(
-    package: &Package,
-    series: usize,
-    budget: &ArrangementBudget,
-) -> Result<(), Error> {
-    // `Workspace` and the shared graph engine take borrowed physical limits,
-    // not the Pages transaction ledger.  Admit a conservative bounded census
-    // before constructing them so graph scans and symbol-vector capacity
-    // cannot run ahead of the caller's residual budget.
-    let source_bytes = package.state.source.shared_source().len();
-    let objects = package.state.object_count.max(1);
-    budget
-        .preflight_work(source_bytes.saturating_mul(16).saturating_add(objects))
-        .map_err(map_arrangement_error)?;
-    budget
-        .preflight_allocations(objects.saturating_add(series.saturating_mul(4)))
-        .map_err(map_arrangement_error)?;
-    budget
-        .preflight_retained(
-            source_bytes.saturating_add(series.saturating_mul(size_of::<Option<Symbol>>())),
-        )
-        .map_err(map_arrangement_error)?;
-    budget
-        .preflight_scratch(source_bytes.saturating_mul(2))
-        .map_err(map_arrangement_error)
-}
-
-fn charge_series_engine(
-    package: &Package,
-    series: usize,
-    budget: &mut ArrangementBudget,
-) -> Result<(), Error> {
-    let source_bytes = package.state.source.shared_source().len();
-    let objects = package.state.object_count.max(1);
-    budget
-        .work(source_bytes.saturating_mul(16).saturating_add(objects))
-        .map_err(map_arrangement_error)?;
-    budget
-        .allocations(objects.saturating_add(series.saturating_mul(4)))
-        .map_err(map_arrangement_error)?;
-    budget
-        .retained(source_bytes.saturating_add(series.saturating_mul(size_of::<Option<Symbol>>())))
-        .map_err(map_arrangement_error)?;
-    budget
-        .scratch(source_bytes.saturating_mul(2))
-        .map_err(map_arrangement_error)
-}
-
 fn package_object(package: &Package, identifier: u64) -> Option<(&str, &ArchiveObject)> {
     package
         .state
@@ -1034,133 +1131,94 @@ fn add_planned_object(
     objects: &mut Vec<(Arc<str>, Vec<u64>)>,
     component: &str,
     identifier: u64,
+    budget: &mut ArrangementBudget,
 ) -> Result<(), Error> {
     if let Some((_, identifiers)) = objects
         .iter_mut()
         .find(|(name, _)| name.as_ref() == component)
     {
         if !identifiers.contains(&identifier) {
+            budget
+                .preflight_allocations(1)
+                .and_then(|_| budget.preflight_retained(size_of::<u64>()))
+                .and_then(|_| budget.preflight_work(1))
+                .map_err(map_arrangement_error)?;
+            budget
+                .allocations(1)
+                .and_then(|_| budget.retained(size_of::<u64>()))
+                .and_then(|_| budget.work(1))
+                .map_err(map_arrangement_error)?;
+            identifiers
+                .try_reserve_exact(1)
+                .map_err(|_| Error::Allocation { amount: 1 })?;
             identifiers.push(identifier);
         }
     } else {
-        objects.push((Arc::from(component), vec![identifier]));
+        let retained = component
+            .len()
+            .checked_add(size_of::<(Arc<str>, Vec<u64>)>())
+            .and_then(|value| value.checked_add(size_of::<u64>()))
+            .ok_or(Error::InvalidSource)?;
+        budget
+            .preflight_allocations(3)
+            .and_then(|_| budget.preflight_retained(retained))
+            .and_then(|_| budget.preflight_work(1))
+            .map_err(map_arrangement_error)?;
+        budget
+            .allocations(3)
+            .and_then(|_| budget.retained(retained))
+            .and_then(|_| budget.work(1))
+            .map_err(map_arrangement_error)?;
+        objects
+            .try_reserve_exact(1)
+            .map_err(|_| Error::Allocation { amount: 1 })?;
+        let mut identifiers = Vec::new();
+        identifiers
+            .try_reserve_exact(1)
+            .map_err(|_| Error::Allocation { amount: 1 })?;
+        identifiers.push(identifier);
+        objects.push((Arc::from(component), identifiers));
     }
     Ok(())
 }
 
-fn source_symbol_objects(
+fn mutation_plan(
     source: &Package,
-    target: &Target,
+    components: &[Arc<str>],
+    changes: &style_graph::Changes,
+    scope: &series_engine::MutationScope,
     budget: &mut ArrangementBudget,
-) -> Result<Vec<(Arc<str>, Vec<u64>)>, Error> {
-    let payload = arrangement::selected_chart_payload(source, &target.chart)
-        .map_err(map_arrangement_error)?;
-    let codec_limits = budget
-        .reference_codec_limits(payload)
+) -> Result<MutationPlan, Error> {
+    let mut objects = Vec::new();
+    let source_object_count = scope
+        .allowed_objects()
+        .len()
+        .checked_add(scope.planned_removed_objects().len())
+        .ok_or(Error::InvalidSource)?;
+    budget
+        .preflight_allocations(1)
+        .and_then(|_| {
+            budget.preflight_retained(source_object_count.saturating_mul(size_of::<u64>()))
+        })
         .map_err(map_arrangement_error)?;
     budget
-        .work(payload.len())
-        .and_then(|_| budget.allocations(1))
+        .allocations(1)
+        .and_then(|_| budget.retained(source_object_count.saturating_mul(size_of::<u64>())))
         .map_err(map_arrangement_error)?;
-    let references =
-        chart_style_codec::references(payload, codec_limits).map_err(map_style_codec_error)?;
-    let mut identifiers = Vec::new();
-    identifiers
-        .try_reserve(
-            1usize
-                .checked_add(references.series_theme_styles().len())
-                .and_then(|value| {
-                    value.checked_add(
-                        references
-                            .series_private_styles()
-                            .map_or(0, |styles| styles.entries().len()),
-                    )
-                })
-                .and_then(|value| {
-                    value.checked_add(
-                        references
-                            .series_non_styles()
-                            .map_or(0, |styles| styles.entries().len()),
-                    )
-                })
-                .ok_or(Error::InvalidSource)?,
-        )
-        .map_err(|_| Error::Allocation { amount: 1 })?;
-    identifiers.push(target.chart.drawable_identifier.get());
-    identifiers.extend(references.series_theme_styles());
-    if let Some(styles) = references.series_private_styles() {
-        identifiers.extend(styles.entries().iter().map(|(_, identifier)| *identifier));
-    }
-    if let Some(styles) = references.series_non_styles() {
-        identifiers.extend(styles.entries().iter().map(|(_, identifier)| *identifier));
-    }
-    let mut index = 0;
-    while index < identifiers.len() {
-        let identifier = identifiers[index];
-        index += 1;
-        let Some((_component, object)) = package_object(source, identifier) else {
-            return Err(Error::Verification);
-        };
-        let Some(message) = object
-            .messages
-            .iter()
-            .find(|message| message.type_ == SERIES_STYLE_MESSAGE_TYPE)
-        else {
-            continue;
-        };
-        let Some(parent) = chart_style_codec::parent(&message.data, codec_limits)
-            .map_err(map_style_codec_error)?
-        else {
-            continue;
-        };
-        if !identifiers.contains(&parent) {
-            identifiers.push(parent);
-        }
-    }
-    let mut grouped = Vec::new();
-    grouped
-        .try_reserve(identifiers.len())
+    let mut source_objects = Vec::new();
+    source_objects
+        .try_reserve_exact(source_object_count)
         .map_err(|_| Error::Allocation {
-            amount: identifiers.len(),
+            amount: source_object_count,
         })?;
-    for identifier in identifiers {
+    source_objects.extend_from_slice(scope.allowed_objects());
+    source_objects.extend_from_slice(scope.planned_removed_objects());
+    for identifier in source_objects {
         let Some((component, _)) = package_object(source, identifier) else {
             return Err(Error::Verification);
         };
-        add_planned_object(&mut grouped, component, identifier)?;
+        add_planned_object(&mut objects, component, identifier, budget)?;
     }
-    if let Some(component) = source
-        .state
-        .source
-        .components()
-        .iter()
-        .find(|component| component.name() == "Index/DocumentStylesheet.iwa")
-    {
-        for object in &component.archive().objects {
-            if object
-                .messages
-                .iter()
-                .any(|message| message.type_ == STYLESHEET_MESSAGE_TYPE)
-            {
-                add_planned_object(
-                    &mut grouped,
-                    component.name(),
-                    object.archive_info.identifier.ok_or(Error::Verification)?,
-                )?;
-            }
-        }
-    }
-    Ok(grouped)
-}
-
-fn mutation_plan(
-    source: &Package,
-    target: &Target,
-    components: &[Arc<str>],
-    changes: &style_graph::Changes,
-    budget: &mut ArrangementBudget,
-) -> Result<MutationPlan, Error> {
-    let mut objects = source_symbol_objects(source, target, budget)?;
     for (name, archive) in &changes.edits {
         for object in &archive.objects {
             let identifier = object.archive_info.identifier.ok_or(Error::Verification)?;
@@ -1168,9 +1226,9 @@ fn mutation_plan(
                 && object
                     .messages
                     .iter()
-                    .all(|message| allowed_message_type(message.type_))
+                    .all(|message| scope.allowed_message_types().contains(&message.type_))
             {
-                add_planned_object(&mut objects, name, identifier)?;
+                add_planned_object(&mut objects, name, identifier, budget)?;
             }
         }
     }
@@ -1180,36 +1238,80 @@ fn mutation_plan(
             if object
                 .messages
                 .iter()
-                .all(|message| allowed_message_type(message.type_))
+                .all(|message| scope.allowed_message_types().contains(&message.type_))
             {
-                add_planned_object(&mut objects, &insertion.name, identifier)?;
+                add_planned_object(&mut objects, &insertion.name, identifier, budget)?;
             }
         }
     }
-    let component_bytes = components
+    let mut scoped_components = Vec::new();
+    let component_names = scope
+        .allowed_members()
         .iter()
-        .try_fold(0usize, |total, component| {
-            total.checked_add(component.len())
-        })
-        .ok_or(Error::InvalidSource)?;
+        .chain(scope.planned_new_members())
+        .chain(scope.planned_removed_members())
+        .map(String::as_str)
+        .chain(components.iter().map(Arc::as_ref));
+    for name in component_names {
+        if scoped_components
+            .iter()
+            .any(|item: &Arc<str>| item.as_ref() == name)
+        {
+            continue;
+        }
+        let retained = name.len().saturating_add(size_of::<Arc<str>>());
+        budget
+            .preflight_allocations(2)
+            .and_then(|_| budget.preflight_retained(retained))
+            .map_err(map_arrangement_error)?;
+        budget
+            .allocations(2)
+            .and_then(|_| budget.retained(retained))
+            .map_err(map_arrangement_error)?;
+        scoped_components
+            .try_reserve_exact(1)
+            .map_err(|_| Error::Allocation { amount: 1 })?;
+        scoped_components.push(Arc::from(name));
+    }
     budget
         .preflight_allocations(2)
-        .and_then(|_| budget.preflight_retained(component_bytes))
+        .and_then(|_| {
+            budget.preflight_retained(
+                scope
+                    .allowed_message_types()
+                    .len()
+                    .saturating_mul(size_of::<u32>()),
+            )
+        })
+        .and_then(|_| {
+            budget.preflight_retained(
+                scope
+                    .allowed_fields()
+                    .len()
+                    .saturating_mul(size_of::<u32>()),
+            )
+        })
         .map_err(map_arrangement_error)?;
     budget.allocations(2).map_err(map_arrangement_error)?;
-    budget
-        .retained(component_bytes)
-        .map_err(map_arrangement_error)?;
-    let mut owned_components = Vec::new();
-    owned_components
-        .try_reserve_exact(components.len())
+    let mut allowed_message_types = Vec::new();
+    allowed_message_types
+        .try_reserve_exact(scope.allowed_message_types().len())
         .map_err(|_| Error::Allocation {
-            amount: components.len(),
+            amount: scope.allowed_message_types().len(),
         })?;
-    owned_components.extend(components.iter().cloned());
+    allowed_message_types.extend_from_slice(scope.allowed_message_types());
+    let mut allowed_fields = Vec::new();
+    allowed_fields
+        .try_reserve_exact(scope.allowed_fields().len())
+        .map_err(|_| Error::Allocation {
+            amount: scope.allowed_fields().len(),
+        })?;
+    allowed_fields.extend_from_slice(scope.allowed_fields());
     Ok(MutationPlan {
-        components: owned_components,
+        components: scoped_components,
         objects,
+        allowed_message_types,
+        allowed_fields,
     })
 }
 
@@ -1219,17 +1321,12 @@ fn planned_contains(plan: &MutationPlan, component: &str, identifier: u64) -> bo
         .any(|(name, ids)| name.as_ref() == component && ids.contains(&identifier))
 }
 
-fn allowed_message_type(message_type: u32) -> bool {
-    matches!(
-        message_type,
-        CHART_MESSAGE_TYPE
-            | SERIES_STYLE_MESSAGE_TYPE
-            | SERIES_NON_STYLE_MESSAGE_TYPE
-            | STYLESHEET_MESSAGE_TYPE
-            | OBJECT_CONTAINER_MESSAGE_TYPE
-            | PACKAGE_METADATA_MESSAGE_TYPE
-            | ROOT_MESSAGE_TYPE
-    )
+impl MutationPlan {
+    fn allowed_object(&self, identifier: u64) -> bool {
+        self.objects
+            .iter()
+            .any(|(_, identifiers)| identifiers.contains(&identifier))
+    }
 }
 
 fn unique_wire_field<'a>(
@@ -1249,14 +1346,15 @@ fn same_wire_fields_except(
     source: &WireView<'_>,
     candidate: &WireView<'_>,
     excluded: &[u32],
+    allowed_fields: &[u32],
     budget: &mut ArrangementBudget,
 ) -> Result<(), Error> {
-    let mut source_fields = source
-        .fields()
-        .filter(|field| !excluded.contains(&field.number()));
-    let mut candidate_fields = candidate
-        .fields()
-        .filter(|field| !excluded.contains(&field.number()));
+    let mut source_fields = source.fields().filter(|field| {
+        !(excluded.contains(&field.number()) && allowed_fields.contains(&field.number()))
+    });
+    let mut candidate_fields = candidate.fields().filter(|field| {
+        !(excluded.contains(&field.number()) && allowed_fields.contains(&field.number()))
+    });
     loop {
         match (source_fields.next(), candidate_fields.next()) {
             (None, None) => return Ok(()),
@@ -1280,6 +1378,7 @@ fn verify_message_unknowns(
     source: &[u8],
     candidate: &[u8],
     family: SymbolFamily,
+    plan: &MutationPlan,
     budget: &mut ArrangementBudget,
 ) -> Result<(), Error> {
     let source_view = budget.parse(source, 1).map_err(map_arrangement_error)?;
@@ -1294,7 +1393,13 @@ fn verify_message_unknowns(
         ROOT_MESSAGE_TYPE => &[7, 9],
         _ => return Err(Error::Verification),
     };
-    same_wire_fields_except(&source_view, &candidate_view, outer_excluded, budget)?;
+    same_wire_fields_except(
+        &source_view,
+        &candidate_view,
+        outer_excluded,
+        &plan.allowed_fields,
+        budget,
+    )?;
     if message_type == PACKAGE_METADATA_MESSAGE_TYPE {
         let mut source_components = source_view.fields().filter(|field| field.number() == 3);
         let mut candidate_components = candidate_view.fields().filter(|field| field.number() == 3);
@@ -1308,7 +1413,13 @@ fn verify_message_unknowns(
                     let candidate_view = budget
                         .parse(candidate_component.payload(), 2)
                         .map_err(map_arrangement_error)?;
-                    same_wire_fields_except(&source_view, &candidate_view, &[6, 11], budget)?;
+                    same_wire_fields_except(
+                        &source_view,
+                        &candidate_view,
+                        &[6, 11],
+                        &plan.allowed_fields,
+                        budget,
+                    )?;
                 },
                 _ => return Err(Error::Verification),
             }
@@ -1336,7 +1447,13 @@ fn verify_message_unknowns(
                 SERIES_STYLE_MESSAGE_TYPE => &[family.size_field()],
                 _ => &[],
             };
-            same_wire_fields_except(&source_view, &candidate_view, excluded, budget)
+            same_wire_fields_except(
+                &source_view,
+                &candidate_view,
+                excluded,
+                &plan.allowed_fields,
+                budget,
+            )
         },
         _ => Err(Error::Verification),
     }
@@ -1346,6 +1463,7 @@ fn verify_object_messages(
     source: &ArchiveObject,
     candidate: &ArchiveObject,
     family: SymbolFamily,
+    plan: &MutationPlan,
     budget: &mut ArrangementBudget,
 ) -> Result<(), Error> {
     if source.messages.len() != candidate.messages.len() {
@@ -1358,10 +1476,17 @@ fn verify_object_messages(
         if before.data == after.data {
             continue;
         }
-        if !allowed_message_type(before.type_) {
+        if !plan.allowed_message_types.contains(&before.type_) {
             return Err(Error::Verification);
         }
-        verify_message_unknowns(before.type_, &before.data, &after.data, family, budget)?;
+        verify_message_unknowns(
+            before.type_,
+            &before.data,
+            &after.data,
+            family,
+            plan,
+            budget,
+        )?;
     }
     Ok(())
 }
@@ -1388,14 +1513,14 @@ fn verify_locality(
                 && before.is_some_and(|before| {
                     after.is_some_and(|after| {
                         before.messages == after.messages
-                            && same_archive_info_except_references(before, after, false)
+                            && same_archive_info_except_references(before, after, false, plan)
                     })
                 }))
             || (name == "Index/DocumentStylesheet.iwa"
                 && before.is_some_and(|before| {
                     after.is_some_and(|after| {
                         before.messages == after.messages
-                            && same_archive_info_except_references(before, after, false)
+                            && same_archive_info_except_references(before, after, false, plan)
                     })
                 }))
     };
@@ -1495,12 +1620,12 @@ fn verify_locality(
                 return Err(Error::Verification);
             }
             if planned_contains(plan, name, identifier)
-                && !same_archive_info_except_references(before, after, true)
+                && !same_archive_info_except_references(before, after, true, plan)
             {
                 return Err(Error::Verification);
             }
             if !same_object_metadata(before, after) {
-                verify_object_messages(before, after, family, budget)?;
+                verify_object_messages(before, after, family, plan, budget)?;
             }
         }
         for after in &after_component.archive().objects {
@@ -1553,6 +1678,7 @@ fn same_archive_info_except_references(
     before: &ArchiveObject,
     after: &ArchiveObject,
     allow_message_lengths: bool,
+    plan: &MutationPlan,
 ) -> bool {
     if before.archive_info.identifier != after.archive_info.identifier
         || before.archive_info.should_merge != after.archive_info.should_merge
@@ -1574,6 +1700,12 @@ fn same_archive_info_except_references(
                 && left.diff_field_path == right.diff_field_path
                 && left.fields_to_remove == right.fields_to_remove
                 && left.diff_read_version == right.diff_read_version
+                && reference_transition_allowed(
+                    &left.object_references,
+                    &right.object_references,
+                    plan,
+                )
+                && left.data_references == right.data_references
                 && left.field_infos.len() == right.field_infos.len()
                 && left
                     .field_infos
@@ -1587,8 +1719,24 @@ fn same_archive_info_except_references(
                             && left.known_field_version == right.known_field_version
                             && left.known_field_feature_identifier
                                 == right.known_field_feature_identifier
+                            && reference_transition_allowed(
+                                &left.object_references,
+                                &right.object_references,
+                                plan,
+                            )
+                            && left.data_references == right.data_references
                     })
         })
+}
+
+fn reference_transition_allowed(before: &[u64], after: &[u64], plan: &MutationPlan) -> bool {
+    let count =
+        |values: &[u64], identifier| values.iter().filter(|value| **value == identifier).count();
+    before.iter().chain(after).all(|identifier| {
+        let left = count(before, *identifier);
+        let right = count(after, *identifier);
+        left == right || plan.allowed_object(*identifier)
+    })
 }
 
 fn zip_record_equal_outside(before: &[u8], after: &[u8], excluded: &[(usize, usize)]) -> bool {
@@ -1827,18 +1975,20 @@ fn commit_edit(edit: Edit<'_>, change: Property) -> Result<Commit, Error> {
     }
 
     admit_workspace(source, &mut budget)?;
-    preflight_series_engine(source, edit.target.series, &budget)?;
     let components = PackageComponents(source);
     let limits = archive_limits(source)?;
     let mut workspace = Workspace::new(&components, limits).map_err(map_graph_error)?;
-    let changed = series_engine::set_symbols(
+    let engine_limits = engine_limits(source, &budget)?;
+    let (changed, report) = series_engine::set_symbols(
         &mut workspace,
         edit.target.chart.drawable_identifier.get(),
         edit.target.family,
         values,
+        engine_limits,
     )
-    .map_err(map_graph_error)?;
-    charge_series_engine(source, edit.target.series, &mut budget)?;
+    .map_err(map_symbol_error)?;
+    let scope = report.scope().cloned().ok_or(Error::Verification)?;
+    charge_engine_report(&mut budget, &report)?;
     if !changed {
         return Ok(unchanged(source, edit.target, before));
     }
@@ -1898,7 +2048,7 @@ fn commit_edit(edit: Edit<'_>, change: Property) -> Result<Commit, Error> {
                     .map(|name| Arc::<str>::from(name.as_str())),
             ),
     );
-    let plan = mutation_plan(source, &edit.target, &names, &changes, &mut budget)?;
+    let plan = mutation_plan(source, &names, &changes, &scope, &mut budget)?;
     let (candidate, touched_components) = publish_changes(source, changes, &mut budget)?;
     let mut candidate_budget = budget;
     let candidate_target = target_with_metadata(
@@ -2123,6 +2273,7 @@ mod tests {
         let plan = MutationPlan {
             components: vec![Arc::clone(&component_name)],
             objects: vec![(component_name, vec![allowed])],
+            ..MutationPlan::default()
         };
         let mut budget = ArrangementBudget::new(&package).expect("locality budget");
         assert!(matches!(
@@ -2182,6 +2333,7 @@ mod tests {
         let plan = MutationPlan {
             components: vec![Arc::clone(&component_name)],
             objects: vec![(component_name, vec![chart_id])],
+            ..MutationPlan::default()
         };
         let mut budget = ArrangementBudget::new(&package).expect("locality budget");
         assert!(matches!(
@@ -2275,6 +2427,7 @@ mod tests {
         let plan = MutationPlan {
             components: vec![Arc::clone(&component_name)],
             objects: vec![(component_name, vec![object_id])],
+            ..MutationPlan::default()
         };
         let mut budget = ArrangementBudget::new(&package).expect("locality budget");
         assert!(matches!(
