@@ -423,8 +423,8 @@ keynote/editor/slide_charts/series_stroke.rs	slide_chart_series_stroke	1	keynote
 keynote/editor/slide_charts/series_stroke.rs	slide_chart_series_strokes	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
 keynote/editor/slide_charts/series_symbol.rs	set_slide_chart_series_symbol	1	keynote	chart.style	migrated	litchi_keynote::Package::edit_slide_chart_series	keynote_slide_chart_series_symbol_allocate_facade_parity	B	-	-
 keynote/editor/slide_charts/series_symbol.rs	set_slide_chart_series_symbols	1	keynote	chart.style	migrated	litchi_keynote::Package::edit_slide_chart_series	keynote_slide_chart_series_symbols_allocate_facade_parity	B	-	-
-keynote/editor/slide_charts/series_symbol.rs	slide_chart_series_symbol	1	keynote	chart.style	migrated	litchi_keynote::Package::slide_chart_series_symbols	keynote_slide_chart_series_symbol_read_facade_parity	A	-	-
-keynote/editor/slide_charts/series_symbol.rs	slide_chart_series_symbols	1	keynote	chart.style	migrated	litchi_keynote::Package::slide_chart_series_symbols	keynote_slide_chart_series_symbols_read_facade_parity	A	-	-
+keynote/editor/slide_charts/series_symbol.rs	slide_chart_series_symbol	1	keynote	chart.style	migrated	litchi_keynote::Package::slide_chart_series	keynote_slide_chart_series_symbol_read_facade_parity	A	-	-
+keynote/editor/slide_charts/series_symbol.rs	slide_chart_series_symbols	1	keynote	chart.style	migrated	litchi_keynote::Package::slide_chart_series	keynote_slide_chart_series_symbols_read_facade_parity	A	-	-
 keynote/editor/slide_charts/series_symbol_fill.rs	reset_slide_chart_series_symbol_fill	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
 keynote/editor/slide_charts/series_symbol_fill.rs	set_slide_chart_series_symbol_fill	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
 keynote/editor/slide_charts/series_symbol_fill.rs	set_slide_chart_series_symbol_fills	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-

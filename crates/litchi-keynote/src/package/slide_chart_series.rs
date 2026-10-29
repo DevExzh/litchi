@@ -16,7 +16,7 @@ use std::mem::size_of;
 use std::sync::Arc;
 
 use litchi_iwa_archive::package::{EntryEdit, EntryInsertion, ExactArtifacts};
-use litchi_iwa_core::{Archive, Limits as ArchiveLimits, SnappyStream};
+use litchi_iwa_core::{Archive, ArchiveObject, Limits as ArchiveLimits, RawMessage, SnappyStream};
 use litchi_iwa_style::graph::{self, Components, Workspace};
 use litchi_iwa_style::series as engine;
 use thiserror::Error as ThisError;
@@ -286,9 +286,11 @@ fn map_selection(error: slide_chart_title::Error) -> Error {
         },
         slide_chart_title::Error::Allocation { amount } => Error::Allocation { amount },
         slide_chart_title::Error::Limit {
-            observed, maximum, ..
+            kind,
+            observed,
+            maximum,
         } => Error::Limit {
-            kind: LimitKind::WireWork,
+            kind: map_title_limit(kind),
             observed,
             maximum,
         },
@@ -296,18 +298,95 @@ fn map_selection(error: slide_chart_title::Error) -> Error {
     }
 }
 
+fn map_title_limit(kind: slide_chart_title::LimitKind) -> LimitKind {
+    use super::slide_chart_title::LimitKind as TitleLimitKind;
+    match kind {
+        TitleLimitKind::InputBytes => LimitKind::InputBytes,
+        TitleLimitKind::OutputBytes => LimitKind::OutputBytes,
+        TitleLimitKind::WireBytes => LimitKind::WireBytes,
+        TitleLimitKind::Entries
+        | TitleLimitKind::EntryBytes
+        | TitleLimitKind::TotalBytes
+        | TitleLimitKind::Slides
+        | TitleLimitKind::References
+        | TitleLimitKind::TextStorages
+        | TitleLimitKind::TextFragments => LimitKind::Entries,
+        TitleLimitKind::TextBytes => LimitKind::WireBytes,
+        TitleLimitKind::WireFields => LimitKind::WireFields,
+        TitleLimitKind::WireNesting => LimitKind::WireNesting,
+        TitleLimitKind::WireWork => LimitKind::WireWork,
+        TitleLimitKind::TitleBytes | TitleLimitKind::SelectorBytes => LimitKind::WireBytes,
+    }
+}
+
 fn family_and_count(
     package: &Package,
     selection: Selection,
+    budget: &mut TransactionBudget,
 ) -> Result<(SymbolFamily, usize), Error> {
+    budget
+        .preflight_semantic_scan(package)
+        .map_err(map_transaction_error)?;
     let metadata = package
         .slide_chart_metadata(
             SlideSelector::position(selection.slide),
             ChartSelector::position(selection.chart),
         )
-        .map_err(|_| Error::InvalidSource)?;
+        .map_err(map_metadata_error)?;
     let family = SymbolFamily::for_chart_kind(metadata.kind()).ok_or(Refusal::UnsupportedKind)?;
     Ok((family, metadata.series_count()))
+}
+
+fn map_metadata_error(error: super::slide_chart_metadata::Error) -> Error {
+    use super::slide_chart_metadata::{Error as MetadataError, LimitKind as MetadataLimitKind};
+    match error {
+        MetadataError::UnsupportedSource => Refusal::UnsupportedSource.into(),
+        MetadataError::AmbiguousSelector => Refusal::AmbiguousSelector.into(),
+        MetadataError::EmptySlideName => Refusal::EmptySlideName.into(),
+        MetadataError::SlideNameNotFound => Refusal::SlideNameNotFound.into(),
+        MetadataError::SlidePositionNotFound { position } => {
+            Refusal::SlidePositionNotFound { position }.into()
+        },
+        MetadataError::ChartNameNotFound => Refusal::ChartNameNotFound.into(),
+        MetadataError::ChartPositionNotFound { position } => {
+            Refusal::ChartPositionNotFound { position }.into()
+        },
+        MetadataError::EmptyChartName => Refusal::EmptyChartName.into(),
+        MetadataError::InvalidSource => Error::InvalidSource,
+        MetadataError::Limit {
+            kind,
+            observed,
+            maximum,
+        } => Error::Limit {
+            kind: match kind {
+                MetadataLimitKind::InputBytes
+                | MetadataLimitKind::PayloadBytes
+                | MetadataLimitKind::WireBytes
+                | MetadataLimitKind::WireRetainedBytes => LimitKind::WireBytes,
+                MetadataLimitKind::PayloadReferences | MetadataLimitKind::References => {
+                    LimitKind::References
+                },
+                MetadataLimitKind::WireFields => LimitKind::WireFields,
+                MetadataLimitKind::WireNesting => LimitKind::WireNesting,
+                MetadataLimitKind::WireWork => LimitKind::WireWork,
+                MetadataLimitKind::WireAllocations | MetadataLimitKind::Allocations => {
+                    LimitKind::Allocations
+                },
+                MetadataLimitKind::Entries
+                | MetadataLimitKind::EntryBytes
+                | MetadataLimitKind::TotalBytes
+                | MetadataLimitKind::Slides
+                | MetadataLimitKind::TextStorages
+                | MetadataLimitKind::TextFragments
+                | MetadataLimitKind::LabelCount => LimitKind::Entries,
+                MetadataLimitKind::RetainedBytes => LimitKind::RetainedBytes,
+                MetadataLimitKind::TextBytes => LimitKind::WireBytes,
+            },
+            observed,
+            maximum,
+        },
+        MetadataError::Allocation { amount } => Error::Allocation { amount },
+    }
 }
 
 struct PackageComponents<'a>(&'a Package);
@@ -368,6 +447,18 @@ fn admit_workspace(package: &Package, budget: &mut TransactionBudget) -> Result<
         .and_then(|_| budget.allocations(index_units))
         .and_then(|_| budget.retained(index_bytes))
         .and_then(|_| budget.scratch(index_bytes))
+        .map_err(map_transaction_error)
+}
+
+fn admit_symbol_result(series: usize, budget: &mut TransactionBudget) -> Result<(), Error> {
+    let bytes = series
+        .checked_mul(size_of::<Option<Symbol>>())
+        .ok_or(Error::InvalidSource)?;
+    budget
+        .allocations(1)
+        .and_then(|_| budget.retained(bytes))
+        .and_then(|_| budget.scratch(bytes))
+        .and_then(|_| budget.work(series))
         .map_err(map_transaction_error)
 }
 
@@ -451,15 +542,114 @@ fn map_graph(error: graph::Error) -> Error {
             },
             _ => Error::InvalidSource,
         },
-        graph::Error::Registry(_)
-        | graph::Error::Wire(_)
-        | graph::Error::Codec(_)
-        | graph::Error::MissingObject(_)
+        graph::Error::Registry(error) => map_registry_error(error),
+        graph::Error::Wire(error) => map_wire_error(error),
+        graph::Error::Codec(error) => map_codec_error(error),
+        graph::Error::MissingObject(_)
         | graph::Error::AmbiguousObject(_)
-        | graph::Error::Invalid(_)
         | graph::Error::IdentifierOverflow => Error::InvalidSource,
+        graph::Error::Invalid("a series style is shared by several charts") => {
+            Refusal::UnsupportedDependency.into()
+        },
+        graph::Error::Invalid(_) => Error::InvalidSource,
         _ => Error::InvalidSource,
     }
+}
+
+fn map_wire_error(error: litchi_iwa_common::Error) -> Error {
+    match error {
+        litchi_iwa_common::Error::LimitExceeded {
+            kind,
+            observed,
+            limit,
+        } => Error::Limit {
+            kind: match kind {
+                litchi_iwa_common::LimitKind::InputBytes => LimitKind::InputBytes,
+                litchi_iwa_common::LimitKind::OutputBytes => LimitKind::OutputBytes,
+                litchi_iwa_common::LimitKind::Fields => LimitKind::WireFields,
+                litchi_iwa_common::LimitKind::Nesting => LimitKind::WireNesting,
+                litchi_iwa_common::LimitKind::RewriteWork => LimitKind::WireWork,
+                litchi_iwa_common::LimitKind::TableRows
+                | litchi_iwa_common::LimitKind::TableColumns
+                | litchi_iwa_common::LimitKind::TableCells
+                | litchi_iwa_common::LimitKind::MaterializedCells => LimitKind::Entries,
+            },
+            observed: observed as u64,
+            maximum: limit as u64,
+        },
+        litchi_iwa_common::Error::Allocation { amount, .. } => Error::Allocation { amount },
+        _ => Error::InvalidSource,
+    }
+}
+
+fn map_codec_error(error: litchi_iwa_protos::chart_style_codec::Error) -> Error {
+    match error {
+        litchi_iwa_protos::chart_style_codec::Error::Limit {
+            kind,
+            observed,
+            maximum,
+        } => Error::Limit {
+            kind: match kind {
+                litchi_iwa_protos::chart_style_codec::LimitKind::Bytes => LimitKind::WireBytes,
+                litchi_iwa_protos::chart_style_codec::LimitKind::Fields => LimitKind::WireFields,
+                _ => LimitKind::WireWork,
+            },
+            observed: observed as u64,
+            maximum: maximum as u64,
+        },
+        litchi_iwa_protos::chart_style_codec::Error::Allocation { bytes } => {
+            Error::Allocation { amount: bytes }
+        },
+        _ => Error::InvalidSource,
+    }
+}
+
+fn map_registry_error(error: litchi_iwa_protos::package_metadata_codec::RewriteError) -> Error {
+    if let Some(amount) = error.allocation_request() {
+        return Error::Allocation { amount };
+    }
+    if let Some(limit) = error.resource_limit() {
+        let (kind, observed, maximum) = match limit {
+            litchi_iwa_protos::package_metadata_codec::RewriteLimit::InputBytes {
+                observed,
+                maximum,
+            } => (LimitKind::InputBytes, observed, maximum),
+            litchi_iwa_protos::package_metadata_codec::RewriteLimit::OutputBytes {
+                observed,
+                maximum,
+            } => (LimitKind::OutputBytes, observed, maximum),
+            litchi_iwa_protos::package_metadata_codec::RewriteLimit::Fields {
+                observed,
+                maximum,
+            } => (LimitKind::WireFields, observed, maximum),
+            litchi_iwa_protos::package_metadata_codec::RewriteLimit::Work { observed, maximum } => {
+                (LimitKind::WireWork, observed, maximum)
+            },
+            litchi_iwa_protos::package_metadata_codec::RewriteLimit::Nesting {
+                observed,
+                maximum,
+            } => (LimitKind::WireNesting, observed as usize, maximum as usize),
+            litchi_iwa_protos::package_metadata_codec::RewriteLimit::Components {
+                observed,
+                maximum,
+            }
+            | litchi_iwa_protos::package_metadata_codec::RewriteLimit::Additions {
+                observed,
+                maximum,
+            } => (LimitKind::Entries, observed, maximum),
+            litchi_iwa_protos::package_metadata_codec::RewriteLimit::References {
+                observed,
+                maximum,
+            } => (LimitKind::References, observed, maximum),
+            _ => return Error::InvalidSource,
+        };
+        return Error::Limit {
+            kind,
+            observed: observed as u64,
+            maximum: maximum as u64,
+        };
+    }
+    Error::InvalidSource
 }
 
 fn map_core_limit(kind: litchi_iwa_core::LimitKind) -> LimitKind {
@@ -483,9 +673,31 @@ fn map_core_limit(kind: litchi_iwa_core::LimitKind) -> LimitKind {
     }
 }
 
+fn planned_archive_bytes(archive: &Archive) -> Result<usize, Error> {
+    archive
+        .objects
+        .iter()
+        .try_fold(0_usize, |total, object: &ArchiveObject| {
+            let payload = object.messages.iter().try_fold(
+                0_usize,
+                |message_total, message: &RawMessage| {
+                    message_total
+                        .checked_add(message.data.len())
+                        .and_then(|value| value.checked_add(size_of::<RawMessage>()))
+                        .ok_or(Error::InvalidSource)
+                },
+            )?;
+            total
+                .checked_add(payload)
+                .and_then(|value| value.checked_add(size_of::<ArchiveObject>()))
+                .ok_or(Error::InvalidSource)
+        })
+}
+
 fn publish_changes(
     source: &Package,
     changes: graph::Changes,
+    selected_chart: u64,
     budget: &mut TransactionBudget,
 ) -> Result<(Package, usize), Error> {
     let touched_components = changes
@@ -505,47 +717,54 @@ fn publish_changes(
         .limits()
         .snappy_limits()
         .map_err(|_| Error::InvalidSource)?;
-    let planned_bytes = catalog
-        .source_bytes()
+    let planned_bytes =
+        changes
+            .edits
+            .iter()
+            .try_fold(catalog.source_bytes().len(), |total, (name, archive)| {
+                let archive_bytes = planned_archive_bytes(archive)?;
+                total
+                    .checked_add(name.len())
+                    .and_then(|total| total.checked_add(archive_bytes))
+                    .ok_or(Error::InvalidSource)
+            })?;
+    let planned_bytes = changes
+        .insertions
+        .iter()
+        .try_fold(planned_bytes, |total, insertion| {
+            let archive_bytes = planned_archive_bytes(&insertion.archive)?;
+            total
+                .checked_add(insertion.name.len())
+                .and_then(|total| total.checked_add(archive_bytes))
+                .ok_or(Error::InvalidSource)
+        })?;
+    budget
+        .preflight_reassembly(catalog, planned_bytes, changes.deletions.len())
+        .map_err(map_transaction_error)?;
+    let collection_allocations = changes
+        .edits
         .len()
-        .checked_add(
-            changes
-                .edits
-                .iter()
-                .map(|(_, archive)| {
-                    archive.objects.iter().fold(0_usize, |sum, object| {
-                        sum.saturating_add(
-                            object.messages.iter().fold(0_usize, |total, message| {
-                                total.saturating_add(message.data.len())
-                            }),
-                        )
-                    })
-                })
-                .sum(),
-        )
-        .and_then(|bytes| {
+        .checked_mul(2)
+        .and_then(|count| count.checked_add(changes.insertions.len().checked_mul(2)?))
+        .and_then(|count| count.checked_add(catalog.package().len()))
+        .and_then(|count| count.checked_add(changes.deletions.len()))
+        .ok_or(Error::InvalidSource)?;
+    let collection_name_bytes = changes
+        .edits
+        .iter()
+        .map(|(name, _)| name.len())
+        .chain(
             changes
                 .insertions
                 .iter()
-                .map(|insertion| {
-                    insertion
-                        .archive
-                        .objects
-                        .iter()
-                        .fold(0_usize, |sum, object| {
-                            sum.saturating_add(
-                                object.messages.iter().fold(0_usize, |total, message| {
-                                    total.saturating_add(message.data.len())
-                                }),
-                            )
-                        })
-                })
-                .sum::<usize>()
-                .checked_add(bytes)
-        })
+                .map(|insertion| insertion.name.len()),
+        )
+        .chain(changes.deletions.iter().map(String::len))
+        .try_fold(0_usize, |total, bytes| total.checked_add(bytes))
         .ok_or(Error::InvalidSource)?;
     budget
-        .preflight_reassembly(catalog, planned_bytes, changes.deletions.len())
+        .allocations(collection_allocations)
+        .and_then(|_| budget.work(collection_name_bytes))
         .map_err(map_transaction_error)?;
     let mut edited = Vec::new();
     edited
@@ -634,8 +853,116 @@ fn publish_changes(
     if bytes_len == 0 {
         return Err(Error::Verification);
     }
+    verify_chart_unknowns(source, &candidate, selected_chart, budget)?;
     verify_member_locality(source, &candidate, &changes)?;
     Ok((candidate, touched_components))
+}
+
+fn chart_payload(package: &Package, identifier: u64) -> Result<&[u8], Error> {
+    package
+        .state
+        .source
+        .components()
+        .iter()
+        .find_map(|component| {
+            component.archive().object(identifier).and_then(|object| {
+                object
+                    .messages
+                    .iter()
+                    .find(|message| message.type_ == 5_021)
+                    .map(|message| message.data.as_slice())
+            })
+        })
+        .ok_or(Error::Verification)
+}
+
+fn verify_wire_preservation(
+    source: &[u8],
+    candidate: &[u8],
+    excluded: impl Fn(u32) -> bool,
+    limits: litchi_iwa_common::WireLimits,
+    budget: &mut TransactionBudget,
+) -> Result<(), Error> {
+    let work = source
+        .len()
+        .checked_add(candidate.len())
+        .ok_or(Error::InvalidSource)?;
+    budget
+        .input(source.len())
+        .and_then(|_| budget.input(candidate.len()))
+        .and_then(|_| budget.work(work))
+        .map_err(map_transaction_error)?;
+    let source_fields = litchi_iwa_common::wire::parse_wire_fields(source, limits)
+        .map_err(|_| Error::InvalidSource)?;
+    let candidate_fields = litchi_iwa_common::wire::parse_wire_fields(candidate, limits)
+        .map_err(|_| Error::InvalidSource)?;
+    let fields = source_fields
+        .len()
+        .checked_add(candidate_fields.len())
+        .ok_or(Error::InvalidSource)?;
+    budget.fields(fields).map_err(map_transaction_error)?;
+    let mut source_iter = source_fields
+        .iter()
+        .filter(|field| !excluded(field.number()));
+    let mut candidate_iter = candidate_fields
+        .iter()
+        .filter(|field| !excluded(field.number()));
+    loop {
+        match (source_iter.next(), candidate_iter.next()) {
+            (None, None) => return Ok(()),
+            (Some(source_field), Some(candidate_field)) => {
+                if source_field.number() != candidate_field.number()
+                    || source_field.wire_type() != candidate_field.wire_type()
+                    || source_field.raw(source).map_err(|_| Error::InvalidSource)?
+                        != candidate_field
+                            .raw(candidate)
+                            .map_err(|_| Error::InvalidSource)?
+                {
+                    return Err(Error::Verification);
+                }
+            },
+            _ => return Err(Error::Verification),
+        }
+    }
+}
+
+fn verify_chart_unknowns(
+    source: &Package,
+    candidate: &Package,
+    identifier: u64,
+    budget: &mut TransactionBudget,
+) -> Result<(), Error> {
+    let source_payload = chart_payload(source, identifier)?;
+    let candidate_payload = chart_payload(candidate, identifier)?;
+    let limits = budget.residual(source).map_err(map_transaction_error)?;
+    verify_wire_preservation(
+        source_payload,
+        candidate_payload,
+        |number| number == 10_000,
+        limits,
+        budget,
+    )?;
+    let source_extension = litchi_iwa_common::wire::parse_wire_fields(source_payload, limits)
+        .map_err(|_| Error::InvalidSource)?
+        .into_iter()
+        .find(|field| field.number() == 10_000)
+        .ok_or(Error::InvalidSource)?
+        .payload(source_payload)
+        .map_err(|_| Error::InvalidSource)?;
+    let candidate_extension = litchi_iwa_common::wire::parse_wire_fields(candidate_payload, limits)
+        .map_err(|_| Error::InvalidSource)?
+        .into_iter()
+        .find(|field| field.number() == 10_000)
+        .ok_or(Error::InvalidSource)?
+        .payload(candidate_payload)
+        .map_err(|_| Error::InvalidSource)?;
+    verify_wire_preservation(
+        source_extension,
+        candidate_extension,
+        |number| number == 17 || number == 19,
+        limits,
+        budget,
+    )
 }
 
 fn verify_member_locality(
@@ -782,6 +1109,12 @@ impl Commit {
         &self.diagnostics
     }
 
+    /// Consume the commit and return its package and exact patch.
+    #[must_use]
+    pub fn into_parts(self) -> (Package, Patch) {
+        (self.package, self.patch)
+    }
+
     /// Consume this commit.
     #[must_use]
     pub fn into_package(self) -> Package {
@@ -820,7 +1153,6 @@ impl<'a> Edit<'a> {
         let chart =
             super::edit::OwnedChartSelector::from_selector(chart.into(), maximum, &mut retained)
                 .map_err(|_| Error::Allocation { amount: retained })?;
-        let _ = select(source, slide.as_selector(), chart.as_selector())?;
         Ok(Self {
             source,
             slide,
@@ -847,7 +1179,7 @@ impl<'a> Edit<'a> {
             self.slide.as_selector(),
             self.chart.as_selector(),
         )?;
-        let (family, series) = family_and_count(self.source, selection)?;
+        let (family, series) = family_and_count(self.source, selection, &mut budget)?;
         if staged.len() != series {
             return Err(Refusal::SeriesCount.into());
         }
@@ -889,15 +1221,19 @@ impl<'a> Edit<'a> {
         if !changed {
             return Err(Error::InvalidSource);
         }
-        let (candidate, touched_components) =
-            publish_changes(self.source, workspace.finish(), &mut budget)?;
+        let (candidate, touched_components) = publish_changes(
+            self.source,
+            workspace.finish(),
+            selection.identifier,
+            &mut budget,
+        )?;
         let candidate_selection = select(
             &candidate,
             self.slide.as_selector(),
             self.chart.as_selector(),
         )?;
         let (candidate_family, candidate_series) =
-            family_and_count(&candidate, candidate_selection)?;
+            family_and_count(&candidate, candidate_selection, &mut budget)?;
         if candidate_family != family || candidate_series != series {
             return Err(Error::Verification);
         }
@@ -928,6 +1264,7 @@ fn read_symbols(
     series: usize,
     budget: &mut TransactionBudget,
 ) -> Result<Vec<Option<Symbol>>, Error> {
+    admit_symbol_result(series, budget)?;
     admit_workspace(package, budget)?;
     let components = PackageComponents(package);
     let workspace = Workspace::new(&components, graph_limits(package)?).map_err(map_graph)?;
@@ -943,14 +1280,14 @@ fn physical_source(package: &Package) -> Result<Arc<[u8]>, Error> {
 
 impl Package {
     /// Read one chart's data symbols, one optional value per visible series.
-    pub fn slide_chart_series_symbols<'slide, 'chart>(
+    pub fn slide_chart_series<'slide, 'chart>(
         &self,
         slide: impl Into<SlideSelector<'slide>>,
         chart: impl Into<ChartSelector<'chart>>,
     ) -> Result<Property, Error> {
         let mut budget = transaction_budget(self)?;
         let selection = select(self, slide.into(), chart.into())?;
-        let (family, series) = family_and_count(self, selection)?;
+        let (family, series) = family_and_count(self, selection, &mut budget)?;
         Ok(Property::Symbols(read_symbols(
             self,
             selection,
@@ -995,7 +1332,8 @@ impl Package {
             SlideSelector::position(patch.slide),
             ChartSelector::position(patch.chart),
         )?;
-        let (family, series) = family_and_count(&candidate, selection)?;
+        verify_chart_unknowns(self, &candidate, selection.identifier, &mut budget)?;
+        let (family, series) = family_and_count(&candidate, selection, &mut budget)?;
         let after = read_symbols(&candidate, selection, family, series, &mut budget)?;
         let Property::Symbols(expected) = &patch.after;
         if after.as_slice() != expected.as_slice() {

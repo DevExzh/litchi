@@ -19,7 +19,7 @@ outside this ownership boundary.
 The leaf destination is:
 
 ```text
-litchi_keynote::Package::{slide_chart_series_symbols,
+litchi_keynote::Package::{slide_chart_series,
                            edit_slide_chart_series,
                            apply_slide_chart_series}
 litchi_keynote::chart::series::Property::Symbols(Vec<Option<Symbol>>)
@@ -43,6 +43,17 @@ maps graph/archive ceilings to typed `Limit`/`Allocation` failures, and does
 not fall back to the legacy host route. The shared engine remains the
 implementation authority for mark/shape and inherited size behavior.
 
+The final budget review has one explicit shared-first blocker: the shared
+`litchi_iwa_style::series` entry points (`values`, `set_values`,
+`style_values`, `set_style_values`, `symbols`, and `set_symbols`) currently
+construct their vectors/maps and invoke `chart_style_codec::Limits::DEFAULT`
+without accepting a caller residual profile or returning a work/allocation
+report. The Keynote facade admits its package census, result vector and
+publication/locality passes, but does not claim that this engine-internal
+graph traversal is fully caller-budgeted. Closing that last guarantee requires
+a shared-series admission/report seam before performance qualification; this
+slice does not paper over it with a fixed multiplier or default replacement.
+
 ## Differential proof
 
 `crates/litchi-iwa/tests/parity/keynote_chart_series_cases.rs` uses the tracked
@@ -61,10 +72,13 @@ The cases are:
 
 The two read cases directly compare the independent host and leaf readers on
 the same populated, host-authored bytes; the generic parity harness's
-same-reader checks are supplementary. The control case covers exact no-op
-bytes, inverse restoration, stale/out-of-range selectors and an empty staged
-value. Set vectors retain the host differential, strict candidate reopen,
-inverse patch and untouched-member checks. Tier-B differences are limited to
+same-reader checks are supplementary. The controls cover exact forward and
+inverse patch application, stale `PatchConflict`, hide-all-series (`None`)
+readback, nonempty count mismatch, malformed chart payloads, low semantic
+budgets, shared series-style dependency refusal, and a host/leaf vector with
+an injected unknown chart field plus explicit unrelated-member locality. Set
+vectors retain the host differential, strict candidate reopen, inverse patch
+and untouched-member checks. Tier-B differences are limited to
 the existing deterministic leaf metadata policy and invalidated root previews.
 
 ## Native and performance boundary
@@ -77,14 +91,17 @@ E3/E4 evidence is asserted and the pending queue still blocks W3.
 ignored full-facade ABBA probes (all-series read/set and one-series read/set).
 Setup and inverse/output checks are outside the measured wrappers; each route
 executes host/leaf/leaf/host with one selected operation per call. The
-coordinator must run the release Callgrind qualification on the final
+one-series read wrapper calls the host's actual one-series reader and projects
+the selected element from the leaf family read; it is not an alias of the
+all-series route. The coordinator must run the release Callgrind qualification on the final
 integrated candidate. This slice makes no wall-clock or final integrated
 performance claim.
 
 ## Scoped verification
 
-The focused parity filter passed five tests (four vectors plus the no-op,
-inverse and refusal control), and the Keynote package crate compiled offline.
+The focused parity filter now covers eight tests (four vectors, patch/no-op
+and refusal controls, malformed/low-budget, unknown/locality, and shared-style
+refusal), and the Keynote package crate compiled offline.
 The complete 53-row gate, final integrated requalification, native queue and
 coordinator merge remain pending.
 

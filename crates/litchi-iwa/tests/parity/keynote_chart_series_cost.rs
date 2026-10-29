@@ -72,10 +72,32 @@ fn host_symbols_read_cost(source: &[u8], chart: u64) -> TestResult<Vec<Option<Ch
 #[inline(never)]
 fn leaf_symbols_read_cost(source: &[u8]) -> TestResult<Vec<Option<Symbol>>> {
     let package = Package::from_bytes(source)?;
-    let Property::Symbols(values) = package.slide_chart_series_symbols(LEAF_SLIDE, CHART)? else {
+    let Property::Symbols(values) = package.slide_chart_series(LEAF_SLIDE, CHART)? else {
         return Err("unexpected chart-series property".into());
     };
     Ok(values)
+}
+
+#[inline(never)]
+fn host_symbol_read_cost(
+    source: &[u8],
+    chart: u64,
+    index: usize,
+) -> TestResult<Option<ChartSeriesSymbol>> {
+    let editor = keynote::Draft::from_bytes(source)?;
+    Ok(editor.slide_chart_series_symbol(SLIDE, chart, Index::from_zero_based(index))?)
+}
+
+#[inline(never)]
+fn leaf_symbol_read_cost(source: &[u8], index: usize) -> TestResult<Option<Symbol>> {
+    let package = Package::from_bytes(source)?;
+    let Property::Symbols(values) = package.slide_chart_series(LEAF_SLIDE, CHART)? else {
+        return Err("unexpected chart-series property".into());
+    };
+    values
+        .get(index)
+        .cloned()
+        .ok_or_else(|| "leaf series index was not present".into())
 }
 
 #[inline(never)]
@@ -108,8 +130,7 @@ fn host_symbol_set_cost(source: &[u8], chart: u64) -> TestResult<Vec<u8>> {
 #[inline(never)]
 fn leaf_symbol_set_cost(source: &[u8]) -> TestResult<Vec<u8>> {
     let package = Package::from_bytes(source)?;
-    let Property::Symbols(mut values) = package.slide_chart_series_symbols(LEAF_SLIDE, CHART)?
-    else {
+    let Property::Symbols(mut values) = package.slide_chart_series(LEAF_SLIDE, CHART)? else {
         return Err("unexpected chart-series property".into());
     };
     values[0] = leaf_symbols()[0];
@@ -155,9 +176,9 @@ fn keynote_chart_series_symbol_set_cost_abba() -> TestResult {
 #[ignore = "coordinator release ABBA cost probe"]
 fn keynote_chart_series_symbol_read_cost_abba() -> TestResult {
     let (source, chart) = setup_populated_source()?;
-    black_box(host_symbols_read_cost(&source, chart)?);
-    black_box(leaf_symbols_read_cost(&source)?);
-    black_box(leaf_symbols_read_cost(&source)?);
-    black_box(host_symbols_read_cost(&source, chart)?);
+    black_box(host_symbol_read_cost(&source, chart, 0)?);
+    black_box(leaf_symbol_read_cost(&source, 0)?);
+    black_box(leaf_symbol_read_cost(&source, 0)?);
+    black_box(host_symbol_read_cost(&source, chart, 0)?);
     Ok(())
 }
