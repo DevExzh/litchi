@@ -2,7 +2,7 @@
 
 - Status: Numbers chart-series caller-ledger repair is isolated on
   `uo2/iwa-w2a-numbers-series-budget`; final handoff source is the current
-  branch tip `576f404cb2` after canonical construction/index admission
+  branch tip `07008d1269` after canonical construction/index admission
   `38a0b13df3`, canonical bounded finish `60d2f93efeb9`, the accepted
   registry-reuse merge `73b7bf0027`, retained-memory policy repair
   `d4fcd3af7f`, and final caller-gate closure.
@@ -34,8 +34,9 @@ and scratch axes before codec work. Retained/scratch graph memory follows the
 checked archive header-memory policy, so a small input ceiling does not make
 valid selector admission fail before the intended candidate limit. Final
 graph index construction and final change-vector construction use canonical
-shared requirements. Census, recensus, and population are all charged before
-execution; finalization uses residual `FinishLimits`, fallible
+shared requirements. Census, recensus, and population are charged from the
+canonical explicit `total_work`/`builder_work` requirements before execution;
+finalization uses residual `FinishLimits`, fallible
 `finish_bounded`, and post-success `FinishReport` charging. No legacy
 infallible finish path is used.
 
