@@ -192,10 +192,15 @@ fn pages_leaf_values(bytes: &[u8]) -> TestResult<(ChartFont, TextPointSize)> {
     ))
 }
 
-fn pages_facade_source() -> TestResult<Vec<u8>> {
+fn pages_facade_fixture() -> TestResult<(Vec<u8>, Target, u64)> {
     let input = input(Format::Pages, Kind::Column2d)?;
     let source = host_write(&input.fixture.bytes, input.target, input.chart, &avenir()?)?;
-    host_write(&source, input.target, input.chart, &size(17.0)?)
+    let source = host_write(&source, input.target, input.chart, &size(17.0)?)?;
+    Ok((source, input.target, input.chart))
+}
+
+fn pages_facade_source() -> TestResult<Vec<u8>> {
+    Ok(pages_facade_fixture()?.0)
 }
 
 fn facade_georgia() -> TestResult<ChartFont> {
@@ -300,6 +305,116 @@ fn pages_facade_size_set_reset_inverse_noop() -> TestResult {
         .set_size(wanted)
         .and_then(|edit| edit.commit())?;
     assert!(noop.patch().is_noop());
+    Ok(())
+}
+
+fn pages_facade_read_font_route(source: &[u8]) -> TestResult<ChartFont> {
+    Ok(PagesPackage::from_bytes(source)?.body_chart_font(BodyChartSelector::index(0))?)
+}
+
+fn pages_facade_read_size_route(source: &[u8]) -> TestResult<TextPointSize> {
+    Ok(PagesPackage::from_bytes(source)?.body_chart_font_size(BodyChartSelector::index(0))?)
+}
+
+fn pages_facade_write_route(source: &[u8], change: &Change) -> TestResult<Vec<u8>> {
+    let package = PagesPackage::from_bytes(source)?;
+    let selector = BodyChartSelector::index(0);
+    let commit = match change {
+        Change::Font(font) => package
+            .edit_body_chart_font(selector)?
+            .set_font(font.clone())?
+            .commit()?,
+        Change::Size(size) => package
+            .edit_body_chart_font_size(selector)?
+            .set_size(*size)?
+            .commit()?,
+        Change::ResetFont => package
+            .edit_body_chart_font(selector)?
+            .reset_font()?
+            .commit()?,
+        Change::ResetSize => package
+            .edit_body_chart_font_size(selector)?
+            .reset_size()?
+            .commit()?,
+        _ => return Err("unsupported chart-font facade probe change".into()),
+    };
+    pages_leaf_bytes(commit.package())
+}
+
+fn pages_facade_host_route(
+    source: &[u8],
+    target: Target,
+    chart: u64,
+    change: &Change,
+) -> TestResult<Vec<u8>> {
+    host_write(source, target, chart, change)
+}
+
+#[test]
+#[ignore = "release instruction probe; run in the coordinator CPU-3 slot"]
+fn pages_facade_font_read_cost_instruction() -> TestResult {
+    let (source, target, chart) = pages_facade_fixture()?;
+    std::hint::black_box(host_read(&source, target, chart)?);
+    std::hint::black_box(pages_facade_read_font_route(&source)?);
+    Ok(())
+}
+
+#[test]
+#[ignore = "release instruction probe; run in the coordinator CPU-3 slot"]
+fn pages_facade_font_set_cost_instruction() -> TestResult {
+    let (source, target, chart) = pages_facade_fixture()?;
+    let change = georgia()?;
+    std::hint::black_box(pages_facade_host_route(&source, target, chart, &change)?);
+    std::hint::black_box(pages_facade_write_route(&source, &change)?);
+    Ok(())
+}
+
+#[test]
+#[ignore = "release instruction probe; run in the coordinator CPU-3 slot"]
+fn pages_facade_font_reset_cost_instruction() -> TestResult {
+    let (source, target, chart) = pages_facade_fixture()?;
+    let source = pages_facade_host_route(&source, target, chart, &georgia()?)?;
+    std::hint::black_box(pages_facade_host_route(
+        &source,
+        target,
+        chart,
+        &Change::ResetFont,
+    )?);
+    std::hint::black_box(pages_facade_write_route(&source, &Change::ResetFont)?);
+    Ok(())
+}
+
+#[test]
+#[ignore = "release instruction probe; run in the coordinator CPU-3 slot"]
+fn pages_facade_size_read_cost_instruction() -> TestResult {
+    let (source, target, chart) = pages_facade_fixture()?;
+    std::hint::black_box(host_read(&source, target, chart)?);
+    std::hint::black_box(pages_facade_read_size_route(&source)?);
+    Ok(())
+}
+
+#[test]
+#[ignore = "release instruction probe; run in the coordinator CPU-3 slot"]
+fn pages_facade_size_set_cost_instruction() -> TestResult {
+    let (source, target, chart) = pages_facade_fixture()?;
+    let change = size(23.0)?;
+    std::hint::black_box(pages_facade_host_route(&source, target, chart, &change)?);
+    std::hint::black_box(pages_facade_write_route(&source, &change)?);
+    Ok(())
+}
+
+#[test]
+#[ignore = "release instruction probe; run in the coordinator CPU-3 slot"]
+fn pages_facade_size_reset_cost_instruction() -> TestResult {
+    let (source, target, chart) = pages_facade_fixture()?;
+    let source = pages_facade_host_route(&source, target, chart, &size(23.0)?)?;
+    std::hint::black_box(pages_facade_host_route(
+        &source,
+        target,
+        chart,
+        &Change::ResetSize,
+    )?);
+    std::hint::black_box(pages_facade_write_route(&source, &Change::ResetSize)?);
     Ok(())
 }
 
