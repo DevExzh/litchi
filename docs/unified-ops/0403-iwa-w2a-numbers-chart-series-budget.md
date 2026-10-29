@@ -113,6 +113,12 @@ annotations, logs and the binary are not committed. The c063 validator
 `c0637e4304f5fdbfae6fca6b0e9a9c17f7d10cb9a56c7df6846951fa4bdf6b8e`)
 verified exact two-call selection, raw summary/function Ir, PROGRAM TOTALS,
 and threshold-100 inclusive annotations for all eight legs.
+The plan's descriptive `output_policy` string retained the old `capture-v2`
+label, although every executable leg and artifact points to `capture-v4`; this
+harmless wording issue is recorded externally in
+`capture-v4-output-policy-note.json` (SHA-256
+`5e0ca70f23ba817307cd3152a34b377380d41204b70efb4e93d7fe6dd2bf8f9f`), with
+no execution or evidence change.
 
 Earlier c3f8/c768 capture sets are retained externally as superseded historical
 evidence; they are not used for these rows. This is source-bound Numbers facade evidence only. Merging the slice into the
