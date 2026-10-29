@@ -36,7 +36,10 @@ selector is a typed `ChartNotFound`, and a tightened source ceiling returns a
 typed finite resource limit before publication. The mutation proof compares
 ordered ZIP member names and confirms both changed and untouched members; the
 production locality verifier additionally checks untouched objects and raw ZIP
-records.
+records. Its focused unit proof injects distinct unknown fields into one
+candidate-changed and one untouched source object, checks both survive the
+candidate, and proves that a negative unknown-field mutation on the untouched
+object is rejected by that production verifier.
 
 ## Gaps and boundaries
 
@@ -58,6 +61,7 @@ The final branch source was checked with:
 - `cargo doc -p litchi-pages --no-deps --all-features`
 - `cargo test -p litchi-pages --lib body_chart_font -- --nocapture`
 - `cargo test -p litchi-iwa --test parity chart_font_cases:: -- --nocapture`
+- `cargo test -p litchi-pages --lib production_locality_preserves_unknown_changed_and_untouched_objects -- --nocapture`
 
 The Pages facade controls and the existing host-vs-leaf chart-font cases pass;
 the seven release/cost probes remain intentionally ignored for the

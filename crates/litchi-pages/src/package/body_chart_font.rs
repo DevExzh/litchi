@@ -1394,4 +1394,165 @@ mod tests {
             source.as_ref()
         );
     }
+
+    fn append_unknown_marker(data: &mut Vec<u8>, marker: u64) {
+        litchi_iwa_common::wire::append_varint_field(data, 12_345, marker)
+            .expect("bounded unknown marker");
+    }
+
+    fn has_unknown_marker(data: &[u8], marker: u64) -> bool {
+        let mut suffix = litchi_iwa_common::varint::encode_varint(12_345_u64 << 3);
+        suffix.extend(litchi_iwa_common::varint::encode_varint(marker));
+        data.windows(suffix.len()).any(|window| window == suffix)
+    }
+
+    #[test]
+    fn production_locality_preserves_unknown_changed_and_untouched_objects() {
+        let package = Package::from_bytes(NATIVE).expect("native Pages fixture");
+        let component = package
+            .state
+            .source
+            .components()
+            .iter()
+            .find(|component| {
+                component
+                    .archive()
+                    .objects
+                    .iter()
+                    .filter(|object| !object.messages.is_empty())
+                    .count()
+                    >= 2
+            })
+            .expect("fixture component with two message-bearing objects");
+        let component_name = Arc::<str>::from(component.name());
+        let object_ids = component
+            .archive()
+            .objects
+            .iter()
+            .filter_map(|object| {
+                (!object.messages.is_empty())
+                    .then(|| object.archive_info.identifier)
+                    .flatten()
+            })
+            .take(2)
+            .collect::<Vec<_>>();
+        let changed_id = object_ids[0];
+        let untouched_id = object_ids[1];
+
+        let mut injected_archive = component.archive().clone();
+        append_unknown_marker(
+            &mut injected_archive
+                .object_mut(changed_id)
+                .expect("changed object")
+                .messages[0]
+                .data,
+            0xfeed,
+        );
+        append_unknown_marker(
+            &mut injected_archive
+                .object_mut(untouched_id)
+                .expect("untouched object")
+                .messages[0]
+                .data,
+            0xbeef,
+        );
+        let injected = package_graph::publish_archives(
+            &package,
+            vec![(Arc::clone(&component_name), injected_archive)],
+        )
+        .expect("unknown-field source injection");
+
+        let mut changed_archive = injected
+            .state
+            .source
+            .components()
+            .get(component_name.as_ref())
+            .expect("injected component")
+            .archive()
+            .clone();
+        append_unknown_marker(
+            &mut changed_archive
+                .object_mut(changed_id)
+                .expect("changed object")
+                .messages[0]
+                .data,
+            0xcafe,
+        );
+        let changed = package_graph::publish_archives(
+            &injected,
+            vec![(Arc::clone(&component_name), changed_archive)],
+        )
+        .expect("known-field candidate mutation");
+        let changed_objects =
+            changed_object_ids(&injected, &changed, std::slice::from_ref(&component_name))
+                .expect("changed-object witness");
+        let changed_message = changed
+            .state
+            .source
+            .components()
+            .get(component_name.as_ref())
+            .expect("changed component")
+            .archive()
+            .object(changed_id)
+            .expect("changed object")
+            .messages[0]
+            .data
+            .as_slice();
+        let untouched_message = changed
+            .state
+            .source
+            .components()
+            .get(component_name.as_ref())
+            .expect("changed component")
+            .archive()
+            .object(untouched_id)
+            .expect("untouched object")
+            .messages[0]
+            .data
+            .as_slice();
+        assert!(has_unknown_marker(changed_message, 0xfeed));
+        assert!(has_unknown_marker(untouched_message, 0xbeef));
+        let mut budget = ArrangementBudget::new(&injected).expect("locality budget");
+        verify_locality(
+            &injected,
+            &changed,
+            std::slice::from_ref(&component_name),
+            &changed_objects,
+            &mut budget,
+        )
+        .expect("unknown fields are preserved through production locality");
+
+        let mut negative_archive = changed
+            .state
+            .source
+            .components()
+            .get(component_name.as_ref())
+            .expect("changed component")
+            .archive()
+            .clone();
+        append_unknown_marker(
+            &mut negative_archive
+                .object_mut(untouched_id)
+                .expect("untouched object")
+                .messages[0]
+                .data,
+            0xabcd,
+        );
+        let negative = package_graph::publish_archives(
+            &changed,
+            vec![(Arc::clone(&component_name), negative_archive)],
+        )
+        .expect("negative candidate mutation");
+        let mut negative_budget = ArrangementBudget::new(&injected).expect("locality budget");
+        assert!(matches!(
+            verify_locality(
+                &injected,
+                &negative,
+                std::slice::from_ref(&component_name),
+                &changed_objects,
+                &mut negative_budget,
+            ),
+            Err(Error::Verification)
+        ));
+    }
 }
