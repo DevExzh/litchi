@@ -3,8 +3,8 @@
 - Status: in progress; Numbers-first substrate and proof repair are complete
   on the isolated WP, pending coordinator/W2-A independent review. Pages and
   Keynote facades are not started, no ledger rows are migrated, and no
-  performance or native acceptance claim is active. The current source tip is
-  `1bd194601b`.
+  performance or native acceptance claim is active. The current code tip is
+  `126b1dd7ce`; this record is on the final clean handoff commit.
 - Source branch: `uo2/iwa-w1g-cell-text-style`, cut from frozen root
   `1e3978082bd8e576f0afeb7e3eebac1ca3908d86`, then synchronized with frozen
   trunk 24ecfb543748885192b8fb5273abb54e669764c6.
