@@ -698,10 +698,10 @@ fn chart_series_symbols_scope_reopen_inverse_and_noop() -> TestResult {
                 chart_arrangement_fixture::UNKNOWN_DRAWABLE_BYTES_FIELD,
             )?
         );
-        let foreign = chart_arrangement_fixture::with_foreign_chart_non_style(&source)?;
-        let foreign_package = Package::from_bytes(&foreign)?;
+        let malformed = chart_arrangement_fixture::with_parent_mismatch(&source)?;
+        let malformed_package = Package::from_bytes(&malformed)?;
         assert!(
-            foreign_package
+            malformed_package
                 .sheet_chart_series(0, 0, PropertyKind::Symbols)
                 .is_err()
         );
