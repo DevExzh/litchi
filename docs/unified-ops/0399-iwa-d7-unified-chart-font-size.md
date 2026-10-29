@@ -41,17 +41,20 @@ the same deferred path as `Node::view().format()`, so the two supported value
 views cannot disagree or hide a focused refusal.  The unified writer stages chart-size operations through each
 format's existing exact-source leaf patch and retains terminal errors.
 
-The accepted optimization adds a private chart-only tree cache for the three
-canonical chart paths.  Pages, Keynote and Numbers keep their ordinary tree
-and query/write routes unchanged; the fast route only constructs the chart
-structural projection needed to resolve `/body/chart[N]`,
-`/slide[N]/chart[N]` or `/sheet[N]/chart[N]`.  A recognized canonical path
-that is out of range returns `path_not_found` directly.  Unsupported path
-syntax still uses the generic navigator.  Inventory/build failures remain
-typed leaf errors, including the Pages arrangement and Numbers drawable
-inventory seams, rather than being turned into an empty projection.  Active
-tests compare the fast projection with the generic `chart[last()]` projection
-and retain the Keynote refused-font control.
+The accepted optimization adds a fixed per-container chart cache for the
+three canonical chart paths.  Pages, Keynote and Numbers keep their ordinary
+tree and query/write routes unchanged; the fast route constructs only the
+selected body's, slide's or sheet's chart projection needed to resolve
+`/body/chart[N]`, `/slide[N]/chart[N]` or `/sheet[N]/chart[N]`.  A recognized
+canonical path that is out of range returns `path_not_found` directly.
+Unsupported path syntax still uses the generic navigator.  Inventory/build
+failures remain typed leaf errors, including the Pages arrangement and
+Numbers drawable inventory seams, rather than being turned into an empty
+projection.  Stable synthetic `At` namespaces keep earlier chart nodes valid
+after another container is selected.  Active tests compare the fast
+projection with the generic `chart[last()]` projection, target a duplicated
+second Keynote slide, preserve prior nodes, and retain the Keynote refused-font
+control.
 
 ## Owned paths
 

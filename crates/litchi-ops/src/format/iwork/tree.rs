@@ -17,9 +17,11 @@ use crate::path::navigate::ElementKind;
 /// for the eager item whose children the part holds).
 pub(crate) const ROOT: u32 = 0;
 
-/// Namespace bit for the private chart-only path cache. It is deliberately
-/// outside the normal part arena, whose parts are assigned from one.
-pub(crate) const CHART_PART: u32 = u32::MAX;
+/// Base namespace for the private chart-only path cache.  The cache reserves
+/// the high half of the part namespace; normal parts are assigned from one
+/// and can never reach this bounded synthetic range.
+pub(crate) const CHART_PART_BASE: u32 = u32::MAX;
+pub(crate) const CHART_PART_MIN: u32 = 1 << 31;
 
 /// Where an item lives: its part (0 for the tree built on the first read,
 /// `k` for the `k`-th lazily built part) and its index there.
@@ -37,12 +39,20 @@ impl At {
         Self { part, index }
     }
 
-    pub(crate) const fn chart(index: u32) -> Self {
-        Self::new(CHART_PART, index)
+    pub(crate) const fn chart(part: u32, index: u32) -> Self {
+        Self::new(part, index)
     }
 
     pub(crate) const fn is_chart(self) -> bool {
-        self.part == CHART_PART
+        self.part >= CHART_PART_MIN
+    }
+
+    pub(crate) const fn chart_slot(self) -> Option<u32> {
+        if self.is_chart() {
+            Some(CHART_PART_BASE - self.part)
+        } else {
+            None
+        }
     }
 }
 

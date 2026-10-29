@@ -313,6 +313,26 @@ mod keynote {
         read(fixture("keynote"))
     }
 
+    fn two_slide_source() -> File {
+        let bytes = std::fs::read(fixture("keynote")).expect("read Keynote chart fixture");
+        let package = litchi_keynote::Package::from_bytes(&bytes).expect("Keynote leaf source");
+        let mut edit = package.edit_slide_creation();
+        edit.duplicate_slide(
+            litchi_keynote::SlideSelector::index(0),
+            litchi_core::Position::new(1),
+        )
+        .expect("duplicate chart slide");
+        let package = edit
+            .commit()
+            .expect("duplicate chart slide commit")
+            .into_package();
+        let mut bytes = Vec::new();
+        package
+            .write_to(&mut bytes)
+            .expect("write two-slide chart fixture");
+        open_bytes(bytes).expect("open two-slide chart fixture")
+    }
+
     #[inline(never)]
     fn direct_set(source: &[u8]) -> Vec<u8> {
         let package = litchi_keynote::Package::from_bytes(source).expect("Keynote leaf source");
@@ -517,6 +537,28 @@ mod keynote {
             file.get("/slide[1]/chart[999]").unwrap_err().code(),
             litchi_ops::Code::PathNotFound
         );
+    }
+
+    #[test]
+    fn canonical_chart_path_scopes_slide_cache_and_preserves_prior_nodes() {
+        let file = two_slide_source();
+        let second = file
+            .get("/slide[2]/chart[1]")
+            .expect("second-slide chart path");
+        let generic = file
+            .get("/slide[2]/chart[last()]")
+            .expect("second-slide generic chart path");
+        assert_eq!(second.path().to_string(), generic.path().to_string());
+        assert_eq!(
+            format_values(&file, "/slide[2]/chart[1]"),
+            format_values(&file, "/slide[2]/chart[last()]")
+        );
+
+        let first = file
+            .get("/slide[1]/chart[1]")
+            .expect("first-slide chart path after second-slide selection");
+        assert_eq!(first.path().to_string(), "/slide[1]/chart[1]");
+        assert_eq!(second.path().to_string(), "/slide[2]/chart[1]");
     }
 
     #[inline(never)]

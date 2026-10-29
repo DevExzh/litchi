@@ -103,9 +103,10 @@ struct State {
     /// Built on the first read: the open route decodes only what the leaf
     /// open decodes.
     tree: OnceLock<Built>,
-    /// A private chart-only tree used by the canonical chart paths. It keeps
-    /// the normal tree lazy without changing generic navigation semantics.
-    chart: OnceLock<Built>,
+    /// Fixed per-container chart entries used by the canonical chart paths.
+    /// Each entry is built only when its slide/sheet is selected; the normal
+    /// tree remains lazy and unrelated container inventories are untouched.
+    chart: OnceLock<Result<ChartCache>>,
     /// The complete Pages tree, whose section headers and footers are built
     /// the first time a read reaches them (record 0299). Every item of
     /// `tree` keeps its index here, so nodes taken from either tree stay
@@ -127,6 +128,38 @@ struct Built {
     tree: Tree,
     error: Option<Error>,
     parts: Box<[Part]>,
+}
+
+/// The stable per-container namespace for canonical chart nodes.  The entry
+/// boxes are fixed when the owner is opened, so a node's [`At`] remains valid
+/// after another slide or sheet is selected and built.
+struct ChartCache {
+    entries: Box<[OnceLock<Built>]>,
+}
+
+impl ChartCache {
+    fn new(owner: &Owner) -> Result<Self> {
+        let count = match owner {
+            #[cfg(feature = "pages")]
+            Owner::Pages(_) => 1,
+            #[cfg(feature = "keynote")]
+            Owner::Keynote(package) => package
+                .slides()
+                .map_err(|error| leaf_error(LeafError::Keynote(error), FileFormat::Keynote))?
+                .len(),
+            #[cfg(feature = "numbers")]
+            Owner::Numbers(package) => package.sheets().len(),
+        };
+        let mut entries = Vec::with_capacity(count);
+        entries.extend((0..count).map(|_| OnceLock::new()));
+        Ok(Self {
+            entries: entries.into_boxed_slice(),
+        })
+    }
+
+    fn entry(&self, slot: usize) -> Option<&OnceLock<Built>> {
+        self.entries.get(slot)
+    }
 }
 
 impl Built {
@@ -411,33 +444,75 @@ impl Iwork {
         self.0.tree.get_or_init(|| Built::new(self.0.owner.tree()))
     }
 
-    fn chart_built(&self) -> &Built {
-        self.0.chart.get_or_init(|| {
-            let built = match self.owner() {
-                #[cfg(feature = "pages")]
-                Owner::Pages(package) => pages::build_charts(package)
-                    .map(|tree| (tree, Vec::<Part>::new().into_boxed_slice())),
-                #[cfg(feature = "keynote")]
-                Owner::Keynote(package) => keynote::build_charts(package)
-                    .map(|tree| (tree, Vec::<Part>::new().into_boxed_slice())),
-                #[cfg(feature = "numbers")]
-                Owner::Numbers(package) => numbers::build_charts(package)
-                    .map(|tree| (tree, Vec::<Part>::new().into_boxed_slice())),
-            };
-            Built::new(built)
-        })
-    }
-
-    pub(crate) fn checked_chart_tree(&self) -> Result<&Tree> {
-        let built = self.chart_built();
-        match &built.error {
-            Some(error) => Err(error.clone()),
-            None => Ok(&built.tree),
+    fn chart_cache(&self) -> Result<&ChartCache> {
+        match self.0.chart.get_or_init(|| ChartCache::new(self.owner())) {
+            Ok(cache) => Ok(cache),
+            Err(error) => Err(error.clone()),
         }
     }
 
+    fn chart_part(slot: usize) -> Result<u32> {
+        let slot = u32::try_from(slot).map_err(|_| {
+            Error::new(
+                crate::Code::LimitExceeded,
+                "canonical chart container index exceeds the bounded namespace",
+            )
+        })?;
+        if slot > tree::CHART_PART_BASE - tree::CHART_PART_MIN {
+            return Err(Error::new(
+                crate::Code::LimitExceeded,
+                "canonical chart container count exceeds the bounded namespace",
+            ));
+        }
+        Ok(tree::CHART_PART_BASE - slot)
+    }
+
+    fn checked_chart_built(&self, selector: ChartPath) -> Result<(u32, &Built)> {
+        let slot = selector.container();
+        let part = Self::chart_part(slot)?;
+        let cache = self.chart_cache()?;
+        let entry = cache.entry(slot).ok_or_else(|| {
+            Error::new(
+                crate::Code::PathNotFound,
+                "requested chart container was not found",
+            )
+            .with_format(self.format())
+        })?;
+        let built = entry.get_or_init(|| {
+            let built = match self.owner() {
+                #[cfg(feature = "pages")]
+                Owner::Pages(package) => pages::build_charts(package),
+                #[cfg(feature = "keynote")]
+                Owner::Keynote(package) => keynote::build_charts(package, slot),
+                #[cfg(feature = "numbers")]
+                Owner::Numbers(package) => numbers::build_charts(package, slot),
+            }
+            .map(|tree| (tree, Vec::<Part>::new().into_boxed_slice()));
+            Built::new(built)
+        });
+        match &built.error {
+            Some(error) => Err(error.clone()),
+            None => Ok((part, built)),
+        }
+    }
+
+    pub(crate) fn checked_chart_tree(&self, selector: ChartPath) -> Result<(u32, &Tree)> {
+        let (part, built) = self.checked_chart_built(selector)?;
+        Ok((part, &built.tree))
+    }
+
     pub(crate) fn chart_item(&self, at: At) -> &tree::Item {
-        self.chart_built().tree.item(at.index)
+        let slot = at
+            .chart_slot()
+            .and_then(|slot| usize::try_from(slot).ok())
+            .expect("chart At must carry a bounded cache slot");
+        let cache = self.chart_cache().expect("chart cache must initialize");
+        let built = cache
+            .entry(slot)
+            .and_then(OnceLock::get)
+            .and_then(|built| built.error.is_none().then_some(built))
+            .expect("chart At must refer to an initialized chart entry");
+        built.tree.item(at.index)
     }
 
     /// Complete the tree (views and whole-tree reads).
@@ -981,7 +1056,7 @@ pub(crate) fn get<'f>(
     path: &crate::path::PathArg<'_>,
 ) -> Result<crate::node::Node<'f>> {
     if let Some(selector) = chart_path(file.format(), path) {
-        let chart_tree = file.checked_chart_tree()?;
+        let (part, chart_tree) = file.checked_chart_tree(selector)?;
         let found = chart_tree.items().iter().enumerate().find(|(_, item)| {
             if item.type_name() != "chart" {
                 return false;
@@ -998,9 +1073,16 @@ pub(crate) fn get<'f>(
             }
         });
         if let Some((index, _)) = found {
+            let index = u32::try_from(index).map_err(|_| {
+                Error::new(
+                    crate::Code::LimitExceeded,
+                    "canonical chart item index exceeds the bounded namespace",
+                )
+                .with_format(file.format())
+            })?;
             return Ok(crate::node::Node::Iwork(Node::new(
                 file,
-                At::chart(u32::try_from(index).unwrap_or(u32::MAX)),
+                At::chart(part, index),
             )));
         }
         return Err(
@@ -1019,6 +1101,16 @@ enum ChartPath {
     Pages(usize),
     Keynote { slide: usize, chart: usize },
     Numbers { sheet: usize, chart: usize },
+}
+
+impl ChartPath {
+    const fn container(self) -> usize {
+        match self {
+            Self::Pages(_) => 0,
+            Self::Keynote { slide, .. } => slide,
+            Self::Numbers { sheet, .. } => sheet,
+        }
+    }
 }
 
 fn chart_path(format: FileFormat, path: &crate::path::PathArg<'_>) -> Option<ChartPath> {
