@@ -66,3 +66,32 @@ fn a_package_without_registry_skips_registry_edits() {
     workspace.set_last_object_identifier(40).expect("no-op");
     assert!(workspace.finish().is_empty());
 }
+
+#[test]
+fn registry_inspection_work_only_charges_an_uncached_state() {
+    let source = components();
+    let mut workspace = Workspace::new(&source, Limits::default()).expect("workspace");
+    let initial = workspace
+        .registry_inspection_requirements()
+        .expect("requirements")
+        .expect("registry")
+        .work_bytes();
+
+    // Preparing the report is reused, but the first lookup still needs the
+    // actual two-pass inspection that populates the root cache.
+    assert_eq!(workspace.registry_inspection_work(), initial);
+    assert_eq!(
+        workspace
+            .component_for_member("Index/Document.iwa")
+            .expect("component lookup"),
+        None
+    );
+    assert_eq!(workspace.registry_inspection_work(), 0);
+
+    // A metadata rewrite invalidates both caches; the next lookup must be
+    // admitted again for the new payload rather than reusing stale facts.
+    workspace
+        .set_last_object_identifier(10)
+        .expect("watermark rewrite");
+    assert!(workspace.registry_inspection_work() > 0);
+}
