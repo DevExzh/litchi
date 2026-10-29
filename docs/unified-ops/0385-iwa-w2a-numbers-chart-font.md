@@ -5,15 +5,18 @@
 This record describes the isolated preparation slice on
 `uo2/iwa-w2a-chart-font`, based on coordinator root
 `9932c7d0691b2c14bbbd11a2dea7df41f66308b6`. It is not an integration or W3
-claim. The six Numbers chart-font rows remain provisional until the shared
-chart-font bounded-limit/report/error contract from the W1-E owner is
-accepted, and until the coordinator runs final native, performance and
-integrated-gate checks. The six canonical ledger rows intentionally remain
-`host-only` until that contract and the final scoped gates are accepted. The
-parity declarations and native queue references below are preparation
-evidence, not a migration claim.
+claim. The six Numbers chart-font rows remain provisional until the
+coordinator runs final native, performance and integrated-gate checks. The six
+canonical ledger rows intentionally remain `host-only` until those final
+checks are accepted. The parity declarations and native queue references
+below are preparation evidence, not a migration claim.
 
-The slice owns only Numbers chart font identity/traits and point size:
+The slice owns only Numbers chart font identity/traits and point size. The
+shared bounded chart-font contract was adopted from E at
+`faefe7303bacfa7c23d908cda73ff6384ca0ba0b`; this repair remains isolated and
+is not an integrated-trunk or native-acceptance claim.
+
+The slice owns:
 
 * `sheet_chart_font` / `edit_sheet_chart_font` for font identity, bold and
   italic traits, and point-size reads and edits;
@@ -51,19 +54,20 @@ not cause an unrelated family to refuse. Staged operations, selector failures,
 source failures and patch conflicts are terminal typed results; the focused
 route never falls back to the legacy host.
 
-The current facade's admission and error mapping are explicitly provisional
-pending E's chart-font-specific contract. In particular, the final contract
-must define bounded pre-admission/reporting for payload, references, wire,
-output, allocation, retained, scratch and identifier resources, and the
-mapping of shared codec/text failures. The implementation does not broaden
-those mappings or add fallback paths while that contract is pending. The
-current finite staged-operation ceiling is covered by a public atomic-limit
-test but is not itself the final resource-ceiling qualification.
+The facade derives residual chart-font limits from the package transaction
+ledger and maps the adopted engine/graph resource errors to typed facade
+limits. Component/index/workspace collection capacity is admitted before
+construction; nesting is tracked as maximum observed depth rather than a
+consumed quota. Changed candidates are planned from output-free archive
+lengths and bounded Snappy output before publication, then actual candidate
+bytes are checked before readback. The finite staged-operation ceiling remains
+covered by a public atomic-limit test; the resource ceiling is still subject
+to final integrated qualification.
 
 Patch application is source-authorized and exact-source. A no-op returns the
 original bytes and an inverse exchanges the family-scoped before/after
-values. The `Patch::before/after` optional family projection is intentionally
-provisional while E finalizes the shared contract. A changed candidate is
+values. The `Patch::before/after` optional family projection is family-scoped:
+`None` means that family was untouched. A changed candidate is
 reopened through the strict Numbers ingress;
 the touched property is read back before returning the commit. Untouched
 members and unrelated graph objects are left to the existing exact-source
@@ -106,7 +110,8 @@ not claimed here.
 
 The Numbers contract test covers populated reads, exact no-op bytes, exact
 apply, inverse restoration, stale-patch conflict, missing sheet/chart typed
-refusals, empty-transaction refusal and atomic finite staging-limit refusal.
+refusals, empty-transaction refusal, atomic finite staging-limit refusal and
+an expanded-candidate typed refusal that proves source atomicity.
 The six-route ignored full-facade probe includes package open, selector
 resolution, read or edit, candidate commit/readback for writes and
 serialization. It performs no timing itself.
@@ -136,7 +141,7 @@ CARGO_BUILD_JOBS=2 CARGO_INCREMENTAL=0 \
     -- --ignored --exact --nocapture
 ```
 
-The focused runs passed: three Numbers public-contract tests, four
+The focused runs passed: four Numbers public-contract tests, four
 host-vs-leaf differential tests, the six-vector direct-reader test and the
 ignored six-route probe. `cargo check --offline --locked -p litchi-numbers
 --all-features` and the parity-test target check also passed. These are scoped
@@ -169,9 +174,9 @@ qualification.
 
 ## Handoff conditions
 
-Before integration, E must publish the chart-font-specific bounded limit and
-error contract, and this adapter must be reconciled with it without adding a
-legacy fallback. The coordinator must then review the six host-only ledger
+Before integration, the adopted E bounded limit and error contract must remain
+unchanged while the coordinator reviews this repair. The coordinator must
+then review the six host-only ledger
 rows and queued native routes, decide their final disposition, rerun affected
 formatting/Clippy/docs, boundary/fuzz-lock checks and the final integrated
 53-row gate, and schedule

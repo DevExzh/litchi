@@ -12,9 +12,11 @@
 )]
 
 use std::fmt;
+use std::mem::size_of;
 
 use litchi_core::Position;
 use litchi_iwa_archive::package::OwnedExactArtifacts;
+use litchi_iwa_core::SnappyStream;
 use litchi_iwa_style::chart_font::ChartFont;
 use litchi_iwa_style::chart_font::{self, Change};
 use litchi_iwa_style::graph::Workspace;
@@ -30,6 +32,17 @@ use super::style_graph::{self, LeafComponents};
 use crate::selector::{ChartSelector, SheetSelector};
 
 const MAX_STAGED_OPERATIONS: usize = 4;
+// `LeafComponents` owns one tuple per parsed component.  The graph workspace
+// then builds a package-wide identifier index and an ambiguity set.  These
+// are admission bounds for the constructor phase; the engine report charges
+// its corresponding source traversal after construction.
+const GRAPH_INDEX_SLOT_BYTES: usize = 64;
+const GRAPH_AMBIGUOUS_SLOT_BYTES: usize = 32;
+const GRAPH_EXTRA_ALLOCATIONS: usize = 4;
+// ZIP local/central records plus a conservative name/EOCD envelope for a
+// planned changed member.  Existing edits do not need this envelope, but
+// charging it uniformly keeps the bound simple and safely overestimates them.
+const ZIP_MEMBER_OVERHEAD_BYTES: usize = 128;
 
 /// A semantic value addressed by a sheet-chart font transaction.
 #[derive(Debug, Clone, PartialEq)]
@@ -278,6 +291,134 @@ struct Target {
     chart_identifier: u64,
 }
 
+#[derive(Debug, Clone, Copy)]
+struct GraphWorkspaceCost {
+    work: usize,
+    allocations: usize,
+    scratch: usize,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct CandidatePlan {
+    output_bytes: usize,
+    scratch_bytes: usize,
+    allocations: usize,
+}
+
+fn graph_workspace_cost(package: &Package) -> Result<GraphWorkspaceCost, Error> {
+    let catalog = package.state.components.catalog();
+    let object_count = catalog.iter().try_fold(0usize, |count, component| {
+        count
+            .checked_add(component.archive().objects.len())
+            .ok_or(Error::InvalidSource)
+    })?;
+    let component_count = catalog.len();
+    let work = component_count
+        .checked_add(object_count)
+        .ok_or(Error::InvalidSource)?;
+    let allocations = component_count
+        .checked_add(object_count.checked_mul(2).ok_or(Error::InvalidSource)?)
+        .and_then(|value| value.checked_add(GRAPH_EXTRA_ALLOCATIONS))
+        .ok_or(Error::InvalidSource)?;
+    let component_scratch = component_count
+        .checked_mul(size_of::<(usize, usize)>())
+        .ok_or(Error::InvalidSource)?;
+    let index_scratch = object_count
+        .checked_mul(GRAPH_INDEX_SLOT_BYTES + GRAPH_AMBIGUOUS_SLOT_BYTES)
+        .ok_or(Error::InvalidSource)?;
+    Ok(GraphWorkspaceCost {
+        work,
+        allocations,
+        scratch: component_scratch
+            .checked_add(index_scratch)
+            .ok_or(Error::InvalidSource)?,
+    })
+}
+
+fn preflight_graph_workspace(
+    package: &Package,
+    budget: &ChartBudget,
+) -> Result<GraphWorkspaceCost, Error> {
+    let cost = graph_workspace_cost(package)?;
+    budget.preflight_work(cost.work).map_err(map_arrangement)?;
+    budget
+        .preflight_allocations(cost.allocations)
+        .map_err(map_arrangement)?;
+    budget
+        .preflight_scratch(cost.scratch)
+        .map_err(map_arrangement)?;
+    Ok(cost)
+}
+
+fn charge_graph_workspace(budget: &mut ChartBudget, cost: GraphWorkspaceCost) -> Result<(), Error> {
+    // Workspace::source_work is included in each engine report, so only the
+    // constructor-owned collection allocations and scratch are charged here.
+    budget
+        .allocations(cost.allocations)
+        .map_err(map_arrangement)?;
+    budget.scratch(cost.scratch).map_err(map_arrangement)
+}
+
+fn archive_compressed_bound(
+    archive: &litchi_iwa_core::Archive,
+    archive_limits: litchi_iwa_core::Limits,
+    snappy_limits: litchi_iwa_core::SnappyLimits,
+) -> Result<usize, Error> {
+    let encoded = archive
+        .encoded_len(archive_limits)
+        .map_err(|error| Error::from(structure::map_core(&error)))?;
+    SnappyStream::maximum_compressed_len(encoded, snappy_limits)
+        .map_err(|error| Error::from(structure::map_core(&error)))
+}
+
+fn candidate_plan(
+    package: &Package,
+    changes: &litchi_iwa_style::graph::Changes,
+) -> Result<CandidatePlan, Error> {
+    let catalog = structure::exact_source(package)?;
+    let archive_limits = archive_limits(package)?;
+    let snappy_limits = catalog
+        .limits()
+        .snappy_limits()
+        .map_err(|error| Error::from(structure::map_archive(&error)))?;
+    let mut output_bytes = package.source_bytes().len();
+    let mut compressed_bytes = 0usize;
+    let mut allocations = GRAPH_EXTRA_ALLOCATIONS;
+    let mut add_member = |name: &str, archive: &litchi_iwa_core::Archive| -> Result<(), Error> {
+        let compressed = archive_compressed_bound(archive, archive_limits, snappy_limits)?;
+        compressed_bytes = compressed_bytes
+            .checked_add(compressed)
+            .ok_or(Error::InvalidSource)?;
+        let name_overhead = name
+            .len()
+            .checked_mul(2)
+            .and_then(|value| value.checked_add(ZIP_MEMBER_OVERHEAD_BYTES))
+            .ok_or(Error::InvalidSource)?;
+        output_bytes = output_bytes
+            .checked_add(compressed)
+            .and_then(|value| value.checked_add(name_overhead))
+            .ok_or(Error::InvalidSource)?;
+        allocations = allocations.checked_add(1).ok_or(Error::InvalidSource)?;
+        Ok(())
+    };
+    for (name, archive) in &changes.edits {
+        add_member(name, archive)?;
+    }
+    for insertion in &changes.insertions {
+        add_member(&insertion.name, &insertion.archive)?;
+    }
+    allocations = allocations
+        .checked_add(changes.deletions.len())
+        .ok_or(Error::InvalidSource)?;
+    Ok(CandidatePlan {
+        output_bytes,
+        scratch_bytes: output_bytes
+            .checked_add(compressed_bytes)
+            .ok_or(Error::InvalidSource)?,
+        allocations,
+    })
+}
+
 fn map_arrangement(error: arrangement::Error) -> Error {
     match error {
         arrangement::Error::Refused(refusal) => match refusal {
@@ -365,8 +506,10 @@ fn read_property(
     kind: PropertyKind,
     budget: &mut ChartBudget,
 ) -> Result<Property, Error> {
+    let graph_cost = preflight_graph_workspace(package, budget)?;
     let components = LeafComponents::new(package).map_err(Error::from)?;
     let workspace = Workspace::new(&components, archive_limits(package)?)?;
+    charge_graph_workspace(budget, graph_cost)?;
     let (value, report) = read_workspace(
         &workspace,
         target.chart_identifier,
@@ -509,8 +652,10 @@ impl Edit<'_> {
                     Some(read_property(self.source, &self.target, kind, &mut budget)?);
             }
         }
+        let graph_cost = preflight_graph_workspace(self.source, &budget)?;
         let components = LeafComponents::new(self.source).map_err(Error::from)?;
         let mut workspace = Workspace::new(&components, archive_limits(self.source)?)?;
+        charge_graph_workspace(&mut budget, graph_cost)?;
         for change in &self.changes {
             let report = chart_font::set(
                 &mut workspace,
@@ -572,11 +717,42 @@ impl Edit<'_> {
             return Err(Error::Verification);
         }
         let source_bytes = self.source.source_bytes().len();
-        budget.output(source_bytes).map_err(map_arrangement)?;
+        let candidate_plan = candidate_plan(self.source, &changes)?;
+        budget
+            .preflight_output(candidate_plan.output_bytes)
+            .map_err(map_arrangement)?;
+        budget
+            .preflight_retained(source_bytes)
+            .and_then(|_| budget.preflight_retained(candidate_plan.output_bytes))
+            .map_err(map_arrangement)?;
+        budget
+            .preflight_allocations(candidate_plan.allocations)
+            .map_err(map_arrangement)?;
+        budget
+            .preflight_scratch(candidate_plan.scratch_bytes)
+            .map_err(map_arrangement)?;
+        budget
+            .output(candidate_plan.output_bytes)
+            .map_err(map_arrangement)?;
         budget.retained(source_bytes).map_err(map_arrangement)?;
-        budget.allocations(1).map_err(map_arrangement)?;
-        budget.scratch(source_bytes).map_err(map_arrangement)?;
+        budget
+            .retained(candidate_plan.output_bytes)
+            .map_err(map_arrangement)?;
+        budget
+            .allocations(candidate_plan.allocations)
+            .map_err(map_arrangement)?;
+        budget
+            .scratch(candidate_plan.scratch_bytes)
+            .map_err(map_arrangement)?;
         let published = style_graph::publish(self.source, changes).map_err(Error::from)?;
+        let actual_candidate_bytes = published.package.source_bytes().len();
+        if actual_candidate_bytes > candidate_plan.output_bytes {
+            return Err(Error::Limit {
+                kind: LimitKind::OutputBytes,
+                observed: actual_candidate_bytes as u64,
+                maximum: candidate_plan.output_bytes as u64,
+            });
+        }
         let candidate_target = resolve_with_budget(
             &published.package,
             SheetSelector::position(self.target.sheet),

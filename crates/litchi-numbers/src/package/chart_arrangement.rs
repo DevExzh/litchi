@@ -704,6 +704,14 @@ impl ChartBudget {
         &mut self,
         report: litchi_iwa_style::chart_font::Report,
     ) -> Result<(), Error> {
+        let depth = usize::try_from(report.max_depth()).unwrap_or(usize::MAX);
+        if depth > self.max_nesting {
+            return Err(Error::Limit {
+                kind: LimitKind::WireNesting,
+                observed: depth as u64,
+                maximum: self.max_nesting as u64,
+            });
+        }
         self.source(report.input_bytes())?;
         self.output(report.output_bytes())?;
         self.fields(report.fields())?;
@@ -711,6 +719,7 @@ impl ChartBudget {
         self.allocations(report.allocations())?;
         self.retained(report.retained_bytes())?;
         self.scratch(report.scratch_bytes())?;
+        self.nesting = self.nesting.max(depth);
         Ok(())
     }
 
@@ -817,11 +826,10 @@ impl ChartBudget {
             .checked_sub(self.work)
             .ok_or(Error::InvalidSource)?
             .clamp(1, WireLimits::MAX_REWRITE_WORK);
-        let nesting = self
-            .max_nesting
-            .checked_sub(self.nesting)
-            .unwrap_or(1)
-            .clamp(1, WireLimits::MAX_NESTING);
+        // Nesting is a peak depth, not an aggregate quota.  A completed
+        // parse therefore does not consume the configured depth available to
+        // the next independent parse.
+        let nesting = self.max_nesting.clamp(1, WireLimits::MAX_NESTING);
         WireLimits::default()
             .with_input_bytes(input)
             .and_then(|limits| limits.with_fields(fields))

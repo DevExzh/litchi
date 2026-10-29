@@ -2,7 +2,7 @@
 
 use litchi_iwa_text::font::Font;
 use litchi_numbers::sheet::chart::font::{ChartFont, Property, PropertyKind};
-use litchi_numbers::{ChartSelector, Package, SheetSelector};
+use litchi_numbers::{ChartSelector, OpenOptions, Package, SheetSelector, SourceLimits};
 
 const NATIVE: &[u8] =
     include_bytes!("../../../test-data/iwork/numbers/chart-grid-authored-native.numbers");
@@ -155,6 +155,30 @@ fn chart_font_selectors_and_empty_transactions_are_typed_and_atomic() -> TestRes
         limit,
         litchi_numbers::sheet::chart::font::Error::Limit { .. }
     ));
+    assert_eq!(exact_bytes(&package)?, source);
+    Ok(())
+}
+
+#[test]
+fn chart_font_expanded_candidate_is_typed_and_source_atomic() -> TestResult {
+    let source_limits = SourceLimits::builder()
+        .max_input_bytes(NATIVE.len() as u64)?
+        .build()?;
+    let package =
+        Package::from_bytes_with_options(NATIVE, OpenOptions::new().source_limits(source_limits))?;
+    let source = exact_bytes(&package)?;
+    let expanded_name = "F".repeat(255);
+    let mut edit =
+        package.edit_sheet_chart_font(SheetSelector::index(0), ChartSelector::index(0))?;
+    edit.set(font(&expanded_name, true, false)?)?;
+    let result = edit.commit();
+    assert!(
+        matches!(
+            result,
+            Err(litchi_numbers::sheet::chart::font::Error::Limit { .. })
+        ),
+        "an expanded candidate must be refused by the typed resource boundary"
+    );
     assert_eq!(exact_bytes(&package)?, source);
     Ok(())
 }
