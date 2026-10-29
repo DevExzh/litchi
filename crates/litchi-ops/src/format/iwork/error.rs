@@ -519,7 +519,8 @@ fn pages_table_values_code(error: &litchi_pages::table::values::Error) -> Code {
 fn pages_table_comments_code(error: &litchi_pages::table::comments::Error) -> Code {
     use litchi_pages::table::comments::Error as E;
     match error {
-        E::TableNotFound | E::AmbiguousTableName | E::AmbiguousSelector => Code::PathNotFound,
+        E::TableNotFound => Code::NotFound,
+        E::AmbiguousTableName | E::AmbiguousSelector => Code::InvalidValue,
         E::UnsupportedSource | E::UnsupportedDependency => Code::UnsupportedCapability,
         E::Limit { .. } => Code::LimitExceeded,
         E::Allocation { .. } => Code::InternalError,
@@ -697,7 +698,8 @@ fn keynote_drawables_code(error: &litchi_keynote::slide::drawable::Error) -> Cod
 fn keynote_table_comments_code(error: &litchi_keynote::slide::table::comments::Error) -> Code {
     use litchi_keynote::slide::table::comments::Error as E;
     match error {
-        E::TableNotFound | E::AmbiguousTableName | E::AmbiguousSelector => Code::PathNotFound,
+        E::TableNotFound => Code::NotFound,
+        E::AmbiguousTableName | E::AmbiguousSelector => Code::InvalidValue,
         E::UnsupportedSource | E::UnsupportedDependency => Code::UnsupportedCapability,
         E::TableLocked => Code::DocumentProtected,
         E::Limit { .. } => Code::LimitExceeded,
@@ -747,6 +749,42 @@ fn numbers_cells_code(error: &litchi_numbers::table::cells::Error) -> Code {
 mod tests {
     use super::LeafError;
     use crate::error::Code;
+
+    #[test]
+    fn table_comment_selection_errors_keep_missing_and_ambiguous_codes() {
+        #[cfg(feature = "pages")]
+        {
+            use litchi_pages::table::comments::Error;
+            assert_eq!(
+                LeafError::PagesTableComments(Error::TableNotFound).code(),
+                Code::NotFound
+            );
+            assert_eq!(
+                LeafError::PagesTableComments(Error::AmbiguousTableName).code(),
+                Code::InvalidValue
+            );
+            assert_eq!(
+                LeafError::PagesTableComments(Error::AmbiguousSelector).code(),
+                Code::InvalidValue
+            );
+        }
+        #[cfg(feature = "keynote")]
+        {
+            use litchi_keynote::slide::table::comments::Error;
+            assert_eq!(
+                LeafError::KeynoteTableComments(Error::TableNotFound).code(),
+                Code::NotFound
+            );
+            assert_eq!(
+                LeafError::KeynoteTableComments(Error::AmbiguousTableName).code(),
+                Code::InvalidValue
+            );
+            assert_eq!(
+                LeafError::KeynoteTableComments(Error::AmbiguousSelector).code(),
+                Code::InvalidValue
+            );
+        }
+    }
 
     #[cfg(feature = "pages")]
     #[test]

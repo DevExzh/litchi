@@ -5,6 +5,9 @@
 
 #![cfg(feature = "pages")]
 
+use std::collections::BTreeMap;
+use std::io::{Cursor, Read};
+
 use litchi_core::FileFormat;
 use litchi_ops::capabilities::{Capabilities, Verb};
 use litchi_ops::{Code, File, NewNode, Placement, create, open, open_bytes, props};
@@ -39,6 +42,18 @@ fn prop(file: &File, path: &str, key: &str) -> Option<String> {
 
 fn reopen(file: &File) -> File {
     open_bytes(file.to_bytes().expect("publish")).expect("reopen")
+}
+
+fn zip_members(bytes: &[u8]) -> BTreeMap<String, Vec<u8>> {
+    let mut archive = zip::ZipArchive::new(Cursor::new(bytes)).expect("zip");
+    (0..archive.len())
+        .map(|index| {
+            let mut entry = archive.by_index(index).expect("entry");
+            let mut bytes = Vec::new();
+            entry.read_to_end(&mut bytes).expect("entry bytes");
+            (entry.name().to_owned(), bytes)
+        })
+        .collect()
 }
 
 fn pages_comment_input() -> File {
@@ -326,6 +341,112 @@ fn pages_cell_comment_schema_is_clearable() {
     assert!(property.set());
     assert!(property.clearable());
     assert!(!property.add());
+}
+
+#[test]
+fn body_table_cell_comment_creates_a_root_from_a_rootless_file_cell() {
+    let file = read("pages/body-table-cells-native.pages");
+    let cell = "/body/tbl[1]/tr[2]/tc[2]";
+    assert_eq!(prop(&file, cell, "comment"), None);
+    let original = file.to_bytes().expect("source bytes");
+    let added = file
+        .set(cell, props! { "comment" => "D7 Pages created root" })
+        .expect("create root comment");
+    assert_eq!(
+        prop(&reopen(&added), cell, "comment").as_deref(),
+        Some("D7 Pages created root")
+    );
+    let commit = file
+        .edit(|tx| tx.set(cell, props! { "comment" => "D7 Pages inverse root" }))
+        .expect("create root in a transaction");
+    let restored = commit
+        .patch()
+        .inverse()
+        .apply(commit.file())
+        .expect("inverse root creation");
+    assert_eq!(restored.to_bytes().expect("inverse bytes"), original);
+}
+
+#[test]
+fn body_table_cell_comment_stale_recipient_and_batch_proofs_are_terminal_and_local() {
+    let file = read("pages/body-table-comment-hidden-native-saved.pages");
+    let populated = "/body/tbl[1]/tr[2]/tc[2]";
+    let first = "/body/tbl[1]/tr[1]/tc[1]";
+    let second = "/body/tbl[1]/tr[1]/tc[2]";
+    assert!(prop(&file, populated, "comment").is_some());
+    assert!(prop(&file, first, "comment").is_none());
+    assert!(prop(&file, second, "comment").is_none());
+    let original = file.to_bytes().expect("source bytes");
+
+    let left = file
+        .edit(|tx| tx.set(first, props! { "comment" => "D7 stale left" }))
+        .expect("left edit");
+    let right = file
+        .edit(|tx| tx.set(first, props! { "comment" => "D7 stale right" }))
+        .expect("right edit");
+    let recipient = right.file().to_bytes().expect("recipient bytes");
+    let stale = left
+        .patch()
+        .apply(right.file())
+        .expect_err("stale patch recipient");
+    assert_eq!(stale.code(), Code::InvalidInput);
+    assert_eq!(
+        right.file().to_bytes().expect("recipient unchanged"),
+        recipient
+    );
+
+    let invalid = file
+        .edit(|tx| {
+            tx.set(first, props! { "comment" => "must not publish" })?;
+            tx.set(
+                "/body/tbl[999]/tr[1]/tc[1]",
+                props! { "comment" => "must refuse" },
+            )
+        })
+        .expect_err("batch failure is atomic");
+    assert_eq!(invalid.code(), Code::PathNotFound);
+    assert_eq!(file.to_bytes().expect("source unchanged"), original);
+
+    let before_comment = litchi_pages::Package::from_bytes(&original)
+        .expect("leaf source")
+        .body_table_cell_comment(
+            litchi_pages::BodyTableSelector::index(0),
+            litchi_pages::table::format::At::new(1, 1),
+        )
+        .expect("untouched comment read")
+        .expect("untouched comment");
+    let batch = file
+        .edit(|tx| {
+            tx.set(first, props! { "comment" => "D7 batch one" })?;
+            tx.set(second, props! { "comment" => "D7 batch two" })
+        })
+        .expect("multi-cell batch");
+    let reopened = reopen(batch.file());
+    assert_eq!(
+        prop(&reopened, first, "comment").as_deref(),
+        Some("D7 batch one")
+    );
+    assert_eq!(
+        prop(&reopened, second, "comment").as_deref(),
+        Some("D7 batch two")
+    );
+    let after_bytes = reopened.to_bytes().expect("batch bytes");
+    let after_comment = litchi_pages::Package::from_bytes(&after_bytes)
+        .expect("reopen leaf")
+        .body_table_cell_comment(
+            litchi_pages::BodyTableSelector::index(0),
+            litchi_pages::table::format::At::new(1, 1),
+        )
+        .expect("untouched comment reread")
+        .expect("untouched comment after batch");
+    assert_eq!(after_comment, before_comment, "untouched metadata/replies");
+    let before_members = zip_members(&original);
+    let after_members = zip_members(&after_bytes);
+    assert_eq!(
+        before_members.get("preview.jpg"),
+        after_members.get("preview.jpg"),
+        "untouched package member"
+    );
 }
 
 #[test]
