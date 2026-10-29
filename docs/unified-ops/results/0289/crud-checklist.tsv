@@ -5567,11 +5567,11 @@ pages	paragraph	get	supported		ok 8 instances, first `iwork/pages/body-sections-
 pages	paragraph	find	supported		ok 8 instances, first `iwork/pages/body-sections-unicode.pages` /body/p[1]
 pages	paragraph	query	supported		ok matches in create()
 pages	paragraph	view	supported		ok 8 instances, first `iwork/pages/body-sections-unicode.pages` /body/p[1]
-pages	paragraph	set	supported		ok `create() + add paragraph` /body/p[1] {"text":"Litchi"}
-pages	paragraph	add	supported		ok /body/p[2] on `create()` under /body {}
-pages	paragraph	remove	supported		ok `create() + add paragraph` /body/p[1]
-pages	paragraph	move	format-verb		ok `create() + add paragraph` /body/p[1] /body/p[2]
-pages	paragraph	swap	format-verb		ok `create() + add paragraph` /body/p[1] /body/p[2]
+pages	paragraph	set	supported		ok `seed + add paragraph` /body/p[1] {"text":"Litchi"}
+pages	paragraph	add	supported		ok /body/p[4] on `seed` under /body {}
+pages	paragraph	remove	supported		ok `seed + add paragraph` /body/p[1]
+pages	paragraph	move	format-verb		ok `seed + add paragraph` /body/p[1] /body/p[2]
+pages	paragraph	swap	format-verb		ok `seed + add paragraph` /body/p[1] /body/p[2]
 pages	paragraph	edit	supported		ok tx.set
 pages	paragraph	batch	supported		ok set item
 pages	paragraph	create	supported		ok format
@@ -5580,9 +5580,9 @@ pages	section	get	supported		ok 8 instances, first `iwork/pages/body-sections-un
 pages	section	find	supported		ok 8 instances, first `iwork/pages/body-sections-unicode.pages` /section[1]
 pages	section	query	supported		ok matches in create()
 pages	section	view	supported		ok 8 instances, first `iwork/pages/body-sections-unicode.pages` /section[1]
-pages	section	set	supported		ok `create() + add paragraph` /section[1] {"name":"Litchi"}
-pages	section	add	supported		ok /section[2] on `create() + add paragraph` under / {}
-pages	section	remove	supported		ok `create() + add paragraph + add section` /section[2]
+pages	section	set	supported		ok `seed + add paragraph` /section[1] {"name":"Litchi"}
+pages	section	add	supported		ok /section[3] on `seed + add paragraph` under / {}
+pages	section	remove	supported		ok `seed + add paragraph` /section[2]
 pages	section	move	format-verb		refused invalid_argument
 pages	section	swap	format-verb		refused invalid_argument
 pages	section	edit	supported		ok tx.set
@@ -5594,8 +5594,8 @@ pages	table	find	supported		ok 7 instances, first `iwork/pages/body-table-read-n
 pages	table	query	supported		ok matches in iwork/pages/body-table-read-native.pages
 pages	table	view	supported		ok 7 instances, first `iwork/pages/body-table-read-native.pages` /body/tbl[1]
 pages	table	set	n/a	set not offered for this element	-
-pages	table	add	supported		ok /body/tbl[3] on `iwork/pages/body-table-read-native.pages` under /body {"name":"Litchi","rows":"2","columns":"2","data":"Litchi"}
-pages	table	remove	supported		ok `iwork/pages/body-table-read-native.pages + add table` /body/tbl[1]
+pages	table	add	supported		ok /body/tbl[2] on `iwork/pages/body-table-visible.pages` under /body {"rows":"2","cols":"2","data":"a,b;c,d"}
+pages	table	remove	supported		ok `iwork/pages/body-table-visible.pages + add table` /body/tbl[1]
 pages	table	move	format-verb		refused invalid_argument
 pages	table	swap	format-verb		refused invalid_argument
 pages	table	edit	n/a	edit not offered for this element	-
@@ -5619,7 +5619,7 @@ pages	cell	get	supported		ok 8 instances, first `iwork/pages/body-table-read-nat
 pages	cell	find	supported		ok 8 instances, first `iwork/pages/body-table-read-native.pages` /body/tbl[1]/tr[1]/tc[1]
 pages	cell	query	supported		ok matches in iwork/pages/body-table-read-native.pages
 pages	cell	view	supported		ok 8 instances, first `iwork/pages/body-table-read-native.pages` /body/tbl[1]/tr[1]/tc[1]
-pages	cell	set	supported		ok `iwork/pages/body-table-read-native.pages + add table` /body/tbl[1]/tr[1]/tc[1] {"text":"Litchi"}
+pages	cell	set	supported		ok `iwork/pages/body-table-visible.pages + add table` /body/tbl[1]/tr[1]/tc[1] {"text":"Litchi"}
 pages	cell	add	n/a	add not offered for this element	-
 pages	cell	remove	n/a	remove not offered for this element	-
 pages	cell	move	format-verb		refused invalid_argument
@@ -5632,7 +5632,7 @@ pages	header	get	supported		ok 8 instances, first `iwork/pages/body-sections-uni
 pages	header	find	supported		ok 8 instances, first `iwork/pages/body-sections-unicode.pages` /section[1]/header[1]
 pages	header	query	supported		ok matches in create()
 pages	header	view	supported		ok 8 instances, first `iwork/pages/body-sections-unicode.pages` /section[1]/header[1]
-pages	header	set	supported		ok `create() + add paragraph` /section[1]/header[1] {"text":"Litchi"}
+pages	header	set	supported		ok `seed + add paragraph` /section[1]/header[1] {"text":"Litchi"}
 pages	header	add	n/a	add not offered for this element	-
 pages	header	remove	n/a	remove not offered for this element	-
 pages	header	move	format-verb		refused invalid_argument
@@ -5645,7 +5645,7 @@ pages	footer	get	supported		ok 8 instances, first `iwork/pages/body-sections-uni
 pages	footer	find	supported		ok 8 instances, first `iwork/pages/body-sections-unicode.pages` /section[1]/footer[1]
 pages	footer	query	supported		ok matches in create()
 pages	footer	view	supported		ok 8 instances, first `iwork/pages/body-sections-unicode.pages` /section[1]/footer[1]
-pages	footer	set	supported		ok `create() + add paragraph` /section[1]/footer[1] {"text":"Litchi"}
+pages	footer	set	supported		ok `seed + add paragraph` /section[1]/footer[1] {"text":"Litchi"}
 pages	footer	add	n/a	add not offered for this element	-
 pages	footer	remove	n/a	remove not offered for this element	-
 pages	footer	move	format-verb		refused invalid_argument
@@ -5667,19 +5667,32 @@ pages	footnotes	edit	n/a	edit not offered for this element	-
 pages	footnotes	batch	n/a	batch not offered for this element	-
 pages	footnotes	create	supported		ok format
 pages	footnotes	save	supported		ok format
-pages	footnote	get	supported		ok 2 instances, first `create() + add paragraph + add footnote` /footnotes/footnote[1]
-pages	footnote	find	supported		ok 2 instances, first `create() + add paragraph + add footnote` /footnotes/footnote[1]
-pages	footnote	query	supported		ok matches in create() + add paragraph + add footnote
-pages	footnote	view	supported		ok 2 instances, first `create() + add paragraph + add footnote` /footnotes/footnote[1]
-pages	footnote	set	supported		ok `create() + add paragraph + add footnote` /footnotes/footnote[1] {"text":"Litchi"}
-pages	footnote	add	supported		ok /footnotes/footnote[1] on `create() + add paragraph` under /footnotes {}
-pages	footnote	remove	supported		ok `create() + add paragraph + add footnote` /footnotes/footnote[1]
+pages	footnote	get	supported		ok 2 instances, first `seed + add paragraph + add footnote` /footnotes/footnote[1]
+pages	footnote	find	supported		ok 2 instances, first `seed + add paragraph + add footnote` /footnotes/footnote[1]
+pages	footnote	query	supported		ok matches in seed + add paragraph + add footnote
+pages	footnote	view	supported		ok 2 instances, first `seed + add paragraph + add footnote` /footnotes/footnote[1]
+pages	footnote	set	supported		ok `seed + add paragraph + add footnote` /footnotes/footnote[1] {"text":"Litchi"}
+pages	footnote	add	supported		ok /footnotes/footnote[1] on `seed + add paragraph` under /footnotes {}
+pages	footnote	remove	supported		ok `seed + add paragraph + add footnote` /footnotes/footnote[1]
 pages	footnote	move	format-verb		refused invalid_argument
 pages	footnote	swap	format-verb		refused invalid_argument
 pages	footnote	edit	supported		ok tx.set
 pages	footnote	batch	supported		ok set item
 pages	footnote	create	supported		ok format
 pages	footnote	save	supported		ok format
+pages	chart	get	supported		ok 1 instances, first `iwork/pages/chart-grid-authored-native.pages` /body/chart[1]
+pages	chart	find	supported		ok 1 instances, first `iwork/pages/chart-grid-authored-native.pages` /body/chart[1]
+pages	chart	query	supported		ok matches in iwork/pages/chart-grid-authored-native.pages
+pages	chart	view	supported		ok 1 instances, first `iwork/pages/chart-grid-authored-native.pages` /body/chart[1]
+pages	chart	set	supported		ok `iwork/pages/chart-grid-authored-native.pages` /body/chart[1] {"font.size":"17pt"}
+pages	chart	add	n/a	add not offered for this element	-
+pages	chart	remove	n/a	remove not offered for this element	-
+pages	chart	move	format-verb		unreached
+pages	chart	swap	format-verb		unreached
+pages	chart	edit	supported		ok tx.set
+pages	chart	batch	supported		ok set item
+pages	chart	create	supported		ok format
+pages	chart	save	supported		ok format
 keynote	presentation	get	supported		ok 8 instances, first `iwork/keynote/multi-slide.key` /
 keynote	presentation	find	supported		ok 8 instances, first `iwork/keynote/multi-slide.key` /
 keynote	presentation	query	n/a	query not offered for this element	-
@@ -5866,13 +5879,13 @@ keynote	chart	get	supported		ok 1 instances, first `iwork/keynote/chart-grid-aut
 keynote	chart	find	supported		ok 1 instances, first `iwork/keynote/chart-grid-authored-native.key` /slide[1]/chart[1]
 keynote	chart	query	supported		ok matches in iwork/keynote/chart-grid-authored-native.key
 keynote	chart	view	supported		ok 1 instances, first `iwork/keynote/chart-grid-authored-native.key` /slide[1]/chart[1]
-keynote	chart	set	n/a	set not offered for this element	-
+keynote	chart	set	supported		ok `iwork/keynote/chart-grid-authored-native.key` /slide[1]/chart[1] {"font.size":"17pt"}
 keynote	chart	add	n/a	add not offered for this element	-
 keynote	chart	remove	n/a	remove not offered for this element	-
 keynote	chart	move	format-verb		unreached
 keynote	chart	swap	format-verb		unreached
-keynote	chart	edit	n/a	edit not offered for this element	-
-keynote	chart	batch	n/a	batch not offered for this element	-
+keynote	chart	edit	supported		ok tx.set
+keynote	chart	batch	supported		ok set item
 keynote	chart	create	supported		ok format
 keynote	chart	save	supported		ok format
 keynote	group	get	supported		ok 1 instances, first `unified-ops/0294/shapes.key` /slide[1]/group[1]
@@ -5979,3 +5992,16 @@ numbers	col	edit	n/a	edit not offered for this element	-
 numbers	col	batch	n/a	batch not offered for this element	-
 numbers	col	create	supported		ok format
 numbers	col	save	supported		ok format
+numbers	chart	get	supported		ok 1 instances, first `iwork/numbers/chart-grid-authored-native.numbers` /sheet[1]/chart[1]
+numbers	chart	find	supported		ok 1 instances, first `iwork/numbers/chart-grid-authored-native.numbers` /sheet[1]/chart[1]
+numbers	chart	query	supported		ok matches in iwork/numbers/chart-grid-authored-native.numbers
+numbers	chart	view	supported		ok 1 instances, first `iwork/numbers/chart-grid-authored-native.numbers` /sheet[1]/chart[1]
+numbers	chart	set	supported		ok `iwork/numbers/chart-grid-authored-native.numbers` /sheet[1]/chart[1] {"font.size":"17pt"}
+numbers	chart	add	n/a	add not offered for this element	-
+numbers	chart	remove	n/a	remove not offered for this element	-
+numbers	chart	move	format-verb		unreached
+numbers	chart	swap	format-verb		unreached
+numbers	chart	edit	supported		ok tx.set
+numbers	chart	batch	supported		ok set item
+numbers	chart	create	supported		ok format
+numbers	chart	save	supported		ok format

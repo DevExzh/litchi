@@ -7278,3 +7278,16 @@ See [0063](0063-source-pptx-modern-comments.md).
   only repair adds the missing Numbers feature guards. Strict all-target
   Clippy passes for Pages-only, Keynote-only and Numbers-only configurations,
   together with formatting; the full gate restarts on the repaired source.
+
+- The `c07e6208cc` run completed 33 rows: 32 passed and the operations-test
+  row failed four generated-report/coverage targets. Facade/core tests, leaf
+  tests, ODS tests and workspace Clippy passed. The run was stopped before
+  integrating the reviewed report closure; its partial results remain tied
+  to c07 and are not reused as a different commit's full gate.
+- Accepted report-only slice `d939d75cdb` (0404). It adds real chart-grid CRUD
+  exercises with changed 17pt values, restores Pages table/section coverage,
+  and refreshes only the intentional fixture/query/registry outputs. Fidelity
+  adds exactly the two-sheet fixture row; query changes are confined to its
+  thirteen Numbers digest entries. All four affected targets pass again with
+  golden updates explicitly disabled. No production runtime or fixture bytes
+  changed. Final qualification restarts on this integrated source.
