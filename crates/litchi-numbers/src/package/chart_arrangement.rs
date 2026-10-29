@@ -2738,7 +2738,7 @@ pub(super) fn same_entry_fixed_metadata(left: &Entry, right: &Entry) -> bool {
         && same_header_metadata(left.metadata().central(), right.metadata().central())
 }
 
-fn same_selected_entry_records(left: &Entry, right: &Entry) -> bool {
+pub(super) fn same_selected_entry_records(left: &Entry, right: &Entry) -> bool {
     zip_local_header_preserved(
         left.raw_record().local_record(),
         right.raw_record().local_record(),
@@ -2746,6 +2746,20 @@ fn same_selected_entry_records(left: &Entry, right: &Entry) -> bool {
         left.raw_record().central_directory_record(),
         right.raw_record().central_directory_record(),
     )
+}
+
+pub(super) fn same_changed_entry_records(left: &Entry, right: &Entry) -> bool {
+    if !zip_local_header_preserved(
+        left.raw_record().local_record(),
+        right.raw_record().local_record(),
+    ) {
+        return false;
+    }
+    let left_central = left.raw_record().central_directory_record();
+    let right_central = right.raw_record().central_directory_record();
+    left_central.len() >= 46
+        && right_central.len() == left_central.len()
+        && zip_record_equal_outside(left_central, right_central, &[(16, 28), (42, 46)])
 }
 
 fn zip_local_header_preserved(left: &[u8], right: &[u8]) -> bool {

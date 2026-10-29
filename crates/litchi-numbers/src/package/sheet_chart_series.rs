@@ -97,6 +97,8 @@ pub enum Error {
     },
     #[error("could not allocate {amount} Numbers chart-series units")]
     Allocation { amount: usize },
+    #[error("Numbers chart-series bounded finalization arithmetic overflowed")]
+    Overflow,
     #[error("the edited Numbers chart series failed semantic verification")]
     Verification,
     #[error("the Numbers chart-series patch does not match the exact source package")]
@@ -554,7 +556,7 @@ impl From<litchi_iwa_style::graph::FinishError> for Error {
     fn from(error: litchi_iwa_style::graph::FinishError) -> Self {
         match error {
             litchi_iwa_style::graph::FinishError::Graph(error) => error.into(),
-            litchi_iwa_style::graph::FinishError::Overflow(_) => Error::InvalidSource,
+            litchi_iwa_style::graph::FinishError::Overflow(_) => Error::Overflow,
             litchi_iwa_style::graph::FinishError::Limit {
                 kind,
                 observed,
@@ -1270,7 +1272,9 @@ fn verify_member_locality(
             return Err(Error::Verification);
         }
         if source_changed(entry.name()) {
-            if !arrangement::same_entry_fixed_metadata(entry, target) {
+            if !arrangement::same_entry_fixed_metadata(entry, target)
+                || !arrangement::same_changed_entry_records(entry, target)
+            {
                 return Err(Error::Verification);
             }
         } else if !arrangement::same_unselected_entry_records(entry, target) {
@@ -1701,7 +1705,9 @@ fn validate_symbol_object_metadata(
     candidate: &litchi_iwa_core::ArchiveObject,
     scope: &engine::MutationScope,
 ) -> bool {
-    if source.archive_info.should_merge != candidate.archive_info.should_merge {
+    if source.archive_info.should_merge != candidate.archive_info.should_merge
+        || source.source_headers().is_some() != candidate.source_headers().is_some()
+    {
         return false;
     }
     if source.archive_info.message_infos.len() != candidate.archive_info.message_infos.len() {
