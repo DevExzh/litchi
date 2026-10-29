@@ -35,6 +35,7 @@ const MODEL_HEADER_ROWS: u32 = 9;
 const MODEL_HEADER_COLUMNS: u32 = 10;
 const MODEL_FOOTER_ROWS: u32 = 11;
 const STORE_TILES: u32 = 3;
+const MAX_CHARACTER_STYLE_ALLOCATIONS: usize = 8;
 
 /// One table cell selected by a leaf facade.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
@@ -142,6 +143,7 @@ pub struct Limits {
     /// Maximum bytes copied into operation-owned graph values.
     pub max_copies: usize,
     remaining_input: Cell<usize>,
+    remaining_output: Cell<usize>,
     remaining_fields: Cell<usize>,
     remaining_work: Cell<usize>,
     remaining_references: Cell<usize>,
@@ -262,6 +264,7 @@ impl Limits {
             max_allocations: max_objects.saturating_add(max_references).max(1),
             max_copies: wire.max_output_bytes().max(1),
             remaining_input: Cell::new(wire.max_input_bytes()),
+            remaining_output: Cell::new(wire.max_output_bytes()),
             remaining_fields: Cell::new(wire.max_fields()),
             remaining_work: Cell::new(wire.max_rewrite_work()),
             remaining_references: Cell::new(max_references),
@@ -306,6 +309,47 @@ impl Limits {
             amount,
             LimitKind::Fields,
         )
+    }
+
+    fn residual_wire(&self) -> Result<WireLimits, Error> {
+        let input = self.remaining_input.get();
+        let fields = self.remaining_fields.get();
+        let output = self.remaining_output.get();
+        let work = self.remaining_work.get();
+        if input == 0 {
+            return Err(Error::Limit {
+                kind: LimitKind::InputBytes,
+                observed: 1,
+                maximum: 0,
+            });
+        }
+        if fields == 0 {
+            return Err(Error::Limit {
+                kind: LimitKind::Fields,
+                observed: 1,
+                maximum: 0,
+            });
+        }
+        if output == 0 {
+            return Err(Error::Limit {
+                kind: LimitKind::OutputBytes,
+                observed: 1,
+                maximum: 0,
+            });
+        }
+        if work == 0 {
+            return Err(Error::Limit {
+                kind: LimitKind::RewriteWork,
+                observed: 1,
+                maximum: 0,
+            });
+        }
+        self.wire
+            .with_input_bytes(input)
+            .and_then(|value| value.with_fields(fields))
+            .and_then(|value| value.with_output_bytes(output))
+            .and_then(|value| value.with_rewrite_work(work))
+            .map_err(map_wire)
     }
 
     fn charge_work(&self, amount: usize) -> Result<(), Error> {
@@ -434,6 +478,7 @@ fn map_wire(error: litchi_iwa_common::Error) -> Error {
 }
 
 fn view<'a>(data: &'a [u8], limits: &Limits) -> Result<WireView<'a>, Error> {
+    let wire = limits.residual_wire()?;
     let remaining_input = limits.remaining_input.get();
     let remaining_fields = limits.remaining_fields.get();
     let remaining_work = limits.remaining_work.get();
@@ -461,7 +506,7 @@ fn view<'a>(data: &'a [u8], limits: &Limits) -> Result<WireView<'a>, Error> {
     let raw_limits = RawWireLimits::new(
         remaining_input.max(1),
         remaining_fields.max(1),
-        limits.wire.max_nesting(),
+        wire.max_nesting(),
         remaining_work.max(1),
     )
     .map_err(map_wire)?;
@@ -471,7 +516,57 @@ fn view<'a>(data: &'a [u8], limits: &Limits) -> Result<WireView<'a>, Error> {
     limits.charge_fields(fields.fields())?;
     limits.charge_work(fields.work())?;
     limits.admit_allocations(fields.fields())?;
-    WireView::parse(data, limits.wire).map_err(map_wire)
+    WireView::parse(data, wire).map_err(map_wire)
+}
+
+fn preflight_codec(data: &[u8], limits: &Limits) -> Result<WireLimits, Error> {
+    let wire = limits.residual_wire()?;
+    if data.len() > limits.remaining_input.get() {
+        return Err(Error::Limit {
+            kind: LimitKind::InputBytes,
+            observed: data.len() as u64,
+            maximum: limits.remaining_input.get() as u64,
+        });
+    }
+    let raw_limits = RawWireLimits::new(
+        limits.remaining_input.get().max(1),
+        limits.remaining_fields.get().max(1),
+        wire.max_nesting(),
+        limits.remaining_work.get().max(1),
+    )
+    .map_err(map_wire)?;
+    let mut fields = RawWireFields::new(data, raw_limits);
+    while fields.next().map_err(map_wire)?.is_some() {}
+    limits.charge_input(data.len())?;
+    limits.charge_fields(fields.fields())?;
+    limits.charge_work(fields.work())?;
+    let nested_fields = data.len().saturating_sub(fields.fields());
+    let nested_work = data.len().saturating_sub(fields.work());
+    limits.charge_fields(nested_fields)?;
+    limits.charge_work(nested_work)?;
+    limits.admit_allocations(MAX_CHARACTER_STYLE_ALLOCATIONS)?;
+    limits.admit_copies(data.len())?;
+    Ok(wire)
+}
+
+fn map_char_style(error: litchi_iwa_text_wire::CharStyleError) -> Error {
+    match error {
+        litchi_iwa_text_wire::CharStyleError::Limit {
+            kind,
+            observed,
+            maximum,
+        } => Error::Limit {
+            kind,
+            observed: observed as u64,
+            maximum: maximum as u64,
+        },
+        litchi_iwa_text_wire::CharStyleError::Allocation { amount } => Error::Allocation { amount },
+        litchi_iwa_text_wire::CharStyleError::Invalid
+        | litchi_iwa_text_wire::CharStyleError::Span => {
+            invalid("malformed character-style properties")
+        },
+        _ => invalid("malformed character-style properties"),
+    }
 }
 
 fn varint(data: &[u8], number: u32, limits: &Limits) -> Result<Option<u64>, Error> {
@@ -682,33 +777,27 @@ fn locate_cell(
 }
 
 fn bnc_limits(data: &[u8], limits: &Limits) -> Result<BncLimits, Error> {
+    let wire = limits.residual_wire()?;
     if data.is_empty() {
-        return Ok(BncLimits::from_wire_limits(limits.wire));
+        return Ok(BncLimits::from_wire_limits(wire));
     }
-    if data.len() > limits.wire.max_input_bytes() {
+    if data.len() > wire.max_input_bytes() {
         return Err(Error::Limit {
             kind: LimitKind::InputBytes,
             observed: data.len() as u64,
-            maximum: limits.wire.max_input_bytes() as u64,
+            maximum: wire.max_input_bytes() as u64,
         });
     }
-    BncLimits::from_wire_limits(limits.wire)
+    BncLimits::from_wire_limits(wire)
         .with_input_bytes(data.len())
         .and_then(|value| {
             value.with_tail_bytes(
                 data.len()
-                    .min(limits.wire.max_input_bytes())
+                    .min(wire.max_input_bytes())
                     .min(BncLimits::MAX_TAIL_BYTES),
             )
         })
-        .and_then(|value| {
-            value.with_items(
-                limits
-                    .wire
-                    .max_rewrite_work()
-                    .clamp(1, BncLimits::MAX_ITEMS),
-            )
-        })
+        .and_then(|value| value.with_items(wire.max_rewrite_work().clamp(1, BncLimits::MAX_ITEMS)))
         .map_err(|_| invalid("invalid BNC operation limits"))
 }
 
@@ -889,7 +978,6 @@ pub fn effective(
     style: u64,
     limits: &Limits,
 ) -> Result<CharacterProperties, Error> {
-    let wire = limits.wire;
     let mut properties = CharacterProperties::new();
     let mut current = Some(style);
     let mut seen = BTreeSet::new();
@@ -900,17 +988,15 @@ pub fn effective(
             return Err(invalid("character-style parent cycle"));
         }
         let payload = style_payload(source, identifier, limits)?;
-        limits.charge_work(payload.len())?;
-        limits.admit_allocations(1)?;
+        let wire = preflight_codec(payload, limits)?;
         let decoded = litchi_iwa_text_wire::character_style_properties(payload, wire)
-            .map_err(|_| invalid("malformed character-style properties"))?;
+            .map_err(map_char_style)?;
         limits.admit_character_properties(&decoded)?;
         limits.admit_character_properties(&properties)?;
         properties.inherit(&decoded);
-        limits.charge_work(payload.len())?;
-        limits.admit_allocations(1)?;
-        current = litchi_iwa_text_wire::character_style_parent(payload, wire)
-            .map_err(|_| invalid("malformed character-style parent"))?;
+        let parent_wire = preflight_codec(payload, limits)?;
+        current = litchi_iwa_text_wire::character_style_parent(payload, parent_wire)
+            .map_err(map_char_style)?;
     }
     if current.is_some() {
         return Err(Error::Limit {
@@ -1107,7 +1193,7 @@ pub fn plan_set(
     if reduced == CharacterProperties::new() {
         return Ok(None);
     }
-    let wire = limits.wire;
+    let wire = limits.residual_wire()?;
     let stylesheet = stylesheet_of(source, parent, limits)?;
     let exclusive = old_key.is_some_and(|key| {
         list.entry(key)
@@ -1513,11 +1599,9 @@ fn style_is_exclusive(
             }
             for message in &object.messages {
                 if message.type_ == PARAGRAPH_STYLE_MESSAGE_TYPE {
-                    limits.charge_work(message.data.len())?;
-                    limits.admit_allocations(1)?;
-                    if litchi_iwa_text_wire::character_style_parent(&message.data, limits.wire)
-                        .ok()
-                        .flatten()
+                    let wire = preflight_codec(&message.data, limits)?;
+                    if litchi_iwa_text_wire::character_style_parent(&message.data, wire)
+                        .map_err(map_char_style)?
                         == Some(style)
                     {
                         return Ok(false);
