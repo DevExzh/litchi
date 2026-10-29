@@ -3,7 +3,7 @@
 - Status: Numbers-first substrate and proof repair remain isolated on the WP.
   Pages and Keynote facades are not started, no ledger rows are migrated, and
   no native acceptance claim is active. The current code tip is
-  `74651bb4ba`; release-mode instruction capture remains coordinator-gated and
+  `ea9a17e04d`; release-mode instruction capture remains coordinator-gated and
   has not started.
 - Source branch: `uo2/iwa-w1g-cell-text-style`, cut from frozen root
   `1e3978082bd8e576f0afeb7e3eebac1ca3908d86`, then synchronized with frozen
@@ -12,8 +12,10 @@
   transition `b9337962b9` through merge `8662fa8ecd`, staged-budget/readback
   repair `76cfbf3afb`, current frozen-root merge `2eb913a401`, and prepared
   multi-stylesheet/segmented-list plus publication-admission closure
-  `74651bb4ba`. Earlier budget, parser, exclusive-path, mutation-output and
-  identity/unknown-preservation checkpoints remain in history.
+  `74651bb4ba`, planner/cache/probe repair `12f9de7115`, and verification
+  budget plus mixed-no-op proof `ea9a17e04d`. Earlier budget, parser,
+  exclusive-path, mutation-output and identity/unknown-preservation
+  checkpoints remain in history.
 - Scope: shared `litchi-iwa-table::cell_text_style` graph reads and direct
   `CharacterProperties` planning, plus the Numbers read and single-cell
   adapter path. Existing public Numbers selectors and vocabulary remain
@@ -79,7 +81,7 @@ out of scope.
 
 The current focused checks pass: 13 shared table unit tests (including
 duplicate/unknown locality, nested-font pre-admission, residual BNC fields,
-zero ceilings and low field/work/allocation cases), eight Numbers
+zero ceilings and low field/work/allocation cases), nine Numbers
 `cell_text_style` tests, formatting, and strict Clippy for both crates. The
 workspace-level glossary, boundary, ledger and fuzz gates remain coordinator
 checks on the integrated candidate. The broader
@@ -91,8 +93,9 @@ candidate. The generated fuzz targets remain outside the checkout.
 The prior Numbers proof rerun covered the 17-property host set/reset/read
 vectors and the populated-reader differential (595 direct semantic reads);
 those receipts are historical until rerun on the integrated candidate. The
-current eight-case Numbers suite includes the shared-key publisher path: two
-cells share one style key, both are changed, the
+current nine-case Numbers suite includes the shared-key publisher path and
+the mixed no-op/changed batch control: two cells share one style key, both are
+changed, the
 candidate is reopened and read directly, the old key is released, an
 unrelated cell remains unchanged, inverse bytes equal the source, and an
 effective-style no-op preserves candidate bytes. The shared planner test also
