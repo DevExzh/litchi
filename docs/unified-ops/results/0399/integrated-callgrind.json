@@ -1,0 +1,35 @@
+{
+  "record": "0399",
+  "status": "accepted current-source full-file unified/direct-leaf instruction qualification",
+  "source_commit": "be2b784791d4070a000ae8f6b7c4ab863ea3783a",
+  "source_clean": true,
+  "scope": "Pages, Keynote and Numbers chart font.size File routes versus direct focused leaf routes; read, set and reset only",
+  "policy": {
+    "ratio": "unified/leaf inclusive Callgrind Ir",
+    "max_ratio": 1.05,
+    "cpu": 5,
+    "calls_per_side": 2,
+    "native_acceptance": "pending",
+    "wall_time_claim": false
+  },
+  "evidence": {
+    "capture_root": "/home/zhuhe/code/litchi-worktrees/.coord/d7-chart-font-size-capture-be2b-cpu5-20261029",
+    "performance_report_sha256": "36c5df491421807c2a83bef38fd410f9d59ee95560a9a8b2d1fd5c2e9adcf9df",
+    "derived_validator_sha256": "6c748ae1b2b0b84847abdf8639f446eac7b0fb0ca2909ddbc48201efa50295c9",
+    "validator": "/home/zhuhe/code/litchi-worktrees/.coord/resume-20261028/perf/iwork-probe-isolation-final/validate_call_audit.py",
+    "validator_sha256": "c0637e4304f5fdbfae6fca6b0e9a9c17f7d10cb9a56c7df6846951fa4bdf6b8e",
+    "binary_sha256": "2beaa8f51fc22b53a9fb4fe2ebd3f95efc24fd69a0cc752f83902b7e6a422f8b",
+    "binary_bytes": 359772600
+  },
+  "routes": [
+    {"id":"pages_read","format":"pages","operation":"read","test":"pages::pages_chart_font_size_read_full_file_cost_abba","scenario":"Pages File chart.font.size read versus direct leaf","size":"chart-grid-authored-native.pages","unified_ir":6207038,"leaf_ir":6018243,"ratio":1.0313704514756217,"calls_per_side":2,"status":"meets"},
+    {"id":"pages_set","format":"pages","operation":"set","test":"pages::pages_chart_font_size_set_full_file_cost_abba","scenario":"Pages File chart.font.size set versus direct leaf","size":"chart-grid-authored-native.pages","unified_ir":34814745,"leaf_ir":34358656,"ratio":1.0132743550853678,"calls_per_side":2,"status":"meets"},
+    {"id":"pages_reset","format":"pages","operation":"reset","test":"pages::pages_chart_font_size_reset_full_file_cost_abba","scenario":"Pages File chart.font.size reset versus direct leaf","size":"chart-grid-authored-native.pages seeded by direct set","unified_ir":24094572,"leaf_ir":23613924,"ratio":1.0203544315633437,"calls_per_side":2,"status":"meets"},
+    {"id":"keynote_read","format":"keynote","operation":"read","test":"keynote::keynote_chart_font_size_read_full_file_cost_abba","scenario":"Keynote File chart.font.size read versus direct leaf","size":"chart-grid-authored-native.key","unified_ir":9647984,"leaf_ir":9201569,"ratio":1.0485150956320601,"calls_per_side":2,"status":"meets"},
+    {"id":"keynote_set","format":"keynote","operation":"set","test":"keynote::keynote_chart_font_size_set_full_file_cost_abba","scenario":"Keynote File chart.font.size set versus direct leaf","size":"chart-grid-authored-native.key","unified_ir":85234829,"leaf_ir":84625309,"ratio":1.0072025734050791,"calls_per_side":2,"status":"meets"},
+    {"id":"keynote_reset","format":"keynote","operation":"reset","test":"keynote::keynote_chart_font_size_reset_full_file_cost_abba","scenario":"Keynote File chart.font.size reset versus direct leaf","size":"chart-grid-authored-native.key seeded by direct set","unified_ir":54685126,"leaf_ir":54060708,"ratio":1.0115503111797943,"calls_per_side":2,"status":"meets"},
+    {"id":"numbers_read","format":"numbers","operation":"read","test":"numbers::numbers_chart_font_size_read_full_file_cost_abba","scenario":"Numbers File chart.font.size read versus direct leaf","size":"chart-grid-authored-native.numbers","unified_ir":9872551,"leaf_ir":9763947,"ratio":1.0111229608272148,"calls_per_side":2,"status":"meets"},
+    {"id":"numbers_set","format":"numbers","operation":"set","test":"numbers::numbers_chart_font_size_set_full_file_cost_abba","scenario":"Numbers File chart.font.size set versus direct leaf","size":"chart-grid-authored-native.numbers","unified_ir":124774692,"leaf_ir":124536918,"ratio":1.00190926517067,"calls_per_side":2,"status":"meets"},
+    {"id":"numbers_reset","format":"numbers","operation":"reset","test":"numbers::numbers_chart_font_size_reset_full_file_cost_abba","scenario":"Numbers File chart.font.size reset versus direct leaf","size":"chart-grid-authored-native.numbers seeded by direct set","unified_ir":38200762,"leaf_ir":37964681,"ratio":1.0062184376052048,"calls_per_side":2,"status":"meets"}
+  ]
+}

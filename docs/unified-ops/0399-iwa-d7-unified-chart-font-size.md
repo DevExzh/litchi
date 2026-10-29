@@ -68,6 +68,8 @@ Runtime/schema/dispatch ownership is limited to:
 * `crates/litchi-ops/src/path/vocabulary.rs` (Numbers chart path spelling);
 * `crates/litchi-ops/tests/iwork_chart_font_size.rs`;
 * `crates/litchi-ops/tests/golden/capabilities/{pages,keynote,numbers}.json`.
+* `tools/unified_bench_matrix.py` and the reduced current-source receipt at
+  `docs/unified-ops/results/0399/integrated-callgrind.json`.
 
 Leaf/shared chart-font crates are read-only dependencies for this slice.  No
 ledger row is flipped by this record.  The coordinator owns `PROGRESS.md`,
@@ -101,8 +103,11 @@ their receipts are retained outside the checkout under
 The release binaries built from `9078ab5837d34d8c9baa18d54fce0903f5721017`
 and `a52c96dd7346a4d88793cde5c07d66150a8e3539` are archived externally, but
 are explicitly non-qualifying because subsequent query-scope repairs landed;
-they must not be used for capture.  A fresh source-bound CPU5 Callgrind run
-from `91b5c65f69` passed all nine full-file unified/direct routes (18 legs):
+they must not be used for capture.  The earlier `c762b00374` matrix failed the
+read-route bar (Pages 1.08733 and Keynote 1.09562), and the `91b5c65f69`
+matrix is superseded historical evidence from before the per-container
+correctness repair.  Neither matrix is current qualification.  That historical
+`91b5c65f69` run passed all nine full-file unified/direct routes (18 legs):
 each leg exited 0 with exactly one selected test pass, exactly two selected
 wrapper calls, and raw full-function Ir equal to summary/totals and the
 threshold-100 annotation.  The per-route unified/direct ratios were Pages
@@ -121,6 +126,24 @@ This is Callgrind instruction evidence only: it makes no wall-time or native
 acceptance claim.  The final integrated coordinator candidate must still be
 requalified after later merges; the earlier c762 matrix remains profiling
 history only.
+
+The accepted current-source qualification is
+`be2b784791d4070a000ae8f6b7c4ab863ea3783a`.  Its immutable release/debug-info
+test binary is external at
+`.coord/d7-chart-font-size-release-be2b7847/staged/iwork_chart_font_size-be2b784791`
+(359,772,600 bytes, mode `0555`, SHA-256
+`2beaa8f51fc22b53a9fb4fe2ebd3f95efc24fd69a0cc752f83902b7e6a422f8b`).  The
+fresh CPU5 matrix has 18 valid legs and a maximum unified/direct inclusive-Ir
+ratio of 1.0485150956: Pages read/set/reset `1.031370/1.013274/1.020354`,
+Keynote read/set/reset `1.048515/1.007203/1.011550`, and Numbers
+read/set/reset `1.011123/1.001909/1.006218`.  The raw selected-call validator
+(`c0637e4304f5fdbfae6fca6b0e9a9c17f7d10cb9a56c7df6846951fa4bdf6b8e`) confirmed
+two calls per wrapper, raw Ir = summary = PROGRAM TOTALS = the threshold-100
+aggregate annotation for every leg.  The current report, derived receipt and
+raw evidence remain external under
+`.coord/d7-chart-font-size-capture-be2b-cpu5-20261029/`; no wall-time or native
+acceptance claim is made.  The final integrated coordinator candidate still
+requires requalification after later merges.
 
 Native mutation evidence is absent.  The nine D7 queue rows appended for this
 slice remain `pending`; no E3/E4 claim is made.  Existing W2-A/W2-B/W2-C leaf
@@ -154,6 +177,6 @@ package is a focused identity/path control only and carries no native
 application acceptance claim.
 
 The post-sync focused suite is 10 passing tests and 9 intentionally ignored
-CPU-slot probes.  The current source-bound release/Callgrind qualification is
-still pending coordinator review; the earlier `91b5c65f69` matrix remains
-profiling history only.
+CPU-slot probes.  The current source-bound release/Callgrind qualification was
+accepted on the be2 current source; the earlier `91b5c65f69` matrix remains
+superseded profiling history only.

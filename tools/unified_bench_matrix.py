@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate the unified-vs-leaf benchmark matrix (records 0289, 0294, 0306, 0310, 0315, 0326, 0337, 0340, 0344, 0391).
+"""Generate the unified-vs-leaf benchmark matrix (records 0289, 0294, 0306, 0310, 0315, 0326, 0337, 0340, 0344, 0391, 0399).
 
 The matrix collects every paired measurement recorded by the unified
 operations records from 0249 on (`docs/unified-ops/02[4-9]*.md`, `03*.md`)
@@ -3814,6 +3814,73 @@ def p0391():
     return out
 
 
+@needs("0399")
+def p0399():
+    """Current-source D7 full-file chart-font-size qualification.
+
+    The reduced receipt retains one row per File/direct-leaf route.  Raw
+    captures and the immutable binary remain external; the receipt is only
+    the compact registry projection of the independently validated matrix.
+    """
+    path = RES / "0399" / "integrated-callgrind.json"
+    data = load_json(path)
+    source = data.get("source_commit")
+    if (not isinstance(source, str) or not re.fullmatch(r"[0-9a-f]{40}", source)
+            or data.get("source_clean") is not True):
+        raise SystemExit("0399 invalid source identity")
+    policy = data.get("policy", {})
+    if (policy.get("ratio") != "unified/leaf inclusive Callgrind Ir"
+            or policy.get("max_ratio") != 1.05
+            or policy.get("cpu") != 5
+            or policy.get("calls_per_side") != 2
+            or policy.get("wall_time_claim") is not False):
+        raise SystemExit("0399 instruction policy changed")
+    routes = data.get("routes")
+    if not isinstance(routes, list) or len(routes) != 9:
+        raise SystemExit("0399 requires exactly nine chart-font-size routes")
+    expected = {
+        "pages": {"read", "set", "reset"},
+        "keynote": {"read", "set", "reset"},
+        "numbers": {"read", "set", "reset"},
+    }
+    out = []
+    seen = set()
+    for route in routes:
+        route_id = route.get("id")
+        fmt = route.get("format")
+        operation = route.get("operation")
+        if (route_id in seen or not isinstance(route_id, str)
+                or fmt not in expected or operation not in expected[fmt]):
+            raise SystemExit(f"0399 invalid or duplicate route: {route_id}")
+        seen.add(route_id)
+        unified = route.get("unified_ir")
+        leaf = route.get("leaf_ir")
+        ratio = route.get("ratio")
+        if (type(unified) is not int or type(leaf) is not int
+                or unified <= 0 or leaf <= 0
+                or type(ratio) not in (int, float)
+                or abs(ratio - unified / leaf) > 1e-12
+                or ratio > policy["max_ratio"]
+                or route.get("calls_per_side") != policy["calls_per_side"]
+                or route.get("status") != "meets"):
+            raise SystemExit(f"0399 invalid instruction result: {route_id}")
+        op = "get" if operation == "read" else "set"
+        out.append(row(
+            "0399", fmt, op, route["scenario"], route.get("size", ""),
+            leaf, unified, [ratio], regression("0399"),
+            f"chart_font_size_full_file:{route_id}:ir", src([path]),
+            stage=f"source-bound {source[:10]}",
+            comparison="unified/leaf (inclusive Callgrind Ir)", unit="Ir",
+            explanation=(
+                "Accepted current-source full-file/direct-leaf instruction route; "
+                "raw selected calls, full-function Ir, PROGRAM TOTALS and the "
+                "threshold-100 aggregate annotation agree. No wall-time or native "
+                "acceptance claim.")))
+    if seen != {route["id"] for route in routes} or len(seen) != 9:
+        raise SystemExit("0399 route set is incomplete")
+    return out
+
+
 @needs("0377")
 def p0377():
     """Record 0377: unified-fin-perf (one source built on the baseline with
@@ -4016,7 +4083,7 @@ PARSERS = [p0250, p0251, p0251f, p0252, p0253, p0254, p0255, p0256, p0258, p0259
            p0328, p0329, p0330, p0333, p0335, p0336, p0337, p0338, p0340, p0342, p0345, p0346,
            p0347, p0348, p0355, p0355a, p0356, p0356a, p0356b, p0356c, p0357, p0357a, p0357b, p0358, p0358a,
            p0359, p0359a, p0359b, p0359qb, p0359qc, p0359qd, p0359r, p0359ra, p0359rb, p0359rc,
-           p0359rd, p0359re, p0359qe, p0360b, p0361, p0361a, p0362, p0362ya, p0362yb, p0362yc, p0362yd, p0362ye, p0375b, p0377, p0377a, p0391]
+           p0359rd, p0359re, p0359qe, p0360b, p0361, p0361a, p0362, p0362ya, p0362yb, p0362yc, p0362yd, p0362ye, p0375b, p0377, p0377a, p0391, p0399]
 
 
 
