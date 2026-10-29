@@ -134,6 +134,126 @@ fn leaf_write(source: &[u8], change: &Change) -> TestResult<LeafRun> {
     Ok(LeafRun::with_inverse(output, restored))
 }
 
+/// Prepare a host-authored source for a captured route.  This setup helper is
+/// deliberately separate from the cost-route symbols: reset/read fixtures
+/// must not add another invocation of the operation being qualified.
+fn prepare_chart_font_source(source: &[u8], chart: u64, change: &Change) -> TestResult<Vec<u8>> {
+    let mut editor = keynote::Draft::from_bytes(source)?;
+    match change {
+        Change::Font(font) => editor.set_slide_chart_font(SLIDE, chart, host_font(font)?)?,
+        Change::Size(size) => editor.set_slide_chart_font_size(
+            SLIDE,
+            chart,
+            ChartFontSize::from_points(size.points())?,
+        )?,
+        _ => return Err("unsupported chart-font setup change".into()),
+    }
+    Ok(editor.to_bytes()?)
+}
+
+/// The host write route used by the isolated ABBA probes.  Keep the wrapper
+/// narrow so its collected work is open, edit, and serialization only.
+#[inline(never)]
+fn host_chart_font_write_cost_route(
+    source: &[u8],
+    chart: u64,
+    change: &Change,
+) -> TestResult<Vec<u8>> {
+    let mut editor = keynote::Draft::from_bytes(source)?;
+    match change {
+        Change::Font(font) => editor.set_slide_chart_font(SLIDE, chart, host_font(font)?)?,
+        Change::Size(size) => editor.set_slide_chart_font_size(
+            SLIDE,
+            chart,
+            ChartFontSize::from_points(size.points())?,
+        )?,
+        Change::ResetFont => {
+            let _ = editor.reset_slide_chart_font(SLIDE, chart)?;
+        },
+        Change::ResetSize => {
+            let _ = editor.reset_slide_chart_font_size(SLIDE, chart)?;
+        },
+        _ => return Err("unsupported chart-font cost change".into()),
+    }
+    Ok(editor.to_bytes()?)
+}
+
+/// The leaf write route used by the isolated ABBA probes.  Inverse
+/// application and output comparison belong to parity cases, not this
+/// matched route-cost measurement.
+#[inline(never)]
+fn leaf_chart_font_write_cost_route(source: &[u8], change: &Change) -> TestResult<Vec<u8>> {
+    let package = Package::from_bytes(source)?;
+    match change {
+        Change::Font(value) => {
+            let commit = package
+                .edit_slide_chart_font(LEAF_SLIDE, LEAF_CHART)?
+                .set(ChartFont::new(value.font.clone(), value.bold, value.italic))
+                .commit()?;
+            Ok(leaf_bytes!(commit.package()))
+        },
+        Change::Size(value) => {
+            let commit = package
+                .edit_slide_chart_font_size(LEAF_SLIDE, LEAF_CHART)?
+                .set(*value)
+                .commit()?;
+            Ok(leaf_bytes!(commit.package()))
+        },
+        Change::ResetFont => {
+            let commit = package
+                .edit_slide_chart_font(LEAF_SLIDE, LEAF_CHART)?
+                .reset()
+                .commit()?;
+            Ok(leaf_bytes!(commit.package()))
+        },
+        Change::ResetSize => {
+            let commit = package
+                .edit_slide_chart_font_size(LEAF_SLIDE, LEAF_CHART)?
+                .reset()
+                .commit()?;
+            Ok(leaf_bytes!(commit.package()))
+        },
+        _ => Err("unsupported chart-font cost change".into()),
+    }
+}
+
+/// Read exactly one selected chart-font property for the host cost route.
+#[inline(never)]
+fn host_chart_font_read_cost_route(
+    source: &[u8],
+    chart: u64,
+    property: &Change,
+) -> TestResult<String> {
+    let editor = keynote::Draft::from_bytes(source)?;
+    match property {
+        Change::Font(_) => Ok(format!("{:?}", editor.slide_chart_font(SLIDE, chart)?)),
+        Change::Size(_) => Ok(format!(
+            "{:.6}",
+            editor.slide_chart_font_size(SLIDE, chart)?.points()
+        )),
+        _ => Err("unsupported chart-font read property".into()),
+    }
+}
+
+/// Read exactly one selected chart-font property for the leaf cost route.
+#[inline(never)]
+fn leaf_chart_font_read_cost_route(source: &[u8], property: &Change) -> TestResult<String> {
+    let package = Package::from_bytes(source)?;
+    match property {
+        Change::Font(_) => Ok(format!(
+            "{:?}",
+            package.slide_chart_font(LEAF_SLIDE, LEAF_CHART)?
+        )),
+        Change::Size(_) => Ok(format!(
+            "{:.6}",
+            package
+                .slide_chart_font_size(LEAF_SLIDE, LEAF_CHART)?
+                .points()
+        )),
+        _ => Err("unsupported chart-font read property".into()),
+    }
+}
+
 fn direct_read_proof(source: &[u8], chart: u64) -> TestResult {
     let host = host_read(source, chart).map_err(|error| format!("host read: {error}"))?;
     let leaf = leaf_read(source).map_err(|error| format!("leaf read: {error}"))?;
@@ -344,25 +464,25 @@ fn run_chart_font_write_cost(change: Change, setup: Option<Change>) -> TestResul
     let mut input = input(Format::Keynote, Kind::Column2d)?;
     let chart = input.chart;
     if let Some(setup) = setup {
-        input.fixture.bytes = host_write(&input.fixture.bytes, chart, &setup)?;
+        input.fixture.bytes = prepare_chart_font_source(&input.fixture.bytes, chart, &setup)?;
     }
     let source = input.fixture.bytes.as_slice();
-    std::hint::black_box(host_write(source, chart, &change)?);
-    std::hint::black_box(leaf_write(source, &change)?);
-    std::hint::black_box(leaf_write(source, &change)?);
-    std::hint::black_box(host_write(source, chart, &change)?);
+    std::hint::black_box(host_chart_font_write_cost_route(source, chart, &change)?);
+    std::hint::black_box(leaf_chart_font_write_cost_route(source, &change)?);
+    std::hint::black_box(leaf_chart_font_write_cost_route(source, &change)?);
+    std::hint::black_box(host_chart_font_write_cost_route(source, chart, &change)?);
     Ok(())
 }
 
 fn run_chart_font_read_cost(change: Change) -> TestResult {
     let mut input = input(Format::Keynote, Kind::Column2d)?;
     let chart = input.chart;
-    input.fixture.bytes = host_write(&input.fixture.bytes, chart, &change)?;
+    input.fixture.bytes = prepare_chart_font_source(&input.fixture.bytes, chart, &change)?;
     let source = input.fixture.bytes.as_slice();
-    std::hint::black_box(host_read(source, chart)?);
-    std::hint::black_box(leaf_read(source)?);
-    std::hint::black_box(leaf_read(source)?);
-    std::hint::black_box(host_read(source, chart)?);
+    std::hint::black_box(host_chart_font_read_cost_route(source, chart, &change)?);
+    std::hint::black_box(leaf_chart_font_read_cost_route(source, &change)?);
+    std::hint::black_box(leaf_chart_font_read_cost_route(source, &change)?);
+    std::hint::black_box(host_chart_font_read_cost_route(source, chart, &change)?);
     Ok(())
 }
 

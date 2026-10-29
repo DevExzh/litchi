@@ -2012,22 +2012,62 @@ fn parse_locality_fields(
     budget: &mut TransactionBudget,
     field_ledger: &mut FieldLedger,
 ) -> Result<Vec<litchi_iwa_common::wire::WireField>, Error> {
+    // The raw scan is the admission preflight.  It retains no spans, and its
+    // residual profile is derived from the same transaction/field ledgers as
+    // the materializing parse below.  This keeps a zero or exhausted budget
+    // from reaching either parser and bounds malformed/group input before any
+    // vector growth is possible.
+    let raw_input = budget
+        .remaining_input()
+        .map_err(map_transaction_error)?
+        .min(limits.max_input_bytes())
+        .min(litchi_iwa_common::wire::RawWireLimits::MAX_INPUT_BYTES);
+    let raw_fields = field_ledger
+        .remaining()?
+        .min(limits.max_fields())
+        .min(litchi_iwa_common::wire::RawWireLimits::MAX_FIELDS);
+    let raw_work = budget
+        .remaining_work()
+        .map_err(map_transaction_error)?
+        .min(limits.max_rewrite_work())
+        .min(litchi_iwa_common::wire::RawWireLimits::MAX_WORK);
+    let raw_limits = litchi_iwa_common::wire::RawWireLimits::new(
+        raw_input,
+        raw_fields,
+        limits
+            .max_nesting()
+            .min(litchi_iwa_common::wire::RawWireLimits::MAX_DEPTH),
+        raw_work,
+    )
+    .map_err(map_wire_error)?;
+    let mut raw = litchi_iwa_common::wire::RawWireFields::new(payload, raw_limits);
+    while raw.next().map_err(map_wire_error)?.is_some() {}
+    let scanned_fields = raw.fields();
+    let scanned_work = raw.work();
+    budget
+        .input(payload.len())
+        .and_then(|_| budget.work(scanned_work))
+        .map_err(map_transaction_error)?;
+    field_ledger.charge(scanned_fields)?;
+
+    // `parse_wire_fields` is the sole materializing pass.  Charge its
+    // complete input/work/span footprint and its logical vector allocation
+    // before invoking it; the raw preflight above deliberately owns no
+    // allocation.  Charge the field ledger again because this pass is part of
+    // the same cumulative transaction, rather than treating preflight as a
+    // free replacement for the actual field vector.
     let span = payload.len().max(1);
-    let scratch = span
+    let materialized_scratch = scanned_fields
+        .max(1)
         .checked_mul(size_of::<litchi_iwa_common::wire::WireField>())
         .ok_or(Error::InvalidSource)?;
     budget
         .input(payload.len())
         .and_then(|_| budget.work(span))
-        .and_then(|_| budget.scratch(scratch))
+        .and_then(|_| budget.scratch(materialized_scratch))
         .and_then(|_| budget.allocations(1))
         .map_err(map_transaction_error)?;
-    let view = litchi_iwa_common::wire::WireView::parse(payload, limits).map_err(map_wire_error)?;
-    field_ledger.charge(view.fields().count())?;
-    budget
-        .input(payload.len())
-        .and_then(|_| budget.work(span))
-        .map_err(map_transaction_error)?;
+    field_ledger.charge(scanned_fields)?;
     let fields =
         litchi_iwa_common::wire::parse_wire_fields(payload, limits).map_err(map_wire_error)?;
     Ok(fields)
@@ -3818,6 +3858,117 @@ mod locality_tests {
             })
         ));
         assert_eq!(fields.used, 0);
+        Ok(())
+    }
+
+    #[test]
+    fn locality_wire_preflight_has_zero_exact_and_cumulative_admission()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let package = Package::from_bytes(SOURCE)?;
+        let payload = [0x08, 0x01, 0x10, 0x02];
+
+        let mut zero_budget = transaction_budget(&package)?;
+        let limits = zero_budget
+            .residual(&package)
+            .map_err(|error| format!("{error:?}"))?;
+        let mut zero_fields = FieldLedger {
+            used: 0,
+            maximum: 0,
+        };
+        assert!(matches!(
+            parse_locality_fields(&payload, limits, &mut zero_budget, &mut zero_fields),
+            Err(Error::Limit {
+                kind: LimitKind::WireFields,
+                ..
+            })
+        ));
+        assert_eq!(zero_fields.used, 0);
+
+        let mut exact_budget = transaction_budget(&package)?;
+        let limits = exact_budget
+            .residual(&package)
+            .map_err(|error| format!("{error:?}"))?;
+        let mut exact_fields = FieldLedger {
+            used: 0,
+            maximum: 4,
+        };
+        let parsed = parse_locality_fields(&payload, limits, &mut exact_budget, &mut exact_fields)?;
+        assert_eq!(parsed.len(), 2);
+        assert_eq!(exact_fields.used, 4);
+
+        let mut cumulative_budget = transaction_budget(&package)?;
+        let limits = cumulative_budget
+            .residual(&package)
+            .map_err(|error| format!("{error:?}"))?;
+        let mut cumulative_fields = FieldLedger {
+            used: 0,
+            maximum: 3,
+        };
+        assert!(matches!(
+            parse_locality_fields(
+                &payload,
+                limits,
+                &mut cumulative_budget,
+                &mut cumulative_fields,
+            ),
+            Err(Error::Limit {
+                kind: LimitKind::WireFields,
+                ..
+            })
+        ));
+        assert_eq!(cumulative_fields.used, 2);
+
+        let mut exact_allocation_budget = transaction_budget(&package)?;
+        let limits = exact_allocation_budget
+            .residual(&package)
+            .map_err(|error| format!("{error:?}"))?;
+        let remaining_allocations = exact_allocation_budget
+            .remaining_allocations()
+            .map_err(|error| format!("{error:?}"))?;
+        exact_allocation_budget
+            .allocations(remaining_allocations - 1)
+            .map_err(|error| format!("{error:?}"))?;
+        let mut allocation_fields = FieldLedger {
+            used: 0,
+            maximum: 4,
+        };
+        assert!(
+            parse_locality_fields(
+                &payload,
+                limits,
+                &mut exact_allocation_budget,
+                &mut allocation_fields,
+            )
+            .is_ok()
+        );
+        assert_eq!(allocation_fields.used, 4);
+
+        let mut zero_allocation_budget = transaction_budget(&package)?;
+        let limits = zero_allocation_budget
+            .residual(&package)
+            .map_err(|error| format!("{error:?}"))?;
+        let remaining_allocations = zero_allocation_budget
+            .remaining_allocations()
+            .map_err(|error| format!("{error:?}"))?;
+        zero_allocation_budget
+            .allocations(remaining_allocations)
+            .map_err(|error| format!("{error:?}"))?;
+        let mut allocation_fields = FieldLedger {
+            used: 0,
+            maximum: 4,
+        };
+        assert!(matches!(
+            parse_locality_fields(
+                &payload,
+                limits,
+                &mut zero_allocation_budget,
+                &mut allocation_fields,
+            ),
+            Err(Error::Limit {
+                kind: LimitKind::Allocations,
+                ..
+            })
+        ));
         Ok(())
     }
 }
