@@ -617,21 +617,16 @@ fn engine_limits(
 fn charge_engine_report(
     budget: &mut ArrangementBudget,
     report: &series_engine::Report,
-    workspace_work: usize,
 ) -> Result<(), Error> {
     let max_nesting = budget
         .residual_wire_limits()
         .map_err(map_arrangement_error)?
         .max_nesting();
-    let engine_work = report
-        .work_bytes()
-        .checked_sub(workspace_work)
-        .ok_or(Error::InvalidSource)?;
     budget
         .input(report.input_bytes())
         .and_then(|_| budget.output(report.output_bytes()))
         .and_then(|_| budget.fields(report.fields()))
-        .and_then(|_| budget.work(engine_work))
+        .and_then(|_| budget.work(report.work_bytes()))
         .and_then(|_| budget.allocations(report.allocations()))
         .and_then(|_| budget.retained(report.retained_bytes()))
         .and_then(|_| budget.scratch(report.scratch_bytes()))
@@ -780,23 +775,29 @@ fn charge_workspace_construction(
     budget: &mut ArrangementBudget,
     requirements: style_graph::ConstructionRequirements,
 ) -> Result<(), Error> {
-    let work = requirements
-        .source_work()
-        .checked_mul(2)
-        .ok_or(Error::Overflow {
-            reason: "workspace construction census/build work",
-        })?;
     budget
-        .preflight_work(work)
+        .preflight_work(requirements.source_work())
         .and_then(|_| budget.preflight_allocations(requirements.index_allocations()))
         .and_then(|_| budget.preflight_retained(requirements.index_retained_bytes()))
         .and_then(|_| budget.preflight_scratch(requirements.index_scratch_bytes()))
         .map_err(map_arrangement_error)?;
     budget
-        .work(work)
+        .work(requirements.source_work())
         .and_then(|_| budget.allocations(requirements.index_allocations()))
         .and_then(|_| budget.retained(requirements.index_retained_bytes()))
         .and_then(|_| budget.scratch(requirements.index_scratch_bytes()))
+        .map_err(map_arrangement_error)
+}
+
+fn charge_workspace_builder(
+    budget: &mut ArrangementBudget,
+    requirements: style_graph::ConstructionRequirements,
+) -> Result<(), Error> {
+    budget
+        .preflight_work(requirements.builder_work())
+        .map_err(map_arrangement_error)?;
+    budget
+        .work(requirements.builder_work())
         .map_err(map_arrangement_error)
 }
 
@@ -929,12 +930,14 @@ fn read_symbols(
     admit_workspace(package, budget)?;
     let components = PackageComponents(package);
     let limits = archive_limits(package)?;
-    let construction_limits = construction_limits(budget)?;
-    let construction = Workspace::construction_requirements(&components, construction_limits)
+    let census_limits = construction_limits(budget)?;
+    let construction = Workspace::construction_requirements(&components, census_limits)
         .map_err(map_construction_error)?;
     charge_workspace_construction(budget, construction)?;
-    let workspace = Workspace::new_bounded(&components, limits, construction, construction_limits)
+    let builder_limits = construction_limits(budget)?;
+    let workspace = Workspace::new_bounded(&components, limits, construction, builder_limits)
         .map_err(map_construction_error)?;
+    charge_workspace_builder(budget, construction)?;
     let engine_limits = engine_limits(package, budget)?;
     let (values, report) = series_engine::symbols(
         &workspace,
@@ -944,7 +947,7 @@ fn read_symbols(
         engine_limits,
     )
     .map_err(map_symbol_error)?;
-    charge_engine_report(budget, &report, construction.source_work())?;
+    charge_engine_report(budget, &report)?;
     Ok(values)
 }
 
@@ -2152,13 +2155,14 @@ fn commit_edit(edit: Edit<'_>, change: Property) -> Result<Commit, Error> {
     admit_workspace(source, &mut budget)?;
     let components = PackageComponents(source);
     let limits = archive_limits(source)?;
-    let construction_limits = construction_limits(&budget)?;
-    let construction = Workspace::construction_requirements(&components, construction_limits)
+    let census_limits = construction_limits(&budget)?;
+    let construction = Workspace::construction_requirements(&components, census_limits)
         .map_err(map_construction_error)?;
     charge_workspace_construction(&mut budget, construction)?;
-    let mut workspace =
-        Workspace::new_bounded(&components, limits, construction, construction_limits)
-            .map_err(map_construction_error)?;
+    let builder_limits = construction_limits(&budget)?;
+    let mut workspace = Workspace::new_bounded(&components, limits, construction, builder_limits)
+        .map_err(map_construction_error)?;
+    charge_workspace_builder(&mut budget, construction)?;
     let engine_limits = engine_limits(source, &budget)?;
     let (changed, report) = series_engine::set_symbols(
         &mut workspace,
@@ -2169,7 +2173,7 @@ fn commit_edit(edit: Edit<'_>, change: Property) -> Result<Commit, Error> {
     )
     .map_err(map_symbol_error)?;
     let scope = report.scope().cloned().ok_or(Error::Verification)?;
-    charge_engine_report(&mut budget, &report, construction.source_work())?;
+    charge_engine_report(&mut budget, &report)?;
     if !changed {
         return Ok(unchanged(source, edit.target, before));
     }
