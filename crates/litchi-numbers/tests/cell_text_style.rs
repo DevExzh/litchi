@@ -28,7 +28,13 @@ fn bold() -> CharacterProperties {
     properties
 }
 
-fn shared_text_style_source() -> TestResult<Vec<u8>> {
+struct SharedTextStyleSource {
+    bytes: Vec<u8>,
+    key: u32,
+    positions: [(u32, u32); 2],
+}
+
+fn shared_text_style_source() -> TestResult<SharedTextStyleSource> {
     const TABLE_MODEL: u32 = 6_001;
     const TILE: u32 = 6_002;
     const LIST: u32 = 6_005;
@@ -39,6 +45,7 @@ fn shared_text_style_source() -> TestResult<Vec<u8>> {
     let catalog = Catalog::from_bytes(&source, ArchiveLimits::default())?;
     let mut style_list_id = None;
     let mut style_id = None;
+    let mut tile_profiles = Vec::new();
     for entry in catalog
         .iter()
         .filter(|entry| entry.name().ends_with(".iwa"))
@@ -51,6 +58,14 @@ fn shared_text_style_source() -> TestResult<Vec<u8>> {
                     let model = tst::TableModelArchive::decode(message.data.as_slice())?;
                     style_list_id = Some(model.base_data_store.style_table.identifier);
                     style_id = Some(model.body_text_style.identifier);
+                    let tile_size = model
+                        .base_data_store
+                        .tiles
+                        .tile_size
+                        .ok_or("missing tile size")?;
+                    for tile in &model.base_data_store.tiles.tiles {
+                        tile_profiles.push((tile.tile.identifier, tile.tileid, tile_size));
+                    }
                 }
             }
         }
@@ -121,6 +136,17 @@ fn shared_text_style_source() -> TestResult<Vec<u8>> {
         .ok_or("missing tile member")?;
     let tile_bytes = SnappyStream::decompress(tile_entry.data(), Default::default())?;
     let mut tile_archive = Archive::parse(tile_bytes.as_bytes(), Default::default())?;
+    let tile_object_id = tile_archive
+        .objects
+        .iter()
+        .find(|object| object.messages.iter().any(|message| message.type_ == TILE))
+        .and_then(|object| object.archive_info.identifier)
+        .ok_or("missing tile object identifier")?;
+    let (tile_index, tile_size) = tile_profiles
+        .iter()
+        .find(|(identifier, _, _)| *identifier == tile_object_id)
+        .map(|(_, index, size)| (*index, *size))
+        .ok_or("tile is not owned by the selected table")?;
     let tile_message = tile_archive
         .objects
         .iter_mut()
@@ -129,6 +155,7 @@ fn shared_text_style_source() -> TestResult<Vec<u8>> {
         .ok_or("missing tile payload")?;
     let mut tile = tst::Tile::decode(tile_message.data.as_slice())?;
     let mut changed = 0_usize;
+    let mut positions = Vec::new();
     for row in &mut tile.row_infos {
         if changed == 2 || row.cell_count == 0 {
             continue;
@@ -153,6 +180,11 @@ fn shared_text_style_source() -> TestResult<Vec<u8>> {
         if present.is_empty() {
             continue;
         }
+        let table_row = tile_index
+            .checked_mul(tile_size)
+            .and_then(|base| base.checked_add(row.tile_row_index))
+            .ok_or("tile row coordinate overflow")?;
+        positions.push((table_row, u32::try_from(present[0])?));
         let mut cells = vec![None; slots];
         for (position, index) in present.iter().enumerate() {
             let begin = usize::from(u16::from_le_bytes([
@@ -198,18 +230,26 @@ fn shared_text_style_source() -> TestResult<Vec<u8>> {
         changed += 1;
     }
     assert_eq!(changed, 2, "source helper needs two materialized rows");
+    let positions: [(u32, u32); 2] = positions
+        .try_into()
+        .map_err(|_| "source helper did not retain two positions")?;
     tile_message.data = tile.encode_to_vec();
     let tile_compressed = SnappyStream::compress(
         &tile_archive.to_bytes(Default::default())?,
         Default::default(),
     )?;
-    Ok(catalog.reassemble_to_bytes(
+    let bytes = catalog.reassemble_to_bytes(
         &[
             EntryEdit::new(&style_member, &style_compressed),
             EntryEdit::new("Index/Tables/Tile.iwa", &tile_compressed),
         ],
         ArchiveLimits::default(),
-    )?)
+    )?;
+    Ok(SharedTextStyleSource {
+        bytes,
+        key: shared_key,
+        positions,
+    })
 }
 
 fn style_entries(bytes: &[u8]) -> TestResult<Vec<(u32, u32)>> {
@@ -307,19 +347,29 @@ fn cells_take_text_styles_on_a_created_workbook() -> TestResult {
     // Restyling a styled cell builds on its style and releases the old key.
     let mut unbold = CharacterProperties::new();
     unbold.bold = Some(false);
-    let again = styled
+    let again_commit = styled
         .edit_table_cell_text_style(0, 0)?
         .set(At::new(1, 1), unbold)?
-        .commit()?
-        .into_package();
+        .commit()?;
+    let again_bytes = bytes(again_commit.package())?;
+    let again_reopened = Package::from_bytes(&again_bytes)?;
     assert_eq!(
-        again.table_cell_text_style(0, 0, At::new(1, 1))?.bold,
+        again_reopened
+            .table_cell_text_style(0, 0, At::new(1, 1))?
+            .bold,
         Some(false)
     );
     assert_eq!(
-        again.table_cell_text_style(0, 0, At::new(2, 1))?.bold,
+        again_reopened
+            .table_cell_text_style(0, 0, At::new(2, 1))?
+            .bold,
         Some(true)
     );
+    let restored_again = again_commit
+        .package()
+        .apply_table_cell_text_style(&again_commit.patch().inverse())?;
+    assert_eq!(bytes(restored_again.package())?, bytes(styled)?);
+    let again = again_commit.into_package();
     let restored = styled.apply_table_cell_text_style(&commit.patch().inverse())?;
     assert_eq!(bytes(restored.package())?, source);
     // A value write keeps the style.
@@ -337,15 +387,20 @@ fn cells_take_text_styles_on_a_created_workbook() -> TestResult {
 
 #[test]
 fn shared_style_key_publishes_reopens_reads_and_reverses_exactly() -> TestResult {
-    let source = shared_text_style_source()?;
+    let generated = shared_text_style_source()?;
+    let source = generated.bytes;
+    let key = generated.key;
+    let first = At::new(generated.positions[0].0, generated.positions[0].1);
+    let second = At::new(generated.positions[1].0, generated.positions[1].1);
     assert!(
-        style_entries(&source)?.contains(&(1, 2)),
+        style_entries(&source)?.contains(&(key, 2)),
         "source helper must publish one shared key"
     );
     let package = Package::from_bytes(&source)?;
-    let first = At::new(1, 1);
-    let second = At::new(2, 1);
-    let sibling = At::new(1, 2);
+    let sibling = (0..10)
+        .flat_map(|row| (0..10).map(move |column| At::new(row, column)))
+        .find(|candidate| *candidate != first && *candidate != second)
+        .ok_or("missing locality candidate")?;
     let before_sibling = package.table_cell_text_style(0, 0, sibling)?;
     assert_eq!(
         package.table_cell_text_style(0, 0, first)?,
@@ -363,7 +418,7 @@ fn shared_style_key_publishes_reopens_reads_and_reverses_exactly() -> TestResult
     assert!(
         !style_entries(&candidate_bytes)?
             .iter()
-            .any(|(key, _)| *key == 1),
+            .any(|(candidate, _)| *candidate == key),
         "the shared source key is released after both cells move"
     );
     let reopened = Package::from_bytes(&candidate_bytes)?;

@@ -511,6 +511,10 @@ fn publish(
         };
         let fresh = match shared::plan_set(source, shared_target, properties, None, &limits) {
             Ok(None) => None,
+            Ok(Some(plan)) if plan.insertions.is_empty() => {
+                limits.admit_allocations(1).map_err(from_shared)?;
+                Some(*working.allocate(1)?.first().ok_or(Error::InvalidSource)?)
+            },
             Ok(Some(_)) => None,
             Err(shared::Error::NeedsIdentifier) => {
                 limits.admit_allocations(1).map_err(from_shared)?;

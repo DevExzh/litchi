@@ -1023,6 +1023,41 @@ fn stylesheet_of(source: &dyn TableSource, style: u64, limits: &Limits) -> Resul
     reference(base, 5, limits)?.ok_or(Error::Refused(Refusal::UnsupportedDependency))
 }
 
+fn parent_of(source: &dyn TableSource, style: u64, limits: &Limits) -> Result<Option<u64>, Error> {
+    let payload = style_payload(source, style, limits)?;
+    let wire = preflight_character_parent(payload, limits)?;
+    litchi_iwa_text_wire::character_style_parent(payload, wire).map_err(map_char_style)
+}
+
+fn overlay_properties(
+    inherited: &CharacterProperties,
+    requested: &CharacterProperties,
+) -> CharacterProperties {
+    let mut properties = inherited.clone();
+    if requested.bold.is_some() {
+        properties.bold = requested.bold;
+    }
+    if requested.italic.is_some() {
+        properties.italic = requested.italic;
+    }
+    if requested.underline.is_some() {
+        properties.underline = requested.underline;
+    }
+    if requested.strikethrough.is_some() {
+        properties.strikethrough = requested.strikethrough;
+    }
+    if requested.size.is_some() {
+        properties.size = requested.size;
+    }
+    if requested.font_name.is_some() {
+        properties.font_name.clone_from(&requested.font_name);
+    }
+    if requested.color.is_some() {
+        properties.color = requested.color;
+    }
+    properties
+}
+
 /// Read effective character properties through the parent chain.
 pub fn effective(
     source: &dyn TableSource,
@@ -1132,6 +1167,36 @@ pub fn minimal(
     output
 }
 
+fn minimal_exact(
+    requested: &CharacterProperties,
+    inherited: &CharacterProperties,
+) -> CharacterProperties {
+    let mut output = CharacterProperties::new();
+    output.bold = requested
+        .bold
+        .filter(|value| inherited.bold != Some(*value));
+    output.italic = requested
+        .italic
+        .filter(|value| inherited.italic != Some(*value));
+    output.underline = requested
+        .underline
+        .filter(|value| inherited.underline != Some(*value));
+    output.strikethrough = requested
+        .strikethrough
+        .filter(|value| inherited.strikethrough != Some(*value));
+    output.size = requested
+        .size
+        .filter(|value| inherited.size != Some(*value));
+    output.font_name = requested
+        .font_name
+        .clone()
+        .filter(|value| inherited.font_name.as_ref() != Some(value));
+    output.color = requested
+        .color
+        .filter(|value| inherited.color != Some(*value));
+    output
+}
+
 /// A style payload rewrite planned by the shared graph engine.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Rewrite {
@@ -1216,6 +1281,17 @@ pub fn plan_set(
     fresh: Option<u64>,
     limits: &Limits,
 ) -> Result<Option<Plan>, Error> {
+    plan_set_inner(source, target, requested, fresh, limits, true)
+}
+
+fn plan_set_inner(
+    source: &dyn TableSource,
+    target: Target,
+    requested: &CharacterProperties,
+    fresh: Option<u64>,
+    limits: &Limits,
+    allow_exclusive: bool,
+) -> Result<Option<Plan>, Error> {
     limits.charge_work(1)?;
     let table = Table::read(source, target, limits)?;
     let cell = locate_cell(source, &table, target, limits)?;
@@ -1250,20 +1326,32 @@ pub fn plan_set(
     }
     let wire = limits.residual_wire()?;
     let stylesheet = stylesheet_of(source, parent, limits)?;
-    let exclusive = old_key.is_some_and(|key| {
-        list.entry(key)
-            .ok()
-            .is_some_and(|entry| entry.refcount == 1)
-    }) && style_is_exclusive(source, parent, table.style_list, limits)?;
+    let exclusive = allow_exclusive
+        && if let Some(key) = old_key {
+            list.entry(key)?.refcount == 1
+                && style_is_exclusive(source, parent, table.style_list, stylesheet, limits)?
+        } else {
+            false
+        };
     if exclusive {
+        let actual_parent = parent_of(source, parent, limits)?;
+        let base = match actual_parent {
+            Some(identifier) => effective(source, identifier, limits)?,
+            None => CharacterProperties::new(),
+        };
+        // overlay_properties() clones the current effective font when it
+        // builds the desired complete state for an in-place rewrite.
+        limits.admit_character_properties(&inherited)?;
+        let desired = overlay_properties(&inherited, requested);
+        let reduced = minimal_exact(&desired, &base);
         limits.admit_allocations(1)?;
         let data = litchi_iwa_text_wire::character_style_variation(
-            Some(parent),
+            actual_parent,
             stylesheet,
             &reduced,
             wire,
         )
-        .map_err(|_| invalid("character-style variation encoding failed"))?;
+        .map_err(map_char_style)?;
         let data = with_paragraph_properties(data, limits)?;
         return Ok(Some(Plan {
             rewrites: vec![Rewrite {
@@ -1281,13 +1369,13 @@ pub fn plan_set(
     limits.admit_allocations(2)?;
     let data =
         litchi_iwa_text_wire::character_style_variation(Some(parent), stylesheet, &reduced, wire)
-            .map_err(|_| invalid("character-style variation encoding failed"))?;
+            .map_err(map_char_style)?;
     let data = with_paragraph_properties(data, limits)?;
     let (sheet_type, sheet_payload) =
         unique_payload(source, stylesheet, &[STYLESHEET_MESSAGE_TYPE], limits)?;
     let sheet_data =
         litchi_iwa_text_wire::stylesheet_with_style(sheet_payload, fresh, Some(parent), wire)
-            .map_err(|_| invalid("stylesheet variation encoding failed"))?;
+            .map_err(map_char_style)?;
     let key = list.next_key()?;
     let next = key.checked_add(1).ok_or(invalid("style key overflow"))?;
     limits.admit_allocations(1)?;
@@ -1398,12 +1486,16 @@ pub fn plan_set_many(
     let mut plans = Vec::new();
     limits.reserve(&mut plans, requests.len())?;
     for request in requests {
-        let Some(plan) = plan_set(
+        // A batch has one publication order for all cells.  Keep the
+        // exclusive in-place path single-cell-only; the Numbers facade
+        // supplies fresh identifiers for these requests before re-planning.
+        let Some(plan) = plan_set_inner(
             source,
             request.target,
             &request.properties,
             request.fresh,
             limits,
+            false,
         )?
         else {
             continue;
@@ -1468,10 +1560,14 @@ pub fn plan_set_many(
                     .last()
                     .map(|(_, key)| *key)
                     .ok_or(invalid("batch list key missing"))?;
-                let entry = repeated_payloads(&rewrite.data, 3, limits)?
-                    .into_iter()
-                    .find(|entry| varint(entry, 1, limits).ok() == Some(Some(u64::from(key))))
-                    .ok_or(invalid("batch style-list entry missing"))?;
+                let mut matching_entry = None;
+                for entry in repeated_payloads(&rewrite.data, 3, limits)? {
+                    if varint(entry, 1, limits)? == Some(u64::from(key)) {
+                        matching_entry = Some(entry);
+                        break;
+                    }
+                }
+                let entry = matching_entry.ok_or(invalid("batch style-list entry missing"))?;
                 list_entries.push(limits.copy(entry)?);
                 continue;
             }
@@ -1490,7 +1586,7 @@ pub fn plan_set_many(
                         insertion.object_references.first().copied(),
                         limits.wire,
                     )
-                    .map_err(|_| invalid("batch stylesheet variation encoding failed"))?;
+                    .map_err(map_char_style)?;
                     limits.reserve(&mut existing.add_references, 1)?;
                     existing.add_references.push(insertion.identifier);
                 } else {
@@ -1509,13 +1605,17 @@ pub fn plan_set_many(
             return Err(invalid("batch style-list owner changed"));
         }
         let mut root_data = limits.copy(&list.root_data)?;
-        let next = list_entries
-            .iter()
-            .filter_map(|entry| varint(entry, 1, limits).ok().flatten())
-            .max()
-            .and_then(|key| key.checked_add(1))
-            .and_then(|key| u32::try_from(key).ok())
-            .unwrap_or(list.next);
+        let mut next = list.next;
+        for entry in &list_entries {
+            let key = u32::try_from(
+                varint(entry, 1, limits)?.ok_or(invalid("batch style-list key missing"))?,
+            )
+            .map_err(|_| invalid("batch style-list key exceeds u32"))?;
+            let candidate = key
+                .checked_add(1)
+                .ok_or(invalid("batch style-list cursor overflow"))?;
+            next = next.max(candidate);
+        }
         limits.admit_allocations(1)?;
         root_data =
             patch_varint_field(&root_data, 2, true, Some(u64::from(next))).map_err(map_wire)?;
@@ -1619,12 +1719,13 @@ fn style_is_exclusive(
     source: &dyn TableSource,
     style: u64,
     list: u64,
+    stylesheet: u64,
     limits: &Limits,
 ) -> Result<bool, Error> {
     for component in source.catalog().iter() {
         for object in &component.archive().objects {
             let identifier = object.archive_info.identifier.unwrap_or_default();
-            if identifier == style || identifier == list {
+            if identifier == style || identifier == list || identifier == stylesheet {
                 continue;
             }
             limits.charge_work(object.messages.len())?;
@@ -1691,9 +1792,9 @@ mod tests {
 
     use super::minimal;
     use super::{
-        Error, LIST_MESSAGE_TYPE, LimitKind, Limits, Request, TABLE_MODEL_MESSAGE_TYPE,
-        TILE_MESSAGE_TYPE, Table, TableSource, Target, locate_cell, plan_set_many,
-        preflight_character_properties, style_key, varint, view,
+        Error, LIST_MESSAGE_TYPE, LimitKind, Limits, Request, StyleList, TABLE_MODEL_MESSAGE_TYPE,
+        TILE_MESSAGE_TYPE, Table, TableSource, Target, locate_cell, plan_set, plan_set_many,
+        preflight_character_properties, style_is_exclusive, style_key, stylesheet_of, varint, view,
     };
     use litchi_iwa_text_wire::CharacterProperties;
 
@@ -2107,6 +2208,45 @@ mod tests {
     }
 
     #[test]
+    fn character_style_encoder_preserves_output_limit_dimension() {
+        let source = limited_source(1_000_000, 1_000_000);
+        let limits = Limits::from_source(&source).expect("source limits");
+        limits.remaining_output.set(1);
+        let model = source
+            .catalog()
+            .iter()
+            .flat_map(|component| component.archive().objects.iter())
+            .find_map(|object| {
+                object
+                    .messages
+                    .iter()
+                    .any(|message| message.type_ == TABLE_MODEL_MESSAGE_TYPE)
+                    .then_some(object.archive_info.identifier)
+                    .flatten()
+            })
+            .expect("table model");
+        let mut requested = CharacterProperties::new();
+        requested.size = Some(73.0);
+        assert!(matches!(
+            plan_set(
+                &source,
+                Target {
+                    model_identifier: model,
+                    row: 1,
+                    column: 1,
+                },
+                &requested,
+                Some(9_000_001),
+                &limits,
+            ),
+            Err(Error::Limit {
+                kind: LimitKind::OutputBytes,
+                ..
+            })
+        ));
+    }
+
+    #[test]
     fn duplicate_singular_style_field_is_rejected_before_projection() {
         let source = limited_source(1_000_000, 1_000_000);
         let limits = Limits::from_source(&source).expect("source limits");
@@ -2181,9 +2321,43 @@ mod tests {
             positions.len() >= 2,
             "fixture did not retain two shared cells"
         );
+        let selected = positions.into_iter().take(2).collect::<Vec<_>>();
+        let old_key = selected
+            .iter()
+            .map(|(row, column)| {
+                let target = Target {
+                    model_identifier: model,
+                    row: *row,
+                    column: *column,
+                };
+                let cell = locate_cell(&source, &table, target, &limits)
+                    .expect("selected cell")
+                    .expect("selected cell bytes");
+                style_key(Some(&cell.bytes), &limits).expect("selected style key")
+            })
+            .collect::<Vec<_>>();
+        assert!(old_key.iter().all(|key| *key == old_key[0]));
+        let old_key = old_key[0].expect("shared style key");
+        let ownership_limits = Limits::from_source(&source).expect("ownership limits");
+        let style_list =
+            StyleList::read(&source, table.style_list, &ownership_limits).expect("style list");
+        let shared_style = style_list.entry(old_key).expect("shared entry").style;
+        let stylesheet =
+            stylesheet_of(&source, shared_style, &ownership_limits).expect("shared stylesheet");
+        assert!(
+            !style_is_exclusive(
+                &source,
+                shared_style,
+                table.style_list,
+                stylesheet,
+                &ownership_limits,
+            )
+            .expect("ownership proof"),
+            "the model's incoming style reference blocks in-place rewrite"
+        );
         let mut properties = CharacterProperties::new();
         properties.size = Some(73.0);
-        let requests = positions
+        let requests = selected
             .into_iter()
             .take(2)
             .enumerate()
@@ -2208,7 +2382,7 @@ mod tests {
             .expect("shared-key list rewrite");
         let list = tst::TableDataList::decode(list_rewrite.data.as_slice()).expect("list rewrite");
         assert!(
-            list.entries.iter().all(|entry| entry.key != 1),
+            list.entries.iter().all(|entry| entry.key != old_key),
             "shared key remains after both cells move"
         );
         assert!(plan.batch_compatible);
