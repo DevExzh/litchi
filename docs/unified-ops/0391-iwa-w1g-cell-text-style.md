@@ -1,11 +1,14 @@
 # 0391 — W1-G: shared whole-cell text-style substrate
 
-- Status: Numbers-first substrate landing; Pages and Keynote facades are not
-  started and no ledger rows are migrated. The current clean tip is
-  `941553f2f4`.
+- Status: paused Numbers-first substrate under explicit budget/admission
+  repair. Pages and Keynote facades are not started, no ledger rows are
+  migrated, and no parity/performance/native acceptance claim is active. The
+  current clean tip is 36be343a42.
 - Source branch: `uo2/iwa-w1g-cell-text-style`, cut from frozen root
   `1e3978082bd8e576f0afeb7e3eebac1ca3908d86`, then synchronized with frozen
-  trunk `295b421bcd3d9ec0b0b9208e4039de22623685bc`.
+  trunk 24ecfb543748885192b8fb5273abb54e669764c6.
+- Continuation commits: trunk merge `d220cd76ed`, budget admission
+  `beb878ea23`, and codec-allocation pre-admission `36be343a42`.
 - Scope: shared `litchi-iwa-table::cell_text_style` graph reads and direct
   `CharacterProperties` planning, plus the Numbers read and single-cell
   adapter path. Existing public Numbers selectors and vocabulary remain
@@ -23,22 +26,20 @@ cell-key updates; the leaf supplies identifiers and owns `Working`, metadata
 publication, exact ZIP reassembly, candidate reopen/readback and public error
 mapping.
 
-The planner preserves the current supported profile: it does not blanket
-refuse shared or segmented graphs. Root and segment style-list entries are
-read with ownership retained; unsupported or ambiguous graph shapes refuse
-typed. Zero ceilings are not raised, and the shared parser does not expose
-native identifiers through supported APIs. `Limits::from_source` pre-admits
-object/reference/work ceilings and derives wire input/output limits before
-table/style traversal or leaf identifier allocation; a zero residual ceiling
-returns a typed limit refusal. Plans carry a bounded `Report` seam for gate
-receipts.
+The current continuation repair makes the budget contract explicit:
+`Limits::from_source` derives wire fields, nesting, input/output and work
+ceilings from the caller's inner archive profile; raw wire structure is
+preflighted before `WireView` allocation; cumulative fields, references,
+work, collection allocations and retained copies are admitted through the
+operation ledger; and style depth follows the caller profile rather than a
+fixed constant. Zero object/reference ceilings are preserved. This is a
+correctness checkpoint, not substrate acceptance; supported-profile,
+malformed/duplicate, locality and host differential proof remain pending.
 
-Numbers now routes whole-cell style reads and writes through the shared
-planner. Fresh-cell batches, exclusive existing-style batches, and supported
-existing-key release batches are combined in one neutral graph plan, retaining
-one variation per cell, atomic staging and exact inverse behavior. There is no
-legacy whole-cell publisher remaining; unsupported graph shapes return the
-typed shared refusal instead of falling through.
+Numbers currently exercises the shared planner for the existing smoke routes.
+The adapter maps `BatchUnsupported` to typed `UnsupportedDependency` and
+does not fall through to a legacy publisher. Full supported-profile and batch
+proof remains pending.
 
 ## Ownership
 
@@ -54,12 +55,11 @@ typed shared refusal instead of falling through.
 
 ## Verification and remaining work
 
-The Numbers `cell_text_style` test target passes five tests, including the
-created-workbook transaction/inverse/readback cases, an exclusive existing
-style batch, and the 33-cell corpus (33 styled, no refusals). Shared planner
-unit tests cover
-minimal inherited-property reduction and host-default emphasis semantics.
-Formatting and strict Clippy for `litchi-iwa-table` and `litchi-numbers` pass.
+The current smoke gates pass: 40 shared table unit tests (including three new
+low-field/work/allocation pre-admission cases), five Numbers
+`cell_text_style` tests, formatting, scoped check, and strict Clippy for both
+crates. These are not the required 17-property host differential or full
+transaction proof.
 
 Before Pages/Keynote work begins, requalify the shared substrate against the
 full Numbers 17-property parity/readback and release-mode facade matrix,
@@ -68,9 +68,9 @@ before wire work, inverse/no-op and candidate reopen. Only after that
 acceptance should the six Pages/Keynote facade rows and native queue entries
 be added. Timing remains held until the coordinator grants the slot.
 
-Current frozen-trunk correctness evidence: the integrated parity target passed
-the direct CharacterProperties read/set/shared/corpus routes (36 corpus reads)
-and all 17 generic text-property set/reset/read vectors (595 reader
-comparisons). The Numbers text-style target has five local tests, including
-fresh-cell, inverse/no-op, exclusive existing-style batch and 33-cell corpus
-coverage; shared residual-budget tests include the zero-reference refusal.
+Historical parity and corpus receipts from the pre-repair checkpoint are
+retained as context only and are not requalified evidence for this source.
+The next gate must add direct host-vs-shared reads for all 17 properties, an
+actual shared-key batch vector, unknown/locality and malformed-duplicate
+controls, cumulative/depth/zero-limit transactions, inverse/no-op and
+candidate reopen before any Pages/Keynote facade or ledger work.
