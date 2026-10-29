@@ -319,6 +319,14 @@ impl Limits {
         )
     }
 
+    fn prepare_output(&self, bound: usize) -> Result<WireLimits, Error> {
+        let wire = self.residual_wire()?;
+        self.charge_output(bound)?;
+        self.admit_copies(bound)?;
+        self.admit_allocations(1)?;
+        Ok(wire)
+    }
+
     fn residual_wire(&self) -> Result<WireLimits, Error> {
         let input = self.remaining_input.get();
         let fields = self.remaining_fields.get();
@@ -1058,6 +1066,150 @@ fn overlay_properties(
     properties
 }
 
+fn canonical_variation_payload(data: &[u8], limits: &Limits) -> Result<bool, Error> {
+    let root = view(data, limits)?;
+    if root.len() != 6 {
+        return Ok(false);
+    }
+    let mut fields = root.fields();
+    let Some(base) = fields.next() else {
+        return Ok(false);
+    };
+    if base.number() != 1 || base.wire_type() != 2 {
+        return Ok(false);
+    }
+    let base = view(base.payload(), limits)?;
+    let mut base_fields = base.fields();
+    if let Some(parent) = base_fields.next() {
+        if parent.number() != 3 || parent.wire_type() != 2 {
+            return Ok(false);
+        }
+        if !canonical_reference_payload(parent.payload(), limits)? {
+            return Ok(false);
+        }
+    }
+    let Some(version) = base_fields.next() else {
+        return Ok(false);
+    };
+    if version.number() != 4 || version.wire_type() != 0 {
+        return Ok(false);
+    }
+    let (version_value, version_length) =
+        litchi_iwa_common::varint::decode_varint_from_bytes(version.payload())
+            .map_err(|_| invalid("malformed canonical style version"))?;
+    if version_value != 1 || version_length != version.payload().len() {
+        return Ok(false);
+    }
+    let Some(stylesheet) = base_fields.next() else {
+        return Ok(false);
+    };
+    if stylesheet.number() != 5 || stylesheet.wire_type() != 2 {
+        return Ok(false);
+    }
+    if !canonical_reference_payload(stylesheet.payload(), limits)? {
+        return Ok(false);
+    }
+    if base_fields.next().is_some() {
+        return Ok(false);
+    }
+
+    let Some(version) = fields.next() else {
+        return Ok(false);
+    };
+    if version.number() != 4 || version.wire_type() != 0 {
+        return Ok(false);
+    }
+    let (version_value, version_length) =
+        litchi_iwa_common::varint::decode_varint_from_bytes(version.payload())
+            .map_err(|_| invalid("malformed canonical style version"))?;
+    if version_value != 1 || version_length != version.payload().len() {
+        return Ok(false);
+    }
+    let Some(stylesheet) = fields.next() else {
+        return Ok(false);
+    };
+    if stylesheet.number() != 5
+        || stylesheet.wire_type() != 2
+        || !canonical_reference_payload(stylesheet.payload(), limits)?
+    {
+        return Ok(false);
+    }
+    let Some(count_field) = fields.next() else {
+        return Ok(false);
+    };
+    if count_field.number() != 10 || count_field.wire_type() != 0 {
+        return Ok(false);
+    }
+    let Some(properties) = fields.next() else {
+        return Ok(false);
+    };
+    if properties.number() != 11 || properties.wire_type() != 2 {
+        return Ok(false);
+    }
+    let properties = view(properties.payload(), limits)?;
+    let allowed = [1, 2, 3, 5, 7, 11, 12];
+    let mut previous = 0;
+    for field in properties.fields() {
+        if !allowed.contains(&field.number()) || field.number() <= previous {
+            return Ok(false);
+        }
+        previous = field.number();
+        let expected_wire = match field.number() {
+            1 | 2 | 11 | 12 => 0,
+            3 => 5,
+            5 | 7 => 2,
+            _ => return Ok(false),
+        };
+        if field.wire_type() != expected_wire {
+            return Ok(false);
+        }
+        if field.number() == 7 {
+            let color = view(field.payload(), limits)?;
+            if color.len() != 5 {
+                return Ok(false);
+            }
+            let expected = [1, 3, 4, 5, 6];
+            for (actual, number) in color.fields().zip(expected) {
+                if actual.number() != number
+                    || actual.wire_type() != if number == 1 { 0 } else { 5 }
+                {
+                    return Ok(false);
+                }
+            }
+        }
+    }
+    let (count, count_length) =
+        litchi_iwa_common::varint::decode_varint_from_bytes(count_field.payload())
+            .map_err(|_| invalid("malformed canonical style count"))?;
+    if count_length != count_field.payload().len() {
+        return Ok(false);
+    }
+    if count != u64::try_from(properties.len()).unwrap_or(u64::MAX) {
+        return Ok(false);
+    }
+    let Some(paragraph) = fields.next() else {
+        return Ok(false);
+    };
+    if paragraph.number() != 12 || paragraph.wire_type() != 2 || !paragraph.payload().is_empty() {
+        return Ok(false);
+    }
+    Ok(fields.next().is_none())
+}
+
+fn canonical_reference_payload(data: &[u8], limits: &Limits) -> Result<bool, Error> {
+    let reference = view(data, limits)?;
+    if reference.len() != 1 {
+        return Ok(false);
+    }
+    let reference = reference.get(0).expect("reference field");
+    if reference.number() != 1 || reference.wire_type() != 0 {
+        return Ok(false);
+    }
+    let (_, length) = litchi_iwa_common::varint::decode_varint_from_bytes(reference.payload())
+        .map_err(|_| invalid("malformed canonical style reference"))?;
+    Ok(length == reference.payload().len())
+}
+
 /// Read effective character properties through the parent chain.
 pub fn effective(
     source: &dyn TableSource,
@@ -1324,11 +1476,11 @@ fn plan_set_inner(
     if reduced == CharacterProperties::new() {
         return Ok(None);
     }
-    let wire = limits.residual_wire()?;
     let stylesheet = stylesheet_of(source, parent, limits)?;
     let exclusive = allow_exclusive
         && if let Some(key) = old_key {
             list.entry(key)?.refcount == 1
+                && canonical_variation_payload(style_payload(source, parent, limits)?, limits)?
                 && style_is_exclusive(source, parent, table.style_list, stylesheet, limits)?
         } else {
             false
@@ -1344,43 +1496,31 @@ fn plan_set_inner(
         limits.admit_character_properties(&inherited)?;
         let desired = overlay_properties(&inherited, requested);
         let reduced = minimal_exact(&desired, &base);
-        limits.admit_allocations(1)?;
-        let data = litchi_iwa_text_wire::character_style_variation(
-            actual_parent,
-            stylesheet,
-            &reduced,
-            wire,
-        )
-        .map_err(map_char_style)?;
-        let data = with_paragraph_properties(data, limits)?;
+        let data = encode_variation(actual_parent, stylesheet, &reduced, limits)?;
+        let mut rewrites = Vec::new();
+        limits.reserve(&mut rewrites, 1)?;
+        rewrites.push(Rewrite {
+            identifier: parent,
+            message_type: PARAGRAPH_STYLE_MESSAGE_TYPE,
+            data,
+            add_references: Vec::new(),
+            remove_references: Vec::new(),
+        });
         return Ok(Some(Plan {
-            rewrites: vec![Rewrite {
-                identifier: parent,
-                message_type: PARAGRAPH_STYLE_MESSAGE_TYPE,
-                data,
-                add_references: Vec::new(),
-                remove_references: Vec::new(),
-            }],
+            rewrites,
             report: limits.report(),
             ..Plan::default()
         }));
     }
     let fresh = fresh.ok_or(Error::NeedsIdentifier)?;
-    limits.admit_allocations(2)?;
-    let data =
-        litchi_iwa_text_wire::character_style_variation(Some(parent), stylesheet, &reduced, wire)
-            .map_err(map_char_style)?;
-    let data = with_paragraph_properties(data, limits)?;
+    let data = encode_variation(Some(parent), stylesheet, &reduced, limits)?;
     let (sheet_type, sheet_payload) =
         unique_payload(source, stylesheet, &[STYLESHEET_MESSAGE_TYPE], limits)?;
-    let sheet_data =
-        litchi_iwa_text_wire::stylesheet_with_style(sheet_payload, fresh, Some(parent), wire)
-            .map_err(map_char_style)?;
+    let sheet_data = encode_stylesheet_variation(sheet_payload, fresh, Some(parent), limits)?;
     let key = list.next_key()?;
     let next = key.checked_add(1).ok_or(invalid("style key overflow"))?;
-    limits.admit_allocations(1)?;
     let mut list_data =
-        patch_varint_field(&list.root_data, 2, true, Some(u64::from(next))).map_err(map_wire)?;
+        patch_varint_bounded(&list.root_data, 2, true, Some(u64::from(next)), limits)?;
     let mut entry = Vec::new();
     limits.admit_allocations(2)?;
     litchi_iwa_common::varint::encode_varint_into(&mut entry, 1_u64 << 3);
@@ -1390,25 +1530,30 @@ fn plan_set_inner(
     let mut reference_payload = Vec::new();
     litchi_iwa_common::varint::encode_varint_into(&mut reference_payload, 1_u64 << 3);
     litchi_iwa_common::varint::encode_varint_into(&mut reference_payload, fresh);
-    append_length_delimited_field(&mut entry, 4, &reference_payload, limits.wire)
-        .map_err(map_wire)?;
-    append_length_delimited_field(&mut list_data, 3, &entry, limits.wire).map_err(map_wire)?;
-    let mut rewrites = vec![
-        Rewrite {
-            identifier: stylesheet,
-            message_type: sheet_type,
-            data: sheet_data,
-            add_references: vec![fresh],
-            remove_references: Vec::new(),
-        },
-        Rewrite {
-            identifier: list.root,
-            message_type: list.root_type,
-            data: list_data,
-            add_references: vec![fresh],
-            remove_references: Vec::new(),
-        },
-    ];
+    append_field_bounded(&mut entry, 4, &reference_payload, limits)?;
+    append_field_bounded(&mut list_data, 3, &entry, limits)?;
+    let mut rewrites = Vec::new();
+    limits.reserve(&mut rewrites, 2)?;
+    let mut stylesheet_references = Vec::new();
+    limits.reserve(&mut stylesheet_references, 1)?;
+    stylesheet_references.push(fresh);
+    rewrites.push(Rewrite {
+        identifier: stylesheet,
+        message_type: sheet_type,
+        data: sheet_data,
+        add_references: stylesheet_references,
+        remove_references: Vec::new(),
+    });
+    let mut list_references = Vec::new();
+    limits.reserve(&mut list_references, 1)?;
+    list_references.push(fresh);
+    rewrites.push(Rewrite {
+        identifier: list.root,
+        message_type: list.root_type,
+        data: list_data,
+        add_references: list_references,
+        remove_references: Vec::new(),
+    });
     let mut releases = Vec::new();
     limits.reserve(&mut releases, if old_key.is_some() { 1 } else { 0 })?;
     if let Some(old) = old_key {
@@ -1448,24 +1593,34 @@ fn plan_set_inner(
             rewrites[1].remove_references = dropped;
         }
     }
+    let mut object_references = Vec::new();
+    limits.reserve(&mut object_references, 1)?;
+    object_references.push(parent);
+    let mut insertions = Vec::new();
+    limits.reserve(&mut insertions, 1)?;
+    insertions.push(NewObject {
+        identifier: fresh,
+        beside: stylesheet,
+        message_type: PARAGRAPH_STYLE_MESSAGE_TYPE,
+        versions: None,
+        data,
+        object_references,
+    });
+    let mut registrations = Vec::new();
+    limits.reserve(&mut registrations, 2)?;
+    registrations.push(Registration::Uuid { object: fresh });
+    registrations.push(Registration::ExternalReference {
+        from: list.root,
+        object: fresh,
+    });
+    let mut cell_updates = Vec::new();
+    limits.reserve(&mut cell_updates, 1)?;
+    cell_updates.push((target, key));
     Ok(Some(Plan {
         rewrites,
-        insertions: vec![NewObject {
-            identifier: fresh,
-            beside: stylesheet,
-            message_type: PARAGRAPH_STYLE_MESSAGE_TYPE,
-            versions: None,
-            data,
-            object_references: vec![parent],
-        }],
-        registrations: vec![
-            Registration::Uuid { object: fresh },
-            Registration::ExternalReference {
-                from: list.root,
-                object: fresh,
-            },
-        ],
-        cell_updates: vec![(target, key)],
+        insertions,
+        registrations,
+        cell_updates,
         batch_compatible: true,
         report: limits.report(),
         releases,
@@ -1580,13 +1735,12 @@ pub fn plan_set_many(
                         .insertions
                         .last()
                         .ok_or(invalid("batch stylesheet insertion missing"))?;
-                    existing.data = litchi_iwa_text_wire::stylesheet_with_style(
+                    existing.data = encode_stylesheet_variation(
                         &existing.data,
                         insertion.identifier,
                         insertion.object_references.first().copied(),
-                        limits.wire,
-                    )
-                    .map_err(map_char_style)?;
+                        limits,
+                    )?;
                     limits.reserve(&mut existing.add_references, 1)?;
                     existing.add_references.push(insertion.identifier);
                 } else {
@@ -1616,12 +1770,9 @@ pub fn plan_set_many(
                 .ok_or(invalid("batch style-list cursor overflow"))?;
             next = next.max(candidate);
         }
-        limits.admit_allocations(1)?;
-        root_data =
-            patch_varint_field(&root_data, 2, true, Some(u64::from(next))).map_err(map_wire)?;
+        root_data = patch_varint_bounded(&root_data, 2, true, Some(u64::from(next)), limits)?;
         for entry in &list_entries {
-            append_length_delimited_field(&mut root_data, 3, entry, limits.wire)
-                .map_err(map_wire)?;
+            append_field_bounded(&mut root_data, 3, entry, limits)?;
         }
         let mut add_references = Vec::new();
         limits.reserve(&mut add_references, combined.insertions.len())?;
@@ -1689,21 +1840,172 @@ fn rewrite_list_key(data: &[u8], old: u32, new: u32, limits: &Limits) -> Result<
     for entry in entries {
         if varint(entry, 1, limits)? == Some(u64::from(old)) {
             limits.admit_allocations(1)?;
-            replacements
-                .push(patch_varint_field(entry, 1, true, Some(u64::from(new))).map_err(map_wire)?);
+            replacements.push(patch_varint_bounded(
+                entry,
+                1,
+                true,
+                Some(u64::from(new)),
+                limits,
+            )?);
         } else {
             replacements.push(limits.copy(entry)?);
         }
     }
     limits.admit_allocations(1)?;
-    let mut output =
-        rewrite_repeated_length_delimited_fields(data, 3, &replacements).map_err(map_wire)?;
+    let mut output = rewrite_repeated_bounded(data, 3, &replacements, limits)?;
     if varint(&output, 2, limits)? == Some(u64::from(old).saturating_add(1)) {
         limits.admit_allocations(1)?;
-        output = patch_varint_field(&output, 2, true, Some(u64::from(new).saturating_add(1)))
-            .map_err(map_wire)?;
+        output = patch_varint_bounded(
+            &output,
+            2,
+            true,
+            Some(u64::from(new).saturating_add(1)),
+            limits,
+        )?;
     }
     Ok(output)
+}
+
+fn bytes_bound(number: u32, length: usize) -> usize {
+    litchi_iwa_common::varint::encoded_len((u64::from(number) << 3) | 2)
+        .saturating_add(litchi_iwa_common::varint::encoded_len(length as u64))
+        .saturating_add(length)
+}
+
+fn patch_varint_bounded(
+    data: &[u8],
+    field: u32,
+    required: bool,
+    value: Option<u64>,
+    limits: &Limits,
+) -> Result<Vec<u8>, Error> {
+    let _wire = limits.prepare_output(data.len().saturating_add(11))?;
+    patch_varint_field(data, field, required, value).map_err(map_wire)
+}
+
+fn append_field_bounded(
+    data: &mut Vec<u8>,
+    field: u32,
+    payload: &[u8],
+    limits: &Limits,
+) -> Result<(), Error> {
+    let wire =
+        limits.prepare_output(data.len().saturating_add(bytes_bound(field, payload.len())))?;
+    append_length_delimited_field(data, field, payload, wire).map_err(map_wire)
+}
+
+fn rewrite_repeated_bounded(
+    data: &[u8],
+    field: u32,
+    replacements: &[Vec<u8>],
+    limits: &Limits,
+) -> Result<Vec<u8>, Error> {
+    let replacement_bytes = replacements
+        .iter()
+        .fold(0_usize, |total, value| total.saturating_add(value.len()));
+    let _wire = limits.prepare_output(data.len().saturating_add(replacement_bytes))?;
+    rewrite_repeated_length_delimited_fields(data, field, replacements).map_err(map_wire)
+}
+
+fn character_properties_bound(properties: &CharacterProperties) -> usize {
+    let mut length = 0_usize;
+    for value in [
+        properties.bold,
+        properties.italic,
+        properties.underline,
+        properties.strikethrough,
+    ] {
+        if value.is_some() {
+            length = length.saturating_add(2);
+        }
+    }
+    if properties.size.is_some() {
+        length = length.saturating_add(5);
+    }
+    if let Some(font) = properties.font_name.as_deref() {
+        length = length.saturating_add(bytes_bound(5, font.len()));
+    }
+    if properties.color.is_some() {
+        length = length.saturating_add(bytes_bound(7, 22));
+    }
+    length
+}
+
+fn variation_fields(parent: Option<u64>, properties: &CharacterProperties) -> usize {
+    6_usize
+        .saturating_add(usize::from(parent.is_some()) * 2)
+        .saturating_add(
+            usize::from(properties.bold.is_some())
+                + usize::from(properties.italic.is_some())
+                + usize::from(properties.underline.is_some())
+                + usize::from(properties.strikethrough.is_some())
+                + usize::from(properties.size.is_some())
+                + usize::from(properties.font_name.is_some())
+                + usize::from(properties.color.is_some()),
+        )
+        .saturating_add(usize::from(properties.color.is_some()) * 5)
+        .saturating_add(1)
+}
+
+fn encode_variation(
+    parent: Option<u64>,
+    stylesheet: u64,
+    properties: &CharacterProperties,
+    limits: &Limits,
+) -> Result<Vec<u8>, Error> {
+    let base_len = bytes_bound(5, 11)
+        .saturating_add(2)
+        .saturating_add(usize::from(parent.is_some()) * bytes_bound(3, 11));
+    let bound = bytes_bound(1, base_len)
+        .saturating_add(2)
+        .saturating_add(bytes_bound(5, 11))
+        .saturating_add(2)
+        .saturating_add(bytes_bound(11, character_properties_bound(properties)))
+        .saturating_add(2);
+    let wire = limits.prepare_output(bound)?;
+    let fields = variation_fields(parent, properties);
+    limits.charge_fields(fields)?;
+    limits.charge_work(fields)?;
+    let data =
+        litchi_iwa_text_wire::character_style_variation(parent, stylesheet, properties, wire)
+            .map_err(map_char_style)?;
+    with_paragraph_properties(data, limits)
+}
+
+fn preflight_stylesheet_writer(
+    data: &[u8],
+    parent: Option<u64>,
+    limits: &Limits,
+) -> Result<(), Error> {
+    let root = view(data, limits)?;
+    admit_decoder_view(data.len(), root.len(), limits)?;
+    if parent.is_some() {
+        for field in root.fields() {
+            if field.number() != 5 || field.wire_type() != 2 {
+                continue;
+            }
+            let entry = view(field.payload(), limits)?;
+            admit_decoder_view(field.payload().len(), entry.len(), limits)?;
+            for inner in entry.fields() {
+                if inner.number() == 1 && inner.wire_type() == 2 {
+                    let reference = view(inner.payload(), limits)?;
+                    admit_decoder_view(inner.payload().len(), reference.len(), limits)?;
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
+fn encode_stylesheet_variation(
+    data: &[u8],
+    style: u64,
+    parent: Option<u64>,
+    limits: &Limits,
+) -> Result<Vec<u8>, Error> {
+    let wire = limits.prepare_output(data.len().saturating_add(64))?;
+    preflight_stylesheet_writer(data, parent, limits)?;
+    litchi_iwa_text_wire::stylesheet_with_style(data, style, parent, wire).map_err(map_char_style)
 }
 
 fn with_paragraph_properties(mut data: Vec<u8>, limits: &Limits) -> Result<Vec<u8>, Error> {
@@ -2375,6 +2677,30 @@ mod tests {
             .expect("shared-key plan")
             .expect("shared-key changes");
         assert_eq!(plan.insertions.len(), 2);
+        let probe_limits = Limits::from_source(&source).expect("probe limits");
+        let before_output = probe_limits.remaining_output.get();
+        let _single = plan_set(
+            &source,
+            requests[0].target,
+            &requests[0].properties,
+            requests[0].fresh,
+            &probe_limits,
+        )
+        .expect("single output probe")
+        .expect("single output change");
+        let single_output = before_output.saturating_sub(probe_limits.remaining_output.get());
+        assert!(single_output > 0, "single plan must debit output");
+        let batch_limits = Limits::from_source(&source).expect("batch limits");
+        batch_limits
+            .remaining_output
+            .set(single_output.saturating_add(1));
+        assert!(matches!(
+            plan_set_many(&source, &requests, &batch_limits),
+            Err(Error::Limit {
+                kind: LimitKind::OutputBytes,
+                ..
+            })
+        ));
         let list_rewrite = plan
             .rewrites
             .iter()
