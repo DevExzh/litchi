@@ -2,18 +2,19 @@
 
 - Status: Numbers chart-series caller-ledger repair is isolated on
   `uo2/iwa-w2a-numbers-series-budget`; final handoff source is the current
-  branch tip `ee9ed903a3` after the accepted registry-reuse merge `73b7bf0027`,
-  retained-memory policy repair `d4fcd3af7f`, and final caller-gate closure.
+  branch tip `2b836bb434` after canonical bounded finish `60d2f93efeb9`, the
+  accepted registry-reuse merge `73b7bf0027`, retained-memory policy repair
+  `d4fcd3af7f`, and final caller-gate closure.
   It contains implementation
   checkpoint `7573d88827`, shared styled-parent/residual hard-limit fixes
   (`055b609ac1`, `701c2c3f37`), and the malformed-source regression
   (`0bf1083940`).
 - Scope: `crates/litchi-numbers/src/package/sheet_chart_series.rs`, the
   Numbers `ChartBudget` residual series seam in `chart_arrangement.rs`, the
-  small shared `Workspace::finish_requirements` admission seam, typed
-  mappings, and focused Numbers chart-series/fixture tests. Pages/Keynote
-  callers, ledger rows, native queue work, and performance captures are out
-  of scope.
+  canonical shared `Workspace::finish_requirements`/`finish_bounded` seam,
+  typed mappings, and focused Numbers chart-series/fixture tests.
+  Pages/Keynote callers, ledger rows, native queue work, and performance
+  captures are out of scope.
 - Native evidence: none. No E3/E4 claim is made.
 
 ## Caller ledger
@@ -30,8 +31,9 @@ process-wide profile. Codec residuals reject exhausted allocation, retained,
 and scratch axes before codec work. Retained/scratch graph memory follows the
 checked archive header-memory policy, so a small input ceiling does not make
 valid selector admission fail before the intended candidate limit. Final
-change-vector construction is pre-admitted through the shared workspace
-finish-requirements report.
+change-vector construction uses the canonical shared finish requirements,
+residual `FinishLimits`, fallible `finish_bounded`, and post-success
+`FinishReport` charging; no legacy infallible finish path is used.
 
 The symbol path adopts F's bounded `series::Limits`/`Report`/`MutationScope`
 seam. The facade charges the report once and verifies the selected chart,
@@ -72,12 +74,12 @@ Numbers-side gap but does not qualify the full Numbers facade or performance.
 
 ## Verification
 
-- `cargo check --offline -p litchi-numbers --lib` — pass on `ee9ed903a3`.
+- `cargo check --offline -p litchi-numbers --lib` — pass on `2b836bb434`.
 - `cargo clippy --offline -p litchi-numbers --lib --all-features -- -D warnings` — pass on the final source (vendor warnings only).
 - `cargo doc --offline -p litchi-numbers --no-deps` — pass.
 - `cargo test --offline -p litchi-numbers --test sheet_drawables -- --test-threads=1` — 15 passed.
 - `cargo test --offline -p litchi-numbers --test sheet_chart_font -- --test-threads=1` — 4 passed, including the expanded-candidate typed refusal.
-- `cargo test --offline -p litchi-iwa-style graph::tests --lib` — 5 passed, including registry-inspection cache reuse and finish admission.
+- `cargo test --offline -p litchi-iwa-style graph::tests --lib` — 7 passed, including registry-inspection cache reuse and bounded finish admission.
 - `cargo test --offline -p litchi-iwa-style symbol_tests --lib` — 8 passed.
 - `cargo fmt --all -- --check` — pass.
 - `python3 tools/iwa_exit_ledger.py --check` — pass.
