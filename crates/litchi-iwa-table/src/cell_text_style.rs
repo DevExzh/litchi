@@ -819,23 +819,22 @@ pub fn table_facts(
     limits: &Limits,
 ) -> Result<TableFacts, Error> {
     let table = Table::read(source, target, limits)?;
-    let row_headers = bytes(&table.store, 1, limits)?
-        .map(|storage| {
-            repeated_payloads(storage, 2, limits)?
-                .into_iter()
-                .enumerate()
-                .map(|(bucket, reference)| {
-                    limits.charge_references(1)?;
-                    let identifier = varint(reference, 1, limits)?
-                        .ok_or(invalid("row-header reference identifier missing"))?;
-                    let bucket = u32::try_from(bucket)
-                        .map_err(|_| invalid("row-header bucket index exceeds u32"))?;
-                    Ok((bucket, identifier))
-                })
-                .collect::<Result<Vec<_>, Error>>()
-        })
-        .transpose()?
-        .unwrap_or_default();
+    let row_headers = if let Some(storage) = bytes(&table.store, 1, limits)? {
+        let references = repeated_payloads(storage, 2, limits)?;
+        let mut buckets = Vec::new();
+        limits.reserve(&mut buckets, references.len())?;
+        for (bucket, reference) in references.into_iter().enumerate() {
+            limits.charge_references(1)?;
+            let identifier = varint(reference, 1, limits)?
+                .ok_or(invalid("row-header reference identifier missing"))?;
+            let bucket = u32::try_from(bucket)
+                .map_err(|_| invalid("row-header bucket index exceeds u32"))?;
+            buckets.push((bucket, identifier));
+        }
+        buckets
+    } else {
+        Vec::new()
+    };
     let column_headers = reference(&table.store, 2, limits)?;
     let tile_storage =
         bytes(&table.store, STORE_TILES, limits)?.ok_or(invalid("tile storage missing"))?;
