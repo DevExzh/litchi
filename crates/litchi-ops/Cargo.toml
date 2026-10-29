@@ -79,7 +79,7 @@ odf-objects = ["dep:litchi-odf-common", "dep:soapberry-zip"]
 pages   = ["iwork-adapter", "dep:litchi-pages", "litchi-pages/internal-iwork-source"]
 keynote = ["iwork-adapter", "dep:base64", "dep:litchi-keynote", "litchi-keynote/internal-iwork-source"]
 numbers = ["iwork-adapter", "dep:litchi-numbers", "litchi-numbers/internal-iwork-source"]
-iwork-adapter = ["dep:litchi-iwa-archive", "dep:litchi-iwa-detect"]
+iwork-adapter = ["dep:litchi-iwa-archive", "dep:litchi-iwa-detect", "dep:soapberry-zip"]
 
 encryption = [
     "dep:litchi-cfb",

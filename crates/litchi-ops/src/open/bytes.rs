@@ -126,6 +126,34 @@ fn zip<T: ZipTail>(
     detection_limits: &crate::detect::SourceLimits,
     tail: &T,
 ) -> Result<File> {
+    // A valid iWork package has a canonical central-directory member that no
+    // ODF or OOXML package needs.  Inspect that directory before the heavier
+    // precedence probes, but only through bounded central records: no member
+    // payload is read or decompressed here.  The full detector remains the
+    // authority, so a false marker simply resumes the ordinary ZIP route.
+    // This early route is compiled only for an all-iWork build; partial
+    // feature builds retain the existing disabled-format classification.
+    #[cfg(all(feature = "pages", feature = "keynote", feature = "numbers"))]
+    let bytes = if likely_iwork_package(&bytes) {
+        match crate::format::iwork::Iwork::detect_bytes(bytes, options)? {
+            crate::format::iwork::Detected::Opened(file) => return Ok(file.into_file()),
+            crate::format::iwork::Detected::Disabled(format) => {
+                return Err(Error::unsupported_format(Some(format)).with_suggestion(
+                    match format {
+                        FileFormat::Pages => "enable the `pages` cargo feature",
+                        FileFormat::Keynote => "enable the `keynote` cargo feature",
+                        _ => "enable the `numbers` cargo feature",
+                    },
+                ));
+            },
+            crate::format::iwork::Detected::Declined(rejected) => rejected,
+        }
+    } else {
+        bytes
+    };
+    #[cfg(not(all(feature = "pages", feature = "keynote", feature = "numbers")))]
+    let bytes = bytes;
+
     #[cfg(any(feature = "odt", feature = "ods", feature = "odp", odf_objects))]
     let odf = litchi_odf_common::detect::packaged_mime(
         &bytes,
@@ -154,6 +182,50 @@ fn zip<T: ZipTail>(
     #[cfg(not(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb")))]
     let _ = odf;
     zip_fallback(bytes, options, detection_limits, tail)
+}
+
+/// Whether the ZIP central directory contains the exact iWork marker and no
+/// higher-precedence ODF/OOXML marker.  This is deliberately a marker probe,
+/// not a classifier: the iWork detector still validates the package and
+/// classifies its application before ownership is transferred.
+#[cfg(all(feature = "pages", feature = "keynote", feature = "numbers"))]
+fn likely_iwork_package(bytes: &[u8]) -> bool {
+    const MAX_MARKER_DIRECTORY_BYTES: u64 = 8 * 1024 * 1024;
+    const MAX_MARKER_ENTRIES: u64 = 100_000;
+    const IWORK_DOCUMENT: &[u8] = b"Index/Document.iwa";
+    const OOXML_CONTENT_TYPES: &[u8] = b"[Content_Types].xml";
+    const ODF_MIMETYPE: &[u8] = b"mimetype";
+
+    let Ok(archive) = soapberry_zip::ZipArchive::from_slice(bytes) else {
+        return false;
+    };
+    if archive.entries_hint() > MAX_MARKER_ENTRIES {
+        return false;
+    }
+    let Some(directory_bytes) = archive
+        .head_eocd_offset()
+        .checked_sub(archive.directory_offset())
+    else {
+        return false;
+    };
+    if directory_bytes > MAX_MARKER_DIRECTORY_BYTES {
+        return false;
+    }
+
+    let mut iwork = false;
+    for entry in archive.entries() {
+        let Ok(entry) = entry else {
+            // A malformed central record is left to the ordinary detector,
+            // which owns the typed archive error and precedence behavior.
+            return false;
+        };
+        match entry.file_path().as_bytes() {
+            IWORK_DOCUMENT => iwork = true,
+            OOXML_CONTENT_TYPES | ODF_MIMETYPE => return false,
+            _ => {},
+        }
+    }
+    iwork
 }
 
 /// Probe an in-memory ZIP as OOXML through exactly one OPC index. A package
@@ -298,5 +370,91 @@ pub(super) fn zip_fallback<T: ZipTail>(
     match tail.classify_bytes(&bytes) {
         Some(format) => Err(Error::iwork_unsupported(format)),
         None => Err(Error::unsupported_format(None)),
+    }
+}
+
+#[cfg(all(test, feature = "pages", feature = "keynote", feature = "numbers"))]
+mod marker_tests {
+    use std::io::{Cursor, Write};
+
+    use super::likely_iwork_package;
+
+    fn archive(names: &[&str]) -> Vec<u8> {
+        let mut writer = zip::ZipWriter::new(Cursor::new(Vec::new()));
+        let options = zip::write::SimpleFileOptions::default()
+            .compression_method(zip::CompressionMethod::Stored);
+        for name in names {
+            writer.start_file(*name, options).expect("start ZIP member");
+            writer
+                .write_all(b"marker-only test payload")
+                .expect("write ZIP member");
+        }
+        writer.finish().expect("finish ZIP").into_inner()
+    }
+
+    #[test]
+    fn marker_reads_exact_central_names_only() {
+        assert!(likely_iwork_package(&archive(&["Index/Document.iwa"])));
+        assert!(!likely_iwork_package(&archive(&[
+            "Data/Index/Document.iwa"
+        ])));
+        assert!(!likely_iwork_package(&archive(&["Index/Document.iwa.bak"])));
+        assert!(!likely_iwork_package(&archive(&["opaque"])));
+    }
+
+    #[test]
+    fn marker_does_not_bypass_higher_precedence_or_payload_decoys() {
+        assert!(!likely_iwork_package(&archive(&[
+            "Index/Document.iwa",
+            "[Content_Types].xml",
+        ])));
+        assert!(!likely_iwork_package(&archive(&[
+            "Index/Document.iwa",
+            "mimetype"
+        ])));
+
+        let mut writer = zip::ZipWriter::new(Cursor::new(Vec::new()));
+        let options = zip::write::SimpleFileOptions::default()
+            .compression_method(zip::CompressionMethod::Stored);
+        writer
+            .start_file("opaque", options)
+            .expect("start ZIP member");
+        writer
+            .write_all(b"Index/Document.iwa [Content_Types].xml mimetype")
+            .expect("write ZIP member");
+        let bytes = writer.finish().expect("finish ZIP").into_inner();
+        assert!(!likely_iwork_package(&bytes));
+    }
+
+    #[test]
+    fn marker_probe_respects_the_outer_input_ceiling() {
+        let source = std::fs::read(
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("../../test-data/iwork/pages/body-table-comment-hidden-native-saved.pages"),
+        )
+        .expect("read tracked iWork fixture");
+        let error = crate::open_bytes_with(source, &crate::OpenOptions::new().max_input_bytes(1))
+            .expect_err("tight input ceiling must refuse before marker routing");
+        assert_eq!(error.code(), crate::Code::LimitExceeded);
+    }
+}
+
+#[cfg(all(
+    test,
+    feature = "pages",
+    not(feature = "keynote"),
+    not(feature = "numbers")
+))]
+mod disabled_marker_tests {
+    #[test]
+    fn partial_iwork_build_keeps_disabled_format_refusal() {
+        let source = std::fs::read(
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("../../test-data/iwork/keynote/basic.key"),
+        )
+        .expect("read tracked Keynote fixture");
+        let error = crate::open_bytes(source).expect_err("Keynote is disabled in this build");
+        assert_eq!(error.code(), crate::Code::UnsupportedFormat);
+        assert_eq!(error.detected(), Some(litchi_core::FileFormat::Keynote));
     }
 }
