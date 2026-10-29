@@ -491,6 +491,18 @@ fn keynote_slide_chart_series_malformed_and_low_budget_refuse() -> TestResult {
         package.slide_chart_series(LEAF_SLIDE, LEAF_CHART),
         Err(Error::Limit { .. })
     ));
+
+    let object_limited = Package::from_bytes_with_options(
+        &input.fixture.bytes,
+        OpenOptions::new().semantic_limits(SemanticLimits::builder().max_objects(1)?.build()?),
+    );
+    match object_limited {
+        Err(error) => assert!(
+            format!("{error:?}").contains("Objects"),
+            "object census must remain typed: {error:?}"
+        ),
+        Ok(_) => panic!("object census must refuse before the series facade"),
+    }
     Ok(())
 }
 
