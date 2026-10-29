@@ -1,15 +1,20 @@
 {
   "application": "Numbers",
   "file": "chart-font-size-two-sheet.numbers",
-  "size": 9417,
-  "sha256": "31285d737a7f1f19739b720123d75f5facf6709ad7b0e0d6485eb6ef0aaa5114",
-  "source": "Synthetic host-package fixture generated with the public litchi-iwa Numbers editor",
-  "generator_source_commit": "538041b70fc56d7d1301a9a212f13b543db40953",
-  "generator_command": "cargo run --manifest-path /tmp/litchi_numbers_two_sheet_gen/Cargo.toml --offline --quiet -- /tmp/two-sheet-chart-font-size.numbers",
+  "size": 9594,
+  "sha256": "578eb93d8df7ae35f6932599a8702b90a710dff9b22d55265fd7b39a701e5070",
+  "source": "Synthetic host-package fixture generated with the tracked public litchi-iwa Numbers editor recipe",
+  "generator_source_commit": "87ad646775d1ba30049c55b99f8141e48829305c",
+  "generator_manifest": "test-data/iwork/numbers/chart-font-size-two-sheet-generator/Cargo.toml",
+  "generator_source": "test-data/iwork/numbers/chart-font-size-two-sheet-generator/src/main.rs",
+  "generator_command": "CARGO_TARGET_DIR=/tmp/litchi_numbers_two_sheet_gen/target cargo run --manifest-path test-data/iwork/numbers/chart-font-size-two-sheet-generator/Cargo.toml --offline --quiet -- /tmp/two-sheet-chart-font-size.numbers",
   "generator_operations": [
     "Builder::build created the first sheet and table",
     "Draft::add_empty_sheet added Secondary chart",
-    "Draft::add_sheet_chart added one standalone Column2d chart to each sheet"
+    "Draft::add_sheet_chart added one standalone Column2d chart to each sheet",
+    "litchi-numbers::Package::edit_sheet_chart_font seeded sheet 1 to 13pt",
+    "litchi-numbers::Package::edit_sheet_chart_font seeded sheet 2 to 27pt"
   ],
+  "inputs": "No external fixture inputs; the tracked generator constructs the package from typed data.",
   "scope": "Synthetic two-container identity/path control only; no native application acceptance or native evidence is claimed."
 }
