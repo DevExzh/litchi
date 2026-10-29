@@ -103,7 +103,7 @@ fn bounded_finish_admits_name_copies_before_materializing_changes() {
     workspace.object_mut(1).expect("object").messages[0]
         .data
         .push(0x10);
-    let requirements = workspace.finish_requirements();
+    let requirements = workspace.finish_requirements().expect("requirements");
     assert_eq!(requirements.edit_count(), 1);
     assert_eq!(requirements.deletion_count(), 0);
     assert_eq!(requirements.copy_bytes(), "Index/Document.iwa".len());
@@ -127,7 +127,7 @@ fn bounded_finish_admits_name_copies_before_materializing_changes() {
     workspace.object_mut(1).expect("object").messages[0]
         .data
         .push(0x10);
-    let requirements = workspace.finish_requirements();
+    let requirements = workspace.finish_requirements().expect("requirements");
     let (changes, report) = workspace
         .finish_bounded(FinishLimits::new(
             requirements.work(),
@@ -149,7 +149,7 @@ fn bounded_finish_accounts_deleted_names_and_moves_insertions() {
     workspace
         .delete_member(super::Location::Source(0))
         .expect("delete");
-    let requirements = workspace.finish_requirements();
+    let requirements = workspace.finish_requirements().expect("requirements");
     assert_eq!(requirements.edit_count(), 0);
     assert_eq!(requirements.deletion_count(), 1);
     assert_eq!(requirements.insertion_count(), 0);
