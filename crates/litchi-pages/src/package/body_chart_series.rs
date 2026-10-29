@@ -641,6 +641,71 @@ fn charge_engine_report(
     Ok(())
 }
 
+fn map_finish_error(error: style_graph::FinishError) -> Error {
+    match error {
+        style_graph::FinishError::Graph(error) => map_graph_error(error),
+        style_graph::FinishError::Overflow(_) => Error::InvalidSource,
+        style_graph::FinishError::Limit {
+            kind,
+            observed,
+            maximum,
+        } => Error::Limit {
+            kind: match kind {
+                style_graph::FinishLimitKind::Work => LimitKind::WireWork,
+                style_graph::FinishLimitKind::Allocations => LimitKind::Allocations,
+                style_graph::FinishLimitKind::RetainedBytes => LimitKind::RetainedBytes,
+                style_graph::FinishLimitKind::ScratchBytes => LimitKind::ScratchBytes,
+                _ => LimitKind::WireWork,
+            },
+            observed: observed as u64,
+            maximum: maximum as u64,
+        },
+        style_graph::FinishError::Allocation { amount } => Error::Allocation { amount },
+        _ => Error::InvalidSource,
+    }
+}
+
+fn preflight_finish(
+    budget: &ArrangementBudget,
+    requirements: style_graph::FinishRequirements,
+) -> Result<(), Error> {
+    budget
+        .preflight_work(requirements.work())
+        .and_then(|_| budget.preflight_allocations(requirements.allocations()))
+        .and_then(|_| budget.preflight_retained(requirements.retained_bytes()))
+        .and_then(|_| budget.preflight_scratch(requirements.scratch_bytes()))
+        .map_err(map_arrangement_error)
+}
+
+fn finish_limits(budget: &ArrangementBudget) -> Result<style_graph::FinishLimits, Error> {
+    Ok(style_graph::FinishLimits::new(
+        budget
+            .residual_work_bytes()
+            .map_err(map_arrangement_error)?,
+        budget
+            .residual_allocations()
+            .map_err(map_arrangement_error)?,
+        budget
+            .residual_retained_bytes()
+            .map_err(map_arrangement_error)?,
+        budget
+            .residual_scratch_bytes()
+            .map_err(map_arrangement_error)?,
+    ))
+}
+
+fn charge_finish_report(
+    budget: &mut ArrangementBudget,
+    report: style_graph::FinishReport,
+) -> Result<(), Error> {
+    budget
+        .work(report.work())
+        .and_then(|_| budget.allocations(report.allocations()))
+        .and_then(|_| budget.retained(report.retained_bytes()))
+        .and_then(|_| budget.scratch(report.scratch_bytes()))
+        .map_err(map_arrangement_error)
+}
+
 fn target_with_budget(
     package: &Package,
     selector: BodyChartSelector,
@@ -1998,7 +2063,13 @@ fn commit_edit(edit: Edit<'_>, change: Property) -> Result<Commit, Error> {
     if !changed {
         return Ok(unchanged(source, edit.target, before));
     }
-    let changes = workspace.finish();
+    let finish_requirements = workspace.finish_requirements().map_err(map_finish_error)?;
+    preflight_finish(&budget, finish_requirements)?;
+    let finish_limits = finish_limits(&budget)?;
+    let (changes, finish_report) = workspace
+        .finish_bounded(finish_limits)
+        .map_err(map_finish_error)?;
+    charge_finish_report(&mut budget, finish_report)?;
     if changes.is_empty() {
         return Ok(unchanged(source, edit.target, before));
     }

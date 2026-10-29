@@ -2,7 +2,8 @@
 
 - Status: boundary-adoption checkpoint on `uo2/iwa-w2b-series-symbols`,
   synchronized with coordinator trunk `c0c10b86ce82151b730a7e6ee00615f7232d7f74`
-  and shared admission helper tip `73b7bf0027a0770a098c82369abd4adff7156706`.
+  and shared admission/finalization helper tip
+  `60d2f93efeb9dd3645f95348bc0970bec43c6e15`.
   Coordinator integration, final performance qualification and native
   verification remain pending.
 - Scope: Pages body-chart series symbol visibility, shape and optional point
@@ -47,7 +48,10 @@ relative locality. Publication locality consumes the engine's precise
 additions/removals), rather than deriving authorization from the observed
 candidate diff. Plan grouping/copies are fallibly pre-admitted. Changed object
 metadata, archive reference transitions and message unknowns are checked, and
-unrelated object/member mutations refuse.
+unrelated object/member mutations refuse. Staged workspace finalization uses
+`finish_requirements` plus residual `FinishLimits` and `finish_bounded`; the
+successful `FinishReport` is charged once after publication vectors are
+materialized.
 
 ## Differential proof
 
