@@ -90,6 +90,8 @@ pub enum LimitKind {
     ScratchBytes,
     /// Native graph references inspected by the selector.
     References,
+    /// Object identifiers allocated by a bounded graph operation.
+    Identifiers,
     /// Compressed IWA member bytes inspected or emitted.
     CompressedBytes,
 }
@@ -106,6 +108,7 @@ impl fmt::Display for LimitKind {
             Self::RetainedBytes => "retained bytes",
             Self::ScratchBytes => "scratch bytes",
             Self::References => "references",
+            Self::Identifiers => "object identifiers",
             Self::CompressedBytes => "compressed bytes",
         })
     }
@@ -491,6 +494,8 @@ pub(super) struct ChartBudget {
     max_allocations: usize,
     max_retained: usize,
     max_scratch: usize,
+    max_registry_entries: usize,
+    max_identifiers: usize,
     input: usize,
     output: usize,
     fields: usize,
@@ -500,6 +505,8 @@ pub(super) struct ChartBudget {
     allocations: usize,
     retained: usize,
     scratch: usize,
+    registry_entries: usize,
+    identifiers: usize,
 }
 
 impl ChartBudget {
@@ -550,6 +557,8 @@ impl ChartBudget {
             max_allocations,
             max_retained: aggregate,
             max_scratch: aggregate,
+            max_registry_entries: semantic.max_references(),
+            max_identifiers: semantic.max_objects(),
             input: 0,
             output: 0,
             fields: 0,
@@ -559,6 +568,8 @@ impl ChartBudget {
             allocations: 0,
             retained: 0,
             scratch: 0,
+            registry_entries: 0,
+            identifiers: 0,
         })
     }
 
@@ -668,6 +679,24 @@ impl ChartBudget {
         )
     }
 
+    pub(super) fn registry_entries(&mut self, amount: usize) -> Result<(), Error> {
+        Self::add(
+            &mut self.registry_entries,
+            amount,
+            self.max_registry_entries,
+            LimitKind::References,
+        )
+    }
+
+    pub(super) fn identifiers(&mut self, amount: usize) -> Result<(), Error> {
+        Self::add(
+            &mut self.identifiers,
+            amount,
+            self.max_identifiers,
+            LimitKind::Identifiers,
+        )
+    }
+
     /// Residual chart-font engine limits after selector and package work
     /// already charged to this transaction.
     pub(super) fn chart_font_limits(&self) -> litchi_iwa_style::chart_font::Limits {
@@ -699,6 +728,27 @@ impl ChartBudget {
         )
     }
 
+    /// Build a residual profile for one bounded chart-series operation.
+    /// Selector and package work already charged to this ledger cannot be
+    /// reacquired by the shared series engine.
+    pub(super) fn series_limits(&self) -> litchi_iwa_style::series::Limits {
+        let limits = self.chart_font_limits();
+        litchi_iwa_style::series::Limits::new(
+            limits.max_input_bytes(),
+            limits.max_fields(),
+            limits.max_output_bytes(),
+            limits.max_nesting(),
+            limits.max_work_bytes(),
+            limits.max_allocations(),
+            limits.max_retained_bytes(),
+            limits.max_scratch_bytes(),
+            self.max_references.saturating_sub(self.references),
+            self.max_registry_entries
+                .saturating_sub(self.registry_entries),
+            self.max_identifiers.saturating_sub(self.identifiers),
+        )
+    }
+
     /// Charge one chart-font engine report into the same transaction ledger.
     pub(super) fn charge_chart_font_report(
         &mut self,
@@ -719,6 +769,35 @@ impl ChartBudget {
         self.allocations(report.allocations())?;
         self.retained(report.retained_bytes())?;
         self.scratch(report.scratch_bytes())?;
+        self.nesting = self.nesting.max(depth);
+        Ok(())
+    }
+
+    /// Reconcile one shared chart-series engine report with this caller
+    /// ledger. The engine is given the residual profile above, so this is not
+    /// a fresh post-hoc profile check.
+    pub(super) fn charge_series_report(
+        &mut self,
+        report: litchi_iwa_style::series::Report,
+    ) -> Result<(), Error> {
+        let depth = usize::try_from(report.max_depth()).unwrap_or(usize::MAX);
+        if depth > self.max_nesting {
+            return Err(Error::Limit {
+                kind: LimitKind::WireNesting,
+                observed: depth as u64,
+                maximum: self.max_nesting as u64,
+            });
+        }
+        self.source(report.input_bytes())?;
+        self.output(report.output_bytes())?;
+        self.fields(report.fields())?;
+        self.work(report.work_bytes())?;
+        self.allocations(report.allocations())?;
+        self.retained(report.retained_bytes())?;
+        self.scratch(report.scratch_bytes())?;
+        self.references(report.references())?;
+        self.registry_entries(report.registry_entries())?;
+        self.identifiers(report.identifiers())?;
         self.nesting = self.nesting.max(depth);
         Ok(())
     }

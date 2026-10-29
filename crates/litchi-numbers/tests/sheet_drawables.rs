@@ -513,5 +513,28 @@ fn chart_series_values_round_trip_and_name_every_series() -> TestResult {
         return Err("a value for another series count must be refused".into());
     };
     assert_eq!((expected, given), (bars.len(), bars.len() + 1));
+
+    let mut changed = bars.clone();
+    changed[0] = error_bar::Series::fixed_value(error_bar::Direction::PositiveAndNegative);
+    let source = bytes(&package)?;
+    let mut edit = package.edit_sheet_chart_series(0, 0)?;
+    edit.set(Property::ErrorBars(changed))?;
+    let commit = edit.commit()?;
+    assert!(commit.diagnostics().changed());
+    let Property::ErrorBars(after) =
+        commit
+            .package()
+            .sheet_chart_series(0, 0, PropertyKind::ErrorBars)?
+    else {
+        return Err("error bars changed kind".into());
+    };
+    assert!(matches!(
+        after.first(),
+        Some(error_bar::Series::FixedValue { .. })
+    ));
+    let restored = commit
+        .package()
+        .apply_sheet_chart_series(&commit.patch().inverse())?;
+    assert_eq!(bytes(restored.package())?, source);
     Ok(())
 }

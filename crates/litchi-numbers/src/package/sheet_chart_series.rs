@@ -17,8 +17,8 @@
 )]
 
 use std::fmt;
+use std::mem::size_of;
 
-use litchi_iwa_common::WireLimits;
 use litchi_iwa_common::chart::error_bar::Series as ErrorBarSeries;
 use litchi_iwa_common::chart::kind::Kind as ChartKind;
 use litchi_iwa_common::chart::pie::{LabelDistance, LabelVisibility, WedgeExplosion};
@@ -27,6 +27,8 @@ use litchi_iwa_common::chart::series::{
 };
 use litchi_iwa_common::chart::series_labels::Visibility;
 use litchi_iwa_common::shape::fill::Fill;
+use litchi_iwa_core::{Archive, SnappyStream};
+use litchi_iwa_protos::chart_metadata_codec as metadata_codec;
 use litchi_iwa_style::graph::Workspace;
 use litchi_iwa_style::series::{
     self as engine,
@@ -38,12 +40,15 @@ use litchi_iwa_style::series::{
 use thiserror::Error as ThisError;
 
 use super::Package;
+use super::chart_arrangement::{
+    self as arrangement, ChartBudget, ChartSelection, parse_wire_view_with_budget,
+    select_chart_with_budget,
+};
 use super::sheet_chart_series_style as style;
-use super::sheet_drawable_graph::{self as graph, CHART_MESSAGE_TYPE};
+use super::sheet_drawable_graph as graph;
 use super::structure::{self, Published, references};
 use super::style_graph::{self, LeafComponents};
 use crate::selector::{ChartSelector, SheetSelector};
-use crate::sheet::drawable::DrawableSelector;
 
 structure::structural_family!("chart-series", Engine(litchi_iwa_style::series::LimitKind));
 
@@ -53,6 +58,10 @@ const CHART_ARCHIVE_FIELD: u32 = 10_000;
 const SERIES_DIRECTION_FIELD: u32 = 5;
 const SERIES_BY_ROW: u64 = 1;
 const SERIES_BY_COLUMN: u64 = 2;
+const GRAPH_INDEX_SLOT_BYTES: usize = 64;
+const GRAPH_AMBIGUOUS_SLOT_BYTES: usize = 32;
+const GRAPH_EXTRA_ALLOCATIONS: usize = 4;
+const ZIP_MEMBER_OVERHEAD_BYTES: usize = 128;
 
 /// One per-series chart property: a value for every series, in series
 /// order.
@@ -363,6 +372,7 @@ pub struct Edit<'a> {
     sheet: usize,
     chart: ChartSelector,
     changes: Vec<Staged>,
+    budget: ChartBudget,
 }
 
 /// One staged change.
@@ -425,20 +435,28 @@ impl Edit<'_> {
         if self.changes.is_empty() {
             return Err(Refusal::NoStagedOperation.into());
         }
+        let mut budget = self.budget;
         let mut current: Option<Package> = None;
         let mut touched = 0_usize;
         for change in &self.changes {
             let base = current.as_ref().unwrap_or(self.source);
             let published = match change {
-                Staged::Set(property) => apply_one(base, self.sheet, self.chart, property)?,
+                Staged::Set(property) => {
+                    apply_one(base, self.sheet, self.chart, property, &mut budget)?
+                },
                 Staged::Reset(kind, series) => {
-                    reset_one(base, self.sheet, self.chart, *kind, *series)?
+                    reset_one(base, self.sheet, self.chart, *kind, *series, &mut budget)?
                 },
             };
             if let Some(published) = published {
                 if let Staged::Set(property) = change
-                    && read(&published.package, self.sheet, self.chart, property.kind())?
-                        != *property
+                    && read(
+                        &published.package,
+                        self.sheet,
+                        self.chart,
+                        property.kind(),
+                        &mut budget,
+                    )? != *property
                 {
                     return Err(Error::Verification);
                 }
@@ -467,38 +485,87 @@ struct Target {
     series: usize,
 }
 
-fn target(package: &Package, sheet: usize, chart: ChartSelector) -> Result<Target, Error> {
-    let drawables = graph::sheet_drawables(package, sheet)?;
-    let entry = drawables
-        .select(DrawableSelector::from(chart))
-        .ok_or(Refusal::ChartNotFound)?;
-    let (index, message_type) = entry.message.ok_or(Error::InvalidSource)?;
-    if message_type != CHART_MESSAGE_TYPE {
-        return Err(Error::InvalidSource);
-    }
-    let metadata = package
-        .sheet_chart_metadata(sheet, chart)
-        .map_err(|_error| Error::InvalidSource)?;
-    let object = graph::object(package, entry.identifier)?;
-    let archives = references::records(&object.messages[index].data, &[CHART_ARCHIVE_FIELD])?;
+fn target(
+    package: &Package,
+    sheet: usize,
+    chart: ChartSelector,
+    budget: &mut ChartBudget,
+) -> Result<Target, Error> {
+    let selection = select_chart_with_budget(
+        package,
+        SheetSelector::position(sheet.into()),
+        chart,
+        false,
+        budget,
+    )
+    .map_err(map_arrangement)?;
+    target_from_selection(package, &selection, budget)
+}
+
+fn target_from_selection(
+    package: &Package,
+    selection: &ChartSelection,
+    budget: &mut ChartBudget,
+) -> Result<Target, Error> {
+    let payload =
+        arrangement::selected_chart_payload(package, selection).map_err(map_arrangement)?;
+    let component = arrangement::package_component(package, selection.component_index)
+        .map_err(map_arrangement)?;
+    let object = component
+        .archive()
+        .objects
+        .get(selection.object_index)
+        .ok_or(Error::InvalidSource)?;
+    let message = object
+        .messages
+        .get(selection.message_index)
+        .ok_or(Error::InvalidSource)?;
+    budget
+        .preflight_reference_scan(&message.data)
+        .map_err(map_arrangement)?;
+    let archives = references::records(&message.data, &[CHART_ARCHIVE_FIELD])?;
+    budget
+        .charge_reference_scan(&message.data, archives.len())
+        .map_err(map_arrangement)?;
     let [archive] = archives.as_slice() else {
         return Err(Error::InvalidSource);
     };
-    let view = litchi_iwa_common::wire::WireView::parse(archive, WireLimits::DEFAULT)?;
-    let direction = graph::unique_field(&view, SERIES_DIRECTION_FIELD, 0)?
-        .map(|field| litchi_iwa_common::decode_varint_from_bytes(field.payload()))
-        .transpose()
-        .map_err(|_error| Error::InvalidSource)?
-        .map(|(value, _)| value);
+    let archive_view = parse_wire_view_with_budget(archive, 1, budget).map_err(map_arrangement)?;
+    let direction = graph::unique_field(&archive_view, SERIES_DIRECTION_FIELD, 0)?
+        .map(|field| {
+            let (value, consumed) = litchi_iwa_common::decode_varint_from_bytes(field.payload())
+                .map_err(|_| Error::InvalidSource)?;
+            if consumed != field.payload().len()
+                || litchi_iwa_common::varint::encoded_len(value) != consumed
+            {
+                return Err(Error::InvalidSource);
+            }
+            Ok(value)
+        })
+        .transpose()?;
+    let options = budget.metadata_codec_options().map_err(map_arrangement)?;
+    let (metadata, report) = match metadata_codec::decode_modern_with_report(payload, &options) {
+        Ok(decoded) => decoded,
+        Err(error) => {
+            budget
+                .metadata_codec_report(error.report())
+                .map_err(map_arrangement)?;
+            return Err(map_metadata_error(&error));
+        },
+    };
+    budget
+        .metadata_codec_report(report)
+        .map_err(map_arrangement)?;
     let components = match direction {
-        Some(SERIES_BY_ROW) => metadata.row_names().len(),
-        Some(SERIES_BY_COLUMN) => metadata.column_names().len(),
+        Some(SERIES_BY_ROW) => metadata.row_labels().len(),
+        Some(SERIES_BY_COLUMN) => metadata.column_labels().len(),
         _ => return Err(Error::InvalidSource),
     };
-    let series = series_count(metadata.kind(), components)?;
+    let kind = ChartKind::from_native(metadata.chart_type());
+    let series = series_count(kind, components)?;
     Ok(Target {
-        chart: entry.identifier,
-        kind: metadata.kind(),
+        chart: selection.chart_identifier,
+        kind,
         series,
     })
 }
@@ -521,6 +588,261 @@ fn series_count(kind: ChartKind, components: usize) -> Result<usize, Error> {
     Ok(count)
 }
 
+fn map_arrangement(error: arrangement::Error) -> Error {
+    match error {
+        arrangement::Error::Refused(refusal) => match refusal {
+            arrangement::Refusal::UnsupportedSource => Refusal::UnsupportedSource.into(),
+            arrangement::Refusal::UnsupportedDependency => Refusal::UnsupportedDependency.into(),
+            arrangement::Refusal::AmbiguousSelector => Error::InvalidSource,
+            arrangement::Refusal::EmptySheetName
+            | arrangement::Refusal::SheetNameNotFound
+            | arrangement::Refusal::SheetPositionNotFound { .. } => Refusal::SheetNotFound.into(),
+            arrangement::Refusal::ChartPositionNotFound { .. } => Refusal::ChartNotFound.into(),
+        },
+        arrangement::Error::Limit {
+            kind,
+            observed,
+            maximum,
+        } => Error::Limit {
+            kind: match kind {
+                arrangement::LimitKind::WireBytes | arrangement::LimitKind::CompressedBytes => {
+                    LimitKind::PayloadBytes
+                },
+                arrangement::LimitKind::WireFields => LimitKind::Engine(engine::LimitKind::Fields),
+                arrangement::LimitKind::WireNesting => {
+                    LimitKind::Engine(engine::LimitKind::Nesting)
+                },
+                arrangement::LimitKind::WireWork => LimitKind::Engine(engine::LimitKind::Work),
+                arrangement::LimitKind::OutputBytes => {
+                    LimitKind::Engine(engine::LimitKind::OutputBytes)
+                },
+                arrangement::LimitKind::Allocations => LimitKind::AllocationEvents,
+                arrangement::LimitKind::RetainedBytes => {
+                    LimitKind::Engine(engine::LimitKind::RetainedBytes)
+                },
+                arrangement::LimitKind::ScratchBytes => LimitKind::ScratchBytes,
+                arrangement::LimitKind::References => {
+                    LimitKind::Engine(engine::LimitKind::References)
+                },
+                arrangement::LimitKind::Identifiers => LimitKind::Identifiers,
+            },
+            observed,
+            maximum,
+        },
+        arrangement::Error::Allocation { amount } => Error::Allocation { amount },
+        arrangement::Error::InvalidSource => Error::InvalidSource,
+        arrangement::Error::Verification => Error::Verification,
+        arrangement::Error::PatchConflict => Error::PatchConflict,
+    }
+}
+
+fn map_metadata_error(error: &metadata_codec::DecodeError) -> Error {
+    let Some(limit) = error.resource_limit() else {
+        return Error::InvalidSource;
+    };
+    let (kind, observed, maximum) = match limit {
+        metadata_codec::DecodeLimit::Bytes { observed, maximum } => {
+            (LimitKind::PayloadBytes, observed, maximum)
+        },
+        metadata_codec::DecodeLimit::Fields { observed, maximum } => (
+            LimitKind::Engine(engine::LimitKind::Fields),
+            observed,
+            maximum,
+        ),
+        metadata_codec::DecodeLimit::Work { observed, maximum } => (
+            LimitKind::Engine(engine::LimitKind::Work),
+            observed,
+            maximum,
+        ),
+        metadata_codec::DecodeLimit::Nesting { observed, maximum } => (
+            LimitKind::Engine(engine::LimitKind::Nesting),
+            observed as usize,
+            maximum as usize,
+        ),
+        metadata_codec::DecodeLimit::Labels { observed, maximum }
+        | metadata_codec::DecodeLimit::Text { observed, maximum } => (
+            LimitKind::Engine(engine::LimitKind::RetainedBytes),
+            observed,
+            maximum,
+        ),
+        _ => return Error::InvalidSource,
+    };
+    Error::Limit {
+        kind,
+        observed: observed as u64,
+        maximum: maximum as u64,
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+struct GraphWorkspaceCost {
+    work: usize,
+    allocations: usize,
+    scratch: usize,
+}
+
+fn graph_workspace_cost(package: &Package) -> Result<GraphWorkspaceCost, Error> {
+    let catalog = package.state.components.catalog();
+    let object_count = catalog.iter().try_fold(0usize, |count, component| {
+        count
+            .checked_add(component.archive().objects.len())
+            .ok_or(Error::InvalidSource)
+    })?;
+    let component_count = catalog.len();
+    let work = component_count
+        .checked_add(object_count)
+        .ok_or(Error::InvalidSource)?;
+    let allocations = component_count
+        .checked_add(object_count.checked_mul(2).ok_or(Error::InvalidSource)?)
+        .and_then(|value| value.checked_add(GRAPH_EXTRA_ALLOCATIONS))
+        .ok_or(Error::InvalidSource)?;
+    let scratch = component_count
+        .checked_mul(size_of::<(usize, usize)>())
+        .and_then(|value| {
+            value.checked_add(
+                object_count.checked_mul(GRAPH_INDEX_SLOT_BYTES + GRAPH_AMBIGUOUS_SLOT_BYTES)?,
+            )
+        })
+        .ok_or(Error::InvalidSource)?;
+    Ok(GraphWorkspaceCost {
+        work,
+        allocations,
+        scratch,
+    })
+}
+
+fn prepare_components<'a>(
+    package: &'a Package,
+    budget: &mut ChartBudget,
+) -> Result<(LeafComponents<'a>, litchi_iwa_core::Limits), Error> {
+    admit_graph_workspace(package, budget)?;
+    let components = LeafComponents::new(package).map_err(Error::from)?;
+    let limits = structure::exact_source(package)?
+        .limits()
+        .effective_archive_limits()
+        .map_err(|error| structure::map_archive(&error))?;
+    Ok((components, limits))
+}
+
+fn admit_graph_workspace(package: &Package, budget: &mut ChartBudget) -> Result<(), Error> {
+    let cost = graph_workspace_cost(package)?;
+    budget.preflight_work(cost.work).map_err(map_arrangement)?;
+    budget
+        .preflight_allocations(cost.allocations)
+        .map_err(map_arrangement)?;
+    budget
+        .preflight_scratch(cost.scratch)
+        .map_err(map_arrangement)?;
+    budget.work(cost.work).map_err(map_arrangement)?;
+    budget
+        .allocations(cost.allocations)
+        .map_err(map_arrangement)?;
+    budget.scratch(cost.scratch).map_err(map_arrangement)?;
+    Ok(())
+}
+
+#[derive(Debug, Clone, Copy)]
+struct CandidatePlan {
+    output_bytes: usize,
+    scratch_bytes: usize,
+    allocations: usize,
+}
+
+fn archive_compressed_bound(
+    archive: &Archive,
+    archive_limits: litchi_iwa_core::Limits,
+    snappy_limits: litchi_iwa_core::SnappyLimits,
+) -> Result<usize, Error> {
+    let encoded = archive
+        .encoded_len(archive_limits)
+        .map_err(|error| structure::map_core(&error))?;
+    Ok(SnappyStream::maximum_compressed_len(encoded, snappy_limits)
+        .map_err(|error| structure::map_core(&error))?)
+}
+
+fn candidate_plan(
+    package: &Package,
+    changes: &litchi_iwa_style::graph::Changes,
+) -> Result<CandidatePlan, Error> {
+    let catalog = structure::exact_source(package)?;
+    let archive_limits = catalog
+        .limits()
+        .effective_archive_limits()
+        .map_err(|error| structure::map_archive(&error))?;
+    let snappy_limits = catalog
+        .limits()
+        .snappy_limits()
+        .map_err(|error| structure::map_archive(&error))?;
+    let mut output_bytes = package.source_bytes().len();
+    let mut compressed_bytes = 0usize;
+    let mut allocations = GRAPH_EXTRA_ALLOCATIONS;
+    let mut add_member = |name: &str, archive: &Archive| -> Result<(), Error> {
+        let compressed = archive_compressed_bound(archive, archive_limits, snappy_limits)?;
+        compressed_bytes = compressed_bytes
+            .checked_add(compressed)
+            .ok_or(Error::InvalidSource)?;
+        output_bytes = output_bytes
+            .checked_add(compressed)
+            .and_then(|value| {
+                value.checked_add(
+                    name.len()
+                        .checked_mul(2)
+                        .and_then(|value| value.checked_add(ZIP_MEMBER_OVERHEAD_BYTES))?,
+                )
+            })
+            .ok_or(Error::InvalidSource)?;
+        allocations = allocations.checked_add(1).ok_or(Error::InvalidSource)?;
+        Ok(())
+    };
+    for (name, archive) in &changes.edits {
+        add_member(name, archive)?;
+    }
+    for insertion in &changes.insertions {
+        add_member(&insertion.name, &insertion.archive)?;
+    }
+    allocations = allocations
+        .checked_add(changes.deletions.len())
+        .ok_or(Error::InvalidSource)?;
+    Ok(CandidatePlan {
+        output_bytes,
+        scratch_bytes: output_bytes
+            .checked_add(compressed_bytes)
+            .ok_or(Error::InvalidSource)?,
+        allocations,
+    })
+}
+
+fn admit_candidate(
+    package: &Package,
+    changes: &litchi_iwa_style::graph::Changes,
+    budget: &mut ChartBudget,
+) -> Result<CandidatePlan, Error> {
+    let plan = candidate_plan(package, changes)?;
+    budget
+        .preflight_output(plan.output_bytes)
+        .map_err(map_arrangement)?;
+    budget
+        .preflight_allocations(plan.allocations)
+        .map_err(map_arrangement)?;
+    budget
+        .preflight_scratch(plan.scratch_bytes)
+        .map_err(map_arrangement)?;
+    budget
+        .preflight_retained(plan.output_bytes)
+        .map_err(map_arrangement)?;
+    budget.output(plan.output_bytes).map_err(map_arrangement)?;
+    budget
+        .allocations(plan.allocations)
+        .map_err(map_arrangement)?;
+    budget
+        .scratch(plan.scratch_bytes)
+        .map_err(map_arrangement)?;
+    budget
+        .candidate_reopen(plan.output_bytes)
+        .map_err(map_arrangement)?;
+    Ok(plan)
+}
+
 fn lines(kind: ChartKind) -> Result<ConnectionLines, Error> {
     Ok(ConnectionLines(
         ConnectionLineFamily::for_chart_kind(kind).ok_or(Refusal::UnsupportedKind)?,
@@ -529,113 +851,6 @@ fn lines(kind: ChartKind) -> Result<ConnectionLines, Error> {
 
 fn symbols(kind: ChartKind) -> Result<SymbolFamily, Error> {
     Ok(SymbolFamily::for_chart_kind(kind).ok_or(Refusal::UnsupportedKind)?)
-}
-
-fn symbol_limits(package: &Package) -> Result<engine::Limits, Error> {
-    let physical = package
-        .profile()
-        .archive()
-        .effective_archive_limits()
-        .map_err(|_| Error::InvalidSource)?;
-    let source = physical
-        .max_message_bytes()
-        .min(physical.max_archive_bytes())
-        .clamp(1, WireLimits::MAX_INPUT_BYTES);
-    let semantic = package.profile().semantic();
-    let allocations = semantic
-        .max_objects()
-        .checked_add(semantic.max_references())
-        .and_then(|value| value.checked_add(1024))
-        .ok_or(Error::InvalidSource)?;
-    Ok(engine::Limits::new(
-        source,
-        source.clamp(1, WireLimits::MAX_FIELDS),
-        source,
-        WireLimits::MAX_NESTING as u32,
-        WireLimits::MAX_REWRITE_WORK,
-        allocations,
-        source,
-        source,
-        semantic.max_references(),
-        semantic.max_references(),
-        semantic.max_objects(),
-    ))
-}
-
-/// Validate the shared engine's actual report against the explicit Numbers
-/// profile. The legacy Numbers series transaction has no reusable residual
-/// ledger yet; this keeps the report typed and fail-closed until that caller
-/// budget is lifted into this family.
-fn validate_symbol_report(report: &engine::Report, limits: engine::Limits) -> Result<(), Error> {
-    let checks = [
-        (
-            engine::LimitKind::InputBytes,
-            report.input_bytes(),
-            limits.max_input_bytes(),
-        ),
-        (
-            engine::LimitKind::Fields,
-            report.fields(),
-            limits.max_fields(),
-        ),
-        (
-            engine::LimitKind::OutputBytes,
-            report.output_bytes(),
-            limits.max_output_bytes(),
-        ),
-        (
-            engine::LimitKind::Work,
-            report.work_bytes(),
-            limits.max_work_bytes(),
-        ),
-        (
-            engine::LimitKind::Allocations,
-            report.allocations(),
-            limits.max_allocations(),
-        ),
-        (
-            engine::LimitKind::RetainedBytes,
-            report.retained_bytes(),
-            limits.max_retained_bytes(),
-        ),
-        (
-            engine::LimitKind::ScratchBytes,
-            report.scratch_bytes(),
-            limits.max_scratch_bytes(),
-        ),
-        (
-            engine::LimitKind::References,
-            report.references(),
-            limits.max_references(),
-        ),
-        (
-            engine::LimitKind::RegistryEntries,
-            report.registry_entries(),
-            limits.max_registry_entries(),
-        ),
-        (
-            engine::LimitKind::Identifiers,
-            report.identifiers(),
-            limits.max_identifiers(),
-        ),
-    ];
-    for (kind, observed, maximum) in checks {
-        if observed > maximum {
-            return Err(Error::Limit {
-                kind: LimitKind::Engine(kind),
-                observed: observed as u64,
-                maximum: maximum as u64,
-            });
-        }
-    }
-    if report.max_depth() > limits.max_nesting() {
-        return Err(Error::Limit {
-            kind: LimitKind::Engine(engine::LimitKind::Nesting),
-            observed: report.max_depth() as u64,
-            maximum: limits.max_nesting() as u64,
-        });
-    }
-    Ok(())
 }
 
 fn value_labels(kind: ChartKind) -> Result<ValueLabels, Error> {
@@ -647,9 +862,11 @@ fn read(
     sheet: usize,
     chart: ChartSelector,
     kind: PropertyKind,
+    budget: &mut ChartBudget,
 ) -> Result<Property, Error> {
-    let target = target(package, sheet, chart)?;
+    let target = target(package, sheet, chart, budget)?;
     if let Some(style_kind) = kind.style() {
+        admit_graph_workspace(package, budget)?;
         let values = style::read(
             package,
             target.chart,
@@ -660,12 +877,8 @@ fn read(
         .map_err(from_style)?;
         return from_style_values(kind, values);
     }
-    let components = LeafComponents::new(package)?;
-    let limits = structure::exact_source(package)?
-        .limits()
-        .effective_archive_limits()
-        .map_err(|error| structure::map_archive(&error))?;
-    let workspace = Workspace::new(&components, limits)?;
+    let (components, limits) = prepare_components(package, budget)?;
+    let workspace = Workspace::new(&components, limits).map_err(Error::from)?;
     let (chart, count) = (target.chart, target.series);
     Ok(match kind {
         PropertyKind::ConnectionLines => Property::ConnectionLines(engine::values(
@@ -681,10 +894,13 @@ fn read(
             Property::LabelDistances(engine::values(&workspace, chart, count, &LabelDistances)?)
         },
         PropertyKind::Symbols => {
-            let limits = symbol_limits(package)?;
+            let limits = budget.series_limits();
             let (values, report) =
-                engine::symbols(&workspace, chart, symbols(target.kind)?, count, limits)?;
-            validate_symbol_report(&report, limits)?;
+                engine::symbols(&workspace, chart, symbols(target.kind)?, count, limits)
+                    .map_err(Error::from)?;
+            budget
+                .charge_series_report(report)
+                .map_err(map_arrangement)?;
             Property::Symbols(values)
         },
         PropertyKind::Trendlines => {
@@ -714,8 +930,9 @@ fn apply_one(
     sheet: usize,
     chart: ChartSelector,
     property: &Property,
+    budget: &mut ChartBudget,
 ) -> Result<Option<Published>, Error> {
-    let target = target(source, sheet, chart)?;
+    let target = target(source, sheet, chart, budget)?;
     if property.len() != target.series {
         return Err(Refusal::SeriesCount {
             expected: target.series,
@@ -724,46 +941,64 @@ fn apply_one(
         .into());
     }
     if let (Some(style_kind), Some(values)) = (property.kind().style(), property.style_values()) {
+        admit_graph_workspace(source, budget)?;
+        let current = from_style_values(
+            property.kind(),
+            style::read(source, target.chart, target.kind, target.series, style_kind)
+                .map_err(from_style)?,
+        )?;
+        if current == *property {
+            return Ok(None);
+        }
+        admit_style_candidate(budget)?;
         let values: Vec<Option<style::Value>> = values.into_iter().map(Some).collect();
-        return style::write(source, target.chart, target.kind, style_kind, &values)
-            .map_err(from_style);
+        let published = style::write(source, target.chart, target.kind, style_kind, &values)
+            .map_err(from_style)?;
+        return publish_changes(published, sheet, chart, property.kind(), budget);
     }
-    let components = LeafComponents::new(source)?;
-    let limits = structure::exact_source(source)?
-        .limits()
-        .effective_archive_limits()
-        .map_err(|error| structure::map_archive(&error))?;
-    let mut workspace = Workspace::new(&components, limits)?;
-    let chart = target.chart;
+    let (components, limits) = prepare_components(source, budget)?;
+    let mut workspace = Workspace::new(&components, limits).map_err(Error::from)?;
+    let chart_id = target.chart;
     let changed = match property {
         Property::ConnectionLines(values) => {
-            engine::set_values(&mut workspace, chart, &lines(target.kind)?, values)?
+            engine::set_values(&mut workspace, chart_id, &lines(target.kind)?, values)?
         },
         Property::WedgeExplosions(values) => {
-            engine::set_values(&mut workspace, chart, &WedgeExplosions, values)?
+            engine::set_values(&mut workspace, chart_id, &WedgeExplosions, values)?
         },
         Property::LabelDistances(values) => {
-            engine::set_values(&mut workspace, chart, &LabelDistances, values)?
+            engine::set_values(&mut workspace, chart_id, &LabelDistances, values)?
         },
         Property::Symbols(values) => {
-            let limits = symbol_limits(source)?;
-            let (changed, report) =
-                engine::set_symbols(&mut workspace, chart, symbols(target.kind)?, values, limits)?;
-            validate_symbol_report(&report, limits)?;
+            let limits = budget.series_limits();
+            let (changed, report) = engine::set_symbols(
+                &mut workspace,
+                chart_id,
+                symbols(target.kind)?,
+                values,
+                limits,
+            )
+            .map_err(Error::from)?;
+            budget
+                .charge_series_report(report)
+                .map_err(map_arrangement)?;
             changed
         },
         Property::Trendlines(values) => {
-            engine::set_values(&mut workspace, chart, &Trendlines, values)?
+            engine::set_values(&mut workspace, chart_id, &Trendlines, values)?
         },
         Property::ErrorBars(values) => {
-            engine::set_values(&mut workspace, chart, &ErrorBars, values)?
+            engine::set_values(&mut workspace, chart_id, &ErrorBars, values)?
         },
         Property::PieLabels(values) => {
-            engine::set_values(&mut workspace, chart, &PieLabels, values)?
+            engine::set_values(&mut workspace, chart_id, &PieLabels, values)?
         },
-        Property::ValueLabels(values) => {
-            engine::set_values(&mut workspace, chart, &value_labels(target.kind)?, values)?
-        },
+        Property::ValueLabels(values) => engine::set_values(
+            &mut workspace,
+            chart_id,
+            &value_labels(target.kind)?,
+            values,
+        )?,
         Property::Strokes(_)
         | Property::Fills(_)
         | Property::SymbolFills(_)
@@ -773,7 +1008,46 @@ fn apply_one(
     if !changed || changes.is_empty() {
         return Ok(None);
     }
-    Ok(Some(style_graph::publish(source, changes)?))
+    let plan = admit_candidate(source, &changes, budget)?;
+    let published = style_graph::publish(source, changes).map_err(Error::from)?;
+    if published.package.source_bytes().len() > plan.output_bytes {
+        return Err(Error::Limit {
+            kind: LimitKind::Engine(engine::LimitKind::OutputBytes),
+            observed: published.package.source_bytes().len() as u64,
+            maximum: plan.output_bytes as u64,
+        });
+    }
+    publish_changes(Some(published), sheet, chart, property.kind(), budget)
+}
+
+fn publish_changes(
+    published: Option<Published>,
+    sheet: usize,
+    chart: ChartSelector,
+    kind: PropertyKind,
+    budget: &mut ChartBudget,
+) -> Result<Option<Published>, Error> {
+    let Some(published) = published else {
+        return Ok(None);
+    };
+    let mut read_budget = *budget;
+    let _ = read(&published.package, sheet, chart, kind, &mut read_budget)?;
+    *budget = read_budget;
+    Ok(Some(published))
+}
+
+fn admit_style_candidate(budget: &mut ChartBudget) -> Result<(), Error> {
+    let bound = budget.series_limits().max_output_bytes();
+    budget.preflight_output(bound).map_err(map_arrangement)?;
+    budget.preflight_retained(bound).map_err(map_arrangement)?;
+    budget.preflight_scratch(bound).map_err(map_arrangement)?;
+    budget.preflight_allocations(1).map_err(map_arrangement)?;
+    budget.output(bound).map_err(map_arrangement)?;
+    budget.retained(bound).map_err(map_arrangement)?;
+    budget.scratch(bound).map_err(map_arrangement)?;
+    budget.allocations(1).map_err(map_arrangement)?;
+    budget.candidate_reopen(bound).map_err(map_arrangement)?;
+    Ok(())
 }
 
 /// Reset series `series`' own value of a series-style property.
@@ -783,9 +1057,10 @@ fn reset_one(
     chart: ChartSelector,
     kind: PropertyKind,
     series: usize,
+    budget: &mut ChartBudget,
 ) -> Result<Option<Published>, Error> {
     let style_kind = kind.style().ok_or(Refusal::NotResettable)?;
-    let target = target(source, sheet, chart)?;
+    let target = target(source, sheet, chart, budget)?;
     if series >= target.series {
         return Err(Refusal::SeriesNotFound { series }.into());
     }
@@ -796,7 +1071,10 @@ fn reset_one(
         .enumerate()
         .map(|(index, value)| (index != series).then_some(value))
         .collect();
-    style::write(source, target.chart, target.kind, style_kind, &values).map_err(from_style)
+    admit_style_candidate(budget)?;
+    let published =
+        style::write(source, target.chart, target.kind, style_kind, &values).map_err(from_style)?;
+    publish_changes(published, sheet, chart, kind, budget)
 }
 
 fn from_style(failure: style::Failure) -> Error {
@@ -843,8 +1121,14 @@ fn from_style_values(kind: PropertyKind, values: Vec<style::Value>) -> Result<Pr
     })
 }
 
-fn resolve_sheet(package: &Package, selector: SheetSelector<'_>) -> Result<usize, Error> {
-    graph::sheet_position(package, selector)?.ok_or_else(|| Refusal::SheetNotFound.into())
+fn resolve_sheet(
+    package: &Package,
+    selector: SheetSelector<'_>,
+    budget: &mut ChartBudget,
+) -> Result<usize, Error> {
+    arrangement::resolve_sheet_position(package, selector, budget)
+        .map(|position| position.get())
+        .map_err(map_arrangement)
 }
 
 impl Package {
@@ -860,8 +1144,9 @@ impl Package {
         chart: impl Into<ChartSelector>,
         kind: PropertyKind,
     ) -> Result<Property, Error> {
-        let sheet = resolve_sheet(self, sheet.into())?;
-        read(self, sheet, chart.into(), kind)
+        let mut budget = ChartBudget::for_package(self).map_err(map_arrangement)?;
+        let sheet = resolve_sheet(self, sheet.into(), &mut budget)?;
+        read(self, sheet, chart.into(), kind, &mut budget)
     }
 
     /// Start an immutable per-series property edit of one sheet chart.
@@ -874,14 +1159,16 @@ impl Package {
         sheet: impl Into<SheetSelector<'sheet>>,
         chart: impl Into<ChartSelector>,
     ) -> Result<Edit<'_>, Error> {
-        let sheet = resolve_sheet(self, sheet.into())?;
+        let mut budget = ChartBudget::for_package(self).map_err(map_arrangement)?;
+        let sheet = resolve_sheet(self, sheet.into(), &mut budget)?;
         let chart = chart.into();
-        target(self, sheet, chart)?;
+        target(self, sheet, chart, &mut budget)?;
         Ok(Edit {
             source: self,
             sheet,
             chart,
             changes: Vec::new(),
+            budget,
         })
     }
 

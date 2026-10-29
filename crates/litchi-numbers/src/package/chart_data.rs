@@ -409,7 +409,9 @@ const fn map_arrangement_limit_kind(kind: chart_arrangement::LimitKind) -> Limit
         },
         chart_arrangement::LimitKind::Allocations => LimitKind::Allocations,
         chart_arrangement::LimitKind::RetainedBytes => LimitKind::RetainedBytes,
-        chart_arrangement::LimitKind::References => LimitKind::References,
+        chart_arrangement::LimitKind::References | chart_arrangement::LimitKind::Identifiers => {
+            LimitKind::References
+        },
         chart_arrangement::LimitKind::CompressedBytes => LimitKind::CompressedBytes,
     }
 }
