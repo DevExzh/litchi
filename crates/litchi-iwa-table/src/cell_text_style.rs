@@ -5,12 +5,14 @@
 //! plan: the leaf owns identifier allocation, archive publication, metadata
 //! transitions, exact-source reassembly and candidate reopen/readback.
 
+use std::cell::Cell;
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 
+use litchi_iwa_common::wire::{RawWireFields, RawWireLimits};
 use litchi_iwa_common::wire::{
     WireView, append_length_delimited_field, patch_varint_field,
-    repeated_length_delimited_payloads, rewrite_repeated_length_delimited_fields,
+    rewrite_repeated_length_delimited_fields,
 };
 use litchi_iwa_common::{LimitKind, WireLimits};
 use litchi_iwa_text_wire::CharacterProperties;
@@ -123,7 +125,7 @@ impl fmt::Display for Error {
 impl std::error::Error for Error {}
 
 /// Caller-selected residual budget for one whole-cell style transaction.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug)]
 pub struct Limits {
     /// Wire input/output limits derived from the opened archive profile.
     pub wire: WireLimits,
@@ -135,6 +137,16 @@ pub struct Limits {
     pub max_work: usize,
     /// Maximum parent-chain depth.
     pub max_style_depth: usize,
+    /// Maximum fallible collection allocations admitted by this operation.
+    pub max_allocations: usize,
+    /// Maximum bytes copied into operation-owned graph values.
+    pub max_copies: usize,
+    remaining_input: Cell<usize>,
+    remaining_fields: Cell<usize>,
+    remaining_work: Cell<usize>,
+    remaining_references: Cell<usize>,
+    remaining_allocations: Cell<usize>,
+    remaining_copies: Cell<usize>,
 }
 
 impl Limits {
@@ -156,16 +168,40 @@ impl Limits {
                 maximum: 0,
             });
         }
-        let maximum = usize::try_from(source.archive_limits().max_entry_bytes())
-            .map_err(|_| invalid("archive entry limit exceeds usize"))?;
+        let profile = source.archive_limits().archive_limits();
+        let input = profile.max_message_bytes().min(WireLimits::MAX_INPUT_BYTES);
+        let fields = profile.max_header_fields().min(WireLimits::MAX_FIELDS);
+        let nesting = profile.max_header_nesting().min(WireLimits::MAX_NESTING);
+        let max_work = profile
+            .max_header_memory_bytes()
+            .min(WireLimits::MAX_REWRITE_WORK);
+        let output = profile
+            .max_message_bytes()
+            .min(WireLimits::MAX_OUTPUT_BYTES);
+        if input == 0 || fields == 0 || nesting == 0 || max_work == 0 || output == 0 {
+            return Err(Error::Limit {
+                kind: if input == 0 {
+                    LimitKind::InputBytes
+                } else if fields == 0 {
+                    LimitKind::Fields
+                } else if nesting == 0 {
+                    LimitKind::Nesting
+                } else if output == 0 {
+                    LimitKind::OutputBytes
+                } else {
+                    LimitKind::RewriteWork
+                },
+                observed: 1,
+                maximum: 0,
+            });
+        }
         let wire = WireLimits::default()
-            .with_input_bytes(maximum.min(WireLimits::MAX_INPUT_BYTES))
-            .and_then(|limits| limits.with_output_bytes(maximum.min(WireLimits::MAX_OUTPUT_BYTES)))
+            .with_input_bytes(input)
+            .and_then(|limits| limits.with_fields(fields))
+            .and_then(|limits| limits.with_output_bytes(output))
+            .and_then(|limits| limits.with_nesting(nesting))
+            .and_then(|limits| limits.with_rewrite_work(max_work))
             .map_err(|_| invalid("source message limits are invalid"))?;
-        let max_work = wire
-            .max_input_bytes()
-            .saturating_add(wire.max_output_bytes())
-            .max(1);
         let mut objects = 0_usize;
         let mut references = 0_usize;
         let mut work = 0_usize;
@@ -184,12 +220,16 @@ impl Limits {
                     });
                 }
                 for info in &object.archive_info.message_infos {
-                    let count = info.object_references.len().saturating_add(
-                        info.field_infos
-                            .iter()
-                            .map(|field| field.object_references.len())
-                            .sum::<usize>(),
-                    );
+                    let mut count = info.object_references.len();
+                    for field in &info.field_infos {
+                        count = count.checked_add(field.object_references.len()).ok_or(
+                            Error::Limit {
+                                kind: LimitKind::Fields,
+                                observed: u64::MAX,
+                                maximum: max_references as u64,
+                            },
+                        )?;
+                    }
                     references = references.checked_add(count).ok_or(Error::Limit {
                         kind: LimitKind::Fields,
                         observed: u64::MAX,
@@ -217,9 +257,135 @@ impl Limits {
             wire,
             max_objects,
             max_references,
-            max_work,
-            max_style_depth: 16,
+            max_work: wire.max_rewrite_work(),
+            max_style_depth: nesting,
+            max_allocations: max_objects.saturating_add(max_references).max(1),
+            max_copies: wire.max_output_bytes().max(1),
+            remaining_input: Cell::new(wire.max_input_bytes()),
+            remaining_fields: Cell::new(wire.max_fields()),
+            remaining_work: Cell::new(wire.max_rewrite_work()),
+            remaining_references: Cell::new(max_references),
+            remaining_allocations: Cell::new(max_objects.saturating_add(max_references).max(1)),
+            remaining_copies: Cell::new(wire.max_output_bytes().max(1)),
         })
+    }
+
+    fn charge(
+        remaining: &Cell<usize>,
+        maximum: usize,
+        amount: usize,
+        kind: LimitKind,
+    ) -> Result<(), Error> {
+        if amount > remaining.get() {
+            let observed = maximum
+                .saturating_sub(remaining.get())
+                .saturating_add(amount);
+            return Err(Error::Limit {
+                kind,
+                observed: observed as u64,
+                maximum: maximum as u64,
+            });
+        }
+        remaining.set(remaining.get() - amount);
+        Ok(())
+    }
+
+    fn charge_input(&self, amount: usize) -> Result<(), Error> {
+        Self::charge(
+            &self.remaining_input,
+            self.wire.max_input_bytes(),
+            amount,
+            LimitKind::InputBytes,
+        )
+    }
+
+    fn charge_fields(&self, amount: usize) -> Result<(), Error> {
+        Self::charge(
+            &self.remaining_fields,
+            self.wire.max_fields(),
+            amount,
+            LimitKind::Fields,
+        )
+    }
+
+    fn charge_work(&self, amount: usize) -> Result<(), Error> {
+        Self::charge(
+            &self.remaining_work,
+            self.max_work,
+            amount,
+            LimitKind::RewriteWork,
+        )
+    }
+
+    fn charge_references(&self, amount: usize) -> Result<(), Error> {
+        Self::charge(
+            &self.remaining_references,
+            self.max_references,
+            amount,
+            LimitKind::Fields,
+        )
+    }
+
+    /// Admit `amount` fallible collection allocations before the operation
+    /// asks a decoder or publisher to reserve them.
+    pub fn admit_allocations(&self, amount: usize) -> Result<(), Error> {
+        if amount > self.remaining_allocations.get() {
+            return Err(Error::Allocation { amount });
+        }
+        self.remaining_allocations
+            .set(self.remaining_allocations.get() - amount);
+        Ok(())
+    }
+
+    /// Admit copied bytes before retaining a second owned graph value.
+    pub fn admit_copies(&self, amount: usize) -> Result<(), Error> {
+        if amount > self.remaining_copies.get() {
+            return Err(Error::Allocation { amount });
+        }
+        self.remaining_copies
+            .set(self.remaining_copies.get() - amount);
+        Ok(())
+    }
+
+    /// Reserve a bounded collection growth before pushing or extending it.
+    pub fn reserve<T>(&self, values: &mut Vec<T>, additional: usize) -> Result<(), Error> {
+        let spare = values.capacity().saturating_sub(values.len());
+        let needed = additional.saturating_sub(spare);
+        if needed == 0 {
+            return Ok(());
+        }
+        self.admit_allocations(needed)?;
+        values
+            .try_reserve(needed)
+            .map_err(|_| Error::Allocation { amount: needed })
+    }
+
+    /// Return the cumulative operation work admitted so far.
+    #[must_use]
+    pub fn report(&self) -> Report {
+        Report {
+            fields: self
+                .wire
+                .max_fields()
+                .saturating_sub(self.remaining_fields.get()),
+            references: self
+                .max_references
+                .saturating_sub(self.remaining_references.get()),
+            work: self.max_work.saturating_sub(self.remaining_work.get()),
+        }
+    }
+
+    fn copy(&self, bytes: &[u8]) -> Result<Vec<u8>, Error> {
+        self.admit_copies(bytes.len())?;
+        self.admit_allocations(1)?;
+        let mut output = Vec::new();
+        output
+            .try_reserve(bytes.len())
+            .map_err(|_| Error::Allocation {
+                amount: bytes.len(),
+            })?;
+        output.extend_from_slice(bytes);
+        Ok(output)
     }
 }
 
@@ -254,13 +420,33 @@ fn map_wire(error: litchi_iwa_common::Error) -> Error {
     }
 }
 
-fn view(data: &[u8]) -> Result<WireView<'_>, Error> {
-    WireView::parse(data, WireLimits::DEFAULT).map_err(map_wire)
+fn view<'a>(data: &'a [u8], limits: &Limits) -> Result<WireView<'a>, Error> {
+    if data.len() > limits.wire.max_input_bytes() {
+        return Err(Error::Limit {
+            kind: LimitKind::InputBytes,
+            observed: data.len() as u64,
+            maximum: limits.wire.max_input_bytes() as u64,
+        });
+    }
+    let raw_limits = RawWireLimits::new(
+        data.len().max(1),
+        limits.wire.max_fields(),
+        limits.wire.max_nesting(),
+        limits.wire.max_rewrite_work(),
+    )
+    .map_err(map_wire)?;
+    let mut fields = RawWireFields::new(data, raw_limits);
+    while fields.next().map_err(map_wire)?.is_some() {}
+    limits.charge_input(data.len())?;
+    limits.charge_fields(fields.fields())?;
+    limits.charge_work(fields.work())?;
+    limits.admit_allocations(1)?;
+    WireView::parse(data, limits.wire).map_err(map_wire)
 }
 
-fn varint(data: &[u8], number: u32) -> Result<Option<u64>, Error> {
+fn varint(data: &[u8], number: u32, limits: &Limits) -> Result<Option<u64>, Error> {
     let mut found = None;
-    for field in view(data)?.fields() {
+    for field in view(data, limits)?.fields() {
         if field.number() != number {
             continue;
         }
@@ -276,9 +462,9 @@ fn varint(data: &[u8], number: u32) -> Result<Option<u64>, Error> {
     Ok(found)
 }
 
-fn bytes(data: &[u8], number: u32) -> Result<Option<&[u8]>, Error> {
+fn bytes<'a>(data: &'a [u8], number: u32, limits: &Limits) -> Result<Option<&'a [u8]>, Error> {
     let mut found = None;
-    for field in view(data)?.fields() {
+    for field in view(data, limits)?.fields() {
         if field.number() != number {
             continue;
         }
@@ -292,18 +478,40 @@ fn bytes(data: &[u8], number: u32) -> Result<Option<&[u8]>, Error> {
     Ok(found)
 }
 
-fn reference(data: &[u8], number: u32) -> Result<Option<u64>, Error> {
-    let Some(payload) = bytes(data, number)? else {
+fn reference(data: &[u8], number: u32, limits: &Limits) -> Result<Option<u64>, Error> {
+    let Some(payload) = bytes(data, number, limits)? else {
         return Ok(None);
     };
-    varint(payload, 1)
+    limits.charge_references(1)?;
+    varint(payload, 1, limits)
+}
+
+fn repeated_payloads<'a>(
+    data: &'a [u8],
+    number: u32,
+    limits: &Limits,
+) -> Result<Vec<&'a [u8]>, Error> {
+    let mut payloads = Vec::new();
+    for field in view(data, limits)?.fields() {
+        if field.number() != number {
+            continue;
+        }
+        if field.wire_type() != 2 {
+            return Err(invalid("repeated field has the wrong wire type"));
+        }
+        limits.reserve(&mut payloads, 1)?;
+        payloads.push(field.payload());
+    }
+    Ok(payloads)
 }
 
 fn unique_payload<'a>(
     source: &'a dyn TableSource,
     identifier: u64,
     types: &[u32],
+    limits: &Limits,
 ) -> Result<(u32, &'a [u8]), Error> {
+    limits.charge_work(1)?;
     let object = source
         .resolve_object(identifier)
         .map_err(|_| invalid("object index is inconsistent"))?
@@ -330,19 +538,23 @@ struct Geometry {
 }
 
 impl Geometry {
-    fn read(model: &[u8]) -> Result<Self, Error> {
+    fn read(model: &[u8], limits: &Limits) -> Result<Self, Error> {
         let value = |field| -> Result<u32, Error> {
-            u32::try_from(varint(model, field)?.ok_or(invalid("table geometry field missing"))?)
-                .map_err(|_| invalid("table geometry exceeds u32"))
+            u32::try_from(
+                varint(model, field, limits)?.ok_or(invalid("table geometry field missing"))?,
+            )
+            .map_err(|_| invalid("table geometry exceeds u32"))
         };
         let geometry = Self {
             rows: value(MODEL_ROWS)?,
             columns: value(MODEL_COLUMNS)?,
-            header_rows: u32::try_from(varint(model, MODEL_HEADER_ROWS)?.unwrap_or(0))
+            header_rows: u32::try_from(varint(model, MODEL_HEADER_ROWS, limits)?.unwrap_or(0))
                 .map_err(|_| invalid("header rows exceed u32"))?,
-            header_columns: u32::try_from(varint(model, MODEL_HEADER_COLUMNS)?.unwrap_or(0))
-                .map_err(|_| invalid("header columns exceed u32"))?,
-            footer_rows: u32::try_from(varint(model, MODEL_FOOTER_ROWS)?.unwrap_or(0))
+            header_columns: u32::try_from(
+                varint(model, MODEL_HEADER_COLUMNS, limits)?.unwrap_or(0),
+            )
+            .map_err(|_| invalid("header columns exceed u32"))?,
+            footer_rows: u32::try_from(varint(model, MODEL_FOOTER_ROWS, limits)?.unwrap_or(0))
                 .map_err(|_| invalid("footer rows exceed u32"))?,
         };
         if geometry.header_rows + geometry.footer_rows > geometry.rows
@@ -362,19 +574,24 @@ struct Table {
 }
 
 impl Table {
-    fn read(source: &dyn TableSource, target: Target) -> Result<Self, Error> {
-        let (_, model) =
-            unique_payload(source, target.model_identifier, &[TABLE_MODEL_MESSAGE_TYPE])?;
-        let geometry = Geometry::read(model)?;
+    fn read(source: &dyn TableSource, target: Target, limits: &Limits) -> Result<Self, Error> {
+        let (_, model) = unique_payload(
+            source,
+            target.model_identifier,
+            &[TABLE_MODEL_MESSAGE_TYPE],
+            limits,
+        )?;
+        let geometry = Geometry::read(model, limits)?;
         if target.row >= geometry.rows || target.column >= geometry.columns {
             return Err(Error::Refused(Refusal::OutsideTable));
         }
-        let store = bytes(model, MODEL_DATA_STORE)?.ok_or(invalid("table data store missing"))?;
-        let store = store.to_vec();
-        let style_list = reference(&store, STYLE_LIST_FIELD)?
+        let store =
+            bytes(model, MODEL_DATA_STORE, limits)?.ok_or(invalid("table data store missing"))?;
+        let store = limits.copy(store)?;
+        let style_list = reference(&store, STYLE_LIST_FIELD, limits)?
             .ok_or(Error::Refused(Refusal::UnsupportedDependency))?;
         Ok(Self {
-            model: model.to_vec(),
+            model: limits.copy(model)?,
             store,
             style_list,
             geometry,
@@ -390,14 +607,17 @@ fn locate_cell(
     source: &dyn TableSource,
     table: &Table,
     target: Target,
+    limits: &Limits,
 ) -> Result<Option<LocatedCell>, Error> {
-    let tile_storage = bytes(&table.store, STORE_TILES)?.ok_or(invalid("tile storage missing"))?;
+    let tile_storage =
+        bytes(&table.store, STORE_TILES, limits)?.ok_or(invalid("tile storage missing"))?;
     let mut tiles = Vec::new();
-    let tile_size = varint(tile_storage, 2)?.ok_or(invalid("tile size missing"))?;
-    for entry in repeated_length_delimited_payloads(tile_storage, 1).map_err(map_wire)? {
-        let key = u32::try_from(varint(entry, 1)?.ok_or(invalid("tile key missing"))?)
+    let tile_size = varint(tile_storage, 2, limits)?.ok_or(invalid("tile size missing"))?;
+    for entry in repeated_payloads(tile_storage, 1, limits)? {
+        limits.reserve(&mut tiles, 1)?;
+        let key = u32::try_from(varint(entry, 1, limits)?.ok_or(invalid("tile key missing"))?)
             .map_err(|_| invalid("tile key exceeds u32"))?;
-        let tile = reference(entry, 2)?.ok_or(invalid("tile reference missing"))?;
+        let tile = reference(entry, 2, limits)?.ok_or(invalid("tile reference missing"))?;
         if tiles.iter().any(|(existing, _)| *existing == key) {
             return Err(invalid("tile key repeats"));
         }
@@ -413,19 +633,15 @@ fn locate_cell(
         .find(|(key, _)| u64::from(*key) == tile_key)
         .ok_or(Error::Refused(Refusal::UnsupportedSource))?
         .1;
-    let (_, tile_data) = unique_payload(source, tile, &[TILE_MESSAGE_TYPE])?;
-    for row in repeated_length_delimited_payloads(tile_data, 5)
-        .map_err(map_wire)?
-        .into_iter()
-    {
-        if varint(row, 1)? != Some(local) {
+    let (_, tile_data) = unique_payload(source, tile, &[TILE_MESSAGE_TYPE], limits)?;
+    for row in repeated_payloads(tile_data, 5, limits)? {
+        if varint(row, 1, limits)? != Some(local) {
             continue;
         }
         for (column, cell) in storage::bnc_cells(row).map_err(|_| invalid("malformed BNC row"))? {
             if column == target.column {
-                return Ok(Some(LocatedCell {
-                    bytes: cell.to_vec(),
-                }));
+                let bytes = limits.copy(cell)?;
+                return Ok(Some(LocatedCell { bytes }));
             }
         }
     }
@@ -442,8 +658,10 @@ fn bnc_limits(data: &[u8]) -> BncLimits {
         .unwrap_or(BncLimits::DEFAULT)
 }
 
-fn style_key(cell: Option<&[u8]>) -> Result<Option<u32>, Error> {
+fn style_key(cell: Option<&[u8]>, limits: &Limits) -> Result<Option<u32>, Error> {
     let Some(cell) = cell else { return Ok(None) };
+    limits.charge_work(cell.len())?;
+    limits.admit_allocations(1)?;
     let cell =
         BncCell::parse(cell, &bnc_limits(cell)).map_err(|_| invalid("malformed BNC cell"))?;
     Ok(cell.text_style_identifier())
@@ -467,26 +685,32 @@ struct StyleList {
 }
 
 impl StyleList {
-    fn read(source: &dyn TableSource, root: u64) -> Result<Self, Error> {
+    fn read(source: &dyn TableSource, root: u64, limits: &Limits) -> Result<Self, Error> {
         let (root_type, root_data) = unique_payload(
             source,
             root,
             &[LIST_MESSAGE_TYPE, LIST_SEGMENT_MESSAGE_TYPE],
+            limits,
         )?;
-        if varint(root_data, 1)? != Some(4) {
+        if varint(root_data, 1, limits)? != Some(4) {
             return Err(Error::Refused(Refusal::UnsupportedStyleList));
         }
-        let next =
-            u32::try_from(varint(root_data, 2)?.ok_or(invalid("style-list cursor missing"))?)
-                .map_err(|_| invalid("style-list cursor exceeds u32"))?;
+        let next = u32::try_from(
+            varint(root_data, 2, limits)?.ok_or(invalid("style-list cursor missing"))?,
+        )
+        .map_err(|_| invalid("style-list cursor exceeds u32"))?;
         let mut entries = Vec::new();
-        for raw in repeated_length_delimited_payloads(root_data, 3).map_err(map_wire)? {
-            let key = u32::try_from(varint(raw, 1)?.ok_or(invalid("style-list key missing"))?)
-                .map_err(|_| invalid("style-list key exceeds u32"))?;
-            let refcount =
-                u32::try_from(varint(raw, 2)?.ok_or(invalid("style-list refcount missing"))?)
-                    .map_err(|_| invalid("style-list refcount exceeds u32"))?;
-            let style = reference(raw, 4)?.ok_or(invalid("style-list style reference missing"))?;
+        for raw in repeated_payloads(root_data, 3, limits)? {
+            limits.reserve(&mut entries, 1)?;
+            let key =
+                u32::try_from(varint(raw, 1, limits)?.ok_or(invalid("style-list key missing"))?)
+                    .map_err(|_| invalid("style-list key exceeds u32"))?;
+            let refcount = u32::try_from(
+                varint(raw, 2, limits)?.ok_or(invalid("style-list refcount missing"))?,
+            )
+            .map_err(|_| invalid("style-list refcount exceeds u32"))?;
+            let style =
+                reference(raw, 4, limits)?.ok_or(invalid("style-list style reference missing"))?;
             if entries.iter().any(|entry: &Entry| entry.key == key) {
                 return Err(invalid("style-list key repeats"));
             }
@@ -498,23 +722,24 @@ impl StyleList {
             });
         }
         let mut segments = Vec::new();
-        for raw in repeated_length_delimited_payloads(root_data, 4).map_err(map_wire)? {
-            let identifier =
-                reference(raw, 1)?.ok_or(invalid("style-list segment reference missing"))?;
+        for raw in repeated_payloads(root_data, 4, limits)? {
+            limits.reserve(&mut segments, 1)?;
+            let identifier = reference(raw, 1, limits)?
+                .ok_or(invalid("style-list segment reference missing"))?;
             let (segment_type, segment_data) =
-                unique_payload(source, identifier, &[LIST_SEGMENT_MESSAGE_TYPE])?;
-            segments.push((identifier, segment_type, segment_data.to_vec()));
-            for segment_entry in
-                repeated_length_delimited_payloads(segment_data, 3).map_err(map_wire)?
-            {
-                let key =
-                    u32::try_from(varint(segment_entry, 1)?.ok_or(invalid("segment key missing"))?)
-                        .map_err(|_| invalid("segment key exceeds u32"))?;
+                unique_payload(source, identifier, &[LIST_SEGMENT_MESSAGE_TYPE], limits)?;
+            let segment_data = limits.copy(segment_data)?;
+            for segment_entry in repeated_payloads(&segment_data, 3, limits)? {
+                limits.reserve(&mut entries, 1)?;
+                let key = u32::try_from(
+                    varint(segment_entry, 1, limits)?.ok_or(invalid("segment key missing"))?,
+                )
+                .map_err(|_| invalid("segment key exceeds u32"))?;
                 let refcount = u32::try_from(
-                    varint(segment_entry, 2)?.ok_or(invalid("segment refcount missing"))?,
+                    varint(segment_entry, 2, limits)?.ok_or(invalid("segment refcount missing"))?,
                 )
                 .map_err(|_| invalid("segment refcount exceeds u32"))?;
-                let style = reference(segment_entry, 4)?
+                let style = reference(segment_entry, 4, limits)?
                     .ok_or(invalid("segment style reference missing"))?;
                 if entries.iter().any(|entry| entry.key == key) {
                     return Err(invalid("style-list key repeats across segments"));
@@ -526,11 +751,12 @@ impl StyleList {
                     owner: identifier,
                 });
             }
+            segments.push((identifier, segment_type, segment_data));
         }
         Ok(Self {
             root,
             root_type,
-            root_data: root_data.to_vec(),
+            root_data: limits.copy(root_data)?,
             entries,
             segments,
             next,
@@ -560,14 +786,19 @@ impl StyleList {
     }
 }
 
-fn style_payload(source: &dyn TableSource, identifier: u64) -> Result<&[u8], Error> {
-    unique_payload(source, identifier, &[PARAGRAPH_STYLE_MESSAGE_TYPE]).map(|(_, data)| data)
+fn style_payload<'a>(
+    source: &'a dyn TableSource,
+    identifier: u64,
+    limits: &Limits,
+) -> Result<&'a [u8], Error> {
+    unique_payload(source, identifier, &[PARAGRAPH_STYLE_MESSAGE_TYPE], limits)
+        .map(|(_, data)| data)
 }
 
-fn stylesheet_of(source: &dyn TableSource, style: u64) -> Result<u64, Error> {
-    let base =
-        bytes(style_payload(source, style)?, 1)?.ok_or(invalid("style base payload missing"))?;
-    reference(base, 5)?.ok_or(Error::Refused(Refusal::UnsupportedDependency))
+fn stylesheet_of(source: &dyn TableSource, style: u64, limits: &Limits) -> Result<u64, Error> {
+    let base = bytes(style_payload(source, style, limits)?, 1, limits)?
+        .ok_or(invalid("style base payload missing"))?;
+    reference(base, 5, limits)?.ok_or(Error::Refused(Refusal::UnsupportedDependency))
 }
 
 /// Read effective character properties through the parent chain.
@@ -585,7 +816,7 @@ pub fn effective(
         if !seen.insert(identifier) {
             return Err(invalid("character-style parent cycle"));
         }
-        let payload = style_payload(source, identifier)?;
+        let payload = style_payload(source, identifier, limits)?;
         properties.inherit(
             &litchi_iwa_text_wire::character_style_properties(payload, wire)
                 .map_err(|_| invalid("malformed character-style properties"))?,
@@ -609,11 +840,15 @@ pub fn read(
     target: Target,
     limits: &Limits,
 ) -> Result<CharacterProperties, Error> {
-    let table = Table::read(source, target)?;
-    let cell = locate_cell(source, &table, target)?;
-    let key = style_key(cell.as_ref().map(|cell| cell.bytes.as_slice()))?;
+    let table = Table::read(source, target, limits)?;
+    let cell = locate_cell(source, &table, target, limits)?;
+    let key = style_key(cell.as_ref().map(|cell| cell.bytes.as_slice()), limits)?;
     let style = match key {
-        Some(key) => StyleList::read(source, table.style_list)?.entry(key)?.style,
+        Some(key) => {
+            StyleList::read(source, table.style_list, limits)?
+                .entry(key)?
+                .style
+        },
         None => {
             let field = if target.row < table.geometry.header_rows {
                 25
@@ -629,7 +864,8 @@ pub fn read(
             } else {
                 24
             };
-            reference(&table.model, field)?.ok_or(Error::Refused(Refusal::UnsupportedDependency))?
+            reference(&table.model, field, limits)?
+                .ok_or(Error::Refused(Refusal::UnsupportedDependency))?
         },
     };
     effective(source, style, limits)
@@ -751,10 +987,11 @@ pub fn plan_set(
     fresh: Option<u64>,
     limits: &Limits,
 ) -> Result<Option<Plan>, Error> {
-    let table = Table::read(source, target)?;
-    let cell = locate_cell(source, &table, target)?;
-    let old_key = style_key(cell.as_ref().map(|cell| cell.bytes.as_slice()))?;
-    let list = StyleList::read(source, table.style_list)?;
+    limits.charge_work(1)?;
+    let table = Table::read(source, target, limits)?;
+    let cell = locate_cell(source, &table, target, limits)?;
+    let old_key = style_key(cell.as_ref().map(|cell| cell.bytes.as_slice()), limits)?;
+    let list = StyleList::read(source, table.style_list, limits)?;
     let parent = match old_key {
         Some(key) => list.entry(key)?.style,
         None => {
@@ -772,7 +1009,8 @@ pub fn plan_set(
             } else {
                 24
             };
-            reference(&table.model, field)?.ok_or(Error::Refused(Refusal::UnsupportedDependency))?
+            reference(&table.model, field, limits)?
+                .ok_or(Error::Refused(Refusal::UnsupportedDependency))?
         },
     };
     let inherited = effective(source, parent, limits)?;
@@ -781,7 +1019,7 @@ pub fn plan_set(
         return Ok(None);
     }
     let wire = limits.wire;
-    let stylesheet = stylesheet_of(source, parent)?;
+    let stylesheet = stylesheet_of(source, parent, limits)?;
     let exclusive = old_key.is_some_and(|key| {
         list.entry(key)
             .ok()
@@ -795,7 +1033,7 @@ pub fn plan_set(
             wire,
         )
         .map_err(|_| invalid("character-style variation encoding failed"))?;
-        let data = with_paragraph_properties(data, wire)?;
+        let data = with_paragraph_properties(data, limits)?;
         return Ok(Some(Plan {
             rewrites: vec![Rewrite {
                 identifier: parent,
@@ -804,6 +1042,7 @@ pub fn plan_set(
                 add_references: Vec::new(),
                 remove_references: Vec::new(),
             }],
+            report: limits.report(),
             ..Plan::default()
         }));
     }
@@ -811,9 +1050,9 @@ pub fn plan_set(
     let data =
         litchi_iwa_text_wire::character_style_variation(Some(parent), stylesheet, &reduced, wire)
             .map_err(|_| invalid("character-style variation encoding failed"))?;
-    let data = with_paragraph_properties(data, wire)?;
+    let data = with_paragraph_properties(data, limits)?;
     let (sheet_type, sheet_payload) =
-        unique_payload(source, stylesheet, &[STYLESHEET_MESSAGE_TYPE])?;
+        unique_payload(source, stylesheet, &[STYLESHEET_MESSAGE_TYPE], limits)?;
     let sheet_data =
         litchi_iwa_text_wire::stylesheet_with_style(sheet_payload, fresh, Some(parent), wire)
             .map_err(|_| invalid("stylesheet variation encoding failed"))?;
@@ -822,6 +1061,7 @@ pub fn plan_set(
     let mut list_data =
         patch_varint_field(&list.root_data, 2, true, Some(u64::from(next))).map_err(map_wire)?;
     let mut entry = Vec::new();
+    limits.admit_allocations(2)?;
     litchi_iwa_common::varint::encode_varint_into(&mut entry, 1_u64 << 3);
     litchi_iwa_common::varint::encode_varint_into(&mut entry, u64::from(key));
     litchi_iwa_common::varint::encode_varint_into(&mut entry, 2_u64 << 3);
@@ -829,10 +1069,9 @@ pub fn plan_set(
     let mut reference_payload = Vec::new();
     litchi_iwa_common::varint::encode_varint_into(&mut reference_payload, 1_u64 << 3);
     litchi_iwa_common::varint::encode_varint_into(&mut reference_payload, fresh);
-    append_length_delimited_field(&mut entry, 4, &reference_payload, WireLimits::DEFAULT)
+    append_length_delimited_field(&mut entry, 4, &reference_payload, limits.wire)
         .map_err(map_wire)?;
-    append_length_delimited_field(&mut list_data, 3, &entry, WireLimits::DEFAULT)
-        .map_err(map_wire)?;
+    append_length_delimited_field(&mut list_data, 3, &entry, limits.wire).map_err(map_wire)?;
     let mut rewrites = vec![
         Rewrite {
             identifier: stylesheet,
@@ -850,6 +1089,7 @@ pub fn plan_set(
         },
     ];
     let mut releases = Vec::new();
+    limits.reserve(&mut releases, if old_key.is_some() { 1 } else { 0 })?;
     if let Some(old) = old_key {
         let mut remaining = BTreeMap::from([(old, 1_u32)]);
         let owner = list.entry(old)?.owner;
@@ -906,6 +1146,7 @@ pub fn plan_set(
         ],
         cell_updates: vec![(target, key)],
         batch_compatible: true,
+        report: limits.report(),
         releases,
         ..Plan::default()
     }))
@@ -919,7 +1160,10 @@ pub fn plan_set_many(
     requests: &[Request],
     limits: &Limits,
 ) -> Result<Option<Plan>, Error> {
+    limits.charge_work(requests.len())?;
+    limits.admit_allocations(requests.len())?;
     let mut plans = Vec::new();
+    limits.reserve(&mut plans, requests.len())?;
     for request in requests {
         let Some(plan) = plan_set(
             source,
@@ -941,6 +1185,7 @@ pub fn plan_set_many(
     }
     let mut combined = Plan::default();
     let mut list_entries = Vec::new();
+    limits.reserve(&mut list_entries, requests.len())?;
     let mut list_identifier = None;
     let mut list_type = None;
     let mut release_counts: BTreeMap<u64, BTreeMap<u32, u32>> = BTreeMap::new();
@@ -963,11 +1208,14 @@ pub fn plan_set_many(
                 *key = next;
                 for rewrite in &mut plan.rewrites {
                     if rewrite.message_type == LIST_MESSAGE_TYPE {
-                        rewrite.data = rewrite_list_key(&rewrite.data, old, next)?;
+                        rewrite.data = rewrite_list_key(&rewrite.data, old, next, limits)?;
                     }
                 }
             }
         }
+        limits.reserve(&mut combined.insertions, plan.insertions.len())?;
+        limits.reserve(&mut combined.registrations, plan.registrations.len())?;
+        limits.reserve(&mut combined.cell_updates, plan.cell_updates.len())?;
         combined.insertions.extend(plan.insertions);
         combined.registrations.extend(plan.registrations);
         combined.cell_updates.extend(plan.cell_updates);
@@ -987,12 +1235,11 @@ pub fn plan_set_many(
                     .last()
                     .map(|(_, key)| *key)
                     .ok_or(invalid("batch list key missing"))?;
-                let entry = repeated_length_delimited_payloads(&rewrite.data, 3)
-                    .map_err(map_wire)?
+                let entry = repeated_payloads(&rewrite.data, 3, limits)?
                     .into_iter()
-                    .find(|entry| varint(entry, 1).ok() == Some(Some(u64::from(key))))
+                    .find(|entry| varint(entry, 1, limits).ok() == Some(Some(u64::from(key))))
                     .ok_or(invalid("batch style-list entry missing"))?;
-                list_entries.push(entry.to_vec());
+                list_entries.push(limits.copy(entry)?);
                 continue;
             }
             if let Some(existing) = combined.rewrites.iter_mut().find(|candidate| {
@@ -1011,25 +1258,27 @@ pub fn plan_set_many(
                         limits.wire,
                     )
                     .map_err(|_| invalid("batch stylesheet variation encoding failed"))?;
+                    limits.reserve(&mut existing.add_references, 1)?;
                     existing.add_references.push(insertion.identifier);
                 } else {
                     return Err(Error::BatchUnsupported);
                 }
             } else {
+                limits.reserve(&mut combined.rewrites, 1)?;
                 combined.rewrites.push(rewrite);
             }
         }
     }
     if let Some(list_identifier) = list_identifier {
-        let table = Table::read(source, requests[0].target)?;
-        let list = StyleList::read(source, table.style_list)?;
+        let table = Table::read(source, requests[0].target, limits)?;
+        let list = StyleList::read(source, table.style_list, limits)?;
         if list.root != list_identifier {
             return Err(invalid("batch style-list owner changed"));
         }
-        let mut root_data = list.root_data.clone();
+        let mut root_data = limits.copy(&list.root_data)?;
         let next = list_entries
             .iter()
-            .filter_map(|entry| varint(entry, 1).ok().flatten())
+            .filter_map(|entry| varint(entry, 1, limits).ok().flatten())
             .max()
             .and_then(|key| key.checked_add(1))
             .and_then(|key| u32::try_from(key).ok())
@@ -1040,15 +1289,14 @@ pub fn plan_set_many(
             append_length_delimited_field(&mut root_data, 3, entry, limits.wire)
                 .map_err(map_wire)?;
         }
+        let mut add_references = Vec::new();
+        limits.reserve(&mut add_references, combined.insertions.len())?;
+        add_references.extend(combined.insertions.iter().map(|object| object.identifier));
         let mut root_rewrite = Rewrite {
             identifier: list_identifier,
             message_type: list_type.unwrap_or(LIST_MESSAGE_TYPE),
             data: root_data,
-            add_references: combined
-                .insertions
-                .iter()
-                .map(|object| object.identifier)
-                .collect(),
+            add_references,
             remove_references: Vec::new(),
         };
         for (owner, mut remaining) in release_counts {
@@ -1064,6 +1312,7 @@ pub fn plan_set_many(
                 if let Some(released) = released {
                     root_rewrite.data = released;
                 }
+                limits.reserve(&mut root_rewrite.remove_references, dropped.len())?;
                 root_rewrite.remove_references.extend(dropped);
             } else {
                 let (_, segment_type, segment_data) = list
@@ -1080,6 +1329,7 @@ pub fn plan_set_many(
                     return Err(Error::Refused(Refusal::UnsupportedDependency));
                 }
                 if let Some(released) = released {
+                    limits.reserve(&mut combined.rewrites, 1)?;
                     combined.rewrites.push(Rewrite {
                         identifier: owner,
                         message_type: *segment_type,
@@ -1090,35 +1340,38 @@ pub fn plan_set_many(
                 }
             }
         }
+        limits.reserve(&mut combined.rewrites, 1)?;
         combined.rewrites.push(root_rewrite);
     }
     combined.batch_compatible = true;
+    combined.report = limits.report();
     Ok(Some(combined))
 }
 
-fn rewrite_list_key(data: &[u8], old: u32, new: u32) -> Result<Vec<u8>, Error> {
-    let entries = repeated_length_delimited_payloads(data, 3).map_err(map_wire)?;
-    let mut replacements = Vec::with_capacity(entries.len());
+fn rewrite_list_key(data: &[u8], old: u32, new: u32, limits: &Limits) -> Result<Vec<u8>, Error> {
+    let entries = repeated_payloads(data, 3, limits)?;
+    let mut replacements = Vec::new();
+    limits.reserve(&mut replacements, entries.len())?;
     for entry in entries {
-        if varint(entry, 1)? == Some(u64::from(old)) {
+        if varint(entry, 1, limits)? == Some(u64::from(old)) {
             replacements
                 .push(patch_varint_field(entry, 1, true, Some(u64::from(new))).map_err(map_wire)?);
         } else {
-            replacements.push(entry.to_vec());
+            replacements.push(limits.copy(entry)?);
         }
     }
     let mut output =
         rewrite_repeated_length_delimited_fields(data, 3, &replacements).map_err(map_wire)?;
-    if varint(&output, 2)? == Some(u64::from(old).saturating_add(1)) {
+    if varint(&output, 2, limits)? == Some(u64::from(old).saturating_add(1)) {
         output = patch_varint_field(&output, 2, true, Some(u64::from(new).saturating_add(1)))
             .map_err(map_wire)?;
     }
     Ok(output)
 }
 
-fn with_paragraph_properties(mut data: Vec<u8>, limits: WireLimits) -> Result<Vec<u8>, Error> {
-    if bytes(&data, PARAGRAPH_PROPERTIES_FIELD)?.is_none() {
-        append_length_delimited_field(&mut data, PARAGRAPH_PROPERTIES_FIELD, &[], limits)
+fn with_paragraph_properties(mut data: Vec<u8>, limits: &Limits) -> Result<Vec<u8>, Error> {
+    if bytes(&data, PARAGRAPH_PROPERTIES_FIELD, limits)?.is_none() {
+        append_length_delimited_field(&mut data, PARAGRAPH_PROPERTIES_FIELD, &[], limits.wire)
             .map_err(map_wire)?;
     }
     Ok(data)
@@ -1147,13 +1400,16 @@ fn style_is_exclusive(
                 return Ok(false);
             }
             for message in &object.messages {
-                if message.type_ == PARAGRAPH_STYLE_MESSAGE_TYPE
-                    && litchi_iwa_text_wire::character_style_parent(&message.data, limits.wire)
+                if message.type_ == PARAGRAPH_STYLE_MESSAGE_TYPE {
+                    limits.charge_work(message.data.len())?;
+                    limits.admit_allocations(1)?;
+                    if litchi_iwa_text_wire::character_style_parent(&message.data, limits.wire)
                         .ok()
                         .flatten()
                         == Some(style)
-                {
-                    return Ok(false);
+                    {
+                        return Ok(false);
+                    }
                 }
             }
             found = true;
@@ -1166,7 +1422,7 @@ fn style_is_exclusive(
 #[cfg(test)]
 mod tests {
     use super::minimal;
-    use super::{Error, Limits, TableSource};
+    use super::{Error, Limits, TableSource, view};
     use litchi_iwa_text_wire::CharacterProperties;
 
     struct LimitedSource {
@@ -1262,6 +1518,47 @@ mod tests {
                 observed: 1,
                 maximum: 0,
             })
+        ));
+    }
+
+    #[test]
+    fn low_wire_field_budget_refuses_before_view_allocation() {
+        let source = limited_source(1_000_000, 1_000_000);
+        let limits = Limits::from_source(&source).expect("source limits");
+        limits.remaining_fields.set(0);
+        assert!(matches!(
+            view(&[8, 1], &limits),
+            Err(Error::Limit {
+                kind: litchi_iwa_common::LimitKind::Fields,
+                maximum: _,
+                ..
+            })
+        ));
+    }
+
+    #[test]
+    fn low_work_budget_refuses_before_wire_decode() {
+        let source = limited_source(1_000_000, 1_000_000);
+        let limits = Limits::from_source(&source).expect("source limits");
+        limits.remaining_work.set(0);
+        assert!(matches!(
+            view(&[8, 1], &limits),
+            Err(Error::Limit {
+                kind: litchi_iwa_common::LimitKind::RewriteWork,
+                maximum: _,
+                ..
+            })
+        ));
+    }
+
+    #[test]
+    fn low_allocation_budget_refuses_before_wire_view_reservation() {
+        let source = limited_source(1_000_000, 1_000_000);
+        let limits = Limits::from_source(&source).expect("source limits");
+        limits.remaining_allocations.set(0);
+        assert!(matches!(
+            view(&[8, 1], &limits),
+            Err(Error::Allocation { amount: 1 })
         ));
     }
 }

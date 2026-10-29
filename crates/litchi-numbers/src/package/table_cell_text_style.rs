@@ -228,6 +228,9 @@ impl Edit<'_> {
             *staged = merged;
             return Ok(self);
         }
+        if self.cells.len() >= litchi_iwa_table::TableSource::max_objects(self.source) {
+            return Err(Error::Allocation { amount: 1 });
+        }
         self.cells
             .try_reserve(1)
             .map_err(|_error| Error::Allocation { amount: 1 })?;
@@ -442,6 +445,7 @@ fn from_shared(error: shared::Error) -> Error {
         },
         shared::Error::Allocation { amount } => Error::Allocation { amount },
         shared::Error::NeedsIdentifier => Error::InvalidSource,
+        shared::Error::BatchUnsupported => Error::Refused(Refusal::UnsupportedDependency),
         _ => Error::InvalidSource,
     }
 }
@@ -471,6 +475,7 @@ fn publish(
         let plan = match shared::plan_set(source, shared_target, properties, None, &limits) {
             Ok(plan) => plan,
             Err(shared::Error::NeedsIdentifier) => {
+                limits.admit_allocations(1).map_err(from_shared)?;
                 let fresh = *working.allocate(1)?.first().ok_or(Error::InvalidSource)?;
                 shared::plan_set(source, shared_target, properties, Some(fresh), &limits)
                     .map_err(from_shared)?
@@ -485,6 +490,9 @@ fn publish(
         return working.publish(&transition).map_err(Error::from);
     }
     let mut requests = Vec::new();
+    limits
+        .reserve(&mut requests, cells.len())
+        .map_err(from_shared)?;
     for (position, properties) in cells {
         let shared_target = shared::Target {
             model_identifier: target.model,
@@ -495,6 +503,7 @@ fn publish(
             Ok(None) => None,
             Ok(Some(_)) => None,
             Err(shared::Error::NeedsIdentifier) => {
+                limits.admit_allocations(1).map_err(from_shared)?;
                 Some(*working.allocate(1)?.first().ok_or(Error::InvalidSource)?)
             },
             Err(error) => return Err(from_shared(error)),
