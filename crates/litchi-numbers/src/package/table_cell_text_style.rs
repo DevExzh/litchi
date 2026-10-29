@@ -575,7 +575,7 @@ fn publish(
                 .map_err(Error::from);
         };
         let mut transition = Transition::default();
-        apply_shared_plan(&mut working, &mut transition, plan, &limits)?;
+        apply_shared_plan(source, &mut working, &mut transition, plan, &limits)?;
         return working
             .publish(&transition)
             .map(|published| (published, limits))
@@ -625,7 +625,7 @@ fn publish(
             .map_err(Error::from);
     };
     let mut transition = Transition::default();
-    apply_shared_plan(&mut working, &mut transition, plan, &limits)?;
+    apply_shared_plan(source, &mut working, &mut transition, plan, &limits)?;
     working
         .publish(&transition)
         .map(|published| (published, limits))
@@ -633,6 +633,7 @@ fn publish(
 }
 
 fn apply_shared_plan(
+    source: &Package,
     working: &mut Working<'_>,
     transition: &mut Transition,
     plan: shared::Plan,
@@ -718,7 +719,7 @@ fn apply_shared_plan(
             },
         }
     }
-    write_style_keys(working, &plan.cell_updates, limits)?;
+    write_style_keys(source, working, &plan.cell_updates, limits)?;
     Ok(())
 }
 
@@ -765,6 +766,7 @@ fn admit_publication(plan: &shared::Plan, limits: &shared::Limits) -> Result<(),
 /// writer owns existing-cell, empty-slot and missing-row handling under the
 /// same staged-to-readback transaction ledger.
 fn write_style_keys(
+    source: &Package,
     working: &mut Working<'_>,
     updates: &[(shared::Target, u32)],
     limits: &shared::Limits,
@@ -778,17 +780,18 @@ fn write_style_keys(
     {
         return Err(Error::Refused(Refusal::UnsupportedDependency));
     }
-    let (_, model) = topology::message(working, first_target.model_identifier, &[6_001])?;
-    let geometry = topology::geometry(model).map_err(from_topology)?;
-    let store = single_bytes(model, 4)?.ok_or(Error::InvalidSource)?;
-    let (tiles, tile_size) = topology::tiles(store).map_err(from_topology)?;
-    if tile_size == 0 {
-        return Err(Error::InvalidSource);
-    }
+    let facts = shared::table_facts(
+        source,
+        first_target,
+        limits,
+    )
+    .map_err(from_shared)?;
+    let tiles = facts.tiles;
+    let tile_size = facts.tile_size;
     let mut groups: Vec<(u64, Vec<writer::Update>)> = Vec::new();
     limits.reserve(&mut groups, 1).map_err(from_shared)?;
     for (target, key) in updates {
-        if target.row >= geometry.rows || target.column >= geometry.columns {
+        if target.row >= facts.rows || target.column >= facts.columns {
             return Err(Error::Refused(Refusal::CellNotFound));
         }
         let tile_key = u64::from(target.row) / tile_size;
@@ -823,7 +826,7 @@ fn write_style_keys(
         let (tile_index, tile_data) = topology::message(working, tile, &[TILE_MESSAGE_TYPE])?;
         let write = writer::set_text_style_keys(
             tile_data,
-            geometry.columns,
+            facts.columns,
             &rows,
             writer::RowPlacement::FieldOrder,
             limits,

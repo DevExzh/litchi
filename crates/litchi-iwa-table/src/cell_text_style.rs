@@ -793,6 +793,53 @@ impl Table {
     }
 }
 
+/// Bounded, source-relative table facts needed by a leaf tile writer.
+#[derive(Debug, Clone)]
+pub struct TableFacts {
+    /// Table row count.
+    pub rows: u32,
+    /// Table column count.
+    pub columns: u32,
+    /// Rows per storage tile.
+    pub tile_size: u64,
+    /// Storage tile index and object identifier pairs.
+    pub tiles: Vec<(u32, u64)>,
+}
+
+/// Read the immutable table geometry and tile index through the shared
+/// residual budget. Leaves use these facts for selection; they must not route
+/// the same admission through a default-limit topology parser.
+pub fn table_facts(
+    source: &dyn TableSource,
+    target: Target,
+    limits: &Limits,
+) -> Result<TableFacts, Error> {
+    let table = Table::read(source, target, limits)?;
+    let tile_storage =
+        bytes(&table.store, STORE_TILES, limits)?.ok_or(invalid("tile storage missing"))?;
+    let tile_size = varint(tile_storage, 2, limits)?.ok_or(invalid("tile size missing"))?;
+    if tile_size == 0 {
+        return Err(invalid("tile size is zero"));
+    }
+    let mut tiles = Vec::new();
+    for entry in repeated_payloads(tile_storage, 1, limits)? {
+        limits.reserve(&mut tiles, 1)?;
+        let key = u32::try_from(varint(entry, 1, limits)?.ok_or(invalid("tile key missing"))?)
+            .map_err(|_| invalid("tile key exceeds u32"))?;
+        let tile = reference(entry, 2, limits)?.ok_or(invalid("tile reference missing"))?;
+        if tiles.iter().any(|(existing, _)| *existing == key) {
+            return Err(invalid("tile key repeats"));
+        }
+        tiles.push((key, tile));
+    }
+    Ok(TableFacts {
+        rows: table.geometry.rows,
+        columns: table.geometry.columns,
+        tile_size,
+        tiles,
+    })
+}
+
 struct LocatedCell {
     bytes: Vec<u8>,
 }
