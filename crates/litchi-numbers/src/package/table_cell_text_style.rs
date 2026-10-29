@@ -548,18 +548,25 @@ fn publish(
             row: position.row(),
             column: position.column(),
         };
-        // The shared batch planner prepares the immutable table/tile/style
-        // graph once.  Reserve one bounded candidate identifier per staged
-        // cell up front; no candidate is published when that request is a
-        // semantic no-op, and the planner remains the authority for whether
-        // the identifier is consumed by a variation.
-        limits.admit_allocations(1).map_err(from_shared)?;
-        let fresh = Some(*working.allocate(1)?.first().ok_or(Error::InvalidSource)?);
         requests.push(shared::Request {
             target: shared_target,
             properties: properties.clone(),
-            fresh,
+            fresh: None,
         });
+    }
+    let mut targets = Vec::new();
+    targets
+        .try_reserve(requests.len())
+        .map_err(|_| Error::Allocation {
+            amount: requests.len(),
+        })?;
+    targets.extend(requests.iter().map(|request| request.target));
+    let current = shared::read_many(source, &targets, &limits).map_err(from_shared)?;
+    for (request, inherited) in requests.iter_mut().zip(current.iter()) {
+        if shared::minimal(&request.properties, inherited) != CharacterProperties::new() {
+            limits.admit_allocations(1).map_err(from_shared)?;
+            request.fresh = Some(*working.allocate(1)?.first().ok_or(Error::InvalidSource)?);
+        }
     }
     let plan = match shared::plan_set_many(source, &requests, &limits) {
         Ok(plan) => plan,
