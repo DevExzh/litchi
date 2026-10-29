@@ -66,6 +66,7 @@ fn host_write(source: &[u8], target: Target, chart: u64, change: &Change) -> Tes
     })
 }
 
+#[inline(never)]
 fn host_read(bytes: &[u8], target: Target, chart: u64) -> TestResult<String> {
     Ok(match target {
         Target::Keynote { slide } => {
@@ -400,14 +401,17 @@ fn pages_facade_size_set_reset_inverse_noop() -> TestResult {
     Ok(())
 }
 
+#[inline(never)]
 fn pages_facade_read_font_route(source: &[u8]) -> TestResult<ChartFont> {
     Ok(PagesPackage::from_bytes(source)?.body_chart_font(BodyChartSelector::index(0))?)
 }
 
+#[inline(never)]
 fn pages_facade_read_size_route(source: &[u8]) -> TestResult<TextPointSize> {
     Ok(PagesPackage::from_bytes(source)?.body_chart_font_size(BodyChartSelector::index(0))?)
 }
 
+#[inline(never)]
 fn pages_facade_write_route(source: &[u8], change: &Change) -> TestResult<Vec<u8>> {
     let package = PagesPackage::from_bytes(source)?;
     let selector = BodyChartSelector::index(0);
@@ -433,6 +437,7 @@ fn pages_facade_write_route(source: &[u8], change: &Change) -> TestResult<Vec<u8
     pages_leaf_bytes(commit.package())
 }
 
+#[inline(never)]
 fn pages_facade_host_route(
     source: &[u8],
     target: Target,
