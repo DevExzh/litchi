@@ -256,6 +256,8 @@ fn bounded_workspace_construction_reports_and_checks_index_requirements() {
     assert_eq!(requirements.component_count(), 2);
     assert_eq!(requirements.object_count(), 3);
     assert!(requirements.source_work() > 5);
+    assert_eq!(requirements.builder_work(), requirements.source_work() * 2);
+    assert_eq!(requirements.total_work(), requirements.source_work() * 3);
     assert_eq!(requirements.index_allocations(), 2);
     assert!(requirements.index_retained_bytes() > 0);
     assert!(requirements.component_view_bytes() > 0);
@@ -317,13 +319,34 @@ fn bounded_workspace_construction_reports_and_checks_index_requirements() {
         Limits::default(),
         requirements,
         ConstructionLimits::new(
-            requirements.source_work(),
+            requirements.builder_work().saturating_sub(1),
+            requirements.index_allocations(),
+            requirements.index_retained_bytes(),
+            requirements.index_scratch_bytes(),
+        ),
+    )
+    .expect_err("two builder passes must be admitted");
+    assert!(matches!(
+        workspace,
+        ConstructionError::Limit {
+            kind: ConstructionLimitKind::Work,
+            ..
+        }
+    ));
+
+    let workspace = Workspace::new_bounded(
+        &source,
+        Limits::default(),
+        requirements,
+        ConstructionLimits::new(
+            requirements.builder_work(),
             requirements.index_allocations(),
             requirements.index_retained_bytes(),
             requirements.index_scratch_bytes(),
         ),
     )
     .expect("bounded workspace");
+    assert_eq!(workspace.source_work(), 0);
     assert_eq!(workspace.next_object_identifier().expect("identifier"), 10);
 }
 
