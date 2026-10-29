@@ -245,6 +245,8 @@ impl fmt::Display for FinishLimitKind {
 pub enum FinishError {
     /// The staged workspace itself is invalid.
     Graph(Error),
+    /// A finalization requirement overflowed its finite arithmetic.
+    Overflow(&'static str),
     /// The caller's residual finalization profile was exhausted.
     Limit {
         /// Exhausted resource.
@@ -265,6 +267,9 @@ impl fmt::Display for FinishError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Graph(error) => write!(formatter, "workspace finalization: {error}"),
+            Self::Overflow(reason) => {
+                write!(formatter, "workspace finalization overflow: {reason}")
+            },
             Self::Limit {
                 kind,
                 observed,
@@ -639,29 +644,33 @@ impl<'s> Workspace<'s> {
     /// copy-on-write entries or are deleted, so this query performs no
     /// source-name scan and allocates nothing.
     #[must_use]
-    pub fn finish_requirements(&self) -> FinishRequirements {
+    pub fn finish_requirements(&self) -> std::result::Result<FinishRequirements, FinishError> {
         let vector_allocations = usize::from(self.finish.edit_count != 0)
-            .saturating_add(usize::from(self.finish.deletion_count != 0));
+            .checked_add(usize::from(self.finish.deletion_count != 0))
+            .ok_or(FinishError::Overflow("finish vector allocation count"))?;
         let allocations = vector_allocations
-            .saturating_add(self.finish.edit_count)
-            .saturating_add(self.finish.deletion_count);
+            .checked_add(self.finish.edit_count)
+            .and_then(|value| value.checked_add(self.finish.deletion_count))
+            .ok_or(FinishError::Overflow("finish allocation count"))?;
         let vector_bytes = self
             .finish
             .edit_count
-            .saturating_mul(size_of::<(String, Archive)>());
-        let deletion_vector_bytes = self
-            .finish
-            .deletion_count
-            .saturating_mul(size_of::<String>());
+            .checked_mul(size_of::<(String, Archive)>());
+        let deletion_vector_bytes = self.finish.deletion_count.checked_mul(size_of::<String>());
+        let vector_bytes = vector_bytes.ok_or(FinishError::Overflow("edit vector bytes"))?;
+        let deletion_vector_bytes =
+            deletion_vector_bytes.ok_or(FinishError::Overflow("deletion vector bytes"))?;
         let retained_bytes = vector_bytes
-            .saturating_add(deletion_vector_bytes)
-            .saturating_add(self.finish.copy_bytes);
+            .checked_add(deletion_vector_bytes)
+            .and_then(|value| value.checked_add(self.finish.copy_bytes))
+            .ok_or(FinishError::Overflow("finish retained bytes"))?;
         let work = self
             .finish
             .changed_entries_scanned
-            .saturating_add(self.finish.deletion_count)
-            .saturating_add(self.finish.copy_bytes);
-        FinishRequirements {
+            .checked_add(self.finish.deletion_count)
+            .and_then(|value| value.checked_add(self.finish.copy_bytes))
+            .ok_or(FinishError::Overflow("finish work"))?;
+        Ok(FinishRequirements {
             changed_entries_scanned: self.finish.changed_entries_scanned,
             edit_count: self.finish.edit_count,
             insertion_count: self.created.len(),
@@ -672,7 +681,7 @@ impl<'s> Workspace<'s> {
             retained_bytes,
             scratch_bytes: 0,
             output_bytes: 0,
-        }
+        })
     }
 
     /// Finish the edit under an explicit residual profile.
@@ -686,7 +695,7 @@ impl<'s> Workspace<'s> {
         self,
         limits: FinishLimits,
     ) -> std::result::Result<(Changes, FinishReport), FinishError> {
-        let requirements = self.finish_requirements();
+        let requirements = self.finish_requirements()?;
         requirements.check(limits)?;
 
         let mut edits = Vec::new();
