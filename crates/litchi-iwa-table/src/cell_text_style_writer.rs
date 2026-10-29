@@ -5,8 +5,6 @@
 //! leaf supplies the transaction ledger and the already-selected Numbers-wire
 //! profile; this writer consumes both while rebuilding each affected row once.
 
-use std::collections::BTreeMap;
-
 use litchi_iwa_common::wire::{
     WireFieldView, WireView, append_length_delimited_field, append_varint_field, visit_wire_fields,
 };
@@ -212,6 +210,10 @@ fn view<'a>(
     WireView::parse(data, limits).map_err(map_common)
 }
 
+fn charge_view_scans(view: &WireView<'_>, transaction: &Limits, scans: usize) -> Result<(), Error> {
+    transaction.admit_work(view.len().saturating_mul(scans))
+}
+
 fn decode_varint(field: WireFieldView<'_>) -> Result<u64, Error> {
     if field.wire_type() != 0 {
         return Err(invalid("tile field has the wrong wire type"));
@@ -335,7 +337,14 @@ fn parse_slots<'a>(
             )
         });
     }
-    let present: Vec<usize> = starts.iter().flatten().copied().collect();
+    let present_count = starts.iter().flatten().count();
+    let mut present = Vec::new();
+    present
+        .try_reserve_exact(present_count)
+        .map_err(|_| Error::Allocation {
+            amount: present_count,
+        })?;
+    present.extend(starts.iter().flatten().copied());
     if present.windows(2).any(|pair| pair[0] >= pair[1])
         || present.first().is_some_and(|value| *value != 0)
         || present.last().is_some_and(|value| *value >= storage.len())
@@ -354,10 +363,16 @@ fn parse_slots<'a>(
     for start in starts {
         output.push(start.map(|start| (start, next.next().copied().unwrap_or(storage.len()))));
     }
-    Ok(output
-        .into_iter()
-        .map(|slot| slot.map(|(start, end)| &storage[start..end]))
-        .collect())
+    let mut cells = Vec::new();
+    cells
+        .try_reserve_exact(output.len())
+        .map_err(|_| Error::Allocation {
+            amount: output.len(),
+        })?;
+    for slot in output {
+        cells.push(slot.map(|(start, end)| &storage[start..end]));
+    }
+    Ok(cells)
 }
 
 fn encode_cells<'a>(
@@ -443,6 +458,7 @@ fn rewrite_row(
 ) -> Result<RowRewrite, Error> {
     let wire = bnc_limits.wire();
     let view = view(row, wire, transaction)?;
+    charge_view_scans(&view, transaction, 5)?;
     let row_number =
         one_varint(&view, ROW_INDEX_FIELD)?.ok_or_else(|| invalid("tile row index is missing"))?;
     let row_number = u32::try_from(row_number).map_err(|_| invalid("tile row index overflow"))?;
@@ -459,14 +475,20 @@ fn rewrite_row(
     } else {
         1
     };
-    transaction.admit_allocations(4)?;
-    let mut slots = parse_slots(storage, offsets, unit)?
-        .into_iter()
-        .map(|cell| match cell {
+    transaction.admit_allocations(5)?;
+    let source_slots = parse_slots(storage, offsets, unit)?;
+    let mut slots = Vec::new();
+    slots
+        .try_reserve_exact(source_slots.len())
+        .map_err(|_| Error::Allocation {
+            amount: source_slots.len(),
+        })?;
+    for cell in source_slots {
+        slots.push(match cell {
             Some(bytes) => CellBytes::Borrowed(bytes),
             None => CellBytes::Owned(Vec::new()),
-        })
-        .collect::<Vec<_>>();
+        });
+    }
     let actual_count = slots
         .iter()
         .filter(|cell| !cell.as_bytes().is_empty())
@@ -475,13 +497,12 @@ fn rewrite_row(
         return Err(invalid("tile row cell count does not match offsets"));
     }
     if slots.len() < columns {
-        transaction.admit_allocations(columns - slots.len())?;
+        let additional = columns - slots.len();
+        transaction.admit_allocations(additional)?;
+        slots
+            .try_reserve_exact(additional)
+            .map_err(|_| Error::Allocation { amount: additional })?;
         slots.resize_with(columns, || CellBytes::Owned(Vec::new()));
-        for slot in &mut slots {
-            if matches!(slot, CellBytes::Owned(bytes) if bytes.is_empty()) {
-                // Empty owned markers are converted to absent slots below.
-            }
-        }
     }
     let mut changed = false;
     for indexed in updates {
@@ -502,14 +523,14 @@ fn rewrite_row(
             let mut cell = BncCell::parse(old, bnc_limits).map_err(map_bnc)?;
             let previous_key = cell.text_style_identifier();
             if previous_key == indexed.update.key {
-                previous[indexed.index] = Some(old.to_vec());
                 transaction.admit_copies(old.len())?;
                 transaction.admit_allocations(1)?;
+                previous[indexed.index] = Some(old.to_vec());
                 continue;
             }
-            previous[indexed.index] = Some(old.to_vec());
             transaction.admit_copies(old.len())?;
             transaction.admit_allocations(1)?;
+            previous[indexed.index] = Some(old.to_vec());
             cell.set_text_style_identifier(indexed.update.key);
             transaction.admit_allocations(1)?;
             transaction.admit_copies(old.len().saturating_add(MAX_STYLE_KEY_WIRE_GROWTH))?;
@@ -529,6 +550,9 @@ fn rewrite_row(
         }
     }
     if !changed {
+        transaction.admit_copies(row.len())?;
+        transaction.admit_output(row.len())?;
+        transaction.admit_allocations(1)?;
         return Ok(RowRewrite {
             row: row_number,
             bytes: row.to_vec(),
@@ -551,7 +575,10 @@ fn rewrite_row(
     transaction.admit_output(replacement_bytes)?;
     transaction.admit_copies(replacement_bytes)?;
     transaction.admit_allocations(8)?;
-    let mut replacements: BTreeMap<u32, Vec<u8>> = BTreeMap::new();
+    let mut replacements: Vec<(u32, Vec<u8>)> = Vec::new();
+    replacements
+        .try_reserve_exact(3)
+        .map_err(|_| Error::Allocation { amount: 3 })?;
     let mut count_field = Vec::new();
     append_varint(
         &mut count_field,
@@ -559,19 +586,20 @@ fn rewrite_row(
         new_count as u64,
         wire,
     )?;
-    replacements.insert(ROW_CELL_COUNT_FIELD, count_field);
+    replacements.push((ROW_CELL_COUNT_FIELD, count_field));
     let mut storage_field = Vec::new();
     append_bytes(&mut storage_field, ROW_STORAGE_FIELD, &new_storage, wire)?;
-    replacements.insert(ROW_STORAGE_FIELD, storage_field);
+    replacements.push((ROW_STORAGE_FIELD, storage_field));
     let mut offsets_field = Vec::new();
     append_bytes(&mut offsets_field, ROW_OFFSETS_FIELD, &new_offsets, wire)?;
-    replacements.insert(ROW_OFFSETS_FIELD, offsets_field);
+    replacements.push((ROW_OFFSETS_FIELD, offsets_field));
     let output_len = view
         .fields()
         .map(|field| {
             replacements
-                .get(&field.number())
-                .map_or(field.raw().len(), Vec::len)
+                .iter()
+                .find(|(number, _)| *number == field.number())
+                .map_or(field.raw().len(), |(_, bytes)| bytes.len())
         })
         .try_fold(0usize, |total, length| total.checked_add(length))
         .ok_or_else(|| invalid("row output length overflow"))?;
@@ -584,7 +612,10 @@ fn rewrite_row(
         .try_reserve_exact(output_len)
         .map_err(|_| Error::Allocation { amount: output_len })?;
     for field in view.fields() {
-        if let Some(replacement) = replacements.get(&field.number()) {
+        if let Some((_, replacement)) = replacements
+            .iter()
+            .find(|(number, _)| *number == field.number())
+        {
             output.extend_from_slice(replacement);
         } else {
             output.extend_from_slice(field.raw());
@@ -658,14 +689,23 @@ pub fn set_text_style_keys(
         .filter(|field| field.number() == TILE_ROW_FIELD)
         .count();
     transaction.admit_allocations(row_count.saturating_add(updates.len()))?;
-    let mut rewrites = BTreeMap::new();
+    let mut rewrites = Vec::new();
+    rewrites
+        .try_reserve_exact(row_count.saturating_add(updates.len()))
+        .map_err(|_| Error::Allocation {
+            amount: row_count.saturating_add(updates.len()),
+        })?;
     let mut existing_rows = Vec::new();
+    existing_rows
+        .try_reserve_exact(row_count)
+        .map_err(|_| Error::Allocation { amount: row_count })?;
     for field in root
         .fields()
         .filter(|field| field.number() == TILE_ROW_FIELD)
     {
         let row = field.payload();
         let row_view = view(row, wire, transaction)?;
+        charge_view_scans(&row_view, transaction, 1)?;
         let row_number = one_varint(&row_view, ROW_INDEX_FIELD)?
             .ok_or_else(|| invalid("tile row index is missing"))?;
         let row_number =
@@ -682,13 +722,19 @@ pub fn set_text_style_keys(
                 transaction,
                 &mut previous,
             )?;
-            rewrites.insert(row_number, rewritten);
+            rewrites.push(rewritten);
         }
     }
     if existing_rows.windows(2).any(|pair| pair[0] >= pair[1]) {
         return Err(invalid("tile rows are not strictly ordered"));
     }
     let mut missing: Vec<Vec<IndexedUpdate>> = Vec::new();
+    transaction.admit_allocations(1)?;
+    missing
+        .try_reserve_exact(updates.len())
+        .map_err(|_| Error::Allocation {
+            amount: updates.len(),
+        })?;
     let mut index = 0usize;
     while index < indexed.len() {
         let row = indexed[index].update.row;
@@ -698,7 +744,14 @@ pub fn set_text_style_keys(
             .map_or(indexed.len(), |offset| index + offset);
         if !existing_rows.contains(&row) {
             transaction.admit_allocations(1)?;
-            missing.push(indexed[index..end].to_vec());
+            let mut group = Vec::new();
+            group
+                .try_reserve_exact(end - index)
+                .map_err(|_| Error::Allocation {
+                    amount: end - index,
+                })?;
+            group.extend_from_slice(&indexed[index..end]);
+            missing.push(group);
         }
         index = end;
     }
@@ -708,6 +761,7 @@ pub fn set_text_style_keys(
         .filter(|field| field.number() == TILE_ROW_FIELD)
     {
         let row_view = view(field.payload(), wire, transaction)?;
+        charge_view_scans(&row_view, transaction, 1)?;
         let offsets = one_bytes(&row_view, ROW_OFFSETS_FIELD)?
             .ok_or_else(|| invalid("tile row offsets are missing"))?;
         capacity = capacity.max(offsets.len() / 2);
@@ -717,7 +771,12 @@ pub fn set_text_style_keys(
         if chunk.iter().all(|item| item.update.key.is_none()) {
             continue;
         }
-        let mut cells = vec![CellBytes::Owned(Vec::new()); capacity];
+        transaction.admit_allocations(capacity)?;
+        let mut cells = Vec::new();
+        cells
+            .try_reserve_exact(capacity)
+            .map_err(|_| Error::Allocation { amount: capacity })?;
+        cells.resize_with(capacity, || CellBytes::Owned(Vec::new()));
         for item in &chunk {
             let mut cell = BncCell::minimal();
             cell.set_text_style_identifier(item.update.key);
@@ -765,20 +824,17 @@ pub fn set_text_style_keys(
         append_bytes(&mut row, ROW_STORAGE_FIELD, &storage, wire)?;
         append_bytes(&mut row, ROW_OFFSETS_FIELD, &offsets, wire)?;
         append_varint(&mut row, ROW_WIDE_OFFSETS_FIELD, 0, wire)?;
-        rewrites.insert(
-            row_number,
-            RowRewrite {
-                row: row_number,
-                bytes: row,
-                changed: true,
-            },
-        );
+        rewrites.push(RowRewrite {
+            row: row_number,
+            bytes: row,
+            changed: true,
+        });
         for item in chunk {
             previous[item.index] = None;
         }
     }
     let mut changed = false;
-    for rewrite in rewrites.values() {
+    for rewrite in &rewrites {
         changed |= rewrite.changed;
     }
     if !changed {
@@ -791,10 +847,12 @@ pub fn set_text_style_keys(
             changed: false,
         });
     }
+    charge_view_scans(&root, transaction, 1)?;
     let old_numrows = one_varint(&root, TILE_NUM_ROWS_FIELD)?
         .ok_or_else(|| invalid("tile row count is missing"))?;
     let inserted_rows = rewrites
-        .keys()
+        .iter()
+        .map(|rewrite| rewrite.row)
         .filter(|row| !existing_rows.contains(row))
         .count();
     let counts_rows = old_numrows == existing_rows.len() as u64;
@@ -805,9 +863,10 @@ pub fn set_text_style_keys(
     } else {
         old_numrows.max(
             rewrites
-                .keys()
+                .iter()
+                .map(|rewrite| rewrite.row)
                 .filter(|row| !existing_rows.contains(row))
-                .filter_map(|row| u64::from(*row).checked_add(1))
+                .filter_map(|row| u64::from(row).checked_add(1))
                 .max()
                 .unwrap_or(old_numrows),
         )
@@ -816,8 +875,12 @@ pub fn set_text_style_keys(
     for field in root.fields() {
         let length = if field.number() == TILE_ROW_FIELD {
             let row_view = view(field.payload(), wire, transaction)?;
+            charge_view_scans(&row_view, transaction, 1)?;
             let row_number = one_varint(&row_view, ROW_INDEX_FIELD)?.unwrap_or(u64::MAX);
-            if let Some(rewrite) = rewrites.get(&(row_number as u32)) {
+            if let Some(rewrite) = rewrites
+                .iter()
+                .find(|rewrite| rewrite.row == row_number as u32)
+            {
                 length_field_len(TILE_ROW_FIELD, rewrite.bytes.len())?
             } else {
                 field.raw().len()
@@ -833,7 +896,7 @@ pub fn set_text_style_keys(
             .checked_add(length)
             .ok_or_else(|| invalid("tile output length overflow"))?;
     }
-    for rewrite in rewrites.values() {
+    for rewrite in &rewrites {
         if !existing_rows.contains(&rewrite.row) {
             output_len = output_len
                 .checked_add(length_field_len(TILE_ROW_FIELD, rewrite.bytes.len())?)
@@ -847,48 +910,73 @@ pub fn set_text_style_keys(
     output
         .try_reserve_exact(output_len)
         .map_err(|_| Error::Allocation { amount: output_len })?;
-    let mut inserted_row_set = BTreeMap::new();
+    transaction.admit_allocations(1)?;
+    let mut inserted_row_set = Vec::new();
+    inserted_row_set
+        .try_reserve_exact(rewrites.len())
+        .map_err(|_| Error::Allocation {
+            amount: rewrites.len(),
+        })?;
     for field in root.fields() {
         if matches!(placement, RowPlacement::FieldOrder) && field.number() > TILE_ROW_FIELD {
-            let rows_to_insert: Vec<u32> = rewrites
-                .values()
-                .filter(|rewrite| {
-                    !existing_rows.contains(&rewrite.row)
-                        && !inserted_row_set.contains_key(&rewrite.row)
-                })
-                .map(|rewrite| rewrite.row)
-                .collect();
+            transaction.admit_allocations(1)?;
+            let mut rows_to_insert = Vec::new();
+            rows_to_insert
+                .try_reserve_exact(rewrites.len())
+                .map_err(|_| Error::Allocation {
+                    amount: rewrites.len(),
+                })?;
+            rows_to_insert.extend(
+                rewrites
+                    .iter()
+                    .filter(|rewrite| {
+                        !existing_rows.contains(&rewrite.row)
+                            && !inserted_row_set.contains(&rewrite.row)
+                    })
+                    .map(|rewrite| rewrite.row),
+            );
             for row in rows_to_insert {
                 let rewrite = rewrites
-                    .get(&row)
+                    .iter()
+                    .find(|rewrite| rewrite.row == row)
                     .ok_or_else(|| invalid("missing inserted row"))?;
                 append_bytes(&mut output, TILE_ROW_FIELD, &rewrite.bytes, wire)?;
-                inserted_row_set.insert(row, ());
+                inserted_row_set.push(row);
             }
         }
         if field.number() == TILE_ROW_FIELD {
             let row_view = view(field.payload(), wire, transaction)?;
+            charge_view_scans(&row_view, transaction, 1)?;
             let row_number = u32::try_from(one_varint(&row_view, ROW_INDEX_FIELD)?.unwrap_or(0))
                 .map_err(|_| invalid("tile row index overflow"))?;
             if matches!(placement, RowPlacement::FieldOrder) {
-                let rows_to_insert: Vec<u32> = rewrites
-                    .values()
-                    .filter(|rewrite| {
-                        !existing_rows.contains(&rewrite.row)
-                            && rewrite.row < row_number
-                            && !inserted_row_set.contains_key(&rewrite.row)
-                    })
-                    .map(|rewrite| rewrite.row)
-                    .collect();
+                transaction.admit_allocations(1)?;
+                let mut rows_to_insert = Vec::new();
+                rows_to_insert
+                    .try_reserve_exact(rewrites.len())
+                    .map_err(|_| Error::Allocation {
+                        amount: rewrites.len(),
+                    })?;
+                rows_to_insert.extend(
+                    rewrites
+                        .iter()
+                        .filter(|rewrite| {
+                            !existing_rows.contains(&rewrite.row)
+                                && rewrite.row < row_number
+                                && !inserted_row_set.contains(&rewrite.row)
+                        })
+                        .map(|rewrite| rewrite.row),
+                );
                 for row in rows_to_insert {
                     let rewrite = rewrites
-                        .get(&row)
+                        .iter()
+                        .find(|rewrite| rewrite.row == row)
                         .ok_or_else(|| invalid("missing inserted row"))?;
                     append_bytes(&mut output, TILE_ROW_FIELD, &rewrite.bytes, wire)?;
-                    inserted_row_set.insert(row, ());
+                    inserted_row_set.push(row);
                 }
             }
-            if let Some(rewrite) = rewrites.get(&row_number) {
+            if let Some(rewrite) = rewrites.iter().find(|rewrite| rewrite.row == row_number) {
                 append_bytes(&mut output, TILE_ROW_FIELD, &rewrite.bytes, wire)?;
             } else {
                 append_raw(&mut output, field.raw(), wire)?;
@@ -899,19 +987,28 @@ pub fn set_text_style_keys(
             append_raw(&mut output, field.raw(), wire)?;
         }
     }
-    let rows_to_insert: Vec<u32> = rewrites
-        .values()
-        .filter(|rewrite| {
-            !existing_rows.contains(&rewrite.row) && !inserted_row_set.contains_key(&rewrite.row)
-        })
-        .map(|rewrite| rewrite.row)
-        .collect();
+    transaction.admit_allocations(1)?;
+    let mut rows_to_insert = Vec::new();
+    rows_to_insert
+        .try_reserve_exact(rewrites.len())
+        .map_err(|_| Error::Allocation {
+            amount: rewrites.len(),
+        })?;
+    rows_to_insert.extend(
+        rewrites
+            .iter()
+            .filter(|rewrite| {
+                !existing_rows.contains(&rewrite.row) && !inserted_row_set.contains(&rewrite.row)
+            })
+            .map(|rewrite| rewrite.row),
+    );
     for row in rows_to_insert {
         let rewrite = rewrites
-            .get(&row)
+            .iter()
+            .find(|rewrite| rewrite.row == row)
             .ok_or_else(|| invalid("missing inserted row"))?;
         append_bytes(&mut output, TILE_ROW_FIELD, &rewrite.bytes, wire)?;
-        inserted_row_set.insert(row, ());
+        inserted_row_set.push(row);
     }
     if output.len() != output_len {
         return Err(invalid("tile output length mismatch"));
@@ -1052,6 +1149,82 @@ mod tests {
         let mut cell = BncCell::minimal();
         cell.set_text_style_identifier(key);
         cell.encode(&BncLimits::DEFAULT).expect("BNC cell")
+    }
+
+    fn tracked_tile(path: &str) -> Vec<u8> {
+        let bytes = std::fs::read(
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("../../test-data")
+                .join(path),
+        )
+        .expect("tracked iWork fixture");
+        let catalog = SourceCatalog::from_bytes(&bytes, litchi_iwa_archive::Limits::default())
+            .expect("tracked iWork catalog");
+        for component in catalog.components().iter() {
+            for object in &component.archive().objects {
+                for message in &object.messages {
+                    if message.type_ != 6_002 {
+                        continue;
+                    }
+                    let view = WireView::parse(message.data.as_slice(), WireLimits::DEFAULT)
+                        .expect("tile wire");
+                    if one_varint(&view, 6).expect("tile storage version") == Some(5)
+                        && one_varint(&view, 7).expect("tile BNC version") == Some(1)
+                    {
+                        return message.data.clone();
+                    }
+                }
+            }
+        }
+        panic!("tracked fixture has no modern tile: {path}");
+    }
+
+    fn first_safe_update(tile: &[u8]) -> Update {
+        let view = WireView::parse(tile, WireLimits::DEFAULT).expect("tile");
+        for field in view
+            .fields()
+            .filter(|field| field.number() == TILE_ROW_FIELD)
+        {
+            let row_view = WireView::parse(field.payload(), WireLimits::DEFAULT).expect("row");
+            let row = one_varint(&row_view, ROW_INDEX_FIELD)
+                .expect("row index")
+                .expect("row index value") as u32;
+            let storage = one_bytes(&row_view, ROW_STORAGE_FIELD)
+                .expect("storage")
+                .expect("storage value");
+            let offsets = one_bytes(&row_view, ROW_OFFSETS_FIELD)
+                .expect("offsets")
+                .expect("offsets value");
+            for (column, cell) in parse_slots(storage, offsets, 1)
+                .expect("slots")
+                .into_iter()
+                .enumerate()
+            {
+                if let Some(cell) = cell
+                    && let Ok(cell) = BncCell::parse(cell, &BncLimits::DEFAULT)
+                    && !matches!(
+                        cell.stored_value(),
+                        litchi_numbers_wire::StoredValue::Formula(_)
+                    )
+                {
+                    return Update {
+                        row,
+                        column: column as u32,
+                        key: Some(cell.text_style_identifier().unwrap_or(1).saturating_add(1)),
+                    };
+                }
+            }
+            return Update {
+                row,
+                column: 0,
+                key: Some(1),
+            };
+        }
+        Update {
+            row: 0,
+            column: 0,
+            key: Some(1),
+        }
     }
 
     fn read_keys(tile: &[u8]) -> Vec<(u32, Vec<Option<u32>>)> {
@@ -1231,5 +1404,30 @@ mod tests {
                 ..
             })
         ));
+    }
+
+    #[test]
+    fn tracked_numbers_pages_and_keynote_tiles_share_the_writer_contract() {
+        for path in [
+            "iwork/numbers/basic.numbers",
+            "iwork/pages/body-table-cells-native.pages",
+            "iwork/keynote/slide-table-read-native.key",
+        ] {
+            let tile = tracked_tile(path);
+            let update = first_safe_update(&tile);
+            let transaction = transaction_limits();
+            let wire = BncLimits::from_wire_limits(transaction.wire);
+            let output = set_text_style_keys(
+                &tile,
+                update.column.saturating_add(1).max(1),
+                &[update],
+                RowPlacement::FieldOrder,
+                &transaction,
+                &wire,
+            )
+            .expect("tracked tile style-key write");
+            assert!(output.changed(), "fixture unexpectedly no-op: {path}");
+            assert!(!output.tile().is_empty(), "empty tile output: {path}");
+        }
     }
 }
