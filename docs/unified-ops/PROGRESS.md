@@ -7189,3 +7189,35 @@ See [0063](0063-source-pptx-modern-comments.md).
   adapter (0391), unified chart point size (0399), Pages chart-series symbols
   (0400) and Keynote chart-series symbols (0401). Their branch-local checks
   and measurements remain separate from the qualified e0e checkpoint.
+
+- Sparse-example post-merge checks on `bc9a37fd75` passed. Its clean worktree
+  and branch were retired with the lock and external output preserved:
+  51 worktrees and 44 branches removed in this continuation.
+- Accepted shared whole-cell style slice `877bdfc46c` (0391), synchronized
+  with `bc9a37fd75`. The shared planner, tile writer and header-count writer
+  preserve cumulative admission through publication and readback, exact
+  no-ops and inverse, source-relative identity, unknown content and terminal
+  typed refusals. Empty-cell and missing-row materialization updates the
+  owned row/column header buckets, including cross-bucket rows; missing
+  ownership refuses before publication. Existing public Numbers selectors
+  and semantic vocabulary remain unchanged.
+- The coordinator independently verified all six captures on clean scoped
+  source `c9f74916c7`: single set, repeated exclusive update and an unpadded
+  50-by-20 shared-key batch. Each leg executes exactly one test and two
+  measured calls. Complete raw function counts match program totals and
+  aggregate annotations; the smaller batch DWARF file-context row is retained
+  without normalization. All three leaf/host instruction ratios pass 1.05.
+  The 595 compatibility-route semantic reads are separate correctness
+  evidence. Three scoped routes are registered in the benchmark matrix.
+- The synchronized style branch passes 62 shared table tests, 390 Numbers
+  tests (four ignored), strict Clippy, rustdoc/glossary, ledger/boundary,
+  example/reference checks, benchmark-registry checks and all twenty locked
+  fuzz workspaces. Post-merge checks and final integrated qualification
+  remain required. This substrate changes no ledger dispositions or native
+  evidence; Pages/Keynote cell-style facades remain future work.
+- D7 point-size dispatch and the two series-symbol facades remain isolated.
+  D7 measurement exposed read overhead and its chart cache is undergoing
+  container-scope review. The series facades require the shared residual
+  admission/report helper (0402), precise planned mutation scopes and caller
+  boundary repairs before performance or integration acceptance. Scoped test
+  results alone do not close these contracts.
