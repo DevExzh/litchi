@@ -1,0 +1,61 @@
+# 0402 — W1: bounded shared chart-series symbol admission
+
+- Status: implementation slice on `uo2/iwa-series-symbols-admission`, cut from
+  coordinator source `bc9a37fd75977b01ab3f24cabfdc4b2fe977c4bc`.
+- Commits: `e57d0df0c7677ba6986a49dcf165eb6d4fd3f722` initial implementation;
+  `212ba356d7b5904e988c4f636f2cc5ceedc50c10` closes the independent
+  admission-review findings.
+- Scope: shared chart-series symbol read/write admission, Numbers mechanical
+  caller adoption, and the direct shared-engine parity caller. Pages and
+  Keynote facade adoption remain owned by their work packages.
+
+## Public shared seam
+
+`litchi-iwa-style::series` now exposes explicit `Limits`, typed
+`SymbolError`, actual `Report`, and source-derived `MutationScope` values.
+The symbol entry points take one caller-supplied profile and return the
+semantic result together with the report. Mark, size, parent traversal,
+codec, graph, registry, allocation, and readback work share one residual
+budget; no default-budget compatibility route is used.
+
+The report scope is source-relative and names selected objects, members,
+message types, known fields, and planned object/member additions/removals.
+It is intended for facade locality verification rather than deriving an
+allowlist from observed post-edit differences.
+
+The repair pass adds fallible reservations before every bounded collection
+growth, residual accounting for repeated wire preparse/codec passes, explicit
+registry inspection and cross-component-reference debits, and a bounded
+container writer instead of delegating to the legacy infallible helper.
+
+## Correctness and evidence boundary
+
+The bounded path preserves unknown fields, exact no-op behavior, shared-owner
+copying, selected-chart locality, and immutable source snapshots. Errors after
+staging leave only the private copy-on-write workspace changed; callers must
+discard that failed workspace, and no source bytes are published.
+
+This slice makes no native-acceptance or performance claim. Numbers currently
+derives a finite physical profile and validates the shared report, but its
+legacy series transaction still lacks a reusable residual caller ledger. That
+is an explicit follow-up gap, not a full Numbers facade-ledger qualification.
+
+## Verification
+
+- `cargo test --offline -p litchi-iwa-style --lib`: 25 passed.
+- `cargo clippy --offline -p litchi-iwa-style --lib --all-features -- -D warnings`: pass.
+- `cargo check --offline -p litchi-numbers --lib`: pass.
+- `cargo clippy --offline -p litchi-numbers --lib --all-features -- -D warnings`: pass.
+- `cargo check --offline -p litchi-iwa --tests`: pass.
+- `cargo fmt --all -- --check`: pass.
+- `cargo doc --offline -p litchi-iwa-style --no-deps`: pass.
+- `RUSTC_BOOTSTRAP=1 python3 tools/check_api_glossary.py --target-dir target`: pass.
+- `python3 tools/iwa_exit_ledger.py --check`: pass.
+- `python3 tools/check_crate_boundaries.py`: pass.
+- `python3 -m unittest tools.test_no_3rdparty_references`: 4 passed.
+- The post-review focused symbol suite includes typed zero-field,
+  zero-reference, and zero-allocation refusals plus shared-owner copying and
+  planned-scope assertions.
+
+No ledger, queue, progress, fixture, performance, native evidence, or
+generated binary changes are included.
