@@ -7074,3 +7074,17 @@ See [0063](0063-source-pptx-modern-comments.md).
   totals; smaller per-file annotation rows caused the preserved historical
   validator failure. No instructions or ratios were discounted. Final
   integrated-source qualification remains required.
+
+- Post-merge checks on `222f90c0b4` passed, including all twenty locked
+  offline fuzz workspaces. The Numbers font and two admission worktrees and
+  branches were retired after artifact preservation: 46 worktrees and
+  40 branches removed in this continuation.
+- Accepted Pages font slice `a0d9fa8910`, synchronized with the Numbers
+  foundation. Font and point-size facades preserve exact snapshots, inverse,
+  no-op, typed refusals, candidate readback and changed/untouched unknown
+  fields. Six actual host-versus-facade parity bindings and pending native
+  routes are registered. Corrected source `4fc7570935` passes six full-facade
+  instruction routes (twelve captures), with one property per read and setup
+  excluded from reset measurements. The coordinator independently checked
+  artifact hashes, exact test execution, two calls per side and attribution.
+  Final integrated qualification and native verification remain required.

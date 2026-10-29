@@ -3,6 +3,8 @@
 pub use litchi_iwa_common::chart::arrangement::ChartArrangement;
 pub use litchi_iwa_common::chart::data::ChartData;
 pub use litchi_iwa_common::chart::metadata::ChartMetadata;
+pub use litchi_iwa_style::chart_font::ChartFont;
+pub use litchi_iwa_text::character::TextPointSize;
 
 /// Exact-source transactions for one body chart's arrangement.
 pub mod arrangement {
@@ -38,4 +40,15 @@ pub mod axis_title {
         Commit, Diagnostics, Edit, Error, LimitKind, Patch, Refusal,
     };
     pub use litchi_iwa_common::chart::axis::Axis;
+}
+
+/// Exact-source chart-wide font identity and point-size transactions of one
+/// rooted body chart: [`crate::Package::edit_body_chart_font`] and
+/// [`crate::Package::edit_body_chart_font_size`].
+pub mod font {
+    pub use crate::package::body_chart_font::{
+        Commit, Diagnostics, Edit, Error, LimitKind, Patch, Refusal,
+    };
+    pub use litchi_iwa_style::chart_font::ChartFont;
+    pub use litchi_iwa_text::character::TextPointSize;
 }
