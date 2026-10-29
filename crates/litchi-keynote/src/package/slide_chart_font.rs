@@ -1142,7 +1142,7 @@ impl Package {
             Package::from_source_with_options(patch.artifacts.target(), self.state.options)
                 .map_err(map_read_error)?;
         candidate.validate().map_err(map_read_error)?;
-        verify_locality_members(self, &candidate, &patch.plan, &mut budget)?;
+        verify_locality_members(self, &candidate, &patch.plan, &mut budget, &mut fields)?;
         let candidate_selection =
             positional_selection(&candidate, &selection, &mut budget, &mut fields)?;
         if !same_selection(&selection, &candidate_selection)
@@ -1257,7 +1257,7 @@ impl Package {
             Package::from_source_with_options(patch.artifacts.target(), self.state.options)
                 .map_err(map_read_error)?;
         candidate.validate().map_err(map_read_error)?;
-        verify_locality_members(self, &candidate, &patch.plan, &mut budget)?;
+        verify_locality_members(self, &candidate, &patch.plan, &mut budget, &mut fields)?;
         let candidate_selection =
             positional_selection(&candidate, &selection, &mut budget, &mut fields)?;
         if !same_selection(&selection, &candidate_selection)
@@ -1656,7 +1656,7 @@ fn write_graph(
         return Err(Error::InvalidSource);
     }
     let plan = mutation_plan(package, chart, &changes, budget)?;
-    let candidate = publish(package, changes, budget, &plan)?;
+    let candidate = publish(package, changes, budget, fields, &plan)?;
     Ok((candidate, true, touched, reset_expectation, plan))
 }
 
@@ -2010,6 +2010,7 @@ fn parse_locality_fields(
     payload: &[u8],
     limits: litchi_iwa_common::WireLimits,
     budget: &mut TransactionBudget,
+    field_ledger: &mut FieldLedger,
 ) -> Result<Vec<litchi_iwa_common::wire::WireField>, Error> {
     let span = payload.len().max(1);
     let scratch = span
@@ -2021,6 +2022,8 @@ fn parse_locality_fields(
         .and_then(|_| budget.scratch(scratch))
         .and_then(|_| budget.allocations(1))
         .map_err(map_transaction_error)?;
+    let view = litchi_iwa_common::wire::WireView::parse(payload, limits).map_err(map_wire_error)?;
+    field_ledger.charge(view.fields().count())?;
     let fields =
         litchi_iwa_common::wire::parse_wire_fields(payload, limits).map_err(map_wire_error)?;
     Ok(fields)
@@ -2079,9 +2082,10 @@ fn wire_reference_id(
     payload: &[u8],
     limits: litchi_iwa_common::WireLimits,
     budget: &mut TransactionBudget,
+    fields: &mut FieldLedger,
 ) -> Result<Option<u64>, Error> {
-    let fields = parse_locality_fields(payload, limits, budget)?;
-    let Some(field) = fields.iter().rev().find(|field| field.number() == 1) else {
+    let wire_fields = parse_locality_fields(payload, limits, budget, fields)?;
+    let Some(field) = wire_fields.iter().rev().find(|field| field.number() == 1) else {
         return Ok(None);
     };
     if field.wire_type() != 0 {
@@ -2099,6 +2103,7 @@ fn payload_object_references(
     message: &RawMessage,
     limits: litchi_iwa_common::WireLimits,
     budget: &mut TransactionBudget,
+    fields: &mut FieldLedger,
 ) -> Result<Vec<u64>, Error> {
     if !matches!(
         message.type_,
@@ -2121,25 +2126,25 @@ fn payload_object_references(
             amount: reference_capacity,
         })?;
     if message.type_ == CHART_MESSAGE_TYPE {
-        let fields = parse_locality_fields(&message.data, limits, budget)?;
-        for extension in fields.iter().filter(|field| field.number() == 10_000) {
+        let wire_fields = parse_locality_fields(&message.data, limits, budget, fields)?;
+        for extension in wire_fields.iter().filter(|field| field.number() == 10_000) {
             let extension = extension.payload(&message.data).map_err(map_wire_error)?;
-            let extension_fields = parse_locality_fields(extension, limits, budget)?;
+            let extension_fields = parse_locality_fields(extension, limits, budget, fields)?;
             for styles in extension_fields.iter().filter(|field| field.number() == 20) {
                 let reference = styles.payload(extension).map_err(map_wire_error)?;
-                if let Some(identifier) = wire_reference_id(reference, limits, budget)? {
+                if let Some(identifier) = wire_reference_id(reference, limits, budget, fields)? {
                     references.push(identifier);
                 }
             }
         }
         return Ok(references);
     }
-    let fields = parse_locality_fields(&message.data, limits, budget)?;
+    let wire_fields = parse_locality_fields(&message.data, limits, budget, fields)?;
     match message.type_ {
         PARAGRAPH_STYLE_MESSAGE_TYPE => {
-            for field in fields.iter().filter(|field| field.number() == 1) {
+            for field in wire_fields.iter().filter(|field| field.number() == 1) {
                 let parent = field.payload(&message.data).map_err(map_wire_error)?;
-                let parent_fields = parse_locality_fields(parent, limits, budget)?;
+                let parent_fields = parse_locality_fields(parent, limits, budget, fields)?;
                 for link in parent_fields
                     .iter()
                     .filter(|field| matches!(field.number(), 3 | 5))
@@ -2151,6 +2156,7 @@ fn payload_object_references(
                         link.payload(parent).map_err(map_wire_error)?,
                         limits,
                         budget,
+                        fields,
                     )? {
                         references.push(identifier);
                     }
@@ -2158,18 +2164,19 @@ fn payload_object_references(
             }
         },
         STYLESHEET_MESSAGE_TYPE => {
-            for field in fields.iter().filter(|field| field.number() == 1) {
+            for field in wire_fields.iter().filter(|field| field.number() == 1) {
                 if let Some(identifier) = wire_reference_id(
                     field.payload(&message.data).map_err(map_wire_error)?,
                     limits,
                     budget,
+                    fields,
                 )? {
                     references.push(identifier);
                 }
             }
-            for field in fields.iter().filter(|field| field.number() == 5) {
+            for field in wire_fields.iter().filter(|field| field.number() == 5) {
                 let payload = field.payload(&message.data).map_err(map_wire_error)?;
-                let entries = parse_locality_fields(payload, limits, budget)?;
+                let entries = parse_locality_fields(payload, limits, budget, fields)?;
                 for entry in entries
                     .iter()
                     .filter(|entry| entry.number() == 1 || entry.number() == 2)
@@ -2181,6 +2188,7 @@ fn payload_object_references(
                         entry.payload(payload).map_err(map_wire_error)?,
                         limits,
                         budget,
+                        fields,
                     )? {
                         references.push(identifier);
                     }
@@ -2196,6 +2204,7 @@ fn reachable_objects(
     package: &Package,
     root_identifier: u64,
     budget: &mut TransactionBudget,
+    fields: &mut FieldLedger,
 ) -> Result<HashSet<u64>, Error> {
     let object_capacity = package.state.total_objects.max(1);
     let mut payload_bytes = 0usize;
@@ -2318,10 +2327,34 @@ fn reachable_objects(
                 limits,
             )
             .map_err(map_core_error)?;
+        let payload_capacity = object
+            .messages
+            .iter()
+            .map(|message| message.data.len())
+            .try_fold(0usize, |sum, bytes| sum.checked_add(bytes))
+            .ok_or(Error::InvalidSource)?
+            .max(1);
+        let payload_scratch = payload_capacity
+            .checked_mul(size_of::<u64>())
+            .ok_or(Error::InvalidSource)?;
+        budget
+            .allocations(1)
+            .and_then(|_| budget.scratch(payload_scratch))
+            .map_err(map_transaction_error)?;
         let mut payload_references = Vec::new();
+        payload_references
+            .try_reserve_exact(payload_capacity)
+            .map_err(|_| Error::Allocation {
+                amount: payload_capacity,
+            })?;
         let wire_limits = budget.residual(package).map_err(map_transaction_error)?;
         for message in &object.messages {
-            payload_references.extend(payload_object_references(message, wire_limits, budget)?);
+            payload_references.extend(payload_object_references(
+                message,
+                wire_limits,
+                budget,
+                fields,
+            )?);
         }
         budget
             .work(payload_references.len())
@@ -2341,6 +2374,7 @@ fn verify_locality_members(
     candidate: &Package,
     plan: &MutationPlan,
     budget: &mut TransactionBudget,
+    fields: &mut FieldLedger,
 ) -> Result<(), Error> {
     let source_catalog = physical_catalog(source)?;
     let candidate_catalog = physical_catalog(candidate)?;
@@ -2391,8 +2425,8 @@ fn verify_locality_members(
             amount: plan.object_ids.len(),
         })?;
     allowed_objects.extend(plan.object_ids.iter().copied());
-    let source_reachable = reachable_objects(source, plan.root_identifier, budget)?;
-    let candidate_reachable = reachable_objects(candidate, plan.root_identifier, budget)?;
+    let source_reachable = reachable_objects(source, plan.root_identifier, budget, fields)?;
+    let candidate_reachable = reachable_objects(candidate, plan.root_identifier, budget, fields)?;
     for identifier in &allowed_objects {
         if *identifier != 2
             && package_object(source, *identifier).is_some()
@@ -2520,6 +2554,7 @@ fn verify_locality_members(
                             candidate_message.data.as_slice(),
                             budget.residual(source).map_err(map_transaction_error)?,
                             budget,
+                            fields,
                         )?)
                 {
                     return Err(Error::InvalidSource);
@@ -2683,17 +2718,25 @@ fn message_unknown_fields_preserved(
     candidate: &[u8],
     limits: litchi_iwa_common::WireLimits,
     budget: &mut TransactionBudget,
+    fields: &mut FieldLedger,
 ) -> Result<bool, Error> {
     match message_type {
-        CHART_MESSAGE_TYPE => chart_unknown_fields_preserved(source, candidate, limits, budget),
-        PARAGRAPH_STYLE_MESSAGE_TYPE => {
-            wire_unknown_fields_preserved(source, candidate, limits, &[1, 10, 11, 12], budget)
+        CHART_MESSAGE_TYPE => {
+            chart_unknown_fields_preserved(source, candidate, limits, budget, fields)
         },
+        PARAGRAPH_STYLE_MESSAGE_TYPE => wire_unknown_fields_preserved(
+            source,
+            candidate,
+            limits,
+            &[1, 10, 11, 12],
+            budget,
+            fields,
+        ),
         STYLESHEET_MESSAGE_TYPE => {
-            wire_unknown_fields_preserved(source, candidate, limits, &[1, 5], budget)
+            wire_unknown_fields_preserved(source, candidate, limits, &[1, 5], budget, fields)
         },
         PACKAGE_METADATA_MESSAGE_TYPE => {
-            wire_unknown_fields_preserved(source, candidate, limits, &[1, 3, 8, 11], budget)
+            wire_unknown_fields_preserved(source, candidate, limits, &[1, 3, 8, 11], budget, fields)
         },
         _ => Ok(true),
     }
@@ -2705,9 +2748,10 @@ fn wire_unknown_fields_preserved(
     limits: litchi_iwa_common::WireLimits,
     known_fields: &[u32],
     budget: &mut TransactionBudget,
+    fields: &mut FieldLedger,
 ) -> Result<bool, Error> {
-    let source_fields = parse_locality_fields(source, limits, budget)?;
-    let candidate_fields = parse_locality_fields(candidate, limits, budget)?;
+    let source_fields = parse_locality_fields(source, limits, budget, fields)?;
+    let candidate_fields = parse_locality_fields(candidate, limits, budget, fields)?;
     Ok(
         raw_fields_except_numbers(&source_fields, source, known_fields, budget)?
             == raw_fields_except_numbers(&candidate_fields, candidate, known_fields, budget)?,
@@ -2719,9 +2763,10 @@ fn chart_unknown_fields_preserved(
     candidate: &[u8],
     limits: litchi_iwa_common::WireLimits,
     budget: &mut TransactionBudget,
+    fields: &mut FieldLedger,
 ) -> Result<bool, Error> {
-    let source_fields = parse_locality_fields(source, limits, budget)?;
-    let candidate_fields = parse_locality_fields(candidate, limits, budget)?;
+    let source_fields = parse_locality_fields(source, limits, budget, fields)?;
+    let candidate_fields = parse_locality_fields(candidate, limits, budget, fields)?;
     let source_unknown = raw_fields_except(&source_fields, source, 10_000, budget)?;
     let candidate_unknown = raw_fields_except(&candidate_fields, candidate, 10_000, budget)?;
     if source_unknown != candidate_unknown {
@@ -2744,8 +2789,10 @@ fn chart_unknown_fields_preserved(
                 let candidate_extension = candidate_extension
                     .payload(candidate)
                     .map_err(map_wire_error)?;
-                let source_fields = parse_locality_fields(source_extension, limits, budget)?;
-                let candidate_fields = parse_locality_fields(candidate_extension, limits, budget)?;
+                let source_fields =
+                    parse_locality_fields(source_extension, limits, budget, fields)?;
+                let candidate_fields =
+                    parse_locality_fields(candidate_extension, limits, budget, fields)?;
                 let source_unknown =
                     raw_fields_except(&source_fields, source_extension, 20, budget)?;
                 let candidate_unknown =
@@ -2927,6 +2974,7 @@ fn publish(
     package: &Package,
     changes: graph::Changes,
     budget: &mut TransactionBudget,
+    fields: &mut FieldLedger,
     plan: &MutationPlan,
 ) -> Result<Package, Error> {
     let catalog = physical_catalog(package)?;
@@ -2938,19 +2986,67 @@ fn publish(
         .limits()
         .snappy_limits()
         .map_err(map_archive_error)?;
+    let edit_capacity = changes.edits.len();
+    let insertion_capacity = changes.insertions.len();
+    let deletion_capacity = changes.deletions.len();
+    let collection_scratch = edit_capacity
+        .checked_mul(size_of::<(&str, Vec<u8>)>())
+        .and_then(|value| value.checked_add(edit_capacity.checked_mul(size_of::<EntryEdit<'_>>())?))
+        .and_then(|value| {
+            value.checked_add(catalog.package().len().checked_mul(size_of::<&str>())?)
+        })
+        .and_then(|value| {
+            value.checked_add(insertion_capacity.checked_mul(size_of::<(
+                &str,
+                Vec<u8>,
+                Option<usize>,
+            )>())?)
+        })
+        .and_then(|value| {
+            value.checked_add(insertion_capacity.checked_mul(size_of::<EntryInsertion<'_>>())?)
+        })
+        .and_then(|value| value.checked_add(deletion_capacity.checked_mul(size_of::<&str>())?))
+        .ok_or(Error::InvalidSource)?;
+    budget
+        .allocations(6)
+        .and_then(|_| budget.scratch(collection_scratch))
+        .map_err(map_transaction_error)?;
     let mut edited = Vec::new();
+    edited
+        .try_reserve_exact(edit_capacity)
+        .map_err(|_| Error::Allocation {
+            amount: edit_capacity,
+        })?;
     for (name, archive) in &changes.edits {
         admit_archive_encoding(archive, archive_limits, snappy_limits, budget)?;
         let bytes = archive.to_bytes(archive_limits).map_err(map_core_error)?;
         let compressed = SnappyStream::compress(&bytes, snappy_limits).map_err(map_core_error)?;
         edited.push((name.as_str(), compressed));
     }
-    let edits: Vec<EntryEdit<'_>> = edited
-        .iter()
-        .map(|(name, data)| EntryEdit::new(name, data.as_slice()))
-        .collect();
-    let names: Vec<&str> = catalog.package().iter().map(|entry| entry.name()).collect();
+    let mut edits = Vec::new();
+    edits
+        .try_reserve_exact(edit_capacity)
+        .map_err(|_| Error::Allocation {
+            amount: edit_capacity,
+        })?;
+    edits.extend(
+        edited
+            .iter()
+            .map(|(name, data)| EntryEdit::new(name, data.as_slice())),
+    );
+    let mut names = Vec::new();
+    names
+        .try_reserve_exact(catalog.package().len())
+        .map_err(|_| Error::Allocation {
+            amount: catalog.package().len(),
+        })?;
+    names.extend(catalog.package().iter().map(|entry| entry.name()));
     let mut inserted = Vec::new();
+    inserted
+        .try_reserve_exact(insertion_capacity)
+        .map_err(|_| Error::Allocation {
+            amount: insertion_capacity,
+        })?;
     for insertion in &changes.insertions {
         let position = match insertion.before.as_deref() {
             Some(before) => Some(
@@ -2969,14 +3065,27 @@ fn publish(
         let compressed = SnappyStream::compress(&bytes, snappy_limits).map_err(map_core_error)?;
         inserted.push((insertion.name.as_str(), compressed, position));
     }
-    let insertions: Vec<EntryInsertion<'_>> = inserted
-        .iter()
-        .map(|(name, data, position)| match position {
-            Some(position) => EntryInsertion::at(*position, name, data.as_slice()),
-            None => EntryInsertion::new(name, data.as_slice()),
-        })
-        .collect();
-    let deletions: Vec<&str> = changes.deletions.iter().map(String::as_str).collect();
+    let mut insertions = Vec::new();
+    insertions
+        .try_reserve_exact(insertion_capacity)
+        .map_err(|_| Error::Allocation {
+            amount: insertion_capacity,
+        })?;
+    insertions.extend(
+        inserted
+            .iter()
+            .map(|(name, data, position)| match position {
+                Some(position) => EntryInsertion::at(*position, name, data.as_slice()),
+                None => EntryInsertion::new(name, data.as_slice()),
+            }),
+    );
+    let mut deletions = Vec::new();
+    deletions
+        .try_reserve_exact(deletion_capacity)
+        .map_err(|_| Error::Allocation {
+            amount: deletion_capacity,
+        })?;
+    deletions.extend(changes.deletions.iter().map(String::as_str));
     let edited_bytes = edited
         .iter()
         .map(|(_, data)| data.len())
@@ -3002,7 +3111,7 @@ fn publish(
     let candidate = Package::from_source_with_options(output.into(), package.state.options)
         .map_err(map_read_error)?;
     candidate.validate().map_err(map_read_error)?;
-    verify_locality_members(package, &candidate, plan, budget)?;
+    verify_locality_members(package, &candidate, plan, budget, fields)?;
     Ok(candidate)
 }
 
@@ -3622,8 +3731,9 @@ mod locality_tests {
     ) -> Result<(), Box<dyn std::error::Error>> {
         let candidate = Package::from_bytes(bytes)?;
         let mut budget = transaction_budget(source)?;
+        let mut fields = FieldLedger::new(source)?;
         admit_transaction(source, &mut budget)?;
-        let result = verify_locality_members(source, &candidate, plan, &mut budget);
+        let result = verify_locality_members(source, &candidate, plan, &mut budget, &mut fields);
         assert!(
             result.is_err(),
             "locality verifier unexpectedly accepted: {result:?}"
