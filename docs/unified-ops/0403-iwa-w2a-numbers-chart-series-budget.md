@@ -2,7 +2,7 @@
 
 - Status: Numbers chart-series caller-ledger repair is isolated on
   `uo2/iwa-w2a-numbers-series-budget`; final handoff source is the current
-  branch tip `d3e953390e` after canonical construction/index admission
+  branch tip `576f404cb2` after canonical construction/index admission
   `38a0b13df3`, canonical bounded finish `60d2f93efeb9`, the accepted
   registry-reuse merge `73b7bf0027`, retained-memory policy repair
   `d4fcd3af7f`, and final caller-gate closure.
@@ -33,16 +33,17 @@ process-wide profile. Codec residuals reject exhausted allocation, retained,
 and scratch axes before codec work. Retained/scratch graph memory follows the
 checked archive header-memory policy, so a small input ceiling does not make
 valid selector admission fail before the intended candidate limit. Final
-  graph index construction and final change-vector construction use canonical
-  shared requirements,
-residual `FinishLimits`, fallible `finish_bounded`, and post-success
-`FinishReport` charging; no legacy infallible finish path is used.
+graph index construction and final change-vector construction use canonical
+shared requirements. Census, recensus, and population are all charged before
+execution; finalization uses residual `FinishLimits`, fallible
+`finish_bounded`, and post-success `FinishReport` charging. No legacy
+infallible finish path is used.
 
 The symbol path adopts F's bounded `series::Limits`/`Report`/`MutationScope`
 seam. The facade charges the report once and verifies the selected chart,
 changed member names, changed object identifiers/message types, generated
 fields, object/message metadata references, planned new/removed members and
-objects, raw ArchiveObject provenance, and raw field transitions before
+objects, nested raw ArchiveInfo unknown fields in order, and raw field transitions before
 publication. Changed ZIP members preserve static local/central-directory
 records; untouched members are compared by raw names, local records,
 compressed bytes and physical metadata after candidate reopen. The candidate is reopened through the
