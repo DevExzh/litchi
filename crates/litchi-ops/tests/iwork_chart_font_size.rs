@@ -41,6 +41,7 @@ fn named_property(file: &File, path: &str, key: &str) -> Option<String> {
         .map(|property| property.to_string())
 }
 
+#[cfg(feature = "numbers")]
 fn node_named_property(node: &litchi_ops::node::Node<'_>, key: &str) -> Option<String> {
     node.view()
         .format()
@@ -63,6 +64,7 @@ fn format_values(file: &File, path: &str) -> Vec<(String, String)> {
         .collect()
 }
 
+#[cfg(feature = "numbers")]
 fn node_format_values(node: &litchi_ops::node::Node<'_>) -> Vec<(String, String)> {
     node.view()
         .format()
