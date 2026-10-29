@@ -368,6 +368,28 @@ fn body_table_cell_comment_creates_a_root_from_a_rootless_file_cell() {
 }
 
 #[test]
+fn body_table_cell_comment_fast_path_keeps_typed_refusals_and_source_bytes() {
+    let file = read("pages/body-table-cells-native.pages");
+    let cell = "/body/tbl[1]/tr[2]/tc[2]";
+    let original = file.to_bytes().expect("source bytes");
+    let invalid_value = file
+        .set(
+            cell,
+            props! { "comment" => litchi_ops::PropValue::from(vec![String::from("not text")]) },
+        )
+        .expect_err("numeric comment is invalid");
+    assert_eq!(invalid_value.code(), Code::InvalidValue);
+    let out_of_range = file
+        .set(
+            "/body/tbl[1]/tr[999]/tc[1]",
+            props! { "comment" => "must refuse" },
+        )
+        .expect_err("out-of-range comment cell");
+    assert_eq!(out_of_range.code(), Code::InvalidInput);
+    assert_eq!(file.to_bytes().expect("source unchanged"), original);
+}
+
+#[test]
 fn body_table_cell_comment_stale_recipient_and_batch_proofs_are_terminal_and_local() {
     let file = read("pages/body-table-comment-hidden-native-saved.pages");
     let populated = "/body/tbl[1]/tr[2]/tc[2]";

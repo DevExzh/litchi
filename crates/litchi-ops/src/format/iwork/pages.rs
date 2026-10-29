@@ -799,8 +799,7 @@ fn direct_cell(
         return None;
     };
     let key = key.as_str();
-    let comment = key == "comment";
-    if !comment && key != "text" && key != "value" {
+    if key != "text" && key != "value" {
         return None;
     }
     let path = target.path()?.path();
@@ -834,15 +833,9 @@ fn direct_cell(
         .nth(table)?;
     let index = file.stand_in(table_at).leaf()[0] as usize;
     let mut chain = Chain::new(package.clone());
-    let row = u32::try_from(row).ok()?;
-    let column = u32::try_from(column).ok()?;
-    if comment {
-        let comment = super::write::text(value, "comment").ok()?;
-        commit_comments(&mut chain, index, vec![(row, column, comment)]).ok()?;
-    } else {
-        let value = table_value(key, value).ok()?;
-        commit_cells(&mut chain, index, vec![(row, column, value)]).ok()?;
-    }
+    let value = table_value(key, value).ok()?;
+    let values = vec![(u32::try_from(row).ok()?, u32::try_from(column).ok()?, value)];
+    commit_cells(&mut chain, index, values).ok()?;
     finish(
         file,
         chain.changed,
@@ -852,6 +845,86 @@ fn direct_cell(
         limits,
     )
     .ok()
+}
+
+/// The comment-only direct-path setter. Unlike the legacy value fast path,
+/// focused comment errors must remain terminal and must not retry the generic
+/// tree route with a fresh budget.
+fn direct_comment(
+    file: &Iwork,
+    package: &Package,
+    target: &TargetArg<'_>,
+    props: &Props<'_>,
+    limits: &SemanticLimits,
+) -> Result<Option<Commit>> {
+    let mut entries = props.iter();
+    let (Some((key, value)), None) = (entries.next(), entries.next()) else {
+        return Ok(None);
+    };
+    if key.as_str() != "comment" {
+        return Ok(None);
+    }
+    let path = target.path().map(|target| target.path());
+    let Some(path) = path else {
+        return Ok(None);
+    };
+    let [body, table, row, column] = path.steps() else {
+        return Ok(None);
+    };
+    if !path.is_absolute()
+        || body.name() != "body"
+        || !body.predicates().is_empty()
+        || !matches!(table.name(), "tbl" | "table")
+        || row.name() != "tr"
+        || column.name() != "tc"
+    {
+        return Ok(None);
+    }
+    let [table, row, column] = [table, row, column].map(|step| step.index().map(Position::get));
+    let (Some(table), Some(row), Some(column)) = (table, row, column) else {
+        return Ok(None);
+    };
+    bound(LimitKind::ExpandedTargets, 1, limits.max_expanded_targets())?;
+    bound(LimitKind::Operations, 1, limits.max_operations())?;
+    file.checked_tree()?;
+    let ordinal = crate::path::navigate::ElementKind::ordinal(Kind::Body);
+    let Some(body_at) = file
+        .kids(super::At::ROOT)
+        .iter()
+        .find(|&child| file.kind_at(child) == ordinal)
+    else {
+        return Ok(None);
+    };
+    let ordinal = crate::path::navigate::ElementKind::ordinal(Kind::Table);
+    let Some(table_at) = file
+        .kids(body_at)
+        .iter()
+        .filter(|&child| file.kind_at(child) == ordinal)
+        .nth(table)
+    else {
+        return Ok(None);
+    };
+    let index = file.stand_in(table_at).leaf()[0] as usize;
+    let comment = super::write::text(value, "comment")?;
+    let mut chain = Chain::new(package.clone());
+    commit_comments(
+        &mut chain,
+        index,
+        vec![(
+            u32::try_from(row).map_err(|_| refusal(Code::OutOfRange, "row is too large"))?,
+            u32::try_from(column).map_err(|_| refusal(Code::OutOfRange, "column is too large"))?,
+            comment,
+        )],
+    )?;
+    finish(
+        file,
+        chain.changed,
+        Owner::Pages(chain.package),
+        chain.patches,
+        1,
+        limits,
+    )
+    .map(Some)
 }
 
 /// Set properties on every target.
@@ -864,6 +937,9 @@ pub(crate) fn set(
 ) -> Result<Commit> {
     if is_metadata(target) {
         return set_metadata(file, package, props, limits);
+    }
+    if let Some(commit) = direct_comment(file, package, target, props, limits)? {
+        return Ok(commit);
     }
     if let Some(commit) = direct_cell(file, package, target, props, limits) {
         return Ok(commit);

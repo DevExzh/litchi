@@ -1439,8 +1439,7 @@ fn direct_cell(
         return None;
     };
     let key = key.as_str();
-    let comment = key == "comment";
-    if !comment && key != "text" && key != "value" {
+    if key != "text" && key != "value" {
         return None;
     }
     let path = target.path()?.path();
@@ -1469,23 +1468,83 @@ fn direct_cell(
         .filter(|&child| file.kind_at(child) == ordinal)
         .nth(table)?;
     let mut pending = Pending::default();
-    let row = u32::try_from(row).ok()?;
-    let column = u32::try_from(column).ok()?;
-    if comment {
-        pending.comments.insert(
-            (slide, table, row, column),
-            (super::super::write::text(value, "comment").ok()?, 0),
-        );
-    } else {
-        let [slide, _, _, drawable] = file.stand_in(table_at).leaf().map(|value| value as usize);
-        let cell = table_cell_value(key, value).ok()?;
-        pending
-            .cells
-            .insert((slide, drawable, row, column), (cell, 0));
-    }
+    let [slide, _, _, drawable] = file.stand_in(table_at).leaf().map(|value| value as usize);
+    let cell = table_cell_value(key, value).ok()?;
+    pending.cells.insert(
+        (
+            slide,
+            drawable,
+            u32::try_from(row).ok()?,
+            u32::try_from(column).ok()?,
+        ),
+        (cell, 0),
+    );
     publish(file, package, pending, 1, limits)
         .ok()
         .map(|(commit, _)| commit)
+}
+
+/// The comment-only direct-path setter. Focused comment errors remain
+/// terminal instead of falling back to the generic tree route.
+fn direct_comment(
+    file: &Iwork,
+    package: &Package,
+    target: &TargetArg<'_>,
+    props: &Props<'_>,
+    limits: &SemanticLimits,
+) -> Result<Option<Commit>> {
+    let mut entries = props.iter();
+    let (Some((key, value)), None) = (entries.next(), entries.next()) else {
+        return Ok(None);
+    };
+    if key.as_str() != "comment" {
+        return Ok(None);
+    }
+    let Some(path) = target.path().map(|target| target.path()) else {
+        return Ok(None);
+    };
+    let [slide, table, row, column] = path.steps() else {
+        return Ok(None);
+    };
+    if !path.is_absolute()
+        || slide.name() != "slide"
+        || table.name() != "table"
+        || row.name() != "tr"
+        || column.name() != "tc"
+    {
+        return Ok(None);
+    }
+    let [slide, table, row, column] =
+        [slide, table, row, column].map(|step| step.index().map(Position::get));
+    let (Some(slide), Some(table), Some(row), Some(column)) = (slide, table, row, column) else {
+        return Ok(None);
+    };
+    bound(LimitKind::ExpandedTargets, 1, limits.max_expanded_targets())?;
+    bound(LimitKind::Operations, 1, limits.max_operations())?;
+    file.checked_tree()?;
+    let Some(slide_at) = file.kids(super::super::At::ROOT).get(slide) else {
+        return Ok(None);
+    };
+    let ordinal = crate::path::navigate::ElementKind::ordinal(super::Kind::Table);
+    let Some(_table_at) = file
+        .kids(slide_at)
+        .iter()
+        .filter(|&child| file.kind_at(child) == ordinal)
+        .nth(table)
+    else {
+        return Ok(None);
+    };
+    let mut pending = Pending::default();
+    pending.comments.insert(
+        (
+            slide,
+            table,
+            u32::try_from(row).map_err(|_| refusal(Code::OutOfRange, "row is too large"))?,
+            u32::try_from(column).map_err(|_| refusal(Code::OutOfRange, "column is too large"))?,
+        ),
+        (super::super::write::text(value, "comment")?, 0),
+    );
+    publish(file, package, pending, 1, limits).map(|(commit, _)| Some(commit))
 }
 
 /// Set properties on every target.
@@ -1496,6 +1555,9 @@ pub(crate) fn set(
     props: &Props<'_>,
     limits: &SemanticLimits,
 ) -> Result<Commit> {
+    if let Some(commit) = direct_comment(file, package, target, props, limits)? {
+        return Ok(commit);
+    }
     if let Some(commit) = direct_cell(file, package, target, props, limits) {
         return Ok(commit);
     }
