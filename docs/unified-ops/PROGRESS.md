@@ -7265,3 +7265,29 @@ See [0063](0063-source-pptx-modern-comments.md).
   historical, with no captures. The repair adds only that dependency edge,
   preserving every pinned version, and locked offline metadata passes. Fresh
   integrated qualification restarts on the repaired commit.
+
+- The merged D7 worktree and branch were retired after source/process audits:
+  56 worktrees and 49 branches removed. Its disposable worktree and external
+  build caches added 56,565,943,595 logical bytes to the measured cleanup;
+  the total is now 147,912,991,238 bytes (about 137.75 GiB). All 342 indexed
+  qualified/historical artifacts checked in this sweep remained hash-exact.
+- The repaired `51079fd655` gate then found two Numbers-only test helpers
+  compiled in Pages-only and Keynote-only builds. The run was stopped after
+  25 rows (23 pass, two strict-Clippy failures); its partial receipt and
+  partial binary preparation remain historical, with no captures. The test-
+  only repair adds the missing Numbers feature guards. Strict all-target
+  Clippy passes for Pages-only, Keynote-only and Numbers-only configurations,
+  together with formatting; the full gate restarts on the repaired source.
+
+- The `c07e6208cc` run completed 33 rows: 32 passed and the operations-test
+  row failed four generated-report/coverage targets. Facade/core tests, leaf
+  tests, ODS tests and workspace Clippy passed. The run was stopped before
+  integrating the reviewed report closure; its partial results remain tied
+  to c07 and are not reused as a different commit's full gate.
+- Accepted report-only slice `d939d75cdb` (0404). It adds real chart-grid CRUD
+  exercises with changed 17pt values, restores Pages table/section coverage,
+  and refreshes only the intentional fixture/query/registry outputs. Fidelity
+  adds exactly the two-sheet fixture row; query changes are confined to its
+  thirteen Numbers digest entries. All four affected targets pass again with
+  golden updates explicitly disabled. No production runtime or fixture bytes
+  changed. Final qualification restarts on this integrated source.
