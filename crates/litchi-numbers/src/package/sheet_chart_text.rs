@@ -743,7 +743,8 @@ fn map_arrangement_error(error: chart_arrangement::Error) -> Error {
                 chart_arrangement::LimitKind::Allocations => LimitKind::Allocations,
                 chart_arrangement::LimitKind::RetainedBytes => LimitKind::RetainedBytes,
                 chart_arrangement::LimitKind::ScratchBytes => LimitKind::ScratchBytes,
-                chart_arrangement::LimitKind::References => LimitKind::PayloadReferences,
+                chart_arrangement::LimitKind::References
+                | chart_arrangement::LimitKind::Identifiers => LimitKind::PayloadReferences,
                 chart_arrangement::LimitKind::CompressedBytes => LimitKind::PackageBytes,
             },
             observed,
