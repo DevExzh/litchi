@@ -1690,12 +1690,12 @@ pages/editor/charts/depth_3d.rs	body_chart_3d_depth	1	pages	chart.style	host-onl
 pages/editor/charts/depth_3d.rs	set_body_chart_3d_depth	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
 pages/editor/charts/donut_inner_radius.rs	body_chart_donut_inner_radius	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
 pages/editor/charts/donut_inner_radius.rs	set_body_chart_donut_inner_radius	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
-pages/editor/charts/font.rs	body_chart_font	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
-pages/editor/charts/font.rs	body_chart_font_size	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
-pages/editor/charts/font.rs	reset_body_chart_font	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
-pages/editor/charts/font.rs	reset_body_chart_font_size	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
-pages/editor/charts/font.rs	set_body_chart_font	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
-pages/editor/charts/font.rs	set_body_chart_font_size	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
+pages/editor/charts/font.rs	body_chart_font	1	pages	chart.style	migrated	litchi_pages::Package::body_chart_font	pages_body_chart_font_read_parity	A	-	host-vs-facade read parity; native mutation queue remains pending (0386)
+pages/editor/charts/font.rs	body_chart_font_size	1	pages	chart.style	migrated	litchi_pages::Package::body_chart_font_size	pages_body_chart_font_size_read_parity	A	-	host-vs-facade read parity; native mutation queue remains pending (0386)
+pages/editor/charts/font.rs	reset_body_chart_font	1	pages	chart.style	migrated	litchi_pages::Package::edit_body_chart_font	pages_body_chart_font_reset_parity	B	-	host-vs-facade reset parity; native mutation queue remains pending (0386)
+pages/editor/charts/font.rs	reset_body_chart_font_size	1	pages	chart.style	migrated	litchi_pages::Package::edit_body_chart_font_size	pages_body_chart_font_size_reset_parity	B	-	host-vs-facade reset parity; native mutation queue remains pending (0386)
+pages/editor/charts/font.rs	set_body_chart_font	1	pages	chart.style	migrated	litchi_pages::Package::edit_body_chart_font	pages_body_chart_font_set_parity	B	-	host-vs-facade set parity; native mutation queue remains pending (0386)
+pages/editor/charts/font.rs	set_body_chart_font_size	1	pages	chart.style	migrated	litchi_pages::Package::edit_body_chart_font_size	pages_body_chart_font_size_set_parity	B	-	host-vs-facade set parity; native mutation queue remains pending (0386)
 pages/editor/charts/gaps.rs	body_chart_gap_spacing	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
 pages/editor/charts/gaps.rs	set_body_chart_gap_spacing	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
 pages/editor/charts/legend.rs	body_chart_legend_fill	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
