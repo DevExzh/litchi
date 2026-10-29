@@ -71,6 +71,24 @@ pub enum LimitKind {
     EntryBytes,
     /// Aggregate package or IWA bytes.
     TotalBytes,
+    /// Bytes in one raw ZIP member name.
+    MemberNameBytes,
+    /// Aggregate raw ZIP header variable metadata bytes.
+    MetadataBytes,
+    /// Compressed bytes in one ZIP member.
+    CompressedEntryBytes,
+    /// Decompressed bytes in one IWA component.
+    IwaStreamBytes,
+    /// Aggregate decompressed bytes across IWA components.
+    IwaTotalBytes,
+    /// Aggregate IWA objects inspected by detection.
+    IwaObjects,
+    /// Protobuf fields inspected by detection.
+    IwaFields,
+    /// Protobuf nesting inspected by detection.
+    IwaNesting,
+    /// Aggregate detection wire work.
+    IwaWork,
     /// Semantic slides visited by the shared chart selector.
     Slides,
     /// Graph references.
@@ -110,6 +128,15 @@ impl fmt::Display for LimitKind {
             Self::Entries => "entries",
             Self::EntryBytes => "entry bytes",
             Self::TotalBytes => "total bytes",
+            Self::MemberNameBytes => "member name bytes",
+            Self::MetadataBytes => "metadata bytes",
+            Self::CompressedEntryBytes => "compressed entry bytes",
+            Self::IwaStreamBytes => "IWA stream bytes",
+            Self::IwaTotalBytes => "total IWA bytes",
+            Self::IwaObjects => "IWA objects",
+            Self::IwaFields => "IWA fields",
+            Self::IwaNesting => "IWA nesting",
+            Self::IwaWork => "IWA work",
             Self::Slides => "slides",
             Self::References => "references",
             Self::TextBytes => "text bytes",
@@ -839,14 +866,75 @@ fn map_archive_error(error: litchi_iwa_archive::Error) -> Error {
                 litchi_iwa_archive::LimitKind::InputBytes => LimitKind::InputBytes,
                 litchi_iwa_archive::LimitKind::OutputBytes => LimitKind::OutputBytes,
                 litchi_iwa_archive::LimitKind::Entries => LimitKind::Entries,
+                litchi_iwa_archive::LimitKind::MemberNameBytes => LimitKind::MemberNameBytes,
+                litchi_iwa_archive::LimitKind::MetadataBytes => LimitKind::MetadataBytes,
+                litchi_iwa_archive::LimitKind::CompressedEntryBytes => {
+                    LimitKind::CompressedEntryBytes
+                },
                 litchi_iwa_archive::LimitKind::EntryBytes => LimitKind::EntryBytes,
                 litchi_iwa_archive::LimitKind::TotalBytes => LimitKind::TotalBytes,
-                _ => LimitKind::WireBytes,
+                litchi_iwa_archive::LimitKind::IwaStreamBytes => LimitKind::IwaStreamBytes,
+                litchi_iwa_archive::LimitKind::IwaTotalBytes => LimitKind::IwaTotalBytes,
             },
             observed,
             maximum,
         },
         litchi_iwa_archive::Error::Allocation { amount, .. } => Error::Allocation { amount },
+        litchi_iwa_archive::Error::Iwa(error) => map_core_error(error),
+        _ => Error::InvalidSource,
+    }
+}
+
+fn map_core_error(error: litchi_iwa_core::Error) -> Error {
+    match error {
+        litchi_iwa_core::Error::Limit {
+            kind,
+            observed,
+            maximum,
+        } => Error::Limit {
+            kind: map_core_limit(kind),
+            observed: usize_to_u64(observed),
+            maximum: usize_to_u64(maximum),
+        },
+        litchi_iwa_core::Error::Allocation { requested, .. } => {
+            Error::Allocation { amount: requested }
+        },
+        _ => Error::InvalidSource,
+    }
+}
+
+fn map_detection_error(error: litchi_iwa_detect::Error) -> Error {
+    match error {
+        litchi_iwa_detect::Error::IwaCore(error) => map_core_error(error),
+        litchi_iwa_detect::Error::IwaCommon(error) => map_wire_error(error),
+        litchi_iwa_detect::Error::LimitExceeded {
+            kind,
+            observed,
+            maximum,
+        } => Error::Limit {
+            kind: match kind {
+                litchi_iwa_detect::LimitKind::InputBytes => LimitKind::InputBytes,
+                litchi_iwa_detect::LimitKind::OutputBytes => LimitKind::OutputBytes,
+                litchi_iwa_detect::LimitKind::Entries => LimitKind::Entries,
+                litchi_iwa_detect::LimitKind::MemberNameBytes => LimitKind::MemberNameBytes,
+                litchi_iwa_detect::LimitKind::MetadataBytes => LimitKind::MetadataBytes,
+                litchi_iwa_detect::LimitKind::CompressedEntryBytes => {
+                    LimitKind::CompressedEntryBytes
+                },
+                litchi_iwa_detect::LimitKind::EntryBytes => LimitKind::EntryBytes,
+                litchi_iwa_detect::LimitKind::TotalBytes => LimitKind::TotalBytes,
+                litchi_iwa_detect::LimitKind::IwaStreamBytes => LimitKind::IwaStreamBytes,
+                litchi_iwa_detect::LimitKind::IwaTotalBytes => LimitKind::IwaTotalBytes,
+                litchi_iwa_detect::LimitKind::IwaObjects => LimitKind::IwaObjects,
+                litchi_iwa_detect::LimitKind::IwaFields => LimitKind::IwaFields,
+                litchi_iwa_detect::LimitKind::IwaNesting => LimitKind::IwaNesting,
+                litchi_iwa_detect::LimitKind::IwaWork => LimitKind::IwaWork,
+                _ => LimitKind::WireWork,
+            },
+            observed,
+            maximum,
+        },
+        litchi_iwa_detect::Error::Allocation { amount } => Error::Allocation { amount },
         _ => Error::InvalidSource,
     }
 }
@@ -888,8 +976,8 @@ fn map_read_error(error: ReadError) -> Error {
         },
         ReadError::Allocation { amount, .. } => Error::Allocation { amount },
         ReadError::Archive(error) => map_archive_error(error),
+        ReadError::Detection(error) => map_detection_error(error),
         ReadError::Io(_)
-        | ReadError::Detection(_)
         | ReadError::UnexpectedFormat { .. }
         | ReadError::InvalidFormat(_)
         | ReadError::Decode(_)
@@ -1927,6 +2015,64 @@ mod limit_mapping_tests {
             LimitKind::SnappyFrames,
             OBSERVED as u64,
             MAXIMUM as u64,
+        );
+    }
+
+    #[test]
+    fn preserves_nested_archive_and_detection_units_and_values() {
+        const OBSERVED: usize = 31;
+        const MAXIMUM: usize = 23;
+
+        assert_limit(
+            map_archive_error(litchi_iwa_archive::Error::Iwa(
+                litchi_iwa_core::Error::Limit {
+                    kind: litchi_iwa_core::LimitKind::SnappyFrames,
+                    observed: OBSERVED,
+                    maximum: MAXIMUM,
+                },
+            )),
+            LimitKind::SnappyFrames,
+            OBSERVED as u64,
+            MAXIMUM as u64,
+        );
+        assert_eq!(
+            map_archive_error(litchi_iwa_archive::Error::Iwa(
+                litchi_iwa_core::Error::Allocation {
+                    resource: "nested IWA",
+                    requested: OBSERVED,
+                },
+            )),
+            Error::Allocation { amount: OBSERVED },
+        );
+        assert_limit(
+            map_read_error(ReadError::Detection(
+                litchi_iwa_detect::Error::LimitExceeded {
+                    kind: litchi_iwa_detect::LimitKind::IwaFields,
+                    observed: OBSERVED as u64,
+                    maximum: MAXIMUM as u64,
+                },
+            )),
+            LimitKind::IwaFields,
+            OBSERVED as u64,
+            MAXIMUM as u64,
+        );
+        assert_limit(
+            map_read_error(ReadError::Detection(litchi_iwa_detect::Error::IwaCommon(
+                litchi_iwa_common::Error::LimitExceeded {
+                    kind: litchi_iwa_common::LimitKind::Fields,
+                    observed: OBSERVED,
+                    limit: MAXIMUM,
+                },
+            ))),
+            LimitKind::WireFields,
+            OBSERVED as u64,
+            MAXIMUM as u64,
+        );
+        assert_eq!(
+            map_read_error(ReadError::Detection(litchi_iwa_detect::Error::Allocation {
+                amount: OBSERVED
+            },)),
+            Error::Allocation { amount: OBSERVED },
         );
     }
 
