@@ -77,10 +77,14 @@ pub enum LimitKind {
     References,
     /// Font-name or other semantic text bytes retained by the selector.
     TextBytes,
+    /// Native chart title bytes retained by the selector.
+    TitleBytes,
     /// Series-style registry entries rewritten.
     RegistryEntries,
     /// Package-wide object identifiers allocated or released.
     Identifiers,
+    /// Snappy frames inspected by the IWA boundary.
+    SnappyFrames,
     /// Parsed wire fields.
     WireFields,
     /// Maximum protobuf nesting depth.
@@ -109,8 +113,10 @@ impl fmt::Display for LimitKind {
             Self::Slides => "slides",
             Self::References => "references",
             Self::TextBytes => "text bytes",
+            Self::TitleBytes => "title bytes",
             Self::RegistryEntries => "registry entries",
             Self::Identifiers => "identifiers",
+            Self::SnappyFrames => "Snappy frames",
             Self::WireFields => "wire fields",
             Self::WireNesting => "wire nesting",
             Self::WireWork => "wire work",
@@ -333,7 +339,7 @@ fn map_axis_support_error(error: AxisSupportError) -> Error {
                 chart_axis_support::AxisSupportLimitKind::WireFields => LimitKind::WireFields,
                 chart_axis_support::AxisSupportLimitKind::WireNesting => LimitKind::WireNesting,
                 chart_axis_support::AxisSupportLimitKind::WireWork => LimitKind::WireWork,
-                chart_axis_support::AxisSupportLimitKind::TitleBytes => LimitKind::SelectorBytes,
+                chart_axis_support::AxisSupportLimitKind::TitleBytes => LimitKind::TitleBytes,
             },
             observed,
             maximum,
@@ -818,7 +824,7 @@ fn map_core_limit(kind: litchi_iwa_core::LimitKind) -> LimitKind {
         | litchi_iwa_core::LimitKind::SnappyCompressedStreamBytes => LimitKind::WireBytes,
         litchi_iwa_core::LimitKind::HeaderFields => LimitKind::WireFields,
         litchi_iwa_core::LimitKind::HeaderNesting => LimitKind::WireNesting,
-        litchi_iwa_core::LimitKind::SnappyFrames => LimitKind::WireWork,
+        litchi_iwa_core::LimitKind::SnappyFrames => LimitKind::SnappyFrames,
     }
 }
 
@@ -1520,7 +1526,7 @@ mod limit_mapping_tests {
                 observed: OBSERVED,
                 maximum: MAXIMUM,
             })),
-            LimitKind::WireWork,
+            LimitKind::SnappyFrames,
             OBSERVED as u64,
             MAXIMUM as u64,
         );
@@ -1550,7 +1556,7 @@ mod limit_mapping_tests {
             ),
             (
                 chart_axis_support::AxisSupportLimitKind::TitleBytes,
-                LimitKind::SelectorBytes,
+                LimitKind::TitleBytes,
             ),
         ] {
             assert_limit(
