@@ -31,26 +31,32 @@ collect setup.
 
 ## External audit validator
 
-The external `validate_call_audit.py` revision validates the raw audit against
-the supplied 69- or 87-route manifest. It rejects missing/extra/duplicate
-legs, unknown route IDs, wrong side sets, and every call count other than two
-for `host_leaf`/`unified_leaf` or one for `leaf_only`. There are no route-specific
-exemptions. Historical runners, manifests, raw audits, and receipts remain
-untouched; the validator writes only a new external receipt.
+The external `validate_call_audit.py` revision derives the audit from the fresh
+run's `results.json`, raw callgrind files, annotation files, source identity,
+and binary-integrity records. It rejects stale results, capture hash/size
+mismatches, missing/extra/duplicate legs, unknown route IDs, wrong side sets,
+helper/setup collection, mismatched exact symbols, and every call count other
+than two for `host_leaf`/`unified_leaf` or one for `leaf_only`. There are no
+route-specific exemptions. Historical `--audit` input remains diagnostic-only;
+the new 69/87 runners derive validation from their own fresh output directory.
 
 External validator SHA-256:
-`56cf47937fade54867c6393bb5d6a561bcb943a01514e152e165d60f3988667f`.
+`64dd455f89805cef07a6a8951334345f04f1e81f638b0e1c6c338310211acd88`.
+
+Synthetic derived-audit controls (`test_derived_call_audit.py`) pass positive,
+malformed-results, stale-source, and capture-hash-mismatch cases. Its SHA-256
+is `4e572387a53a08ee65a23c257231434b2826719338398ac346aa2d808eebfc4b`.
 
 New measurement-pipeline copies require `--call-audit` in measurement mode,
 strip it before delegating to the historical parser, and validate the raw audit
 against the normalized manifest after the parent run succeeds:
 
-- 69-route runner:
+- 69-route runner (derives audit after the delegated run):
   `iwork-owner-probe-final/qualify_iwork_owner.py`, SHA-256
-  `4898d5d5308f9059897be7f68e40a0c0dacafc0f034834087103c132f6fc7c8d`;
-- 87-route runner:
+  `ccb3374509cda8fc99a98dd51e059fc07ef0c40855ff26f2a59fb0894a2359aa`;
+- 87-route runner (derives audit after the delegated run):
   `iwork-chart-font-probe-final/qualify_iwork_chart_font.py`, SHA-256
-  `881b8cabd750f60ce53ab4c29ba916c1b937ec5e42ea484ab7ee516407c92699`.
+  `2fbe3746850e0fec6fa1ae92baf67984233dced6d38ad616b04223e88b3c2e9f`.
 
 Historical runners and manifests remain the immutable parents of these copies.
 
