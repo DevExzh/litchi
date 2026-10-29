@@ -794,6 +794,14 @@ impl<'s> Workspace<'s> {
 
     /// Exact wire work required by one package-registry inspection.
     pub(crate) fn registry_inspection_work(&self) -> usize {
+        // Callers use this as the admission for the next `inspect`-backed
+        // lookup.  Once that lookup has populated the root cache, charging
+        // the full two-pass codec report again would account preparation as
+        // work that is not performed.  `set_registry_payload` clears both
+        // caches, so every changed registry state is admitted again.
+        if self.registry_root.borrow().is_some() {
+            return 0;
+        }
         self.registry_inspection_requirements()
             .ok()
             .flatten()
