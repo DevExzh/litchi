@@ -782,6 +782,84 @@ struct LocatedCell {
     bytes: Vec<u8>,
 }
 
+/// Immutable data prepared once for a multi-cell style batch.  The batch
+/// planner keeps the table model, style list, and selected cell payloads
+/// source-bound so each request does not repeat the same full tile walk.
+struct BatchContext {
+    table: Table,
+    style_list: StyleList,
+    keys: Vec<Option<u32>>,
+    styles: Vec<BatchStyle>,
+}
+
+struct BatchStyle {
+    key: u32,
+    parent: u64,
+    inherited: CharacterProperties,
+    stylesheet: Option<u64>,
+}
+
+fn prepare_batch_context(
+    source: &dyn TableSource,
+    targets: &[Target],
+    limits: &Limits,
+    include_stylesheets: bool,
+) -> Result<BatchContext, Error> {
+    let first = targets.first().ok_or(invalid("empty style batch"))?;
+    let table = Table::read(source, *first, limits)?;
+    let style_list = StyleList::read(source, table.style_list, limits)?;
+    let cells = locate_cells(source, &table, targets, limits)?;
+    let mut keys = Vec::new();
+    limits.reserve(&mut keys, cells.len())?;
+    for cell in &cells {
+        keys.push(style_key(cell.as_deref(), limits)?);
+    }
+    let mut styles = Vec::new();
+    let mut effective_cache = Vec::new();
+    let mut effective_path = BTreeSet::new();
+    for key in keys.iter().flatten().copied() {
+        if styles.iter().any(|style: &BatchStyle| style.key == key) {
+            continue;
+        }
+        limits.admit_allocations(1)?;
+        let parent = style_list.entry(key)?.style;
+        let (inherited, stylesheet) = if let Some(cached) = styles
+            .iter()
+            .find(|style: &&BatchStyle| style.parent == parent)
+        {
+            (cached.inherited.clone(), cached.stylesheet)
+        } else {
+            (
+                effective_cached(
+                    source,
+                    parent,
+                    limits,
+                    &mut effective_cache,
+                    &mut effective_path,
+                    0,
+                )?,
+                if include_stylesheets {
+                    Some(stylesheet_of(source, parent, limits)?)
+                } else {
+                    None
+                },
+            )
+        };
+        styles.push(BatchStyle {
+            key,
+            parent,
+            inherited,
+            stylesheet,
+        });
+    }
+    Ok(BatchContext {
+        table,
+        style_list,
+        keys,
+        styles,
+    })
+}
+
 fn locate_cell(
     source: &dyn TableSource,
     table: &Table,
@@ -827,6 +905,98 @@ fn locate_cell(
         }
     }
     Ok(None)
+}
+
+fn locate_cells(
+    source: &dyn TableSource,
+    table: &Table,
+    targets: &[Target],
+    limits: &Limits,
+) -> Result<Vec<Option<Vec<u8>>>, Error> {
+    let mut sorted = Vec::new();
+    limits.reserve(&mut sorted, targets.len())?;
+    for (index, target) in targets.iter().copied().enumerate() {
+        if target.row >= table.geometry.rows || target.column >= table.geometry.columns {
+            return Err(Error::Refused(Refusal::OutsideTable));
+        }
+        sorted.push((target.row, target.column, index));
+    }
+    sorted.sort_unstable();
+    limits.charge_work(sorted.len().saturating_mul(2))?;
+
+    let mut cells = Vec::new();
+    limits.reserve(&mut cells, targets.len())?;
+    cells.resize_with(targets.len(), || None);
+    let tile_storage =
+        bytes(&table.store, STORE_TILES, limits)?.ok_or(invalid("tile storage missing"))?;
+    let tile_size = varint(tile_storage, 2, limits)?.ok_or(invalid("tile size missing"))?;
+    if tile_size == 0 {
+        return Err(invalid("tile size is zero"));
+    }
+    let mut tiles = Vec::new();
+    for entry in repeated_payloads(tile_storage, 1, limits)? {
+        limits.reserve(&mut tiles, 1)?;
+        let key = u32::try_from(varint(entry, 1, limits)?.ok_or(invalid("tile key missing"))?)
+            .map_err(|_| invalid("tile key exceeds u32"))?;
+        let tile = reference(entry, 2, limits)?.ok_or(invalid("tile reference missing"))?;
+        if tiles.iter().any(|(existing, _)| *existing == key) {
+            return Err(invalid("tile key repeats"));
+        }
+        tiles.push((key, tile));
+    }
+
+    let mut first = 0;
+    while first < sorted.len() {
+        let tile_key = u64::from(sorted[first].0) / tile_size;
+        let mut last = first + 1;
+        while last < sorted.len() && u64::from(sorted[last].0) / tile_size == tile_key {
+            last += 1;
+        }
+        let tile_identifier = tiles
+            .iter()
+            .find(|(key, _)| u64::from(*key) == tile_key)
+            .ok_or(Error::Refused(Refusal::UnsupportedSource))?
+            .1;
+        let (_, tile_data) = unique_payload(source, tile_identifier, &[TILE_MESSAGE_TYPE], limits)?;
+        for row in repeated_payloads(tile_data, 5, limits)? {
+            limits.charge_work(row.len())?;
+            limits.admit_allocations(1)?;
+            let local = varint(row, 1, limits)?.ok_or(invalid("tile row index missing"))?;
+            let row_number = tile_key
+                .checked_mul(tile_size)
+                .and_then(|value| value.checked_add(local))
+                .ok_or(invalid("tile row coordinate overflow"))?;
+            let mut row_first = first;
+            while row_first < last && u64::from(sorted[row_first].0) < row_number {
+                row_first += 1;
+            }
+            if row_first == last || u64::from(sorted[row_first].0) != row_number {
+                continue;
+            }
+            limits.admit_allocations(1)?;
+            let row_cells = storage::bnc_cells(row).map_err(|_| invalid("malformed BNC row"))?;
+            let mut row_last = row_first;
+            while row_last < last && u64::from(sorted[row_last].0) == row_number {
+                row_last += 1;
+            }
+            for (column, cell) in row_cells {
+                let mut target_index = row_first;
+                while target_index < row_last {
+                    let (_, target_column, index) = sorted[target_index];
+                    if target_column == column {
+                        cells[index] = Some(limits.copy(cell)?);
+                        break;
+                    }
+                    if target_column > column {
+                        break;
+                    }
+                    target_index += 1;
+                }
+            }
+        }
+        first = last;
+    }
+    Ok(cells)
 }
 
 fn bnc_limits(data: &[u8], limits: &Limits) -> Result<BncLimits, Error> {
@@ -1226,6 +1396,55 @@ pub fn effective(
     Ok(properties)
 }
 
+fn effective_cached(
+    source: &dyn TableSource,
+    style: u64,
+    limits: &Limits,
+    cache: &mut Vec<(u64, CharacterProperties)>,
+    path: &mut BTreeSet<u64>,
+    depth: usize,
+) -> Result<CharacterProperties, Error> {
+    if let Some((_, properties)) = cache.iter().find(|(identifier, _)| *identifier == style) {
+        return Ok(properties.clone());
+    }
+    if depth >= limits.max_style_depth {
+        return Err(Error::Limit {
+            kind: LimitKind::Nesting,
+            observed: (depth + 1) as u64,
+            maximum: limits.max_style_depth as u64,
+        });
+    }
+    limits.admit_allocations(1)?;
+    if !path.insert(style) {
+        return Err(invalid("character-style parent cycle"));
+    }
+    let payload = style_payload(source, style, limits)?;
+    let wire = preflight_character_properties(payload, limits)?;
+    let decoded =
+        litchi_iwa_text_wire::character_style_properties(payload, wire).map_err(map_char_style)?;
+    let parent_wire = preflight_character_parent(payload, limits)?;
+    let parent = litchi_iwa_text_wire::character_style_parent(payload, parent_wire)
+        .map_err(map_char_style)?;
+    let mut properties = decoded;
+    if let Some(parent) = parent {
+        let inherited = effective_cached(source, parent, limits, cache, path, depth + 1)?;
+        if properties.font_name.is_none() {
+            if let Some(font_name) = inherited.font_name.as_deref() {
+                limits.admit_allocations(1)?;
+                limits.admit_copies(font_name.len())?;
+            }
+        }
+        properties.inherit(&inherited);
+    }
+    path.remove(&style);
+    limits.admit_allocations(1)?;
+    cache
+        .try_reserve(1)
+        .map_err(|_| Error::Allocation { amount: 1 })?;
+    cache.push((style, properties.clone()));
+    Ok(properties)
+}
+
 /// Read the effective character properties of one target cell.
 pub fn read(
     source: &dyn TableSource,
@@ -1261,6 +1480,50 @@ pub fn read(
         },
     };
     effective(source, style, limits)
+}
+
+/// Read effective character properties for one bounded batch of cells while
+/// reusing the immutable table, tile, and style-list preparation.
+pub fn read_many(
+    source: &dyn TableSource,
+    targets: &[Target],
+    limits: &Limits,
+) -> Result<Vec<CharacterProperties>, Error> {
+    let context = prepare_batch_context(source, targets, limits, false)?;
+    let mut output = Vec::new();
+    limits.reserve(&mut output, targets.len())?;
+    for (index, target) in targets.iter().copied().enumerate() {
+        let properties = if let Some(key) = context.keys[index] {
+            context
+                .styles
+                .iter()
+                .find(|style| style.key == key)
+                .ok_or(invalid("batch style facts missing"))?
+                .inherited
+                .clone()
+        } else {
+            let field = if target.row < context.table.geometry.header_rows {
+                25
+            } else if target.row
+                >= context
+                    .table
+                    .geometry
+                    .rows
+                    .saturating_sub(context.table.geometry.footer_rows)
+            {
+                27
+            } else if target.column < context.table.geometry.header_columns {
+                26
+            } else {
+                24
+            };
+            let style = reference(&context.table.model, field, limits)?
+                .ok_or(Error::Refused(Refusal::UnsupportedDependency))?;
+            effective(source, style, limits)?
+        };
+        output.push(properties);
+    }
+    Ok(output)
 }
 
 /// The reduced direct character overrides to apply to a current style.
@@ -1409,7 +1672,7 @@ pub fn plan_set(
     fresh: Option<u64>,
     limits: &Limits,
 ) -> Result<Option<Plan>, Error> {
-    plan_set_inner(source, target, requested, fresh, limits, true)
+    plan_set_inner(source, target, requested, fresh, limits, true, None)
 }
 
 fn plan_set_inner(
@@ -1419,40 +1682,82 @@ fn plan_set_inner(
     fresh: Option<u64>,
     limits: &Limits,
     allow_exclusive: bool,
+    batch: Option<(&BatchContext, usize)>,
 ) -> Result<Option<Plan>, Error> {
     limits.charge_work(1)?;
-    let table = Table::read(source, target, limits)?;
-    let cell = locate_cell(source, &table, target, limits)?;
-    let old_key = style_key(cell.as_ref().map(|cell| cell.bytes.as_slice()), limits)?;
-    let list = StyleList::read(source, table.style_list, limits)?;
-    let parent = match old_key {
-        Some(key) => list.entry(key)?.style,
-        None => {
-            let field = if target.row < table.geometry.header_rows {
-                25
-            } else if target.row
-                >= table
-                    .geometry
-                    .rows
-                    .saturating_sub(table.geometry.footer_rows)
-            {
-                27
-            } else if target.column < table.geometry.header_columns {
-                26
-            } else {
-                24
-            };
-            reference(&table.model, field, limits)?
-                .ok_or(Error::Refused(Refusal::UnsupportedDependency))?
-        },
+    let owned_table = if batch.is_none() {
+        Some(Table::read(source, target, limits)?)
+    } else {
+        None
     };
-    let inherited = effective(source, parent, limits)?;
+    let table = batch
+        .map(|(context, _)| &context.table)
+        .or(owned_table.as_ref())
+        .ok_or(invalid("batch table context missing"))?;
+    let batch_style = batch.and_then(|(context, index)| {
+        context
+            .keys
+            .get(index)
+            .and_then(|key| *key)
+            .and_then(|key| context.styles.iter().find(|style| style.key == key))
+    });
+    let old_key = if let Some((context, index)) = batch {
+        context.keys.get(index).copied().flatten()
+    } else {
+        let cell = locate_cell(source, table, target, limits)?;
+        style_key(cell.as_ref().map(|cell| cell.bytes.as_slice()), limits)?
+    };
+    let owned_list = if batch.is_none() {
+        Some(StyleList::read(source, table.style_list, limits)?)
+    } else {
+        None
+    };
+    let list = batch
+        .map(|(context, _)| &context.style_list)
+        .or(owned_list.as_ref())
+        .ok_or(invalid("batch style-list context missing"))?;
+    let parent = if let Some(style) = batch_style {
+        style.parent
+    } else {
+        match old_key {
+            Some(key) => list.entry(key)?.style,
+            None => {
+                let field = if target.row < table.geometry.header_rows {
+                    25
+                } else if target.row
+                    >= table
+                        .geometry
+                        .rows
+                        .saturating_sub(table.geometry.footer_rows)
+                {
+                    27
+                } else if target.column < table.geometry.header_columns {
+                    26
+                } else {
+                    24
+                };
+                reference(&table.model, field, limits)?
+                    .ok_or(Error::Refused(Refusal::UnsupportedDependency))?
+            },
+        }
+    };
+    let inherited = if let Some(style) = batch_style {
+        style.inherited.clone()
+    } else {
+        effective(source, parent, limits)?
+    };
     limits.admit_character_properties(requested)?;
     let reduced = minimal(requested, &inherited);
     if reduced == CharacterProperties::new() {
         return Ok(None);
     }
-    let stylesheet = stylesheet_of(source, parent, limits)?;
+    let stylesheet = if let Some(style) = batch_style {
+        style
+            .stylesheet
+            .ok_or(invalid("batch stylesheet context missing"))?
+    } else {
+        stylesheet_of(source, parent, limits)?
+    };
     let exclusive = allow_exclusive
         && if let Some(key) = old_key {
             let refcount = list.entry(key)?.refcount == 1;
@@ -1493,9 +1798,16 @@ fn plan_set_inner(
     }
     let fresh = fresh.ok_or(Error::NeedsIdentifier)?;
     let data = encode_variation(Some(parent), stylesheet, &reduced, limits)?;
-    let (sheet_type, sheet_payload) =
-        unique_payload(source, stylesheet, &[STYLESHEET_MESSAGE_TYPE], limits)?;
-    let sheet_data = encode_stylesheet_variation(sheet_payload, fresh, Some(parent), limits)?;
+    let (sheet_type, sheet_data) = if batch.is_some() {
+        (STYLESHEET_MESSAGE_TYPE, Vec::new())
+    } else {
+        let (sheet_type, sheet_payload) =
+            unique_payload(source, stylesheet, &[STYLESHEET_MESSAGE_TYPE], limits)?;
+        (
+            sheet_type,
+            encode_stylesheet_variation(sheet_payload, fresh, Some(parent), limits)?,
+        )
+    };
     let key = list.next_key()?;
     let next = key.checked_add(1).ok_or(invalid("style key overflow"))?;
     let mut list_data =
@@ -1622,11 +1934,50 @@ pub fn plan_set_many(
     requests: &[Request],
     limits: &Limits,
 ) -> Result<Option<Plan>, Error> {
+    plan_set_many_inner(source, requests, limits, true)
+}
+
+/// Compatibility-preserving leaf batch planning path used only when the
+/// prepared shared profile refuses a graph shape.  It remains leaf-owned and
+/// typed; it never delegates to the host route.
+pub fn plan_set_many_unprepared(
+    source: &dyn TableSource,
+    requests: &[Request],
+    limits: &Limits,
+) -> Result<Option<Plan>, Error> {
+    plan_set_many_inner(source, requests, limits, false)
+}
+
+fn plan_set_many_inner(
+    source: &dyn TableSource,
+    requests: &[Request],
+    limits: &Limits,
+    prepare_batch: bool,
+) -> Result<Option<Plan>, Error> {
     limits.charge_work(requests.len())?;
     limits.admit_allocations(requests.len())?;
+    let batch_context = if prepare_batch {
+        if let Some(first) = requests.first() {
+            if requests
+                .iter()
+                .all(|request| request.target.model_identifier == first.target.model_identifier)
+            {
+                let mut targets = Vec::new();
+                limits.reserve(&mut targets, requests.len())?;
+                targets.extend(requests.iter().map(|request| request.target));
+                Some(prepare_batch_context(source, &targets, limits, true)?)
+            } else {
+                None
+            }
+        } else {
+            None
+        }
+    } else {
+        None
+    };
     let mut plans = Vec::new();
     limits.reserve(&mut plans, requests.len())?;
-    for request in requests {
+    for (index, request) in requests.iter().enumerate() {
         // A batch has one publication order for all cells.  Keep the
         // exclusive in-place path single-cell-only; the Numbers facade
         // supplies fresh identifiers for these requests before re-planning.
@@ -1637,6 +1988,7 @@ pub fn plan_set_many(
             request.fresh,
             limits,
             false,
+            batch_context.as_ref().map(|context| (context, index)),
         )?
         else {
             continue;
@@ -1654,6 +2006,8 @@ pub fn plan_set_many(
     limits.reserve(&mut list_entries, requests.len())?;
     let mut list_identifier = None;
     let mut list_type = None;
+    let mut stylesheet_identifier = None;
+    let mut stylesheet_type = None;
     limits.admit_allocations(requests.len().saturating_mul(2))?;
     let mut release_counts: BTreeMap<u64, BTreeMap<u32, u32>> = BTreeMap::new();
     for mut plan in plans {
@@ -1694,6 +2048,15 @@ pub fn plan_set_many(
                 .or_default() += 1;
         }
         for rewrite in plan.rewrites {
+            if prepare_batch && rewrite.message_type == STYLESHEET_MESSAGE_TYPE {
+                if stylesheet_identifier.is_some_and(|identifier| identifier != rewrite.identifier)
+                {
+                    return Err(Error::BatchUnsupported);
+                }
+                stylesheet_identifier = Some(rewrite.identifier);
+                stylesheet_type = Some(rewrite.message_type);
+                continue;
+            }
             if rewrite.message_type == LIST_MESSAGE_TYPE {
                 list_identifier.get_or_insert(rewrite.identifier);
                 list_type.get_or_insert(rewrite.message_type);
@@ -1713,35 +2076,83 @@ pub fn plan_set_many(
                 list_entries.push(limits.copy(entry)?);
                 continue;
             }
-            if let Some(existing) = combined.rewrites.iter_mut().find(|candidate| {
+            if !prepare_batch {
+                if let Some(existing) = combined.rewrites.iter_mut().find(|candidate| {
+                    candidate.identifier == rewrite.identifier
+                        && candidate.message_type == rewrite.message_type
+                }) {
+                    if rewrite.message_type == STYLESHEET_MESSAGE_TYPE {
+                        let insertion = combined
+                            .insertions
+                            .last()
+                            .ok_or(invalid("batch stylesheet insertion missing"))?;
+                        existing.data = encode_stylesheet_variation(
+                            &existing.data,
+                            insertion.identifier,
+                            insertion.object_references.first().copied(),
+                            limits,
+                        )?;
+                        limits.reserve(&mut existing.add_references, 1)?;
+                        existing.add_references.push(insertion.identifier);
+                    } else {
+                        return Err(Error::BatchUnsupported);
+                    }
+                } else {
+                    limits.reserve(&mut combined.rewrites, 1)?;
+                    combined.rewrites.push(rewrite);
+                }
+                continue;
+            }
+            if combined.rewrites.iter().any(|candidate| {
                 candidate.identifier == rewrite.identifier
                     && candidate.message_type == rewrite.message_type
             }) {
-                if rewrite.message_type == STYLESHEET_MESSAGE_TYPE {
-                    let insertion = combined
-                        .insertions
-                        .last()
-                        .ok_or(invalid("batch stylesheet insertion missing"))?;
-                    existing.data = encode_stylesheet_variation(
-                        &existing.data,
-                        insertion.identifier,
-                        insertion.object_references.first().copied(),
-                        limits,
-                    )?;
-                    limits.reserve(&mut existing.add_references, 1)?;
-                    existing.add_references.push(insertion.identifier);
-                } else {
-                    return Err(Error::BatchUnsupported);
-                }
+                return Err(Error::BatchUnsupported);
             } else {
                 limits.reserve(&mut combined.rewrites, 1)?;
                 combined.rewrites.push(rewrite);
             }
         }
     }
+    if let Some(stylesheet_identifier) = stylesheet_identifier {
+        let (_, stylesheet_data) = unique_payload(
+            source,
+            stylesheet_identifier,
+            &[STYLESHEET_MESSAGE_TYPE],
+            limits,
+        )?;
+        let mut styles = Vec::new();
+        limits.reserve(&mut styles, combined.insertions.len())?;
+        for insertion in &combined.insertions {
+            let parent = insertion
+                .object_references
+                .first()
+                .copied()
+                .ok_or(invalid("batch stylesheet parent missing"))?;
+            styles.push((insertion.identifier, parent));
+        }
+        let data = encode_stylesheet_batch(stylesheet_data, &styles, limits)?;
+        let mut add_references = Vec::new();
+        limits.reserve(&mut add_references, styles.len())?;
+        add_references.extend(styles.iter().map(|(identifier, _)| *identifier));
+        limits.reserve(&mut combined.rewrites, 1)?;
+        combined.rewrites.push(Rewrite {
+            identifier: stylesheet_identifier,
+            message_type: stylesheet_type.unwrap_or(STYLESHEET_MESSAGE_TYPE),
+            data,
+            add_references,
+            remove_references: Vec::new(),
+        });
+    }
     if let Some(list_identifier) = list_identifier {
-        let table = Table::read(source, requests[0].target, limits)?;
-        let list = StyleList::read(source, table.style_list, limits)?;
+        let owned_list;
+        let list = if let Some(context) = batch_context.as_ref() {
+            &context.style_list
+        } else {
+            let table = Table::read(source, requests[0].target, limits)?;
+            owned_list = StyleList::read(source, table.style_list, limits)?;
+            &owned_list
+        };
         if list.root != list_identifier {
             return Err(invalid("batch style-list owner changed"));
         }
@@ -1758,9 +2169,7 @@ pub fn plan_set_many(
             next = next.max(candidate);
         }
         root_data = patch_varint_bounded(&root_data, 2, true, Some(u64::from(next)), limits)?;
-        for entry in &list_entries {
-            append_field_bounded(&mut root_data, 3, entry, limits)?;
-        }
+        append_repeated_fields_bounded(&mut root_data, 3, &list_entries, limits)?;
         let mut add_references = Vec::new();
         limits.reserve(&mut add_references, combined.insertions.len())?;
         add_references.extend(combined.insertions.iter().map(|object| object.identifier));
@@ -1920,6 +2329,26 @@ fn append_field_bounded(
     let _wire =
         limits.prepare_output(data.len().saturating_add(bytes_bound(field, payload.len())))?;
     append_field_prepared(data, field, payload, limits)
+}
+
+fn append_repeated_fields_bounded(
+    data: &mut Vec<u8>,
+    field: u32,
+    payloads: &[Vec<u8>],
+    limits: &Limits,
+) -> Result<(), Error> {
+    let additional = payloads.iter().fold(0_usize, |total, payload| {
+        total.saturating_add(bytes_bound(field, payload.len()))
+    });
+    let _wire = limits.prepare_output(data.len().saturating_add(additional))?;
+    limits.charge_fields(payloads.len())?;
+    limits.charge_work(payloads.len())?;
+    data.try_reserve(additional)
+        .map_err(|_| Error::Allocation { amount: additional })?;
+    for payload in payloads {
+        append_raw_field(data, field, 2, payload);
+    }
+    Ok(())
 }
 
 fn rewrite_repeated_bounded(
@@ -2110,6 +2539,131 @@ fn encode_stylesheet_variation(
     let wire = limits.prepare_output(data.len().saturating_add(64))?;
     preflight_stylesheet_writer(data, parent, limits)?;
     litchi_iwa_text_wire::stylesheet_with_style(data, style, parent, wire).map_err(map_char_style)
+}
+
+fn encode_stylesheet_batch(
+    data: &[u8],
+    styles: &[(u64, u64)],
+    limits: &Limits,
+) -> Result<Vec<u8>, Error> {
+    let Some((_, parent)) = styles.first().copied() else {
+        return Err(invalid("empty stylesheet batch"));
+    };
+    if styles.iter().any(|(_, candidate)| *candidate != parent) {
+        return Err(Error::BatchUnsupported);
+    }
+    let fields = view(data, limits)?;
+    let mut last_style = None;
+    let mut parent_entry = None;
+    for (index, field) in fields.fields().enumerate() {
+        if field.number() == 1 {
+            last_style = Some(index);
+        }
+        if field.number() != 5 || parent_entry.is_some() {
+            continue;
+        }
+        let nested = view(field.payload(), limits)?;
+        let candidate = nested
+            .fields()
+            .find(|inner| inner.number() == 1)
+            .map(|inner| varint(inner.payload(), 1, limits))
+            .transpose()?
+            .flatten();
+        if candidate == Some(parent) {
+            parent_entry = Some((index, field.payload().len()));
+        }
+    }
+
+    let mut added_children = Vec::new();
+    limits.admit_allocations(1)?;
+    added_children
+        .try_reserve(styles.len().saturating_mul(16))
+        .map_err(|_| Error::Allocation {
+            amount: styles.len().saturating_mul(16),
+        })?;
+    for (style, _) in styles {
+        let mut reference = Vec::new();
+        reference
+            .try_reserve(16)
+            .map_err(|_| Error::Allocation { amount: 16 })?;
+        let mut encoded = [0_u8; 10];
+        let value = litchi_iwa_common::varint::encode_varint_to_buffer(*style, &mut encoded);
+        append_raw_field(&mut reference, 1, 0, value);
+        append_raw_field(&mut added_children, 2, 2, &reference);
+    }
+    let added_styles = styles
+        .iter()
+        .map(|(style, _)| {
+            let mut reference = Vec::new();
+            let mut encoded = [0_u8; 10];
+            let value = litchi_iwa_common::varint::encode_varint_to_buffer(*style, &mut encoded);
+            append_raw_field(&mut reference, 1, 0, value);
+            reference
+        })
+        .collect::<Vec<_>>();
+    let style_bytes = added_styles
+        .iter()
+        .map(|reference| bytes_bound(1, reference.len()))
+        .sum::<usize>();
+    let parent_delta = if let Some((index, payload_len)) = parent_entry {
+        let field = fields
+            .get(index)
+            .ok_or(invalid("stylesheet field missing"))?;
+        bytes_bound(5, payload_len.saturating_add(added_children.len()))
+            .saturating_sub(field.raw().len())
+    } else {
+        let mut parent_reference = Vec::new();
+        let mut encoded = [0_u8; 10];
+        let value = litchi_iwa_common::varint::encode_varint_to_buffer(parent, &mut encoded);
+        append_raw_field(&mut parent_reference, 1, 0, value);
+        bytes_bound(
+            5,
+            parent_reference.len().saturating_add(added_children.len()),
+        )
+    };
+    let output_len = data
+        .len()
+        .saturating_add(style_bytes)
+        .saturating_add(parent_delta);
+    let _wire = limits.prepare_output(output_len)?;
+    limits.charge_fields(styles.len().saturating_mul(2))?;
+    limits.charge_work(styles.len().saturating_mul(2))?;
+    let mut output = Vec::new();
+    output
+        .try_reserve_exact(output_len)
+        .map_err(|_| Error::Allocation { amount: output_len })?;
+    for (index, field) in fields.fields().enumerate() {
+        if let Some((selected, _)) = parent_entry {
+            if selected == index {
+                let mut payload = field.payload().to_vec();
+                payload.extend_from_slice(&added_children);
+                append_raw_field(&mut output, 5, 2, &payload);
+            } else {
+                output.extend_from_slice(field.raw());
+            }
+        } else {
+            output.extend_from_slice(field.raw());
+        }
+        if Some(index) == last_style {
+            for reference in &added_styles {
+                append_raw_field(&mut output, 1, 2, reference);
+            }
+        }
+    }
+    if last_style.is_none() {
+        for reference in &added_styles {
+            append_raw_field(&mut output, 1, 2, reference);
+        }
+    }
+    if parent_entry.is_none() {
+        let mut parent_reference = Vec::new();
+        let mut encoded = [0_u8; 10];
+        let value = litchi_iwa_common::varint::encode_varint_to_buffer(parent, &mut encoded);
+        append_raw_field(&mut parent_reference, 1, 0, value);
+        parent_reference.extend_from_slice(&added_children);
+        append_raw_field(&mut output, 5, 2, &parent_reference);
+    }
+    Ok(output)
 }
 
 fn with_paragraph_properties(mut data: Vec<u8>, limits: &Limits) -> Result<Vec<u8>, Error> {

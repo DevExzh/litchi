@@ -258,8 +258,24 @@ impl Edit<'_> {
             return Err(Error::Refused(Refusal::NoStagedOperation));
         }
         let published = publish(self.source, self.sheet, self.table, &self.cells)?;
-        for (position, properties) in &self.cells {
-            let effective = text_style(&published.package, self.sheet, self.table, *position)?;
+        let effective_values = if self.cells.len() == 1 {
+            vec![text_style(
+                &published.package,
+                self.sheet,
+                self.table,
+                self.cells[0].0,
+            )?]
+        } else {
+            let mut positions = Vec::new();
+            positions
+                .try_reserve(self.cells.len())
+                .map_err(|_| Error::Allocation {
+                    amount: self.cells.len(),
+                })?;
+            positions.extend(self.cells.iter().map(|(position, _)| *position));
+            text_style_many(&published.package, self.sheet, self.table, &positions)?
+        };
+        for ((_, properties), effective) in self.cells.iter().zip(effective_values) {
             let mut expected = properties.clone();
             expected.inherit(&effective);
             if with_flags_off(expected.clone()) != with_flags_off(effective.clone()) {
@@ -430,6 +446,29 @@ fn text_style(
     .map_err(from_shared)
 }
 
+fn text_style_many(
+    package: &Package,
+    sheet: usize,
+    table: usize,
+    positions: &[At],
+) -> Result<Vec<CharacterProperties>, Error> {
+    let limits = shared::Limits::from_source(package).map_err(from_shared)?;
+    let working = Working::new(package)?;
+    let target = topology::locate(&working, sheet, table).map_err(from_topology)?;
+    let mut targets = Vec::new();
+    targets
+        .try_reserve(positions.len())
+        .map_err(|_| Error::Allocation {
+            amount: positions.len(),
+        })?;
+    targets.extend(positions.iter().map(|position| shared::Target {
+        model_identifier: target.model,
+        row: position.row(),
+        column: position.column(),
+    }));
+    shared::read_many(package, &targets, &limits).map_err(from_shared)
+}
+
 fn from_shared(error: shared::Error) -> Error {
     match error {
         shared::Error::InvalidSource(_) => Error::InvalidSource,
@@ -509,19 +548,13 @@ fn publish(
             row: position.row(),
             column: position.column(),
         };
-        let fresh = match shared::plan_set(source, shared_target, properties, None, &limits) {
-            Ok(None) => None,
-            Ok(Some(plan)) if plan.insertions.is_empty() => {
-                limits.admit_allocations(1).map_err(from_shared)?;
-                Some(*working.allocate(1)?.first().ok_or(Error::InvalidSource)?)
-            },
-            Ok(Some(_)) => None,
-            Err(shared::Error::NeedsIdentifier) => {
-                limits.admit_allocations(1).map_err(from_shared)?;
-                Some(*working.allocate(1)?.first().ok_or(Error::InvalidSource)?)
-            },
-            Err(error) => return Err(from_shared(error)),
-        };
+        // The shared batch planner prepares the immutable table/tile/style
+        // graph once.  Reserve one bounded candidate identifier per staged
+        // cell up front; no candidate is published when that request is a
+        // semantic no-op, and the planner remains the authority for whether
+        // the identifier is consumed by a variation.
+        limits.admit_allocations(1).map_err(from_shared)?;
+        let fresh = Some(*working.allocate(1)?.first().ok_or(Error::InvalidSource)?);
         requests.push(shared::Request {
             target: shared_target,
             properties: properties.clone(),
@@ -530,8 +563,61 @@ fn publish(
     }
     let plan = match shared::plan_set_many(source, &requests, &limits) {
         Ok(plan) => plan,
-        Err(shared::Error::BatchUnsupported) => {
-            return Err(from_shared(shared::Error::BatchUnsupported));
+        Err(error)
+            if matches!(
+                &error,
+                shared::Error::BatchUnsupported
+                    | shared::Error::Refused(
+                        shared::Refusal::UnsupportedDependency
+                            | shared::Refusal::UnsupportedStyleList
+                    )
+            ) =>
+        {
+            let fallback_limits = shared::Limits::from_source(source).map_err(from_shared)?;
+            let mut fallback_requests = Vec::new();
+            fallback_requests
+                .try_reserve(cells.len())
+                .map_err(|_| Error::Allocation {
+                    amount: cells.len(),
+                })?;
+            for (position, properties) in cells {
+                fallback_limits
+                    .admit_character_properties(properties)
+                    .map_err(from_shared)?;
+                let shared_target = shared::Target {
+                    model_identifier: target.model,
+                    row: position.row(),
+                    column: position.column(),
+                };
+                let fresh = match shared::plan_set(
+                    source,
+                    shared_target,
+                    properties,
+                    None,
+                    &fallback_limits,
+                ) {
+                    Ok(None) => None,
+                    Ok(Some(plan)) if plan.insertions.is_empty() => {
+                        fallback_limits.admit_allocations(1).map_err(from_shared)?;
+                        Some(*working.allocate(1)?.first().ok_or(Error::InvalidSource)?)
+                    },
+                    Ok(Some(_)) => None,
+                    Err(shared::Error::NeedsIdentifier) => {
+                        fallback_limits.admit_allocations(1).map_err(from_shared)?;
+                        Some(*working.allocate(1)?.first().ok_or(Error::InvalidSource)?)
+                    },
+                    Err(error) => return Err(from_shared(error)),
+                };
+                fallback_requests.push(shared::Request {
+                    target: shared_target,
+                    properties: properties.clone(),
+                    fresh,
+                });
+            }
+            let fallback_plan =
+                shared::plan_set_many_unprepared(source, &fallback_requests, &fallback_limits)
+                    .map_err(from_shared)?;
+            fallback_plan
         },
         Err(error) => return Err(from_shared(error)),
     };
@@ -627,10 +713,138 @@ fn apply_shared_plan(
             },
         }
     }
-    for (target, key) in &plan.cell_updates {
-        write_shared_key(working, *target, *key)?;
+    if plan.cell_updates.len() > 1 && !write_shared_keys(working, &plan.cell_updates)? {
+        for (target, key) in &plan.cell_updates {
+            write_shared_key(working, *target, *key)?;
+        }
+    } else if plan.cell_updates.len() == 1 {
+        let (target, key) = plan.cell_updates[0];
+        write_shared_key(working, target, key)?;
     }
     Ok(())
+}
+
+/// Apply one prepared batch of existing-cell key changes with one immutable
+/// tile/row index per touched tile.  `false` is a preflight refusal (for
+/// example an empty slot); callers then use the existing materializing path
+/// before any batch mutation has occurred.
+fn write_shared_keys(
+    working: &mut Working<'_>,
+    updates: &[(shared::Target, u32)],
+) -> Result<bool, Error> {
+    let Some((first_target, _)) = updates.first().copied() else {
+        return Ok(true);
+    };
+    if updates
+        .iter()
+        .any(|(target, _)| target.model_identifier != first_target.model_identifier)
+    {
+        return Ok(false);
+    }
+    let (_, model) = topology::message(working, first_target.model_identifier, &[6_001])?;
+    let store = single_bytes(model, 4)?
+        .ok_or(Error::InvalidSource)?
+        .to_vec();
+    let (tiles, tile_size) = topology::tiles(&store).map_err(from_topology)?;
+    if tile_size == 0 {
+        return Err(Error::InvalidSource);
+    }
+
+    // Group by the native tile object and local row.  The vectors are bounded
+    // by the already staged update count, and all updates are preflighted
+    // before any tile is replaced.
+    let mut groups: Vec<(u64, Vec<(u32, u32, u32)>)> = Vec::new();
+    for (target, key) in updates {
+        let tile_key = u64::from(target.row) / tile_size;
+        let local =
+            u32::try_from(u64::from(target.row) % tile_size).map_err(|_| Error::InvalidSource)?;
+        let Some((_, tile)) = tiles
+            .iter()
+            .find(|(candidate, _)| u64::from(*candidate) == tile_key)
+        else {
+            return Ok(false);
+        };
+        if let Some((_, rows)) = groups
+            .iter_mut()
+            .find(|(identifier, _)| *identifier == *tile)
+        {
+            rows.try_reserve(1)
+                .map_err(|_| Error::Allocation { amount: 1 })?;
+            rows.push((local, target.column, *key));
+        } else {
+            let mut rows = Vec::new();
+            rows.try_reserve(1)
+                .map_err(|_| Error::Allocation { amount: 1 })?;
+            rows.push((local, target.column, *key));
+            groups
+                .try_reserve(1)
+                .map_err(|_| Error::Allocation { amount: 1 })?;
+            groups.push((*tile, rows));
+        }
+    }
+
+    for (tile, rows) in &groups {
+        let (_, tile_data) = topology::message(working, *tile, &[TILE_MESSAGE_TYPE])?;
+        let mut found_rows = std::collections::BTreeSet::new();
+        for row in repeated_bytes(tile_data, 5)? {
+            let local = single_varint(row, 1)?.ok_or(Error::InvalidSource)? as u32;
+            if rows.iter().any(|(wanted, _, _)| *wanted == local) {
+                found_rows.insert(local);
+            }
+            for (wanted_row, column, _) in rows.iter().filter(|(wanted, _, _)| *wanted == local) {
+                let _ = wanted_row;
+                if storage::bnc_cells(row)
+                    .map_err(|_| Error::InvalidSource)?
+                    .into_iter()
+                    .all(|(candidate, _)| candidate != *column)
+                {
+                    return Ok(false);
+                }
+            }
+        }
+        if rows
+            .iter()
+            .any(|(wanted, _, _)| !found_rows.contains(wanted))
+        {
+            return Ok(false);
+        }
+    }
+
+    for (tile, rows) in groups {
+        let (tile_index, tile_data) = topology::message(working, tile, &[TILE_MESSAGE_TYPE])?;
+        let rewritten = rebuild(tile_data, |field| {
+            if field.number != 5 {
+                return Ok(None);
+            }
+            let local = single_varint(field.payload, 1)
+                .map_err(|_| Fault::Invalid)?
+                .ok_or(Fault::Invalid)? as u32;
+            if !rows.iter().any(|(wanted, _, _)| *wanted == local) {
+                return Ok(None);
+            }
+            let mut row = field.payload.to_vec();
+            for (_, column, key) in rows.iter().filter(|(wanted, _, _)| *wanted == local) {
+                let cell = storage::bnc_cells(&row)
+                    .map_err(|_| Fault::Invalid)?
+                    .into_iter()
+                    .find(|(candidate, _)| *candidate == *column)
+                    .map(|(_, bytes)| bytes)
+                    .ok_or(Fault::Invalid)?;
+                let limits = crate::cell::wire::limits_for_source(cell);
+                let mut decoded = litchi_numbers_wire::BncCell::parse(cell, &limits)
+                    .map_err(|_| Fault::Invalid)?;
+                decoded.set_text_style_identifier(Some(*key));
+                let encoded =
+                    crate::cell::wire::encode(&decoded, &limits).map_err(|_| Fault::Invalid)?;
+                row = storage::replace_cell(&row, *column, &encoded)
+                    .map_err(|_| Fault::Invalid)?
+                    .ok_or(Fault::Invalid)?;
+            }
+            bytes_field(5, &row).map(Some)
+        })?;
+        replace_message(working, tile, tile_index, rewritten)?;
+    }
+    Ok(true)
 }
 
 fn write_shared_key(

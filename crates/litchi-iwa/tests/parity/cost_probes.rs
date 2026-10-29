@@ -17,7 +17,14 @@
 use std::hint::black_box;
 
 use litchi_iwa::numbers;
+use litchi_iwa_archive::iwa::{Archive, ArchiveObject, RawMessage, SnappyStream};
+use litchi_iwa_archive::{
+    Limits as ArchiveLimits,
+    package::{Catalog, EntryEdit},
+};
+use litchi_iwa_protos::{tn, tsp, tss, tst, tswp};
 use litchi_numbers::table::topology::{ColumnInsertion, RowInsertion};
+use prost::Message as _;
 
 use crate::harness::{TestResult, fixture};
 use crate::leaf_bytes;
@@ -133,6 +140,893 @@ fn numbers_text_style_cost_abba() -> TestResult {
         black_box(host_text_style(&input.bytes, cells)?);
     }
     Ok(())
+}
+
+fn whole_cell_style_properties(
+    size: f32,
+    bold: bool,
+    italic: bool,
+) -> litchi_numbers::cell::text_style::CharacterProperties {
+    let mut properties = litchi_numbers::cell::text_style::CharacterProperties::new();
+    properties.size = Some(size);
+    properties.bold = Some(bold);
+    properties.italic = Some(italic);
+    properties
+}
+
+#[inline(never)]
+fn host_whole_cell_style_single(source: &[u8]) -> TestResult<Vec<u8>> {
+    let mut editor = numbers::Draft::from_bytes(source)?;
+    let model = crate::numbers_cases::host_first_table_model_id(&editor)?;
+    let style =
+        litchi_iwa::text::TextStyle::new(litchi_iwa::text::TextPointSize::from_points(18.0)?)
+            .with_bold(true);
+    editor.set_table_cell_text_style(model, 1, 1, style)?;
+    Ok(editor.to_bytes()?)
+}
+
+#[inline(never)]
+fn leaf_whole_cell_style_single(source: &[u8]) -> TestResult<Vec<u8>> {
+    let package = litchi_numbers::Package::from_bytes(source)?;
+    let properties = whole_cell_style_properties(18.0, true, false);
+    let commit = package
+        .edit_table_cell_text_style(0usize, 0usize)?
+        .set(litchi_numbers::table::At::new(1, 1), properties)?
+        .commit()?;
+    Ok(leaf_bytes!(commit.package()))
+}
+
+#[inline(never)]
+fn host_whole_cell_style_exclusive_repeat(source: &[u8]) -> TestResult<Vec<u8>> {
+    let mut editor = numbers::Draft::from_bytes(source)?;
+    let model = crate::numbers_cases::host_first_table_model_id(&editor)?;
+    let style =
+        litchi_iwa::text::TextStyle::new(litchi_iwa::text::TextPointSize::from_points(21.0)?)
+            .with_italic(true);
+    editor.set_table_cell_text_style(model, 1, 1, style)?;
+    Ok(editor.to_bytes()?)
+}
+
+#[inline(never)]
+fn leaf_whole_cell_style_exclusive_repeat(source: &[u8]) -> TestResult<Vec<u8>> {
+    let package = litchi_numbers::Package::from_bytes(source)?;
+    let properties = whole_cell_style_properties(21.0, false, true);
+    let commit = package
+        .edit_table_cell_text_style(0usize, 0usize)?
+        .set(litchi_numbers::table::At::new(1, 1), properties)?
+        .commit()?;
+    Ok(leaf_bytes!(commit.package()))
+}
+
+#[inline(never)]
+fn host_whole_cell_style_batch_1000(source: &[u8], cells: &[(u32, u32)]) -> TestResult<Vec<u8>> {
+    let mut editor = numbers::Draft::from_bytes(source)?;
+    let model = crate::numbers_cases::host_first_table_model_id(&editor)?;
+    let style =
+        litchi_iwa::text::TextStyle::new(litchi_iwa::text::TextPointSize::from_points(19.0)?)
+            .with_bold(true);
+    for &(row, column) in cells {
+        editor.set_table_cell_text_style(model, row as usize, column as usize, style)?;
+    }
+    Ok(editor.to_bytes()?)
+}
+
+#[inline(never)]
+fn leaf_whole_cell_style_batch_1000(source: &[u8], cells: &[(u32, u32)]) -> TestResult<Vec<u8>> {
+    let package = litchi_numbers::Package::from_bytes(source)?;
+    let properties = whole_cell_style_properties(19.0, true, false);
+    let mut edit = package.edit_table_cell_text_style(0usize, 0usize)?;
+    for &(row, column) in cells {
+        edit = edit.set(
+            litchi_numbers::table::At::new(row, column),
+            properties.clone(),
+        )?;
+    }
+    Ok(leaf_bytes!(edit.commit()?.package()))
+}
+
+fn assert_whole_cell_style_output(
+    _source: &[u8],
+    output: &[u8],
+    cells: &[(u32, u32)],
+    size: f32,
+    bold: bool,
+    italic: bool,
+) -> TestResult {
+    let package = litchi_numbers::Package::from_bytes(output)?;
+    let reopened = litchi_numbers::Package::from_bytes(output)?;
+    for &(row, column) in cells {
+        for candidate in [&package, &reopened] {
+            let properties = candidate.table_cell_text_style(
+                0usize,
+                0usize,
+                litchi_numbers::table::At::new(row, column),
+            )?;
+            assert_eq!(properties.size, Some(size));
+            if bold {
+                assert_eq!(properties.bold, Some(true));
+            }
+            if italic {
+                assert_eq!(properties.italic, Some(true));
+            }
+        }
+    }
+    Ok(())
+}
+
+fn leaf_whole_cell_style_inverse(
+    source: &[u8],
+    cells: &[(u32, u32)],
+    properties: litchi_numbers::cell::text_style::CharacterProperties,
+) -> TestResult<Vec<u8>> {
+    let package = litchi_numbers::Package::from_bytes(source)?;
+    let mut edit = package.edit_table_cell_text_style(0usize, 0usize)?;
+    for &(row, column) in cells {
+        edit = edit.set(
+            litchi_numbers::table::At::new(row, column),
+            properties.clone(),
+        )?;
+    }
+    let commit = edit.commit()?;
+    let output = leaf_bytes!(commit.package());
+    let restored = commit
+        .package()
+        .apply_table_cell_text_style(&commit.patch().inverse())?;
+    assert_eq!(leaf_bytes!(restored.package()), source);
+    Ok(output)
+}
+
+/// Current-source single whole-cell CharacterProperties cost route.
+#[test]
+#[ignore = "callgrind cost probe; run explicitly after coordinator acceptance"]
+fn numbers_whole_cell_style_single_cost_abba() -> TestResult {
+    let input = fixture("iwork/numbers/basic.numbers")?;
+    let cells = [(1, 1)];
+    let host_setup = host_whole_cell_style_single(&input.bytes)?;
+    let leaf_setup = leaf_whole_cell_style_single(&input.bytes)?;
+    assert_whole_cell_style_output(&input.bytes, &host_setup, &cells, 18.0, true, false)?;
+    assert_whole_cell_style_output(&input.bytes, &leaf_setup, &cells, 18.0, true, false)?;
+    let _ = leaf_whole_cell_style_inverse(
+        &input.bytes,
+        &cells,
+        whole_cell_style_properties(18.0, true, false),
+    )?;
+    black_box(host_whole_cell_style_single(&input.bytes)?);
+    black_box(leaf_whole_cell_style_single(&input.bytes)?);
+    black_box(leaf_whole_cell_style_single(&input.bytes)?);
+    black_box(host_whole_cell_style_single(&input.bytes)?);
+    Ok(())
+}
+
+/// Current-source repeated exclusive single-cell CharacterProperties route.
+#[test]
+#[ignore = "callgrind cost probe; run explicitly after coordinator acceptance"]
+fn numbers_whole_cell_style_exclusive_repeat_cost_abba() -> TestResult {
+    let input = fixture("iwork/numbers/basic.numbers")?;
+    let cells = [(1, 1)];
+    let seeded = host_whole_cell_style_single(&input.bytes)?;
+    let host_setup = host_whole_cell_style_exclusive_repeat(&seeded)?;
+    let leaf_setup = leaf_whole_cell_style_exclusive_repeat(&seeded)?;
+    assert_whole_cell_style_output(&seeded, &host_setup, &cells, 21.0, false, true)?;
+    assert_whole_cell_style_output(&seeded, &leaf_setup, &cells, 21.0, false, true)?;
+    let _ = leaf_whole_cell_style_inverse(
+        &seeded,
+        &cells,
+        whole_cell_style_properties(21.0, false, true),
+    )?;
+    black_box(host_whole_cell_style_exclusive_repeat(&seeded)?);
+    black_box(leaf_whole_cell_style_exclusive_repeat(&seeded)?);
+    black_box(leaf_whole_cell_style_exclusive_repeat(&seeded)?);
+    black_box(host_whole_cell_style_exclusive_repeat(&seeded)?);
+    Ok(())
+}
+
+/// Current-source 1000-cell shared-key whole-cell CharacterProperties route.
+#[test]
+#[ignore = "callgrind cost probe; run explicitly after coordinator acceptance"]
+fn numbers_whole_cell_style_batch_1000_cost_abba() -> TestResult {
+    let fixture = shared_1000_cell_style_fixture()?;
+    assert_eq!(fixture.cells.len(), 1_000);
+    let host_setup = host_whole_cell_style_batch_1000(&fixture.bytes, &fixture.cells)?;
+    let leaf_setup = leaf_whole_cell_style_batch_1000(&fixture.bytes, &fixture.cells)?;
+    assert_whole_cell_style_output(
+        &fixture.bytes,
+        &host_setup,
+        &fixture.cells,
+        19.0,
+        true,
+        false,
+    )?;
+    assert_whole_cell_style_output(
+        &fixture.bytes,
+        &leaf_setup,
+        &fixture.cells,
+        19.0,
+        true,
+        false,
+    )?;
+    let _ = leaf_whole_cell_style_inverse(
+        &fixture.bytes,
+        &fixture.cells,
+        whole_cell_style_properties(19.0, true, false),
+    )?;
+    black_box(host_whole_cell_style_batch_1000(
+        &fixture.bytes,
+        &fixture.cells,
+    )?);
+    black_box(leaf_whole_cell_style_batch_1000(
+        &fixture.bytes,
+        &fixture.cells,
+    )?);
+    black_box(leaf_whole_cell_style_batch_1000(
+        &fixture.bytes,
+        &fixture.cells,
+    )?);
+    black_box(host_whole_cell_style_batch_1000(
+        &fixture.bytes,
+        &fixture.cells,
+    )?);
+    Ok(())
+}
+
+#[derive(Clone)]
+struct WholeCellFixture {
+    bytes: Vec<u8>,
+    cells: Vec<(u32, u32)>,
+}
+
+#[allow(
+    dead_code,
+    reason = "kept as a bounded source-fixture construction reference"
+)]
+fn whole_cell_reference(identifier: u64) -> tsp::Reference {
+    tsp::Reference {
+        identifier,
+        ..Default::default()
+    }
+}
+
+#[allow(
+    dead_code,
+    reason = "kept as a bounded source-fixture construction reference"
+)]
+fn whole_cell_object(
+    identifier: u64,
+    message_type: u32,
+    data: Vec<u8>,
+) -> TestResult<ArchiveObject> {
+    Ok(ArchiveObject::new(
+        identifier,
+        vec![RawMessage {
+            type_: message_type,
+            data,
+        }],
+        Default::default(),
+    )?)
+}
+
+#[allow(
+    dead_code,
+    reason = "kept as a bounded source-fixture construction reference"
+)]
+fn minimal_1000_cell_style_fixture() -> TestResult<WholeCellFixture> {
+    const DOCUMENT: u64 = 9_000_000_001;
+    const SHEET: u64 = 9_000_000_002;
+    const TABLE_INFO: u64 = 9_000_000_003;
+    const TABLE_MODEL: u64 = 9_000_000_004;
+    const STYLE_LIST: u64 = 9_000_000_005;
+    const TILE: u64 = 9_000_000_006;
+    const STYLE: u64 = 9_000_000_007;
+    const STRING_LIST: u64 = 9_000_000_008;
+    const FORMULA_LIST: u64 = 9_000_000_009;
+    const FORMAT_LIST: u64 = 9_000_000_010;
+    const FORMULA_ERROR_LIST: u64 = 9_000_000_011;
+    const RICH_TEXT_LIST: u64 = 9_000_000_012;
+    const STYLESHEET: u64 = 9_000_000_013;
+    const DOCUMENT_TYPE: u32 = 1;
+    const SHEET_TYPE: u32 = 2;
+    const TABLE_INFO_TYPE: u32 = 6_000;
+    const TABLE_MODEL_TYPE: u32 = 6_001;
+    const TILE_TYPE: u32 = 6_002;
+    const LIST_TYPE: u32 = 6_005;
+    const STYLE_TYPE: u32 = 2_022;
+    const STYLESHEET_TYPE: u32 = 401;
+
+    let shared_key = 1;
+    let mut cell = litchi_numbers_wire::BncCell::minimal();
+    cell.set_text_style_identifier(Some(shared_key));
+    let cell = cell.encode(&litchi_numbers_wire::Limits::DEFAULT)?;
+    let mut rows = Vec::new();
+    for row_index in 0..50_u32 {
+        let mut storage = Vec::new();
+        let mut offsets = vec![u16::MAX.to_le_bytes(); 20]
+            .into_iter()
+            .flatten()
+            .collect::<Vec<_>>();
+        for column in 0..20_usize {
+            let offset = u16::try_from(storage.len())?;
+            offsets[column * 2..column * 2 + 2].copy_from_slice(&offset.to_le_bytes());
+            storage.extend_from_slice(&cell);
+        }
+        rows.push(tst::TileRowInfo {
+            tile_row_index: row_index,
+            cell_count: 20,
+            cell_storage_buffer_pre_bnc: Vec::new(),
+            cell_offsets_pre_bnc: Vec::new(),
+            storage_version: Some(5),
+            cell_storage_buffer: Some(storage),
+            cell_offsets: Some(offsets),
+            has_wide_offsets: Some(false),
+        });
+    }
+    let tile = tst::Tile {
+        max_column: 19,
+        max_row: 49,
+        num_cells: 1_000,
+        numrows: 50,
+        row_infos: rows,
+        storage_version: Some(5),
+        last_saved_in_bnc: Some(true),
+        should_use_wide_rows: Some(false),
+    };
+
+    let style_list = whole_cell_object(
+        STYLE_LIST,
+        LIST_TYPE,
+        tst::TableDataList {
+            list_type: tst::table_data_list::ListType::Style as i32,
+            next_list_id: shared_key + 1,
+            entries: vec![tst::table_data_list::ListEntry {
+                key: shared_key,
+                refcount: 1_000,
+                reference: Some(whole_cell_reference(STYLE)),
+                ..Default::default()
+            }],
+            ..Default::default()
+        }
+        .encode_to_vec(),
+    )?;
+    let empty_list = |identifier, list_type| {
+        whole_cell_object(
+            identifier,
+            LIST_TYPE,
+            tst::TableDataList {
+                list_type: list_type as i32,
+                next_list_id: 1,
+                ..Default::default()
+            }
+            .encode_to_vec(),
+        )
+    };
+    let string_list = empty_list(STRING_LIST, tst::table_data_list::ListType::String)?;
+    let formula_list = empty_list(FORMULA_LIST, tst::table_data_list::ListType::Formula)?;
+    let format_list = empty_list(FORMAT_LIST, tst::table_data_list::ListType::Format)?;
+    let formula_error_list = empty_list(
+        FORMULA_ERROR_LIST,
+        tst::table_data_list::ListType::FormulaError,
+    )?;
+    let rich_text_list = empty_list(
+        RICH_TEXT_LIST,
+        tst::table_data_list::ListType::RichTextPayload,
+    )?;
+    let style = whole_cell_object(
+        STYLE,
+        STYLE_TYPE,
+        tswp::ParagraphStyleArchive {
+            super_: tss::StyleArchive {
+                stylesheet: Some(whole_cell_reference(STYLESHEET)),
+                ..Default::default()
+            },
+            char_properties: Some(tswp::CharacterStylePropertiesArchive::default()),
+            para_properties: Some(tswp::ParagraphStylePropertiesArchive::default()),
+            ..Default::default()
+        }
+        .encode_to_vec(),
+    )?;
+    let stylesheet = whole_cell_object(
+        STYLESHEET,
+        STYLESHEET_TYPE,
+        tss::StylesheetArchive {
+            styles: vec![whole_cell_reference(STYLE)],
+            ..Default::default()
+        }
+        .encode_to_vec(),
+    )?;
+    let model = tst::TableModelArchive {
+        table_id: "whole-cell-style-cost".to_owned(),
+        table_style: whole_cell_reference(STYLE),
+        body_text_style: whole_cell_reference(STYLE),
+        header_row_text_style: whole_cell_reference(STYLE),
+        header_column_text_style: whole_cell_reference(STYLE),
+        footer_row_text_style: whole_cell_reference(STYLE),
+        body_cell_style: whole_cell_reference(STYLE),
+        header_row_style: whole_cell_reference(STYLE),
+        header_column_style: whole_cell_reference(STYLE),
+        footer_row_style: whole_cell_reference(STYLE),
+        base_data_store: tst::DataStore {
+            row_headers: tst::HeaderStorage {
+                bucket_hash_function: 1,
+                ..Default::default()
+            },
+            column_headers: whole_cell_reference(STRING_LIST),
+            tiles: tst::TileStorage {
+                tiles: vec![tst::tile_storage::Tile {
+                    tileid: 0,
+                    tile: whole_cell_reference(TILE),
+                }],
+                tile_size: Some(256),
+                should_use_wide_rows: Some(false),
+            },
+            string_table: whole_cell_reference(STRING_LIST),
+            style_table: whole_cell_reference(STYLE_LIST),
+            formula_table: whole_cell_reference(FORMULA_LIST),
+            formula_error_table: Some(whole_cell_reference(FORMULA_ERROR_LIST)),
+            format_table_pre_bnc: whole_cell_reference(FORMAT_LIST),
+            format_table: Some(whole_cell_reference(FORMAT_LIST)),
+            rich_text_table: Some(whole_cell_reference(RICH_TEXT_LIST)),
+            next_row_strip_id: 1,
+            next_column_strip_id: 1,
+            row_tile_tree: tst::TableRbTree::default(),
+            column_tile_tree: tst::TableRbTree::default(),
+            ..Default::default()
+        },
+        number_of_rows: 50,
+        number_of_columns: 20,
+        table_name: "Whole-cell style cost".to_owned(),
+        default_row_height: 17.0,
+        default_column_width: 60.0,
+        ..Default::default()
+    };
+    let mut document = whole_cell_object(
+        DOCUMENT,
+        DOCUMENT_TYPE,
+        tn::DocumentArchive {
+            sheets: vec![whole_cell_reference(SHEET)],
+            ..Default::default()
+        }
+        .encode_to_vec(),
+    )?;
+    let mut sheet = whole_cell_object(
+        SHEET,
+        SHEET_TYPE,
+        tn::SheetArchive {
+            name: "Whole-cell style sheet".to_owned(),
+            drawable_infos: vec![whole_cell_reference(TABLE_INFO)],
+            ..Default::default()
+        }
+        .encode_to_vec(),
+    )?;
+    let table_info = whole_cell_object(
+        TABLE_INFO,
+        TABLE_INFO_TYPE,
+        tst::TableInfoArchive {
+            table_model: whole_cell_reference(TABLE_MODEL),
+            ..Default::default()
+        }
+        .encode_to_vec(),
+    )?;
+    let model = whole_cell_object(TABLE_MODEL, TABLE_MODEL_TYPE, model.encode_to_vec())?;
+    let tile = whole_cell_object(TILE, TILE_TYPE, tile.encode_to_vec())?;
+    document.archive_info.message_infos[0].object_references = vec![SHEET];
+    sheet.archive_info.message_infos[0].object_references = vec![TABLE_INFO];
+    let archive = Archive {
+        objects: vec![
+            document,
+            sheet,
+            table_info,
+            model,
+            style_list,
+            tile,
+            style,
+            string_list,
+            formula_list,
+            format_list,
+            formula_error_list,
+            rich_text_list,
+            stylesheet,
+        ],
+    };
+    let compressed =
+        SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
+    // Preserve the native registry members needed by Numbers' publication
+    // transition.  The selected table graph above remains source-built and
+    // bounded; these small registry members are not measured table payload.
+    let input = fixture("iwork/numbers/basic.numbers")?;
+    let catalog = Catalog::from_bytes(&input.bytes, ArchiveLimits::default())?;
+    let mut entries = vec![("Index/Document.iwa", compressed.as_slice())];
+    for entry in catalog.iter().filter(|entry| {
+        matches!(
+            entry.name(),
+            "Index/ViewState.iwa"
+                | "Index/CalculationEngine.iwa"
+                | "Index/AnnotationAuthorStorage.iwa"
+                | "Index/DocumentStylesheet.iwa"
+                | "Index/DocumentMetadata.iwa"
+                | "Index/Metadata.iwa"
+        )
+    }) {
+        entries.push((entry.name(), entry.data()));
+    }
+    let bytes = litchi_iwa_archive::package::to_bytes(entries, ArchiveLimits::default())?;
+    Ok(WholeCellFixture {
+        bytes,
+        cells: (0..50)
+            .flat_map(|row| (0..20).map(move |column| (row, column)))
+            .collect(),
+    })
+}
+
+fn shared_1000_cell_style_fixture() -> TestResult<WholeCellFixture> {
+    const TABLE_MODEL: u32 = 6_001;
+    const TILE: u32 = 6_002;
+    const LIST: u32 = 6_005;
+    let input = fixture("iwork/numbers/basic.numbers")?;
+    let catalog = Catalog::from_bytes(&input.bytes, ArchiveLimits::default())?;
+    let mut model_id = None;
+    let mut model_member = None;
+    let mut style_list_id = None;
+    let mut style_id = None;
+    let mut tile_id = None;
+    for entry in catalog
+        .iter()
+        .filter(|entry| entry.name().ends_with(".iwa"))
+    {
+        let bytes = SnappyStream::decompress(entry.data(), Default::default())?;
+        let archive = Archive::parse(bytes.as_bytes(), Default::default())?;
+        for object in &archive.objects {
+            for message in &object.messages {
+                if message.type_ != TABLE_MODEL {
+                    continue;
+                }
+                let model = tst::TableModelArchive::decode(message.data.as_slice())?;
+                model_id = object.archive_info.identifier;
+                model_member = Some(entry.name().to_owned());
+                style_list_id = Some(model.base_data_store.style_table.identifier);
+                style_id = Some(model.body_text_style.identifier);
+                tile_id = model
+                    .base_data_store
+                    .tiles
+                    .tiles
+                    .first()
+                    .map(|tile| tile.tile.identifier);
+            }
+        }
+    }
+    let model_id = model_id.ok_or("missing table model")?;
+    let model_member = model_member.ok_or("missing table model member")?;
+    let style_list_id = style_list_id.ok_or("missing style list")?;
+    let style_id = style_id.ok_or("missing body style")?;
+    let tile_id = tile_id.ok_or("missing tile")?;
+    let style_entry = catalog
+        .iter()
+        .find(|entry| {
+            let Ok(bytes) = SnappyStream::decompress(entry.data(), Default::default()) else {
+                return false;
+            };
+            let Ok(archive) = Archive::parse(bytes.as_bytes(), Default::default()) else {
+                return false;
+            };
+            archive
+                .objects
+                .iter()
+                .any(|object| object.archive_info.identifier == Some(style_list_id))
+        })
+        .ok_or("missing style list member")?;
+    let style_member = style_entry.name().to_owned();
+    let style_bytes = SnappyStream::decompress(style_entry.data(), Default::default())?;
+    let mut style_archive = Archive::parse(style_bytes.as_bytes(), Default::default())?;
+    let style_object = style_archive
+        .objects
+        .iter_mut()
+        .find(|object| object.archive_info.identifier == Some(style_list_id))
+        .ok_or("missing style list object")?;
+    let style_message = style_object
+        .messages
+        .iter_mut()
+        .find(|message| message.type_ == LIST)
+        .ok_or("missing style list payload")?;
+    let mut style_list = tst::TableDataList::decode(style_message.data.as_slice())?;
+    style_list.list_type = tst::table_data_list::ListType::Style as i32;
+    // The generated table below contains no cells that retain the template's
+    // other style keys.  Keep only the one selected entry so each measured
+    // request exercises the shared-key path rather than repeatedly scanning
+    // an unrelated native style corpus.
+    let shared_key = 1;
+    style_list.entries.clear();
+    style_list.segments.clear();
+    style_list.next_list_id = shared_key + 1;
+    style_list.entries.push(tst::table_data_list::ListEntry {
+        key: shared_key,
+        refcount: 1_000,
+        reference: Some(litchi_iwa_protos::tsp::Reference {
+            identifier: style_id,
+            ..Default::default()
+        }),
+        ..Default::default()
+    });
+    style_message.data = style_list.encode_to_vec();
+    if let Some(info) = style_object.archive_info.message_infos.first_mut() {
+        if !info.object_references.contains(&style_id) {
+            info.object_references.push(style_id);
+        }
+    }
+    let style_compressed = SnappyStream::compress(
+        &style_archive.to_bytes(Default::default())?,
+        Default::default(),
+    )?;
+
+    let style_payload_entry = catalog
+        .iter()
+        .find(|entry| {
+            let Ok(bytes) = SnappyStream::decompress(entry.data(), Default::default()) else {
+                return false;
+            };
+            let Ok(archive) = Archive::parse(bytes.as_bytes(), Default::default()) else {
+                return false;
+            };
+            archive.objects.iter().any(|object| {
+                object.archive_info.identifier == Some(style_id)
+                    && object.messages.iter().any(|message| message.type_ == 2_022)
+            })
+        })
+        .ok_or("missing paragraph-style member")?;
+    let style_payload_member = style_payload_entry.name().to_owned();
+    let style_payload_bytes =
+        SnappyStream::decompress(style_payload_entry.data(), Default::default())?;
+    let mut style_payload_archive =
+        Archive::parse(style_payload_bytes.as_bytes(), Default::default())?;
+    let style_payload_object = style_payload_archive
+        .objects
+        .iter_mut()
+        .find(|object| object.archive_info.identifier == Some(style_id))
+        .ok_or("missing paragraph-style object")?;
+    let style_payload_message = style_payload_object
+        .messages
+        .iter_mut()
+        .find(|message| message.type_ == 2_022)
+        .ok_or("missing paragraph-style payload")?;
+    let existing_style =
+        tswp::ParagraphStyleArchive::decode(style_payload_message.data.as_slice())?;
+    let _old_stylesheet = existing_style
+        .super_
+        .stylesheet
+        .ok_or("paragraph style has no stylesheet")?;
+    let stylesheet_id = 9_800_000_001;
+    let stylesheet = litchi_iwa_protos::tsp::Reference {
+        identifier: stylesheet_id,
+        ..Default::default()
+    };
+    style_payload_message.data = tswp::ParagraphStyleArchive {
+        super_: tss::StyleArchive {
+            stylesheet: Some(stylesheet),
+            ..Default::default()
+        },
+        char_properties: Some(tswp::CharacterStylePropertiesArchive::default()),
+        para_properties: Some(tswp::ParagraphStylePropertiesArchive::default()),
+        ..Default::default()
+    }
+    .encode_to_vec();
+    if let Some(info) = style_payload_object.archive_info.message_infos.first_mut() {
+        info.object_references
+            .retain(|reference| *reference != _old_stylesheet.identifier);
+        if !info.object_references.contains(&stylesheet_id) {
+            info.object_references.push(stylesheet_id);
+        }
+    }
+    let _ = style_payload_object;
+    style_payload_archive.objects.push(ArchiveObject::new(
+        stylesheet_id,
+        vec![RawMessage {
+            type_: 401,
+            data: tss::StylesheetArchive {
+                styles: vec![litchi_iwa_protos::tsp::Reference {
+                    identifier: style_id,
+                    ..Default::default()
+                }],
+                ..Default::default()
+            }
+            .encode_to_vec(),
+        }],
+        Default::default(),
+    )?);
+    let style_payload_compressed = SnappyStream::compress(
+        &style_payload_archive.to_bytes(Default::default())?,
+        Default::default(),
+    )?;
+    let stylesheet_member = style_payload_member.clone();
+    let stylesheet_compressed = style_payload_compressed.clone();
+
+    let metadata_entry = catalog
+        .iter()
+        .find(|entry| entry.name() == "Index/Metadata.iwa")
+        .ok_or("missing metadata member")?;
+    let metadata_member = metadata_entry.name().to_owned();
+    let metadata_bytes = SnappyStream::decompress(metadata_entry.data(), Default::default())?;
+    let mut metadata_archive = Archive::parse(metadata_bytes.as_bytes(), Default::default())?;
+    let metadata_message = metadata_archive
+        .objects
+        .iter_mut()
+        .flat_map(|object| object.messages.iter_mut())
+        .find(|message| message.type_ == 11_006)
+        .ok_or("missing metadata payload")?;
+    let mut metadata =
+        litchi_iwa_protos::tsp::PackageMetadata::decode(metadata_message.data.as_slice())?;
+    let revision = metadata.revision.get_or_insert_with(Default::default);
+    revision.identifier = Some("r".repeat(20_000));
+    metadata_message.data = metadata.encode_to_vec();
+    let metadata_compressed = SnappyStream::compress(
+        &metadata_archive.to_bytes(Default::default())?,
+        Default::default(),
+    )?;
+
+    let tile_entry = catalog
+        .iter()
+        .find(|entry| {
+            let Ok(bytes) = SnappyStream::decompress(entry.data(), Default::default()) else {
+                return false;
+            };
+            let Ok(archive) = Archive::parse(bytes.as_bytes(), Default::default()) else {
+                return false;
+            };
+            archive
+                .objects
+                .iter()
+                .any(|object| object.archive_info.identifier == Some(tile_id))
+        })
+        .ok_or("missing tile member")?;
+    let tile_member = tile_entry.name().to_owned();
+    let tile_bytes = SnappyStream::decompress(tile_entry.data(), Default::default())?;
+    let mut tile_archive = Archive::parse(tile_bytes.as_bytes(), Default::default())?;
+    let tile_object = tile_archive
+        .objects
+        .iter_mut()
+        .find(|object| object.archive_info.identifier == Some(tile_id))
+        .ok_or("missing tile object")?;
+    let tile_message = tile_object
+        .messages
+        .iter_mut()
+        .find(|message| message.type_ == TILE)
+        .ok_or("missing tile payload")?;
+    let tile = tst::Tile::decode(tile_message.data.as_slice())?;
+    let mut sample_cell = litchi_numbers_wire::BncCell::minimal();
+    sample_cell.set_text_style_identifier(Some(shared_key));
+    let sample = sample_cell.encode(&litchi_numbers_wire::Limits::DEFAULT)?;
+    let mut rows = Vec::new();
+    for row_index in 0..50_u32 {
+        let mut storage = Vec::new();
+        let mut offsets = vec![u16::MAX.to_le_bytes(); 20]
+            .into_iter()
+            .flatten()
+            .collect::<Vec<_>>();
+        for column in 0..20_usize {
+            let offset = u16::try_from(storage.len())?;
+            offsets[column * 2..column * 2 + 2].copy_from_slice(&offset.to_le_bytes());
+            storage.extend_from_slice(&sample);
+        }
+        rows.push(tst::TileRowInfo {
+            tile_row_index: row_index,
+            cell_count: 20,
+            cell_storage_buffer_pre_bnc: Vec::new(),
+            cell_offsets_pre_bnc: Vec::new(),
+            storage_version: Some(5),
+            cell_storage_buffer: Some(storage),
+            cell_offsets: Some(offsets),
+            has_wide_offsets: Some(false),
+        });
+    }
+    let rewritten_tile = tst::Tile {
+        max_column: 19,
+        max_row: 49,
+        num_cells: 1_000,
+        numrows: 50,
+        row_infos: rows,
+        storage_version: tile.storage_version,
+        last_saved_in_bnc: tile.last_saved_in_bnc,
+        should_use_wide_rows: tile.should_use_wide_rows,
+    };
+    tile_message.data = rewritten_tile.encode_to_vec();
+    let tile_compressed = SnappyStream::compress(
+        &tile_archive.to_bytes(Default::default())?,
+        Default::default(),
+    )?;
+
+    let model_entry = catalog
+        .iter()
+        .find(|entry| entry.name() == model_member)
+        .ok_or("missing model member")?;
+    let model_bytes = SnappyStream::decompress(model_entry.data(), Default::default())?;
+    let mut model_archive = Archive::parse(model_bytes.as_bytes(), Default::default())?;
+    let model_object = model_archive
+        .objects
+        .iter_mut()
+        .find(|object| object.archive_info.identifier == Some(model_id))
+        .ok_or("missing model object")?;
+    let model_message = model_object
+        .messages
+        .iter_mut()
+        .find(|message| message.type_ == TABLE_MODEL)
+        .ok_or("missing model payload")?;
+    let original_model = tst::TableModelArchive::decode(model_message.data.as_slice())?;
+    let original_store = original_model.base_data_store;
+    let style_reference = litchi_iwa_protos::tsp::Reference {
+        identifier: style_id,
+        ..Default::default()
+    };
+    let model = tst::TableModelArchive {
+        table_id: "whole-cell-style-cost".to_owned(),
+        table_style: style_reference,
+        body_text_style: style_reference,
+        header_row_text_style: style_reference,
+        header_column_text_style: style_reference,
+        footer_row_text_style: style_reference,
+        body_cell_style: style_reference,
+        header_row_style: style_reference,
+        header_column_style: style_reference,
+        footer_row_style: style_reference,
+        base_data_store: tst::DataStore {
+            row_headers: original_store.row_headers,
+            column_headers: original_store.column_headers,
+            tiles: tst::TileStorage {
+                tiles: vec![tst::tile_storage::Tile {
+                    tileid: 0,
+                    tile: litchi_iwa_protos::tsp::Reference {
+                        identifier: tile_id,
+                        ..Default::default()
+                    },
+                }],
+                tile_size: Some(256),
+                should_use_wide_rows: Some(false),
+            },
+            string_table: original_store.string_table,
+            style_table: original_store.style_table,
+            formula_table: original_store.formula_table,
+            formula_error_table: original_store.formula_error_table,
+            format_table_pre_bnc: original_store.format_table_pre_bnc,
+            multiple_choice_list_format_table: original_store.multiple_choice_list_format_table,
+            merge_region_map: original_store.merge_region_map,
+            deprecated_custom_format_table: original_store.deprecated_custom_format_table,
+            next_row_strip_id: 1,
+            next_column_strip_id: 1,
+            row_tile_tree: tst::TableRbTree::default(),
+            column_tile_tree: tst::TableRbTree::default(),
+            storage_version_pre_bnc: original_store.storage_version_pre_bnc,
+            rich_text_table: original_store.rich_text_table,
+            conditionalstyletable: original_store.conditionalstyletable,
+            comment_storage_table: original_store.comment_storage_table,
+            import_warning_set_table: original_store.import_warning_set_table,
+            control_cell_spec_table: original_store.control_cell_spec_table,
+            format_table: original_store.format_table,
+        },
+        number_of_rows: 50,
+        number_of_columns: 20,
+        table_name: "Whole-cell style cost".to_owned(),
+        default_row_height: 17.0,
+        default_column_width: 60.0,
+        ..Default::default()
+    };
+    model_message.data = model.encode_to_vec();
+    let model_compressed = SnappyStream::compress(
+        &model_archive.to_bytes(Default::default())?,
+        Default::default(),
+    )?;
+    let mut edits = vec![EntryEdit::new(&style_member, &style_compressed)];
+    if style_payload_member != stylesheet_member {
+        edits.push(EntryEdit::new(
+            &style_payload_member,
+            &style_payload_compressed,
+        ));
+    }
+    edits.push(EntryEdit::new(&stylesheet_member, &stylesheet_compressed));
+    edits.push(EntryEdit::new(&metadata_member, &metadata_compressed));
+    edits.push(EntryEdit::new(&tile_member, &tile_compressed));
+    edits.push(EntryEdit::new(&model_member, &model_compressed));
+    let bytes = catalog.reassemble_to_bytes(&edits, ArchiveLimits::default())?;
+    Ok(WholeCellFixture {
+        bytes,
+        cells: (0..50)
+            .flat_map(|row| (0..20).map(move |column| (row, column)))
+            .collect(),
+    })
 }
 
 #[inline(never)]
