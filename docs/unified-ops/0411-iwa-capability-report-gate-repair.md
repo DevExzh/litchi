@@ -31,9 +31,14 @@ tools/gate/run_gate.sh capability-report-repair 48 52 — pass
   row 52 corpus-dispositions: 0
 ```
 
-Row 42 (`goldens`) was not run: it requires Cargo workspace execution and the
-coordinator’s large terminal target cache. No duplicate cache was created.
-The full 53-row gate remains coordinator-owned.
+Row 42 (`goldens`) passed with the coordinator-approved terminal target and
+the prescribed offline, four-job environment:
+`CARGO_TARGET_DIR=/home/zhuhe/code/litchi-worktrees/gate-trunk/target`
+`CARGO_BUILD_JOBS=4 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0`
+`CARGO_INCREMENTAL=0 CARGO_NET_OFFLINE=true` and the gate-tool path prefix.
+The exact command was `bash tools/gate/check_goldens.sh`; capability/registry
+legs (both feature profiles), the litchi-cli corpus leg, and regenerated
+report/corpus checks passed. The full 53-row gate remains coordinator-owned.
 
 No native, parity, performance, or feature-completeness claim is made by this
 record.
