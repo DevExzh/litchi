@@ -99,6 +99,13 @@ SEEDS = {
         ("add", "/body", "paragraph", {"text": "Two"}),
     ],
     "ods": [("set", "/Sheet1/A1:B2", {"merge": "true"})],
+    # Keep in step with crud_matrix.rs: Pages needs a named, non-empty second
+    # section so section-removal and paragraph rows exercise the same seed.
+    "pages": [
+        ("add", "/body", "paragraph", {"text": "Intro"}),
+        ("add", "/", "section", {"name": "Appendix"}),
+        ("set", "/section[2]", {"text": "Tail"}),
+    ],
     # Record 0309: character properties are written on runs of text boxes.
     "keynote": [("add", "/slide[1]", "shape", {"text": "Box\nSecond"})],
 }
