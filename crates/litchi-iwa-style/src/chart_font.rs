@@ -1667,7 +1667,10 @@ fn prune(
             field.object_references.retain(|id| *id != style);
         }
         workspace.remove(style)?;
-        budget.admit_registry(workspace, 64)?;
+        // `remove` updates only the staged object graph and identifier index;
+        // it does not mutate package metadata. Admit the read-only registry
+        // inspection below once, then keep the registry mutation admissions
+        // at the actual UUID/reference mutation calls.
         budget.work(workspace.registry_inspection_work())?;
         if let Some(style_component) = workspace.component_for_member(&style_member)? {
             budget.admit_registry(workspace, 64)?;
