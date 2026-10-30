@@ -8,6 +8,7 @@
 //! their private targets.
 
 use std::collections::HashSet;
+use std::mem::size_of;
 
 use litchi_core::Position;
 use litchi_iwa_common::WireLimits;
@@ -426,6 +427,20 @@ impl PublicationAdmission for LegacyPublicationAdmission {
         Ok(())
     }
 
+    fn admit_candidate(
+        &mut self,
+        _candidate: &[u8],
+        _limits: litchi_iwa_archive::Limits,
+    ) -> FaultResult<()> {
+        Ok(())
+    }
+
+    fn reopen_candidate(&mut self, source: &Package, candidate: Vec<u8>) -> FaultResult<Package> {
+        source
+            .reopen_candidate(candidate.into())
+            .map_err(|_error| Fault::Verification)
+    }
+
     fn admit_clone(
         &mut self,
         _chunk: litchi_iwa_core::ArchiveCloneInventoryChunk,
@@ -433,7 +448,11 @@ impl PublicationAdmission for LegacyPublicationAdmission {
         Ok(())
     }
 
-    fn admit_staging(&mut self, _amount: usize) -> FaultResult<()> {
+    fn admit_clone_arithmetic(&mut self, _resource: &'static str) -> FaultResult<()> {
+        Err(Fault::Invalid)
+    }
+
+    fn admit_staging(&mut self, _charge: PublicationStagingCharge) -> FaultResult<()> {
         Ok(())
     }
 }
@@ -463,12 +482,58 @@ pub(super) trait PublicationAdmission {
         requirements: litchi_iwa_archive::package::ReassemblyExecutionRequirements,
     ) -> Result<(), Self::Error>;
 
+    fn admit_candidate(
+        &mut self,
+        candidate: &[u8],
+        limits: litchi_iwa_archive::Limits,
+    ) -> Result<(), Self::Error>;
+
+    fn reopen_candidate(
+        &mut self,
+        source: &Package,
+        candidate: Vec<u8>,
+    ) -> Result<Package, Self::Error>;
+
     fn admit_clone(
         &mut self,
         chunk: litchi_iwa_core::ArchiveCloneInventoryChunk,
     ) -> Result<(), Self::Error>;
 
-    fn admit_staging(&mut self, amount: usize) -> Result<(), Self::Error>;
+    fn admit_clone_arithmetic(&mut self, resource: &'static str) -> Result<(), Self::Error>;
+
+    fn admit_staging(&mut self, charge: PublicationStagingCharge) -> Result<(), Self::Error>;
+}
+
+/// A bounded allocation/copy charge for the small publication collections
+/// owned by the graph publisher.  Payload and archive-clone charges are
+/// reported separately by their canonical visitors.
+#[derive(Debug, Clone, Copy)]
+pub(super) struct PublicationStagingCharge {
+    pub(super) retained_bytes: usize,
+    pub(super) work_bytes: usize,
+    pub(super) scratch_bytes: usize,
+    pub(super) allocations: usize,
+}
+
+impl PublicationStagingCharge {
+    pub(super) fn vector<T>(elements: usize) -> Option<Self> {
+        let bytes = elements.checked_mul(size_of::<T>())?;
+        Some(Self {
+            retained_bytes: bytes,
+            work_bytes: bytes,
+            scratch_bytes: 0,
+            allocations: if elements == 0 { 0 } else { 1 },
+        })
+    }
+
+    pub(super) const fn owned_bytes(bytes: usize) -> Self {
+        Self {
+            retained_bytes: bytes,
+            work_bytes: bytes,
+            scratch_bytes: 0,
+            allocations: 1,
+        }
+    }
 }
 
 /// Publish an in-place change using a caller-owned, bounded member encoder.
@@ -487,7 +552,10 @@ where
         .effective_archive_limits()
         .map_err(|error| structure::map_archive(&error))?;
     let components = source.state.components.catalog();
-    admission.admit_staging(3)?;
+    let archive_stage =
+        PublicationStagingCharge::vector::<(String, litchi_iwa_core::Archive)>(edits.len())
+            .ok_or_else(|| A::Error::from(Fault::Invalid))?;
+    admission.admit_staging(archive_stage)?;
     let mut archives: Vec<(String, litchi_iwa_core::Archive)> = Vec::new();
     structure::reserve(&mut archives, edits.len())?;
     for (identifier, edit) in edits.iter_mut() {
@@ -503,6 +571,8 @@ where
         let slot = match archives.iter().position(|(name, _)| name == owner.name()) {
             Some(slot) => slot,
             None => {
+                admission
+                    .admit_staging(PublicationStagingCharge::owned_bytes(owner.name().len()))?;
                 let clone_result = owner
                     .archive()
                     .clone_inventory_with_admission(&mut |chunk| admission.admit_clone(chunk));
@@ -512,8 +582,11 @@ where
                         return Err(error);
                     },
                     Err(litchi_iwa_core::ArchiveCloneInventoryError::ArithmeticOverflow {
-                        ..
-                    }) => return Err(A::Error::from(Fault::Invalid)),
+                        resource,
+                    }) => {
+                        admission.admit_clone_arithmetic(resource)?;
+                        return Err(A::Error::from(Fault::Invalid));
+                    },
                     Err(_) => return Err(A::Error::from(Fault::Invalid)),
                 }
                 archives.push((owner.name().to_owned(), owner.archive().clone()));
@@ -530,12 +603,20 @@ where
         .limits()
         .snappy_limits()
         .map_err(|error| structure::map_archive(&error))?;
+    let encoded_stage = PublicationStagingCharge::vector::<(&str, Vec<u8>)>(archives.len())
+        .ok_or_else(|| A::Error::from(Fault::Invalid))?;
+    admission.admit_staging(encoded_stage)?;
     let mut encoded = Vec::new();
     structure::reserve(&mut encoded, archives.len())?;
     for (name, archive) in &archives {
         let compressed = admission.encode_member(name, archive, archive_limits, snappy)?;
         encoded.push((name.as_str(), compressed));
     }
+    let entries_stage = PublicationStagingCharge::vector::<
+        litchi_iwa_archive::package::EntryEdit<'_>,
+    >(encoded.len())
+    .ok_or_else(|| A::Error::from(Fault::Invalid))?;
+    admission.admit_staging(entries_stage)?;
     let mut entries = Vec::new();
     structure::reserve(&mut entries, encoded.len())?;
     for (name, data) in &encoded {
@@ -565,9 +646,8 @@ where
     let output = prepared
         .execute(requirements.exact_limits())
         .map_err(|error| A::Error::from(structure::map_archive(&error)))?;
-    let package = source
-        .reopen_candidate(output.into())
-        .map_err(|_error| Fault::Verification)?;
+    admission.admit_candidate(&output, catalog.limits())?;
+    let package = admission.reopen_candidate(source, output)?;
     Ok(structure::Published {
         package,
         touched_components: encoded.len(),

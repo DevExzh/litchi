@@ -137,9 +137,19 @@ pub(super) trait PublicationAdmission {
         requirements: litchi_iwa_archive::package::ReassemblyExecutionRequirements,
     ) -> Result<()>;
 
+    fn admit_candidate(
+        &mut self,
+        candidate: &[u8],
+        limits: litchi_iwa_archive::Limits,
+    ) -> Result<()>;
+
+    fn reopen_candidate(&mut self, source: &Package, candidate: Vec<u8>) -> Result<Package>;
+
     fn admit_clone(&mut self, chunk: litchi_iwa_core::ArchiveCloneInventoryChunk) -> Result<()>;
 
-    fn admit_staging(&mut self, amount: usize) -> Result<()>;
+    fn admit_clone_arithmetic(&mut self, resource: &'static str) -> Result<()>;
+
+    fn admit_staging(&mut self, charge: graph::PublicationStagingCharge) -> Result<()>;
 }
 
 impl<T: PublicationAdmission> graph::PublicationAdmission for T {
@@ -169,12 +179,28 @@ impl<T: PublicationAdmission> graph::PublicationAdmission for T {
         PublicationAdmission::admit_execution(self, requirements)
     }
 
+    fn admit_candidate(
+        &mut self,
+        candidate: &[u8],
+        limits: litchi_iwa_archive::Limits,
+    ) -> Result<()> {
+        PublicationAdmission::admit_candidate(self, candidate, limits)
+    }
+
+    fn reopen_candidate(&mut self, source: &Package, candidate: Vec<u8>) -> Result<Package> {
+        PublicationAdmission::reopen_candidate(self, source, candidate)
+    }
+
     fn admit_clone(&mut self, chunk: litchi_iwa_core::ArchiveCloneInventoryChunk) -> Result<()> {
         PublicationAdmission::admit_clone(self, chunk)
     }
 
-    fn admit_staging(&mut self, amount: usize) -> Result<()> {
-        PublicationAdmission::admit_staging(self, amount)
+    fn admit_clone_arithmetic(&mut self, resource: &'static str) -> Result<()> {
+        PublicationAdmission::admit_clone_arithmetic(self, resource)
+    }
+
+    fn admit_staging(&mut self, charge: graph::PublicationStagingCharge) -> Result<()> {
+        PublicationAdmission::admit_staging(self, charge)
     }
 }
 
@@ -452,7 +478,9 @@ pub(super) fn write(
         let (index, payload) = style_payload(package, style)?;
         let data = rewrite(payload, chart_kind, kind, value.as_ref())?;
         if data != payload {
-            admission.admit_staging(1)?;
+            let charge = graph::PublicationStagingCharge::vector::<(u64, usize, Vec<u8>)>(1)
+                .ok_or(Failure::Fault(Fault::Invalid))?;
+            admission.admit_staging(charge)?;
             structure::reserve(&mut replacements, 1)?;
             replacements.push((style, index, data));
         }
@@ -462,13 +490,19 @@ pub(super) fn write(
     }
     let message_type = Archive::SeriesStyle.message_type();
     let mut closures = Vec::new();
-    admission.admit_staging(1)?;
+    let closure_charge =
+        graph::PublicationStagingCharge::vector::<(u64, Vec<u8>)>(replacements.len())
+            .ok_or(Failure::Fault(Fault::Invalid))?;
+    admission.admit_staging(closure_charge)?;
     structure::reserve(&mut closures, replacements.len())?;
     for (style, index, data) in replacements {
         closures.push((style, rewriter(index, message_type, data)));
     }
     let mut targets: Vec<(u64, &mut StyleRewrite<'_>)> = Vec::new();
-    admission.admit_staging(1)?;
+    let target_charge =
+        graph::PublicationStagingCharge::vector::<(u64, &mut StyleRewrite<'_>)>(closures.len())
+            .ok_or(Failure::Fault(Fault::Invalid))?;
+    admission.admit_staging(target_charge)?;
     structure::reserve(&mut targets, closures.len())?;
     for (style, closure) in &mut closures {
         targets.push((*style, closure));

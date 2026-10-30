@@ -21,7 +21,9 @@ use std::hash::{Hash, Hasher};
 use std::mem::size_of;
 
 use litchi_iwa_archive::package::{EntryEdit, EntryInsertion, OwnedExactArtifacts};
-use litchi_iwa_archive::unstable::{CandidateIngressCharge, CandidateIngressError};
+use litchi_iwa_archive::unstable::{
+    CandidateIngressCharge, CandidateIngressError, CandidateIngressPlan,
+};
 use litchi_iwa_common::chart::error_bar::Series as ErrorBarSeries;
 use litchi_iwa_common::chart::kind::Kind as ChartKind;
 use litchi_iwa_common::chart::pie::{LabelDistance, LabelVisibility, WedgeExplosion};
@@ -1137,7 +1139,7 @@ fn map_candidate_ingress_error(error: CandidateIngressError<arrangement::Error>)
     match error {
         CandidateIngressError::Physical(error) => map_candidate_archive_error(error),
         CandidateIngressError::Admission(error) => map_arrangement(error),
-        CandidateIngressError::CloneArithmetic { .. } => Error::InvalidSource,
+        CandidateIngressError::CloneArithmetic { .. } => Error::Overflow,
         _ => Error::InvalidSource,
     }
 }
@@ -2381,6 +2383,39 @@ impl style::PublicationAdmission for StylePublicationAdmission<'_> {
             .map_err(map_style_arrangement)
     }
 
+    fn admit_candidate(
+        &mut self,
+        candidate: &[u8],
+        limits: litchi_iwa_archive::Limits,
+    ) -> StyleAdmissionResult<()> {
+        let plan = CandidateIngressPlan::from_bytes(candidate, limits)
+            .map_err(map_candidate_archive_error)
+            .map_err(style::Failure::Budget)?;
+        plan.admit_zip_directory(&mut |charge| self.admit_candidate_charge(charge))
+            .map_err(map_candidate_ingress_error)
+            .map_err(style::Failure::Budget)?;
+        for entry in plan.entries() {
+            let entry = entry
+                .map_err(map_candidate_archive_error)
+                .map_err(style::Failure::Budget)?;
+            plan.admit_entry(entry, &mut |charge| self.admit_candidate_charge(charge))
+                .map_err(map_candidate_ingress_error)
+                .map_err(style::Failure::Budget)?;
+        }
+        Ok(())
+    }
+
+    fn reopen_candidate(
+        &mut self,
+        source: &Package,
+        candidate: Vec<u8>,
+    ) -> StyleAdmissionResult<Package> {
+        source
+            .reopen_candidate(candidate.into())
+            .map_err(map_candidate_package_error)
+            .map_err(style::Failure::Budget)
+    }
+
     fn admit_clone(
         &mut self,
         chunk: litchi_iwa_core::ArchiveCloneInventoryChunk,
@@ -2405,13 +2440,52 @@ impl style::PublicationAdmission for StylePublicationAdmission<'_> {
             .map_err(map_style_arrangement)
     }
 
-    fn admit_staging(&mut self, amount: usize) -> StyleAdmissionResult<()> {
+    fn admit_clone_arithmetic(&mut self, _resource: &'static str) -> StyleAdmissionResult<()> {
+        Err(style::Failure::Budget(Error::Overflow))
+    }
+
+    fn admit_staging(
+        &mut self,
+        charge: graph::PublicationStagingCharge,
+    ) -> StyleAdmissionResult<()> {
         self.budget
-            .preflight_allocations(amount)
+            .preflight_work(charge.work_bytes)
             .map_err(map_style_arrangement)?;
         self.budget
-            .allocations(amount)
+            .preflight_retained(charge.retained_bytes)
+            .map_err(map_style_arrangement)?;
+        self.budget
+            .preflight_scratch(charge.scratch_bytes)
+            .map_err(map_style_arrangement)?;
+        self.budget
+            .preflight_allocations(charge.allocations)
+            .map_err(map_style_arrangement)?;
+        self.budget
+            .work(charge.work_bytes)
+            .map_err(map_style_arrangement)?;
+        self.budget
+            .retained(charge.retained_bytes)
+            .map_err(map_style_arrangement)?;
+        self.budget
+            .scratch(charge.scratch_bytes)
+            .map_err(map_style_arrangement)?;
+        self.budget
+            .allocations(charge.allocations)
             .map_err(map_style_arrangement)
+    }
+}
+
+impl StylePublicationAdmission<'_> {
+    fn admit_candidate_charge(
+        &mut self,
+        charge: CandidateIngressCharge,
+    ) -> Result<(), arrangement::Error> {
+        self.budget.preflight_work(charge.traversal_bytes())?;
+        self.budget.preflight_retained(charge.retained_bytes())?;
+        self.budget.preflight_allocations(charge.allocations())?;
+        self.budget.work(charge.traversal_bytes())?;
+        self.budget.retained(charge.retained_bytes())?;
+        self.budget.allocations(charge.allocations())
     }
 }
 
