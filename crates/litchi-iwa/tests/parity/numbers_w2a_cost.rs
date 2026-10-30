@@ -14,8 +14,13 @@ use std::hint::black_box;
 use std::time::Duration;
 
 use litchi_core::Position;
+use litchi_iwa::charts::{ChartSeriesStroke, ChartSeriesStrokePattern, ChartSeriesSymbolFill};
 use litchi_iwa::numbers;
 use litchi_iwa::shapes::{DrawablePoint, DrawableSize, ShapeFill};
+use litchi_iwa_common::chart::series::{
+    Stroke as SeriesStroke, StrokePattern as SeriesStrokePattern, SymbolFill as SeriesSymbolFill,
+};
+use litchi_iwa_common::chart::{ChartData, kind::Kind as ChartKind};
 use litchi_iwa_common::color::{RgbColorSpace, Rgba};
 use litchi_iwa_common::media::playback::{MediaLoopMode, MediaPlaybackSettings};
 use litchi_iwa_common::shape::path::Preset;
@@ -31,7 +36,7 @@ use litchi_numbers::sheet::drawable::text::Property;
 use litchi_numbers::sheet::drawable::{DrawableSelector, Geometry, Kind, Point, Size};
 
 use crate::harness::{TestResult, fixture};
-use crate::numbers_drawable_cases::{authored_fixture, chart_fixture, host_drawable};
+use crate::numbers_drawable_cases::{authored_fixture, chart_fixture, first_sheet, host_drawable};
 
 const POINT: DrawablePoint = DrawablePoint { x: 120.0, y: 140.0 };
 const SIZE: DrawableSize = DrawableSize {
@@ -226,6 +231,9 @@ const ROUTES_2: &[&str] = &[
     "image_add",
     "chart_error_bars",
     "chart_series_fills",
+    "chart_series_strokes",
+    "chart_series_symbol_fills",
+    "chart_series_symbol_outlines",
     "chart_border",
     "chart_axis_line",
 ];
@@ -245,12 +253,81 @@ fn error_bars() -> TestResult<Vec<litchi_iwa_common::chart::error_bar::Series>> 
     ])
 }
 
+fn line_chart_fixture() -> TestResult<Vec<u8>> {
+    let mut editor = numbers::Draft::from_bytes(&fixture("iwork/numbers/basic.numbers")?.bytes)?;
+    let sheet = first_sheet(&editor)?;
+    let data = ChartData::new(
+        vec!["Region 1".to_owned(), "Region 2".to_owned()],
+        vec!["April".to_owned(), "May".to_owned()],
+        vec![vec![Some(17.0), Some(26.0)], vec![Some(55.0), Some(43.0)]],
+    )?;
+    editor.add_sheet_chart(
+        sheet,
+        ChartKind::Line2d,
+        data,
+        DrawablePoint { x: 120.0, y: 140.0 },
+        DrawableSize {
+            width: 360.0,
+            height: 240.0,
+        },
+    )?;
+    Ok(editor.to_bytes()?)
+}
+
 fn series_fills() -> TestResult<Vec<litchi_iwa_common::shape::fill::Fill>> {
     use litchi_iwa_common::color::{RgbColorSpace, Rgba};
     use litchi_iwa_common::shape::fill::Fill;
     Ok(vec![
         Fill::Solid(Rgba::new(0.1, 0.4, 0.9, 1.0, RgbColorSpace::Srgb)?),
         Fill::Solid(Rgba::new(0.7, 0.1, 0.1, 1.0, RgbColorSpace::Srgb)?),
+    ])
+}
+
+fn series_strokes() -> TestResult<Vec<Option<SeriesStroke>>> {
+    Ok(vec![
+        Some(SeriesStroke::new(
+            Rgba::new(0.1, 0.4, 0.9, 1.0, RgbColorSpace::Srgb)?,
+            Width::new(2.5)?,
+            SeriesStrokePattern::MediumDash,
+        )),
+        None,
+    ])
+}
+
+fn host_series_strokes() -> TestResult<Vec<Option<ChartSeriesStroke>>> {
+    Ok(vec![
+        Some(ChartSeriesStroke::new(
+            Rgba::new(0.1, 0.4, 0.9, 1.0, RgbColorSpace::Srgb)?,
+            Width::new(2.5)?,
+            ChartSeriesStrokePattern::MediumDash,
+        )),
+        None,
+    ])
+}
+
+fn series_symbol_fills() -> TestResult<Vec<SeriesSymbolFill>> {
+    Ok(vec![
+        SeriesSymbolFill::SeriesFill,
+        SeriesSymbolFill::Custom(litchi_iwa_common::shape::fill::Fill::Solid(Rgba::new(
+            0.7,
+            0.1,
+            0.1,
+            1.0,
+            RgbColorSpace::Srgb,
+        )?)),
+    ])
+}
+
+fn host_series_symbol_fills() -> TestResult<Vec<ChartSeriesSymbolFill>> {
+    Ok(vec![
+        ChartSeriesSymbolFill::SeriesFill,
+        ChartSeriesSymbolFill::Custom(ShapeFill::Solid(Rgba::new(
+            0.7,
+            0.1,
+            0.1,
+            1.0,
+            RgbColorSpace::Srgb,
+        )?)),
     ])
 }
 
@@ -305,6 +382,15 @@ fn w2a_host_route_2(route: &str, source: &[u8], sheet: u64, id: u64) -> TestResu
                 })
                 .collect::<Vec<_>>(),
         )?,
+        "chart_series_strokes" => {
+            e.set_sheet_chart_series_strokes(sheet, id, &host_series_strokes()?)?
+        },
+        "chart_series_symbol_fills" => {
+            e.set_sheet_chart_series_symbol_fills(sheet, id, &host_series_symbol_fills()?)?
+        },
+        "chart_series_symbol_outlines" => {
+            e.set_sheet_chart_series_symbol_outlines(sheet, id, &host_series_strokes()?)?
+        },
         "chart_border" => e.set_sheet_chart_border_visible(sheet, id, true)?,
         "chart_axis_line" => e.set_sheet_chart_axis_line_visible(
             sheet,
@@ -367,12 +453,19 @@ fn w2a_leaf_route_2(route: &str, source: &[u8], selector: DrawableSelector) -> T
             edit.replace_data(0, selector, &png()?)?;
             edit.commit()?.into_package()
         },
-        "chart_error_bars" | "chart_series_fills" => {
+        "chart_error_bars"
+        | "chart_series_fills"
+        | "chart_series_strokes"
+        | "chart_series_symbol_fills"
+        | "chart_series_symbol_outlines" => {
             let mut edit = package.edit_sheet_chart_series(0, 0)?;
-            edit.set(if route == "chart_error_bars" {
-                Series::ErrorBars(error_bars()?)
-            } else {
-                Series::Fills(series_fills()?)
+            edit.set(match route {
+                "chart_error_bars" => Series::ErrorBars(error_bars()?),
+                "chart_series_fills" => Series::Fills(series_fills()?),
+                "chart_series_strokes" => Series::Strokes(series_strokes()?),
+                "chart_series_symbol_fills" => Series::SymbolFills(series_symbol_fills()?),
+                "chart_series_symbol_outlines" => Series::SymbolOutlines(series_strokes()?),
+                _ => unreachable!("matched chart series route"),
             })?;
             edit.commit()?.into_package()
         },
@@ -405,6 +498,7 @@ fn numbers_w2a_route_cost_abba_2() -> TestResult {
     let selected = std::env::var("W2A_ROUTE").ok();
     let authored = authored_fixture()?.bytes;
     let charts = chart_fixture()?.bytes;
+    let line_charts = line_chart_fixture()?;
     for route in ROUTES_2 {
         if selected
             .as_deref()
@@ -417,6 +511,9 @@ fn numbers_w2a_route_cost_abba_2() -> TestResult {
                 (fixture(IMAGES)?.bytes, Kind::Image)
             },
             "image_add" => (fixture(IMAGES)?.bytes, Kind::Image),
+            "chart_series_strokes"
+            | "chart_series_symbol_fills"
+            | "chart_series_symbol_outlines" => (line_charts.clone(), Kind::Chart),
             "chart_error_bars" | "chart_series_fills" | "chart_border" | "chart_axis_line" => {
                 (charts.clone(), Kind::Chart)
             },
