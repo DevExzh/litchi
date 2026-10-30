@@ -694,3 +694,176 @@ pub(super) fn text_storage(
     structure::unique_message(object(package, storage)?, &[2_001])?;
     Ok(TextTarget::Storage { storage })
 }
+
+#[cfg(test)]
+mod tests {
+    use super::{
+        ObjectEdit, Package, PublicationAdmission, PublicationStagingCharge,
+        publish_in_place_with_admission,
+    };
+    use litchi_iwa_archive::package::ReassemblyExecutionRequirements;
+    use litchi_iwa_archive::unstable::CandidateIngressCharge;
+    use litchi_iwa_core::{
+        Archive, ArchiveCloneInventoryChunk, ArchiveObject, Limits, SnappyLimits,
+    };
+    use std::path::PathBuf;
+
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    enum Refusal {
+        AllocationRetained,
+        WorkOutput,
+        UnexpectedPhase,
+    }
+
+    impl From<super::Fault> for Refusal {
+        fn from(_fault: super::Fault) -> Self {
+            Self::UnexpectedPhase
+        }
+    }
+
+    struct AdmissionSpy {
+        refusal: Refusal,
+        staging: usize,
+        clones: usize,
+        encodes: usize,
+        reassemblies: usize,
+        executions: usize,
+        candidates: usize,
+        reopens: usize,
+    }
+
+    impl AdmissionSpy {
+        fn new(refusal: Refusal) -> Self {
+            Self {
+                refusal,
+                staging: 0,
+                clones: 0,
+                encodes: 0,
+                reassemblies: 0,
+                executions: 0,
+                candidates: 0,
+                reopens: 0,
+            }
+        }
+
+        fn assert_prepublication(&self) {
+            assert_eq!(self.staging, 1);
+            assert_eq!(self.clones, 0);
+            assert_eq!(self.encodes, 0);
+            assert_eq!(self.reassemblies, 0);
+            assert_eq!(self.executions, 0);
+            assert_eq!(self.candidates, 0);
+            assert_eq!(self.reopens, 0);
+        }
+    }
+
+    impl PublicationAdmission for AdmissionSpy {
+        type Error = Refusal;
+
+        fn encode_member(
+            &mut self,
+            _name: &str,
+            _archive: &Archive,
+            _archive_limits: Limits,
+            _snappy_limits: SnappyLimits,
+        ) -> Result<Vec<u8>, Self::Error> {
+            self.encodes += 1;
+            Err(Refusal::UnexpectedPhase)
+        }
+
+        fn admit_reassembly(&mut self, _charge: CandidateIngressCharge) -> Result<(), Self::Error> {
+            self.reassemblies += 1;
+            Err(Refusal::UnexpectedPhase)
+        }
+
+        fn admit_execution(
+            &mut self,
+            _requirements: ReassemblyExecutionRequirements,
+        ) -> Result<(), Self::Error> {
+            self.executions += 1;
+            Err(Refusal::UnexpectedPhase)
+        }
+
+        fn admit_candidate(
+            &mut self,
+            _candidate: &[u8],
+            _limits: litchi_iwa_archive::Limits,
+        ) -> Result<(), Self::Error> {
+            self.candidates += 1;
+            Err(Refusal::UnexpectedPhase)
+        }
+
+        fn reopen_candidate(
+            &mut self,
+            _source: &Package,
+            _candidate: Vec<u8>,
+        ) -> Result<Package, Self::Error> {
+            self.reopens += 1;
+            Err(Refusal::UnexpectedPhase)
+        }
+
+        fn admit_clone(&mut self, _chunk: ArchiveCloneInventoryChunk) -> Result<(), Self::Error> {
+            self.clones += 1;
+            Err(Refusal::UnexpectedPhase)
+        }
+
+        fn admit_clone_arithmetic(&mut self, _resource: &'static str) -> Result<(), Self::Error> {
+            Err(Refusal::UnexpectedPhase)
+        }
+
+        fn admit_staging(&mut self, charge: PublicationStagingCharge) -> Result<(), Self::Error> {
+            self.staging += 1;
+            match self.refusal {
+                Refusal::AllocationRetained
+                    if charge.allocations > 0 || charge.retained_bytes > 0 =>
+                {
+                    Err(Refusal::AllocationRetained)
+                },
+                Refusal::WorkOutput if charge.work_bytes > 0 || charge.scratch_bytes > 0 => {
+                    Err(Refusal::WorkOutput)
+                },
+                _ => Ok(()),
+            }
+        }
+    }
+
+    fn source() -> Package {
+        let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../../test-data/iwork/numbers/chart-data-native.numbers");
+        Package::from_bytes(&std::fs::read(path).expect("tracked chart fixture"))
+            .expect("chart fixture parses")
+    }
+
+    fn identifier(source: &Package) -> u64 {
+        source
+            .state
+            .components
+            .iter_objects()
+            .find_map(|object| object.archive_info.identifier)
+            .expect("fixture has an object identifier")
+    }
+
+    fn run_refusal(refusal: Refusal) {
+        let source = source();
+        let before = source.source_bytes().to_vec();
+        let identifier = identifier(&source);
+        let mut edit =
+            |_object: &mut ArchiveObject, _limits: Limits| -> Result<(), super::Fault> { Ok(()) };
+        let mut edits: [(u64, ObjectEdit<'_>); 1] = [(identifier, &mut edit)];
+        let mut spy = AdmissionSpy::new(refusal);
+        let result = publish_in_place_with_admission(&source, &mut edits, &mut spy);
+        assert!(matches!(result, Err(error) if error == refusal));
+        spy.assert_prepublication();
+        assert_eq!(source.source_bytes(), before.as_slice());
+    }
+
+    #[test]
+    fn style_publication_admission_rejects_allocation_before_clone() {
+        run_refusal(Refusal::AllocationRetained);
+    }
+
+    #[test]
+    fn style_publication_admission_rejects_work_before_clone() {
+        run_refusal(Refusal::WorkOutput);
+    }
+}
