@@ -2610,3 +2610,96 @@ impl Package {
         apply_series_patch(self, patch)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::{ChartBudget, Error, LimitKind, Package, StylePublicationAdmission, graph};
+    use litchi_iwa_core::{ArchiveObject, Limits};
+    use std::path::PathBuf;
+
+    fn source() -> Package {
+        let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../../test-data/iwork/numbers/chart-data-native.numbers");
+        Package::from_bytes(&std::fs::read(path).expect("tracked chart fixture"))
+            .expect("chart fixture parses")
+    }
+
+    fn object_identifier(source: &Package) -> u64 {
+        source
+            .state
+            .components
+            .iter_objects()
+            .find_map(|object| object.archive_info.identifier)
+            .expect("fixture has an object identifier")
+    }
+
+    fn run_exhaustion(work: bool) {
+        let source = source();
+        let before = source.source_bytes().to_vec();
+        let mut budget = ChartBudget::for_package(&source).expect("chart budget");
+        if work {
+            let error = budget
+                .work(usize::MAX / 2)
+                .expect_err("large work charge must exceed the ceiling");
+            let super::arrangement::Error::Limit { maximum, .. } = error else {
+                panic!("unexpected work exhaustion error: {error:?}");
+            };
+            budget.work(maximum as usize).expect("consume work ceiling");
+        } else {
+            let error = budget
+                .allocations(usize::MAX / 2)
+                .expect_err("large allocation charge must exceed the ceiling");
+            let super::arrangement::Error::Limit { maximum, .. } = error else {
+                panic!("unexpected allocation exhaustion error: {error:?}");
+            };
+            budget
+                .allocations(maximum as usize)
+                .expect("consume allocation ceiling");
+        }
+
+        let identifier = object_identifier(&source);
+        let mut called = false;
+        let mut edit = |_object: &mut ArchiveObject, _limits: Limits| {
+            called = true;
+            Ok(())
+        };
+        let mut edits: [(u64, graph::ObjectEdit<'_>); 1] = [(identifier, &mut edit)];
+        let mut admission = StylePublicationAdmission {
+            budget: &mut budget,
+        };
+        let result = graph::publish_in_place_with_admission(&source, &mut edits, &mut admission);
+
+        match result {
+            Err(super::style::Failure::Budget(Error::Limit {
+                kind,
+                observed,
+                maximum,
+            })) => {
+                let expected = if work {
+                    LimitKind::Engine(litchi_iwa_style::series::LimitKind::Work)
+                } else {
+                    LimitKind::AllocationEvents
+                };
+                assert_eq!(kind, expected);
+                assert!(observed > maximum);
+            },
+            Err(super::style::Failure::Budget(other)) => {
+                panic!("unexpected budget error: {other:?}");
+            },
+            Err(_) => panic!("unexpected non-budget publication error"),
+            Ok(_) => panic!("exhausted admission unexpectedly published"),
+        }
+        assert!(!called, "edit callback ran after exhausted admission");
+        assert_eq!(source.source_bytes(), before.as_slice());
+    }
+
+    #[test]
+    fn style_publication_admission_rejects_allocation_exhaustion_before_edit() {
+        run_exhaustion(false);
+    }
+
+    #[test]
+    fn style_publication_admission_rejects_work_exhaustion_before_edit() {
+        run_exhaustion(true);
+    }
+}
