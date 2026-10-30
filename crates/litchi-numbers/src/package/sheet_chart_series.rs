@@ -1765,10 +1765,21 @@ fn apply_one(
         if current == *property {
             return Ok(None);
         }
-        admit_style_candidate(budget)?;
+        budget
+            .preflight_allocations(values.len())
+            .map_err(map_arrangement)?;
+        budget.allocations(values.len()).map_err(map_arrangement)?;
         let values: Vec<Option<style::Value>> = values.into_iter().map(Some).collect();
-        let published = style::write(source, target.chart, target.kind, style_kind, &values)
-            .map_err(from_style)?;
+        let mut admission = StylePublicationAdmission { budget };
+        let published = style::write(
+            source,
+            target.chart,
+            target.kind,
+            style_kind,
+            &values,
+            &mut admission,
+        )
+        .map_err(from_style)?;
         return publish_changes(published, sheet, chart, property.kind(), budget);
     }
     let prepared = prepare_components(source, budget)?;
@@ -2267,23 +2278,6 @@ fn publish_changes(
     Ok(Some(published))
 }
 
-fn admit_style_candidate(budget: &mut ChartBudget) -> Result<(), Error> {
-    let bound = budget
-        .series_limits()
-        .map_err(map_arrangement)?
-        .max_output_bytes();
-    budget.preflight_output(bound).map_err(map_arrangement)?;
-    budget.preflight_retained(bound).map_err(map_arrangement)?;
-    budget.preflight_scratch(bound).map_err(map_arrangement)?;
-    budget.preflight_allocations(1).map_err(map_arrangement)?;
-    budget.output(bound).map_err(map_arrangement)?;
-    budget.retained(bound).map_err(map_arrangement)?;
-    budget.scratch(bound).map_err(map_arrangement)?;
-    budget.allocations(1).map_err(map_arrangement)?;
-    budget.candidate_reopen(bound).map_err(map_arrangement)?;
-    Ok(())
-}
-
 /// Reset series `series`' own value of a series-style property.
 fn reset_one(
     source: &Package,
@@ -2300,14 +2294,25 @@ fn reset_one(
     }
     let current = style::read(source, target.chart, target.kind, target.series, style_kind)
         .map_err(from_style)?;
+    budget
+        .preflight_allocations(target.series)
+        .map_err(map_arrangement)?;
+    budget.allocations(target.series).map_err(map_arrangement)?;
     let values: Vec<Option<style::Value>> = current
         .into_iter()
         .enumerate()
         .map(|(index, value)| (index != series).then_some(value))
         .collect();
-    admit_style_candidate(budget)?;
-    let published =
-        style::write(source, target.chart, target.kind, style_kind, &values).map_err(from_style)?;
+    let mut admission = StylePublicationAdmission { budget };
+    let published = style::write(
+        source,
+        target.chart,
+        target.kind,
+        style_kind,
+        &values,
+        &mut admission,
+    )
+    .map_err(from_style)?;
     publish_changes(published, sheet, chart, kind, budget)
 }
 
@@ -2317,6 +2322,96 @@ fn from_style(failure: style::Failure) -> Error {
         style::Failure::Refused(style::Refused::Shared) => Refusal::SharedStyle.into(),
         style::Failure::Refused(style::Refused::ImageFill) => Refusal::ImageFill.into(),
         style::Failure::Fault(fault) => fault.into(),
+        style::Failure::Budget(error) => error,
+    }
+}
+
+fn map_style_arrangement(error: arrangement::Error) -> style::Failure {
+    style::Failure::Budget(map_arrangement(error))
+}
+
+type StyleAdmissionResult<T> = Result<T, style::Failure>;
+
+struct StylePublicationAdmission<'a> {
+    budget: &'a mut ChartBudget,
+}
+
+impl style::PublicationAdmission for StylePublicationAdmission<'_> {
+    fn encode_member(
+        &mut self,
+        _name: &str,
+        archive: &Archive,
+        archive_limits: litchi_iwa_core::Limits,
+        snappy_limits: litchi_iwa_core::SnappyLimits,
+    ) -> StyleAdmissionResult<Vec<u8>> {
+        encode_and_compress_member(archive, archive_limits, snappy_limits, self.budget)
+            .map_err(style::Failure::Budget)
+    }
+
+    fn admit_reassembly(&mut self, charge: CandidateIngressCharge) -> StyleAdmissionResult<()> {
+        self.budget
+            .preflight_work(charge.traversal_bytes())
+            .map_err(map_style_arrangement)?;
+        self.budget
+            .preflight_retained(charge.retained_bytes())
+            .map_err(map_style_arrangement)?;
+        self.budget
+            .preflight_allocations(charge.allocations())
+            .map_err(map_style_arrangement)?;
+        self.budget
+            .work(charge.traversal_bytes())
+            .map_err(map_style_arrangement)?;
+        self.budget
+            .retained(charge.retained_bytes())
+            .map_err(map_style_arrangement)?;
+        self.budget
+            .allocations(charge.allocations())
+            .map_err(map_style_arrangement)
+    }
+
+    fn admit_execution(
+        &mut self,
+        requirements: litchi_iwa_archive::package::ReassemblyExecutionRequirements,
+    ) -> StyleAdmissionResult<()> {
+        self.budget
+            .reassembly(requirements)
+            .map_err(map_style_arrangement)?;
+        self.budget
+            .candidate_reopen(requirements.output_bytes())
+            .map_err(map_style_arrangement)
+    }
+
+    fn admit_clone(
+        &mut self,
+        chunk: litchi_iwa_core::ArchiveCloneInventoryChunk,
+    ) -> StyleAdmissionResult<()> {
+        self.budget
+            .preflight_work(chunk.traversal_bytes())
+            .map_err(map_style_arrangement)?;
+        self.budget
+            .preflight_retained(chunk.retained_bytes())
+            .map_err(map_style_arrangement)?;
+        self.budget
+            .preflight_allocations(chunk.allocations())
+            .map_err(map_style_arrangement)?;
+        self.budget
+            .work(chunk.traversal_bytes())
+            .map_err(map_style_arrangement)?;
+        self.budget
+            .retained(chunk.retained_bytes())
+            .map_err(map_style_arrangement)?;
+        self.budget
+            .allocations(chunk.allocations())
+            .map_err(map_style_arrangement)
+    }
+
+    fn admit_staging(&mut self, amount: usize) -> StyleAdmissionResult<()> {
+        self.budget
+            .preflight_allocations(amount)
+            .map_err(map_style_arrangement)?;
+        self.budget
+            .allocations(amount)
+            .map_err(map_style_arrangement)
     }
 }
 

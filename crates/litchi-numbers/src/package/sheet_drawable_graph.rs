@@ -386,26 +386,136 @@ pub(super) fn publish_in_place(
     source: &Package,
     edits: &mut [(u64, ObjectEdit<'_>)],
 ) -> FaultResult<structure::Published> {
+    let mut admission = LegacyPublicationAdmission;
+    publish_in_place_with_admission(source, edits, &mut admission)
+}
+
+/// The legacy drawable families do not have a family-specific transaction
+/// ledger.  Keep their established encoder and make the new admission hooks
+/// no-ops; chart-series styles provide the bounded implementation below.
+struct LegacyPublicationAdmission;
+
+impl PublicationAdmission for LegacyPublicationAdmission {
+    type Error = Fault;
+
+    fn encode_member(
+        &mut self,
+        _name: &str,
+        archive: &litchi_iwa_core::Archive,
+        archive_limits: litchi_iwa_core::Limits,
+        snappy_limits: litchi_iwa_core::SnappyLimits,
+    ) -> FaultResult<Vec<u8>> {
+        let bytes = archive
+            .to_bytes(archive_limits)
+            .map_err(|error| structure::map_core(&error))?;
+        litchi_iwa_core::SnappyStream::compress(&bytes, snappy_limits)
+            .map_err(|error| structure::map_core(&error))
+    }
+
+    fn admit_reassembly(
+        &mut self,
+        _charge: litchi_iwa_archive::unstable::CandidateIngressCharge,
+    ) -> FaultResult<()> {
+        Ok(())
+    }
+
+    fn admit_execution(
+        &mut self,
+        _requirements: litchi_iwa_archive::package::ReassemblyExecutionRequirements,
+    ) -> FaultResult<()> {
+        Ok(())
+    }
+
+    fn admit_clone(
+        &mut self,
+        _chunk: litchi_iwa_core::ArchiveCloneInventoryChunk,
+    ) -> FaultResult<()> {
+        Ok(())
+    }
+
+    fn admit_staging(&mut self, _amount: usize) -> FaultResult<()> {
+        Ok(())
+    }
+}
+
+/// An encoder/admission seam shared by the graph publisher and a focused
+/// format facade.  Keeping the seam here prevents a facade from rebuilding a
+/// second, unbudgeted ZIP/Snappy/reassembly pipeline while leaving the older
+/// drawable callers on their original behavior.
+pub(super) trait PublicationAdmission {
+    type Error;
+
+    fn encode_member(
+        &mut self,
+        name: &str,
+        archive: &litchi_iwa_core::Archive,
+        archive_limits: litchi_iwa_core::Limits,
+        snappy_limits: litchi_iwa_core::SnappyLimits,
+    ) -> Result<Vec<u8>, Self::Error>;
+
+    fn admit_reassembly(
+        &mut self,
+        charge: litchi_iwa_archive::unstable::CandidateIngressCharge,
+    ) -> Result<(), Self::Error>;
+
+    fn admit_execution(
+        &mut self,
+        requirements: litchi_iwa_archive::package::ReassemblyExecutionRequirements,
+    ) -> Result<(), Self::Error>;
+
+    fn admit_clone(
+        &mut self,
+        chunk: litchi_iwa_core::ArchiveCloneInventoryChunk,
+    ) -> Result<(), Self::Error>;
+
+    fn admit_staging(&mut self, amount: usize) -> Result<(), Self::Error>;
+}
+
+/// Publish an in-place change using a caller-owned, bounded member encoder.
+pub(super) fn publish_in_place_with_admission<A>(
+    source: &Package,
+    edits: &mut [(u64, ObjectEdit<'_>)],
+    admission: &mut A,
+) -> Result<structure::Published, A::Error>
+where
+    A: PublicationAdmission,
+    A::Error: From<Fault>,
+{
     let catalog = structure::exact_source(source)?;
     let archive_limits = catalog
         .limits()
         .effective_archive_limits()
         .map_err(|error| structure::map_archive(&error))?;
     let components = source.state.components.catalog();
+    admission.admit_staging(3)?;
     let mut archives: Vec<(String, litchi_iwa_core::Archive)> = Vec::new();
+    structure::reserve(&mut archives, edits.len())?;
     for (identifier, edit) in edits.iter_mut() {
         let mut owner = None;
         for component in components.iter() {
             if component.archive().object(*identifier).is_some()
                 && owner.replace(component).is_some()
             {
-                return Err(Fault::Unsupported);
+                return Err(Fault::Unsupported.into());
             }
         }
         let owner = owner.ok_or(Fault::Invalid)?;
         let slot = match archives.iter().position(|(name, _)| name == owner.name()) {
             Some(slot) => slot,
             None => {
+                let clone_result = owner
+                    .archive()
+                    .clone_inventory_with_admission(&mut |chunk| admission.admit_clone(chunk));
+                match clone_result {
+                    Ok(_) => {},
+                    Err(litchi_iwa_core::ArchiveCloneInventoryError::Admission(error)) => {
+                        return Err(error);
+                    },
+                    Err(litchi_iwa_core::ArchiveCloneInventoryError::ArithmeticOverflow {
+                        ..
+                    }) => return Err(A::Error::from(Fault::Invalid)),
+                    Err(_) => return Err(A::Error::from(Fault::Invalid)),
+                }
                 archives.push((owner.name().to_owned(), owner.archive().clone()));
                 archives.len() - 1
             },
@@ -423,21 +533,38 @@ pub(super) fn publish_in_place(
     let mut encoded = Vec::new();
     structure::reserve(&mut encoded, archives.len())?;
     for (name, archive) in &archives {
-        let bytes = archive
-            .to_bytes(archive_limits)
-            .map_err(|error| structure::map_core(&error))?;
-        let compressed = litchi_iwa_core::SnappyStream::compress(&bytes, snappy)
-            .map_err(|error| structure::map_core(&error))?;
+        let compressed = admission.encode_member(name, archive, archive_limits, snappy)?;
         encoded.push((name.as_str(), compressed));
     }
-    let entries: Vec<litchi_iwa_archive::package::EntryEdit<'_>> = encoded
-        .iter()
-        .map(|(name, data)| litchi_iwa_archive::package::EntryEdit::new(name, data))
-        .collect();
-    let output = catalog
-        .package()
-        .reassemble_with_changes_to_bytes(&[], &entries, &[], catalog.limits())
-        .map_err(|error| structure::map_archive(&error))?;
+    let mut entries = Vec::new();
+    structure::reserve(&mut entries, encoded.len())?;
+    for (name, data) in &encoded {
+        entries.push(litchi_iwa_archive::package::EntryEdit::new(name, data));
+    }
+    let mut visitor = |charge| admission.admit_reassembly(charge);
+    let prepared = catalog
+        .__prepare_reassembly_with_changes_admitted(
+            &[],
+            &entries,
+            &[],
+            catalog.limits(),
+            &mut visitor,
+        )
+        .map_err(|error| match error {
+            litchi_iwa_archive::unstable::CandidateIngressError::Physical(error) => {
+                A::Error::from(structure::map_archive(&error))
+            },
+            litchi_iwa_archive::unstable::CandidateIngressError::Admission(error) => error,
+            litchi_iwa_archive::unstable::CandidateIngressError::CloneArithmetic { .. } => {
+                A::Error::from(Fault::Invalid)
+            },
+            _ => A::Error::from(Fault::Invalid),
+        })?;
+    let requirements = prepared.execution_requirements();
+    admission.admit_execution(requirements)?;
+    let output = prepared
+        .execute(requirements.exact_limits())
+        .map_err(|error| A::Error::from(structure::map_archive(&error)))?;
     let package = source
         .reopen_candidate(output.into())
         .map_err(|_error| Fault::Verification)?;

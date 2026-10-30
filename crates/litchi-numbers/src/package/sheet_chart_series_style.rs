@@ -88,11 +88,18 @@ pub(super) enum Refused {
 pub(super) enum Failure {
     Refused(Refused),
     Fault(Fault),
+    Budget(super::sheet_chart_series::Error),
 }
 
 impl From<Fault> for Failure {
     fn from(fault: Fault) -> Self {
         Self::Fault(fault)
+    }
+}
+
+impl From<super::sheet_chart_series::Error> for Failure {
+    fn from(error: super::sheet_chart_series::Error) -> Self {
+        Self::Budget(error)
     }
 }
 
@@ -106,6 +113,70 @@ impl From<codec::Error> for Failure {
 }
 
 type Result<T> = std::result::Result<T, Failure>;
+
+/// Transaction-owned admission for the style publisher.  The chart-series
+/// facade implements this once so staging, member encoding, physical
+/// reassembly, clone, and candidate execution all consume one ledger.  The
+/// graph module adapts these operations to its generic publisher seam.
+pub(super) trait PublicationAdmission {
+    fn encode_member(
+        &mut self,
+        name: &str,
+        archive: &litchi_iwa_core::Archive,
+        archive_limits: litchi_iwa_core::Limits,
+        snappy_limits: litchi_iwa_core::SnappyLimits,
+    ) -> Result<Vec<u8>>;
+
+    fn admit_reassembly(
+        &mut self,
+        charge: litchi_iwa_archive::unstable::CandidateIngressCharge,
+    ) -> Result<()>;
+
+    fn admit_execution(
+        &mut self,
+        requirements: litchi_iwa_archive::package::ReassemblyExecutionRequirements,
+    ) -> Result<()>;
+
+    fn admit_clone(&mut self, chunk: litchi_iwa_core::ArchiveCloneInventoryChunk) -> Result<()>;
+
+    fn admit_staging(&mut self, amount: usize) -> Result<()>;
+}
+
+impl<T: PublicationAdmission> graph::PublicationAdmission for T {
+    type Error = Failure;
+
+    fn encode_member(
+        &mut self,
+        name: &str,
+        archive: &litchi_iwa_core::Archive,
+        archive_limits: litchi_iwa_core::Limits,
+        snappy_limits: litchi_iwa_core::SnappyLimits,
+    ) -> Result<Vec<u8>> {
+        PublicationAdmission::encode_member(self, name, archive, archive_limits, snappy_limits)
+    }
+
+    fn admit_reassembly(
+        &mut self,
+        charge: litchi_iwa_archive::unstable::CandidateIngressCharge,
+    ) -> Result<()> {
+        PublicationAdmission::admit_reassembly(self, charge)
+    }
+
+    fn admit_execution(
+        &mut self,
+        requirements: litchi_iwa_archive::package::ReassemblyExecutionRequirements,
+    ) -> Result<()> {
+        PublicationAdmission::admit_execution(self, requirements)
+    }
+
+    fn admit_clone(&mut self, chunk: litchi_iwa_core::ArchiveCloneInventoryChunk) -> Result<()> {
+        PublicationAdmission::admit_clone(self, chunk)
+    }
+
+    fn admit_staging(&mut self, amount: usize) -> Result<()> {
+        PublicationAdmission::admit_staging(self, amount)
+    }
+}
 
 /// The effective series styles of the chart's first `count` series.
 fn styles(package: &Package, chart: u64, count: usize) -> Result<Vec<u64>> {
@@ -359,6 +430,7 @@ pub(super) fn write(
     chart_kind: ChartKind,
     kind: Kind,
     values: &[Option<Value>],
+    admission: &mut impl PublicationAdmission,
 ) -> Result<Option<Published>> {
     let slots = styles(package, chart, values.len())?;
     let mut replacements: Vec<(u64, usize, Vec<u8>)> = Vec::new();
@@ -380,6 +452,7 @@ pub(super) fn write(
         let (index, payload) = style_payload(package, style)?;
         let data = rewrite(payload, chart_kind, kind, value.as_ref())?;
         if data != payload {
+            admission.admit_staging(1)?;
             structure::reserve(&mut replacements, 1)?;
             replacements.push((style, index, data));
         }
@@ -389,15 +462,17 @@ pub(super) fn write(
     }
     let message_type = Archive::SeriesStyle.message_type();
     let mut closures = Vec::new();
+    admission.admit_staging(1)?;
     structure::reserve(&mut closures, replacements.len())?;
     for (style, index, data) in replacements {
         closures.push((style, rewriter(index, message_type, data)));
     }
     let mut targets: Vec<(u64, &mut StyleRewrite<'_>)> = Vec::new();
+    admission.admit_staging(1)?;
     structure::reserve(&mut targets, closures.len())?;
     for (style, closure) in &mut closures {
         targets.push((*style, closure));
     }
-    let published = graph::publish_in_place(package, &mut targets)?;
+    let published = graph::publish_in_place_with_admission(package, &mut targets, admission)?;
     Ok(Some(published))
 }
