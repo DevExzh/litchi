@@ -7468,3 +7468,21 @@ See [0063](0063-source-pptx-modern-comments.md).
   and 58 branches removed. Measured logical cleanup totals 318,310,065,421
   bytes (about 296.45 GiB), plus the separately noted approximate owner cache
   removal; all qualified archives and raw evidence remain preserved.
+
+- The `3ce2a06774` integrated candidate completed all 53 gate rows: 48 passed
+  and five failed. Row 33 found two Numbers chart-font reset work-limit
+  failures and four series-style publication work-limit failures; row 38
+  found a missing Pages seed in the Python CRUD mirror. Rows 42, 48 and 52
+  found the same stale generated capability report. All terminal logs and
+  source-bound build archives are preserved. No final captures ran on 3ce;
+  the last fully qualified source remains `e0e297a82b`.
+- Accepted Pages Python repair `15767d45ea` (record 0410). The Python mirror
+  now creates the same Pages seed as the Rust CRUD checklist. All 301 Python
+  tests pass, including atomic refusal and exact inverse checks; runtime
+  bindings and assertions are unchanged. The remaining fixes stay on owned
+  branches until review, followed by a complete gate on one integrated source.
+- Cleanup has retired 66 worktrees and 59 branches. A further inactive cache
+  removal brings measured logical cleanup to 320,792,184,049 bytes (about
+  298.76 GiB), excluding the separately noted approximate 2.1 GiB owner cache
+  removal. The coordinator independently rehashed all 121 protected sibling
+  evidence files from this cleanup; all remain exact.
