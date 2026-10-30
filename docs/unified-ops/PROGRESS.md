@@ -7514,3 +7514,26 @@ See [0063](0063-source-pptx-modern-comments.md).
   all four two-call captures and source/artifact bindings. These are scoped
   measurements; full integrated qualification remains pending the series-style
   repair, and the last fully qualified source remains e0e297a82b.
+
+- Font integration `a1ccbdb94d` passed workspace compilation, all 20 locked
+  fuzz checks, boundaries, ledger and clean-source checks. Its merged worktree,
+  branch and inactive dedicated build cache were retired, preserving all
+  qualified artifacts. Cleanup totals are 69 worktrees and 62 branches, with
+  329,042,545,791 measured logical bytes removed (about 306.44 GiB).
+- Accepted Numbers series-style repair `1c997abf13` (record 0408), synchronized
+  with a1ccb. It replaces the configured 64 MiB output ceiling used as work
+  with prepared publication charges, accounts staging and clone storage, and
+  preserves typed failures through physical candidate ingress. Real exhausted
+  allocation/work controls refuse before the edit callback; normal-profile
+  host parity and scoped gates pass. Legacy style codec aggregate admission and
+  full catalog-storage census remain explicitly outside this bounded repair.
+- Independent raw audit and c063 derive accepted four source-scoped style set
+  routes/eight captures on 3dd6a6fee7 at CPU 7, with leaf/host ratios between
+  0.221086 and 0.230689. They are not final integrated evidence. Final CPU 3
+  qualification adds those four routes to the prior 119: 123 routes and 245
+  captures, plus the separate FIN matrix and quiet timing checks.
+- All repairs for the five failed 3ce gate rows are now integrated. Freeze this
+  source, rerun all 53 gate rows on this one commit, and build fresh source-bound
+  performance binaries. Final captures wait for the complete gate to pass.
+  Native routes remain pending; W3 is blocked, and the last fully qualified
+  integrated source remains e0e297a82b until these checks finish.

@@ -21,7 +21,9 @@ use std::hash::{Hash, Hasher};
 use std::mem::size_of;
 
 use litchi_iwa_archive::package::{EntryEdit, EntryInsertion, OwnedExactArtifacts};
-use litchi_iwa_archive::unstable::{CandidateIngressCharge, CandidateIngressError};
+use litchi_iwa_archive::unstable::{
+    CandidateIngressCharge, CandidateIngressError, CandidateIngressPlan,
+};
 use litchi_iwa_common::chart::error_bar::Series as ErrorBarSeries;
 use litchi_iwa_common::chart::kind::Kind as ChartKind;
 use litchi_iwa_common::chart::pie::{LabelDistance, LabelVisibility, WedgeExplosion};
@@ -1137,7 +1139,7 @@ fn map_candidate_ingress_error(error: CandidateIngressError<arrangement::Error>)
     match error {
         CandidateIngressError::Physical(error) => map_candidate_archive_error(error),
         CandidateIngressError::Admission(error) => map_arrangement(error),
-        CandidateIngressError::CloneArithmetic { .. } => Error::InvalidSource,
+        CandidateIngressError::CloneArithmetic { .. } => Error::Overflow,
         _ => Error::InvalidSource,
     }
 }
@@ -1765,10 +1767,21 @@ fn apply_one(
         if current == *property {
             return Ok(None);
         }
-        admit_style_candidate(budget)?;
+        budget
+            .preflight_allocations(values.len())
+            .map_err(map_arrangement)?;
+        budget.allocations(values.len()).map_err(map_arrangement)?;
         let values: Vec<Option<style::Value>> = values.into_iter().map(Some).collect();
-        let published = style::write(source, target.chart, target.kind, style_kind, &values)
-            .map_err(from_style)?;
+        let mut admission = StylePublicationAdmission { budget };
+        let published = style::write(
+            source,
+            target.chart,
+            target.kind,
+            style_kind,
+            &values,
+            &mut admission,
+        )
+        .map_err(from_style)?;
         return publish_changes(published, sheet, chart, property.kind(), budget);
     }
     let prepared = prepare_components(source, budget)?;
@@ -2267,23 +2280,6 @@ fn publish_changes(
     Ok(Some(published))
 }
 
-fn admit_style_candidate(budget: &mut ChartBudget) -> Result<(), Error> {
-    let bound = budget
-        .series_limits()
-        .map_err(map_arrangement)?
-        .max_output_bytes();
-    budget.preflight_output(bound).map_err(map_arrangement)?;
-    budget.preflight_retained(bound).map_err(map_arrangement)?;
-    budget.preflight_scratch(bound).map_err(map_arrangement)?;
-    budget.preflight_allocations(1).map_err(map_arrangement)?;
-    budget.output(bound).map_err(map_arrangement)?;
-    budget.retained(bound).map_err(map_arrangement)?;
-    budget.scratch(bound).map_err(map_arrangement)?;
-    budget.allocations(1).map_err(map_arrangement)?;
-    budget.candidate_reopen(bound).map_err(map_arrangement)?;
-    Ok(())
-}
-
 /// Reset series `series`' own value of a series-style property.
 fn reset_one(
     source: &Package,
@@ -2300,14 +2296,25 @@ fn reset_one(
     }
     let current = style::read(source, target.chart, target.kind, target.series, style_kind)
         .map_err(from_style)?;
+    budget
+        .preflight_allocations(target.series)
+        .map_err(map_arrangement)?;
+    budget.allocations(target.series).map_err(map_arrangement)?;
     let values: Vec<Option<style::Value>> = current
         .into_iter()
         .enumerate()
         .map(|(index, value)| (index != series).then_some(value))
         .collect();
-    admit_style_candidate(budget)?;
-    let published =
-        style::write(source, target.chart, target.kind, style_kind, &values).map_err(from_style)?;
+    let mut admission = StylePublicationAdmission { budget };
+    let published = style::write(
+        source,
+        target.chart,
+        target.kind,
+        style_kind,
+        &values,
+        &mut admission,
+    )
+    .map_err(from_style)?;
     publish_changes(published, sheet, chart, kind, budget)
 }
 
@@ -2317,6 +2324,192 @@ fn from_style(failure: style::Failure) -> Error {
         style::Failure::Refused(style::Refused::Shared) => Refusal::SharedStyle.into(),
         style::Failure::Refused(style::Refused::ImageFill) => Refusal::ImageFill.into(),
         style::Failure::Fault(fault) => fault.into(),
+        style::Failure::Budget(error) => error,
+    }
+}
+
+fn map_style_arrangement(error: arrangement::Error) -> style::Failure {
+    style::Failure::Budget(map_arrangement(error))
+}
+
+type StyleAdmissionResult<T> = Result<T, style::Failure>;
+
+struct StylePublicationAdmission<'a> {
+    budget: &'a mut ChartBudget,
+}
+
+impl style::PublicationAdmission for StylePublicationAdmission<'_> {
+    fn encode_member(
+        &mut self,
+        _name: &str,
+        archive: &Archive,
+        archive_limits: litchi_iwa_core::Limits,
+        snappy_limits: litchi_iwa_core::SnappyLimits,
+    ) -> StyleAdmissionResult<Vec<u8>> {
+        encode_and_compress_member(archive, archive_limits, snappy_limits, self.budget)
+            .map_err(style::Failure::Budget)
+    }
+
+    fn admit_reassembly(&mut self, charge: CandidateIngressCharge) -> StyleAdmissionResult<()> {
+        self.budget
+            .preflight_work(charge.traversal_bytes())
+            .map_err(map_style_arrangement)?;
+        self.budget
+            .preflight_retained(charge.retained_bytes())
+            .map_err(map_style_arrangement)?;
+        self.budget
+            .preflight_allocations(charge.allocations())
+            .map_err(map_style_arrangement)?;
+        self.budget
+            .work(charge.traversal_bytes())
+            .map_err(map_style_arrangement)?;
+        self.budget
+            .retained(charge.retained_bytes())
+            .map_err(map_style_arrangement)?;
+        self.budget
+            .allocations(charge.allocations())
+            .map_err(map_style_arrangement)
+    }
+
+    fn admit_execution(
+        &mut self,
+        requirements: litchi_iwa_archive::package::ReassemblyExecutionRequirements,
+    ) -> StyleAdmissionResult<()> {
+        self.budget
+            .reassembly(requirements)
+            .map_err(map_style_arrangement)?;
+        self.budget
+            .candidate_reopen(requirements.output_bytes())
+            .map_err(map_style_arrangement)
+    }
+
+    fn admit_candidate(
+        &mut self,
+        candidate: &[u8],
+        limits: litchi_iwa_archive::Limits,
+    ) -> StyleAdmissionResult<()> {
+        let plan = CandidateIngressPlan::from_bytes(candidate, limits)
+            .map_err(map_candidate_archive_error)
+            .map_err(style::Failure::Budget)?;
+        plan.admit_zip_directory(&mut |charge| self.admit_candidate_charge(charge))
+            .map_err(map_candidate_ingress_error)
+            .map_err(style::Failure::Budget)?;
+        for entry in plan.entries() {
+            let entry = entry
+                .map_err(map_candidate_archive_error)
+                .map_err(style::Failure::Budget)?;
+            let admitted = plan
+                .admit_entry(entry, &mut |charge| self.admit_candidate_charge(charge))
+                .map_err(map_candidate_ingress_error)
+                .map_err(style::Failure::Budget)?;
+            if entry.is_iwa() {
+                let compressed = admitted
+                    .read()
+                    .map_err(map_candidate_archive_error)
+                    .map_err(style::Failure::Budget)?;
+                plan.admit_snappy_stream(&compressed, &mut |charge| {
+                    self.admit_candidate_charge(charge)
+                })
+                .map_err(map_candidate_ingress_error)
+                .map_err(style::Failure::Budget)?;
+                let snappy_limits = limits
+                    .snappy_limits()
+                    .map_err(map_candidate_archive_error)
+                    .map_err(style::Failure::Budget)?;
+                let decoded = SnappyStream::decompress(&compressed, snappy_limits)
+                    .map_err(map_candidate_core_error)
+                    .map_err(style::Failure::Budget)?;
+                plan.admit_archive_stream(decoded.as_bytes(), &mut |charge| {
+                    self.admit_candidate_charge(charge)
+                })
+                .map_err(map_candidate_ingress_error)
+                .map_err(style::Failure::Budget)?;
+            }
+        }
+        Ok(())
+    }
+
+    fn reopen_candidate(
+        &mut self,
+        source: &Package,
+        candidate: Vec<u8>,
+    ) -> StyleAdmissionResult<Package> {
+        source
+            .reopen_candidate(candidate.into())
+            .map_err(map_candidate_package_error)
+            .map_err(style::Failure::Budget)
+    }
+
+    fn admit_clone(
+        &mut self,
+        chunk: litchi_iwa_core::ArchiveCloneInventoryChunk,
+    ) -> StyleAdmissionResult<()> {
+        self.budget
+            .preflight_work(chunk.traversal_bytes())
+            .map_err(map_style_arrangement)?;
+        self.budget
+            .preflight_retained(chunk.retained_bytes())
+            .map_err(map_style_arrangement)?;
+        self.budget
+            .preflight_allocations(chunk.allocations())
+            .map_err(map_style_arrangement)?;
+        self.budget
+            .work(chunk.traversal_bytes())
+            .map_err(map_style_arrangement)?;
+        self.budget
+            .retained(chunk.retained_bytes())
+            .map_err(map_style_arrangement)?;
+        self.budget
+            .allocations(chunk.allocations())
+            .map_err(map_style_arrangement)
+    }
+
+    fn admit_clone_arithmetic(&mut self, _resource: &'static str) -> StyleAdmissionResult<()> {
+        Err(style::Failure::Budget(Error::Overflow))
+    }
+
+    fn admit_staging(
+        &mut self,
+        charge: graph::PublicationStagingCharge,
+    ) -> StyleAdmissionResult<()> {
+        self.budget
+            .preflight_work(charge.work_bytes)
+            .map_err(map_style_arrangement)?;
+        self.budget
+            .preflight_retained(charge.retained_bytes)
+            .map_err(map_style_arrangement)?;
+        self.budget
+            .preflight_scratch(charge.scratch_bytes)
+            .map_err(map_style_arrangement)?;
+        self.budget
+            .preflight_allocations(charge.allocations)
+            .map_err(map_style_arrangement)?;
+        self.budget
+            .work(charge.work_bytes)
+            .map_err(map_style_arrangement)?;
+        self.budget
+            .retained(charge.retained_bytes)
+            .map_err(map_style_arrangement)?;
+        self.budget
+            .scratch(charge.scratch_bytes)
+            .map_err(map_style_arrangement)?;
+        self.budget
+            .allocations(charge.allocations)
+            .map_err(map_style_arrangement)
+    }
+}
+
+impl StylePublicationAdmission<'_> {
+    fn admit_candidate_charge(
+        &mut self,
+        charge: CandidateIngressCharge,
+    ) -> Result<(), arrangement::Error> {
+        self.budget.preflight_work(charge.traversal_bytes())?;
+        self.budget.preflight_retained(charge.retained_bytes())?;
+        self.budget.preflight_allocations(charge.allocations())?;
+        self.budget.work(charge.traversal_bytes())?;
+        self.budget.retained(charge.retained_bytes())?;
+        self.budget.allocations(charge.allocations())
     }
 }
 
@@ -2415,5 +2608,98 @@ impl Package {
     /// source.
     pub fn apply_sheet_chart_series(&self, patch: &Patch) -> Result<Commit, Error> {
         apply_series_patch(self, patch)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{ChartBudget, Error, LimitKind, Package, StylePublicationAdmission, graph};
+    use litchi_iwa_core::{ArchiveObject, Limits};
+    use std::path::PathBuf;
+
+    fn source() -> Package {
+        let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../../test-data/iwork/numbers/chart-data-native.numbers");
+        Package::from_bytes(&std::fs::read(path).expect("tracked chart fixture"))
+            .expect("chart fixture parses")
+    }
+
+    fn object_identifier(source: &Package) -> u64 {
+        source
+            .state
+            .components
+            .iter_objects()
+            .find_map(|object| object.archive_info.identifier)
+            .expect("fixture has an object identifier")
+    }
+
+    fn run_exhaustion(work: bool) {
+        let source = source();
+        let before = source.source_bytes().to_vec();
+        let mut budget = ChartBudget::for_package(&source).expect("chart budget");
+        if work {
+            let error = budget
+                .work(usize::MAX / 2)
+                .expect_err("large work charge must exceed the ceiling");
+            let super::arrangement::Error::Limit { maximum, .. } = error else {
+                panic!("unexpected work exhaustion error: {error:?}");
+            };
+            budget.work(maximum as usize).expect("consume work ceiling");
+        } else {
+            let error = budget
+                .allocations(usize::MAX / 2)
+                .expect_err("large allocation charge must exceed the ceiling");
+            let super::arrangement::Error::Limit { maximum, .. } = error else {
+                panic!("unexpected allocation exhaustion error: {error:?}");
+            };
+            budget
+                .allocations(maximum as usize)
+                .expect("consume allocation ceiling");
+        }
+
+        let identifier = object_identifier(&source);
+        let mut called = false;
+        let mut edit = |_object: &mut ArchiveObject, _limits: Limits| {
+            called = true;
+            Ok(())
+        };
+        let mut edits: [(u64, graph::ObjectEdit<'_>); 1] = [(identifier, &mut edit)];
+        let mut admission = StylePublicationAdmission {
+            budget: &mut budget,
+        };
+        let result = graph::publish_in_place_with_admission(&source, &mut edits, &mut admission);
+
+        match result {
+            Err(super::style::Failure::Budget(Error::Limit {
+                kind,
+                observed,
+                maximum,
+            })) => {
+                let expected = if work {
+                    LimitKind::Engine(litchi_iwa_style::series::LimitKind::Work)
+                } else {
+                    LimitKind::AllocationEvents
+                };
+                assert_eq!(kind, expected);
+                assert!(observed > maximum);
+            },
+            Err(super::style::Failure::Budget(other)) => {
+                panic!("unexpected budget error: {other:?}");
+            },
+            Err(_) => panic!("unexpected non-budget publication error"),
+            Ok(_) => panic!("exhausted admission unexpectedly published"),
+        }
+        assert!(!called, "edit callback ran after exhausted admission");
+        assert_eq!(source.source_bytes(), before.as_slice());
+    }
+
+    #[test]
+    fn style_publication_admission_rejects_allocation_exhaustion_before_edit() {
+        run_exhaustion(false);
+    }
+
+    #[test]
+    fn style_publication_admission_rejects_work_exhaustion_before_edit() {
+        run_exhaustion(true);
     }
 }
