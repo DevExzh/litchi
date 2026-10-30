@@ -1,8 +1,9 @@
 # 0408 — Numbers chart-series style gate repair
 
 - Status: bounded runtime repair on `uo2/iwa-numbers-series-gate-repair`, cut
-  from coordinator source `3ce2a06774` and synchronized with the report-only
-  trunk tip `73944b984b` before handoff.
+  from coordinator source `3ce2a06774`, synchronized with report-only trunk
+  `73944b984b`, and finally merged with the coordinator's non-overlapping font
+  fix at integrated tip `a5f00ac8f0f54ab340e6fd7797d1d91eb68e73a6`.
 - Scope: the four Numbers chart-series style families only — strokes, fills,
   symbol fills, and symbol outlines. The owning implementation is
   `crates/litchi-numbers/src/package/sheet_chart_series.rs`,
@@ -54,15 +55,45 @@ each family reported its changed `Index/CalculationEngine.iwa` member and
 matching host/leaf object counts. This is Tier A differential evidence for the
 fixture only; it is not native application acceptance evidence.
 
-## Performance boundary
+## Source-bound performance qualification
 
-No performance qualification is claimed for this repair. The old route
-refused before meaningful style publication work, so historical W2-A symbols
-or Numbers facade measurements do not qualify these families. A future
-source-bound instruction probe should cover the existing fills route and
-separate strokes, symbol-fills, and symbol-outlines routes, with setup and
-proof helpers excluded from measured wrappers. The coordinator must rerun
-that matrix on the final integrated trunk.
+The four complete-facade style routes were measured on the clean pre-merge
+source `3dd6a6fee751253f3e061eb6229f9c02233637dc` using the immutable
+release-debug1 parity ELF, CPU 7, and two selected wrapper calls per host/leaf
+side. The Callgrind total is inclusive Ir; each row is a source-built fixture
+route, not an engine-only measurement. All rows are below the 1.05 regression
+bar.
+
+| Route | Fixture | Host Ir | Leaf Ir | Leaf/host |
+| --- | --- | ---: | ---: | ---: |
+| chart series fills | Column2d chart fixture | 266,012,588 | 58,927,439 | 0.221521242446 |
+| chart series strokes | source-built Line2d chart | 254,696,939 | 58,755,837 | 0.230689215311 |
+| chart series symbol fills | source-built Line2d chart | 266,043,359 | 58,818,332 | 0.221085511103 |
+| chart series symbol outlines | source-built Line2d chart | 255,539,602 | 58,734,393 | 0.229844581976 |
+
+The archived ELF is external at
+`/home/zhuhe/code/litchi-worktrees/.coord/iwa-w2a-series-style-perf-3dd6a6fee7/bin/parity-3dd6a6fee7-release-debug1`
+(0555, 219,623,840 bytes, SHA-256
+`f0fd836369ebf3346183dcb94ae29159a03852d810eff748cd86989a7d65b043`). The
+fresh capture manifest is external at
+`.../capture-manifest-v1.json` (SHA-256
+`fe7040fd9c03f71c3ebd7c9b9a495e842981ea81189c8617a3f93cafc2295906`), with
+the compact plan at `.../callgrind-plan-v1.json` (SHA-256
+`ace539ce39cfdfce33ad07f97dfc646996e8c39114bc530c14efc2b4399a8b4e`). Raw
+Callgrind files, stdout/stderr, exit statuses, threshold-100 annotations,
+build logs, and artifact hashes remain outside the repository under
+`.../capture-v1/`; all eight legs exited 0. The c063 validator used for the
+final audit is external at
+`/home/zhuhe/code/litchi-worktrees/.coord/resume-20261028/perf/iwork-probe-isolation-final/validate_call_audit.py`
+(SHA-256
+`c0637e4304f5fdbfae6fca6b0e9a9c17f7d10cb9a56c7df6846951fa4bdf6b8e`).
+The reduced four-row summary is committed at
+`docs/unified-ops/results/0408/integrated-callgrind.json`; raw profiles and
+the ELF are not committed.
+
+These captures predate the coordinator's non-overlapping font merge, so they
+are scoped evidence for this WP rather than final integrated qualification.
+The coordinator must rerun the matrix on the final integrated trunk.
 
 ## Verification
 
@@ -74,8 +105,15 @@ Commands used with the capped offline environment (`CARGO_BUILD_JOBS=4`,
 - `cargo clippy --offline -p litchi-numbers --lib --all-features -- -D warnings`
   — pass on the final physical-ingress source (vendor warnings only).
 - `cargo test --offline -p litchi-iwa --features parity-host-oracle --test parity numbers_chart_series_style_cases::numbers_sheet_chart_series_ -- --nocapture` — 5 passed after the final clone-inventory tightening.
+- `cargo test --release --locked --offline -p litchi-iwa --features parity-host-oracle --test parity --no-run` — pass for the source-bound performance ELF.
+- Four archived-ELF ignored ABBA smokes (`chart_series_fills`,
+  `chart_series_strokes`, `chart_series_symbol_fills`,
+  `chart_series_symbol_outlines`) — 4 passed.
 - Direct `rustfmt --edition 2024 --check` on the three owned Rust files — pass.
 
 The full workspace gate, affected fuzz locks, final integrated performance,
-native queue execution, and `PROGRESS.md` remain coordinator-owned. No binary
-or large evidence file is committed.
+native queue execution, and `PROGRESS.md` remain coordinator-owned. Full
+SourceCatalog storage census and legacy style-codec aggregate admission remain
+pre-existing debt outside this fixed-cap publication slice; this record does
+not claim a complete style-parser budget migration. No binary or large
+evidence file is committed.
