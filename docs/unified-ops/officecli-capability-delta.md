@@ -35,8 +35,8 @@ row has no disposition.
 | golden | `crates/litchi-ops/tests/golden/registry/xls.json` | `82f7e11e26680573e7c4ea5270146c465b19bc72bd0f6925f0c45d2cf3eb67b8` |
 | golden | `crates/litchi-ops/tests/golden/registry/pptx.json` | `6a20ea27b072892d6d6477ab362de4e9e11c2a6474dfa0acbe8a4941377a642e` |
 | golden | `crates/litchi-ops/tests/golden/registry/ppt.json` | `4d17817dc9d2dfe0013cc5b0e54c36ef7fccf98a7bbc3bce3c532336e56158e8` |
-| golden | `crates/litchi-ops/tests/golden/registry/keynote.json` | `ae99ad664ac932fdf27bad3a7c26349cb9b141a8be8c8af1dbbca9580d9d17f8` |
-| golden | `crates/litchi-ops/tests/golden/registry/numbers.json` | `680b7cdab12b6a935a0f5d918a102de98d81e9e60d09e8c17aced888f559c2c0` |
+| golden | `crates/litchi-ops/tests/golden/registry/keynote.json` | `ef9b5c681cf66f4a2922fc7b03df045514f7f5536a790a83eabf4b1ef1555cb4` |
+| golden | `crates/litchi-ops/tests/golden/registry/numbers.json` | `02dae0f1c0192227d133f0d607781e4af52bb0c43dd5c0b35f52a1412d73bde6` |
 | golden | `crates/litchi-ops/tests/golden/registry/odb.json` | `6db2565f0802f112be6d3db035e0444e2e132d7c24546c7ff18ec004de4fada7` |
 | golden | `crates/litchi-ops/tests/golden/registry/odc.json` | `b3d7d096e06b8dd2300d8d27d56449e1cbba6976e302308f6cc47db1090bd8ee` |
 | golden | `crates/litchi-ops/tests/golden/registry/odf.json` | `7f3d45bc3a6a7be93cb0cf50617df4c59fe2c13236ce331e3142f38229005a41` |
@@ -47,7 +47,7 @@ row has no disposition.
 | golden | `crates/litchi-ops/tests/golden/registry/ods.json` | `55ac12fa012441e0a0e805b4273332be52d07761b284e0047cea832cd1a8870e` |
 | golden | `crates/litchi-ops/tests/golden/registry/odt.json` | `aff90aab29cd1019acf04b7c7e5518839fa6717121020b3594ef77a8e433a576` |
 | golden | `crates/litchi-ops/tests/golden/registry/oth.json` | `3c1993c218d197d696a1304c96f71d3ecaa4a045ce7bbacbf3e13bb8f4457771` |
-| golden | `crates/litchi-ops/tests/golden/registry/pages.json` | `7a144479a348048f8d206ef940dcdf5358ee2bf0c55f1d64a9413a2fd81c961f` |
+| golden | `crates/litchi-ops/tests/golden/registry/pages.json` | `bbc9bb12bce23f345d10c9a43f31034657c243b6591883ec77dadda0aac962fe` |
 | officecli | `schemas/help` (152 files, OfficeCLI commit `dced0d74`) | `0bcd8cae45fabc0c5e45ff99d1994465fb213ac1b8db3f7eadd87339fb40ced4` |
 
 ## Statuses
@@ -95,7 +95,7 @@ Elements:
 | pptx | 29 | 4 | 0 | 0 | 0 | 0 | 1 | 7 |
 | ppt | 23 | 10 | 0 | 0 | 0 | 0 | 1 | 6 |
 | keynote | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 16 |
-| numbers | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 7 |
+| numbers | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 8 |
 | odb | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 4 |
 | odc | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 4 |
 | odf | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 |
@@ -106,7 +106,7 @@ Elements:
 | ods | 29 | 10 | 0 | 0 | 0 | 0 | 2 | 1 |
 | odt | 31 | 13 | 0 | 0 | 0 | 0 | 2 | 5 |
 | oth | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 34 |
-| pages | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 11 |
+| pages | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 12 |
 
 Property reads:
 
@@ -1010,6 +1010,7 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 |  | mergeCell | litchi-only |  |  |  |
 |  | row | litchi-only |  |  |  |
 |  | col | litchi-only |  |  |  |
+|  | chart | litchi-only |  |  |  |
 
 ### Contextual operation gaps
 
@@ -1486,6 +1487,7 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 |  | footer | litchi-only |  |  |  |
 |  | footnotes | litchi-only |  |  |  |
 |  | footnote | litchi-only |  |  |  |
+|  | chart | litchi-only |  |  |  |
 
 ### Contextual operation gaps
 
