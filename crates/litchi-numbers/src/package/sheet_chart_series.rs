@@ -2398,9 +2398,33 @@ impl style::PublicationAdmission for StylePublicationAdmission<'_> {
             let entry = entry
                 .map_err(map_candidate_archive_error)
                 .map_err(style::Failure::Budget)?;
-            plan.admit_entry(entry, &mut |charge| self.admit_candidate_charge(charge))
+            let admitted = plan
+                .admit_entry(entry, &mut |charge| self.admit_candidate_charge(charge))
                 .map_err(map_candidate_ingress_error)
                 .map_err(style::Failure::Budget)?;
+            if entry.is_iwa() {
+                let compressed = admitted
+                    .read()
+                    .map_err(map_candidate_archive_error)
+                    .map_err(style::Failure::Budget)?;
+                plan.admit_snappy_stream(&compressed, &mut |charge| {
+                    self.admit_candidate_charge(charge)
+                })
+                .map_err(map_candidate_ingress_error)
+                .map_err(style::Failure::Budget)?;
+                let snappy_limits = limits
+                    .snappy_limits()
+                    .map_err(map_candidate_archive_error)
+                    .map_err(style::Failure::Budget)?;
+                let decoded = SnappyStream::decompress(&compressed, snappy_limits)
+                    .map_err(map_candidate_core_error)
+                    .map_err(style::Failure::Budget)?;
+                plan.admit_archive_stream(decoded.as_bytes(), &mut |charge| {
+                    self.admit_candidate_charge(charge)
+                })
+                .map_err(map_candidate_ingress_error)
+                .map_err(style::Failure::Budget)?;
+            }
         }
         Ok(())
     }
