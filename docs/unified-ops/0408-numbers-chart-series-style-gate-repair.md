@@ -24,15 +24,15 @@ shared drawable publisher. It uses the canonical prepared Archive encoding and
 Snappy compression requirements, admits each preparation chunk and execution
 requirement before allocation, admits physical reassembly before the reader is
 constructed, charges reassembly execution from the exact prepared output
-requirements, and preflights the candidate ZIP-directory/member ingress plan
-before typed candidate reopen. Candidate reopen maps archive, detection,
-common, semantic, limit, allocation, and arithmetic failures through the
-chart-series error contract. The graph publisher reserves its staging vectors,
-charges their retained/work/scratch envelopes, and uses the core archive
-clone-inventory visitor before cloning an edited component; clone arithmetic
-is reported as a typed overflow. Legacy drawable callers retain their
-established encoder through a no-op admission implementation; they do not
-inherit the chart-series style route.
+requirements, and preflights the candidate ZIP-directory/member, Snappy, and
+IWA archive/header ingress phases before typed candidate reopen. Candidate
+reopen maps archive, detection, common, semantic, limit, allocation, and
+arithmetic failures through the chart-series error contract. The graph
+publisher reserves its staging vectors, charges their retained/work/scratch
+envelopes, and uses the core archive clone-inventory visitor before cloning an
+edited component; clone arithmetic is reported as a typed overflow. Legacy
+drawable callers retain their established encoder through a no-op admission
+implementation; they do not inherit the chart-series style route.
 
 No ceiling was raised, source-size multiplier was added, or fallback to the
 legacy host was introduced. Existing selector, no-op, inverse, candidate
@@ -72,8 +72,7 @@ Commands used with the capped offline environment (`CARGO_BUILD_JOBS=4`,
 
 - `cargo check --offline -p litchi-numbers --lib` — pass.
 - `cargo clippy --offline -p litchi-numbers --lib --all-features -- -D warnings`
-  — pass on the clone-inventory source before the subsequent typed-ingress and
-  staging-charge follow-up; rerun on the final clean source.
+  — pass on the final physical-ingress source (vendor warnings only).
 - `cargo test --offline -p litchi-iwa --features parity-host-oracle --test parity numbers_chart_series_style_cases::numbers_sheet_chart_series_ -- --nocapture` — 5 passed after the final clone-inventory tightening.
 - Direct `rustfmt --edition 2024 --check` on the three owned Rust files — pass.
 
