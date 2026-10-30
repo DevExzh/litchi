@@ -526,6 +526,24 @@ fn numbers_w2a_route_cost_abba_2() -> TestResult {
         let b2 = black_box(w2a_leaf_route_2(route, &input, selector)?);
         let a2 = black_box(w2a_host_route_2(route, &input, sheet, id)?);
         assert!(!a1.is_empty() && !a2.is_empty() && !b1.is_empty() && !b2.is_empty());
+        if matches!(
+            *route,
+            "chart_series_fills"
+                | "chart_series_strokes"
+                | "chart_series_symbol_fills"
+                | "chart_series_symbol_outlines"
+        ) {
+            assert_ne!(
+                a1, input,
+                "{route}: host style route must change the source"
+            );
+            assert_ne!(
+                b1, input,
+                "{route}: leaf style route must change the source"
+            );
+            assert_eq!(a1, a2, "{route}: host route is deterministic");
+            assert_eq!(b1, b2, "{route}: leaf route is deterministic");
+        }
     }
     Ok(())
 }
