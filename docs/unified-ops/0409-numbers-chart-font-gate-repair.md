@@ -36,4 +36,3 @@ work-ceiling failure. No limit ceiling or headroom was raised.
   pass (4 contract tests).
 - Typed reset/readback/inverse/no-op behavior remains covered by the existing
   parity and contract vectors. Series-style failures are outside this slice.
-
