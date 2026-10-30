@@ -633,15 +633,15 @@ impl Edit<'_> {
             return Err(Refusal::NoStagedOperation.into());
         }
         let mut budget = self.budget;
-        let current = resolve_with_budget(
-            self.source,
-            SheetSelector::position(self.target.sheet),
-            ChartSelector::position(self.target.chart),
-            &mut budget,
-        )?;
-        if current != self.target {
-            return Err(Error::PatchConflict);
-        }
+        // `Edit` borrows an immutable source snapshot and `target` was
+        // resolved when the edit was created. Re-running the package-wide
+        // selector census here only spends the residual WireWork budget a
+        // second time; candidate publication below still re-resolves and
+        // read-backs the selected chart before returning a commit.
+        let graph_cost = preflight_graph_workspace(self.source, &budget)?;
+        let components = LeafComponents::new(self.source).map_err(Error::from)?;
+        let mut workspace = Workspace::new(&components, archive_limits(self.source)?)?;
+        charge_graph_workspace(&mut budget, graph_cost)?;
         let mut touched = [false; 2];
         let mut before_values: [Option<Property>; 2] = std::array::from_fn(|_| None);
         for change in &self.changes {
@@ -649,14 +649,19 @@ impl Edit<'_> {
             let index = property_index(kind);
             if !touched[index] {
                 touched[index] = true;
-                before_values[index] =
-                    Some(read_property(self.source, &self.target, kind, &mut budget)?);
+                let (value, report) = read_workspace(
+                    &workspace,
+                    self.target.chart_identifier,
+                    kind,
+                    budget.chart_font_limits(),
+                )
+                .map_err(map_engine_error)?;
+                budget
+                    .charge_chart_font_report(report)
+                    .map_err(map_arrangement)?;
+                before_values[index] = Some(value);
             }
         }
-        let graph_cost = preflight_graph_workspace(self.source, &budget)?;
-        let components = LeafComponents::new(self.source).map_err(Error::from)?;
-        let mut workspace = Workspace::new(&components, archive_limits(self.source)?)?;
-        charge_graph_workspace(&mut budget, graph_cost)?;
         for change in &self.changes {
             let report = chart_font::set(
                 &mut workspace,

@@ -7498,3 +7498,19 @@ See [0063](0063-source-pptx-modern-comments.md).
   unchanged. The golden check, all 1,800 tooling tests and corpus-disposition
   checks pass, addressing rows 42, 48 and 52 of the failed 3ce gate. The full
   gate will rerun after the two Numbers runtime repairs are integrated.
+
+- Report integration `73944b984b` passed workspace compilation, all 20 locked
+  fuzz checks, boundaries, ledger and clean-source checks. Its merged worktree
+  and branch were retired without touching the shared gate cache. Cleanup now
+  totals 68 worktrees and 61 branches, with 323,875,594,431 measured logical
+  bytes removed; protected logs and evidence remain exact.
+- Accepted Numbers font repair `d6717521fd` (record 0409; runtime c498ead7a1).
+  The reset failure was a duplicate registry-field admission, mislabeled by
+  the existing facade as wire work. Removing that charge and reusing one
+  admitted workspace preserves the single residual ledger and existing limits.
+  Focused parity, contract, shared-engine, strict Clippy and formatting pass.
+- Both reset routes passed source-scoped CPU 3 instruction comparisons on d671:
+  leaf/host ratios are 0.587693 and 0.568085. Independent c063 audit accepted
+  all four two-call captures and source/artifact bindings. These are scoped
+  measurements; full integrated qualification remains pending the series-style
+  repair, and the last fully qualified source remains e0e297a82b.
