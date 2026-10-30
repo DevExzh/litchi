@@ -1,9 +1,9 @@
 # 0409 — Numbers chart-font reset gate repair
 
 - Base: coordinator source `3ce2a067742b9606e3c2558adee9e022c87f0420`.
-- Scope: Numbers chart-font facade and focused parity/contract tests only;
-  shared chart-font engine registry admission and the Numbers series-style
-  paths remain separate ownership.
+- Scope: Numbers chart-font facade, the shared chart-font registry-admission
+  path, and focused parity/contract tests; Numbers series-style paths remain
+  separate ownership.
 - Performance claim: none; no capture or timing was run.
 
 ## Root cause and bounded repair
@@ -17,15 +17,17 @@ before mutating the chart, while the immutable edit already retained the
 resolved target. This left a residual field ceiling of 96,448 for a reset
 operation that required about 108,000 fields.
 
-The facade now reuses one admitted workspace for before-read, chart-font
-mutation, and staged readback. The redundant source-side selector re-resolution
-was removed; candidate publication still resolves the target and performs
-strict semantic readback. The shared engine also no longer pre-admits a
-registry mutation immediately after removing a style, before the actual
-registry mutation admission; the subsequent exact inspection and mutation
-admissions remain intact. The observed failure was a chart-font `Fields`
-admission (mapped through the existing facade taxonomy as `WireWork`), not a
-work-ceiling failure. No limit ceiling or headroom was raised.
+The root cause was an unnecessary registry-mutation admission immediately
+after removing a style, before the actual registry mutation admission. That
+duplicate charge pushed the chart-font field report above the residual default
+ceiling; the observed ~108k field count was not the operation's true required
+work. The subsequent exact inspection and mutation admissions remain intact.
+The facade also reuses one admitted workspace for before-read, chart-font
+mutation, and staged readback, and removes redundant immutable-source selector
+re-resolution. Candidate publication still resolves the target and performs
+strict semantic readback. The original debugger residual maxima were 93,258
+and 93,378; the intermediate workspace-only repair reached 96,448 before the
+registry double-charge was removed. No limit ceiling or headroom was raised.
 
 ## Verification
 
