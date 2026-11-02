@@ -1632,13 +1632,13 @@ pages/editor/body_shapes/caption.rs	remove_body_shape_caption	1	pages	drawable.s
 pages/editor/body_shapes/caption.rs	remove_body_shape_title	1	pages	drawable.shape	migrated	litchi_pages::Package::edit_body_drawable_caption	pages_body_shape_title_remove_parity	B	-	-
 pages/editor/body_shapes/caption.rs	set_body_shape_caption	1	pages	drawable.shape	migrated	litchi_pages::Package::edit_body_drawable_caption	pages_body_shape_caption_set_parity	B	-	-
 pages/editor/body_shapes/caption.rs	set_body_shape_title	1	pages	drawable.shape	migrated	litchi_pages::Package::edit_body_drawable_caption	pages_body_shape_title_set_parity	B	-	-
-pages/editor/charts.rs	add_body_chart	1	pages	chart.lifecycle	host-only	litchi-pages	-	-	-	-
+pages/editor/charts.rs	add_body_chart	1	pages	chart.lifecycle	migrated	litchi_pages::drawable::lifecycle::Edit::add_chart	pages_body_chart_add_parity	B	-	-
 pages/editor/charts.rs	body_charts	1	pages	chart.lifecycle	migrated	litchi_pages::Package::body_chart_metadata	pages_body_charts_read_parity	A	-	-
 pages/editor/charts.rs	duplicate_body_chart	1	pages	chart.lifecycle	host-only	litchi-pages	-	-	-	-
 pages/editor/charts.rs	remove_body_chart	1	pages	chart.lifecycle	host-only	litchi-pages	-	-	-	-
 pages/editor/charts.rs	set_body_chart_data	1	pages	chart.lifecycle	migrated	litchi_pages::chart::data::Edit::set	pages_body_chart_data_set_parity	B	-	-
 pages/editor/charts.rs	set_body_chart_direction	1	pages	chart.lifecycle	migrated	litchi_pages::chart::lifecycle::Edit::set_direction	pages_body_chart_direction_parity	B	-	-
-pages/editor/charts.rs	set_body_chart_geometry	1	pages	chart.lifecycle	host-only	litchi-pages	-	-	-	-
+pages/editor/charts.rs	set_body_chart_geometry	1	pages	chart.lifecycle	migrated	litchi_pages::chart::lifecycle::Edit::set_geometry	pages_body_chart_geometry_parity	B	-	-
 pages/editor/charts.rs	set_body_chart_kind	1	pages	chart.lifecycle	migrated	litchi_pages::chart::lifecycle::Edit::set_kind	pages_body_chart_kind_parity	B	-	-
 pages/editor/charts/axis.rs	body_chart_axis_title	1	pages	chart.text	migrated	litchi-pages::Package::body_chart_axis_title	pages_chart_title_and_axis_title_read_parity	A	-	-
 pages/editor/charts/axis.rs	remove_body_chart_axis_title	1	pages	chart.text	migrated	litchi-pages::Package::edit_body_chart_axis_title	pages_chart_title_and_axis_title_remove_parity	A	-	-
