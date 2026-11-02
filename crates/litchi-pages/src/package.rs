@@ -8,6 +8,7 @@ pub(crate) mod body_bookmarks;
 pub(crate) mod body_chart_arrangement;
 pub(crate) mod body_chart_data;
 pub(crate) mod body_chart_font;
+pub(crate) mod body_chart_lifecycle;
 pub(crate) mod body_chart_metadata;
 pub(crate) mod body_chart_series;
 pub(crate) mod body_chart_style;

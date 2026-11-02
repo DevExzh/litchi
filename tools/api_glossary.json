@@ -23354,6 +23354,7 @@
         "litchi_numbers::sheet::drawable::plain_text",
         "litchi_numbers::sheet::drawable::language",
         "litchi_numbers::sheet::chart::style",
+        "litchi_numbers::sheet::chart::lifecycle",
         "litchi_numbers::sheet::chart::legend_style",
         "litchi_numbers::sheet::chart::font",
         "litchi_numbers::sheet::order",
@@ -23483,6 +23484,10 @@
         {
           "method": "litchi_numbers::Package::apply_sheet_chart_style",
           "ok": "litchi_numbers::sheet::chart::style::Commit"
+        },
+        {
+          "method": "litchi_numbers::Package::apply_sheet_chart_lifecycle",
+          "ok": "litchi_numbers::sheet::chart::lifecycle::Commit"
         },
         {
           "method": "litchi_numbers::Package::apply_sheet_chart_legend_style",
@@ -24295,6 +24300,7 @@
         "litchi_numbers::sheet::drawable::plain_text",
         "litchi_numbers::sheet::drawable::language",
         "litchi_numbers::sheet::chart::style",
+        "litchi_numbers::sheet::chart::lifecycle",
         "litchi_numbers::sheet::chart::legend_style",
         "litchi_numbers::sheet::chart::font",
         "litchi_numbers::sheet::order",
@@ -24424,6 +24430,10 @@
         {
           "method": "litchi_numbers::Package::apply_sheet_chart_style",
           "ok": "litchi_numbers::sheet::chart::style::Commit"
+        },
+        {
+          "method": "litchi_numbers::Package::apply_sheet_chart_lifecycle",
+          "ok": "litchi_numbers::sheet::chart::lifecycle::Commit"
         },
         {
           "method": "litchi_numbers::Package::apply_sheet_chart_legend_style",
@@ -26053,6 +26063,7 @@
         "litchi_pages::footnote::body::transaction",
         "litchi_pages::chart::arrangement",
         "litchi_pages::chart::data",
+        "litchi_pages::chart::lifecycle",
         "litchi_pages::chart::title",
         "litchi_pages::chart::axis_title",
         "litchi_pages::chart::series",
@@ -26150,6 +26161,10 @@
         {
           "method": "litchi_pages::Package::apply_body_chart_data",
           "ok": "litchi_pages::chart::data::Commit"
+        },
+        {
+          "method": "litchi_pages::Package::apply_body_chart_lifecycle",
+          "ok": "litchi_pages::chart::lifecycle::Commit"
         },
         {
           "method": "litchi_pages::Package::apply_body_chart_title",
