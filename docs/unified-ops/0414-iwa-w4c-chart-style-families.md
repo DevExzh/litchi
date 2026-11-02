@@ -344,3 +344,54 @@ routes either way). Chart shadow, category labels and legend fonts follow.
 Slice 4 gates (trunk `d67a878026` merged at `b7ca9b584f`; logs
 `.coord/iwa-w4c/gates5`): every command of §8 exits 0; target 15 GB after
 pruning.
+
+## 12. Slice 5: lighting validation, chart shadow, category label layout
+
+**Fix (coordinator):** a 3D lighting read now refuses every package the
+host's `validate_native_package` refuses. The new
+`chart_style/lighting_package.rs` applies the host's checks at the wire
+level with `prost`'s decode semantics (the last scalar wins, a repeated
+submessage merges, a wrong wire type is an error): every light named, finite
+ambient, diffuse and specular colors and attenuation, a finite non-negative
+intensity, coordinate space 0 or 1, exactly one point, directional or spot
+source with finite vectors (and finite spot cutoff and dropoff). Regression:
+`chart_lighting_invalid_package_refuses` appends seven malformations to every
+light of a host-written Glossy package (unnamed light, NaN, negative and
+infinite intensity, NaN ambient color, coordinate space 2, two sources) on
+each format; the host and the leaf both refuse each one, and both read the
+unmodified package as Glossy.
+
+12 rows flip (chart shadow and category label layout: set and read on each
+format).
+
+| Crate | What |
+|---|---|
+| `litchi-iwa-style` | `chart_style::chart::Property::Shadow(Shadow)`, `Shadow::{None, IndividualSeries(Drop), Grouped(Drop)}` (the host's `ChartShadow`): every series style stores the drop shadow, or the disabled shadow, in field 38 (the native default removes it), and the chart style stores the grouping switch in field 13 (the host's `patch_chart_shadow_scope`: removed for the native default, otherwise written when grouped or already stored). `write_chart` requires the chart style and every series theme style (private overrides applied, all of them, not only the visible series) to be exclusive before writing, and admits the series styles to the mutation scope. The read requires the series shadows to be uniform, as the host does. `series::chart_series_styles` is the slot listing the bounded workspace path now shares; `series::style::{series_shadow, rewrite_series_shadow}` are its payload rules. `chart_style::axis::Property::CategoryLabels(Layout)` (category axis only): the interval (field 5) and show-last switch (field 26) of the category axis style, read strictly as the host's `strict_optional_varint` does (a repeated field, another wire type or trailing bytes refuse; a show-last other than 0 or 1 refuses; a negative interval is sign-extended), plus the axis labels switch. A write rewrites the axis style only when the show-last switch or a shown interval changes (after its exclusivity check), then writes the labels switch through the ordinary labels rule |
+| `litchi-numbers` | The payload-level style family publishes a shadow as one in-place publication of the chart style and every changed series style (each exclusive). The axis family publishes a category label layout as the style rewrite followed by the labels write, as the host does |
+| `litchi-keynote`, `litchi-pages` | Through `write_chart`/`write_axis` on their chart-property cores; the series styles and the axis non-style enter the scope the cores verify |
+
+Parity: the options cases gain four shadows (none on a column chart, grouped
+custom on a line chart, per-series custom on a pie, grouped native drop on a
+bar); the axis cases gain five category layouts (every third label with the
+last hidden, hidden, all, an unsupported −4 interval, hidden with the last
+hidden). Each is set, reset (options) and inverted (axis), and every read is
+host-equal on all three formats. Numbers and Pages are byte-identical (Tier
+A), Keynote Tier B. Regression `numbers_sheet_chart_shadow_shared_series_style_refuses`:
+a second chart that shares the first chart's first series style makes a
+shadow write refuse in the host and in the leaf, with the source unchanged.
+The existing W4-C style and axis rows of `0363-mac-queue.md` cover the
+routes.
+
+| Route | Host Ir | Leaf Ir | Leaf/host |
+|---|---:|---:|---:|
+| Keynote shadow set | 1,310,517,257 | 80,051,893 | 0.0611 |
+| Keynote category labels set | 797,515,286 | 77,555,220 | 0.0972 |
+| Pages shadow set | 1,945,369,030 | 49,403,764 | 0.0254 |
+| Pages category labels set | 1,222,344,574 | 47,331,224 | 0.0387 |
+| Numbers shadow set | 374,463,511 | 46,225,533 | 0.1234 |
+| Numbers category labels set | 178,412,990 | 44,534,500 | 0.2496 |
+
+Receipt `results/0414/callgrind-slice5.json`; raw captures in
+`.coord/iwa-w4c/cg5/`. The style engines' public surface only grew (new
+variants of `#[non_exhaustive]` enums and new payload functions), so W4-D's
+chart lifecycle work is unaffected. Legend font and font size follow.
