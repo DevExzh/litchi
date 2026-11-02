@@ -184,7 +184,7 @@ callgrind_annotate --inclusive=yes <route>.cg | grep 'w4c_\(host\|leaf\)_route \
 Follow-up noted, not changed here: Numbers' chart-level style writes do not
 apply the host's exclusivity refusal (the engine's workspace path does);
 aligning the Numbers payload path is a behaviour change for shared chart
-styles and is left for its own review.
+styles and is left for its own review. (Fixed in slice 3, §10.)
 
 ## 7. Verification (slice 1)
 
@@ -305,3 +305,42 @@ Receipt `results/0414/callgrind-slice3.json`; raw captures in
 
 Slice 3 gates (trunk `5b5dad5c57` merged at `9cfdf2f69d`; logs
 `.coord/iwa-w4c/gates4`): every command of §8 exits 0.
+
+## 11. Slice 4: chart background fill and 3D lighting
+
+12 rows flip (background fill and 3D lighting style: set and read on each
+format). The image background fill (`set_*_chart_background_image_fill`, three
+rows) stays host-only until the image-fill step (§6, coordinator item 6).
+
+| Crate | What |
+|---|---|
+| `litchi-iwa-style` | `chart_style::chart::Property::BackgroundFill(Fill)` (chart style field 14, `tschchartinfodefaultgridbackgroundfill`): a non-default fill is merged into the stored one with the new `merge::schema::FILL`, as the host's strict fill merge does; the native default (`chart::default_background()`, 67% gray to white, linear, 0°) removes the field, and a then-empty extension is removed; an image fill is `Refusal::ImageFill`. `chart::Property::Lighting3d(Lighting3d)`: the whole `TSCH.Chart3DLightingPackageArchive` in the family slot of the kind (area 2, bar 3, column 4, line 6, pie 7), as the host's `LightingField`; `Default` removes the package. The six preset packages are the host's encodings byte for byte (`chart_style/lighting_presets.rs`, captured from the host encoder; the parity cases compare published bytes, so a host preset change fails them). A read names the preset by its package name and refuses a package without a light or with an unknown name, as the host does (the host also range-checks every light; the leaf does not decode the lights). `chart::Property` is no longer `Copy` |
+| `litchi-iwa-protos` | `chart_style_codec::merge::schema::FILL` (`TSD.FillArchive`) |
+| `litchi-numbers`, `litchi-keynote`, `litchi-pages` | `style::Lighting3d` re-exported; `style::Patch::{before, after}` return references; Numbers' staged value is no longer `Copy` |
+
+Parity: `{numbers_sheet,keynote_slide,pages_body}_chart_options_{set,read}_parity`
+gain three background fills (solid on a column chart, none on a pie, a
+90° linear gradient on a bar) and six lighting presets (one per 3D family:
+column, stacked bar, area, line, pie, donut), each set and reset after a host
+set. Numbers and Pages are byte-identical (Tier A), Keynote Tier B (root
+previews). The existing W4-C style rows of `0363-mac-queue.md` cover the
+routes.
+
+| Route | Host Ir | Leaf Ir | Leaf/host |
+|---|---:|---:|---:|
+| Keynote background fill set | 1,087,334,143 | 77,231,949 | 0.0710 |
+| Keynote lighting set | 772,461,051 | 77,256,231 | 0.1000 |
+| Pages background fill set | 1,746,856,797 | 46,963,360 | 0.0269 |
+| Pages lighting set | 1,198,062,743 | 46,959,173 | 0.0392 |
+| Numbers background fill set | 187,024,368 | 44,589,128 | 0.2384 |
+| Numbers lighting set | 155,704,752 | 44,588,686 | 0.2864 |
+
+Receipt `results/0414/callgrind-slice4.json`; raw captures in
+`.coord/iwa-w4c/cg4/`. The release binary carries no debug info (the slice 3
+receipt's build line names `CARGO_PROFILE_RELEASE_DEBUG=1`, which the build
+environment never set; the measured symbols are the probe's `#[inline(never)]`
+routes either way). Chart shadow, category labels and legend fonts follow.
+
+Slice 4 gates (trunk `d67a878026` merged at `b7ca9b584f`; logs
+`.coord/iwa-w4c/gates5`): every command of §8 exits 0; target 15 GB after
+pruning.
