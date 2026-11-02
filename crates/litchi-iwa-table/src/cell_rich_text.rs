@@ -34,8 +34,6 @@ use crate::structure::{self, Fault, FaultLimit, FaultResult, TableLeaf, Working,
 
 /// Paragraph lists of one cell's text.
 pub mod list;
-/// Paragraph lists of any `TSWP.StorageArchive` of a working set.
-pub mod storage_list;
 /// One character or paragraph property of whole cells' text.
 pub mod text;
 

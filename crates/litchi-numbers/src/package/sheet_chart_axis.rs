@@ -18,10 +18,11 @@
 
 use std::fmt;
 
-use litchi_iwa_common::chart::axis::style::Visibility;
-use litchi_iwa_common::chart::axis::{Axis, TickMarkLocation};
+use litchi_iwa_common::chart::axis::Axis;
 use litchi_iwa_core::RawMessage;
-use litchi_iwa_protos::chart_style_codec::{self as codec, Archive, Limits, Write};
+use litchi_iwa_protos::chart_style_codec::{self as codec, Archive, Limits};
+use litchi_iwa_style::chart_style::axis as engine;
+use litchi_iwa_style::series::{Refusal as EngineRefusal, SymbolError};
 use thiserror::Error as ThisError;
 
 use super::Package;
@@ -32,107 +33,7 @@ use crate::sheet::drawable::DrawableSelector;
 
 structure::structural_family!("chart-axis");
 
-/// One axis-style property with its value.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[non_exhaustive]
-pub enum Property {
-    /// Whether the axis line shows.
-    Line(Visibility),
-    /// Whether major gridlines show.
-    MajorGridlines(Visibility),
-    /// Whether minor gridlines show.
-    MinorGridlines(Visibility),
-    /// Whether minor tick marks show.
-    MinorTickMarks(Visibility),
-    /// Where major tick marks are drawn.
-    TickMarkLocation(TickMarkLocation),
-    /// Whether the value axis shows its minimum label (value axis only).
-    MinimumLabel(Visibility),
-    /// Whether the axis labels show.
-    Labels(Visibility),
-    /// Whether the category axis shows the series names (category axis
-    /// only).
-    SeriesNames(Visibility),
-}
-
-/// The property a [`Property`] value sets, for reads.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-#[non_exhaustive]
-pub enum PropertyKind {
-    /// [`Property::Line`].
-    Line,
-    /// [`Property::MajorGridlines`].
-    MajorGridlines,
-    /// [`Property::MinorGridlines`].
-    MinorGridlines,
-    /// [`Property::MinorTickMarks`].
-    MinorTickMarks,
-    /// [`Property::TickMarkLocation`].
-    TickMarkLocation,
-    /// [`Property::MinimumLabel`].
-    MinimumLabel,
-    /// [`Property::Labels`].
-    Labels,
-    /// [`Property::SeriesNames`].
-    SeriesNames,
-}
-
-impl Property {
-    /// The property this value sets.
-    #[must_use]
-    pub const fn kind(&self) -> PropertyKind {
-        match self {
-            Self::Line(_) => PropertyKind::Line,
-            Self::MajorGridlines(_) => PropertyKind::MajorGridlines,
-            Self::MinorGridlines(_) => PropertyKind::MinorGridlines,
-            Self::MinorTickMarks(_) => PropertyKind::MinorTickMarks,
-            Self::TickMarkLocation(_) => PropertyKind::TickMarkLocation,
-            Self::MinimumLabel(_) => PropertyKind::MinimumLabel,
-            Self::Labels(_) => PropertyKind::Labels,
-            Self::SeriesNames(_) => PropertyKind::SeriesNames,
-        }
-    }
-}
-
-impl PropertyKind {
-    /// The extension field of the property on `axis` (the host's
-    /// `axis_style` constants), or `None` when the axis has no such field.
-    const fn field(self, axis: Axis) -> Option<u32> {
-        Some(match (self, axis) {
-            (Self::Line, Axis::Category) => 24,
-            (Self::Line, Axis::Value) => 25,
-            (Self::MajorGridlines, Axis::Category) => 27,
-            (Self::MajorGridlines, Axis::Value) => 28,
-            (Self::MinorGridlines, Axis::Category) => 32,
-            (Self::MinorGridlines, Axis::Value) => 33,
-            (Self::MinorTickMarks, Axis::Category) => 34,
-            (Self::MinorTickMarks, Axis::Value) => 35,
-            (Self::TickMarkLocation, Axis::Category) => 36,
-            (Self::TickMarkLocation, Axis::Value) => 37,
-            (Self::MinimumLabel, Axis::Value) => 31,
-            (Self::Labels, Axis::Category) => 9,
-            (Self::Labels, Axis::Value) => 11,
-            (Self::SeriesNames, Axis::Category) => 12,
-            _ => return None,
-        })
-    }
-
-    /// The value of a switch the style does not store.
-    const fn default_visible(self) -> bool {
-        matches!(
-            self,
-            Self::MinimumLabel | Self::MinorTickMarks | Self::Labels
-        )
-    }
-
-    /// The axis archive storing the property.
-    const fn archive(self) -> Archive {
-        match self {
-            Self::Labels | Self::SeriesNames => Archive::AxisNonStyle,
-            _ => Archive::AxisStyle,
-        }
-    }
-}
+pub use litchi_iwa_style::chart_style::axis::{Property, PropertyKind};
 
 /// A typed, content-redacted chart-axis failure.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
@@ -217,6 +118,16 @@ impl Refusal {
 impl From<Refusal> for Error {
     fn from(refusal: Refusal) -> Self {
         Self::Refused(refusal)
+    }
+}
+
+impl From<SymbolError> for Error {
+    fn from(error: SymbolError) -> Self {
+        match error {
+            SymbolError::Refused(EngineRefusal::UnsupportedAxis) => Refusal::UnsupportedAxis.into(),
+            SymbolError::Graph(litchi_iwa_style::graph::Error::Codec(error)) => error.into(),
+            _ => Self::InvalidSource,
+        }
     }
 }
 
@@ -365,14 +276,6 @@ fn exclusive(package: &Package, style: u64, archive: Archive) -> Result<bool, Er
     Ok(owners == 1)
 }
 
-const fn visibility(visible: bool) -> Visibility {
-    if visible {
-        Visibility::Visible
-    } else {
-        Visibility::Hidden
-    }
-}
-
 fn read(
     package: &Package,
     sheet: usize,
@@ -380,29 +283,14 @@ fn read(
     axis: Axis,
     kind: PropertyKind,
 ) -> Result<Property, Error> {
-    let field = kind.field(axis).ok_or(Refusal::UnsupportedAxis)?;
+    if kind.field(axis).is_none() {
+        return Err(Refusal::UnsupportedAxis.into());
+    }
     let archive = kind.archive();
     let (style, index) = axis_style(package, sheet, chart, axis, archive)?;
     let object = graph::object(package, style)?;
     let properties = codec::decode(&object.messages[index].data, archive, Limits::DEFAULT)?;
-    if kind == PropertyKind::TickMarkLocation {
-        return Ok(Property::TickMarkLocation(
-            properties
-                .int32(field)?
-                .map(TickMarkLocation::from_native)
-                .unwrap_or_default(),
-        ));
-    }
-    let visible = visibility(properties.bool(field)?.unwrap_or(kind.default_visible()));
-    Ok(match kind {
-        PropertyKind::Line => Property::Line(visible),
-        PropertyKind::MajorGridlines => Property::MajorGridlines(visible),
-        PropertyKind::MinorGridlines => Property::MinorGridlines(visible),
-        PropertyKind::MinorTickMarks => Property::MinorTickMarks(visible),
-        PropertyKind::Labels => Property::Labels(visible),
-        PropertyKind::SeriesNames => Property::SeriesNames(visible),
-        _ => Property::MinimumLabel(visible),
-    })
+    Ok(engine::value(&properties, axis, kind)?)
 }
 
 fn apply_one(
@@ -413,7 +301,6 @@ fn apply_one(
     value: Property,
 ) -> Result<Option<Published>, Error> {
     let kind = value.kind();
-    let field = kind.field(axis).ok_or(Refusal::UnsupportedAxis)?;
     if read(source, sheet, chart, axis, kind)? == value {
         return Ok(None);
     }
@@ -422,34 +309,12 @@ fn apply_one(
     if !exclusive(source, style, archive)? {
         return Err(Refusal::SharedStyle.into());
     }
-    let write = match value {
-        Property::TickMarkLocation(location) => Write::Int32 {
-            field,
-            value: Some(location.native_value()),
-        },
-        Property::Line(visible)
-        | Property::MajorGridlines(visible)
-        | Property::MinorGridlines(visible)
-        | Property::MinorTickMarks(visible)
-        | Property::MinimumLabel(visible)
-        | Property::Labels(visible)
-        | Property::SeriesNames(visible) => Write::Bool {
-            field,
-            value: Some(visible.is_visible()),
-        },
-    };
     let object = graph::object(source, style)?;
-    let rewritten = codec::rewrite(
-        &object.messages[index].data,
-        archive,
-        &[write],
-        codec::EmptyExtension::Keep,
-        Limits::DEFAULT,
-    )?;
-    if !rewritten.changed() {
+    let rewritten = engine::rewrite(&object.messages[index].data, axis, value)?;
+    if rewritten == object.messages[index].data {
         return Ok(None);
     }
-    let mut data = Some(rewritten.into_bytes().into_owned());
+    let mut data = Some(rewritten);
     let message_type = archive.message_type();
     let mut replace = |object: &mut litchi_iwa_core::ArchiveObject,
                        limits: litchi_iwa_core::Limits| {

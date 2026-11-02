@@ -15,8 +15,15 @@ use litchi_iwa_archive::package::{
 use litchi_iwa_archive::unstable::{
     CandidateIngressCharge, CandidateIngressError, CandidateIngressPlan, CandidateIngressVisitor,
 };
+use litchi_iwa_common::chart::error_bar::Series as ErrorBarSeries;
 use litchi_iwa_common::chart::kind::Kind as ChartKind;
-use litchi_iwa_common::chart::series::{Symbol, SymbolFamily};
+use litchi_iwa_common::chart::number_format::{LabelAffixes, NumberFormat};
+use litchi_iwa_common::chart::pie::{LabelDistance, LabelVisibility, WedgeExplosion};
+use litchi_iwa_common::chart::series::{
+    ConnectionLine, ConnectionLineFamily, Stroke, Symbol, SymbolFamily, SymbolFill, Trendline,
+};
+use litchi_iwa_common::chart::series_labels::Visibility;
+use litchi_iwa_common::shape::fill::Fill;
 use litchi_iwa_common::wire::{WireFieldView, WireView};
 use litchi_iwa_core::{
     Archive, ArchiveEncodingPreparationChunk, ArchiveEncodingPreparationError, ArchiveObject,
@@ -26,6 +33,8 @@ use litchi_iwa_protos::chart_metadata_codec::{self, DecodeOptions};
 use litchi_iwa_protos::chart_style_codec;
 use litchi_iwa_style::graph::{self as style_graph, Components, Workspace};
 use litchi_iwa_style::series as series_engine;
+use litchi_iwa_style::series::property as series_property;
+use litchi_iwa_style::series::style as style_engine;
 use thiserror::Error as ThisError;
 
 use super::body_chart_arrangement::{self as arrangement, ArrangementBudget, ChartTarget};
@@ -35,8 +44,8 @@ use super::{Package, PackageError};
 use crate::selector::BodyChartSelector;
 
 const CHART_MESSAGE_TYPE: u32 = 5_021;
-const SERIES_STYLE_MESSAGE_TYPE: u32 = 5_028;
-const SERIES_NON_STYLE_MESSAGE_TYPE: u32 = 5_029;
+const CHART_STYLE_MESSAGE_TYPES_FIRST: u32 = 5_022;
+const CHART_STYLE_MESSAGE_TYPES_LAST: u32 = 5_029;
 const STYLESHEET_MESSAGE_TYPE: u32 = 401;
 const OBJECT_CONTAINER_MESSAGE_TYPE: u32 = 11_008;
 const PACKAGE_METADATA_MESSAGE_TYPE: u32 = 11_006;
@@ -44,13 +53,27 @@ const ROOT_MESSAGE_TYPE: u32 = 10_000;
 const STYLE_EXTENSION_FIELD: u32 = 10_000;
 
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
-struct MutationPlan {
+pub(super) struct MutationPlan {
     components: Vec<Arc<str>>,
     objects: Vec<(Arc<str>, Vec<u64>)>,
     allowed_message_types: Vec<u32>,
     allowed_fields: Vec<u32>,
+    chart_fields: Vec<u32>,
     planned_new_members: Vec<Arc<str>>,
     planned_removed_members: Vec<Arc<str>>,
+}
+
+impl MutationPlan {
+    /// The plan of the inverse publication: members the forward edit created
+    /// leave, and members it removed come back.
+    fn inverse(&self) -> Self {
+        let mut inverse = self.clone();
+        std::mem::swap(
+            &mut inverse.planned_new_members,
+            &mut inverse.planned_removed_members,
+        );
+        inverse
+    }
 }
 
 /// A finite resource charged by one Pages body-chart series-symbol operation.
@@ -145,15 +168,35 @@ pub enum Refusal {
     /// The source is not an exact package artifact.
     #[error("this Pages source does not support exact body-chart series edits")]
     UnsupportedSource,
-    /// The chart kind has no native series-symbol family.
-    #[error("the selected chart kind does not support series symbols")]
+    /// The property does not apply to the chart's kind.
+    #[error("the property does not apply to the selected chart kind")]
     UnsupportedKind,
-    /// The symbol vector does not match the chart's visible series count.
-    #[error("the series-symbol vector has {given} values; expected {expected}")]
+    /// The value vector does not match the chart's visible series count.
+    #[error("the series vector has {given} values; expected {expected}")]
     SeriesCount { expected: usize, given: usize },
+    /// The series is past the chart's series.
+    #[error("the selected chart has no series {series}")]
+    SeriesNotFound {
+        /// The requested zero-based series.
+        series: usize,
+    },
+    /// The property has no reset (only the series-style properties do).
+    #[error("the chart property cannot be reset")]
+    NotResettable,
     /// A style object is shared by more than one chart.
-    #[error("the selected chart series style is shared by another chart")]
+    #[error("the selected chart style is shared by another chart")]
     SharedStyle,
+    /// An image fill needs the embedded-data graph this family does not
+    /// write.
+    #[error("image fills are not written by this family")]
+    ImageFill,
+    /// The property does not exist on the requested axis, or the chart has
+    /// no primary axis of that direction.
+    #[error("the chart axis has no such property")]
+    UnsupportedAxis,
+    /// The chart has no style object for the property.
+    #[error("the chart has no style object for the property")]
+    MissingStyle,
     /// No operation was staged.
     #[error("no body-chart series-symbol change is staged")]
     NoStagedOperation,
@@ -177,7 +220,12 @@ impl Refusal {
             | Self::SeriesCount { .. }
             | Self::WrongProperty
             | Self::NoStagedOperation => RefusalKind::UnsupportedOperation,
-            Self::SharedStyle | Self::UnsupportedPublication => RefusalKind::UnsupportedContent,
+            Self::SeriesNotFound { .. } => RefusalKind::NotFound,
+            Self::NotResettable => RefusalKind::UnsupportedOperation,
+            Self::UnsupportedAxis | Self::MissingStyle => RefusalKind::UnsupportedTarget,
+            Self::SharedStyle | Self::ImageFill | Self::UnsupportedPublication => {
+                RefusalKind::UnsupportedContent
+            },
         }
     }
 }
@@ -224,26 +272,129 @@ impl From<Refusal> for Error {
     }
 }
 
-/// The only supported series-symbol property.
+/// One per-series chart property: a value for every visible series, in
+/// series order.
 #[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]
 pub enum Property {
+    /// The line joining a series' points (line, area, radar and scatter
+    /// charts).
+    ConnectionLines(Vec<ConnectionLine>),
+    /// How far each wedge is pulled out of a pie or donut.
+    WedgeExplosions(Vec<WedgeExplosion>),
+    /// How far each wedge's label sits from the pie centre.
+    LabelDistances(Vec<LabelDistance>),
     /// One optional symbol value per visible chart series; `None` hides it.
     Symbols(Vec<Option<Symbol>>),
+    /// The trendline of each series.
+    Trendlines(Vec<Trendline>),
+    /// The error bars of each series.
+    ErrorBars(Vec<ErrorBarSeries>),
+    /// Which labels each pie wedge shows.
+    PieLabels(Vec<LabelVisibility>),
+    /// The value-label visibility of each series.
+    ValueLabels(Vec<Visibility>),
+    /// The value-label prefix and suffix of each series.
+    ValueLabelAffixes(Vec<LabelAffixes>),
+    /// The value-label number format of each series.
+    ValueLabelNumberFormats(Vec<NumberFormat>),
+    /// The stroke of each series (`None`: no stroke).
+    Strokes(Vec<Option<Stroke>>),
+    /// The fill of each series.
+    Fills(Vec<Fill>),
+    /// The fill of each series' data symbols.
+    SymbolFills(Vec<SymbolFill>),
+    /// The outline of each series' data symbols (`None`: no outline).
+    SymbolOutlines(Vec<Option<Stroke>>),
+}
+
+/// The property a [`Property`] value sets, for reads and resets.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum PropertyKind {
+    /// [`Property::ConnectionLines`].
+    ConnectionLines,
+    /// [`Property::WedgeExplosions`].
+    WedgeExplosions,
+    /// [`Property::LabelDistances`].
+    LabelDistances,
+    /// [`Property::Symbols`].
+    Symbols,
+    /// [`Property::Trendlines`].
+    Trendlines,
+    /// [`Property::ErrorBars`].
+    ErrorBars,
+    /// [`Property::PieLabels`].
+    PieLabels,
+    /// [`Property::ValueLabels`].
+    ValueLabels,
+    /// [`Property::ValueLabelAffixes`].
+    ValueLabelAffixes,
+    /// [`Property::ValueLabelNumberFormats`].
+    ValueLabelNumberFormats,
+    /// [`Property::Strokes`].
+    Strokes,
+    /// [`Property::Fills`].
+    Fills,
+    /// [`Property::SymbolFills`].
+    SymbolFills,
+    /// [`Property::SymbolOutlines`].
+    SymbolOutlines,
+}
+
+impl PropertyKind {
+    /// The series-style property this kind names, if it is one (the
+    /// properties [`Edit::reset`] applies to).
+    const fn style(self) -> Option<style_engine::Kind> {
+        match self {
+            Self::Strokes => Some(style_engine::Kind::Strokes),
+            Self::Fills => Some(style_engine::Kind::Fills),
+            Self::SymbolFills => Some(style_engine::Kind::SymbolFills),
+            Self::SymbolOutlines => Some(style_engine::Kind::SymbolOutlines),
+            _ => None,
+        }
+    }
 }
 
 impl Property {
     /// Return the property kind.
     #[must_use]
     pub const fn kind(&self) -> PropertyKind {
-        PropertyKind::Symbols
+        match self {
+            Self::ConnectionLines(_) => PropertyKind::ConnectionLines,
+            Self::WedgeExplosions(_) => PropertyKind::WedgeExplosions,
+            Self::LabelDistances(_) => PropertyKind::LabelDistances,
+            Self::Symbols(_) => PropertyKind::Symbols,
+            Self::Trendlines(_) => PropertyKind::Trendlines,
+            Self::ErrorBars(_) => PropertyKind::ErrorBars,
+            Self::PieLabels(_) => PropertyKind::PieLabels,
+            Self::ValueLabels(_) => PropertyKind::ValueLabels,
+            Self::ValueLabelAffixes(_) => PropertyKind::ValueLabelAffixes,
+            Self::ValueLabelNumberFormats(_) => PropertyKind::ValueLabelNumberFormats,
+            Self::Strokes(_) => PropertyKind::Strokes,
+            Self::Fills(_) => PropertyKind::Fills,
+            Self::SymbolFills(_) => PropertyKind::SymbolFills,
+            Self::SymbolOutlines(_) => PropertyKind::SymbolOutlines,
+        }
     }
 
     /// Return the number of values supplied.
     #[must_use]
     pub fn len(&self) -> usize {
         match self {
+            Self::ConnectionLines(values) => values.len(),
+            Self::WedgeExplosions(values) => values.len(),
+            Self::LabelDistances(values) => values.len(),
             Self::Symbols(values) => values.len(),
+            Self::Trendlines(values) => values.len(),
+            Self::ErrorBars(values) => values.len(),
+            Self::PieLabels(values) => values.len(),
+            Self::ValueLabels(values) => values.len(),
+            Self::ValueLabelAffixes(values) => values.len(),
+            Self::ValueLabelNumberFormats(values) => values.len(),
+            Self::Strokes(values) | Self::SymbolOutlines(values) => values.len(),
+            Self::Fills(values) => values.len(),
+            Self::SymbolFills(values) => values.len(),
         }
     }
 
@@ -252,30 +403,33 @@ impl Property {
     pub fn is_empty(&self) -> bool {
         self.len() == 0
     }
-}
 
-/// The supported body-chart series-symbol property kind.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-#[non_exhaustive]
-pub enum PropertyKind {
-    /// Symbol visibility, shape and optional point size.
-    Symbols,
-}
-
-impl PropertyKind {
-    /// Return the shared symbol property kind.
-    #[must_use]
-    pub const fn kind(self) -> Self {
-        self
+    /// The per-series style values of a series-style property.
+    fn style_values(&self) -> Option<Vec<Option<style_engine::Value>>> {
+        Some(match self {
+            Self::Strokes(values) | Self::SymbolOutlines(values) => values
+                .iter()
+                .map(|value| Some(style_engine::Value::Stroke(*value)))
+                .collect(),
+            Self::Fills(values) => values
+                .iter()
+                .map(|value| Some(style_engine::Value::Fill(value.clone())))
+                .collect(),
+            Self::SymbolFills(values) => values
+                .iter()
+                .map(|value| Some(style_engine::Value::SymbolFill(value.clone())))
+                .collect(),
+            _ => return None,
+        })
     }
 }
 
+/// The selected body chart with its kind and visible series count.
 #[derive(Clone, PartialEq)]
-struct Target {
-    chart: ChartTarget,
-    kind: ChartKind,
-    series: usize,
-    family: SymbolFamily,
+pub(super) struct Target {
+    pub(super) chart: ChartTarget,
+    pub(super) kind: ChartKind,
+    pub(super) series: usize,
 }
 
 struct PackageComponents<'a>(&'a Package);
@@ -514,6 +668,14 @@ fn map_symbol_error(error: series_engine::SymbolError) -> Error {
         series_engine::SymbolError::Allocation { amount } => Error::Allocation { amount },
         series_engine::SymbolError::Invalid(_) => Error::InvalidSource,
         series_engine::SymbolError::IdentifierOverflow => Refusal::UnsupportedPublication.into(),
+        series_engine::SymbolError::Refused(refusal) => match refusal {
+            series_engine::Refusal::UnsupportedKind => Refusal::UnsupportedKind.into(),
+            series_engine::Refusal::SharedStyle => Refusal::SharedStyle.into(),
+            series_engine::Refusal::ImageFill => Refusal::ImageFill.into(),
+            series_engine::Refusal::UnsupportedAxis => Refusal::UnsupportedAxis.into(),
+            series_engine::Refusal::MissingStyle => Refusal::MissingStyle.into(),
+            _ => Refusal::UnsupportedPublication.into(),
+        },
         _ => Error::InvalidSource,
     }
 }
@@ -949,17 +1111,10 @@ fn map_metadata_error(error: chart_metadata_codec::DecodeError) -> Error {
 }
 
 fn series_count(kind: ChartKind, components: usize) -> Result<usize, Error> {
-    let count = match kind {
-        ChartKind::Scatter2d if components == 2 => 1,
-        ChartKind::Bubble2d if components == 3 => 1,
-        ChartKind::Scatter2d | ChartKind::Bubble2d => return Err(Refusal::UnsupportedKind.into()),
-        ChartKind::MultiDataScatter2d | ChartKind::MultiDataBubble2d => 1,
-        _ => components,
-    };
-    if count == 0 {
-        return Err(Error::InvalidSource);
-    }
-    Ok(count)
+    series_engine::visible_series(kind, components).ok_or_else(|| match kind {
+        ChartKind::Scatter2d | ChartKind::Bubble2d => Refusal::UnsupportedKind.into(),
+        _ => Error::InvalidSource,
+    })
 }
 
 fn target_with_metadata(
@@ -981,41 +1136,12 @@ fn target_with_metadata(
     };
     charge_metadata_report(budget, report)?;
     let kind = ChartKind::from_native(snapshot.chart_type());
-    let family = SymbolFamily::for_chart_kind(kind).ok_or(Refusal::UnsupportedKind)?;
     let series = series_count(kind, snapshot.series_count())?;
     Ok(Target {
         chart,
         kind,
         series,
-        family,
     })
-}
-
-fn read_symbols(
-    package: &Package,
-    target: &Target,
-    budget: &mut ArrangementBudget,
-) -> Result<Vec<Option<Symbol>>, Error> {
-    admit_workspace(package, budget)?;
-    let components = PackageComponents(package);
-    let limits = archive_limits(package)?;
-    let census_limits = construction_limits(budget)?;
-    let construction = Workspace::construction_requirements(&components, census_limits)
-        .map_err(map_construction_error)?;
-    charge_workspace_construction(budget, construction)?;
-    let workspace = Workspace::new_bounded(&components, limits, construction, census_limits)
-        .map_err(map_construction_error)?;
-    let engine_limits = engine_limits(package, budget)?;
-    let (values, report) = series_engine::symbols(
-        &workspace,
-        target.chart.drawable_identifier.get(),
-        target.family,
-        target.series,
-        engine_limits,
-    )
-    .map_err(map_symbol_error)?;
-    charge_engine_report(budget, &report)?;
-    Ok(values)
 }
 
 fn preflight_publication(
@@ -1614,11 +1740,31 @@ fn mutation_plan(
             amount: scope.allowed_fields().len(),
         })?;
     allowed_fields.extend_from_slice(scope.allowed_fields());
+    budget
+        .preflight_allocations(1)
+        .and_then(|_| {
+            budget.preflight_retained(
+                scope
+                    .allowed_chart_fields()
+                    .len()
+                    .saturating_mul(size_of::<u32>()),
+            )
+        })
+        .map_err(map_arrangement_error)?;
+    budget.allocations(1).map_err(map_arrangement_error)?;
+    let mut chart_fields = Vec::new();
+    chart_fields
+        .try_reserve_exact(scope.allowed_chart_fields().len())
+        .map_err(|_| Error::Allocation {
+            amount: scope.allowed_chart_fields().len(),
+        })?;
+    chart_fields.extend_from_slice(scope.allowed_chart_fields());
     Ok(MutationPlan {
         components: scoped_components,
         objects,
         allowed_message_types,
         allowed_fields,
+        chart_fields,
         planned_new_members,
         planned_removed_members,
     })
@@ -1698,14 +1844,13 @@ fn verify_message_unknowns(
     message_type: u32,
     source: &[u8],
     candidate: &[u8],
-    family: SymbolFamily,
     plan: &MutationPlan,
     budget: &mut ArrangementBudget,
 ) -> Result<(), Error> {
     let source_view = budget.parse(source, 1).map_err(map_arrangement_error)?;
     let candidate_view = budget.parse(candidate, 1).map_err(map_arrangement_error)?;
     let outer_excluded: &[u32] = match message_type {
-        CHART_MESSAGE_TYPE | SERIES_STYLE_MESSAGE_TYPE | SERIES_NON_STYLE_MESSAGE_TYPE => {
+        CHART_MESSAGE_TYPE | CHART_STYLE_MESSAGE_TYPES_FIRST..=CHART_STYLE_MESSAGE_TYPES_LAST => {
             &[STYLE_EXTENSION_FIELD]
         },
         STYLESHEET_MESSAGE_TYPE => &[1],
@@ -1722,28 +1867,60 @@ fn verify_message_unknowns(
         budget,
     )?;
     if message_type == PACKAGE_METADATA_MESSAGE_TYPE {
-        let mut source_components = source_view.fields().filter(|field| field.number() == 3);
-        let mut candidate_components = candidate_view.fields().filter(|field| field.number() == 3);
-        loop {
-            match (source_components.next(), candidate_components.next()) {
-                (None, None) => break,
-                (Some(source_component), Some(candidate_component)) => {
-                    let source_view = budget
-                        .parse(source_component.payload(), 2)
-                        .map_err(map_arrangement_error)?;
-                    let candidate_view = budget
-                        .parse(candidate_component.payload(), 2)
-                        .map_err(map_arrangement_error)?;
-                    same_wire_fields_except(
-                        &source_view,
-                        &candidate_view,
-                        &[6, 11],
-                        &plan.allowed_fields,
-                        budget,
-                    )?;
-                },
-                _ => return Err(Error::Verification),
+        // Component registrations match by identifier: a planned new member
+        // registers one more component, a planned removed member one less;
+        // every other registration keeps its bytes outside its object-UUID
+        // and external-reference lists.
+        let mut keyed = |view: &WireView<'_>| -> Result<Vec<(Vec<u8>, Vec<u8>)>, Error> {
+            let mut entries = Vec::new();
+            for field in view.fields().filter(|field| field.number() == 3) {
+                let entry = budget
+                    .parse(field.payload(), 2)
+                    .map_err(map_arrangement_error)?;
+                let identifier = unique_wire_field(&entry, 1)?
+                    .ok_or(Error::Verification)?
+                    .payload()
+                    .to_vec();
+                budget
+                    .work(field.payload().len())
+                    .map_err(map_arrangement_error)?;
+                entries
+                    .try_reserve(1)
+                    .map_err(|_| Error::Allocation { amount: 1 })?;
+                entries.push((identifier, field.payload().to_vec()));
             }
+            Ok(entries)
+        };
+        let source_entries = keyed(&source_view)?;
+        let candidate_entries = keyed(&candidate_view)?;
+        let mut matched = 0_usize;
+        let mut removed = 0_usize;
+        for (identifier, source_entry) in &source_entries {
+            let Some((_, candidate_entry)) = candidate_entries
+                .iter()
+                .find(|(candidate, _)| candidate == identifier)
+            else {
+                removed = removed.saturating_add(1);
+                continue;
+            };
+            matched = matched.saturating_add(1);
+            let source_view = budget
+                .parse(source_entry, 2)
+                .map_err(map_arrangement_error)?;
+            let candidate_view = budget
+                .parse(candidate_entry, 2)
+                .map_err(map_arrangement_error)?;
+            same_wire_fields_except(
+                &source_view,
+                &candidate_view,
+                &[6, 11],
+                &plan.allowed_fields,
+                budget,
+            )?;
+        }
+        let added = candidate_entries.len().saturating_sub(matched);
+        if removed > plan.planned_removed_members.len() || added > plan.planned_new_members.len() {
+            return Err(Error::Verification);
         }
         return Ok(());
     }
@@ -1763,10 +1940,8 @@ fn verify_message_unknowns(
                 .parse(candidate.payload(), 2)
                 .map_err(map_arrangement_error)?;
             let excluded: &[u32] = match message_type {
-                CHART_MESSAGE_TYPE => &[19],
-                SERIES_NON_STYLE_MESSAGE_TYPE => &[family.show_field(), family.type_field()],
-                SERIES_STYLE_MESSAGE_TYPE => &[family.size_field()],
-                _ => &[],
+                CHART_MESSAGE_TYPE => &plan.chart_fields,
+                _ => &plan.allowed_fields,
             };
             same_wire_fields_except(
                 &source_view,
@@ -1783,7 +1958,6 @@ fn verify_message_unknowns(
 fn verify_object_messages(
     source: &ArchiveObject,
     candidate: &ArchiveObject,
-    family: SymbolFamily,
     plan: &MutationPlan,
     budget: &mut ArrangementBudget,
 ) -> Result<(), Error> {
@@ -1800,14 +1974,7 @@ fn verify_object_messages(
         if !plan.allowed_message_types.contains(&before.type_) {
             return Err(Error::Verification);
         }
-        verify_message_unknowns(
-            before.type_,
-            &before.data,
-            &after.data,
-            family,
-            plan,
-            budget,
-        )?;
+        verify_message_unknowns(before.type_, &before.data, &after.data, plan, budget)?;
     }
     Ok(())
 }
@@ -1816,7 +1983,6 @@ fn verify_locality(
     source: &Package,
     candidate: &Package,
     plan: &MutationPlan,
-    family: SymbolFamily,
     budget: &mut ArrangementBudget,
 ) -> Result<(), Error> {
     let changed = |name: &str| plan.components.iter().any(|item| item.as_ref() == name);
@@ -1920,7 +2086,7 @@ fn verify_locality(
                 return Err(Error::Verification);
             }
             if !unchanged {
-                verify_object_messages(before, after, family, plan, budget)?;
+                verify_object_messages(before, after, plan, budget)?;
             }
         }
         for after in &after_component.archive().objects {
@@ -2075,58 +2241,659 @@ fn zip_local_header_len(record: &[u8]) -> Option<usize> {
         .filter(|length| *length <= record.len())
 }
 
-/// A staged immutable body-chart series-symbol edit.
+// ---------------------------------------------------------------------------
+// The shared core of the Pages chart-property families (series, style,
+// axis): one transaction budget, the bounded workspace, exact-source
+// publication under the engine's mutation scope and candidate reopen.
+// ---------------------------------------------------------------------------
+
+/// The transaction budget of one chart-property operation.
+pub(super) struct Ledger {
+    budget: ArrangementBudget,
+}
+
+/// A published candidate of the shared core.
+pub(super) struct Published {
+    pub(super) package: Package,
+    pub(super) touched: usize,
+    pub(super) plan: MutationPlan,
+    pub(super) components: Arc<[Arc<str>]>,
+}
+
+impl Ledger {
+    /// Admit one operation on `package`.
+    pub(super) fn new(package: &Package) -> Result<Self, Error> {
+        Ok(Self {
+            budget: ArrangementBudget::new(package).map_err(map_arrangement_error)?,
+        })
+    }
+
+    /// Resolve the selected chart, its kind and its series count.
+    pub(super) fn target(
+        &mut self,
+        package: &Package,
+        selector: BodyChartSelector,
+    ) -> Result<Target, Error> {
+        target_with_metadata(package, selector, &mut self.budget)
+    }
+
+    /// Run one engine read over a bounded workspace of `package`.
+    pub(super) fn read<T>(
+        &mut self,
+        package: &Package,
+        read: impl FnOnce(
+            &Workspace<'_>,
+            series_engine::Limits,
+        ) -> series_engine::SymbolResult<(T, series_engine::Report)>,
+    ) -> Result<T, Error> {
+        let budget = &mut self.budget;
+        admit_workspace(package, budget)?;
+        let components = PackageComponents(package);
+        let limits = archive_limits(package)?;
+        let census_limits = construction_limits(budget)?;
+        let construction = Workspace::construction_requirements(&components, census_limits)
+            .map_err(map_construction_error)?;
+        charge_workspace_construction(budget, construction)?;
+        let workspace = Workspace::new_bounded(&components, limits, construction, census_limits)
+            .map_err(map_construction_error)?;
+        let engine_limits = engine_limits(package, budget)?;
+        let (value, report) = read(&workspace, engine_limits).map_err(map_symbol_error)?;
+        charge_engine_report(budget, &report)?;
+        Ok(value)
+    }
+
+    /// Run one engine write over a bounded workspace of `source` and publish
+    /// its changes under the engine's mutation scope; `None` when nothing
+    /// changes.
+    pub(super) fn write(
+        &mut self,
+        source: &Package,
+        write: impl FnOnce(
+            &mut Workspace<'_>,
+            series_engine::Limits,
+        ) -> series_engine::SymbolResult<(bool, series_engine::Report)>,
+    ) -> Result<Option<Published>, Error> {
+        if !source.state.source.source_is_exact() {
+            return Err(Refusal::UnsupportedSource.into());
+        }
+        let budget = &mut self.budget;
+        admit_workspace(source, budget)?;
+        let components = PackageComponents(source);
+        let limits = archive_limits(source)?;
+        let census_limits = construction_limits(budget)?;
+        let construction = Workspace::construction_requirements(&components, census_limits)
+            .map_err(map_construction_error)?;
+        charge_workspace_construction(budget, construction)?;
+        let mut workspace =
+            Workspace::new_bounded(&components, limits, construction, census_limits)
+                .map_err(map_construction_error)?;
+        let engine_limits = engine_limits(source, budget)?;
+        let (changed, report) = write(&mut workspace, engine_limits).map_err(map_symbol_error)?;
+        if !changed {
+            charge_engine_report(budget, &report)?;
+            return Ok(None);
+        }
+        let scope = report.scope().cloned().ok_or(Error::Verification)?;
+        charge_engine_report(budget, &report)?;
+        let finish_requirements = workspace.finish_requirements().map_err(map_finish_error)?;
+        preflight_finish(budget, finish_requirements)?;
+        let finish_limits = finish_limits(budget)?;
+        let (changes, finish_report) = workspace
+            .finish_bounded(finish_limits)
+            .map_err(map_finish_error)?;
+        charge_finish_report(budget, finish_report)?;
+        if changes.is_empty() {
+            return Ok(None);
+        }
+        let name_count = changes
+            .edits
+            .len()
+            .checked_add(changes.insertions.len())
+            .and_then(|value| value.checked_add(changes.deletions.len()))
+            .ok_or(Error::InvalidSource)?;
+        let name_bytes = changes
+            .edits
+            .iter()
+            .map(|(name, _)| name.len())
+            .chain(
+                changes
+                    .insertions
+                    .iter()
+                    .map(|insertion| insertion.name.len()),
+            )
+            .chain(changes.deletions.iter().map(String::len))
+            .try_fold(0usize, |total, bytes| total.checked_add(bytes))
+            .ok_or(Error::InvalidSource)?;
+        budget
+            .preflight_allocations(name_count)
+            .and_then(|_| budget.preflight_retained(name_bytes))
+            .and_then(|_| budget.preflight_work(name_bytes))
+            .map_err(map_arrangement_error)?;
+        budget
+            .allocations(name_count)
+            .and_then(|_| budget.retained(name_bytes))
+            .and_then(|_| budget.work(name_bytes))
+            .map_err(map_arrangement_error)?;
+        let mut names = Vec::new();
+        names
+            .try_reserve_exact(name_count)
+            .map_err(|_| Error::Allocation { amount: name_count })?;
+        names.extend(
+            changes
+                .edits
+                .iter()
+                .map(|(name, _)| Arc::<str>::from(name.as_str()))
+                .chain(
+                    changes
+                        .insertions
+                        .iter()
+                        .map(|insertion| Arc::<str>::from(insertion.name.as_str())),
+                )
+                .chain(
+                    changes
+                        .deletions
+                        .iter()
+                        .map(|name| Arc::<str>::from(name.as_str())),
+                ),
+        );
+        let plan = mutation_plan(source, &names, &changes, &scope, budget)?;
+        let (candidate, touched) = publish_changes(source, changes, budget)?;
+        verify_locality(source, &candidate, &plan, budget)?;
+        Ok(Some(Published {
+            package: candidate,
+            touched,
+            plan,
+            components: names.into(),
+        }))
+    }
+
+    /// Reopen the exact target of a patch over `package` and verify its
+    /// locality against `plan`.
+    pub(super) fn reopen(
+        &mut self,
+        package: &Package,
+        artifacts: &OwnedExactArtifacts,
+        plan: &MutationPlan,
+    ) -> Result<Package, Error> {
+        let budget = &mut self.budget;
+        admit_workspace(package, budget)?;
+        let source = package.state.source.shared_source();
+        let source_owner = SharedBytes::from_shared_slice(Arc::clone(&source));
+        budget
+            .work(
+                source
+                    .len()
+                    .checked_add(artifacts.source_owner().as_ref().len())
+                    .ok_or(Error::InvalidSource)?,
+            )
+            .map_err(map_arrangement_error)?;
+        if !artifacts.authorizes_owner(&source_owner) {
+            return Err(Error::PatchConflict);
+        }
+        if !package.state.source.source_is_exact() {
+            return Err(Refusal::UnsupportedSource.into());
+        }
+        let target_owner = artifacts.target_owner();
+        budget
+            .preflight_output(target_owner.as_ref().len())
+            .map_err(map_arrangement_error)?;
+        budget
+            .preflight_scratch(target_owner.as_ref().len())
+            .map_err(map_arrangement_error)?;
+        let candidate_plan = litchi_iwa_archive::SourceCatalog::__candidate_ingress(
+            target_owner.as_ref(),
+            package.state.source.limits(),
+        )
+        .map_err(map_archive_error)?;
+        charge_candidate_plan(&candidate_plan, budget)?;
+        budget
+            .output(target_owner.as_ref().len())
+            .and_then(|_| budget.scratch(target_owner.as_ref().len()))
+            .map_err(map_arrangement_error)?;
+        budget
+            .candidate_reopen(target_owner.as_ref().len())
+            .map_err(map_arrangement_error)?;
+        let candidate_bytes = Arc::<[u8]>::from(target_owner.as_ref());
+        let candidate = reopen_series_candidate(package, candidate_bytes)?;
+        verify_locality(package, &candidate, plan, budget)?;
+        Ok(candidate)
+    }
+}
+
+/// The exact artifacts of a commit from `source` to `target`.
+pub(super) fn artifacts(source: &Package, target: &Package) -> OwnedExactArtifacts {
+    OwnedExactArtifacts::new(
+        SharedBytes::from_shared_slice(source.state.source.shared_source()),
+        SharedBytes::from_shared_slice(target.state.source.shared_source()),
+    )
+}
+
+/// The exact no-op artifacts of `source`.
+pub(super) fn noop_artifacts(source: &Package) -> OwnedExactArtifacts {
+    let owner = SharedBytes::from_shared_slice(source.state.source.shared_source());
+    OwnedExactArtifacts::new(owner.clone(), owner)
+}
+
+/// Whether `artifacts` were produced from `package`'s exact bytes.
+pub(super) fn authorizes(package: &Package, artifacts: &OwnedExactArtifacts) -> bool {
+    artifacts.authorizes_owner(&SharedBytes::from_shared_slice(
+        package.state.source.shared_source(),
+    ))
+}
+
+/// Inverse a publication plan.
+pub(super) fn inverse_plan(plan: &MutationPlan) -> MutationPlan {
+    plan.inverse()
+}
+
+impl Diagnostics {
+    pub(super) const fn unchanged() -> Self {
+        Self {
+            changed: false,
+            touched_components: 0,
+        }
+    }
+
+    pub(super) const fn published(touched_components: usize) -> Self {
+        Self {
+            changed: true,
+            touched_components,
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// The per-series family.
+// ---------------------------------------------------------------------------
+
+/// One staged per-series operation.
+#[derive(Debug, Clone, PartialEq)]
+enum Staged {
+    Set(Property),
+    Reset(PropertyKind, usize),
+}
+
+/// A staged immutable body-chart per-series edit.
 pub struct Edit<'a> {
     source: &'a Package,
-    target: Target,
-    before: Vec<Option<Symbol>>,
-    budget: ArrangementBudget,
-    change: Option<Property>,
+    selector: BodyChartSelector,
+    change: Option<Staged>,
 }
 
 impl fmt::Debug for Edit<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
             .debug_struct("Edit")
-            .field("position", &self.target.chart.position)
-            .field("series", &self.target.series)
+            .field("selector", &self.selector)
             .field("staged", &self.change.is_some())
             .finish_non_exhaustive()
     }
 }
 
 impl Edit<'_> {
-    /// Stage one semantic symbol vector.
+    /// Stage `property` (one value per visible series), replacing any
+    /// staged operation.
+    ///
+    /// # Errors
+    ///
+    /// [`Refusal::SeriesCount`] for a value naming no series.
     pub fn set(mut self, property: Property) -> Result<Self, Error> {
-        if property.len() != self.target.series {
+        if property.is_empty() {
             return Err(Refusal::SeriesCount {
-                expected: self.target.series,
-                given: property.len(),
+                expected: 1,
+                given: 0,
             }
             .into());
         }
-        self.change = Some(property);
+        self.change = Some(Staged::Set(property));
+        Ok(self)
+    }
+
+    /// Stage removing series `series`' own value of a series-style property
+    /// (strokes, fills, symbol fills, symbol outlines), so it inherits its
+    /// theme style's again (the host's `reset_body_chart_series_*`).
+    ///
+    /// # Errors
+    ///
+    /// [`Refusal::NotResettable`] for the other properties.
+    pub fn reset(mut self, kind: PropertyKind, series: usize) -> Result<Self, Error> {
+        if kind.style().is_none() {
+            return Err(Refusal::NotResettable.into());
+        }
+        self.change = Some(Staged::Reset(kind, series));
         Ok(self)
     }
 
     /// Publish the staged exact-source transaction and reopen its candidate.
+    ///
+    /// # Errors
+    ///
+    /// [`Refusal::NoStagedOperation`], [`Refusal::UnsupportedKind`],
+    /// [`Refusal::SeriesCount`], [`Refusal::SeriesNotFound`],
+    /// [`Refusal::SharedStyle`], [`Refusal::ImageFill`], source, limit and
+    /// verification errors.
     pub fn commit(self) -> Result<Commit, Error> {
-        let change = self
+        let staged = self
             .change
-            .clone()
             .ok_or_else(|| Error::from(Refusal::NoStagedOperation))?;
-        commit_edit(self, change)
+        let source = self.source;
+        let mut ledger = Ledger::new(source)?;
+        let target = ledger.target(source, self.selector)?;
+        let kind = match &staged {
+            Staged::Set(property) => property.kind(),
+            Staged::Reset(kind, _) => *kind,
+        };
+        let before = read_property(&mut ledger, source, &target, kind)?;
+        let published = match &staged {
+            Staged::Set(property) => {
+                if property.len() != target.series {
+                    return Err(Refusal::SeriesCount {
+                        expected: target.series,
+                        given: property.len(),
+                    }
+                    .into());
+                }
+                if before == *property {
+                    None
+                } else {
+                    ledger.write(source, |workspace, limits| {
+                        write_property(workspace, &target, property, limits)
+                    })?
+                }
+            },
+            Staged::Reset(kind, series) => {
+                if *series >= target.series {
+                    return Err(Refusal::SeriesNotFound { series: *series }.into());
+                }
+                let style_kind = kind.style().ok_or(Refusal::NotResettable)?;
+                let mut values = before.style_values().ok_or(Error::InvalidSource)?;
+                values[*series] = None;
+                ledger.write(source, |workspace, limits| {
+                    style_engine::write(
+                        workspace,
+                        target.chart.drawable_identifier.get(),
+                        target.kind,
+                        style_kind,
+                        &values,
+                        limits,
+                    )
+                })?
+            },
+        };
+        let Some(published) = published else {
+            return Ok(Commit {
+                package: source.clone(),
+                patch: Patch {
+                    artifacts: noop_artifacts(source),
+                    position: target.chart.position,
+                    target,
+                    before: before.clone(),
+                    after: before,
+                    changed_components: Arc::from([]),
+                    plan: MutationPlan::default(),
+                },
+                diagnostics: Diagnostics::unchanged(),
+            });
+        };
+        let candidate_target = ledger.target(
+            &published.package,
+            BodyChartSelector::position(target.chart.position),
+        )?;
+        if candidate_target.kind != target.kind || candidate_target.series != target.series {
+            return Err(Error::Verification);
+        }
+        let after = read_property(&mut ledger, &published.package, &candidate_target, kind)?;
+        if let Staged::Set(property) = &staged
+            && after != *property
+        {
+            return Err(Error::Verification);
+        }
+        Ok(Commit {
+            patch: Patch {
+                artifacts: artifacts(source, &published.package),
+                position: target.chart.position,
+                target,
+                before,
+                after,
+                changed_components: published.components,
+                plan: published.plan,
+            },
+            package: published.package,
+            diagnostics: Diagnostics::published(published.touched),
+        })
     }
 }
 
-/// Exact-source reversible body-chart series-symbol patch.
+fn unsupported() -> series_engine::SymbolError {
+    series_engine::SymbolError::Refused(series_engine::Refusal::UnsupportedKind)
+}
+
+fn connection_lines(
+    kind: ChartKind,
+) -> series_engine::SymbolResult<series_property::ConnectionLines> {
+    ConnectionLineFamily::for_chart_kind(kind)
+        .map(series_property::ConnectionLines)
+        .ok_or_else(unsupported)
+}
+
+fn symbol_family(kind: ChartKind) -> series_engine::SymbolResult<SymbolFamily> {
+    SymbolFamily::for_chart_kind(kind).ok_or_else(unsupported)
+}
+
+fn value_labels(kind: ChartKind) -> series_engine::SymbolResult<series_property::ValueLabels> {
+    series_property::ValueLabels::for_chart_kind(kind).ok_or_else(unsupported)
+}
+
+fn value_label_affixes(
+    kind: ChartKind,
+) -> series_engine::SymbolResult<series_property::ValueLabelAffixes> {
+    series_property::ValueLabelAffixes::for_chart_kind(kind).ok_or_else(unsupported)
+}
+
+fn value_label_formats(
+    kind: ChartKind,
+) -> series_engine::SymbolResult<series_property::ValueLabelNumberFormats> {
+    series_property::ValueLabelNumberFormats::for_chart_kind(kind).ok_or_else(unsupported)
+}
+
+/// Read per-series property `kind` of the target chart.
+fn read_property(
+    ledger: &mut Ledger,
+    package: &Package,
+    target: &Target,
+    kind: PropertyKind,
+) -> Result<Property, Error> {
+    let chart = target.chart.drawable_identifier.get();
+    let count = target.series;
+    let chart_kind = target.kind;
+    ledger.read(package, |workspace, limits| {
+        if let Some(style_kind) = kind.style() {
+            let (values, report) =
+                style_engine::read(workspace, chart, chart_kind, count, style_kind, limits)?;
+            return Ok((from_style_values(kind, values)?, report));
+        }
+        macro_rules! generic {
+            ($variant:ident, $property:expr) => {{
+                let (values, report) =
+                    series_engine::read(workspace, chart, count, &$property, limits)?;
+                (Property::$variant(values), report)
+            }};
+        }
+        Ok(match kind {
+            PropertyKind::Symbols => {
+                let (values, report) = series_engine::symbols(
+                    workspace,
+                    chart,
+                    symbol_family(chart_kind)?,
+                    count,
+                    limits,
+                )?;
+                (Property::Symbols(values), report)
+            },
+            PropertyKind::ConnectionLines => {
+                generic!(ConnectionLines, connection_lines(chart_kind)?)
+            },
+            PropertyKind::WedgeExplosions => {
+                generic!(WedgeExplosions, series_property::WedgeExplosions)
+            },
+            PropertyKind::LabelDistances => {
+                generic!(LabelDistances, series_property::LabelDistances)
+            },
+            PropertyKind::Trendlines => generic!(Trendlines, series_property::Trendlines),
+            PropertyKind::ErrorBars => generic!(ErrorBars, series_property::ErrorBars),
+            PropertyKind::PieLabels => generic!(PieLabels, series_property::PieLabels),
+            PropertyKind::ValueLabels => generic!(ValueLabels, value_labels(chart_kind)?),
+            PropertyKind::ValueLabelAffixes => {
+                generic!(ValueLabelAffixes, value_label_affixes(chart_kind)?)
+            },
+            PropertyKind::ValueLabelNumberFormats => {
+                generic!(ValueLabelNumberFormats, value_label_formats(chart_kind)?)
+            },
+            PropertyKind::Strokes
+            | PropertyKind::Fills
+            | PropertyKind::SymbolFills
+            | PropertyKind::SymbolOutlines => {
+                return Err(series_engine::SymbolError::Invalid("a series-style kind"));
+            },
+        })
+    })
+}
+
+/// Write per-series `property` to the target chart.
+fn write_property(
+    workspace: &mut Workspace<'_>,
+    target: &Target,
+    property: &Property,
+    limits: series_engine::Limits,
+) -> series_engine::SymbolResult<(bool, series_engine::Report)> {
+    let chart = target.chart.drawable_identifier.get();
+    let chart_kind = target.kind;
+    if let (Some(style_kind), Some(values)) = (property.kind().style(), property.style_values()) {
+        return style_engine::write(workspace, chart, chart_kind, style_kind, &values, limits);
+    }
+    match property {
+        Property::Symbols(values) => {
+            series_engine::set_symbols(workspace, chart, symbol_family(chart_kind)?, values, limits)
+        },
+        Property::ConnectionLines(values) => series_engine::write(
+            workspace,
+            chart,
+            &connection_lines(chart_kind)?,
+            values,
+            limits,
+        ),
+        Property::WedgeExplosions(values) => series_engine::write(
+            workspace,
+            chart,
+            &series_property::WedgeExplosions,
+            values,
+            limits,
+        ),
+        Property::LabelDistances(values) => series_engine::write(
+            workspace,
+            chart,
+            &series_property::LabelDistances,
+            values,
+            limits,
+        ),
+        Property::Trendlines(values) => series_engine::write(
+            workspace,
+            chart,
+            &series_property::Trendlines,
+            values,
+            limits,
+        ),
+        Property::ErrorBars(values) => series_engine::write(
+            workspace,
+            chart,
+            &series_property::ErrorBars,
+            values,
+            limits,
+        ),
+        Property::PieLabels(values) => series_engine::write(
+            workspace,
+            chart,
+            &series_property::PieLabels,
+            values,
+            limits,
+        ),
+        Property::ValueLabels(values) => {
+            series_engine::write(workspace, chart, &value_labels(chart_kind)?, values, limits)
+        },
+        Property::ValueLabelAffixes(values) => series_engine::write(
+            workspace,
+            chart,
+            &value_label_affixes(chart_kind)?,
+            values,
+            limits,
+        ),
+        Property::ValueLabelNumberFormats(values) => series_engine::write(
+            workspace,
+            chart,
+            &value_label_formats(chart_kind)?,
+            values,
+            limits,
+        ),
+        Property::Strokes(_)
+        | Property::Fills(_)
+        | Property::SymbolFills(_)
+        | Property::SymbolOutlines(_) => {
+            Err(series_engine::SymbolError::Invalid("a series-style value"))
+        },
+    }
+}
+
+fn from_style_values(
+    kind: PropertyKind,
+    values: Vec<style_engine::Value>,
+) -> series_engine::SymbolResult<Property> {
+    let invalid =
+        || series_engine::SymbolError::Invalid("a series-style value of another property");
+    Ok(match kind {
+        PropertyKind::Strokes | PropertyKind::SymbolOutlines => {
+            let strokes = values
+                .into_iter()
+                .map(|value| match value {
+                    style_engine::Value::Stroke(stroke) => Ok(stroke),
+                    _ => Err(invalid()),
+                })
+                .collect::<series_engine::SymbolResult<Vec<_>>>()?;
+            if kind == PropertyKind::Strokes {
+                Property::Strokes(strokes)
+            } else {
+                Property::SymbolOutlines(strokes)
+            }
+        },
+        PropertyKind::Fills => Property::Fills(
+            values
+                .into_iter()
+                .map(|value| match value {
+                    style_engine::Value::Fill(fill) => Ok(fill),
+                    _ => Err(invalid()),
+                })
+                .collect::<series_engine::SymbolResult<_>>()?,
+        ),
+        PropertyKind::SymbolFills => Property::SymbolFills(
+            values
+                .into_iter()
+                .map(|value| match value {
+                    style_engine::Value::SymbolFill(fill) => Ok(fill),
+                    _ => Err(invalid()),
+                })
+                .collect::<series_engine::SymbolResult<_>>()?,
+        ),
+        _ => return Err(invalid()),
+    })
+}
+
+/// Exact-source reversible body-chart per-series patch.
 #[derive(Clone, PartialEq)]
 pub struct Patch {
     artifacts: OwnedExactArtifacts,
     position: Position,
     target: Target,
-    before: Vec<Option<Symbol>>,
-    after: Vec<Option<Symbol>>,
+    before: Property,
+    after: Property,
     changed_components: Arc<[Arc<str>]>,
     plan: MutationPlan,
 }
@@ -2158,7 +2925,7 @@ impl Patch {
             before: self.after.clone(),
             after: self.before.clone(),
             changed_components: self.changed_components.clone(),
-            plan: self.plan.clone(),
+            plan: self.plan.inverse(),
         }
     }
 }
@@ -2184,8 +2951,8 @@ impl Diagnostics {
     }
 }
 
-/// Fully reopened immutable result of one body-chart series-symbol edit.
-#[must_use = "a series-symbol commit contains the validated package snapshot"]
+/// Fully reopened immutable result of one body-chart per-series edit.
+#[must_use = "a chart-series commit contains the validated package snapshot"]
 #[derive(Debug)]
 pub struct Commit {
     package: Package,
@@ -2225,197 +2992,13 @@ impl Commit {
     }
 }
 
-fn unchanged(source: &Package, target: Target, before: Vec<Option<Symbol>>) -> Commit {
-    let bytes = source.state.source.shared_source();
-    let owner = SharedBytes::from_shared_slice(Arc::clone(&bytes));
-    Commit {
-        package: source.clone(),
-        patch: Patch {
-            artifacts: OwnedExactArtifacts::new(owner.clone(), owner),
-            position: target.chart.position,
-            target,
-            before: before.clone(),
-            after: before,
-            changed_components: Arc::from([]),
-            plan: MutationPlan::default(),
-        },
-        diagnostics: Diagnostics {
-            changed: false,
-            touched_components: 0,
-        },
-    }
-}
-
-fn commit_edit(edit: Edit<'_>, change: Property) -> Result<Commit, Error> {
-    let source = edit.source;
-    let mut budget = edit.budget;
-    let before = edit.before;
-    let Property::Symbols(values) = &change;
-    if values.len() != edit.target.series {
-        return Err(Refusal::SeriesCount {
-            expected: edit.target.series,
-            given: values.len(),
-        }
-        .into());
-    }
-    if before == *values {
-        return Ok(unchanged(source, edit.target, before));
-    }
-    if !source.state.source.source_is_exact() {
-        return Err(Refusal::UnsupportedSource.into());
-    }
-
-    admit_workspace(source, &mut budget)?;
-    let components = PackageComponents(source);
-    let limits = archive_limits(source)?;
-    let census_limits = construction_limits(&budget)?;
-    let construction = Workspace::construction_requirements(&components, census_limits)
-        .map_err(map_construction_error)?;
-    charge_workspace_construction(&mut budget, construction)?;
-    let mut workspace = Workspace::new_bounded(&components, limits, construction, census_limits)
-        .map_err(map_construction_error)?;
-    let engine_limits = engine_limits(source, &budget)?;
-    let (changed, report) = series_engine::set_symbols(
-        &mut workspace,
-        edit.target.chart.drawable_identifier.get(),
-        edit.target.family,
-        values,
-        engine_limits,
-    )
-    .map_err(map_symbol_error)?;
-    let scope = report.scope().cloned().ok_or(Error::Verification)?;
-    charge_engine_report(&mut budget, &report)?;
-    if !changed {
-        return Ok(unchanged(source, edit.target, before));
-    }
-    let finish_requirements = workspace.finish_requirements().map_err(map_finish_error)?;
-    preflight_finish(&budget, finish_requirements)?;
-    let finish_limits = finish_limits(&budget)?;
-    let (changes, finish_report) = workspace
-        .finish_bounded(finish_limits)
-        .map_err(map_finish_error)?;
-    charge_finish_report(&mut budget, finish_report)?;
-    if changes.is_empty() {
-        return Ok(unchanged(source, edit.target, before));
-    }
-
-    let name_count = changes
-        .edits
-        .len()
-        .checked_add(changes.insertions.len())
-        .and_then(|value| value.checked_add(changes.deletions.len()))
-        .ok_or(Error::InvalidSource)?;
-    let name_bytes = changes
-        .edits
-        .iter()
-        .map(|(name, _)| name.len())
-        .chain(
-            changes
-                .insertions
-                .iter()
-                .map(|insertion| insertion.name.len()),
-        )
-        .chain(changes.deletions.iter().map(String::len))
-        .try_fold(0usize, |total, bytes| total.checked_add(bytes))
-        .ok_or(Error::InvalidSource)?;
-    budget
-        .preflight_allocations(name_count)
-        .and_then(|_| budget.preflight_retained(name_bytes))
-        .and_then(|_| budget.preflight_work(name_bytes))
-        .map_err(map_arrangement_error)?;
-    budget
-        .allocations(name_count)
-        .and_then(|_| budget.retained(name_bytes))
-        .and_then(|_| budget.work(name_bytes))
-        .map_err(map_arrangement_error)?;
-    let mut names = Vec::new();
-    names
-        .try_reserve_exact(name_count)
-        .map_err(|_| Error::Allocation { amount: name_count })?;
-    names.extend(
-        changes
-            .edits
-            .iter()
-            .map(|(name, _)| Arc::<str>::from(name.as_str()))
-            .chain(
-                changes
-                    .insertions
-                    .iter()
-                    .map(|insertion| Arc::<str>::from(insertion.name.as_str())),
-            )
-            .chain(
-                changes
-                    .deletions
-                    .iter()
-                    .map(|name| Arc::<str>::from(name.as_str())),
-            ),
-    );
-    let plan = mutation_plan(source, &names, &changes, &scope, &mut budget)?;
-    let (candidate, touched_components) = publish_changes(source, changes, &mut budget)?;
-    let mut candidate_budget = budget;
-    let candidate_target = target_with_metadata(
-        &candidate,
-        BodyChartSelector::position(edit.target.chart.position),
-        &mut candidate_budget,
-    )?;
-    if candidate_target.kind != edit.target.kind || candidate_target.series != edit.target.series {
-        return Err(Error::Verification);
-    }
-    let after = read_symbols(&candidate, &candidate_target, &mut candidate_budget)?;
-    if after != *values {
-        return Err(Error::Verification);
-    }
-    let target_bytes = Arc::clone(&candidate.state.source.shared_source());
-    verify_locality(
-        source,
-        &candidate,
-        &plan,
-        edit.target.family,
-        &mut candidate_budget,
-    )?;
-    Ok(Commit {
-        package: candidate,
-        patch: Patch {
-            artifacts: OwnedExactArtifacts::new(
-                SharedBytes::from_shared_slice(source.state.source.shared_source()),
-                SharedBytes::from_shared_slice(target_bytes),
-            ),
-            position: edit.target.chart.position,
-            target: edit.target,
-            before,
-            after,
-            changed_components: names.into(),
-            plan,
-        },
-        diagnostics: Diagnostics {
-            changed: true,
-            touched_components,
-        },
-    })
-}
-
 fn apply_patch(package: &Package, patch: &Patch) -> Result<Commit, Error> {
-    let mut budget = ArrangementBudget::new(package).map_err(map_arrangement_error)?;
-    admit_workspace(package, &mut budget)?;
-    let source = package.state.source.shared_source();
-    let source_owner = SharedBytes::from_shared_slice(Arc::clone(&source));
-    budget
-        .work(
-            source
-                .len()
-                .checked_add(patch.artifacts.source_owner().as_ref().len())
-                .ok_or(Error::InvalidSource)?,
-        )
-        .map_err(map_arrangement_error)?;
-    if !patch.artifacts.authorizes_owner(&source_owner) {
+    let mut ledger = Ledger::new(package)?;
+    if !authorizes(package, &patch.artifacts) {
         return Err(Error::PatchConflict);
     }
-    let current = target_with_metadata(
-        package,
-        BodyChartSelector::position(patch.position),
-        &mut budget,
-    )?;
-    let before = read_symbols(package, &current, &mut budget)?;
+    let current = ledger.target(package, BodyChartSelector::position(patch.position))?;
+    let before = read_property(&mut ledger, package, &current, patch.before.kind())?;
     if !current.chart.same_identity(&patch.target.chart)
         || current.kind != patch.target.kind
         || current.series != patch.target.series
@@ -2427,43 +3010,12 @@ fn apply_patch(package: &Package, patch: &Patch) -> Result<Commit, Error> {
         return Ok(Commit {
             package: package.clone(),
             patch: patch.clone(),
-            diagnostics: Diagnostics {
-                changed: false,
-                touched_components: 0,
-            },
+            diagnostics: Diagnostics::unchanged(),
         });
     }
-    if !package.state.source.source_is_exact() {
-        return Err(Refusal::UnsupportedSource.into());
-    }
-    let target_owner = patch.artifacts.target_owner();
-    budget
-        .preflight_output(target_owner.as_ref().len())
-        .map_err(map_arrangement_error)?;
-    budget
-        .preflight_scratch(target_owner.as_ref().len())
-        .map_err(map_arrangement_error)?;
-    let candidate_plan = litchi_iwa_archive::SourceCatalog::__candidate_ingress(
-        target_owner.as_ref(),
-        package.state.source.limits(),
-    )
-    .map_err(map_archive_error)?;
-    charge_candidate_plan(&candidate_plan, &mut budget)?;
-    budget
-        .output(target_owner.as_ref().len())
-        .and_then(|_| budget.scratch(target_owner.as_ref().len()))
-        .map_err(map_arrangement_error)?;
-    budget
-        .candidate_reopen(target_owner.as_ref().len())
-        .map_err(map_arrangement_error)?;
-    let candidate_bytes = Arc::<[u8]>::from(target_owner.as_ref());
-    let candidate = reopen_series_candidate(package, candidate_bytes)?;
-    let verified = target_with_metadata(
-        &candidate,
-        BodyChartSelector::position(patch.position),
-        &mut budget,
-    )?;
-    let after = read_symbols(&candidate, &verified, &mut budget)?;
+    let candidate = ledger.reopen(package, &patch.artifacts, &patch.plan)?;
+    let verified = ledger.target(&candidate, BodyChartSelector::position(patch.position))?;
+    let after = read_property(&mut ledger, &candidate, &verified, patch.after.kind())?;
     if !verified.chart.same_identity(&patch.target.chart)
         || verified.kind != patch.target.kind
         || verified.series != patch.target.series
@@ -2471,52 +3023,72 @@ fn apply_patch(package: &Package, patch: &Patch) -> Result<Commit, Error> {
     {
         return Err(Error::Verification);
     }
-    verify_locality(
-        package,
-        &candidate,
-        &patch.plan,
-        patch.target.family,
-        &mut budget,
-    )?;
     Ok(Commit {
         package: candidate,
         patch: patch.clone(),
-        diagnostics: Diagnostics {
-            changed: true,
-            touched_components: patch.changed_components.len(),
-        },
+        diagnostics: Diagnostics::published(patch.changed_components.len()),
     })
 }
 
 impl Package {
-    /// Read the selected body chart's per-series symbols.
+    /// Read one per-series property of the selected body chart, one value
+    /// per visible series in series order.
+    ///
+    /// # Errors
+    ///
+    /// Selector errors, [`Refusal::UnsupportedKind`], source and limit
+    /// errors.
     pub fn body_chart_series(
         &self,
         selector: impl Into<BodyChartSelector>,
+        kind: PropertyKind,
     ) -> Result<Property, Error> {
-        let mut budget = ArrangementBudget::new(self).map_err(map_arrangement_error)?;
-        let target = target_with_metadata(self, selector.into(), &mut budget)?;
-        Ok(Property::Symbols(read_symbols(self, &target, &mut budget)?))
+        let mut ledger = Ledger::new(self)?;
+        let target = ledger.target(self, selector.into())?;
+        read_property(&mut ledger, self, &target, kind)
     }
 
-    /// Begin a selector-first per-series symbol transaction.
+    /// Begin a selector-first per-series chart transaction.
+    ///
+    /// ```no_run
+    /// use litchi_pages::Package;
+    /// use litchi_pages::chart::series::PropertyKind;
+    ///
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let package = Package::open("input.pages")?;
+    /// let commit = package
+    ///     .edit_body_chart_series(0)?
+    ///     .reset(PropertyKind::Fills, 0)?
+    ///     .commit()?;
+    /// let restored = commit.package().apply_body_chart_series(&commit.patch().inverse())?;
+    /// # let _ = restored;
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
+    /// # Errors
+    ///
+    /// Selector errors.
     pub fn edit_body_chart_series(
         &self,
         selector: impl Into<BodyChartSelector>,
     ) -> Result<Edit<'_>, Error> {
-        let mut budget = ArrangementBudget::new(self).map_err(map_arrangement_error)?;
-        let target = target_with_metadata(self, selector.into(), &mut budget)?;
-        let before = read_symbols(self, &target, &mut budget)?;
+        let selector = selector.into();
+        let mut ledger = Ledger::new(self)?;
+        ledger.target(self, selector)?;
         Ok(Edit {
             source: self,
-            target,
-            before,
-            budget,
+            selector,
             change: None,
         })
     }
 
     /// Apply a patch produced from this exact source package.
+    ///
+    /// # Errors
+    ///
+    /// [`Error::PatchConflict`] when this package is not the patch's exact
+    /// source; locality and verification errors.
     pub fn apply_body_chart_series(&self, patch: &Patch) -> Result<Commit, Error> {
         apply_patch(self, patch)
     }
@@ -2576,13 +3148,7 @@ mod tests {
         };
         let mut budget = ArrangementBudget::new(&package).expect("locality budget");
         assert!(matches!(
-            verify_locality(
-                &package,
-                &candidate,
-                &plan,
-                SymbolFamily::Line2d,
-                &mut budget,
-            ),
+            verify_locality(&package, &candidate, &plan, &mut budget,),
             Err(Error::Verification)
         ));
     }
@@ -2636,13 +3202,7 @@ mod tests {
         };
         let mut budget = ArrangementBudget::new(&package).expect("locality budget");
         assert!(matches!(
-            verify_locality(
-                &package,
-                &candidate,
-                &plan,
-                SymbolFamily::Line2d,
-                &mut budget,
-            ),
+            verify_locality(&package, &candidate, &plan, &mut budget,),
             Err(Error::Verification)
         ));
     }
@@ -2660,13 +3220,7 @@ mod tests {
         .expect("extra-member candidate publication");
         let mut budget = ArrangementBudget::new(&package).expect("locality budget");
         assert!(matches!(
-            verify_locality(
-                &package,
-                &candidate,
-                &empty_plan(),
-                SymbolFamily::Line2d,
-                &mut budget,
-            ),
+            verify_locality(&package, &candidate, &empty_plan(), &mut budget,),
             Err(Error::Verification)
         ));
     }
@@ -2686,13 +3240,7 @@ mod tests {
                 .expect("unplanned IWA removal");
         let mut budget = ArrangementBudget::new(&package).expect("locality budget");
         assert!(matches!(
-            verify_locality(
-                &package,
-                &removed,
-                &empty_plan(),
-                SymbolFamily::Line2d,
-                &mut budget,
-            ),
+            verify_locality(&package, &removed, &empty_plan(), &mut budget,),
             Err(Error::Verification)
         ));
     }
@@ -2717,13 +3265,7 @@ mod tests {
         let candidate = Package::from_bytes(&bytes).expect("metadata-tampered candidate");
         let mut budget = ArrangementBudget::new(&package).expect("locality budget");
         assert!(matches!(
-            verify_locality(
-                &package,
-                &candidate,
-                &empty_plan(),
-                SymbolFamily::Line2d,
-                &mut budget,
-            ),
+            verify_locality(&package, &candidate, &empty_plan(), &mut budget,),
             Err(Error::Verification)
         ));
     }
@@ -2756,13 +3298,7 @@ mod tests {
         };
         let mut budget = ArrangementBudget::new(&package).expect("locality budget");
         assert!(matches!(
-            verify_locality(
-                &package,
-                &candidate,
-                &plan,
-                SymbolFamily::Line2d,
-                &mut budget,
-            ),
+            verify_locality(&package, &candidate, &plan, &mut budget,),
             Err(Error::Verification)
         ));
     }
@@ -2795,13 +3331,7 @@ mod tests {
                 .expect("registry candidate publication");
         let mut budget = ArrangementBudget::new(&package).expect("locality budget");
         assert!(matches!(
-            verify_locality(
-                &package,
-                &candidate,
-                &empty_plan(),
-                SymbolFamily::Line2d,
-                &mut budget,
-            ),
+            verify_locality(&package, &candidate, &empty_plan(), &mut budget,),
             Err(Error::Verification)
         ));
     }

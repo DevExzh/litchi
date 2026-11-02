@@ -17,6 +17,9 @@ use litchi_iwa_common::chart::error_bar::{
     CustomValues, Direction as ErrorBarDirection, FixedValue, Percentage, Series as ErrorBarSeries,
 };
 use litchi_iwa_common::chart::kind::Kind;
+use litchi_iwa_common::chart::number_format::{
+    DecimalPlaces, LabelAffixes, NegativeStyle, NumberFormat,
+};
 use litchi_iwa_common::chart::pie::{LabelDistance, LabelVisibility, WedgeExplosion};
 use litchi_iwa_common::chart::series::{
     ConnectionLine, MovingAveragePeriod, PolynomialOrder, Symbol, SymbolShape, SymbolSize,
@@ -84,6 +87,8 @@ enum Values {
     Errors(Vec<ErrorBarSeries>),
     PieLabels(Vec<LabelVisibility>),
     ValueLabels(Vec<Visibility>),
+    Affixes(Vec<LabelAffixes>),
+    Formats(Vec<NumberFormat>),
 }
 
 impl Values {
@@ -92,7 +97,9 @@ impl Values {
             Self::Lines(kind, _) | Self::Symbols(kind, _) => *kind,
             Self::Wedges(_) | Self::Labels(_) | Self::PieLabels(_) => Kind::Pie2d,
             Self::Trends(_) => Kind::Scatter2d,
-            Self::Errors(_) | Self::ValueLabels(_) => Kind::Column2d,
+            Self::Errors(_) | Self::ValueLabels(_) | Self::Affixes(_) | Self::Formats(_) => {
+                Kind::Column2d
+            },
         }
     }
 
@@ -106,6 +113,8 @@ impl Values {
             Self::Errors(_) => PropertyKind::ErrorBars,
             Self::PieLabels(_) => PropertyKind::PieLabels,
             Self::ValueLabels(_) => PropertyKind::ValueLabels,
+            Self::Affixes(_) => PropertyKind::ValueLabelAffixes,
+            Self::Formats(_) => PropertyKind::ValueLabelNumberFormats,
         }
     }
 
@@ -148,6 +157,8 @@ impl Values {
             Self::Errors(values) => Property::ErrorBars(values.clone()),
             Self::PieLabels(values) => Property::PieLabels(values.clone()),
             Self::ValueLabels(values) => Property::ValueLabels(values.clone()),
+            Self::Affixes(values) => Property::ValueLabelAffixes(values.clone()),
+            Self::Formats(values) => Property::ValueLabelNumberFormats(values.clone()),
         })
     }
 }
@@ -260,6 +271,18 @@ fn host_write(
             series,
             v.clone()
         ),
+        Values::Affixes(v) => route!(
+            set_sheet_chart_series_value_label_affixes,
+            set_sheet_chart_series_value_label_affix,
+            series,
+            v.clone()
+        ),
+        Values::Formats(v) => route!(
+            set_sheet_chart_series_value_label_number_formats,
+            set_sheet_chart_series_value_label_number_format,
+            series,
+            v.clone()
+        ),
     }
     Ok(e.to_bytes()?)
 }
@@ -280,6 +303,14 @@ fn host_read(bytes: &[u8], sheet: u64, chart: u64, values: &Values) -> TestResul
         Values::ValueLabels(_) => format!(
             "{:?}",
             e.sheet_chart_series_value_label_visibilities(sheet, chart)?
+        ),
+        Values::Affixes(_) => format!(
+            "{:?}",
+            e.sheet_chart_series_value_label_affixes(sheet, chart)?
+        ),
+        Values::Formats(_) => format!(
+            "{:?}",
+            e.sheet_chart_series_value_label_number_formats(sheet, chart)?
         ),
     })
 }
@@ -603,7 +634,9 @@ fn replace(current: &mut Property, wanted: &Property, i: usize) -> TestResult {
         Trendlines,
         ErrorBars,
         PieLabels,
-        ValueLabels
+        ValueLabels,
+        ValueLabelAffixes,
+        ValueLabelNumberFormats
     );
     Ok(())
 }
@@ -818,6 +851,48 @@ fn numbers_sheet_chart_series_value_labels_parity() -> TestResult {
     Ok(())
 }
 
+fn affixes() -> TestResult<Values> {
+    Ok(Values::Affixes(vec![
+        LabelAffixes::new("$", " M")?,
+        LabelAffixes::new("", "%")?,
+    ]))
+}
+
+fn formats() -> TestResult<Values> {
+    Ok(Values::Formats(vec![
+        NumberFormat::new(DecimalPlaces::fixed(2)?, NegativeStyle::Parentheses, false),
+        NumberFormat::SERIES_VALUE_LABEL_NATIVE_DEFAULT,
+    ]))
+}
+
+#[test]
+fn numbers_sheet_chart_series_value_label_affixes_parity() -> TestResult {
+    let _ = Evidence::Queued;
+    let name = "numbers_sheet_chart_series_value_label_affixes_parity";
+    run(name, Tier::B, &[], &affixes()?, None)?;
+    run(
+        name,
+        Tier::B,
+        &[affixes()?],
+        &Values::Affixes(vec![
+            LabelAffixes::new("", "")?,
+            LabelAffixes::new("~", "")?,
+        ]),
+        None,
+    )?;
+    run(name, Tier::B, &[], &affixes()?, Some(1))?;
+    Ok(())
+}
+
+#[test]
+fn numbers_sheet_chart_series_value_label_number_formats_parity() -> TestResult {
+    let _ = Evidence::Queued;
+    let name = "numbers_sheet_chart_series_value_label_number_formats_parity";
+    run(name, Tier::B, &[], &formats()?, None)?;
+    run(name, Tier::B, &[], &formats()?, Some(0))?;
+    Ok(())
+}
+
 #[test]
 fn numbers_sheet_chart_series_read_parity() -> TestResult {
     let (curved, _) = lines();
@@ -837,6 +912,8 @@ fn numbers_sheet_chart_series_read_parity() -> TestResult {
             LabelVisibility::HIDDEN,
             LabelVisibility::VALUES_ONLY,
         ]),
+        affixes()?,
+        formats()?,
     ] {
         let input = chart_input(&values, std::slice::from_ref(&values))?;
         let read = Package::from_bytes(&input.fixture.bytes)?.sheet_chart_series(

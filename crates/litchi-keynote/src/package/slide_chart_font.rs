@@ -325,7 +325,9 @@ pub(super) struct MutationPlan {
 
 pub(super) fn inverse_mutation_plan(plan: &MutationPlan) -> MutationPlan {
     let mut inverse = plan.clone();
-    inverse.deleted_members = Box::default();
+    // Members the forward edit created (a series override container) leave
+    // again; members it deleted come back as changed members.
+    inverse.deleted_members = plan.planned_new_members.clone();
     std::mem::swap(
         &mut inverse.planned_new_objects,
         &mut inverse.planned_removed_objects,

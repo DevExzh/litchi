@@ -11,16 +11,10 @@
 //! metadata does not change.
 
 use litchi_iwa_common::chart::kind::Kind as ChartKind;
-use litchi_iwa_common::chart::series::{
-    FillFamily, Stroke, StrokeFamily, SymbolFill, SymbolFillFamily, SymbolOutlineFamily,
-};
-use litchi_iwa_common::shape::fill::Fill;
 use litchi_iwa_core::RawMessage;
-use litchi_iwa_protos::chart_style_codec::{
-    self as codec, Archive, Limits, Properties, property as rules,
-};
-use litchi_iwa_protos::shape_style_codec::native as stored;
-use litchi_iwa_style::drawing;
+use litchi_iwa_protos::chart_style_codec::{self as codec, Archive, Limits};
+use litchi_iwa_style::series::style as engine;
+use litchi_iwa_style::series::{Refusal as EngineRefusal, SymbolError};
 
 use super::Package;
 use super::sheet_drawable_graph::{self as graph, CHART_MESSAGE_TYPE};
@@ -53,25 +47,7 @@ fn rewriter(
     }
 }
 
-/// The longest style parent chain followed.
-const MAX_DEPTH: usize = 64;
-
-/// A property of the series styles.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(super) enum Kind {
-    Strokes,
-    Fills,
-    SymbolFills,
-    SymbolOutlines,
-}
-
-/// One series' value of a style property.
-#[derive(Debug, Clone, PartialEq)]
-pub(super) enum Value {
-    Stroke(Option<Stroke>),
-    Fill(Fill),
-    SymbolFill(SymbolFill),
-}
+pub(super) use litchi_iwa_style::series::style::{Kind, Value};
 
 /// Why a style property is refused.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -100,6 +76,18 @@ impl From<Fault> for Failure {
 impl From<super::sheet_chart_series::Error> for Failure {
     fn from(error: super::sheet_chart_series::Error) -> Self {
         Self::Budget(error)
+    }
+}
+
+impl From<SymbolError> for Failure {
+    fn from(error: SymbolError) -> Self {
+        match error {
+            SymbolError::Refused(EngineRefusal::UnsupportedKind) => Self::Refused(Refused::Kind),
+            SymbolError::Refused(EngineRefusal::ImageFill) => Self::Refused(Refused::ImageFill),
+            SymbolError::Refused(EngineRefusal::SharedStyle) => Self::Refused(Refused::Shared),
+            SymbolError::Graph(litchi_iwa_style::graph::Error::Codec(error)) => error.into(),
+            _ => Self::Fault(Fault::Invalid),
+        }
     }
 }
 
@@ -224,115 +212,15 @@ fn style_payload(package: &Package, style: u64) -> FaultResult<(usize, &[u8])> {
     Ok((index, &object.messages[index].data))
 }
 
-/// The first value `read` finds up the parent chain of `style`.
-fn inherited<T>(
-    package: &Package,
-    style: u64,
-    read: impl Fn(&Properties<'_>) -> Result<Option<T>>,
-) -> Result<Option<T>> {
-    let mut current = style;
-    for _ in 0..MAX_DEPTH {
-        let (_, payload) = style_payload(package, current)?;
-        let properties = codec::decode(payload, Archive::SeriesStyle, Limits::DEFAULT)?;
-        if let Some(value) = read(&properties)? {
-            return Ok(Some(value));
-        }
-        match codec::parent(payload, Limits::DEFAULT)? {
-            Some(parent) => current = parent,
-            None => return Ok(None),
-        }
-    }
-    Err(Failure::Fault(Fault::Invalid))
-}
-
-fn stroke_at(properties: &Properties<'_>, field: u32) -> Result<Option<Option<Stroke>>> {
-    let Some(bytes) = properties.message(field)? else {
-        return Ok(None);
-    };
-    let decoded =
-        stored::stroke(bytes, Limits::DEFAULT).map_err(|_error| Failure::Fault(Fault::Invalid))?;
-    let stroke = drawing::stroke(&decoded).map_err(|_error| Failure::Fault(Fault::Invalid))?;
-    Ok(Some(
-        stroke
-            .map(Stroke::from_shape_stroke)
-            .transpose()
-            .map_err(|_error| Failure::Fault(Fault::Invalid))?,
-    ))
-}
-
-fn fill_at(properties: &Properties<'_>, field: u32) -> Result<Option<Fill>> {
-    let Some(bytes) = properties.message(field)? else {
-        return Ok(None);
-    };
-    let decoded =
-        stored::fill(bytes, Limits::DEFAULT).map_err(|_error| Failure::Fault(Fault::Invalid))?;
-    Ok(Some(
-        drawing::fill(&decoded).map_err(|_error| Failure::Fault(Fault::Invalid))?,
-    ))
-}
-
-fn flag(properties: &Properties<'_>, field: u32) -> Result<Option<bool>> {
-    Ok(properties.varint(field)?.map(|value| value != 0))
-}
-
-fn symbol_fill_at(
-    properties: &Properties<'_>,
-    family: SymbolFillFamily,
-) -> Result<Option<SymbolFill>> {
-    let use_fill = match family.use_series_fill_field() {
-        Some(field) => flag(properties, field)?,
-        None => None,
-    };
-    let use_stroke = flag(properties, family.use_series_stroke_field())?;
-    family
-        .read(
-            use_fill,
-            use_stroke,
-            fill_at(properties, family.fill_field())?,
-        )
-        .map_err(|_error| Failure::Fault(Fault::Invalid))
-}
-
 /// The effective value of `kind` in `style` (and whether `style` defines
-/// it itself).
+/// it itself), on the shared series-style engine.
 fn effective(package: &Package, style: u64, chart: ChartKind, kind: Kind) -> Result<(Value, bool)> {
-    let (_, payload) = style_payload(package, style)?;
-    let local = codec::decode(payload, Archive::SeriesStyle, Limits::DEFAULT)?;
-    Ok(match kind {
-        Kind::Strokes | Kind::SymbolOutlines => {
-            let field = stroke_field(chart, kind)?;
-            let defined = stroke_at(&local, field)?.is_some();
-            let value = inherited(package, style, |p| stroke_at(p, field))?.flatten();
-            (Value::Stroke(value), defined)
-        },
-        Kind::Fills => {
-            let family =
-                FillFamily::for_chart_kind(chart).ok_or(Failure::Refused(Refused::Kind))?;
-            let defined = fill_at(&local, family.field())?.is_some();
-            let value = match inherited(package, style, |p| fill_at(p, family.field()))? {
-                Some(fill) => fill,
-                None => inherited(package, style, |p| fill_at(p, FillFamily::DEFAULT_FIELD))?
-                    .ok_or(Failure::Fault(Fault::Invalid))?,
-            };
-            (Value::Fill(value), defined)
-        },
-        Kind::SymbolFills => {
-            let family =
-                SymbolFillFamily::for_chart_kind(chart).ok_or(Failure::Refused(Refused::Kind))?;
-            let defined = symbol_fill_at(&local, family)?.is_some();
-            let value = inherited(package, style, |p| symbol_fill_at(p, family))?
-                .unwrap_or_else(|| family.default_fill());
-            (Value::SymbolFill(value), defined)
-        },
+    engine::effective(style, chart, kind, |identifier| {
+        style_payload(package, identifier)
+            .map(|(_, payload)| payload)
+            .map_err(|_fault| SymbolError::Invalid("a series style is missing"))
     })
-}
-
-fn stroke_field(chart: ChartKind, kind: Kind) -> Result<u32> {
-    match kind {
-        Kind::Strokes => StrokeFamily::for_chart_kind(chart).map(StrokeFamily::field),
-        _ => SymbolOutlineFamily::for_chart_kind(chart).map(SymbolOutlineFamily::field),
-    }
-    .ok_or(Failure::Refused(Refused::Kind))
+    .map_err(Failure::from)
 }
 
 /// The effective value of `kind` for each of the chart's `count` series.
@@ -372,80 +260,7 @@ fn exclusive(package: &Package, style: u64) -> Result<bool> {
 
 /// The rewritten payload of `style` storing `value` (`None`: reset).
 fn rewrite(payload: &[u8], chart: ChartKind, kind: Kind, value: Option<&Value>) -> Result<Vec<u8>> {
-    let encoded: Vec<u8>;
-    let write = match (kind, value) {
-        (Kind::Strokes, value) => {
-            let field = stroke_field(chart, kind)?;
-            match value {
-                Some(Value::Stroke(stroke)) => {
-                    encoded = drawing::encode_stroke(stroke.map(Stroke::to_shape_stroke));
-                    rules::series_stroke(field, Some(&encoded))
-                },
-                None => rules::series_stroke(field, None),
-                Some(_) => return Err(Failure::Fault(Fault::Invalid)),
-            }
-        },
-        (Kind::SymbolOutlines, value) => {
-            let field = stroke_field(chart, kind)?;
-            match value {
-                Some(Value::Stroke(stroke)) => {
-                    encoded = drawing::encode_stroke(stroke.map(Stroke::to_shape_stroke));
-                    rules::series_message(field, Some(&encoded))
-                },
-                None => rules::series_message(field, None),
-                Some(_) => return Err(Failure::Fault(Fault::Invalid)),
-            }
-        },
-        (Kind::Fills, value) => {
-            let family =
-                FillFamily::for_chart_kind(chart).ok_or(Failure::Refused(Refused::Kind))?;
-            match value {
-                Some(Value::Fill(Fill::Image(_))) => {
-                    return Err(Failure::Refused(Refused::ImageFill));
-                },
-                Some(Value::Fill(fill)) => {
-                    encoded = drawing::encode_fill(fill);
-                    rules::series_message(family.field(), Some(&encoded))
-                },
-                None => rules::series_message(family.field(), None),
-                Some(_) => return Err(Failure::Fault(Fault::Invalid)),
-            }
-        },
-        (Kind::SymbolFills, value) => {
-            let family =
-                SymbolFillFamily::for_chart_kind(chart).ok_or(Failure::Refused(Refused::Kind))?;
-            let stored = match value {
-                Some(Value::SymbolFill(SymbolFill::Custom(Fill::Image(_)))) => {
-                    return Err(Failure::Refused(Refused::ImageFill));
-                },
-                Some(Value::SymbolFill(SymbolFill::Custom(fill))) => {
-                    encoded = drawing::encode_fill(fill);
-                    rules::SymbolFill::Custom(&encoded)
-                },
-                Some(Value::SymbolFill(SymbolFill::SeriesFill)) => rules::SymbolFill::SeriesFill,
-                Some(Value::SymbolFill(SymbolFill::SeriesStroke)) => {
-                    rules::SymbolFill::SeriesStroke
-                },
-                None => rules::SymbolFill::Reset,
-                Some(_) => return Err(Failure::Fault(Fault::Invalid)),
-            };
-            rules::symbol_fill(
-                family.fill_field(),
-                family.use_series_fill_field(),
-                family.use_series_stroke_field(),
-                stored,
-            )
-            .ok_or(Failure::Refused(Refused::Kind))?
-        },
-    };
-    let rewritten = codec::rewrite(
-        payload,
-        write.archive(),
-        write.writes(),
-        write.empty(),
-        Limits::DEFAULT,
-    )?;
-    Ok(rewritten.into_bytes().into_owned())
+    engine::rewrite(payload, chart, kind, value).map_err(Failure::from)
 }
 
 /// Store `values` (`Some`: set; `None`: reset) in the effective styles of

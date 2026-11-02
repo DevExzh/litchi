@@ -26,6 +26,7 @@ use litchi_iwa_archive::unstable::{
 };
 use litchi_iwa_common::chart::error_bar::Series as ErrorBarSeries;
 use litchi_iwa_common::chart::kind::Kind as ChartKind;
+use litchi_iwa_common::chart::number_format::{LabelAffixes, NumberFormat};
 use litchi_iwa_common::chart::pie::{LabelDistance, LabelVisibility, WedgeExplosion};
 use litchi_iwa_common::chart::series::{
     ConnectionLine, ConnectionLineFamily, Stroke, Symbol, SymbolFamily, SymbolFill, Trendline,
@@ -41,8 +42,8 @@ use litchi_iwa_style::graph::Workspace;
 use litchi_iwa_style::series::{
     self as engine,
     property::{
-        ConnectionLines, ErrorBars, LabelDistances, PieLabels, Trendlines, ValueLabels,
-        WedgeExplosions,
+        ConnectionLines, ErrorBars, LabelDistances, PieLabels, Trendlines, ValueLabelAffixes,
+        ValueLabelNumberFormats, ValueLabels, WedgeExplosions,
     },
 };
 use thiserror::Error as ThisError;
@@ -172,7 +173,7 @@ impl From<structure::Fault> for Error {
     }
 }
 
-const PROPERTY_KINDS: usize = 12;
+const PROPERTY_KINDS: usize = 14;
 
 const fn property_index(kind: PropertyKind) -> usize {
     match kind {
@@ -188,6 +189,8 @@ const fn property_index(kind: PropertyKind) -> usize {
         PropertyKind::Fills => 9,
         PropertyKind::SymbolFills => 10,
         PropertyKind::SymbolOutlines => 11,
+        PropertyKind::ValueLabelAffixes => 12,
+        PropertyKind::ValueLabelNumberFormats => 13,
     }
 }
 
@@ -371,6 +374,10 @@ pub enum Property {
     PieLabels(Vec<LabelVisibility>),
     /// The value-label visibility of each series.
     ValueLabels(Vec<Visibility>),
+    /// The value-label prefix and suffix of each series.
+    ValueLabelAffixes(Vec<LabelAffixes>),
+    /// The value-label number format of each series.
+    ValueLabelNumberFormats(Vec<NumberFormat>),
     /// The stroke of each series (`None`: no stroke).
     Strokes(Vec<Option<Stroke>>),
     /// The fill of each series.
@@ -401,6 +408,10 @@ pub enum PropertyKind {
     PieLabels,
     /// [`Property::ValueLabels`].
     ValueLabels,
+    /// [`Property::ValueLabelAffixes`].
+    ValueLabelAffixes,
+    /// [`Property::ValueLabelNumberFormats`].
+    ValueLabelNumberFormats,
     /// [`Property::Strokes`].
     Strokes,
     /// [`Property::Fills`].
@@ -438,6 +449,8 @@ impl Property {
             Self::ErrorBars(_) => PropertyKind::ErrorBars,
             Self::PieLabels(_) => PropertyKind::PieLabels,
             Self::ValueLabels(_) => PropertyKind::ValueLabels,
+            Self::ValueLabelAffixes(_) => PropertyKind::ValueLabelAffixes,
+            Self::ValueLabelNumberFormats(_) => PropertyKind::ValueLabelNumberFormats,
             Self::Strokes(_) => PropertyKind::Strokes,
             Self::Fills(_) => PropertyKind::Fills,
             Self::SymbolFills(_) => PropertyKind::SymbolFills,
@@ -473,6 +486,8 @@ impl Property {
             Self::ErrorBars(values) => values.len(),
             Self::PieLabels(values) => values.len(),
             Self::ValueLabels(values) => values.len(),
+            Self::ValueLabelAffixes(values) => values.len(),
+            Self::ValueLabelNumberFormats(values) => values.len(),
             Self::Strokes(values) | Self::SymbolOutlines(values) => values.len(),
             Self::Fills(values) => values.len(),
             Self::SymbolFills(values) => values.len(),
@@ -957,17 +972,7 @@ fn target_from_selection(
 /// bubble (`X + Y + size`) chart and the multi-data point charts, which show
 /// one.
 fn series_count(kind: ChartKind, components: usize) -> Result<usize, Error> {
-    let count = match kind {
-        ChartKind::Scatter2d if components == 2 => 1,
-        ChartKind::Bubble2d if components == 3 => 1,
-        ChartKind::Scatter2d | ChartKind::Bubble2d => return Err(Error::InvalidSource),
-        ChartKind::MultiDataScatter2d | ChartKind::MultiDataBubble2d => 1,
-        _ => components,
-    };
-    if count == 0 {
-        return Err(Error::InvalidSource);
-    }
-    Ok(count)
+    engine::visible_series(kind, components).ok_or(Error::InvalidSource)
 }
 
 fn map_arrangement(error: arrangement::Error) -> Error {
@@ -1644,6 +1649,8 @@ fn apply_series_patch(package: &Package, patch: &Patch) -> Result<Commit, Error>
             9 => PropertyKind::Fills,
             10 => PropertyKind::SymbolFills,
             11 => PropertyKind::SymbolOutlines,
+            12 => PropertyKind::ValueLabelAffixes,
+            13 => PropertyKind::ValueLabelNumberFormats,
             _ => return Err(Error::Verification),
         };
         if read(&candidate, patch.sheet, patch.chart, kind, &mut budget)? != *expected {
@@ -1672,6 +1679,14 @@ fn symbols(kind: ChartKind) -> Result<SymbolFamily, Error> {
 
 fn value_labels(kind: ChartKind) -> Result<ValueLabels, Error> {
     Ok(ValueLabels::for_chart_kind(kind).ok_or(Refusal::UnsupportedKind)?)
+}
+
+fn value_label_affixes(kind: ChartKind) -> Result<ValueLabelAffixes, Error> {
+    Ok(ValueLabelAffixes::for_chart_kind(kind).ok_or(Refusal::UnsupportedKind)?)
+}
+
+fn value_label_formats(kind: ChartKind) -> Result<ValueLabelNumberFormats, Error> {
+    Ok(ValueLabelNumberFormats::for_chart_kind(kind).ok_or(Refusal::UnsupportedKind)?)
 }
 
 fn read(
@@ -1734,6 +1749,18 @@ fn read(
             chart,
             count,
             &value_labels(target.kind)?,
+        )?),
+        PropertyKind::ValueLabelAffixes => Property::ValueLabelAffixes(engine::values(
+            &workspace,
+            chart,
+            count,
+            &value_label_affixes(target.kind)?,
+        )?),
+        PropertyKind::ValueLabelNumberFormats => Property::ValueLabelNumberFormats(engine::values(
+            &workspace,
+            chart,
+            count,
+            &value_label_formats(target.kind)?,
         )?),
         PropertyKind::Strokes
         | PropertyKind::Fills
@@ -1827,6 +1854,18 @@ fn apply_one(
             &mut workspace,
             chart_id,
             &value_labels(target.kind)?,
+            values,
+        )?,
+        Property::ValueLabelAffixes(values) => engine::set_values(
+            &mut workspace,
+            chart_id,
+            &value_label_affixes(target.kind)?,
+            values,
+        )?,
+        Property::ValueLabelNumberFormats(values) => engine::set_values(
+            &mut workspace,
+            chart_id,
+            &value_label_formats(target.kind)?,
             values,
         )?,
         Property::Strokes(_)

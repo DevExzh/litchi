@@ -16,7 +16,7 @@
 //!
 //! The list change itself runs W1-D's engine
 //! ([`litchi_iwa_text_wire::list`], record 0374) and is published by
-//! [`super::storage_list`]. Host `set_x`/`reset_x` pairs collapse into one
+//! the shared publisher (`litchi_iwa_text_wire::list::publish`). Host `set_x`/`reset_x` pairs collapse into one
 //! property verb ([`Edit::set`]/[`Edit::reset`]); `reset_list` and
 //! `reset_level` are [`Edit::set_list`] with [`ParagraphList::None`] and
 //! [`Edit::set_level`] with [`ParagraphListLevel::ZERO`].

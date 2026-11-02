@@ -16,7 +16,8 @@
 //!
 //! The list change itself runs W1-D's engine
 //! ([`litchi_iwa_text_wire::list`], record 0374) and is published by
-//! [`storage_list`](crate::cell_rich_text::storage_list).
+//! the shared publisher (`litchi_iwa_text_wire::list::publish`) over the
+//! working set's [`ListWorkspace`](crate::structure::list_workspace::ListWorkspace).
 
 use litchi_iwa_common::WireLimits;
 use litchi_iwa_common::table::coordinate::At;
@@ -28,18 +29,19 @@ pub use litchi_iwa_text::position::TextPosition;
 use litchi_iwa_text_wire::list::{self, Change};
 pub use litchi_iwa_text_wire::list::{Property, PropertyKind};
 
-use super::storage_list::{Failure, ListStyles, Publisher};
 use super::{
     Error, LIST_MESSAGE_TYPE, LIST_SEGMENT_MESSAGE_TYPE, Refusal, TABLE_MODEL_MESSAGE_TYPE, Table,
     cell_limits, current_style, locate_cell, materialize_cell, message, replace_message,
     rewrite_cell, style_wire_limits, stylesheet_of, table,
 };
+use crate::structure::list_workspace::{ListWorkspace, ReadStyles as ListStyles, storage_payload};
 use crate::structure::metadata::{self, Transition};
 use crate::structure::wire::{
     push_bytes_field, push_varint_field, rebuild, repeated_bytes, single_bytes, single_reference,
     single_varint, varint_field,
 };
-use crate::structure::{self, Published, TableLeaf, Working};
+use crate::structure::{self, Fault, Published, TableLeaf, Working};
+use litchi_iwa_text_wire::list::publish::{Failure, Publisher, STORAGE_MESSAGE_TYPE};
 
 /// `TST.RichTextPayloadArchive`.
 const RICH_TEXT_PAYLOAD_MESSAGE_TYPE: u32 = 6_218;
@@ -79,10 +81,10 @@ pub fn from_list(error: list::Error) -> Error {
     }
 }
 
-impl From<Failure> for Error {
-    fn from(failure: Failure) -> Self {
+impl From<Failure<Fault>> for Error {
+    fn from(failure: Failure<Fault>) -> Self {
         match failure {
-            Failure::Fault(fault) => fault.into(),
+            Failure::Workspace(fault) => fault.into(),
             Failure::List(error) => from_list(error),
         }
     }
@@ -301,7 +303,7 @@ impl<'p, P: TableLeaf> Reader<'p, P> {
         let Text::Rich(storage) = self.text else {
             return Err(Error::InvalidSource);
         };
-        Ok(super::storage_list::storage(&self.working, storage)?.payload)
+        Ok(storage_payload(&self.working, storage)?)
     }
 
     /// The list preset every paragraph shares ([`ParagraphList::None`] for
@@ -615,7 +617,7 @@ fn promote<P: TableLeaf>(
     let storage_object = new_object(
         working,
         storage_id,
-        super::storage_list::STORAGE_MESSAGE_TYPE,
+        STORAGE_MESSAGE_TYPE,
         storage_archive,
         storage_references(stylesheet, paragraph_style, none_preset),
     )?;
@@ -734,7 +736,7 @@ pub fn apply<P: TableLeaf>(
     // One preset for the whole cell needs paragraphs that share one list
     // (the host reads the cell's list first).
     if let (Text::Rich(storage), Operation::List(_)) = (&text, change) {
-        let payload = super::storage_list::storage(&working, *storage)?.payload;
+        let payload = storage_payload(&working, *storage)?;
         list::uniform_style(&payload, limits).map_err(|error| match error {
             list::Error::InvalidSource { .. } => Error::Refused(Refusal::NotUniform),
             other => from_list(other),
@@ -759,12 +761,12 @@ pub fn apply<P: TableLeaf>(
             true,
         ),
     };
-    let mut publisher = Publisher {
+    let mut workspace = ListWorkspace {
         working: &mut working,
         registry: &registry,
         transition: &mut transition,
-        limits,
     };
+    let mut publisher = Publisher::new(&mut workspace, limits);
     let changed = match change {
         Operation::List(preset) => publisher.set_list(storage, *preset)?,
         Operation::Lists(placements) => publisher.set_lists(storage, placements)?,

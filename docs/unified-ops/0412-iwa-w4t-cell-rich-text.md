@@ -3,8 +3,9 @@
 - Status: slices 1–3 merge-ready on branch `uo2/iwa-w4t`, cut from trunk
   `feat/unified-ops-api` at `4b26bb3379` and synchronized with trunk
   `1bc0d4c996`: engine lift `335baa93fc`, Pages `9eca49c6ae`, Keynote
-  `2adfa1c782`, shared-publisher adoption `037c0132ec`, this record and doc
-  repairs in the following commit. Slice 4 (Pages/Keynote cell formats) is
+  `2adfa1c782`, shared-publisher adoption `037c0132ec` (superseded by trunk's
+  `list_workspace` in the second trunk merge), record `f8d34553fc`; merged
+  with trunk `cd89e91f63`. Slice 4 (Pages/Keynote cell formats) is
   not in this record (§5).
 - Date: 2026-11-02.
 - Plan: [0363](0363-iwa-monolith-exit-plan.md) §3.2 (table-cell families),
@@ -45,12 +46,13 @@ keeps its public transaction, patch, verification and error vocabulary.
 - `litchi-iwa-table` gains the `litchi-iwa-text` dependency (the list value
   types); `tools/crate_boundaries.json` and the five affected locks (four
   fuzz workspaces and the FIN harness) are refreshed offline.
-- After trunk's record 0413 lifted the same storage-list publisher into
-  `litchi_iwa_text_wire::list::publish` behind a `Workspace` trait,
-  `cell_rich_text::storage_list` became that trait's single adapter over the
-  table `Working` set (`037c0132ec`). No copy of the publication logic
-  remains in `litchi-iwa-table` or `litchi-numbers`; the Numbers sheet
-  text-box lists run through the same adapter.
+- Trunk's record 0413 lifted the same storage-list publisher into
+  `litchi_iwa_text_wire::list::publish` behind a `Workspace` trait, with
+  its working-set side in `litchi_iwa_table::structure::list_workspace`.
+  This branch briefly carried its own adapter (`037c0132ec`); the trunk
+  merge after it drops that module, and the cell-list engine publishes
+  through trunk's `ListWorkspace`. No copy of the publication logic
+  remains.
 
 One shared text-engine change: `paragraph_style::plan` decodes a style's
 own overrides only when the target variation is exclusive. Native Keynote

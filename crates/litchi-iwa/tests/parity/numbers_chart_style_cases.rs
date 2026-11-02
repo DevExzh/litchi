@@ -299,6 +299,12 @@ fn cases() -> TestResult<Vec<(Kind, Property)>> {
             Kind::Column2d,
             Property::RoundedCorners(corner::Rounding::new(corner::Radius::new(30.0)?, true)),
         ),
+        (
+            Kind::Column2d,
+            Property::LegendFrame(legend::Frame::Frame(legend::Rect::from_points(
+                24.0, 30.0, 140.0, 48.0,
+            )?)),
+        ),
     ])
 }
 
