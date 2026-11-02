@@ -389,6 +389,15 @@ impl MutationScope {
         }
     }
 
+    /// Admit chart drawable extension `fields`.
+    pub(crate) fn allow_chart_fields(&mut self, fields: &[u32]) {
+        for field in fields {
+            if !self.chart_fields.contains(field) {
+                self.chart_fields.push(*field);
+            }
+        }
+    }
+
     /// Admit extension or outer `fields`.
     pub(crate) fn allow_fields(&mut self, fields: &[u32]) {
         for field in fields {

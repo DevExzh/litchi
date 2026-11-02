@@ -109,11 +109,13 @@ pub mod style {
 /// [`crate::Package::edit_sheet_chart_legend_style`].
 pub mod legend_style {
     pub use crate::package::sheet_chart_legend_style::{
-        Commit, Diagnostics, Edit, LegendFill, LegendShadow, LegendStroke, Patch, Property,
-        PropertyKind,
+        Commit, Diagnostics, Edit, LegendFill, LegendFont, LegendFontSize, LegendShadow,
+        LegendStroke, Patch, Property, PropertyKind,
     };
     pub use crate::package::sheet_chart_series::{Error, LimitKind, Refusal};
     pub use litchi_iwa_common::shape::fill::{Fill, Gradient};
     pub use litchi_iwa_common::shape::shadow::Drop;
     pub use litchi_iwa_common::shape::stroke::Stroke;
+    pub use litchi_iwa_text::character::TextPointSize;
+    pub use litchi_iwa_text::font::Font;
 }

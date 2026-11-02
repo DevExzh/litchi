@@ -145,7 +145,9 @@ pub(crate) mod legend_style {
         legend_engine,
     };
 
-    pub use legend_engine::{LegendFill, LegendShadow, LegendStroke, Property, PropertyKind};
+    pub use legend_engine::{
+        LegendFill, LegendFont, LegendFontSize, LegendShadow, LegendStroke, Property, PropertyKind,
+    };
 
     /// A compact exact-source patch of one legend-style property.
     #[derive(Clone, PartialEq)]

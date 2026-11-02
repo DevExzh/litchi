@@ -1162,7 +1162,7 @@ fn usize_to_u64(value: usize) -> u64 {
 }
 
 const fn is_series_rewritable_type(message_type: u32) -> bool {
-    matches!(message_type, 401 | 5_021..=5_029 | 11_006 | 11_008)
+    matches!(message_type, 401 | 2_022 | 5_021..=5_029 | 11_006 | 11_008)
 }
 
 fn map_font_error(error: slide_chart_font::Error) -> Error {

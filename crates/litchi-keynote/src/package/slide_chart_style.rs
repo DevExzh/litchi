@@ -32,6 +32,19 @@ use crate::{ChartSelector, SlideSelector};
 /// The chart-drawable extension field of the legend style reference.
 const LEGEND_STYLE_FIELDS: &[u32] = &[11];
 
+/// The legend style reference and the paragraph-style list the legend
+/// typography edits.
+const LEGEND_TYPOGRAPHY_FIELDS: &[u32] = &[11, 20];
+
+const fn legend_fields(kind: legend_engine::PropertyKind) -> &'static [u32] {
+    match kind {
+        legend_engine::PropertyKind::Font | legend_engine::PropertyKind::FontSize => {
+            LEGEND_TYPOGRAPHY_FIELDS
+        },
+        _ => LEGEND_STYLE_FIELDS,
+    }
+}
+
 /// The chart-drawable extension field of the legend frame.
 const LEGEND_FRAME_FIELDS: &[u32] = &[3];
 
@@ -162,7 +175,9 @@ pub(crate) mod style {
 pub(crate) mod legend_style {
     use super::{Diagnostics, ExactArtifacts, MutationPlan, Package, Position, fmt, legend_engine};
 
-    pub use legend_engine::{LegendFill, LegendShadow, LegendStroke, Property, PropertyKind};
+    pub use legend_engine::{
+        LegendFill, LegendFont, LegendFontSize, LegendShadow, LegendStroke, Property, PropertyKind,
+    };
 
     /// A compact exact-source patch of one legend-style property.
     #[derive(Clone, PartialEq)]
@@ -599,7 +614,7 @@ impl LegendStyleEdit<'_> {
             ledger.write(
                 self.source,
                 &target,
-                LEGEND_STYLE_FIELDS,
+                legend_fields(value.kind()),
                 |workspace, limits| {
                     legend_engine::write(workspace, target.selection.identifier, &value, limits)
                 },
@@ -937,7 +952,12 @@ impl Package {
                 diagnostics: Diagnostics::unchanged(),
             });
         }
-        let candidate = ledger.reopen(self, &patch.artifacts, &patch.plan, LEGEND_STYLE_FIELDS)?;
+        let candidate = ledger.reopen(
+            self,
+            &patch.artifacts,
+            &patch.plan,
+            legend_fields(patch.after.kind()),
+        )?;
         let target = ledger.target(
             &candidate,
             SlideSelector::position(patch.slide),

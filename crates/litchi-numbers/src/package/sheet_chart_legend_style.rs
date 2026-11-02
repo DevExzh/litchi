@@ -20,7 +20,9 @@ use super::sheet_drawable_graph as graph;
 use super::structure;
 use crate::selector::{ChartSelector, SheetSelector};
 
-pub use engine::{LegendFill, LegendShadow, LegendStroke, Property, PropertyKind};
+pub use engine::{
+    LegendFill, LegendFont, LegendFontSize, LegendShadow, LegendStroke, Property, PropertyKind,
+};
 
 /// Compact publication diagnostics.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
