@@ -13,6 +13,16 @@ pub mod arrangement {
     };
 }
 
+/// Chart lifecycle of a body chart: the native kind and series direction
+/// (record 0416); `Package::body_chart_geometry` reads its frame.
+pub mod lifecycle {
+    pub use crate::package::body_chart_lifecycle::{
+        Commit, Diagnostics, Edit, Error, LimitKind, Patch, Refusal,
+    };
+    pub use litchi_iwa_common::chart::Direction;
+    pub use litchi_iwa_common::chart::kind::Kind;
+}
+
 /// Exact-source transactions for one body chart's data grid.
 pub mod data {
     pub use crate::package::body_chart_data::{
