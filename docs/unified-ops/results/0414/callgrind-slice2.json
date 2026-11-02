@@ -1,0 +1,92 @@
+{
+  "record": "0414",
+  "slice": 2,
+  "binary_sha256": "64e471800daff8fe71865414837e5282ae740427e907f29f53b08c314ef07750",
+  "build": "CARGO_PROFILE_RELEASE_DEBUG=1 cargo test --release -p litchi-iwa --all-features --test parity --no-run",
+  "run": "W4C_ROUTE=<route> taskset -c 3 valgrind --tool=callgrind <binary> --ignored --exact chart_property_cost::chart_property_route_cost_abba --test-threads=1",
+  "metric": "inclusive Ir of w4c_host_route / w4c_leaf_route, two calls each (ABBA)",
+  "captures_dir": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-w4c/cg2 (outside the repository)",
+  "routes": [
+    {
+      "route": "keynote_axis_format_set",
+      "host_ir": 767569222,
+      "leaf_ir": 77373265,
+      "leaf_over_host": 0.100803,
+      "capture": "keynote_axis_format_set.cg",
+      "capture_bytes": 1304497,
+      "capture_sha256": "c6d08810077815648a4fa59962eacd245bee8274f687d78fcf6a4a346aac0cc6"
+    },
+    {
+      "route": "keynote_border_set",
+      "host_ir": 1087487175,
+      "leaf_ir": 77247654,
+      "leaf_over_host": 0.071033,
+      "capture": "keynote_border_set.cg",
+      "capture_bytes": 1306637,
+      "capture_sha256": "51d3c0940c2ff1ac119d178d62c5c5be829a0ac1c9474743dae87650cf3a1e21"
+    },
+    {
+      "route": "keynote_gridline_stroke_set",
+      "host_ir": 767543195,
+      "leaf_ir": 77274616,
+      "leaf_over_host": 0.100678,
+      "capture": "keynote_gridline_stroke_set.cg",
+      "capture_bytes": 1308972,
+      "capture_sha256": "e96eb17b519b6fc0b204987602f65d691928b37355334f296aa9310cbad4e8be"
+    },
+    {
+      "route": "numbers_axis_format_set",
+      "host_ir": 151129897,
+      "leaf_ir": 44413081,
+      "leaf_over_host": 0.293874,
+      "capture": "numbers_axis_format_set.cg",
+      "capture_bytes": 1183852,
+      "capture_sha256": "246b221eaf48cc8e206379c4b74ef5f025fed75ae5d2f5d9d2062c55dcc4296e"
+    },
+    {
+      "route": "numbers_border_set",
+      "host_ir": 187014852,
+      "leaf_ir": 44512260,
+      "leaf_over_host": 0.238015,
+      "capture": "numbers_border_set.cg",
+      "capture_bytes": 1204929,
+      "capture_sha256": "3fdd8f420c53da46b5e97cac9aaf7fc324aef8c32b7266f7cef87256c9f32d30"
+    },
+    {
+      "route": "numbers_gridline_stroke_set",
+      "host_ir": 150993816,
+      "leaf_ir": 44326587,
+      "leaf_over_host": 0.293566,
+      "capture": "numbers_gridline_stroke_set.cg",
+      "capture_bytes": 1187414,
+      "capture_sha256": "b00adb36568cc1de9895dfd2a8cb83fcc74898ea8f153f0c76c799dde82c67f4"
+    },
+    {
+      "route": "pages_axis_format_set",
+      "host_ir": 1193184273,
+      "leaf_ir": 47095918,
+      "leaf_over_host": 0.039471,
+      "capture": "pages_axis_format_set.cg",
+      "capture_bytes": 1273007,
+      "capture_sha256": "090a67ec722679c6ae74d41213d6cfa7253c6a8d02b9601fb62e64415bec6bfa"
+    },
+    {
+      "route": "pages_border_set",
+      "host_ir": 1746969037,
+      "leaf_ir": 46973465,
+      "leaf_over_host": 0.026889,
+      "capture": "pages_border_set.cg",
+      "capture_bytes": 1275589,
+      "capture_sha256": "f7f53bf269e898d710dd86c4e59be166750a9edc77d7a967787f2e2c56146cea"
+    },
+    {
+      "route": "pages_gridline_stroke_set",
+      "host_ir": 1193029441,
+      "leaf_ir": 46994157,
+      "leaf_over_host": 0.039391,
+      "capture": "pages_gridline_stroke_set.cg",
+      "capture_bytes": 1276740,
+      "capture_sha256": "e3a020150996d56deef7f12c67303db2de117144c6879f577b85e42169576c3d"
+    }
+  ]
+}

@@ -35,21 +35,21 @@ charts/series_trendline.rs	with_legend_name	1	shared	keynote.build	migrated	litc
 charts/series_trendline.rs	with_legend_visibility	1	shared	keynote.build	migrated	litchi_iwa_common::chart::series::Trendline::with_legend_visibility	keynote_chart_series_trendlines_read_parity	A	-	-
 charts/series_trendline.rs	with_r_squared_visibility	1	shared	keynote.build	migrated	litchi_iwa_common::chart::series::Trendline::with_r_squared_visibility	keynote_chart_series_trendlines_read_parity	A	-	-
 charts/series_trendline.rs	without_custom_name	1	shared	chart	migrated	litchi_iwa_common::chart::series::Trendline::without_custom_name	keynote_chart_series_trendlines_read_parity	A	-	-
-comments.rs	add_reply	1	shared	drawable.comment	host-only	litchi-iwa-common::shape (values) + litchi-iwa-protos shape codecs	-	-	-	-
-comments.rs	application	1	shared	drawable.comment	host-only	litchi-iwa-common::shape (values) + litchi-iwa-protos shape codecs	-	-	-	-
-comments.rs	clear_comment	1	shared	drawable.comment	host-only	litchi-iwa-common::shape (values) + litchi-iwa-protos shape codecs	-	-	-	-
-comments.rs	comment	1	shared	drawable.comment	host-only	litchi-iwa-common::shape (values) + litchi-iwa-protos shape codecs	-	-	-	-
-comments.rs	drawables	1	shared	drawable.list	host-only	litchi-iwa-common::shape (values) + litchi-iwa-protos shape codecs	-	-	-	-
+comments.rs	add_reply	1	shared	drawable.comment	migrated	litchi_pages::drawable::comment::Edit::add_reply	pages_drawable_comment_reply_add_parity	B	-	-
+comments.rs	application	1	shared	drawable.comment	retired	-	-	-	-	retired: accessor of the host comments Draft for the application it classified at open; each leaf Package is already format-typed, and the drawable-comment families are per format (records 0372, 0378a, 0413)
+comments.rs	clear_comment	1	shared	drawable.comment	migrated	litchi_pages::drawable::comment::Edit::clear	pages_drawable_comment_clear_parity	B	-	-
+comments.rs	comment	1	shared	drawable.comment	migrated	litchi_pages::Package::body_drawable_comment	pages_drawable_comment_read_parity	A	-	-
+comments.rs	drawables	1	shared	drawable.list	migrated	litchi_pages::Package::body_drawable_comment	pages_drawable_list_parity	A	-	-
 comments.rs	from_bytes	1	shared	io	host-only	litchi-iwa-archive::unstable (physical) / leaf Package	-	-	-	-
 comments.rs	from_package	1	shared	io	host-only	litchi-iwa-archive::unstable (physical) / leaf Package	-	-	-	-
 comments.rs	into_package	1	shared	io	host-only	litchi-iwa-archive::unstable (physical) / leaf Package	-	-	-	-
 comments.rs	open	1	shared	io	host-only	litchi-iwa-archive::unstable (physical) / leaf Package	-	-	-	-
 comments.rs	package	1	shared	io	host-only	litchi-iwa-archive::unstable (physical) / leaf Package	-	-	-	-
-comments.rs	remove_reply	1	shared	drawable.comment	host-only	litchi-iwa-common::shape (values) + litchi-iwa-protos shape codecs	-	-	-	-
-comments.rs	replies	1	shared	drawable.comment	host-only	litchi-iwa-common::shape (values) + litchi-iwa-protos shape codecs	-	-	-	-
+comments.rs	remove_reply	1	shared	drawable.comment	migrated	litchi_pages::drawable::comment::Edit::remove_reply	pages_drawable_comment_reply_remove_parity	B	-	-
+comments.rs	replies	1	shared	drawable.comment	migrated	litchi_pages::Package::body_drawable_comment	pages_drawable_comment_read_parity	A	-	-
 comments.rs	save	1	shared	io	host-only	litchi-iwa-archive::unstable (physical) / leaf Package	-	-	-	-
-comments.rs	set_comment	1	shared	drawable.comment	host-only	litchi-iwa-common::shape (values) + litchi-iwa-protos shape codecs	-	-	-	-
-comments.rs	set_reply	1	shared	drawable.comment	host-only	litchi-iwa-common::shape (values) + litchi-iwa-protos shape codecs	-	-	-	-
+comments.rs	set_comment	1	shared	drawable.comment	migrated	litchi_pages::drawable::comment::Edit::set	pages_drawable_comment_set_parity	B	-	-
+comments.rs	set_reply	1	shared	drawable.comment	migrated	litchi_pages::drawable::comment::Edit::set_reply	pages_drawable_comment_reply_set_parity	B	-	-
 comments.rs	to_bytes	1	shared	io	host-only	litchi-iwa-archive::unstable (physical) / leaf Package	-	-	-	-
 document.rs	application	1	shared	other	host-only	litchi-iwa-archive / litchi-iwa-common (see record 0363 section 3)	-	-	-	-
 document.rs	charts	1	shared	chart.lifecycle	host-only	litchi-iwa-common::chart (values) + litchi-iwa-protos chart codecs (private)	-	-	-	-
@@ -303,26 +303,26 @@ keynote/editor/slide_charts.rs	set_slide_chart_geometry	1	keynote	chart.lifecycl
 keynote/editor/slide_charts.rs	set_slide_chart_kind	1	keynote	chart.lifecycle	migrated	litchi_keynote::chart::lifecycle::Edit::set_kind	keynote_slide_chart_kind_parity	B	-	-
 keynote/editor/slide_charts.rs	slide_chart_catalog	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
 keynote/editor/slide_charts.rs	slide_charts	1	keynote	chart.lifecycle	migrated	litchi_keynote::Package::slide_chart_metadata	keynote_slide_chart_read_parity	A	-	-
-keynote/editor/slide_charts/axis_gridlines.rs	set_slide_chart_axis_gridline_stroke	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
+keynote/editor/slide_charts/axis_gridlines.rs	set_slide_chart_axis_gridline_stroke	1	keynote	chart.style	migrated	litchi_keynote::chart::axis::Edit::set	keynote_slide_chart_axis_set_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
 keynote/editor/slide_charts/axis_gridlines.rs	set_slide_chart_axis_major_gridlines_visible	1	keynote	chart.style	migrated	litchi_keynote::chart::axis::Edit::set	keynote_slide_chart_axis_set_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
 keynote/editor/slide_charts/axis_gridlines.rs	set_slide_chart_axis_minor_gridlines_visible	1	keynote	chart.style	migrated	litchi_keynote::chart::axis::Edit::set	keynote_slide_chart_axis_set_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
-keynote/editor/slide_charts/axis_gridlines.rs	slide_chart_axis_gridline_stroke	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
+keynote/editor/slide_charts/axis_gridlines.rs	slide_chart_axis_gridline_stroke	1	keynote	chart.style	migrated	litchi_keynote::Package::slide_chart_axis	keynote_slide_chart_axis_read_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
 keynote/editor/slide_charts/axis_gridlines.rs	slide_chart_axis_major_gridlines_visible	1	keynote	chart.style	migrated	litchi_keynote::Package::slide_chart_axis	keynote_slide_chart_axis_read_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
 keynote/editor/slide_charts/axis_gridlines.rs	slide_chart_axis_minor_gridlines_visible	1	keynote	chart.style	migrated	litchi_keynote::Package::slide_chart_axis	keynote_slide_chart_axis_read_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
-keynote/editor/slide_charts/axis_label_affixes.rs	set_slide_chart_axis_label_affixes	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_charts/axis_label_affixes.rs	slide_chart_axis_label_affixes	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_charts/axis_label_angle.rs	set_slide_chart_axis_label_angle	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_charts/axis_label_angle.rs	slide_chart_axis_label_angle	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_charts/axis_label_position_3d.rs	set_slide_chart_3d_value_axis_label_position	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_charts/axis_label_position_3d.rs	slide_chart_3d_value_axis_label_position	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
+keynote/editor/slide_charts/axis_label_affixes.rs	set_slide_chart_axis_label_affixes	1	keynote	chart.style	migrated	litchi_keynote::chart::axis::Edit::set	keynote_slide_chart_axis_set_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+keynote/editor/slide_charts/axis_label_affixes.rs	slide_chart_axis_label_affixes	1	keynote	chart.style	migrated	litchi_keynote::Package::slide_chart_axis	keynote_slide_chart_axis_read_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+keynote/editor/slide_charts/axis_label_angle.rs	set_slide_chart_axis_label_angle	1	keynote	chart.style	migrated	litchi_keynote::chart::axis::Edit::set	keynote_slide_chart_axis_set_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+keynote/editor/slide_charts/axis_label_angle.rs	slide_chart_axis_label_angle	1	keynote	chart.style	migrated	litchi_keynote::Package::slide_chart_axis	keynote_slide_chart_axis_read_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+keynote/editor/slide_charts/axis_label_position_3d.rs	set_slide_chart_3d_value_axis_label_position	1	keynote	chart.style	migrated	litchi_keynote::chart::axis::Edit::set	keynote_slide_chart_axis_set_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+keynote/editor/slide_charts/axis_label_position_3d.rs	slide_chart_3d_value_axis_label_position	1	keynote	chart.style	migrated	litchi_keynote::Package::slide_chart_axis	keynote_slide_chart_axis_read_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
 keynote/editor/slide_charts/axis_labels.rs	set_slide_chart_axis_labels_visible	1	keynote	chart.style	migrated	litchi_keynote::chart::axis::Edit::set	keynote_slide_chart_axis_set_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
 keynote/editor/slide_charts/axis_labels.rs	slide_chart_axis_labels_visible	1	keynote	chart.style	migrated	litchi_keynote::Package::slide_chart_axis	keynote_slide_chart_axis_read_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
 keynote/editor/slide_charts/axis_line.rs	set_slide_chart_axis_line_visible	1	keynote	chart.style	migrated	litchi_keynote::chart::axis::Edit::set	keynote_slide_chart_axis_set_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
 keynote/editor/slide_charts/axis_line.rs	slide_chart_axis_line_visible	1	keynote	chart.style	migrated	litchi_keynote::Package::slide_chart_axis	keynote_slide_chart_axis_read_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
 keynote/editor/slide_charts/axis_minimum_label.rs	set_slide_chart_value_axis_minimum_label_visible	1	keynote	chart.style	migrated	litchi_keynote::chart::axis::Edit::set	keynote_slide_chart_axis_set_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
 keynote/editor/slide_charts/axis_minimum_label.rs	slide_chart_value_axis_minimum_label_visible	1	keynote	chart.style	migrated	litchi_keynote::Package::slide_chart_axis	keynote_slide_chart_axis_read_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
-keynote/editor/slide_charts/axis_number_format.rs	set_slide_chart_axis_number_format	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_charts/axis_number_format.rs	slide_chart_axis_number_format	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
+keynote/editor/slide_charts/axis_number_format.rs	set_slide_chart_axis_number_format	1	keynote	chart.style	migrated	litchi_keynote::chart::axis::Edit::set	keynote_slide_chart_axis_set_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+keynote/editor/slide_charts/axis_number_format.rs	slide_chart_axis_number_format	1	keynote	chart.style	migrated	litchi_keynote::Package::slide_chart_axis	keynote_slide_chart_axis_read_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
 keynote/editor/slide_charts/axis_series_names.rs	set_slide_chart_category_axis_series_names_visible	1	keynote	chart.style	migrated	litchi_keynote::chart::axis::Edit::set	keynote_slide_chart_axis_set_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
 keynote/editor/slide_charts/axis_series_names.rs	slide_chart_category_axis_series_names_visible	1	keynote	chart.style	migrated	litchi_keynote::Package::slide_chart_axis	keynote_slide_chart_axis_read_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
 keynote/editor/slide_charts/axis_tick_marks.rs	set_slide_chart_axis_minor_tick_marks_visible	1	keynote	chart.style	migrated	litchi_keynote::chart::axis::Edit::set	keynote_slide_chart_axis_set_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
@@ -336,8 +336,8 @@ keynote/editor/slide_charts/bar_shape_3d.rs	set_slide_chart_3d_bar_shape	1	keyno
 keynote/editor/slide_charts/bar_shape_3d.rs	slide_chart_3d_bar_shape	1	keynote	chart.style	migrated	litchi_keynote::Package::slide_chart_style	keynote_slide_chart_options_read_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
 keynote/editor/slide_charts/border.rs	set_slide_chart_border_visible	1	keynote	chart.style	migrated	litchi_keynote::chart::style::Edit::set	keynote_slide_chart_options_set_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
 keynote/editor/slide_charts/border.rs	slide_chart_border_visible	1	keynote	chart.style	migrated	litchi_keynote::Package::slide_chart_style	keynote_slide_chart_options_read_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
-keynote/editor/slide_charts/border_stroke.rs	set_slide_chart_border_stroke	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_charts/border_stroke.rs	slide_chart_border_stroke	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
+keynote/editor/slide_charts/border_stroke.rs	set_slide_chart_border_stroke	1	keynote	chart.style	migrated	litchi_keynote::chart::style::Edit::set	keynote_slide_chart_options_set_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+keynote/editor/slide_charts/border_stroke.rs	slide_chart_border_stroke	1	keynote	chart.style	migrated	litchi_keynote::Package::slide_chart_style	keynote_slide_chart_options_read_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
 keynote/editor/slide_charts/category_labels.rs	set_slide_chart_category_label_layout	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
 keynote/editor/slide_charts/category_labels.rs	slide_chart_category_label_layout	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
 keynote/editor/slide_charts/depth_3d.rs	set_slide_chart_3d_depth	1	keynote	chart.style	migrated	litchi_keynote::chart::style::Edit::set	keynote_slide_chart_style_set_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
@@ -1081,26 +1081,26 @@ numbers/editor/sheet_charts/axis.rs	set_sheet_chart_axis_title	1	numbers	chart.t
 numbers/editor/sheet_charts/axis.rs	sheet_chart_axis_title	1	numbers	chart.text	migrated	litchi-numbers::Package::sheet_chart_axis_title	numbers_chart_title_and_axis_title_read_parity	A	-	-
 numbers/editor/sheet_charts/axis_bounds.rs	set_sheet_chart_value_axis_bounds	1	numbers	chart.legend_axis	host-only	litchi-numbers	-	-	-	-
 numbers/editor/sheet_charts/axis_bounds.rs	sheet_chart_value_axis_bounds	1	numbers	chart.legend_axis	host-only	litchi-numbers	-	-	-	-
-numbers/editor/sheet_charts/axis_gridlines.rs	set_sheet_chart_axis_gridline_stroke	1	numbers	chart.style	host-only	litchi-numbers	-	-	-	-
+numbers/editor/sheet_charts/axis_gridlines.rs	set_sheet_chart_axis_gridline_stroke	1	numbers	chart.style	migrated	litchi_numbers::sheet::chart::axis::Edit::set	numbers_sheet_chart_axis_set_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
 numbers/editor/sheet_charts/axis_gridlines.rs	set_sheet_chart_axis_major_gridlines_visible	1	numbers	chart.style	migrated	litchi_numbers::sheet::chart::axis::Edit::set	numbers_sheet_chart_axis_set_parity	A	-	-
 numbers/editor/sheet_charts/axis_gridlines.rs	set_sheet_chart_axis_minor_gridlines_visible	1	numbers	chart.style	migrated	litchi_numbers::sheet::chart::axis::Edit::set	numbers_sheet_chart_axis_set_parity	A	-	-
-numbers/editor/sheet_charts/axis_gridlines.rs	sheet_chart_axis_gridline_stroke	1	numbers	chart.style	host-only	litchi-numbers	-	-	-	-
+numbers/editor/sheet_charts/axis_gridlines.rs	sheet_chart_axis_gridline_stroke	1	numbers	chart.style	migrated	litchi_numbers::Package::sheet_chart_axis	numbers_sheet_chart_axis_read_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
 numbers/editor/sheet_charts/axis_gridlines.rs	sheet_chart_axis_major_gridlines_visible	1	numbers	chart.style	migrated	litchi_numbers::Package::sheet_chart_axis	numbers_sheet_chart_axis_read_parity	A	-	-
 numbers/editor/sheet_charts/axis_gridlines.rs	sheet_chart_axis_minor_gridlines_visible	1	numbers	chart.style	migrated	litchi_numbers::Package::sheet_chart_axis	numbers_sheet_chart_axis_read_parity	A	-	-
-numbers/editor/sheet_charts/axis_label_affixes.rs	set_sheet_chart_axis_label_affixes	1	numbers	chart.style	host-only	litchi-numbers	-	-	-	-
-numbers/editor/sheet_charts/axis_label_affixes.rs	sheet_chart_axis_label_affixes	1	numbers	chart.style	host-only	litchi-numbers	-	-	-	-
-numbers/editor/sheet_charts/axis_label_angle.rs	set_sheet_chart_axis_label_angle	1	numbers	chart.style	host-only	litchi-numbers	-	-	-	-
-numbers/editor/sheet_charts/axis_label_angle.rs	sheet_chart_axis_label_angle	1	numbers	chart.style	host-only	litchi-numbers	-	-	-	-
-numbers/editor/sheet_charts/axis_label_position_3d.rs	set_sheet_chart_3d_value_axis_label_position	1	numbers	chart.style	host-only	litchi-numbers	-	-	-	-
-numbers/editor/sheet_charts/axis_label_position_3d.rs	sheet_chart_3d_value_axis_label_position	1	numbers	chart.style	host-only	litchi-numbers	-	-	-	-
+numbers/editor/sheet_charts/axis_label_affixes.rs	set_sheet_chart_axis_label_affixes	1	numbers	chart.style	migrated	litchi_numbers::sheet::chart::axis::Edit::set	numbers_sheet_chart_axis_set_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+numbers/editor/sheet_charts/axis_label_affixes.rs	sheet_chart_axis_label_affixes	1	numbers	chart.style	migrated	litchi_numbers::Package::sheet_chart_axis	numbers_sheet_chart_axis_read_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+numbers/editor/sheet_charts/axis_label_angle.rs	set_sheet_chart_axis_label_angle	1	numbers	chart.style	migrated	litchi_numbers::sheet::chart::axis::Edit::set	numbers_sheet_chart_axis_set_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+numbers/editor/sheet_charts/axis_label_angle.rs	sheet_chart_axis_label_angle	1	numbers	chart.style	migrated	litchi_numbers::Package::sheet_chart_axis	numbers_sheet_chart_axis_read_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+numbers/editor/sheet_charts/axis_label_position_3d.rs	set_sheet_chart_3d_value_axis_label_position	1	numbers	chart.style	migrated	litchi_numbers::sheet::chart::axis::Edit::set	numbers_sheet_chart_axis_set_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+numbers/editor/sheet_charts/axis_label_position_3d.rs	sheet_chart_3d_value_axis_label_position	1	numbers	chart.style	migrated	litchi_numbers::Package::sheet_chart_axis	numbers_sheet_chart_axis_read_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
 numbers/editor/sheet_charts/axis_labels.rs	set_sheet_chart_axis_labels_visible	1	numbers	chart.style	migrated	litchi_numbers::sheet::chart::axis::Edit::set	numbers_sheet_chart_axis_set_parity	A	-	-
 numbers/editor/sheet_charts/axis_labels.rs	sheet_chart_axis_labels_visible	1	numbers	chart.style	migrated	litchi_numbers::Package::sheet_chart_axis	numbers_sheet_chart_axis_read_parity	A	-	-
 numbers/editor/sheet_charts/axis_line.rs	set_sheet_chart_axis_line_visible	1	numbers	chart.style	migrated	litchi_numbers::sheet::chart::axis::Edit::set	numbers_sheet_chart_axis_set_parity	A	-	-
 numbers/editor/sheet_charts/axis_line.rs	sheet_chart_axis_line_visible	1	numbers	chart.style	migrated	litchi_numbers::Package::sheet_chart_axis	numbers_sheet_chart_axis_read_parity	A	-	-
 numbers/editor/sheet_charts/axis_minimum_label.rs	set_sheet_chart_value_axis_minimum_label_visible	1	numbers	chart.style	migrated	litchi_numbers::sheet::chart::axis::Edit::set	numbers_sheet_chart_axis_set_parity	A	-	-
 numbers/editor/sheet_charts/axis_minimum_label.rs	sheet_chart_value_axis_minimum_label_visible	1	numbers	chart.style	migrated	litchi_numbers::Package::sheet_chart_axis	numbers_sheet_chart_axis_read_parity	A	-	-
-numbers/editor/sheet_charts/axis_number_format.rs	set_sheet_chart_axis_number_format	1	numbers	chart.style	host-only	litchi-numbers	-	-	-	-
-numbers/editor/sheet_charts/axis_number_format.rs	sheet_chart_axis_number_format	1	numbers	chart.style	host-only	litchi-numbers	-	-	-	-
+numbers/editor/sheet_charts/axis_number_format.rs	set_sheet_chart_axis_number_format	1	numbers	chart.style	migrated	litchi_numbers::sheet::chart::axis::Edit::set	numbers_sheet_chart_axis_set_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+numbers/editor/sheet_charts/axis_number_format.rs	sheet_chart_axis_number_format	1	numbers	chart.style	migrated	litchi_numbers::Package::sheet_chart_axis	numbers_sheet_chart_axis_read_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
 numbers/editor/sheet_charts/axis_scale.rs	set_sheet_chart_value_axis_scale	1	numbers	chart.legend_axis	host-only	litchi-numbers	-	-	-	-
 numbers/editor/sheet_charts/axis_scale.rs	sheet_chart_value_axis_scale	1	numbers	chart.legend_axis	host-only	litchi-numbers	-	-	-	-
 numbers/editor/sheet_charts/axis_series_names.rs	set_sheet_chart_category_axis_series_names_visible	1	numbers	chart.style	migrated	litchi_numbers::sheet::chart::axis::Edit::set	numbers_sheet_chart_axis_set_parity	A	-	-
@@ -1118,8 +1118,8 @@ numbers/editor/sheet_charts/bar_shape_3d.rs	set_sheet_chart_3d_bar_shape	1	numbe
 numbers/editor/sheet_charts/bar_shape_3d.rs	sheet_chart_3d_bar_shape	1	numbers	chart.style	migrated	litchi_numbers::Package::sheet_chart_style	numbers_sheet_chart_options_read_parity	A	-	-
 numbers/editor/sheet_charts/border.rs	set_sheet_chart_border_visible	1	numbers	chart.style	migrated	litchi_numbers::sheet::chart::style::Edit::set	numbers_sheet_chart_options_set_parity	A	-	-
 numbers/editor/sheet_charts/border.rs	sheet_chart_border_visible	1	numbers	chart.style	migrated	litchi_numbers::Package::sheet_chart_style	numbers_sheet_chart_options_read_parity	A	-	-
-numbers/editor/sheet_charts/border_stroke.rs	set_sheet_chart_border_stroke	1	numbers	chart.style	host-only	litchi-numbers	-	-	-	-
-numbers/editor/sheet_charts/border_stroke.rs	sheet_chart_border_stroke	1	numbers	chart.style	host-only	litchi-numbers	-	-	-	-
+numbers/editor/sheet_charts/border_stroke.rs	set_sheet_chart_border_stroke	1	numbers	chart.style	migrated	litchi_numbers::sheet::chart::style::Edit::set	numbers_sheet_chart_options_set_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+numbers/editor/sheet_charts/border_stroke.rs	sheet_chart_border_stroke	1	numbers	chart.style	migrated	litchi_numbers::Package::sheet_chart_style	numbers_sheet_chart_options_read_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
 numbers/editor/sheet_charts/caption.rs	remove_sheet_chart_caption	1	numbers	chart.text	host-only	litchi-numbers	-	-	-	-
 numbers/editor/sheet_charts/caption.rs	set_sheet_chart_caption	1	numbers	chart.text	host-only	litchi-numbers	-	-	-	-
 numbers/editor/sheet_charts/caption.rs	sheet_chart_caption	1	numbers	chart.text	host-only	litchi-numbers	-	-	-	-
@@ -1394,7 +1394,7 @@ pages/creation.rs	build	1	pages	builder	migrated	litchi_pages::builder::Builder:
 pages/creation.rs	language	1	pages	builder	migrated	litchi_pages::builder::Builder::language	pages_builder_language_locale_parity	B	-	-
 pages/creation.rs	locale	1	pages	builder	migrated	litchi_pages::builder::Builder::locale	pages_builder_language_locale_parity	B	-	-
 pages/creation.rs	new	1	pages	builder	migrated	litchi_pages::builder::Builder::new	pages_builder_language_locale_parity	B	-	-
-pages/editor.rs	add_drawable_comment_reply	1	pages	drawable.comment	host-only	litchi-pages	-	-	-	-
+pages/editor.rs	add_drawable_comment_reply	1	pages	drawable.comment	migrated	litchi_pages::drawable::comment::Edit::add_reply	pages_drawable_comment_reply_add_parity	B	-	-
 pages/editor.rs	add_text_box_comment	1	pages	text.comment	migrated	litchi_pages::drawable::annotation::Edit::add_comment	pages_text_box_comment_add_parity	B	-	-
 pages/editor.rs	add_text_box_comment_reply	1	pages	text.comment	migrated	litchi_pages::drawable::annotation::Edit::add_reply	pages_text_box_comment_reply_parity	B	-	-
 pages/editor.rs	add_text_box_highlight	1	pages	text.highlight	migrated	litchi_pages::drawable::annotation::Edit::add_highlight	pages_text_box_highlight_add_parity	B	-	-
@@ -1403,18 +1403,18 @@ pages/editor.rs	append_section	1	pages	section.lifecycle	migrated	litchi_pages::
 pages/editor.rs	apply_text_box_named_paragraph_style	1	pages	text.paragraph_style	migrated	litchi_pages::drawable::named_style::Edit::apply	pages_text_box_named_style_apply_parity	B	-	-
 pages/editor.rs	body_storage	1	pages	text.storage	migrated	litchi_pages::Package::body_storage	pages_body_storage_read_parity	A	-	-
 pages/editor.rs	body_text	1	pages	text.storage	migrated	litchi_pages::Package::body_storage	pages_body_storage_read_parity	A	-	-
-pages/editor.rs	builder	1	pages	keynote.build	host-only	litchi-pages	-	-	-	-
-pages/editor.rs	clear_drawable_comment	1	pages	drawable.comment	host-only	litchi-pages	-	-	-	-
+pages/editor.rs	builder	1	pages	keynote.build	migrated	litchi_pages::builder::Builder::new	pages_builder_language_locale_parity	B	-	-
+pages/editor.rs	clear_drawable_comment	1	pages	drawable.comment	migrated	litchi_pages::drawable::comment::Edit::clear	pages_drawable_comment_clear_parity	B	-	-
 pages/editor.rs	clear_drawable_text	1	pages	text.storage	migrated	litchi_pages::drawable::text::Edit::clear	pages_text_box_plain_text_parity	A	-	-
 pages/editor.rs	create	1	pages	io	host-only	litchi-pages	-	-	-	-
 pages/editor.rs	create_text_box_named_paragraph_style	1	pages	text.paragraph_style	migrated	litchi_pages::drawable::named_style::Edit::create	pages_text_box_named_style_create_parity	B	-	-
 pages/editor.rs	create_with_text	1	pages	io	host-only	litchi-pages	-	-	-	-
 pages/editor.rs	delete_applied_text_box_named_paragraph_style_with_replacement	1	pages	text.paragraph_style	migrated	litchi_pages::drawable::named_style::Edit::delete_applied	pages_text_box_named_style_delete_parity	B	-	-
 pages/editor.rs	delete_text_box_named_paragraph_style	1	pages	text.paragraph_style	migrated	litchi_pages::drawable::named_style::Edit::delete	pages_text_box_named_style_delete_parity	B	-	-
-pages/editor.rs	drawable_comment	1	pages	drawable.comment	host-only	litchi-pages	-	-	-	-
-pages/editor.rs	drawable_comment_replies	1	pages	drawable.comment	host-only	litchi-pages	-	-	-	-
+pages/editor.rs	drawable_comment	1	pages	drawable.comment	migrated	litchi_pages::Package::body_drawable_comment	pages_drawable_comment_read_parity	A	-	-
+pages/editor.rs	drawable_comment_replies	1	pages	drawable.comment	migrated	litchi_pages::Package::body_drawable_comment	pages_drawable_comment_read_parity	A	-	-
 pages/editor.rs	drawable_text_storages	1	pages	text.storage	migrated	litchi_pages::Package::body_drawable_text	pages_text_box_frame_read_parity	A	-	-
-pages/editor.rs	drawables	1	pages	drawable.list	host-only	litchi-pages	-	-	-	-
+pages/editor.rs	drawables	1	pages	drawable.list	migrated	litchi_pages::Package::body_drawable_comment	pages_drawable_list_parity	A	-	-
 pages/editor.rs	duplicate_text_box	1	pages	drawable.text_box_lifecycle	host-only	litchi-pages	-	-	-	-
 pages/editor.rs	extract_media	1	pages	media.asset	migrated	litchi_pages::Package::extract_media	pages_media_assets_read_parity	A	-	-
 pages/editor.rs	from_bytes	1	pages	io	host-only	litchi-pages	-	-	-	-
@@ -1425,9 +1425,9 @@ pages/editor.rs	media_assets	1	pages	media.asset	migrated	litchi_pages::Package:
 pages/editor.rs	open	1	pages	io	host-only	litchi-pages	-	-	-	-
 pages/editor.rs	package	1	pages	io	host-only	litchi-pages	-	-	-	-
 pages/editor.rs	redefine_applied_text_box_named_paragraph_style	1	pages	text.paragraph_style	migrated	litchi_pages::drawable::named_style::Edit::redefine	pages_text_box_named_style_redefine_parity	B	-	-
-pages/editor.rs	remove_drawable_comment_reply	1	pages	drawable.comment	host-only	litchi-pages	-	-	-	-
+pages/editor.rs	remove_drawable_comment_reply	1	pages	drawable.comment	migrated	litchi_pages::drawable::comment::Edit::remove_reply	pages_drawable_comment_reply_remove_parity	B	-	-
 pages/editor.rs	remove_section	1	pages	section.lifecycle	migrated	litchi_pages::Package::edit_section_lifecycle	pages_section_remove_parity	B	-	-
-pages/editor.rs	remove_text_box	1	pages	drawable.text_box_lifecycle	host-only	litchi-pages	-	-	-	-
+pages/editor.rs	remove_text_box	1	pages	drawable.text_box_lifecycle	migrated	litchi_pages::drawable::lifecycle::Edit::remove	pages_text_box_remove_parity	B	-	-
 pages/editor.rs	remove_text_box_comment	1	pages	text.comment	migrated	litchi_pages::drawable::annotation::Edit::remove_comment	pages_text_box_comment_remove_parity	B	-	-
 pages/editor.rs	remove_text_box_comment_reply	1	pages	text.comment	migrated	litchi_pages::drawable::annotation::Edit::remove_reply	pages_text_box_comment_reply_parity	B	-	-
 pages/editor.rs	remove_text_box_highlight	1	pages	text.highlight	migrated	litchi_pages::drawable::annotation::Edit::remove_highlight	pages_text_box_highlight_remove_parity	B	-	-
@@ -1476,8 +1476,8 @@ pages/editor.rs	reset_text_box_text_style	1	pages	text.character	migrated	litchi
 pages/editor.rs	save	1	pages	io	host-only	litchi-pages	-	-	-	-
 pages/editor.rs	section_media_assets	1	pages	media.asset	migrated	litchi_pages::Package::section_media_assets	pages_media_assets_read_parity	A	-	-
 pages/editor.rs	sections	1	pages	section.lifecycle	migrated	litchi_pages::Package::sections	pages_section_append_parity	B	-	-
-pages/editor.rs	set_drawable_comment	1	pages	drawable.comment	host-only	litchi-pages	-	-	-	-
-pages/editor.rs	set_drawable_comment_reply	1	pages	drawable.comment	host-only	litchi-pages	-	-	-	-
+pages/editor.rs	set_drawable_comment	1	pages	drawable.comment	migrated	litchi_pages::drawable::comment::Edit::set	pages_drawable_comment_set_parity	B	-	-
+pages/editor.rs	set_drawable_comment_reply	1	pages	drawable.comment	migrated	litchi_pages::drawable::comment::Edit::set_reply	pages_drawable_comment_reply_set_parity	B	-	-
 pages/editor.rs	set_drawable_text	1	pages	text.storage	migrated	litchi_pages::drawable::text::Edit::set	pages_text_box_plain_text_parity	A	-	-
 pages/editor.rs	set_text_box_columns	1	pages	drawable.text_box_properties	migrated	litchi_pages::drawable::style::Edit::set	pages_text_box_layout_and_columns_set_parity	B	-	-
 pages/editor.rs	set_text_box_geometry	1	pages	drawable.text_box_properties	migrated	litchi_pages::drawable::properties::Edit::set_geometry	pages_text_box_geometry_parity	A	-	-
@@ -1591,11 +1591,11 @@ pages/editor/body_shapes.rs	add_body_rectangle	1	pages	drawable.shape	host-only	
 pages/editor/body_shapes.rs	add_body_shape	1	pages	drawable.shape	host-only	litchi-pages	-	-	-	-
 pages/editor/body_shapes.rs	add_body_shape_with_fill	1	pages	drawable.shape	host-only	litchi-pages	-	-	-	-
 pages/editor/body_shapes.rs	body_line_endpoints	1	pages	drawable.shape	migrated	litchi_pages::Package::body_drawable_style	pages_body_line_endpoints_reset_parity	A	-	-
-pages/editor/body_shapes.rs	body_line_segment	1	pages	drawable.shape	host-only	litchi-pages	-	-	-	-
+pages/editor/body_shapes.rs	body_line_segment	1	pages	drawable.shape	migrated	litchi_pages::drawable::properties::Snapshot::line_segment	pages_body_line_segment_read_parity	A	-	-
 pages/editor/body_shapes.rs	body_shape_effects	1	pages	drawable.shape	migrated	litchi_pages::Package::body_drawable_style	pages_body_shape_style_read_parity	A	-	-
 pages/editor/body_shapes.rs	body_shape_fill	1	pages	drawable.shape	migrated	litchi_pages::Package::body_drawable_style	pages_body_shape_style_read_parity	A	-	-
 pages/editor/body_shapes.rs	body_shape_geometry	1	pages	drawable.shape	migrated	litchi_pages::Package::body_drawable_properties	pages_body_shape_geometry_parity	A	-	-
-pages/editor/body_shapes.rs	body_shape_preset	1	pages	drawable.shape	host-only	litchi-pages	-	-	-	-
+pages/editor/body_shapes.rs	body_shape_preset	1	pages	drawable.shape	migrated	litchi_pages::drawable::properties::Snapshot::preset	pages_body_shape_preset_read_parity	A	-	-
 pages/editor/body_shapes.rs	body_shape_properties	1	pages	drawable.shape	migrated	litchi_pages::Package::body_drawable_properties	pages_body_shape_properties_parity	A	-	-
 pages/editor/body_shapes.rs	body_shape_shadow	1	pages	drawable.shape	migrated	litchi_pages::Package::body_drawable_style	pages_body_shape_style_read_parity	A	-	-
 pages/editor/body_shapes.rs	body_shape_stroke	1	pages	drawable.shape	migrated	litchi_pages::Package::body_drawable_style	pages_body_shape_style_read_parity	A	-	-
@@ -1604,7 +1604,7 @@ pages/editor/body_shapes.rs	body_shapes	1	pages	drawable.shape	host-only	litchi-
 pages/editor/body_shapes.rs	clear_body_shape_text	1	pages	drawable.shape	migrated	litchi_pages::Package::edit_body_drawable_text	pages_body_shape_text_clear_parity	A	-	-
 pages/editor/body_shapes.rs	duplicate_body_shape	1	pages	drawable.shape	host-only	litchi-pages	-	-	-	-
 pages/editor/body_shapes.rs	flip_body_shape	1	pages	drawable.shape	migrated	litchi_pages::Package::edit_body_drawable_properties	pages_body_shape_flip_parity	A	-	-
-pages/editor/body_shapes.rs	remove_body_shape	1	pages	drawable.shape	host-only	litchi-pages	-	-	-	-
+pages/editor/body_shapes.rs	remove_body_shape	1	pages	drawable.shape	migrated	litchi_pages::drawable::lifecycle::Edit::remove	pages_body_shape_remove_parity	B	-	-
 pages/editor/body_shapes.rs	replace_body_shape_text	1	pages	drawable.shape	migrated	litchi_pages::Package::edit_body_drawable_text	pages_body_shape_text_replace_parity	A	-	-
 pages/editor/body_shapes.rs	reset_body_line_endpoints	1	pages	drawable.shape	migrated	litchi_pages::Package::edit_body_drawable_style	pages_body_line_endpoints_reset_parity	A	-	-
 pages/editor/body_shapes.rs	reset_body_shape_effects	1	pages	drawable.shape	migrated	litchi_pages::Package::edit_body_drawable_style	pages_body_shape_style_reset_parity	A	-	-
@@ -1613,12 +1613,12 @@ pages/editor/body_shapes.rs	reset_body_shape_shadow	1	pages	drawable.shape	migra
 pages/editor/body_shapes.rs	reset_body_shape_stroke	1	pages	drawable.shape	migrated	litchi_pages::Package::edit_body_drawable_style	pages_body_shape_style_reset_parity	A	-	-
 pages/editor/body_shapes.rs	reset_body_shape_text_layout	1	pages	drawable.shape	migrated	litchi_pages::Package::edit_body_drawable_style	pages_body_shape_style_reset_parity	A	-	-
 pages/editor/body_shapes.rs	set_body_line_endpoints	1	pages	drawable.shape	migrated	litchi_pages::Package::edit_body_drawable_style	pages_body_line_endpoints_set_parity	B	-	-
-pages/editor/body_shapes.rs	set_body_line_segment	1	pages	drawable.shape	host-only	litchi-pages	-	-	-	-
+pages/editor/body_shapes.rs	set_body_line_segment	1	pages	drawable.shape	migrated	litchi_pages::drawable::properties::Edit::set_line_segment	pages_body_line_segment_parity	A	-	-
 pages/editor/body_shapes.rs	set_body_shape_effects	1	pages	drawable.shape	migrated	litchi_pages::Package::edit_body_drawable_style	pages_body_shape_style_set_parity	B	-	-
 pages/editor/body_shapes.rs	set_body_shape_fill	1	pages	drawable.shape	migrated	litchi_pages::Package::edit_body_drawable_style	pages_body_shape_style_set_parity	B	-	-
 pages/editor/body_shapes.rs	set_body_shape_geometry	1	pages	drawable.shape	migrated	litchi_pages::Package::edit_body_drawable_properties	pages_body_shape_geometry_parity	A	-	-
 pages/editor/body_shapes.rs	set_body_shape_image_fill	1	pages	drawable.shape	host-only	litchi-pages	-	-	-	-
-pages/editor/body_shapes.rs	set_body_shape_preset	1	pages	drawable.shape	host-only	litchi-pages	-	-	-	-
+pages/editor/body_shapes.rs	set_body_shape_preset	1	pages	drawable.shape	migrated	litchi_pages::drawable::properties::Edit::set_preset	pages_body_shape_preset_parity	A	-	-
 pages/editor/body_shapes.rs	set_body_shape_properties	1	pages	drawable.shape	migrated	litchi_pages::Package::edit_body_drawable_properties	pages_body_shape_properties_parity	A	-	-
 pages/editor/body_shapes.rs	set_body_shape_shadow	1	pages	drawable.shape	migrated	litchi_pages::Package::edit_body_drawable_style	pages_body_shape_style_set_parity	B	-	-
 pages/editor/body_shapes.rs	set_body_shape_stroke	1	pages	drawable.shape	migrated	litchi_pages::Package::edit_body_drawable_style	pages_body_shape_style_set_parity	B	-	-
@@ -1642,26 +1642,26 @@ pages/editor/charts/axis.rs	remove_body_chart_axis_title	1	pages	chart.text	migr
 pages/editor/charts/axis.rs	set_body_chart_axis_title	1	pages	chart.text	migrated	litchi-pages::Package::edit_body_chart_axis_title	pages_chart_title_and_axis_title_set_parity	A	-	-
 pages/editor/charts/axis_bounds.rs	body_chart_value_axis_bounds	1	pages	chart.legend_axis	host-only	litchi-pages	-	-	-	-
 pages/editor/charts/axis_bounds.rs	set_body_chart_value_axis_bounds	1	pages	chart.legend_axis	host-only	litchi-pages	-	-	-	-
-pages/editor/charts/axis_gridlines.rs	body_chart_axis_gridline_stroke	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
+pages/editor/charts/axis_gridlines.rs	body_chart_axis_gridline_stroke	1	pages	chart.style	migrated	litchi_pages::Package::body_chart_axis	pages_body_chart_axis_read_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
 pages/editor/charts/axis_gridlines.rs	body_chart_axis_major_gridlines_visible	1	pages	chart.style	migrated	litchi_pages::Package::body_chart_axis	pages_body_chart_axis_read_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
 pages/editor/charts/axis_gridlines.rs	body_chart_axis_minor_gridlines_visible	1	pages	chart.style	migrated	litchi_pages::Package::body_chart_axis	pages_body_chart_axis_read_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
-pages/editor/charts/axis_gridlines.rs	set_body_chart_axis_gridline_stroke	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
+pages/editor/charts/axis_gridlines.rs	set_body_chart_axis_gridline_stroke	1	pages	chart.style	migrated	litchi_pages::chart::axis::Edit::set	pages_body_chart_axis_set_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
 pages/editor/charts/axis_gridlines.rs	set_body_chart_axis_major_gridlines_visible	1	pages	chart.style	migrated	litchi_pages::chart::axis::Edit::set	pages_body_chart_axis_set_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
 pages/editor/charts/axis_gridlines.rs	set_body_chart_axis_minor_gridlines_visible	1	pages	chart.style	migrated	litchi_pages::chart::axis::Edit::set	pages_body_chart_axis_set_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
-pages/editor/charts/axis_label_affixes.rs	body_chart_axis_label_affixes	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
-pages/editor/charts/axis_label_affixes.rs	set_body_chart_axis_label_affixes	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
-pages/editor/charts/axis_label_angle.rs	body_chart_axis_label_angle	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
-pages/editor/charts/axis_label_angle.rs	set_body_chart_axis_label_angle	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
-pages/editor/charts/axis_label_position_3d.rs	body_chart_3d_value_axis_label_position	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
-pages/editor/charts/axis_label_position_3d.rs	set_body_chart_3d_value_axis_label_position	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
+pages/editor/charts/axis_label_affixes.rs	body_chart_axis_label_affixes	1	pages	chart.style	migrated	litchi_pages::Package::body_chart_axis	pages_body_chart_axis_read_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+pages/editor/charts/axis_label_affixes.rs	set_body_chart_axis_label_affixes	1	pages	chart.style	migrated	litchi_pages::chart::axis::Edit::set	pages_body_chart_axis_set_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+pages/editor/charts/axis_label_angle.rs	body_chart_axis_label_angle	1	pages	chart.style	migrated	litchi_pages::Package::body_chart_axis	pages_body_chart_axis_read_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+pages/editor/charts/axis_label_angle.rs	set_body_chart_axis_label_angle	1	pages	chart.style	migrated	litchi_pages::chart::axis::Edit::set	pages_body_chart_axis_set_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+pages/editor/charts/axis_label_position_3d.rs	body_chart_3d_value_axis_label_position	1	pages	chart.style	migrated	litchi_pages::Package::body_chart_axis	pages_body_chart_axis_read_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+pages/editor/charts/axis_label_position_3d.rs	set_body_chart_3d_value_axis_label_position	1	pages	chart.style	migrated	litchi_pages::chart::axis::Edit::set	pages_body_chart_axis_set_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
 pages/editor/charts/axis_labels.rs	body_chart_axis_labels_visible	1	pages	chart.style	migrated	litchi_pages::Package::body_chart_axis	pages_body_chart_axis_read_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
 pages/editor/charts/axis_labels.rs	set_body_chart_axis_labels_visible	1	pages	chart.style	migrated	litchi_pages::chart::axis::Edit::set	pages_body_chart_axis_set_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
 pages/editor/charts/axis_line.rs	body_chart_axis_line_visible	1	pages	chart.style	migrated	litchi_pages::Package::body_chart_axis	pages_body_chart_axis_read_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
 pages/editor/charts/axis_line.rs	set_body_chart_axis_line_visible	1	pages	chart.style	migrated	litchi_pages::chart::axis::Edit::set	pages_body_chart_axis_set_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
 pages/editor/charts/axis_minimum_label.rs	body_chart_value_axis_minimum_label_visible	1	pages	chart.style	migrated	litchi_pages::Package::body_chart_axis	pages_body_chart_axis_read_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
 pages/editor/charts/axis_minimum_label.rs	set_body_chart_value_axis_minimum_label_visible	1	pages	chart.style	migrated	litchi_pages::chart::axis::Edit::set	pages_body_chart_axis_set_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
-pages/editor/charts/axis_number_format.rs	body_chart_axis_number_format	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
-pages/editor/charts/axis_number_format.rs	set_body_chart_axis_number_format	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
+pages/editor/charts/axis_number_format.rs	body_chart_axis_number_format	1	pages	chart.style	migrated	litchi_pages::Package::body_chart_axis	pages_body_chart_axis_read_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+pages/editor/charts/axis_number_format.rs	set_body_chart_axis_number_format	1	pages	chart.style	migrated	litchi_pages::chart::axis::Edit::set	pages_body_chart_axis_set_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
 pages/editor/charts/axis_scale.rs	body_chart_value_axis_scale	1	pages	chart.legend_axis	host-only	litchi-pages	-	-	-	-
 pages/editor/charts/axis_scale.rs	set_body_chart_value_axis_scale	1	pages	chart.legend_axis	host-only	litchi-pages	-	-	-	-
 pages/editor/charts/axis_series_names.rs	body_chart_category_axis_series_names_visible	1	pages	chart.style	migrated	litchi_pages::Package::body_chart_axis	pages_body_chart_axis_read_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
@@ -1679,8 +1679,8 @@ pages/editor/charts/bar_shape_3d.rs	body_chart_3d_bar_shape	1	pages	chart.style	
 pages/editor/charts/bar_shape_3d.rs	set_body_chart_3d_bar_shape	1	pages	chart.style	migrated	litchi_pages::chart::style::Edit::set	pages_body_chart_options_set_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
 pages/editor/charts/border.rs	body_chart_border_visible	1	pages	chart.style	migrated	litchi_pages::Package::body_chart_style	pages_body_chart_options_read_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
 pages/editor/charts/border.rs	set_body_chart_border_visible	1	pages	chart.style	migrated	litchi_pages::chart::style::Edit::set	pages_body_chart_options_set_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
-pages/editor/charts/border_stroke.rs	body_chart_border_stroke	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
-pages/editor/charts/border_stroke.rs	set_body_chart_border_stroke	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
+pages/editor/charts/border_stroke.rs	body_chart_border_stroke	1	pages	chart.style	migrated	litchi_pages::Package::body_chart_style	pages_body_chart_options_read_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+pages/editor/charts/border_stroke.rs	set_body_chart_border_stroke	1	pages	chart.style	migrated	litchi_pages::chart::style::Edit::set	pages_body_chart_options_set_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
 pages/editor/charts/caption.rs	body_chart_caption	1	pages	chart.text	host-only	litchi-pages	-	-	-	-
 pages/editor/charts/caption.rs	remove_body_chart_caption	1	pages	chart.text	host-only	litchi-pages	-	-	-	-
 pages/editor/charts/caption.rs	set_body_chart_caption	1	pages	chart.text	host-only	litchi-pages	-	-	-	-

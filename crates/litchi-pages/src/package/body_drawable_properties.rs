@@ -20,6 +20,10 @@ use litchi_iwa_common::wire::{patch_fixed32_field, transform_length_delimited_fi
 use litchi_iwa_protos::shape_properties_codec as codec;
 use thiserror::Error as ThisError;
 
+use litchi_iwa_common::shape::line::Segment;
+use litchi_iwa_common::shape::path::Preset;
+use litchi_iwa_protos::shape_style_codec as line_codec;
+
 use super::Package;
 use super::body_drawable_graph::{
     self as graph, Budget, GraphError, GraphLimit, MessageRewrite, ObjectIndex, kind_name,
@@ -223,9 +227,26 @@ pub struct Snapshot {
     playback: Option<MediaPlaybackSettings>,
     original_size: Option<Size>,
     natural_size: Option<Size>,
+    line_segment: Option<Segment>,
+    line_reversed: bool,
+    preset: Option<Preset>,
 }
 
 impl Snapshot {
+    /// The preset a shape's or text box's path draws (`None` for a path no
+    /// preset draws, such as a line, and for media).
+    #[must_use]
+    pub const fn preset(&self) -> Option<Preset> {
+        self.preset
+    }
+
+    /// The segment a native straight line draws, from its start to its end
+    /// (`None` for every other drawable).
+    #[must_use]
+    pub const fn line_segment(&self) -> Option<Segment> {
+        self.line_segment
+    }
+
     /// The selector this snapshot was read through.
     #[must_use]
     pub const fn selector(&self) -> DrawableSelector {
@@ -432,6 +453,69 @@ impl Edit<'_> {
             size: Some(original),
             ..geometry
         });
+        Ok(self)
+    }
+
+    /// Move a native straight line onto `segment`, keeping its stored
+    /// direction (the frame, flags, rotation and the path's length follow).
+    ///
+    /// # Errors
+    ///
+    /// Refuses a drawable that is not a native straight line.
+    pub fn set_line_segment(&mut self, segment: Segment) -> Result<&mut Self, Error> {
+        if self.after.line_segment.is_none() {
+            return Err(Refusal::UnsupportedOperation {
+                operation: "set_line_segment",
+                kind: self.kind_name(),
+            }
+            .into());
+        }
+        let directed = if self.after.line_reversed {
+            segment.reversed()
+        } else {
+            segment
+        };
+        let (position, size, angle) = directed.geometry();
+        self.after.geometry = Some(Geometry {
+            position: Some(position),
+            size: Some(size),
+            flags: Some(GeometryFlags::from_bits(line_codec::LINE_FLAGS)),
+            angle: Some(angle),
+        });
+        self.after.line_segment = Some(segment);
+        Ok(self)
+    }
+
+    /// Replace a shape's or text box's path with `preset` drawn in its
+    /// frame, keeping its text and style (the host's
+    /// `set_body_shape_preset`).
+    ///
+    /// # Errors
+    ///
+    /// Refuses media, a drawable without a frame size, and a preset that
+    /// does not fit the frame (a corner radius above half the shorter side).
+    pub fn set_preset(&mut self, preset: Preset) -> Result<&mut Self, Error> {
+        if !matches!(
+            self.target.selector,
+            DrawableSelector::Shape(_) | DrawableSelector::TextBox(_)
+        ) {
+            return Err(Refusal::UnsupportedOperation {
+                operation: "set_preset",
+                kind: self.kind_name(),
+            }
+            .into());
+        }
+        let size = self.stored_geometry()?.size.ok_or(Refusal::MissingState {
+            kind: self.kind_name(),
+            missing: "frame size",
+        })?;
+        if litchi_iwa_style::shape_path::path_source(preset, size.width, size.height).is_none() {
+            return Err(Refusal::InvalidValue {
+                reason: "the preset does not fit the frame",
+            }
+            .into());
+        }
+        self.after.preset = Some(preset);
         Ok(self)
     }
 
@@ -814,6 +898,17 @@ fn read_snapshot(
                 .map_err(|_| Error::InvalidSource)?,
         ),
     };
+    let (line_segment, line_reversed) = match selector {
+        DrawableSelector::Shape(_) => line_of(payload)?,
+        _ => (None, false),
+    };
+    let preset = match selector {
+        DrawableSelector::Shape(_) | DrawableSelector::TextBox(_) => {
+            litchi_iwa_style::shape_path::preset(payload, budget.wire_limits())
+                .map_err(|_| Error::InvalidSource)?
+        },
+        _ => None,
+    };
     Ok(Snapshot {
         selector,
         geometry,
@@ -821,6 +916,33 @@ fn read_snapshot(
         playback,
         original_size,
         natural_size,
+        line_segment,
+        line_reversed,
+        preset,
+    })
+}
+
+/// The segment of a native straight line and whether its stored path runs
+/// backwards (the host's `body_line_segment`).
+fn line_of(shape_info: &[u8]) -> Result<(Option<Segment>, bool), Error> {
+    let Some(stored) = line_codec::line(shape_info, line_codec::Limits::DEFAULT)
+        .map_err(|_| Error::InvalidSource)?
+    else {
+        return Ok((None, false));
+    };
+    let [x, y] = stored.geometry.position.ok_or(Error::InvalidSource)?;
+    let [width, height] = stored.geometry.size.ok_or(Error::InvalidSource)?;
+    let segment = Segment::from_geometry(
+        Point { x, y },
+        Size { width, height },
+        stored.geometry.angle.ok_or(Error::InvalidSource)?,
+        stored.natural_width,
+    )
+    .map_err(|_| Error::InvalidSource)?;
+    Ok(if stored.horizontal_flip {
+        (Some(segment.reversed()), true)
+    } else {
+        (Some(segment), false)
     })
 }
 
@@ -858,10 +980,17 @@ fn commit_edit(edit: Edit<'_>) -> Result<Commit, Error> {
     let geometry_changed = edit.after.geometry != edit.before.geometry;
     let properties_changed = edit.after.properties != edit.before.properties;
     let playback_changed = edit.after.playback != edit.before.playback;
+    let line_changed = edit.after.line_segment != edit.before.line_segment;
+    let preset_changed = edit.after.preset != edit.before.preset;
     let position_changed = edit.move_attachment
         && edit.after.geometry.and_then(|geometry| geometry.position)
             != edit.before.geometry.and_then(|geometry| geometry.position);
-    if !geometry_changed && !properties_changed && !playback_changed && !position_changed {
+    if !geometry_changed
+        && !properties_changed
+        && !playback_changed
+        && !position_changed
+        && !preset_changed
+    {
         return Ok(Commit {
             package: source.clone(),
             patch: Patch {
@@ -892,9 +1021,49 @@ fn commit_edit(edit: Edit<'_>) -> Result<Commit, Error> {
         .ok_or(Error::InvalidSource)?
         .data
         .clone();
-    if geometry_changed || properties_changed {
-        let rewrite =
-            |drawable: &[u8]| rewrite_drawable(drawable, &edit.before, &edit.after, &budget);
+    let mut before = edit.before.clone();
+    if preset_changed {
+        let preset = edit.after.preset.ok_or(Error::InvalidSource)?;
+        let size = edit
+            .after
+            .geometry
+            .and_then(|geometry| geometry.size)
+            .ok_or(Error::InvalidSource)?;
+        payload = litchi_iwa_style::shape_path::with_preset(
+            &payload,
+            preset,
+            size.width,
+            size.height,
+            budget.wire_limits(),
+        )
+        .map_err(|_| Error::InvalidSource)?
+        .ok_or(Refusal::InvalidValue {
+            reason: "the preset does not fit the frame",
+        })?;
+    }
+    if line_changed {
+        let directed = edit.after.geometry.ok_or(Error::InvalidSource)?;
+        let segment = edit.after.line_segment.ok_or(Error::InvalidSource)?;
+        let geometry = line_codec::Geometry {
+            position: directed.position.map(|point| [point.x, point.y]),
+            size: directed.size.map(|size| [size.width, size.height]),
+            flags: directed.flags.map(GeometryFlags::bits),
+            angle: directed.angle,
+        };
+        payload = line_codec::rewrite_line(
+            &payload,
+            geometry,
+            segment.length(),
+            line_codec::Limits::DEFAULT,
+        )
+        .map_err(|_| Error::InvalidSource)?
+        .into_bytes()
+        .into_owned();
+        // The frame is written; only property changes remain.
+        before.geometry = edit.after.geometry;
+    }
+    if (geometry_changed && !line_changed) || properties_changed {
+        let rewrite = |drawable: &[u8]| rewrite_drawable(drawable, &before, &edit.after, &budget);
         payload = if matches!(
             current.selector,
             DrawableSelector::Shape(_) | DrawableSelector::TextBox(_)
@@ -971,9 +1140,19 @@ fn commit_edit(edit: Edit<'_>) -> Result<Commit, Error> {
         };
     let candidate = graph::publish(source, rewrites)?;
     let (reopened_target, reopened) = resolve(&candidate, current.selector)?;
-    if reopened_target.drawable != current.drawable || reopened != edit.after {
+    // A line's endpoints are derived back from the stored frame and path
+    // width, so they hold up to `f32` rounding; everything else is exact.
+    let mut expected = edit.after.clone();
+    if line_changed
+        && let (Some(wanted), Some(read)) = (expected.line_segment, reopened.line_segment)
+        && segments_match(wanted, read)
+    {
+        expected.line_segment = Some(read);
+    }
+    if reopened_target.drawable != current.drawable || reopened != expected {
         return Err(Error::Verification);
     }
+    let edit_after = expected;
     let target_bytes = candidate.state.source.shared_source();
     Ok(Commit {
         package: candidate,
@@ -981,7 +1160,7 @@ fn commit_edit(edit: Edit<'_>) -> Result<Commit, Error> {
             artifacts: ExactArtifacts::new(source_bytes, target_bytes),
             selector: current.selector,
             before: edit.before,
-            after: edit.after,
+            after: edit_after,
             touched_components,
         },
         diagnostics: Diagnostics {
@@ -989,6 +1168,16 @@ fn commit_edit(edit: Edit<'_>) -> Result<Commit, Error> {
             touched_components,
         },
     })
+}
+
+/// Whether two line segments agree up to the `f32` rounding of a frame
+/// round trip.
+fn segments_match(left: Segment, right: Segment) -> bool {
+    let close = |a: f32, b: f32| (a - b).abs() <= 1e-3 * a.abs().max(b.abs()).max(1.0);
+    close(left.start().x, right.start().x)
+        && close(left.start().y, right.start().y)
+        && close(left.end().x, right.end().x)
+        && close(left.end().y, right.end().y)
 }
 
 fn find_object<'a>(
