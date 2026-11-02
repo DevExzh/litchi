@@ -353,6 +353,51 @@ impl MutationScope {
         }
     }
 
+    /// Admit `object` (in `member`, of `message_type`) to the scope.
+    pub(crate) fn allow(&mut self, object: u64, member: &str, message_type: u32) {
+        if !self.allowed_objects.contains(&object) {
+            self.allowed_objects.push(object);
+        }
+        if !self.allowed_members.iter().any(|known| known == member) {
+            self.allowed_members.push(member.to_owned());
+        }
+        if !self.allowed_message_types.contains(&message_type) {
+            self.allowed_message_types.push(message_type);
+        }
+    }
+
+    /// Plan `object` (in `member`, of `message_type`) as created (`true`)
+    /// or removed (`false`); removing an object this scope planned to
+    /// create cancels the creation.
+    pub(crate) fn plan(&mut self, object: u64, member: &str, message_type: u32, created: bool) {
+        if !self.allowed_members.iter().any(|known| known == member) {
+            self.allowed_members.push(member.to_owned());
+        }
+        if !self.allowed_message_types.contains(&message_type) {
+            self.allowed_message_types.push(message_type);
+        }
+        if created {
+            self.planned_new_objects.push(object);
+        } else if let Some(index) = self
+            .planned_new_objects
+            .iter()
+            .position(|planned| *planned == object)
+        {
+            self.planned_new_objects.remove(index);
+        } else {
+            self.planned_removed_objects.push(object);
+        }
+    }
+
+    /// Admit extension or outer `fields`.
+    pub(crate) fn allow_fields(&mut self, fields: &[u32]) {
+        for field in fields {
+            if !self.allowed_fields.contains(field) {
+                self.allowed_fields.push(*field);
+            }
+        }
+    }
+
     /// The fields of the chart drawable's generated extension the operation
     /// may change.
     #[must_use]
@@ -885,6 +930,10 @@ impl SymbolBudget {
             changed,
             scope: self.scope,
         }
+    }
+
+    pub(crate) fn scope_mut(&mut self) -> Option<&mut MutationScope> {
+        self.scope.as_mut()
     }
 
     pub(crate) fn set_scope(&mut self, scope: MutationScope) {

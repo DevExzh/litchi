@@ -104,7 +104,7 @@ fn host_symbol_fill(fill: &SymbolFill) -> TestResult<ChartSeriesSymbolFill> {
 
 fn host_write(
     source: &[u8],
-    ____sheet: (),
+    ______sheet: (),
     chart: u64,
     values: &Values,
     route: Route,
@@ -158,7 +158,7 @@ fn host_write(
     Ok(e.to_bytes()?)
 }
 
-fn host_read(bytes: &[u8], ____sheet: (), chart: u64, values: &Values) -> TestResult<String> {
+fn host_read(bytes: &[u8], ______sheet: (), chart: u64, values: &Values) -> TestResult<String> {
     let e = pages::Draft::from_bytes(bytes)?;
     Ok(match values {
         Values::Strokes(_) => format!("{:?}", e.body_chart_series_strokes(chart)?),
