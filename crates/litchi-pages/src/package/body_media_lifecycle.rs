@@ -256,7 +256,7 @@ impl From<caption::Error> for Error {
 #[derive(Debug, Clone, PartialEq)]
 enum Operation {
     Remove(DrawableSelector),
-    Duplicate(DrawableSelector, TextPosition),
+    Duplicate(DrawableSelector, TextPosition, Option<Box<str>>),
     Replace(DrawableSelector, Asset, Arc<[u8]>),
     ReplaceAsset(AssetId, Arc<[u8]>),
     Add(TextPosition, NewMedia),
@@ -348,9 +348,35 @@ impl Edit<'_> {
         selector: impl Into<DrawableSelector>,
         anchor: TextPosition,
     ) -> Result<&mut Self, Error> {
+        self.stage(Operation::Duplicate(selector.into(), anchor, None))
+    }
+
+    /// Stage a copy of one body text box anchored at a UTF-16 body position,
+    /// offset 12 pt from its source, holding `text` instead of the source's
+    /// text (the host's `duplicate_text_box`).
+    ///
+    /// # Errors
+    ///
+    /// Refuses a selector that is not a text box and a second operation.
+    pub fn duplicate_text_box(
+        &mut self,
+        selector: impl Into<DrawableSelector>,
+        anchor: TextPosition,
+        text: &str,
+    ) -> Result<&mut Self, Error> {
         let selector = selector.into();
-        media_kind(selector)?;
-        self.stage(Operation::Duplicate(selector, anchor))
+        if !matches!(selector, DrawableSelector::TextBox(_)) {
+            return Err(Refusal::NotFound {
+                kind: kind_name(selector),
+                position: selector.position(),
+            }
+            .into());
+        }
+        self.stage(Operation::Duplicate(
+            selector,
+            anchor,
+            Some(Box::from(text)),
+        ))
     }
 
     /// Stage new bytes for the media data of one body image, movie or audio
@@ -619,7 +645,13 @@ impl Edit<'_> {
                 },
                 other => other?,
             },
-            Operation::Duplicate(selector, anchor) => duplicate(self.source, selector, anchor)?,
+            Operation::Duplicate(selector, anchor, text) => {
+                let (package, diagnostics) = duplicate(self.source, selector, anchor)?;
+                match text {
+                    Some(text) => (set_copy_text(&package, anchor, &text)?, diagnostics),
+                    None => (package, diagnostics),
+                }
+            },
             Operation::Replace(selector, asset, data) => {
                 let identifier = asset_identifier(self.source, selector, asset)?;
                 replace(self.source, identifier, &data)?
@@ -994,17 +1026,42 @@ fn resolve(package: &Package, selector: DrawableSelector) -> Result<MediaGraph, 
         return Err(Refusal::Commented.into());
     }
     let drawable = selected.anchor.drawable;
-    let mut graph_objects = vec![drawable.get()];
-    // A shape's or text box's owned storage (the host's text-box graph).
-    graph_objects.extend(selected.storage.map(NonZeroU64::get));
-    for kind in [LabelKind::Title, LabelKind::Caption] {
-        graph_objects.extend(
-            caption::label_objects(package, selector, kind)?
-                .into_iter()
-                .map(NonZeroU64::get),
-        );
+    let mut labels = [Vec::new(), Vec::new()];
+    for (slot, kind) in labels
+        .iter_mut()
+        .zip([LabelKind::Title, LabelKind::Caption])
+    {
+        *slot = caption::label_objects(package, selector, kind)?
+            .into_iter()
+            .map(NonZeroU64::get)
+            .collect();
     }
-    graph_objects.push(selected.anchor.attachment.get());
+    let [titles, captions] = labels;
+    let attachment = selected.anchor.attachment.get();
+    // The host graph orders (its identifiers for a copy follow them):
+    // media drawable, titles, captions, attachment; text box drawable,
+    // storage, attachment, title, caption; shape drawable, caption, title,
+    // storage, attachment.
+    let mut graph_objects = vec![drawable.get()];
+    match (selector, selected.storage) {
+        (DrawableSelector::TextBox(_), Some(storage)) => {
+            graph_objects.push(storage.get());
+            graph_objects.push(attachment);
+            graph_objects.extend(&titles);
+            graph_objects.extend(&captions);
+        },
+        (DrawableSelector::Shape(_), Some(storage)) => {
+            graph_objects.extend(&captions);
+            graph_objects.extend(&titles);
+            graph_objects.push(storage.get());
+            graph_objects.push(attachment);
+        },
+        _ => {
+            graph_objects.extend(&titles);
+            graph_objects.extend(&captions);
+            graph_objects.push(attachment);
+        },
+    }
     let unique = graph_objects.iter().collect::<HashSet<_>>();
     if unique.len() != graph_objects.len() {
         return Err(Refusal::SharedGraph.into());
@@ -1435,7 +1492,21 @@ fn reference_paths(message_type: u32) -> Option<&'static [&'static [u32]]> {
         &[26, 1, 2],
     ];
     const ATTACHMENT: &[&[u32]] = &[&[1]];
+    // `TSWP.ShapeInfoArchive`: the drawable's parent, comment, title and
+    // caption, the shape's style, and both storage slots.
+    const SHAPE_INFO: &[&[u32]] = &[
+        &[1, 1, 2],
+        &[1, 1, 6],
+        &[1, 1, 9],
+        &[1, 1, 10],
+        &[1, 1, 11],
+        &[1, 2],
+        &[2],
+        &[3],
+        &[4],
+    ];
     match message_type {
+        2_011 => Some(SHAPE_INFO),
         IMAGE_MESSAGE_TYPE => Some(IMAGE),
         MOVIE_MESSAGE_TYPE => Some(MOVIE),
         2_001 | 2_022 => Some(STORAGE),
@@ -1708,11 +1779,12 @@ fn duplicate(
                     .iter()
                     .position(|message| message.type_ == message_type)
                     .ok_or(Error::InvalidSource)?;
-                let data = litchi_iwa_common::wire::transform_length_delimited_field(
-                    &cloned.messages[index].data,
-                    1,
-                    |drawable| {
-                        litchi_iwa_protos::shape_properties_codec::rewrite_drawable_archive(
+                let shape = matches!(
+                    selector,
+                    DrawableSelector::Shape(_) | DrawableSelector::TextBox(_)
+                );
+                let rewrite = |drawable: &[u8]| {
+                    litchi_iwa_protos::shape_properties_codec::rewrite_drawable_archive(
                             drawable,
                             litchi_iwa_protos::shape_properties_codec::GeometryWrite::preserve()
                                 .with_position(Some(moved)),
@@ -1725,8 +1797,24 @@ fn duplicate(
                         .map_err(|_| {
                             litchi_iwa_common::Error::InvalidFormat("drawable geometry".to_owned())
                         })
-                    },
-                )
+                };
+                let data = if shape {
+                    litchi_iwa_common::wire::transform_length_delimited_field(
+                        &cloned.messages[index].data,
+                        1,
+                        |shape| {
+                            litchi_iwa_common::wire::transform_length_delimited_field(
+                                shape, 1, rewrite,
+                            )
+                        },
+                    )
+                } else {
+                    litchi_iwa_common::wire::transform_length_delimited_field(
+                        &cloned.messages[index].data,
+                        1,
+                        rewrite,
+                    )
+                }
                 .map_err(graph::map_wire_error)?;
                 cloned
                     .replace_message_preserving_header(
@@ -3107,6 +3195,31 @@ fn add_text_shape(
             ..Diagnostics::default()
         },
     ))
+}
+
+/// Replace the text of the text box anchored at UTF-16 `anchor` (a copy
+/// just made) through the shared plain-text family.
+fn set_copy_text(package: &Package, anchor: TextPosition, text: &str) -> Result<Package, Error> {
+    let mut budget = Budget::new(package)?;
+    let index = ObjectIndex::new(package, &mut budget)?;
+    let body = graph::resolve_body(&index, &mut budget)?;
+    let mut position = 0;
+    loop {
+        let selector = DrawableSelector::text_box(position);
+        let selected = graph::select_drawable(&index, &body, selector, &mut budget)?
+            .ok_or(Error::Verification)?;
+        if selected.anchor.character_index == anchor.utf16_index() {
+            let mut edit = package
+                .edit_body_drawable_text(selector)
+                .map_err(|_| Error::Verification)?;
+            edit.set(text).map_err(|_| Error::Verification)?;
+            return Ok(edit
+                .commit()
+                .map_err(|_| Error::Verification)?
+                .into_package());
+        }
+        position += 1;
+    }
 }
 
 /// A new empty drawable z-order object, referenced from the document root.

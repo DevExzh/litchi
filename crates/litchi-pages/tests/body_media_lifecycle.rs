@@ -38,12 +38,13 @@ fn native_image_removal_deletes_the_graph_and_assets_and_inverts() {
 #[test]
 fn refusals_are_typed() {
     let package = Package::from_bytes(IMAGES).unwrap();
-    // Shapes and text boxes are removable (record 0413); duplication is
-    // still media-only.
+    // Shapes and text boxes are removable and duplicable (record 0413b).
     let mut edit = package.edit_body_media();
+    edit.duplicate(DrawableSelector::shape(0), litchi_pages::TextPosition::ZERO)
+        .unwrap();
     assert!(matches!(
-        edit.duplicate(DrawableSelector::shape(0), litchi_pages::TextPosition::ZERO),
-        Err(Error::Refused(Refusal::NotMedia { .. }))
+        edit.commit(),
+        Err(Error::Refused(Refusal::NotFound { .. }))
     ));
     let mut edit = package.edit_body_media();
     edit.remove(DrawableSelector::text_box(0)).unwrap();
