@@ -33,7 +33,7 @@ const fn host_gridline(value: GridlineStroke) -> ChartAxisGridlineStroke {
 
 fn host_write(
     source: &[u8],
-    _sheet: (),
+    ___sheet: (),
     chart: u64,
     axis: Axis,
     value: &Property,
@@ -87,7 +87,7 @@ fn host_write(
 
 fn host_read(
     bytes: &[u8],
-    _sheet: (),
+    ___sheet: (),
     chart: u64,
     axis: Axis,
     kind: PropertyKind,

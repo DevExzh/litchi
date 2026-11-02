@@ -193,7 +193,7 @@ fn host_symbol(value: Option<(SymbolShape, Option<f32>)>) -> TestResult<Option<C
 /// through the one-series route.
 fn host_write(
     source: &[u8],
-    ____sheet: (),
+    ______sheet: (),
     chart: u64,
     values: &Values,
     one: Option<usize>,
@@ -285,7 +285,7 @@ fn host_write(
 }
 
 /// The host's read of the property, as comparable text.
-fn host_read(bytes: &[u8], ____sheet: (), chart: u64, values: &Values) -> TestResult<String> {
+fn host_read(bytes: &[u8], ______sheet: (), chart: u64, values: &Values) -> TestResult<String> {
     let e = pages::Draft::from_bytes(bytes)?;
     Ok(match values {
         Values::Lines(..) => format!("{:?}", e.body_chart_series_connection_lines(chart)?),
