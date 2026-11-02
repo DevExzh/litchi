@@ -113,7 +113,7 @@ Both pre-commit size checks printed nothing for every commit.
 
 | Commit | What |
 |---|---|
-| *(this slice)* | Pages `drawable::lifecycle::Edit::add_chart(TextPosition, Kind, ChartData, Point, Size)` and `Refusal::InvalidChart` (submodule `body_media_lifecycle/chart.rs`): the shared author's graph with the Pages profile in the body component, attachment, U+FFFC, z-order created on first use, styles appended to the stylesheet and the preset to the theme's chart presets, UUIDs at the body component and the host's cross-component edges. `chart::lifecycle::Edit::set_geometry(Geometry)` and `Refusal::InvalidGeometry`: the frame parts that differ are rewritten in place and a moved chart's attachment offsets follow (horizontal from the body's left margin, vertical from the page). `chart::lifecycle::Patch::is_noop` is now byte-based, so a frame-only patch and its inverse replay |
+| `99d19c56a3`, `bfa650f286` | Pages `drawable::lifecycle::Edit::add_chart(TextPosition, Kind, ChartData, Point, Size)` and `Refusal::InvalidChart` (submodule `body_media_lifecycle/chart.rs`): the shared author's graph with the Pages profile in the body component, attachment, U+FFFC, z-order created on first use, styles appended to the stylesheet and the preset to the theme's chart presets, UUIDs at the body component and the host's cross-component edges. `chart::lifecycle::Edit::set_geometry(Geometry)` and `Refusal::InvalidGeometry`: the frame parts that differ are rewritten in place and a moved chart's attachment offsets follow (horizontal from the body's left margin, vertical from the page). `chart::lifecycle::Patch::is_noop` is now byte-based, so a frame-only patch and its inverse replay |
 
 | Host route | Destination | Tier |
 |---|---|---|
