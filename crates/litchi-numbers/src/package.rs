@@ -103,7 +103,6 @@ pub(crate) mod table_cell_list;
 pub(crate) mod table_cell_number_format;
 pub(crate) mod table_cell_percentage_format;
 pub(crate) mod table_cell_pop_up_menu;
-pub(crate) use litchi_iwa_table::cell_format::pop_up_menu_metadata as table_cell_pop_up_menu_metadata;
 pub(crate) use litchi_iwa_table::cell_format::pop_up_menu_native as table_cell_pop_up_menu_native;
 pub(crate) mod table_cell_scientific_format;
 pub(crate) mod table_cell_text;
