@@ -25,6 +25,7 @@
 mod archive_diff;
 mod chart_font_admission_cases;
 mod chart_font_cases;
+mod chart_lifecycle_cases;
 mod chart_property_cost;
 mod chart_style_cases;
 mod chart_text_cases;
