@@ -7537,3 +7537,16 @@ See [0063](0063-source-pptx-modern-comments.md).
   performance binaries. Final captures wait for the complete gate to pass.
   Native routes remain pending; W3 is blocked, and the last fully qualified
   integrated source remains e0e297a82b until these checks finish.
+
+## Coordinator resume (2026-11-02)
+- No commits have landed on any branch since `4b26bb3379` (2026-10-30). That commit's full gate (`.coord/resume-20261028/full-4b26bb3379/`) stopped after 36 passing rows and has no completion marker. The complete 53-row gate is running again on the same frozen commit (`full-4b26bb3379-r2`). The last fully qualified source is still `e0e297a82b`.
+- Ledger: 1,213 migrated, 43 retired and 983 host-only rows. The host-only rows are Pages 486, Keynote 290, Numbers 140 and shared 67. The largest blocks:
+  - chart.style: 360 rows;
+  - table.cell_rich_text: 158;
+  - Pages text-box text families: about 150;
+  - table.cell_format on Pages and Keynote: 64.
+- Wave W4 started, three agents (memory limit), each on a fresh branch from `4b26bb3379`:
+  - W4-T (0412): the cell rich-text engine lifted into `litchi-iwa-table`, plus Pages and Keynote rich-text and cell-format facades;
+  - W4-P (0413): Pages text-box text, annotation, field, text-box, shape and comment families over the shared text/style engines;
+  - W4-C (0414): the remaining chart-style engines in `litchi-iwa-style`, plus Numbers, Keynote and Pages facades.
+- Queued for a free slot: Numbers shapes, captions, drawables and chart lifecycle; Numbers sort and pivot; table comments, topology and conditional highlights on Pages and Keynote; the Keynote builder. Native routes are still pending, so W3 stays blocked. Nothing pushed.
