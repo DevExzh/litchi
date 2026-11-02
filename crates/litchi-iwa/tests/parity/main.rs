@@ -23,6 +23,7 @@
 //! The harness lives in the host's tests so that W3 deletes it with the host.
 
 mod archive_diff;
+mod chart_create_cases;
 mod chart_font_admission_cases;
 mod chart_font_cases;
 mod chart_lifecycle_cases;
@@ -64,6 +65,7 @@ mod keynote_slide_cases;
 mod keynote_table_cases;
 mod keynote_table_cell_appearance_cases;
 mod keynote_table_lifecycle_cases;
+mod keynote_table_topology_cases;
 mod keynote_text_annotation_cases;
 mod keynote_text_list_cases;
 mod keynote_text_property_cases;
@@ -125,6 +127,7 @@ mod pages_lifecycle_cases;
 mod pages_media_lifecycle_cases;
 mod pages_shape_style_cases;
 mod pages_table_cases;
+mod pages_table_topology_cases;
 mod pages_text_box_annotation_cases;
 mod pages_text_box_cases;
 mod pages_text_box_lifecycle_cases;

@@ -3,12 +3,14 @@
 //! drawable's `TSCH.ChartArchive` extension, read and rewritten in place
 //! (the host's `set_*_chart_kind` and `set_*_chart_direction`, which assign
 //! `chart_type` and `series_direction`). Every other byte of the payload is
-//! kept.
+//! kept. [`author`] writes the private graph of a new chart.
 
 use litchi_iwa_common::WireLimits;
 use litchi_iwa_common::chart::Direction;
 use litchi_iwa_common::chart::kind::Kind;
 use litchi_iwa_common::wire::{WireView, patch_varint_field, transform_length_delimited_field};
+
+pub mod author;
 
 /// The `TSCH.ChartArchive` extension of `TSCH.ChartDrawableArchive`.
 const CHART_UNITY: u32 = 10_000;
@@ -26,6 +28,13 @@ pub enum Error {
     /// mistyped.
     #[error("the chart drawable has no well-formed chart archive")]
     Invalid,
+    /// The chart data cannot form the requested kind, or its grid cannot be
+    /// encoded.
+    #[error("the chart data cannot form the chart")]
+    InvalidData,
+    /// A new chart object exceeds the archive limits.
+    #[error("a new chart object exceeds the archive limits")]
+    Object,
 }
 
 /// The kind and series direction a chart drawable payload stores (`None`

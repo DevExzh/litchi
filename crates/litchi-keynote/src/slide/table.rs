@@ -109,6 +109,14 @@ pub mod lifecycle {
         Commit, Diagnostics, Edit, Error, LimitKind, Patch, Refusal,
     };
 }
+/// Exact-source row and column insertion and removal in one rooted slide
+/// table over the shared table-topology engine (record 0412e).
+pub mod topology {
+    pub use crate::package::slide_table_topology::{
+        ColumnDeletion, ColumnInsertion, Commit, Diagnostics, Edit, Error, LimitKind, Patch,
+        Refusal, RowDeletion, RowInsertion, Unsupported,
+    };
+}
 /// Decimal number display formats for existing table cells.
 pub mod number_format;
 /// Physical row-sort transaction values for a Keynote slide table.

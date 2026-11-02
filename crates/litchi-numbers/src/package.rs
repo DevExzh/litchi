@@ -64,6 +64,7 @@ pub(crate) mod sheet_chart_title;
 pub(crate) mod sheet_drawable;
 pub(crate) mod sheet_drawable_annotation;
 mod sheet_drawable_author;
+mod sheet_drawable_chart;
 pub(crate) mod sheet_drawable_comment;
 mod sheet_drawable_comment_graph;
 pub(crate) mod sheet_drawable_date_time;
@@ -1110,7 +1111,9 @@ impl Package {
     }
 
     /// Return the raw Numbers-wire profile selected by this package's
-    /// retained archive and semantic ingress limits.
+    /// retained archive and semantic ingress limits (the table-topology
+    /// engine derives the same profile from `TableSource::archive_limits`).
+    #[cfg(test)]
     pub(crate) fn numbers_wire_limits(&self) -> Result<litchi_numbers_wire::Limits> {
         let maximum = self
             .profile()
