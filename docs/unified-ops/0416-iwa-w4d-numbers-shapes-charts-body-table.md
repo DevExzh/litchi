@@ -59,10 +59,12 @@ evidence). Numbers host-only rows: 114 → 95.
   same way (`numbers_sheet_shape_shadow_inconsistent_theme_refusal_parity`).
   Shadow parity runs on `chart-grid-authored-native.numbers`, whose theme
   shadow both sides decode.
-- **Line copies.** The host's `duplicate_sheet_shape` compares the moved
-  copy's segment with the source's and refuses every line (the defect fixed
-  for Pages in `428c32a13c`). The leaf copies lines; the parity case
-  duplicates a rectangle. The host is not changed here.
+- **Line copies.** The host's `duplicate_sheet_shape` compared the moved
+  copy's segment with the source's and refused every line (the defect fixed
+  for Pages in `428c32a13c`). Slice 2 fixes the host check the same way
+  (the expected segment is the source's moved by the duplicate offset;
+  macOS-queued as a host fix), and the duplicate parity case now copies
+  both the rectangle and a line.
 
 ## 4. Performance
 
