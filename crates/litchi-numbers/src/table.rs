@@ -6,6 +6,8 @@
 
 /// Lossless table appearance values and selector-first transactions.
 pub mod appearance;
+/// Cell fill, text layout and borders of table cells (record 0412b).
+pub mod cell_appearance;
 /// Presence-preserving semantic cell reads.
 pub mod cells;
 /// Compact, archive-free cell coordinates and A1 selectors.

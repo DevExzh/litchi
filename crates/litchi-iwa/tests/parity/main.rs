@@ -67,6 +67,7 @@ mod keynote_text_storage_cases;
 mod keynote_w1c_cost;
 mod numbers_builder_cases;
 mod numbers_cases;
+mod numbers_cell_appearance_cases;
 mod numbers_cell_data_format_cases;
 mod numbers_cell_list_cases;
 mod numbers_cell_text_cases;
