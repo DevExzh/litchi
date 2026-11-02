@@ -1345,3 +1345,30 @@ fn keynote_slide_table_cell_custom_format_cost_abba() -> TestResult {
         },
     )
 }
+
+/// Callgrind probe (record 0412a): Text on the text cell naming an implicit
+/// Number entry, host family setter against the leaf, ABBA.
+#[test]
+#[ignore = "callgrind probe; run explicitly"]
+fn keynote_slide_table_cell_text_format_cost_abba() -> TestResult {
+    let (input, at) = text_input(&fixture(TEXT_FIXTURE)?)?;
+    let format = DataFormat::Text(Text);
+    crate::pages_cost_probes::abba(
+        &input,
+        |source| {
+            let mut editor = keynote::Draft::from_bytes(source)?;
+            let model = host_model(&editor)?;
+            let (row, column) = (at.row() as usize, at.column() as usize);
+            editor.set_slide_table_cell_text_format(SLIDE, model, row, column)?;
+            Ok(editor.to_bytes()?)
+        },
+        |source| {
+            let package = Package::from_bytes(source)?;
+            let commit = package
+                .edit_slide_table_cell_format(SLIDE, TABLE, at)?
+                .set(format.clone())
+                .commit()?;
+            Ok(leaf_bytes!(commit.package()))
+        },
+    )
+}

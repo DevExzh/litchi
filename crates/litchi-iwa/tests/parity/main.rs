@@ -25,6 +25,7 @@
 mod archive_diff;
 mod chart_font_admission_cases;
 mod chart_font_cases;
+mod chart_lighting_validation_cases;
 mod chart_property_cost;
 mod chart_style_cases;
 mod chart_text_cases;
@@ -68,6 +69,7 @@ mod keynote_text_storage_cases;
 mod keynote_w1c_cost;
 mod numbers_builder_cases;
 mod numbers_cases;
+mod numbers_cell_appearance_cases;
 mod numbers_cell_data_format_cases;
 mod numbers_cell_list_cases;
 mod numbers_cell_text_cases;
@@ -88,6 +90,7 @@ mod numbers_lifecycle_cases;
 mod numbers_media_add_cases;
 mod numbers_media_cases;
 mod numbers_owner_allocation;
+mod numbers_shape_lifecycle_cases;
 mod numbers_shape_style_cases;
 #[cfg(feature = "parity-host-oracle")]
 mod numbers_table_comment_cases;

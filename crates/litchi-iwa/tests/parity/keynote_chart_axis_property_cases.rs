@@ -10,6 +10,7 @@ use litchi_iwa_common::chart::axis::label_angle::LabelAngle;
 use litchi_iwa_common::chart::axis::label_position_3d::LabelPosition3d;
 use litchi_iwa_common::chart::axis::style::Visibility;
 use litchi_iwa_common::chart::axis::{Axis, TickMarkLocation};
+use litchi_iwa_common::chart::category_labels::{Frequency, Interval, Layout};
 use litchi_iwa_common::chart::kind::Kind;
 use litchi_iwa_common::chart::number_format::{
     DecimalPlaces, LabelAffixes, NegativeStyle, NumberFormat,
@@ -60,6 +61,7 @@ fn host_write(
         Property::LabelPosition3d(v) => {
             e.set_slide_chart_3d_value_axis_label_position(sheet, chart, v)?;
         },
+        Property::CategoryLabels(v) => e.set_slide_chart_category_label_layout(sheet, chart, v)?,
         Property::Line(v) => e.set_slide_chart_axis_line_visible(sheet, chart, axis, v)?,
         Property::MajorGridlines(v) => {
             e.set_slide_chart_axis_major_gridlines_visible(sheet, chart, axis, v)?;
@@ -132,6 +134,9 @@ fn host_read(
             "{:?}",
             e.slide_chart_3d_value_axis_label_position(sheet, chart)?
         ),
+        PropertyKind::CategoryLabels => {
+            format!("{:?}", e.slide_chart_category_label_layout(sheet, chart)?)
+        },
         PropertyKind::Line => format!("{:?}", e.slide_chart_axis_line_visible(sheet, chart, axis)?),
         PropertyKind::MajorGridlines => format!(
             "{:?}",
@@ -181,6 +186,7 @@ fn leaf_read(bytes: &[u8], axis: Axis, kind: PropertyKind) -> TestResult<String>
         Property::LabelAffixes(v) => format!("{v:?}"),
         Property::NumberFormat(v) => format!("{v:?}"),
         Property::LabelPosition3d(v) => format!("{v:?}"),
+        Property::CategoryLabels(v) => format!("{v:?}"),
         _ => return Err("unmapped property".into()),
     })
 }
@@ -246,6 +252,29 @@ fn cases() -> Vec<(Axis, Property)> {
             Axis::Value,
             Property::LabelPosition3d(LabelPosition3d::Leading),
         ),
+        (
+            Axis::Category,
+            Property::CategoryLabels(Layout::new(
+                Frequency::Every(Interval::new(3).expect("interval")),
+                false,
+            )),
+        ),
+        (
+            Axis::Category,
+            Property::CategoryLabels(Layout::new(Frequency::None, true)),
+        ),
+        (
+            Axis::Category,
+            Property::CategoryLabels(Layout::new(Frequency::All, true)),
+        ),
+        (
+            Axis::Category,
+            Property::CategoryLabels(Layout::new(Frequency::Unsupported(-4), false)),
+        ),
+        (
+            Axis::Category,
+            Property::CategoryLabels(Layout::new(Frequency::None, false)),
+        ),
     ]
 }
 
@@ -297,6 +326,7 @@ fn changed(bytes: &[u8], axis: Axis, value: Property) -> TestResult<Property> {
         Property::LabelAffixes(_) => Property::LabelAffixes(LabelAffixes::new("~", "")?),
         Property::NumberFormat(_) => Property::NumberFormat(NumberFormat::AXIS_NATIVE_DEFAULT),
         Property::LabelPosition3d(_) => Property::LabelPosition3d(LabelPosition3d::Trailing),
+        Property::CategoryLabels(_) => Property::CategoryLabels(Layout::new(Frequency::All, false)),
         _ => return Err("unmapped property".into()),
     })
 }

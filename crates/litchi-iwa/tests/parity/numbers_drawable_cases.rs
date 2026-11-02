@@ -114,7 +114,7 @@ pub(crate) fn chart_fixture() -> TestResult<Fixture> {
     })
 }
 
-fn host_geometry(geometry: Geometry) -> DrawableGeometry {
+pub(crate) fn host_geometry(geometry: Geometry) -> DrawableGeometry {
     DrawableGeometry {
         position: geometry.position.map(|point| DrawablePoint {
             x: point.x,
@@ -129,7 +129,7 @@ fn host_geometry(geometry: Geometry) -> DrawableGeometry {
     }
 }
 
-fn host_properties(properties: &Properties) -> DrawableProperties {
+pub(crate) fn host_properties(properties: &Properties) -> DrawableProperties {
     DrawableProperties {
         hyperlink_url: properties.hyperlink.clone(),
         locked: properties.locked,
@@ -662,13 +662,13 @@ fn numbers_sheet_chart_geometry_parity() -> TestResult {
 // The structural family: list, z-order, removal.
 
 /// The host's back-to-front drawable identifiers, mapped to list positions.
-fn host_order(bytes: &[u8]) -> TestResult<Vec<u64>> {
+pub(crate) fn host_order(bytes: &[u8]) -> TestResult<Vec<u64>> {
     let editor = numbers::Draft::from_bytes(bytes)?;
     let sheet = first_sheet(&editor)?;
     Ok(editor.sheet_drawable_order(sheet)?)
 }
 
-fn leaf_list(bytes: &[u8]) -> TestResult<String> {
+pub(crate) fn leaf_list(bytes: &[u8]) -> TestResult<String> {
     Ok(format!(
         "{:#?}",
         Package::from_bytes(bytes)?.sheet_drawable_list(0)?
