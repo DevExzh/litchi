@@ -17,13 +17,13 @@
 use super::{
     AuthorPlan, COMMENT_STORAGE_MESSAGE_TYPE, Fault, FaultResult, LimitKind,
     MAX_COMMENT_TEXT_BYTES, Mutation, Profile, Selection, TABLE_DATA_LIST_MESSAGE_TYPE,
-    TABLE_ENTRY_REFCOUNT_FIELD, TABLE_LIST_ENTRY_FIELD, TABLE_REFERENCE_IDENTIFIER_FIELD,
-    append_list, author_storage_component, comment_codec, comment_list_message_index,
-    comment_storage_message_index, create_root, decode_entry, ensure_unique_root, list_entry,
-    map_comment_decode_error, map_core_error, map_wire_error, materialize_author, plan_author,
-    read_varint, register_insertions, remove_list_entry, replace_message_at, rewrite_existing_text,
-    rewrite_tile, unique_field, uuid_for, validate_archive_header_shape,
-    validate_existing_comment_graph, validate_selection, varint_field,
+    TABLE_ENTRY_REFCOUNT_FIELD, TABLE_LIST_ENTRY_FIELD, append_list, author_storage_component,
+    comment_codec, comment_list_message_index, comment_storage_message_index, create_root,
+    decode_entry, ensure_unique_root, list_entry, map_comment_decode_error, map_core_error,
+    map_wire_error, materialize_author, plan_author, register_insertions, remove_list_entry,
+    replace_message_at, rewrite_existing_text, rewrite_tile, unique_field, uuid_for,
+    validate_archive_header_shape, validate_existing_comment_graph, validate_selection,
+    varint_field,
 };
 use crate::structure::{self, TableLeaf, Working, metadata};
 use litchi_iwa_common::WireLimits;
@@ -478,44 +478,43 @@ fn retarget_replies<P: TableLeaf>(
             .data
             .as_slice(),
     )?;
-    let output = match (old, new) {
-        (None, Some(new)) => {
-            let reference = varint_field(TABLE_REFERENCE_IDENTIFIER_FIELD, new)?;
-            let mut output = source;
-            wire::append_length_delimited_field(
-                &mut output,
-                REPLIES_FIELD,
-                &reference,
-                WireLimits::DEFAULT,
-            )
-            .map_err(map_wire_error)?;
-            output
+    // The strict prepared reply-reference codec rewrites field 4 in place,
+    // checking the expected identifier at its ordinal.
+    let ordinal = |old: u64| {
+        before
+            .iter()
+            .position(|reply| *reply == old)
+            .ok_or(Fault::Invalid)
+    };
+    let rewrite = match (old, new) {
+        (None, Some(new)) => comment_codec::CommentStorageReplyRewrite::Append { identifier: new },
+        (Some(old), Some(new)) => comment_codec::CommentStorageReplyRewrite::Replace {
+            ordinal: ordinal(old)?,
+            expected_identifier: old,
+            replacement_identifier: new,
         },
-        (Some(old), Some(new)) => {
-            wire::transform_repeated_length_delimited_fields(&source, REPLIES_FIELD, |payload| {
-                if reference_identifier(payload).map_err(ReplyWireError)? == old {
-                    wire::patch_varint_field(
-                        payload,
-                        TABLE_REFERENCE_IDENTIFIER_FIELD,
-                        true,
-                        Some(new),
-                    )
-                    .map_err(ReplyWireError::from)
-                } else {
-                    structure::copy_bytes(payload)
-                        .map_err(|fault| ReplyWireError(Fault::from(fault)))
-                }
-            })
-            .map_err(|error: ReplyWireError| error.0)?
-        },
-        (Some(old), None) => {
-            wire::remove_repeated_length_delimited_field_where(&source, REPLIES_FIELD, |payload| {
-                Ok(reference_identifier(payload).map_err(ReplyWireError)? == old)
-            })
-            .map_err(|error: ReplyWireError| error.0)?
+        (Some(old), None) => comment_codec::CommentStorageReplyRewrite::Remove {
+            ordinal: ordinal(old)?,
+            expected_identifier: old,
         },
         (None, None) => return Err(Fault::Invalid),
     };
+    let headroom = source.len().saturating_add(64);
+    let options = comment_codec::DecodeOptions::new(
+        headroom,
+        headroom.saturating_mul(4),
+        headroom.saturating_mul(64),
+        64,
+        working.source().max_references(),
+        MAX_COMMENT_TEXT_BYTES,
+    );
+    let prepared = comment_codec::prepare_comment_storage_reply_rewrite(&source, rewrite, options)
+        .map_err(map_comment_decode_error)?;
+    let requirements = prepared.execution_requirements();
+    let output = prepared
+        .execute(requirements.exact())
+        .map_err(map_comment_decode_error)?
+        .into_bytes();
     let limits = working.archive_limits();
     {
         let object = working
@@ -656,15 +655,6 @@ fn renumber_reply_fields(info: &mut litchi_iwa_core::archive::MessageInfo) -> Fa
         }
     }
     Ok(())
-}
-
-fn reference_identifier(payload: &[u8]) -> FaultResult<u64> {
-    let view = WireView::parse(payload, WireLimits::DEFAULT).map_err(map_wire_error)?;
-    let field = unique_field(&view, TABLE_REFERENCE_IDENTIFIER_FIELD)?.ok_or(Fault::Invalid)?;
-    if field.wire_type() != 0 {
-        return Err(Fault::Invalid);
-    }
-    read_varint(field.payload())
 }
 
 /// A wire-callback error carrying the engine's fault.
