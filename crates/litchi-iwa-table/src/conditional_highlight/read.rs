@@ -11,8 +11,8 @@ const CONDITIONAL_STYLE_SET_MESSAGE_TYPE: u32 = 6_010;
 const CELL_STYLE_MESSAGE_TYPE: u32 = 6_004;
 const PARAGRAPH_STYLE_MESSAGE_TYPE: u32 = 2_022;
 
-pub(super) fn decode_style_set(
-    working: &Working<'_>,
+pub(super) fn decode_style_set<P: TableLeaf>(
+    working: &Working<'_, P>,
     style_set_id: u64,
 ) -> Result<tst::ConditionalStyleSetArchive> {
     with_object(working, style_set_id, |object| {
@@ -26,8 +26,8 @@ pub(super) fn decode_style_set(
     })
 }
 
-pub(super) fn decode_rules(
-    working: &Working<'_>,
+pub(super) fn decode_rules<P: TableLeaf>(
+    working: &Working<'_, P>,
     set: &tst::ConditionalStyleSetArchive,
 ) -> Result<Vec<Rule>> {
     let current = set.rules.as_ref().ok_or_else(unsupported_rule_graph)?;
@@ -48,8 +48,8 @@ pub(super) fn decode_rules(
         .collect()
 }
 
-fn decode_rule(
-    working: &Working<'_>,
+fn decode_rule<P: TableLeaf>(
+    working: &Working<'_, P>,
     rule: &tst::conditional_style_set_archive::ConditionalStyleRule,
     prepivot: Option<&tst::conditional_style_set_archive::ConditionalStyleRulePrePivot>,
 ) -> Result<Rule> {
@@ -392,7 +392,10 @@ fn decode_date_argument(argument: Option<&tst::FormulaPredArgArchive>) -> Result
     Date::new(value).map_err(|_| unsupported_rule_graph())
 }
 
-fn decode_cell_style(working: &Working<'_>, identifier: u64) -> Result<Option<RgbaColor>> {
+fn decode_cell_style<P: TableLeaf>(
+    working: &Working<'_, P>,
+    identifier: u64,
+) -> Result<Option<RgbaColor>> {
     let style = with_object(working, identifier, |object| {
         object
             .messages
@@ -417,7 +420,10 @@ fn decode_cell_style(working: &Working<'_>, identifier: u64) -> Result<Option<Rg
     fill.color.as_ref().map(color_from_native).transpose()
 }
 
-fn decode_text_style(working: &Working<'_>, identifier: u64) -> Result<(Option<RgbaColor>, bool)> {
+fn decode_text_style<P: TableLeaf>(
+    working: &Working<'_, P>,
+    identifier: u64,
+) -> Result<(Option<RgbaColor>, bool)> {
     let style = with_object(working, identifier, |object| {
         object
             .messages
@@ -445,8 +451,8 @@ fn decode_text_style(working: &Working<'_>, identifier: u64) -> Result<(Option<R
     Ok((color, bold))
 }
 
-fn with_object<T>(
-    working: &Working<'_>,
+fn with_object<P: TableLeaf, T>(
+    working: &Working<'_, P>,
     identifier: u64,
     decode: impl FnOnce(&litchi_iwa_core::ArchiveObject) -> Result<T>,
 ) -> Result<T> {

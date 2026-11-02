@@ -55,6 +55,7 @@ pub mod comments;
 /// ownership, list-key, or locality rules.
 pub mod comments_native;
 
+pub mod conditional_highlight;
 pub mod structure;
 pub mod topology;
 

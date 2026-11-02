@@ -2745,11 +2745,9 @@ mod tests {
             Default::default(),
         )
         .map_err(|error| Error::InvalidFormat(error.to_string()))?;
-        let empty_cell = crate::cell::wire::encode(
-            &crate::cell::wire::BncCell::minimal(),
-            &crate::cell::wire::Limits::DEFAULT,
-        )
-        .expect("minimal BNC cell encodes under default limits");
+        let empty_cell = crate::cell::wire::BncCell::minimal()
+            .encode(&crate::cell::wire::Limits::DEFAULT)
+            .expect("minimal BNC cell encodes under default limits");
         let mut objects = vec![
             object(
                 1,
@@ -2969,7 +2967,8 @@ mod tests {
                 cell_count: 1,
                 storage_version: Some(5),
                 cell_storage_buffer: Some(
-                    crate::cell::wire::encode(&formula_cell, &crate::cell::wire::Limits::DEFAULT)
+                    formula_cell
+                        .encode(&crate::cell::wire::Limits::DEFAULT)
                         .expect("formula BNC cell encodes under default limits"),
                 ),
                 cell_offsets: Some(vec![0, 0]),

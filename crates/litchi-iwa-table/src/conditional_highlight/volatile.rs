@@ -8,12 +8,15 @@ use litchi_numbers_wire::conditional_volatile::{self as planner, Object, Source}
 use litchi_numbers_wire::formula_owner::Uuid;
 
 use super::{Change, Error, FORMULA_OWNER_MESSAGE_TYPE, Result, Table, conditional_owner};
-use crate::package::structure::{self, Working, metadata};
-use crate::table::At;
+use crate::structure::{self, TableLeaf, Working, metadata};
+use litchi_iwa_common::table::coordinate::At;
 
 const CALCULATION_ENGINE_MESSAGE_TYPE: u32 = 4_000;
 
-fn first_message<'w>(working: &'w Working<'_>, identifier: u64) -> Option<&'w [u8]> {
+fn first_message<'w, P: TableLeaf>(
+    working: &'w Working<'_, P>,
+    identifier: u64,
+) -> Option<&'w [u8]> {
     working
         .object(identifier)
         .ok()
@@ -22,10 +25,15 @@ fn first_message<'w>(working: &'w Working<'_>, identifier: u64) -> Option<&'w [u
 }
 
 /// The engine and owner object identifiers of the source.
-fn graph(working: &Working<'_>) -> Result<Option<(u64, Vec<u64>)>> {
+fn graph<P: TableLeaf>(working: &Working<'_, P>) -> Result<Option<(u64, Vec<u64>)>> {
     let mut engine = None;
     let mut owners = Vec::new();
-    for object in working.source().state.components.iter_objects() {
+    for object in working
+        .source()
+        .catalog()
+        .iter()
+        .flat_map(|component| component.archive().objects.iter())
+    {
         let Some(message) = object.messages.first() else {
             continue;
         };
@@ -42,8 +50,8 @@ fn graph(working: &Working<'_>) -> Result<Option<(u64, Vec<u64>)>> {
     Ok(engine.map(|engine| (engine, owners)))
 }
 
-fn plan(
-    change: &Change<'_, '_>,
+fn plan<P: TableLeaf>(
+    change: &Change<'_, '_, P>,
     table: &Table,
     position: At,
     ensure: bool,
@@ -104,7 +112,11 @@ fn plan(
     Ok(Some((engine_id, edit)))
 }
 
-fn publish(change: &mut Change<'_, '_>, engine_id: u64, edit: planner::Edit) -> Result<()> {
+fn publish<P: TableLeaf>(
+    change: &mut Change<'_, '_, P>,
+    engine_id: u64,
+    edit: planner::Edit,
+) -> Result<()> {
     let member = change
         .working
         .locate(engine_id)?
@@ -189,7 +201,11 @@ fn publish(change: &mut Change<'_, '_>, engine_id: u64, edit: planner::Edit) -> 
 
 /// Register the volatile cell at `position` (the host's
 /// `ensure_volatile_owner`).
-pub(super) fn ensure(change: &mut Change<'_, '_>, table: &Table, position: At) -> Result<()> {
+pub(super) fn ensure<P: TableLeaf>(
+    change: &mut Change<'_, '_, P>,
+    table: &Table,
+    position: At,
+) -> Result<()> {
     if let Some((engine, edit)) = plan(change, table, position, true)? {
         publish(change, engine, edit)?;
     }
@@ -198,7 +214,11 @@ pub(super) fn ensure(change: &mut Change<'_, '_>, table: &Table, position: At) -
 
 /// Unregister the volatile cell at `position`, when it is registered (the
 /// host's `remove_volatile_host`).
-pub(super) fn remove(change: &mut Change<'_, '_>, table: &Table, position: At) -> Result<()> {
+pub(super) fn remove<P: TableLeaf>(
+    change: &mut Change<'_, '_, P>,
+    table: &Table,
+    position: At,
+) -> Result<()> {
     if let Some((engine, edit)) = plan(change, table, position, false)? {
         publish(change, engine, edit)?;
     }

@@ -174,13 +174,13 @@ pub(super) trait Decode: Sized {
     fn decode(data: &[u8]) -> Result<Self>;
 }
 
-pub(in crate::package) mod tsp {
+pub(crate) mod tsp {
     use super::{Decode, DecodeError, Encode, Result, Writer, fields};
 
     #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
-    pub(in crate::package) struct Uuid {
-        pub(in crate::package) lower: u64,
-        pub(in crate::package) upper: u64,
+    pub(crate) struct Uuid {
+        pub(crate) lower: u64,
+        pub(crate) upper: u64,
     }
 
     impl Encode for Uuid {
@@ -205,12 +205,12 @@ pub(in crate::package) mod tsp {
     }
 
     #[derive(Debug, Clone, Default, PartialEq, Eq)]
-    pub(in crate::package) struct CfuuidArchive {
-        pub(in crate::package) uuid_bytes: Option<Vec<u8>>,
-        pub(in crate::package) uuid_w0: Option<u32>,
-        pub(in crate::package) uuid_w1: Option<u32>,
-        pub(in crate::package) uuid_w2: Option<u32>,
-        pub(in crate::package) uuid_w3: Option<u32>,
+    pub(crate) struct CfuuidArchive {
+        pub(crate) uuid_bytes: Option<Vec<u8>>,
+        pub(crate) uuid_w0: Option<u32>,
+        pub(crate) uuid_w1: Option<u32>,
+        pub(crate) uuid_w2: Option<u32>,
+        pub(crate) uuid_w3: Option<u32>,
     }
 
     impl Encode for CfuuidArchive {
@@ -249,8 +249,8 @@ pub(in crate::package) mod tsp {
     }
 
     #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
-    pub(in crate::package) struct Reference {
-        pub(in crate::package) identifier: u64,
+    pub(crate) struct Reference {
+        pub(crate) identifier: u64,
     }
 
     impl Encode for Reference {
@@ -273,15 +273,15 @@ pub(in crate::package) mod tsp {
 
     /// `TSP.Color` (RGB model only is produced).
     #[derive(Debug, Clone, Copy, Default, PartialEq)]
-    pub(in crate::package) struct Color {
-        pub(in crate::package) model: i32,
-        pub(in crate::package) r: Option<f32>,
-        pub(in crate::package) g: Option<f32>,
-        pub(in crate::package) b: Option<f32>,
-        pub(in crate::package) a: Option<f32>,
+    pub(crate) struct Color {
+        pub(crate) model: i32,
+        pub(crate) r: Option<f32>,
+        pub(crate) g: Option<f32>,
+        pub(crate) b: Option<f32>,
+        pub(crate) a: Option<f32>,
         /// Any of the CMYK or white channels.
-        pub(in crate::package) other_channels: bool,
-        pub(in crate::package) rgbspace: Option<i32>,
+        pub(crate) other_channels: bool,
+        pub(crate) rgbspace: Option<i32>,
     }
 
     impl Encode for Color {
@@ -317,22 +317,22 @@ pub(in crate::package) mod tsp {
         }
     }
 
-    impl From<DecodeError> for crate::package::conditional_highlight::Error {
+    impl From<DecodeError> for crate::conditional_highlight::Error {
         fn from(_error: DecodeError) -> Self {
             Self::InvalidSource
         }
     }
 }
 
-pub(in crate::package) mod tsd {
+pub(crate) mod tsd {
     use super::{Decode, Encode, Result, Writer, fields, tsp};
 
     /// `TSD.FillArchive`: a colour fill (gradients and images are only
     /// detected).
     #[derive(Debug, Clone, Copy, Default, PartialEq)]
-    pub(in crate::package) struct FillArchive {
-        pub(in crate::package) color: Option<tsp::Color>,
-        pub(in crate::package) other: bool,
+    pub(crate) struct FillArchive {
+        pub(crate) color: Option<tsp::Color>,
+        pub(crate) other: bool,
     }
 
     impl Encode for FillArchive {
@@ -357,14 +357,14 @@ pub(in crate::package) mod tsd {
     }
 }
 
-pub(in crate::package) mod tswp {
+pub(crate) mod tswp {
     use super::{Decode, Encode, Result, Writer, fields, tsp};
 
     #[derive(Debug, Clone, Copy, Default, PartialEq)]
-    pub(in crate::package) struct CharacterStylePropertiesArchive {
-        pub(in crate::package) bold: Option<bool>,
-        pub(in crate::package) font_color: Option<tsp::Color>,
-        pub(in crate::package) other: bool,
+    pub(crate) struct CharacterStylePropertiesArchive {
+        pub(crate) bold: Option<bool>,
+        pub(crate) font_color: Option<tsp::Color>,
+        pub(crate) other: bool,
     }
 
     impl Encode for CharacterStylePropertiesArchive {
@@ -394,11 +394,11 @@ pub(in crate::package) mod tswp {
 
     /// `TSWP.ParagraphStyleArchive` with an empty `super` style.
     #[derive(Debug, Clone, Copy, Default, PartialEq)]
-    pub(in crate::package) struct ParagraphStyleArchive {
-        pub(in crate::package) override_count: Option<u32>,
-        pub(in crate::package) char_properties: Option<CharacterStylePropertiesArchive>,
+    pub(crate) struct ParagraphStyleArchive {
+        pub(crate) override_count: Option<u32>,
+        pub(crate) char_properties: Option<CharacterStylePropertiesArchive>,
         /// Whether `para_properties` is present and sets any field.
-        pub(in crate::package) para_properties_set: bool,
+        pub(crate) para_properties_set: bool,
     }
 
     impl Encode for ParagraphStyleArchive {
@@ -429,13 +429,13 @@ pub(in crate::package) mod tswp {
     }
 }
 
-pub(in crate::package) mod tst {
+pub(crate) mod tst {
     use super::{Decode, Encode, Result, Writer, fields, tsce, tsd, tsp};
 
     #[derive(Debug, Clone, Copy, Default, PartialEq)]
-    pub(in crate::package) struct CellStylePropertiesArchive {
-        pub(in crate::package) cell_fill: Option<tsd::FillArchive>,
-        pub(in crate::package) other: bool,
+    pub(crate) struct CellStylePropertiesArchive {
+        pub(crate) cell_fill: Option<tsd::FillArchive>,
+        pub(crate) other: bool,
     }
 
     impl Encode for CellStylePropertiesArchive {
@@ -461,9 +461,9 @@ pub(in crate::package) mod tst {
 
     /// `TST.CellStyleArchive` with an empty `super` style.
     #[derive(Debug, Clone, Copy, Default, PartialEq)]
-    pub(in crate::package) struct CellStyleArchive {
-        pub(in crate::package) override_count: Option<u32>,
-        pub(in crate::package) cell_properties: Option<CellStylePropertiesArchive>,
+    pub(crate) struct CellStyleArchive {
+        pub(crate) override_count: Option<u32>,
+        pub(crate) cell_properties: Option<CellStylePropertiesArchive>,
     }
 
     impl Encode for CellStyleArchive {
@@ -493,12 +493,12 @@ pub(in crate::package) mod tst {
     }
 
     #[derive(Debug, Clone, Default, PartialEq)]
-    pub(in crate::package) struct FormulaPredArgDataArchive {
-        pub(in crate::package) double_value: Option<f64>,
-        pub(in crate::package) decimal_low: Option<u64>,
-        pub(in crate::package) decimal_high: Option<u64>,
-        pub(in crate::package) string_value: Option<String>,
-        pub(in crate::package) date_value: Option<f64>,
+    pub(crate) struct FormulaPredArgDataArchive {
+        pub(crate) double_value: Option<f64>,
+        pub(crate) decimal_low: Option<u64>,
+        pub(crate) decimal_high: Option<u64>,
+        pub(crate) string_value: Option<String>,
+        pub(crate) date_value: Option<f64>,
     }
 
     impl Encode for FormulaPredArgDataArchive {
@@ -539,12 +539,12 @@ pub(in crate::package) mod tst {
     }
 
     #[derive(Debug, Clone, Default, PartialEq)]
-    pub(in crate::package) struct FormulaPredArgArchive {
-        pub(in crate::package) arg_type: i32,
-        pub(in crate::package) arg_value: Option<FormulaPredArgDataArchive>,
-        pub(in crate::package) relative_cell_ref: Option<tsce::RelativeCellRefArchive>,
-        pub(in crate::package) preserve_row: Option<bool>,
-        pub(in crate::package) preserve_column: Option<bool>,
+    pub(crate) struct FormulaPredArgArchive {
+        pub(crate) arg_type: i32,
+        pub(crate) arg_value: Option<FormulaPredArgDataArchive>,
+        pub(crate) relative_cell_ref: Option<tsce::RelativeCellRefArchive>,
+        pub(crate) preserve_row: Option<bool>,
+        pub(crate) preserve_column: Option<bool>,
     }
 
     impl Encode for FormulaPredArgArchive {
@@ -583,15 +583,15 @@ pub(in crate::package) mod tst {
     }
 
     #[derive(Debug, Clone, Default, PartialEq)]
-    pub(in crate::package) struct FormulaPredicateArchive {
-        pub(in crate::package) predicate_type: i32,
-        pub(in crate::package) qualifier1: i32,
-        pub(in crate::package) qualifier2: i32,
-        pub(in crate::package) param_value0: Option<FormulaPredArgArchive>,
-        pub(in crate::package) param_value1: Option<FormulaPredArgArchive>,
-        pub(in crate::package) param_value2: Option<FormulaPredArgArchive>,
-        pub(in crate::package) formula: Option<tsce::FormulaArchive>,
-        pub(in crate::package) for_conditional_style: Option<bool>,
+    pub(crate) struct FormulaPredicateArchive {
+        pub(crate) predicate_type: i32,
+        pub(crate) qualifier1: i32,
+        pub(crate) qualifier2: i32,
+        pub(crate) param_value0: Option<FormulaPredArgArchive>,
+        pub(crate) param_value1: Option<FormulaPredArgArchive>,
+        pub(crate) param_value2: Option<FormulaPredArgArchive>,
+        pub(crate) formula: Option<tsce::FormulaArchive>,
+        pub(crate) for_conditional_style: Option<bool>,
     }
 
     impl Encode for FormulaPredicateArchive {
@@ -638,14 +638,14 @@ pub(in crate::package) mod tst {
     }
 
     #[derive(Debug, Clone, Default, PartialEq)]
-    pub(in crate::package) struct FormulaPredicatePrePivotArchive {
-        pub(in crate::package) formula: tsce::FormulaArchive,
-        pub(in crate::package) predicate_type: i32,
-        pub(in crate::package) qualifier1: i32,
-        pub(in crate::package) qualifier2: i32,
-        pub(in crate::package) param_index1: i32,
-        pub(in crate::package) param_index2: i32,
-        pub(in crate::package) param_index0: i32,
+    pub(crate) struct FormulaPredicatePrePivotArchive {
+        pub(crate) formula: tsce::FormulaArchive,
+        pub(crate) predicate_type: i32,
+        pub(crate) qualifier1: i32,
+        pub(crate) qualifier2: i32,
+        pub(crate) param_index1: i32,
+        pub(crate) param_index2: i32,
+        pub(crate) param_index0: i32,
     }
 
     impl Encode for FormulaPredicatePrePivotArchive {
@@ -679,15 +679,15 @@ pub(in crate::package) mod tst {
         }
     }
 
-    pub(in crate::package) mod conditional_style_set_archive {
+    pub(crate) mod conditional_style_set_archive {
         use super::super::{Decode, Encode, Result, Writer, fields};
         use super::{FormulaPredicateArchive, FormulaPredicatePrePivotArchive, tsp};
 
         #[derive(Debug, Clone, Default, PartialEq)]
-        pub(in crate::package) struct ConditionalStyleRulePrePivot {
-            pub(in crate::package) predicate: FormulaPredicatePrePivotArchive,
-            pub(in crate::package) cell_style: tsp::Reference,
-            pub(in crate::package) text_style: tsp::Reference,
+        pub(crate) struct ConditionalStyleRulePrePivot {
+            pub(crate) predicate: FormulaPredicatePrePivotArchive,
+            pub(crate) cell_style: tsp::Reference,
+            pub(crate) text_style: tsp::Reference,
         }
 
         impl Encode for ConditionalStyleRulePrePivot {
@@ -714,10 +714,10 @@ pub(in crate::package) mod tst {
         }
 
         #[derive(Debug, Clone, Default, PartialEq)]
-        pub(in crate::package) struct ConditionalStyleRule {
-            pub(in crate::package) predicate: Option<FormulaPredicateArchive>,
-            pub(in crate::package) cell_style: tsp::Reference,
-            pub(in crate::package) text_style: tsp::Reference,
+        pub(crate) struct ConditionalStyleRule {
+            pub(crate) predicate: Option<FormulaPredicateArchive>,
+            pub(crate) cell_style: tsp::Reference,
+            pub(crate) text_style: tsp::Reference,
         }
 
         impl Encode for ConditionalStyleRule {
@@ -746,8 +746,8 @@ pub(in crate::package) mod tst {
         }
 
         #[derive(Debug, Clone, Default, PartialEq)]
-        pub(in crate::package) struct ConditionalStyleRules {
-            pub(in crate::package) rule: Vec<ConditionalStyleRule>,
+        pub(crate) struct ConditionalStyleRules {
+            pub(crate) rule: Vec<ConditionalStyleRule>,
         }
 
         impl Encode for ConditionalStyleRules {
@@ -772,11 +772,10 @@ pub(in crate::package) mod tst {
     }
 
     #[derive(Debug, Clone, Default, PartialEq)]
-    pub(in crate::package) struct ConditionalStyleSetArchive {
-        pub(in crate::package) rule_count: u32,
-        pub(in crate::package) rules_prepivot:
-            Vec<conditional_style_set_archive::ConditionalStyleRulePrePivot>,
-        pub(in crate::package) rules: Option<conditional_style_set_archive::ConditionalStyleRules>,
+    pub(crate) struct ConditionalStyleSetArchive {
+        pub(crate) rule_count: u32,
+        pub(crate) rules_prepivot: Vec<conditional_style_set_archive::ConditionalStyleRulePrePivot>,
+        pub(crate) rules: Option<conditional_style_set_archive::ConditionalStyleRules>,
     }
 
     impl Encode for ConditionalStyleSetArchive {
@@ -807,18 +806,18 @@ pub(in crate::package) mod tst {
     }
 }
 
-pub(in crate::package) mod tsce {
+pub(crate) mod tsce {
     use super::{Decode, Encode, Result, Writer, fields, tsp};
 
     #[derive(Debug, Clone, Default, PartialEq, Eq)]
-    pub(in crate::package) struct RelativeCellRefArchive {
-        pub(in crate::package) relative_row_offset: Option<i32>,
-        pub(in crate::package) relative_column_offset: Option<i32>,
-        pub(in crate::package) table_uid: Option<tsp::Uuid>,
-        pub(in crate::package) preserve_column: Option<bool>,
-        pub(in crate::package) preserve_row: Option<bool>,
-        pub(in crate::package) is_spanning_column: Option<bool>,
-        pub(in crate::package) is_spanning_row: Option<bool>,
+    pub(crate) struct RelativeCellRefArchive {
+        pub(crate) relative_row_offset: Option<i32>,
+        pub(crate) relative_column_offset: Option<i32>,
+        pub(crate) table_uid: Option<tsp::Uuid>,
+        pub(crate) preserve_column: Option<bool>,
+        pub(crate) preserve_row: Option<bool>,
+        pub(crate) is_spanning_column: Option<bool>,
+        pub(crate) is_spanning_row: Option<bool>,
     }
 
     impl Encode for RelativeCellRefArchive {
@@ -865,8 +864,8 @@ pub(in crate::package) mod tsce {
     }
 
     #[derive(Debug, Clone, Default, PartialEq)]
-    pub(in crate::package) struct FormulaArchive {
-        pub(in crate::package) ast_node_array: AstNodeArrayArchive,
+    pub(crate) struct FormulaArchive {
+        pub(crate) ast_node_array: AstNodeArrayArchive,
     }
 
     impl Encode for FormulaArchive {
@@ -888,8 +887,8 @@ pub(in crate::package) mod tsce {
     }
 
     #[derive(Debug, Clone, Default, PartialEq)]
-    pub(in crate::package) struct AstNodeArrayArchive {
-        pub(in crate::package) ast_node: Vec<ast_node_array_archive::AstNodeArchive>,
+    pub(crate) struct AstNodeArrayArchive {
+        pub(crate) ast_node: Vec<ast_node_array_archive::AstNodeArchive>,
     }
 
     impl Encode for AstNodeArrayArchive {
@@ -912,7 +911,7 @@ pub(in crate::package) mod tsce {
         }
     }
 
-    pub(in crate::package) mod ast_node_array_archive {
+    pub(crate) mod ast_node_array_archive {
         use super::super::{Decode, Encode, Result, Writer, fields};
         use super::tsp;
 
@@ -921,7 +920,7 @@ pub(in crate::package) mod tsce {
         #[derive(Debug, Clone, Copy, PartialEq, Eq)]
         #[repr(i32)]
         #[allow(clippy::enum_variant_names, reason = "the generated enum's names")]
-        pub(in crate::package) enum AstNodeType {
+        pub(crate) enum AstNodeType {
             AdditionNode = 1,
             SubtractionNode = 2,
             MultiplicationNode = 3,
@@ -943,8 +942,8 @@ pub(in crate::package) mod tsce {
         }
 
         #[derive(Debug, Clone, Default, PartialEq, Eq)]
-        pub(in crate::package) struct AstCrossTableReferenceExtraInfoArchive {
-            pub(in crate::package) table_id: tsp::CfuuidArchive,
+        pub(crate) struct AstCrossTableReferenceExtraInfoArchive {
+            pub(crate) table_id: tsp::CfuuidArchive,
         }
 
         impl Encode for AstCrossTableReferenceExtraInfoArchive {
@@ -968,28 +967,28 @@ pub(in crate::package) mod tsce {
         /// One AST node; `other` records any field these routes do not
         /// write.
         #[derive(Debug, Clone, Default, PartialEq)]
-        pub(in crate::package) struct AstNodeArchive {
-            pub(in crate::package) ast_node_type: i32,
-            pub(in crate::package) ast_function_node_index: Option<u32>,
-            pub(in crate::package) ast_function_node_num_args: Option<u32>,
-            pub(in crate::package) ast_number_node_number: Option<f64>,
-            pub(in crate::package) ast_boolean_node_boolean: Option<bool>,
-            pub(in crate::package) ast_string_node_string: Option<String>,
-            pub(in crate::package) ast_date_node_date_num: Option<f64>,
-            pub(in crate::package) ast_duration_node_unit_num: Option<f64>,
-            pub(in crate::package) ast_duration_node_unit: Option<i32>,
-            pub(in crate::package) ast_number_node_decimal_low: Option<u64>,
-            pub(in crate::package) ast_number_node_decimal_high: Option<u64>,
-            pub(in crate::package) ast_date_node_suppress_date_format: Option<bool>,
-            pub(in crate::package) ast_date_node_suppress_time_format: Option<bool>,
-            pub(in crate::package) ast_date_node_date_time_format: Option<String>,
-            pub(in crate::package) ast_duration_node_style: Option<u32>,
-            pub(in crate::package) ast_duration_node_duration_unit_largest: Option<u32>,
-            pub(in crate::package) ast_duration_node_duration_unit_smallest: Option<u32>,
-            pub(in crate::package) ast_cross_table_reference_extra_info:
+        pub(crate) struct AstNodeArchive {
+            pub(crate) ast_node_type: i32,
+            pub(crate) ast_function_node_index: Option<u32>,
+            pub(crate) ast_function_node_num_args: Option<u32>,
+            pub(crate) ast_number_node_number: Option<f64>,
+            pub(crate) ast_boolean_node_boolean: Option<bool>,
+            pub(crate) ast_string_node_string: Option<String>,
+            pub(crate) ast_date_node_date_num: Option<f64>,
+            pub(crate) ast_duration_node_unit_num: Option<f64>,
+            pub(crate) ast_duration_node_unit: Option<i32>,
+            pub(crate) ast_number_node_decimal_low: Option<u64>,
+            pub(crate) ast_number_node_decimal_high: Option<u64>,
+            pub(crate) ast_date_node_suppress_date_format: Option<bool>,
+            pub(crate) ast_date_node_suppress_time_format: Option<bool>,
+            pub(crate) ast_date_node_date_time_format: Option<String>,
+            pub(crate) ast_duration_node_style: Option<u32>,
+            pub(crate) ast_duration_node_duration_unit_largest: Option<u32>,
+            pub(crate) ast_duration_node_duration_unit_smallest: Option<u32>,
+            pub(crate) ast_cross_table_reference_extra_info:
                 Option<AstCrossTableReferenceExtraInfoArchive>,
-            pub(in crate::package) ast_duration_node_use_automatic_units: Option<bool>,
-            pub(in crate::package) other: bool,
+            pub(crate) ast_duration_node_use_automatic_units: Option<bool>,
+            pub(crate) other: bool,
         }
 
         impl Encode for AstNodeArchive {

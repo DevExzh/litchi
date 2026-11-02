@@ -60,6 +60,7 @@ mod slide_table_cell_rich_text;
 pub(crate) mod slide_table_cell_text;
 pub(crate) mod slide_table_cells;
 pub(crate) mod slide_table_comments;
+pub(crate) mod slide_table_conditional_highlight;
 pub(crate) mod slide_table_core;
 pub(crate) mod slide_table_dimension;
 pub(crate) mod slide_table_headers;
