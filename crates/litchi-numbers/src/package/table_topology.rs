@@ -55,7 +55,7 @@
 
 pub(super) use litchi_iwa_table::structure::wire;
 
-pub(super) use litchi_numbers_wire::table_topology::{extents as calc, lists, storage};
+pub(super) use litchi_numbers_wire::table_topology::{extents as calc, storage};
 
 use std::fmt;
 
@@ -78,10 +78,6 @@ structure::structural_family!("table-topology");
 
 /// `TST.Tile`.
 pub(super) const TILE_MESSAGE_TYPE: u32 = 6_002;
-/// `TST.TableDataList`.
-pub(super) const LIST_MESSAGE_TYPE: u32 = 6_005;
-/// `TST.TableDataListSegment`.
-pub(super) const LIST_SEGMENT_MESSAGE_TYPE: u32 = 6_011;
 
 /// A typed, content-redacted table-topology failure.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]

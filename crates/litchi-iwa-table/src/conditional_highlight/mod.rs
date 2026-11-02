@@ -1,6 +1,6 @@
-//! Implementation of the public [`crate::cell::conditional_highlight`]
-//! transactions (record 0370d): the ordered conditional-highlight rules of
-//! one cell.
+//! The shared conditional-highlight engine (record 0370d, lifted from
+//! `litchi-numbers` for Pages and Keynote in record 0412f): the ordered
+//! conditional-highlight rules of one table cell.
 //!
 //! A cell's rules are a key in its table's conditional-style list whose
 //! entry names a `TST.ConditionalStyleSetArchive`. The set holds each rule
@@ -34,10 +34,8 @@ mod proto;
 mod read;
 mod volatile;
 
-use std::fmt;
-
 use litchi_iwa_common::color::{RgbColorSpace, Rgba};
-pub(in crate::package) use litchi_iwa_common::table::cell::conditional_highlight::{
+pub(crate) use litchi_iwa_common::table::cell::conditional_highlight::{
     Condition, Date, DateRange, Rule,
 };
 use thiserror::Error as ThisError;
@@ -62,24 +60,59 @@ use self::native::{
     UNARY_FUNCTION_ARGUMENT_COUNT, VALUE_TYPE_FUNCTION_INDEX, ZERO_FUNCTION_ARGUMENT_COUNT,
 };
 use self::proto::{Decode as _, Encode as _};
-pub(in crate::package) use self::proto::{tsce, tsd, tsp, tst, tswp};
-use super::Package;
-use super::structure::{
-    self, Fault, Published, Working,
-    metadata::{self, Registry, Transition},
-};
-use super::table_cell_text_style as cells;
-use super::table_topology::wire::{
+pub(crate) use self::proto::{tsce, tsd, tsp, tst, tswp};
+use crate::cell_rich_text as cells;
+use crate::structure::wire::{
     bytes_field, push_bytes_field, push_varint_field, rebuild, repeated_bytes, single_bytes,
     single_reference, single_varint, varint_field,
 };
-use super::table_topology::{
-    self as topology, LIST_MESSAGE_TYPE, LIST_SEGMENT_MESSAGE_TYPE, TILE_MESSAGE_TYPE, storage,
+use crate::structure::{
+    self, Fault, FaultLimit, Published, TableLeaf, Working,
+    metadata::{self, Registry, Transition},
 };
-use crate::selector::{SheetSelector, TableSelector};
-use crate::table::At;
+use crate::topology::{
+    self, LIST_MESSAGE_TYPE, LIST_SEGMENT_MESSAGE_TYPE, TILE_MESSAGE_TYPE, Target, storage,
+};
+use litchi_iwa_common::table::coordinate::At;
 
-structure::structural_family!("conditional-highlight", Wire(litchi_iwa_common::LimitKind));
+/// A finite resource governed by the engine.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum LimitKind {
+    /// Complete source or candidate package bytes.
+    PackageBytes,
+    /// Bytes in one decoded component.
+    PayloadBytes,
+    /// Native object identifiers.
+    Identifiers,
+    /// A bounded wire operation performed by the engine.
+    Wire(litchi_iwa_common::LimitKind),
+}
+
+impl From<Fault> for Error {
+    fn from(fault: Fault) -> Self {
+        match fault {
+            Fault::Unsupported => Self::Refused(Refusal::UnsupportedSource),
+            Fault::Invalid => Self::InvalidSource,
+            Fault::Dependency => Self::Refused(Refusal::UnsupportedDependency),
+            Fault::Limit {
+                kind,
+                observed,
+                maximum,
+            } => Self::Limit {
+                kind: match kind {
+                    FaultLimit::PackageBytes => LimitKind::PackageBytes,
+                    FaultLimit::PayloadBytes => LimitKind::PayloadBytes,
+                    FaultLimit::Identifiers => LimitKind::Identifiers,
+                },
+                observed,
+                maximum,
+            },
+            Fault::Allocation { amount } => Self::Allocation { amount },
+            Fault::Verification => Self::Verification,
+        }
+    }
+}
 
 type RgbaColor = Rgba;
 type Result<T, E = Error> = std::result::Result<T, E>;
@@ -112,7 +145,7 @@ pub enum Error {
     #[error("rooted conditional-highlight source is invalid")]
     InvalidSource,
     /// A finite transaction limit was exceeded.
-    #[error("{kind} limit exceeded: observed {observed}, maximum {maximum}")]
+    #[error("{kind:?} limit exceeded: observed {observed}, maximum {maximum}")]
     Limit {
         /// Resource category.
         kind: LimitKind,
@@ -130,9 +163,6 @@ pub enum Error {
     /// The reopened candidate did not reproduce the requested state.
     #[error("conditional-highlight candidate verification failed")]
     Verification,
-    /// The patch was applied to an artifact other than its exact source.
-    #[error("conditional-highlight patch conflicts with this package")]
-    PatchConflict,
 }
 
 /// A well-formed request this family's route refuses, classified by
@@ -140,18 +170,9 @@ pub enum Error {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
 pub enum Refusal {
-    /// The sheet selector did not resolve one sheet.
-    #[error("sheet selector did not resolve")]
-    SheetNotFound,
-    /// The table selector did not resolve one table of the sheet.
-    #[error("table selector did not resolve")]
-    TableNotFound,
     /// The cell is outside the table.
     #[error("cell outside the table")]
     CellNotFound,
-    /// Commit was requested before staging a change.
-    #[error("no conditional-highlight change is staged")]
-    NoStagedOperation,
     /// A rule set must hold between one and fifteen rules.
     #[error("conditional highlighting takes one to fifteen rules")]
     InvalidRuleCount,
@@ -169,8 +190,7 @@ impl Refusal {
     pub const fn kind(&self) -> litchi_core::edit::RefusalKind {
         use litchi_core::edit::RefusalKind;
         match self {
-            Self::SheetNotFound | Self::TableNotFound | Self::CellNotFound => RefusalKind::NotFound,
-            Self::NoStagedOperation => RefusalKind::UnsupportedOperation,
+            Self::CellNotFound => RefusalKind::NotFound,
             Self::InvalidRuleCount => RefusalKind::InvalidValue,
             Self::UnsupportedDependency | Self::UnsupportedSource => {
                 RefusalKind::UnsupportedContent
@@ -187,15 +207,17 @@ impl From<Refusal> for Error {
 
 impl From<topology::Error> for Error {
     fn from(error: topology::Error) -> Self {
-        from_cells(cells::from_topology(error))
+        match error {
+            topology::Error::Fault(fault) => Self::from(fault),
+            topology::Error::Allocation { amount } => Self::Allocation { amount },
+            _ => Self::InvalidSource,
+        }
     }
 }
 
 fn from_cells(error: cells::Error) -> Error {
     use cells::{Error as E, LimitKind as K, Refusal as R};
     match error {
-        E::Refused(R::SheetNotFound) => Error::Refused(Refusal::SheetNotFound),
-        E::Refused(R::TableNotFound) => Error::Refused(Refusal::TableNotFound),
         E::Refused(R::CellNotFound) => Error::Refused(Refusal::CellNotFound),
         E::Refused(R::UnsupportedDependency) => Error::Refused(Refusal::UnsupportedDependency),
         E::Refused(R::UnsupportedSource) => Error::Refused(Refusal::UnsupportedSource),
@@ -206,19 +228,22 @@ fn from_cells(error: cells::Error) -> Error {
         } => Error::Limit {
             kind: match kind {
                 K::PackageBytes => LimitKind::PackageBytes,
-                K::PayloadBytes => LimitKind::PayloadBytes,
                 K::Identifiers => LimitKind::Identifiers,
-                K::ScratchBytes => LimitKind::ScratchBytes,
-                K::AllocationEvents => LimitKind::AllocationEvents,
                 K::Wire(kind) => LimitKind::Wire(kind),
+                _ => LimitKind::PayloadBytes,
             },
             observed,
             maximum,
         },
         E::Allocation { amount } => Error::Allocation { amount },
         E::Verification => Error::Verification,
-        E::PatchConflict => Error::PatchConflict,
         _ => Error::InvalidSource,
+    }
+}
+
+impl From<cells::Error> for Error {
+    fn from(error: cells::Error) -> Self {
+        from_cells(error)
     }
 }
 
@@ -329,117 +354,20 @@ const fn is_volatile_date_condition(condition: &Condition) -> bool {
 
 /// One staged change of one cell.
 #[derive(Debug, Clone, PartialEq)]
-enum Staged {
+pub enum Staged {
+    /// Set the cell's rules, in order (replacing any it has).
     Set(Vec<Rule>),
+    /// Remove the cell's conditional highlighting.
     Clear,
 }
 
-/// One immutable edit that changes the conditional highlighting of cells of
-/// one table.
-pub struct Edit<'a> {
-    source: &'a Package,
-    sheet: usize,
-    table: usize,
-    rows: u32,
-    columns: u32,
-    changes: Vec<(At, Staged)>,
-}
+/// The most rules one cell takes.
+pub const MAX_RULES: usize = MAX_CONDITIONAL_HIGHLIGHT_RULES;
 
-impl fmt::Debug for Edit<'_> {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        formatter
-            .debug_struct("Edit")
-            .field("sheet", &self.sheet)
-            .field("table", &self.table)
-            .field("changes", &self.changes.len())
-            .finish_non_exhaustive()
-    }
-}
-
-impl Edit<'_> {
-    fn stage(mut self, position: At, change: Staged) -> Result<Self> {
-        if position.row() >= self.rows || position.column() >= self.columns {
-            return Err(Error::Refused(Refusal::CellNotFound));
-        }
-        self.changes
-            .try_reserve(1)
-            .map_err(|_error| Error::Allocation { amount: 1 })?;
-        self.changes.push((position, change));
-        Ok(self)
-    }
-
-    /// Stage `rules`, in order, as the cell's conditional highlighting
-    /// (replacing any it has).
-    ///
-    /// # Errors
-    ///
-    /// [`Refusal::CellNotFound`], [`Refusal::InvalidRuleCount`] for no rule
-    /// or more than fifteen, [`Error::Allocation`]. A volatile date rule
-    /// registers the cell with the calculation engine's volatile owner
-    /// family (record 0376a).
-    pub fn set(self, position: At, rules: impl IntoIterator<Item = Rule>) -> Result<Self> {
-        let mut staged = Vec::new();
-        for rule in rules {
-            staged
-                .try_reserve(1)
-                .map_err(|_error| Error::Allocation { amount: 1 })?;
-            staged.push(rule);
-        }
-        if staged.is_empty() || staged.len() > MAX_CONDITIONAL_HIGHLIGHT_RULES {
-            return Err(Error::Refused(Refusal::InvalidRuleCount));
-        }
-        self.stage(position, Staged::Set(staged))
-    }
-
-    /// Stage removing the cell's conditional highlighting, keeping its value
-    /// and base style.
-    ///
-    /// # Errors
-    ///
-    /// [`Refusal::CellNotFound`], [`Error::Allocation`].
-    pub fn clear(self, position: At) -> Result<Self> {
-        self.stage(position, Staged::Clear)
-    }
-
-    /// Validate and atomically publish the staged changes, in order. A
-    /// change that leaves the cell as it is is skipped.
-    ///
-    /// # Errors
-    ///
-    /// [`Refusal::NoStagedOperation`], the refusals, source, resource and
-    /// verification errors. Failure never publishes a partial package.
-    pub fn commit(self) -> Result<Commit> {
-        if self.changes.is_empty() {
-            return Err(Error::Refused(Refusal::NoStagedOperation));
-        }
-        let mut current: Option<Package> = None;
-        let mut touched = 0_usize;
-        for (position, change) in &self.changes {
-            let base = current.as_ref().unwrap_or(self.source);
-            if let Some(published) = apply_one(base, self.sheet, self.table, *position, change)? {
-                let expected = match change {
-                    Staged::Set(rules) => Some(rules.clone()),
-                    Staged::Clear => None,
-                };
-                if rules_of(&published.package, self.sheet, self.table, *position)? != expected {
-                    return Err(Error::Verification);
-                }
-                touched = touched.saturating_add(published.touched_components);
-                current = Some(published.package);
-            }
-        }
-        let Some(package) = current else {
-            return Commit::unchanged(self.source);
-        };
-        Commit::new(
-            self.source,
-            Published {
-                package,
-                touched_components: touched,
-                deleted_previews: 0,
-            },
-        )
-    }
+/// Whether a rule needs the calculation engine's volatile owner family.
+#[must_use]
+pub const fn is_volatile(rule: &Rule) -> bool {
+    is_volatile_date_condition(&rule.condition)
 }
 
 /// The cell's table: its model, data store and geometry.
@@ -451,8 +379,7 @@ struct Table {
     geometry: topology::Geometry,
 }
 
-fn table(working: &Working<'_>, sheet: usize, table: usize) -> Result<Table> {
-    let target = topology::locate(working, sheet, table).map_err(Error::from)?;
+fn table<P: TableLeaf>(working: &Working<'_, P>, target: Target) -> Result<Table> {
     let (_, model) = topology::message(working, target.model, &[6_001]).map_err(Error::from)?;
     let geometry = topology::geometry(model).map_err(Error::from)?;
     let store = single_bytes(model, 4)?
@@ -469,7 +396,11 @@ fn table(working: &Working<'_>, sheet: usize, table: usize) -> Result<Table> {
 
 /// The entry of `key` in a table data list (root or segments) and the
 /// object holding it.
-fn list_entry(working: &Working<'_>, list: u64, key: u32) -> Result<(u64, Vec<u8>)> {
+fn list_entry<P: TableLeaf>(
+    working: &Working<'_, P>,
+    list: u64,
+    key: u32,
+) -> Result<(u64, Vec<u8>)> {
     let (_, data) = topology::message(working, list, &[LIST_MESSAGE_TYPE]).map_err(Error::from)?;
     let find = |data: &[u8]| -> Result<Option<Vec<u8>>> {
         for entry in repeated_bytes(data, 3)? {
@@ -494,8 +425,8 @@ fn list_entry(working: &Working<'_>, list: u64, key: u32) -> Result<(u64, Vec<u8
 }
 
 /// The cell's BNC record, when it is stored.
-fn stored_cell(
-    working: &Working<'_>,
+fn stored_cell<P: TableLeaf>(
+    working: &Working<'_, P>,
     table: &Table,
     position: At,
 ) -> Result<Option<litchi_numbers_wire::BncCell>> {
@@ -505,7 +436,7 @@ fn stored_cell(
     };
     litchi_numbers_wire::BncCell::parse(
         &located.bytes,
-        &crate::cell::wire::limits_for_source(&located.bytes),
+        &crate::cell_format::bnc_limits_for_source(&located.bytes),
     )
     .map(Some)
     .map_err(|_error| Error::InvalidSource)
@@ -521,7 +452,11 @@ struct Entry {
     style_set: u64,
 }
 
-fn entry(working: &Working<'_>, table: &Table, position: At) -> Result<Option<Entry>> {
+fn entry<P: TableLeaf>(
+    working: &Working<'_, P>,
+    table: &Table,
+    position: At,
+) -> Result<Option<Entry>> {
     let Some(cell) = stored_cell(working, table, position)? else {
         return Ok(None);
     };
@@ -547,14 +482,18 @@ fn entry(working: &Working<'_>, table: &Table, position: At) -> Result<Option<En
 }
 
 /// The cell's rules (`None` without conditional highlighting).
-fn rules_of(
-    package: &Package,
-    sheet: usize,
-    table_index: usize,
+///
+/// # Errors
+///
+/// [`Refusal::CellNotFound`], [`Error::InvalidSource`] for a rule
+/// representation the engine does not read, resource errors.
+pub fn rules_of<P: TableLeaf>(
+    package: &P,
+    target: Target,
     position: At,
 ) -> Result<Option<Vec<Rule>>> {
     let working = Working::new(package)?;
-    let table = table(&working, sheet, table_index)?;
+    let table = table(&working, target)?;
     if position.row() >= table.geometry.rows || position.column() >= table.geometry.columns {
         return Err(Error::Refused(Refusal::CellNotFound));
     }
@@ -632,7 +571,11 @@ fn rule_identifiers(
 
 /// No object but `owner` references any of `children` (the host's
 /// `ensure_children_are_private`).
-fn ensure_private(working: &Working<'_>, owner: u64, children: &[u64]) -> Result<()> {
+fn ensure_private<P: TableLeaf>(
+    working: &Working<'_, P>,
+    owner: u64,
+    children: &[u64],
+) -> Result<()> {
     if children.is_empty() {
         return Ok(());
     }
@@ -662,8 +605,8 @@ fn ensure_private(working: &Working<'_>, owner: u64, children: &[u64]) -> Result
 
 /// Write the cell's conditional-style key and applied rule (`None` removes
 /// them), storing a cell when it is empty.
-fn write_cell(
-    working: &mut Working<'_>,
+fn write_cell<P: TableLeaf>(
+    working: &mut Working<'_, P>,
     table: &Table,
     position: At,
     key: Option<u32>,
@@ -685,11 +628,11 @@ fn write_cell(
         )
         .map_err(from_cells);
     };
-    let limits = crate::cell::wire::limits_for_source(&located.bytes);
+    let limits = crate::cell_format::bnc_limits_for_source(&located.bytes);
     let mut cell = litchi_numbers_wire::BncCell::parse(&located.bytes, &limits)
         .map_err(|_error| Error::InvalidSource)?;
     cell.set_conditional_style(key, applied);
-    let encoded = crate::cell::wire::encode(&cell, &limits).map_err(|_| Error::InvalidSource)?;
+    let encoded = cell.encode(&limits).map_err(|_| Error::InvalidSource)?;
     let (_, tile_data) =
         topology::message(working, located.tile, &[TILE_MESSAGE_TYPE]).map_err(Error::from)?;
     let mut field_index = 0_usize;
@@ -719,7 +662,11 @@ enum ConditionalCellValue {
     Text(String),
 }
 
-fn cell_value(working: &Working<'_>, table: &Table, position: At) -> Result<ConditionalCellValue> {
+fn cell_value<P: TableLeaf>(
+    working: &Working<'_, P>,
+    table: &Table,
+    position: At,
+) -> Result<ConditionalCellValue> {
     use litchi_numbers_wire::{CachedScalar, StoredValue};
     let Some(cell) = stored_cell(working, table, position)? else {
         return Ok(ConditionalCellValue::Blank);
@@ -897,13 +844,13 @@ fn contains_case_insensitive(value: &str, needle: &str) -> bool {
 }
 
 /// The publication state of one change.
-struct Change<'a, 'p> {
-    working: &'a mut Working<'p>,
+struct Change<'a, 'p, P: TableLeaf> {
+    working: &'a mut Working<'p, P>,
     registry: &'a Registry,
     transition: &'a mut Transition,
 }
 
-impl Change<'_, '_> {
+impl<P: TableLeaf> Change<'_, '_, P> {
     fn component(&self, entry: &str) -> Result<u64> {
         Ok(self.registry.component_for_entry(entry)?.identifier)
     }
@@ -997,7 +944,11 @@ impl Change<'_, '_> {
 }
 
 /// Clear the cell's highlighting (the host's `delete::clear_at_location`).
-fn clear(change: &mut Change<'_, '_>, table: &Table, position: At) -> Result<bool> {
+fn clear<P: TableLeaf>(
+    change: &mut Change<'_, '_, P>,
+    table: &Table,
+    position: At,
+) -> Result<bool> {
     let Some(entry) = entry(change.working, table, position)? else {
         return Ok(false);
     };
@@ -1025,7 +976,12 @@ fn clear(change: &mut Change<'_, '_>, table: &Table, position: At) -> Result<boo
 
 /// Write `rules` on a cell without highlighting (the host's
 /// `set_at_location`).
-fn create(change: &mut Change<'_, '_>, table: &Table, position: At, rules: &[Rule]) -> Result<()> {
+fn create<P: TableLeaf>(
+    change: &mut Change<'_, '_, P>,
+    table: &Table,
+    position: At,
+    rules: &[Rule],
+) -> Result<()> {
     let limits = change.working.archive_limits();
     let existing_list = single_reference(&table.store, CONDITIONAL_LIST_FIELD)?;
     let count = 1 + rules.len() * 2 + usize::from(existing_list.is_none());
@@ -1141,7 +1097,7 @@ fn create(change: &mut Change<'_, '_>, table: &Table, position: At, rules: &[Rul
 
 /// The next key of a table data list (the host's
 /// `next_table_data_list_key`).
-fn next_key(working: &Working<'_>, list: &[u8]) -> Result<u32> {
+fn next_key<P: TableLeaf>(working: &Working<'_, P>, list: &[u8]) -> Result<u32> {
     let mut next = single_varint(list, 2)?.unwrap_or(0).max(1);
     let mut visit = |data: &[u8]| -> Result<()> {
         for entry in repeated_bytes(data, 3)? {
@@ -1163,8 +1119,8 @@ fn next_key(working: &Working<'_>, list: &[u8]) -> Result<u32> {
 
 /// Rewrite the graph of an entry the cell alone uses (the host's
 /// `replace::try_at_location`); `false` when its style pairs repeat.
-fn replace(
-    change: &mut Change<'_, '_>,
+fn replace<P: TableLeaf>(
+    change: &mut Change<'_, '_, P>,
     table: &Table,
     position: At,
     entry: &Entry,
@@ -1278,16 +1234,21 @@ fn replace(
     Ok(true)
 }
 
-fn apply_one(
-    source: &Package,
-    sheet: usize,
-    table_index: usize,
+/// Apply one staged change to one cell and publish (`None` when the change
+/// leaves the cell as it is).
+///
+/// # Errors
+///
+/// The refusals, source, resource and verification errors.
+pub fn apply_one<P: TableLeaf>(
+    source: &P,
+    target: Target,
     position: At,
     staged: &Staged,
-) -> Result<Option<Published>> {
+) -> Result<Option<Published<P>>> {
     let mut working = Working::new(source)?;
     working.keep_previews();
-    let table = table(&working, sheet, table_index)?;
+    let table = table(&working, target)?;
     if position.row() >= table.geometry.rows || position.column() >= table.geometry.columns {
         return Err(Error::Refused(Refusal::CellNotFound));
     }
@@ -1340,73 +1301,4 @@ fn apply_one(
         },
     }
     Ok(Some(working.publish(&transition)?))
-}
-
-impl Package {
-    /// The ordered conditional-highlight rules of one cell (`None` when it
-    /// has none).
-    ///
-    /// # Errors
-    ///
-    /// Selector errors, [`Refusal::CellNotFound`], [`Error::InvalidSource`]
-    /// for a rule representation this route does not read.
-    pub fn table_cell_conditional_highlight<'sheet, 'table>(
-        &self,
-        sheet: impl Into<SheetSelector<'sheet>>,
-        table: impl Into<TableSelector<'table>>,
-        position: At,
-    ) -> Result<Option<Vec<Rule>>> {
-        let (sheet, table) = self.resolve_conditional_target(sheet.into(), table.into())?;
-        rules_of(self, sheet, table, position)
-    }
-
-    /// Start an immutable conditional-highlight edit of one table.
-    ///
-    /// # Errors
-    ///
-    /// Selector and source errors.
-    pub fn edit_table_cell_conditional_highlights<'sheet, 'table>(
-        &self,
-        sheet: impl Into<SheetSelector<'sheet>>,
-        table: impl Into<TableSelector<'table>>,
-    ) -> Result<Edit<'_>> {
-        let (sheet, table) = self.resolve_conditional_target(sheet.into(), table.into())?;
-        let leaf = self.workbook_ref().sheets()[sheet]
-            .tables()
-            .nth(table)
-            .ok_or(Error::Refused(Refusal::TableNotFound))?;
-        Ok(Edit {
-            source: self,
-            sheet,
-            table,
-            rows: leaf.row_count(),
-            columns: leaf.column_count(),
-            changes: Vec::new(),
-        })
-    }
-
-    /// Apply a conditional-highlight patch to its exact source package.
-    ///
-    /// # Errors
-    ///
-    /// [`Error::PatchConflict`] when this package is not the patch's exact
-    /// source.
-    pub fn apply_table_cell_conditional_highlights(&self, patch: &Patch) -> Result<Commit> {
-        apply_patch(self, patch)
-    }
-
-    fn resolve_conditional_target(
-        &self,
-        sheet: SheetSelector<'_>,
-        table: TableSelector<'_>,
-    ) -> Result<(usize, usize)> {
-        let sheet = self
-            .workbook_ref()
-            .sheet(sheet)
-            .map_err(|_error| Error::InvalidSource)?
-            .ok_or(Error::Refused(Refusal::SheetNotFound))?
-            .index();
-        let table = topology::table_position(self, sheet, table).map_err(Error::from)?;
-        Ok((sheet, table))
-    }
 }

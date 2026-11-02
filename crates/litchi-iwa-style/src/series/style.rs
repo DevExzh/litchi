@@ -39,6 +39,8 @@ use crate::drawing;
 use crate::graph::{Error, Workspace};
 use crate::shape::property::{encode_shadow, shadow_of};
 
+pub mod radar;
+
 /// The longest style parent chain followed.
 const MAX_DEPTH: usize = 64;
 

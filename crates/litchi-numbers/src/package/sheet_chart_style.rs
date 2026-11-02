@@ -38,7 +38,7 @@ structure::structural_family!("chart-style");
 
 pub use litchi_iwa_common::shape::shadow::Drop;
 pub use litchi_iwa_style::chart_style::chart::{
-    Lighting3d, Property, PropertyKind, RadarGridShape, Shadow,
+    Lighting3d, Property, PropertyKind, RadarGridShape, RadarSeriesStyle, Shadow,
 };
 
 /// A typed, content-redacted chart-style failure.
@@ -339,12 +339,160 @@ fn target(
     })
 }
 
+/// A chart-series failure as this family's error. The structural limits
+/// keep their kind; the series engine's wire, archive and semantic limits
+/// are reported as the payload or package bytes they bound.
+fn from_series(error: super::sheet_chart_series::Error) -> Error {
+    use super::sheet_chart_series::{Error as Series, LimitKind as SeriesLimit, Refusal as Why};
+    match error {
+        Series::Refused(Why::SheetNotFound) => Refusal::SheetNotFound.into(),
+        Series::Refused(Why::ChartNotFound) => Refusal::ChartNotFound.into(),
+        Series::Refused(Why::UnsupportedKind) => Refusal::UnsupportedKind.into(),
+        Series::Refused(Why::SharedStyle) => Refusal::SharedStyle.into(),
+        Series::Refused(Why::UnsupportedDependency) => Refusal::UnsupportedDependency.into(),
+        Series::Refused(Why::UnsupportedSource) => Refusal::UnsupportedSource.into(),
+        Series::Limit {
+            kind,
+            observed,
+            maximum,
+        } => Error::Limit {
+            kind: match kind {
+                SeriesLimit::PackageBytes | SeriesLimit::Archive(_) | SeriesLimit::Detection(_) => {
+                    LimitKind::PackageBytes
+                },
+                SeriesLimit::Identifiers => LimitKind::Identifiers,
+                SeriesLimit::ScratchBytes => LimitKind::ScratchBytes,
+                SeriesLimit::AllocationEvents => LimitKind::AllocationEvents,
+                _ => LimitKind::PayloadBytes,
+            },
+            observed,
+            maximum,
+        },
+        Series::Allocation { amount } => Error::Allocation { amount },
+        Series::Verification => Error::Verification,
+        Series::PatchConflict => Error::PatchConflict,
+        _ => Error::InvalidSource,
+    }
+}
+
+/// The kind and the effective series styles of the visible series of one
+/// sheet chart (the host's `effective_chart_series_style_slots`).
+fn radar_styles(
+    package: &Package,
+    sheet: usize,
+    chart: ChartSelector,
+) -> Result<(ChartKind, Vec<u64>), Error> {
+    let (identifier, kind, count) =
+        super::sheet_chart_series::chart_series(package, sheet, chart).map_err(from_series)?;
+    let object = graph::object(package, identifier)?;
+    let index = structure::unique_message(object, &[CHART_MESSAGE_TYPE])?;
+    let references = codec::references(&object.messages[index].data, Limits::DEFAULT)?;
+    let mut styles = Vec::new();
+    structure::reserve(&mut styles, count)?;
+    for series in 0..count {
+        styles.push(
+            references
+                .series_style(series)
+                .ok_or(Error::InvalidSource)?,
+        );
+    }
+    Ok((kind, styles))
+}
+
+/// The series style payload of `style`.
+fn series_payload(package: &Package, style: u64) -> Result<&[u8], SymbolError> {
+    let object = graph::object(package, style)
+        .map_err(|_fault| SymbolError::Invalid("a series style is missing"))?;
+    let index = structure::unique_message(object, &[Archive::SeriesStyle.message_type()])
+        .map_err(|_fault| SymbolError::Invalid("a series style has no single payload"))?;
+    Ok(&object.messages[index].data)
+}
+
+/// The uniform radar series style of one sheet chart (the host's
+/// `sheet_chart_radar_series_style`).
+fn read_radar(package: &Package, sheet: usize, chart: ChartSelector) -> Result<Property, Error> {
+    let (kind, styles) = radar_styles(package, sheet, chart)?;
+    if !PropertyKind::RadarSeriesStyle.applies_to(kind) {
+        return Err(Refusal::UnsupportedKind.into());
+    }
+    Ok(Property::RadarSeriesStyle(series_style::radar::effective(
+        &styles,
+        |style| series_payload(package, style),
+    )?))
+}
+
+/// The host's `set_sheet_chart_radar_series_style`: every visible series'
+/// effective style whose value differs is rewritten in place, each
+/// exclusive to the chart.
+fn apply_radar(
+    source: &Package,
+    sheet: usize,
+    chart: ChartSelector,
+    style: RadarSeriesStyle,
+) -> Result<Option<Published>, Error> {
+    let (kind, styles) = radar_styles(source, sheet, chart)?;
+    if !PropertyKind::RadarSeriesStyle.applies_to(kind) {
+        return Err(Refusal::UnsupportedKind.into());
+    }
+    if series_style::radar::effective(&styles, |identifier| series_payload(source, identifier))
+        .is_ok_and(|current| current == style)
+    {
+        return Ok(None);
+    }
+    let rewrites = series_style::radar::rewrites(&styles, style, |identifier| {
+        series_payload(source, identifier)
+    })?;
+    for (identifier, _) in &rewrites {
+        if !exclusive_series(source, *identifier)? {
+            return Err(Refusal::SharedStyle.into());
+        }
+    }
+    if rewrites.is_empty() {
+        return Ok(None);
+    }
+    let message_type = Archive::SeriesStyle.message_type();
+    let mut closures = Vec::new();
+    structure::reserve(&mut closures, rewrites.len())?;
+    for (object, data) in rewrites {
+        let index = structure::unique_message(graph::object(source, object)?, &[message_type])?;
+        let mut data = Some(data);
+        let replace = move |object: &mut litchi_iwa_core::ArchiveObject,
+                            limits: litchi_iwa_core::Limits| {
+            object
+                .replace_message_preserving_header(
+                    index,
+                    RawMessage {
+                        type_: message_type,
+                        data: data.take().ok_or(Fault::Invalid)?,
+                    },
+                    limits,
+                )
+                .map(drop)
+                .map_err(|error| structure::map_core(&error))
+        };
+        closures.push((object, replace));
+    }
+    let mut edits: Vec<(u64, graph::ObjectEdit<'_>)> = Vec::new();
+    structure::reserve(&mut edits, closures.len())?;
+    for (object, replace) in &mut closures {
+        edits.push((*object, replace));
+    }
+    let published = graph::publish_in_place(source, &mut edits)?;
+    if read_radar(&published.package, sheet, chart)? != Property::RadarSeriesStyle(style) {
+        return Err(Error::Verification);
+    }
+    Ok(Some(published))
+}
+
 fn read(
     package: &Package,
     sheet: usize,
     chart: ChartSelector,
     kind: PropertyKind,
 ) -> Result<Property, Error> {
+    if kind == PropertyKind::RadarSeriesStyle {
+        return read_radar(package, sheet, chart);
+    }
     let Some(archive) = kind.archive() else {
         return read_legend(package, sheet, chart);
     };
@@ -496,6 +644,9 @@ fn apply_one(
 ) -> Result<Option<Published>, Error> {
     if let Property::LegendFrame(frame) = value {
         return apply_legend(source, sheet, chart, frame);
+    }
+    if let Property::RadarSeriesStyle(style) = value {
+        return apply_radar(source, sheet, chart, style);
     }
     let kind = value.kind();
     let archive = kind.archive().ok_or(Error::InvalidSource)?;

@@ -32,6 +32,7 @@ pub(crate) mod body_table_cell_list;
 mod body_table_cell_rich_text;
 pub(crate) mod body_table_cell_text;
 pub(crate) mod body_table_comments;
+pub(crate) mod body_table_conditional_highlight;
 pub(crate) mod body_table_creation;
 pub(crate) mod body_table_deletion;
 pub(crate) mod body_table_dimension;

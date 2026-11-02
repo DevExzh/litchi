@@ -7591,3 +7591,8 @@ See [0063](0063-source-pptx-modern-comments.md).
   - 69 host owner I/O and plumbing rows retired, each naming the leaf API that covers it.
 - W4-C and W4-R are finished and their worktrees retired. W4-F (0419) takes the remaining chart rows: radar, reference lines, value axis, image fills, and the shared caption lift with Numbers and chart captions. W4-E keeps chart add/duplicate/remove, Pages geometry, Numbers image fill, Pages body_table and the Keynote shared-helper moves.
 - Ledger: 2,024 migrated, 116 retired and 94 host-only rows (Numbers 41, Pages 31, Keynote 21, shared 1). Nothing pushed.
+- Gate on `1cafb9dfc2`: 52 of 53 rows passed in the full run (finished 2026-11-02T23:16:52Z). Row 36 (rustdoc of litchi-core/litchi-ops/litchi with all features) was OOM-killed at the 26 GB per-command cap, with a 26 GB peak. That row has peaked at the cap on every run today. Re-run alone on the same commit with a 40 GB cap, it passed (peak 28.5 GB, `full-1cafb9dfc2-r36`). Gates now launch with `LITCHI_MEM_MAX=40G`. Follow-up: rustdoc memory for the all-features facade docs.
+- Merged since then:
+  - W4-T 0412e (`2604268add`): `litchi_iwa_table::topology` lifted from Numbers; Pages/Keynote row and column insert/remove, Tier A;
+  - W4-E 0418 slice 1 (`ee40f1a375`): shared chart author; Keynote moved onto the shared chart and line-end codecs, about 650 lines of copies deleted; Numbers chart add/duplicate/remove;
+  - W4-F 0419 slice 1 (`9f43dabf61`): radar series style on all three formats.

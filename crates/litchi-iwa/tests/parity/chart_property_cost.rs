@@ -15,8 +15,8 @@ use std::hint::black_box;
 
 use litchi_iwa::charts::{
     Chart3dLightingStyle, ChartAxisGridline, ChartAxisGridlineStroke, ChartFont, ChartLegendFill,
-    ChartLegendFont, ChartPieStartAngle, ChartSeriesConnectionLine, ChartSeriesValueLabelLocation,
-    ChartShadow,
+    ChartLegendFont, ChartPieStartAngle, ChartRadarSeriesStyle, ChartSeriesConnectionLine,
+    ChartSeriesValueLabelLocation, ChartShadow,
 };
 use litchi_iwa::shapes::ShapeFill;
 use litchi_iwa::text::TextFont;
@@ -38,7 +38,9 @@ use litchi_iwa_common::shape::shadow::{
 };
 use litchi_iwa_common::shape::stroke::{Pattern, Stroke, Width};
 use litchi_iwa_style::chart_style::axis::{GridlineStroke, Property as AxisProperty};
-use litchi_iwa_style::chart_style::chart::{Property as ChartProperty, Shadow as LeafShadow};
+use litchi_iwa_style::chart_style::chart::{
+    Property as ChartProperty, RadarSeriesStyle, Shadow as LeafShadow,
+};
 use litchi_iwa_style::legend_style::{LegendFill, LegendFont, Property as LegendProperty};
 use litchi_iwa_style::series::style::ValueLabelLocation;
 
@@ -67,6 +69,7 @@ enum Operation {
     LightingSet,
     ShadowSet,
     CategoryLabelsSet,
+    RadarSet,
 }
 
 const ROUTES: &[(&str, Format, Operation)] = &[
@@ -236,6 +239,9 @@ const ROUTES: &[(&str, Format, Operation)] = &[
         Format::Numbers,
         Operation::LabelLocationsSet,
     ),
+    ("keynote_radar_set", Format::Keynote, Operation::RadarSet),
+    ("pages_radar_set", Format::Pages, Operation::RadarSet),
+    ("numbers_radar_set", Format::Numbers, Operation::RadarSet),
 ];
 
 const fn chart_kind(operation: Operation) -> Kind {
@@ -254,6 +260,7 @@ const fn chart_kind(operation: Operation) -> Kind {
         | Operation::BackgroundSet => Kind::Column2d,
         Operation::LightingSet => Kind::Column3d,
         Operation::ShadowSet | Operation::CategoryLabelsSet => Kind::Column2d,
+        Operation::RadarSet => Kind::Radar2d,
     }
 }
 
@@ -275,6 +282,10 @@ fn drop_shadow() -> TestResult<Drop> {
 
 fn layout() -> TestResult<Layout> {
     Ok(Layout::new(Frequency::Every(Interval::new(3)?), false))
+}
+
+const fn radar_leaf() -> ChartProperty {
+    ChartProperty::RadarSeriesStyle(RadarSeriesStyle::Fill)
 }
 
 fn shadow_leaf() -> TestResult<ChartProperty> {
@@ -407,6 +418,13 @@ fn host_operation(input: &Input, source: &[u8], operation: Operation) -> TestRes
                 Operation::ShadowSet => {
                     e.set_slide_chart_shadow(slide, chart, ChartShadow::Grouped(drop_shadow()?))?;
                 },
+                Operation::RadarSet => {
+                    e.set_slide_chart_radar_series_style(
+                        slide,
+                        chart,
+                        ChartRadarSeriesStyle::Fill,
+                    )?;
+                },
                 Operation::CategoryLabelsSet => {
                     e.set_slide_chart_category_label_layout(slide, chart, layout()?)?;
                 },
@@ -468,6 +486,9 @@ fn host_operation(input: &Input, source: &[u8], operation: Operation) -> TestRes
                 Operation::ShadowSet => {
                     e.set_body_chart_shadow(chart, ChartShadow::Grouped(drop_shadow()?))?;
                 },
+                Operation::RadarSet => {
+                    e.set_body_chart_radar_series_style(chart, ChartRadarSeriesStyle::Fill)?;
+                },
                 Operation::CategoryLabelsSet => {
                     e.set_body_chart_category_label_layout(chart, layout()?)?;
                 },
@@ -519,6 +540,13 @@ fn host_operation(input: &Input, source: &[u8], operation: Operation) -> TestRes
                 },
                 Operation::ShadowSet => {
                     e.set_sheet_chart_shadow(sheet, chart, ChartShadow::Grouped(drop_shadow()?))?;
+                },
+                Operation::RadarSet => {
+                    e.set_sheet_chart_radar_series_style(
+                        sheet,
+                        chart,
+                        ChartRadarSeriesStyle::Fill,
+                    )?;
                 },
                 Operation::CategoryLabelsSet => {
                     e.set_sheet_chart_category_label_layout(sheet, chart, layout()?)?;
@@ -615,6 +643,11 @@ fn keynote_operation(source: &[u8], operation: Operation) -> TestResult<Vec<u8>>
         Operation::ShadowSet => {
             let mut edit = package.edit_slide_chart_style(slide, chart)?;
             edit.set(shadow_leaf()?)?;
+            leaf_bytes!(edit.commit()?.package())
+        },
+        Operation::RadarSet => {
+            let mut edit = package.edit_slide_chart_style(slide, chart)?;
+            edit.set(radar_leaf())?;
             leaf_bytes!(edit.commit()?.package())
         },
         Operation::CategoryLabelsSet => {
@@ -735,6 +768,13 @@ fn pages_operation(source: &[u8], operation: Operation) -> TestResult<Vec<u8>> {
                 .commit()?
                 .package()
         ),
+        Operation::RadarSet => leaf_bytes!(
+            package
+                .edit_body_chart_style(chart)?
+                .set(radar_leaf())?
+                .commit()?
+                .package()
+        ),
         Operation::ShadowSet => leaf_bytes!(
             package
                 .edit_body_chart_style(chart)?
@@ -818,6 +858,11 @@ fn numbers_operation(source: &[u8], operation: Operation) -> TestResult<Vec<u8>>
         Operation::ShadowSet => {
             let mut edit = package.edit_sheet_chart_style(0, 1)?;
             edit.set(shadow_leaf()?)?;
+            Ok(leaf_bytes!(edit.commit()?.package()))
+        },
+        Operation::RadarSet => {
+            let mut edit = package.edit_sheet_chart_style(0, 1)?;
+            edit.set(radar_leaf())?;
             Ok(leaf_bytes!(edit.commit()?.package()))
         },
         Operation::CategoryLabelsSet => {
