@@ -14,10 +14,17 @@ use std::collections::TryReserveError;
 
 use litchi_core::Position;
 
-/// Archive-free semantic values for selecting and editing chart axes.
+/// Archive-free semantic values for selecting and editing chart axes, and
+/// the exact-source axis-style transactions of a chart's primary axes:
+/// [`crate::Package::edit_slide_chart_axis`].
 pub mod axis {
+    pub use crate::package::slide_chart_series::{Diagnostics, Error, LimitKind, Refusal};
+    pub use crate::package::slide_chart_style::AxisEdit as Edit;
+    pub use crate::package::slide_chart_style::axis::{Commit, Patch, Property, PropertyKind};
+    pub use litchi_iwa_common::chart::axis::style::Visibility;
     pub use litchi_iwa_common::chart::axis::{
-        Axis, Bound, Bounds, MajorStepCount, MinorStepCount, Scale, Steps, ValueAxisSettings,
+        Axis, Bound, Bounds, MajorStepCount, MinorStepCount, Scale, Steps, TickMarkLocation,
+        ValueAxisSettings,
     };
 }
 
@@ -434,11 +441,33 @@ pub mod data {
     };
 }
 
-/// Exact-source per-series data-symbol transactions for one slide chart.
+/// Exact-source per-series transactions for one slide chart (one value per
+/// series): [`crate::Package::edit_slide_chart_series`].
 pub mod series {
     pub use crate::package::slide_chart_series::{
-        Commit, Diagnostics, Edit, Error, LimitKind, Patch, Property, Refusal,
+        Commit, Diagnostics, Edit, Error, LimitKind, Patch, Property, PropertyKind, Refusal,
     };
+    pub use litchi_iwa_common::chart::error_bar;
+    pub use litchi_iwa_common::chart::number_format::{LabelAffixes, NumberFormat};
+    pub use litchi_iwa_common::chart::pie::{LabelDistance, LabelVisibility, WedgeExplosion};
+    pub use litchi_iwa_common::chart::series::{
+        ConnectionLine, MovingAveragePeriod, PolynomialOrder, Stroke, StrokePattern, Symbol,
+        SymbolFill, SymbolShape, SymbolSize, Trendline, TrendlineType,
+    };
+    pub use litchi_iwa_common::chart::series_labels::Visibility;
+    pub use litchi_iwa_common::shape::fill::{Fill, Gradient};
+}
+
+/// Exact-source chart-level style transactions of one slide chart on the
+/// shared chart style engine: [`crate::Package::edit_slide_chart_style`].
+pub mod style {
+    pub use crate::package::slide_chart_series::{Diagnostics, Error, LimitKind, Refusal};
+    pub use crate::package::slide_chart_style::StyleEdit as Edit;
+    pub use crate::package::slide_chart_style::style::{
+        Commit, Patch, Property, PropertyKind, RadarGridShape,
+    };
+    pub use litchi_iwa_common::chart::{corner, donut, gaps, legend, pie, radar};
+    pub use litchi_iwa_common::chart3d;
 }
 
 /// Exact-source transactions for one slide chart's effective font identity
