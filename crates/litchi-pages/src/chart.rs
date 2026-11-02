@@ -76,7 +76,7 @@ pub mod style {
     pub use crate::package::body_chart_series::{Diagnostics, Error, LimitKind, Refusal};
     pub use crate::package::body_chart_style::StyleEdit as Edit;
     pub use crate::package::body_chart_style::style::{
-        Commit, Lighting3d, Patch, Property, PropertyKind, RadarGridShape,
+        Commit, Drop, Lighting3d, Patch, Property, PropertyKind, RadarGridShape, Shadow,
     };
     pub use litchi_iwa_common::chart::{corner, donut, gaps, legend, pie, radar};
     pub use litchi_iwa_common::chart3d;
@@ -94,6 +94,7 @@ pub mod axis {
     pub use litchi_iwa_common::chart::axis::label_position_3d::LabelPosition3d;
     pub use litchi_iwa_common::chart::axis::style::Visibility;
     pub use litchi_iwa_common::chart::axis::{Axis, TickMarkLocation};
+    pub use litchi_iwa_common::chart::category_labels::{Frequency, Interval, Layout};
     pub use litchi_iwa_common::chart::number_format::{LabelAffixes, NumberFormat};
     pub use litchi_iwa_common::shape::stroke::Stroke;
 }

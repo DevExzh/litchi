@@ -3462,19 +3462,19 @@ fn bounded_read_values<P: BoundedProperty>(
     Ok(values)
 }
 
-fn bounded_style_slots(
-    workspace: &Workspace<'_>,
-    chart: u64,
-    series_count: usize,
-    budget: &mut SymbolBudget,
-) -> SymbolResult<Vec<u64>> {
-    let (_, payload) = bounded_chart_payload(workspace, chart, budget)?;
-    let references = bounded_references(payload, budget)?;
+/// The series style objects of a chart drawable's style references: its
+/// theme styles with the private overrides applied, one per series slot
+/// (the host's `chart_series_style_slots`).
+///
+/// # Errors
+///
+/// No series style, a zero or repeated identifier, or a private override
+/// outside the theme styles or disagreeing with its count.
+pub fn chart_series_styles(references: &codec::StyleReferences) -> SymbolResult<Vec<u64>> {
     let theme = references.series_theme_styles();
     if theme.is_empty() {
         return Err(SymbolError::Invalid("the chart has no series styles"));
     }
-    budget.reserve::<u64>(theme.len(), true)?;
     let mut styles = Vec::new();
     styles
         .try_reserve_exact(theme.len())
@@ -3501,7 +3501,6 @@ fn bounded_style_slots(
             ));
         }
         for &(index, identifier) in private.entries() {
-            budget.work(1)?;
             let index = usize::try_from(index)
                 .map_err(|_| SymbolError::Invalid("a series index exceeds usize"))?;
             if index >= styles.len()
@@ -3514,12 +3513,33 @@ fn bounded_style_slots(
             styles[index] = identifier;
         }
     }
-    if styles.len() < series_count {
-        return Err(SymbolError::Invalid(
-            "the chart has fewer series styles than series",
-        ));
+    Ok(styles)
+}
+
+fn bounded_style_slots(
+    workspace: &Workspace<'_>,
+    chart: u64,
+    series_count: usize,
+    budget: &mut SymbolBudget,
+) -> SymbolResult<Vec<u64>> {
+    let (_, payload) = bounded_chart_payload(workspace, chart, budget)?;
+    let references = bounded_references(payload, budget)?;
+    budget.reserve::<u64>(references.series_theme_styles().len(), true)?;
+    if let Some(private) = references.series_private_styles() {
+        for _ in private.entries() {
+            budget.work(1)?;
+        }
     }
-    styles.truncate(series_count);
+    let mut styles = chart_series_styles(&references)?;
+    // `usize::MAX`: every series style (the chart-level shadow).
+    if series_count != usize::MAX {
+        if styles.len() < series_count {
+            return Err(SymbolError::Invalid(
+                "the chart has fewer series styles than series",
+            ));
+        }
+        styles.truncate(series_count);
+    }
     for &style in &styles {
         let _ = bounded_payload(
             workspace,
