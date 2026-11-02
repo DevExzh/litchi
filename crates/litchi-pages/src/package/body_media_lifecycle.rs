@@ -24,6 +24,8 @@ use litchi_iwa_core::{Archive, RawMessage};
 use litchi_iwa_text::TextPosition;
 use thiserror::Error as ThisError;
 
+use litchi_iwa_common::shape::path::Preset;
+
 use super::Package;
 use super::body_drawable_caption::{self as caption, Kind as LabelKind};
 use super::body_drawable_graph::{
@@ -154,6 +156,13 @@ pub enum Refusal {
     /// or the data's signature names another media type than the kind.
     #[error("the media file name or type does not fit the new drawable")]
     InvalidMedia,
+    /// A new drawable's position is not finite or its size not positive, or
+    /// its preset does not fit the frame.
+    #[error("the new Pages drawable's frame is invalid")]
+    InvalidGeometry,
+    /// The theme lists no style preset for the new drawable.
+    #[error("the Pages theme has no style preset for the new drawable")]
+    MissingThemeStyle,
     /// The selector resolves no section.
     #[error("the Pages document has no such section")]
     SectionNotFound,
@@ -181,10 +190,10 @@ impl Refusal {
                 RefusalKind::NotFound
             },
             Self::NotMedia { .. } | Self::NoPoster { .. } => RefusalKind::UnsupportedTarget,
-            Self::EmptyData | Self::MismatchedType | Self::InvalidMedia => {
+            Self::EmptyData | Self::MismatchedType | Self::InvalidMedia | Self::InvalidGeometry => {
                 RefusalKind::InvalidValue
             },
-            Self::NotMaterialized => RefusalKind::UnsupportedContent,
+            Self::NotMaterialized | Self::MissingThemeStyle => RefusalKind::UnsupportedContent,
             Self::Commented | Self::SharedGraph | Self::UnsupportedSource => {
                 RefusalKind::UnsupportedContent
             },
@@ -251,6 +260,20 @@ enum Operation {
     Replace(DrawableSelector, Asset, Arc<[u8]>),
     ReplaceAsset(AssetId, Arc<[u8]>),
     Add(TextPosition, NewMedia),
+    AddTextShape(TextPosition, NewTextShape),
+}
+
+/// A new body text box, preset shape or straight line (the host's
+/// `add_text_box`, `add_body_shape` and `add_body_line`).
+#[derive(Debug, Clone, PartialEq)]
+struct NewTextShape {
+    text: Box<str>,
+    position: crate::drawable::Point,
+    size: crate::drawable::Size,
+    angle: f32,
+    /// The encoded `TSD.PathSourceArchive`.
+    path: Vec<u8>,
+    text_box: bool,
 }
 
 /// A new body image, movie or audio clip.
@@ -465,6 +488,104 @@ impl Edit<'_> {
         ))
     }
 
+    /// Stage a new body text box anchored at a UTF-16 body position, with
+    /// `text` in its own storage and a frame at `position` × `size` (the
+    /// host's `add_text_box`): a rectangle path in the theme's first
+    /// text-box style.
+    ///
+    /// # Errors
+    ///
+    /// Refuses a non-finite position, a non-positive size and a second
+    /// operation.
+    pub fn add_text_box(
+        &mut self,
+        anchor: TextPosition,
+        text: &str,
+        position: crate::drawable::Point,
+        size: crate::drawable::Size,
+    ) -> Result<&mut Self, Error> {
+        self.add_text_shape(anchor, text, position, size, Preset::Rectangle, true)
+    }
+
+    /// Stage a new body shape drawing `preset`, anchored at a UTF-16 body
+    /// position, with `text` in its own storage (the host's
+    /// `add_body_shape` and `add_body_rectangle`): the theme's first shape
+    /// style.
+    ///
+    /// # Errors
+    ///
+    /// Refuses a non-finite position, a non-positive size, a preset that
+    /// does not fit the frame and a second operation.
+    pub fn add_shape(
+        &mut self,
+        anchor: TextPosition,
+        text: &str,
+        position: crate::drawable::Point,
+        size: crate::drawable::Size,
+        preset: Preset,
+    ) -> Result<&mut Self, Error> {
+        self.add_text_shape(anchor, text, position, size, preset, false)
+    }
+
+    /// Stage a new native straight line along `segment`, anchored at a
+    /// UTF-16 body position (the host's `add_body_line`), in the theme's
+    /// first shape style.
+    ///
+    /// # Errors
+    ///
+    /// Refuses a second operation.
+    pub fn add_line(
+        &mut self,
+        anchor: TextPosition,
+        segment: litchi_iwa_common::shape::line::Segment,
+    ) -> Result<&mut Self, Error> {
+        let (position, size, angle) = segment.geometry();
+        self.stage(Operation::AddTextShape(
+            anchor,
+            NewTextShape {
+                text: Box::from(""),
+                position,
+                size,
+                angle,
+                path: litchi_iwa_style::shape_path::line_path_source(segment.length()),
+                text_box: false,
+            },
+        ))
+    }
+
+    fn add_text_shape(
+        &mut self,
+        anchor: TextPosition,
+        text: &str,
+        position: crate::drawable::Point,
+        size: crate::drawable::Size,
+        preset: Preset,
+        text_box: bool,
+    ) -> Result<&mut Self, Error> {
+        if !position.x.is_finite()
+            || !position.y.is_finite()
+            || !size.width.is_finite()
+            || !size.height.is_finite()
+            || size.width <= 0.0
+            || size.height <= 0.0
+        {
+            return Err(Refusal::InvalidGeometry.into());
+        }
+        let path = litchi_iwa_style::shape_path::path_source(preset, size.width, size.height)
+            .ok_or(Refusal::InvalidGeometry)?;
+        self.stage(Operation::AddTextShape(
+            anchor,
+            NewTextShape {
+                text: Box::from(text),
+                position,
+                size,
+                angle: 0.0,
+                path,
+                text_box,
+            },
+        ))
+    }
+
     fn stage(&mut self, operation: Operation) -> Result<&mut Self, Error> {
         if self.operation.is_some() {
             return Err(Refusal::OperationAlreadyStaged.into());
@@ -487,6 +608,7 @@ impl Edit<'_> {
                 replace(self.source, identifier, &data)?
             },
             Operation::Add(anchor, media) => add(self.source, anchor, &media)?,
+            Operation::AddTextShape(anchor, shape) => add_text_shape(self.source, anchor, &shape)?,
             Operation::ReplaceAsset(asset, data) => {
                 if !media_assets(self.source, graph::ROOT_OBJECT_IDENTIFIER)?
                     .iter()
@@ -2511,49 +2633,7 @@ fn add(
     {
         let archive = editable(source, &mut archives, &body_component)?;
         if let Some(zorder) = ids.zorder {
-            archive
-                .insert_object(
-                    new_object(
-                        source,
-                        zorder,
-                        ZORDER_MESSAGE_TYPE,
-                        Vec::new(),
-                        STANDARD_VERSION,
-                        Vec::new(),
-                        Vec::new(),
-                    )?,
-                    archive_limits,
-                )
-                .map_err(graph::map_core_error)?;
-            let root = archive
-                .object_mut(graph::ROOT_OBJECT_IDENTIFIER)
-                .ok_or(Error::InvalidSource)?;
-            let (index, message) = graph::unique_message(root, ROOT_MESSAGE_TYPE)?;
-            let data = litchi_iwa_common::wire::patch_length_delimited_field(
-                &message.data,
-                ROOT_ZORDER_FIELD,
-                false,
-                Some(&Pb::default().varint(1, zorder).0),
-            )
-            .map_err(graph::map_wire_error)?;
-            root.replace_message_preserving_header(
-                index,
-                RawMessage {
-                    type_: ROOT_MESSAGE_TYPE,
-                    data,
-                },
-                archive_limits,
-            )
-            .map_err(graph::map_core_error)?;
-            add_reference(
-                &mut root
-                    .archive_info
-                    .message_infos
-                    .get_mut(index)
-                    .ok_or(Error::InvalidSource)?
-                    .object_references,
-                zorder,
-            );
+            create_zorder(source, archive, zorder, archive_limits)?;
         }
         for object in [
             new_object(
@@ -2680,6 +2760,370 @@ fn add(
             ..Diagnostics::default()
         },
     ))
+}
+
+/// The body storage's text context a new drawable storage inherits (the
+/// host's `body_text_storage`): its stylesheet, first paragraph and list
+/// styles and first language.
+struct BodyTextContext {
+    stylesheet: u64,
+    paragraph: Option<u64>,
+    list: Option<u64>,
+    language: Option<Vec<u8>>,
+}
+
+fn first_table_entry(
+    storage: &[u8],
+    field: u32,
+    budget: &mut Budget,
+) -> Result<Option<Vec<u8>>, Error> {
+    let view = budget.parse(storage, 1)?;
+    let Some(table) = graph::unique_field(&view, field, 2)? else {
+        return Ok(None);
+    };
+    let table = budget.parse(table.payload(), 2)?;
+    for entry in table.fields().filter(|entry| entry.number() == 1) {
+        let entry = budget.parse(entry.payload(), 3)?;
+        if let Some(object) = graph::unique_field(&entry, 2, 2)? {
+            return Ok(Some(object.payload().to_vec()));
+        }
+    }
+    Ok(None)
+}
+
+fn body_text_context(source: &Package) -> Result<BodyTextContext, Error> {
+    let (storage, mut budget) = objects::body_storage(source)?;
+    let view = budget.parse(&storage.payload, 1)?;
+    let stylesheet = graph::unique_field(&view, 2, 2)?.ok_or(Error::InvalidSource)?;
+    let stylesheet = graph::parse_reference(stylesheet.payload(), &mut budget)?.get();
+    let reference = |payload: Option<Vec<u8>>, budget: &mut Budget| -> Result<Option<u64>, Error> {
+        payload
+            .map(|payload| graph::parse_reference(&payload, budget).map(NonZeroU64::get))
+            .transpose()
+            .map_err(Error::from)
+    };
+    let paragraph = first_table_entry(&storage.payload, 5, &mut budget)?;
+    let paragraph = reference(paragraph, &mut budget)?;
+    let list = first_table_entry(&storage.payload, 7, &mut budget)?;
+    let list = reference(list, &mut budget)?;
+    let language = first_table_entry(&storage.payload, 19, &mut budget)?;
+    Ok(BodyTextContext {
+        stylesheet,
+        paragraph,
+        list,
+        language,
+    })
+}
+
+/// The host's `body_text_storage` payload and its object references.
+fn text_storage_payload(text: &str, context: &BodyTextContext) -> (Vec<u8>, Vec<u64>) {
+    let attribute = |object: Option<u64>| {
+        let mut entry = Pb::default().varint(1, 0);
+        if let Some(object) = object {
+            entry = entry.reference(2, object);
+        }
+        Pb::default().message(1, &entry.0)
+    };
+    let zero = || Pb::default().message(1, &Pb::default().varint(1, 0).varint(2, 0).varint(3, 0).0);
+    let mut storage = Pb::default()
+        .reference(2, context.stylesheet)
+        .message(3, text.as_bytes())
+        .boolean(10, true)
+        .message(5, &attribute(context.paragraph).0)
+        .message(6, &zero().0)
+        .message(7, &attribute(context.list).0)
+        .message(14, &zero().0);
+    if let Some(language) = &context.language {
+        storage = storage.message(
+            19,
+            &Pb::default()
+                .message(1, &Pb::default().varint(1, 0).message(2, language).0)
+                .0,
+        );
+    }
+    storage = storage
+        .message(24, &zero().0)
+        .message(28, &attribute(None).0);
+    let mut references: Vec<u64> = [Some(context.stylesheet), context.paragraph, context.list]
+        .into_iter()
+        .flatten()
+        .collect();
+    references.sort_unstable();
+    references.dedup();
+    (storage.0, references)
+}
+
+/// Create a body text box, preset shape or line (the host's
+/// `add_text_box` and `add_body_shape_path`): the shape, two caption
+/// stand-ins, its own storage and the body attachment, under fresh
+/// identifiers after an optional new z-order; the U+FFFC and attachment
+/// entry; the z-order entry; UUIDs, the style's external reference and the
+/// identifier watermark.
+#[allow(
+    clippy::too_many_lines,
+    reason = "one creation: graph, anchor, metadata"
+)]
+fn add_text_shape(
+    source: &Package,
+    anchor: TextPosition,
+    shape: &NewTextShape,
+) -> Result<(Package, Diagnostics), Error> {
+    let anchor = anchor.utf16_index();
+    let archive_limits = source
+        .state
+        .source
+        .limits()
+        .effective_archive_limits()
+        .map_err(graph::map_archive_error)?;
+    let style = style_preset(source, if shape.text_box { 6 } else { 5 })
+        .map_err(|_| Refusal::MissingThemeStyle)?;
+    let context = body_text_context(source)?;
+    let metadata = objects::metadata(source)?.ok_or(Error::InvalidSource)?;
+    let (body_identifier, left_margin, zorder, body_component) = {
+        let mut budget = Budget::new(source)?;
+        let index = ObjectIndex::new(source, &mut budget)?;
+        let body = graph::resolve_body(&index, &mut budget)?;
+        let zorder = graph::root_zorder(source, &mut budget)?;
+        let component = index.component_name(index.get(body.root.body)?.component_index)?;
+        (
+            body.root.body.get(),
+            body.root.left_margin,
+            zorder,
+            component,
+        )
+    };
+    let first = objects::next_identifier(source, Some(&metadata))?;
+    let graph_first = first + u64::from(zorder.is_none());
+    // The host's order: drawable, caption, title, storage, attachment.
+    let (drawable, caption, title, storage, attachment) = (
+        graph_first,
+        graph_first + 1,
+        graph_first + 2,
+        graph_first + 3,
+        graph_first + 4,
+    );
+    let ids = CreationIds {
+        zorder: zorder.is_none().then_some(first),
+        drawable,
+        title,
+        caption,
+        attachment,
+    };
+    let frame = Pb::default()
+        .pair(1, shape.position.x, shape.position.y)
+        .pair(2, shape.size.width, shape.size.height)
+        .varint(3, 3)
+        .float(4, shape.angle);
+    let wrap = Pb::default()
+        .varint(1, 4)
+        .varint(2, 2)
+        .varint(3, 1)
+        .float(4, 12.0)
+        .float(5, 0.5)
+        .boolean(6, false);
+    let drawable_archive = Pb::default()
+        .message(1, &frame.0)
+        .reference(2, body_identifier)
+        .message(3, &wrap.0)
+        .boolean(5, false)
+        .boolean(7, false)
+        .reference(10, title)
+        .reference(11, caption)
+        .boolean(12, false)
+        .boolean(13, false);
+    let shape_archive = Pb::default()
+        .message(1, &drawable_archive.0)
+        .reference(2, style.get())
+        .message(3, &shape.path)
+        .float(6, 0.0);
+    let shape_info = Pb::default()
+        .message(1, &shape_archive.0)
+        .reference(2, storage)
+        .reference(4, storage)
+        .boolean(6, shape.text_box)
+        .0;
+    let (storage_payload, storage_references) = text_storage_payload(&shape.text, &context);
+    let attachment_payload = Pb::default()
+        .reference(1, drawable)
+        .varint(2, 0)
+        .float(3, shape.position.x - left_margin.unwrap_or_default())
+        .varint(4, 1)
+        .float(5, shape.position.y)
+        .0;
+    let mut archives: Vec<(Arc<str>, Archive)> = Vec::new();
+    {
+        let archive = editable(source, &mut archives, &body_component)?;
+        if let Some(zorder) = ids.zorder {
+            create_zorder(source, archive, zorder, archive_limits)?;
+        }
+        for object in [
+            new_object(
+                source,
+                drawable,
+                graph::message_type(DrawableSelector::shape(0)),
+                shape_info,
+                STANDARD_VERSION,
+                vec![caption, title, style.get(), storage],
+                Vec::new(),
+            )?,
+            new_object(
+                source,
+                caption,
+                STANDIN_MESSAGE_TYPE,
+                Vec::new(),
+                STANDIN_VERSION,
+                Vec::new(),
+                Vec::new(),
+            )?,
+            new_object(
+                source,
+                title,
+                STANDIN_MESSAGE_TYPE,
+                Vec::new(),
+                STANDIN_VERSION,
+                Vec::new(),
+                Vec::new(),
+            )?,
+            new_object(
+                source,
+                storage,
+                2_001,
+                storage_payload,
+                STANDARD_VERSION,
+                storage_references,
+                Vec::new(),
+            )?,
+            new_object(
+                source,
+                attachment,
+                graph::DRAWABLE_ATTACHMENT_MESSAGE_TYPE,
+                attachment_payload,
+                STANDARD_VERSION,
+                vec![drawable],
+                Vec::new(),
+            )?,
+        ] {
+            archive
+                .insert_object(object, archive_limits)
+                .map_err(graph::map_core_error)?;
+        }
+    }
+    insert_anchor(source, &mut archives, anchor, attachment, archive_limits)?;
+    let zorder_identifier = zorder.map_or(ids.zorder.unwrap_or(0), NonZeroU64::get);
+    append_zorder(
+        source,
+        &mut archives,
+        zorder_identifier,
+        &body_component,
+        drawable,
+        archive_limits,
+    )?;
+    let mut payload = metadata.registered(
+        source,
+        DOCUMENT_COMPONENT_IDENTIFIER,
+        &[drawable, caption, title, storage],
+        attachment,
+    )?;
+    {
+        let mut budget = Budget::new(source)?;
+        let index = ObjectIndex::new(source, &mut budget)?;
+        let style_component = index.component_name(index.get(style)?.component_index)?;
+        if let Some(component) = metadata.component_for_entry(&style_component)?
+            && component != DOCUMENT_COMPONENT_IDENTIFIER
+        {
+            payload = objects::add_external_reference(
+                &payload,
+                DOCUMENT_COMPONENT_IDENTIFIER,
+                component,
+                style.get(),
+            )?;
+        }
+    }
+    {
+        let archive = editable(source, &mut archives, &metadata.component)?;
+        archive
+            .object_mut(metadata.object)
+            .ok_or(Error::InvalidSource)?
+            .replace_message_preserving_header(
+                metadata.message_index,
+                RawMessage {
+                    type_: METADATA_MESSAGE_TYPE,
+                    data: payload,
+                },
+                archive_limits,
+            )
+            .map_err(graph::map_core_error)?;
+    }
+    let candidate = graph::publish_changes(source, archives, &[], &[], &[])?;
+    let kind = if shape.text_box {
+        DrawableSelector::text_box(0)
+    } else {
+        DrawableSelector::shape(0)
+    };
+    if !resolve_drawable(&candidate, kind, NonZeroU64::new(drawable))? {
+        return Err(Error::Verification);
+    }
+    Ok((
+        candidate,
+        Diagnostics {
+            changed: true,
+            created_objects: 5 + usize::from(ids.zorder.is_some()),
+            ..Diagnostics::default()
+        },
+    ))
+}
+
+/// A new empty drawable z-order object, referenced from the document root.
+fn create_zorder(
+    source: &Package,
+    archive: &mut Archive,
+    zorder: u64,
+    archive_limits: litchi_iwa_core::Limits,
+) -> Result<(), Error> {
+    archive
+        .insert_object(
+            new_object(
+                source,
+                zorder,
+                ZORDER_MESSAGE_TYPE,
+                Vec::new(),
+                STANDARD_VERSION,
+                Vec::new(),
+                Vec::new(),
+            )?,
+            archive_limits,
+        )
+        .map_err(graph::map_core_error)?;
+    let root = archive
+        .object_mut(graph::ROOT_OBJECT_IDENTIFIER)
+        .ok_or(Error::InvalidSource)?;
+    let (index, message) = graph::unique_message(root, ROOT_MESSAGE_TYPE)?;
+    let data = litchi_iwa_common::wire::patch_length_delimited_field(
+        &message.data,
+        ROOT_ZORDER_FIELD,
+        false,
+        Some(&Pb::default().varint(1, zorder).0),
+    )
+    .map_err(graph::map_wire_error)?;
+    root.replace_message_preserving_header(
+        index,
+        RawMessage {
+            type_: ROOT_MESSAGE_TYPE,
+            data,
+        },
+        archive_limits,
+    )
+    .map_err(graph::map_core_error)?;
+    add_reference(
+        &mut root
+            .archive_info
+            .message_infos
+            .get_mut(index)
+            .ok_or(Error::InvalidSource)?
+            .object_references,
+        zorder,
+    );
+    Ok(())
 }
 
 /// Insert a U+FFFC at `anchor` and its attachment entry (shared by
