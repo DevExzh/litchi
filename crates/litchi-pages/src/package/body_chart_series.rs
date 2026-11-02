@@ -56,6 +56,10 @@ const OBJECT_CONTAINER_MESSAGE_TYPE: u32 = 11_008;
 const PACKAGE_METADATA_MESSAGE_TYPE: u32 = 11_006;
 const ROOT_MESSAGE_TYPE: u32 = 10_000;
 const STYLE_EXTENSION_FIELD: u32 = 10_000;
+/// `TSCH.ChartArchive` field of the reference lines.
+const REFERENCE_LINES_FIELD: u32 = litchi_iwa_style::reference_line::REFERENCE_LINES_FIELD;
+/// `TSCH.ReferenceLineNonStyleArchive`.
+const REFERENCE_LINE_MESSAGE_TYPE: u32 = litchi_iwa_style::reference_line::MESSAGE_TYPE;
 
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub(super) struct MutationPlan {
@@ -1894,9 +1898,14 @@ fn verify_message_unknowns(
     let source_view = budget.parse(source, 1).map_err(map_arrangement_error)?;
     let candidate_view = budget.parse(candidate, 1).map_err(map_arrangement_error)?;
     let outer_excluded: &[u32] = match message_type {
-        CHART_MESSAGE_TYPE | CHART_STYLE_MESSAGE_TYPES_FIRST..=CHART_STYLE_MESSAGE_TYPES_LAST => {
+        // The chart archive's reference-line field (10005) changes only
+        // when the plan admits it (a reference-line write).
+        CHART_MESSAGE_TYPE => &[STYLE_EXTENSION_FIELD, REFERENCE_LINES_FIELD],
+        CHART_STYLE_MESSAGE_TYPES_FIRST..=CHART_STYLE_MESSAGE_TYPES_LAST => {
             &[STYLE_EXTENSION_FIELD]
         },
+        // A reference line the plan names is rewritten whole.
+        REFERENCE_LINE_MESSAGE_TYPE => return Ok(()),
         STYLESHEET_MESSAGE_TYPE => &[1, 5],
         // A legend typography variation patched in place: its override
         // count and character properties.

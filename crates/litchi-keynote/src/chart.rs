@@ -679,6 +679,17 @@ mod tests {
     }
 }
 
+/// Exact-source reference-line transactions of one chart's primary value
+/// axis on the shared reference-line graph:
+/// [`crate::Package::edit_slide_chart_reference_lines`].
+pub mod reference_lines {
+    pub use crate::package::slide_chart_reference_lines::ReferenceLinesEdit as Edit;
+    pub use crate::package::slide_chart_reference_lines::reference_lines::{
+        Commit, Kind, Line, Patch, Unknown, Value,
+    };
+    pub use crate::package::slide_chart_series::{Diagnostics, Error, LimitKind, Refusal};
+}
+
 /// Exact-source legend fill, border and shadow transactions of one chart
 /// on the shared legend-style variation graph:
 /// [`crate::Package::edit_slide_chart_legend_style`].

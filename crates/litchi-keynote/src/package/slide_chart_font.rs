@@ -3072,8 +3072,21 @@ fn chart_unknown_fields_preserved(
 ) -> Result<bool, Error> {
     let source_fields = parse_locality_fields(source, limits, budget, fields)?;
     let candidate_fields = parse_locality_fields(candidate, limits, budget, fields)?;
-    let source_unknown = raw_fields_except(&source_fields, source, 10_000, budget)?;
-    let candidate_unknown = raw_fields_except(&candidate_fields, candidate, 10_000, budget)?;
+    // A reference-line write names the chart archive's reference-line
+    // field (10005) among its chart fields; it may change beside the
+    // generated extension.
+    let outer: &[u32] = if chart_extension_fields
+        .contains(&litchi_iwa_style::reference_line::REFERENCE_LINES_FIELD)
+    {
+        &[
+            10_000,
+            litchi_iwa_style::reference_line::REFERENCE_LINES_FIELD,
+        ]
+    } else {
+        &[10_000]
+    };
+    let source_unknown = raw_fields_except_numbers(&source_fields, source, outer, budget)?;
+    let candidate_unknown = raw_fields_except_numbers(&candidate_fields, candidate, outer, budget)?;
     if source_unknown != candidate_unknown {
         return Ok(false);
     }

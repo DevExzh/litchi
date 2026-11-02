@@ -495,3 +495,223 @@ fn reference_line_write_cost_abba() -> TestResult {
     }
     Ok(())
 }
+
+// ---------------------------------------------------------------------------
+// The format facades (record 0419): `edit_{sheet,slide,body}_chart_reference_lines`.
+// ---------------------------------------------------------------------------
+
+/// The leaf position of the host-added chart.
+const fn leaf_chart(format: Format) -> usize {
+    match format {
+        Format::Pages => 0,
+        Format::Keynote | Format::Numbers => 1,
+    }
+}
+
+/// Replace the chart's lines with `after` through a format facade, with
+/// the inverse replayed.
+fn facade_write(format: Format, source: &[u8], after: &[Line]) -> TestResult<LeafRun> {
+    let chart = leaf_chart(format);
+    Ok(match format {
+        Format::Numbers => {
+            let package = litchi_numbers::Package::from_bytes(source)?;
+            let mut edit = package.edit_sheet_chart_reference_lines(0, chart)?;
+            edit.set(after.to_vec())?;
+            let commit = edit.commit()?;
+            let restored = commit
+                .package()
+                .apply_sheet_chart_reference_lines(&commit.patch().inverse())?;
+            LeafRun::with_inverse(
+                crate::leaf_bytes!(commit.package()),
+                crate::leaf_bytes!(restored.package()),
+            )
+        },
+        Format::Keynote => {
+            let package = litchi_keynote::Package::from_bytes(source)?;
+            let mut edit = package.edit_slide_chart_reference_lines(0, chart)?;
+            edit.set(after.to_vec())?;
+            let commit = edit.commit()?;
+            let restored = commit
+                .package()
+                .apply_slide_chart_reference_lines(&commit.patch().inverse())?;
+            LeafRun::with_inverse(
+                crate::leaf_bytes!(commit.package()),
+                crate::leaf_bytes!(restored.package()),
+            )
+        },
+        Format::Pages => {
+            let package = litchi_pages::Package::from_bytes(source)?;
+            let commit = package
+                .edit_body_chart_reference_lines(chart)?
+                .set(after.to_vec())?
+                .commit()?;
+            let restored = commit
+                .package()
+                .apply_body_chart_reference_lines(&commit.patch().inverse())?;
+            LeafRun::with_inverse(
+                crate::leaf_bytes!(commit.package()),
+                crate::leaf_bytes!(restored.package()),
+            )
+        },
+    })
+}
+
+/// The facade read in the host read's rendering.
+fn facade_read(format: Format, bytes: &[u8]) -> TestResult<String> {
+    let chart = leaf_chart(format);
+    Ok(match format {
+        Format::Numbers => format!(
+            "{:?}",
+            litchi_numbers::Package::from_bytes(bytes)?.sheet_chart_reference_lines(0, chart)?
+        ),
+        Format::Keynote => format!(
+            "{:?}",
+            litchi_keynote::Package::from_bytes(bytes)?.slide_chart_reference_lines(0, chart)?
+        ),
+        Format::Pages => format!(
+            "{:?}",
+            litchi_pages::Package::from_bytes(bytes)?.body_chart_reference_lines(chart)?
+        ),
+    })
+}
+
+/// `after` written through the host and the facade, after a host write
+/// of `before`; allocations are tier B (random host item UUIDs), Keynote
+/// always (root previews).
+fn facade_case(
+    name: &'static str,
+    format: Format,
+    tier: Tier,
+    before: &[Line],
+    after: &[Line],
+) -> TestResult {
+    let mut input = input(format, Kind::Column2d)?;
+    let (target, chart) = (input.target, input.chart);
+    if !before.is_empty() {
+        input.fixture.bytes = host_write(&input.fixture.bytes, target, chart, before)?;
+    }
+    let mut case = Case::new(name, format, tier, Evidence::Queued, &input.fixture)
+        .host(|source| host_write(source, target, chart, after))
+        .leaf(|source| facade_write(format, source, after))
+        .read("host reference-line read", move |bytes| {
+            host_read(bytes, target, chart)
+        })
+        .read("leaf reference-line read", move |bytes| {
+            facade_read(format, bytes)
+        });
+    if format == Format::Keynote {
+        case = case.leaf_invalidates_root_previews();
+    }
+    if tier == Tier::B {
+        case = case
+            .leaf_structural_metadata()
+            .reference_line_allocation_metadata(chart)
+            .known_fields(|known| {
+                known.with(
+                    CHART_MESSAGE_TYPE,
+                    "TSCH.ChartDrawableArchive (item UUIDs zeroed)",
+                    chart_without_item_uuids,
+                )
+            });
+    }
+    case.run()?;
+    Ok(())
+}
+
+/// The facade sequences: allocate into an empty axis, patch in place,
+/// append, remove one and remove all.
+fn facade_sequences() -> TestResult<Vec<(bool, Vec<Line>, Vec<Line>)>> {
+    Ok(vec![
+        (true, vec![], vec![Line::average(), threshold()?]),
+        (false, vec![Line::average()], vec![named_average()?]),
+        (
+            true,
+            vec![Line::minimum()],
+            vec![Line::minimum(), Line::maximum()],
+        ),
+        (
+            false,
+            vec![Line::minimum(), Line::median()],
+            vec![Line::minimum()],
+        ),
+        (false, vec![Line::median(), threshold()?], vec![]),
+    ])
+}
+
+fn facade_set(name: &'static str, format: Format, keynote_tier: bool) -> TestResult {
+    for (allocates, before, after) in facade_sequences()? {
+        let tier = if allocates || keynote_tier {
+            Tier::B
+        } else {
+            Tier::A
+        };
+        facade_case(name, format, tier, &before, &after)
+            .map_err(|error| format!("{before:?} -> {after:?}: {error}"))?;
+    }
+    Ok(())
+}
+
+#[test]
+fn numbers_sheet_chart_reference_lines_set_parity() -> TestResult {
+    let _ = (Tier::B, Evidence::Queued);
+    facade_set(
+        "numbers_sheet_chart_reference_lines_set_parity",
+        Format::Numbers,
+        false,
+    )
+}
+
+#[test]
+fn keynote_slide_chart_reference_lines_set_parity() -> TestResult {
+    let _ = (Tier::B, Evidence::Queued);
+    facade_set(
+        "keynote_slide_chart_reference_lines_set_parity",
+        Format::Keynote,
+        true,
+    )
+}
+
+#[test]
+fn pages_body_chart_reference_lines_set_parity() -> TestResult {
+    let _ = (Tier::B, Evidence::Queued);
+    facade_set(
+        "pages_body_chart_reference_lines_set_parity",
+        Format::Pages,
+        false,
+    )
+}
+
+fn facade_reads(format: Format) -> TestResult {
+    for (_, before, _) in facade_sequences()? {
+        let input = input(format, Kind::Column2d)?;
+        let bytes = if before.is_empty() {
+            input.fixture.bytes.clone()
+        } else {
+            host_write(&input.fixture.bytes, input.target, input.chart, &before)?
+        };
+        assert_eq!(
+            host_read(&bytes, input.target, input.chart)?,
+            facade_read(format, &bytes)?,
+            "{before:?}"
+        );
+    }
+    Ok(())
+}
+
+#[test]
+fn numbers_sheet_chart_reference_lines_read_parity() -> TestResult {
+    let _ = (Tier::A, Evidence::Queued);
+    facade_reads(Format::Numbers)
+}
+
+#[test]
+fn keynote_slide_chart_reference_lines_read_parity() -> TestResult {
+    let _ = (Tier::A, Evidence::Queued);
+    facade_reads(Format::Keynote)
+}
+
+#[test]
+fn pages_body_chart_reference_lines_read_parity() -> TestResult {
+    let _ = (Tier::A, Evidence::Queued);
+    facade_reads(Format::Pages)
+}
