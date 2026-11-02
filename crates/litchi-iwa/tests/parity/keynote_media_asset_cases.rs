@@ -272,3 +272,133 @@ fn keynote_media_asset_replace_cost_abba() -> TestResult {
         },
     )
 }
+
+/// Fixtures that receive host-inserted unreferenced data records, per
+/// format.
+const PRUNE_FIXTURES: &[(&str, Format)] = &[
+    (
+        "iwork/keynote/image-adjustments-native.key",
+        Format::Keynote,
+    ),
+    ("iwork/pages/basic.pages", Format::Pages),
+    ("iwork/numbers/basic.numbers", Format::Numbers),
+];
+
+/// `source` with `count` unreferenced data records (host
+/// `media::Draft::insert_unreferenced`, which the leaves never publish).
+fn with_orphans(source: &[u8], count: usize) -> TestResult<Vec<u8>> {
+    let mut draft = litchi_iwa::media::Draft::from_bytes(source)?;
+    let png = fixture(REPLACEMENTS[0])?.bytes;
+    let wav = fixture(REPLACEMENTS[3])?.bytes;
+    for index in 0..count {
+        let (name, data) = if index % 2 == 0 {
+            ("orphan.png", &png)
+        } else {
+            ("orphan.wav", &wav)
+        };
+        drop(draft.insert_unreferenced(name, data)?);
+    }
+    Ok(draft.to_bytes()?)
+}
+
+/// Host: remove every unreferenced record one by one
+/// (`media::Draft::remove_unreferenced`).
+fn host_prune(source: &[u8]) -> TestResult<Vec<u8>> {
+    let mut draft = litchi_iwa::media::Draft::from_bytes(source)?;
+    let orphans = draft
+        .assets()
+        .iter()
+        .filter(|asset| !asset.is_referenced())
+        .map(|asset| asset.data_identifier)
+        .collect::<Vec<_>>();
+    assert!(!orphans.is_empty());
+    for identifier in orphans {
+        drop(draft.remove_unreferenced(identifier)?);
+    }
+    Ok(draft.to_bytes()?)
+}
+
+/// Leaf: `prune_unreferenced` on each format's media family, with its
+/// inverse.
+fn leaf_prune(format: Format, source: &[u8]) -> TestResult<LeafRun> {
+    Ok(match format {
+        Format::Keynote => {
+            let package = Package::from_bytes(source)?;
+            let mut edit = package.edit_media_assets();
+            edit.prune_unreferenced();
+            let commit = edit.commit()?;
+            assert!(commit.diagnostics().pruned() > 0);
+            let restored = commit
+                .package()
+                .apply_media_asset_data(&commit.patch().inverse())?;
+            LeafRun::with_inverse(
+                leaf_bytes!(commit.package()),
+                leaf_bytes!(restored.package()),
+            )
+        },
+        Format::Pages => {
+            let package = litchi_pages::Package::from_bytes(source)?;
+            let mut edit = package.edit_body_media();
+            edit.prune_unreferenced()?;
+            let commit = edit.commit()?;
+            let restored = commit
+                .package()
+                .apply_body_media(&commit.patch().inverse())?;
+            LeafRun::with_inverse(
+                leaf_bytes!(commit.package()),
+                leaf_bytes!(restored.package()),
+            )
+        },
+        Format::Numbers => {
+            let package = litchi_numbers::Package::from_bytes(source)?;
+            let mut edit = package.edit_media();
+            edit.prune_unreferenced()?;
+            let commit = edit.commit()?;
+            let restored = commit.package().apply_media(&commit.patch().inverse())?;
+            LeafRun::with_inverse(
+                leaf_bytes!(commit.package()),
+                leaf_bytes!(restored.package()),
+            )
+        },
+    })
+}
+
+/// Host `media::Draft::remove_unreferenced` on every unreferenced record
+/// against the leaf `prune_unreferenced` on all three formats (one and
+/// three orphans), and the exact no-op on a package without orphans.
+#[test]
+fn media_prune_unreferenced_parity() -> TestResult {
+    let _ = (Tier::B, Evidence::Queued);
+    for &(path, format) in PRUNE_FIXTURES {
+        let base = fixture(path)?;
+        for count in [1, 3] {
+            let input = crate::harness::Fixture {
+                path,
+                bytes: with_orphans(&base.bytes, count)?,
+            };
+            let mut case = Case::new(
+                "media_prune_unreferenced_parity",
+                format,
+                Tier::B,
+                Evidence::Queued,
+                &input,
+            );
+            if format == Format::Keynote {
+                // Every Keynote structural publication invalidates the
+                // root previews (the leaf's natively verified policy).
+                case = case.leaf_invalidates_root_previews();
+            }
+            case.host(host_prune)
+                .leaf(move |source| leaf_prune(format, source))
+                .run()
+                .map_err(|error| format!("{path} ({count}): {error}"))?;
+        }
+        let unchanged = leaf_bytes!(&Package::from_bytes(&fixture(FIXTURES[0])?.bytes)?);
+        let package = Package::from_bytes(&unchanged)?;
+        let mut edit = package.edit_media_assets();
+        edit.prune_unreferenced();
+        let commit = edit.commit()?;
+        assert!(!commit.diagnostics().changed() && commit.patch().is_noop());
+    }
+    Ok(())
+}

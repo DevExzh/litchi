@@ -25,7 +25,7 @@
 
 ## 2. Ledger
 
-86 rows change: 16 migrated, 70 retired. Host-only rows after the merge:
+86 rows change: 17 migrated, 69 retired. Host-only rows after the merge:
 Keynote 50, Numbers 101, Pages 64, shared 1 (`document.rs charts`, chart
 lifecycle, W4-D). None of the rows in this package's scope stays
 host-only.
@@ -42,6 +42,7 @@ host-only.
 | `media/package.rs replace` | same | `media_draft_replace_parity` (host `media::Draft::replace`) | B |
 | `media/package.rs set_max_replacement_bytes` | `slide::media::asset_data::EditOptions::max_replacement_bytes` | `media_asset_replacement_limit_parity` | B |
 | `pages/editor.rs create`, `create_with_text` | `litchi_pages::builder::Builder::{build, body_text}` | `pages_builder_create_parity` | B |
+| `media/package.rs remove_unreferenced` | one shared rule, `litchi_iwa_style::media::unreferenced_data` (no component owner, object data reference or `DataMetadataMap` entry), with facades `prune_unreferenced` on Keynote `slide::media::asset_data::Edit` (from the new `Package::edit_media_assets`), Pages `drawable::lifecycle::Edit` and Numbers `sheet::drawable::media::Edit` (through the shared data-owner transition's `data_removals`); the leaf prunes every orphan in one commit, the host one identifier at a time | `media_prune_unreferenced_parity` (three formats; one and three orphans; inverse) | B |
 | `numbers/editor/semantic/text_box.rs sheet_text_boxes` | `litchi_numbers::Package::sheet_drawable_list` (`Kind::TextBox`) with `sheet_drawable_plain_text` | `numbers_sheet_text_boxes_read_parity` | A |
 
 `Builder::slide_number_visible` has no ledger row (the host method is a
@@ -52,7 +53,7 @@ covers it.
 
 | Host rows | Leaf replacement | Test pointer |
 |---|---|---|
-| `media/package.rs insert_unreferenced`, `remove_unreferenced` | host-internal steps of the host media add/remove routes; the leaves allocate and release `DataInfo` records inside their lifecycle transactions (Pages `edit_body_media`, Numbers `sheet::drawable::Edit::{add_*, remove}`, Keynote `slide::drawable::Edit::{add_image, remove}`, `slide::media::lifecycle`) | the lifecycle parity cases of records 0371, 0372, 0378 |
+| `media/package.rs insert_unreferenced` | host-internal step of the host media add routes. No caller needs an unattached record: no application shows it, no supported API can attach it later (every leaf add takes the bytes and allocates the record in the same transaction: Pages `edit_body_media`, Numbers `sheet::drawable::Edit::add_*`, Keynote `slide::drawable::Edit::add_image` and the movie/audio creation families), and the leaves prune it as garbage | the lifecycle parity cases of records 0371, 0372, 0378 |
 | `comments.rs`, `text/editor.rs`, `pages/editor.rs`, `numbers/editor/semantic/{workbook,media}.rs` owner I/O (`open`, `from_bytes`, `save`, `to_bytes`, `from_package`, `package`, `into_package`) | the immutable leaf `Package::{open, from_bytes, write_to, save}` (Pages also `to_bytes`); the host raw-package conversions go with the host (0363 §3.1) | `pages_package_lifecycle_parity`, `numbers_package_lifecycle_parity`, `shared_draft_lifecycle_parity` |
 | `package.rs` raw `Package` (`new`, `open`, `from_bytes`, `from_shared_bytes`, `from_read_at`, `len`, `is_empty`, `validate`, `to_bytes`, `write_to`, `save`, `contains_entry`) | `litchi_iwa_archive::SourceCatalog::{from_bytes, from_shared_bytes, from_read_at}`, `package::Catalog::{len, is_empty, to_bytes, write_to}`, `unstable::entry`, the leaf `save` | `physical_package_owner_parity`, `*_physical_access_parity` |
 | `package.rs` raw `Edit` family (`edit`, `commit`, `apply`, `reset`, `insert_entry`, `remove_entry`, `replace_archive`, `insert_archive_before`, `update_archive`, and `len`/`is_empty`/`validate`/`contains_entry` of the staged edit) | deleted with the host (0363 §3.1, D5: no raw mutation API); physical member changes are `litchi_iwa_archive::package::Catalog::{prepare_reassembly_with_changes, reassemble_with_*}` with `EntryEdit` and `ReassemblyPatch::{apply, inverse}` | — |
@@ -91,13 +92,18 @@ keynote_media_asset_cases, owner_io_cases, pages_builder_cases}.rs`.
   archive order (master placeholder text, U+FFFC attachment characters)
   and misses Numbers cell text; the leaf reads are semantic. Pages is equal;
   for Keynote every leaf line occurs in the host dump.
-- **Not proven by a leaf API.** Pruning a data record that is already
-  unreferenced in an input file (host `remove_unreferenced` called
-  directly) has no leaf API; no host route used it that way. Flagged for
-  the owner (§5).
+- **Pruning.** Host-inserted orphans (`media::Draft::insert_unreferenced`)
+  on a native file of each format; the host removes each with
+  `remove_unreferenced`, the leaf prunes them in one commit. Tier B: the
+  host re-encodes `TSP.PackageMetadata` with Prost; Keynote also
+  invalidates the root previews (its structural-publication policy). The
+  inverse restores the input. Numbers prunes materialized records only
+  (the shared transition's data removals delete a member); an
+  unmaterialized orphan stays on Numbers, where Pages and Keynote remove
+  its `DataInfo`.
 
 macOS queue: 11 Keynote rows (builder values, the empty-text form, asset
-replacement) and 2 shared rows (format-neutral replace, the ceiling) in
+replacement) and 3 shared rows (format-neutral replace, the ceiling, pruning) in
 `0363-mac-queue.md`; the Pages builder and Numbers drawable-list rows
 were already queued.
 
@@ -124,9 +130,7 @@ are already measured (records 0296, 0306); no new hot path.
 
 ## 5. Gaps and follow-ups
 
-- Orphan data-record pruning (`media::Draft::remove_unreferenced` used on
-  an input that already has unreferenced records) has no leaf API; the
-  owner decides whether a leaf route is wanted.
+- Numbers pruning keeps unmaterialized orphan records (above).
 - The Keynote builder keeps the slide-number visibility as its own
   transaction (it also adds the slide-number drawable to the slide's
   drawables and z-order); folding it into the single publication would
