@@ -135,4 +135,27 @@ are already measured (records 0296, 0306); no new hot path.
 
 ## 6. Gates
 
-See the commit that adds this record for the command list and exit codes.
+On `02c1262657` (trunk `8010cc9fb4` merged), build env of the rules file;
+every command exited 0.
+
+| Command | Exit |
+|---|---|
+| `cargo fmt --all --check` | 0 |
+| `cargo clippy -p litchi-keynote -p litchi-iwa -p litchi-pages -p litchi-numbers -p litchi-ops -p litchi -p litchi-py --all-targets --all-features -- -D warnings` | 0 |
+| `cargo clippy -p litchi-ops --no-default-features --all-targets -- -D warnings`, and with `--features keynote` | 0, 0 |
+| `cargo test -p litchi-keynote --all-features` | 0 |
+| `cargo test -p litchi-iwa --all-features --test parity`, `--lib` | 0, 0 |
+| `RUSTDOCFLAGS=-Dwarnings cargo doc --no-deps --all-features -p litchi-keynote -p litchi-iwa` | 0 |
+| `RUSTC_BOOTSTRAP=1 python3 tools/check_api_glossary.py` (all profiles; and `--profile keynote-full`) | 0 |
+| `cargo test -p litchi-ops --all-features` (`--lib`, `--doc`, `--tests`; capabilities and registry goldens unchanged) | 0 |
+| `cargo test -p litchi --all-features` | 0 |
+| `crates/pyo3-litchi/tests/run_tests.sh` | 0 |
+| `cd tools/perf-baseline && cargo check --locked --all-targets` | 0 |
+| `python3 tools/check_feature_matrix.py` (31 legs) | 0 |
+| `python3 -m unittest tools.test_officecli_corpus tools.test_officecli_capability_delta tools.test_no_3rdparty_references tools.test_check_crate_boundaries tools.test_non_iwork_gate` (1,276 tests) | 0 |
+| `python3 tools/officecli_capability_delta.py --check`, `python3 tools/officecli_corpus.py --check` | 0, 0 |
+| `python3 tools/unified_bench_matrix.py --check` (matrix regenerated for 0417) | 0 |
+| `python3 tools/check_crate_boundaries.py`, `python3 tools/non_iwork_gate.py verify` | 0, 0 |
+| `python3 tools/iwa_exit_ledger.py --check` | 0 |
+
+No dependency changed (no fuzz lock refresh). Target directory 5.1 GB.
