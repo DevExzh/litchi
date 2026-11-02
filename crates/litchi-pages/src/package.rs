@@ -76,6 +76,7 @@ pub(crate) mod table_lock;
 pub(crate) mod text_box_annotation;
 mod text_box_comment_graph;
 pub(crate) mod text_box_date_time;
+pub(crate) mod text_box_drawable_comment;
 pub(crate) mod text_box_drop_cap;
 pub(crate) mod text_box_hyperlink;
 pub(crate) mod text_box_language;

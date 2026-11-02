@@ -26058,6 +26058,7 @@
         "litchi_pages::drawable::properties",
         "litchi_pages::drawable::text",
         "litchi_pages::drawable::style",
+        "litchi_pages::drawable::comment",
         "litchi_pages::drawable::annotation",
         "litchi_pages::drawable::date_time",
         "litchi_pages::drawable::hyperlink",
@@ -26080,6 +26081,10 @@
         {
           "method": "litchi_pages::Package::apply_metadata",
           "ok": "litchi_pages::metadata::Commit"
+        },
+        {
+          "method": "litchi_pages::Package::apply_body_drawable_comment",
+          "ok": "litchi_pages::drawable::comment::Commit"
         },
         {
           "method": "litchi_pages::Package::apply_body_drawable_annotations",
