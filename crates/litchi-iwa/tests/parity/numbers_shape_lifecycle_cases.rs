@@ -293,23 +293,29 @@ fn numbers_sheet_shape_add_with_fill_parity() -> TestResult {
 #[test]
 fn numbers_sheet_shape_duplicate_parity() -> TestResult {
     let _ = (Tier::B, Evidence::Queued);
-    let input = authored_fixture()?;
-    structural(
-        "numbers_sheet_shape_duplicate_parity",
-        &input,
-        Box::new(|editor, sheet| {
-            let (_, id) = host_drawable(editor, Kind::Shape, 0)?;
-            drop(editor.duplicate_sheet_shape(sheet, id)?);
-            Ok(())
-        }),
-        Box::new(|source| {
-            Ok(leaf_drawables(source, |edit| {
-                edit.duplicate(DrawableSelector::shape(0))?;
+    // Shape 0 is the authored rectangle; shape 1 the host-added line (the
+    // host refused line copies until record 0416 fixed its check).
+    let input = line_fixture()?;
+    for index in [0, 1] {
+        structural(
+            "numbers_sheet_shape_duplicate_parity",
+            &input,
+            Box::new(move |editor, sheet| {
+                let (_, id) = host_drawable(editor, Kind::Shape, index)?;
+                drop(editor.duplicate_sheet_shape(sheet, id)?);
                 Ok(())
-            })?
-            .1)
-        }),
-    )
+            }),
+            Box::new(move |source| {
+                Ok(leaf_drawables(source, |edit| {
+                    edit.duplicate(DrawableSelector::shape(index))?;
+                    Ok(())
+                })?
+                .1)
+            }),
+        )
+        .map_err(|error| format!("shape {index}: {error}"))?;
+    }
+    Ok(())
 }
 
 // ---------------------------------------------------------------------------
