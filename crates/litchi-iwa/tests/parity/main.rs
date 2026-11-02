@@ -39,6 +39,8 @@ mod keynote_build_cases;
 mod keynote_builder_cases;
 mod keynote_cases;
 mod keynote_cell_format_cases;
+mod keynote_cell_list_cases;
+mod keynote_cell_text_cases;
 mod keynote_chart_cases;
 mod keynote_chart_font_cases;
 mod keynote_chart_series_cases;

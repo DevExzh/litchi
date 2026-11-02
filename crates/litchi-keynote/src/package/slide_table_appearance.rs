@@ -46,6 +46,10 @@ const TABLE_STYLE_MESSAGE_TYPE: u32 = 6_003;
 const TABLE_STYLE_PRESET_MESSAGE_TYPE: u32 = 6_008;
 const TABLE_STYLE_NETWORK_MESSAGE_TYPE: u32 = 6_247;
 const TABLE_STYLESHEET_MESSAGE_TYPE: u32 = 401;
+/// `TSWP.StorageArchive`.
+const TEXT_STORAGE_MESSAGE_TYPE: u32 = 2_001;
+/// `TSWP.StorageArchive.style_sheet`.
+const TEXT_STORAGE_STYLESHEET_FIELD: u32 = 2;
 const METADATA_MESSAGE_TYPE: u32 = 11_006;
 const SLIDE_OWNED_DRAWABLES_FIELD: u32 = 7;
 const SLIDE_Z_ORDER_FIELD: u32 = 42;
@@ -4631,6 +4635,9 @@ impl ArchiveReferenceVisitor for AppearanceInboundVisitor<'_> {
         let source_is_show = source_message_type == SHOW_MESSAGE_TYPE;
         let source_is_show_aggregate =
             source_is_show && matches!(occurrence.scope, ArchiveReferenceScope::Message);
+        // A cell's rich-text storage names the stylesheet its paragraph
+        // styles live in (`TSWP.StorageArchive.style_sheet`, record 0412).
+        let source_is_storage = source_message_type == TEXT_STORAGE_MESSAGE_TYPE;
         let target = occurrence.referenced_identifier;
         if target == self.model_identifier {
             if occurrence.object_identifier != self.table_info_identifier
@@ -4690,11 +4697,20 @@ impl ArchiveReferenceVisitor for AppearanceInboundVisitor<'_> {
                 self.invalid = true;
             }
         } else if self.stylesheet_identifier == Some(target)
-            && (!source_is_style && !source_is_stylesheet && !source_is_show_aggregate
+            && (!source_is_style
+                && !source_is_stylesheet
+                && !source_is_show_aggregate
+                && !source_is_storage
                 || (source_is_style
                     && !self.occurrence_matches_field_path(occurrence, target, &[1, 5]))
                 || (source_is_stylesheet
-                    && !self.occurrence_matches_field_path(occurrence, target, &[1])))
+                    && !self.occurrence_matches_field_path(occurrence, target, &[1]))
+                || (source_is_storage
+                    && !self.occurrence_matches_field_path(
+                        occurrence,
+                        target,
+                        &[TEXT_STORAGE_STYLESHEET_FIELD],
+                    )))
         {
             self.invalid = true;
         }
