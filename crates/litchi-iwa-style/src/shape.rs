@@ -1845,6 +1845,16 @@ impl Plan {
     }
 }
 
+/// The fill a `TSWP.ShapeStyleArchive` payload stores directly, if any
+/// (for a format family's image-fill release check, record 0415).
+///
+/// # Errors
+///
+/// A malformed style payload.
+pub fn stored_fill(style: &[u8]) -> Result<Option<&[u8]>> {
+    stored_slot(style, Slot::Fill)
+}
+
 fn stored_slot(payload: &[u8], slot: Slot) -> Result<Option<&[u8]>> {
     let (text, number) = slot.location();
     let properties = if text {
@@ -2590,6 +2600,32 @@ pub mod property {
                 ));
             }
             Ok(())
+        }
+    }
+
+    /// [`Fills`] for a format family that releases the data reference and
+    /// media of an image fill it replaces or resets itself (record 0415):
+    /// the same slots and values, but a stored image fill is replaceable.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+    pub struct ReleasingFills;
+
+    impl ShapeProperty for ReleasingFills {
+        type Value = Fill;
+
+        fn groups(&self) -> &'static [&'static [Slot]] {
+            Fills.groups()
+        }
+
+        fn read(&self, stored: &[Option<&[u8]>]) -> Result<Fill> {
+            Fills.read(stored)
+        }
+
+        fn writes(&self, value: &Fill) -> Result<Vec<(Slot, Option<Value>)>> {
+            Fills.writes(value)
+        }
+
+        fn lenient_reset(&self) -> bool {
+            Fills.lenient_reset()
         }
     }
 
