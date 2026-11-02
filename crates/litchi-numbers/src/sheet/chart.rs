@@ -54,10 +54,12 @@ pub mod font {
 /// category axis: [`crate::Package::edit_sheet_chart_axis`].
 pub mod axis {
     pub use crate::package::sheet_chart_axis::{
-        Commit, Diagnostics, Edit, Error, LimitKind, Patch, Property, PropertyKind, Refusal,
+        Commit, Diagnostics, Edit, Error, Frequency, Layout, LimitKind, Patch, Property,
+        PropertyKind, Refusal,
     };
     pub use litchi_iwa_common::chart::axis::style::Visibility;
     pub use litchi_iwa_common::chart::axis::{Axis, TickMarkLocation};
+    pub use litchi_iwa_common::chart::category_labels::Interval;
     pub use litchi_iwa_style::chart_style::axis::{
         GridlineStroke, LabelAffixes, LabelAngle, LabelPosition3d, NumberFormat, Stroke,
     };
@@ -84,8 +86,8 @@ pub mod series {
 /// shared chart style engine: [`crate::Package::edit_sheet_chart_style`].
 pub mod style {
     pub use crate::package::sheet_chart_style::{
-        Commit, Diagnostics, Edit, Error, Lighting3d, LimitKind, Patch, Property, PropertyKind,
-        RadarGridShape, Refusal,
+        Commit, Diagnostics, Drop, Edit, Error, Lighting3d, LimitKind, Patch, Property,
+        PropertyKind, RadarGridShape, Refusal, Shadow,
     };
     pub use litchi_iwa_common::chart::{corner, donut, gaps, legend, pie, radar};
     pub use litchi_iwa_common::chart3d;

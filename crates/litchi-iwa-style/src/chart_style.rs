@@ -25,10 +25,13 @@
 //!   profile and report the source-derived mutation scope.
 
 use litchi_iwa_common::chart::axis::Axis;
+use litchi_iwa_common::chart::axis::style::Visibility;
 use litchi_iwa_common::chart::kind::Kind as ChartKind;
 use litchi_iwa_protos::chart_style_codec::{
     self as codec, Archive, Limits as CodecLimits, Properties, StyleReferences,
 };
+
+use litchi_iwa_common::shape::shadow::Shadow as StoredShadow;
 
 use crate::graph::{Error, Workspace};
 use crate::series::{
@@ -78,6 +81,7 @@ pub mod chart {
     use litchi_iwa_common::chart3d::{self, Scale};
     use litchi_iwa_common::color::{RgbColorSpace, Rgba};
     use litchi_iwa_common::shape::fill::{Angle, Fill, Gradient};
+    use litchi_iwa_common::shape::shadow::Drop;
     use litchi_iwa_common::shape::stroke::{Pattern, Stroke, Width};
     use litchi_iwa_protos::chart_style_codec::{
         self as codec, Archive, Limits as CodecLimits, Properties, Write, field, property,
@@ -108,6 +112,10 @@ pub mod chart {
 
     use super::{apply_writes, codec_error, out_of_range};
     use crate::series::{Refusal, SymbolError, SymbolResult};
+
+    fn decode_chart(payload: &[u8], archive: Archive) -> SymbolResult<Properties<'_>> {
+        codec::decode(payload, archive, CodecLimits::DEFAULT).map_err(codec_error)
+    }
 
     /// One chart-level style property with its value.
     #[derive(Debug, Clone, PartialEq)]
@@ -148,6 +156,49 @@ pub mod chart {
         BackgroundFill(Fill),
         /// The lighting preset of a 3D chart.
         Lighting3d(Lighting3d),
+        /// The drop shadow of the chart's series, drawn per series or
+        /// grouped. Stored in every series style and the chart style.
+        Shadow(Shadow),
+    }
+
+    /// The shadow of a chart's series (the host's `ChartShadow`).
+    #[derive(Debug, Clone, Copy, PartialEq)]
+    #[non_exhaustive]
+    pub enum Shadow {
+        /// No shadow.
+        None,
+        /// A drop shadow drawn behind each series.
+        IndividualSeries(Drop),
+        /// A drop shadow drawn behind the series grouped as one layer.
+        Grouped(Drop),
+    }
+
+    impl Shadow {
+        /// The shadow of a chart without stored shadows: a black drop
+        /// shadow per series (10 pt blur, 6 pt offset, 75% opacity, 45°).
+        pub const NATIVE_DEFAULT: Self =
+            Self::IndividualSeries(crate::series::style::NATIVE_DEFAULT_SHADOW);
+
+        /// The drop shadow drawn, if any.
+        #[must_use]
+        pub const fn drop_shadow(self) -> Option<Drop> {
+            match self {
+                Self::None => None,
+                Self::IndividualSeries(shadow) | Self::Grouped(shadow) => Some(shadow),
+            }
+        }
+
+        /// Whether the series draw as one grouped layer.
+        #[must_use]
+        pub const fn groups_series(self) -> bool {
+            matches!(self, Self::Grouped(_))
+        }
+    }
+
+    impl Default for Shadow {
+        fn default() -> Self {
+            Self::NATIVE_DEFAULT
+        }
     }
 
     /// One native choice from the Chart inspector's Lighting Style menu of
@@ -287,6 +338,8 @@ pub mod chart {
         BackgroundFill,
         /// [`Property::Lighting3d`].
         Lighting3d,
+        /// [`Property::Shadow`].
+        Shadow,
     }
 
     impl Property {
@@ -311,6 +364,7 @@ pub mod chart {
                 Self::BorderStroke(_) => PropertyKind::BorderStroke,
                 Self::BackgroundFill(_) => PropertyKind::BackgroundFill,
                 Self::Lighting3d(_) => PropertyKind::Lighting3d,
+                Self::Shadow(_) => PropertyKind::Shadow,
             }
         }
     }
@@ -337,6 +391,7 @@ pub mod chart {
                 Self::BorderStroke => Property::BorderStroke(Some(default_border())),
                 Self::BackgroundFill => Property::BackgroundFill(default_background()),
                 Self::Lighting3d => Property::Lighting3d(Lighting3d::Default),
+                Self::Shadow => Property::Shadow(Shadow::NATIVE_DEFAULT),
             }
         }
 
@@ -352,7 +407,8 @@ pub mod chart {
                 | Self::GapSpacing
                 | Self::BorderStroke
                 | Self::BackgroundFill
-                | Self::Lighting3d => Archive::ChartStyle,
+                | Self::Lighting3d
+                | Self::Shadow => Archive::ChartStyle,
                 _ => Archive::ChartNonStyle,
             })
         }
@@ -377,7 +433,8 @@ pub mod chart {
                 | Self::IncludesHiddenData
                 | Self::GapSpacing
                 | Self::BorderStroke
-                | Self::BackgroundFill => true,
+                | Self::BackgroundFill
+                | Self::Shadow => true,
             }
         }
     }
@@ -398,6 +455,8 @@ pub mod chart {
         pub(super) const RADAR_GRID_CURVE: u32 = 29;
         /// `tschchartinfodefaultgridbackgroundfill` (chart style).
         pub(super) const BACKGROUND_FILL: u32 = 14;
+        /// `tschchartinfodefaultcombinelayers` (chart style).
+        pub(super) const COMBINE_LAYERS: u32 = 13;
         /// `tschchartinfodefaultborderstroke` (chart style).
         pub(super) const BORDER_STROKE: u32 = 12;
         /// `tschchartinfodefaultinterbargap` and `…intersetgap` (chart
@@ -570,12 +629,43 @@ pub mod chart {
                     Some(package) => Lighting3d::from_package(package)?,
                 })
             },
+            PropertyKind::Shadow => {
+                return Err(SymbolError::Invalid(
+                    "the chart shadow is stored by the series styles too",
+                ));
+            },
             PropertyKind::LegendFrame => {
                 return Err(SymbolError::Invalid(
                     "the legend frame is stored by the chart drawable",
                 ));
             },
         })
+    }
+
+    /// The chart shadow from the decoded chart style payload and the
+    /// uniform shadow of the chart's series styles (the host's
+    /// `chart_shadow_from_native`).
+    ///
+    /// # Errors
+    ///
+    /// A disabled shadow over grouped layers, or a non-drop series shadow.
+    pub fn shadow(
+        properties: &Properties<'_>,
+        series: litchi_iwa_common::shape::shadow::Shadow,
+    ) -> SymbolResult<Shadow> {
+        use litchi_iwa_common::shape::shadow::Shadow as Stored;
+        let combined = flag(properties, scalar::COMBINE_LAYERS)?.unwrap_or(false);
+        match series {
+            Stored::Disabled if !combined => Ok(Shadow::None),
+            Stored::Drop(drop) if combined => Ok(Shadow::Grouped(drop)),
+            Stored::Drop(drop) => Ok(Shadow::IndividualSeries(drop)),
+            Stored::Disabled => Err(SymbolError::Invalid(
+                "a disabled chart shadow combines series layers",
+            )),
+            _ => Err(SymbolError::Invalid(
+                "a chart series uses a non-drop shadow",
+            )),
+        }
     }
 
     /// The writes of a chart-level scalar property, as the host patches it.
@@ -692,6 +782,27 @@ pub mod chart {
             };
             return apply_writes(payload, archive, &[write], codec::EmptyExtension::Remove);
         }
+        if let Property::Shadow(shadow) = *value {
+            // The host's `patch_chart_shadow_scope`: the native default
+            // removes the switch; otherwise it is written when grouped or
+            // already stored.
+            let present = flag(&decode_chart(payload, archive)?, scalar::COMBINE_LAYERS)?.is_some();
+            let combined = shadow.groups_series();
+            let stored = if shadow == Shadow::NATIVE_DEFAULT {
+                None
+            } else {
+                (present || combined).then_some(combined)
+            };
+            return apply_writes(
+                payload,
+                archive,
+                &[Write::Bool {
+                    field: scalar::COMBINE_LAYERS,
+                    value: stored,
+                }],
+                codec::EmptyExtension::Keep,
+            );
+        }
         if let Property::Lighting3d(lighting) = *value {
             let field =
                 lighting_field(chart).ok_or(SymbolError::Refused(Refusal::UnsupportedKind))?;
@@ -767,6 +878,7 @@ pub mod axis {
 
     pub use litchi_iwa_common::chart::axis::label_angle::LabelAngle;
     pub use litchi_iwa_common::chart::axis::label_position_3d::LabelPosition3d;
+    pub use litchi_iwa_common::chart::category_labels::{Frequency, Layout};
     pub use litchi_iwa_common::chart::number_format::{LabelAffixes, NumberFormat};
     pub use litchi_iwa_common::shape::stroke::Stroke;
 
@@ -831,6 +943,11 @@ pub mod axis {
         /// Where a 3D chart draws its value-axis labels (value axis of the 3D
         /// kinds only).
         LabelPosition3d(LabelPosition3d),
+        /// How often the category axis labels show and whether the last
+        /// one always shows (category axis only). Hidden labels
+        /// ([`Frequency::None`]) switch [`Property::Labels`] off and keep the
+        /// stored interval.
+        CategoryLabels(Layout),
     }
 
     /// The property a [`Property`] value sets, for reads.
@@ -865,6 +982,8 @@ pub mod axis {
         NumberFormat,
         /// [`Property::LabelPosition3d`].
         LabelPosition3d,
+        /// [`Property::CategoryLabels`].
+        CategoryLabels,
     }
 
     impl Property {
@@ -886,6 +1005,7 @@ pub mod axis {
                 Self::LabelAffixes(_) => PropertyKind::LabelAffixes,
                 Self::NumberFormat(_) => PropertyKind::NumberFormat,
                 Self::LabelPosition3d(_) => PropertyKind::LabelPosition3d,
+                Self::CategoryLabels(_) => PropertyKind::CategoryLabels,
             }
         }
     }
@@ -921,6 +1041,7 @@ pub mod axis {
                 (Self::LabelAngle, Axis::Value) => 11,
                 (Self::LabelAffixes | Self::NumberFormat, _) => LABEL_FORMAT.current,
                 (Self::LabelPosition3d, Axis::Value) => 1,
+                (Self::CategoryLabels, Axis::Category) => CATEGORY_LABEL_INTERVAL,
                 _ => return None,
             })
         }
@@ -953,6 +1074,176 @@ pub mod axis {
                 _ => Archive::AxisStyle,
             }
         }
+    }
+
+    /// `tschchartaxiscategorylabelsinterval` (category axis style).
+    const CATEGORY_LABEL_INTERVAL: u32 = 5;
+    /// `tschchartaxisshowlastlabel` (category axis style).
+    const SHOW_LAST_CATEGORY: u32 = 26;
+
+    fn invalid_labels<E>(_error: E) -> SymbolError {
+        SymbolError::Invalid("an invalid category-label field")
+    }
+
+    /// A singular varint field of the extension, refusing a repeated field,
+    /// another wire type or trailing bytes (the host's
+    /// `strict_optional_varint`).
+    fn strict_varint(extension: &[u8], field: u32) -> SymbolResult<Option<u64>> {
+        use litchi_iwa_common::WireLimits;
+        use litchi_iwa_common::varint::decode_varint_from_bytes;
+        let view = wire::WireView::parse(extension, WireLimits::DEFAULT).map_err(invalid_labels)?;
+        let mut found = None;
+        for candidate in view.fields() {
+            if candidate.number() != field {
+                continue;
+            }
+            if found.is_some() || candidate.wire_type() != 0 {
+                return Err(SymbolError::Invalid("an invalid category-label field"));
+            }
+            let payload = candidate.payload();
+            let (value, consumed) = decode_varint_from_bytes(payload).map_err(invalid_labels)?;
+            if consumed != payload.len() {
+                return Err(SymbolError::Invalid("an invalid category-label field"));
+            }
+            found = Some(value);
+        }
+        Ok(found)
+    }
+
+    /// A stored signed 32-bit interval (a negative one is sign-extended).
+    fn native_i32(raw: u64) -> SymbolResult<i32> {
+        const NEGATIVE_INT32_START: u64 = 0xffff_ffff_8000_0000;
+        if let Ok(value) = i32::try_from(raw) {
+            return Ok(value);
+        }
+        if raw >= NEGATIVE_INT32_START {
+            #[allow(
+                clippy::cast_possible_truncation,
+                clippy::cast_possible_wrap,
+                reason = "a sign-extended int32 varint, as protobuf encodes it"
+            )]
+            return Ok(raw as i64 as i32);
+        }
+        Err(SymbolError::Invalid(
+            "a category-label interval outside int32",
+        ))
+    }
+
+    /// The stored interval and show-last switch of a decoded category axis
+    /// style payload (absent: auto-fit, shown).
+    ///
+    /// # Errors
+    ///
+    /// A repeated or malformed field, a show-last value other than 0 or 1.
+    pub fn category_label_style(properties: &Properties<'_>) -> SymbolResult<(Frequency, bool)> {
+        let Some(extension) = properties.extension() else {
+            return Ok((Frequency::AutoFit, true));
+        };
+        let frequency = match strict_varint(extension, CATEGORY_LABEL_INTERVAL)? {
+            None | Some(0) => Frequency::AutoFit,
+            Some(1) => Frequency::All,
+            Some(raw) => Frequency::from_native(native_i32(raw)?),
+        };
+        let show_last = match strict_varint(extension, SHOW_LAST_CATEGORY)? {
+            None | Some(1) => true,
+            Some(0) => false,
+            Some(_) => {
+                return Err(SymbolError::Invalid(
+                    "a show-last-category switch other than 0 or 1",
+                ));
+            },
+        };
+        Ok((frequency, show_last))
+    }
+
+    /// The category label layout from the decoded category axis style
+    /// payload and the axis labels switch (the host's
+    /// `chart_category_label_layout`).
+    ///
+    /// # Errors
+    ///
+    /// As [`category_label_style`].
+    pub fn category_labels(
+        properties: &Properties<'_>,
+        labels: Visibility,
+    ) -> SymbolResult<Layout> {
+        let (frequency, show_last) = category_label_style(properties)?;
+        Ok(Layout::new(
+            if labels.is_visible() {
+                frequency
+            } else {
+                Frequency::None
+            },
+            show_last,
+        ))
+    }
+
+    /// The category axis style payload storing `frequency` (`None`: keep
+    /// the stored interval) and the show-last switch, every other byte
+    /// kept (the host's `patch_category_label_style`: auto-fit removes the
+    /// interval; showing the last label keeps a stored switch and writes
+    /// none otherwise; an emptied extension is removed).
+    ///
+    /// # Errors
+    ///
+    /// [`Frequency::None`] as the interval, an invalid payload.
+    pub fn rewrite_category_labels(
+        payload: &[u8],
+        frequency: Option<Frequency>,
+        show_last: bool,
+    ) -> SymbolResult<Vec<u8>> {
+        let wire_error = |error| SymbolError::Graph(Error::Wire(error));
+        let properties = codec::decode(payload, Archive::AxisStyle, CodecLimits::DEFAULT)
+            .map_err(codec_error)?;
+        let existing = properties.extension();
+        let extension = existing.unwrap_or_default();
+        let interval_present = strict_varint(extension, CATEGORY_LABEL_INTERVAL)?.is_some();
+        let show_last_present = strict_varint(extension, SHOW_LAST_CATEGORY)?.is_some();
+        let mut patched = match frequency {
+            Some(frequency) => {
+                let replacement = match frequency {
+                    Frequency::AutoFit => None,
+                    Frequency::All => Some(1),
+                    Frequency::Every(interval) => Some(u64::from(interval.value())),
+                    #[allow(
+                        clippy::cast_sign_loss,
+                        reason = "a negative int32 is stored sign-extended"
+                    )]
+                    Frequency::Unsupported(value) => Some(i64::from(value) as u64),
+                    _ => {
+                        return Err(SymbolError::Invalid(
+                            "hidden category labels have no stored interval",
+                        ));
+                    },
+                };
+                wire::patch_varint_field(
+                    extension,
+                    CATEGORY_LABEL_INTERVAL,
+                    interval_present,
+                    replacement,
+                )
+                .map_err(wire_error)?
+            },
+            None => extension.to_vec(),
+        };
+        let present = strict_varint(&patched, SHOW_LAST_CATEGORY)?.is_some();
+        let replacement = if show_last {
+            show_last_present.then_some(1)
+        } else {
+            Some(0)
+        };
+        patched = wire::patch_varint_field(&patched, SHOW_LAST_CATEGORY, present, replacement)
+            .map_err(wire_error)?;
+        if existing.is_none() && patched.is_empty() {
+            return Ok(payload.to_vec());
+        }
+        wire::patch_length_delimited_field(
+            payload,
+            codec::EXTENSION_FIELD,
+            existing.is_some(),
+            (!patched.is_empty()).then_some(patched.as_slice()),
+        )
+        .map_err(wire_error)
     }
 
     const fn visibility(visible: bool) -> Visibility {
@@ -1033,6 +1324,11 @@ pub mod axis {
                     .map(LabelPosition3d::from_native)
                     .unwrap_or_default(),
             ),
+            PropertyKind::CategoryLabels => {
+                return Err(SymbolError::Invalid(
+                    "the category label layout also reads the labels switch",
+                ));
+            },
             _ => {
                 let visible = visibility(
                     properties
@@ -1152,6 +1448,11 @@ pub mod axis {
                         NumberFormat::AXIS_NATIVE_DEFAULT,
                     )
                 });
+            },
+            Property::CategoryLabels(_) => {
+                return Err(SymbolError::Invalid(
+                    "the category label layout is written with rewrite_category_labels",
+                ));
             },
             Property::NumberFormat(format) => {
                 return patch_extension(payload, archive, |extension| {
@@ -1323,6 +1624,18 @@ fn chart_value(
         });
     };
     let style = style_object(workspace, chart, archive, None, budget)?;
+    if kind == chart::PropertyKind::Shadow {
+        let series = crate::series::style::chart_shadow(workspace, chart, budget)?;
+        return read_payload(
+            workspace,
+            style,
+            archive.message_type(),
+            budget,
+            |payload| {
+                chart::shadow(&decode(payload, archive)?, series).map(chart::Property::Shadow)
+            },
+        );
+    }
     read_payload(
         workspace,
         style,
@@ -1407,13 +1720,27 @@ pub fn write_chart(
                 &[],
                 &mut budget,
             )?;
-            rewrite_in_place(
+            let series = match *value {
+                // The host's `set_chart_shadow`: every series style is
+                // exclusive and rewritten before the chart style.
+                chart::Property::Shadow(shadow) => crate::series::style::write_chart_shadow(
+                    workspace,
+                    chart,
+                    shadow
+                        .drop_shadow()
+                        .map_or(StoredShadow::Disabled, StoredShadow::Drop),
+                    &mut budget,
+                )?,
+                _ => false,
+            };
+            let style_changed = rewrite_in_place(
                 workspace,
                 style,
                 archive.message_type(),
                 &mut budget,
                 |payload| chart::rewrite(payload, value, chart_kind),
-            )?
+            )?;
+            series || style_changed
         },
     };
     if changed && chart_value(workspace, chart, chart_kind, kind, &mut budget)? != *value {
@@ -1440,6 +1767,29 @@ fn axis_value(
     }
     let archive = kind.archive();
     let style = style_object(workspace, chart, archive, Some(axis), budget)?;
+    if kind == axis::PropertyKind::CategoryLabels {
+        let axis::Property::Labels(labels) = axis_value(
+            workspace,
+            chart,
+            chart_kind,
+            axis,
+            axis::PropertyKind::Labels,
+            budget,
+        )?
+        else {
+            return Err(SymbolError::Invalid("not an axis labels switch"));
+        };
+        return read_payload(
+            workspace,
+            style,
+            archive.message_type(),
+            budget,
+            |payload| {
+                axis::category_labels(&decode(payload, archive)?, labels)
+                    .map(axis::Property::CategoryLabels)
+            },
+        );
+    }
     read_payload(
         workspace,
         style,
@@ -1447,6 +1797,89 @@ fn axis_value(
         budget,
         |payload| axis::value(&decode(payload, archive)?, axis, kind),
     )
+}
+
+/// The host's `set_chart_category_label_layout`: the category axis style
+/// is rewritten (after its exclusivity check) only when the show-last
+/// switch or a shown interval changes, then the labels switch follows the
+/// layout's visibility through the ordinary labels write.
+fn write_category_labels(
+    workspace: &mut Workspace<'_>,
+    chart: u64,
+    chart_kind: ChartKind,
+    axis: Axis,
+    layout: axis::Layout,
+    budget: &mut SymbolBudget,
+) -> SymbolResult<bool> {
+    let style = style_object(workspace, chart, Archive::AxisStyle, Some(axis), budget)?;
+    in_place_scope(
+        workspace,
+        chart,
+        style,
+        Archive::AxisStyle.message_type(),
+        &[],
+        budget,
+    )?;
+    let (stored, show_last) = read_payload(
+        workspace,
+        style,
+        Archive::AxisStyle.message_type(),
+        budget,
+        |payload| axis::category_label_style(&decode(payload, Archive::AxisStyle)?),
+    )?;
+    let requested = match layout.frequency() {
+        axis::Frequency::None => None,
+        frequency => Some(frequency),
+    };
+    let mut changed = false;
+    if show_last != layout.show_last_category()
+        || requested.is_some_and(|frequency| frequency != stored)
+    {
+        if owners(workspace, style, Archive::AxisStyle, budget)? != 1 {
+            return Err(SymbolError::Refused(Refusal::SharedStyle));
+        }
+        changed |= rewrite_in_place(
+            workspace,
+            style,
+            Archive::AxisStyle.message_type(),
+            budget,
+            |payload| {
+                axis::rewrite_category_labels(payload, requested, layout.show_last_category())
+            },
+        )?;
+    }
+    let labels = axis::Property::Labels(if layout.frequency().is_visible() {
+        Visibility::Visible
+    } else {
+        Visibility::Hidden
+    });
+    if axis_value(
+        workspace,
+        chart,
+        chart_kind,
+        axis,
+        axis::PropertyKind::Labels,
+        budget,
+    )? != labels
+    {
+        let non_style = style_object(workspace, chart, Archive::AxisNonStyle, Some(axis), budget)?;
+        if owners(workspace, non_style, Archive::AxisNonStyle, budget)? != 1 {
+            return Err(SymbolError::Refused(Refusal::SharedStyle));
+        }
+        let location = workspace.locate(non_style).map_err(SymbolError::from)?;
+        let member = workspace.member(location).to_owned();
+        if let Some(scope) = budget.scope_mut() {
+            scope.allow(non_style, &member, Archive::AxisNonStyle.message_type());
+        }
+        changed |= rewrite_in_place(
+            workspace,
+            non_style,
+            Archive::AxisNonStyle.message_type(),
+            budget,
+            |payload| axis::rewrite(payload, axis, &labels),
+        )?;
+    }
+    Ok(changed)
 }
 
 /// Read axis property `kind` of the primary `axis` of chart drawable
@@ -1492,25 +1925,29 @@ pub fn write_axis(
         return Ok((false, budget.report(false)));
     }
     let archive = kind.archive();
-    let style = style_object(workspace, chart, archive, Some(axis), &mut budget)?;
-    if owners(workspace, style, archive, &mut budget)? != 1 {
-        return Err(SymbolError::Refused(Refusal::SharedStyle));
-    }
-    in_place_scope(
-        workspace,
-        chart,
-        style,
-        archive.message_type(),
-        &[],
-        &mut budget,
-    )?;
-    let changed = rewrite_in_place(
-        workspace,
-        style,
-        archive.message_type(),
-        &mut budget,
-        |payload| axis::rewrite(payload, axis, value),
-    )?;
+    let changed = if let axis::Property::CategoryLabels(layout) = *value {
+        write_category_labels(workspace, chart, chart_kind, axis, layout, &mut budget)?
+    } else {
+        let style = style_object(workspace, chart, archive, Some(axis), &mut budget)?;
+        if owners(workspace, style, archive, &mut budget)? != 1 {
+            return Err(SymbolError::Refused(Refusal::SharedStyle));
+        }
+        in_place_scope(
+            workspace,
+            chart,
+            style,
+            archive.message_type(),
+            &[],
+            &mut budget,
+        )?;
+        rewrite_in_place(
+            workspace,
+            style,
+            archive.message_type(),
+            &mut budget,
+            |payload| axis::rewrite(payload, axis, value),
+        )?
+    };
     if changed && axis_value(workspace, chart, chart_kind, axis, kind, &mut budget)? != *value {
         return Err(SymbolError::Invalid(
             "an axis style write does not read back",
