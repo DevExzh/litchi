@@ -16,7 +16,7 @@
 //!
 //! The list change itself runs W1-D's engine
 //! ([`litchi_iwa_text_wire::list`], record 0374) and is published by
-//! [`super::storage_list`]. Host `set_x`/`reset_x` pairs collapse into one
+//! `litchi_iwa_text_wire::list::publish`. Host `set_x`/`reset_x` pairs collapse into one
 //! property verb ([`Edit::set`]/[`Edit::reset`]); `reset_list` and
 //! `reset_level` are [`Edit::set_list`] with [`ParagraphList::None`] and
 //! [`Edit::set_level`] with [`ParagraphListLevel::ZERO`].
@@ -38,7 +38,6 @@ use litchi_iwa_text_wire::list::{self, Change, Property, PropertyKind};
 use thiserror::Error as ThisError;
 
 use super::Package;
-use super::storage_list::{self, Failure, ListStyles, Publisher};
 use super::structure::{
     self, Fault, Published, Working,
     metadata::{self, Transition},
@@ -53,6 +52,10 @@ use super::table_topology::{
 };
 use crate::selector::{SheetSelector, TableSelector};
 use crate::table::At;
+use litchi_iwa_table::structure::list_workspace::{
+    ListWorkspace, ReadStyles as ListStyles, storage_payload,
+};
+use litchi_iwa_text_wire::list::publish::{self as storage_list, Failure, Publisher};
 
 structure::structural_family!("cell-list", Wire(litchi_iwa_common::LimitKind));
 
@@ -232,10 +235,10 @@ fn from_list(error: list::Error) -> Error {
     }
 }
 
-impl From<Failure> for Error {
-    fn from(failure: Failure) -> Self {
+impl From<Failure<Fault>> for Error {
+    fn from(failure: Failure<Fault>) -> Self {
         match failure {
-            Failure::Fault(fault) => fault.into(),
+            Failure::Workspace(fault) => fault.into(),
             Failure::List(error) => from_list(error),
         }
     }
@@ -620,7 +623,7 @@ impl<'p> Reader<'p> {
         let Text::Rich(storage) = self.text else {
             return Err(Error::InvalidSource);
         };
-        Ok(storage_list::storage(&self.working, storage)?.payload)
+        Ok(storage_payload(&self.working, storage)?)
     }
 
     fn list(&self) -> Result<ParagraphList, Error> {
@@ -1043,7 +1046,7 @@ fn apply_one(
     // One preset for the whole cell needs paragraphs that share one list
     // (the host reads the cell's list first).
     if let (Text::Rich(storage), Staged::List(_)) = (&text, change) {
-        let payload = storage_list::storage(&working, *storage)?.payload;
+        let payload = storage_payload(&working, *storage)?;
         list::uniform_style(&payload, limits).map_err(|error| match error {
             list::Error::InvalidSource { .. } => Error::Refused(Refusal::NotUniform),
             other => from_list(other),
@@ -1070,12 +1073,12 @@ fn apply_one(
             true,
         ),
     };
-    let mut publisher = Publisher {
+    let mut workspace = ListWorkspace {
         working: &mut working,
         registry: &registry,
         transition: &mut transition,
-        limits,
     };
+    let mut publisher = Publisher::new(&mut workspace, limits);
     let changed = match change {
         Staged::List(preset) => publisher.set_list(storage, *preset)?,
         Staged::Lists(placements) => publisher.set_lists(storage, placements)?,
