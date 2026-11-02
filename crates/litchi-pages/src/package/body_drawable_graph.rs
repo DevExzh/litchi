@@ -1103,7 +1103,7 @@ pub(crate) const fn message_type(selector: DrawableSelector) -> u32 {
     match selector {
         DrawableSelector::Image(_) => IMAGE_MESSAGE_TYPE,
         DrawableSelector::Movie(_) | DrawableSelector::Audio(_) => MOVIE_MESSAGE_TYPE,
-        DrawableSelector::Shape(_) => SHAPE_INFO_MESSAGE_TYPE,
+        DrawableSelector::Shape(_) | DrawableSelector::TextBox(_) => SHAPE_INFO_MESSAGE_TYPE,
     }
 }
 
@@ -1114,6 +1114,7 @@ pub(crate) const fn kind_name(selector: DrawableSelector) -> &'static str {
         DrawableSelector::Movie(_) => "movie",
         DrawableSelector::Audio(_) => "audio",
         DrawableSelector::Shape(_) => "shape",
+        DrawableSelector::TextBox(_) => "text box",
     }
 }
 
@@ -1166,7 +1167,13 @@ pub(crate) fn select_drawable<'a>(
                 }
             },
             DrawableSelector::Shape(_) => {
-                let Some(owned) = ordinary_shape_storage(payload, budget)? else {
+                let Some(owned) = shape_storage(payload, false, budget)? else {
+                    continue;
+                };
+                storage = Some(owned);
+            },
+            DrawableSelector::TextBox(_) => {
+                let Some(owned) = shape_storage(payload, true, budget)? else {
                     continue;
                 };
                 storage = Some(owned);
@@ -1211,7 +1218,10 @@ fn drawable_payload<'a>(
     let outer = unique_field(&view, WRAPPED_DRAWABLE_FIELD, 2)?
         .ok_or(GraphError::InvalidSource)?
         .payload();
-    if !matches!(selector, DrawableSelector::Shape(_)) {
+    if !matches!(
+        selector,
+        DrawableSelector::Shape(_) | DrawableSelector::TextBox(_)
+    ) {
         return Ok(outer);
     }
     let shape = budget.parse(outer, 2)?;
@@ -1228,24 +1238,35 @@ fn drawable_payload<'a>(
     Ok(drawable)
 }
 
-/// The owned storage of an ordinary body shape: an explicit non-text-box
-/// flag and one storage recorded in both storage slots. `None` for a text
-/// box or a shape without the explicit flag.
-fn ordinary_shape_storage(payload: &[u8], budget: &mut Budget) -> GraphResult<Option<NonZeroU64>> {
+/// The owned storage of an ordinary body shape (`text_box == false`: an
+/// explicit non-text-box flag and one storage recorded in both storage
+/// slots) or of a body text box (`text_box == true`: the text-box flag, an
+/// owned storage and a deprecated slot that is absent or names the same
+/// storage, the host editor's text-box ownership proof). `None` for a shape
+/// of the other role or without the explicit flag.
+fn shape_storage(
+    payload: &[u8],
+    text_box: bool,
+    budget: &mut Budget,
+) -> GraphResult<Option<NonZeroU64>> {
     let view = budget.parse(payload, 1)?;
-    let text_box = unique_field(&view, SHAPE_INFO_IS_TEXT_BOX_FIELD, 0)?
+    let flag = unique_field(&view, SHAPE_INFO_IS_TEXT_BOX_FIELD, 0)?
         .map(|field| canonical_varint(field.payload()))
         .transpose()?;
-    if text_box != Some(0) {
+    if flag != Some(u64::from(text_box)) {
         return Ok(None);
     }
     let owned =
         unique_field(&view, SHAPE_INFO_OWNED_STORAGE_FIELD, 2)?.ok_or(GraphError::InvalidSource)?;
-    let deprecated = unique_field(&view, SHAPE_INFO_DEPRECATED_STORAGE_FIELD, 2)?
-        .ok_or(GraphError::InvalidSource)?;
     let owned = parse_reference(owned.payload(), budget)?;
-    if owned != parse_reference(deprecated.payload(), budget)? {
-        return Err(GraphError::InvalidSource);
+    match unique_field(&view, SHAPE_INFO_DEPRECATED_STORAGE_FIELD, 2)? {
+        Some(deprecated) => {
+            if owned != parse_reference(deprecated.payload(), budget)? {
+                return Err(GraphError::InvalidSource);
+            }
+        },
+        None if text_box => {},
+        None => return Err(GraphError::InvalidSource),
     }
     Ok(Some(owned))
 }
