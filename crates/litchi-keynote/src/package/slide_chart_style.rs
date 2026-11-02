@@ -46,7 +46,8 @@ const fn chart_fields(kind: chart_engine::PropertyKind) -> &'static [u32] {
 pub(crate) mod style {
     use super::{Diagnostics, ExactArtifacts, MutationPlan, Package, Position, chart_engine, fmt};
 
-    pub use chart_engine::{Lighting3d, Property, PropertyKind, RadarGridShape};
+    pub use chart_engine::{Lighting3d, Property, PropertyKind, RadarGridShape, Shadow};
+    pub use litchi_iwa_common::shape::shadow::Drop;
 
     /// A compact exact-source patch of one chart-level style property.
     #[derive(Clone, PartialEq)]

@@ -7564,3 +7564,13 @@ See [0063](0063-source-pptx-modern-comments.md).
 - Ledger: 1,786 migrated, 44 retired and 401 host-only rows (Pages 123, Numbers 120, Keynote 100, shared 58). The full gate on `f0aa2ad349` is still running. Nothing pushed.
 - Full gate on `f0aa2ad349` (`.coord/resume-20261028/full-f0aa2ad349/`): all 53 rows passed (`DONE failed=0`, finished 2026-11-02T11:41:13Z; summary SHA-256 `5bc9b7f645cc40b38d434e0004a036198b5304c8fe9a4f00d701fd3763b2d8d1`). It is the first complete green gate since `e0e297a82b`. Instruction qualification for this candidate is not run; final performance qualification waits for the end of wave W4 on one frozen commit.
 - Merged W4-P 0413b lifecycle (`07b612e0a2`, 10 Pages rows: text-box, shape and line adds, duplicates, body_shapes; clear-on-remove for commented drawables; host line-duplicate fix, macOS-queued). A full gate on `07b612e0a2` is starting.
+- Full gate on `661b89a041`: all 53 rows passed (finished 2026-11-02T15:26:06Z; summary SHA-256 `12bec28425937418826877f3717099b6fdc7f15c6de18d479c3950ba271a6fa5`).
+- Merged since then:
+  - W4-C slice 3 (`48159f0129`, 18 rows: shared legend-style engine; Numbers refuses shared chart styles as the host does);
+  - W4-P 0413b image fill (`d67a878026`) and 0415 image-fill replace/reset releasing old data (`12682616f7`);
+  - W4-C slice 4 (`d43f1dd26d`, 12 rows: background fill, 3D lighting);
+  - W4-T 0412a (`8010cc9fb4`, 29 rows: every Pages/Keynote cell format; shared Pop-Up publication);
+  - W4-T 0412b (`4f272aff85`, 9 Numbers cell-appearance rows).
+- W4-P finished (203 Pages rows); its worktree is retired. Two new agents started: W4-D (0416: Pages body_table from scratch in numbers-wire, Numbers drawables, chart lifecycle on all formats) and W4-R (0417: Keynote builder, media replacement, and triage of the host owner I/O and plumbing rows, which retire only when a leaf API provides the capability).
+- Agents no longer use `git stash` (rule added after one agent popped another agent's preserved entry; the entry and the agent's tree were verified intact).
+- Ledger: 1,894 migrated, 44 retired and 293 host-only rows (Numbers 101, Pages 73, Keynote 61, shared 58). Nothing pushed.

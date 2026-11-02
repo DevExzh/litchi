@@ -338,8 +338,8 @@ keynote/editor/slide_charts/border.rs	set_slide_chart_border_visible	1	keynote	c
 keynote/editor/slide_charts/border.rs	slide_chart_border_visible	1	keynote	chart.style	migrated	litchi_keynote::Package::slide_chart_style	keynote_slide_chart_options_read_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
 keynote/editor/slide_charts/border_stroke.rs	set_slide_chart_border_stroke	1	keynote	chart.style	migrated	litchi_keynote::chart::style::Edit::set	keynote_slide_chart_options_set_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
 keynote/editor/slide_charts/border_stroke.rs	slide_chart_border_stroke	1	keynote	chart.style	migrated	litchi_keynote::Package::slide_chart_style	keynote_slide_chart_options_read_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
-keynote/editor/slide_charts/category_labels.rs	set_slide_chart_category_label_layout	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_charts/category_labels.rs	slide_chart_category_label_layout	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
+keynote/editor/slide_charts/category_labels.rs	set_slide_chart_category_label_layout	1	keynote	chart.style	migrated	litchi_keynote::chart::axis::Edit::set	keynote_slide_chart_axis_set_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+keynote/editor/slide_charts/category_labels.rs	slide_chart_category_label_layout	1	keynote	chart.style	migrated	litchi_keynote::Package::slide_chart_axis	keynote_slide_chart_axis_read_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
 keynote/editor/slide_charts/depth_3d.rs	set_slide_chart_3d_depth	1	keynote	chart.style	migrated	litchi_keynote::chart::style::Edit::set	keynote_slide_chart_style_set_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
 keynote/editor/slide_charts/depth_3d.rs	slide_chart_3d_depth	1	keynote	chart.style	migrated	litchi_keynote::Package::slide_chart_style	keynote_slide_chart_style_read_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
 keynote/editor/slide_charts/donut_inner_radius.rs	set_slide_chart_donut_inner_radius	1	keynote	chart.style	migrated	litchi_keynote::chart::style::Edit::set	keynote_slide_chart_style_set_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
@@ -460,8 +460,8 @@ keynote/editor/slide_charts/series_value_labels.rs	slide_chart_series_value_labe
 keynote/editor/slide_charts/series_value_labels.rs	slide_chart_series_value_label_locations	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
 keynote/editor/slide_charts/series_value_labels.rs	slide_chart_series_value_label_visibilities	1	keynote	chart.style	migrated	litchi_keynote::Package::slide_chart_series	keynote_slide_chart_series_read_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
 keynote/editor/slide_charts/series_value_labels.rs	slide_chart_series_value_label_visibility	1	keynote	chart.style	migrated	litchi_keynote::Package::slide_chart_series	keynote_slide_chart_series_read_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
-keynote/editor/slide_charts/shadow.rs	set_slide_chart_shadow	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_charts/shadow.rs	slide_chart_shadow	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
+keynote/editor/slide_charts/shadow.rs	set_slide_chart_shadow	1	keynote	chart.style	migrated	litchi_keynote::chart::style::Edit::set	keynote_slide_chart_options_set_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+keynote/editor/slide_charts/shadow.rs	slide_chart_shadow	1	keynote	chart.style	migrated	litchi_keynote::Package::slide_chart_style	keynote_slide_chart_options_read_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
 keynote/editor/slide_create.rs	add_slide	1	keynote	slide.lifecycle	migrated	litchi_keynote::slide::creation::Edit::add_slide	keynote_slide_add_parity	B	-	-
 keynote/editor/slide_create.rs	default_slide_layout	1	keynote	slide.lifecycle	migrated	litchi_keynote::Package::default_slide_layout	keynote_slide_layouts_read_parity	A	-	-
 keynote/editor/slide_create.rs	insert_slide	1	keynote	slide.lifecycle	migrated	litchi_keynote::slide::creation::Edit::add_slide	keynote_slide_insert_parity	B	-	-
@@ -801,12 +801,12 @@ numbers/editor/semantic/table.rs	cell_comment_replies	1	numbers	table.cell_comme
 numbers/editor/semantic/table.rs	cell_conditional_highlight_rules	1	numbers	table.conditional_highlight	migrated	litchi_numbers::Package::table_cell_conditional_highlight	numbers_conditional_highlight_read_parity	A	-	-
 numbers/editor/semantic/table.rs	cell_conditional_highlighting	1	numbers	table.conditional_highlight	migrated	litchi_numbers::Package::table_cell_conditional_highlight	numbers_conditional_highlight_read_parity	A	-	-
 numbers/editor/semantic/table.rs	clear_cell_conditional_highlighting	1	numbers	table.conditional_highlight	migrated	litchi_numbers::Package::edit_table_cell_conditional_highlights	numbers_conditional_highlight_clear_parity	B	-	-
-numbers/editor/semantic/table.rs	clear_table_cell_border	1	numbers	table.cell_appearance	host-only	litchi-numbers	-	-	-	-
+numbers/editor/semantic/table.rs	clear_table_cell_border	1	numbers	table.cell_appearance	migrated	litchi_numbers::Package::edit_table_cell_appearance	numbers_table_cell_border_clear_parity	B	-	-
 numbers/editor/semantic/table.rs	merge_cells	1	numbers	table.merge	migrated	litchi_numbers::Package::edit_table_merges	numbers_table_merge_parity	A	-	-
 numbers/editor/semantic/table.rs	pivot_categories	1	numbers	table.pivot	host-only	litchi-numbers	-	-	-	-
 numbers/editor/semantic/table.rs	remove_cell_comment_reply	1	numbers	table.cell_comment	host-only	-	-	-	-	root-only shared slice; reply-thread lifecycle remains deferred
-numbers/editor/semantic/table.rs	reset_table_cell_fill	1	numbers	table.cell_appearance	host-only	litchi-numbers	-	-	-	-
-numbers/editor/semantic/table.rs	reset_table_cell_layout	1	numbers	table.cell_appearance	host-only	litchi-numbers	-	-	-	-
+numbers/editor/semantic/table.rs	reset_table_cell_fill	1	numbers	table.cell_appearance	migrated	litchi_numbers::Package::edit_table_cell_appearance	numbers_table_cell_fill_reset_parity	B	-	-
+numbers/editor/semantic/table.rs	reset_table_cell_layout	1	numbers	table.cell_appearance	migrated	litchi_numbers::Package::edit_table_cell_appearance	numbers_table_cell_layout_reset_parity	B	-	-
 numbers/editor/semantic/table.rs	reset_table_cell_numeral_system_format	1	numbers	table.cell_format	migrated	litchi_numbers::Package::edit_table_cell_data_format	numbers_table_cell_numeral_system_format_parity	B	-	-
 numbers/editor/semantic/table.rs	reset_table_cell_paragraph_indents	1	numbers	table.cell_rich_text	migrated	litchi_numbers::Package::edit_table_cell_text	numbers_cell_text_property_parity	B	-	-
 numbers/editor/semantic/table.rs	reset_table_cell_paragraph_line_spacing	1	numbers	table.cell_rich_text	migrated	litchi_numbers::Package::edit_table_cell_text	numbers_cell_text_property_parity	B	-	-
@@ -837,10 +837,10 @@ numbers/editor/semantic/table.rs	reset_table_cell_text_style	1	numbers	table.cel
 numbers/editor/semantic/table.rs	set_cell_comment	1	numbers	table.cell_comment	host-only	-	-	-	-	root replacement with replies remains deferred; no full host coverage claim
 numbers/editor/semantic/table.rs	set_cell_comment_reply	1	numbers	table.cell_comment	host-only	-	-	-	-	root-only shared slice; reply-thread lifecycle remains deferred
 numbers/editor/semantic/table.rs	set_cell_conditional_highlighting	1	numbers	table.conditional_highlight	migrated	litchi_numbers::Package::edit_table_cell_conditional_highlights	numbers_conditional_highlight_set_parity	B	-	-
-numbers/editor/semantic/table.rs	set_table_cell_border	1	numbers	table.cell_appearance	host-only	litchi-numbers	-	-	-	-
+numbers/editor/semantic/table.rs	set_table_cell_border	1	numbers	table.cell_appearance	migrated	litchi_numbers::Package::edit_table_cell_appearance	numbers_table_cell_border_parity	B	-	-
 numbers/editor/semantic/table.rs	set_table_cell_data_format	1	numbers	table.cell_format	migrated	litchi_numbers::Package::edit_table_cell_data_format	numbers_table_cell_data_format_set_parity	B	-	-
-numbers/editor/semantic/table.rs	set_table_cell_fill	1	numbers	table.cell_appearance	host-only	litchi-numbers	-	-	-	-
-numbers/editor/semantic/table.rs	set_table_cell_layout	1	numbers	table.cell_appearance	host-only	litchi-numbers	-	-	-	-
+numbers/editor/semantic/table.rs	set_table_cell_fill	1	numbers	table.cell_appearance	migrated	litchi_numbers::Package::edit_table_cell_appearance	numbers_table_cell_fill_set_parity	B	-	-
+numbers/editor/semantic/table.rs	set_table_cell_layout	1	numbers	table.cell_appearance	migrated	litchi_numbers::Package::edit_table_cell_appearance	numbers_table_cell_layout_set_parity	B	-	-
 numbers/editor/semantic/table.rs	set_table_cell_numeral_system_format	1	numbers	table.cell_format	migrated	litchi_numbers::Package::edit_table_cell_data_format	numbers_table_cell_numeral_system_format_parity	B	-	-
 numbers/editor/semantic/table.rs	set_table_cell_paragraph_indents	1	numbers	table.cell_rich_text	migrated	litchi_numbers::Package::edit_table_cell_text	numbers_cell_text_property_parity	B	-	-
 numbers/editor/semantic/table.rs	set_table_cell_paragraph_line_spacing	1	numbers	table.cell_rich_text	migrated	litchi_numbers::Package::edit_table_cell_text	numbers_cell_text_property_parity	B	-	-
@@ -870,10 +870,10 @@ numbers/editor/semantic/table.rs	set_table_cell_text_outline	1	numbers	table.cel
 numbers/editor/semantic/table.rs	set_table_cell_text_script	1	numbers	table.cell_rich_text	migrated	litchi_numbers::Package::edit_table_cell_text	numbers_cell_text_property_parity	B	-	-
 numbers/editor/semantic/table.rs	set_table_cell_text_shadow	1	numbers	table.cell_rich_text	migrated	litchi_numbers::Package::edit_table_cell_text	numbers_cell_text_property_parity	B	-	-
 numbers/editor/semantic/table.rs	set_table_cell_text_style	1	numbers	table.cell_rich_text	migrated	litchi_numbers::Package::edit_table_cell_text_style	numbers_cell_text_style_parity	B	-	-
-numbers/editor/semantic/table.rs	table_cell_borders	1	numbers	table.cell_appearance	host-only	litchi-numbers	-	-	-	-
+numbers/editor/semantic/table.rs	table_cell_borders	1	numbers	table.cell_appearance	migrated	litchi_numbers::Package::table_cell_appearance	numbers_table_cell_appearance_read_parity	A	-	-
 numbers/editor/semantic/table.rs	table_cell_data_format	1	numbers	table.cell_format	migrated	litchi_numbers::Package::table_cell_data_format	numbers_table_cell_data_format_read_parity	A	-	-
-numbers/editor/semantic/table.rs	table_cell_fill	1	numbers	table.cell_appearance	host-only	litchi-numbers	-	-	-	-
-numbers/editor/semantic/table.rs	table_cell_layout	1	numbers	table.cell_appearance	host-only	litchi-numbers	-	-	-	-
+numbers/editor/semantic/table.rs	table_cell_fill	1	numbers	table.cell_appearance	migrated	litchi_numbers::Package::table_cell_appearance	numbers_table_cell_appearance_read_parity	A	-	-
+numbers/editor/semantic/table.rs	table_cell_layout	1	numbers	table.cell_appearance	migrated	litchi_numbers::Package::table_cell_appearance	numbers_table_cell_appearance_read_parity	A	-	-
 numbers/editor/semantic/table.rs	table_cell_merges	1	numbers	table.merge	migrated	litchi_numbers::Package::table_merges	numbers_table_merges_read_parity	A	test-data/iwork/numbers/table-merges-native-receipt.json	-
 numbers/editor/semantic/table.rs	table_cell_numeral_system_format	1	numbers	table.cell_format	migrated	litchi_numbers::Package::table_cell_data_format	numbers_table_cell_data_format_read_parity	A	-	-
 numbers/editor/semantic/table.rs	table_cell_paragraph_indents	1	numbers	table.cell_rich_text	migrated	litchi_numbers::Package::table_cell_text	numbers_cell_text_property_read_parity	A	-	-
@@ -1123,8 +1123,8 @@ numbers/editor/sheet_charts/border_stroke.rs	sheet_chart_border_stroke	1	numbers
 numbers/editor/sheet_charts/caption.rs	remove_sheet_chart_caption	1	numbers	chart.text	host-only	litchi-numbers	-	-	-	-
 numbers/editor/sheet_charts/caption.rs	set_sheet_chart_caption	1	numbers	chart.text	host-only	litchi-numbers	-	-	-	-
 numbers/editor/sheet_charts/caption.rs	sheet_chart_caption	1	numbers	chart.text	host-only	litchi-numbers	-	-	-	-
-numbers/editor/sheet_charts/category_labels.rs	set_sheet_chart_category_label_layout	1	numbers	chart.style	host-only	litchi-numbers	-	-	-	-
-numbers/editor/sheet_charts/category_labels.rs	sheet_chart_category_label_layout	1	numbers	chart.style	host-only	litchi-numbers	-	-	-	-
+numbers/editor/sheet_charts/category_labels.rs	set_sheet_chart_category_label_layout	1	numbers	chart.style	migrated	litchi_numbers::sheet::chart::axis::Edit::set	numbers_sheet_chart_axis_set_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+numbers/editor/sheet_charts/category_labels.rs	sheet_chart_category_label_layout	1	numbers	chart.style	migrated	litchi_numbers::Package::sheet_chart_axis	numbers_sheet_chart_axis_read_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
 numbers/editor/sheet_charts/depth_3d.rs	set_sheet_chart_3d_depth	1	numbers	chart.style	migrated	litchi_numbers::sheet::chart::style::Edit::set	numbers_sheet_chart_style_set_parity	A	-	-
 numbers/editor/sheet_charts/depth_3d.rs	sheet_chart_3d_depth	1	numbers	chart.style	migrated	litchi_numbers::Package::sheet_chart_style	numbers_sheet_chart_style_read_parity	A	-	-
 numbers/editor/sheet_charts/donut_inner_radius.rs	set_sheet_chart_donut_inner_radius	1	numbers	chart.style	migrated	litchi_numbers::sheet::chart::style::Edit::set	numbers_sheet_chart_style_set_parity	A	-	-
@@ -1249,8 +1249,8 @@ numbers/editor/sheet_charts/series_value_labels.rs	sheet_chart_series_value_labe
 numbers/editor/sheet_charts/series_value_labels.rs	sheet_chart_series_value_label_locations	1	numbers	chart.style	host-only	litchi-numbers	-	-	-	-
 numbers/editor/sheet_charts/series_value_labels.rs	sheet_chart_series_value_label_visibilities	1	numbers	chart.style	migrated	litchi_numbers::Package::sheet_chart_series	numbers_sheet_chart_series_read_parity	A	-	-
 numbers/editor/sheet_charts/series_value_labels.rs	sheet_chart_series_value_label_visibility	1	numbers	chart.style	migrated	litchi_numbers::Package::sheet_chart_series	numbers_sheet_chart_series_read_parity	A	-	-
-numbers/editor/sheet_charts/shadow.rs	set_sheet_chart_shadow	1	numbers	chart.style	host-only	litchi-numbers	-	-	-	-
-numbers/editor/sheet_charts/shadow.rs	sheet_chart_shadow	1	numbers	chart.style	host-only	litchi-numbers	-	-	-	-
+numbers/editor/sheet_charts/shadow.rs	set_sheet_chart_shadow	1	numbers	chart.style	migrated	litchi_numbers::sheet::chart::style::Edit::set	numbers_sheet_chart_options_set_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+numbers/editor/sheet_charts/shadow.rs	sheet_chart_shadow	1	numbers	chart.style	migrated	litchi_numbers::Package::sheet_chart_style	numbers_sheet_chart_options_read_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
 numbers/editor/sheet_charts/title.rs	remove_sheet_chart_title	1	numbers	chart.text	migrated	litchi-numbers::Package::edit_sheet_chart_title	numbers_chart_title_and_axis_title_remove_parity	A	-	-
 numbers/editor/sheet_charts/title.rs	set_sheet_chart_title	1	numbers	chart.text	migrated	litchi-numbers::Package::edit_sheet_chart_title	numbers_chart_title_and_axis_title_set_parity	A	-	-
 numbers/editor/sheet_charts/title.rs	sheet_chart_title	1	numbers	chart.text	migrated	litchi-numbers::Package::sheet_chart_title	numbers_chart_title_and_axis_title_read_parity	A	-	-
@@ -1684,8 +1684,8 @@ pages/editor/charts/border_stroke.rs	set_body_chart_border_stroke	1	pages	chart.
 pages/editor/charts/caption.rs	body_chart_caption	1	pages	chart.text	host-only	litchi-pages	-	-	-	-
 pages/editor/charts/caption.rs	remove_body_chart_caption	1	pages	chart.text	host-only	litchi-pages	-	-	-	-
 pages/editor/charts/caption.rs	set_body_chart_caption	1	pages	chart.text	host-only	litchi-pages	-	-	-	-
-pages/editor/charts/category_labels.rs	body_chart_category_label_layout	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
-pages/editor/charts/category_labels.rs	set_body_chart_category_label_layout	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
+pages/editor/charts/category_labels.rs	body_chart_category_label_layout	1	pages	chart.style	migrated	litchi_pages::Package::body_chart_axis	pages_body_chart_axis_read_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+pages/editor/charts/category_labels.rs	set_body_chart_category_label_layout	1	pages	chart.style	migrated	litchi_pages::chart::axis::Edit::set	pages_body_chart_axis_set_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
 pages/editor/charts/depth_3d.rs	body_chart_3d_depth	1	pages	chart.style	migrated	litchi_pages::Package::body_chart_style	pages_body_chart_style_read_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
 pages/editor/charts/depth_3d.rs	set_body_chart_3d_depth	1	pages	chart.style	migrated	litchi_pages::chart::style::Edit::set	pages_body_chart_style_set_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
 pages/editor/charts/donut_inner_radius.rs	body_chart_donut_inner_radius	1	pages	chart.style	migrated	litchi_pages::Package::body_chart_style	pages_body_chart_style_read_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
@@ -1808,8 +1808,8 @@ pages/editor/charts/series_value_labels.rs	set_body_chart_series_value_label_loc
 pages/editor/charts/series_value_labels.rs	set_body_chart_series_value_label_locations	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
 pages/editor/charts/series_value_labels.rs	set_body_chart_series_value_label_visibilities	1	pages	chart.style	migrated	litchi_pages::chart::series::Edit::set	pages_body_chart_series_value_labels_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
 pages/editor/charts/series_value_labels.rs	set_body_chart_series_value_label_visibility	1	pages	chart.style	migrated	litchi_pages::chart::series::Edit::set	pages_body_chart_series_value_labels_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
-pages/editor/charts/shadow.rs	body_chart_shadow	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
-pages/editor/charts/shadow.rs	set_body_chart_shadow	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
+pages/editor/charts/shadow.rs	body_chart_shadow	1	pages	chart.style	migrated	litchi_pages::Package::body_chart_style	pages_body_chart_options_read_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+pages/editor/charts/shadow.rs	set_body_chart_shadow	1	pages	chart.style	migrated	litchi_pages::chart::style::Edit::set	pages_body_chart_options_set_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
 pages/editor/charts/title.rs	body_chart_title	1	pages	chart.text	migrated	litchi-pages::Package::body_chart_title	pages_chart_title_and_axis_title_read_parity	A	-	-
 pages/editor/charts/title.rs	remove_body_chart_title	1	pages	chart.text	migrated	litchi-pages::Package::edit_body_chart_title	pages_chart_title_and_axis_title_remove_parity	A	-	-
 pages/editor/charts/title.rs	set_body_chart_title	1	pages	chart.text	migrated	litchi-pages::Package::edit_body_chart_title	pages_chart_title_and_axis_title_set_parity	A	-	-

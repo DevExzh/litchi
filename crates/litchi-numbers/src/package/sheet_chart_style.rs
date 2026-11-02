@@ -20,9 +20,11 @@ use std::fmt;
 
 use litchi_iwa_common::chart::kind::Kind as ChartKind;
 use litchi_iwa_common::chart::legend;
+use litchi_iwa_common::shape::shadow::Shadow as StoredShadow;
 use litchi_iwa_core::RawMessage;
 use litchi_iwa_protos::chart_style_codec::{self as codec, Archive, Limits};
 use litchi_iwa_style::chart_style::chart as engine;
+use litchi_iwa_style::series::style as series_style;
 use litchi_iwa_style::series::{Refusal as EngineRefusal, SymbolError};
 use thiserror::Error as ThisError;
 
@@ -34,8 +36,9 @@ use crate::sheet::drawable::DrawableSelector;
 
 structure::structural_family!("chart-style");
 
+pub use litchi_iwa_common::shape::shadow::Drop;
 pub use litchi_iwa_style::chart_style::chart::{
-    Lighting3d, Property, PropertyKind, RadarGridShape,
+    Lighting3d, Property, PropertyKind, RadarGridShape, Shadow,
 };
 
 /// A typed, content-redacted chart-style failure.
@@ -355,7 +358,134 @@ fn read(
         archive,
         Limits::DEFAULT,
     )?;
+    if kind == PropertyKind::Shadow {
+        let mut uniform = None;
+        for (style, index) in series_styles(package, sheet, chart)? {
+            let shadow =
+                series_style::series_shadow(&graph::object(package, style)?.messages[index].data)?;
+            if uniform.is_some_and(|known| known != shadow) {
+                return Err(Error::InvalidSource);
+            }
+            uniform = Some(shadow);
+        }
+        let series = uniform.ok_or(Error::InvalidSource)?;
+        return Ok(Property::Shadow(engine::shadow(&properties, series)?));
+    }
     Ok(engine::value(&properties, kind, target.kind)?)
+}
+
+/// The chart's series style objects (theme styles with private overrides,
+/// all of them) and the index of each one's series style message.
+fn series_styles(
+    package: &Package,
+    sheet: usize,
+    chart: ChartSelector,
+) -> Result<Vec<(u64, usize)>, Error> {
+    let (identifier, index) = chart_drawable(package, sheet, chart)?;
+    let object = graph::object(package, identifier)?;
+    let references = codec::references(&object.messages[index].data, Limits::DEFAULT)?;
+    let mut styles = Vec::new();
+    for style in litchi_iwa_style::series::chart_series_styles(&references)? {
+        let index = structure::unique_message(
+            graph::object(package, style)?,
+            &[Archive::SeriesStyle.message_type()],
+        )?;
+        styles.push((style, index));
+    }
+    Ok(styles)
+}
+
+/// Whether only one chart references series style `style` (the host's
+/// `ChartSeriesStyleSlot::ensure_exclusive`).
+fn exclusive_series(package: &Package, style: u64) -> Result<bool, Error> {
+    let mut owners = 0_usize;
+    for object in package.state.components.iter_objects() {
+        for message in &object.messages {
+            if message.type_ != CHART_MESSAGE_TYPE {
+                continue;
+            }
+            let references = codec::references(&message.data, Limits::DEFAULT)?;
+            let private = references
+                .series_private_styles()
+                .is_some_and(|sparse| sparse.entries().iter().any(|(_, entry)| *entry == style));
+            if private || references.series_theme_styles().contains(&style) {
+                owners += 1;
+            }
+        }
+    }
+    Ok(owners == 1)
+}
+
+/// The host's `set_chart_shadow`: the chart style and every series style
+/// must be exclusive; each series style stores the drop shadow (or the
+/// disabled shadow) and the chart style the grouping switch, published in
+/// place together.
+fn apply_shadow(
+    source: &Package,
+    sheet: usize,
+    chart: ChartSelector,
+    target: &Target,
+    value: &Property,
+) -> Result<Option<Published>, Error> {
+    let Property::Shadow(shadow) = *value else {
+        return Err(Error::InvalidSource);
+    };
+    let styles = series_styles(source, sheet, chart)?;
+    for &(style, _) in &styles {
+        if !exclusive_series(source, style)? {
+            return Err(Refusal::SharedStyle.into());
+        }
+    }
+    let stored = shadow
+        .drop_shadow()
+        .map_or(StoredShadow::Disabled, StoredShadow::Drop);
+    let mut rewrites: Vec<(u64, usize, u32, Vec<u8>)> = Vec::new();
+    for (style, index) in styles {
+        let payload = &graph::object(source, style)?.messages[index].data;
+        let data = series_style::rewrite_series_shadow(payload, stored)?;
+        if data != *payload {
+            rewrites.push((style, index, Archive::SeriesStyle.message_type(), data));
+        }
+    }
+    let payload = &graph::object(source, target.style)?.messages[target.index].data;
+    let data = engine::rewrite(payload, value, target.kind)?;
+    if data != *payload {
+        rewrites.push((
+            target.style,
+            target.index,
+            Archive::ChartStyle.message_type(),
+            data,
+        ));
+    }
+    if rewrites.is_empty() {
+        return Ok(None);
+    }
+    let mut closures: Vec<_> = rewrites
+        .into_iter()
+        .map(|(object, index, message_type, data)| {
+            let mut data = Some(data);
+            let replace = move |object: &mut litchi_iwa_core::ArchiveObject,
+                                limits: litchi_iwa_core::Limits| {
+                object
+                    .replace_message_preserving_header(
+                        index,
+                        RawMessage {
+                            type_: message_type,
+                            data: data.take().ok_or(Fault::Invalid)?,
+                        },
+                        limits,
+                    )
+                    .map(drop)
+                    .map_err(|error| structure::map_core(&error))
+            };
+            (object, replace)
+        })
+        .collect();
+    let mut edits: Vec<(u64, graph::ObjectEdit<'_>)> = Vec::new();
+    for (object, replace) in &mut closures {
+        edits.push((*object, replace));
+    }
+    Ok(Some(graph::publish_in_place(source, &mut edits)?))
 }
 
 fn apply_one(
@@ -375,12 +505,29 @@ fn apply_one(
     }
     let object = graph::object(source, target.style)?;
     let payload = &object.messages[target.index].data;
-    let properties = codec::decode(payload, archive, Limits::DEFAULT)?;
-    if engine::value(&properties, kind, target.kind)? == value {
+    let current = if kind == PropertyKind::Shadow {
+        read(source, sheet, chart, kind)?
+    } else {
+        engine::value(
+            &codec::decode(payload, archive, Limits::DEFAULT)?,
+            kind,
+            target.kind,
+        )?
+    };
+    if current == value {
         return Ok(None);
     }
     if !exclusive(source, target.style, archive)? {
         return Err(Refusal::SharedStyle.into());
+    }
+    if kind == PropertyKind::Shadow {
+        let published = apply_shadow(source, sheet, chart, &target, &value)?;
+        if let Some(published) = &published
+            && read(&published.package, sheet, chart, kind)? != value
+        {
+            return Err(Error::Verification);
+        }
+        return Ok(published);
     }
     let rewritten = engine::rewrite(payload, &value, target.kind)?;
     if rewritten == *payload {

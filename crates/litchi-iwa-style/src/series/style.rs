@@ -22,6 +22,9 @@ use litchi_iwa_common::chart::series::{
     FillFamily, Stroke, StrokeFamily, SymbolFill, SymbolFillFamily, SymbolOutlineFamily,
 };
 use litchi_iwa_common::shape::fill::Fill;
+use litchi_iwa_common::shape::shadow::{
+    Angle as ShadowAngle, Appearance, BlurRadius, Drop, Offset, Opacity, Shadow,
+};
 use litchi_iwa_protos::chart_style_codec::{
     self as codec, Archive, Limits as CodecLimits, Properties, property as rules,
 };
@@ -34,6 +37,7 @@ use super::{
 };
 use crate::drawing;
 use crate::graph::{Error, Workspace};
+use crate::shape::property::{encode_shadow, shadow_of};
 
 /// The longest style parent chain followed.
 const MAX_DEPTH: usize = 64;
@@ -458,4 +462,145 @@ pub fn write(
         }
     }
     Ok((changed, budget.report(changed)))
+}
+
+/// `tschchartseriesdefaultshadow` of `TSCH.ChartSeriesStyleArchive`.
+const SHADOW_FIELD: u32 = 38;
+
+/// The drop shadow a series style without a stored shadow draws (the
+/// host's `ChartShadow::NATIVE_DEFAULT`).
+pub const NATIVE_DEFAULT_SHADOW: Drop = Drop::new(
+    Appearance::new(
+        litchi_iwa_common::color::Rgba::black(),
+        BlurRadius::TEN_POINTS,
+        Offset::SIX_POINTS,
+        Opacity::THREE_QUARTERS,
+    ),
+    ShadowAngle::FORTY_FIVE_DEGREES,
+);
+
+/// The shadow stored by one series style payload (its own field, as the
+/// host's series-style slots read it; absent: the native default drop
+/// shadow).
+///
+/// # Errors
+///
+/// An invalid payload or stored shadow.
+pub fn series_shadow(payload: &[u8]) -> SymbolResult<Shadow> {
+    match decode(payload)?
+        .message(SHADOW_FIELD)
+        .map_err(|error| SymbolError::Graph(Error::Codec(error)))?
+    {
+        None => Ok(Shadow::Drop(NATIVE_DEFAULT_SHADOW)),
+        Some(bytes) => shadow_of(bytes).map_err(SymbolError::Graph),
+    }
+}
+
+/// The series style payload storing `shadow`, every other byte kept (the
+/// native default removes the field).
+///
+/// # Errors
+///
+/// An invalid payload.
+pub fn rewrite_series_shadow(payload: &[u8], shadow: Shadow) -> SymbolResult<Vec<u8>> {
+    let encoded = (shadow != Shadow::Drop(NATIVE_DEFAULT_SHADOW)).then(|| encode_shadow(shadow));
+    Ok(codec::rewrite(
+        payload,
+        Archive::SeriesStyle,
+        &[codec::Write::Message {
+            field: SHADOW_FIELD,
+            value: encoded.as_deref(),
+        }],
+        codec::EmptyExtension::Keep,
+        CodecLimits::DEFAULT,
+    )
+    .map_err(|error| SymbolError::Graph(Error::Codec(error)))?
+    .into_bytes()
+    .into_owned())
+}
+
+/// The uniform shadow of every series style of chart drawable `chart`
+/// (theme styles with private overrides, all of them, as the host's
+/// `chart_series_style_slots`).
+///
+/// # Errors
+///
+/// Nonuniform series shadows, a chart without series styles, an invalid
+/// style, or an exhausted limit.
+pub(crate) fn chart_shadow(
+    workspace: &Workspace<'_>,
+    chart: u64,
+    budget: &mut SymbolBudget,
+) -> SymbolResult<Shadow> {
+    let styles = bounded_style_slots(workspace, chart, usize::MAX, budget)?;
+    let mut uniform = None;
+    for style in styles {
+        budget.work(1)?;
+        let (_, payload) = bounded_payload(
+            workspace,
+            style,
+            SERIES_STYLE_MESSAGE_TYPE,
+            "a series style must have exactly one payload",
+            budget,
+        )?;
+        let shadow = series_shadow(payload)?;
+        match uniform {
+            None => uniform = Some(shadow),
+            Some(known) if known != shadow => {
+                return Err(SymbolError::Invalid(
+                    "a chart has nonuniform series shadows",
+                ));
+            },
+            Some(_) => {},
+        }
+    }
+    uniform.ok_or(SymbolError::Invalid("the chart has no series styles"))
+}
+
+/// Store `shadow` in every series style of chart drawable `chart`, after
+/// requiring each to be exclusive to the chart (the host's
+/// `ensure_exclusive` on every series slot), admitting each style to the
+/// budget's scope. Returns whether a payload changed.
+///
+/// # Errors
+///
+/// [`Refusal::SharedStyle`], an invalid style, or an exhausted limit.
+pub(crate) fn write_chart_shadow(
+    workspace: &mut Workspace<'_>,
+    chart: u64,
+    shadow: Shadow,
+    budget: &mut SymbolBudget,
+) -> SymbolResult<bool> {
+    let styles = bounded_style_slots(workspace, chart, usize::MAX, budget)?;
+    for &style in &styles {
+        if bounded_style_owner_count(workspace, style, budget)? != 1 {
+            return Err(SymbolError::Refused(Refusal::SharedStyle));
+        }
+    }
+    let mut changed = false;
+    for style in styles {
+        budget.work(1)?;
+        let location = workspace.locate(style).map_err(SymbolError::from)?;
+        let member = workspace.member(location).to_owned();
+        if let Some(scope) = budget.scope_mut() {
+            scope.allow(style, &member, SERIES_STYLE_MESSAGE_TYPE);
+        }
+        let (message, payload) = bounded_payload(
+            workspace,
+            style,
+            SERIES_STYLE_MESSAGE_TYPE,
+            "a series style must have exactly one payload",
+            budget,
+        )?;
+        let data = charged_patch(payload, budget, |payload| {
+            rewrite_series_shadow(payload, shadow)
+        })?;
+        if data != payload {
+            workspace
+                .replace_payload(style, message, data)
+                .map_err(SymbolError::from)?;
+            changed = true;
+        }
+    }
+    Ok(changed)
 }

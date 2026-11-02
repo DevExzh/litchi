@@ -15,12 +15,13 @@ use std::hint::black_box;
 
 use litchi_iwa::charts::{
     Chart3dLightingStyle, ChartAxisGridline, ChartAxisGridlineStroke, ChartLegendFill,
-    ChartPieStartAngle, ChartSeriesConnectionLine,
+    ChartPieStartAngle, ChartSeriesConnectionLine, ChartShadow,
 };
 use litchi_iwa::shapes::ShapeFill;
 use litchi_iwa::{keynote, numbers, pages};
 use litchi_iwa_common::chart::axis::Axis;
 use litchi_iwa_common::chart::axis::style::Visibility;
+use litchi_iwa_common::chart::category_labels::{Frequency, Interval, Layout};
 use litchi_iwa_common::chart::kind::Kind;
 use litchi_iwa_common::chart::number_format::{
     DecimalPlaces, LabelAffixes, NegativeStyle, NumberFormat,
@@ -29,8 +30,12 @@ use litchi_iwa_common::chart::pie::StartAngle;
 use litchi_iwa_common::chart::series::ConnectionLine;
 use litchi_iwa_common::color::{RgbColorSpace, Rgba};
 use litchi_iwa_common::shape::fill::Fill;
+use litchi_iwa_common::shape::shadow::{
+    Angle as ShadowAngle, Appearance, BlurRadius, Drop, Offset, Opacity,
+};
 use litchi_iwa_common::shape::stroke::{Pattern, Stroke, Width};
 use litchi_iwa_style::chart_style::axis::{GridlineStroke, Property as AxisProperty};
+use litchi_iwa_style::chart_style::chart::{Property as ChartProperty, Shadow as LeafShadow};
 use litchi_iwa_style::legend_style::{LegendFill, Property as LegendProperty};
 
 use crate::chart_style_cases::{Input, Target, input};
@@ -53,6 +58,8 @@ enum Operation {
     LegendFillSet,
     BackgroundSet,
     LightingSet,
+    ShadowSet,
+    CategoryLabelsSet,
 }
 
 const ROUTES: &[(&str, Format, Operation)] = &[
@@ -159,6 +166,24 @@ const ROUTES: &[(&str, Format, Operation)] = &[
         Format::Numbers,
         Operation::LightingSet,
     ),
+    ("keynote_shadow_set", Format::Keynote, Operation::ShadowSet),
+    (
+        "keynote_category_labels_set",
+        Format::Keynote,
+        Operation::CategoryLabelsSet,
+    ),
+    ("pages_shadow_set", Format::Pages, Operation::ShadowSet),
+    (
+        "pages_category_labels_set",
+        Format::Pages,
+        Operation::CategoryLabelsSet,
+    ),
+    ("numbers_shadow_set", Format::Numbers, Operation::ShadowSet),
+    (
+        "numbers_category_labels_set",
+        Format::Numbers,
+        Operation::CategoryLabelsSet,
+    ),
 ];
 
 const fn chart_kind(operation: Operation) -> Kind {
@@ -174,11 +199,32 @@ const fn chart_kind(operation: Operation) -> Kind {
         | Operation::LegendFillSet
         | Operation::BackgroundSet => Kind::Column2d,
         Operation::LightingSet => Kind::Column3d,
+        Operation::ShadowSet | Operation::CategoryLabelsSet => Kind::Column2d,
     }
 }
 
 fn fill() -> TestResult<Rgba> {
     Ok(Rgba::new(0.1, 0.4, 0.9, 1.0, RgbColorSpace::Srgb)?)
+}
+
+fn drop_shadow() -> TestResult<Drop> {
+    Ok(Drop::new(
+        Appearance::new(
+            fill()?,
+            BlurRadius::from_points(4)?,
+            Offset::from_points(3.0)?,
+            Opacity::new(0.5)?,
+        ),
+        ShadowAngle::from_degrees(120.0)?,
+    ))
+}
+
+fn layout() -> TestResult<Layout> {
+    Ok(Layout::new(Frequency::Every(Interval::new(3)?), false))
+}
+
+fn shadow_leaf() -> TestResult<ChartProperty> {
+    Ok(ChartProperty::Shadow(LeafShadow::Grouped(drop_shadow()?)))
 }
 
 fn label_format() -> TestResult<NumberFormat> {
@@ -271,6 +317,12 @@ fn host_operation(input: &Input, source: &[u8], operation: Operation) -> TestRes
                 Operation::LightingSet => {
                     e.set_slide_chart_3d_lighting_style(slide, chart, Chart3dLightingStyle::Glossy)?
                 },
+                Operation::ShadowSet => {
+                    e.set_slide_chart_shadow(slide, chart, ChartShadow::Grouped(drop_shadow()?))?;
+                },
+                Operation::CategoryLabelsSet => {
+                    e.set_slide_chart_category_label_layout(slide, chart, layout()?)?;
+                },
                 Operation::LegendFillSet => {
                     e.set_slide_chart_legend_fill(slide, chart, &legend_fill_host()?)?;
                 },
@@ -313,6 +365,12 @@ fn host_operation(input: &Input, source: &[u8], operation: Operation) -> TestRes
                 Operation::LightingSet => {
                     e.set_body_chart_3d_lighting_style(chart, Chart3dLightingStyle::Glossy)?;
                 },
+                Operation::ShadowSet => {
+                    e.set_body_chart_shadow(chart, ChartShadow::Grouped(drop_shadow()?))?;
+                },
+                Operation::CategoryLabelsSet => {
+                    e.set_body_chart_category_label_layout(chart, layout()?)?;
+                },
                 Operation::LegendFillSet => {
                     e.set_body_chart_legend_fill(chart, &legend_fill_host()?)?
                 },
@@ -349,6 +407,12 @@ fn host_operation(input: &Input, source: &[u8], operation: Operation) -> TestRes
                 },
                 Operation::LightingSet => {
                     e.set_sheet_chart_3d_lighting_style(sheet, chart, Chart3dLightingStyle::Glossy)?
+                },
+                Operation::ShadowSet => {
+                    e.set_sheet_chart_shadow(sheet, chart, ChartShadow::Grouped(drop_shadow()?))?;
+                },
+                Operation::CategoryLabelsSet => {
+                    e.set_sheet_chart_category_label_layout(sheet, chart, layout()?)?;
                 },
                 Operation::LegendFillSet => {
                     e.set_sheet_chart_legend_fill(sheet, chart, &legend_fill_host()?)?;
@@ -424,6 +488,16 @@ fn keynote_operation(source: &[u8], operation: Operation) -> TestResult<Vec<u8>>
         Operation::LightingSet => {
             let mut edit = package.edit_slide_chart_style(slide, chart)?;
             edit.set(style::Property::Lighting3d(style::Lighting3d::Glossy))?;
+            leaf_bytes!(edit.commit()?.package())
+        },
+        Operation::ShadowSet => {
+            let mut edit = package.edit_slide_chart_style(slide, chart)?;
+            edit.set(shadow_leaf()?)?;
+            leaf_bytes!(edit.commit()?.package())
+        },
+        Operation::CategoryLabelsSet => {
+            let mut edit = package.edit_slide_chart_axis(slide, chart)?;
+            edit.set(Axis::Category, AxisProperty::CategoryLabels(layout()?))?;
             leaf_bytes!(edit.commit()?.package())
         },
         Operation::LegendFillSet => {
@@ -524,6 +598,20 @@ fn pages_operation(source: &[u8], operation: Operation) -> TestResult<Vec<u8>> {
                 .commit()?
                 .package()
         ),
+        Operation::ShadowSet => leaf_bytes!(
+            package
+                .edit_body_chart_style(chart)?
+                .set(shadow_leaf()?)?
+                .commit()?
+                .package()
+        ),
+        Operation::CategoryLabelsSet => leaf_bytes!(
+            package
+                .edit_body_chart_axis(chart)?
+                .set(Axis::Category, AxisProperty::CategoryLabels(layout()?))?
+                .commit()?
+                .package()
+        ),
         Operation::LegendFillSet => leaf_bytes!(
             package
                 .edit_body_chart_legend_style(chart)?
@@ -567,6 +655,16 @@ fn numbers_operation(source: &[u8], operation: Operation) -> TestResult<Vec<u8>>
             use litchi_numbers::sheet::chart::style::{Lighting3d, Property};
             let mut edit = package.edit_sheet_chart_style(0, 1)?;
             edit.set(Property::Lighting3d(Lighting3d::Glossy))?;
+            Ok(leaf_bytes!(edit.commit()?.package()))
+        },
+        Operation::ShadowSet => {
+            let mut edit = package.edit_sheet_chart_style(0, 1)?;
+            edit.set(shadow_leaf()?)?;
+            Ok(leaf_bytes!(edit.commit()?.package()))
+        },
+        Operation::CategoryLabelsSet => {
+            let mut edit = package.edit_sheet_chart_axis(0, 1)?;
+            edit.set(Axis::Category, AxisProperty::CategoryLabels(layout()?))?;
             Ok(leaf_bytes!(edit.commit()?.package()))
         },
         Operation::LegendFillSet => {

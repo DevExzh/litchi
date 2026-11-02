@@ -98,6 +98,7 @@ pub(crate) mod table_cell_custom_format;
 pub(crate) mod table_cell_data_format;
 pub(crate) mod table_cell_date_time_format;
 pub(crate) use litchi_iwa_table::cell_format::display as table_cell_display_format_native;
+pub(crate) mod table_cell_appearance;
 pub(crate) mod table_cell_duration_format;
 pub(crate) mod table_cell_edit;
 pub(crate) mod table_cell_fraction_format;

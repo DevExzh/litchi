@@ -1723,3 +1723,166 @@ pub fn plan_border(
         field_references,
     })
 }
+
+/// Publication of a [`Plan`] on the shared structural working set (record
+/// 0412b): the leaves that edit through `structure::Working` (Numbers)
+/// apply the plan's rewrites, its new or removed style object and its
+/// registry changes, then publish. Pages and Keynote keep their own
+/// workspaces.
+pub mod working {
+    use litchi_iwa_core::{ArchiveObject, RawMessage};
+
+    use super::{Plan, Registration};
+    use crate::structure::metadata::{self, Transition};
+    use crate::structure::{Fault, FaultResult, Published, TableLeaf, Working};
+
+    fn component(
+        working: &Working<'_, impl TableLeaf>,
+        registry: &metadata::Registry,
+        object: u64,
+    ) -> FaultResult<u64> {
+        let member = working.locate(object)?.ok_or(Fault::Invalid)?;
+        Ok(registry.component_for_entry(&member)?.identifier)
+    }
+
+    /// Apply `plan` on a fresh working set over `source` and publish it,
+    /// keeping the root previews (the host's cell edits keep them). A
+    /// transaction of several publications passes the save token its first
+    /// publication wrote as `save_token`, so the token advances once.
+    ///
+    /// # Errors
+    ///
+    /// A [`Fault`] of the working set, a plan that does not match it, or
+    /// the candidate's reopen.
+    pub fn publish<P: TableLeaf>(
+        source: &P,
+        plan: &Plan,
+        save_token: Option<u64>,
+    ) -> FaultResult<Published<P>> {
+        let mut working = Working::new(source)?;
+        working.keep_previews();
+        if let Some(token) = save_token {
+            working.set_save_token(token);
+        }
+        let registry = metadata::registry(&working)?.ok_or(Fault::Unsupported)?;
+        let mut transition = Transition::default();
+        let limits = working.archive_limits();
+        for rewrite in &plan.rewrites {
+            let object = working.object_mut(rewrite.identifier)?;
+            let index = object
+                .messages
+                .iter()
+                .position(|message| message.type_ == rewrite.message_type)
+                .ok_or(Fault::Invalid)?;
+            object
+                .replace_message_preserving_header(
+                    index,
+                    RawMessage {
+                        type_: rewrite.message_type,
+                        data: rewrite.data.clone(),
+                    },
+                    limits,
+                )
+                .map_err(|error| crate::structure::map_core(&error))?;
+            let info = object
+                .archive_info
+                .message_infos
+                .get_mut(index)
+                .ok_or(Fault::Invalid)?;
+            for reference in &rewrite.add_references {
+                if !info.object_references.contains(reference) {
+                    crate::structure::reserve(&mut info.object_references, 1)?;
+                    info.object_references.push(*reference);
+                }
+            }
+            for reference in &rewrite.remove_references {
+                info.object_references
+                    .retain(|current| current != reference);
+                for field in &mut info.field_infos {
+                    field
+                        .object_references
+                        .retain(|current| current != reference);
+                }
+            }
+        }
+        for field in &plan.field_references {
+            let object = working.object_mut(field.object)?;
+            let index = object
+                .messages
+                .iter()
+                .position(|message| message.type_ == field.message_type)
+                .ok_or(Fault::Invalid)?;
+            for record in &mut object
+                .archive_info
+                .message_infos
+                .get_mut(index)
+                .ok_or(Fault::Invalid)?
+                .field_infos
+            {
+                if record.object_references.contains(&field.sibling)
+                    && !record.object_references.contains(&field.reference)
+                {
+                    crate::structure::reserve(&mut record.object_references, 1)?;
+                    record.object_references.push(field.reference);
+                }
+            }
+        }
+        let mut inserted = None;
+        if let Some(insertion) = &plan.insertion {
+            if working.allocate(1)?.first().copied() != Some(insertion.identifier) {
+                return Err(Fault::Invalid);
+            }
+            let member = working.locate(insertion.beside)?.ok_or(Fault::Invalid)?;
+            let mut object = ArchiveObject::new(
+                insertion.identifier,
+                vec![RawMessage {
+                    type_: insertion.message_type,
+                    data: insertion.data.clone(),
+                }],
+                limits,
+            )
+            .map_err(|error| crate::structure::map_core(&error))?;
+            let info = object
+                .archive_info
+                .message_infos
+                .first_mut()
+                .ok_or(Fault::Invalid)?;
+            if let Some(versions) = insertion.versions {
+                info.versions = versions.to_vec().into();
+            }
+            info.object_references
+                .extend(insertion.object_references.iter().copied());
+            working.insert(&member, object)?;
+            inserted = Some(insertion.identifier);
+        }
+        for registration in &plan.registrations {
+            match *registration {
+                Registration::Uuid { object } => {
+                    if Some(object) != inserted {
+                        return Err(Fault::Invalid);
+                    }
+                    let owner = component(&working, &registry, object)?;
+                    let seed = metadata::identity_seed(&working, object)?;
+                    transition.register_uuid(&registry, owner, object, seed)?;
+                },
+                Registration::ExternalReference { from, object } => {
+                    let from = component(&working, &registry, from)?;
+                    let to = component(&working, &registry, object)?;
+                    if from != to {
+                        transition.reference(&registry, from, to, object)?;
+                    }
+                },
+                // The identifier allocation raised the watermark.
+                Registration::Watermark(_) => {},
+                Registration::Removed { object } => {
+                    transition.remove_objects(&registry, &[object])?;
+                    transition.release_suffix(&[object])?;
+                },
+            }
+        }
+        if let Some(removed) = plan.removal {
+            working.remove(removed)?;
+        }
+        working.publish(&transition)
+    }
+}

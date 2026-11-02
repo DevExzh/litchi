@@ -19,6 +19,7 @@
 use std::fmt;
 
 use litchi_iwa_common::chart::axis::Axis;
+use litchi_iwa_common::chart::axis::style::Visibility;
 use litchi_iwa_core::RawMessage;
 use litchi_iwa_protos::chart_style_codec::{self as codec, Archive, Limits};
 use litchi_iwa_style::chart_style::axis as engine;
@@ -33,7 +34,7 @@ use crate::sheet::drawable::DrawableSelector;
 
 structure::structural_family!("chart-axis");
 
-pub use litchi_iwa_style::chart_style::axis::{Property, PropertyKind};
+pub use litchi_iwa_style::chart_style::axis::{Frequency, Layout, Property, PropertyKind};
 
 /// A typed, content-redacted chart-axis failure.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
@@ -303,32 +304,29 @@ fn read(
     let (style, index) = axis_style(package, sheet, chart, axis, archive)?;
     let object = graph::object(package, style)?;
     let properties = codec::decode(&object.messages[index].data, archive, Limits::DEFAULT)?;
+    if kind == PropertyKind::CategoryLabels {
+        let Property::Labels(labels) = read(package, sheet, chart, axis, PropertyKind::Labels)?
+        else {
+            return Err(Error::InvalidSource);
+        };
+        return Ok(Property::CategoryLabels(engine::category_labels(
+            &properties,
+            labels,
+        )?));
+    }
     Ok(engine::value(&properties, axis, kind)?)
 }
 
-fn apply_one(
+/// Publish `data` as message `index` (of `message_type`) of `object`, in
+/// place.
+fn publish_one(
     source: &Package,
-    sheet: usize,
-    chart: ChartSelector,
-    axis: Axis,
-    value: &Property,
-) -> Result<Option<Published>, Error> {
-    let kind = value.kind();
-    if read(source, sheet, chart, axis, kind)? == *value {
-        return Ok(None);
-    }
-    let archive = kind.archive();
-    let (style, index) = axis_style(source, sheet, chart, axis, archive)?;
-    if !exclusive(source, style, archive)? {
-        return Err(Refusal::SharedStyle.into());
-    }
-    let object = graph::object(source, style)?;
-    let rewritten = engine::rewrite(&object.messages[index].data, axis, value)?;
-    if rewritten == object.messages[index].data {
-        return Ok(None);
-    }
-    let mut data = Some(rewritten);
-    let message_type = archive.message_type();
+    object: u64,
+    index: usize,
+    message_type: u32,
+    data: Vec<u8>,
+) -> Result<Published, Error> {
+    let mut data = Some(data);
     let mut replace = |object: &mut litchi_iwa_core::ArchiveObject,
                        limits: litchi_iwa_core::Limits| {
         object
@@ -343,9 +341,106 @@ fn apply_one(
             .map(drop)
             .map_err(|error| structure::map_core(&error))
     };
-    Ok(Some(graph::publish_in_place(
+    Ok(graph::publish_in_place(
         source,
-        &mut [(style, &mut replace)],
+        &mut [(object, &mut replace)],
+    )?)
+}
+
+/// The host's `set_chart_category_label_layout`: the category axis style
+/// is rewritten (after its exclusivity check) only when the show-last
+/// switch or a shown interval changes; the labels switch then follows the
+/// layout's visibility through the ordinary labels write.
+fn apply_category_labels(
+    source: &Package,
+    sheet: usize,
+    chart: ChartSelector,
+    axis: Axis,
+    layout: Layout,
+) -> Result<Option<Published>, Error> {
+    let (style, index) = axis_style(source, sheet, chart, axis, Archive::AxisStyle)?;
+    let payload = &graph::object(source, style)?.messages[index].data;
+    let (stored, show_last) = engine::category_label_style(&codec::decode(
+        payload,
+        Archive::AxisStyle,
+        Limits::DEFAULT,
+    )?)?;
+    let requested = match layout.frequency() {
+        Frequency::None => None,
+        frequency => Some(frequency),
+    };
+    let mut published = None;
+    if show_last != layout.show_last_category()
+        || requested.is_some_and(|frequency| frequency != stored)
+    {
+        if !exclusive(source, style, Archive::AxisStyle)? {
+            return Err(Refusal::SharedStyle.into());
+        }
+        let rewritten =
+            engine::rewrite_category_labels(payload, requested, layout.show_last_category())?;
+        if rewritten != *payload {
+            published = Some(publish_one(
+                source,
+                style,
+                index,
+                Archive::AxisStyle.message_type(),
+                rewritten,
+            )?);
+        }
+    }
+    let labels = Property::Labels(if layout.frequency().is_visible() {
+        Visibility::Visible
+    } else {
+        Visibility::Hidden
+    });
+    let base = published
+        .as_ref()
+        .map_or(source, |first: &Published| &first.package);
+    let Some(next) = apply_one(base, sheet, chart, axis, &labels)? else {
+        return Ok(published);
+    };
+    Ok(Some(match published {
+        Some(first) => Published {
+            package: next.package,
+            touched_components: first
+                .touched_components
+                .saturating_add(next.touched_components),
+            deleted_previews: first.deleted_previews.saturating_add(next.deleted_previews),
+        },
+        None => next,
+    }))
+}
+
+fn apply_one(
+    source: &Package,
+    sheet: usize,
+    chart: ChartSelector,
+    axis: Axis,
+    value: &Property,
+) -> Result<Option<Published>, Error> {
+    let kind = value.kind();
+    if read(source, sheet, chart, axis, kind)? == *value {
+        return Ok(None);
+    }
+    if let Property::CategoryLabels(layout) = *value {
+        return apply_category_labels(source, sheet, chart, axis, layout);
+    }
+    let archive = kind.archive();
+    let (style, index) = axis_style(source, sheet, chart, axis, archive)?;
+    if !exclusive(source, style, archive)? {
+        return Err(Refusal::SharedStyle.into());
+    }
+    let object = graph::object(source, style)?;
+    let rewritten = engine::rewrite(&object.messages[index].data, axis, value)?;
+    if rewritten == object.messages[index].data {
+        return Ok(None);
+    }
+    Ok(Some(publish_one(
+        source,
+        style,
+        index,
+        archive.message_type(),
+        rewritten,
     )?))
 }
 
