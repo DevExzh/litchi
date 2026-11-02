@@ -849,3 +849,77 @@ fn shape_preset_set_cost_abba() -> TestResult {
         },
     )
 }
+
+// ---- image fills ---------------------------------------------------------------------
+
+#[test]
+fn pages_body_shape_image_fill_parity() -> TestResult {
+    use litchi_iwa::shapes::ShapeImageFillTechnique;
+    use litchi_pages::drawable::style::ImageTechnique;
+    let _ = (Tier::B, Evidence::Queued);
+    let png = crate::harness::fixture("iwork/keynote/media-replacement-assets/poster.png")?.bytes;
+    let tint = red()?;
+    let read = |bytes: &[u8], host: bool| -> TestResult<String> {
+        if host {
+            let e = pages::Draft::from_bytes(bytes)?;
+            let d = e
+                .body_shapes()?
+                .first()
+                .ok_or("no shape")?
+                .drawable_object_id;
+            Ok(format!("{:?}", e.body_shape_fill(d)?))
+        } else {
+            Ok(format!(
+                "{:?}",
+                Package::from_bytes(bytes)?.body_drawable_style(
+                    DrawableSelector::shape(0),
+                    litchi_pages::drawable::style::PropertyKind::Fill
+                )?
+            ))
+        }
+    };
+    for (technique, host_technique, tint) in [
+        (
+            ImageTechnique::ScaleToFill,
+            ShapeImageFillTechnique::ScaleToFill,
+            Some(tint),
+        ),
+        (ImageTechnique::Tile, ShapeImageFillTechnique::Tile, None),
+    ] {
+        Case::new(
+            "pages_body_shape_image_fill_parity",
+            Format::Pages,
+            Tier::B,
+            Evidence::Queued,
+            &shape_fixture()?,
+        )
+        .leaf_structural_metadata()
+        .host(|source| {
+            let mut e = pages::Draft::from_bytes(source)?;
+            let d = e
+                .body_shapes()?
+                .first()
+                .ok_or("no shape")?
+                .drawable_object_id;
+            e.set_body_shape_image_fill(d, "poster.png", &png, host_technique, tint)?;
+            Ok(e.to_bytes()?)
+        })
+        .leaf(|source| {
+            let package = Package::from_bytes(source)?;
+            let mut edit = package.edit_body_drawable_style(DrawableSelector::shape(0))?;
+            edit.set_image_fill(&png, "poster.png", technique, tint);
+            let commit = edit.commit()?;
+            let restored = commit
+                .package()
+                .apply_body_drawable_style(&commit.patch().inverse())?;
+            Ok(LeafRun::with_inverse(
+                leaf_bytes!(commit.package()),
+                leaf_bytes!(restored.package()),
+            ))
+        })
+        .read("host fill", |bytes| read(bytes, true))
+        .read("leaf fill", |bytes| read(bytes, false))
+        .run()?;
+    }
+    Ok(())
+}
