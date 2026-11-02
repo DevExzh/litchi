@@ -14,7 +14,7 @@ use litchi_iwa_common::chart::kind::Kind;
 use litchi_iwa_common::chart::series::{Symbol, SymbolShape, SymbolSize};
 use litchi_iwa_common::varint::encode_varint_into;
 use litchi_iwa_protos::chart_style_codec::{self as chart_style_codec, Limits as ChartCodecLimits};
-use litchi_keynote::chart::series::{Error, LimitKind, Property, Refusal};
+use litchi_keynote::chart::series::{Error, LimitKind, Property, PropertyKind, Refusal};
 use litchi_keynote::{
     ChartSelector, OpenOptions, Package, SemanticLimits, SlideSelector, SourceLimits,
 };
@@ -144,7 +144,9 @@ fn direct_symbol_read_proof(source: &[u8], chart: u64, index: usize) -> TestResu
 
 fn leaf_read(source: &[u8]) -> TestResult<Vec<Option<Symbol>>> {
     let package = Package::from_bytes(source)?;
-    let Property::Symbols(values) = package.slide_chart_series(LEAF_SLIDE, LEAF_CHART)? else {
+    let Property::Symbols(values) =
+        package.slide_chart_series(LEAF_SLIDE, LEAF_CHART, PropertyKind::Symbols)?
+    else {
         return Err("unexpected chart-series property".into());
     };
     Ok(values)
@@ -180,7 +182,7 @@ fn leaf_write(source: &[u8], values: &Values, one: Option<usize>) -> TestResult<
         symbols[index] = values.leaf()?[index];
     }
     let mut edit = package.edit_slide_chart_series(LEAF_SLIDE, LEAF_CHART)?;
-    edit.set(symbols)?;
+    edit.set(Property::Symbols(symbols))?;
     let commit = edit.commit()?;
     let restored = commit
         .package()
@@ -405,14 +407,14 @@ fn keynote_slide_chart_series_noop_inverse_and_refusal_controls() -> TestResult 
     let package = Package::from_bytes(&input.fixture.bytes)?;
     let current = values.leaf()?;
     let mut edit = package.edit_slide_chart_series(LEAF_SLIDE, LEAF_CHART)?;
-    edit.set(current)?;
+    edit.set(Property::Symbols(current))?;
     let noop = edit.commit()?;
     assert!(noop.patch().is_noop());
     assert!(!noop.diagnostics().changed());
     assert_eq!(leaf_bytes!(noop.package()), input.fixture.bytes);
 
     let mut changed = package.edit_slide_chart_series(LEAF_SLIDE, LEAF_CHART)?;
-    changed.set(Values(vec![None, None]).leaf()?)?;
+    changed.set(Property::Symbols(Values(vec![None, None]).leaf()?))?;
     let changed = changed.commit()?;
     let forward = package.apply_slide_chart_series(changed.patch())?;
     assert_eq!(
@@ -460,17 +462,17 @@ fn keynote_slide_chart_series_noop_inverse_and_refusal_controls() -> TestResult 
     assert_eq!(leaf_bytes!(restored.package()), input.fixture.bytes);
 
     assert!(matches!(
-        package.slide_chart_series(LEAF_SLIDE, ChartSelector::index(99)),
+        package.slide_chart_series(LEAF_SLIDE, ChartSelector::index(99), PropertyKind::Symbols),
         Err(Error::Refused(Refusal::ChartPositionNotFound { .. }))
     ));
     assert!(matches!(
         package
             .edit_slide_chart_series(LEAF_SLIDE, LEAF_CHART)?
-            .set(Vec::new()),
+            .set(Property::Symbols(Vec::new())),
         Err(Error::Refused(Refusal::SeriesCount))
     ));
     let mut mismatch = package.edit_slide_chart_series(LEAF_SLIDE, LEAF_CHART)?;
-    mismatch.set(vec![None])?;
+    mismatch.set(Property::Symbols(vec![None]))?;
     assert!(matches!(
         mismatch.commit(),
         Err(Error::Refused(Refusal::SeriesCount))
@@ -506,7 +508,7 @@ fn keynote_slide_chart_series_malformed_and_low_budget_refuse() -> TestResult {
     let malformed = rewrite_chart_payload(&input.fixture.bytes, input.chart, vec![0xff])?;
     let package = Package::from_bytes(&malformed)?;
     assert!(matches!(
-        package.slide_chart_series(LEAF_SLIDE, LEAF_CHART),
+        package.slide_chart_series(LEAF_SLIDE, LEAF_CHART, PropertyKind::Symbols),
         Err(Error::InvalidSource)
     ));
 
@@ -516,7 +518,7 @@ fn keynote_slide_chart_series_malformed_and_low_budget_refuse() -> TestResult {
         OpenOptions::new().semantic_limits(limits),
     )?;
     assert!(matches!(
-        package.slide_chart_series(LEAF_SLIDE, LEAF_CHART),
+        package.slide_chart_series(LEAF_SLIDE, LEAF_CHART, PropertyKind::Symbols),
         Err(Error::Limit { .. })
     ));
 
@@ -541,13 +543,13 @@ fn keynote_slide_chart_series_shared_style_refuses_atomically() -> TestResult {
     let package = Package::from_bytes(&source)?;
     let before = leaf_bytes!(package.snapshot());
     let mut edit = package.edit_slide_chart_series(LEAF_SLIDE, ChartSelector::index(2))?;
-    edit.set(
+    edit.set(Property::Symbols(
         Values(vec![
             Some((SymbolShape::Diamond, Some(12.0))),
             Some((SymbolShape::Square, None)),
         ])
         .leaf()?,
-    )?;
+    ))?;
     assert!(matches!(
         edit.commit(),
         Err(Error::Refused(Refusal::UnsupportedDependency))

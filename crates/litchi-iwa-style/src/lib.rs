@@ -9,6 +9,8 @@
 //!
 //! - [`chart_font`]: the chart-font graph engine (paragraph-style font
 //!   variations of a chart's text);
+//! - [`chart_style`]: the chart-level and axis-level style properties and
+//!   their in-place rewrites;
 //! - [`chart_text`]: the shared chart title and axis-title wire engine
 //!   (caption authoring remains a deferred host-only follow-up);
 //! - [`drawing`]: the stored drawing values (colors, strokes, fills) in both
@@ -32,6 +34,7 @@
 #![forbid(unsafe_code)]
 
 pub mod chart_font;
+pub mod chart_style;
 pub mod chart_text;
 pub mod drawing;
 pub mod graph;

@@ -9,7 +9,7 @@ use litchi_iwa::pages;
 use litchi_iwa::shapes::{DrawablePoint, DrawableSize};
 use litchi_iwa_common::chart::ChartData;
 use litchi_iwa_common::chart::kind::Kind;
-use litchi_pages::chart::series::{Property, Symbol, SymbolShape, SymbolSize};
+use litchi_pages::chart::series::{Property, PropertyKind, Symbol, SymbolShape, SymbolSize};
 use litchi_pages::{BodyChartSelector, Package};
 
 use crate::harness::{Case, Evidence, Fixture, Format, LeafRun, TestResult, Tier, fixture};
@@ -61,7 +61,7 @@ fn host_symbols(source: &[u8]) -> TestResult<Vec<Option<ChartSeriesSymbol>>> {
 
 fn leaf_symbols(source: &[u8]) -> TestResult<Vec<Option<Symbol>>> {
     let package = Package::from_bytes(source)?;
-    match package.body_chart_series(BodyChartSelector::index(0))? {
+    match package.body_chart_series(BodyChartSelector::index(0), PropertyKind::Symbols)? {
         Property::Symbols(values) => Ok(values),
         _ => Err("unexpected Pages series property".into()),
     }

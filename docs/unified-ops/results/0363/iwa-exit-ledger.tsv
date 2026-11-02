@@ -304,162 +304,162 @@ keynote/editor/slide_charts.rs	set_slide_chart_kind	1	keynote	chart.lifecycle	mi
 keynote/editor/slide_charts.rs	slide_chart_catalog	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
 keynote/editor/slide_charts.rs	slide_charts	1	keynote	chart.lifecycle	migrated	litchi_keynote::Package::slide_chart_metadata	keynote_slide_chart_read_parity	A	-	-
 keynote/editor/slide_charts/axis_gridlines.rs	set_slide_chart_axis_gridline_stroke	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_charts/axis_gridlines.rs	set_slide_chart_axis_major_gridlines_visible	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_charts/axis_gridlines.rs	set_slide_chart_axis_minor_gridlines_visible	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
+keynote/editor/slide_charts/axis_gridlines.rs	set_slide_chart_axis_major_gridlines_visible	1	keynote	chart.style	migrated	litchi_keynote::chart::axis::Edit::set	keynote_slide_chart_axis_set_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+keynote/editor/slide_charts/axis_gridlines.rs	set_slide_chart_axis_minor_gridlines_visible	1	keynote	chart.style	migrated	litchi_keynote::chart::axis::Edit::set	keynote_slide_chart_axis_set_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
 keynote/editor/slide_charts/axis_gridlines.rs	slide_chart_axis_gridline_stroke	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_charts/axis_gridlines.rs	slide_chart_axis_major_gridlines_visible	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_charts/axis_gridlines.rs	slide_chart_axis_minor_gridlines_visible	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
+keynote/editor/slide_charts/axis_gridlines.rs	slide_chart_axis_major_gridlines_visible	1	keynote	chart.style	migrated	litchi_keynote::Package::slide_chart_axis	keynote_slide_chart_axis_read_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+keynote/editor/slide_charts/axis_gridlines.rs	slide_chart_axis_minor_gridlines_visible	1	keynote	chart.style	migrated	litchi_keynote::Package::slide_chart_axis	keynote_slide_chart_axis_read_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
 keynote/editor/slide_charts/axis_label_affixes.rs	set_slide_chart_axis_label_affixes	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
 keynote/editor/slide_charts/axis_label_affixes.rs	slide_chart_axis_label_affixes	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
 keynote/editor/slide_charts/axis_label_angle.rs	set_slide_chart_axis_label_angle	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
 keynote/editor/slide_charts/axis_label_angle.rs	slide_chart_axis_label_angle	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
 keynote/editor/slide_charts/axis_label_position_3d.rs	set_slide_chart_3d_value_axis_label_position	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
 keynote/editor/slide_charts/axis_label_position_3d.rs	slide_chart_3d_value_axis_label_position	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_charts/axis_labels.rs	set_slide_chart_axis_labels_visible	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_charts/axis_labels.rs	slide_chart_axis_labels_visible	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_charts/axis_line.rs	set_slide_chart_axis_line_visible	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_charts/axis_line.rs	slide_chart_axis_line_visible	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_charts/axis_minimum_label.rs	set_slide_chart_value_axis_minimum_label_visible	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_charts/axis_minimum_label.rs	slide_chart_value_axis_minimum_label_visible	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
+keynote/editor/slide_charts/axis_labels.rs	set_slide_chart_axis_labels_visible	1	keynote	chart.style	migrated	litchi_keynote::chart::axis::Edit::set	keynote_slide_chart_axis_set_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+keynote/editor/slide_charts/axis_labels.rs	slide_chart_axis_labels_visible	1	keynote	chart.style	migrated	litchi_keynote::Package::slide_chart_axis	keynote_slide_chart_axis_read_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+keynote/editor/slide_charts/axis_line.rs	set_slide_chart_axis_line_visible	1	keynote	chart.style	migrated	litchi_keynote::chart::axis::Edit::set	keynote_slide_chart_axis_set_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+keynote/editor/slide_charts/axis_line.rs	slide_chart_axis_line_visible	1	keynote	chart.style	migrated	litchi_keynote::Package::slide_chart_axis	keynote_slide_chart_axis_read_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+keynote/editor/slide_charts/axis_minimum_label.rs	set_slide_chart_value_axis_minimum_label_visible	1	keynote	chart.style	migrated	litchi_keynote::chart::axis::Edit::set	keynote_slide_chart_axis_set_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+keynote/editor/slide_charts/axis_minimum_label.rs	slide_chart_value_axis_minimum_label_visible	1	keynote	chart.style	migrated	litchi_keynote::Package::slide_chart_axis	keynote_slide_chart_axis_read_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
 keynote/editor/slide_charts/axis_number_format.rs	set_slide_chart_axis_number_format	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
 keynote/editor/slide_charts/axis_number_format.rs	slide_chart_axis_number_format	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_charts/axis_series_names.rs	set_slide_chart_category_axis_series_names_visible	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_charts/axis_series_names.rs	slide_chart_category_axis_series_names_visible	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_charts/axis_tick_marks.rs	set_slide_chart_axis_minor_tick_marks_visible	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_charts/axis_tick_marks.rs	set_slide_chart_axis_tick_mark_location	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_charts/axis_tick_marks.rs	slide_chart_axis_minor_tick_marks_visible	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_charts/axis_tick_marks.rs	slide_chart_axis_tick_mark_location	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
+keynote/editor/slide_charts/axis_series_names.rs	set_slide_chart_category_axis_series_names_visible	1	keynote	chart.style	migrated	litchi_keynote::chart::axis::Edit::set	keynote_slide_chart_axis_set_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+keynote/editor/slide_charts/axis_series_names.rs	slide_chart_category_axis_series_names_visible	1	keynote	chart.style	migrated	litchi_keynote::Package::slide_chart_axis	keynote_slide_chart_axis_read_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+keynote/editor/slide_charts/axis_tick_marks.rs	set_slide_chart_axis_minor_tick_marks_visible	1	keynote	chart.style	migrated	litchi_keynote::chart::axis::Edit::set	keynote_slide_chart_axis_set_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+keynote/editor/slide_charts/axis_tick_marks.rs	set_slide_chart_axis_tick_mark_location	1	keynote	chart.style	migrated	litchi_keynote::chart::axis::Edit::set	keynote_slide_chart_axis_set_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+keynote/editor/slide_charts/axis_tick_marks.rs	slide_chart_axis_minor_tick_marks_visible	1	keynote	chart.style	migrated	litchi_keynote::Package::slide_chart_axis	keynote_slide_chart_axis_read_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+keynote/editor/slide_charts/axis_tick_marks.rs	slide_chart_axis_tick_mark_location	1	keynote	chart.style	migrated	litchi_keynote::Package::slide_chart_axis	keynote_slide_chart_axis_read_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
 keynote/editor/slide_charts/background_fill.rs	set_slide_chart_background_fill	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
 keynote/editor/slide_charts/background_fill.rs	set_slide_chart_background_image_fill	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
 keynote/editor/slide_charts/background_fill.rs	slide_chart_background_fill	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_charts/bar_shape_3d.rs	set_slide_chart_3d_bar_shape	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_charts/bar_shape_3d.rs	slide_chart_3d_bar_shape	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_charts/border.rs	set_slide_chart_border_visible	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_charts/border.rs	slide_chart_border_visible	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
+keynote/editor/slide_charts/bar_shape_3d.rs	set_slide_chart_3d_bar_shape	1	keynote	chart.style	migrated	litchi_keynote::chart::style::Edit::set	keynote_slide_chart_options_set_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+keynote/editor/slide_charts/bar_shape_3d.rs	slide_chart_3d_bar_shape	1	keynote	chart.style	migrated	litchi_keynote::Package::slide_chart_style	keynote_slide_chart_options_read_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+keynote/editor/slide_charts/border.rs	set_slide_chart_border_visible	1	keynote	chart.style	migrated	litchi_keynote::chart::style::Edit::set	keynote_slide_chart_options_set_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+keynote/editor/slide_charts/border.rs	slide_chart_border_visible	1	keynote	chart.style	migrated	litchi_keynote::Package::slide_chart_style	keynote_slide_chart_options_read_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
 keynote/editor/slide_charts/border_stroke.rs	set_slide_chart_border_stroke	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
 keynote/editor/slide_charts/border_stroke.rs	slide_chart_border_stroke	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
 keynote/editor/slide_charts/category_labels.rs	set_slide_chart_category_label_layout	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
 keynote/editor/slide_charts/category_labels.rs	slide_chart_category_label_layout	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_charts/depth_3d.rs	set_slide_chart_3d_depth	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_charts/depth_3d.rs	slide_chart_3d_depth	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_charts/donut_inner_radius.rs	set_slide_chart_donut_inner_radius	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_charts/donut_inner_radius.rs	slide_chart_donut_inner_radius	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
+keynote/editor/slide_charts/depth_3d.rs	set_slide_chart_3d_depth	1	keynote	chart.style	migrated	litchi_keynote::chart::style::Edit::set	keynote_slide_chart_style_set_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+keynote/editor/slide_charts/depth_3d.rs	slide_chart_3d_depth	1	keynote	chart.style	migrated	litchi_keynote::Package::slide_chart_style	keynote_slide_chart_style_read_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+keynote/editor/slide_charts/donut_inner_radius.rs	set_slide_chart_donut_inner_radius	1	keynote	chart.style	migrated	litchi_keynote::chart::style::Edit::set	keynote_slide_chart_style_set_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+keynote/editor/slide_charts/donut_inner_radius.rs	slide_chart_donut_inner_radius	1	keynote	chart.style	migrated	litchi_keynote::Package::slide_chart_style	keynote_slide_chart_style_read_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
 keynote/editor/slide_charts/font.rs	reset_slide_chart_font	1	keynote	chart.style	migrated	litchi_keynote::Package::edit_slide_chart_font	keynote_slide_chart_font_reset_facade_parity	A	-	-
 keynote/editor/slide_charts/font.rs	reset_slide_chart_font_size	1	keynote	chart.style	migrated	litchi_keynote::Package::edit_slide_chart_font_size	keynote_slide_chart_font_size_reset_facade_parity	A	-	-
 keynote/editor/slide_charts/font.rs	set_slide_chart_font	1	keynote	chart.style	migrated	litchi_keynote::Package::edit_slide_chart_font	keynote_slide_chart_font_allocate_facade_parity	B	-	-
 keynote/editor/slide_charts/font.rs	set_slide_chart_font_size	1	keynote	chart.style	migrated	litchi_keynote::Package::edit_slide_chart_font_size	keynote_slide_chart_font_size_allocate_facade_parity	B	-	-
 keynote/editor/slide_charts/font.rs	slide_chart_font	1	keynote	chart.style	migrated	litchi_keynote::Package::slide_chart_font	keynote_slide_chart_font_read_facade_parity	A	-	-
 keynote/editor/slide_charts/font.rs	slide_chart_font_size	1	keynote	chart.style	migrated	litchi_keynote::Package::slide_chart_font_size	keynote_slide_chart_font_size_read_facade_parity	A	-	-
-keynote/editor/slide_charts/gaps.rs	set_slide_chart_gap_spacing	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_charts/gaps.rs	slide_chart_gap_spacing	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
+keynote/editor/slide_charts/gaps.rs	set_slide_chart_gap_spacing	1	keynote	chart.style	migrated	litchi_keynote::chart::style::Edit::set	keynote_slide_chart_options_set_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+keynote/editor/slide_charts/gaps.rs	slide_chart_gap_spacing	1	keynote	chart.style	migrated	litchi_keynote::Package::slide_chart_style	keynote_slide_chart_options_read_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
 keynote/editor/slide_charts/legend.rs	set_slide_chart_legend_fill	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
 keynote/editor/slide_charts/legend.rs	set_slide_chart_legend_font	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
 keynote/editor/slide_charts/legend.rs	set_slide_chart_legend_font_size	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_charts/legend.rs	set_slide_chart_legend_frame	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
+keynote/editor/slide_charts/legend.rs	set_slide_chart_legend_frame	1	keynote	chart.style	migrated	litchi_keynote::chart::style::Edit::set	keynote_slide_chart_style_set_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
 keynote/editor/slide_charts/legend.rs	set_slide_chart_legend_shadow	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
 keynote/editor/slide_charts/legend.rs	set_slide_chart_legend_stroke	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
 keynote/editor/slide_charts/legend.rs	slide_chart_legend_fill	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
 keynote/editor/slide_charts/legend.rs	slide_chart_legend_font	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
 keynote/editor/slide_charts/legend.rs	slide_chart_legend_font_size	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_charts/legend.rs	slide_chart_legend_frame	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
+keynote/editor/slide_charts/legend.rs	slide_chart_legend_frame	1	keynote	chart.style	migrated	litchi_keynote::Package::slide_chart_style	keynote_slide_chart_style_read_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
 keynote/editor/slide_charts/legend.rs	slide_chart_legend_shadow	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
 keynote/editor/slide_charts/legend.rs	slide_chart_legend_stroke	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
 keynote/editor/slide_charts/lighting_3d.rs	set_slide_chart_3d_lighting_style	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
 keynote/editor/slide_charts/lighting_3d.rs	slide_chart_3d_lighting_style	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_charts/pie_label_distance.rs	set_slide_chart_pie_label_distance	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_charts/pie_label_distance.rs	set_slide_chart_pie_label_distances	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_charts/pie_label_distance.rs	slide_chart_pie_label_distance	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_charts/pie_label_distance.rs	slide_chart_pie_label_distances	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_charts/pie_labels.rs	set_slide_chart_pie_label_visibilities	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_charts/pie_labels.rs	set_slide_chart_pie_label_visibility	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_charts/pie_labels.rs	slide_chart_pie_label_visibilities	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_charts/pie_labels.rs	slide_chart_pie_label_visibility	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
+keynote/editor/slide_charts/pie_label_distance.rs	set_slide_chart_pie_label_distance	1	keynote	chart.style	migrated	litchi_keynote::chart::series::Edit::set	keynote_slide_chart_pie_label_distances_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+keynote/editor/slide_charts/pie_label_distance.rs	set_slide_chart_pie_label_distances	1	keynote	chart.style	migrated	litchi_keynote::chart::series::Edit::set	keynote_slide_chart_pie_label_distances_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+keynote/editor/slide_charts/pie_label_distance.rs	slide_chart_pie_label_distance	1	keynote	chart.style	migrated	litchi_keynote::Package::slide_chart_series	keynote_slide_chart_series_read_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+keynote/editor/slide_charts/pie_label_distance.rs	slide_chart_pie_label_distances	1	keynote	chart.style	migrated	litchi_keynote::Package::slide_chart_series	keynote_slide_chart_series_read_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+keynote/editor/slide_charts/pie_labels.rs	set_slide_chart_pie_label_visibilities	1	keynote	chart.style	migrated	litchi_keynote::chart::series::Edit::set	keynote_slide_chart_pie_labels_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+keynote/editor/slide_charts/pie_labels.rs	set_slide_chart_pie_label_visibility	1	keynote	chart.style	migrated	litchi_keynote::chart::series::Edit::set	keynote_slide_chart_pie_labels_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+keynote/editor/slide_charts/pie_labels.rs	slide_chart_pie_label_visibilities	1	keynote	chart.style	migrated	litchi_keynote::Package::slide_chart_series	keynote_slide_chart_series_read_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+keynote/editor/slide_charts/pie_labels.rs	slide_chart_pie_label_visibility	1	keynote	chart.style	migrated	litchi_keynote::Package::slide_chart_series	keynote_slide_chart_series_read_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
 keynote/editor/slide_charts/pie_leader_lines.rs	set_slide_chart_pie_leader_line_visibilities	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
 keynote/editor/slide_charts/pie_leader_lines.rs	set_slide_chart_pie_leader_line_visibility	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
 keynote/editor/slide_charts/pie_leader_lines.rs	slide_chart_pie_leader_line_visibilities	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
 keynote/editor/slide_charts/pie_leader_lines.rs	slide_chart_pie_leader_line_visibility	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_charts/pie_start_angle.rs	set_slide_chart_pie_start_angle	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_charts/pie_start_angle.rs	slide_chart_pie_start_angle	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_charts/pie_wedge_explosion.rs	set_slide_chart_pie_wedge_explosion	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_charts/pie_wedge_explosion.rs	set_slide_chart_pie_wedge_explosions	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_charts/pie_wedge_explosion.rs	slide_chart_pie_wedge_explosion	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_charts/pie_wedge_explosion.rs	slide_chart_pie_wedge_explosions	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_charts/radar_grid_shape.rs	set_slide_chart_radar_grid_shape	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_charts/radar_grid_shape.rs	slide_chart_radar_grid_shape	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
+keynote/editor/slide_charts/pie_start_angle.rs	set_slide_chart_pie_start_angle	1	keynote	chart.style	migrated	litchi_keynote::chart::style::Edit::set	keynote_slide_chart_style_set_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+keynote/editor/slide_charts/pie_start_angle.rs	slide_chart_pie_start_angle	1	keynote	chart.style	migrated	litchi_keynote::Package::slide_chart_style	keynote_slide_chart_style_read_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+keynote/editor/slide_charts/pie_wedge_explosion.rs	set_slide_chart_pie_wedge_explosion	1	keynote	chart.style	migrated	litchi_keynote::chart::series::Edit::set	keynote_slide_chart_pie_wedge_explosions_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+keynote/editor/slide_charts/pie_wedge_explosion.rs	set_slide_chart_pie_wedge_explosions	1	keynote	chart.style	migrated	litchi_keynote::chart::series::Edit::set	keynote_slide_chart_pie_wedge_explosions_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+keynote/editor/slide_charts/pie_wedge_explosion.rs	slide_chart_pie_wedge_explosion	1	keynote	chart.style	migrated	litchi_keynote::Package::slide_chart_series	keynote_slide_chart_series_read_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+keynote/editor/slide_charts/pie_wedge_explosion.rs	slide_chart_pie_wedge_explosions	1	keynote	chart.style	migrated	litchi_keynote::Package::slide_chart_series	keynote_slide_chart_series_read_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+keynote/editor/slide_charts/radar_grid_shape.rs	set_slide_chart_radar_grid_shape	1	keynote	chart.style	migrated	litchi_keynote::chart::style::Edit::set	keynote_slide_chart_options_set_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+keynote/editor/slide_charts/radar_grid_shape.rs	slide_chart_radar_grid_shape	1	keynote	chart.style	migrated	litchi_keynote::Package::slide_chart_style	keynote_slide_chart_options_read_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
 keynote/editor/slide_charts/radar_series_style.rs	set_slide_chart_radar_series_style	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
 keynote/editor/slide_charts/radar_series_style.rs	slide_chart_radar_series_style	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_charts/radar_start_angle.rs	set_slide_chart_radar_start_angle	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_charts/radar_start_angle.rs	slide_chart_radar_start_angle	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
+keynote/editor/slide_charts/radar_start_angle.rs	set_slide_chart_radar_start_angle	1	keynote	chart.style	migrated	litchi_keynote::chart::style::Edit::set	keynote_slide_chart_style_set_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+keynote/editor/slide_charts/radar_start_angle.rs	slide_chart_radar_start_angle	1	keynote	chart.style	migrated	litchi_keynote::Package::slide_chart_style	keynote_slide_chart_style_read_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
 keynote/editor/slide_charts/reference_line.rs	set_slide_chart_reference_lines	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
 keynote/editor/slide_charts/reference_line.rs	slide_chart_reference_lines	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_charts/rounded_corners.rs	set_slide_chart_rounded_corners	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_charts/rounded_corners.rs	slide_chart_rounded_corners	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_charts/scene_3d.rs	set_slide_chart_3d_rotation	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_charts/scene_3d.rs	slide_chart_3d_rotation	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_charts/series_connection_line.rs	set_slide_chart_series_connection_line	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_charts/series_connection_line.rs	set_slide_chart_series_connection_lines	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_charts/series_connection_line.rs	slide_chart_series_connection_line	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_charts/series_connection_line.rs	slide_chart_series_connection_lines	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
+keynote/editor/slide_charts/rounded_corners.rs	set_slide_chart_rounded_corners	1	keynote	chart.style	migrated	litchi_keynote::chart::style::Edit::set	keynote_slide_chart_style_set_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+keynote/editor/slide_charts/rounded_corners.rs	slide_chart_rounded_corners	1	keynote	chart.style	migrated	litchi_keynote::Package::slide_chart_style	keynote_slide_chart_style_read_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+keynote/editor/slide_charts/scene_3d.rs	set_slide_chart_3d_rotation	1	keynote	chart.style	migrated	litchi_keynote::chart::style::Edit::set	keynote_slide_chart_style_set_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+keynote/editor/slide_charts/scene_3d.rs	slide_chart_3d_rotation	1	keynote	chart.style	migrated	litchi_keynote::Package::slide_chart_style	keynote_slide_chart_style_read_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+keynote/editor/slide_charts/series_connection_line.rs	set_slide_chart_series_connection_line	1	keynote	chart.style	migrated	litchi_keynote::chart::series::Edit::set	keynote_slide_chart_series_connection_lines_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+keynote/editor/slide_charts/series_connection_line.rs	set_slide_chart_series_connection_lines	1	keynote	chart.style	migrated	litchi_keynote::chart::series::Edit::set	keynote_slide_chart_series_connection_lines_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+keynote/editor/slide_charts/series_connection_line.rs	slide_chart_series_connection_line	1	keynote	chart.style	migrated	litchi_keynote::Package::slide_chart_series	keynote_slide_chart_series_read_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+keynote/editor/slide_charts/series_connection_line.rs	slide_chart_series_connection_lines	1	keynote	chart.style	migrated	litchi_keynote::Package::slide_chart_series	keynote_slide_chart_series_read_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
 keynote/editor/slide_charts/series_error_bar_auto_fit.rs	set_slide_chart_series_error_bar_auto_fit	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
 keynote/editor/slide_charts/series_error_bar_auto_fit.rs	set_slide_chart_series_error_bar_auto_fits	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
 keynote/editor/slide_charts/series_error_bar_auto_fit.rs	slide_chart_series_error_bar_auto_fit	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
 keynote/editor/slide_charts/series_error_bar_auto_fit.rs	slide_chart_series_error_bar_auto_fits	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_charts/series_error_bars.rs	set_slide_chart_series_error_bar	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_charts/series_error_bars.rs	set_slide_chart_series_error_bars	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_charts/series_error_bars.rs	slide_chart_series_error_bar	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_charts/series_error_bars.rs	slide_chart_series_error_bars	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_charts/series_fill.rs	reset_slide_chart_series_fill	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_charts/series_fill.rs	set_slide_chart_series_fill	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_charts/series_fill.rs	set_slide_chart_series_fills	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
+keynote/editor/slide_charts/series_error_bars.rs	set_slide_chart_series_error_bar	1	keynote	chart.style	migrated	litchi_keynote::chart::series::Edit::set	keynote_slide_chart_series_error_bars_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+keynote/editor/slide_charts/series_error_bars.rs	set_slide_chart_series_error_bars	1	keynote	chart.style	migrated	litchi_keynote::chart::series::Edit::set	keynote_slide_chart_series_error_bars_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+keynote/editor/slide_charts/series_error_bars.rs	slide_chart_series_error_bar	1	keynote	chart.style	migrated	litchi_keynote::Package::slide_chart_series	keynote_slide_chart_series_read_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+keynote/editor/slide_charts/series_error_bars.rs	slide_chart_series_error_bars	1	keynote	chart.style	migrated	litchi_keynote::Package::slide_chart_series	keynote_slide_chart_series_read_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+keynote/editor/slide_charts/series_fill.rs	reset_slide_chart_series_fill	1	keynote	chart.style	migrated	litchi_keynote::chart::series::Edit::reset	keynote_slide_chart_series_fills_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+keynote/editor/slide_charts/series_fill.rs	set_slide_chart_series_fill	1	keynote	chart.style	migrated	litchi_keynote::chart::series::Edit::set	keynote_slide_chart_series_fills_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+keynote/editor/slide_charts/series_fill.rs	set_slide_chart_series_fills	1	keynote	chart.style	migrated	litchi_keynote::chart::series::Edit::set	keynote_slide_chart_series_fills_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
 keynote/editor/slide_charts/series_fill.rs	set_slide_chart_series_image_fill	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_charts/series_fill.rs	slide_chart_series_fill	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_charts/series_fill.rs	slide_chart_series_fills	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_charts/series_gap_3d.rs	set_slide_chart_3d_series_gap	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_charts/series_gap_3d.rs	slide_chart_3d_series_gap	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_charts/series_stroke.rs	reset_slide_chart_series_stroke	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_charts/series_stroke.rs	set_slide_chart_series_stroke	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_charts/series_stroke.rs	set_slide_chart_series_strokes	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_charts/series_stroke.rs	slide_chart_series_stroke	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_charts/series_stroke.rs	slide_chart_series_strokes	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
+keynote/editor/slide_charts/series_fill.rs	slide_chart_series_fill	1	keynote	chart.style	migrated	litchi_keynote::Package::slide_chart_series	keynote_slide_chart_series_style_read_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+keynote/editor/slide_charts/series_fill.rs	slide_chart_series_fills	1	keynote	chart.style	migrated	litchi_keynote::Package::slide_chart_series	keynote_slide_chart_series_style_read_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+keynote/editor/slide_charts/series_gap_3d.rs	set_slide_chart_3d_series_gap	1	keynote	chart.style	migrated	litchi_keynote::chart::style::Edit::set	keynote_slide_chart_style_set_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+keynote/editor/slide_charts/series_gap_3d.rs	slide_chart_3d_series_gap	1	keynote	chart.style	migrated	litchi_keynote::Package::slide_chart_style	keynote_slide_chart_style_read_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+keynote/editor/slide_charts/series_stroke.rs	reset_slide_chart_series_stroke	1	keynote	chart.style	migrated	litchi_keynote::chart::series::Edit::reset	keynote_slide_chart_series_strokes_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+keynote/editor/slide_charts/series_stroke.rs	set_slide_chart_series_stroke	1	keynote	chart.style	migrated	litchi_keynote::chart::series::Edit::set	keynote_slide_chart_series_strokes_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+keynote/editor/slide_charts/series_stroke.rs	set_slide_chart_series_strokes	1	keynote	chart.style	migrated	litchi_keynote::chart::series::Edit::set	keynote_slide_chart_series_strokes_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+keynote/editor/slide_charts/series_stroke.rs	slide_chart_series_stroke	1	keynote	chart.style	migrated	litchi_keynote::Package::slide_chart_series	keynote_slide_chart_series_style_read_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+keynote/editor/slide_charts/series_stroke.rs	slide_chart_series_strokes	1	keynote	chart.style	migrated	litchi_keynote::Package::slide_chart_series	keynote_slide_chart_series_style_read_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
 keynote/editor/slide_charts/series_symbol.rs	set_slide_chart_series_symbol	1	keynote	chart.style	migrated	litchi_keynote::Package::edit_slide_chart_series	keynote_slide_chart_series_symbol_allocate_facade_parity	B	-	-
 keynote/editor/slide_charts/series_symbol.rs	set_slide_chart_series_symbols	1	keynote	chart.style	migrated	litchi_keynote::Package::edit_slide_chart_series	keynote_slide_chart_series_symbols_allocate_facade_parity	B	-	-
 keynote/editor/slide_charts/series_symbol.rs	slide_chart_series_symbol	1	keynote	chart.style	migrated	litchi_keynote::Package::slide_chart_series	keynote_slide_chart_series_symbol_read_facade_parity	A	-	-
 keynote/editor/slide_charts/series_symbol.rs	slide_chart_series_symbols	1	keynote	chart.style	migrated	litchi_keynote::Package::slide_chart_series	keynote_slide_chart_series_symbols_read_facade_parity	A	-	-
-keynote/editor/slide_charts/series_symbol_fill.rs	reset_slide_chart_series_symbol_fill	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_charts/series_symbol_fill.rs	set_slide_chart_series_symbol_fill	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_charts/series_symbol_fill.rs	set_slide_chart_series_symbol_fills	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
+keynote/editor/slide_charts/series_symbol_fill.rs	reset_slide_chart_series_symbol_fill	1	keynote	chart.style	migrated	litchi_keynote::chart::series::Edit::reset	keynote_slide_chart_series_symbol_fills_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+keynote/editor/slide_charts/series_symbol_fill.rs	set_slide_chart_series_symbol_fill	1	keynote	chart.style	migrated	litchi_keynote::chart::series::Edit::set	keynote_slide_chart_series_symbol_fills_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+keynote/editor/slide_charts/series_symbol_fill.rs	set_slide_chart_series_symbol_fills	1	keynote	chart.style	migrated	litchi_keynote::chart::series::Edit::set	keynote_slide_chart_series_symbol_fills_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
 keynote/editor/slide_charts/series_symbol_fill.rs	set_slide_chart_series_symbol_image_fill	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_charts/series_symbol_fill.rs	slide_chart_series_symbol_fill	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_charts/series_symbol_fill.rs	slide_chart_series_symbol_fills	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_charts/series_symbol_outline.rs	reset_slide_chart_series_symbol_outline	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_charts/series_symbol_outline.rs	set_slide_chart_series_symbol_outline	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_charts/series_symbol_outline.rs	set_slide_chart_series_symbol_outlines	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_charts/series_symbol_outline.rs	slide_chart_series_symbol_outline	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_charts/series_symbol_outline.rs	slide_chart_series_symbol_outlines	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_charts/series_trendline.rs	set_slide_chart_series_trendline	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_charts/series_trendline.rs	set_slide_chart_series_trendlines	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_charts/series_trendline.rs	slide_chart_series_trendline	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_charts/series_trendline.rs	slide_chart_series_trendlines	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_charts/series_value_label_affixes.rs	set_slide_chart_series_value_label_affix	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_charts/series_value_label_affixes.rs	set_slide_chart_series_value_label_affixes	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_charts/series_value_label_affixes.rs	slide_chart_series_value_label_affix	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_charts/series_value_label_affixes.rs	slide_chart_series_value_label_affixes	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
+keynote/editor/slide_charts/series_symbol_fill.rs	slide_chart_series_symbol_fill	1	keynote	chart.style	migrated	litchi_keynote::Package::slide_chart_series	keynote_slide_chart_series_style_read_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+keynote/editor/slide_charts/series_symbol_fill.rs	slide_chart_series_symbol_fills	1	keynote	chart.style	migrated	litchi_keynote::Package::slide_chart_series	keynote_slide_chart_series_style_read_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+keynote/editor/slide_charts/series_symbol_outline.rs	reset_slide_chart_series_symbol_outline	1	keynote	chart.style	migrated	litchi_keynote::chart::series::Edit::reset	keynote_slide_chart_series_symbol_outlines_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+keynote/editor/slide_charts/series_symbol_outline.rs	set_slide_chart_series_symbol_outline	1	keynote	chart.style	migrated	litchi_keynote::chart::series::Edit::set	keynote_slide_chart_series_symbol_outlines_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+keynote/editor/slide_charts/series_symbol_outline.rs	set_slide_chart_series_symbol_outlines	1	keynote	chart.style	migrated	litchi_keynote::chart::series::Edit::set	keynote_slide_chart_series_symbol_outlines_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+keynote/editor/slide_charts/series_symbol_outline.rs	slide_chart_series_symbol_outline	1	keynote	chart.style	migrated	litchi_keynote::Package::slide_chart_series	keynote_slide_chart_series_style_read_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+keynote/editor/slide_charts/series_symbol_outline.rs	slide_chart_series_symbol_outlines	1	keynote	chart.style	migrated	litchi_keynote::Package::slide_chart_series	keynote_slide_chart_series_style_read_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+keynote/editor/slide_charts/series_trendline.rs	set_slide_chart_series_trendline	1	keynote	chart.style	migrated	litchi_keynote::chart::series::Edit::set	keynote_slide_chart_series_trendlines_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+keynote/editor/slide_charts/series_trendline.rs	set_slide_chart_series_trendlines	1	keynote	chart.style	migrated	litchi_keynote::chart::series::Edit::set	keynote_slide_chart_series_trendlines_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+keynote/editor/slide_charts/series_trendline.rs	slide_chart_series_trendline	1	keynote	chart.style	migrated	litchi_keynote::Package::slide_chart_series	keynote_slide_chart_series_read_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+keynote/editor/slide_charts/series_trendline.rs	slide_chart_series_trendlines	1	keynote	chart.style	migrated	litchi_keynote::Package::slide_chart_series	keynote_slide_chart_series_read_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+keynote/editor/slide_charts/series_value_label_affixes.rs	set_slide_chart_series_value_label_affix	1	keynote	chart.style	migrated	litchi_keynote::chart::series::Edit::set	keynote_slide_chart_series_value_label_affixes_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+keynote/editor/slide_charts/series_value_label_affixes.rs	set_slide_chart_series_value_label_affixes	1	keynote	chart.style	migrated	litchi_keynote::chart::series::Edit::set	keynote_slide_chart_series_value_label_affixes_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+keynote/editor/slide_charts/series_value_label_affixes.rs	slide_chart_series_value_label_affix	1	keynote	chart.style	migrated	litchi_keynote::Package::slide_chart_series	keynote_slide_chart_series_read_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+keynote/editor/slide_charts/series_value_label_affixes.rs	slide_chart_series_value_label_affixes	1	keynote	chart.style	migrated	litchi_keynote::Package::slide_chart_series	keynote_slide_chart_series_read_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
 keynote/editor/slide_charts/series_value_label_auto_fit.rs	set_slide_chart_series_value_label_auto_fit	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
 keynote/editor/slide_charts/series_value_label_auto_fit.rs	set_slide_chart_series_value_label_auto_fits	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
 keynote/editor/slide_charts/series_value_label_auto_fit.rs	slide_chart_series_value_label_auto_fit	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
 keynote/editor/slide_charts/series_value_label_auto_fit.rs	slide_chart_series_value_label_auto_fits	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_charts/series_value_label_number_format.rs	set_slide_chart_series_value_label_number_format	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_charts/series_value_label_number_format.rs	set_slide_chart_series_value_label_number_formats	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_charts/series_value_label_number_format.rs	slide_chart_series_value_label_number_format	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_charts/series_value_label_number_format.rs	slide_chart_series_value_label_number_formats	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
+keynote/editor/slide_charts/series_value_label_number_format.rs	set_slide_chart_series_value_label_number_format	1	keynote	chart.style	migrated	litchi_keynote::chart::series::Edit::set	keynote_slide_chart_series_value_label_number_formats_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+keynote/editor/slide_charts/series_value_label_number_format.rs	set_slide_chart_series_value_label_number_formats	1	keynote	chart.style	migrated	litchi_keynote::chart::series::Edit::set	keynote_slide_chart_series_value_label_number_formats_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+keynote/editor/slide_charts/series_value_label_number_format.rs	slide_chart_series_value_label_number_format	1	keynote	chart.style	migrated	litchi_keynote::Package::slide_chart_series	keynote_slide_chart_series_read_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+keynote/editor/slide_charts/series_value_label_number_format.rs	slide_chart_series_value_label_number_formats	1	keynote	chart.style	migrated	litchi_keynote::Package::slide_chart_series	keynote_slide_chart_series_read_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
 keynote/editor/slide_charts/series_value_labels.rs	set_slide_chart_series_value_label_location	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
 keynote/editor/slide_charts/series_value_labels.rs	set_slide_chart_series_value_label_locations	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_charts/series_value_labels.rs	set_slide_chart_series_value_label_visibilities	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_charts/series_value_labels.rs	set_slide_chart_series_value_label_visibility	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
+keynote/editor/slide_charts/series_value_labels.rs	set_slide_chart_series_value_label_visibilities	1	keynote	chart.style	migrated	litchi_keynote::chart::series::Edit::set	keynote_slide_chart_series_value_labels_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+keynote/editor/slide_charts/series_value_labels.rs	set_slide_chart_series_value_label_visibility	1	keynote	chart.style	migrated	litchi_keynote::chart::series::Edit::set	keynote_slide_chart_series_value_labels_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
 keynote/editor/slide_charts/series_value_labels.rs	slide_chart_series_value_label_location	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
 keynote/editor/slide_charts/series_value_labels.rs	slide_chart_series_value_label_locations	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_charts/series_value_labels.rs	slide_chart_series_value_label_visibilities	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_charts/series_value_labels.rs	slide_chart_series_value_label_visibility	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
+keynote/editor/slide_charts/series_value_labels.rs	slide_chart_series_value_label_visibilities	1	keynote	chart.style	migrated	litchi_keynote::Package::slide_chart_series	keynote_slide_chart_series_read_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+keynote/editor/slide_charts/series_value_labels.rs	slide_chart_series_value_label_visibility	1	keynote	chart.style	migrated	litchi_keynote::Package::slide_chart_series	keynote_slide_chart_series_read_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
 keynote/editor/slide_charts/shadow.rs	set_slide_chart_shadow	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
 keynote/editor/slide_charts/shadow.rs	slide_chart_shadow	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
 keynote/editor/slide_create.rs	add_slide	1	keynote	slide.lifecycle	migrated	litchi_keynote::slide::creation::Edit::add_slide	keynote_slide_add_parity	B	-	-
@@ -793,10 +793,10 @@ numbers/editor/semantic/media.rs	replace_media	1	numbers	media.asset	migrated	li
 numbers/editor/semantic/media.rs	save	1	numbers	io	host-only	litchi-numbers	-	-	-	-
 numbers/editor/semantic/media.rs	sheet_media_assets	1	numbers	media.asset	migrated	litchi_numbers::Package::sheet_media_assets	numbers_media_assets_read_parity	A	-	-
 numbers/editor/semantic/media.rs	to_bytes	1	numbers	io	host-only	litchi-numbers	-	-	-	-
-numbers/editor/semantic/table.rs	add_cell_comment_reply	1	numbers	table.cell_comment	host-only	-	-	-	-	root-only shared slice; reply-thread lifecycle remains deferred
 numbers/editor/semantic/table.rs	__parity_clear_table_cell_comment_legacy	1	numbers	table.cell_comment	retired	-	-	-	-	parity-only hidden legacy host oracle, not a supported Numbers API; removed with the differential host harness in W3
 numbers/editor/semantic/table.rs	__parity_read_table_cell_comment	1	numbers	table.cell_comment	retired	-	-	-	-	parity-only hidden selector witness, not a supported Numbers API; removed with the differential host harness in W3
 numbers/editor/semantic/table.rs	__parity_set_table_cell_comment_legacy	1	numbers	table.cell_comment	retired	-	-	-	-	parity-only hidden legacy host oracle, not a supported Numbers API; removed with the differential host harness in W3
+numbers/editor/semantic/table.rs	add_cell_comment_reply	1	numbers	table.cell_comment	host-only	-	-	-	-	root-only shared slice; reply-thread lifecycle remains deferred
 numbers/editor/semantic/table.rs	cell_comment_replies	1	numbers	table.cell_comment	migrated	litchi_numbers::Package::table_cell_comment_replies	numbers_table_cell_comment_replies_read_parity	A	-	-
 numbers/editor/semantic/table.rs	cell_conditional_highlight_rules	1	numbers	table.conditional_highlight	migrated	litchi_numbers::Package::table_cell_conditional_highlight	numbers_conditional_highlight_read_parity	A	-	-
 numbers/editor/semantic/table.rs	cell_conditional_highlighting	1	numbers	table.conditional_highlight	migrated	litchi_numbers::Package::table_cell_conditional_highlight	numbers_conditional_highlight_read_parity	A	-	-
@@ -1229,18 +1229,18 @@ numbers/editor/sheet_charts/series_trendline.rs	set_sheet_chart_series_trendline
 numbers/editor/sheet_charts/series_trendline.rs	set_sheet_chart_series_trendlines	1	numbers	chart.style	migrated	litchi_numbers::sheet::chart::series::Edit::set	numbers_sheet_chart_series_trendlines_parity	B	-	-
 numbers/editor/sheet_charts/series_trendline.rs	sheet_chart_series_trendline	1	numbers	chart.style	migrated	litchi_numbers::Package::sheet_chart_series	numbers_sheet_chart_series_read_parity	A	-	-
 numbers/editor/sheet_charts/series_trendline.rs	sheet_chart_series_trendlines	1	numbers	chart.style	migrated	litchi_numbers::Package::sheet_chart_series	numbers_sheet_chart_series_read_parity	A	-	-
-numbers/editor/sheet_charts/series_value_label_affixes.rs	set_sheet_chart_series_value_label_affix	1	numbers	chart.style	host-only	litchi-numbers	-	-	-	-
-numbers/editor/sheet_charts/series_value_label_affixes.rs	set_sheet_chart_series_value_label_affixes	1	numbers	chart.style	host-only	litchi-numbers	-	-	-	-
-numbers/editor/sheet_charts/series_value_label_affixes.rs	sheet_chart_series_value_label_affix	1	numbers	chart.style	host-only	litchi-numbers	-	-	-	-
-numbers/editor/sheet_charts/series_value_label_affixes.rs	sheet_chart_series_value_label_affixes	1	numbers	chart.style	host-only	litchi-numbers	-	-	-	-
+numbers/editor/sheet_charts/series_value_label_affixes.rs	set_sheet_chart_series_value_label_affix	1	numbers	chart.style	migrated	litchi_numbers::sheet::chart::series::Edit::set	numbers_sheet_chart_series_value_label_affixes_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+numbers/editor/sheet_charts/series_value_label_affixes.rs	set_sheet_chart_series_value_label_affixes	1	numbers	chart.style	migrated	litchi_numbers::sheet::chart::series::Edit::set	numbers_sheet_chart_series_value_label_affixes_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+numbers/editor/sheet_charts/series_value_label_affixes.rs	sheet_chart_series_value_label_affix	1	numbers	chart.style	migrated	litchi_numbers::Package::sheet_chart_series	numbers_sheet_chart_series_read_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+numbers/editor/sheet_charts/series_value_label_affixes.rs	sheet_chart_series_value_label_affixes	1	numbers	chart.style	migrated	litchi_numbers::Package::sheet_chart_series	numbers_sheet_chart_series_read_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
 numbers/editor/sheet_charts/series_value_label_auto_fit.rs	set_sheet_chart_series_value_label_auto_fit	1	numbers	chart.style	host-only	litchi-numbers	-	-	-	-
 numbers/editor/sheet_charts/series_value_label_auto_fit.rs	set_sheet_chart_series_value_label_auto_fits	1	numbers	chart.style	host-only	litchi-numbers	-	-	-	-
 numbers/editor/sheet_charts/series_value_label_auto_fit.rs	sheet_chart_series_value_label_auto_fit	1	numbers	chart.style	host-only	litchi-numbers	-	-	-	-
 numbers/editor/sheet_charts/series_value_label_auto_fit.rs	sheet_chart_series_value_label_auto_fits	1	numbers	chart.style	host-only	litchi-numbers	-	-	-	-
-numbers/editor/sheet_charts/series_value_label_number_format.rs	set_sheet_chart_series_value_label_number_format	1	numbers	chart.style	host-only	litchi-numbers	-	-	-	-
-numbers/editor/sheet_charts/series_value_label_number_format.rs	set_sheet_chart_series_value_label_number_formats	1	numbers	chart.style	host-only	litchi-numbers	-	-	-	-
-numbers/editor/sheet_charts/series_value_label_number_format.rs	sheet_chart_series_value_label_number_format	1	numbers	chart.style	host-only	litchi-numbers	-	-	-	-
-numbers/editor/sheet_charts/series_value_label_number_format.rs	sheet_chart_series_value_label_number_formats	1	numbers	chart.style	host-only	litchi-numbers	-	-	-	-
+numbers/editor/sheet_charts/series_value_label_number_format.rs	set_sheet_chart_series_value_label_number_format	1	numbers	chart.style	migrated	litchi_numbers::sheet::chart::series::Edit::set	numbers_sheet_chart_series_value_label_number_formats_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+numbers/editor/sheet_charts/series_value_label_number_format.rs	set_sheet_chart_series_value_label_number_formats	1	numbers	chart.style	migrated	litchi_numbers::sheet::chart::series::Edit::set	numbers_sheet_chart_series_value_label_number_formats_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+numbers/editor/sheet_charts/series_value_label_number_format.rs	sheet_chart_series_value_label_number_format	1	numbers	chart.style	migrated	litchi_numbers::Package::sheet_chart_series	numbers_sheet_chart_series_read_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+numbers/editor/sheet_charts/series_value_label_number_format.rs	sheet_chart_series_value_label_number_formats	1	numbers	chart.style	migrated	litchi_numbers::Package::sheet_chart_series	numbers_sheet_chart_series_read_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
 numbers/editor/sheet_charts/series_value_labels.rs	set_sheet_chart_series_value_label_location	1	numbers	chart.style	host-only	litchi-numbers	-	-	-	-
 numbers/editor/sheet_charts/series_value_labels.rs	set_sheet_chart_series_value_label_locations	1	numbers	chart.style	host-only	litchi-numbers	-	-	-	-
 numbers/editor/sheet_charts/series_value_labels.rs	set_sheet_chart_series_value_label_visibilities	1	numbers	chart.style	migrated	litchi_numbers::sheet::chart::series::Edit::set	numbers_sheet_chart_series_value_labels_parity	B	-	-
@@ -1643,42 +1643,42 @@ pages/editor/charts/axis.rs	set_body_chart_axis_title	1	pages	chart.text	migrate
 pages/editor/charts/axis_bounds.rs	body_chart_value_axis_bounds	1	pages	chart.legend_axis	host-only	litchi-pages	-	-	-	-
 pages/editor/charts/axis_bounds.rs	set_body_chart_value_axis_bounds	1	pages	chart.legend_axis	host-only	litchi-pages	-	-	-	-
 pages/editor/charts/axis_gridlines.rs	body_chart_axis_gridline_stroke	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
-pages/editor/charts/axis_gridlines.rs	body_chart_axis_major_gridlines_visible	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
-pages/editor/charts/axis_gridlines.rs	body_chart_axis_minor_gridlines_visible	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
+pages/editor/charts/axis_gridlines.rs	body_chart_axis_major_gridlines_visible	1	pages	chart.style	migrated	litchi_pages::Package::body_chart_axis	pages_body_chart_axis_read_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+pages/editor/charts/axis_gridlines.rs	body_chart_axis_minor_gridlines_visible	1	pages	chart.style	migrated	litchi_pages::Package::body_chart_axis	pages_body_chart_axis_read_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
 pages/editor/charts/axis_gridlines.rs	set_body_chart_axis_gridline_stroke	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
-pages/editor/charts/axis_gridlines.rs	set_body_chart_axis_major_gridlines_visible	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
-pages/editor/charts/axis_gridlines.rs	set_body_chart_axis_minor_gridlines_visible	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
+pages/editor/charts/axis_gridlines.rs	set_body_chart_axis_major_gridlines_visible	1	pages	chart.style	migrated	litchi_pages::chart::axis::Edit::set	pages_body_chart_axis_set_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+pages/editor/charts/axis_gridlines.rs	set_body_chart_axis_minor_gridlines_visible	1	pages	chart.style	migrated	litchi_pages::chart::axis::Edit::set	pages_body_chart_axis_set_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
 pages/editor/charts/axis_label_affixes.rs	body_chart_axis_label_affixes	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
 pages/editor/charts/axis_label_affixes.rs	set_body_chart_axis_label_affixes	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
 pages/editor/charts/axis_label_angle.rs	body_chart_axis_label_angle	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
 pages/editor/charts/axis_label_angle.rs	set_body_chart_axis_label_angle	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
 pages/editor/charts/axis_label_position_3d.rs	body_chart_3d_value_axis_label_position	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
 pages/editor/charts/axis_label_position_3d.rs	set_body_chart_3d_value_axis_label_position	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
-pages/editor/charts/axis_labels.rs	body_chart_axis_labels_visible	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
-pages/editor/charts/axis_labels.rs	set_body_chart_axis_labels_visible	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
-pages/editor/charts/axis_line.rs	body_chart_axis_line_visible	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
-pages/editor/charts/axis_line.rs	set_body_chart_axis_line_visible	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
-pages/editor/charts/axis_minimum_label.rs	body_chart_value_axis_minimum_label_visible	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
-pages/editor/charts/axis_minimum_label.rs	set_body_chart_value_axis_minimum_label_visible	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
+pages/editor/charts/axis_labels.rs	body_chart_axis_labels_visible	1	pages	chart.style	migrated	litchi_pages::Package::body_chart_axis	pages_body_chart_axis_read_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+pages/editor/charts/axis_labels.rs	set_body_chart_axis_labels_visible	1	pages	chart.style	migrated	litchi_pages::chart::axis::Edit::set	pages_body_chart_axis_set_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+pages/editor/charts/axis_line.rs	body_chart_axis_line_visible	1	pages	chart.style	migrated	litchi_pages::Package::body_chart_axis	pages_body_chart_axis_read_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+pages/editor/charts/axis_line.rs	set_body_chart_axis_line_visible	1	pages	chart.style	migrated	litchi_pages::chart::axis::Edit::set	pages_body_chart_axis_set_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+pages/editor/charts/axis_minimum_label.rs	body_chart_value_axis_minimum_label_visible	1	pages	chart.style	migrated	litchi_pages::Package::body_chart_axis	pages_body_chart_axis_read_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+pages/editor/charts/axis_minimum_label.rs	set_body_chart_value_axis_minimum_label_visible	1	pages	chart.style	migrated	litchi_pages::chart::axis::Edit::set	pages_body_chart_axis_set_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
 pages/editor/charts/axis_number_format.rs	body_chart_axis_number_format	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
 pages/editor/charts/axis_number_format.rs	set_body_chart_axis_number_format	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
 pages/editor/charts/axis_scale.rs	body_chart_value_axis_scale	1	pages	chart.legend_axis	host-only	litchi-pages	-	-	-	-
 pages/editor/charts/axis_scale.rs	set_body_chart_value_axis_scale	1	pages	chart.legend_axis	host-only	litchi-pages	-	-	-	-
-pages/editor/charts/axis_series_names.rs	body_chart_category_axis_series_names_visible	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
-pages/editor/charts/axis_series_names.rs	set_body_chart_category_axis_series_names_visible	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
+pages/editor/charts/axis_series_names.rs	body_chart_category_axis_series_names_visible	1	pages	chart.style	migrated	litchi_pages::Package::body_chart_axis	pages_body_chart_axis_read_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+pages/editor/charts/axis_series_names.rs	set_body_chart_category_axis_series_names_visible	1	pages	chart.style	migrated	litchi_pages::chart::axis::Edit::set	pages_body_chart_axis_set_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
 pages/editor/charts/axis_steps.rs	body_chart_value_axis_steps	1	pages	chart.legend_axis	host-only	litchi-pages	-	-	-	-
 pages/editor/charts/axis_steps.rs	set_body_chart_value_axis_steps	1	pages	chart.legend_axis	host-only	litchi-pages	-	-	-	-
-pages/editor/charts/axis_tick_marks.rs	body_chart_axis_minor_tick_marks_visible	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
-pages/editor/charts/axis_tick_marks.rs	body_chart_axis_tick_mark_location	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
-pages/editor/charts/axis_tick_marks.rs	set_body_chart_axis_minor_tick_marks_visible	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
-pages/editor/charts/axis_tick_marks.rs	set_body_chart_axis_tick_mark_location	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
+pages/editor/charts/axis_tick_marks.rs	body_chart_axis_minor_tick_marks_visible	1	pages	chart.style	migrated	litchi_pages::Package::body_chart_axis	pages_body_chart_axis_read_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+pages/editor/charts/axis_tick_marks.rs	body_chart_axis_tick_mark_location	1	pages	chart.style	migrated	litchi_pages::Package::body_chart_axis	pages_body_chart_axis_read_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+pages/editor/charts/axis_tick_marks.rs	set_body_chart_axis_minor_tick_marks_visible	1	pages	chart.style	migrated	litchi_pages::chart::axis::Edit::set	pages_body_chart_axis_set_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+pages/editor/charts/axis_tick_marks.rs	set_body_chart_axis_tick_mark_location	1	pages	chart.style	migrated	litchi_pages::chart::axis::Edit::set	pages_body_chart_axis_set_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
 pages/editor/charts/background_fill.rs	body_chart_background_fill	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
 pages/editor/charts/background_fill.rs	set_body_chart_background_fill	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
 pages/editor/charts/background_fill.rs	set_body_chart_background_image_fill	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
-pages/editor/charts/bar_shape_3d.rs	body_chart_3d_bar_shape	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
-pages/editor/charts/bar_shape_3d.rs	set_body_chart_3d_bar_shape	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
-pages/editor/charts/border.rs	body_chart_border_visible	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
-pages/editor/charts/border.rs	set_body_chart_border_visible	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
+pages/editor/charts/bar_shape_3d.rs	body_chart_3d_bar_shape	1	pages	chart.style	migrated	litchi_pages::Package::body_chart_style	pages_body_chart_options_read_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+pages/editor/charts/bar_shape_3d.rs	set_body_chart_3d_bar_shape	1	pages	chart.style	migrated	litchi_pages::chart::style::Edit::set	pages_body_chart_options_set_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+pages/editor/charts/border.rs	body_chart_border_visible	1	pages	chart.style	migrated	litchi_pages::Package::body_chart_style	pages_body_chart_options_read_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+pages/editor/charts/border.rs	set_body_chart_border_visible	1	pages	chart.style	migrated	litchi_pages::chart::style::Edit::set	pages_body_chart_options_set_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
 pages/editor/charts/border_stroke.rs	body_chart_border_stroke	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
 pages/editor/charts/border_stroke.rs	set_body_chart_border_stroke	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
 pages/editor/charts/caption.rs	body_chart_caption	1	pages	chart.text	host-only	litchi-pages	-	-	-	-
@@ -1686,128 +1686,128 @@ pages/editor/charts/caption.rs	remove_body_chart_caption	1	pages	chart.text	host
 pages/editor/charts/caption.rs	set_body_chart_caption	1	pages	chart.text	host-only	litchi-pages	-	-	-	-
 pages/editor/charts/category_labels.rs	body_chart_category_label_layout	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
 pages/editor/charts/category_labels.rs	set_body_chart_category_label_layout	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
-pages/editor/charts/depth_3d.rs	body_chart_3d_depth	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
-pages/editor/charts/depth_3d.rs	set_body_chart_3d_depth	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
-pages/editor/charts/donut_inner_radius.rs	body_chart_donut_inner_radius	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
-pages/editor/charts/donut_inner_radius.rs	set_body_chart_donut_inner_radius	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
+pages/editor/charts/depth_3d.rs	body_chart_3d_depth	1	pages	chart.style	migrated	litchi_pages::Package::body_chart_style	pages_body_chart_style_read_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+pages/editor/charts/depth_3d.rs	set_body_chart_3d_depth	1	pages	chart.style	migrated	litchi_pages::chart::style::Edit::set	pages_body_chart_style_set_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+pages/editor/charts/donut_inner_radius.rs	body_chart_donut_inner_radius	1	pages	chart.style	migrated	litchi_pages::Package::body_chart_style	pages_body_chart_style_read_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+pages/editor/charts/donut_inner_radius.rs	set_body_chart_donut_inner_radius	1	pages	chart.style	migrated	litchi_pages::chart::style::Edit::set	pages_body_chart_style_set_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
 pages/editor/charts/font.rs	body_chart_font	1	pages	chart.style	migrated	litchi_pages::Package::body_chart_font	pages_body_chart_font_read_parity	A	-	host-vs-facade read parity; native mutation queue remains pending (0386)
 pages/editor/charts/font.rs	body_chart_font_size	1	pages	chart.style	migrated	litchi_pages::Package::body_chart_font_size	pages_body_chart_font_size_read_parity	A	-	host-vs-facade read parity; native mutation queue remains pending (0386)
 pages/editor/charts/font.rs	reset_body_chart_font	1	pages	chart.style	migrated	litchi_pages::Package::edit_body_chart_font	pages_body_chart_font_reset_parity	B	-	host-vs-facade reset parity; native mutation queue remains pending (0386)
 pages/editor/charts/font.rs	reset_body_chart_font_size	1	pages	chart.style	migrated	litchi_pages::Package::edit_body_chart_font_size	pages_body_chart_font_size_reset_parity	B	-	host-vs-facade reset parity; native mutation queue remains pending (0386)
 pages/editor/charts/font.rs	set_body_chart_font	1	pages	chart.style	migrated	litchi_pages::Package::edit_body_chart_font	pages_body_chart_font_set_parity	B	-	host-vs-facade set parity; native mutation queue remains pending (0386)
 pages/editor/charts/font.rs	set_body_chart_font_size	1	pages	chart.style	migrated	litchi_pages::Package::edit_body_chart_font_size	pages_body_chart_font_size_set_parity	B	-	host-vs-facade set parity; native mutation queue remains pending (0386)
-pages/editor/charts/gaps.rs	body_chart_gap_spacing	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
-pages/editor/charts/gaps.rs	set_body_chart_gap_spacing	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
+pages/editor/charts/gaps.rs	body_chart_gap_spacing	1	pages	chart.style	migrated	litchi_pages::Package::body_chart_style	pages_body_chart_options_read_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+pages/editor/charts/gaps.rs	set_body_chart_gap_spacing	1	pages	chart.style	migrated	litchi_pages::chart::style::Edit::set	pages_body_chart_options_set_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
 pages/editor/charts/legend.rs	body_chart_legend_fill	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
 pages/editor/charts/legend.rs	body_chart_legend_font	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
 pages/editor/charts/legend.rs	body_chart_legend_font_size	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
-pages/editor/charts/legend.rs	body_chart_legend_frame	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
+pages/editor/charts/legend.rs	body_chart_legend_frame	1	pages	chart.style	migrated	litchi_pages::Package::body_chart_style	pages_body_chart_style_read_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
 pages/editor/charts/legend.rs	body_chart_legend_shadow	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
 pages/editor/charts/legend.rs	body_chart_legend_stroke	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
 pages/editor/charts/legend.rs	body_chart_legend_visible	1	pages	chart.legend_axis	host-only	litchi-pages	-	-	-	-
 pages/editor/charts/legend.rs	set_body_chart_legend_fill	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
 pages/editor/charts/legend.rs	set_body_chart_legend_font	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
 pages/editor/charts/legend.rs	set_body_chart_legend_font_size	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
-pages/editor/charts/legend.rs	set_body_chart_legend_frame	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
+pages/editor/charts/legend.rs	set_body_chart_legend_frame	1	pages	chart.style	migrated	litchi_pages::chart::style::Edit::set	pages_body_chart_style_set_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
 pages/editor/charts/legend.rs	set_body_chart_legend_shadow	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
 pages/editor/charts/legend.rs	set_body_chart_legend_stroke	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
 pages/editor/charts/legend.rs	set_body_chart_legend_visible	1	pages	chart.legend_axis	host-only	litchi-pages	-	-	-	-
 pages/editor/charts/lighting_3d.rs	body_chart_3d_lighting_style	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
 pages/editor/charts/lighting_3d.rs	set_body_chart_3d_lighting_style	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
-pages/editor/charts/pie_label_distance.rs	body_chart_pie_label_distance	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
-pages/editor/charts/pie_label_distance.rs	body_chart_pie_label_distances	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
-pages/editor/charts/pie_label_distance.rs	set_body_chart_pie_label_distance	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
-pages/editor/charts/pie_label_distance.rs	set_body_chart_pie_label_distances	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
-pages/editor/charts/pie_labels.rs	body_chart_pie_label_visibilities	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
-pages/editor/charts/pie_labels.rs	body_chart_pie_label_visibility	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
-pages/editor/charts/pie_labels.rs	set_body_chart_pie_label_visibilities	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
-pages/editor/charts/pie_labels.rs	set_body_chart_pie_label_visibility	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
+pages/editor/charts/pie_label_distance.rs	body_chart_pie_label_distance	1	pages	chart.style	migrated	litchi_pages::Package::body_chart_series	pages_body_chart_series_read_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+pages/editor/charts/pie_label_distance.rs	body_chart_pie_label_distances	1	pages	chart.style	migrated	litchi_pages::Package::body_chart_series	pages_body_chart_series_read_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+pages/editor/charts/pie_label_distance.rs	set_body_chart_pie_label_distance	1	pages	chart.style	migrated	litchi_pages::chart::series::Edit::set	pages_body_chart_pie_label_distances_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+pages/editor/charts/pie_label_distance.rs	set_body_chart_pie_label_distances	1	pages	chart.style	migrated	litchi_pages::chart::series::Edit::set	pages_body_chart_pie_label_distances_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+pages/editor/charts/pie_labels.rs	body_chart_pie_label_visibilities	1	pages	chart.style	migrated	litchi_pages::Package::body_chart_series	pages_body_chart_series_read_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+pages/editor/charts/pie_labels.rs	body_chart_pie_label_visibility	1	pages	chart.style	migrated	litchi_pages::Package::body_chart_series	pages_body_chart_series_read_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+pages/editor/charts/pie_labels.rs	set_body_chart_pie_label_visibilities	1	pages	chart.style	migrated	litchi_pages::chart::series::Edit::set	pages_body_chart_pie_labels_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+pages/editor/charts/pie_labels.rs	set_body_chart_pie_label_visibility	1	pages	chart.style	migrated	litchi_pages::chart::series::Edit::set	pages_body_chart_pie_labels_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
 pages/editor/charts/pie_leader_lines.rs	body_chart_pie_leader_line_visibilities	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
 pages/editor/charts/pie_leader_lines.rs	body_chart_pie_leader_line_visibility	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
 pages/editor/charts/pie_leader_lines.rs	set_body_chart_pie_leader_line_visibilities	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
 pages/editor/charts/pie_leader_lines.rs	set_body_chart_pie_leader_line_visibility	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
-pages/editor/charts/pie_start_angle.rs	body_chart_pie_start_angle	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
-pages/editor/charts/pie_start_angle.rs	set_body_chart_pie_start_angle	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
-pages/editor/charts/pie_wedge_explosion.rs	body_chart_pie_wedge_explosion	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
-pages/editor/charts/pie_wedge_explosion.rs	body_chart_pie_wedge_explosions	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
-pages/editor/charts/pie_wedge_explosion.rs	set_body_chart_pie_wedge_explosion	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
-pages/editor/charts/pie_wedge_explosion.rs	set_body_chart_pie_wedge_explosions	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
-pages/editor/charts/radar_grid_shape.rs	body_chart_radar_grid_shape	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
-pages/editor/charts/radar_grid_shape.rs	set_body_chart_radar_grid_shape	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
+pages/editor/charts/pie_start_angle.rs	body_chart_pie_start_angle	1	pages	chart.style	migrated	litchi_pages::Package::body_chart_style	pages_body_chart_style_read_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+pages/editor/charts/pie_start_angle.rs	set_body_chart_pie_start_angle	1	pages	chart.style	migrated	litchi_pages::chart::style::Edit::set	pages_body_chart_style_set_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+pages/editor/charts/pie_wedge_explosion.rs	body_chart_pie_wedge_explosion	1	pages	chart.style	migrated	litchi_pages::Package::body_chart_series	pages_body_chart_series_read_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+pages/editor/charts/pie_wedge_explosion.rs	body_chart_pie_wedge_explosions	1	pages	chart.style	migrated	litchi_pages::Package::body_chart_series	pages_body_chart_series_read_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+pages/editor/charts/pie_wedge_explosion.rs	set_body_chart_pie_wedge_explosion	1	pages	chart.style	migrated	litchi_pages::chart::series::Edit::set	pages_body_chart_pie_wedge_explosions_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+pages/editor/charts/pie_wedge_explosion.rs	set_body_chart_pie_wedge_explosions	1	pages	chart.style	migrated	litchi_pages::chart::series::Edit::set	pages_body_chart_pie_wedge_explosions_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+pages/editor/charts/radar_grid_shape.rs	body_chart_radar_grid_shape	1	pages	chart.style	migrated	litchi_pages::Package::body_chart_style	pages_body_chart_options_read_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+pages/editor/charts/radar_grid_shape.rs	set_body_chart_radar_grid_shape	1	pages	chart.style	migrated	litchi_pages::chart::style::Edit::set	pages_body_chart_options_set_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
 pages/editor/charts/radar_series_style.rs	body_chart_radar_series_style	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
 pages/editor/charts/radar_series_style.rs	set_body_chart_radar_series_style	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
-pages/editor/charts/radar_start_angle.rs	body_chart_radar_start_angle	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
-pages/editor/charts/radar_start_angle.rs	set_body_chart_radar_start_angle	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
+pages/editor/charts/radar_start_angle.rs	body_chart_radar_start_angle	1	pages	chart.style	migrated	litchi_pages::Package::body_chart_style	pages_body_chart_style_read_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+pages/editor/charts/radar_start_angle.rs	set_body_chart_radar_start_angle	1	pages	chart.style	migrated	litchi_pages::chart::style::Edit::set	pages_body_chart_style_set_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
 pages/editor/charts/reference_line.rs	body_chart_reference_lines	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
 pages/editor/charts/reference_line.rs	set_body_chart_reference_lines	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
-pages/editor/charts/rounded_corners.rs	body_chart_rounded_corners	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
-pages/editor/charts/rounded_corners.rs	set_body_chart_rounded_corners	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
-pages/editor/charts/scene_3d.rs	body_chart_3d_rotation	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
-pages/editor/charts/scene_3d.rs	set_body_chart_3d_rotation	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
-pages/editor/charts/series_connection_line.rs	body_chart_series_connection_line	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
-pages/editor/charts/series_connection_line.rs	body_chart_series_connection_lines	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
-pages/editor/charts/series_connection_line.rs	set_body_chart_series_connection_line	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
-pages/editor/charts/series_connection_line.rs	set_body_chart_series_connection_lines	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
+pages/editor/charts/rounded_corners.rs	body_chart_rounded_corners	1	pages	chart.style	migrated	litchi_pages::Package::body_chart_style	pages_body_chart_style_read_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+pages/editor/charts/rounded_corners.rs	set_body_chart_rounded_corners	1	pages	chart.style	migrated	litchi_pages::chart::style::Edit::set	pages_body_chart_style_set_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+pages/editor/charts/scene_3d.rs	body_chart_3d_rotation	1	pages	chart.style	migrated	litchi_pages::Package::body_chart_style	pages_body_chart_style_read_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+pages/editor/charts/scene_3d.rs	set_body_chart_3d_rotation	1	pages	chart.style	migrated	litchi_pages::chart::style::Edit::set	pages_body_chart_style_set_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+pages/editor/charts/series_connection_line.rs	body_chart_series_connection_line	1	pages	chart.style	migrated	litchi_pages::Package::body_chart_series	pages_body_chart_series_read_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+pages/editor/charts/series_connection_line.rs	body_chart_series_connection_lines	1	pages	chart.style	migrated	litchi_pages::Package::body_chart_series	pages_body_chart_series_read_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+pages/editor/charts/series_connection_line.rs	set_body_chart_series_connection_line	1	pages	chart.style	migrated	litchi_pages::chart::series::Edit::set	pages_body_chart_series_connection_lines_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+pages/editor/charts/series_connection_line.rs	set_body_chart_series_connection_lines	1	pages	chart.style	migrated	litchi_pages::chart::series::Edit::set	pages_body_chart_series_connection_lines_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
 pages/editor/charts/series_error_bar_auto_fit.rs	body_chart_series_error_bar_auto_fit	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
 pages/editor/charts/series_error_bar_auto_fit.rs	body_chart_series_error_bar_auto_fits	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
 pages/editor/charts/series_error_bar_auto_fit.rs	set_body_chart_series_error_bar_auto_fit	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
 pages/editor/charts/series_error_bar_auto_fit.rs	set_body_chart_series_error_bar_auto_fits	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
-pages/editor/charts/series_error_bars.rs	body_chart_series_error_bar	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
-pages/editor/charts/series_error_bars.rs	body_chart_series_error_bars	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
-pages/editor/charts/series_error_bars.rs	set_body_chart_series_error_bar	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
-pages/editor/charts/series_error_bars.rs	set_body_chart_series_error_bars	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
-pages/editor/charts/series_fill.rs	body_chart_series_fill	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
-pages/editor/charts/series_fill.rs	body_chart_series_fills	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
-pages/editor/charts/series_fill.rs	reset_body_chart_series_fill	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
-pages/editor/charts/series_fill.rs	set_body_chart_series_fill	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
-pages/editor/charts/series_fill.rs	set_body_chart_series_fills	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
+pages/editor/charts/series_error_bars.rs	body_chart_series_error_bar	1	pages	chart.style	migrated	litchi_pages::Package::body_chart_series	pages_body_chart_series_read_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+pages/editor/charts/series_error_bars.rs	body_chart_series_error_bars	1	pages	chart.style	migrated	litchi_pages::Package::body_chart_series	pages_body_chart_series_read_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+pages/editor/charts/series_error_bars.rs	set_body_chart_series_error_bar	1	pages	chart.style	migrated	litchi_pages::chart::series::Edit::set	pages_body_chart_series_error_bars_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+pages/editor/charts/series_error_bars.rs	set_body_chart_series_error_bars	1	pages	chart.style	migrated	litchi_pages::chart::series::Edit::set	pages_body_chart_series_error_bars_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+pages/editor/charts/series_fill.rs	body_chart_series_fill	1	pages	chart.style	migrated	litchi_pages::Package::body_chart_series	pages_body_chart_series_style_read_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+pages/editor/charts/series_fill.rs	body_chart_series_fills	1	pages	chart.style	migrated	litchi_pages::Package::body_chart_series	pages_body_chart_series_style_read_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+pages/editor/charts/series_fill.rs	reset_body_chart_series_fill	1	pages	chart.style	migrated	litchi_pages::chart::series::Edit::reset	pages_body_chart_series_fills_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+pages/editor/charts/series_fill.rs	set_body_chart_series_fill	1	pages	chart.style	migrated	litchi_pages::chart::series::Edit::set	pages_body_chart_series_fills_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+pages/editor/charts/series_fill.rs	set_body_chart_series_fills	1	pages	chart.style	migrated	litchi_pages::chart::series::Edit::set	pages_body_chart_series_fills_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
 pages/editor/charts/series_fill.rs	set_body_chart_series_image_fill	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
-pages/editor/charts/series_gap_3d.rs	body_chart_3d_series_gap	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
-pages/editor/charts/series_gap_3d.rs	set_body_chart_3d_series_gap	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
-pages/editor/charts/series_stroke.rs	body_chart_series_stroke	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
-pages/editor/charts/series_stroke.rs	body_chart_series_strokes	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
-pages/editor/charts/series_stroke.rs	reset_body_chart_series_stroke	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
-pages/editor/charts/series_stroke.rs	set_body_chart_series_stroke	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
-pages/editor/charts/series_stroke.rs	set_body_chart_series_strokes	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
+pages/editor/charts/series_gap_3d.rs	body_chart_3d_series_gap	1	pages	chart.style	migrated	litchi_pages::Package::body_chart_style	pages_body_chart_style_read_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+pages/editor/charts/series_gap_3d.rs	set_body_chart_3d_series_gap	1	pages	chart.style	migrated	litchi_pages::chart::style::Edit::set	pages_body_chart_style_set_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+pages/editor/charts/series_stroke.rs	body_chart_series_stroke	1	pages	chart.style	migrated	litchi_pages::Package::body_chart_series	pages_body_chart_series_style_read_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+pages/editor/charts/series_stroke.rs	body_chart_series_strokes	1	pages	chart.style	migrated	litchi_pages::Package::body_chart_series	pages_body_chart_series_style_read_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+pages/editor/charts/series_stroke.rs	reset_body_chart_series_stroke	1	pages	chart.style	migrated	litchi_pages::chart::series::Edit::reset	pages_body_chart_series_strokes_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+pages/editor/charts/series_stroke.rs	set_body_chart_series_stroke	1	pages	chart.style	migrated	litchi_pages::chart::series::Edit::set	pages_body_chart_series_strokes_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+pages/editor/charts/series_stroke.rs	set_body_chart_series_strokes	1	pages	chart.style	migrated	litchi_pages::chart::series::Edit::set	pages_body_chart_series_strokes_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
 pages/editor/charts/series_symbol.rs	body_chart_series_symbol	1	pages	chart.style	migrated	litchi_pages::Package::body_chart_series	pages_body_chart_series_symbols_read_parity	A	-	0400
 pages/editor/charts/series_symbol.rs	body_chart_series_symbols	1	pages	chart.style	migrated	litchi_pages::Package::body_chart_series	pages_body_chart_series_symbols_read_parity	A	-	0400
 pages/editor/charts/series_symbol.rs	set_body_chart_series_symbol	1	pages	chart.style	migrated	litchi_pages::chart::series::Edit::set	pages_body_chart_series_symbols_allocate_parity	B	-	0400
 pages/editor/charts/series_symbol.rs	set_body_chart_series_symbols	1	pages	chart.style	migrated	litchi_pages::chart::series::Edit::set	pages_body_chart_series_symbols_allocate_parity	B	-	0400
-pages/editor/charts/series_symbol_fill.rs	body_chart_series_symbol_fill	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
-pages/editor/charts/series_symbol_fill.rs	body_chart_series_symbol_fills	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
-pages/editor/charts/series_symbol_fill.rs	reset_body_chart_series_symbol_fill	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
-pages/editor/charts/series_symbol_fill.rs	set_body_chart_series_symbol_fill	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
-pages/editor/charts/series_symbol_fill.rs	set_body_chart_series_symbol_fills	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
+pages/editor/charts/series_symbol_fill.rs	body_chart_series_symbol_fill	1	pages	chart.style	migrated	litchi_pages::Package::body_chart_series	pages_body_chart_series_style_read_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+pages/editor/charts/series_symbol_fill.rs	body_chart_series_symbol_fills	1	pages	chart.style	migrated	litchi_pages::Package::body_chart_series	pages_body_chart_series_style_read_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+pages/editor/charts/series_symbol_fill.rs	reset_body_chart_series_symbol_fill	1	pages	chart.style	migrated	litchi_pages::chart::series::Edit::reset	pages_body_chart_series_symbol_fills_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+pages/editor/charts/series_symbol_fill.rs	set_body_chart_series_symbol_fill	1	pages	chart.style	migrated	litchi_pages::chart::series::Edit::set	pages_body_chart_series_symbol_fills_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+pages/editor/charts/series_symbol_fill.rs	set_body_chart_series_symbol_fills	1	pages	chart.style	migrated	litchi_pages::chart::series::Edit::set	pages_body_chart_series_symbol_fills_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
 pages/editor/charts/series_symbol_fill.rs	set_body_chart_series_symbol_image_fill	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
-pages/editor/charts/series_symbol_outline.rs	body_chart_series_symbol_outline	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
-pages/editor/charts/series_symbol_outline.rs	body_chart_series_symbol_outlines	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
-pages/editor/charts/series_symbol_outline.rs	reset_body_chart_series_symbol_outline	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
-pages/editor/charts/series_symbol_outline.rs	set_body_chart_series_symbol_outline	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
-pages/editor/charts/series_symbol_outline.rs	set_body_chart_series_symbol_outlines	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
-pages/editor/charts/series_trendline.rs	body_chart_series_trendline	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
-pages/editor/charts/series_trendline.rs	body_chart_series_trendlines	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
-pages/editor/charts/series_trendline.rs	set_body_chart_series_trendline	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
-pages/editor/charts/series_trendline.rs	set_body_chart_series_trendlines	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
-pages/editor/charts/series_value_label_affixes.rs	body_chart_series_value_label_affix	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
-pages/editor/charts/series_value_label_affixes.rs	body_chart_series_value_label_affixes	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
-pages/editor/charts/series_value_label_affixes.rs	set_body_chart_series_value_label_affix	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
-pages/editor/charts/series_value_label_affixes.rs	set_body_chart_series_value_label_affixes	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
+pages/editor/charts/series_symbol_outline.rs	body_chart_series_symbol_outline	1	pages	chart.style	migrated	litchi_pages::Package::body_chart_series	pages_body_chart_series_style_read_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+pages/editor/charts/series_symbol_outline.rs	body_chart_series_symbol_outlines	1	pages	chart.style	migrated	litchi_pages::Package::body_chart_series	pages_body_chart_series_style_read_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+pages/editor/charts/series_symbol_outline.rs	reset_body_chart_series_symbol_outline	1	pages	chart.style	migrated	litchi_pages::chart::series::Edit::reset	pages_body_chart_series_symbol_outlines_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+pages/editor/charts/series_symbol_outline.rs	set_body_chart_series_symbol_outline	1	pages	chart.style	migrated	litchi_pages::chart::series::Edit::set	pages_body_chart_series_symbol_outlines_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+pages/editor/charts/series_symbol_outline.rs	set_body_chart_series_symbol_outlines	1	pages	chart.style	migrated	litchi_pages::chart::series::Edit::set	pages_body_chart_series_symbol_outlines_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+pages/editor/charts/series_trendline.rs	body_chart_series_trendline	1	pages	chart.style	migrated	litchi_pages::Package::body_chart_series	pages_body_chart_series_read_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+pages/editor/charts/series_trendline.rs	body_chart_series_trendlines	1	pages	chart.style	migrated	litchi_pages::Package::body_chart_series	pages_body_chart_series_read_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+pages/editor/charts/series_trendline.rs	set_body_chart_series_trendline	1	pages	chart.style	migrated	litchi_pages::chart::series::Edit::set	pages_body_chart_series_trendlines_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+pages/editor/charts/series_trendline.rs	set_body_chart_series_trendlines	1	pages	chart.style	migrated	litchi_pages::chart::series::Edit::set	pages_body_chart_series_trendlines_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+pages/editor/charts/series_value_label_affixes.rs	body_chart_series_value_label_affix	1	pages	chart.style	migrated	litchi_pages::Package::body_chart_series	pages_body_chart_series_read_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+pages/editor/charts/series_value_label_affixes.rs	body_chart_series_value_label_affixes	1	pages	chart.style	migrated	litchi_pages::Package::body_chart_series	pages_body_chart_series_read_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+pages/editor/charts/series_value_label_affixes.rs	set_body_chart_series_value_label_affix	1	pages	chart.style	migrated	litchi_pages::chart::series::Edit::set	pages_body_chart_series_value_label_affixes_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+pages/editor/charts/series_value_label_affixes.rs	set_body_chart_series_value_label_affixes	1	pages	chart.style	migrated	litchi_pages::chart::series::Edit::set	pages_body_chart_series_value_label_affixes_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
 pages/editor/charts/series_value_label_auto_fit.rs	body_chart_series_value_label_auto_fit	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
 pages/editor/charts/series_value_label_auto_fit.rs	body_chart_series_value_label_auto_fits	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
 pages/editor/charts/series_value_label_auto_fit.rs	set_body_chart_series_value_label_auto_fit	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
 pages/editor/charts/series_value_label_auto_fit.rs	set_body_chart_series_value_label_auto_fits	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
-pages/editor/charts/series_value_label_number_format.rs	body_chart_series_value_label_number_format	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
-pages/editor/charts/series_value_label_number_format.rs	body_chart_series_value_label_number_formats	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
-pages/editor/charts/series_value_label_number_format.rs	set_body_chart_series_value_label_number_format	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
-pages/editor/charts/series_value_label_number_format.rs	set_body_chart_series_value_label_number_formats	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
+pages/editor/charts/series_value_label_number_format.rs	body_chart_series_value_label_number_format	1	pages	chart.style	migrated	litchi_pages::Package::body_chart_series	pages_body_chart_series_read_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+pages/editor/charts/series_value_label_number_format.rs	body_chart_series_value_label_number_formats	1	pages	chart.style	migrated	litchi_pages::Package::body_chart_series	pages_body_chart_series_read_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+pages/editor/charts/series_value_label_number_format.rs	set_body_chart_series_value_label_number_format	1	pages	chart.style	migrated	litchi_pages::chart::series::Edit::set	pages_body_chart_series_value_label_number_formats_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+pages/editor/charts/series_value_label_number_format.rs	set_body_chart_series_value_label_number_formats	1	pages	chart.style	migrated	litchi_pages::chart::series::Edit::set	pages_body_chart_series_value_label_number_formats_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
 pages/editor/charts/series_value_labels.rs	body_chart_series_value_label_location	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
 pages/editor/charts/series_value_labels.rs	body_chart_series_value_label_locations	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
-pages/editor/charts/series_value_labels.rs	body_chart_series_value_label_visibilities	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
-pages/editor/charts/series_value_labels.rs	body_chart_series_value_label_visibility	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
+pages/editor/charts/series_value_labels.rs	body_chart_series_value_label_visibilities	1	pages	chart.style	migrated	litchi_pages::Package::body_chart_series	pages_body_chart_series_read_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+pages/editor/charts/series_value_labels.rs	body_chart_series_value_label_visibility	1	pages	chart.style	migrated	litchi_pages::Package::body_chart_series	pages_body_chart_series_read_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
 pages/editor/charts/series_value_labels.rs	set_body_chart_series_value_label_location	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
 pages/editor/charts/series_value_labels.rs	set_body_chart_series_value_label_locations	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
-pages/editor/charts/series_value_labels.rs	set_body_chart_series_value_label_visibilities	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
-pages/editor/charts/series_value_labels.rs	set_body_chart_series_value_label_visibility	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
+pages/editor/charts/series_value_labels.rs	set_body_chart_series_value_label_visibilities	1	pages	chart.style	migrated	litchi_pages::chart::series::Edit::set	pages_body_chart_series_value_labels_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+pages/editor/charts/series_value_labels.rs	set_body_chart_series_value_label_visibility	1	pages	chart.style	migrated	litchi_pages::chart::series::Edit::set	pages_body_chart_series_value_labels_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
 pages/editor/charts/shadow.rs	body_chart_shadow	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
 pages/editor/charts/shadow.rs	set_body_chart_shadow	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
 pages/editor/charts/title.rs	body_chart_title	1	pages	chart.text	migrated	litchi-pages::Package::body_chart_title	pages_chart_title_and_axis_title_read_parity	A	-	-
