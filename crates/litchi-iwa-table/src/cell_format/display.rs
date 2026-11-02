@@ -1055,6 +1055,50 @@ fn map_bnc_error(error: litchi_numbers_wire::Error, path: Path) -> Error {
     }
 }
 
+/// Convert a decimal cell to a Currency, Date and Time, Duration or (text
+/// and empty cells) Text cell naming `key`: the stored scalar takes the family's native type (a
+/// Duration's value becomes seconds) and the format metadata the family's
+/// explicit tuple, as the host's compatibility writer does (record 0412a).
+fn convert_cell_to_family(
+    source: &[u8],
+    family: DisplayFormatFamily,
+    key: u32,
+    path: Path,
+    budget: &mut TransactionBudget,
+) -> Result<Vec<u8>, Error> {
+    let output_limit = source
+        .len()
+        .checked_add(16)
+        .ok_or(Error::InvalidSource { path })?;
+    let allocations = litchi_numbers_wire::MAX_OWNED_BNC_PARSE_ALLOCATIONS
+        .checked_mul(2)
+        .and_then(|amount| amount.checked_add(4))
+        .ok_or(Error::InvalidSource { path })?;
+    budget.charge_allocations(allocations, path)?;
+    budget.charge_scratch_bytes(source.len().saturating_add(output_limit), path)?;
+    budget.charge_retained_bytes(output_limit, path)?;
+    budget.charge_transaction_work(
+        output_limit.saturating_mul(2).saturating_add(source.len()),
+        path,
+    )?;
+    let kind = match family {
+        DisplayFormatFamily::Currency => CellDataFormatKind::Currency,
+        DisplayFormatFamily::DateTime => CellDataFormatKind::DateTime,
+        DisplayFormatFamily::Duration => CellDataFormatKind::Duration,
+        DisplayFormatFamily::Text => CellDataFormatKind::Text,
+        _ => {
+            return Err(Error::Refused(
+                crate::cell_format::Refusal::UnsupportedDependency { path },
+            ));
+        },
+    };
+    let mut cell = BncCell::parse(source, &crate::cell_format::bnc_limits_for_source(source))
+        .map_err(|_| Error::InvalidSource { path })?;
+    cell.set_data_format_identifier(key, kind, None)
+        .map_err(|_| Error::Refused(crate::cell_format::Refusal::UnsupportedDependency { path }))?;
+    encode_bnc(&cell, source, output_limit, path)
+}
+
 fn encode_bnc(
     cell: &BncCell,
     source: &[u8],
@@ -2169,7 +2213,30 @@ fn rewrite_display_format(
         ));
     }
     let explicit_flags = cell.explicit_format_flags();
+    // A native decimal cell naming an implicit Number entry converted to
+    // Currency, Date and Time, Duration or (a text cell) Text: the host's compatibility writer
+    // interns the new family's entry, converts the stored scalar and changes
+    // the cell's kind, as `BncCell::set_data_format_identifier` does
+    // (record 0412a).
+    let converting = (matches!(
+        family,
+        DisplayFormatFamily::Currency
+            | DisplayFormatFamily::DateTime
+            | DisplayFormatFamily::Duration
+    ) || (family == DisplayFormatFamily::Text
+        && matches!(
+            cell.stored_value(),
+            litchi_numbers_wire::StoredValue::Empty | litchi_numbers_wire::StoredValue::Text(_)
+        )))
+        && before.is_none()
+        && after.is_some()
+        && old_format.is_some_and(|identifier| identifier != 0)
+        && cell.cell_format_kind() == Some(litchi_numbers_wire::DECIMAL_CELL_FORMAT_KIND)
+        && explicit_flags == 0
+        && old_secondary.is_none()
+        && cell.has_only_decimal_format_metadata();
     match (family, old_format, cell.cell_format_kind()) {
+        _ if converting => {},
         (
             DisplayFormatFamily::Number
             | DisplayFormatFamily::Percentage
@@ -2392,7 +2459,11 @@ fn rewrite_display_format(
         if entry.ref_count == 0 || !entry.is_format {
             return Err(Error::InvalidSource { path });
         }
-        let decoded = decode_display_payload(family, &entry.payload, budget, path);
+        let decoded = if converting {
+            Err(DisplayReadError::WrongFormatFamily)
+        } else {
+            decode_display_payload(family, &entry.payload, budget, path)
+        };
         let current = match decoded {
             Err(DisplayReadError::WrongFormatFamily) if explicit_flags == 0 && before.is_none() => {
                 implicit_foreign = true;
@@ -2491,7 +2562,9 @@ fn rewrite_display_format(
     }
     let replacement_cell = if after_is_some {
         let key = new_format_key.ok_or(Error::InvalidSource { path })?;
-        if family == DisplayFormatFamily::Currency {
+        if converting {
+            convert_cell_to_family(cell_source, family, key, path, budget)?
+        } else if family == DisplayFormatFamily::Currency {
             rewrite_currency_cell_metadata(cell_source, Some(key), path, budget)?
         } else if family == DisplayFormatFamily::DateTime {
             rewrite_date_time_cell_metadata(cell_source, Some(key), path, budget)?
@@ -2506,7 +2579,17 @@ fn rewrite_display_format(
         if family == DisplayFormatFamily::Currency {
             rewrite_currency_cell_metadata(cell_source, None, path, budget)?
         } else if family == DisplayFormatFamily::DateTime {
-            rewrite_date_time_cell_metadata(cell_source, None, path, budget)?
+            // A cleared Date and Time cell holding a plain number goes back
+            // to the ordinary numeric type, as the host's
+            // `clear_explicit_format` does (record 0412a).
+            let cleared = rewrite_date_time_cell_metadata(cell_source, None, path, budget)?;
+            let mut cell = BncCell::parse(
+                &cleared,
+                &crate::cell_format::bnc_limits_for_source(&cleared),
+            )
+            .map_err(|_| Error::Verification)?;
+            cell.clear_explicit_format();
+            encode_bnc(&cell, &cleared, cleared.len(), path)?
         } else if family == DisplayFormatFamily::Duration {
             rewrite_duration_cell_metadata(cell_source, None, path, budget)?
         } else if family == DisplayFormatFamily::Text {
@@ -3016,22 +3099,21 @@ fn locate_custom_registry(
             crate::cell_format::Refusal::UnsupportedSource,
         ))?;
     let document_object = native::unique_object(document_archive, 1, path)?;
-    let document_index =
-        native::unique_message_index(document_object, DOCUMENT_MESSAGE_TYPE, path)?;
-    let root = &document_object.messages[document_index].data;
+    let layout = document_layout(document_object, path)?;
+    let root = &document_object.messages[layout.index].data;
     let view = custom_wire_view(root, budget, 0, path)?;
     let mut root_reference = None;
     let mut legacy_reference = None;
     let mut legacy_super_fields = 0usize;
     for field in view.fields() {
         match field.number() {
-            CUSTOM_REGISTRY_REFERENCE_FIELD => {
+            number if number == layout.direct_field => {
                 let reference = parse_custom_registry_reference(field, path)?;
                 if root_reference.replace(reference).is_some() {
                     return Err(Error::InvalidSource { path });
                 }
             },
-            DOCUMENT_LEGACY_SUPER_FIELD => {
+            number if number == layout.super_field => {
                 legacy_super_fields = legacy_super_fields
                     .checked_add(1)
                     .ok_or(Error::InvalidSource { path })?;
@@ -4627,13 +4709,12 @@ fn validate_custom_legacy_routes(
             crate::cell_format::Refusal::UnsupportedSource,
         ))?;
     let document_object = native::unique_object(document_archive, 1, path)?;
-    let document_index =
-        native::unique_message_index(document_object, DOCUMENT_MESSAGE_TYPE, path)?;
-    let root = &document_object.messages[document_index].data;
+    let layout = document_layout(document_object, path)?;
+    let root = &document_object.messages[layout.index].data;
     let root_view = custom_wire_view(root, budget, 0, path)?;
     for field in root_view
         .fields()
-        .filter(|field| field.number() == DOCUMENT_LEGACY_SUPER_FIELD)
+        .filter(|field| field.number() == layout.super_field)
     {
         if field.wire_type() != 2 {
             return Err(Error::InvalidSource { path });
@@ -5613,6 +5694,67 @@ const FORMAT_LIST_TYPE: i32 = 2;
 // document registry's native message type (222).
 const CUSTOM_FORMAT_LIST_TYPE: i32 = 6;
 const DOCUMENT_MESSAGE_TYPE: u32 = 1;
+/// `TP.DocumentArchive` (Pages).
+const PAGES_DOCUMENT_MESSAGE_TYPE: u32 = 10_000;
+/// `TP.DocumentArchive.super` (the `TSA.DocumentArchive`).
+const PAGES_DOCUMENT_SUPER_FIELD: u32 = 15;
+/// `TP.DocumentArchive.tables_custom_format_list`.
+const PAGES_CUSTOM_REGISTRY_REFERENCE_FIELD: u32 = 41;
+/// `KN.DocumentArchive.super` (the `TSA.DocumentArchive`).
+const KEYNOTE_DOCUMENT_SUPER_FIELD: u32 = 3;
+/// `KN.DocumentArchive.tables_custom_format_list`.
+const KEYNOTE_CUSTOM_REGISTRY_REFERENCE_FIELD: u32 = 4;
+
+/// Where one format's document root names the custom-format registry
+/// (record 0412a): its message, its direct reference field, and its
+/// `TSA.DocumentArchive` envelope (whose field 12 is the native reference).
+#[derive(Debug, Clone, Copy)]
+struct DocumentLayout {
+    index: usize,
+    direct_field: u32,
+    super_field: u32,
+}
+
+/// The document root layout of a Numbers (`TN.DocumentArchive`, super 8),
+/// Keynote (`KN.DocumentArchive`, super 3) or Pages (`TP.DocumentArchive`,
+/// super 15) package. Numbers and Keynote share message type 1; Numbers'
+/// required super is field 8.
+fn document_layout(
+    object: &litchi_iwa_core::ArchiveObject,
+    path: Path,
+) -> Result<DocumentLayout, Error> {
+    let index = native::unique_message_index(object, DOCUMENT_MESSAGE_TYPE, path)
+        .or_else(|_| native::unique_message_index(object, PAGES_DOCUMENT_MESSAGE_TYPE, path))?;
+    let message = &object.messages[index];
+    if message.type_ == PAGES_DOCUMENT_MESSAGE_TYPE {
+        return Ok(DocumentLayout {
+            index,
+            direct_field: PAGES_CUSTOM_REGISTRY_REFERENCE_FIELD,
+            super_field: PAGES_DOCUMENT_SUPER_FIELD,
+        });
+    }
+    let view = litchi_iwa_common::wire::parse_wire_view(
+        &message.data,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )
+    .map_err(|_| Error::InvalidSource { path })?;
+    if view
+        .fields()
+        .any(|field| field.number() == DOCUMENT_LEGACY_SUPER_FIELD)
+    {
+        Ok(DocumentLayout {
+            index,
+            direct_field: CUSTOM_REGISTRY_REFERENCE_FIELD,
+            super_field: DOCUMENT_LEGACY_SUPER_FIELD,
+        })
+    } else {
+        Ok(DocumentLayout {
+            index,
+            direct_field: KEYNOTE_CUSTOM_REGISTRY_REFERENCE_FIELD,
+            super_field: KEYNOTE_DOCUMENT_SUPER_FIELD,
+        })
+    }
+}
 // TN.DocumentArchive.super is field 8, the legacy TSA envelope.  Native
 // Numbers has been observed to store the document-scoped custom registry
 // reference as field 12 inside that envelope; the compact fixture route uses
