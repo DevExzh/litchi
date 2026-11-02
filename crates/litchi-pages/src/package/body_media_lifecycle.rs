@@ -300,16 +300,15 @@ impl fmt::Debug for Edit<'_> {
 }
 
 impl Edit<'_> {
-    /// Stage the removal of one body image, movie or audio clip with its
-    /// private graph and the data assets only it uses.
+    /// Stage the removal of one body image, movie, audio clip, shape or
+    /// text box with its private graph (a shape's or text box's owned
+    /// storage included) and the data assets only it uses.
     ///
     /// # Errors
     ///
-    /// Refuses a shape and a second operation.
+    /// Refuses a second operation.
     pub fn remove(&mut self, selector: impl Into<DrawableSelector>) -> Result<&mut Self, Error> {
-        let selector = selector.into();
-        media_kind(selector)?;
-        self.stage(Operation::Remove(selector))
+        self.stage(Operation::Remove(selector.into()))
     }
 
     /// Stage a copy of one body image, movie or audio clip anchored at a
@@ -824,7 +823,6 @@ struct MediaGraph {
 }
 
 fn resolve(package: &Package, selector: DrawableSelector) -> Result<MediaGraph, Error> {
-    media_kind(selector)?;
     let mut budget = Budget::new(package)?;
     let index = ObjectIndex::new(package, &mut budget)?;
     let body = graph::resolve_body(&index, &mut budget)?;
@@ -839,6 +837,8 @@ fn resolve(package: &Package, selector: DrawableSelector) -> Result<MediaGraph, 
     }
     let drawable = selected.anchor.drawable;
     let mut graph_objects = vec![drawable.get()];
+    // A shape's or text box's owned storage (the host's text-box graph).
+    graph_objects.extend(selected.storage.map(NonZeroU64::get));
     for kind in [LabelKind::Title, LabelKind::Caption] {
         graph_objects.extend(
             caption::label_objects(package, selector, kind)?
