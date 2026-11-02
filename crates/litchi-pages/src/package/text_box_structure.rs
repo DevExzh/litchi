@@ -22,8 +22,8 @@ use litchi_iwa_core::ArchiveObject;
 use litchi_iwa_table::TableSource;
 
 pub(super) use litchi_iwa_table::structure::{
-    Fault, FaultLimit, FaultResult, exact_source, map_archive, map_core, map_wire, metadata,
-    new_object, references, reserve, unique_message,
+    Fault, FaultLimit, FaultResult, copy_bytes, exact_source, map_archive, map_core, map_wire,
+    metadata, new_object, references, reserve, unique_message,
 };
 
 use litchi_iwa_common::wire::{WireFieldView, WireView};
@@ -48,6 +48,16 @@ pub(super) fn object(package: &Package, identifier: u64) -> FaultResult<&Archive
         .get_index(resolved.component_index)
         .and_then(|component| component.archive().objects.get(resolved.object_index))
         .ok_or(Fault::Invalid)
+}
+
+/// Every object of `package`'s exact source, in catalog order.
+pub(super) fn source_objects(package: &Package) -> impl Iterator<Item = &ArchiveObject> {
+    package
+        .state
+        .source
+        .components()
+        .iter()
+        .flat_map(|component| component.archive().objects.iter())
 }
 
 /// The single field `number` of `view`, of wire type `wire_type`.

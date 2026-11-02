@@ -42,3 +42,21 @@ fn media_owns_no_text() {
         litchi_core::edit::RefusalKind::UnsupportedTarget
     );
 }
+
+#[test]
+fn lists_and_named_styles_refuse_media() {
+    let package = Package::from_bytes(IMAGES).unwrap();
+    let image = DrawableSelector::image(0);
+    assert_eq!(
+        package.edit_body_text_box_lists(image).err(),
+        Some(litchi_pages::drawable::list::Error::Refused(
+            litchi_pages::drawable::list::Refusal::NoText { kind: "image" }
+        ))
+    );
+    assert_eq!(
+        package.body_text_box_named_styles(image).err(),
+        Some(litchi_pages::drawable::named_style::Error::Refused(
+            litchi_pages::drawable::named_style::Refusal::NoText { kind: "image" }
+        ))
+    );
+}
