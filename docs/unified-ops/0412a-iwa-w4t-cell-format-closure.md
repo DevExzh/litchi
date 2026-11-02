@@ -114,5 +114,14 @@ Ledger: 14 Pages and 15 Keynote rows migrate; ten native queue rows.
 
 ## 5. Verification
 
-See the hand-off message of this slice for the gate results on the merged
-tip.
+On the merge of trunk `12682616f7` (`85dd7c59f1`), the gate script
+`.coord/iwa-w4t/gates.sh` passes every row (formatting, workspace and
+`litchi-ops` feature Clippy, leaf/`litchi`/`litchi-ops` tests, boundaries,
+non-iWork gate, five glossary profiles, ledger, tool unit tests, delta,
+corpus, bench and feature matrices, pyo3, perf-baseline, four fuzz locks,
+FIN lock, debug parity filters: 106 passed) except rustdoc and the
+`iwa-table` glossary profile, which failed on one unresolved intra-doc link
+in `pop_up_publish`; after the link repair both pass, with formatting.
+Custom-format and Text writes have callgrind probes
+(`*_cell_custom_format_cost_abba`); their measurement waits for the next
+release build.

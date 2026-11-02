@@ -2,7 +2,7 @@
 //! Numbers Pop-Up Menu facade, record 0412a).
 //!
 //! The native graph rewrite, the metadata registry transition and the menu
-//! model allocation are this crate's [`super::pop_up_menu`] engine; this
+//! model allocation are this crate's [`pop_up_menu`](crate::cell_format::pop_up_menu) engine; this
 //! module stages their members, the package metadata member and (when the
 //! leaf invalidates them) the root preview deletions as one exact-source
 //! reassembly, reopens the candidate through the leaf, proves package
