@@ -788,3 +788,64 @@ fn pages_body_shapes_read_parity() -> TestResult {
     let _ = (Tier::A, Evidence::Queued);
     Ok(())
 }
+
+#[test]
+#[ignore = "callgrind cost probe (record 0413b)"]
+fn text_box_add_cost_abba() -> TestResult {
+    let add = Add::TextBox("New box");
+    crate::pages_cost_probes::abba(
+        &basic()?,
+        |source| host_add(source, &add),
+        |source| Ok(leaf_add(source, &add)?.output),
+    )
+}
+
+#[test]
+#[ignore = "callgrind cost probe (record 0413b)"]
+fn shape_duplicate_cost_abba() -> TestResult {
+    crate::pages_cost_probes::abba(
+        &shape_fixture()?,
+        |source| {
+            let mut e = pages::Draft::from_bytes(source)?;
+            let d = e
+                .body_shapes()?
+                .first()
+                .ok_or("no shape")?
+                .drawable_object_id;
+            let at = body_end(source)?;
+            e.duplicate_body_shape(d, at)?;
+            Ok(e.to_bytes()?)
+        },
+        |source| {
+            let package = Package::from_bytes(source)?;
+            let at = litchi_pages::TextPosition::from_utf16_index(body_end(source)?)?;
+            let mut edit = package.edit_body_media();
+            edit.duplicate(DrawableSelector::shape(0), at)?;
+            Ok(leaf_bytes!(edit.commit()?.package()))
+        },
+    )
+}
+
+#[test]
+#[ignore = "callgrind cost probe (record 0413b)"]
+fn shape_preset_set_cost_abba() -> TestResult {
+    crate::pages_cost_probes::abba(
+        &shape_fixture()?,
+        |source| {
+            let mut e = pages::Draft::from_bytes(source)?;
+            let d = e
+                .body_shapes()?
+                .first()
+                .ok_or("no shape")?
+                .drawable_object_id;
+            e.set_body_shape_preset(d, Preset::Ellipse)?;
+            Ok(e.to_bytes()?)
+        },
+        |source| {
+            let package = Package::from_bytes(source)?;
+            let mut edit = package.edit_body_drawable_properties(DrawableSelector::shape(0))?;
+            edit.set_preset(Preset::Ellipse)?;
+            Ok(leaf_bytes!(edit.commit()?.package()))
+        },
+    )
+}
