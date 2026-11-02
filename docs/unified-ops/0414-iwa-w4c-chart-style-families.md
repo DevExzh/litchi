@@ -302,3 +302,6 @@ host); reads Tier A. Seven macOS-queue routes added.
 Receipt `results/0414/callgrind-slice3.json`; raw captures in
 `.coord/iwa-w4c/cg3/`. Legend font and font size (a paragraph-style graph like
 `chart_font`) follow in the next slice.
+
+Slice 3 gates (trunk `5b5dad5c57` merged at `9cfdf2f69d`; logs
+`.coord/iwa-w4c/gates4`): every command of §8 exits 0.
