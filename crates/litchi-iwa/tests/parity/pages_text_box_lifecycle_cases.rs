@@ -129,3 +129,117 @@ fn text_box_remove_cost_abba() -> TestResult {
         },
     )
 }
+
+// ---- straight-line segments --------------------------------------------------
+
+use litchi_iwa::shapes::DrawablePoint;
+use litchi_pages::drawable::Point;
+use litchi_pages::drawable::properties::Segment;
+
+/// `basic.pages` with a host straight line at the start of the body; the
+/// line is the body's first shape.
+fn line_fixture() -> TestResult<Fixture> {
+    let mut e =
+        pages::Draft::from_bytes(&crate::harness::fixture("iwork/pages/basic.pages")?.bytes)?;
+    e.add_body_line(
+        0,
+        DrawablePoint { x: 40.0, y: 60.0 },
+        DrawablePoint { x: 240.0, y: 160.0 },
+    )?;
+    Ok(Fixture {
+        path: "basic.pages + host add_body_line",
+        bytes: e.to_bytes()?,
+    })
+}
+
+fn host_segment(bytes: &[u8]) -> TestResult<String> {
+    let e = pages::Draft::from_bytes(bytes)?;
+    let d = e
+        .body_shapes()?
+        .first()
+        .ok_or("no shape")?
+        .drawable_object_id;
+    let segment = e.body_line_segment(d)?;
+    Ok(format!(
+        "{:?} {:?}",
+        (segment.start().x, segment.start().y),
+        (segment.end().x, segment.end().y)
+    ))
+}
+
+fn leaf_segment(bytes: &[u8]) -> TestResult<String> {
+    let snapshot =
+        Package::from_bytes(bytes)?.body_drawable_properties(DrawableSelector::shape(0))?;
+    let segment = snapshot.line_segment().ok_or("no segment")?;
+    Ok(format!(
+        "{:?} {:?}",
+        (segment.start().x, segment.start().y),
+        (segment.end().x, segment.end().y)
+    ))
+}
+
+#[test]
+fn pages_body_line_segment_parity() -> TestResult {
+    let _ = (Tier::A, Evidence::Queued);
+    let input = line_fixture()?;
+    for (start, end) in [
+        ((10.0, 20.0), (110.0, 20.0)),
+        ((300.0, 200.0), (100.0, 50.0)),
+    ] {
+        Case::new(
+            "pages_body_line_segment_parity",
+            Format::Pages,
+            Tier::A,
+            Evidence::Queued,
+            &input,
+        )
+        .host(|source| {
+            let mut e = pages::Draft::from_bytes(source)?;
+            let d = e
+                .body_shapes()?
+                .first()
+                .ok_or("no shape")?
+                .drawable_object_id;
+            e.set_body_line_segment(
+                d,
+                DrawablePoint {
+                    x: start.0,
+                    y: start.1,
+                },
+                DrawablePoint { x: end.0, y: end.1 },
+            )?;
+            Ok(e.to_bytes()?)
+        })
+        .leaf(|source| {
+            let package = Package::from_bytes(source)?;
+            let mut edit = package.edit_body_drawable_properties(DrawableSelector::shape(0))?;
+            edit.set_line_segment(Segment::new(
+                Point {
+                    x: start.0,
+                    y: start.1,
+                },
+                Point { x: end.0, y: end.1 },
+            )?)?;
+            let commit = edit.commit()?;
+            let restored = commit
+                .package()
+                .apply_body_drawable_properties(&commit.patch().inverse())?;
+            Ok(LeafRun::with_inverse(
+                leaf_bytes!(commit.package()),
+                leaf_bytes!(restored.package()),
+            ))
+        })
+        .read("host segment", host_segment)
+        .read("leaf segment", leaf_segment)
+        .run()?;
+    }
+    Ok(())
+}
+
+#[test]
+fn pages_body_line_segment_read_parity() -> TestResult {
+    let input = line_fixture()?;
+    assert_eq!(host_segment(&input.bytes)?, leaf_segment(&input.bytes)?);
+    let _ = (Tier::A, Evidence::Queued);
+    Ok(())
+}

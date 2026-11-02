@@ -1403,7 +1403,7 @@ pages/editor.rs	append_section	1	pages	section.lifecycle	migrated	litchi_pages::
 pages/editor.rs	apply_text_box_named_paragraph_style	1	pages	text.paragraph_style	migrated	litchi_pages::drawable::named_style::Edit::apply	pages_text_box_named_style_apply_parity	B	-	-
 pages/editor.rs	body_storage	1	pages	text.storage	migrated	litchi_pages::Package::body_storage	pages_body_storage_read_parity	A	-	-
 pages/editor.rs	body_text	1	pages	text.storage	migrated	litchi_pages::Package::body_storage	pages_body_storage_read_parity	A	-	-
-pages/editor.rs	builder	1	pages	keynote.build	host-only	litchi-pages	-	-	-	-
+pages/editor.rs	builder	1	pages	keynote.build	migrated	litchi_pages::builder::Builder::new	pages_builder_language_locale_parity	B	-	-
 pages/editor.rs	clear_drawable_comment	1	pages	drawable.comment	migrated	litchi_pages::drawable::comment::Edit::clear	pages_drawable_comment_clear_parity	B	-	-
 pages/editor.rs	clear_drawable_text	1	pages	text.storage	migrated	litchi_pages::drawable::text::Edit::clear	pages_text_box_plain_text_parity	A	-	-
 pages/editor.rs	create	1	pages	io	host-only	litchi-pages	-	-	-	-
@@ -1591,7 +1591,7 @@ pages/editor/body_shapes.rs	add_body_rectangle	1	pages	drawable.shape	host-only	
 pages/editor/body_shapes.rs	add_body_shape	1	pages	drawable.shape	host-only	litchi-pages	-	-	-	-
 pages/editor/body_shapes.rs	add_body_shape_with_fill	1	pages	drawable.shape	host-only	litchi-pages	-	-	-	-
 pages/editor/body_shapes.rs	body_line_endpoints	1	pages	drawable.shape	migrated	litchi_pages::Package::body_drawable_style	pages_body_line_endpoints_reset_parity	A	-	-
-pages/editor/body_shapes.rs	body_line_segment	1	pages	drawable.shape	host-only	litchi-pages	-	-	-	-
+pages/editor/body_shapes.rs	body_line_segment	1	pages	drawable.shape	migrated	litchi_pages::drawable::properties::Snapshot::line_segment	pages_body_line_segment_read_parity	A	-	-
 pages/editor/body_shapes.rs	body_shape_effects	1	pages	drawable.shape	migrated	litchi_pages::Package::body_drawable_style	pages_body_shape_style_read_parity	A	-	-
 pages/editor/body_shapes.rs	body_shape_fill	1	pages	drawable.shape	migrated	litchi_pages::Package::body_drawable_style	pages_body_shape_style_read_parity	A	-	-
 pages/editor/body_shapes.rs	body_shape_geometry	1	pages	drawable.shape	migrated	litchi_pages::Package::body_drawable_properties	pages_body_shape_geometry_parity	A	-	-
@@ -1613,7 +1613,7 @@ pages/editor/body_shapes.rs	reset_body_shape_shadow	1	pages	drawable.shape	migra
 pages/editor/body_shapes.rs	reset_body_shape_stroke	1	pages	drawable.shape	migrated	litchi_pages::Package::edit_body_drawable_style	pages_body_shape_style_reset_parity	A	-	-
 pages/editor/body_shapes.rs	reset_body_shape_text_layout	1	pages	drawable.shape	migrated	litchi_pages::Package::edit_body_drawable_style	pages_body_shape_style_reset_parity	A	-	-
 pages/editor/body_shapes.rs	set_body_line_endpoints	1	pages	drawable.shape	migrated	litchi_pages::Package::edit_body_drawable_style	pages_body_line_endpoints_set_parity	B	-	-
-pages/editor/body_shapes.rs	set_body_line_segment	1	pages	drawable.shape	host-only	litchi-pages	-	-	-	-
+pages/editor/body_shapes.rs	set_body_line_segment	1	pages	drawable.shape	migrated	litchi_pages::drawable::properties::Edit::set_line_segment	pages_body_line_segment_parity	A	-	-
 pages/editor/body_shapes.rs	set_body_shape_effects	1	pages	drawable.shape	migrated	litchi_pages::Package::edit_body_drawable_style	pages_body_shape_style_set_parity	B	-	-
 pages/editor/body_shapes.rs	set_body_shape_fill	1	pages	drawable.shape	migrated	litchi_pages::Package::edit_body_drawable_style	pages_body_shape_style_set_parity	B	-	-
 pages/editor/body_shapes.rs	set_body_shape_geometry	1	pages	drawable.shape	migrated	litchi_pages::Package::edit_body_drawable_properties	pages_body_shape_geometry_parity	A	-	-
