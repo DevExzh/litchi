@@ -97,3 +97,17 @@ pub mod axis {
     pub use litchi_iwa_common::chart::number_format::{LabelAffixes, NumberFormat};
     pub use litchi_iwa_common::shape::stroke::Stroke;
 }
+
+/// Exact-source legend fill, border and shadow transactions of one chart
+/// on the shared legend-style variation graph:
+/// [`crate::Package::edit_body_chart_legend_style`].
+pub mod legend_style {
+    pub use crate::package::body_chart_series::{Diagnostics, Error, LimitKind, Refusal};
+    pub use crate::package::body_chart_style::LegendStyleEdit as Edit;
+    pub use crate::package::body_chart_style::legend_style::{
+        Commit, LegendFill, LegendShadow, LegendStroke, Patch, Property, PropertyKind,
+    };
+    pub use litchi_iwa_common::shape::fill::{Fill, Gradient};
+    pub use litchi_iwa_common::shape::shadow::Drop;
+    pub use litchi_iwa_common::shape::stroke::Stroke;
+}

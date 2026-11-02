@@ -19,6 +19,7 @@ use litchi_core::Position;
 use litchi_iwa_archive::package::OwnedExactArtifacts as ExactArtifacts;
 use litchi_iwa_common::chart::axis::Axis;
 use litchi_iwa_style::chart_style::{self as engine, axis as axis_engine, chart as chart_engine};
+use litchi_iwa_style::legend_style as legend_engine;
 
 use super::Package;
 use super::body_chart_series::{
@@ -96,6 +97,115 @@ pub(crate) mod style {
     }
 
     /// One verified chart-level style commit.
+    #[derive(Debug)]
+    pub struct Commit {
+        pub(in super::super) package: Package,
+        pub(in super::super) patch: Patch,
+        pub(in super::super) diagnostics: Diagnostics,
+    }
+
+    impl Commit {
+        /// Borrow the candidate package.
+        #[must_use]
+        pub const fn package(&self) -> &Package {
+            &self.package
+        }
+
+        /// Borrow the exact patch.
+        #[must_use]
+        pub const fn patch(&self) -> &Patch {
+            &self.patch
+        }
+
+        /// Borrow compact publication diagnostics.
+        #[must_use]
+        pub const fn diagnostics(&self) -> &Diagnostics {
+            &self.diagnostics
+        }
+
+        /// Consume the commit and return its package and exact patch.
+        #[must_use]
+        pub fn into_parts(self) -> (Package, Patch) {
+            (self.package, self.patch)
+        }
+
+        /// Consume this commit.
+        #[must_use]
+        pub fn into_package(self) -> Package {
+            self.package
+        }
+    }
+}
+
+/// Exact-source legend-style types.
+pub(crate) mod legend_style {
+    use super::{
+        Diagnostics, ExactArtifacts, MutationPlan, Package, Position, fmt, inverse_plan,
+        legend_engine,
+    };
+
+    pub use legend_engine::{LegendFill, LegendShadow, LegendStroke, Property, PropertyKind};
+
+    /// A compact exact-source patch of one legend-style property.
+    #[derive(Clone, PartialEq)]
+    pub struct Patch {
+        pub(in super::super) artifacts: ExactArtifacts,
+        pub(in super::super) chart: Position,
+        pub(in super::super) before: Property,
+        pub(in super::super) after: Property,
+        pub(in super::super) plan: MutationPlan,
+    }
+
+    impl fmt::Debug for Patch {
+        fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+            formatter
+                .debug_struct("Patch")
+                .field("chart", &self.chart)
+                .field("before", &self.before)
+                .field("after", &self.after)
+                .finish_non_exhaustive()
+        }
+    }
+
+    impl Patch {
+        /// Whether the patch is an exact byte no-op.
+        #[must_use]
+        pub fn is_noop(&self) -> bool {
+            self.artifacts.is_byte_noop()
+        }
+
+        /// Return the exact inverse patch.
+        #[must_use]
+        pub fn inverse(&self) -> Self {
+            Self {
+                artifacts: self.artifacts.inverse(),
+                chart: self.chart,
+                before: self.after.clone(),
+                after: self.before.clone(),
+                plan: inverse_plan(&self.plan),
+            }
+        }
+
+        /// Return the selected semantic chart position.
+        #[must_use]
+        pub const fn chart_position(&self) -> Position {
+            self.chart
+        }
+
+        /// The source value.
+        #[must_use]
+        pub const fn before(&self) -> &Property {
+            &self.before
+        }
+
+        /// The target value.
+        #[must_use]
+        pub const fn after(&self) -> &Property {
+            &self.after
+        }
+    }
+
+    /// One verified legend-style commit.
     #[derive(Debug)]
     pub struct Commit {
         pub(in super::super) package: Package,
@@ -367,6 +477,117 @@ impl StyleEdit<'_> {
     }
 }
 
+/// One immutable selector-first legend-style edit.
+pub struct LegendStyleEdit<'a> {
+    source: &'a Package,
+    selector: BodyChartSelector,
+    staged: Option<legend_style::Property>,
+}
+
+impl fmt::Debug for LegendStyleEdit<'_> {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("Edit")
+            .field("staged", &self.staged)
+            .finish_non_exhaustive()
+    }
+}
+
+fn read_legend_style(
+    ledger: &mut Ledger,
+    package: &Package,
+    target: &Target,
+    kind: legend_style::PropertyKind,
+) -> Result<legend_style::Property, Error> {
+    ledger.read(package, |workspace, limits| {
+        legend_engine::read(
+            workspace,
+            target.chart.drawable_identifier.get(),
+            kind,
+            limits,
+        )
+    })
+}
+
+impl LegendStyleEdit<'_> {
+    /// Stage `property` as the chart's value, replacing any staged one.
+    ///
+    /// # Errors
+    ///
+    /// None today; the signature matches the other chart families.
+    pub fn set(mut self, property: legend_style::Property) -> Result<Self, Error> {
+        self.staged = Some(property);
+        Ok(self)
+    }
+
+    /// Stage removing the legend's own value of `kind` (inheriting again).
+    ///
+    /// # Errors
+    ///
+    /// None today; the signature matches the other chart families.
+    pub fn reset(mut self, kind: legend_style::PropertyKind) -> Result<Self, Error> {
+        self.staged = Some(kind.inherited());
+        Ok(self)
+    }
+
+    /// Validate and atomically publish the staged value. A value equal to
+    /// the chart's is an exact no-op.
+    ///
+    /// # Errors
+    ///
+    /// [`Refusal::NoStagedOperation`], [`Refusal::MissingStyle`],
+    /// [`Refusal::ImageFill`], source, limit and verification errors.
+    pub fn commit(self) -> Result<legend_style::Commit, Error> {
+        let value = self.staged.ok_or(Refusal::NoStagedOperation)?;
+        let mut ledger = Ledger::new(self.source)?;
+        let target = ledger.target(self.source, self.selector)?;
+        let before = read_legend_style(&mut ledger, self.source, &target, value.kind())?;
+        let published = if before == value {
+            None
+        } else {
+            ledger.write(self.source, |workspace, limits| {
+                legend_engine::write(
+                    workspace,
+                    target.chart.drawable_identifier.get(),
+                    &value,
+                    limits,
+                )
+            })?
+        };
+        let Some(published) = published else {
+            return Ok(legend_style::Commit {
+                package: self.source.clone(),
+                patch: legend_style::Patch {
+                    artifacts: noop_artifacts(self.source),
+                    chart: target.chart.position,
+                    before: before.clone(),
+                    after: before,
+                    plan: MutationPlan::default(),
+                },
+                diagnostics: Diagnostics::unchanged(),
+            });
+        };
+        let candidate = ledger.target(&published.package, self.selector)?;
+        if candidate.kind != target.kind
+            || read_legend_style(&mut ledger, &published.package, &candidate, value.kind())?
+                != value
+        {
+            return Err(Error::Verification);
+        }
+        Ok(legend_style::Commit {
+            patch: legend_style::Patch {
+                artifacts: artifacts(self.source, &published.package),
+                chart: target.chart.position,
+                before,
+                after: value,
+                plan: published.plan,
+            },
+            package: published.package,
+            diagnostics: Diagnostics::published(published.touched),
+        })
+    }
+}
+
 /// One immutable selector-first axis-style edit.
 pub struct AxisEdit<'a> {
     source: &'a Package,
@@ -559,6 +780,90 @@ impl Package {
             return Err(Error::Verification);
         }
         Ok(style::Commit {
+            package: candidate,
+            patch: patch.clone(),
+            diagnostics: Diagnostics::published(0),
+        })
+    }
+
+    /// The stored (or native default) value of one legend-style
+    /// property of one body chart.
+    ///
+    /// # Errors
+    ///
+    /// Selector errors, [`Refusal::UnsupportedKind`],
+    /// [`Refusal::MissingStyle`], source and limit errors.
+    pub fn body_chart_legend_style(
+        &self,
+        selector: impl Into<BodyChartSelector>,
+        kind: legend_style::PropertyKind,
+    ) -> Result<legend_style::Property, Error> {
+        let mut ledger = Ledger::new(self)?;
+        let target = ledger.target(self, selector.into())?;
+        read_legend_style(&mut ledger, self, &target, kind)
+    }
+
+    /// Start an exact-source legend-style edit of one body chart.
+    ///
+    /// ```no_run
+    /// use litchi_pages::Package;
+    /// use litchi_pages::chart::legend_style::PropertyKind;
+    ///
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let package = Package::open("input.pages")?;
+    /// let commit = package
+    ///     .edit_body_chart_legend_style(0)?
+    ///     .reset(PropertyKind::Fill)?
+    ///     .commit()?;
+    /// let restored = commit.package().apply_body_chart_legend_style(&commit.patch().inverse())?;
+    /// # let _ = restored;
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
+    /// # Errors
+    ///
+    /// Selector ceiling errors.
+    pub fn edit_body_chart_legend_style(
+        &self,
+        selector: impl Into<BodyChartSelector>,
+    ) -> Result<LegendStyleEdit<'_>, Error> {
+        let selector = selector.into();
+        Ledger::new(self)?.target(self, selector)?;
+        Ok(LegendStyleEdit {
+            source: self,
+            selector,
+            staged: None,
+        })
+    }
+
+    /// Apply a legend-style patch only to its exact source package.
+    ///
+    /// # Errors
+    ///
+    /// [`Error::PatchConflict`] when this package is not the patch's exact
+    /// source; locality and verification errors.
+    pub fn apply_body_chart_legend_style(
+        &self,
+        patch: &legend_style::Patch,
+    ) -> Result<legend_style::Commit, Error> {
+        let mut ledger = Ledger::new(self)?;
+        if !authorizes(self, &patch.artifacts) {
+            return Err(Error::PatchConflict);
+        }
+        if patch.is_noop() {
+            return Ok(legend_style::Commit {
+                package: self.clone(),
+                patch: patch.clone(),
+                diagnostics: Diagnostics::unchanged(),
+            });
+        }
+        let candidate = ledger.reopen(self, &patch.artifacts, &patch.plan)?;
+        let target = ledger.target(&candidate, BodyChartSelector::position(patch.chart))?;
+        if read_legend_style(&mut ledger, &candidate, &target, patch.after.kind())? != patch.after {
+            return Err(Error::Verification);
+        }
+        Ok(legend_style::Commit {
             package: candidate,
             patch: patch.clone(),
             diagnostics: Diagnostics::published(0),
