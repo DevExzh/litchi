@@ -773,9 +773,14 @@ fn plan_set(
         kind,
         PropertyKind::DecimalTabCharacter | PropertyKind::DefaultTabInterval
     );
-    if let Some(mut overrides) = overrides::direct_overrides(&style, raw, budget)?
+    // A shared style is never rewritten, so its own overrides are decoded
+    // only for an exclusive variation (record 0412: native Keynote table
+    // base styles carry a zero default tab interval the override decoder
+    // refuses, and a derived child does not inherit that field as an
+    // override).
+    if target.exclusive
+        && let Some(mut overrides) = overrides::direct_overrides(&style, raw, budget)?
         && (!requires_child_variation || overrides.is_tab_defaults_only())
-        && target.exclusive
     {
         let parent = parent_of(&style)?;
         let inherited = inherited_character(styles, parent, kind, budget)?;

@@ -38,6 +38,35 @@ pub mod lock;
 pub mod merge;
 /// Validated display names for a table.
 pub mod name;
+/// One character or paragraph property of whole slide-table cells' text,
+/// started by [`crate::Package::edit_slide_table_cell_text`] and read by
+/// [`crate::Package::slide_table_cell_text`] (record 0412).
+pub mod cell_text {
+    pub use crate::package::slide_table_cell_text::{
+        Commit, Diagnostics, Edit, Error, LimitKind, Patch, Refusal,
+    };
+    pub use litchi_iwa_common::table::coordinate::At;
+    pub use litchi_iwa_text_wire::paragraph_style::{Property, PropertyKind};
+}
+/// Paragraph lists of slide-table cells' text, started by
+/// [`crate::Package::edit_slide_table_cell_lists`]: a plain cell is promoted
+/// to rich text on its first list change (record 0412).
+pub mod cell_list {
+    pub use crate::package::slide_table_cell_list::{
+        Commit, Diagnostics, Edit, Error, LimitKind, Patch, Refusal,
+    };
+    pub use litchi_iwa_common::table::coordinate::At;
+    pub use litchi_iwa_text::paragraph::list::{
+        ParagraphList, ParagraphListBullet, ParagraphListBulletBaselineOffset,
+        ParagraphListBulletGeometry, ParagraphListBulletScale, ParagraphListIndentation,
+        ParagraphListLabelColor, ParagraphListLabelIndent, ParagraphListLevel,
+        ParagraphListLevelPlacement, ParagraphListNumberFormat, ParagraphListNumberPunctuation,
+        ParagraphListNumberScale, ParagraphListNumberSequence, ParagraphListNumberTiering,
+        ParagraphListNumbering, ParagraphListPlacement, ParagraphListStart, ParagraphListTextGap,
+    };
+    pub use litchi_iwa_text::position::TextPosition;
+    pub use litchi_iwa_text_wire::list::{Property, PropertyKind};
+}
 /// Display formats of stored slide-table cells: one family over the neutral
 /// `DataFormat` (record 0379).
 pub mod format {
