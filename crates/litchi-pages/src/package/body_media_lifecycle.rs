@@ -325,7 +325,8 @@ impl fmt::Debug for Edit<'_> {
 impl Edit<'_> {
     /// Stage the removal of one body image, movie, audio clip, shape or
     /// text box with its private graph (a shape's or text box's owned
-    /// storage included) and the data assets only it uses.
+    /// storage included) and the data assets only it uses. A direct comment
+    /// on the drawable is cleared first, as the host does.
     ///
     /// # Errors
     ///
@@ -601,7 +602,23 @@ impl Edit<'_> {
             return Err(Refusal::UnsupportedSource.into());
         }
         let (package, diagnostics) = match operation {
-            Operation::Remove(selector) => remove(self.source, selector)?,
+            Operation::Remove(selector) => match remove(self.source, selector) {
+                Err(Error::Refused(Refusal::Commented)) => {
+                    // The host clears a removed drawable's direct comment
+                    // first (its comment storages and author lifecycle);
+                    // the patch spans both steps (record 0413b).
+                    let mut clear = self
+                        .source
+                        .edit_body_drawable_comment(selector)
+                        .map_err(comment_error)?;
+                    clear.clear().map_err(comment_error)?;
+                    let cleared = clear.commit().map_err(comment_error)?.into_package();
+                    let (package, mut diagnostics) = remove(&cleared, selector)?;
+                    diagnostics.changed = true;
+                    (package, diagnostics)
+                },
+                other => other?,
+            },
             Operation::Duplicate(selector, anchor) => duplicate(self.source, selector, anchor)?,
             Operation::Replace(selector, asset, data) => {
                 let identifier = asset_identifier(self.source, selector, asset)?;
@@ -926,6 +943,25 @@ fn media_kind(selector: DrawableSelector) -> Result<(), Error> {
         .into());
     }
     Ok(())
+}
+
+/// A drawable-comment failure while clearing the comment of a removed
+/// drawable.
+fn comment_error(error: super::text_box_drawable_comment::Error) -> Error {
+    use super::text_box_drawable_comment::Error as Comment;
+    match error {
+        Comment::Limit {
+            observed, maximum, ..
+        } => Error::Limit {
+            kind: LimitKind::WireWork,
+            observed,
+            maximum,
+        },
+        Comment::Allocation { amount } => Error::Allocation { amount },
+        Comment::Verification => Error::Verification,
+        Comment::Refused(_) => Refusal::SharedGraph.into(),
+        _ => Error::InvalidSource,
+    }
 }
 
 /// The private graph of one body media drawable.
