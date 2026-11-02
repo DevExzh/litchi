@@ -141,3 +141,193 @@ fn numbers_sheet_chart_shadow_shared_series_style_refuses() -> TestResult {
     assert_eq!(leaf_bytes!(package), before);
     Ok(())
 }
+
+/// A host-added chart with a host-set legend font, and a second chart that
+/// also consumes the legend's paragraph-style variation (its
+/// `paragraph_styles` list and metadata name it). The host's
+/// `style_is_exclusive_to_chart` then sees another consumer, so a font
+/// change replaces the shared variation (`replace_shared_style`).
+fn shared_legend_variation() -> TestResult<(crate::harness::Fixture, u64, u64)> {
+    use litchi_iwa::charts::{ChartFont, ChartLegendFont};
+    use litchi_iwa::text::TextFont;
+    let input = input(Format::Numbers, Kind::Column2d)?;
+    let Target::Numbers { sheet } = input.target else {
+        return Err("not a Numbers target".into());
+    };
+    let mut editor = numbers::Draft::from_bytes(&input.fixture.bytes)?;
+    editor.set_sheet_chart_legend_font(
+        sheet,
+        input.chart,
+        &ChartLegendFont::Font(ChartFont::new(TextFont::named("Georgia")?).with_bold(true)),
+    )?;
+    let second = editor.add_sheet_chart(
+        sheet,
+        Kind::Column2d,
+        ChartData::new(
+            vec!["A".to_owned(), "B".to_owned()],
+            vec!["X".to_owned()],
+            vec![vec![Some(1.0)], vec![Some(2.0)]],
+        )?,
+        DrawablePoint { x: 300.0, y: 140.0 },
+        DrawableSize {
+            width: 200.0,
+            height: 160.0,
+        },
+    )?;
+    let source = editor.to_bytes()?;
+    let components = Components::read(&source)?;
+    let first = components.locate(input.chart, CHART_MESSAGE_TYPE)?;
+    let variation = *codec::references(components.payload(input.chart, first)?, Limits::DEFAULT)
+        .map_err(|error| error.to_string())?
+        .paragraph_styles()
+        .last()
+        .ok_or("the first chart has no paragraph styles")?;
+    let second_id = second.drawable_object_id;
+    let second_location = components.locate(second_id, CHART_MESSAGE_TYPE)?;
+    let mut reference = Vec::new();
+    litchi_iwa_common::wire::append_varint_field(&mut reference, 1, variation)?;
+    let rewritten = litchi_iwa_common::wire::transform_length_delimited_field(
+        components.payload(second_id, second_location)?,
+        10_000,
+        |chart| {
+            let mut chart = chart.to_vec();
+            litchi_iwa_common::wire::append_length_delimited_field(
+                &mut chart,
+                20,
+                &reference,
+                litchi_iwa_common::WireLimits::DEFAULT,
+            )?;
+            Ok::<_, litchi_iwa_common::Error>(chart)
+        },
+    )?;
+    let shared = crate::chart_style_cases::publish_referencing(
+        &source,
+        components,
+        vec![(second_id, CHART_MESSAGE_TYPE, rewritten, vec![variation])],
+    )?;
+    Ok((
+        crate::harness::Fixture {
+            path: "chart-data-native.numbers + shared legend variation",
+            bytes: shared,
+        },
+        sheet,
+        input.chart,
+    ))
+}
+
+/// The host replaces a legend paragraph-style variation another chart also
+/// consumes; the leaf takes the same route (record 0414 §13).
+#[test]
+fn numbers_sheet_chart_legend_font_shared_variation_parity() -> TestResult {
+    use crate::harness::{Case, Evidence, LeafRun, Tier};
+    use litchi_iwa::charts::{ChartFont, ChartLegendFont, ChartLegendFontSize};
+    use litchi_iwa::text::TextFont;
+    use litchi_numbers::sheet::chart::legend_style::{
+        Font, LegendFont, LegendFontSize, Property as LegendProperty, PropertyKind, TextPointSize,
+    };
+    let (fixture, sheet, chart) = shared_legend_variation()?;
+    // The fixture really shares the variation: the host's font change
+    // replaces it in the first chart's list.
+    let styles = |bytes: &[u8]| -> TestResult<Vec<u64>> {
+        let components = Components::read(bytes)?;
+        let location = components.locate(chart, CHART_MESSAGE_TYPE)?;
+        Ok(
+            codec::references(components.payload(chart, location)?, Limits::DEFAULT)
+                .map_err(|error| error.to_string())?
+                .paragraph_styles()
+                .to_vec(),
+        )
+    };
+    let mut host = numbers::Draft::from_bytes(&fixture.bytes)?;
+    host.set_sheet_chart_legend_font(
+        sheet,
+        chart,
+        &ChartLegendFont::Font(ChartFont::new(TextFont::named("Courier New")?)),
+    )?;
+    let before = styles(&fixture.bytes)?;
+    let after = styles(&host.to_bytes()?)?;
+    assert_eq!(before.len(), after.len());
+    assert_ne!(
+        before.last(),
+        after.last(),
+        "the shared variation is replaced"
+    );
+    let cases = [
+        (
+            LegendProperty::Font(LegendFont::Font {
+                font: Font::named("Courier New")?,
+                bold: false,
+                italic: true,
+            }),
+            false,
+        ),
+        (
+            LegendProperty::FontSize(LegendFontSize::Size(TextPointSize::from_points(20.0)?)),
+            false,
+        ),
+        (LegendProperty::Font(LegendFont::Inherited), true),
+    ];
+    for (value, _) in cases {
+        let host_value = value.clone();
+        let staged = value.clone();
+        let kind = value.kind();
+        Case::new(
+            "numbers_sheet_chart_legend_font_shared_variation_parity",
+            Format::Numbers,
+            Tier::B,
+            Evidence::Queued,
+            &fixture,
+        )
+        .host(|source| {
+            let mut e = numbers::Draft::from_bytes(source)?;
+            match &host_value {
+                LegendProperty::Font(LegendFont::Font { font, bold, italic }) => e
+                    .set_sheet_chart_legend_font(
+                        sheet,
+                        chart,
+                        &ChartLegendFont::Font(
+                            ChartFont::new(font.clone())
+                                .with_bold(*bold)
+                                .with_italic(*italic),
+                        ),
+                    )?,
+                LegendProperty::Font(_) => {
+                    e.set_sheet_chart_legend_font(sheet, chart, &ChartLegendFont::Inherited)?;
+                },
+                LegendProperty::FontSize(LegendFontSize::Size(size)) => e
+                    .set_sheet_chart_legend_font_size(
+                        sheet,
+                        chart,
+                        ChartLegendFontSize::Size((*size).into()),
+                    )?,
+                _ => return Err("unmapped".into()),
+            }
+            Ok(e.to_bytes()?)
+        })
+        .leaf(|source| {
+            let package = Package::from_bytes(source)?;
+            let mut edit = package.edit_sheet_chart_legend_style(0, 1)?;
+            edit.set(staged.clone())?;
+            let commit = edit.commit()?;
+            let restored = commit
+                .package()
+                .apply_sheet_chart_legend_style(&commit.patch().inverse())?;
+            Ok(LeafRun::with_inverse(
+                leaf_bytes!(commit.package()),
+                leaf_bytes!(restored.package()),
+            ))
+        })
+        .read("host legend typography", move |bytes| {
+            let e = numbers::Draft::from_bytes(bytes)?;
+            Ok(if kind == PropertyKind::Font {
+                format!("{:?}", e.sheet_chart_legend_font(sheet, chart)?)
+            } else {
+                format!("{:?}", e.sheet_chart_legend_font_size(sheet, chart)?)
+            })
+        })
+        .leaf_structural_metadata()
+        .run()
+        .map_err(|error| format!("{value:?}: {error}"))?;
+    }
+    Ok(())
+}

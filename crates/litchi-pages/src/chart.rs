@@ -66,12 +66,15 @@ pub mod font {
 /// Exact-source per-series transactions of one rooted body chart (one value
 /// per series): [`crate::Package::edit_body_chart_series`].
 pub mod series {
+    pub use crate::package::body_chart_series::{AutoFit, ValueLabelLocation};
     pub use crate::package::body_chart_series::{
         Commit, Diagnostics, Edit, Error, LimitKind, Patch, Property, PropertyKind, Refusal,
     };
     pub use litchi_iwa_common::chart::error_bar;
     pub use litchi_iwa_common::chart::number_format::{LabelAffixes, NumberFormat};
-    pub use litchi_iwa_common::chart::pie::{LabelDistance, LabelVisibility, WedgeExplosion};
+    pub use litchi_iwa_common::chart::pie::{
+        LabelDistance, LabelVisibility, LeaderLineVisibility, WedgeExplosion,
+    };
     pub use litchi_iwa_common::chart::series::{
         ConnectionLine, MovingAveragePeriod, PolynomialOrder, Stroke, StrokePattern, Symbol,
         SymbolFamily, SymbolFill, SymbolShape, SymbolSize, Trendline, TrendlineType,

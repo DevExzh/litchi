@@ -641,6 +641,15 @@ pub mod data {
     };
 }
 
+/// Exact-source replacement of one embedded media asset by its
+/// [`assets::MediaAsset`] handle, keeping its identifier (record 0417).
+pub mod asset_data {
+    pub use crate::package::slide_media_replacement::asset::{
+        Commit, Diagnostics, Edit, EditOptions, Patch,
+    };
+    pub use crate::package::slide_media_replacement::{Error, LimitKind, Refusal};
+}
+
 /// Exact-source duplicate/remove transactions for slide media.
 pub mod lifecycle {
     pub use crate::package::slide_media_lifecycle::{

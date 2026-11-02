@@ -269,3 +269,52 @@ fn builder_writes_language_and_locale() -> Result<(), Box<dyn std::error::Error>
     ));
     Ok(())
 }
+
+#[test]
+fn builder_shows_the_slide_number() -> TestResult {
+    use litchi_keynote::slide::placeholder::{Kind, State};
+    let first = SlideSelector::index(0);
+    let shown = Builder::new()
+        .identity(fixed(5)?)
+        .slide_number_visible(true)
+        .build()?;
+    shown.validate()?;
+    assert_eq!(
+        shown.slide_placeholder_visibility(first, Kind::SlideNumber)?,
+        Some(State::Visible)
+    );
+    let hidden = Builder::new()
+        .identity(fixed(5)?)
+        .slide_number_visible(false)
+        .build()?;
+    assert_eq!(
+        hidden.slide_placeholder_visibility(first, Kind::SlideNumber)?,
+        Some(State::Hidden)
+    );
+    assert_eq!(
+        bytes(&hidden)?,
+        bytes(&Builder::new().identity(fixed(5)?).build()?)?
+    );
+    Ok(())
+}
+
+#[test]
+fn builder_refuses_object_markers_in_text() -> TestResult {
+    use litchi_keynote::slide::{notes, text};
+    assert!(matches!(
+        Builder::new()
+            .identity(fixed(6)?)
+            .title("a\u{fffc}b")
+            .build(),
+        Err(BuilderError::Text(text::Error::Refused(
+            text::Refusal::ObjectMarkerReplacement
+        )))
+    ));
+    assert!(matches!(
+        Builder::new().identity(fixed(6)?).notes("\u{000e}").build(),
+        Err(BuilderError::Notes(notes::Error::Refused(
+            notes::Refusal::ObjectMarkerReplacement
+        )))
+    ));
+    Ok(())
+}

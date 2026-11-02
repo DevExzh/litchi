@@ -114,6 +114,52 @@ fn pages_builder_language_locale_parity() -> TestResult {
     Ok(())
 }
 
+/// Host `pages::Draft::{create, create_with_text}` (a default build, and
+/// one with body text) against the leaf builder under the host output's
+/// identity (record 0417).
+#[test]
+fn pages_builder_create_parity() -> TestResult {
+    let _ = (Tier::B, Evidence::Queued);
+    for text in [None, Some("Bonjour"), Some("Line one\nLine two"), Some("")] {
+        let host = match text {
+            None => litchi_iwa::pages::Draft::create()?,
+            Some(text) => litchi_iwa::pages::Draft::create_with_text(text)?,
+        };
+        let host_bytes = host.to_bytes()?;
+        let identity = identity(&host_bytes)?;
+        let leaf = move |_source: &[u8]| -> TestResult<LeafRun> {
+            let mut builder = litchi_pages::builder::Builder::new().identity(identity);
+            if let Some(text) = text {
+                builder = builder.body_text(text);
+            }
+            Ok(LeafRun::output(leaf_bytes!(&builder.build()?)))
+        };
+        let input = Fixture {
+            path: "builder",
+            bytes: leaf_bytes!(&litchi_pages::Package::new()?),
+        };
+        Case::new(
+            "pages_builder_create_parity",
+            Format::Pages,
+            Tier::B,
+            Evidence::Queued,
+            &input,
+        )
+        .known_fields(|known| {
+            known.with(
+                11_006,
+                "TSP.PackageMetadata (object UUIDs by form)",
+                metadata_without_object_uuids,
+            )
+        })
+        .host(move |_source| Ok(host_bytes.clone()))
+        .leaf(leaf)
+        .run()
+        .map_err(|error| format!("{text:?}: {error}"))?;
+    }
+    Ok(())
+}
+
 #[test]
 #[ignore = "callgrind cost probe (record 0371)"]
 fn builder_language_locale_cost_abba() -> TestResult {
