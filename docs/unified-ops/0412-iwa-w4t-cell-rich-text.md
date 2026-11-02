@@ -217,3 +217,17 @@ On the merge of trunk `1bc0d4c996` (sequential gate script
 | `cargo check -q --locked --offline --manifest-path crates/{litchi-numbers,litchi-pages,litchi-keynote,litchi}/fuzz/Cargo.toml --bins`; `cargo metadata --locked --offline` on the FIN harness | 0 each |
 | `cargo test -p litchi-iwa --all-features --test parity -- numbers_cell_ numbers_text_box numbers_sheet_text_box keynote_cell_ pages_cell_text_ numbers_conditional` | 0 (92 passed) |
 | release parity binary: `pages_cell_list_cases keynote_cell_list_cases numbers_cell_list` | 0 (24 passed) |
+
+Slice 4 (`6aac7d8f6c`, the pinned-refusal test update after it), merged
+with trunk `5b5dad5c57`: the same gate script passes every row (fmt, all
+Clippy configurations, litchi/ops tests in six chunks, rustdoc, six
+glossary profiles, boundaries, non-iWork, ledger, tool unit tests, delta,
+corpus, bench and feature matrices, pyo3, perf-baseline, four fuzz locks,
+FIN lock, debug parity filters). Its first leaf-test row failed on two
+integration tests that pinned the old refusals (`refusals_are_typed` in
+`litchi-pages/tests/body_table_cell_format.rs` and
+`litchi-keynote/tests/slide_table_cell_format.rs`); they now assert the
+Pop-Up refusal and the new Checkbox/Percentage writes, and
+`cargo test --no-fail-fast` of the five changed crates passes, as do the
+36 format parity cases.
+
