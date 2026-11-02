@@ -19,6 +19,7 @@
 //! creates the stylesheet's preset objects ([`find_preset`],
 //! [`preset_payload`]) and rewrites the boundaries ([`replace_boundaries`]).
 
+pub mod publish;
 mod storage;
 mod style;
 
