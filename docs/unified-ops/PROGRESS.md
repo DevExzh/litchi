@@ -7550,3 +7550,6 @@ See [0063](0063-source-pptx-modern-comments.md).
   - W4-P (0413): Pages text-box text, annotation, field, text-box, shape and comment families over the shared text/style engines;
   - W4-C (0414): the remaining chart-style engines in `litchi-iwa-style`, plus Numbers, Keynote and Pages facades.
 - Queued for a free slot: Numbers shapes, captions, drawables and chart lifecycle; Numbers sort and pivot; table comments, topology and conditional highlights on Pages and Keynote; the Keynote builder. Native routes are still pending, so W3 stays blocked. Nothing pushed.
+- Full gate on frozen `4b26bb3379` (`full-4b26bb3379-r2`): 51 of 53 rows passed. Rows 48 (tooling unit tests) and 51 (bench matrix) failed for one reason. Record 0408's leaf-versus-host evidence had no bench-matrix row and no exemption, so the committed matrix was stale. This is fixed on trunk by `fc7a879e7c` (an exemption with the reason, and a regenerated matrix). It is not a green gate.
+- Merged W4-P slice 1 (`82c4d4fe32`, 86 Pages rows: text-box character, paragraph, frame, layout and plain text) and slice 2 (`f0aa2ad349`, 38 Pages rows: text-box lists and named paragraph styles, plus the shared `litchi_iwa_text_wire::list::publish`). Measured routes cost 70–91% less than the host. Post-merge checks pass.
+- A fresh full gate is running on `f0aa2ad349`.
