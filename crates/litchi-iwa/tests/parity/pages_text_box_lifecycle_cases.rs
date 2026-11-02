@@ -563,3 +563,56 @@ fn pages_body_line_add_parity() -> TestResult {
         ),
     )
 }
+
+/// A commented drawable's removal clears its comment thread first, as the
+/// host does.
+#[test]
+fn pages_commented_drawable_remove_parity() -> TestResult {
+    let _ = (Tier::B, Evidence::Queued);
+    let commented = |input: Fixture, shape: bool| -> TestResult<Fixture> {
+        let mut e = pages::Draft::from_bytes(&input.bytes)?;
+        let d = if shape {
+            e.body_shapes()?
+                .first()
+                .ok_or("no shape")?
+                .drawable_object_id
+        } else {
+            host_text_box(&e, 0)?
+        };
+        e.set_drawable_comment(d, "Root")?;
+        e.add_drawable_comment_reply(
+            litchi_iwa_common::comment::DrawableId::try_from(d)?,
+            "Reply",
+        )?;
+        Ok(Fixture {
+            path: "fixture + host drawable comment thread",
+            bytes: e.to_bytes()?,
+        })
+    };
+    remove_case(
+        "pages_commented_drawable_remove_parity",
+        &commented(text_box_fixture()?, false)?,
+        |source| {
+            let mut e = pages::Draft::from_bytes(source)?;
+            let d = host_text_box(&e, 0)?;
+            e.remove_text_box(d)?;
+            Ok(e.to_bytes()?)
+        },
+        DrawableSelector::text_box(0),
+    )?;
+    remove_case(
+        "pages_commented_drawable_remove_parity",
+        &commented(shape_fixture()?, true)?,
+        |source| {
+            let mut e = pages::Draft::from_bytes(source)?;
+            let d = e
+                .body_shapes()?
+                .first()
+                .ok_or("no shape")?
+                .drawable_object_id;
+            e.remove_body_shape(d)?;
+            Ok(e.to_bytes()?)
+        },
+        DrawableSelector::shape(0),
+    )
+}
