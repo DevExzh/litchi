@@ -291,269 +291,94 @@ fn read(
             engine::value(workspace, shape, &TextColumns).map_err(from_engine)?,
         ),
         PropertyKind::LineEndpoints => {
-            Property::LineEndpoints(endpoints(workspace, &line_ends(source, shape)?, shape)?)
+            Property::LineEndpoints(endpoints(workspace, shape, line_end_limits(source)?)?)
         },
     })
 }
 
-// ---- Line endpoints (the host's `shapes::line_end`; the slot values are
-// the shared `litchi_iwa_style::line_end` payloads) ----
+// ---- Line endpoints (the host's `shapes::line_end`, through the shared
+// `litchi_iwa_style::line_end` engine) ----
 
-const SHAPE_INFO_MESSAGE_TYPE: u32 = 2_011;
-const SHAPE_ARCHIVE: u32 = 1;
-const SHAPE_PATH_SOURCE: u32 = 3;
-const SHAPE_HEAD_LINE_END: u32 = 4;
-const SHAPE_TAIL_LINE_END: u32 = 5;
-const PATH_SOURCE_HORIZONTAL_FLIP: u32 = 1;
-
-/// The shape's own (legacy per-shape) head and tail decorations and its
-/// horizontal flip.
-struct LineEnds {
-    head: Option<Vec<u8>>,
-    tail: Option<Vec<u8>>,
-    flipped: bool,
-    limits: WireLimits,
+/// The wire limits line-end payloads are read under.
+fn line_end_limits(package: &Package) -> Result<WireLimits, Error> {
+    Ok(Budget::new(package)?.wire_limits())
 }
 
-fn single<'a>(
-    budget: &mut Budget,
-    data: &'a [u8],
-    number: u32,
-    depth: usize,
-) -> Result<Option<&'a [u8]>, Error> {
-    let view = budget.parse(data, depth)?;
-    let mut found = None;
-    for field in view.fields() {
-        if field.number() != number {
-            continue;
-        }
-        if field.wire_type() != 2 || found.replace(field.payload()).is_some() {
-            return Err(Error::InvalidSource);
-        }
-    }
-    Ok(found)
-}
-
-fn last_varint(
-    budget: &mut Budget,
-    data: &[u8],
-    number: u32,
-    depth: usize,
-) -> Result<Option<u64>, Error> {
-    let view = budget.parse(data, depth)?;
-    let mut found = None;
-    for field in view.fields() {
-        if field.number() != number {
-            continue;
-        }
-        if field.wire_type() != 0 {
-            return Err(Error::InvalidSource);
-        }
-        let (value, length) =
-            decode_varint_from_bytes(field.payload()).map_err(|_error| Error::InvalidSource)?;
-        if length != field.payload().len() {
-            return Err(Error::InvalidSource);
-        }
-        found = Some(value);
-    }
-    Ok(found)
-}
-
-/// Own one nested line-end payload only after charging its complete wire
-/// traversal and copy against the body-drawable budget.  The endpoint codec
-/// receives this owned payload later; it must not be able to turn a borrowed
-/// native field into an uncharged allocation.
-fn owned_payload(budget: &mut Budget, payload: &[u8], depth: usize) -> Result<Vec<u8>, Error> {
-    budget.parse(payload, depth)?;
-    budget.work(payload.len())?;
-    let mut owned = Vec::new();
-    owned
-        .try_reserve_exact(payload.len())
-        .map_err(|_| Error::Allocation {
-            amount: payload.len(),
-        })?;
-    owned.extend_from_slice(payload);
-    Ok(owned)
-}
-
-fn line_ends(package: &Package, shape: u64) -> Result<LineEnds, Error> {
-    let mut budget = Budget::new(package)?;
-    let index = ObjectIndex::new(package, &mut budget)?;
-    let located = index.get(std::num::NonZeroU64::new(shape).ok_or(Error::InvalidSource)?)?;
-    let info = located
-        .object
-        .messages
-        .iter()
-        .find(|message| message.type_ == SHAPE_INFO_MESSAGE_TYPE)
-        .ok_or(Refusal::NotAShape)?;
-    let archive = single(&mut budget, &info.data, SHAPE_ARCHIVE, 0)?.ok_or(Error::InvalidSource)?;
-    let flipped = match single(&mut budget, archive, SHAPE_PATH_SOURCE, 1)? {
-        Some(source) => last_varint(&mut budget, source, PATH_SOURCE_HORIZONTAL_FLIP, 2)?
-            .is_some_and(|flip| flip != 0),
-        None => false,
-    };
-    let head = match single(&mut budget, archive, SHAPE_HEAD_LINE_END, 1)? {
-        Some(payload) => Some(owned_payload(&mut budget, payload, 2)?),
-        None => None,
-    };
-    let tail = match single(&mut budget, archive, SHAPE_TAIL_LINE_END, 1)? {
-        Some(payload) => Some(owned_payload(&mut budget, payload, 2)?),
-        None => None,
-    };
-    Ok(LineEnds {
-        head,
-        tail,
-        flipped,
-        limits: budget.wire_limits(),
-    })
-}
-
-fn decode_endpoint(
-    payload: Option<&[u8]>,
-    limits: WireLimits,
-) -> Result<litchi_iwa_common::shape::line::Endpoint, Error> {
-    litchi_iwa_style::line_end::decode(payload, limits).map_err(|error| match error {
-        litchi_iwa_style::line_end::DecodeError::Unknown(_error) => {
-            Refusal::UnsupportedStyle.into()
-        },
-        litchi_iwa_style::line_end::DecodeError::Wire(error) => match error {
-            WireError::LimitExceeded {
-                kind,
-                observed,
-                limit,
-            } => match kind {
-                WireLimitKind::InputBytes => Error::Limit {
-                    kind: LimitKind::InputBytes,
-                    observed: observed as u64,
-                    maximum: limit as u64,
-                },
-                WireLimitKind::Fields => Error::Limit {
-                    kind: LimitKind::WireFields,
-                    observed: observed as u64,
-                    maximum: limit as u64,
-                },
-                WireLimitKind::OutputBytes => Error::Limit {
-                    kind: LimitKind::OutputBytes,
-                    observed: observed as u64,
-                    maximum: limit as u64,
-                },
-                WireLimitKind::Nesting => Error::Limit {
-                    kind: LimitKind::WireNesting,
-                    observed: observed as u64,
-                    maximum: limit as u64,
-                },
-                WireLimitKind::RewriteWork => Error::Limit {
-                    kind: LimitKind::WireWork,
-                    observed: observed as u64,
-                    maximum: limit as u64,
-                },
-                WireLimitKind::TableRows
-                | WireLimitKind::TableColumns
-                | WireLimitKind::TableCells
-                | WireLimitKind::MaterializedCells => Error::InvalidSource,
+fn from_line_end(error: litchi_iwa_style::line_end::EndpointsError) -> Error {
+    use litchi_iwa_style::line_end::EndpointsError;
+    match error {
+        EndpointsError::Graph(error) => from_engine(error),
+        EndpointsError::Orphan => Refusal::UnsupportedStyle.into(),
+        EndpointsError::Verification => Error::Verification,
+        EndpointsError::Decode(error) => match error {
+            litchi_iwa_style::line_end::DecodeError::Unknown(_error) => {
+                Refusal::UnsupportedStyle.into()
             },
-            WireError::Allocation { amount, .. } => Error::Allocation { amount },
-            WireError::InvalidFormat(_) => Refusal::UnsupportedStyle.into(),
-            WireError::InvalidLimit { .. } => Error::InvalidSource,
+            litchi_iwa_style::line_end::DecodeError::Wire(error) => match error {
+                WireError::LimitExceeded {
+                    kind,
+                    observed,
+                    limit,
+                } => match kind {
+                    WireLimitKind::InputBytes => Error::Limit {
+                        kind: LimitKind::InputBytes,
+                        observed: observed as u64,
+                        maximum: limit as u64,
+                    },
+                    WireLimitKind::Fields => Error::Limit {
+                        kind: LimitKind::WireFields,
+                        observed: observed as u64,
+                        maximum: limit as u64,
+                    },
+                    WireLimitKind::OutputBytes => Error::Limit {
+                        kind: LimitKind::OutputBytes,
+                        observed: observed as u64,
+                        maximum: limit as u64,
+                    },
+                    WireLimitKind::Nesting => Error::Limit {
+                        kind: LimitKind::WireNesting,
+                        observed: observed as u64,
+                        maximum: limit as u64,
+                    },
+                    WireLimitKind::RewriteWork => Error::Limit {
+                        kind: LimitKind::WireWork,
+                        observed: observed as u64,
+                        maximum: limit as u64,
+                    },
+                    WireLimitKind::TableRows
+                    | WireLimitKind::TableColumns
+                    | WireLimitKind::TableCells
+                    | WireLimitKind::MaterializedCells => Error::InvalidSource,
+                },
+                WireError::Allocation { amount, .. } => Error::Allocation { amount },
+                WireError::InvalidFormat(_) => Refusal::UnsupportedStyle.into(),
+                WireError::InvalidLimit { .. } => Error::InvalidSource,
+                _ => Error::InvalidSource,
+            },
             _ => Error::InvalidSource,
         },
         _ => Error::InvalidSource,
-    })
+    }
 }
 
-/// The effective head and tail of a style chain, each inherited on its own.
-fn inherited_line_ends(
+fn endpoints(
     workspace: &Workspace<'_>,
-    style: u64,
-) -> Result<(Option<Vec<u8>>, Option<Vec<u8>>), Error> {
-    Ok((
-        engine::effective(workspace, style, engine::Slot::HeadLineEnd).map_err(from_engine)?,
-        engine::effective(workspace, style, engine::Slot::TailLineEnd).map_err(from_engine)?,
-    ))
-}
-
-fn endpoints(workspace: &Workspace<'_>, own: &LineEnds, shape: u64) -> Result<Endpoints, Error> {
-    let (mut head, mut tail) = (own.head.clone(), own.tail.clone());
-    if head.is_none() || tail.is_none() {
-        let style = engine::target(workspace, shape)
-            .map_err(from_engine)?
-            .style();
-        let (inherited_head, inherited_tail) = inherited_line_ends(workspace, style)?;
-        head = head.or(inherited_head);
-        tail = tail.or(inherited_tail);
-    }
-    let mut endpoints = Endpoints {
-        start: decode_endpoint(tail.as_deref(), own.limits)?,
-        end: decode_endpoint(head.as_deref(), own.limits)?,
-    };
-    if own.flipped {
-        std::mem::swap(&mut endpoints.start, &mut endpoints.end);
-    }
-    Ok(endpoints)
+    shape: u64,
+    limits: WireLimits,
+) -> Result<Endpoints, Error> {
+    litchi_iwa_style::line_end::endpoints(workspace, shape, limits).map_err(from_line_end)
 }
 
 /// Store `wanted` as the line's decorations (the host's
 /// `set_shape_line_endpoints`); returns whether anything changed.
 fn set_endpoints(
     workspace: &mut Workspace<'_>,
-    own: &LineEnds,
     shape: u64,
     wanted: Endpoints,
+    limits: WireLimits,
 ) -> Result<bool, Error> {
-    if endpoints(workspace, own, shape)? == wanted {
-        return Ok(false);
-    }
-    let mut stored = wanted;
-    if own.flipped {
-        std::mem::swap(&mut stored.start, &mut stored.end);
-    }
-    let target = engine::target(workspace, shape).map_err(from_engine)?;
-    let payload = engine::Styles::shape_style(&*workspace, target.style())
-        .ok_or(Error::InvalidSource)?
-        .to_vec();
-    let disposable = target.exclusive()
-        && engine::direct_slots(&payload)
-            .map_err(from_engine)?
-            .is_some();
-    let mut clear = false;
-    if disposable && wanted == Endpoints::default() {
-        let parent = engine::parent_of(&payload)
-            .map_err(from_engine)?
-            .ok_or(Refusal::UnsupportedStyle)?;
-        let (head, tail) = inherited_line_ends(workspace, parent)?;
-        let inherited = Endpoints {
-            start: decode_endpoint(tail.as_deref(), own.limits)?,
-            end: decode_endpoint(head.as_deref(), own.limits)?,
-        };
-        clear = inherited == Endpoints::default();
-    }
-    let writes = if clear {
-        vec![
-            (engine::Slot::HeadLineEnd, None),
-            (engine::Slot::TailLineEnd, None),
-        ]
-    } else {
-        vec![
-            (
-                engine::Slot::HeadLineEnd,
-                Some(engine::Value::message(litchi_iwa_style::line_end::encode(
-                    stored.end,
-                ))),
-            ),
-            (
-                engine::Slot::TailLineEnd,
-                Some(engine::Value::message(litchi_iwa_style::line_end::encode(
-                    stored.start,
-                ))),
-            ),
-        ]
-    };
-    let plan = engine::plan_set(&*workspace, target, &writes).map_err(from_engine)?;
-    engine::apply(workspace, shape, plan).map_err(from_engine)?;
-    if endpoints(workspace, own, shape)? != wanted {
-        return Err(Error::Verification);
-    }
-    Ok(true)
+    litchi_iwa_style::line_end::set_endpoints(workspace, shape, wanted, limits)
+        .map_err(from_line_end)
 }
 
 /// One staged change.
@@ -663,7 +488,7 @@ impl Edit<'_> {
         let (components, limits) = workspace(self.source)?;
         let mut workspace = Workspace::new(&components, limits).map_err(from_engine)?;
         let mut applied = 0;
-        let own = line_ends(self.source, self.shape)?;
+        let line_limits = line_end_limits(self.source)?;
         let mut image: Option<NewImage> = None;
         let mut releases: Vec<Release> = Vec::new();
         for change in &self.changes {
@@ -704,16 +529,20 @@ impl Edit<'_> {
                     Ok(changed)
                 },
                 Change::Set(Property::LineEndpoints(wanted)) => {
-                    applied +=
-                        usize::from(set_endpoints(&mut workspace, &own, self.shape, *wanted)?);
+                    applied += usize::from(set_endpoints(
+                        &mut workspace,
+                        self.shape,
+                        *wanted,
+                        line_limits,
+                    )?);
                     continue;
                 },
                 Change::Reset(PropertyKind::LineEndpoints) => {
                     applied += usize::from(set_endpoints(
                         &mut workspace,
-                        &own,
                         self.shape,
                         Endpoints::default(),
+                        line_limits,
                     )?);
                     continue;
                 },
