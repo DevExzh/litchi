@@ -6,6 +6,7 @@
 use litchi_iwa::charts::{
     Chart3dDepth, Chart3dLightingStyle, Chart3dRotation, Chart3dSeriesGap, ChartCornerRadius,
     ChartDonutInnerRadius, ChartPieStartAngle, ChartRadarStartAngle, ChartRoundedCorners,
+    ChartShadow,
 };
 use litchi_iwa::numbers;
 use litchi_iwa::shapes::{DrawablePoint, DrawableSize, ShapeFill};
@@ -13,11 +14,14 @@ use litchi_iwa_common::chart::ChartData;
 use litchi_iwa_common::chart::kind::Kind;
 use litchi_iwa_common::color::{RgbColorSpace, Rgba};
 use litchi_iwa_common::shape::fill::{Angle, Fill, Gradient};
+use litchi_iwa_common::shape::shadow::{
+    Angle as ShadowAngle, Appearance, BlurRadius, Offset, Opacity,
+};
 use litchi_iwa_common::shape::stroke::{Pattern, Stroke, Width};
 use litchi_numbers::Package;
 use litchi_numbers::sheet::chart::style::{
-    Lighting3d, Property, PropertyKind, RadarGridShape, chart3d, corner, donut, gaps, legend, pie,
-    radar,
+    Drop, Lighting3d, Property, PropertyKind, RadarGridShape, Shadow, chart3d, corner, donut, gaps,
+    legend, pie, radar,
 };
 
 use crate::harness::{Case, Evidence, Fixture, Format, LeafRun, TestResult, Tier, fixture};
@@ -91,6 +95,26 @@ const fn host_lighting(lighting: Lighting3d) -> Chart3dLightingStyle {
     }
 }
 
+const fn host_shadow(shadow: Shadow) -> ChartShadow {
+    match shadow {
+        Shadow::IndividualSeries(drop) => ChartShadow::IndividualSeries(drop),
+        Shadow::Grouped(drop) => ChartShadow::Grouped(drop),
+        _ => ChartShadow::None,
+    }
+}
+
+fn drop_shadow(points: f32, opacity: f32, degrees: f32) -> TestResult<Drop> {
+    Ok(Drop::new(
+        Appearance::new(
+            Rgba::new(0.1, 0.2, 0.6, 1.0, RgbColorSpace::Srgb)?,
+            BlurRadius::from_points(4)?,
+            Offset::from_points(points)?,
+            Opacity::new(opacity)?,
+        ),
+        ShadowAngle::from_degrees(degrees)?,
+    ))
+}
+
 fn host_write(source: &[u8], sheet: u64, chart: u64, value: Property) -> TestResult<Vec<u8>> {
     let mut e = numbers::Draft::from_bytes(source)?;
     match value {
@@ -161,6 +185,7 @@ fn host_write(source: &[u8], sheet: u64, chart: u64, value: Property) -> TestRes
         Property::Lighting3d(v) => {
             e.set_sheet_chart_3d_lighting_style(sheet, chart, host_lighting(v))?;
         },
+        Property::Shadow(v) => e.set_sheet_chart_shadow(sheet, chart, host_shadow(v))?,
         _ => return Err("unmapped property".into()),
     }
     Ok(e.to_bytes()?)
@@ -237,6 +262,10 @@ fn host_read(bytes: &[u8], sheet: u64, chart: u64, kind: PropertyKind) -> TestRe
             .sheet_chart_3d_lighting_style(sheet, chart)?
             .inspector_label()
             .to_owned(),
+        PropertyKind::Shadow => {
+            let shadow = e.sheet_chart_shadow(sheet, chart)?;
+            format!("{:?}", (shadow.drop_shadow(), shadow.groups_series()))
+        },
         _ => return Err("unmapped kind".into()),
     })
 }
@@ -266,6 +295,7 @@ fn leaf_read(bytes: &[u8], kind: PropertyKind) -> TestResult<String> {
         Property::BorderStroke(v) => format!("{v:?}"),
         Property::BackgroundFill(v) => format!("{:?}", shape_fill(&v)?),
         Property::Lighting3d(v) => v.inspector_label().to_owned(),
+        Property::Shadow(v) => format!("{:?}", (v.drop_shadow(), v.groups_series())),
         _ => return Err("unmapped property".into()),
     })
 }
@@ -452,6 +482,21 @@ fn option_cases() -> TestResult<Vec<(Kind, Property)>> {
         (Kind::Line3d, Property::Lighting3d(Lighting3d::MediumCenter)),
         (Kind::Pie3d, Property::Lighting3d(Lighting3d::MediumRight)),
         (Kind::Donut3d, Property::Lighting3d(Lighting3d::MediumLeft)),
+        (Kind::Column2d, Property::Shadow(Shadow::None)),
+        (
+            Kind::Line2d,
+            Property::Shadow(Shadow::Grouped(drop_shadow(3.0, 0.5, 120.0)?)),
+        ),
+        (
+            Kind::Pie2d,
+            Property::Shadow(Shadow::IndividualSeries(drop_shadow(8.0, 0.9, 300.0)?)),
+        ),
+        (
+            Kind::Bar2d,
+            Property::Shadow(Shadow::Grouped(
+                Shadow::NATIVE_DEFAULT.drop_shadow().ok_or("default")?,
+            )),
+        ),
         (
             Kind::Column2d,
             Property::GapSpacing(gaps::Spacing::new(

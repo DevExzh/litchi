@@ -30,6 +30,7 @@ pub mod axis {
         Axis, Bound, Bounds, MajorStepCount, MinorStepCount, Scale, Steps, TickMarkLocation,
         ValueAxisSettings,
     };
+    pub use litchi_iwa_common::chart::category_labels::{Frequency, Interval, Layout};
     pub use litchi_iwa_common::chart::number_format::{LabelAffixes, NumberFormat};
     pub use litchi_iwa_common::shape::stroke::Stroke;
 }
@@ -470,7 +471,7 @@ pub mod style {
     pub use crate::package::slide_chart_series::{Diagnostics, Error, LimitKind, Refusal};
     pub use crate::package::slide_chart_style::StyleEdit as Edit;
     pub use crate::package::slide_chart_style::style::{
-        Commit, Lighting3d, Patch, Property, PropertyKind, RadarGridShape,
+        Commit, Drop, Lighting3d, Patch, Property, PropertyKind, RadarGridShape, Shadow,
     };
     pub use litchi_iwa_common::chart::{corner, donut, gaps, legend, pie, radar};
     pub use litchi_iwa_common::chart3d;

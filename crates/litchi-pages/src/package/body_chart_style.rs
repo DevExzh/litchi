@@ -35,7 +35,8 @@ pub(crate) mod style {
         inverse_plan,
     };
 
-    pub use chart_engine::{Lighting3d, Property, PropertyKind, RadarGridShape};
+    pub use chart_engine::{Lighting3d, Property, PropertyKind, RadarGridShape, Shadow};
+    pub use litchi_iwa_common::shape::shadow::Drop;
 
     /// A compact exact-source patch of one chart-level style property.
     #[derive(Clone, PartialEq)]

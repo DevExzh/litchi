@@ -25,6 +25,7 @@
 mod archive_diff;
 mod chart_font_admission_cases;
 mod chart_font_cases;
+mod chart_lighting_validation_cases;
 mod chart_property_cost;
 mod chart_style_cases;
 mod chart_text_cases;
@@ -89,6 +90,7 @@ mod numbers_lifecycle_cases;
 mod numbers_media_add_cases;
 mod numbers_media_cases;
 mod numbers_owner_allocation;
+mod numbers_shape_lifecycle_cases;
 mod numbers_shape_style_cases;
 #[cfg(feature = "parity-host-oracle")]
 mod numbers_table_comment_cases;

@@ -242,7 +242,16 @@ fn native_object(
     Ok(object)
 }
 
-/// Author a text box (`text_box`) or preset shape at `geometry` with
+/// The path a new shape draws.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub(super) enum Path {
+    /// A preset drawn in the frame.
+    Preset(Preset),
+    /// A native straight line of this length (the frame's width).
+    Line(f32),
+}
+
+/// Author a text box (`text_box`), preset shape or straight line at `geometry` with
 /// `text`, owned by `sheet`, under the identifiers `identifiers`
 /// (drawable, caption, title, storage). `None` when the preset does not fit
 /// the frame.
@@ -251,7 +260,7 @@ pub(super) fn author(
     identifiers: [u64; 4],
     sheet: u64,
     geometry: Geometry,
-    preset: Preset,
+    path: Path,
     text: &str,
     text_box: bool,
     limits: litchi_iwa_core::Limits,
@@ -260,10 +269,16 @@ pub(super) fn author(
     let (Some(position), Some(size)) = (geometry.position, geometry.size) else {
         return Err(Fault::Invalid);
     };
-    let Some(path_source) =
-        litchi_iwa_style::shape_path::path_source(preset, size.width, size.height)
-    else {
-        return Ok(None);
+    let path_source = match path {
+        Path::Preset(preset) => {
+            let Some(source) =
+                litchi_iwa_style::shape_path::path_source(preset, size.width, size.height)
+            else {
+                return Ok(None);
+            };
+            source
+        },
+        Path::Line(length) => litchi_iwa_style::shape_path::line_path_source(length),
     };
     let frame = Writer::new()
         .message(1, &point(position.x, position.y))
