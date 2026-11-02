@@ -305,21 +305,6 @@ impl Edit<'_> {
     }
 }
 
-/// One stored BNC cell located in the table's tiles (the shared engine's,
-/// record 0412).
-pub(super) use litchi_iwa_table::cell_rich_text::Located;
-
-/// The stored cell at `position`, through the shared engine.
-pub(super) fn locate_cell(
-    working: &Working<'_>,
-    store: &[u8],
-    position: At,
-) -> Result<Option<Located>, Error> {
-    Ok(litchi_iwa_table::cell_rich_text::locate_cell(
-        working, store, position,
-    )?)
-}
-
 /// The shared rich-text engine's error (record 0412).
 impl From<litchi_iwa_table::cell_rich_text::Error> for Error {
     fn from(error: litchi_iwa_table::cell_rich_text::Error) -> Self {
@@ -846,20 +831,6 @@ fn with_flags_off(mut properties: CharacterProperties) -> CharacterProperties {
 /// Replace one message, transitioning its aggregate object references, or
 /// keeping its header (the shared engine's helpers, record 0412).
 pub(super) use litchi_iwa_table::cell_rich_text::{replace_message, replace_with_references};
-
-/// Store `cell` at the empty position `position`, counting it in its row
-/// and column headers (the shared engine's writer, record 0412).
-pub(super) fn materialize_cell(
-    working: &mut Working<'_>,
-    store: &[u8],
-    columns: u32,
-    position: At,
-    cell: &litchi_numbers_wire::BncCell,
-) -> Result<(), Error> {
-    Ok(litchi_iwa_table::cell_rich_text::materialize_cell(
-        working, store, columns, position, cell,
-    )?)
-}
 
 impl From<topology::Error> for Error {
     fn from(error: topology::Error) -> Self {
