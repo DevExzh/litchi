@@ -24,6 +24,10 @@ pub mod formula;
 pub mod metadata;
 pub mod plan;
 pub mod references;
+/// Exact wire helpers of the structural rewrites (moved from
+/// `litchi-numbers`' table topology, record 0412): every rewrite keeps the
+/// bytes of each field it does not change.
+pub mod wire;
 
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::sync::Arc;

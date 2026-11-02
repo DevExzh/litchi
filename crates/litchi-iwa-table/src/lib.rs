@@ -32,6 +32,10 @@ pub mod cell_appearance;
 /// Format-neutral whole-cell character-style graph planning.
 pub mod cell_text_style;
 
+/// Character and paragraph properties and paragraph lists of whole cells'
+/// text (lifted from `litchi-numbers`, record 0412).
+pub mod cell_rich_text;
+
 /// Bounded row/column header-count publication for style-only cell materialization.
 pub mod cell_text_style_headers;
 

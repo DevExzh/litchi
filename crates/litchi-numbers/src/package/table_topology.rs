@@ -49,7 +49,7 @@
 )]
 
 mod shift;
-pub(super) mod wire;
+pub(super) use litchi_iwa_table::structure::wire;
 
 pub(super) use litchi_numbers_wire::table_topology::{extents as calc, lists, storage};
 
