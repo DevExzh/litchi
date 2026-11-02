@@ -303,26 +303,26 @@ keynote/editor/slide_charts.rs	set_slide_chart_geometry	1	keynote	chart.lifecycl
 keynote/editor/slide_charts.rs	set_slide_chart_kind	1	keynote	chart.lifecycle	migrated	litchi_keynote::chart::lifecycle::Edit::set_kind	keynote_slide_chart_kind_parity	B	-	-
 keynote/editor/slide_charts.rs	slide_chart_catalog	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
 keynote/editor/slide_charts.rs	slide_charts	1	keynote	chart.lifecycle	migrated	litchi_keynote::Package::slide_chart_metadata	keynote_slide_chart_read_parity	A	-	-
-keynote/editor/slide_charts/axis_gridlines.rs	set_slide_chart_axis_gridline_stroke	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
+keynote/editor/slide_charts/axis_gridlines.rs	set_slide_chart_axis_gridline_stroke	1	keynote	chart.style	migrated	litchi_keynote::chart::axis::Edit::set	keynote_slide_chart_axis_set_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
 keynote/editor/slide_charts/axis_gridlines.rs	set_slide_chart_axis_major_gridlines_visible	1	keynote	chart.style	migrated	litchi_keynote::chart::axis::Edit::set	keynote_slide_chart_axis_set_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
 keynote/editor/slide_charts/axis_gridlines.rs	set_slide_chart_axis_minor_gridlines_visible	1	keynote	chart.style	migrated	litchi_keynote::chart::axis::Edit::set	keynote_slide_chart_axis_set_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
-keynote/editor/slide_charts/axis_gridlines.rs	slide_chart_axis_gridline_stroke	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
+keynote/editor/slide_charts/axis_gridlines.rs	slide_chart_axis_gridline_stroke	1	keynote	chart.style	migrated	litchi_keynote::Package::slide_chart_axis	keynote_slide_chart_axis_read_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
 keynote/editor/slide_charts/axis_gridlines.rs	slide_chart_axis_major_gridlines_visible	1	keynote	chart.style	migrated	litchi_keynote::Package::slide_chart_axis	keynote_slide_chart_axis_read_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
 keynote/editor/slide_charts/axis_gridlines.rs	slide_chart_axis_minor_gridlines_visible	1	keynote	chart.style	migrated	litchi_keynote::Package::slide_chart_axis	keynote_slide_chart_axis_read_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
-keynote/editor/slide_charts/axis_label_affixes.rs	set_slide_chart_axis_label_affixes	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_charts/axis_label_affixes.rs	slide_chart_axis_label_affixes	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_charts/axis_label_angle.rs	set_slide_chart_axis_label_angle	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_charts/axis_label_angle.rs	slide_chart_axis_label_angle	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_charts/axis_label_position_3d.rs	set_slide_chart_3d_value_axis_label_position	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_charts/axis_label_position_3d.rs	slide_chart_3d_value_axis_label_position	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
+keynote/editor/slide_charts/axis_label_affixes.rs	set_slide_chart_axis_label_affixes	1	keynote	chart.style	migrated	litchi_keynote::chart::axis::Edit::set	keynote_slide_chart_axis_set_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+keynote/editor/slide_charts/axis_label_affixes.rs	slide_chart_axis_label_affixes	1	keynote	chart.style	migrated	litchi_keynote::Package::slide_chart_axis	keynote_slide_chart_axis_read_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+keynote/editor/slide_charts/axis_label_angle.rs	set_slide_chart_axis_label_angle	1	keynote	chart.style	migrated	litchi_keynote::chart::axis::Edit::set	keynote_slide_chart_axis_set_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+keynote/editor/slide_charts/axis_label_angle.rs	slide_chart_axis_label_angle	1	keynote	chart.style	migrated	litchi_keynote::Package::slide_chart_axis	keynote_slide_chart_axis_read_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+keynote/editor/slide_charts/axis_label_position_3d.rs	set_slide_chart_3d_value_axis_label_position	1	keynote	chart.style	migrated	litchi_keynote::chart::axis::Edit::set	keynote_slide_chart_axis_set_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+keynote/editor/slide_charts/axis_label_position_3d.rs	slide_chart_3d_value_axis_label_position	1	keynote	chart.style	migrated	litchi_keynote::Package::slide_chart_axis	keynote_slide_chart_axis_read_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
 keynote/editor/slide_charts/axis_labels.rs	set_slide_chart_axis_labels_visible	1	keynote	chart.style	migrated	litchi_keynote::chart::axis::Edit::set	keynote_slide_chart_axis_set_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
 keynote/editor/slide_charts/axis_labels.rs	slide_chart_axis_labels_visible	1	keynote	chart.style	migrated	litchi_keynote::Package::slide_chart_axis	keynote_slide_chart_axis_read_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
 keynote/editor/slide_charts/axis_line.rs	set_slide_chart_axis_line_visible	1	keynote	chart.style	migrated	litchi_keynote::chart::axis::Edit::set	keynote_slide_chart_axis_set_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
 keynote/editor/slide_charts/axis_line.rs	slide_chart_axis_line_visible	1	keynote	chart.style	migrated	litchi_keynote::Package::slide_chart_axis	keynote_slide_chart_axis_read_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
 keynote/editor/slide_charts/axis_minimum_label.rs	set_slide_chart_value_axis_minimum_label_visible	1	keynote	chart.style	migrated	litchi_keynote::chart::axis::Edit::set	keynote_slide_chart_axis_set_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
 keynote/editor/slide_charts/axis_minimum_label.rs	slide_chart_value_axis_minimum_label_visible	1	keynote	chart.style	migrated	litchi_keynote::Package::slide_chart_axis	keynote_slide_chart_axis_read_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
-keynote/editor/slide_charts/axis_number_format.rs	set_slide_chart_axis_number_format	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_charts/axis_number_format.rs	slide_chart_axis_number_format	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
+keynote/editor/slide_charts/axis_number_format.rs	set_slide_chart_axis_number_format	1	keynote	chart.style	migrated	litchi_keynote::chart::axis::Edit::set	keynote_slide_chart_axis_set_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+keynote/editor/slide_charts/axis_number_format.rs	slide_chart_axis_number_format	1	keynote	chart.style	migrated	litchi_keynote::Package::slide_chart_axis	keynote_slide_chart_axis_read_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
 keynote/editor/slide_charts/axis_series_names.rs	set_slide_chart_category_axis_series_names_visible	1	keynote	chart.style	migrated	litchi_keynote::chart::axis::Edit::set	keynote_slide_chart_axis_set_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
 keynote/editor/slide_charts/axis_series_names.rs	slide_chart_category_axis_series_names_visible	1	keynote	chart.style	migrated	litchi_keynote::Package::slide_chart_axis	keynote_slide_chart_axis_read_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
 keynote/editor/slide_charts/axis_tick_marks.rs	set_slide_chart_axis_minor_tick_marks_visible	1	keynote	chart.style	migrated	litchi_keynote::chart::axis::Edit::set	keynote_slide_chart_axis_set_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
@@ -336,8 +336,8 @@ keynote/editor/slide_charts/bar_shape_3d.rs	set_slide_chart_3d_bar_shape	1	keyno
 keynote/editor/slide_charts/bar_shape_3d.rs	slide_chart_3d_bar_shape	1	keynote	chart.style	migrated	litchi_keynote::Package::slide_chart_style	keynote_slide_chart_options_read_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
 keynote/editor/slide_charts/border.rs	set_slide_chart_border_visible	1	keynote	chart.style	migrated	litchi_keynote::chart::style::Edit::set	keynote_slide_chart_options_set_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
 keynote/editor/slide_charts/border.rs	slide_chart_border_visible	1	keynote	chart.style	migrated	litchi_keynote::Package::slide_chart_style	keynote_slide_chart_options_read_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
-keynote/editor/slide_charts/border_stroke.rs	set_slide_chart_border_stroke	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_charts/border_stroke.rs	slide_chart_border_stroke	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
+keynote/editor/slide_charts/border_stroke.rs	set_slide_chart_border_stroke	1	keynote	chart.style	migrated	litchi_keynote::chart::style::Edit::set	keynote_slide_chart_options_set_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+keynote/editor/slide_charts/border_stroke.rs	slide_chart_border_stroke	1	keynote	chart.style	migrated	litchi_keynote::Package::slide_chart_style	keynote_slide_chart_options_read_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
 keynote/editor/slide_charts/category_labels.rs	set_slide_chart_category_label_layout	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
 keynote/editor/slide_charts/category_labels.rs	slide_chart_category_label_layout	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
 keynote/editor/slide_charts/depth_3d.rs	set_slide_chart_3d_depth	1	keynote	chart.style	migrated	litchi_keynote::chart::style::Edit::set	keynote_slide_chart_style_set_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
@@ -550,39 +550,39 @@ keynote/editor/slide_tables.rs	reset_slide_table_cell_fill	1	keynote	table.cell_
 keynote/editor/slide_tables.rs	reset_slide_table_cell_fraction_format	1	keynote	table.cell_format	migrated	litchi_keynote::slide::table::format::Edit::reset	keynote_slide_table_cell_format_reset_parity	B	-	-
 keynote/editor/slide_tables.rs	reset_slide_table_cell_layout	1	keynote	table.cell_appearance	migrated	litchi_keynote::slide::table::cell_appearance::Edit::reset_layout	keynote_slide_table_cell_layout_reset_parity	B	-	-
 keynote/editor/slide_tables.rs	reset_slide_table_cell_numeral_system_format	1	keynote	table.cell_format	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_tables.rs	reset_slide_table_cell_paragraph_indents	1	keynote	table.cell_rich_text	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_tables.rs	reset_slide_table_cell_paragraph_line_spacing	1	keynote	table.cell_rich_text	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_tables.rs	reset_slide_table_cell_paragraph_list	1	keynote	table.cell_rich_text	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_tables.rs	reset_slide_table_cell_paragraph_list_bullet	1	keynote	table.cell_rich_text	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_tables.rs	reset_slide_table_cell_paragraph_list_bullet_geometry	1	keynote	table.cell_rich_text	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_tables.rs	reset_slide_table_cell_paragraph_list_indentation	1	keynote	table.cell_rich_text	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_tables.rs	reset_slide_table_cell_paragraph_list_label_color	1	keynote	table.cell_rich_text	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_tables.rs	reset_slide_table_cell_paragraph_list_level	1	keynote	table.cell_rich_text	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_tables.rs	reset_slide_table_cell_paragraph_list_number_format	1	keynote	table.cell_format	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_tables.rs	reset_slide_table_cell_paragraph_list_number_scale	1	keynote	table.cell_rich_text	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_tables.rs	reset_slide_table_cell_paragraph_list_number_tiering	1	keynote	table.cell_rich_text	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_tables.rs	reset_slide_table_cell_paragraph_spacing	1	keynote	table.cell_rich_text	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_tables.rs	reset_slide_table_cell_paragraph_tab_stops	1	keynote	table.cell_rich_text	host-only	litchi-keynote	-	-	-	-
+keynote/editor/slide_tables.rs	reset_slide_table_cell_paragraph_indents	1	keynote	table.cell_rich_text	migrated	litchi_keynote::Package::edit_slide_table_cell_text	keynote_slide_table_cell_text_property_parity	B	-	-
+keynote/editor/slide_tables.rs	reset_slide_table_cell_paragraph_line_spacing	1	keynote	table.cell_rich_text	migrated	litchi_keynote::Package::edit_slide_table_cell_text	keynote_slide_table_cell_text_property_parity	B	-	-
+keynote/editor/slide_tables.rs	reset_slide_table_cell_paragraph_list	1	keynote	table.cell_rich_text	migrated	litchi_keynote::Package::edit_slide_table_cell_lists	keynote_slide_table_cell_list_preset_parity	B	-	-
+keynote/editor/slide_tables.rs	reset_slide_table_cell_paragraph_list_bullet	1	keynote	table.cell_rich_text	migrated	litchi_keynote::Package::edit_slide_table_cell_lists	keynote_slide_table_cell_list_property_reset_parity	B	-	-
+keynote/editor/slide_tables.rs	reset_slide_table_cell_paragraph_list_bullet_geometry	1	keynote	table.cell_rich_text	migrated	litchi_keynote::Package::edit_slide_table_cell_lists	keynote_slide_table_cell_list_property_reset_parity	B	-	-
+keynote/editor/slide_tables.rs	reset_slide_table_cell_paragraph_list_indentation	1	keynote	table.cell_rich_text	migrated	litchi_keynote::Package::edit_slide_table_cell_lists	keynote_slide_table_cell_list_property_reset_parity	B	-	-
+keynote/editor/slide_tables.rs	reset_slide_table_cell_paragraph_list_label_color	1	keynote	table.cell_rich_text	migrated	litchi_keynote::Package::edit_slide_table_cell_lists	keynote_slide_table_cell_list_property_reset_parity	B	-	-
+keynote/editor/slide_tables.rs	reset_slide_table_cell_paragraph_list_level	1	keynote	table.cell_rich_text	migrated	litchi_keynote::Package::edit_slide_table_cell_lists	keynote_slide_table_cell_list_level_numbering_parity	A	-	-
+keynote/editor/slide_tables.rs	reset_slide_table_cell_paragraph_list_number_format	1	keynote	table.cell_format	migrated	litchi_keynote::Package::edit_slide_table_cell_lists	keynote_slide_table_cell_list_property_reset_parity	B	-	-
+keynote/editor/slide_tables.rs	reset_slide_table_cell_paragraph_list_number_scale	1	keynote	table.cell_rich_text	migrated	litchi_keynote::Package::edit_slide_table_cell_lists	keynote_slide_table_cell_list_property_reset_parity	B	-	-
+keynote/editor/slide_tables.rs	reset_slide_table_cell_paragraph_list_number_tiering	1	keynote	table.cell_rich_text	migrated	litchi_keynote::Package::edit_slide_table_cell_lists	keynote_slide_table_cell_list_property_reset_parity	B	-	-
+keynote/editor/slide_tables.rs	reset_slide_table_cell_paragraph_spacing	1	keynote	table.cell_rich_text	migrated	litchi_keynote::Package::edit_slide_table_cell_text	keynote_slide_table_cell_text_property_parity	B	-	-
+keynote/editor/slide_tables.rs	reset_slide_table_cell_paragraph_tab_stops	1	keynote	table.cell_rich_text	migrated	litchi_keynote::Package::edit_slide_table_cell_text	keynote_slide_table_cell_text_property_parity	B	-	-
 keynote/editor/slide_tables.rs	reset_slide_table_cell_percentage_format	1	keynote	table.cell_format	migrated	litchi_keynote::slide::table::format::Edit::reset	keynote_slide_table_cell_format_reset_parity	B	-	-
 keynote/editor/slide_tables.rs	reset_slide_table_cell_pop_up_menu_format	1	keynote	table.cell_format	host-only	litchi-keynote	-	-	-	-
 keynote/editor/slide_tables.rs	reset_slide_table_cell_scientific_format	1	keynote	table.cell_format	migrated	litchi_keynote::slide::table::format::Edit::reset	keynote_slide_table_cell_format_reset_parity	B	-	-
 keynote/editor/slide_tables.rs	reset_slide_table_cell_slider_format	1	keynote	table.cell_format	host-only	litchi-keynote	-	-	-	-
 keynote/editor/slide_tables.rs	reset_slide_table_cell_star_rating_format	1	keynote	table.cell_format	host-only	litchi-keynote	-	-	-	-
 keynote/editor/slide_tables.rs	reset_slide_table_cell_stepper_format	1	keynote	table.cell_format	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_tables.rs	reset_slide_table_cell_text_alignment	1	keynote	table.cell_rich_text	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_tables.rs	reset_slide_table_cell_text_background	1	keynote	table.cell_rich_text	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_tables.rs	reset_slide_table_cell_text_baseline_shift	1	keynote	table.cell_rich_text	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_tables.rs	reset_slide_table_cell_text_capitalization	1	keynote	table.cell_rich_text	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_tables.rs	reset_slide_table_cell_text_character_spacing	1	keynote	table.cell_rich_text	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_tables.rs	reset_slide_table_cell_text_color	1	keynote	table.cell_rich_text	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_tables.rs	reset_slide_table_cell_text_decorations	1	keynote	table.cell_rich_text	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_tables.rs	reset_slide_table_cell_text_font	1	keynote	table.cell_rich_text	host-only	litchi-keynote	-	-	-	-
+keynote/editor/slide_tables.rs	reset_slide_table_cell_text_alignment	1	keynote	table.cell_rich_text	migrated	litchi_keynote::Package::edit_slide_table_cell_text	keynote_slide_table_cell_text_property_parity	B	-	-
+keynote/editor/slide_tables.rs	reset_slide_table_cell_text_background	1	keynote	table.cell_rich_text	migrated	litchi_keynote::Package::edit_slide_table_cell_text	keynote_slide_table_cell_text_property_parity	B	-	-
+keynote/editor/slide_tables.rs	reset_slide_table_cell_text_baseline_shift	1	keynote	table.cell_rich_text	migrated	litchi_keynote::Package::edit_slide_table_cell_text	keynote_slide_table_cell_text_property_parity	B	-	-
+keynote/editor/slide_tables.rs	reset_slide_table_cell_text_capitalization	1	keynote	table.cell_rich_text	migrated	litchi_keynote::Package::edit_slide_table_cell_text	keynote_slide_table_cell_text_property_parity	B	-	-
+keynote/editor/slide_tables.rs	reset_slide_table_cell_text_character_spacing	1	keynote	table.cell_rich_text	migrated	litchi_keynote::Package::edit_slide_table_cell_text	keynote_slide_table_cell_text_property_parity	B	-	-
+keynote/editor/slide_tables.rs	reset_slide_table_cell_text_color	1	keynote	table.cell_rich_text	migrated	litchi_keynote::Package::edit_slide_table_cell_text	keynote_slide_table_cell_text_property_parity	B	-	-
+keynote/editor/slide_tables.rs	reset_slide_table_cell_text_decorations	1	keynote	table.cell_rich_text	migrated	litchi_keynote::Package::edit_slide_table_cell_text	keynote_slide_table_cell_text_property_parity	B	-	-
+keynote/editor/slide_tables.rs	reset_slide_table_cell_text_font	1	keynote	table.cell_rich_text	migrated	litchi_keynote::Package::edit_slide_table_cell_text	keynote_slide_table_cell_text_property_parity	B	-	-
 keynote/editor/slide_tables.rs	reset_slide_table_cell_text_format	1	keynote	table.cell_format	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_tables.rs	reset_slide_table_cell_text_ligatures	1	keynote	table.cell_rich_text	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_tables.rs	reset_slide_table_cell_text_outline	1	keynote	table.cell_rich_text	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_tables.rs	reset_slide_table_cell_text_script	1	keynote	table.cell_rich_text	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_tables.rs	reset_slide_table_cell_text_shadow	1	keynote	table.cell_rich_text	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_tables.rs	reset_slide_table_cell_text_style	1	keynote	table.cell_rich_text	host-only	litchi-keynote	-	-	-	-
+keynote/editor/slide_tables.rs	reset_slide_table_cell_text_ligatures	1	keynote	table.cell_rich_text	migrated	litchi_keynote::Package::edit_slide_table_cell_text	keynote_slide_table_cell_text_property_parity	B	-	-
+keynote/editor/slide_tables.rs	reset_slide_table_cell_text_outline	1	keynote	table.cell_rich_text	migrated	litchi_keynote::Package::edit_slide_table_cell_text	keynote_slide_table_cell_text_property_parity	B	-	-
+keynote/editor/slide_tables.rs	reset_slide_table_cell_text_script	1	keynote	table.cell_rich_text	migrated	litchi_keynote::Package::edit_slide_table_cell_text	keynote_slide_table_cell_text_property_parity	B	-	-
+keynote/editor/slide_tables.rs	reset_slide_table_cell_text_shadow	1	keynote	table.cell_rich_text	migrated	litchi_keynote::Package::edit_slide_table_cell_text	keynote_slide_table_cell_text_property_parity	B	-	-
+keynote/editor/slide_tables.rs	reset_slide_table_cell_text_style	1	keynote	table.cell_rich_text	migrated	litchi_keynote::Package::edit_slide_table_cell_text	keynote_slide_table_cell_text_property_parity	B	-	-
 keynote/editor/slide_tables.rs	resize_slide_table	1	keynote	table.lifecycle	host-only	litchi-keynote	-	-	-	-
 keynote/editor/slide_tables.rs	set_slide_table_cell	1	keynote	table.cells	migrated	litchi_keynote::slide::drawable::Edit::set_table_cell	keynote_slide_table_formula_refresh_parity	B	-	-
 keynote/editor/slide_tables.rs	set_slide_table_cell_border	1	keynote	table.cell_appearance	migrated	litchi_keynote::slide::table::cell_appearance::Edit::set_border	keynote_slide_table_cell_border_parity	B	-	-
@@ -596,41 +596,41 @@ keynote/editor/slide_tables.rs	set_slide_table_cell_fill	1	keynote	table.cell_ap
 keynote/editor/slide_tables.rs	set_slide_table_cell_fraction_format	1	keynote	table.cell_format	migrated	litchi_keynote::Package::edit_slide_table_cell_format	keynote_slide_table_cell_format_set_parity	B	-	-
 keynote/editor/slide_tables.rs	set_slide_table_cell_layout	1	keynote	table.cell_appearance	migrated	litchi_keynote::slide::table::cell_appearance::Edit::set_layout	keynote_slide_table_cell_layout_set_parity	B	-	-
 keynote/editor/slide_tables.rs	set_slide_table_cell_numeral_system_format	1	keynote	table.cell_format	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_tables.rs	set_slide_table_cell_paragraph_indents	1	keynote	table.cell_rich_text	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_tables.rs	set_slide_table_cell_paragraph_line_spacing	1	keynote	table.cell_rich_text	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_tables.rs	set_slide_table_cell_paragraph_list	1	keynote	table.cell_rich_text	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_tables.rs	set_slide_table_cell_paragraph_list_bullet	1	keynote	table.cell_rich_text	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_tables.rs	set_slide_table_cell_paragraph_list_bullet_geometry	1	keynote	table.cell_rich_text	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_tables.rs	set_slide_table_cell_paragraph_list_indentation	1	keynote	table.cell_rich_text	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_tables.rs	set_slide_table_cell_paragraph_list_label_color	1	keynote	table.cell_rich_text	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_tables.rs	set_slide_table_cell_paragraph_list_level	1	keynote	table.cell_rich_text	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_tables.rs	set_slide_table_cell_paragraph_list_number_format	1	keynote	table.cell_format	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_tables.rs	set_slide_table_cell_paragraph_list_number_scale	1	keynote	table.cell_rich_text	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_tables.rs	set_slide_table_cell_paragraph_list_number_tiering	1	keynote	table.cell_rich_text	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_tables.rs	set_slide_table_cell_paragraph_list_numbering	1	keynote	table.cell_rich_text	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_tables.rs	set_slide_table_cell_paragraph_lists	1	keynote	table.cell_rich_text	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_tables.rs	set_slide_table_cell_paragraph_spacing	1	keynote	table.cell_rich_text	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_tables.rs	set_slide_table_cell_paragraph_tab_stops	1	keynote	table.cell_rich_text	host-only	litchi-keynote	-	-	-	-
+keynote/editor/slide_tables.rs	set_slide_table_cell_paragraph_indents	1	keynote	table.cell_rich_text	migrated	litchi_keynote::Package::edit_slide_table_cell_text	keynote_slide_table_cell_text_property_parity	B	-	-
+keynote/editor/slide_tables.rs	set_slide_table_cell_paragraph_line_spacing	1	keynote	table.cell_rich_text	migrated	litchi_keynote::Package::edit_slide_table_cell_text	keynote_slide_table_cell_text_property_parity	B	-	-
+keynote/editor/slide_tables.rs	set_slide_table_cell_paragraph_list	1	keynote	table.cell_rich_text	migrated	litchi_keynote::Package::edit_slide_table_cell_lists	keynote_slide_table_cell_list_preset_parity	B	-	-
+keynote/editor/slide_tables.rs	set_slide_table_cell_paragraph_list_bullet	1	keynote	table.cell_rich_text	migrated	litchi_keynote::Package::edit_slide_table_cell_lists	keynote_slide_table_cell_list_property_set_parity	B	-	-
+keynote/editor/slide_tables.rs	set_slide_table_cell_paragraph_list_bullet_geometry	1	keynote	table.cell_rich_text	migrated	litchi_keynote::Package::edit_slide_table_cell_lists	keynote_slide_table_cell_list_property_set_parity	B	-	-
+keynote/editor/slide_tables.rs	set_slide_table_cell_paragraph_list_indentation	1	keynote	table.cell_rich_text	migrated	litchi_keynote::Package::edit_slide_table_cell_lists	keynote_slide_table_cell_list_property_set_parity	B	-	-
+keynote/editor/slide_tables.rs	set_slide_table_cell_paragraph_list_label_color	1	keynote	table.cell_rich_text	migrated	litchi_keynote::Package::edit_slide_table_cell_lists	keynote_slide_table_cell_list_property_set_parity	B	-	-
+keynote/editor/slide_tables.rs	set_slide_table_cell_paragraph_list_level	1	keynote	table.cell_rich_text	migrated	litchi_keynote::Package::edit_slide_table_cell_lists	keynote_slide_table_cell_list_level_numbering_parity	A	-	-
+keynote/editor/slide_tables.rs	set_slide_table_cell_paragraph_list_number_format	1	keynote	table.cell_format	migrated	litchi_keynote::Package::edit_slide_table_cell_lists	keynote_slide_table_cell_list_property_set_parity	B	-	-
+keynote/editor/slide_tables.rs	set_slide_table_cell_paragraph_list_number_scale	1	keynote	table.cell_rich_text	migrated	litchi_keynote::Package::edit_slide_table_cell_lists	keynote_slide_table_cell_list_property_set_parity	B	-	-
+keynote/editor/slide_tables.rs	set_slide_table_cell_paragraph_list_number_tiering	1	keynote	table.cell_rich_text	migrated	litchi_keynote::Package::edit_slide_table_cell_lists	keynote_slide_table_cell_list_property_set_parity	B	-	-
+keynote/editor/slide_tables.rs	set_slide_table_cell_paragraph_list_numbering	1	keynote	table.cell_rich_text	migrated	litchi_keynote::Package::edit_slide_table_cell_lists	keynote_slide_table_cell_list_level_numbering_parity	A	-	-
+keynote/editor/slide_tables.rs	set_slide_table_cell_paragraph_lists	1	keynote	table.cell_rich_text	migrated	litchi_keynote::Package::edit_slide_table_cell_lists	keynote_slide_table_cell_list_preset_parity	B	-	-
+keynote/editor/slide_tables.rs	set_slide_table_cell_paragraph_spacing	1	keynote	table.cell_rich_text	migrated	litchi_keynote::Package::edit_slide_table_cell_text	keynote_slide_table_cell_text_property_parity	B	-	-
+keynote/editor/slide_tables.rs	set_slide_table_cell_paragraph_tab_stops	1	keynote	table.cell_rich_text	migrated	litchi_keynote::Package::edit_slide_table_cell_text	keynote_slide_table_cell_text_property_parity	B	-	-
 keynote/editor/slide_tables.rs	set_slide_table_cell_percentage_format	1	keynote	table.cell_format	migrated	litchi_keynote::Package::edit_slide_table_cell_format	keynote_slide_table_cell_format_set_parity	B	-	-
 keynote/editor/slide_tables.rs	set_slide_table_cell_pop_up_menu_format	1	keynote	table.cell_format	host-only	litchi-keynote	-	-	-	-
 keynote/editor/slide_tables.rs	set_slide_table_cell_scientific_format	1	keynote	table.cell_format	migrated	litchi_keynote::Package::edit_slide_table_cell_format	keynote_slide_table_cell_format_set_parity	B	-	-
 keynote/editor/slide_tables.rs	set_slide_table_cell_slider_format	1	keynote	table.cell_format	host-only	litchi-keynote	-	-	-	-
 keynote/editor/slide_tables.rs	set_slide_table_cell_star_rating_format	1	keynote	table.cell_format	host-only	litchi-keynote	-	-	-	-
 keynote/editor/slide_tables.rs	set_slide_table_cell_stepper_format	1	keynote	table.cell_format	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_tables.rs	set_slide_table_cell_text_alignment	1	keynote	table.cell_rich_text	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_tables.rs	set_slide_table_cell_text_background	1	keynote	table.cell_rich_text	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_tables.rs	set_slide_table_cell_text_baseline_shift	1	keynote	table.cell_rich_text	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_tables.rs	set_slide_table_cell_text_capitalization	1	keynote	table.cell_rich_text	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_tables.rs	set_slide_table_cell_text_character_spacing	1	keynote	table.cell_rich_text	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_tables.rs	set_slide_table_cell_text_color	1	keynote	table.cell_rich_text	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_tables.rs	set_slide_table_cell_text_decorations	1	keynote	table.cell_rich_text	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_tables.rs	set_slide_table_cell_text_font	1	keynote	table.cell_rich_text	host-only	litchi-keynote	-	-	-	-
+keynote/editor/slide_tables.rs	set_slide_table_cell_text_alignment	1	keynote	table.cell_rich_text	migrated	litchi_keynote::Package::edit_slide_table_cell_text	keynote_slide_table_cell_text_property_parity	B	-	-
+keynote/editor/slide_tables.rs	set_slide_table_cell_text_background	1	keynote	table.cell_rich_text	migrated	litchi_keynote::Package::edit_slide_table_cell_text	keynote_slide_table_cell_text_property_parity	B	-	-
+keynote/editor/slide_tables.rs	set_slide_table_cell_text_baseline_shift	1	keynote	table.cell_rich_text	migrated	litchi_keynote::Package::edit_slide_table_cell_text	keynote_slide_table_cell_text_property_parity	B	-	-
+keynote/editor/slide_tables.rs	set_slide_table_cell_text_capitalization	1	keynote	table.cell_rich_text	migrated	litchi_keynote::Package::edit_slide_table_cell_text	keynote_slide_table_cell_text_property_parity	B	-	-
+keynote/editor/slide_tables.rs	set_slide_table_cell_text_character_spacing	1	keynote	table.cell_rich_text	migrated	litchi_keynote::Package::edit_slide_table_cell_text	keynote_slide_table_cell_text_property_parity	B	-	-
+keynote/editor/slide_tables.rs	set_slide_table_cell_text_color	1	keynote	table.cell_rich_text	migrated	litchi_keynote::Package::edit_slide_table_cell_text	keynote_slide_table_cell_text_property_parity	B	-	-
+keynote/editor/slide_tables.rs	set_slide_table_cell_text_decorations	1	keynote	table.cell_rich_text	migrated	litchi_keynote::Package::edit_slide_table_cell_text	keynote_slide_table_cell_text_property_parity	B	-	-
+keynote/editor/slide_tables.rs	set_slide_table_cell_text_font	1	keynote	table.cell_rich_text	migrated	litchi_keynote::Package::edit_slide_table_cell_text	keynote_slide_table_cell_text_property_parity	B	-	-
 keynote/editor/slide_tables.rs	set_slide_table_cell_text_format	1	keynote	table.cell_format	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_tables.rs	set_slide_table_cell_text_ligatures	1	keynote	table.cell_rich_text	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_tables.rs	set_slide_table_cell_text_outline	1	keynote	table.cell_rich_text	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_tables.rs	set_slide_table_cell_text_script	1	keynote	table.cell_rich_text	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_tables.rs	set_slide_table_cell_text_shadow	1	keynote	table.cell_rich_text	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_tables.rs	set_slide_table_cell_text_style	1	keynote	table.cell_rich_text	host-only	litchi-keynote	-	-	-	-
+keynote/editor/slide_tables.rs	set_slide_table_cell_text_ligatures	1	keynote	table.cell_rich_text	migrated	litchi_keynote::Package::edit_slide_table_cell_text	keynote_slide_table_cell_text_property_parity	B	-	-
+keynote/editor/slide_tables.rs	set_slide_table_cell_text_outline	1	keynote	table.cell_rich_text	migrated	litchi_keynote::Package::edit_slide_table_cell_text	keynote_slide_table_cell_text_property_parity	B	-	-
+keynote/editor/slide_tables.rs	set_slide_table_cell_text_script	1	keynote	table.cell_rich_text	migrated	litchi_keynote::Package::edit_slide_table_cell_text	keynote_slide_table_cell_text_property_parity	B	-	-
+keynote/editor/slide_tables.rs	set_slide_table_cell_text_shadow	1	keynote	table.cell_rich_text	migrated	litchi_keynote::Package::edit_slide_table_cell_text	keynote_slide_table_cell_text_property_parity	B	-	-
+keynote/editor/slide_tables.rs	set_slide_table_cell_text_style	1	keynote	table.cell_rich_text	migrated	litchi_keynote::Package::edit_slide_table_cell_text	keynote_slide_table_cell_text_property_parity	B	-	-
 keynote/editor/slide_tables.rs	set_slide_table_cells	1	keynote	table.cells	migrated	litchi_keynote::slide::drawable::Edit::set_table_cell	keynote_slide_table_formula_refresh_batch_parity	B	-	-
 keynote/editor/slide_tables.rs	set_slide_table_geometry	1	keynote	table.lifecycle	host-only	litchi-keynote	-	-	-	-
 keynote/editor/slide_tables.rs	slide_table	1	keynote	table.lifecycle	host-only	litchi-keynote	-	-	-	-
@@ -646,41 +646,41 @@ keynote/editor/slide_tables.rs	slide_table_cell_fraction_format	1	keynote	table.
 keynote/editor/slide_tables.rs	slide_table_cell_layout	1	keynote	table.cell_appearance	migrated	litchi_keynote::Package::slide_table_cell_appearance	keynote_slide_table_cell_appearance_read_parity	A	-	-
 keynote/editor/slide_tables.rs	slide_table_cell_merges	1	keynote	table.merge	migrated	litchi_keynote::Package::slide_table_merges	keynote_slide_table_merges_read_parity	A	test-data/iwork/keynote/slide-table-merges-native-receipt.json	-
 keynote/editor/slide_tables.rs	slide_table_cell_numeral_system_format	1	keynote	table.cell_format	migrated	litchi_keynote::Package::slide_table_cell_format	keynote_slide_table_cell_numeral_system_format_read_parity	A	-	-
-keynote/editor/slide_tables.rs	slide_table_cell_paragraph_indents	1	keynote	table.cell_rich_text	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_tables.rs	slide_table_cell_paragraph_line_spacing	1	keynote	table.cell_rich_text	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_tables.rs	slide_table_cell_paragraph_list	1	keynote	table.cell_rich_text	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_tables.rs	slide_table_cell_paragraph_list_bullet	1	keynote	table.cell_rich_text	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_tables.rs	slide_table_cell_paragraph_list_bullet_geometry	1	keynote	table.cell_rich_text	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_tables.rs	slide_table_cell_paragraph_list_indentation	1	keynote	table.cell_rich_text	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_tables.rs	slide_table_cell_paragraph_list_label_color	1	keynote	table.cell_rich_text	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_tables.rs	slide_table_cell_paragraph_list_levels	1	keynote	table.cell_rich_text	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_tables.rs	slide_table_cell_paragraph_list_number_format	1	keynote	table.cell_format	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_tables.rs	slide_table_cell_paragraph_list_number_scale	1	keynote	table.cell_rich_text	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_tables.rs	slide_table_cell_paragraph_list_number_tiering	1	keynote	table.cell_rich_text	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_tables.rs	slide_table_cell_paragraph_list_numbering	1	keynote	table.cell_rich_text	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_tables.rs	slide_table_cell_paragraph_lists	1	keynote	table.cell_rich_text	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_tables.rs	slide_table_cell_paragraph_spacing	1	keynote	table.cell_rich_text	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_tables.rs	slide_table_cell_paragraph_tab_stops	1	keynote	table.cell_rich_text	host-only	litchi-keynote	-	-	-	-
+keynote/editor/slide_tables.rs	slide_table_cell_paragraph_indents	1	keynote	table.cell_rich_text	migrated	litchi_keynote::Package::slide_table_cell_text	keynote_slide_table_cell_text_property_read_parity	A	-	-
+keynote/editor/slide_tables.rs	slide_table_cell_paragraph_line_spacing	1	keynote	table.cell_rich_text	migrated	litchi_keynote::Package::slide_table_cell_text	keynote_slide_table_cell_text_property_read_parity	A	-	-
+keynote/editor/slide_tables.rs	slide_table_cell_paragraph_list	1	keynote	table.cell_rich_text	migrated	litchi_keynote::Package::slide_table_cell_list	keynote_slide_table_cell_list_read_parity	A	-	-
+keynote/editor/slide_tables.rs	slide_table_cell_paragraph_list_bullet	1	keynote	table.cell_rich_text	migrated	litchi_keynote::Package::slide_table_cell_list_property	keynote_slide_table_cell_list_read_parity	A	-	-
+keynote/editor/slide_tables.rs	slide_table_cell_paragraph_list_bullet_geometry	1	keynote	table.cell_rich_text	migrated	litchi_keynote::Package::slide_table_cell_list_property	keynote_slide_table_cell_list_read_parity	A	-	-
+keynote/editor/slide_tables.rs	slide_table_cell_paragraph_list_indentation	1	keynote	table.cell_rich_text	migrated	litchi_keynote::Package::slide_table_cell_list_property	keynote_slide_table_cell_list_read_parity	A	-	-
+keynote/editor/slide_tables.rs	slide_table_cell_paragraph_list_label_color	1	keynote	table.cell_rich_text	migrated	litchi_keynote::Package::slide_table_cell_list_property	keynote_slide_table_cell_list_read_parity	A	-	-
+keynote/editor/slide_tables.rs	slide_table_cell_paragraph_list_levels	1	keynote	table.cell_rich_text	migrated	litchi_keynote::Package::slide_table_cell_list_levels	keynote_slide_table_cell_list_read_parity	A	-	-
+keynote/editor/slide_tables.rs	slide_table_cell_paragraph_list_number_format	1	keynote	table.cell_format	migrated	litchi_keynote::Package::slide_table_cell_list_property	keynote_slide_table_cell_list_read_parity	A	-	-
+keynote/editor/slide_tables.rs	slide_table_cell_paragraph_list_number_scale	1	keynote	table.cell_rich_text	migrated	litchi_keynote::Package::slide_table_cell_list_property	keynote_slide_table_cell_list_read_parity	A	-	-
+keynote/editor/slide_tables.rs	slide_table_cell_paragraph_list_number_tiering	1	keynote	table.cell_rich_text	migrated	litchi_keynote::Package::slide_table_cell_list_property	keynote_slide_table_cell_list_read_parity	A	-	-
+keynote/editor/slide_tables.rs	slide_table_cell_paragraph_list_numbering	1	keynote	table.cell_rich_text	migrated	litchi_keynote::Package::slide_table_cell_list_numbering	keynote_slide_table_cell_list_read_parity	A	-	-
+keynote/editor/slide_tables.rs	slide_table_cell_paragraph_lists	1	keynote	table.cell_rich_text	migrated	litchi_keynote::Package::slide_table_cell_lists	keynote_slide_table_cell_list_read_parity	A	-	-
+keynote/editor/slide_tables.rs	slide_table_cell_paragraph_spacing	1	keynote	table.cell_rich_text	migrated	litchi_keynote::Package::slide_table_cell_text	keynote_slide_table_cell_text_property_read_parity	A	-	-
+keynote/editor/slide_tables.rs	slide_table_cell_paragraph_tab_stops	1	keynote	table.cell_rich_text	migrated	litchi_keynote::Package::slide_table_cell_text	keynote_slide_table_cell_text_property_read_parity	A	-	-
 keynote/editor/slide_tables.rs	slide_table_cell_percentage_format	1	keynote	table.cell_format	migrated	litchi_keynote::Package::slide_table_cell_format	keynote_slide_table_cell_format_read_parity	A	-	-
 keynote/editor/slide_tables.rs	slide_table_cell_pop_up_menu_format	1	keynote	table.cell_format	host-only	litchi-keynote	-	-	-	-
 keynote/editor/slide_tables.rs	slide_table_cell_scientific_format	1	keynote	table.cell_format	migrated	litchi_keynote::Package::slide_table_cell_format	keynote_slide_table_cell_format_read_parity	A	-	-
 keynote/editor/slide_tables.rs	slide_table_cell_slider_format	1	keynote	table.cell_format	host-only	litchi-keynote	-	-	-	-
 keynote/editor/slide_tables.rs	slide_table_cell_star_rating_format	1	keynote	table.cell_format	host-only	litchi-keynote	-	-	-	-
 keynote/editor/slide_tables.rs	slide_table_cell_stepper_format	1	keynote	table.cell_format	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_tables.rs	slide_table_cell_text_alignment	1	keynote	table.cell_rich_text	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_tables.rs	slide_table_cell_text_background	1	keynote	table.cell_rich_text	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_tables.rs	slide_table_cell_text_baseline_shift	1	keynote	table.cell_rich_text	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_tables.rs	slide_table_cell_text_capitalization	1	keynote	table.cell_rich_text	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_tables.rs	slide_table_cell_text_character_spacing	1	keynote	table.cell_rich_text	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_tables.rs	slide_table_cell_text_color	1	keynote	table.cell_rich_text	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_tables.rs	slide_table_cell_text_decorations	1	keynote	table.cell_rich_text	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_tables.rs	slide_table_cell_text_font	1	keynote	table.cell_rich_text	host-only	litchi-keynote	-	-	-	-
+keynote/editor/slide_tables.rs	slide_table_cell_text_alignment	1	keynote	table.cell_rich_text	migrated	litchi_keynote::Package::slide_table_cell_text	keynote_slide_table_cell_text_property_read_parity	A	-	-
+keynote/editor/slide_tables.rs	slide_table_cell_text_background	1	keynote	table.cell_rich_text	migrated	litchi_keynote::Package::slide_table_cell_text	keynote_slide_table_cell_text_property_read_parity	A	-	-
+keynote/editor/slide_tables.rs	slide_table_cell_text_baseline_shift	1	keynote	table.cell_rich_text	migrated	litchi_keynote::Package::slide_table_cell_text	keynote_slide_table_cell_text_property_read_parity	A	-	-
+keynote/editor/slide_tables.rs	slide_table_cell_text_capitalization	1	keynote	table.cell_rich_text	migrated	litchi_keynote::Package::slide_table_cell_text	keynote_slide_table_cell_text_property_read_parity	A	-	-
+keynote/editor/slide_tables.rs	slide_table_cell_text_character_spacing	1	keynote	table.cell_rich_text	migrated	litchi_keynote::Package::slide_table_cell_text	keynote_slide_table_cell_text_property_read_parity	A	-	-
+keynote/editor/slide_tables.rs	slide_table_cell_text_color	1	keynote	table.cell_rich_text	migrated	litchi_keynote::Package::slide_table_cell_text	keynote_slide_table_cell_text_property_read_parity	A	-	-
+keynote/editor/slide_tables.rs	slide_table_cell_text_decorations	1	keynote	table.cell_rich_text	migrated	litchi_keynote::Package::slide_table_cell_text	keynote_slide_table_cell_text_property_read_parity	A	-	-
+keynote/editor/slide_tables.rs	slide_table_cell_text_font	1	keynote	table.cell_rich_text	migrated	litchi_keynote::Package::slide_table_cell_text	keynote_slide_table_cell_text_property_read_parity	A	-	-
 keynote/editor/slide_tables.rs	slide_table_cell_text_format	1	keynote	table.cell_format	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_tables.rs	slide_table_cell_text_ligatures	1	keynote	table.cell_rich_text	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_tables.rs	slide_table_cell_text_outline	1	keynote	table.cell_rich_text	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_tables.rs	slide_table_cell_text_script	1	keynote	table.cell_rich_text	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_tables.rs	slide_table_cell_text_shadow	1	keynote	table.cell_rich_text	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_tables.rs	slide_table_cell_text_style	1	keynote	table.cell_rich_text	host-only	litchi-keynote	-	-	-	-
+keynote/editor/slide_tables.rs	slide_table_cell_text_ligatures	1	keynote	table.cell_rich_text	migrated	litchi_keynote::Package::slide_table_cell_text	keynote_slide_table_cell_text_property_read_parity	A	-	-
+keynote/editor/slide_tables.rs	slide_table_cell_text_outline	1	keynote	table.cell_rich_text	migrated	litchi_keynote::Package::slide_table_cell_text	keynote_slide_table_cell_text_property_read_parity	A	-	-
+keynote/editor/slide_tables.rs	slide_table_cell_text_script	1	keynote	table.cell_rich_text	migrated	litchi_keynote::Package::slide_table_cell_text	keynote_slide_table_cell_text_property_read_parity	A	-	-
+keynote/editor/slide_tables.rs	slide_table_cell_text_shadow	1	keynote	table.cell_rich_text	migrated	litchi_keynote::Package::slide_table_cell_text	keynote_slide_table_cell_text_property_read_parity	A	-	-
+keynote/editor/slide_tables.rs	slide_table_cell_text_style	1	keynote	table.cell_rich_text	migrated	litchi_keynote::Package::slide_table_cell_text	keynote_slide_table_cell_text_property_read_parity	A	-	-
 keynote/editor/slide_tables.rs	slide_tables	1	keynote	table.lifecycle	host-only	litchi-keynote	-	-	-	-
 keynote/editor/slide_tables.rs	unmerge_slide_table_cells	1	keynote	table.merge	migrated	litchi_keynote::Package::edit_slide_table_merges	keynote_slide_table_unmerge_parity	A	-	-
 keynote/editor/slide_tables/comments.rs	add_slide_table_cell_comment_reply	1	keynote	table.cell_comment	host-only	-	-	-	-	root-only shared slice; reply-thread lifecycle remains deferred
@@ -1081,26 +1081,26 @@ numbers/editor/sheet_charts/axis.rs	set_sheet_chart_axis_title	1	numbers	chart.t
 numbers/editor/sheet_charts/axis.rs	sheet_chart_axis_title	1	numbers	chart.text	migrated	litchi-numbers::Package::sheet_chart_axis_title	numbers_chart_title_and_axis_title_read_parity	A	-	-
 numbers/editor/sheet_charts/axis_bounds.rs	set_sheet_chart_value_axis_bounds	1	numbers	chart.legend_axis	host-only	litchi-numbers	-	-	-	-
 numbers/editor/sheet_charts/axis_bounds.rs	sheet_chart_value_axis_bounds	1	numbers	chart.legend_axis	host-only	litchi-numbers	-	-	-	-
-numbers/editor/sheet_charts/axis_gridlines.rs	set_sheet_chart_axis_gridline_stroke	1	numbers	chart.style	host-only	litchi-numbers	-	-	-	-
+numbers/editor/sheet_charts/axis_gridlines.rs	set_sheet_chart_axis_gridline_stroke	1	numbers	chart.style	migrated	litchi_numbers::sheet::chart::axis::Edit::set	numbers_sheet_chart_axis_set_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
 numbers/editor/sheet_charts/axis_gridlines.rs	set_sheet_chart_axis_major_gridlines_visible	1	numbers	chart.style	migrated	litchi_numbers::sheet::chart::axis::Edit::set	numbers_sheet_chart_axis_set_parity	A	-	-
 numbers/editor/sheet_charts/axis_gridlines.rs	set_sheet_chart_axis_minor_gridlines_visible	1	numbers	chart.style	migrated	litchi_numbers::sheet::chart::axis::Edit::set	numbers_sheet_chart_axis_set_parity	A	-	-
-numbers/editor/sheet_charts/axis_gridlines.rs	sheet_chart_axis_gridline_stroke	1	numbers	chart.style	host-only	litchi-numbers	-	-	-	-
+numbers/editor/sheet_charts/axis_gridlines.rs	sheet_chart_axis_gridline_stroke	1	numbers	chart.style	migrated	litchi_numbers::Package::sheet_chart_axis	numbers_sheet_chart_axis_read_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
 numbers/editor/sheet_charts/axis_gridlines.rs	sheet_chart_axis_major_gridlines_visible	1	numbers	chart.style	migrated	litchi_numbers::Package::sheet_chart_axis	numbers_sheet_chart_axis_read_parity	A	-	-
 numbers/editor/sheet_charts/axis_gridlines.rs	sheet_chart_axis_minor_gridlines_visible	1	numbers	chart.style	migrated	litchi_numbers::Package::sheet_chart_axis	numbers_sheet_chart_axis_read_parity	A	-	-
-numbers/editor/sheet_charts/axis_label_affixes.rs	set_sheet_chart_axis_label_affixes	1	numbers	chart.style	host-only	litchi-numbers	-	-	-	-
-numbers/editor/sheet_charts/axis_label_affixes.rs	sheet_chart_axis_label_affixes	1	numbers	chart.style	host-only	litchi-numbers	-	-	-	-
-numbers/editor/sheet_charts/axis_label_angle.rs	set_sheet_chart_axis_label_angle	1	numbers	chart.style	host-only	litchi-numbers	-	-	-	-
-numbers/editor/sheet_charts/axis_label_angle.rs	sheet_chart_axis_label_angle	1	numbers	chart.style	host-only	litchi-numbers	-	-	-	-
-numbers/editor/sheet_charts/axis_label_position_3d.rs	set_sheet_chart_3d_value_axis_label_position	1	numbers	chart.style	host-only	litchi-numbers	-	-	-	-
-numbers/editor/sheet_charts/axis_label_position_3d.rs	sheet_chart_3d_value_axis_label_position	1	numbers	chart.style	host-only	litchi-numbers	-	-	-	-
+numbers/editor/sheet_charts/axis_label_affixes.rs	set_sheet_chart_axis_label_affixes	1	numbers	chart.style	migrated	litchi_numbers::sheet::chart::axis::Edit::set	numbers_sheet_chart_axis_set_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+numbers/editor/sheet_charts/axis_label_affixes.rs	sheet_chart_axis_label_affixes	1	numbers	chart.style	migrated	litchi_numbers::Package::sheet_chart_axis	numbers_sheet_chart_axis_read_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+numbers/editor/sheet_charts/axis_label_angle.rs	set_sheet_chart_axis_label_angle	1	numbers	chart.style	migrated	litchi_numbers::sheet::chart::axis::Edit::set	numbers_sheet_chart_axis_set_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+numbers/editor/sheet_charts/axis_label_angle.rs	sheet_chart_axis_label_angle	1	numbers	chart.style	migrated	litchi_numbers::Package::sheet_chart_axis	numbers_sheet_chart_axis_read_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+numbers/editor/sheet_charts/axis_label_position_3d.rs	set_sheet_chart_3d_value_axis_label_position	1	numbers	chart.style	migrated	litchi_numbers::sheet::chart::axis::Edit::set	numbers_sheet_chart_axis_set_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+numbers/editor/sheet_charts/axis_label_position_3d.rs	sheet_chart_3d_value_axis_label_position	1	numbers	chart.style	migrated	litchi_numbers::Package::sheet_chart_axis	numbers_sheet_chart_axis_read_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
 numbers/editor/sheet_charts/axis_labels.rs	set_sheet_chart_axis_labels_visible	1	numbers	chart.style	migrated	litchi_numbers::sheet::chart::axis::Edit::set	numbers_sheet_chart_axis_set_parity	A	-	-
 numbers/editor/sheet_charts/axis_labels.rs	sheet_chart_axis_labels_visible	1	numbers	chart.style	migrated	litchi_numbers::Package::sheet_chart_axis	numbers_sheet_chart_axis_read_parity	A	-	-
 numbers/editor/sheet_charts/axis_line.rs	set_sheet_chart_axis_line_visible	1	numbers	chart.style	migrated	litchi_numbers::sheet::chart::axis::Edit::set	numbers_sheet_chart_axis_set_parity	A	-	-
 numbers/editor/sheet_charts/axis_line.rs	sheet_chart_axis_line_visible	1	numbers	chart.style	migrated	litchi_numbers::Package::sheet_chart_axis	numbers_sheet_chart_axis_read_parity	A	-	-
 numbers/editor/sheet_charts/axis_minimum_label.rs	set_sheet_chart_value_axis_minimum_label_visible	1	numbers	chart.style	migrated	litchi_numbers::sheet::chart::axis::Edit::set	numbers_sheet_chart_axis_set_parity	A	-	-
 numbers/editor/sheet_charts/axis_minimum_label.rs	sheet_chart_value_axis_minimum_label_visible	1	numbers	chart.style	migrated	litchi_numbers::Package::sheet_chart_axis	numbers_sheet_chart_axis_read_parity	A	-	-
-numbers/editor/sheet_charts/axis_number_format.rs	set_sheet_chart_axis_number_format	1	numbers	chart.style	host-only	litchi-numbers	-	-	-	-
-numbers/editor/sheet_charts/axis_number_format.rs	sheet_chart_axis_number_format	1	numbers	chart.style	host-only	litchi-numbers	-	-	-	-
+numbers/editor/sheet_charts/axis_number_format.rs	set_sheet_chart_axis_number_format	1	numbers	chart.style	migrated	litchi_numbers::sheet::chart::axis::Edit::set	numbers_sheet_chart_axis_set_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+numbers/editor/sheet_charts/axis_number_format.rs	sheet_chart_axis_number_format	1	numbers	chart.style	migrated	litchi_numbers::Package::sheet_chart_axis	numbers_sheet_chart_axis_read_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
 numbers/editor/sheet_charts/axis_scale.rs	set_sheet_chart_value_axis_scale	1	numbers	chart.legend_axis	host-only	litchi-numbers	-	-	-	-
 numbers/editor/sheet_charts/axis_scale.rs	sheet_chart_value_axis_scale	1	numbers	chart.legend_axis	host-only	litchi-numbers	-	-	-	-
 numbers/editor/sheet_charts/axis_series_names.rs	set_sheet_chart_category_axis_series_names_visible	1	numbers	chart.style	migrated	litchi_numbers::sheet::chart::axis::Edit::set	numbers_sheet_chart_axis_set_parity	A	-	-
@@ -1118,8 +1118,8 @@ numbers/editor/sheet_charts/bar_shape_3d.rs	set_sheet_chart_3d_bar_shape	1	numbe
 numbers/editor/sheet_charts/bar_shape_3d.rs	sheet_chart_3d_bar_shape	1	numbers	chart.style	migrated	litchi_numbers::Package::sheet_chart_style	numbers_sheet_chart_options_read_parity	A	-	-
 numbers/editor/sheet_charts/border.rs	set_sheet_chart_border_visible	1	numbers	chart.style	migrated	litchi_numbers::sheet::chart::style::Edit::set	numbers_sheet_chart_options_set_parity	A	-	-
 numbers/editor/sheet_charts/border.rs	sheet_chart_border_visible	1	numbers	chart.style	migrated	litchi_numbers::Package::sheet_chart_style	numbers_sheet_chart_options_read_parity	A	-	-
-numbers/editor/sheet_charts/border_stroke.rs	set_sheet_chart_border_stroke	1	numbers	chart.style	host-only	litchi-numbers	-	-	-	-
-numbers/editor/sheet_charts/border_stroke.rs	sheet_chart_border_stroke	1	numbers	chart.style	host-only	litchi-numbers	-	-	-	-
+numbers/editor/sheet_charts/border_stroke.rs	set_sheet_chart_border_stroke	1	numbers	chart.style	migrated	litchi_numbers::sheet::chart::style::Edit::set	numbers_sheet_chart_options_set_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+numbers/editor/sheet_charts/border_stroke.rs	sheet_chart_border_stroke	1	numbers	chart.style	migrated	litchi_numbers::Package::sheet_chart_style	numbers_sheet_chart_options_read_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
 numbers/editor/sheet_charts/caption.rs	remove_sheet_chart_caption	1	numbers	chart.text	host-only	litchi-numbers	-	-	-	-
 numbers/editor/sheet_charts/caption.rs	set_sheet_chart_caption	1	numbers	chart.text	host-only	litchi-numbers	-	-	-	-
 numbers/editor/sheet_charts/caption.rs	sheet_chart_caption	1	numbers	chart.text	host-only	litchi-numbers	-	-	-	-
@@ -1642,26 +1642,26 @@ pages/editor/charts/axis.rs	remove_body_chart_axis_title	1	pages	chart.text	migr
 pages/editor/charts/axis.rs	set_body_chart_axis_title	1	pages	chart.text	migrated	litchi-pages::Package::edit_body_chart_axis_title	pages_chart_title_and_axis_title_set_parity	A	-	-
 pages/editor/charts/axis_bounds.rs	body_chart_value_axis_bounds	1	pages	chart.legend_axis	host-only	litchi-pages	-	-	-	-
 pages/editor/charts/axis_bounds.rs	set_body_chart_value_axis_bounds	1	pages	chart.legend_axis	host-only	litchi-pages	-	-	-	-
-pages/editor/charts/axis_gridlines.rs	body_chart_axis_gridline_stroke	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
+pages/editor/charts/axis_gridlines.rs	body_chart_axis_gridline_stroke	1	pages	chart.style	migrated	litchi_pages::Package::body_chart_axis	pages_body_chart_axis_read_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
 pages/editor/charts/axis_gridlines.rs	body_chart_axis_major_gridlines_visible	1	pages	chart.style	migrated	litchi_pages::Package::body_chart_axis	pages_body_chart_axis_read_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
 pages/editor/charts/axis_gridlines.rs	body_chart_axis_minor_gridlines_visible	1	pages	chart.style	migrated	litchi_pages::Package::body_chart_axis	pages_body_chart_axis_read_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
-pages/editor/charts/axis_gridlines.rs	set_body_chart_axis_gridline_stroke	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
+pages/editor/charts/axis_gridlines.rs	set_body_chart_axis_gridline_stroke	1	pages	chart.style	migrated	litchi_pages::chart::axis::Edit::set	pages_body_chart_axis_set_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
 pages/editor/charts/axis_gridlines.rs	set_body_chart_axis_major_gridlines_visible	1	pages	chart.style	migrated	litchi_pages::chart::axis::Edit::set	pages_body_chart_axis_set_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
 pages/editor/charts/axis_gridlines.rs	set_body_chart_axis_minor_gridlines_visible	1	pages	chart.style	migrated	litchi_pages::chart::axis::Edit::set	pages_body_chart_axis_set_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
-pages/editor/charts/axis_label_affixes.rs	body_chart_axis_label_affixes	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
-pages/editor/charts/axis_label_affixes.rs	set_body_chart_axis_label_affixes	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
-pages/editor/charts/axis_label_angle.rs	body_chart_axis_label_angle	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
-pages/editor/charts/axis_label_angle.rs	set_body_chart_axis_label_angle	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
-pages/editor/charts/axis_label_position_3d.rs	body_chart_3d_value_axis_label_position	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
-pages/editor/charts/axis_label_position_3d.rs	set_body_chart_3d_value_axis_label_position	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
+pages/editor/charts/axis_label_affixes.rs	body_chart_axis_label_affixes	1	pages	chart.style	migrated	litchi_pages::Package::body_chart_axis	pages_body_chart_axis_read_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+pages/editor/charts/axis_label_affixes.rs	set_body_chart_axis_label_affixes	1	pages	chart.style	migrated	litchi_pages::chart::axis::Edit::set	pages_body_chart_axis_set_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+pages/editor/charts/axis_label_angle.rs	body_chart_axis_label_angle	1	pages	chart.style	migrated	litchi_pages::Package::body_chart_axis	pages_body_chart_axis_read_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+pages/editor/charts/axis_label_angle.rs	set_body_chart_axis_label_angle	1	pages	chart.style	migrated	litchi_pages::chart::axis::Edit::set	pages_body_chart_axis_set_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+pages/editor/charts/axis_label_position_3d.rs	body_chart_3d_value_axis_label_position	1	pages	chart.style	migrated	litchi_pages::Package::body_chart_axis	pages_body_chart_axis_read_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+pages/editor/charts/axis_label_position_3d.rs	set_body_chart_3d_value_axis_label_position	1	pages	chart.style	migrated	litchi_pages::chart::axis::Edit::set	pages_body_chart_axis_set_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
 pages/editor/charts/axis_labels.rs	body_chart_axis_labels_visible	1	pages	chart.style	migrated	litchi_pages::Package::body_chart_axis	pages_body_chart_axis_read_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
 pages/editor/charts/axis_labels.rs	set_body_chart_axis_labels_visible	1	pages	chart.style	migrated	litchi_pages::chart::axis::Edit::set	pages_body_chart_axis_set_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
 pages/editor/charts/axis_line.rs	body_chart_axis_line_visible	1	pages	chart.style	migrated	litchi_pages::Package::body_chart_axis	pages_body_chart_axis_read_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
 pages/editor/charts/axis_line.rs	set_body_chart_axis_line_visible	1	pages	chart.style	migrated	litchi_pages::chart::axis::Edit::set	pages_body_chart_axis_set_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
 pages/editor/charts/axis_minimum_label.rs	body_chart_value_axis_minimum_label_visible	1	pages	chart.style	migrated	litchi_pages::Package::body_chart_axis	pages_body_chart_axis_read_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
 pages/editor/charts/axis_minimum_label.rs	set_body_chart_value_axis_minimum_label_visible	1	pages	chart.style	migrated	litchi_pages::chart::axis::Edit::set	pages_body_chart_axis_set_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
-pages/editor/charts/axis_number_format.rs	body_chart_axis_number_format	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
-pages/editor/charts/axis_number_format.rs	set_body_chart_axis_number_format	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
+pages/editor/charts/axis_number_format.rs	body_chart_axis_number_format	1	pages	chart.style	migrated	litchi_pages::Package::body_chart_axis	pages_body_chart_axis_read_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+pages/editor/charts/axis_number_format.rs	set_body_chart_axis_number_format	1	pages	chart.style	migrated	litchi_pages::chart::axis::Edit::set	pages_body_chart_axis_set_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
 pages/editor/charts/axis_scale.rs	body_chart_value_axis_scale	1	pages	chart.legend_axis	host-only	litchi-pages	-	-	-	-
 pages/editor/charts/axis_scale.rs	set_body_chart_value_axis_scale	1	pages	chart.legend_axis	host-only	litchi-pages	-	-	-	-
 pages/editor/charts/axis_series_names.rs	body_chart_category_axis_series_names_visible	1	pages	chart.style	migrated	litchi_pages::Package::body_chart_axis	pages_body_chart_axis_read_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
@@ -1679,8 +1679,8 @@ pages/editor/charts/bar_shape_3d.rs	body_chart_3d_bar_shape	1	pages	chart.style	
 pages/editor/charts/bar_shape_3d.rs	set_body_chart_3d_bar_shape	1	pages	chart.style	migrated	litchi_pages::chart::style::Edit::set	pages_body_chart_options_set_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
 pages/editor/charts/border.rs	body_chart_border_visible	1	pages	chart.style	migrated	litchi_pages::Package::body_chart_style	pages_body_chart_options_read_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
 pages/editor/charts/border.rs	set_body_chart_border_visible	1	pages	chart.style	migrated	litchi_pages::chart::style::Edit::set	pages_body_chart_options_set_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
-pages/editor/charts/border_stroke.rs	body_chart_border_stroke	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
-pages/editor/charts/border_stroke.rs	set_body_chart_border_stroke	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
+pages/editor/charts/border_stroke.rs	body_chart_border_stroke	1	pages	chart.style	migrated	litchi_pages::Package::body_chart_style	pages_body_chart_options_read_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+pages/editor/charts/border_stroke.rs	set_body_chart_border_stroke	1	pages	chart.style	migrated	litchi_pages::chart::style::Edit::set	pages_body_chart_options_set_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
 pages/editor/charts/caption.rs	body_chart_caption	1	pages	chart.text	host-only	litchi-pages	-	-	-	-
 pages/editor/charts/caption.rs	remove_body_chart_caption	1	pages	chart.text	host-only	litchi-pages	-	-	-	-
 pages/editor/charts/caption.rs	set_body_chart_caption	1	pages	chart.text	host-only	litchi-pages	-	-	-	-
@@ -1914,39 +1914,39 @@ pages/editor/tables/semantic.rs	reset_table_cell_fraction_format	1	pages	table.c
 pages/editor/tables/semantic.rs	reset_table_cell_layout	1	pages	table.cell_appearance	migrated	litchi_pages::Package::edit_body_table_cell_appearance	pages_body_table_cell_layout_reset_parity	A	-	-
 pages/editor/tables/semantic.rs	reset_table_cell_number_format	1	pages	table.cell_format	migrated	litchi_pages::table::format::Edit::reset	pages_body_table_cell_format_reset_parity	B	-	-
 pages/editor/tables/semantic.rs	reset_table_cell_numeral_system_format	1	pages	table.cell_format	host-only	litchi-pages	-	-	-	-
-pages/editor/tables/semantic.rs	reset_table_cell_paragraph_indents	1	pages	table.cell_rich_text	host-only	litchi-pages	-	-	-	-
-pages/editor/tables/semantic.rs	reset_table_cell_paragraph_line_spacing	1	pages	table.cell_rich_text	host-only	litchi-pages	-	-	-	-
-pages/editor/tables/semantic.rs	reset_table_cell_paragraph_list	1	pages	table.cell_rich_text	host-only	litchi-pages	-	-	-	-
-pages/editor/tables/semantic.rs	reset_table_cell_paragraph_list_bullet	1	pages	table.cell_rich_text	host-only	litchi-pages	-	-	-	-
-pages/editor/tables/semantic.rs	reset_table_cell_paragraph_list_bullet_geometry	1	pages	table.cell_rich_text	host-only	litchi-pages	-	-	-	-
-pages/editor/tables/semantic.rs	reset_table_cell_paragraph_list_indentation	1	pages	table.cell_rich_text	host-only	litchi-pages	-	-	-	-
-pages/editor/tables/semantic.rs	reset_table_cell_paragraph_list_label_color	1	pages	table.cell_rich_text	host-only	litchi-pages	-	-	-	-
-pages/editor/tables/semantic.rs	reset_table_cell_paragraph_list_level	1	pages	table.cell_rich_text	host-only	litchi-pages	-	-	-	-
-pages/editor/tables/semantic.rs	reset_table_cell_paragraph_list_number_format	1	pages	table.cell_format	host-only	litchi-pages	-	-	-	-
-pages/editor/tables/semantic.rs	reset_table_cell_paragraph_list_number_scale	1	pages	table.cell_rich_text	host-only	litchi-pages	-	-	-	-
-pages/editor/tables/semantic.rs	reset_table_cell_paragraph_list_number_tiering	1	pages	table.cell_rich_text	host-only	litchi-pages	-	-	-	-
-pages/editor/tables/semantic.rs	reset_table_cell_paragraph_spacing	1	pages	table.cell_rich_text	host-only	litchi-pages	-	-	-	-
-pages/editor/tables/semantic.rs	reset_table_cell_paragraph_tab_stops	1	pages	table.cell_rich_text	host-only	litchi-pages	-	-	-	-
+pages/editor/tables/semantic.rs	reset_table_cell_paragraph_indents	1	pages	table.cell_rich_text	migrated	litchi_pages::Package::edit_body_table_cell_text	pages_body_table_cell_text_property_parity	B	-	-
+pages/editor/tables/semantic.rs	reset_table_cell_paragraph_line_spacing	1	pages	table.cell_rich_text	migrated	litchi_pages::Package::edit_body_table_cell_text	pages_body_table_cell_text_property_parity	B	-	-
+pages/editor/tables/semantic.rs	reset_table_cell_paragraph_list	1	pages	table.cell_rich_text	migrated	litchi_pages::Package::edit_body_table_cell_lists	pages_body_table_cell_list_preset_parity	B	-	-
+pages/editor/tables/semantic.rs	reset_table_cell_paragraph_list_bullet	1	pages	table.cell_rich_text	migrated	litchi_pages::Package::edit_body_table_cell_lists	pages_body_table_cell_list_property_reset_parity	B	-	-
+pages/editor/tables/semantic.rs	reset_table_cell_paragraph_list_bullet_geometry	1	pages	table.cell_rich_text	migrated	litchi_pages::Package::edit_body_table_cell_lists	pages_body_table_cell_list_property_reset_parity	B	-	-
+pages/editor/tables/semantic.rs	reset_table_cell_paragraph_list_indentation	1	pages	table.cell_rich_text	migrated	litchi_pages::Package::edit_body_table_cell_lists	pages_body_table_cell_list_property_reset_parity	B	-	-
+pages/editor/tables/semantic.rs	reset_table_cell_paragraph_list_label_color	1	pages	table.cell_rich_text	migrated	litchi_pages::Package::edit_body_table_cell_lists	pages_body_table_cell_list_property_reset_parity	B	-	-
+pages/editor/tables/semantic.rs	reset_table_cell_paragraph_list_level	1	pages	table.cell_rich_text	migrated	litchi_pages::Package::edit_body_table_cell_lists	pages_body_table_cell_list_level_numbering_parity	A	-	-
+pages/editor/tables/semantic.rs	reset_table_cell_paragraph_list_number_format	1	pages	table.cell_format	migrated	litchi_pages::Package::edit_body_table_cell_lists	pages_body_table_cell_list_property_reset_parity	B	-	-
+pages/editor/tables/semantic.rs	reset_table_cell_paragraph_list_number_scale	1	pages	table.cell_rich_text	migrated	litchi_pages::Package::edit_body_table_cell_lists	pages_body_table_cell_list_property_reset_parity	B	-	-
+pages/editor/tables/semantic.rs	reset_table_cell_paragraph_list_number_tiering	1	pages	table.cell_rich_text	migrated	litchi_pages::Package::edit_body_table_cell_lists	pages_body_table_cell_list_property_reset_parity	B	-	-
+pages/editor/tables/semantic.rs	reset_table_cell_paragraph_spacing	1	pages	table.cell_rich_text	migrated	litchi_pages::Package::edit_body_table_cell_text	pages_body_table_cell_text_property_parity	B	-	-
+pages/editor/tables/semantic.rs	reset_table_cell_paragraph_tab_stops	1	pages	table.cell_rich_text	migrated	litchi_pages::Package::edit_body_table_cell_text	pages_body_table_cell_text_property_parity	B	-	-
 pages/editor/tables/semantic.rs	reset_table_cell_percentage_format	1	pages	table.cell_format	migrated	litchi_pages::table::format::Edit::reset	pages_body_table_cell_format_reset_parity	B	-	-
 pages/editor/tables/semantic.rs	reset_table_cell_pop_up_menu_format	1	pages	table.cell_format	host-only	litchi-pages	-	-	-	-
 pages/editor/tables/semantic.rs	reset_table_cell_scientific_format	1	pages	table.cell_format	migrated	litchi_pages::table::format::Edit::reset	pages_body_table_cell_format_reset_parity	B	-	-
 pages/editor/tables/semantic.rs	reset_table_cell_slider_format	1	pages	table.cell_format	host-only	litchi-pages	-	-	-	-
 pages/editor/tables/semantic.rs	reset_table_cell_star_rating_format	1	pages	table.cell_format	host-only	litchi-pages	-	-	-	-
 pages/editor/tables/semantic.rs	reset_table_cell_stepper_format	1	pages	table.cell_format	host-only	litchi-pages	-	-	-	-
-pages/editor/tables/semantic.rs	reset_table_cell_text_alignment	1	pages	table.cell_rich_text	host-only	litchi-pages	-	-	-	-
-pages/editor/tables/semantic.rs	reset_table_cell_text_background	1	pages	table.cell_rich_text	host-only	litchi-pages	-	-	-	-
-pages/editor/tables/semantic.rs	reset_table_cell_text_baseline_shift	1	pages	table.cell_rich_text	host-only	litchi-pages	-	-	-	-
-pages/editor/tables/semantic.rs	reset_table_cell_text_capitalization	1	pages	table.cell_rich_text	host-only	litchi-pages	-	-	-	-
-pages/editor/tables/semantic.rs	reset_table_cell_text_character_spacing	1	pages	table.cell_rich_text	host-only	litchi-pages	-	-	-	-
-pages/editor/tables/semantic.rs	reset_table_cell_text_color	1	pages	table.cell_rich_text	host-only	litchi-pages	-	-	-	-
-pages/editor/tables/semantic.rs	reset_table_cell_text_decorations	1	pages	table.cell_rich_text	host-only	litchi-pages	-	-	-	-
-pages/editor/tables/semantic.rs	reset_table_cell_text_font	1	pages	table.cell_rich_text	host-only	litchi-pages	-	-	-	-
+pages/editor/tables/semantic.rs	reset_table_cell_text_alignment	1	pages	table.cell_rich_text	migrated	litchi_pages::Package::edit_body_table_cell_text	pages_body_table_cell_text_property_parity	B	-	-
+pages/editor/tables/semantic.rs	reset_table_cell_text_background	1	pages	table.cell_rich_text	migrated	litchi_pages::Package::edit_body_table_cell_text	pages_body_table_cell_text_property_parity	B	-	-
+pages/editor/tables/semantic.rs	reset_table_cell_text_baseline_shift	1	pages	table.cell_rich_text	migrated	litchi_pages::Package::edit_body_table_cell_text	pages_body_table_cell_text_property_parity	B	-	-
+pages/editor/tables/semantic.rs	reset_table_cell_text_capitalization	1	pages	table.cell_rich_text	migrated	litchi_pages::Package::edit_body_table_cell_text	pages_body_table_cell_text_property_parity	B	-	-
+pages/editor/tables/semantic.rs	reset_table_cell_text_character_spacing	1	pages	table.cell_rich_text	migrated	litchi_pages::Package::edit_body_table_cell_text	pages_body_table_cell_text_property_parity	B	-	-
+pages/editor/tables/semantic.rs	reset_table_cell_text_color	1	pages	table.cell_rich_text	migrated	litchi_pages::Package::edit_body_table_cell_text	pages_body_table_cell_text_property_parity	B	-	-
+pages/editor/tables/semantic.rs	reset_table_cell_text_decorations	1	pages	table.cell_rich_text	migrated	litchi_pages::Package::edit_body_table_cell_text	pages_body_table_cell_text_property_parity	B	-	-
+pages/editor/tables/semantic.rs	reset_table_cell_text_font	1	pages	table.cell_rich_text	migrated	litchi_pages::Package::edit_body_table_cell_text	pages_body_table_cell_text_property_parity	B	-	-
 pages/editor/tables/semantic.rs	reset_table_cell_text_format	1	pages	table.cell_format	host-only	litchi-pages	-	-	-	-
-pages/editor/tables/semantic.rs	reset_table_cell_text_ligatures	1	pages	table.cell_rich_text	host-only	litchi-pages	-	-	-	-
-pages/editor/tables/semantic.rs	reset_table_cell_text_outline	1	pages	table.cell_rich_text	host-only	litchi-pages	-	-	-	-
-pages/editor/tables/semantic.rs	reset_table_cell_text_script	1	pages	table.cell_rich_text	host-only	litchi-pages	-	-	-	-
-pages/editor/tables/semantic.rs	reset_table_cell_text_shadow	1	pages	table.cell_rich_text	host-only	litchi-pages	-	-	-	-
-pages/editor/tables/semantic.rs	reset_table_cell_text_style	1	pages	table.cell_rich_text	host-only	litchi-pages	-	-	-	-
+pages/editor/tables/semantic.rs	reset_table_cell_text_ligatures	1	pages	table.cell_rich_text	migrated	litchi_pages::Package::edit_body_table_cell_text	pages_body_table_cell_text_property_parity	B	-	-
+pages/editor/tables/semantic.rs	reset_table_cell_text_outline	1	pages	table.cell_rich_text	migrated	litchi_pages::Package::edit_body_table_cell_text	pages_body_table_cell_text_property_parity	B	-	-
+pages/editor/tables/semantic.rs	reset_table_cell_text_script	1	pages	table.cell_rich_text	migrated	litchi_pages::Package::edit_body_table_cell_text	pages_body_table_cell_text_property_parity	B	-	-
+pages/editor/tables/semantic.rs	reset_table_cell_text_shadow	1	pages	table.cell_rich_text	migrated	litchi_pages::Package::edit_body_table_cell_text	pages_body_table_cell_text_property_parity	B	-	-
+pages/editor/tables/semantic.rs	reset_table_cell_text_style	1	pages	table.cell_rich_text	migrated	litchi_pages::Package::edit_body_table_cell_text	pages_body_table_cell_text_property_parity	B	-	-
 pages/editor/tables/semantic.rs	resize_table	1	pages	table.lifecycle	migrated	litchi_pages::Package::edit_body_table_size	pages_body_table_resize_parity	A	-	-
 pages/editor/tables/semantic.rs	set_table_cell	1	pages	table.cells	migrated	litchi_pages::Package::edit_body_table_values	pages_body_table_cell_parity	A	-	-
 pages/editor/tables/semantic.rs	set_table_cell_border	1	pages	table.cell_appearance	migrated	litchi_pages::Package::edit_body_table_cell_appearance	pages_body_table_cell_border_parity	A	-	-
@@ -1961,41 +1961,41 @@ pages/editor/tables/semantic.rs	set_table_cell_fraction_format	1	pages	table.cel
 pages/editor/tables/semantic.rs	set_table_cell_layout	1	pages	table.cell_appearance	migrated	litchi_pages::Package::edit_body_table_cell_appearance	pages_body_table_cell_layout_set_parity	B	-	-
 pages/editor/tables/semantic.rs	set_table_cell_number_format	1	pages	table.cell_format	migrated	litchi_pages::Package::edit_body_table_cell_format	pages_body_table_cell_format_set_parity	B	-	-
 pages/editor/tables/semantic.rs	set_table_cell_numeral_system_format	1	pages	table.cell_format	host-only	litchi-pages	-	-	-	-
-pages/editor/tables/semantic.rs	set_table_cell_paragraph_indents	1	pages	table.cell_rich_text	host-only	litchi-pages	-	-	-	-
-pages/editor/tables/semantic.rs	set_table_cell_paragraph_line_spacing	1	pages	table.cell_rich_text	host-only	litchi-pages	-	-	-	-
-pages/editor/tables/semantic.rs	set_table_cell_paragraph_list	1	pages	table.cell_rich_text	host-only	litchi-pages	-	-	-	-
-pages/editor/tables/semantic.rs	set_table_cell_paragraph_list_bullet	1	pages	table.cell_rich_text	host-only	litchi-pages	-	-	-	-
-pages/editor/tables/semantic.rs	set_table_cell_paragraph_list_bullet_geometry	1	pages	table.cell_rich_text	host-only	litchi-pages	-	-	-	-
-pages/editor/tables/semantic.rs	set_table_cell_paragraph_list_indentation	1	pages	table.cell_rich_text	host-only	litchi-pages	-	-	-	-
-pages/editor/tables/semantic.rs	set_table_cell_paragraph_list_label_color	1	pages	table.cell_rich_text	host-only	litchi-pages	-	-	-	-
-pages/editor/tables/semantic.rs	set_table_cell_paragraph_list_level	1	pages	table.cell_rich_text	host-only	litchi-pages	-	-	-	-
-pages/editor/tables/semantic.rs	set_table_cell_paragraph_list_number_format	1	pages	table.cell_format	host-only	litchi-pages	-	-	-	-
-pages/editor/tables/semantic.rs	set_table_cell_paragraph_list_number_scale	1	pages	table.cell_rich_text	host-only	litchi-pages	-	-	-	-
-pages/editor/tables/semantic.rs	set_table_cell_paragraph_list_number_tiering	1	pages	table.cell_rich_text	host-only	litchi-pages	-	-	-	-
-pages/editor/tables/semantic.rs	set_table_cell_paragraph_list_numbering	1	pages	table.cell_rich_text	host-only	litchi-pages	-	-	-	-
-pages/editor/tables/semantic.rs	set_table_cell_paragraph_lists	1	pages	table.cell_rich_text	host-only	litchi-pages	-	-	-	-
-pages/editor/tables/semantic.rs	set_table_cell_paragraph_spacing	1	pages	table.cell_rich_text	host-only	litchi-pages	-	-	-	-
-pages/editor/tables/semantic.rs	set_table_cell_paragraph_tab_stops	1	pages	table.cell_rich_text	host-only	litchi-pages	-	-	-	-
+pages/editor/tables/semantic.rs	set_table_cell_paragraph_indents	1	pages	table.cell_rich_text	migrated	litchi_pages::Package::edit_body_table_cell_text	pages_body_table_cell_text_property_parity	B	-	-
+pages/editor/tables/semantic.rs	set_table_cell_paragraph_line_spacing	1	pages	table.cell_rich_text	migrated	litchi_pages::Package::edit_body_table_cell_text	pages_body_table_cell_text_property_parity	B	-	-
+pages/editor/tables/semantic.rs	set_table_cell_paragraph_list	1	pages	table.cell_rich_text	migrated	litchi_pages::Package::edit_body_table_cell_lists	pages_body_table_cell_list_preset_parity	B	-	-
+pages/editor/tables/semantic.rs	set_table_cell_paragraph_list_bullet	1	pages	table.cell_rich_text	migrated	litchi_pages::Package::edit_body_table_cell_lists	pages_body_table_cell_list_property_set_parity	B	-	-
+pages/editor/tables/semantic.rs	set_table_cell_paragraph_list_bullet_geometry	1	pages	table.cell_rich_text	migrated	litchi_pages::Package::edit_body_table_cell_lists	pages_body_table_cell_list_property_set_parity	B	-	-
+pages/editor/tables/semantic.rs	set_table_cell_paragraph_list_indentation	1	pages	table.cell_rich_text	migrated	litchi_pages::Package::edit_body_table_cell_lists	pages_body_table_cell_list_property_set_parity	B	-	-
+pages/editor/tables/semantic.rs	set_table_cell_paragraph_list_label_color	1	pages	table.cell_rich_text	migrated	litchi_pages::Package::edit_body_table_cell_lists	pages_body_table_cell_list_property_set_parity	B	-	-
+pages/editor/tables/semantic.rs	set_table_cell_paragraph_list_level	1	pages	table.cell_rich_text	migrated	litchi_pages::Package::edit_body_table_cell_lists	pages_body_table_cell_list_level_numbering_parity	A	-	-
+pages/editor/tables/semantic.rs	set_table_cell_paragraph_list_number_format	1	pages	table.cell_format	migrated	litchi_pages::Package::edit_body_table_cell_lists	pages_body_table_cell_list_property_set_parity	B	-	-
+pages/editor/tables/semantic.rs	set_table_cell_paragraph_list_number_scale	1	pages	table.cell_rich_text	migrated	litchi_pages::Package::edit_body_table_cell_lists	pages_body_table_cell_list_property_set_parity	B	-	-
+pages/editor/tables/semantic.rs	set_table_cell_paragraph_list_number_tiering	1	pages	table.cell_rich_text	migrated	litchi_pages::Package::edit_body_table_cell_lists	pages_body_table_cell_list_property_set_parity	B	-	-
+pages/editor/tables/semantic.rs	set_table_cell_paragraph_list_numbering	1	pages	table.cell_rich_text	migrated	litchi_pages::Package::edit_body_table_cell_lists	pages_body_table_cell_list_level_numbering_parity	A	-	-
+pages/editor/tables/semantic.rs	set_table_cell_paragraph_lists	1	pages	table.cell_rich_text	migrated	litchi_pages::Package::edit_body_table_cell_lists	pages_body_table_cell_list_preset_parity	B	-	-
+pages/editor/tables/semantic.rs	set_table_cell_paragraph_spacing	1	pages	table.cell_rich_text	migrated	litchi_pages::Package::edit_body_table_cell_text	pages_body_table_cell_text_property_parity	B	-	-
+pages/editor/tables/semantic.rs	set_table_cell_paragraph_tab_stops	1	pages	table.cell_rich_text	migrated	litchi_pages::Package::edit_body_table_cell_text	pages_body_table_cell_text_property_parity	B	-	-
 pages/editor/tables/semantic.rs	set_table_cell_percentage_format	1	pages	table.cell_format	migrated	litchi_pages::Package::edit_body_table_cell_format	pages_body_table_cell_format_set_parity	B	-	-
 pages/editor/tables/semantic.rs	set_table_cell_pop_up_menu_format	1	pages	table.cell_format	host-only	litchi-pages	-	-	-	-
 pages/editor/tables/semantic.rs	set_table_cell_scientific_format	1	pages	table.cell_format	migrated	litchi_pages::Package::edit_body_table_cell_format	pages_body_table_cell_format_set_parity	B	-	-
 pages/editor/tables/semantic.rs	set_table_cell_slider_format	1	pages	table.cell_format	host-only	litchi-pages	-	-	-	-
 pages/editor/tables/semantic.rs	set_table_cell_star_rating_format	1	pages	table.cell_format	host-only	litchi-pages	-	-	-	-
 pages/editor/tables/semantic.rs	set_table_cell_stepper_format	1	pages	table.cell_format	host-only	litchi-pages	-	-	-	-
-pages/editor/tables/semantic.rs	set_table_cell_text_alignment	1	pages	table.cell_rich_text	host-only	litchi-pages	-	-	-	-
-pages/editor/tables/semantic.rs	set_table_cell_text_background	1	pages	table.cell_rich_text	host-only	litchi-pages	-	-	-	-
-pages/editor/tables/semantic.rs	set_table_cell_text_baseline_shift	1	pages	table.cell_rich_text	host-only	litchi-pages	-	-	-	-
-pages/editor/tables/semantic.rs	set_table_cell_text_capitalization	1	pages	table.cell_rich_text	host-only	litchi-pages	-	-	-	-
-pages/editor/tables/semantic.rs	set_table_cell_text_character_spacing	1	pages	table.cell_rich_text	host-only	litchi-pages	-	-	-	-
-pages/editor/tables/semantic.rs	set_table_cell_text_color	1	pages	table.cell_rich_text	host-only	litchi-pages	-	-	-	-
-pages/editor/tables/semantic.rs	set_table_cell_text_decorations	1	pages	table.cell_rich_text	host-only	litchi-pages	-	-	-	-
-pages/editor/tables/semantic.rs	set_table_cell_text_font	1	pages	table.cell_rich_text	host-only	litchi-pages	-	-	-	-
+pages/editor/tables/semantic.rs	set_table_cell_text_alignment	1	pages	table.cell_rich_text	migrated	litchi_pages::Package::edit_body_table_cell_text	pages_body_table_cell_text_property_parity	B	-	-
+pages/editor/tables/semantic.rs	set_table_cell_text_background	1	pages	table.cell_rich_text	migrated	litchi_pages::Package::edit_body_table_cell_text	pages_body_table_cell_text_property_parity	B	-	-
+pages/editor/tables/semantic.rs	set_table_cell_text_baseline_shift	1	pages	table.cell_rich_text	migrated	litchi_pages::Package::edit_body_table_cell_text	pages_body_table_cell_text_property_parity	B	-	-
+pages/editor/tables/semantic.rs	set_table_cell_text_capitalization	1	pages	table.cell_rich_text	migrated	litchi_pages::Package::edit_body_table_cell_text	pages_body_table_cell_text_property_parity	B	-	-
+pages/editor/tables/semantic.rs	set_table_cell_text_character_spacing	1	pages	table.cell_rich_text	migrated	litchi_pages::Package::edit_body_table_cell_text	pages_body_table_cell_text_property_parity	B	-	-
+pages/editor/tables/semantic.rs	set_table_cell_text_color	1	pages	table.cell_rich_text	migrated	litchi_pages::Package::edit_body_table_cell_text	pages_body_table_cell_text_property_parity	B	-	-
+pages/editor/tables/semantic.rs	set_table_cell_text_decorations	1	pages	table.cell_rich_text	migrated	litchi_pages::Package::edit_body_table_cell_text	pages_body_table_cell_text_property_parity	B	-	-
+pages/editor/tables/semantic.rs	set_table_cell_text_font	1	pages	table.cell_rich_text	migrated	litchi_pages::Package::edit_body_table_cell_text	pages_body_table_cell_text_property_parity	B	-	-
 pages/editor/tables/semantic.rs	set_table_cell_text_format	1	pages	table.cell_format	host-only	litchi-pages	-	-	-	-
-pages/editor/tables/semantic.rs	set_table_cell_text_ligatures	1	pages	table.cell_rich_text	host-only	litchi-pages	-	-	-	-
-pages/editor/tables/semantic.rs	set_table_cell_text_outline	1	pages	table.cell_rich_text	host-only	litchi-pages	-	-	-	-
-pages/editor/tables/semantic.rs	set_table_cell_text_script	1	pages	table.cell_rich_text	host-only	litchi-pages	-	-	-	-
-pages/editor/tables/semantic.rs	set_table_cell_text_shadow	1	pages	table.cell_rich_text	host-only	litchi-pages	-	-	-	-
-pages/editor/tables/semantic.rs	set_table_cell_text_style	1	pages	table.cell_rich_text	host-only	litchi-pages	-	-	-	-
+pages/editor/tables/semantic.rs	set_table_cell_text_ligatures	1	pages	table.cell_rich_text	migrated	litchi_pages::Package::edit_body_table_cell_text	pages_body_table_cell_text_property_parity	B	-	-
+pages/editor/tables/semantic.rs	set_table_cell_text_outline	1	pages	table.cell_rich_text	migrated	litchi_pages::Package::edit_body_table_cell_text	pages_body_table_cell_text_property_parity	B	-	-
+pages/editor/tables/semantic.rs	set_table_cell_text_script	1	pages	table.cell_rich_text	migrated	litchi_pages::Package::edit_body_table_cell_text	pages_body_table_cell_text_property_parity	B	-	-
+pages/editor/tables/semantic.rs	set_table_cell_text_shadow	1	pages	table.cell_rich_text	migrated	litchi_pages::Package::edit_body_table_cell_text	pages_body_table_cell_text_property_parity	B	-	-
+pages/editor/tables/semantic.rs	set_table_cell_text_style	1	pages	table.cell_rich_text	migrated	litchi_pages::Package::edit_body_table_cell_text	pages_body_table_cell_text_property_parity	B	-	-
 pages/editor/tables/semantic.rs	set_table_cells	1	pages	table.cells	migrated	litchi_pages::Package::edit_body_table_values	pages_body_table_cells_batch_parity	A	-	-
 pages/editor/tables/semantic.rs	table	1	pages	other	migrated	litchi_pages::Package::body_table_cells	pages_body_table_reads_parity	A	test-data/iwork/pages/body-table-cells-native-receipt.json	-
 pages/editor/tables/semantic.rs	table_cell_borders	1	pages	table.cell_appearance	migrated	litchi_pages::Package::body_table_cell_appearance	pages_body_table_cell_appearance_read_parity	A	-	-
@@ -2011,41 +2011,41 @@ pages/editor/tables/semantic.rs	table_cell_layout	1	pages	table.cell_appearance	
 pages/editor/tables/semantic.rs	table_cell_merges	1	pages	table.merge	migrated	litchi_pages::Package::body_table_merges	pages_body_table_merges_read_parity	A	test-data/iwork/pages/body-table-merges-native-receipt.json	-
 pages/editor/tables/semantic.rs	table_cell_number_format	1	pages	table.cell_format	migrated	litchi_pages::Package::body_table_cell_format	pages_body_table_cell_format_read_parity	A	-	-
 pages/editor/tables/semantic.rs	table_cell_numeral_system_format	1	pages	table.cell_format	migrated	litchi_pages::Package::body_table_cell_format	pages_body_table_cell_numeral_system_format_read_parity	A	-	-
-pages/editor/tables/semantic.rs	table_cell_paragraph_indents	1	pages	table.cell_rich_text	host-only	litchi-pages	-	-	-	-
-pages/editor/tables/semantic.rs	table_cell_paragraph_line_spacing	1	pages	table.cell_rich_text	host-only	litchi-pages	-	-	-	-
-pages/editor/tables/semantic.rs	table_cell_paragraph_list	1	pages	table.cell_rich_text	host-only	litchi-pages	-	-	-	-
-pages/editor/tables/semantic.rs	table_cell_paragraph_list_bullet	1	pages	table.cell_rich_text	host-only	litchi-pages	-	-	-	-
-pages/editor/tables/semantic.rs	table_cell_paragraph_list_bullet_geometry	1	pages	table.cell_rich_text	host-only	litchi-pages	-	-	-	-
-pages/editor/tables/semantic.rs	table_cell_paragraph_list_indentation	1	pages	table.cell_rich_text	host-only	litchi-pages	-	-	-	-
-pages/editor/tables/semantic.rs	table_cell_paragraph_list_label_color	1	pages	table.cell_rich_text	host-only	litchi-pages	-	-	-	-
-pages/editor/tables/semantic.rs	table_cell_paragraph_list_levels	1	pages	table.cell_rich_text	host-only	litchi-pages	-	-	-	-
-pages/editor/tables/semantic.rs	table_cell_paragraph_list_number_format	1	pages	table.cell_format	host-only	litchi-pages	-	-	-	-
-pages/editor/tables/semantic.rs	table_cell_paragraph_list_number_scale	1	pages	table.cell_rich_text	host-only	litchi-pages	-	-	-	-
-pages/editor/tables/semantic.rs	table_cell_paragraph_list_number_tiering	1	pages	table.cell_rich_text	host-only	litchi-pages	-	-	-	-
-pages/editor/tables/semantic.rs	table_cell_paragraph_list_numbering	1	pages	table.cell_rich_text	host-only	litchi-pages	-	-	-	-
-pages/editor/tables/semantic.rs	table_cell_paragraph_lists	1	pages	table.cell_rich_text	host-only	litchi-pages	-	-	-	-
-pages/editor/tables/semantic.rs	table_cell_paragraph_spacing	1	pages	table.cell_rich_text	host-only	litchi-pages	-	-	-	-
-pages/editor/tables/semantic.rs	table_cell_paragraph_tab_stops	1	pages	table.cell_rich_text	host-only	litchi-pages	-	-	-	-
+pages/editor/tables/semantic.rs	table_cell_paragraph_indents	1	pages	table.cell_rich_text	migrated	litchi_pages::Package::body_table_cell_text	pages_body_table_cell_text_property_read_parity	A	-	-
+pages/editor/tables/semantic.rs	table_cell_paragraph_line_spacing	1	pages	table.cell_rich_text	migrated	litchi_pages::Package::body_table_cell_text	pages_body_table_cell_text_property_read_parity	A	-	-
+pages/editor/tables/semantic.rs	table_cell_paragraph_list	1	pages	table.cell_rich_text	migrated	litchi_pages::Package::body_table_cell_list	pages_body_table_cell_list_read_parity	A	-	-
+pages/editor/tables/semantic.rs	table_cell_paragraph_list_bullet	1	pages	table.cell_rich_text	migrated	litchi_pages::Package::body_table_cell_list_property	pages_body_table_cell_list_read_parity	A	-	-
+pages/editor/tables/semantic.rs	table_cell_paragraph_list_bullet_geometry	1	pages	table.cell_rich_text	migrated	litchi_pages::Package::body_table_cell_list_property	pages_body_table_cell_list_read_parity	A	-	-
+pages/editor/tables/semantic.rs	table_cell_paragraph_list_indentation	1	pages	table.cell_rich_text	migrated	litchi_pages::Package::body_table_cell_list_property	pages_body_table_cell_list_read_parity	A	-	-
+pages/editor/tables/semantic.rs	table_cell_paragraph_list_label_color	1	pages	table.cell_rich_text	migrated	litchi_pages::Package::body_table_cell_list_property	pages_body_table_cell_list_read_parity	A	-	-
+pages/editor/tables/semantic.rs	table_cell_paragraph_list_levels	1	pages	table.cell_rich_text	migrated	litchi_pages::Package::body_table_cell_list_levels	pages_body_table_cell_list_read_parity	A	-	-
+pages/editor/tables/semantic.rs	table_cell_paragraph_list_number_format	1	pages	table.cell_format	migrated	litchi_pages::Package::body_table_cell_list_property	pages_body_table_cell_list_read_parity	A	-	-
+pages/editor/tables/semantic.rs	table_cell_paragraph_list_number_scale	1	pages	table.cell_rich_text	migrated	litchi_pages::Package::body_table_cell_list_property	pages_body_table_cell_list_read_parity	A	-	-
+pages/editor/tables/semantic.rs	table_cell_paragraph_list_number_tiering	1	pages	table.cell_rich_text	migrated	litchi_pages::Package::body_table_cell_list_property	pages_body_table_cell_list_read_parity	A	-	-
+pages/editor/tables/semantic.rs	table_cell_paragraph_list_numbering	1	pages	table.cell_rich_text	migrated	litchi_pages::Package::body_table_cell_list_numbering	pages_body_table_cell_list_read_parity	A	-	-
+pages/editor/tables/semantic.rs	table_cell_paragraph_lists	1	pages	table.cell_rich_text	migrated	litchi_pages::Package::body_table_cell_lists	pages_body_table_cell_list_read_parity	A	-	-
+pages/editor/tables/semantic.rs	table_cell_paragraph_spacing	1	pages	table.cell_rich_text	migrated	litchi_pages::Package::body_table_cell_text	pages_body_table_cell_text_property_read_parity	A	-	-
+pages/editor/tables/semantic.rs	table_cell_paragraph_tab_stops	1	pages	table.cell_rich_text	migrated	litchi_pages::Package::body_table_cell_text	pages_body_table_cell_text_property_read_parity	A	-	-
 pages/editor/tables/semantic.rs	table_cell_percentage_format	1	pages	table.cell_format	migrated	litchi_pages::Package::body_table_cell_format	pages_body_table_cell_format_read_parity	A	-	-
 pages/editor/tables/semantic.rs	table_cell_pop_up_menu_format	1	pages	table.cell_format	host-only	litchi-pages	-	-	-	-
 pages/editor/tables/semantic.rs	table_cell_scientific_format	1	pages	table.cell_format	migrated	litchi_pages::Package::body_table_cell_format	pages_body_table_cell_format_read_parity	A	-	-
 pages/editor/tables/semantic.rs	table_cell_slider_format	1	pages	table.cell_format	host-only	litchi-pages	-	-	-	-
 pages/editor/tables/semantic.rs	table_cell_star_rating_format	1	pages	table.cell_format	host-only	litchi-pages	-	-	-	-
 pages/editor/tables/semantic.rs	table_cell_stepper_format	1	pages	table.cell_format	host-only	litchi-pages	-	-	-	-
-pages/editor/tables/semantic.rs	table_cell_text_alignment	1	pages	table.cell_rich_text	host-only	litchi-pages	-	-	-	-
-pages/editor/tables/semantic.rs	table_cell_text_background	1	pages	table.cell_rich_text	host-only	litchi-pages	-	-	-	-
-pages/editor/tables/semantic.rs	table_cell_text_baseline_shift	1	pages	table.cell_rich_text	host-only	litchi-pages	-	-	-	-
-pages/editor/tables/semantic.rs	table_cell_text_capitalization	1	pages	table.cell_rich_text	host-only	litchi-pages	-	-	-	-
-pages/editor/tables/semantic.rs	table_cell_text_character_spacing	1	pages	table.cell_rich_text	host-only	litchi-pages	-	-	-	-
-pages/editor/tables/semantic.rs	table_cell_text_color	1	pages	table.cell_rich_text	host-only	litchi-pages	-	-	-	-
-pages/editor/tables/semantic.rs	table_cell_text_decorations	1	pages	table.cell_rich_text	host-only	litchi-pages	-	-	-	-
-pages/editor/tables/semantic.rs	table_cell_text_font	1	pages	table.cell_rich_text	host-only	litchi-pages	-	-	-	-
+pages/editor/tables/semantic.rs	table_cell_text_alignment	1	pages	table.cell_rich_text	migrated	litchi_pages::Package::body_table_cell_text	pages_body_table_cell_text_property_read_parity	A	-	-
+pages/editor/tables/semantic.rs	table_cell_text_background	1	pages	table.cell_rich_text	migrated	litchi_pages::Package::body_table_cell_text	pages_body_table_cell_text_property_read_parity	A	-	-
+pages/editor/tables/semantic.rs	table_cell_text_baseline_shift	1	pages	table.cell_rich_text	migrated	litchi_pages::Package::body_table_cell_text	pages_body_table_cell_text_property_read_parity	A	-	-
+pages/editor/tables/semantic.rs	table_cell_text_capitalization	1	pages	table.cell_rich_text	migrated	litchi_pages::Package::body_table_cell_text	pages_body_table_cell_text_property_read_parity	A	-	-
+pages/editor/tables/semantic.rs	table_cell_text_character_spacing	1	pages	table.cell_rich_text	migrated	litchi_pages::Package::body_table_cell_text	pages_body_table_cell_text_property_read_parity	A	-	-
+pages/editor/tables/semantic.rs	table_cell_text_color	1	pages	table.cell_rich_text	migrated	litchi_pages::Package::body_table_cell_text	pages_body_table_cell_text_property_read_parity	A	-	-
+pages/editor/tables/semantic.rs	table_cell_text_decorations	1	pages	table.cell_rich_text	migrated	litchi_pages::Package::body_table_cell_text	pages_body_table_cell_text_property_read_parity	A	-	-
+pages/editor/tables/semantic.rs	table_cell_text_font	1	pages	table.cell_rich_text	migrated	litchi_pages::Package::body_table_cell_text	pages_body_table_cell_text_property_read_parity	A	-	-
 pages/editor/tables/semantic.rs	table_cell_text_format	1	pages	table.cell_format	host-only	litchi-pages	-	-	-	-
-pages/editor/tables/semantic.rs	table_cell_text_ligatures	1	pages	table.cell_rich_text	host-only	litchi-pages	-	-	-	-
-pages/editor/tables/semantic.rs	table_cell_text_outline	1	pages	table.cell_rich_text	host-only	litchi-pages	-	-	-	-
-pages/editor/tables/semantic.rs	table_cell_text_script	1	pages	table.cell_rich_text	host-only	litchi-pages	-	-	-	-
-pages/editor/tables/semantic.rs	table_cell_text_shadow	1	pages	table.cell_rich_text	host-only	litchi-pages	-	-	-	-
-pages/editor/tables/semantic.rs	table_cell_text_style	1	pages	table.cell_rich_text	host-only	litchi-pages	-	-	-	-
+pages/editor/tables/semantic.rs	table_cell_text_ligatures	1	pages	table.cell_rich_text	migrated	litchi_pages::Package::body_table_cell_text	pages_body_table_cell_text_property_read_parity	A	-	-
+pages/editor/tables/semantic.rs	table_cell_text_outline	1	pages	table.cell_rich_text	migrated	litchi_pages::Package::body_table_cell_text	pages_body_table_cell_text_property_read_parity	A	-	-
+pages/editor/tables/semantic.rs	table_cell_text_script	1	pages	table.cell_rich_text	migrated	litchi_pages::Package::body_table_cell_text	pages_body_table_cell_text_property_read_parity	A	-	-
+pages/editor/tables/semantic.rs	table_cell_text_shadow	1	pages	table.cell_rich_text	migrated	litchi_pages::Package::body_table_cell_text	pages_body_table_cell_text_property_read_parity	A	-	-
+pages/editor/tables/semantic.rs	table_cell_text_style	1	pages	table.cell_rich_text	migrated	litchi_pages::Package::body_table_cell_text	pages_body_table_cell_text_property_read_parity	A	-	-
 pages/editor/tables/semantic.rs	tables	1	pages	table.lifecycle	migrated	litchi_pages::Package::body_tables	pages_body_table_reads_parity	A	test-data/iwork/pages/body-table-cells-native-receipt.json	-
 pages/editor/tables/semantic.rs	unmerge_table_cells	1	pages	table.merge	migrated	litchi_pages::Package::edit_body_table_merges	pages_body_table_unmerge_parity	A	-	-
 pages/editor/tables/sort.rs	apply_table_sort_order	1	pages	table.sort	migrated	litchi_pages::Package::edit_body_table_sort_execution	pages_body_table_sort_apply_parity	A	-	-

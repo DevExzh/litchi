@@ -22,7 +22,6 @@
 
 use std::fmt;
 
-use litchi_iwa_core::RawMessage;
 use litchi_iwa_table::{
     cell_text_style as shared, cell_text_style_headers as headers, cell_text_style_writer as writer,
 };
@@ -34,28 +33,17 @@ use thiserror::Error as ThisError;
 
 use super::Package;
 use super::structure::{
-    self, Fault, FaultResult, Working,
+    self, Fault, Working,
     metadata::{self, Transition},
-    references,
 };
-use super::table_topology::wire::{
-    push_bytes_field, repeated_bytes, single_bytes, single_reference, single_varint,
-};
-use super::table_topology::{
-    self as topology, LIST_MESSAGE_TYPE, LIST_SEGMENT_MESSAGE_TYPE, TILE_MESSAGE_TYPE, storage,
-};
+use super::table_topology::{self as topology, TILE_MESSAGE_TYPE};
 use crate::selector::{SheetSelector, TableSelector};
 use crate::table::At;
 
 structure::structural_family!("cell-text-style", Wire(litchi_iwa_common::LimitKind));
 
-/// `TSWP.ParagraphStyleArchive`.
-const PARAGRAPH_STYLE_MESSAGE_TYPE: u32 = 2_022;
 /// `TST.HeaderStorageBucket`.
 const HEADER_BUCKET_MESSAGE_TYPE: u32 = 6_006;
-/// `TSS.StylesheetArchive`.
-/// `DataStore.styleTable`.
-const STYLE_LIST_FIELD: u32 = 5;
 /// A typed, content-redacted cell text-style failure.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
@@ -176,18 +164,6 @@ fn from_style(error: litchi_iwa_text_wire::CharStyleError) -> Error {
         litchi_iwa_text_wire::CharStyleError::Allocation { amount } => Error::Allocation { amount },
         _ => Error::InvalidSource,
     }
-}
-
-pub(super) fn style_wire_limits(
-    working: &Working<'_>,
-) -> Result<litchi_iwa_common::WireLimits, Error> {
-    let maximum = working.archive_limits().max_message_bytes();
-    litchi_iwa_common::WireLimits::default()
-        .with_input_bytes(maximum.min(litchi_iwa_common::WireLimits::MAX_INPUT_BYTES))
-        .and_then(|limits| {
-            limits.with_output_bytes(maximum.min(litchi_iwa_common::WireLimits::MAX_OUTPUT_BYTES))
-        })
-        .map_err(|_| Error::InvalidSource)
 }
 
 /// One immutable edit that sets the character properties of cells of one
@@ -329,129 +305,48 @@ impl Edit<'_> {
     }
 }
 
-/// One stored BNC cell located in the table's tiles.
-pub(super) struct Located {
-    pub(super) tile: u64,
-    pub(super) tile_index: usize,
-    /// The field index of the cell's row record among the tile's fields.
-    pub(super) row_field: usize,
-    pub(super) bytes: Vec<u8>,
-}
+/// One stored BNC cell located in the table's tiles (the shared engine's,
+/// record 0412).
+pub(super) use litchi_iwa_table::cell_rich_text::Located;
 
+/// The stored cell at `position`, through the shared engine.
 pub(super) fn locate_cell(
     working: &Working<'_>,
     store: &[u8],
     position: At,
 ) -> Result<Option<Located>, Error> {
-    let (tiles, size) = topology::tiles(store).map_err(from_topology)?;
-    let key = u64::from(position.row()) / size;
-    let local = u64::from(position.row()) % size;
-    let Some((_, tile)) = tiles
-        .iter()
-        .find(|(tile_key, _)| u64::from(*tile_key) == key)
-    else {
-        return Ok(None);
-    };
-    let (tile_index, data) =
-        topology::message(working, *tile, &[TILE_MESSAGE_TYPE]).map_err(Error::from)?;
-    for (row_field, field) in super::table_topology::wire::fields(data)?
-        .iter()
-        .enumerate()
-    {
-        if field.number != 5 || single_varint(field.payload, 1)? != Some(local) {
-            continue;
-        }
-        for (column, bytes) in storage::bnc_cells(field.payload).map_err(Fault::from)? {
-            if column == position.column() {
-                return Ok(Some(Located {
-                    tile: *tile,
-                    tile_index,
-                    row_field,
-                    bytes: bytes.to_vec(),
-                }));
-            }
-        }
-    }
-    Ok(None)
+    Ok(litchi_iwa_table::cell_rich_text::locate_cell(
+        working, store, position,
+    )?)
 }
 
-/// The entry of `key` in the style list (root or segments): its reference.
-pub(super) fn list_reference(
-    working: &Working<'_>,
-    list: &[u8],
-    key: u32,
-) -> Result<Option<u64>, Error> {
-    let find = |data: &[u8]| -> FaultResult<Option<Option<u64>>> {
-        for entry in repeated_bytes(data, 3)? {
-            if single_varint(entry, 1)? == Some(u64::from(key)) {
-                return Ok(Some(single_reference(entry, 4)?));
-            }
+/// The shared rich-text engine's error (record 0412).
+impl From<litchi_iwa_table::cell_rich_text::Error> for Error {
+    fn from(error: litchi_iwa_table::cell_rich_text::Error) -> Self {
+        use litchi_iwa_table::cell_rich_text::{Error as E, LimitKind as K, Refusal as R};
+        match error {
+            E::Refused(R::CellNotFound) => Self::Refused(Refusal::CellNotFound),
+            E::Refused(R::UnsupportedSource) => Self::Refused(Refusal::UnsupportedSource),
+            E::Refused(_) => Self::Refused(Refusal::UnsupportedDependency),
+            E::Limit {
+                kind,
+                observed,
+                maximum,
+            } => Self::Limit {
+                kind: match kind {
+                    K::PackageBytes => LimitKind::PackageBytes,
+                    K::Identifiers => LimitKind::Identifiers,
+                    K::Wire(kind) => LimitKind::Wire(kind),
+                    _ => LimitKind::PayloadBytes,
+                },
+                observed,
+                maximum,
+            },
+            E::Allocation { amount } => Self::Allocation { amount },
+            E::Verification => Self::Verification,
+            _ => Self::InvalidSource,
         }
-        Ok(None)
-    };
-    if let Some(found) = find(list)? {
-        return Ok(found);
     }
-    for reference in repeated_bytes(list, 4)? {
-        let segment = references::reference_identifier(reference)?;
-        let (_, data) = topology::message(working, segment, &[LIST_SEGMENT_MESSAGE_TYPE])
-            .map_err(Error::from)?;
-        if let Some(found) = find(data)? {
-            return Ok(found);
-        }
-    }
-    Err(Error::InvalidSource)
-}
-
-/// The section base text style of `position`.
-pub(super) fn base_style(
-    model: &[u8],
-    geometry: topology::Geometry,
-    position: At,
-) -> Result<u64, Error> {
-    let field = if position.row() < geometry.header_rows {
-        25
-    } else if position.row() >= geometry.rows.saturating_sub(geometry.footer_rows) {
-        27
-    } else if position.column() < geometry.header_columns {
-        26
-    } else {
-        24
-    };
-    single_reference(model, field)?.ok_or(Error::Refused(Refusal::UnsupportedDependency))
-}
-
-/// The current text style object of the stored cell at `position` (its
-/// key's entry, else its section's base style).
-pub(super) fn current_style(
-    working: &Working<'_>,
-    sheet: usize,
-    table: usize,
-    position: At,
-) -> Result<u64, Error> {
-    let target = topology::locate(working, sheet, table).map_err(from_topology)?;
-    let (_, model) = topology::message(working, target.model, &[6_001]).map_err(Error::from)?;
-    let geometry = topology::geometry(model).map_err(from_topology)?;
-    if position.row() >= geometry.rows || position.column() >= geometry.columns {
-        return Err(Error::Refused(Refusal::CellNotFound));
-    }
-    let store = single_bytes(model, 4)?.ok_or(Error::InvalidSource)?;
-    let base = base_style(model, geometry, position)?;
-    let Some(cell) = locate_cell(working, store, position)? else {
-        return Ok(base);
-    };
-    let cell = litchi_numbers_wire::BncCell::parse(
-        &cell.bytes,
-        &crate::cell::wire::limits_for_source(&cell.bytes),
-    )
-    .map_err(|_error| Error::InvalidSource)?;
-    let Some(key) = cell.text_style_identifier() else {
-        return Ok(base);
-    };
-    let list = single_reference(store, STYLE_LIST_FIELD)?.ok_or(Error::InvalidSource)?;
-    let (_, list_data) =
-        topology::message(working, list, &[LIST_MESSAGE_TYPE, 6_201]).map_err(Error::from)?;
-    list_reference(working, list_data, key)?.ok_or(Error::InvalidSource)
 }
 
 fn text_style(
@@ -935,17 +830,6 @@ fn materialized_header_groups(
     Ok(groups)
 }
 
-/// `TSWP.ParagraphStyleArchive.para_properties`.
-const PARAGRAPH_PROPERTIES_FIELD: u32 = 12;
-
-/// `style` with an empty `para_properties` when it has none.
-pub(super) fn with_paragraph_properties(mut style: Vec<u8>) -> Result<Vec<u8>, Error> {
-    if single_bytes(&style, PARAGRAPH_PROPERTIES_FIELD)?.is_none() {
-        push_bytes_field(&mut style, PARAGRAPH_PROPERTIES_FIELD, &[])?;
-    }
-    Ok(style)
-}
-
 /// `properties` with every unset emphasis flag read as off.
 fn with_flags_off(mut properties: CharacterProperties) -> CharacterProperties {
     for flag in [
@@ -959,72 +843,12 @@ fn with_flags_off(mut properties: CharacterProperties) -> CharacterProperties {
     properties
 }
 
-/// The stylesheet a paragraph style belongs to (`super.stylesheet`).
-pub(super) fn stylesheet_of(working: &Working<'_>, style: u64) -> Result<u64, Error> {
-    let (_, data) =
-        topology::message(working, style, &[PARAGRAPH_STYLE_MESSAGE_TYPE]).map_err(Error::from)?;
-    let base = single_bytes(data, 1)?.ok_or(Error::InvalidSource)?;
-    single_reference(base, 5)?.ok_or(Error::Refused(Refusal::UnsupportedDependency))
-}
-
-/// Replace one message, transitioning its aggregate object references.
-pub(super) fn replace_with_references(
-    working: &mut Working<'_>,
-    identifier: u64,
-    index: usize,
-    data: Vec<u8>,
-    removed: &[u64],
-    appended: &[u64],
-) -> FaultResult<()> {
-    let limits = working.archive_limits();
-    let object = working.object_mut(identifier)?;
-    references::replace(object, index, data, removed, appended, &[], limits)
-}
-
-pub(super) fn replace_message(
-    working: &mut Working<'_>,
-    identifier: u64,
-    index: usize,
-    data: Vec<u8>,
-) -> FaultResult<()> {
-    let limits = working.archive_limits();
-    let object = working.object_mut(identifier)?;
-    let message_type = object.messages.get(index).ok_or(Fault::Invalid)?.type_;
-    object
-        .replace_message_preserving_header(
-            index,
-            RawMessage {
-                type_: message_type,
-                data,
-            },
-            limits,
-        )
-        .map_err(|error| structure::map_core(&error))?;
-    Ok(())
-}
-
-#[allow(
-    clippy::too_many_lines,
-    reason = "one staged publication: styles, stylesheet, list, cells, registry"
-)]
-#[allow(
-    dead_code,
-    reason = "replaced by the shared cell_text_style graph publisher during extraction"
-)]
-pub(super) fn materialize(
-    working: &mut Working<'_>,
-    store: &[u8],
-    columns: u32,
-    position: At,
-    key: u32,
-) -> Result<(), Error> {
-    let mut cell = litchi_numbers_wire::BncCell::minimal();
-    cell.set_text_style_identifier(Some(key));
-    materialize_cell(working, store, columns, position, &cell)
-}
+/// Replace one message, transitioning its aggregate object references, or
+/// keeping its header (the shared engine's helpers, record 0412).
+pub(super) use litchi_iwa_table::cell_rich_text::{replace_message, replace_with_references};
 
 /// Store `cell` at the empty position `position`, counting it in its row
-/// and column headers.
+/// and column headers (the shared engine's writer, record 0412).
 pub(super) fn materialize_cell(
     working: &mut Working<'_>,
     store: &[u8],
@@ -1032,60 +856,9 @@ pub(super) fn materialize_cell(
     position: At,
     cell: &litchi_numbers_wire::BncCell,
 ) -> Result<(), Error> {
-    let (tiles, size) = topology::tiles(store).map_err(from_topology)?;
-    let tile_key = u64::from(position.row()) / size;
-    let local =
-        u32::try_from(u64::from(position.row()) % size).map_err(|_| Error::InvalidSource)?;
-    let (_, tile) = tiles
-        .iter()
-        .find(|(candidate, _)| u64::from(*candidate) == tile_key)
-        .ok_or(Error::Refused(Refusal::UnsupportedDependency))?;
-    let limits = litchi_numbers_wire::Limits::DEFAULT;
-    let encoded = crate::cell::wire::encode(cell, &limits).map_err(|_| Error::InvalidSource)?;
-    let (tile_index, tile_data) =
-        topology::message(working, *tile, &[TILE_MESSAGE_TYPE]).map_err(Error::from)?;
-    let written = litchi_numbers_wire::table_write::tile_set_cell_in_field_order(
-        tile_data,
-        local,
-        position.column(),
-        columns,
-        Some(&encoded),
-        &limits,
-    )
-    .map_err(|error| match error {
-        litchi_numbers_wire::table_write::WriteError::Unsupported => {
-            Error::Refused(Refusal::UnsupportedSource)
-        },
-        litchi_numbers_wire::table_write::WriteError::Allocation { requested } => {
-            Error::Allocation { amount: requested }
-        },
-        _ => Error::InvalidSource,
-    })?;
-    replace_message(working, *tile, tile_index, written.tile)?;
-    // The row's header counts the new cell.
-    let headers = single_bytes(store, 1)?.ok_or(Error::InvalidSource)?;
-    let bucket = usize::try_from(u64::from(position.row()) / storage::HEADER_BUCKET_ROWS)
-        .map_err(|_| Error::InvalidSource)?;
-    let reference = *repeated_bytes(headers, 2)?
-        .get(bucket)
-        .ok_or(Error::Refused(Refusal::UnsupportedDependency))?;
-    let bucket = references::reference_identifier(reference)?;
-    let (bucket_index, bucket_data) =
-        topology::message(working, bucket, &[HEADER_BUCKET_MESSAGE_TYPE]).map_err(Error::from)?;
-    let adjusted =
-        litchi_numbers_wire::table_write::header_adjust(bucket_data, position.row(), 1, &limits)
-            .map_err(|_| Error::InvalidSource)?;
-    replace_message(working, bucket, bucket_index, adjusted)?;
-    // So does its column's header.
-    let column_bucket =
-        single_reference(store, 2)?.ok_or(Error::Refused(Refusal::UnsupportedDependency))?;
-    let (column_index, column_data) =
-        topology::message(working, column_bucket, &[HEADER_BUCKET_MESSAGE_TYPE])
-            .map_err(Error::from)?;
-    let adjusted =
-        litchi_numbers_wire::table_write::header_adjust(column_data, position.column(), 1, &limits)
-            .map_err(|_| Error::InvalidSource)?;
-    replace_message(working, column_bucket, column_index, adjusted).map_err(Error::from)
+    Ok(litchi_iwa_table::cell_rich_text::materialize_cell(
+        working, store, columns, position, cell,
+    )?)
 }
 
 impl From<topology::Error> for Error {

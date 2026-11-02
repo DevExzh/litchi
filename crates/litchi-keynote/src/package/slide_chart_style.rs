@@ -159,7 +159,7 @@ pub(crate) mod axis {
         Axis, Diagnostics, ExactArtifacts, MutationPlan, Package, Position, axis_engine, fmt,
     };
 
-    pub use axis_engine::{Property, PropertyKind};
+    pub use axis_engine::{GridlineStroke, Property, PropertyKind};
 
     /// A compact exact-source patch of one axis-style property.
     #[derive(Clone, PartialEq)]
@@ -201,8 +201,8 @@ pub(crate) mod axis {
                 slide: self.slide,
                 chart: self.chart,
                 axis: self.axis,
-                before: self.after,
-                after: self.before,
+                before: self.after.clone(),
+                after: self.before.clone(),
                 plan: super::super::slide_chart_font::inverse_mutation_plan(&self.plan),
             }
         }
@@ -227,14 +227,14 @@ pub(crate) mod axis {
 
         /// The source value.
         #[must_use]
-        pub const fn before(&self) -> Property {
-            self.before
+        pub const fn before(&self) -> &Property {
+            &self.before
         }
 
         /// The target value.
         #[must_use]
-        pub const fn after(&self) -> Property {
-            self.after
+        pub const fn after(&self) -> &Property {
+            &self.after
         }
     }
 
@@ -433,7 +433,14 @@ fn read_axis(
     kind: axis::PropertyKind,
 ) -> Result<axis::Property, Error> {
     ledger.read(package, |workspace, limits| {
-        engine::read_axis(workspace, target.selection.identifier, axis, kind, limits)
+        engine::read_axis(
+            workspace,
+            target.selection.identifier,
+            target.kind,
+            axis,
+            kind,
+            limits,
+        )
     })
 }
 
@@ -472,7 +479,14 @@ impl AxisEdit<'_> {
             None
         } else {
             ledger.write(self.source, &target, &[], |workspace, limits| {
-                engine::write_axis(workspace, target.selection.identifier, axis, value, limits)
+                engine::write_axis(
+                    workspace,
+                    target.selection.identifier,
+                    target.kind,
+                    axis,
+                    &value,
+                    limits,
+                )
             })?
         };
         let Some(published) = published else {
@@ -483,7 +497,7 @@ impl AxisEdit<'_> {
                     slide: target.selection.slide,
                     chart: target.selection.chart,
                     axis,
-                    before,
+                    before: before.clone(),
                     after: before,
                     plan: MutationPlan::default(),
                 },

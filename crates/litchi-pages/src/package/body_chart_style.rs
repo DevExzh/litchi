@@ -143,7 +143,7 @@ pub(crate) mod axis {
         inverse_plan,
     };
 
-    pub use axis_engine::{Property, PropertyKind};
+    pub use axis_engine::{GridlineStroke, Property, PropertyKind};
 
     /// A compact exact-source patch of one axis-style property.
     #[derive(Clone, PartialEq)]
@@ -182,8 +182,8 @@ pub(crate) mod axis {
                 artifacts: self.artifacts.inverse(),
                 chart: self.chart,
                 axis: self.axis,
-                before: self.after,
-                after: self.before,
+                before: self.after.clone(),
+                after: self.before.clone(),
                 plan: inverse_plan(&self.plan),
             }
         }
@@ -202,14 +202,14 @@ pub(crate) mod axis {
 
         /// The source value.
         #[must_use]
-        pub const fn before(&self) -> Property {
-            self.before
+        pub const fn before(&self) -> &Property {
+            &self.before
         }
 
         /// The target value.
         #[must_use]
-        pub const fn after(&self) -> Property {
-            self.after
+        pub const fn after(&self) -> &Property {
+            &self.after
         }
     }
 
@@ -394,6 +394,7 @@ fn read_axis(
         engine::read_axis(
             workspace,
             target.chart.drawable_identifier.get(),
+            target.kind,
             axis,
             kind,
             limits,
@@ -435,8 +436,9 @@ impl AxisEdit<'_> {
                 engine::write_axis(
                     workspace,
                     target.chart.drawable_identifier.get(),
+                    target.kind,
                     axis,
-                    value,
+                    &value,
                     limits,
                 )
             })?
@@ -448,7 +450,7 @@ impl AxisEdit<'_> {
                     artifacts: noop_artifacts(self.source),
                     chart: target.chart.position,
                     axis,
-                    before,
+                    before: before.clone(),
                     after: before,
                     plan: MutationPlan::default(),
                 },
