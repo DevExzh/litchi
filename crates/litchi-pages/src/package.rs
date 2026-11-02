@@ -44,6 +44,7 @@ pub(crate) mod body_table_resize;
 pub(crate) mod body_table_sort;
 pub(crate) mod body_table_sort_execution;
 pub(crate) mod body_table_title;
+pub(crate) mod body_table_topology;
 pub(crate) mod body_table_values;
 #[cfg(feature = "internal-iwork-source")]
 mod catalog_body_table_appearance;

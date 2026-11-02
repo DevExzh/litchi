@@ -68,6 +68,7 @@ pub(crate) mod slide_table_name;
 pub(crate) mod slide_table_physical_sort;
 pub(crate) mod slide_table_sort_order;
 pub(crate) mod slide_table_title;
+pub(crate) mod slide_table_topology;
 
 pub(crate) mod slide_placeholder_visibility;
 mod slide_preview;

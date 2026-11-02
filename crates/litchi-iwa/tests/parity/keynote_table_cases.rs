@@ -19,7 +19,7 @@ use crate::known_fields::{Decoded, top_level_fields};
 use crate::leaf_bytes;
 use crate::text_glue::Workspace;
 
-const TABLE: &str = "iwork/keynote/table-discovery.key";
+pub(crate) const TABLE: &str = "iwork/keynote/table-discovery.key";
 pub(crate) const SLIDE: usize = 0;
 pub(crate) const COMMENT_ROW: usize = 0;
 pub(crate) const COMMENT_COLUMN: usize = 0;
@@ -459,7 +459,7 @@ pub(crate) fn host_model(editor: &keynote::Draft) -> TestResult<u64> {
 }
 
 /// Host read: every cell of the first slide table.
-fn host_cells(bytes: &[u8]) -> TestResult<Vec<((usize, usize), String)>> {
+pub(crate) fn host_cells(bytes: &[u8]) -> TestResult<Vec<((usize, usize), String)>> {
     let editor = keynote::Draft::from_bytes(bytes)?;
     let table = editor.slide_table(SLIDE, host_model(&editor)?)?;
     Ok(table
@@ -469,7 +469,7 @@ fn host_cells(bytes: &[u8]) -> TestResult<Vec<((usize, usize), String)>> {
 }
 
 /// Leaf read: every cell of the first slide table.
-fn leaf_cells(bytes: &[u8]) -> TestResult<Vec<((u32, u32), String)>> {
+pub(crate) fn leaf_cells(bytes: &[u8]) -> TestResult<Vec<((u32, u32), String)>> {
     let package = Package::from_bytes(bytes)?;
     let table = package.slide_table_cells(SlideSelector::index(SLIDE), TableSelector::index(0))?;
     Ok(table

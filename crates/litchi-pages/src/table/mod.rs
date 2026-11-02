@@ -75,6 +75,14 @@ pub mod size {
         Commit, Diagnostics, Edit, Error, LimitKind, Patch, Refusal,
     };
 }
+/// Exact-source row and column insertion and removal in one rooted body
+/// table over the shared table-topology engine (record 0412e).
+pub mod topology {
+    pub use crate::package::body_table_topology::{
+        ColumnDeletion, ColumnInsertion, Commit, Diagnostics, Edit, Error, LimitKind, Patch,
+        Refusal, RowDeletion, RowInsertion, Unsupported,
+    };
+}
 /// Exact-source deletion of one rooted body table.
 pub mod deletion {
     pub use crate::package::body_table_deletion::{

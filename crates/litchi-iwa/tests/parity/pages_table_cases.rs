@@ -20,11 +20,11 @@ use crate::known_fields::{Decoded, KnownFields, top_level_fields};
 use crate::leaf_bytes;
 use crate::text_glue::Workspace;
 
-const CELLS: &str = "iwork/pages/body-table-cells-native.pages";
+pub(crate) const CELLS: &str = "iwork/pages/body-table-cells-native.pages";
 /// Native two-table source without formulas (the values family refuses
 /// cells that take part in a formula graph, as `body-table-cells-native`
 /// has).
-const CATALOG: &str = "iwork/pages/body-table-catalog-native.pages";
+pub(crate) const CATALOG: &str = "iwork/pages/body-table-catalog-native.pages";
 pub(crate) const TABLE: usize = 0;
 pub(crate) const COMMENT_ROW: usize = 1;
 pub(crate) const COMMENT_COLUMN: usize = 1;
@@ -1811,7 +1811,7 @@ pub(crate) fn host_model(editor: &pages::Draft) -> TestResult<u64> {
         .model_object_id)
 }
 
-fn host_cells(bytes: &[u8]) -> TestResult<Vec<String>> {
+pub(crate) fn host_cells(bytes: &[u8]) -> TestResult<Vec<String>> {
     let editor = pages::Draft::from_bytes(bytes)?;
     let table = editor.table(host_model(&editor)?)?;
     let mut cells = table
@@ -1822,7 +1822,7 @@ fn host_cells(bytes: &[u8]) -> TestResult<Vec<String>> {
     Ok(cells)
 }
 
-fn leaf_cells(bytes: &[u8]) -> TestResult<String> {
+pub(crate) fn leaf_cells(bytes: &[u8]) -> TestResult<String> {
     Ok(format!(
         "{:#?}",
         Package::from_bytes(bytes)?.body_table_cells(TABLE)?
