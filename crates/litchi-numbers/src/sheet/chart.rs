@@ -67,6 +67,7 @@ pub mod series {
         Commit, Diagnostics, Edit, Error, LimitKind, Patch, Property, PropertyKind, Refusal,
     };
     pub use litchi_iwa_common::chart::error_bar;
+    pub use litchi_iwa_common::chart::number_format::{LabelAffixes, NumberFormat};
     pub use litchi_iwa_common::chart::pie::{LabelDistance, LabelVisibility, WedgeExplosion};
     pub use litchi_iwa_common::chart::series::{
         ConnectionLine, MovingAveragePeriod, PolynomialOrder, Stroke, StrokePattern, Symbol,
