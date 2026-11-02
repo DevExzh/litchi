@@ -109,3 +109,23 @@ fn pages_body_shape_remove_parity() -> TestResult {
         DrawableSelector::shape(0),
     )
 }
+
+#[test]
+#[ignore = "callgrind cost probe (record 0413)"]
+fn text_box_remove_cost_abba() -> TestResult {
+    crate::pages_cost_probes::abba(
+        &text_box_fixture()?,
+        |source| {
+            let mut e = pages::Draft::from_bytes(source)?;
+            let d = host_text_box(&e, 0)?;
+            e.remove_text_box(d)?;
+            Ok(e.to_bytes()?)
+        },
+        |source| {
+            let package = Package::from_bytes(source)?;
+            let mut edit = package.edit_body_media();
+            edit.remove(DrawableSelector::text_box(0))?;
+            Ok(leaf_bytes!(edit.commit()?.package()))
+        },
+    )
+}

@@ -94,6 +94,7 @@ mod pages_chart_series_symbol_cases;
 mod pages_chart_series_symbol_cost;
 mod pages_cost_probes;
 mod pages_drawable_cases;
+mod pages_drawable_comment_cases;
 mod pages_lifecycle_cases;
 mod pages_media_lifecycle_cases;
 mod pages_shape_style_cases;

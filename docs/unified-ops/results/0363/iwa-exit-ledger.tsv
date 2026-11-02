@@ -35,21 +35,21 @@ charts/series_trendline.rs	with_legend_name	1	shared	keynote.build	migrated	litc
 charts/series_trendline.rs	with_legend_visibility	1	shared	keynote.build	migrated	litchi_iwa_common::chart::series::Trendline::with_legend_visibility	keynote_chart_series_trendlines_read_parity	A	-	-
 charts/series_trendline.rs	with_r_squared_visibility	1	shared	keynote.build	migrated	litchi_iwa_common::chart::series::Trendline::with_r_squared_visibility	keynote_chart_series_trendlines_read_parity	A	-	-
 charts/series_trendline.rs	without_custom_name	1	shared	chart	migrated	litchi_iwa_common::chart::series::Trendline::without_custom_name	keynote_chart_series_trendlines_read_parity	A	-	-
-comments.rs	add_reply	1	shared	drawable.comment	host-only	litchi-iwa-common::shape (values) + litchi-iwa-protos shape codecs	-	-	-	-
-comments.rs	application	1	shared	drawable.comment	host-only	litchi-iwa-common::shape (values) + litchi-iwa-protos shape codecs	-	-	-	-
-comments.rs	clear_comment	1	shared	drawable.comment	host-only	litchi-iwa-common::shape (values) + litchi-iwa-protos shape codecs	-	-	-	-
-comments.rs	comment	1	shared	drawable.comment	host-only	litchi-iwa-common::shape (values) + litchi-iwa-protos shape codecs	-	-	-	-
-comments.rs	drawables	1	shared	drawable.list	host-only	litchi-iwa-common::shape (values) + litchi-iwa-protos shape codecs	-	-	-	-
+comments.rs	add_reply	1	shared	drawable.comment	migrated	litchi_pages::drawable::comment::Edit::add_reply	pages_drawable_comment_reply_add_parity	B	-	-
+comments.rs	application	1	shared	drawable.comment	retired	-	-	-	-	retired: accessor of the host comments Draft for the application it classified at open; each leaf Package is already format-typed, and the drawable-comment families are per format (records 0372, 0378a, 0413)
+comments.rs	clear_comment	1	shared	drawable.comment	migrated	litchi_pages::drawable::comment::Edit::clear	pages_drawable_comment_clear_parity	B	-	-
+comments.rs	comment	1	shared	drawable.comment	migrated	litchi_pages::Package::body_drawable_comment	pages_drawable_comment_read_parity	A	-	-
+comments.rs	drawables	1	shared	drawable.list	migrated	litchi_pages::Package::body_drawable_comment	pages_drawable_list_parity	A	-	-
 comments.rs	from_bytes	1	shared	io	host-only	litchi-iwa-archive::unstable (physical) / leaf Package	-	-	-	-
 comments.rs	from_package	1	shared	io	host-only	litchi-iwa-archive::unstable (physical) / leaf Package	-	-	-	-
 comments.rs	into_package	1	shared	io	host-only	litchi-iwa-archive::unstable (physical) / leaf Package	-	-	-	-
 comments.rs	open	1	shared	io	host-only	litchi-iwa-archive::unstable (physical) / leaf Package	-	-	-	-
 comments.rs	package	1	shared	io	host-only	litchi-iwa-archive::unstable (physical) / leaf Package	-	-	-	-
-comments.rs	remove_reply	1	shared	drawable.comment	host-only	litchi-iwa-common::shape (values) + litchi-iwa-protos shape codecs	-	-	-	-
-comments.rs	replies	1	shared	drawable.comment	host-only	litchi-iwa-common::shape (values) + litchi-iwa-protos shape codecs	-	-	-	-
+comments.rs	remove_reply	1	shared	drawable.comment	migrated	litchi_pages::drawable::comment::Edit::remove_reply	pages_drawable_comment_reply_remove_parity	B	-	-
+comments.rs	replies	1	shared	drawable.comment	migrated	litchi_pages::Package::body_drawable_comment	pages_drawable_comment_read_parity	A	-	-
 comments.rs	save	1	shared	io	host-only	litchi-iwa-archive::unstable (physical) / leaf Package	-	-	-	-
-comments.rs	set_comment	1	shared	drawable.comment	host-only	litchi-iwa-common::shape (values) + litchi-iwa-protos shape codecs	-	-	-	-
-comments.rs	set_reply	1	shared	drawable.comment	host-only	litchi-iwa-common::shape (values) + litchi-iwa-protos shape codecs	-	-	-	-
+comments.rs	set_comment	1	shared	drawable.comment	migrated	litchi_pages::drawable::comment::Edit::set	pages_drawable_comment_set_parity	B	-	-
+comments.rs	set_reply	1	shared	drawable.comment	migrated	litchi_pages::drawable::comment::Edit::set_reply	pages_drawable_comment_reply_set_parity	B	-	-
 comments.rs	to_bytes	1	shared	io	host-only	litchi-iwa-archive::unstable (physical) / leaf Package	-	-	-	-
 document.rs	application	1	shared	other	host-only	litchi-iwa-archive / litchi-iwa-common (see record 0363 section 3)	-	-	-	-
 document.rs	charts	1	shared	chart.lifecycle	host-only	litchi-iwa-common::chart (values) + litchi-iwa-protos chart codecs (private)	-	-	-	-
@@ -1394,7 +1394,7 @@ pages/creation.rs	build	1	pages	builder	migrated	litchi_pages::builder::Builder:
 pages/creation.rs	language	1	pages	builder	migrated	litchi_pages::builder::Builder::language	pages_builder_language_locale_parity	B	-	-
 pages/creation.rs	locale	1	pages	builder	migrated	litchi_pages::builder::Builder::locale	pages_builder_language_locale_parity	B	-	-
 pages/creation.rs	new	1	pages	builder	migrated	litchi_pages::builder::Builder::new	pages_builder_language_locale_parity	B	-	-
-pages/editor.rs	add_drawable_comment_reply	1	pages	drawable.comment	host-only	litchi-pages	-	-	-	-
+pages/editor.rs	add_drawable_comment_reply	1	pages	drawable.comment	migrated	litchi_pages::drawable::comment::Edit::add_reply	pages_drawable_comment_reply_add_parity	B	-	-
 pages/editor.rs	add_text_box_comment	1	pages	text.comment	migrated	litchi_pages::drawable::annotation::Edit::add_comment	pages_text_box_comment_add_parity	B	-	-
 pages/editor.rs	add_text_box_comment_reply	1	pages	text.comment	migrated	litchi_pages::drawable::annotation::Edit::add_reply	pages_text_box_comment_reply_parity	B	-	-
 pages/editor.rs	add_text_box_highlight	1	pages	text.highlight	migrated	litchi_pages::drawable::annotation::Edit::add_highlight	pages_text_box_highlight_add_parity	B	-	-
@@ -1404,17 +1404,17 @@ pages/editor.rs	apply_text_box_named_paragraph_style	1	pages	text.paragraph_styl
 pages/editor.rs	body_storage	1	pages	text.storage	migrated	litchi_pages::Package::body_storage	pages_body_storage_read_parity	A	-	-
 pages/editor.rs	body_text	1	pages	text.storage	migrated	litchi_pages::Package::body_storage	pages_body_storage_read_parity	A	-	-
 pages/editor.rs	builder	1	pages	keynote.build	host-only	litchi-pages	-	-	-	-
-pages/editor.rs	clear_drawable_comment	1	pages	drawable.comment	host-only	litchi-pages	-	-	-	-
+pages/editor.rs	clear_drawable_comment	1	pages	drawable.comment	migrated	litchi_pages::drawable::comment::Edit::clear	pages_drawable_comment_clear_parity	B	-	-
 pages/editor.rs	clear_drawable_text	1	pages	text.storage	migrated	litchi_pages::drawable::text::Edit::clear	pages_text_box_plain_text_parity	A	-	-
 pages/editor.rs	create	1	pages	io	host-only	litchi-pages	-	-	-	-
 pages/editor.rs	create_text_box_named_paragraph_style	1	pages	text.paragraph_style	migrated	litchi_pages::drawable::named_style::Edit::create	pages_text_box_named_style_create_parity	B	-	-
 pages/editor.rs	create_with_text	1	pages	io	host-only	litchi-pages	-	-	-	-
 pages/editor.rs	delete_applied_text_box_named_paragraph_style_with_replacement	1	pages	text.paragraph_style	migrated	litchi_pages::drawable::named_style::Edit::delete_applied	pages_text_box_named_style_delete_parity	B	-	-
 pages/editor.rs	delete_text_box_named_paragraph_style	1	pages	text.paragraph_style	migrated	litchi_pages::drawable::named_style::Edit::delete	pages_text_box_named_style_delete_parity	B	-	-
-pages/editor.rs	drawable_comment	1	pages	drawable.comment	host-only	litchi-pages	-	-	-	-
-pages/editor.rs	drawable_comment_replies	1	pages	drawable.comment	host-only	litchi-pages	-	-	-	-
+pages/editor.rs	drawable_comment	1	pages	drawable.comment	migrated	litchi_pages::Package::body_drawable_comment	pages_drawable_comment_read_parity	A	-	-
+pages/editor.rs	drawable_comment_replies	1	pages	drawable.comment	migrated	litchi_pages::Package::body_drawable_comment	pages_drawable_comment_read_parity	A	-	-
 pages/editor.rs	drawable_text_storages	1	pages	text.storage	migrated	litchi_pages::Package::body_drawable_text	pages_text_box_frame_read_parity	A	-	-
-pages/editor.rs	drawables	1	pages	drawable.list	host-only	litchi-pages	-	-	-	-
+pages/editor.rs	drawables	1	pages	drawable.list	migrated	litchi_pages::Package::body_drawable_comment	pages_drawable_list_parity	A	-	-
 pages/editor.rs	duplicate_text_box	1	pages	drawable.text_box_lifecycle	host-only	litchi-pages	-	-	-	-
 pages/editor.rs	extract_media	1	pages	media.asset	migrated	litchi_pages::Package::extract_media	pages_media_assets_read_parity	A	-	-
 pages/editor.rs	from_bytes	1	pages	io	host-only	litchi-pages	-	-	-	-
@@ -1425,7 +1425,7 @@ pages/editor.rs	media_assets	1	pages	media.asset	migrated	litchi_pages::Package:
 pages/editor.rs	open	1	pages	io	host-only	litchi-pages	-	-	-	-
 pages/editor.rs	package	1	pages	io	host-only	litchi-pages	-	-	-	-
 pages/editor.rs	redefine_applied_text_box_named_paragraph_style	1	pages	text.paragraph_style	migrated	litchi_pages::drawable::named_style::Edit::redefine	pages_text_box_named_style_redefine_parity	B	-	-
-pages/editor.rs	remove_drawable_comment_reply	1	pages	drawable.comment	host-only	litchi-pages	-	-	-	-
+pages/editor.rs	remove_drawable_comment_reply	1	pages	drawable.comment	migrated	litchi_pages::drawable::comment::Edit::remove_reply	pages_drawable_comment_reply_remove_parity	B	-	-
 pages/editor.rs	remove_section	1	pages	section.lifecycle	migrated	litchi_pages::Package::edit_section_lifecycle	pages_section_remove_parity	B	-	-
 pages/editor.rs	remove_text_box	1	pages	drawable.text_box_lifecycle	migrated	litchi_pages::drawable::lifecycle::Edit::remove	pages_text_box_remove_parity	B	-	-
 pages/editor.rs	remove_text_box_comment	1	pages	text.comment	migrated	litchi_pages::drawable::annotation::Edit::remove_comment	pages_text_box_comment_remove_parity	B	-	-
@@ -1476,8 +1476,8 @@ pages/editor.rs	reset_text_box_text_style	1	pages	text.character	migrated	litchi
 pages/editor.rs	save	1	pages	io	host-only	litchi-pages	-	-	-	-
 pages/editor.rs	section_media_assets	1	pages	media.asset	migrated	litchi_pages::Package::section_media_assets	pages_media_assets_read_parity	A	-	-
 pages/editor.rs	sections	1	pages	section.lifecycle	migrated	litchi_pages::Package::sections	pages_section_append_parity	B	-	-
-pages/editor.rs	set_drawable_comment	1	pages	drawable.comment	host-only	litchi-pages	-	-	-	-
-pages/editor.rs	set_drawable_comment_reply	1	pages	drawable.comment	host-only	litchi-pages	-	-	-	-
+pages/editor.rs	set_drawable_comment	1	pages	drawable.comment	migrated	litchi_pages::drawable::comment::Edit::set	pages_drawable_comment_set_parity	B	-	-
+pages/editor.rs	set_drawable_comment_reply	1	pages	drawable.comment	migrated	litchi_pages::drawable::comment::Edit::set_reply	pages_drawable_comment_reply_set_parity	B	-	-
 pages/editor.rs	set_drawable_text	1	pages	text.storage	migrated	litchi_pages::drawable::text::Edit::set	pages_text_box_plain_text_parity	A	-	-
 pages/editor.rs	set_text_box_columns	1	pages	drawable.text_box_properties	migrated	litchi_pages::drawable::style::Edit::set	pages_text_box_layout_and_columns_set_parity	B	-	-
 pages/editor.rs	set_text_box_geometry	1	pages	drawable.text_box_properties	migrated	litchi_pages::drawable::properties::Edit::set_geometry	pages_text_box_geometry_parity	A	-	-
