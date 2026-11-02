@@ -402,3 +402,32 @@ appearance) was then merged at `44e529905b`. On that merge, the following were r
 and exit 0 (logs `.coord/iwa-w4c/gates6b`): ledger, glossary, the clippy leg
 over the five touched crates, `cargo test -p litchi-numbers --all-features`,
 the chart parity cases, fmt and the bench matrix. Target 12 GB after pruning.
+
+## 13. Slice 6: legend font and font size
+
+12 rows flip (legend font and font size: set and read on each format).
+
+| Crate | What |
+|---|---|
+| `litchi-iwa-style` | `legend_style::Property::{Font(LegendFont), FontSize(LegendFontSize)}`, the host's `charts::legend_font` graph (`legend_style/typography.rs`) inside the existing legend-style lifecycle: the legend style is made exclusive (a derived variation when shared or not a variation), then field 2 of its extension, the index into the chart's `paragraph_styles` list (field 20), decides. With no index, a new font variation of the list's first style is inserted beside it (registered in its stylesheet, UUID, external reference), appended to the list and indexed. With an index, the variation keeps its other overrides. An exclusive one (no consumer besides the chart, its stylesheet and child styles, counted from metadata as the host does) is patched in place field by field (bold 1, italic 2, size 3, default-font 4 and font name 5 of the character properties, override count 10). A shared one is replaced by a fresh variation, and the chart's external reference to the old one is dropped when unused. A reset that empties the variation unindexes the legend, restores the list (pop or parent), and removes the variation (unregister, UUID, release) when exclusive. The legend style then collapses when it equals its parent again. The font write stores the font identity always and bold or italic only where they differ from the parent's effective traits, as the host does |
+| `litchi-iwa-text-wire` | `paragraph_style::{VariationOverrides, variation_overrides, variation_with}`: a variation's whole override set with its font subset editable, and a canonical variation of it |
+| `litchi-keynote` | The legend family passes chart fields `[11, 20]` for typography writes (and their inverse). The chart-property core admits paragraph styles (2022) among the rewritable types; the mutation scope still names each object |
+| `litchi-pages` | The locality verifier admits an in-place paragraph-style patch (outer fields 10 and 11 only) |
+
+Parity: the legend-style cases gain a font (Georgia bold) and a size (18 pt),
+each set and reset after a host set, plus five sequences on an existing
+variation: font after size and size after font (in-place patch), size after
+size, and font or size reset with the other override kept. All formats are
+Tier B (the inserted variation's UUID). Gap: the shared-variation path
+(`replace_shared_style`) is implemented but has no parity case. Building one
+needs a second chart that references the variation in its metadata, and the
+parity `publish` helper does not rewrite metadata.
+
+| Route | Host Ir | Leaf Ir | Leaf/host |
+|---|---:|---:|---:|
+| Keynote legend font set | 1,594,961,772 | 261,880,163 | 0.1642 |
+| Pages legend font set | 2,113,559,691 | 192,898,468 | 0.0913 |
+| Numbers legend font set | 570,407,936 | 185,136,912 | 0.3246 |
+
+Receipt `results/0414/callgrind-slice6.json`; raw captures in
+`.coord/iwa-w4c/cg6/`.
