@@ -4,16 +4,11 @@
 //! The host writes the language into the document archive and every text
 //! storage's language table, and the locale into the document archive (its
 //! current and creation locale) and the calculation engine. This rewrites
-//! exactly those fields on the wire.
-
-use std::collections::HashSet;
-
-use litchi_iwa_core::RawMessage;
+//! exactly those fields on the wire, inside the builder's single
+//! fresh-settings publication (`super::blank_layout`).
 
 use super::structure::StructureError;
 use super::structure::wire::{Fields, LENGTH_DELIMITED};
-use super::structure::workspace::Workspace;
-use super::{Package, ReadError, ReadResult};
 
 const DOCUMENT_MESSAGE_TYPE: u32 = 1;
 const STORAGE_MESSAGE_TYPE: u32 = 2_001;
@@ -30,10 +25,6 @@ const ATTRIBUTE_TABLE_ENTRIES: u32 = 1;
 const ATTRIBUTE_OBJECT: u32 = 2;
 const ENGINE_SAVED_LOCALE: u32 = 16;
 
-fn invalid(error: StructureError) -> ReadError {
-    ReadError::InvalidFormat(format!("Keynote locale rewrite failed: {error:?}"))
-}
-
 /// Set the singular string field `number` to `new`; returns whether it
 /// changed.
 fn set_string(fields: &mut Fields, number: u32, new: &str) -> bool {
@@ -49,68 +40,29 @@ fn set_string(fields: &mut Fields, number: u32, new: &str) -> bool {
     true
 }
 
-impl Package {
-    /// Return a reopened copy with the document `language` and `locale`
-    /// written where the host builder writes them. `None` keeps a value.
-    pub(crate) fn with_language_and_locale(
-        &self,
-        language: Option<&str>,
-        locale: Option<&str>,
-    ) -> ReadResult<Self> {
-        let mut workspace = Workspace::new(self).map_err(invalid)?;
-        let wire = workspace.wire;
-        let identifiers = self
-            .state
-            .object_index
-            .iter()
-            .map(|locator| locator.identifier)
-            .collect::<HashSet<_>>();
-        let mut changed = false;
-        let mut identifiers = identifiers.into_iter().collect::<Vec<_>>();
-        identifiers.sort_unstable();
-        for identifier in identifiers {
-            let object = workspace.require(identifier).map_err(invalid)?;
-            let mut rewrites = Vec::new();
-            for (index, message) in object.messages.iter().enumerate() {
-                let data = match message.type_ {
-                    DOCUMENT_MESSAGE_TYPE => document(&message.data, language, locale, wire),
-                    STORAGE_MESSAGE_TYPE => match language {
-                        Some(language) => storage(&message.data, language, wire),
-                        None => Ok(None),
-                    },
-                    CALCULATION_ENGINE_MESSAGE_TYPE => match locale {
-                        Some(locale) => engine(&message.data, locale, wire),
-                        None => Ok(None),
-                    },
-                    _ => Ok(None),
-                }
-                .map_err(invalid)?;
-                if let Some(data) = data {
-                    rewrites.push((index, message.type_, data));
-                }
-            }
-            let limits = workspace.archive_limits();
-            for (index, message_type, data) in rewrites {
-                workspace
-                    .object_mut(identifier)
-                    .map_err(invalid)?
-                    .replace_message_preserving_header(
-                        index,
-                        RawMessage {
-                            type_: message_type,
-                            data,
-                        },
-                        limits,
-                    )
-                    .map_err(|error| invalid(error.into()))?;
-                changed = true;
-            }
-        }
-        if !changed {
-            return Ok(self.snapshot());
-        }
-        let bytes = workspace.publish().map_err(invalid)?;
-        self.structure_reopen(bytes)
+/// Rewrite one message for the document `language` and `locale` where the
+/// host builder writes them; `None` keeps a value or leaves an unrelated
+/// message. Applied by `Package::with_fresh_settings` (`super::blank_layout`).
+pub(super) fn rewrite(
+    message_type: u32,
+    payload: &[u8],
+    language: Option<&str>,
+    locale: Option<&str>,
+    wire: litchi_iwa_common::WireLimits,
+) -> Result<Option<Vec<u8>>, StructureError> {
+    match message_type {
+        DOCUMENT_MESSAGE_TYPE if language.is_some() || locale.is_some() => {
+            document(payload, language, locale, wire)
+        },
+        STORAGE_MESSAGE_TYPE => match language {
+            Some(language) => storage(payload, language, wire),
+            None => Ok(None),
+        },
+        CALCULATION_ENGINE_MESSAGE_TYPE => match locale {
+            Some(locale) => engine(payload, locale, wire),
+            None => Ok(None),
+        },
+        _ => Ok(None),
     }
 }
 

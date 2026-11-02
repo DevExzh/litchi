@@ -27721,6 +27721,7 @@
         "litchi_keynote::slide::text",
         "litchi_keynote::slide::comment::transaction",
         "litchi_keynote::slide::media::data",
+        "litchi_keynote::slide::media::asset_data",
         "litchi_keynote::slide::media::properties",
         "litchi_keynote::slide::table::appearance::transaction",
         "litchi_keynote::slide::table::dimension::transaction",
@@ -27870,6 +27871,10 @@
         {
           "method": "litchi_keynote::Package::apply_slide_media_data",
           "ok": "litchi_keynote::slide::media::data::Commit"
+        },
+        {
+          "method": "litchi_keynote::Package::apply_media_asset_data",
+          "ok": "litchi_keynote::slide::media::asset_data::Commit"
         },
         {
           "method": "litchi_keynote::Package::apply_slide_media_lifecycle",
@@ -29391,6 +29396,7 @@
         "litchi_keynote::slide::text",
         "litchi_keynote::slide::comment::transaction",
         "litchi_keynote::slide::media::data",
+        "litchi_keynote::slide::media::asset_data",
         "litchi_keynote::slide::media::properties",
         "litchi_keynote::slide::table::appearance::transaction",
         "litchi_keynote::slide::table::dimension::transaction",
@@ -29540,6 +29546,10 @@
         {
           "method": "litchi_keynote::Package::apply_slide_media_data",
           "ok": "litchi_keynote::slide::media::data::Commit"
+        },
+        {
+          "method": "litchi_keynote::Package::apply_media_asset_data",
+          "ok": "litchi_keynote::slide::media::asset_data::Commit"
         },
         {
           "method": "litchi_keynote::Package::apply_slide_media_lifecycle",

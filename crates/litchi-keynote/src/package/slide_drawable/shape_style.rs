@@ -40,7 +40,7 @@ use litchi_iwa_text::columns::Columns;
 use sha1::{Digest as _, Sha1};
 
 use super::super::structure::metadata::ExternalReference;
-use super::super::structure::wire::{Fields, Writer};
+use super::super::structure::wire::Fields;
 use super::super::structure::workspace::Workspace;
 use super::{Error, Refusal, Unsupported, lift};
 
@@ -51,13 +51,6 @@ const SHAPE_PATH_SOURCE: u32 = 3;
 const SHAPE_HEAD_LINE_END: u32 = 4;
 const SHAPE_TAIL_LINE_END: u32 = 5;
 const PATH_SOURCE_HORIZONTAL_FLIP: u32 = 1;
-const LINE_END_PATH: u32 = 1;
-const LINE_END_JOIN: u32 = 2;
-const LINE_END_POINT: u32 = 3;
-const LINE_END_FILLED: u32 = 4;
-const LINE_END_IDENTIFIER: u32 = 5;
-const MITER_JOIN: u64 = 0;
-const ROUND_JOIN: u64 = 1;
 
 /// One drawing or frame property of a text box, shape or line.
 #[derive(Debug, Clone, PartialEq)]
@@ -761,27 +754,9 @@ fn shape_line_ends(
 }
 
 fn endpoint_of(workspace: &Workspace<'_>, line_end: Option<&[u8]>) -> Result<Endpoint, Error> {
-    let Some(line_end) = line_end else {
-        return Ok(Endpoint::None);
-    };
-    let fields = Fields::parse(line_end, workspace.wire).map_err(lift)?;
-    let identifier = match fields.unique(LINE_END_IDENTIFIER).map_err(lift)? {
-        Some(field) => std::str::from_utf8(field.payload()).map_err(|_| Error::InvalidSource)?,
-        None => "none",
-    };
-    Ok(match identifier {
-        "none" => Endpoint::None,
-        "simple arrow" => Endpoint::SimpleArrow,
-        "filled circle" => Endpoint::FilledCircle,
-        "filled diamond" => Endpoint::FilledDiamond,
-        "open arrow" => Endpoint::OpenArrow,
-        "filled arrow" => Endpoint::FilledArrow,
-        "filled square" => Endpoint::FilledSquare,
-        "open square" => Endpoint::OpenSquare,
-        "open circle" => Endpoint::OpenCircle,
-        "inverted arrow" => Endpoint::InvertedArrow,
-        "line" => Endpoint::Line,
-        _ => return Err(refused()),
+    litchi_iwa_style::line_end::decode(line_end, workspace.wire).map_err(|error| match error {
+        litchi_iwa_style::line_end::DecodeError::Unknown(_) => refused(),
+        _ => Error::InvalidSource,
     })
 }
 
@@ -813,218 +788,6 @@ fn endpoints(workspace: &Workspace<'_>, drawable: u64) -> Result<Endpoints, Erro
         std::mem::swap(&mut endpoints.start, &mut endpoints.end);
     }
     Ok(endpoints)
-}
-
-const CANONICAL_MIN: f32 = 0.0;
-const CANONICAL_MID: f32 = 3.0;
-const CANONICAL_MAX: f32 = 6.0;
-const CIRCLE_INSET: f32 = 0.5;
-const CIRCLE_CONTROL_LOW: f32 = 1.619_288_1;
-const CIRCLE_CONTROL_HIGH: f32 = 4.380_712;
-const OPEN_ARROW_TIP_Y: f32 = 5.0;
-const FILLED_ARROW_NOTCH_Y: f32 = 1.5;
-const DIAMOND_ATTACHMENT_Y: f32 = 0.331_4;
-const FILLED_SQUARE_INSET: f32 = 0.5;
-const OPEN_SQUARE_INSET: f32 = 1.0;
-const OPEN_SQUARE_ATTACHMENT_Y: f32 = 0.2;
-const OPEN_CIRCLE_ATTACHMENT_Y: f32 = -0.3;
-const LINE_ATTACHMENT_Y: f32 = -0.8;
-const MOVE_TO: u64 = 1;
-const LINE_TO: u64 = 2;
-const CURVE_TO: u64 = 4;
-const CLOSE_SUBPATH: u64 = 5;
-
-fn point(x: f32, y: f32) -> Writer {
-    Writer::new().float(1, x).float(2, y)
-}
-
-fn element(kind: u64, points: &[(f32, f32)]) -> Writer {
-    points
-        .iter()
-        .fold(Writer::new().varint(1, kind), |writer, &(x, y)| {
-            writer.message(2, &point(x, y))
-        })
-}
-
-/// `TSD.LineEndArchive`, field by field in tag order (the host's prost
-/// encoding of `shapes::line_end::native::endpoint_archive`).
-fn line_end(
-    identifier: &str,
-    join: u64,
-    elements: &[Writer],
-    end_point: Option<(f32, f32)>,
-    filled: Option<bool>,
-) -> Vec<u8> {
-    let path = elements
-        .iter()
-        .fold(Writer::new(), |path, element| path.message(1, element));
-    let mut writer = Writer::new()
-        .message(LINE_END_PATH, &path)
-        .varint(LINE_END_JOIN, join);
-    if let Some((x, y)) = end_point {
-        writer = writer.message(LINE_END_POINT, &point(x, y));
-    }
-    if let Some(filled) = filled {
-        writer = writer.boolean(LINE_END_FILLED, filled);
-    }
-    writer.string(LINE_END_IDENTIFIER, identifier).finish()
-}
-
-fn circle_end(identifier: &str, endpoint_y: f32, filled: Option<bool>) -> Vec<u8> {
-    let low = CIRCLE_INSET;
-    let high = CANONICAL_MAX - CIRCLE_INSET;
-    line_end(
-        identifier,
-        MITER_JOIN,
-        &[
-            element(MOVE_TO, &[(high, CANONICAL_MID)]),
-            element(
-                CURVE_TO,
-                &[
-                    (high, CIRCLE_CONTROL_HIGH),
-                    (CIRCLE_CONTROL_HIGH, high),
-                    (CANONICAL_MID, high),
-                ],
-            ),
-            element(
-                CURVE_TO,
-                &[
-                    (CIRCLE_CONTROL_LOW, high),
-                    (low, CIRCLE_CONTROL_HIGH),
-                    (low, CANONICAL_MID),
-                ],
-            ),
-            element(
-                CURVE_TO,
-                &[
-                    (low, CIRCLE_CONTROL_LOW),
-                    (CIRCLE_CONTROL_LOW, low),
-                    (CANONICAL_MID, low),
-                ],
-            ),
-            element(
-                CURVE_TO,
-                &[
-                    (CIRCLE_CONTROL_HIGH, low),
-                    (high, CIRCLE_CONTROL_LOW),
-                    (high, CANONICAL_MID),
-                ],
-            ),
-            element(CLOSE_SUBPATH, &[]),
-        ],
-        Some((CANONICAL_MID, endpoint_y)),
-        filled,
-    )
-}
-
-fn square_end(identifier: &str, inset: f32, filled: Option<bool>, endpoint_y: f32) -> Vec<u8> {
-    let far = CANONICAL_MAX - inset;
-    line_end(
-        identifier,
-        MITER_JOIN,
-        &[
-            element(MOVE_TO, &[(inset, inset)]),
-            element(LINE_TO, &[(far, inset)]),
-            element(LINE_TO, &[(far, far)]),
-            element(LINE_TO, &[(inset, far)]),
-            element(CLOSE_SUBPATH, &[]),
-        ],
-        Some((CANONICAL_MID, endpoint_y)),
-        filled,
-    )
-}
-
-fn encode_endpoint(endpoint: Endpoint) -> Vec<u8> {
-    match endpoint {
-        Endpoint::None => line_end("none", MITER_JOIN, &[], None, None),
-        Endpoint::SimpleArrow => line_end(
-            "simple arrow",
-            MITER_JOIN,
-            &[
-                element(MOVE_TO, &[(CANONICAL_MIN, CANONICAL_MIN)]),
-                element(LINE_TO, &[(CANONICAL_MID, CANONICAL_MAX)]),
-                element(LINE_TO, &[(CANONICAL_MAX, CANONICAL_MIN)]),
-                element(CLOSE_SUBPATH, &[]),
-            ],
-            Some((CANONICAL_MID, CANONICAL_MIN)),
-            Some(true),
-        ),
-        Endpoint::FilledCircle => circle_end("filled circle", CIRCLE_INSET, Some(true)),
-        Endpoint::FilledDiamond => line_end(
-            "filled diamond",
-            MITER_JOIN,
-            &[
-                element(MOVE_TO, &[(CANONICAL_MID, CANONICAL_MIN)]),
-                element(LINE_TO, &[(CANONICAL_MIN, CANONICAL_MID)]),
-                element(LINE_TO, &[(CANONICAL_MID, CANONICAL_MAX)]),
-                element(LINE_TO, &[(CANONICAL_MAX, CANONICAL_MID)]),
-                element(CLOSE_SUBPATH, &[]),
-            ],
-            Some((CANONICAL_MID, DIAMOND_ATTACHMENT_Y)),
-            Some(true),
-        ),
-        Endpoint::OpenArrow => line_end(
-            "open arrow",
-            ROUND_JOIN,
-            &[
-                element(MOVE_TO, &[(CANONICAL_MIN, CANONICAL_MIN)]),
-                element(LINE_TO, &[(CANONICAL_MID, OPEN_ARROW_TIP_Y)]),
-                element(LINE_TO, &[(CANONICAL_MAX, CANONICAL_MIN)]),
-                element(MOVE_TO, &[(CANONICAL_MID, CANONICAL_MIN)]),
-                element(LINE_TO, &[(CANONICAL_MID, OPEN_ARROW_TIP_Y)]),
-            ],
-            Some((CANONICAL_MID, CANONICAL_MIN)),
-            None,
-        ),
-        Endpoint::FilledArrow => line_end(
-            "filled arrow",
-            MITER_JOIN,
-            &[
-                element(MOVE_TO, &[(CANONICAL_MIN, CANONICAL_MIN)]),
-                element(LINE_TO, &[(CANONICAL_MID, CANONICAL_MAX)]),
-                element(LINE_TO, &[(CANONICAL_MAX, CANONICAL_MIN)]),
-                element(LINE_TO, &[(CANONICAL_MID, FILLED_ARROW_NOTCH_Y)]),
-                element(CLOSE_SUBPATH, &[]),
-            ],
-            Some((CANONICAL_MID, FILLED_ARROW_NOTCH_Y)),
-            Some(true),
-        ),
-        Endpoint::FilledSquare => square_end(
-            "filled square",
-            FILLED_SQUARE_INSET,
-            Some(true),
-            FILLED_SQUARE_INSET,
-        ),
-        Endpoint::OpenSquare => square_end(
-            "open square",
-            OPEN_SQUARE_INSET,
-            None,
-            OPEN_SQUARE_ATTACHMENT_Y,
-        ),
-        Endpoint::OpenCircle => circle_end("open circle", OPEN_CIRCLE_ATTACHMENT_Y, None),
-        Endpoint::InvertedArrow => line_end(
-            "inverted arrow",
-            MITER_JOIN,
-            &[
-                element(MOVE_TO, &[(CANONICAL_MIN, CANONICAL_MID)]),
-                element(LINE_TO, &[(CANONICAL_MID, CANONICAL_MIN)]),
-                element(LINE_TO, &[(CANONICAL_MAX, CANONICAL_MID)]),
-                element(CLOSE_SUBPATH, &[]),
-            ],
-            Some((CANONICAL_MID, DIAMOND_ATTACHMENT_Y)),
-            Some(true),
-        ),
-        Endpoint::Line => line_end(
-            "line",
-            MITER_JOIN,
-            &[
-                element(MOVE_TO, &[(CANONICAL_MIN, CANONICAL_MIN)]),
-                element(LINE_TO, &[(CANONICAL_MAX, CANONICAL_MIN)]),
-            ],
-            Some((CANONICAL_MID, LINE_ATTACHMENT_Y)),
-            None,
-        ),
-    }
 }
 
 /// Store `wanted` as the line's decorations (host `set_shape_line_endpoints`).
@@ -1065,11 +828,15 @@ fn set_endpoints(
         vec![
             (
                 Slot::HeadLineEnd,
-                Some(Value::message(encode_endpoint(stored.end))),
+                Some(Value::message(litchi_iwa_style::line_end::encode(
+                    stored.end,
+                ))),
             ),
             (
                 Slot::TailLineEnd,
-                Some(Value::message(encode_endpoint(stored.start))),
+                Some(Value::message(litchi_iwa_style::line_end::encode(
+                    stored.start,
+                ))),
             ),
         ]
     };
