@@ -417,6 +417,7 @@ pub fn rewrite_popup_metadata(
     control_component_index: usize,
     removed_models: &[u64],
     removed_model_components: &[(usize, u64)],
+    register_model_uuid: bool,
     path: Path,
     budget: &mut TransactionBudget,
 ) -> Result<Vec<u8>, Error> {
@@ -444,9 +445,15 @@ pub fn rewrite_popup_metadata(
         let component_index = added_model_component
             .or_else(|| component_indices.first().copied())
             .ok_or(Error::InvalidSource { path })?;
-        let additions = facts
-            .uuid_additions(&[(component_index, fresh)])
-            .map_err(|error| map_popup_metadata_error(error, path))?;
+        // Numbers registers the new menu model's UUID; the Pages and Keynote
+        // host writers do not (record 0412a).
+        let additions = if register_model_uuid {
+            facts
+                .uuid_additions(&[(component_index, fresh)])
+                .map_err(|error| map_popup_metadata_error(error, path))?
+        } else {
+            Vec::new()
+        };
         let external_additions = if component_index != control_component_index {
             facts
                 .external_additions(&[popup_metadata::ExternalEdge::new(
@@ -500,49 +507,57 @@ pub fn rewrite_popup_metadata(
                     Some(false),
                 ));
             }
-            let external_removals = facts
-                .external_removals(&external_edges)
-                .map_err(|error| map_popup_metadata_error(error, path))?;
-            let transition = popup_metadata::CombinedTransition::new(
-                facts.last_object_identifier(),
-                identifier,
-                &additions,
-                &external_additions,
-                &removals,
-                &external_removals,
-                &[],
-            );
-            let prepared = popup_metadata::prepare_combined(
-                facts,
-                CombinedSaveTokenBatch::new(transition, save_tokens),
-                options,
-            )
+            let external_removals = if register_model_uuid {
+                facts.external_removals(&external_edges)
+            } else {
+                facts.recorded_external_removals(&external_edges)
+            }
             .map_err(|error| map_popup_metadata_error(error, path))?;
-            let report = prepared.prepare_report();
-            budget.charge_wire_fields(report.fields(), path)?;
-            budget.charge_wire_work(report.work_bytes(), path)?;
-            budget.charge_wire_nesting(report.max_depth(), path)?;
-            budget.charge_payload_items(report.components_scanned(), path)?;
-            budget.charge_payload_references(report.references_scanned(), path)?;
-            budget.charge_transaction_work(
-                report.input_bytes().saturating_add(report.output_bytes()),
-                path,
-            )?;
-            let requirements = prepared.execution_requirements();
-            budget.charge_wire_fields(requirements.fields(), path)?;
-            budget.charge_wire_work(requirements.work_bytes(), path)?;
-            budget.charge_payload_items(requirements.components(), path)?;
-            budget.charge_payload_references(requirements.references(), path)?;
-            budget.charge_allocations(requirements.allocations(), path)?;
-            budget.charge_retained_bytes(requirements.retained_bytes(), path)?;
-            budget.charge_scratch_bytes(requirements.scratch_bytes(), path)?;
-            budget.charge_transaction_work(requirements.output_bytes(), path)?;
-            return prepared
-                .execute(requirements.exact_limits())
-                .map(|output| output.into_bytes())
-                .map_err(|error| {
-                    map_popup_metadata_error(popup_metadata::map_rewrite_error(error), path)
-                });
+            // Pages and Keynote register nothing for a menu model; with no
+            // removal to record, only the watermark and save tokens change
+            // (the addition batch below, record 0412a).
+            if !removals.is_empty() || !external_removals.is_empty() {
+                let transition = popup_metadata::CombinedTransition::new(
+                    facts.last_object_identifier(),
+                    identifier,
+                    &additions,
+                    &external_additions,
+                    &removals,
+                    &external_removals,
+                    &[],
+                );
+                let prepared = popup_metadata::prepare_combined(
+                    facts,
+                    CombinedSaveTokenBatch::new(transition, save_tokens),
+                    options,
+                )
+                .map_err(|error| map_popup_metadata_error(error, path))?;
+                let report = prepared.prepare_report();
+                budget.charge_wire_fields(report.fields(), path)?;
+                budget.charge_wire_work(report.work_bytes(), path)?;
+                budget.charge_wire_nesting(report.max_depth(), path)?;
+                budget.charge_payload_items(report.components_scanned(), path)?;
+                budget.charge_payload_references(report.references_scanned(), path)?;
+                budget.charge_transaction_work(
+                    report.input_bytes().saturating_add(report.output_bytes()),
+                    path,
+                )?;
+                let requirements = prepared.execution_requirements();
+                budget.charge_wire_fields(requirements.fields(), path)?;
+                budget.charge_wire_work(requirements.work_bytes(), path)?;
+                budget.charge_payload_items(requirements.components(), path)?;
+                budget.charge_payload_references(requirements.references(), path)?;
+                budget.charge_allocations(requirements.allocations(), path)?;
+                budget.charge_retained_bytes(requirements.retained_bytes(), path)?;
+                budget.charge_scratch_bytes(requirements.scratch_bytes(), path)?;
+                budget.charge_transaction_work(requirements.output_bytes(), path)?;
+                return prepared
+                    .execute(requirements.exact_limits())
+                    .map(|output| output.into_bytes())
+                    .map_err(|error| {
+                        map_popup_metadata_error(popup_metadata::map_rewrite_error(error), path)
+                    });
+            }
         }
         let batch = MetadataBatch::new(
             facts.last_object_identifier(),
@@ -623,9 +638,12 @@ pub fn rewrite_popup_metadata(
                 Some(false),
             ));
         }
-        let external_removals = facts
-            .external_removals(&external_edges)
-            .map_err(|error| map_popup_metadata_error(error, path))?;
+        let external_removals = if register_model_uuid {
+            facts.external_removals(&external_edges)
+        } else {
+            facts.recorded_external_removals(&external_edges)
+        }
+        .map_err(|error| map_popup_metadata_error(error, path))?;
         if !removals.is_empty() || !external_removals.is_empty() {
             let batch = RemovalBatch::new(
                 facts.last_object_identifier(),
@@ -966,6 +984,13 @@ fn read_non_popup_control<'source>(
     if cell.cell_format_kind() == Some(5) {
         return Ok(None);
     }
+    // A Date and Time (3) or Duration (4) cell without a control spec holds
+    // no control; the display readers own it. The host writes these kinds
+    // on number cells, and refusing them here made every format read of
+    // such a cell fail (record 0412a).
+    if control_identifier.is_none() && matches!(cell.cell_format_kind(), Some(3 | 4)) {
+        return Ok(None);
+    }
     if !matches!(cell.cell_format_kind(), Some(1 | 2 | 6)) {
         return Err(Error::InvalidSource { path });
     }
@@ -1020,17 +1045,22 @@ fn read_non_popup_control<'source>(
         format_payload = entry.format.clone();
     }
     let format_payload = format_payload.ok_or(Error::InvalidSource { path })?;
+    let Some(control_identifier) = control_identifier else {
+        // A cell without a control spec must not name a control-only format
+        // (Checkbox 263, Star Rating 267). Any other payload is a display
+        // or custom format the display readers decode and validate; the
+        // control codec does not model custom (270-272) payloads, so only
+        // the format type is read here (record 0412a).
+        if matches!(format_type(&format_payload), Some(263 | 267)) {
+            return Err(Error::InvalidSource { path });
+        }
+        return Ok(None);
+    };
     let (format, _) = control_codec::decode_control_format_with_report(
         &format_payload,
         control_codec::DecodeOptions::for_source(&format_payload),
     )
     .map_err(|_| Error::InvalidSource { path })?;
-    let Some(control_identifier) = control_identifier else {
-        if matches!(format.format_type(), 263 | 267) {
-            return Err(Error::InvalidSource { path });
-        }
-        return Ok(None);
-    };
 
     let control_table_identifier = store
         .control_cell_spec_table()
@@ -2146,6 +2176,22 @@ impl storage_codec::StorageVisitor for ListCollector {
         self.segments = self.segments.saturating_add(1);
         Ok(())
     }
+}
+
+/// The `format_type` (field 1) of a `TSK.FormatStructArchive` payload, if
+/// present.
+fn format_type(payload: &[u8]) -> Option<u64> {
+    let view =
+        litchi_iwa_common::wire::parse_wire_view(payload, litchi_iwa_common::WireLimits::DEFAULT)
+            .ok()?;
+    view.fields()
+        .filter(|field| field.number() == 1 && field.wire_type() == 0)
+        .last()
+        .and_then(|field| {
+            litchi_iwa_common::varint::decode_varint_from_bytes(field.payload())
+                .ok()
+                .map(|(value, _)| value)
+        })
 }
 
 #[cfg(test)]

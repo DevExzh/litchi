@@ -23,7 +23,7 @@ use litchi_iwa_core::Archive;
 use litchi_iwa_style::graph::{Components, Workspace};
 use litchi_iwa_style::shape::{
     self as engine,
-    property::{Fills, Shadows, ShapeEffects, Strokes, TextColumns, TextLayout},
+    property::{Fills, ReleasingFills, Shadows, ShapeEffects, Strokes, TextColumns, TextLayout},
 };
 use thiserror::Error as ThisError;
 
@@ -597,7 +597,9 @@ impl fmt::Debug for Edit<'_> {
 
 impl Edit<'_> {
     /// Stage the shape's own value of one property (an image fill is
-    /// refused).
+    /// staged by [`Self::set_image_fill`]; a fill set or reset over an
+    /// image fill releases its data reference and, when nothing else uses
+    /// it, its media).
     ///
     /// # Errors
     ///
@@ -663,6 +665,7 @@ impl Edit<'_> {
         let mut applied = 0;
         let own = line_ends(self.source, self.shape)?;
         let mut image: Option<NewImage> = None;
+        let mut releases: Vec<Release> = Vec::new();
         for change in &self.changes {
             let changed = match change {
                 Change::ImageFill {
@@ -671,13 +674,11 @@ impl Edit<'_> {
                     technique,
                     tint,
                 } => {
-                    if image.is_some()
-                        || matches!(
-                            engine::value(&workspace, self.shape, &Fills).map_err(from_engine)?,
-                            Fill::Image(_)
-                        )
-                    {
+                    if image.is_some() {
                         return Err(Refusal::ImageFill.into());
+                    }
+                    if let Some(release) = released_image(&workspace, self.shape)? {
+                        releases.push(release);
                     }
                     let staged = stage_image(self.source, self.selector, bytes, file_name)?;
                     let size = self
@@ -717,7 +718,13 @@ impl Edit<'_> {
                     continue;
                 },
                 Change::Set(Property::Fill(fill)) => {
-                    engine::set(&mut workspace, self.shape, &Fills, fill)
+                    match released_image(&workspace, self.shape)? {
+                        Some(release) => {
+                            releases.push(release);
+                            engine::set(&mut workspace, self.shape, &ReleasingFills, fill)
+                        },
+                        None => engine::set(&mut workspace, self.shape, &Fills, fill),
+                    }
                 },
                 Change::Set(Property::Stroke(stroke)) => {
                     engine::set(&mut workspace, self.shape, &Strokes, stroke)
@@ -735,7 +742,13 @@ impl Edit<'_> {
                     engine::set(&mut workspace, self.shape, &TextColumns, columns)
                 },
                 Change::Reset(PropertyKind::Fill) => {
-                    engine::reset(&mut workspace, self.shape, &Fills)
+                    match released_image(&workspace, self.shape)? {
+                        Some(release) => {
+                            releases.push(release);
+                            engine::reset(&mut workspace, self.shape, &ReleasingFills)
+                        },
+                        None => engine::reset(&mut workspace, self.shape, &Fills),
+                    }
                 },
                 Change::Reset(PropertyKind::Stroke) => {
                     engine::reset(&mut workspace, self.shape, &Strokes)
@@ -776,6 +789,8 @@ impl Edit<'_> {
                 .into_iter()
                 .map(|(name, archive)| (Arc::<str>::from(name), archive))
                 .collect();
+            let deletions = release_images(self.source, &mut archives, &releases)?;
+            let deletions = deletions.iter().map(String::as_str).collect::<Vec<_>>();
             match &image {
                 Some(image) => {
                     own_image(self.source, &mut archives, self.shape, image)?;
@@ -785,10 +800,10 @@ impl Edit<'_> {
                         archives,
                         &[(member.as_str(), image.bytes.as_ref())],
                         &[],
-                        &[],
+                        &deletions,
                     )?
                 },
-                None => graph::publish_changes(self.source, archives, &[], &[], &[])?,
+                None => graph::publish_changes(self.source, archives, &[], &[], &deletions)?,
             }
         };
         // The last staged value of each property reads back.
@@ -1154,4 +1169,161 @@ fn shape_style_of(payload: &[u8]) -> Result<Option<u64>, Error> {
         .find(|field| field.number() == 1)
         .and_then(|field| decode_varint_from_bytes(field.payload()).ok())
         .map(|(value, _)| value))
+}
+
+/// An image fill a change replaces or resets: the style that held it and
+/// its data identifier.
+struct Release {
+    style: u64,
+    data: u64,
+}
+
+/// The image fill shape `shape` shows from its own style, if any.
+fn released_image(workspace: &Workspace<'_>, shape: u64) -> Result<Option<Release>, Error> {
+    let Fill::Image(image) = engine::value(workspace, shape, &Fills).map_err(from_engine)? else {
+        return Ok(None);
+    };
+    let Some(data) = image.data() else {
+        return Ok(None);
+    };
+    let target = engine::target(workspace, shape).map_err(from_engine)?;
+    Ok(Some(Release {
+        style: target.style(),
+        data: data.get(),
+    }))
+}
+
+/// The data-owner transition of released image fills (the host's
+/// `remove_style_data_reference` and `remove_orphaned_image_asset`): a
+/// style that no longer stores the image drops its data reference and its
+/// registered owner (a removed variation drops its owner), and data nothing
+/// references any more loses its `DataInfo` and `Data/` member. Returns the
+/// members to delete.
+fn release_images(
+    source: &Package,
+    archives: &mut Vec<(Arc<str>, Archive)>,
+    releases: &[Release],
+) -> Result<Vec<String>, Error> {
+    if releases.is_empty() {
+        return Ok(Vec::new());
+    }
+    let objects = super::body_storage_objects::metadata(source)?.ok_or(Error::InvalidSource)?;
+    let editable = |archives: &mut Vec<(Arc<str>, Archive)>, name: &str| -> Result<usize, Error> {
+        if let Some(position) = archives
+            .iter()
+            .position(|(member, _)| member.as_ref() == name)
+        {
+            return Ok(position);
+        }
+        archives.push((Arc::from(name), graph::editable_archive(source, name)?));
+        Ok(archives.len() - 1)
+    };
+    let position = editable(archives, &objects.component)?;
+    let mut payload = archives[position]
+        .1
+        .object(objects.object)
+        .and_then(|object| object.messages.get(objects.message_index))
+        .ok_or(Error::InvalidSource)?
+        .data
+        .clone();
+    let mut deletions = Vec::new();
+    for release in releases {
+        let member = source
+            .state
+            .source
+            .components()
+            .iter()
+            .find(|component| component.archive().object(release.style).is_some())
+            .map(|component| component.name().to_owned())
+            .ok_or(Error::InvalidSource)?;
+        let component = objects
+            .component_for_entry(&member)?
+            .ok_or(Error::InvalidSource)?;
+        // The released style as published: kept with another fill
+        // (rewritten), untouched (a shared style the shape left) or removed.
+        let edited = archives
+            .iter()
+            .find(|(name, _)| name.as_ref() == member)
+            .map(|(_, archive)| archive.object(release.style).is_some());
+        let still_stores = match edited {
+            Some(true) => {
+                let position = editable(archives, &member)?;
+                let object = archives[position]
+                    .1
+                    .object(release.style)
+                    .ok_or(Error::InvalidSource)?;
+                let fill = engine::ShapeProperty::read(
+                    &Fills,
+                    &[engine::stored_fill(
+                        object
+                            .messages
+                            .first()
+                            .map(|message| message.data.as_slice())
+                            .ok_or(Error::InvalidSource)?,
+                    )
+                    .map_err(from_engine)?],
+                )
+                .ok();
+                matches!(fill, Some(Fill::Image(image)) if image.data().map(|data| data.get()) == Some(release.data))
+            },
+            Some(false) => false,
+            None => true,
+        };
+        if still_stores {
+            continue;
+        }
+        if edited == Some(true) {
+            let position = editable(archives, &member)?;
+            let object = archives[position]
+                .1
+                .object_mut(release.style)
+                .ok_or(Error::InvalidSource)?;
+            for info in &mut object.archive_info.message_infos {
+                info.data_references.retain(|data| *data != release.data);
+            }
+        }
+        payload = super::body_storage_objects::adjust_data_reference(
+            &payload,
+            component,
+            release.data,
+            release.style,
+            false,
+        )?;
+        if objects.data_metadata_map.is_none()
+            && !super::body_storage_objects::referenced_data(&payload)?.contains(&release.data)
+        {
+            if let Some(member) = super::body_storage_objects::data_member(&payload, release.data)?
+                && source
+                    .state
+                    .source
+                    .package()
+                    .iter()
+                    .any(|entry| entry.name() == member)
+            {
+                deletions.push(member);
+            }
+            payload = super::body_storage_objects::remove_data_info(&payload, release.data)?;
+        }
+    }
+    let limits = source
+        .state
+        .source
+        .limits()
+        .effective_archive_limits()
+        .map_err(|_| Error::InvalidSource)?;
+    let position = editable(archives, &objects.component)?;
+    archives[position]
+        .1
+        .object_mut(objects.object)
+        .ok_or(Error::InvalidSource)?
+        .replace_message_preserving_header(
+            objects.message_index,
+            litchi_iwa_core::RawMessage {
+                type_: 11_006,
+                data: payload,
+            },
+            limits,
+        )
+        .map_err(|_| Error::InvalidSource)?;
+    Ok(deletions)
 }

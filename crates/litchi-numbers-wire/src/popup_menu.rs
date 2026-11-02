@@ -56,6 +56,31 @@ const KNOWN_FLAGS: u32 = 0x001f_ffff;
 const VALUE_FLAGS: u32 = 0x0000_020f;
 const POPUP_METADATA_FLAGS: u32 =
     CONTROL_CELL_SPEC_FLAG | CELL_FORMAT_KIND_FLAG | TEXT_FORMAT_IDENTIFIER_FLAG;
+/// `CELL_FORMAT_IDENTIFIER_FLAG`, the generic (decimal) format identifier.
+const GENERIC_FORMAT_IDENTIFIER_FLAG: u32 = 0x0000_2000;
+/// Every format-family identifier field of a BNC cell.
+const FORMAT_IDENTIFIER_FLAGS: u32 = 0x0007_e000;
+const DECIMAL_CELL_FORMAT_KIND: u32 = 1;
+
+/// Whether the cell names only an implicit decimal entry: decimal kind, a
+/// generic identifier, no explicit-format flag and no control. A Pop-Up
+/// Menu replaces that entry (the host compatibility writer's behaviour on
+/// native Pages and Keynote cells, record 0412a).
+/// The generic identifier flag an implicit decimal cell gives up.
+fn implicit_generic(parsed: &ParsedCell<'_>) -> u32 {
+    if implicit_decimal(parsed) {
+        GENERIC_FORMAT_IDENTIFIER_FLAG
+    } else {
+        0
+    }
+}
+
+fn implicit_decimal(parsed: &ParsedCell<'_>) -> bool {
+    parsed.kind == Some(DECIMAL_CELL_FORMAT_KIND)
+        && parsed.source.get(6..8) == Some(&[0, 0][..])
+        && parsed.control_identifier.is_none()
+        && parsed.flags & FORMAT_IDENTIFIER_FLAGS == GENERIC_FORMAT_IDENTIFIER_FLAG
+}
 
 /// The requested metadata/value state of one Pop-Up Menu BNC cell.
 ///
@@ -691,6 +716,7 @@ fn validate_transition(parsed: &ParsedCell<'_>, target: PopUpMenuBncState) -> Re
         }
         if let Some(kind) = parsed.kind
             && kind != TEXT_CELL_FORMAT_KIND
+            && !implicit_decimal(parsed)
         {
             return Err(PopUpMenuRewriteError::InvalidFormat(
                 "Pop-Up Menu transition targeted a non-text format",
@@ -732,9 +758,9 @@ fn target_flags(parsed: &ParsedCell<'_>, target: PopUpMenuBncState) -> u32 {
     if target.is_reset() {
         old_flags & !POPUP_METADATA_FLAGS
     } else if new_string {
-        old_flags | POPUP_METADATA_FLAGS | STRING_FLAG
+        (old_flags & !implicit_generic(parsed)) | POPUP_METADATA_FLAGS | STRING_FLAG
     } else {
-        old_flags | POPUP_METADATA_FLAGS
+        (old_flags & !implicit_generic(parsed)) | POPUP_METADATA_FLAGS
     }
 }
 
@@ -867,6 +893,7 @@ fn emit(
         flags &= !POPUP_METADATA_FLAGS;
     } else {
         prefix[6..8].copy_from_slice(&EXPLICIT_TEXT_FORMAT.to_le_bytes());
+        flags &= !implicit_generic(parsed);
         flags |= POPUP_METADATA_FLAGS;
     }
     let old_string = parsed.string_identifier;

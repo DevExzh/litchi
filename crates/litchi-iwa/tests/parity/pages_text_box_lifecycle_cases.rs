@@ -956,3 +956,107 @@ fn shape_image_fill_cost_abba() -> TestResult {
         },
     )
 }
+
+/// Replacing and resetting an existing image fill release its data
+/// reference and, when nothing else uses it, its media (record 0415).
+#[test]
+fn pages_body_shape_image_fill_release_parity() -> TestResult {
+    use litchi_iwa::shapes::{ShapeFill, ShapeImageFillTechnique};
+    use litchi_pages::drawable::style::{ImageTechnique, PropertyKind as Kind};
+    let _ = (Tier::B, Evidence::Queued);
+    let png = crate::harness::fixture("iwork/keynote/media-replacement-assets/poster.png")?.bytes;
+    let filled = {
+        let input = shape_fixture()?;
+        let mut e = pages::Draft::from_bytes(&input.bytes)?;
+        let d = e
+            .body_shapes()?
+            .first()
+            .ok_or("no shape")?
+            .drawable_object_id;
+        e.set_body_shape_image_fill(
+            d,
+            "poster.png",
+            &png,
+            ShapeImageFillTechnique::Stretch,
+            None,
+        )?;
+        Fixture {
+            path: "source-built rectangle + host image fill",
+            bytes: e.to_bytes()?,
+        }
+    };
+    #[derive(Clone, Copy)]
+    enum Op {
+        Solid,
+        Reset,
+        Image,
+    }
+    for op in [Op::Solid, Op::Reset, Op::Image] {
+        Case::new(
+            "pages_body_shape_image_fill_release_parity",
+            Format::Pages,
+            Tier::B,
+            Evidence::Queued,
+            &filled,
+        )
+        .leaf_structural_metadata()
+        .host(|source| {
+            let mut e = pages::Draft::from_bytes(source)?;
+            let d = e
+                .body_shapes()?
+                .first()
+                .ok_or("no shape")?
+                .drawable_object_id;
+            match op {
+                Op::Solid => e.set_body_shape_fill(d, &ShapeFill::Solid(red()?))?,
+                Op::Reset => drop(e.reset_body_shape_fill(d)?),
+                Op::Image => {
+                    e.set_body_shape_image_fill(
+                        d,
+                        "poster.png",
+                        &png,
+                        ShapeImageFillTechnique::Tile,
+                        None,
+                    )?;
+                },
+            }
+            Ok(e.to_bytes()?)
+        })
+        .leaf(|source| {
+            let package = Package::from_bytes(source)?;
+            let mut edit = package.edit_body_drawable_style(DrawableSelector::shape(0))?;
+            match op {
+                Op::Solid => {
+                    edit.set(StyleProperty::Fill(Fill::Solid(red()?)))?;
+                },
+                Op::Reset => {
+                    edit.reset(Kind::Fill);
+                },
+                Op::Image => {
+                    edit.set_image_fill(&png, "poster.png", ImageTechnique::Tile, None);
+                },
+            }
+            let commit = edit.commit()?;
+            let restored = commit
+                .package()
+                .apply_body_drawable_style(&commit.patch().inverse())?;
+            Ok(LeafRun::with_inverse(
+                leaf_bytes!(commit.package()),
+                leaf_bytes!(restored.package()),
+            ))
+        })
+        .read("leaf fill", |bytes| {
+            Ok(format!(
+                "{:?}",
+                Package::from_bytes(bytes)?
+                    .body_drawable_style(DrawableSelector::shape(0), Kind::Fill)?
+            ))
+        })
+        .read("members", |bytes| {
+            let package = Package::from_bytes(bytes)?;
+            Ok(format!("{:?}", package.media_assets()?.len()))
+        })
+        .run()?;
+    }
+    Ok(())
+}
