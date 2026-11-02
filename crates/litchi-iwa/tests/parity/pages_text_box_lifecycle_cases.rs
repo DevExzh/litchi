@@ -616,3 +616,175 @@ fn pages_commented_drawable_remove_parity() -> TestResult {
         DrawableSelector::shape(0),
     )
 }
+
+// ---- duplication -------------------------------------------------------------------
+
+fn duplicate_case(
+    name: &'static str,
+    input: &Fixture,
+    host: impl FnOnce(&[u8]) -> TestResult<Vec<u8>>,
+    selector: DrawableSelector,
+    text: Option<&'static str>,
+) -> TestResult {
+    Case::new(name, Format::Pages, Tier::B, Evidence::Queued, input)
+        .leaf_structural_metadata()
+        .host(host)
+        .leaf(|source| {
+            let package = Package::from_bytes(source)?;
+            let at = litchi_pages::TextPosition::from_utf16_index(body_end(source)?)?;
+            let mut edit = package.edit_body_media();
+            match text {
+                Some(text) => {
+                    edit.duplicate_text_box(selector, at, text)?;
+                },
+                None => {
+                    edit.duplicate(selector, at)?;
+                },
+            }
+            let commit = edit.commit()?;
+            let restored = commit
+                .package()
+                .apply_body_media(&commit.patch().inverse())?;
+            Ok(LeafRun::with_inverse(
+                leaf_bytes!(commit.package()),
+                leaf_bytes!(restored.package()),
+            ))
+        })
+        .read("host texts", host_texts)
+        .read("leaf texts", leaf_texts)
+        .read("host presets", host_presets)
+        .read("leaf presets", leaf_presets)
+        .run()?;
+    Ok(())
+}
+
+#[test]
+fn pages_text_box_duplicate_parity() -> TestResult {
+    let _ = (Tier::B, Evidence::Queued);
+    let input = text_box_fixture()?;
+    for index in [0, 1] {
+        duplicate_case(
+            "pages_text_box_duplicate_parity",
+            &input,
+            |source| {
+                let mut e = pages::Draft::from_bytes(source)?;
+                let d = host_text_box(&e, index)?;
+                let at = body_end(source)?;
+                e.duplicate_text_box(d, at, "Copied box")?;
+                Ok(e.to_bytes()?)
+            },
+            DrawableSelector::text_box(index),
+            Some("Copied box"),
+        )
+        .map_err(|e| format!("text box {index}: {e}"))?;
+    }
+    Ok(())
+}
+
+#[test]
+fn pages_body_shape_duplicate_parity() -> TestResult {
+    let _ = (Tier::B, Evidence::Queued);
+    for input in [shape_fixture()?, line_fixture()?] {
+        duplicate_case(
+            "pages_body_shape_duplicate_parity",
+            &input,
+            |source| {
+                let mut e = pages::Draft::from_bytes(source)?;
+                let d = e
+                    .body_shapes()?
+                    .first()
+                    .ok_or("no shape")?
+                    .drawable_object_id;
+                let at = body_end(source)?;
+                e.duplicate_body_shape(d, at)?;
+                Ok(e.to_bytes()?)
+            },
+            DrawableSelector::shape(0),
+            None,
+        )?;
+    }
+    Ok(())
+}
+
+// ---- the body shape listing -------------------------------------------------------
+
+/// Every body shape as (text, preset, line endpoints, frame, properties)
+/// through the host's `body_shapes`.
+fn host_shape_list(bytes: &[u8]) -> TestResult<String> {
+    let e = pages::Draft::from_bytes(bytes)?;
+    let shapes = e
+        .body_shapes()?
+        .into_iter()
+        .map(|shape| {
+            format!(
+                "{:?} {:?} {:?} {:?} {:?} {:?}",
+                shape.storage.storage.text(),
+                shape.preset,
+                shape.line_segment.map(|segment| {
+                    (
+                        (segment.start().x, segment.start().y),
+                        (segment.end().x, segment.end().y),
+                    )
+                }),
+                shape.line_endpoints,
+                shape.geometry,
+                shape.properties
+            )
+        })
+        .collect::<Vec<_>>();
+    Ok(shapes.join("\n"))
+}
+
+/// The same through the leaf reads.
+fn leaf_shape_list(bytes: &[u8]) -> TestResult<String> {
+    use litchi_pages::drawable::style::PropertyKind as Kind;
+    let package = Package::from_bytes(bytes)?;
+    let mut shapes = Vec::new();
+    let mut index = 0;
+    while let Ok(snapshot) = package.body_drawable_properties(DrawableSelector::shape(index)) {
+        let selector = DrawableSelector::shape(index);
+        let endpoints = snapshot
+            .line_segment()
+            .map(|_| package.body_drawable_style(selector, Kind::LineEndpoints))
+            .transpose()?
+            .map(|property| match property {
+                StyleProperty::LineEndpoints(endpoints) => Ok(endpoints),
+                _ => Err("endpoints"),
+            })
+            .transpose()?;
+        shapes.push(format!(
+            "{:?} {:?} {:?} {:?} {:?} {:?}",
+            package.body_drawable_text(selector)?,
+            snapshot.preset(),
+            snapshot.line_segment().map(|segment| {
+                (
+                    (segment.start().x, segment.start().y),
+                    (segment.end().x, segment.end().y),
+                )
+            }),
+            endpoints,
+            crate::pages_drawable_cases::host_geometry(snapshot.geometry().ok_or("frame")?),
+            crate::pages_drawable_cases::host_properties(snapshot.properties()),
+        ));
+        index += 1;
+    }
+    Ok(shapes.join("\n"))
+}
+
+#[test]
+fn pages_body_shapes_read_parity() -> TestResult {
+    let mut inputs = vec![shape_fixture()?, line_fixture()?];
+    let with_line = host_add(&shape_fixture()?.bytes, &Add::Line)?;
+    inputs.push(Fixture {
+        path: "rectangle + host line",
+        bytes: with_line,
+    });
+    for input in inputs {
+        assert_eq!(
+            host_shape_list(&input.bytes)?,
+            leaf_shape_list(&input.bytes)?
+        );
+    }
+    let _ = (Tier::A, Evidence::Queued);
+    Ok(())
+}
