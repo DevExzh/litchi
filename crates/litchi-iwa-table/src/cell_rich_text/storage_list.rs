@@ -1,39 +1,32 @@
 //! Paragraph lists of one `TSWP.StorageArchive` in a structural working set
-//! (record 0370b).
+//! (records 0370b, 0412).
 //!
-//! W1-D's list engine ([`litchi_iwa_text_wire::list`], record 0374) plans
-//! each change from the storage and its list styles; this module publishes
-//! the plan as the host text editor's list families do: list-style
+//! The publication itself is the shared text engine's
+//! ([`litchi_iwa_text_wire::list::publish`], record 0413): list-style
 //! boundaries are rewritten with their reference sequence, presets and
 //! paragraph variations are stored beside their stylesheet and registered
 //! there, and the metadata registry gains or loses the matching UUIDs and
-//! cross-component references. Any storage of the package can be published
-//! this way: the cell-list engine ([`super::list`]) runs it on a cell's
-//! rich-text storage, and the Numbers sheet drawables on a text box's
-//! storage. Lifted from `litchi-numbers` (record 0412).
-
-#![allow(
-    clippy::arbitrary_source_item_ordering,
-    reason = "the publisher keeps each step beside the operation that runs it"
-)]
-
-use std::collections::BTreeMap;
+//! cross-component references. This module is its package side over the
+//! table engines' [`Working`] set: [`Workspace`] maps the publisher's object,
+//! header, identifier and registry requests onto the working set and its
+//! registry transition. The cell-list engine ([`super::list`]) runs it on a
+//! cell's rich-text storage, and the Numbers sheet drawables on a text box's
+//! storage.
 
 use litchi_iwa_common::WireLimits;
+use litchi_iwa_core::{ArchiveObject, MessageInfo, RawMessage};
 use litchi_iwa_text::paragraph::list::{
     ParagraphList, ParagraphListLevel, ParagraphListNumbering, ParagraphListPlacement,
 };
 use litchi_iwa_text::position::TextPosition;
-use litchi_iwa_text_wire::list::{self, Change, Plan, PropertyKind, Styles};
+use litchi_iwa_text_wire::list::publish;
+use litchi_iwa_text_wire::list::{self, Change, Styles};
 
-use crate::structure::metadata::{Registry, Transition};
-use crate::structure::wire::{repeated_bytes, single_bytes, single_reference};
-use crate::structure::{self, Fault, TableLeaf, Working};
+use crate::structure::metadata::{self, Registry, Transition};
+use crate::structure::{self, Fault, FaultResult, TableLeaf, Working};
 
 /// `TSWP.StorageArchive`.
-pub const STORAGE_MESSAGE_TYPE: u32 = 2_001;
-/// `TSS.StylesheetArchive`.
-const STYLESHEET_MESSAGE_TYPE: u32 = 401;
+pub const STORAGE_MESSAGE_TYPE: u32 = publish::STORAGE_MESSAGE_TYPE;
 
 /// Why a storage-list publication failed.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -53,6 +46,15 @@ impl From<Fault> for Failure {
 impl From<list::Error> for Failure {
     fn from(error: list::Error) -> Self {
         Self::List(error)
+    }
+}
+
+impl From<publish::Failure<Fault>> for Failure {
+    fn from(failure: publish::Failure<Fault>) -> Self {
+        match failure {
+            publish::Failure::Workspace(fault) => Self::Fault(fault),
+            publish::Failure::List(error) => Self::List(error),
+        }
     }
 }
 
@@ -102,69 +104,82 @@ pub fn storage<P: TableLeaf>(working: &Working<'_, P>, identifier: u64) -> Resul
     })
 }
 
-/// The publisher of one transaction: the working set, the source registry
-/// and the registry transition it accumulates.
-pub struct Publisher<'a, 'p, P> {
-    /// The working set.
-    pub working: &'a mut Working<'p, P>,
-    /// The source package metadata registry.
-    pub registry: &'a Registry,
-    /// The registry transition the publication accumulates.
-    pub transition: &'a mut Transition,
-    /// The shared text engines' wire profile.
-    pub limits: WireLimits,
+/// The package side of the shared list publisher: the working set, the
+/// source registry and the registry transition it accumulates.
+pub struct Workspace<'a, 'p, P> {
+    working: &'a mut Working<'p, P>,
+    registry: &'a Registry,
+    transition: &'a mut Transition,
 }
 
-impl<P: TableLeaf> Publisher<'_, '_, P> {
-    fn component(&self, entry: &str) -> Option<u64> {
-        self.registry
-            .component_for_entry(entry)
-            .ok()
-            .map(|component| component.identifier)
-    }
-
-    /// The list-style boundaries' styles, in order.
-    fn boundary_styles(&self, payload: &[u8]) -> Result<Vec<u64>> {
-        Ok(list::boundaries(payload, self.limits)?
-            .into_iter()
-            .map(|entry| entry.1)
-            .collect())
-    }
-
-    /// The host's `replace_reference_sequence`: replace the storage payload
-    /// and swap the old boundary styles for the new ones, in place, in the
-    /// message's references and in every field info naming one of them.
-    fn replace_with_sequence(
-        &mut self,
-        storage: &Storage,
-        payload: Vec<u8>,
-        old: &[u64],
-        new: &[u64],
-    ) -> Result<()> {
-        fn sequence(references: &mut Vec<u64>, old: &[u64], new: &[u64]) -> Result<()> {
-            let positions = references
-                .iter()
-                .filter(|reference| old.contains(reference))
-                .count();
-            if positions != old.len() {
-                return Err(Fault::Invalid.into());
-            }
-            let insertion = references
-                .iter()
-                .position(|reference| old.contains(reference))
-                .unwrap_or(references.len());
-            references.retain(|reference| !old.contains(reference));
-            structure::reserve(references, new.len())?;
-            references.splice(insertion..insertion, new.iter().copied());
-            Ok(())
-        }
-        super::replace_message(self.working, storage.identifier, storage.index, payload)?;
-        let object = self.working.object_mut(storage.identifier)?;
-        let info = object
+impl<P: TableLeaf> Workspace<'_, '_, P> {
+    fn info(&mut self, identifier: u64, index: usize) -> FaultResult<&mut MessageInfo> {
+        self.working
+            .object_mut(identifier)?
             .archive_info
             .message_infos
-            .get_mut(storage.index)
-            .ok_or(Fault::Invalid)?;
+            .get_mut(index)
+            .ok_or(Fault::Invalid)
+    }
+}
+
+/// The host's `replace_reference_sequence` over one reference list.
+fn sequence(references: &mut Vec<u64>, old: &[u64], new: &[u64]) -> FaultResult<()> {
+    let positions = references
+        .iter()
+        .filter(|reference| old.contains(reference))
+        .count();
+    if positions != old.len() {
+        return Err(Fault::Invalid);
+    }
+    let insertion = references
+        .iter()
+        .position(|reference| old.contains(reference))
+        .unwrap_or(references.len());
+    references.retain(|reference| !old.contains(reference));
+    structure::reserve(references, new.len())?;
+    references.splice(insertion..insertion, new.iter().copied());
+    Ok(())
+}
+
+impl<P: TableLeaf> publish::Workspace for Workspace<'_, '_, P> {
+    type Error = Fault;
+
+    fn entry(&self, identifier: u64) -> FaultResult<String> {
+        self.working.locate(identifier)?.ok_or(Fault::Invalid)
+    }
+
+    fn message(&self, identifier: u64, message_type: u32) -> FaultResult<(usize, &[u8])> {
+        let object = self.working.object(identifier)?;
+        let index = structure::unique_message(object, &[message_type])?;
+        Ok((index, object.messages[index].data.as_slice()))
+    }
+
+    fn replace(&mut self, identifier: u64, index: usize, payload: Vec<u8>) -> FaultResult<()> {
+        let limits = self.working.archive_limits();
+        let object = self.working.object_mut(identifier)?;
+        let message_type = object.messages.get(index).ok_or(Fault::Invalid)?.type_;
+        object
+            .replace_message_preserving_header(
+                index,
+                RawMessage {
+                    type_: message_type,
+                    data: payload,
+                },
+                limits,
+            )
+            .map(drop)
+            .map_err(|error| structure::map_core(&error))
+    }
+
+    fn replace_reference_sequence(
+        &mut self,
+        identifier: u64,
+        index: usize,
+        old: &[u64],
+        new: &[u64],
+    ) -> FaultResult<()> {
+        let info = self.info(identifier, index)?;
         sequence(&mut info.object_references, old, new)?;
         for field in &mut info.field_infos {
             if field
@@ -178,162 +193,180 @@ impl<P: TableLeaf> Publisher<'_, '_, P> {
         Ok(())
     }
 
-    /// Replace the storage payload, keeping its references.
-    fn replace(&mut self, storage: &Storage, payload: Vec<u8>) -> Result<()> {
-        super::replace_message(self.working, storage.identifier, storage.index, payload)?;
-        Ok(())
-    }
-
-    /// The stylesheet message of `stylesheet`: its index and payload.
-    fn stylesheet(&self, stylesheet: u64) -> Result<(usize, Vec<u8>)> {
-        let object = self.working.object(stylesheet)?;
-        let index = structure::unique_message(object, &[STYLESHEET_MESSAGE_TYPE])?;
-        Ok((index, structure::copy_bytes(&object.messages[index].data)?))
-    }
-
-    /// Replace the stylesheet payload and append `style` to its references.
-    fn replace_stylesheet(&mut self, stylesheet: u64, data: Vec<u8>, style: u64) -> Result<()> {
-        let (index, _) = self.stylesheet(stylesheet)?;
-        super::replace_message(self.working, stylesheet, index, data)?;
-        let info = self
-            .working
-            .object_mut(stylesheet)?
-            .archive_info
-            .message_infos
-            .get_mut(index)
-            .ok_or(Fault::Invalid)?;
-        if info.object_references.contains(&style) {
-            return Err(Fault::Invalid.into());
+    fn append_reference(
+        &mut self,
+        identifier: u64,
+        index: usize,
+        reference: u64,
+    ) -> FaultResult<()> {
+        let info = self.info(identifier, index)?;
+        if info.object_references.contains(&reference) {
+            return Err(Fault::Invalid);
         }
         structure::reserve(&mut info.object_references, 1)?;
-        info.object_references.push(style);
+        info.object_references.push(reference);
         Ok(())
     }
 
-    /// A new list-style object: one message at the engine's version.
-    fn new_style(
-        &self,
+    fn remove_reference(
+        &mut self,
         identifier: u64,
+        index: usize,
+        reference: u64,
+    ) -> FaultResult<()> {
+        let info = self.info(identifier, index)?;
+        info.object_references.retain(|item| *item != reference);
+        for field in &mut info.field_infos {
+            field.object_references.retain(|item| *item != reference);
+        }
+        Ok(())
+    }
+
+    fn allocate(&mut self) -> FaultResult<u64> {
+        self.working
+            .allocate(1)?
+            .first()
+            .copied()
+            .ok_or(Fault::Invalid)
+    }
+
+    fn insert(
+        &mut self,
+        entry: &str,
+        identifier: u64,
+        message_type: u32,
+        version: &[u32],
         payload: Vec<u8>,
         references: Vec<u64>,
-    ) -> Result<litchi_iwa_core::ArchiveObject> {
-        let mut object = structure::new_object(
+    ) -> FaultResult<()> {
+        let mut object: ArchiveObject = structure::new_object(
             identifier,
             None,
-            list::MESSAGE_TYPE,
+            message_type,
             payload,
             references,
             self.working.archive_limits(),
         )?;
-        object.archive_info.message_infos[0].versions = list::MESSAGE_VERSION.to_vec().into();
-        Ok(object)
+        object.archive_info.message_infos[0].versions = version.to_vec().into();
+        self.working.insert(entry, object)
     }
 
-    /// The host's `register_style_reference`: the storage's component
-    /// references `style` in the style's component.
-    fn register_reference(
-        &mut self,
-        owner_entry: &str,
-        style_entry: &str,
-        style: u64,
-    ) -> Result<()> {
-        if let (Some(owner), Some(target)) =
-            (self.component(owner_entry), self.component(style_entry))
-        {
-            self.transition
-                .reference(self.registry, owner, target, style)?;
+    fn remove(&mut self, identifier: u64) -> FaultResult<()> {
+        self.working.remove(identifier).map(drop)
+    }
+
+    fn entry_messages(&self, entry: &str, message_type: u32) -> FaultResult<Vec<(u64, &[u8])>> {
+        let archive = self.working.archive(entry)?;
+        let mut output = Vec::new();
+        for object in &archive.objects {
+            let Some(identifier) = object.archive_info.identifier else {
+                continue;
+            };
+            if let Some(message) = object
+                .messages
+                .iter()
+                .find(|message| message.type_ == message_type)
+            {
+                structure::reserve(&mut output, 1)?;
+                output.push((identifier, message.data.as_slice()));
+            }
         }
-        Ok(())
+        Ok(output)
     }
 
-    /// The host's `register_private_style`: a UUID in the style's component
-    /// and the storage component's reference.
-    fn register_private(&mut self, owner_entry: &str, style_entry: &str, style: u64) -> Result<()> {
-        let Some(target) = self.component(style_entry) else {
-            return Ok(());
-        };
-        let seed = structure::metadata::identity_seed(self.working, style)?;
-        self.transition
-            .register_uuid(self.registry, target, style, seed)?;
-        self.register_reference(owner_entry, style_entry, style)
-    }
-
-    /// The host's `unregister_owner_reference_if_unused`: the storage
-    /// component's reference to `style` goes once none of its objects
-    /// references the style.
-    fn unregister_if_unused(
-        &mut self,
-        owner_entry: &str,
-        style_entry: &str,
-        style: u64,
-    ) -> Result<()> {
-        let (Some(owner), Some(target)) =
-            (self.component(owner_entry), self.component(style_entry))
-        else {
-            return Ok(());
-        };
-        if owner == target {
-            return Ok(());
-        }
-        let archive = self.working.archive(owner_entry)?;
-        if archive.objects.iter().any(|object| {
+    fn entry_references(&self, entry: &str, reference: u64) -> FaultResult<bool> {
+        let archive = self.working.archive(entry)?;
+        Ok(archive.objects.iter().any(|object| {
             object
                 .archive_info
                 .message_infos
                 .iter()
-                .any(|info| info.object_references.contains(&style))
-        }) {
-            return Ok(());
-        }
-        self.transition
-            .remove_reference(self.registry, owner, target, style)?;
-        Ok(())
+                .any(|info| info.object_references.contains(&reference))
+        }))
     }
 
-    /// The stylesheet's preset style for `preset`, stored and registered
-    /// when it has none (the host's `preset_style_id` with creation).
-    fn preset_object(
-        &mut self,
-        owner_entry: &str,
-        style_entry: &str,
-        stylesheet: u64,
-        preset: ParagraphList,
-    ) -> Result<u64> {
-        let existing = {
-            let archive = self.working.archive(style_entry)?;
-            let candidates = archive.objects.iter().filter_map(|object| {
-                let identifier = object.archive_info.identifier?;
-                object
-                    .messages
-                    .iter()
-                    .find(|message| message.type_ == list::MESSAGE_TYPE)
-                    .map(|message| (identifier, message.data.as_slice()))
-            });
-            list::find_preset(candidates, stylesheet, preset, self.limits)?
-        };
-        if let Some(identifier) = existing {
-            self.register_reference(owner_entry, style_entry, identifier)?;
-            return Ok(identifier);
+    fn all_messages(&self, message_type: u32) -> FaultResult<Vec<&[u8]>> {
+        let mut output = Vec::new();
+        for name in self.working.component_names() {
+            let archive = self.working.archive(&name)?;
+            for object in &archive.objects {
+                for message in &object.messages {
+                    if message.type_ == message_type {
+                        structure::reserve(&mut output, 1)?;
+                        output.push(message.data.as_slice());
+                    }
+                }
+            }
         }
-        let created = *self.working.allocate(1)?.first().ok_or(Fault::Invalid)?;
-        let object = self.new_style(
-            created,
-            list::preset_payload(stylesheet, preset, self.limits)?,
-            Vec::new(),
-        )?;
-        // The host's `insert_private_style`: appended to the stylesheet's
-        // styles (field 1).
-        let (_, sheet) = self.stylesheet(stylesheet)?;
-        let mut reference = Vec::new();
-        litchi_iwa_common::wire::append_varint_field(&mut reference, 1, created)
-            .map_err(|error| structure::map_wire(&error))?;
-        let data =
-            litchi_iwa_common::wire::append_repeated_length_delimited_field(&sheet, 1, &reference)
-                .map_err(|error| structure::map_wire(&error))?;
-        self.replace_stylesheet(stylesheet, data, created)?;
-        self.working.insert(style_entry, object)?;
-        self.register_private(owner_entry, style_entry, created)?;
-        Ok(created)
+        Ok(output)
+    }
+
+    fn component(&self, entry: &str) -> Option<u64> {
+        self.registry
+            .component_for_entry(entry)
+            .ok()
+            .map(|component| component.identifier)
+    }
+
+    fn add_external_reference(&mut self, owner: u64, target: u64, object: u64) -> FaultResult<()> {
+        self.transition
+            .reference(self.registry, owner, target, object)
+    }
+
+    fn remove_external_reference(
+        &mut self,
+        owner: u64,
+        target: u64,
+        object: u64,
+    ) -> FaultResult<()> {
+        self.transition
+            .remove_reference(self.registry, owner, target, object)
+    }
+
+    fn register_uuid(&mut self, component: u64, object: u64) -> FaultResult<()> {
+        let seed = metadata::identity_seed(self.working, object)?;
+        self.transition
+            .register_uuid(self.registry, component, object, seed)
+    }
+
+    fn unregister(&mut self, object: u64) -> FaultResult<()> {
+        self.transition.remove_objects(self.registry, &[object])?;
+        self.transition.release_suffix(&[object])
+    }
+
+    fn invalid() -> Fault {
+        Fault::Invalid
+    }
+}
+
+/// The publisher of one transaction: the working set, the source registry
+/// and the registry transition it accumulates. Each operation runs the
+/// shared publisher over a [`Workspace`] of these.
+pub struct Publisher<'a, 'p, P> {
+    /// The working set.
+    pub working: &'a mut Working<'p, P>,
+    /// The source package metadata registry.
+    pub registry: &'a Registry,
+    /// The registry transition the publication accumulates.
+    pub transition: &'a mut Transition,
+    /// The shared text engines' wire profile.
+    pub limits: WireLimits,
+}
+
+impl<P: TableLeaf> Publisher<'_, '_, P> {
+    fn run<T>(
+        &mut self,
+        operation: impl FnOnce(
+            &mut publish::Publisher<'_, Workspace<'_, '_, P>>,
+        ) -> std::result::Result<T, publish::Failure<Fault>>,
+    ) -> Result<T> {
+        let mut workspace = Workspace {
+            working: self.working,
+            registry: self.registry,
+            transition: self.transition,
+        };
+        let mut publisher = publish::Publisher::new(&mut workspace, self.limits);
+        Ok(operation(&mut publisher)?)
     }
 
     /// Give every paragraph of `storage` the one preset `preset` (the host
@@ -343,19 +376,7 @@ impl<P: TableLeaf> Publisher<'_, '_, P> {
     ///
     /// A [`Failure`] of the working set or the list engine.
     pub fn set_list(&mut self, storage: u64, preset: ParagraphList) -> Result<bool> {
-        let located = self::storage(self.working, storage)?;
-        let style = list::uniform_style(&located.payload, self.limits)?;
-        if list::preset(&ListStyles(self.working), style, self.limits).ok() == Some(preset) {
-            return Ok(false);
-        }
-        let style_entry = self.working.locate(style)?.ok_or(Fault::Invalid)?;
-        let stylesheet = list::stylesheet(&ListStyles(self.working), style, self.limits)?;
-        let target = self.preset_object(&located.entry, &style_entry, stylesheet, preset)?;
-        let located = self::storage(self.working, storage)?;
-        let payload = list::replace_boundaries(&located.payload, &[(0, target)], self.limits)?;
-        self.replace_with_sequence(&located, payload, &[style], &[target])?;
-        self.unregister_if_unused(&located.entry, &style_entry, style)?;
-        Ok(true)
+        self.run(|publisher| publisher.set_list(storage, preset))
     }
 
     /// Give the paragraphs of `storage` the presets of `placements` (the
@@ -369,52 +390,7 @@ impl<P: TableLeaf> Publisher<'_, '_, P> {
         storage: u64,
         placements: &[ParagraphListPlacement],
     ) -> Result<bool> {
-        let located = self::storage(self.working, storage)?;
-        let normalized = list::normalize(&located.payload, placements, self.limits)?;
-        if list::placements(&located.payload, &ListStyles(self.working), self.limits)? == normalized
-        {
-            return Ok(false);
-        }
-        let boundaries = list::boundaries(&located.payload, self.limits)?;
-        let first = boundaries.first().ok_or(Fault::Invalid)?.1;
-        let style_entry = self.working.locate(first)?.ok_or(Fault::Invalid)?;
-        let stylesheet = list::stylesheet(&ListStyles(self.working), first, self.limits)?;
-        let slot = |preset: ParagraphList| match preset {
-            ParagraphList::None => 0,
-            ParagraphList::Bullet => 1,
-            ParagraphList::Numbered => 2,
-        };
-        let mut slots: [Option<u64>; 3] = [None; 3];
-        for placement in &normalized {
-            if slots[slot(placement.list)].is_none() {
-                slots[slot(placement.list)] = Some(self.preset_object(
-                    &located.entry,
-                    &style_entry,
-                    stylesheet,
-                    placement.list,
-                )?);
-            }
-        }
-        let mut new = Vec::new();
-        structure::reserve(&mut new, normalized.len())?;
-        for placement in &normalized {
-            new.push((
-                placement.paragraph.utf16_index(),
-                slots[slot(placement.list)].ok_or(Fault::Invalid)?,
-            ));
-        }
-        let located = self::storage(self.working, storage)?;
-        let old: Vec<u64> = boundaries.iter().map(|entry| entry.1).collect();
-        let payload = list::replace_boundaries(&located.payload, &new, self.limits)?;
-        let styles: Vec<u64> = new.iter().map(|entry| entry.1).collect();
-        self.replace_with_sequence(&located, payload, &old, &styles)?;
-        let mut unique = old;
-        unique.sort_unstable();
-        unique.dedup();
-        for style in unique {
-            self.unregister_if_unused(&located.entry, &style_entry, style)?;
-        }
-        Ok(true)
+        self.run(|publisher| publisher.set_lists(storage, placements))
     }
 
     /// Set the list level of the paragraph at `paragraph`.
@@ -428,13 +404,7 @@ impl<P: TableLeaf> Publisher<'_, '_, P> {
         paragraph: TextPosition,
         level: ParagraphListLevel,
     ) -> Result<bool> {
-        let located = self::storage(self.working, storage)?;
-        let Some(payload) = list::with_level(&located.payload, paragraph, level, self.limits)?
-        else {
-            return Ok(false);
-        };
-        self.replace(&located, payload)?;
-        Ok(true)
+        self.run(|publisher| publisher.set_level(storage, paragraph, level))
     }
 
     /// Set the numbering of the paragraph at `paragraph`.
@@ -448,19 +418,7 @@ impl<P: TableLeaf> Publisher<'_, '_, P> {
         paragraph: TextPosition,
         numbering: ParagraphListNumbering,
     ) -> Result<bool> {
-        let located = self::storage(self.working, storage)?;
-        let Some(payload) = list::with_numbering(
-            &located.payload,
-            &ListStyles(self.working),
-            paragraph,
-            numbering,
-            self.limits,
-        )?
-        else {
-            return Ok(false);
-        };
-        self.replace(&located, payload)?;
-        Ok(true)
+        self.run(|publisher| publisher.set_numbering(storage, paragraph, numbering))
     }
 
     /// Set or reset one list property of the paragraph at `paragraph`; a
@@ -476,178 +434,6 @@ impl<P: TableLeaf> Publisher<'_, '_, P> {
         paragraph: TextPosition,
         change: &Change,
     ) -> Result<bool> {
-        let located = self::storage(self.working, storage)?;
-        let exclusive = Exclusive::load(self.working)?;
-        let plan = list::plan(
-            &located.payload,
-            &ListStyles(self.working),
-            paragraph,
-            change,
-            |style| exclusive.is_exclusive(style),
-            self.limits,
-        )?;
-        let changed = self.apply(storage, paragraph, plan)?;
-        if let Change::Reset(kind) = change
-            && changed
-        {
-            self.collapse(storage, paragraph, *kind)?;
-        }
-        Ok(changed)
-    }
-
-    fn collapse(
-        &mut self,
-        storage: u64,
-        paragraph: TextPosition,
-        kind: PropertyKind,
-    ) -> Result<()> {
-        let located = self::storage(self.working, storage)?;
-        let exclusive = Exclusive::load(self.working)?;
-        let plan = list::plan_collapse(
-            &located.payload,
-            &ListStyles(self.working),
-            paragraph,
-            kind,
-            |style| exclusive.is_exclusive(style),
-            self.limits,
-        )?;
-        self.apply(storage, paragraph, plan)?;
-        Ok(())
-    }
-
-    fn apply(&mut self, storage: u64, paragraph: TextPosition, plan: Plan) -> Result<bool> {
-        let located = self::storage(self.working, storage)?;
-        match plan {
-            Plan::Unchanged => return Ok(false),
-            Plan::Rewrite { style, payload } => {
-                let object = self.working.object(style)?;
-                let index = structure::unique_message(object, &[list::MESSAGE_TYPE])?;
-                super::replace_message(self.working, style, index, payload)?;
-            },
-            Plan::Derive {
-                parent,
-                stylesheet,
-                payload,
-            } => {
-                let style_entry = self.working.locate(parent)?.ok_or(Fault::Invalid)?;
-                let created = *self.working.allocate(1)?.first().ok_or(Fault::Invalid)?;
-                let object = self.new_style(created, payload, vec![parent])?;
-                // The host's `insert_style_variation`.
-                let (_, sheet) = self.stylesheet(stylesheet)?;
-                let data = litchi_iwa_text_wire::paragraph_style::stylesheet_with_variation(
-                    &sheet,
-                    parent,
-                    created,
-                    self.limits,
-                )
-                .map_err(|_error| Fault::Invalid)?;
-                self.replace_stylesheet(stylesheet, data, created)?;
-                self.working.insert(&style_entry, object)?;
-                self.register_private(&located.entry, &style_entry, created)?;
-                let located = self::storage(self.working, storage)?;
-                let old = self.boundary_styles(&located.payload)?;
-                let new =
-                    list::boundaries_with_style(&located.payload, paragraph, created, self.limits)?;
-                let payload = list::replace_boundaries(&located.payload, &new, self.limits)?;
-                let new: Vec<u64> = new.into_iter().map(|entry| entry.1).collect();
-                self.replace_with_sequence(&located, payload, &old, &new)?;
-            },
-            Plan::Collapse {
-                style,
-                parent,
-                stylesheet,
-            } => {
-                let style_entry = self.working.locate(style)?.ok_or(Fault::Invalid)?;
-                let old = self.boundary_styles(&located.payload)?;
-                let new =
-                    list::boundaries_with_style(&located.payload, paragraph, parent, self.limits)?;
-                let payload = list::replace_boundaries(&located.payload, &new, self.limits)?;
-                let new: Vec<u64> = new.into_iter().map(|entry| entry.1).collect();
-                self.replace_with_sequence(&located, payload, &old, &new)?;
-                // The host's `remove_style_variation`.
-                let (index, sheet) = self.stylesheet(stylesheet)?;
-                let data = litchi_iwa_text_wire::paragraph_style::stylesheet_without_variation(
-                    &sheet,
-                    parent,
-                    style,
-                    self.limits,
-                )
-                .map_err(|_error| Fault::Invalid)?;
-                super::replace_message(self.working, stylesheet, index, data)?;
-                let info = self
-                    .working
-                    .object_mut(stylesheet)?
-                    .archive_info
-                    .message_infos
-                    .get_mut(index)
-                    .ok_or(Fault::Invalid)?;
-                info.object_references
-                    .retain(|reference| *reference != style);
-                for field in &mut info.field_infos {
-                    field
-                        .object_references
-                        .retain(|reference| *reference != style);
-                }
-                self.working.remove(style)?;
-                // The host's `unregister_private_style`, with the parent as
-                // the storage component's replacement reference.
-                self.transition.remove_objects(self.registry, &[style])?;
-                self.register_reference(&located.entry, &style_entry, parent)?;
-                self.transition.release_suffix(&[style])?;
-            },
-            _ => return Err(Fault::Invalid.into()),
-        }
-        Ok(true)
-    }
-}
-
-/// Which list styles one storage boundary alone references and nobody
-/// names as parent (the host's `style_is_exclusive`).
-struct Exclusive {
-    references: BTreeMap<u64, usize>,
-    parents: Vec<u64>,
-}
-
-impl Exclusive {
-    fn load<P: TableLeaf>(working: &Working<'_, P>) -> Result<Self> {
-        let mut references = BTreeMap::new();
-        let mut parents = Vec::new();
-        for name in working.component_names() {
-            let archive = working.archive(&name)?;
-            for object in &archive.objects {
-                for message in &object.messages {
-                    match message.type_ {
-                        STORAGE_MESSAGE_TYPE => {
-                            // `table_list_style` entries' objects.
-                            let Ok(Some(table)) = single_bytes(&message.data, 7) else {
-                                continue;
-                            };
-                            for entry in repeated_bytes(table, 1).unwrap_or_default() {
-                                if let Ok(Some(style)) = single_reference(entry, 2) {
-                                    *references.entry(style).or_default() += 1;
-                                }
-                            }
-                        },
-                        list::MESSAGE_TYPE => {
-                            // `super.parent`.
-                            if let Ok(Some(base)) = single_bytes(&message.data, 1)
-                                && let Ok(Some(parent)) = single_reference(base, 3)
-                            {
-                                parents.push(parent);
-                            }
-                        },
-                        _ => {},
-                    }
-                }
-            }
-        }
-        Ok(Self {
-            references,
-            parents,
-        })
-    }
-
-    fn is_exclusive(&self, style: u64) -> bool {
-        self.references.get(&style) == Some(&1) && !self.parents.contains(&style)
+        self.run(|publisher| publisher.property(storage, paragraph, change))
     }
 }
