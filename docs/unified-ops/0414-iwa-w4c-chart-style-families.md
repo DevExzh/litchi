@@ -265,3 +265,11 @@ Performance (same probe and method as §5; receipt
 | Numbers axis number format set | 151,129,897 | 44,413,081 | 0.2939 |
 | Numbers major gridline stroke set | 150,993,816 | 44,326,587 | 0.2936 |
 | Numbers border stroke set | 187,014,852 | 44,512,260 | 0.2380 |
+
+Slice 2 gates (branch with trunk `cd89e91f63`-line merged; logs
+`.coord/iwa-w4c/gates3`): every command of §8 exits 0 — fmt, the four clippy
+sets, rustdoc, the glossary (after re-exporting the axis values through the
+family modules, which the crate-boundary check requires), the leaf, `litchi-iwa`
+(parity included), `litchi` and nine `litchi-ops` test groups, pyo3,
+perf-baseline, the feature matrix (31 legs), boundaries, non-iWork, tool unit
+tests, ledger, OfficeCLI delta and corpus, bench matrix.
