@@ -2377,6 +2377,12 @@ fn rewrite_display_format(
         }
     }
 
+    // An implicit entry (no explicit-format flag) of another display family:
+    // native Pages and Keynote cells name an implicit Number entry. The
+    // host's compatibility writer interns a fresh entry of the requested
+    // family and releases the cell's reference to the implicit one instead
+    // of rewriting it in place (record 0412, the 0370k gap).
+    let mut implicit_foreign = false;
     if let Some(old_key) = old_format {
         let entry = format_facts
             .entries
@@ -2386,8 +2392,14 @@ fn rewrite_display_format(
         if entry.ref_count == 0 || !entry.is_format {
             return Err(Error::InvalidSource { path });
         }
-        let current = decode_display_payload(family, &entry.payload, budget, path)
-            .map_err(|error| display_read_error_to_write_error(error, path))?;
+        let decoded = decode_display_payload(family, &entry.payload, budget, path);
+        let current = match decoded {
+            Err(DisplayReadError::WrongFormatFamily) if explicit_flags == 0 && before.is_none() => {
+                implicit_foreign = true;
+                None
+            },
+            other => Some(other.map_err(|error| display_read_error_to_write_error(error, path))?),
+        };
         let expected_explicit = match family {
             DisplayFormatFamily::Currency => {
                 litchi_numbers_wire::explicit_currency_format_flags(old_secondary.is_some())
@@ -2410,7 +2422,7 @@ fn rewrite_display_format(
             },
         };
         if explicit_flags == expected_explicit {
-            if before != Some(current) {
+            if before != current {
                 return Err(Error::PatchConflict);
             }
         } else if before.is_some() {
@@ -2423,6 +2435,13 @@ fn rewrite_display_format(
     let after_is_some = after.is_some();
     let after_is_none = !after_is_some;
     let desired_payload = match (after, old_format) {
+        (Some(value), Some(_)) if implicit_foreign => Some(prepare_display_append(
+            family,
+            value,
+            format_payload.len(),
+            budget,
+            path,
+        )?),
         (Some(value), Some(old_key)) => {
             let entry = format_facts
                 .entries

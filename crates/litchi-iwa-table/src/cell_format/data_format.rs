@@ -186,7 +186,59 @@ pub fn rewrite(
 #[must_use]
 pub const fn maximum_members(family: Family) -> usize {
     match family {
-        Family::Custom => 3,
+        // A scalar control rewrites the tile, the format list and the
+        // control list.
+        Family::Custom | Family::ScalarControl => 3,
         _ => 2,
     }
+}
+
+/// The scalar control a format holds, when it is one (Checkbox, Star
+/// Rating, Slider or Stepper).
+#[must_use]
+pub fn scalar_control(format: &DataFormat) -> Option<CellControl> {
+    Some(match format {
+        DataFormat::Checkbox(value) => CellControl::Checkbox(*value),
+        DataFormat::StarRating(value) => CellControl::StarRating(*value),
+        DataFormat::Slider(value) => CellControl::Slider(value.clone()),
+        DataFormat::Stepper(value) => CellControl::Stepper(value.clone()),
+        _ => return None,
+    })
+}
+
+/// Rewrite the selected stored cell within one family: the display
+/// families through [`rewrite`], the scalar controls through
+/// [`control::rewrite_scalar_control`](super::control::rewrite_scalar_control)
+/// (record 0412). Pop-Up Menus are refused here; their writes also allocate
+/// a menu model and rewrite the package metadata registry.
+///
+/// # Errors
+///
+/// As [`rewrite`]; [`Refusal::UnsupportedDependency`] for a Pop-Up Menu or
+/// a change between two families.
+pub fn rewrite_family(
+    source: &dyn TableSource,
+    target: Target,
+    before: &DataFormat,
+    after: &DataFormat,
+    path: Path,
+    budget: &mut TransactionBudget,
+) -> Result<NativeControlOutput, Error> {
+    let scalar = |format: &DataFormat| family(format) == Some(Family::ScalarControl);
+    if scalar(before) || scalar(after) {
+        if (!scalar(before) && family(before).is_some())
+            || (!scalar(after) && family(after).is_some())
+        {
+            return Err(Error::Refused(Refusal::UnsupportedDependency { path }));
+        }
+        return super::control::rewrite_scalar_control(
+            source,
+            target,
+            scalar_control(before).as_ref(),
+            scalar_control(after).as_ref(),
+            path,
+            budget,
+        );
+    }
+    rewrite(source, target, before, after, path, budget)
 }
