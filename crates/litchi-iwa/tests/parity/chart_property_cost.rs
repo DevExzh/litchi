@@ -14,10 +14,11 @@
 use std::hint::black_box;
 
 use litchi_iwa::charts::{
-    Chart3dLightingStyle, ChartAxisGridline, ChartAxisGridlineStroke, ChartLegendFill,
-    ChartPieStartAngle, ChartSeriesConnectionLine, ChartShadow,
+    Chart3dLightingStyle, ChartAxisGridline, ChartAxisGridlineStroke, ChartFont, ChartLegendFill,
+    ChartLegendFont, ChartPieStartAngle, ChartSeriesConnectionLine, ChartShadow,
 };
 use litchi_iwa::shapes::ShapeFill;
+use litchi_iwa::text::TextFont;
 use litchi_iwa::{keynote, numbers, pages};
 use litchi_iwa_common::chart::axis::Axis;
 use litchi_iwa_common::chart::axis::style::Visibility;
@@ -36,7 +37,7 @@ use litchi_iwa_common::shape::shadow::{
 use litchi_iwa_common::shape::stroke::{Pattern, Stroke, Width};
 use litchi_iwa_style::chart_style::axis::{GridlineStroke, Property as AxisProperty};
 use litchi_iwa_style::chart_style::chart::{Property as ChartProperty, Shadow as LeafShadow};
-use litchi_iwa_style::legend_style::{LegendFill, Property as LegendProperty};
+use litchi_iwa_style::legend_style::{LegendFill, LegendFont, Property as LegendProperty};
 
 use crate::chart_style_cases::{Input, Target, input};
 use crate::harness::{Format, TestResult};
@@ -56,6 +57,7 @@ enum Operation {
     GridlineStrokeSet,
     BorderSet,
     LegendFillSet,
+    LegendFontSet,
     BackgroundSet,
     LightingSet,
     ShadowSet,
@@ -184,6 +186,21 @@ const ROUTES: &[(&str, Format, Operation)] = &[
         Format::Numbers,
         Operation::CategoryLabelsSet,
     ),
+    (
+        "keynote_legend_font_set",
+        Format::Keynote,
+        Operation::LegendFontSet,
+    ),
+    (
+        "pages_legend_font_set",
+        Format::Pages,
+        Operation::LegendFontSet,
+    ),
+    (
+        "numbers_legend_font_set",
+        Format::Numbers,
+        Operation::LegendFontSet,
+    ),
 ];
 
 const fn chart_kind(operation: Operation) -> Kind {
@@ -197,6 +214,7 @@ const fn chart_kind(operation: Operation) -> Kind {
         | Operation::GridlineStrokeSet
         | Operation::BorderSet
         | Operation::LegendFillSet
+        | Operation::LegendFontSet
         | Operation::BackgroundSet => Kind::Column2d,
         Operation::LightingSet => Kind::Column3d,
         Operation::ShadowSet | Operation::CategoryLabelsSet => Kind::Column2d,
@@ -241,6 +259,20 @@ fn stroke() -> TestResult<Stroke> {
 
 fn legend_fill_host() -> TestResult<ChartLegendFill> {
     Ok(ChartLegendFill::Fill(ShapeFill::Solid(fill()?)))
+}
+
+fn legend_font_host() -> TestResult<ChartLegendFont> {
+    Ok(ChartLegendFont::Font(
+        ChartFont::new(TextFont::named("Georgia")?).with_bold(true),
+    ))
+}
+
+fn legend_font_leaf() -> TestResult<LegendProperty> {
+    Ok(LegendProperty::Font(LegendFont::Font {
+        font: TextFont::named("Georgia")?,
+        bold: true,
+        italic: false,
+    }))
 }
 
 fn legend_fill_leaf() -> TestResult<LegendProperty> {
@@ -326,6 +358,9 @@ fn host_operation(input: &Input, source: &[u8], operation: Operation) -> TestRes
                 Operation::LegendFillSet => {
                     e.set_slide_chart_legend_fill(slide, chart, &legend_fill_host()?)?;
                 },
+                Operation::LegendFontSet => {
+                    e.set_slide_chart_legend_font(slide, chart, &legend_font_host()?)?;
+                },
                 Operation::AffixesSet => return Err("not a Keynote route".into()),
             }
             e.to_bytes()?
@@ -374,6 +409,9 @@ fn host_operation(input: &Input, source: &[u8], operation: Operation) -> TestRes
                 Operation::LegendFillSet => {
                     e.set_body_chart_legend_fill(chart, &legend_fill_host()?)?
                 },
+                Operation::LegendFontSet => {
+                    e.set_body_chart_legend_font(chart, &legend_font_host()?)?;
+                },
                 Operation::AffixesSet => return Err("not a Pages route".into()),
             }
             e.to_bytes()?
@@ -416,6 +454,9 @@ fn host_operation(input: &Input, source: &[u8], operation: Operation) -> TestRes
                 },
                 Operation::LegendFillSet => {
                     e.set_sheet_chart_legend_fill(sheet, chart, &legend_fill_host()?)?;
+                },
+                Operation::LegendFontSet => {
+                    e.set_sheet_chart_legend_font(sheet, chart, &legend_font_host()?)?;
                 },
                 _ => return Err("not a Numbers route".into()),
             }
@@ -503,6 +544,11 @@ fn keynote_operation(source: &[u8], operation: Operation) -> TestResult<Vec<u8>>
         Operation::LegendFillSet => {
             let mut edit = package.edit_slide_chart_legend_style(slide, chart)?;
             edit.set(legend_fill_leaf()?)?;
+            leaf_bytes!(edit.commit()?.package())
+        },
+        Operation::LegendFontSet => {
+            let mut edit = package.edit_slide_chart_legend_style(slide, chart)?;
+            edit.set(legend_font_leaf()?)?;
             leaf_bytes!(edit.commit()?.package())
         },
         Operation::AffixesSet => return Err("not a Keynote route".into()),
@@ -619,6 +665,13 @@ fn pages_operation(source: &[u8], operation: Operation) -> TestResult<Vec<u8>> {
                 .commit()?
                 .package()
         ),
+        Operation::LegendFontSet => leaf_bytes!(
+            package
+                .edit_body_chart_legend_style(chart)?
+                .set(legend_font_leaf()?)?
+                .commit()?
+                .package()
+        ),
         Operation::AffixesSet => return Err("not a Pages route".into()),
     })
 }
@@ -670,6 +723,11 @@ fn numbers_operation(source: &[u8], operation: Operation) -> TestResult<Vec<u8>>
         Operation::LegendFillSet => {
             let mut edit = package.edit_sheet_chart_legend_style(0, 1)?;
             edit.set(legend_fill_leaf()?)?;
+            Ok(leaf_bytes!(edit.commit()?.package()))
+        },
+        Operation::LegendFontSet => {
+            let mut edit = package.edit_sheet_chart_legend_style(0, 1)?;
+            edit.set(legend_font_leaf()?)?;
             Ok(leaf_bytes!(edit.commit()?.package()))
         },
         _ => Err("not a Numbers route".into()),

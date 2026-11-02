@@ -46,6 +46,8 @@ use crate::selector::BodyChartSelector;
 const CHART_MESSAGE_TYPE: u32 = 5_021;
 const CHART_STYLE_MESSAGE_TYPES_FIRST: u32 = 5_022;
 const CHART_STYLE_MESSAGE_TYPES_LAST: u32 = 5_029;
+/// `TSWP.ParagraphStyleArchive`.
+const PARAGRAPH_STYLE_MESSAGE_TYPE: u32 = 2_022;
 const STYLESHEET_MESSAGE_TYPE: u32 = 401;
 const OBJECT_CONTAINER_MESSAGE_TYPE: u32 = 11_008;
 const PACKAGE_METADATA_MESSAGE_TYPE: u32 = 11_006;
@@ -1854,6 +1856,9 @@ fn verify_message_unknowns(
             &[STYLE_EXTENSION_FIELD]
         },
         STYLESHEET_MESSAGE_TYPE => &[1, 5],
+        // A legend typography variation patched in place: its override
+        // count and character properties.
+        PARAGRAPH_STYLE_MESSAGE_TYPE => &[10, 11],
         OBJECT_CONTAINER_MESSAGE_TYPE => &[2],
         PACKAGE_METADATA_MESSAGE_TYPE => &[1, 3, 8, 10, 12],
         ROOT_MESSAGE_TYPE => &[7, 9],

@@ -7574,3 +7574,13 @@ See [0063](0063-source-pptx-modern-comments.md).
 - W4-P finished (203 Pages rows); its worktree is retired. Two new agents started: W4-D (0416: Pages body_table from scratch in numbers-wire, Numbers drawables, chart lifecycle on all formats) and W4-R (0417: Keynote builder, media replacement, and triage of the host owner I/O and plumbing rows, which retire only when a leaf API provides the capability).
 - Agents no longer use `git stash` (rule added after one agent popped another agent's preserved entry; the entry and the agent's tree were verified intact).
 - Ledger: 1,894 migrated, 44 retired and 293 host-only rows (Numbers 101, Pages 73, Keynote 61, shared 58). Nothing pushed.
+- Full gate on `0c9838a622`: all 53 rows passed (finished 2026-11-02T19:18:09Z; summary SHA-256 `edaac558427ff71e3281845e8f7115a553ef99a162a9d81cf5982ec930614a49`).
+- Merged since then:
+  - W4-D 0416 (`831c3a368b`, 19 Numbers drawable rows; shared `line_end` and `shape_path` helpers);
+  - W4-C slice 5 (`10af106c18`, chart shadow and category labels; lighting reads now as strict as the host);
+  - W4-T 0412c (`b440f4b424`, shared copy-on-write table comment reply engine; Pages/Keynote threads);
+  - W4-D 0416a (`9694f59ae5`, Numbers/Pages chart kind, direction and data; host Numbers line-duplicate fix, macOS-queued);
+  - W4-C slice 6 (`b667dc4246`, legend font and size);
+  - W4-T 0412d (`a19162dfed`, Numbers replies on the shared engine; the 3,423-line private engine is deleted).
+- W4-D stopped at a clean commit (context). Its remainder (chart add/duplicate/remove, Pages chart geometry, Numbers captions and image fill, Pages body_table from scratch, Keynote moved onto the shared helpers) is assigned to new agent W4-E (0418).
+- Ledger: 1,959 migrated, 47 retired and 228 host-only rows (Numbers 66, shared 58, Pages 56, Keynote 48). Nothing pushed.

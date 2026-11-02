@@ -25,6 +25,7 @@
 mod archive_diff;
 mod chart_font_admission_cases;
 mod chart_font_cases;
+mod chart_lifecycle_cases;
 mod chart_lighting_validation_cases;
 mod chart_property_cost;
 mod chart_style_cases;
@@ -82,6 +83,7 @@ mod numbers_chart_series_cases;
 mod numbers_chart_series_style_cases;
 mod numbers_chart_shared_style_cases;
 mod numbers_chart_style_cases;
+mod numbers_comment_thread_cases;
 mod numbers_conditional_highlight_cases;
 mod numbers_drawable_cases;
 mod numbers_drawable_comment_cases;

@@ -20,7 +20,6 @@ pub(crate) mod comments_metadata;
     dead_code,
     reason = "The private native reply transition is reached through package::comments."
 )]
-pub(crate) mod comments_reply_native;
 pub(crate) mod conditional_highlight;
 mod document_locale;
 #[allow(
@@ -56,6 +55,7 @@ pub(crate) mod sheet_chart_axis;
 pub(crate) mod sheet_chart_axis_title;
 pub(crate) mod sheet_chart_font;
 pub(crate) mod sheet_chart_legend_style;
+pub(crate) mod sheet_chart_lifecycle;
 pub(crate) mod sheet_chart_series;
 mod sheet_chart_series_style;
 pub(crate) mod sheet_chart_style;
@@ -105,7 +105,6 @@ pub(crate) mod table_cell_list;
 pub(crate) mod table_cell_number_format;
 pub(crate) mod table_cell_percentage_format;
 pub(crate) mod table_cell_pop_up_menu;
-pub(crate) use litchi_iwa_table::cell_format::pop_up_menu_native as table_cell_pop_up_menu_native;
 pub(crate) mod table_cell_scientific_format;
 pub(crate) mod table_cell_text;
 pub(crate) mod table_cell_text_format;

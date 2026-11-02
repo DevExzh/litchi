@@ -13,6 +13,16 @@ pub mod arrangement {
     };
 }
 
+/// Chart lifecycle of a body chart: the native kind and series direction
+/// (record 0416); `Package::body_chart_geometry` reads its frame.
+pub mod lifecycle {
+    pub use crate::package::body_chart_lifecycle::{
+        Commit, Diagnostics, Edit, Error, LimitKind, Patch, Refusal,
+    };
+    pub use litchi_iwa_common::chart::Direction;
+    pub use litchi_iwa_common::chart::kind::Kind;
+}
+
 /// Exact-source transactions for one body chart's data grid.
 pub mod data {
     pub use crate::package::body_chart_data::{
@@ -106,9 +116,12 @@ pub mod legend_style {
     pub use crate::package::body_chart_series::{Diagnostics, Error, LimitKind, Refusal};
     pub use crate::package::body_chart_style::LegendStyleEdit as Edit;
     pub use crate::package::body_chart_style::legend_style::{
-        Commit, LegendFill, LegendShadow, LegendStroke, Patch, Property, PropertyKind,
+        Commit, LegendFill, LegendFont, LegendFontSize, LegendShadow, LegendStroke, Patch,
+        Property, PropertyKind,
     };
     pub use litchi_iwa_common::shape::fill::{Fill, Gradient};
     pub use litchi_iwa_common::shape::shadow::Drop;
     pub use litchi_iwa_common::shape::stroke::Stroke;
+    pub use litchi_iwa_text::character::TextPointSize;
+    pub use litchi_iwa_text::font::Font;
 }

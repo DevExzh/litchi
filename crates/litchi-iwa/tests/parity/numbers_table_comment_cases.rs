@@ -1,9 +1,8 @@
 //! Numbers table-cell comment mutation parity (wave W1-G, record 0379).
 //!
 //! The shared slice covers Numbers table-cell comment reads and root
-//! create/set/clear transitions. Direct reply mutations remain an explicit
-//! host-only follow-up until their graph transitions are lifted into the
-//! shared native engine.
+//! create/set/clear transitions. Direct reply mutations and a reply-bearing
+//! root's set are in `numbers_comment_thread_cases` (record 0412d).
 
 #[cfg(feature = "parity-host-oracle")]
 use std::collections::{BTreeMap, BTreeSet};
@@ -74,15 +73,15 @@ struct DataListSnapshot {
     payload: Vec<u8>,
 }
 
-fn position() -> At {
+pub(crate) fn position() -> At {
     At::new(ROW as u32, COLUMN as u32)
 }
 
-fn host_model(editor: &numbers::Draft) -> TestResult<u64> {
+pub(crate) fn host_model(editor: &numbers::Draft) -> TestResult<u64> {
     crate::numbers_cases::host_first_table_model_id(editor)
 }
 
-fn populated_comment_fixture() -> TestResult<Fixture> {
+pub(crate) fn populated_comment_fixture() -> TestResult<Fixture> {
     // Keep the source-built marker alive while the host writes both records:
     // `Draft::set_cell_comment` therefore takes its legacy fallback, rather
     // than delegating this fixture's authoring to the focused leaf owner.
@@ -97,7 +96,7 @@ fn populated_comment_fixture() -> TestResult<Fixture> {
 }
 
 #[cfg(feature = "parity-host-oracle")]
-fn native_fixture() -> TestResult<Fixture> {
+pub(crate) fn native_fixture() -> TestResult<Fixture> {
     fixture(FIXTURE)
 }
 
@@ -755,7 +754,7 @@ fn decode_comment_storage(data: &[u8]) -> Result<Decoded, prost::DecodeError> {
 }
 
 #[cfg(feature = "parity-host-oracle")]
-fn masked_new_comment_storage(data: &[u8]) -> Result<Decoded, prost::DecodeError> {
+pub(crate) fn masked_new_comment_storage(data: &[u8]) -> Result<Decoded, prost::DecodeError> {
     let mut message = tsd::CommentStorageArchive::decode(data)?;
     if message.creation_date.is_some() {
         message.creation_date = Some(litchi_iwa_protos::tsp::Date { seconds: 0.0 });

@@ -353,14 +353,14 @@ keynote/editor/slide_charts/font.rs	slide_chart_font_size	1	keynote	chart.style	
 keynote/editor/slide_charts/gaps.rs	set_slide_chart_gap_spacing	1	keynote	chart.style	migrated	litchi_keynote::chart::style::Edit::set	keynote_slide_chart_options_set_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
 keynote/editor/slide_charts/gaps.rs	slide_chart_gap_spacing	1	keynote	chart.style	migrated	litchi_keynote::Package::slide_chart_style	keynote_slide_chart_options_read_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
 keynote/editor/slide_charts/legend.rs	set_slide_chart_legend_fill	1	keynote	chart.style	migrated	litchi_keynote::chart::legend_style::Edit::set	keynote_slide_chart_legend_style_set_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
-keynote/editor/slide_charts/legend.rs	set_slide_chart_legend_font	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_charts/legend.rs	set_slide_chart_legend_font_size	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
+keynote/editor/slide_charts/legend.rs	set_slide_chart_legend_font	1	keynote	chart.style	migrated	litchi_keynote::chart::legend_style::Edit::set	keynote_slide_chart_legend_style_set_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+keynote/editor/slide_charts/legend.rs	set_slide_chart_legend_font_size	1	keynote	chart.style	migrated	litchi_keynote::chart::legend_style::Edit::set	keynote_slide_chart_legend_style_set_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
 keynote/editor/slide_charts/legend.rs	set_slide_chart_legend_frame	1	keynote	chart.style	migrated	litchi_keynote::chart::style::Edit::set	keynote_slide_chart_style_set_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
 keynote/editor/slide_charts/legend.rs	set_slide_chart_legend_shadow	1	keynote	chart.style	migrated	litchi_keynote::chart::legend_style::Edit::set	keynote_slide_chart_legend_style_set_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
 keynote/editor/slide_charts/legend.rs	set_slide_chart_legend_stroke	1	keynote	chart.style	migrated	litchi_keynote::chart::legend_style::Edit::set	keynote_slide_chart_legend_style_set_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
 keynote/editor/slide_charts/legend.rs	slide_chart_legend_fill	1	keynote	chart.style	migrated	litchi_keynote::Package::slide_chart_legend_style	keynote_slide_chart_legend_style_read_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
-keynote/editor/slide_charts/legend.rs	slide_chart_legend_font	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_charts/legend.rs	slide_chart_legend_font_size	1	keynote	chart.style	host-only	litchi-keynote	-	-	-	-
+keynote/editor/slide_charts/legend.rs	slide_chart_legend_font	1	keynote	chart.style	migrated	litchi_keynote::Package::slide_chart_legend_style	keynote_slide_chart_legend_style_read_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+keynote/editor/slide_charts/legend.rs	slide_chart_legend_font_size	1	keynote	chart.style	migrated	litchi_keynote::Package::slide_chart_legend_style	keynote_slide_chart_legend_style_read_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
 keynote/editor/slide_charts/legend.rs	slide_chart_legend_frame	1	keynote	chart.style	migrated	litchi_keynote::Package::slide_chart_style	keynote_slide_chart_style_read_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
 keynote/editor/slide_charts/legend.rs	slide_chart_legend_shadow	1	keynote	chart.style	migrated	litchi_keynote::Package::slide_chart_legend_style	keynote_slide_chart_legend_style_read_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
 keynote/editor/slide_charts/legend.rs	slide_chart_legend_stroke	1	keynote	chart.style	migrated	litchi_keynote::Package::slide_chart_legend_style	keynote_slide_chart_legend_style_read_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
@@ -793,10 +793,13 @@ numbers/editor/semantic/media.rs	replace_media	1	numbers	media.asset	migrated	li
 numbers/editor/semantic/media.rs	save	1	numbers	io	retired	-	-	-	-	retired: output of the host Numbers Draft; the leaf owner writes through litchi_numbers::Package::{write_to, save}. Unedited output equals the leaf: numbers_package_lifecycle_parity (record 0417)
 numbers/editor/semantic/media.rs	sheet_media_assets	1	numbers	media.asset	migrated	litchi_numbers::Package::sheet_media_assets	numbers_media_assets_read_parity	A	-	-
 numbers/editor/semantic/media.rs	to_bytes	1	numbers	io	retired	-	-	-	-	retired: output of the host Numbers Draft; the leaf owner writes through litchi_numbers::Package::{write_to, save}. Unedited output equals the leaf: numbers_package_lifecycle_parity (record 0417)
+numbers/editor/semantic/table.rs	__parity_add_table_cell_comment_reply_legacy	1	numbers	table.cell_comment	retired	-	-	-	-	parity-only hidden legacy host oracle, not a supported Numbers API; removed with the differential host harness in W3
 numbers/editor/semantic/table.rs	__parity_clear_table_cell_comment_legacy	1	numbers	table.cell_comment	retired	-	-	-	-	parity-only hidden legacy host oracle, not a supported Numbers API; removed with the differential host harness in W3
 numbers/editor/semantic/table.rs	__parity_read_table_cell_comment	1	numbers	table.cell_comment	retired	-	-	-	-	parity-only hidden selector witness, not a supported Numbers API; removed with the differential host harness in W3
+numbers/editor/semantic/table.rs	__parity_remove_table_cell_comment_reply_legacy	1	numbers	table.cell_comment	retired	-	-	-	-	parity-only hidden legacy host oracle, not a supported Numbers API; removed with the differential host harness in W3
 numbers/editor/semantic/table.rs	__parity_set_table_cell_comment_legacy	1	numbers	table.cell_comment	retired	-	-	-	-	parity-only hidden legacy host oracle, not a supported Numbers API; removed with the differential host harness in W3
-numbers/editor/semantic/table.rs	add_cell_comment_reply	1	numbers	table.cell_comment	host-only	-	-	-	-	root-only shared slice; reply-thread lifecycle remains deferred
+numbers/editor/semantic/table.rs	__parity_set_table_cell_comment_reply_legacy	1	numbers	table.cell_comment	retired	-	-	-	-	parity-only hidden legacy host oracle, not a supported Numbers API; removed with the differential host harness in W3
+numbers/editor/semantic/table.rs	add_cell_comment_reply	1	numbers	table.cell_comment	migrated	litchi_numbers::Package::add_table_cell_comment_reply	numbers_table_cell_comment_reply_add_parity	B	-	-
 numbers/editor/semantic/table.rs	cell_comment_replies	1	numbers	table.cell_comment	migrated	litchi_numbers::Package::table_cell_comment_replies	numbers_table_cell_comment_replies_read_parity	A	-	-
 numbers/editor/semantic/table.rs	cell_conditional_highlight_rules	1	numbers	table.conditional_highlight	migrated	litchi_numbers::Package::table_cell_conditional_highlight	numbers_conditional_highlight_read_parity	A	-	-
 numbers/editor/semantic/table.rs	cell_conditional_highlighting	1	numbers	table.conditional_highlight	migrated	litchi_numbers::Package::table_cell_conditional_highlight	numbers_conditional_highlight_read_parity	A	-	-
@@ -804,7 +807,7 @@ numbers/editor/semantic/table.rs	clear_cell_conditional_highlighting	1	numbers	t
 numbers/editor/semantic/table.rs	clear_table_cell_border	1	numbers	table.cell_appearance	migrated	litchi_numbers::Package::edit_table_cell_appearance	numbers_table_cell_border_clear_parity	B	-	-
 numbers/editor/semantic/table.rs	merge_cells	1	numbers	table.merge	migrated	litchi_numbers::Package::edit_table_merges	numbers_table_merge_parity	A	-	-
 numbers/editor/semantic/table.rs	pivot_categories	1	numbers	table.pivot	host-only	litchi-numbers	-	-	-	-
-numbers/editor/semantic/table.rs	remove_cell_comment_reply	1	numbers	table.cell_comment	host-only	-	-	-	-	root-only shared slice; reply-thread lifecycle remains deferred
+numbers/editor/semantic/table.rs	remove_cell_comment_reply	1	numbers	table.cell_comment	migrated	litchi_numbers::Package::remove_table_cell_comment_reply	numbers_table_cell_comment_reply_remove_parity	B	-	-
 numbers/editor/semantic/table.rs	reset_table_cell_fill	1	numbers	table.cell_appearance	migrated	litchi_numbers::Package::edit_table_cell_appearance	numbers_table_cell_fill_reset_parity	B	-	-
 numbers/editor/semantic/table.rs	reset_table_cell_layout	1	numbers	table.cell_appearance	migrated	litchi_numbers::Package::edit_table_cell_appearance	numbers_table_cell_layout_reset_parity	B	-	-
 numbers/editor/semantic/table.rs	reset_table_cell_numeral_system_format	1	numbers	table.cell_format	migrated	litchi_numbers::Package::edit_table_cell_data_format	numbers_table_cell_numeral_system_format_parity	B	-	-
@@ -834,8 +837,8 @@ numbers/editor/semantic/table.rs	reset_table_cell_text_outline	1	numbers	table.c
 numbers/editor/semantic/table.rs	reset_table_cell_text_script	1	numbers	table.cell_rich_text	migrated	litchi_numbers::Package::edit_table_cell_text	numbers_cell_text_property_parity	B	-	-
 numbers/editor/semantic/table.rs	reset_table_cell_text_shadow	1	numbers	table.cell_rich_text	migrated	litchi_numbers::Package::edit_table_cell_text	numbers_cell_text_property_parity	B	-	-
 numbers/editor/semantic/table.rs	reset_table_cell_text_style	1	numbers	table.cell_rich_text	migrated	litchi_numbers::Package::edit_table_cell_text	numbers_cell_text_property_parity	B	-	-
-numbers/editor/semantic/table.rs	set_cell_comment	1	numbers	table.cell_comment	host-only	-	-	-	-	root replacement with replies remains deferred; no full host coverage claim
-numbers/editor/semantic/table.rs	set_cell_comment_reply	1	numbers	table.cell_comment	host-only	-	-	-	-	root-only shared slice; reply-thread lifecycle remains deferred
+numbers/editor/semantic/table.rs	set_cell_comment	1	numbers	table.cell_comment	migrated	litchi_numbers::Package::set_table_cell_comment	numbers_table_cell_comment_set_with_replies_parity	B	-	-
+numbers/editor/semantic/table.rs	set_cell_comment_reply	1	numbers	table.cell_comment	migrated	litchi_numbers::Package::set_table_cell_comment_reply	numbers_table_cell_comment_reply_set_parity	B	-	-
 numbers/editor/semantic/table.rs	set_cell_conditional_highlighting	1	numbers	table.conditional_highlight	migrated	litchi_numbers::Package::edit_table_cell_conditional_highlights	numbers_conditional_highlight_set_parity	B	-	-
 numbers/editor/semantic/table.rs	set_table_cell_border	1	numbers	table.cell_appearance	migrated	litchi_numbers::Package::edit_table_cell_appearance	numbers_table_cell_border_parity	B	-	-
 numbers/editor/semantic/table.rs	set_table_cell_data_format	1	numbers	table.cell_format	migrated	litchi_numbers::Package::edit_table_cell_data_format	numbers_table_cell_data_format_set_parity	B	-	-
@@ -1071,11 +1074,11 @@ numbers/editor/sheet_audio.rs	sheet_audio_properties	1	numbers	drawable.audio	mi
 numbers/editor/sheet_charts.rs	add_sheet_chart	1	numbers	chart.lifecycle	host-only	litchi-numbers	-	-	-	-
 numbers/editor/sheet_charts.rs	duplicate_sheet_chart	1	numbers	chart.lifecycle	host-only	litchi-numbers	-	-	-	-
 numbers/editor/sheet_charts.rs	remove_sheet_chart	1	numbers	chart.lifecycle	host-only	litchi-numbers	-	-	-	-
-numbers/editor/sheet_charts.rs	set_sheet_chart_data	1	numbers	chart.lifecycle	host-only	litchi-numbers	-	-	-	-
-numbers/editor/sheet_charts.rs	set_sheet_chart_direction	1	numbers	chart.lifecycle	host-only	litchi-numbers	-	-	-	-
+numbers/editor/sheet_charts.rs	set_sheet_chart_data	1	numbers	chart.lifecycle	migrated	litchi_numbers::sheet::chart::data::Edit::set	numbers_sheet_chart_data_set_parity	B	-	-
+numbers/editor/sheet_charts.rs	set_sheet_chart_direction	1	numbers	chart.lifecycle	migrated	litchi_numbers::sheet::chart::lifecycle::Edit::set_direction	numbers_sheet_chart_direction_parity	B	-	-
 numbers/editor/sheet_charts.rs	set_sheet_chart_geometry	1	numbers	chart.lifecycle	migrated	litchi_numbers::sheet::drawable::properties::Edit::set_geometry	numbers_sheet_chart_geometry_parity	A	-	-
-numbers/editor/sheet_charts.rs	set_sheet_chart_kind	1	numbers	chart.lifecycle	host-only	litchi-numbers	-	-	-	-
-numbers/editor/sheet_charts.rs	sheet_charts	1	numbers	chart.lifecycle	host-only	litchi-numbers	-	-	-	-
+numbers/editor/sheet_charts.rs	set_sheet_chart_kind	1	numbers	chart.lifecycle	migrated	litchi_numbers::sheet::chart::lifecycle::Edit::set_kind	numbers_sheet_chart_kind_parity	B	-	-
+numbers/editor/sheet_charts.rs	sheet_charts	1	numbers	chart.lifecycle	migrated	litchi_numbers::Package::sheet_chart_metadata	numbers_sheet_charts_read_parity	A	-	-
 numbers/editor/sheet_charts/axis.rs	remove_sheet_chart_axis_title	1	numbers	chart.text	migrated	litchi-numbers::Package::edit_sheet_chart_axis_title	numbers_chart_title_and_axis_title_remove_parity	A	-	-
 numbers/editor/sheet_charts/axis.rs	set_sheet_chart_axis_title	1	numbers	chart.text	migrated	litchi-numbers::Package::edit_sheet_chart_axis_title	numbers_chart_title_and_axis_title_set_parity	A	-	-
 numbers/editor/sheet_charts/axis.rs	sheet_chart_axis_title	1	numbers	chart.text	migrated	litchi-numbers::Package::sheet_chart_axis_title	numbers_chart_title_and_axis_title_read_parity	A	-	-
@@ -1140,15 +1143,15 @@ numbers/editor/sheet_charts/gaps.rs	sheet_chart_gap_spacing	1	numbers	chart.styl
 numbers/editor/sheet_charts/hidden_data.rs	set_sheet_chart_includes_hidden_data	1	numbers	chart.style	migrated	litchi_numbers::sheet::chart::style::Edit::set	numbers_sheet_chart_options_set_parity	A	-	-
 numbers/editor/sheet_charts/hidden_data.rs	sheet_chart_includes_hidden_data	1	numbers	chart.style	migrated	litchi_numbers::Package::sheet_chart_style	numbers_sheet_chart_options_read_parity	A	-	-
 numbers/editor/sheet_charts/legend.rs	set_sheet_chart_legend_fill	1	numbers	chart.style	migrated	litchi_numbers::sheet::chart::legend_style::Edit::set	numbers_sheet_chart_legend_style_set_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
-numbers/editor/sheet_charts/legend.rs	set_sheet_chart_legend_font	1	numbers	chart.style	host-only	litchi-numbers	-	-	-	-
-numbers/editor/sheet_charts/legend.rs	set_sheet_chart_legend_font_size	1	numbers	chart.style	host-only	litchi-numbers	-	-	-	-
+numbers/editor/sheet_charts/legend.rs	set_sheet_chart_legend_font	1	numbers	chart.style	migrated	litchi_numbers::sheet::chart::legend_style::Edit::set	numbers_sheet_chart_legend_style_set_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+numbers/editor/sheet_charts/legend.rs	set_sheet_chart_legend_font_size	1	numbers	chart.style	migrated	litchi_numbers::sheet::chart::legend_style::Edit::set	numbers_sheet_chart_legend_style_set_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
 numbers/editor/sheet_charts/legend.rs	set_sheet_chart_legend_frame	1	numbers	chart.style	migrated	litchi_numbers::sheet::chart::style::Edit::set	numbers_sheet_chart_style_set_parity	A	-	-
 numbers/editor/sheet_charts/legend.rs	set_sheet_chart_legend_shadow	1	numbers	chart.style	migrated	litchi_numbers::sheet::chart::legend_style::Edit::set	numbers_sheet_chart_legend_style_set_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
 numbers/editor/sheet_charts/legend.rs	set_sheet_chart_legend_stroke	1	numbers	chart.style	migrated	litchi_numbers::sheet::chart::legend_style::Edit::set	numbers_sheet_chart_legend_style_set_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
 numbers/editor/sheet_charts/legend.rs	set_sheet_chart_legend_visible	1	numbers	chart.legend_axis	migrated	litchi_numbers::sheet::chart::style::Edit::set	numbers_sheet_chart_options_set_parity	A	-	-
 numbers/editor/sheet_charts/legend.rs	sheet_chart_legend_fill	1	numbers	chart.style	migrated	litchi_numbers::Package::sheet_chart_legend_style	numbers_sheet_chart_legend_style_read_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
-numbers/editor/sheet_charts/legend.rs	sheet_chart_legend_font	1	numbers	chart.style	host-only	litchi-numbers	-	-	-	-
-numbers/editor/sheet_charts/legend.rs	sheet_chart_legend_font_size	1	numbers	chart.style	host-only	litchi-numbers	-	-	-	-
+numbers/editor/sheet_charts/legend.rs	sheet_chart_legend_font	1	numbers	chart.style	migrated	litchi_numbers::Package::sheet_chart_legend_style	numbers_sheet_chart_legend_style_read_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+numbers/editor/sheet_charts/legend.rs	sheet_chart_legend_font_size	1	numbers	chart.style	migrated	litchi_numbers::Package::sheet_chart_legend_style	numbers_sheet_chart_legend_style_read_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
 numbers/editor/sheet_charts/legend.rs	sheet_chart_legend_frame	1	numbers	chart.style	migrated	litchi_numbers::Package::sheet_chart_style	numbers_sheet_chart_style_read_parity	A	-	-
 numbers/editor/sheet_charts/legend.rs	sheet_chart_legend_shadow	1	numbers	chart.style	migrated	litchi_numbers::Package::sheet_chart_legend_style	numbers_sheet_chart_legend_style_read_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
 numbers/editor/sheet_charts/legend.rs	sheet_chart_legend_stroke	1	numbers	chart.style	migrated	litchi_numbers::Package::sheet_chart_legend_style	numbers_sheet_chart_legend_style_read_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
@@ -1630,13 +1633,13 @@ pages/editor/body_shapes/caption.rs	remove_body_shape_title	1	pages	drawable.sha
 pages/editor/body_shapes/caption.rs	set_body_shape_caption	1	pages	drawable.shape	migrated	litchi_pages::Package::edit_body_drawable_caption	pages_body_shape_caption_set_parity	B	-	-
 pages/editor/body_shapes/caption.rs	set_body_shape_title	1	pages	drawable.shape	migrated	litchi_pages::Package::edit_body_drawable_caption	pages_body_shape_title_set_parity	B	-	-
 pages/editor/charts.rs	add_body_chart	1	pages	chart.lifecycle	host-only	litchi-pages	-	-	-	-
-pages/editor/charts.rs	body_charts	1	pages	chart.lifecycle	host-only	litchi-pages	-	-	-	-
+pages/editor/charts.rs	body_charts	1	pages	chart.lifecycle	migrated	litchi_pages::Package::body_chart_metadata	pages_body_charts_read_parity	A	-	-
 pages/editor/charts.rs	duplicate_body_chart	1	pages	chart.lifecycle	host-only	litchi-pages	-	-	-	-
 pages/editor/charts.rs	remove_body_chart	1	pages	chart.lifecycle	host-only	litchi-pages	-	-	-	-
-pages/editor/charts.rs	set_body_chart_data	1	pages	chart.lifecycle	host-only	litchi-pages	-	-	-	-
-pages/editor/charts.rs	set_body_chart_direction	1	pages	chart.lifecycle	host-only	litchi-pages	-	-	-	-
+pages/editor/charts.rs	set_body_chart_data	1	pages	chart.lifecycle	migrated	litchi_pages::chart::data::Edit::set	pages_body_chart_data_set_parity	B	-	-
+pages/editor/charts.rs	set_body_chart_direction	1	pages	chart.lifecycle	migrated	litchi_pages::chart::lifecycle::Edit::set_direction	pages_body_chart_direction_parity	B	-	-
 pages/editor/charts.rs	set_body_chart_geometry	1	pages	chart.lifecycle	host-only	litchi-pages	-	-	-	-
-pages/editor/charts.rs	set_body_chart_kind	1	pages	chart.lifecycle	host-only	litchi-pages	-	-	-	-
+pages/editor/charts.rs	set_body_chart_kind	1	pages	chart.lifecycle	migrated	litchi_pages::chart::lifecycle::Edit::set_kind	pages_body_chart_kind_parity	B	-	-
 pages/editor/charts/axis.rs	body_chart_axis_title	1	pages	chart.text	migrated	litchi-pages::Package::body_chart_axis_title	pages_chart_title_and_axis_title_read_parity	A	-	-
 pages/editor/charts/axis.rs	remove_body_chart_axis_title	1	pages	chart.text	migrated	litchi-pages::Package::edit_body_chart_axis_title	pages_chart_title_and_axis_title_remove_parity	A	-	-
 pages/editor/charts/axis.rs	set_body_chart_axis_title	1	pages	chart.text	migrated	litchi-pages::Package::edit_body_chart_axis_title	pages_chart_title_and_axis_title_set_parity	A	-	-
@@ -1699,15 +1702,15 @@ pages/editor/charts/font.rs	set_body_chart_font_size	1	pages	chart.style	migrate
 pages/editor/charts/gaps.rs	body_chart_gap_spacing	1	pages	chart.style	migrated	litchi_pages::Package::body_chart_style	pages_body_chart_options_read_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
 pages/editor/charts/gaps.rs	set_body_chart_gap_spacing	1	pages	chart.style	migrated	litchi_pages::chart::style::Edit::set	pages_body_chart_options_set_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
 pages/editor/charts/legend.rs	body_chart_legend_fill	1	pages	chart.style	migrated	litchi_pages::Package::body_chart_legend_style	pages_body_chart_legend_style_read_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
-pages/editor/charts/legend.rs	body_chart_legend_font	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
-pages/editor/charts/legend.rs	body_chart_legend_font_size	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
+pages/editor/charts/legend.rs	body_chart_legend_font	1	pages	chart.style	migrated	litchi_pages::Package::body_chart_legend_style	pages_body_chart_legend_style_read_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+pages/editor/charts/legend.rs	body_chart_legend_font_size	1	pages	chart.style	migrated	litchi_pages::Package::body_chart_legend_style	pages_body_chart_legend_style_read_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
 pages/editor/charts/legend.rs	body_chart_legend_frame	1	pages	chart.style	migrated	litchi_pages::Package::body_chart_style	pages_body_chart_style_read_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
 pages/editor/charts/legend.rs	body_chart_legend_shadow	1	pages	chart.style	migrated	litchi_pages::Package::body_chart_legend_style	pages_body_chart_legend_style_read_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
 pages/editor/charts/legend.rs	body_chart_legend_stroke	1	pages	chart.style	migrated	litchi_pages::Package::body_chart_legend_style	pages_body_chart_legend_style_read_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
 pages/editor/charts/legend.rs	body_chart_legend_visible	1	pages	chart.legend_axis	host-only	litchi-pages	-	-	-	-
 pages/editor/charts/legend.rs	set_body_chart_legend_fill	1	pages	chart.style	migrated	litchi_pages::chart::legend_style::Edit::set	pages_body_chart_legend_style_set_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
-pages/editor/charts/legend.rs	set_body_chart_legend_font	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
-pages/editor/charts/legend.rs	set_body_chart_legend_font_size	1	pages	chart.style	host-only	litchi-pages	-	-	-	-
+pages/editor/charts/legend.rs	set_body_chart_legend_font	1	pages	chart.style	migrated	litchi_pages::chart::legend_style::Edit::set	pages_body_chart_legend_style_set_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
+pages/editor/charts/legend.rs	set_body_chart_legend_font_size	1	pages	chart.style	migrated	litchi_pages::chart::legend_style::Edit::set	pages_body_chart_legend_style_set_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
 pages/editor/charts/legend.rs	set_body_chart_legend_frame	1	pages	chart.style	migrated	litchi_pages::chart::style::Edit::set	pages_body_chart_style_set_parity	A	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
 pages/editor/charts/legend.rs	set_body_chart_legend_shadow	1	pages	chart.style	migrated	litchi_pages::chart::legend_style::Edit::set	pages_body_chart_legend_style_set_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md
 pages/editor/charts/legend.rs	set_body_chart_legend_stroke	1	pages	chart.style	migrated	litchi_pages::chart::legend_style::Edit::set	pages_body_chart_legend_style_set_parity	B	-	W4-C 0414: shared chart engine (litchi_iwa_style); native verification queued in 0363-mac-queue.md

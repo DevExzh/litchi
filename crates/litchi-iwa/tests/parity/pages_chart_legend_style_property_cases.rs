@@ -4,7 +4,10 @@
 //! `litchi_pages::Package::edit_body_chart_legend_style` on the shared
 //! legend-style graph.
 
-use litchi_iwa::charts::{ChartLegendFill, ChartLegendShadow, ChartLegendStroke};
+use litchi_iwa::charts::{
+    ChartFont, ChartFontSize, ChartLegendFill, ChartLegendFont, ChartLegendFontSize,
+    ChartLegendShadow, ChartLegendStroke,
+};
 use litchi_iwa::pages;
 use litchi_iwa::shapes::ShapeFill;
 use litchi_iwa_common::chart::kind::Kind;
@@ -14,7 +17,8 @@ use litchi_iwa_common::shape::shadow::{Angle, Appearance, BlurRadius, Drop, Offs
 use litchi_iwa_common::shape::stroke::{Pattern, Stroke, Width};
 use litchi_pages::Package;
 use litchi_pages::chart::legend_style::{
-    LegendFill, LegendShadow, LegendStroke, Property, PropertyKind,
+    Font, LegendFill, LegendFont, LegendFontSize, LegendShadow, LegendStroke, Property,
+    PropertyKind, TextPointSize,
 };
 
 use crate::chart_style_cases::input;
@@ -58,12 +62,32 @@ const fn host_shadow(shadow: LegendShadow) -> ChartLegendShadow {
     }
 }
 
+fn host_font(font: &LegendFont) -> ChartLegendFont {
+    match font {
+        LegendFont::Font { font, bold, italic } => ChartLegendFont::Font(
+            ChartFont::new(font.clone())
+                .with_bold(*bold)
+                .with_italic(*italic),
+        ),
+        _ => ChartLegendFont::Inherited,
+    }
+}
+
+fn host_size(size: LegendFontSize) -> ChartLegendFontSize {
+    match size {
+        LegendFontSize::Size(size) => ChartLegendFontSize::Size(ChartFontSize::from(size)),
+        _ => ChartLegendFontSize::Inherited,
+    }
+}
+
 fn host_write(source: &[u8], _sheet: (), chart: u64, value: &Property) -> TestResult<Vec<u8>> {
     let mut e = pages::Draft::from_bytes(source)?;
     match value {
         Property::Fill(v) => e.set_body_chart_legend_fill(chart, &host_fill(v)?)?,
         Property::Stroke(v) => e.set_body_chart_legend_stroke(chart, host_stroke(*v))?,
         Property::Shadow(v) => e.set_body_chart_legend_shadow(chart, host_shadow(*v))?,
+        Property::Font(v) => e.set_body_chart_legend_font(chart, &host_font(v))?,
+        Property::FontSize(v) => e.set_body_chart_legend_font_size(chart, host_size(*v))?,
         _ => return Err("unmapped property".into()),
     }
     Ok(e.to_bytes()?)
@@ -75,6 +99,8 @@ fn host_read(bytes: &[u8], _sheet: (), chart: u64, kind: PropertyKind) -> TestRe
         PropertyKind::Fill => format!("{:?}", e.body_chart_legend_fill(chart)?),
         PropertyKind::Stroke => format!("{:?}", e.body_chart_legend_stroke(chart)?),
         PropertyKind::Shadow => format!("{:?}", e.body_chart_legend_shadow(chart)?),
+        PropertyKind::Font => format!("{:?}", e.body_chart_legend_font(chart)?),
+        PropertyKind::FontSize => format!("{:?}", e.body_chart_legend_font_size(chart)?),
         _ => return Err("unmapped kind".into()),
     })
 }
@@ -86,6 +112,8 @@ fn leaf_read(bytes: &[u8], kind: PropertyKind) -> TestResult<String> {
         Property::Fill(v) => format!("{:?}", host_fill(&v)?),
         Property::Stroke(v) => format!("{:?}", host_stroke(v)),
         Property::Shadow(v) => format!("{:?}", host_shadow(v)),
+        Property::Font(v) => format!("{:?}", host_font(&v)),
+        Property::FontSize(v) => format!("{:?}", host_size(v)),
         _ => return Err("unmapped property".into()),
     })
 }
@@ -110,15 +138,62 @@ fn cases() -> TestResult<Vec<Property>> {
             Angle::FORTY_FIVE_DEGREES,
         ))),
         Property::Shadow(LegendShadow::None),
+        Property::Font(LegendFont::Font {
+            font: Font::named("Georgia")?,
+            bold: true,
+            italic: false,
+        }),
+        Property::FontSize(LegendFontSize::Size(TextPointSize::from_points(18.0)?)),
+    ])
+}
+
+/// Typography writes over an existing legend variation: (host-applied
+/// prefix, value). Setting the font beside a stored size patches the
+/// exclusive variation in place; resetting one of two overrides keeps it.
+fn typography_sequences() -> TestResult<Vec<(Vec<Property>, Property)>> {
+    let size = Property::FontSize(LegendFontSize::Size(TextPointSize::from_points(15.0)?));
+    let font = Property::Font(LegendFont::Font {
+        font: Font::named("Courier New")?,
+        bold: false,
+        italic: true,
+    });
+    Ok(vec![
+        (vec![size.clone()], font.clone()),
+        (vec![font.clone()], size.clone()),
+        (
+            vec![size.clone()],
+            Property::FontSize(LegendFontSize::Size(TextPointSize::from_points(9.0)?)),
+        ),
+        (
+            vec![size.clone(), font.clone()],
+            Property::Font(LegendFont::Inherited),
+        ),
+        (
+            vec![font, size],
+            Property::FontSize(LegendFontSize::Inherited),
+        ),
     ])
 }
 
 /// Set `value` on a host-added chart (or reset it after a host set).
 fn legend_case(name: &'static str, value: &Property, reset: bool) -> TestResult {
+    legend_case_after(name, &[], value, reset)
+}
+
+/// [`legend_case`] on a source the host first applied `prefix` to.
+fn legend_case_after(
+    name: &'static str,
+    prefix: &[Property],
+    value: &Property,
+    reset: bool,
+) -> TestResult {
     let mut input = input(Format::Pages, Kind::Column2d)?;
     let sheet = ();
     let chart = input.chart;
     let kind = value.kind();
+    for step in prefix {
+        input.fixture.bytes = host_write(&input.fixture.bytes, sheet, chart, step)?;
+    }
     if reset {
         input.fixture.bytes = host_write(&input.fixture.bytes, sheet, chart, value)?;
     }
@@ -169,6 +244,14 @@ fn pages_body_chart_legend_style_set_parity() -> TestResult {
     for value in cases()? {
         legend_case("pages_body_chart_legend_style_set_parity", &value, false)?;
         legend_case("pages_body_chart_legend_style_set_parity", &value, true)?;
+    }
+    for (prefix, value) in typography_sequences()? {
+        legend_case_after(
+            "pages_body_chart_legend_style_set_parity",
+            &prefix,
+            &value,
+            false,
+        )?;
     }
     Ok(())
 }

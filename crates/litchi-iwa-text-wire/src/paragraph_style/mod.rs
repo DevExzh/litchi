@@ -750,6 +750,79 @@ pub fn font_variation(
     variation(parent, stylesheet, &overrides, limits)
 }
 
+/// Every override a managed variation holds (opaque), with its font subset
+/// editable: the chart legend typography keeps the variation's other
+/// overrides when it rewrites the font ones (record 0414).
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct VariationOverrides(Overrides);
+
+impl VariationOverrides {
+    /// The font subset.
+    #[must_use]
+    pub fn font(&self) -> FontOverrides {
+        FontOverrides {
+            font: self.0.font.clone(),
+            bold: self.0.bold,
+            italic: self.0.italic,
+            point_size: self.0.point_size,
+        }
+    }
+
+    /// Replace the font subset, keeping every other override.
+    pub fn set_font(&mut self, font: FontOverrides) {
+        self.0.font = font.font;
+        self.0.bold = font.bold;
+        self.0.italic = font.italic;
+        self.0.point_size = font.point_size;
+    }
+
+    /// How many properties the variation overrides (its stored override
+    /// count).
+    #[must_use]
+    pub fn count(&self) -> u32 {
+        self.0.count()
+    }
+
+    /// Whether nothing is overridden.
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+}
+
+/// The overrides of `style` when it is a managed variation (`None`
+/// otherwise).
+///
+/// # Errors
+///
+/// [`Error::InvalidSource`] for a missing or malformed style; resource
+/// errors as configured.
+pub fn variation_overrides(
+    styles: &(impl Styles + ?Sized),
+    style: u64,
+    limits: WireLimits,
+) -> Result<Option<VariationOverrides>> {
+    let mut budget = Budget::new(limits);
+    let (parsed, raw) = inherit::locate(styles, style, &mut budget)?;
+    Ok(overrides::direct_overrides(&parsed, raw, &mut budget)?.map(VariationOverrides))
+}
+
+/// A canonical variation of `parent` in `stylesheet` holding exactly
+/// `overrides`.
+///
+/// # Errors
+///
+/// [`Error::InvalidSource`] for empty overrides; resource errors as
+/// configured.
+pub fn variation_with(
+    parent: u64,
+    stylesheet: u64,
+    overrides: &VariationOverrides,
+    limits: WireLimits,
+) -> Result<Variation> {
+    variation(parent, stylesheet, &overrides.0, limits)
+}
+
 /// An identifier no package object uses, for reading a derived variation
 /// back before the caller allocates its real identifier.
 const PROVISIONAL_IDENTIFIER: u64 = u64::MAX;
