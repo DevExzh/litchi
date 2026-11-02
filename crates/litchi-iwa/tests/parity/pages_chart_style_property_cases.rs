@@ -9,6 +9,8 @@ use litchi_iwa::charts::{
 };
 use litchi_iwa::pages;
 use litchi_iwa_common::chart::kind::Kind;
+use litchi_iwa_common::color::{RgbColorSpace, Rgba};
+use litchi_iwa_common::shape::stroke::{Pattern, Stroke, Width};
 use litchi_pages::Package;
 use litchi_pages::chart::style::{
     Property, PropertyKind, RadarGridShape, chart3d, corner, donut, gaps, legend, pie, radar,
@@ -31,7 +33,7 @@ fn input(kind: Kind) -> TestResult<(Fixture, (), u64)> {
     Ok((input.fixture, (), input.chart))
 }
 
-fn host_write(source: &[u8], _sheet: (), chart: u64, value: Property) -> TestResult<Vec<u8>> {
+fn host_write(source: &[u8], __sheet: (), chart: u64, value: Property) -> TestResult<Vec<u8>> {
     let mut e = pages::Draft::from_bytes(source)?;
     match value {
         Property::PieStartAngle(v) => {
@@ -84,12 +86,13 @@ fn host_write(source: &[u8], _sheet: (), chart: u64, value: Property) -> TestRes
             },
         )?,
         Property::GapSpacing(v) => e.set_body_chart_gap_spacing(chart, v)?,
+        Property::BorderStroke(v) => e.set_body_chart_border_stroke(chart, v)?,
         _ => return Err("unmapped property".into()),
     }
     Ok(e.to_bytes()?)
 }
 
-fn host_read(bytes: &[u8], _sheet: (), chart: u64, kind: PropertyKind) -> TestResult<String> {
+fn host_read(bytes: &[u8], __sheet: (), chart: u64, kind: PropertyKind) -> TestResult<String> {
     let e = pages::Draft::from_bytes(bytes)?;
     Ok(match kind {
         PropertyKind::PieStartAngle => {
@@ -140,6 +143,7 @@ fn host_read(bytes: &[u8], _sheet: (), chart: u64, kind: PropertyKind) -> TestRe
                 == litchi_iwa::charts::ChartRadarGridShape::Curved
         ),
         PropertyKind::GapSpacing => format!("{:?}", e.body_chart_gap_spacing(chart)?),
+        PropertyKind::BorderStroke => format!("{:?}", e.body_chart_border_stroke(chart)?),
         _ => return Err("unmapped kind".into()),
     })
 }
@@ -166,6 +170,7 @@ fn leaf_read(bytes: &[u8], kind: PropertyKind) -> TestResult<String> {
         Property::BarShape3d(v) => format!("{v:?}"),
         Property::RadarGridShape(v) => format!("{:?}", v == RadarGridShape::Curved),
         Property::GapSpacing(v) => format!("{v:?}"),
+        Property::BorderStroke(v) => format!("{v:?}"),
         _ => return Err("unmapped property".into()),
     })
 }
@@ -304,6 +309,15 @@ fn option_cases() -> TestResult<Vec<(Kind, Property)>> {
             Kind::Radar2d,
             Property::RadarGridShape(RadarGridShape::Curved),
         ),
+        (
+            Kind::Column2d,
+            Property::BorderStroke(Some(Stroke::new(
+                Rgba::new(0.8, 0.1, 0.1, 1.0, RgbColorSpace::Srgb)?,
+                Width::new(3.0)?,
+                Pattern::RoundedDash,
+            ))),
+        ),
+        (Kind::Column2d, Property::BorderStroke(None)),
         (
             Kind::Column2d,
             Property::GapSpacing(gaps::Spacing::new(

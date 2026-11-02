@@ -87,7 +87,13 @@ pub mod style {
 pub mod axis {
     pub use crate::package::body_chart_series::{Diagnostics, Error, LimitKind, Refusal};
     pub use crate::package::body_chart_style::AxisEdit as Edit;
-    pub use crate::package::body_chart_style::axis::{Commit, Patch, Property, PropertyKind};
+    pub use crate::package::body_chart_style::axis::{
+        Commit, GridlineStroke, Patch, Property, PropertyKind,
+    };
+    pub use litchi_iwa_common::chart::axis::label_angle::LabelAngle;
+    pub use litchi_iwa_common::chart::axis::label_position_3d::LabelPosition3d;
     pub use litchi_iwa_common::chart::axis::style::Visibility;
     pub use litchi_iwa_common::chart::axis::{Axis, TickMarkLocation};
+    pub use litchi_iwa_common::chart::number_format::{LabelAffixes, NumberFormat};
+    pub use litchi_iwa_common::shape::stroke::Stroke;
 }

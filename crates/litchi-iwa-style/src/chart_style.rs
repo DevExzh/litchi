@@ -73,9 +73,21 @@ pub mod chart {
     use litchi_iwa_common::chart::kind::Kind as ChartKind;
     use litchi_iwa_common::chart::{corner, donut, gaps, legend, pie, radar};
     use litchi_iwa_common::chart3d::{self, Scale};
+    use litchi_iwa_common::color::Rgba;
+    use litchi_iwa_common::shape::stroke::{Pattern, Stroke, Width};
     use litchi_iwa_protos::chart_style_codec::{
         self as codec, Archive, Limits as CodecLimits, Properties, Write, field, property,
     };
+    use litchi_iwa_protos::shape_style_codec::native as stored;
+
+    use crate::drawing;
+
+    /// The chart border a chart style without a stored border draws (the
+    /// host's `native_default_chart_border_stroke`: black, one point, solid).
+    #[must_use]
+    pub fn default_border() -> Stroke {
+        Stroke::new(Rgba::black(), Width::ONE, Pattern::Solid)
+    }
 
     use super::{apply_writes, codec_error, out_of_range};
     use crate::series::{Refusal, SymbolError, SymbolResult};
@@ -112,6 +124,8 @@ pub mod chart {
         RadarGridShape(RadarGridShape),
         /// The gaps between bars or columns and between their sets.
         GapSpacing(gaps::Spacing),
+        /// The chart-area border stroke (`None`: no border line).
+        BorderStroke(Option<Stroke>),
     }
 
     /// The radius gridlines of a radar chart.
@@ -157,6 +171,8 @@ pub mod chart {
         RadarGridShape,
         /// [`Property::GapSpacing`].
         GapSpacing,
+        /// [`Property::BorderStroke`].
+        BorderStroke,
     }
 
     impl Property {
@@ -178,6 +194,7 @@ pub mod chart {
                 Self::BarShape3d(_) => PropertyKind::BarShape3d,
                 Self::RadarGridShape(_) => PropertyKind::RadarGridShape,
                 Self::GapSpacing(_) => PropertyKind::GapSpacing,
+                Self::BorderStroke(_) => PropertyKind::BorderStroke,
             }
         }
     }
@@ -185,7 +202,7 @@ pub mod chart {
     impl PropertyKind {
         /// The native default of this property (what a reset writes).
         #[must_use]
-        pub const fn native_default(self) -> Property {
+        pub fn native_default(self) -> Property {
             match self {
                 Self::PieStartAngle => Property::PieStartAngle(pie::StartAngle::ZERO),
                 Self::DonutInnerRadius => Property::DonutInnerRadius(donut::InnerRadius::DEFAULT),
@@ -201,6 +218,7 @@ pub mod chart {
                 Self::BarShape3d => Property::BarShape3d(chart3d::BarShape::Rectangle),
                 Self::RadarGridShape => Property::RadarGridShape(RadarGridShape::Straight),
                 Self::GapSpacing => Property::GapSpacing(gaps::Spacing::DEFAULT),
+                Self::BorderStroke => Property::BorderStroke(Some(default_border())),
             }
         }
 
@@ -213,7 +231,8 @@ pub mod chart {
                 Self::RoundedCorners
                 | Self::BorderVisible
                 | Self::RadarGridShape
-                | Self::GapSpacing => Archive::ChartStyle,
+                | Self::GapSpacing
+                | Self::BorderStroke => Archive::ChartStyle,
                 _ => Archive::ChartNonStyle,
             })
         }
@@ -235,7 +254,8 @@ pub mod chart {
                 | Self::LegendVisible
                 | Self::BorderVisible
                 | Self::IncludesHiddenData
-                | Self::GapSpacing => true,
+                | Self::GapSpacing
+                | Self::BorderStroke => true,
             }
         }
     }
@@ -254,6 +274,8 @@ pub mod chart {
         pub(super) const BORDER_VISIBLE: u32 = 18;
         /// `tschchartinfodefaultradarradiusgridlinecurve` (chart style).
         pub(super) const RADAR_GRID_CURVE: u32 = 29;
+        /// `tschchartinfodefaultborderstroke` (chart style).
+        pub(super) const BORDER_STROKE: u32 = 12;
         /// `tschchartinfodefaultinterbargap` and `…intersetgap` (chart
         /// style).
         pub(super) const GAP_BETWEEN_ITEMS: u32 = 16;
@@ -392,6 +414,18 @@ pub mod chart {
                     )?,
                 ))
             },
+            PropertyKind::BorderStroke => Property::BorderStroke(
+                match properties
+                    .message(scalar::BORDER_STROKE)
+                    .map_err(codec_error)?
+                {
+                    None => Some(default_border()),
+                    Some(bytes) => drawing::stroke(
+                        &stored::stroke(bytes, CodecLimits::DEFAULT).map_err(out_of_range)?,
+                    )
+                    .map_err(out_of_range)?,
+                },
+            ),
             PropertyKind::LegendFrame => {
                 return Err(SymbolError::Invalid(
                     "the legend frame is stored by the chart drawable",
@@ -496,6 +530,19 @@ pub mod chart {
         let archive = value.kind().archive().ok_or(SymbolError::Invalid(
             "the legend frame is stored by the chart drawable",
         ))?;
+        if let Property::BorderStroke(stroke) = value {
+            let encoded =
+                (stroke != Some(default_border())).then(|| drawing::encode_stroke(stroke));
+            return apply_writes(
+                payload,
+                archive,
+                &[Write::Message {
+                    field: scalar::BORDER_STROKE,
+                    value: encoded.as_deref(),
+                }],
+                codec::EmptyExtension::Keep,
+            );
+        }
         if let Some(writes) = scalar_writes(value) {
             return apply_writes(payload, archive, &writes, codec::EmptyExtension::Keep);
         }
@@ -536,13 +583,47 @@ pub mod chart {
 pub mod axis {
     use litchi_iwa_common::chart::axis::style::Visibility;
     use litchi_iwa_common::chart::axis::{Axis, TickMarkLocation};
-    use litchi_iwa_protos::chart_style_codec::{self as codec, Archive, Properties, Write};
+    use litchi_iwa_common::chart::kind::Kind as ChartKind;
+    use litchi_iwa_common::wire;
+    use litchi_iwa_protos::chart_style_codec::{
+        self as codec, Archive, Limits as CodecLimits, Properties, Write,
+    };
+    use litchi_iwa_protos::shape_style_codec::native as stored;
 
-    use super::{apply_writes, codec_error};
+    pub use litchi_iwa_common::chart::axis::label_angle::LabelAngle;
+    pub use litchi_iwa_common::chart::axis::label_position_3d::LabelPosition3d;
+    pub use litchi_iwa_common::chart::number_format::{LabelAffixes, NumberFormat};
+    pub use litchi_iwa_common::shape::stroke::Stroke;
+
+    use super::{apply_writes, codec_error, out_of_range};
+    use crate::drawing;
+    use crate::graph::Error;
+    use crate::number_format::{self as formats, Fields};
     use crate::series::{Refusal, SymbolError, SymbolResult};
 
+    /// The axis-label formatter of `TSCH.ChartAxisNonStyleArchive` (the
+    /// host's `AXIS_NUMBER_FORMAT_FIELDS`).
+    const LABEL_FORMAT: Fields = Fields {
+        legacy: 2,
+        current: 42,
+        format_type: 3,
+    };
+
+    /// The stroke override of one gridline family.
+    #[derive(Debug, Clone, Copy, PartialEq, Default)]
+    #[non_exhaustive]
+    pub enum GridlineStroke {
+        /// No override: the gridlines use the axis style's parent chain.
+        #[default]
+        Inherited,
+        /// The inspector's "None" stroke.
+        None,
+        /// An explicit stroke.
+        Stroke(Stroke),
+    }
+
     /// One axis-style property with its value.
-    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    #[derive(Debug, Clone, PartialEq)]
     #[non_exhaustive]
     pub enum Property {
         /// Whether the axis line shows.
@@ -562,6 +643,19 @@ pub mod axis {
         /// Whether the category axis shows the series names (category axis
         /// only).
         SeriesNames(Visibility),
+        /// The stroke of the major gridlines.
+        MajorGridlineStroke(GridlineStroke),
+        /// The stroke of the minor gridlines.
+        MinorGridlineStroke(GridlineStroke),
+        /// The rotation of the axis labels.
+        LabelAngle(LabelAngle),
+        /// The prefix and suffix of the axis labels.
+        LabelAffixes(LabelAffixes),
+        /// The number format of the axis labels.
+        NumberFormat(NumberFormat),
+        /// Where a 3D chart draws its value-axis labels (value axis of the 3D
+        /// kinds only).
+        LabelPosition3d(LabelPosition3d),
     }
 
     /// The property a [`Property`] value sets, for reads.
@@ -584,6 +678,18 @@ pub mod axis {
         Labels,
         /// [`Property::SeriesNames`].
         SeriesNames,
+        /// [`Property::MajorGridlineStroke`].
+        MajorGridlineStroke,
+        /// [`Property::MinorGridlineStroke`].
+        MinorGridlineStroke,
+        /// [`Property::LabelAngle`].
+        LabelAngle,
+        /// [`Property::LabelAffixes`].
+        LabelAffixes,
+        /// [`Property::NumberFormat`].
+        NumberFormat,
+        /// [`Property::LabelPosition3d`].
+        LabelPosition3d,
     }
 
     impl Property {
@@ -599,14 +705,22 @@ pub mod axis {
                 Self::MinimumLabel(_) => PropertyKind::MinimumLabel,
                 Self::Labels(_) => PropertyKind::Labels,
                 Self::SeriesNames(_) => PropertyKind::SeriesNames,
+                Self::MajorGridlineStroke(_) => PropertyKind::MajorGridlineStroke,
+                Self::MinorGridlineStroke(_) => PropertyKind::MinorGridlineStroke,
+                Self::LabelAngle(_) => PropertyKind::LabelAngle,
+                Self::LabelAffixes(_) => PropertyKind::LabelAffixes,
+                Self::NumberFormat(_) => PropertyKind::NumberFormat,
+                Self::LabelPosition3d(_) => PropertyKind::LabelPosition3d,
             }
         }
     }
 
     impl PropertyKind {
         /// The extension field of the property on `axis` (the host's
-        /// `axis_style` constants), or `None` when the axis has no such
-        /// field.
+        /// `axis_style`, `axis_gridline_stroke`, `axis_label_angle`,
+        /// `axis_number_format` and `axis_label_position_3d` constants), or
+        /// `None` when the axis has no such field. The label affixes and
+        /// number format name the current formatter field.
         #[must_use]
         pub const fn field(self, axis: Axis) -> Option<u32> {
             Some(match (self, axis) {
@@ -624,8 +738,24 @@ pub mod axis {
                 (Self::Labels, Axis::Category) => 9,
                 (Self::Labels, Axis::Value) => 11,
                 (Self::SeriesNames, Axis::Category) => 12,
+                (Self::MajorGridlineStroke, Axis::Category) => 16,
+                (Self::MajorGridlineStroke, Axis::Value) => 17,
+                (Self::MinorGridlineStroke, Axis::Category) => 22,
+                (Self::MinorGridlineStroke, Axis::Value) => 23,
+                (Self::LabelAngle, Axis::Category) => 9,
+                (Self::LabelAngle, Axis::Value) => 11,
+                (Self::LabelAffixes | Self::NumberFormat, _) => LABEL_FORMAT.current,
+                (Self::LabelPosition3d, Axis::Value) => 1,
                 _ => return None,
             })
+        }
+
+        /// Whether the property exists on `axis` of a chart of kind `chart`.
+        #[must_use]
+        pub const fn applies_to(self, axis: Axis, chart: ChartKind) -> bool {
+            self.field(axis).is_some()
+                && (!matches!(self, Self::LabelPosition3d)
+                    || chart.supports_3d_value_axis_label_position())
         }
 
         /// The value of a switch the style does not store.
@@ -640,7 +770,11 @@ pub mod axis {
         #[must_use]
         pub const fn archive(self) -> Archive {
             match self {
-                Self::Labels | Self::SeriesNames => Archive::AxisNonStyle,
+                Self::Labels
+                | Self::SeriesNames
+                | Self::LabelAffixes
+                | Self::NumberFormat
+                | Self::LabelPosition3d => Archive::AxisNonStyle,
                 _ => Archive::AxisStyle,
             }
         }
@@ -652,6 +786,21 @@ pub mod axis {
         } else {
             Visibility::Hidden
         }
+    }
+
+    fn gridline_stroke(properties: &Properties<'_>, field: u32) -> SymbolResult<GridlineStroke> {
+        let Some(bytes) = properties.message(field).map_err(codec_error)? else {
+            return Ok(GridlineStroke::Inherited);
+        };
+        let decoded = stored::stroke(bytes, CodecLimits::DEFAULT).map_err(out_of_range)?;
+        Ok(match drawing::stroke(&decoded).map_err(out_of_range)? {
+            Some(stroke) => GridlineStroke::Stroke(stroke),
+            None => GridlineStroke::None,
+        })
+    }
+
+    fn format_error(error: Error) -> SymbolError {
+        SymbolError::Graph(error)
     }
 
     /// The stored (or native default) value of `kind` on `axis` in the
@@ -668,30 +817,87 @@ pub mod axis {
         let field = kind
             .field(axis)
             .ok_or(SymbolError::Refused(Refusal::UnsupportedAxis))?;
-        if kind == PropertyKind::TickMarkLocation {
-            return Ok(Property::TickMarkLocation(
+        Ok(match kind {
+            PropertyKind::TickMarkLocation => Property::TickMarkLocation(
                 properties
                     .int32(field)
                     .map_err(codec_error)?
                     .map(TickMarkLocation::from_native)
                     .unwrap_or_default(),
-            ));
-        }
-        let visible = visibility(
-            properties
-                .bool(field)
-                .map_err(codec_error)?
-                .unwrap_or(kind.default_visible()),
-        );
-        Ok(match kind {
-            PropertyKind::Line => Property::Line(visible),
-            PropertyKind::MajorGridlines => Property::MajorGridlines(visible),
-            PropertyKind::MinorGridlines => Property::MinorGridlines(visible),
-            PropertyKind::MinorTickMarks => Property::MinorTickMarks(visible),
-            PropertyKind::Labels => Property::Labels(visible),
-            PropertyKind::SeriesNames => Property::SeriesNames(visible),
-            _ => Property::MinimumLabel(visible),
+            ),
+            PropertyKind::MajorGridlineStroke => {
+                Property::MajorGridlineStroke(gridline_stroke(properties, field)?)
+            },
+            PropertyKind::MinorGridlineStroke => {
+                Property::MinorGridlineStroke(gridline_stroke(properties, field)?)
+            },
+            PropertyKind::LabelAngle => Property::LabelAngle(
+                properties
+                    .float(field)
+                    .map_err(codec_error)?
+                    .map(LabelAngle::new)
+                    .transpose()
+                    .map_err(out_of_range)?
+                    .unwrap_or(LabelAngle::HORIZONTAL),
+            ),
+            PropertyKind::LabelAffixes => Property::LabelAffixes(
+                formats::affixes(properties.extension(), LABEL_FORMAT).map_err(format_error)?,
+            ),
+            PropertyKind::NumberFormat => Property::NumberFormat(
+                formats::number_format(
+                    properties.extension(),
+                    LABEL_FORMAT,
+                    NumberFormat::AXIS_NATIVE_DEFAULT,
+                )
+                .map_err(format_error)?,
+            ),
+            PropertyKind::LabelPosition3d => Property::LabelPosition3d(
+                properties
+                    .int32(field)
+                    .map_err(codec_error)?
+                    .map(LabelPosition3d::from_native)
+                    .unwrap_or_default(),
+            ),
+            _ => {
+                let visible = visibility(
+                    properties
+                        .bool(field)
+                        .map_err(codec_error)?
+                        .unwrap_or(kind.default_visible()),
+                );
+                match kind {
+                    PropertyKind::Line => Property::Line(visible),
+                    PropertyKind::MajorGridlines => Property::MajorGridlines(visible),
+                    PropertyKind::MinorGridlines => Property::MinorGridlines(visible),
+                    PropertyKind::MinorTickMarks => Property::MinorTickMarks(visible),
+                    PropertyKind::Labels => Property::Labels(visible),
+                    PropertyKind::SeriesNames => Property::SeriesNames(visible),
+                    _ => Property::MinimumLabel(visible),
+                }
+            },
         })
+    }
+
+    /// Rewrite the generated extension of `payload` with `patch` (`None`
+    /// from the patch keeps the payload).
+    fn patch_extension(
+        payload: &[u8],
+        archive: Archive,
+        patch: impl FnOnce(&[u8]) -> crate::graph::Result<Option<Vec<u8>>>,
+    ) -> SymbolResult<Vec<u8>> {
+        let properties =
+            codec::decode(payload, archive, CodecLimits::DEFAULT).map_err(codec_error)?;
+        let existing = properties.extension();
+        let Some(extension) = patch(existing.unwrap_or_default()).map_err(format_error)? else {
+            return Ok(payload.to_vec());
+        };
+        wire::patch_length_delimited_field(
+            payload,
+            codec::EXTENSION_FIELD,
+            existing.is_some(),
+            Some(extension.as_slice()),
+        )
+        .map_err(|error| SymbolError::Graph(Error::Wire(error)))
     }
 
     /// The payload of the axis style object of `value`'s archive storing
@@ -700,33 +906,94 @@ pub mod axis {
     /// # Errors
     ///
     /// [`Refusal::UnsupportedAxis`], an invalid payload.
-    pub fn rewrite(payload: &[u8], axis: Axis, value: Property) -> SymbolResult<Vec<u8>> {
+    pub fn rewrite(payload: &[u8], axis: Axis, value: &Property) -> SymbolResult<Vec<u8>> {
         let kind = value.kind();
         let field = kind
             .field(axis)
             .ok_or(SymbolError::Refused(Refusal::UnsupportedAxis))?;
-        let write = match value {
-            Property::TickMarkLocation(location) => Write::Int32 {
-                field,
-                value: Some(location.native_value()),
-            },
+        let archive = kind.archive();
+        let encoded;
+        let (write, empty) = match value {
+            Property::TickMarkLocation(location) => (
+                Write::Int32 {
+                    field,
+                    value: Some(location.native_value()),
+                },
+                codec::EmptyExtension::Keep,
+            ),
             Property::Line(visible)
             | Property::MajorGridlines(visible)
             | Property::MinorGridlines(visible)
             | Property::MinorTickMarks(visible)
             | Property::MinimumLabel(visible)
             | Property::Labels(visible)
-            | Property::SeriesNames(visible) => Write::Bool {
-                field,
-                value: Some(visible.is_visible()),
+            | Property::SeriesNames(visible) => (
+                Write::Bool {
+                    field,
+                    value: Some(visible.is_visible()),
+                },
+                codec::EmptyExtension::Keep,
+            ),
+            Property::MajorGridlineStroke(stroke) | Property::MinorGridlineStroke(stroke) => {
+                encoded = match stroke {
+                    GridlineStroke::Inherited => None,
+                    GridlineStroke::None => Some(drawing::encode_stroke(None)),
+                    GridlineStroke::Stroke(stroke) => Some(drawing::encode_stroke(Some(*stroke))),
+                };
+                (
+                    Write::Message {
+                        field,
+                        value: encoded.as_deref(),
+                    },
+                    codec::EmptyExtension::Keep,
+                )
+            },
+            Property::LabelAngle(angle) => (
+                Write::Float {
+                    field,
+                    value: (*angle != LabelAngle::HORIZONTAL).then_some(angle.degrees()),
+                },
+                codec::EmptyExtension::Remove,
+            ),
+            Property::LabelPosition3d(position) => {
+                let properties =
+                    codec::decode(payload, archive, CodecLimits::DEFAULT).map_err(codec_error)?;
+                let present = properties.int32(field).map_err(codec_error)?.is_some();
+                (
+                    Write::Int32 {
+                        field,
+                        value: (present || *position != LabelPosition3d::default())
+                            .then_some(position.native_value()),
+                    },
+                    codec::EmptyExtension::Keep,
+                )
+            },
+            Property::LabelAffixes(affixes) => {
+                return patch_extension(payload, archive, |extension| {
+                    formats::patch_affixes(
+                        extension,
+                        LABEL_FORMAT,
+                        affixes,
+                        NumberFormat::AXIS_NATIVE_DEFAULT,
+                    )
+                });
+            },
+            Property::NumberFormat(format) => {
+                return patch_extension(payload, archive, |extension| {
+                    if *format == NumberFormat::AXIS_NATIVE_DEFAULT {
+                        formats::clear(extension, LABEL_FORMAT)
+                    } else {
+                        formats::patch_number_format(
+                            extension,
+                            LABEL_FORMAT,
+                            *format,
+                            NumberFormat::AXIS_NATIVE_DEFAULT,
+                        )
+                    }
+                });
             },
         };
-        apply_writes(
-            payload,
-            kind.archive(),
-            &[write],
-            codec::EmptyExtension::Keep,
-        )
+        apply_writes(payload, archive, &[write], empty)
     }
 }
 
@@ -985,12 +1252,16 @@ pub fn write_chart(
 fn axis_value(
     workspace: &Workspace<'_>,
     chart: u64,
+    chart_kind: ChartKind,
     axis: Axis,
     kind: axis::PropertyKind,
     budget: &mut SymbolBudget,
 ) -> SymbolResult<axis::Property> {
     if kind.field(axis).is_none() {
         return Err(SymbolError::Refused(Refusal::UnsupportedAxis));
+    }
+    if !kind.applies_to(axis, chart_kind) {
+        return Err(SymbolError::Refused(Refusal::UnsupportedKind));
     }
     let archive = kind.archive();
     let style = style_object(workspace, chart, archive, Some(axis), budget)?;
@@ -1003,22 +1274,23 @@ fn axis_value(
     )
 }
 
-/// Read axis property `kind` of the chart's primary `axis` under one
-/// residual profile.
+/// Read axis property `kind` of the primary `axis` of chart drawable
+/// `chart` (of kind `chart_kind`) under one residual profile.
 ///
 /// # Errors
 ///
-/// [`Refusal::UnsupportedAxis`], an invalid chart or style, or an
-/// exhausted limit.
+/// [`Refusal::UnsupportedAxis`], [`Refusal::UnsupportedKind`], an invalid
+/// chart or style, or an exhausted limit.
 pub fn read_axis(
     workspace: &Workspace<'_>,
     chart: u64,
+    chart_kind: ChartKind,
     axis: Axis,
     kind: axis::PropertyKind,
     limits: Limits,
 ) -> SymbolResult<(axis::Property, Report)> {
     let mut budget = SymbolBudget::new(limits);
-    let value = axis_value(workspace, chart, axis, kind, &mut budget)?;
+    let value = axis_value(workspace, chart, chart_kind, axis, kind, &mut budget)?;
     Ok((value, budget.report(false)))
 }
 
@@ -1028,18 +1300,20 @@ pub fn read_axis(
 ///
 /// # Errors
 ///
-/// [`Refusal::UnsupportedAxis`], [`Refusal::SharedStyle`], an invalid chart
-/// or style, an exhausted limit, or a write that does not read back.
+/// [`Refusal::UnsupportedAxis`], [`Refusal::UnsupportedKind`],
+/// [`Refusal::SharedStyle`], an invalid chart or style, an exhausted limit,
+/// or a write that does not read back.
 pub fn write_axis(
     workspace: &mut Workspace<'_>,
     chart: u64,
+    chart_kind: ChartKind,
     axis: Axis,
-    value: axis::Property,
+    value: &axis::Property,
     limits: Limits,
 ) -> SymbolResult<(bool, Report)> {
     let mut budget = SymbolBudget::new(limits);
     let kind = value.kind();
-    if axis_value(workspace, chart, axis, kind, &mut budget)? == value {
+    if axis_value(workspace, chart, chart_kind, axis, kind, &mut budget)? == *value {
         return Ok((false, budget.report(false)));
     }
     let archive = kind.archive();
@@ -1062,7 +1336,7 @@ pub fn write_axis(
         &mut budget,
         |payload| axis::rewrite(payload, axis, value),
     )?;
-    if changed && axis_value(workspace, chart, axis, kind, &mut budget)? != value {
+    if changed && axis_value(workspace, chart, chart_kind, axis, kind, &mut budget)? != *value {
         return Err(SymbolError::Invalid(
             "an axis style write does not read back",
         ));

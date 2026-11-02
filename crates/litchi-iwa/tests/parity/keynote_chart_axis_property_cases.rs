@@ -4,26 +4,62 @@
 //! and `set_slide_chart_value_axis_minimum_label_visible` routes against
 //! `litchi_keynote::chart::axis::Edit::set`.
 
+use litchi_iwa::charts::{ChartAxisGridline, ChartAxisGridlineStroke};
 use litchi_iwa::keynote;
+use litchi_iwa_common::chart::axis::label_angle::LabelAngle;
+use litchi_iwa_common::chart::axis::label_position_3d::LabelPosition3d;
 use litchi_iwa_common::chart::axis::style::Visibility;
 use litchi_iwa_common::chart::axis::{Axis, TickMarkLocation};
 use litchi_iwa_common::chart::kind::Kind;
+use litchi_iwa_common::chart::number_format::{
+    DecimalPlaces, LabelAffixes, NegativeStyle, NumberFormat,
+};
+use litchi_iwa_common::color::{RgbColorSpace, Rgba};
+use litchi_iwa_common::shape::stroke::{Pattern, Stroke, Width};
 use litchi_keynote::Package;
-use litchi_keynote::chart::axis::{Property, PropertyKind};
+use litchi_keynote::chart::axis::{GridlineStroke, Property, PropertyKind};
 
 use crate::chart_style_cases::{Target, input};
 use crate::harness::{Case, Evidence, Format, LeafRun, TestResult, Tier};
 use crate::leaf_bytes;
+
+const fn host_gridline(value: GridlineStroke) -> ChartAxisGridlineStroke {
+    match value {
+        GridlineStroke::Stroke(stroke) => ChartAxisGridlineStroke::Stroke(stroke),
+        GridlineStroke::None => ChartAxisGridlineStroke::NoStroke,
+        _ => ChartAxisGridlineStroke::Inherited,
+    }
+}
 
 fn host_write(
     source: &[u8],
     sheet: usize,
     chart: u64,
     axis: Axis,
-    value: Property,
+    value: &Property,
 ) -> TestResult<Vec<u8>> {
     let mut e = keynote::Draft::from_bytes(source)?;
-    match value {
+    match value.clone() {
+        Property::MajorGridlineStroke(v) => e.set_slide_chart_axis_gridline_stroke(
+            sheet,
+            chart,
+            axis,
+            ChartAxisGridline::Major,
+            host_gridline(v),
+        )?,
+        Property::MinorGridlineStroke(v) => e.set_slide_chart_axis_gridline_stroke(
+            sheet,
+            chart,
+            axis,
+            ChartAxisGridline::Minor,
+            host_gridline(v),
+        )?,
+        Property::LabelAngle(v) => e.set_slide_chart_axis_label_angle(sheet, chart, axis, v)?,
+        Property::LabelAffixes(v) => e.set_slide_chart_axis_label_affixes(sheet, chart, axis, v)?,
+        Property::NumberFormat(v) => e.set_slide_chart_axis_number_format(sheet, chart, axis, v)?,
+        Property::LabelPosition3d(v) => {
+            e.set_slide_chart_3d_value_axis_label_position(sheet, chart, v)?;
+        },
         Property::Line(v) => e.set_slide_chart_axis_line_visible(sheet, chart, axis, v)?,
         Property::MajorGridlines(v) => {
             e.set_slide_chart_axis_major_gridlines_visible(sheet, chart, axis, v)?;
@@ -59,7 +95,43 @@ fn host_read(
     kind: PropertyKind,
 ) -> TestResult<String> {
     let e = keynote::Draft::from_bytes(bytes)?;
+    let gridline = |stroke: ChartAxisGridlineStroke| match stroke {
+        ChartAxisGridlineStroke::Stroke(stroke) => format!("{:?}", GridlineStroke::Stroke(stroke)),
+        ChartAxisGridlineStroke::NoStroke => format!("{:?}", GridlineStroke::None),
+        _ => format!("{:?}", GridlineStroke::Inherited),
+    };
     Ok(match kind {
+        PropertyKind::MajorGridlineStroke => gridline(e.slide_chart_axis_gridline_stroke(
+            sheet,
+            chart,
+            axis,
+            ChartAxisGridline::Major,
+        )?),
+        PropertyKind::MinorGridlineStroke => gridline(e.slide_chart_axis_gridline_stroke(
+            sheet,
+            chart,
+            axis,
+            ChartAxisGridline::Minor,
+        )?),
+        PropertyKind::LabelAngle => {
+            format!("{:?}", e.slide_chart_axis_label_angle(sheet, chart, axis)?)
+        },
+        PropertyKind::LabelAffixes => {
+            format!(
+                "{:?}",
+                e.slide_chart_axis_label_affixes(sheet, chart, axis)?
+            )
+        },
+        PropertyKind::NumberFormat => {
+            format!(
+                "{:?}",
+                e.slide_chart_axis_number_format(sheet, chart, axis)?
+            )
+        },
+        PropertyKind::LabelPosition3d => format!(
+            "{:?}",
+            e.slide_chart_3d_value_axis_label_position(sheet, chart)?
+        ),
         PropertyKind::Line => format!("{:?}", e.slide_chart_axis_line_visible(sheet, chart, axis)?),
         PropertyKind::MajorGridlines => format!(
             "{:?}",
@@ -104,6 +176,11 @@ fn leaf_read(bytes: &[u8], axis: Axis, kind: PropertyKind) -> TestResult<String>
         | Property::Labels(v)
         | Property::SeriesNames(v) => format!("{v:?}"),
         Property::TickMarkLocation(v) => format!("{v:?}"),
+        Property::MajorGridlineStroke(v) | Property::MinorGridlineStroke(v) => format!("{v:?}"),
+        Property::LabelAngle(v) => format!("{v:?}"),
+        Property::LabelAffixes(v) => format!("{v:?}"),
+        Property::NumberFormat(v) => format!("{v:?}"),
+        Property::LabelPosition3d(v) => format!("{v:?}"),
         _ => return Err("unmapped property".into()),
     })
 }
@@ -141,7 +218,52 @@ fn cases() -> Vec<(Axis, Property)> {
         (Axis::Value, Property::Labels(Visibility::Hidden)),
         (Axis::Category, Property::Labels(Visibility::Hidden)),
         (Axis::Category, Property::SeriesNames(Visibility::Visible)),
+        (
+            Axis::Value,
+            Property::MajorGridlineStroke(GridlineStroke::Stroke(stroke())),
+        ),
+        (
+            Axis::Category,
+            Property::MinorGridlineStroke(GridlineStroke::None),
+        ),
+        (
+            Axis::Category,
+            Property::LabelAngle(LabelAngle::new(315.0).expect("angle")),
+        ),
+        (
+            Axis::Value,
+            Property::LabelAffixes(LabelAffixes::new("$", " M").expect("affixes")),
+        ),
+        (
+            Axis::Value,
+            Property::NumberFormat(NumberFormat::new(
+                DecimalPlaces::fixed(2).expect("places"),
+                NegativeStyle::Parentheses,
+                true,
+            )),
+        ),
+        (
+            Axis::Value,
+            Property::LabelPosition3d(LabelPosition3d::Leading),
+        ),
     ]
+}
+
+fn stroke() -> Stroke {
+    Stroke::new(
+        Rgba::new(0.2, 0.4, 0.6, 1.0, RgbColorSpace::Srgb).expect("color"),
+        Width::new(2.0).expect("width"),
+        Pattern::Solid,
+    )
+}
+
+/// The chart kind a case needs: the 3D label position needs a 3D chart.
+const fn chart_kind(value: &Property) -> Kind {
+    if matches!(value, Property::LabelPosition3d(_)) {
+        Kind::Column3d
+    } else {
+        Kind::Column2d
+    }
 }
 
 /// `value`, or its opposite when the host-added chart already stores it.
@@ -167,6 +289,14 @@ fn changed(bytes: &[u8], axis: Axis, value: Property) -> TestResult<Property> {
         Property::Labels(v) => Property::Labels(flip(v)),
         Property::SeriesNames(v) => Property::SeriesNames(flip(v)),
         Property::TickMarkLocation(_) => Property::TickMarkLocation(TickMarkLocation::Centered),
+        Property::MajorGridlineStroke(_) => Property::MajorGridlineStroke(GridlineStroke::None),
+        Property::MinorGridlineStroke(_) => {
+            Property::MinorGridlineStroke(GridlineStroke::Stroke(stroke()))
+        },
+        Property::LabelAngle(_) => Property::LabelAngle(LabelAngle::new(30.0)?),
+        Property::LabelAffixes(_) => Property::LabelAffixes(LabelAffixes::new("~", "")?),
+        Property::NumberFormat(_) => Property::NumberFormat(NumberFormat::AXIS_NATIVE_DEFAULT),
+        Property::LabelPosition3d(_) => Property::LabelPosition3d(LabelPosition3d::Trailing),
         _ => return Err("unmapped property".into()),
     })
 }
@@ -175,13 +305,14 @@ fn changed(bytes: &[u8], axis: Axis, value: Property) -> TestResult<Property> {
 fn keynote_slide_chart_axis_set_parity() -> TestResult {
     let _ = (Tier::B, Evidence::Queued);
     for (axis, value) in cases() {
-        let input = input(Format::Keynote, Kind::Column2d)?;
+        let input = input(Format::Keynote, chart_kind(&value))?;
         let Target::Keynote { slide: sheet } = input.target else {
             return Err("not a Keynote target".into());
         };
         let chart = input.chart;
         let kind = value.kind();
         let value = changed(&input.fixture.bytes, axis, value)?;
+        let staged = value.clone();
         Case::new(
             "keynote_slide_chart_axis_set_parity",
             Format::Keynote,
@@ -191,11 +322,11 @@ fn keynote_slide_chart_axis_set_parity() -> TestResult {
         )
         .leaf_invalidates_root_previews()
         .leaf_structural_metadata()
-        .host(|source| host_write(source, sheet, chart, axis, value))
+        .host(|source| host_write(source, sheet, chart, axis, &value))
         .leaf(|source| {
             let package = Package::from_bytes(source)?;
             let mut edit = package.edit_slide_chart_axis(0, last_chart(source)?)?;
-            edit.set(axis, value)?;
+            edit.set(axis, staged.clone())?;
             let commit = edit.commit()?;
             let restored = commit
                 .package()
@@ -220,13 +351,13 @@ fn keynote_slide_chart_axis_set_parity() -> TestResult {
 #[test]
 fn keynote_slide_chart_axis_read_parity() -> TestResult {
     for (axis, value) in cases() {
-        let input = input(Format::Keynote, Kind::Column2d)?;
+        let input = input(Format::Keynote, chart_kind(&value))?;
         let Target::Keynote { slide: sheet } = input.target else {
             return Err("not a Keynote target".into());
         };
         for bytes in [
             input.fixture.bytes.clone(),
-            host_write(&input.fixture.bytes, sheet, input.chart, axis, value)?,
+            host_write(&input.fixture.bytes, sheet, input.chart, axis, &value)?,
         ] {
             assert_eq!(
                 host_read(&bytes, sheet, input.chart, axis, value.kind())?,

@@ -85,6 +85,10 @@ pub enum Refusal {
     /// apply to it (the minimum label of a category axis).
     #[error("the chart has no such axis property")]
     UnsupportedAxis,
+    /// The property does not apply to the chart's kind (the 3D value-axis
+    /// label position of a 2D chart).
+    #[error("the property does not apply to this chart kind")]
+    UnsupportedKind,
     /// Another chart uses the axis style.
     #[error("the axis style is shared with another chart")]
     SharedStyle,
@@ -106,7 +110,7 @@ impl Refusal {
         use litchi_core::edit::RefusalKind;
         match self {
             Self::SheetNotFound | Self::ChartNotFound => RefusalKind::NotFound,
-            Self::UnsupportedAxis => RefusalKind::UnsupportedTarget,
+            Self::UnsupportedAxis | Self::UnsupportedKind => RefusalKind::UnsupportedTarget,
             Self::NoStagedOperation => RefusalKind::UnsupportedOperation,
             Self::SharedStyle | Self::UnsupportedDependency | Self::UnsupportedSource => {
                 RefusalKind::UnsupportedContent
@@ -192,7 +196,7 @@ impl Edit<'_> {
         let mut touched = 0_usize;
         for (axis, property) in &self.changes {
             let base = current.as_ref().unwrap_or(self.source);
-            if let Some(published) = apply_one(base, self.sheet, self.chart, *axis, *property)? {
+            if let Some(published) = apply_one(base, self.sheet, self.chart, *axis, property)? {
                 if read(
                     &published.package,
                     self.sheet,
@@ -286,6 +290,15 @@ fn read(
     if kind.field(axis).is_none() {
         return Err(Refusal::UnsupportedAxis.into());
     }
+    if kind == PropertyKind::LabelPosition3d {
+        let chart_kind = package
+            .sheet_chart_metadata(sheet, chart)
+            .map_err(|_error| Error::InvalidSource)?
+            .kind();
+        if !kind.applies_to(axis, chart_kind) {
+            return Err(Refusal::UnsupportedKind.into());
+        }
+    }
     let archive = kind.archive();
     let (style, index) = axis_style(package, sheet, chart, axis, archive)?;
     let object = graph::object(package, style)?;
@@ -298,10 +311,10 @@ fn apply_one(
     sheet: usize,
     chart: ChartSelector,
     axis: Axis,
-    value: Property,
+    value: &Property,
 ) -> Result<Option<Published>, Error> {
     let kind = value.kind();
-    if read(source, sheet, chart, axis, kind)? == value {
+    if read(source, sheet, chart, axis, kind)? == *value {
         return Ok(None);
     }
     let archive = kind.archive();

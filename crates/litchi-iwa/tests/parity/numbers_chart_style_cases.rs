@@ -11,6 +11,8 @@ use litchi_iwa::numbers;
 use litchi_iwa::shapes::{DrawablePoint, DrawableSize};
 use litchi_iwa_common::chart::ChartData;
 use litchi_iwa_common::chart::kind::Kind;
+use litchi_iwa_common::color::{RgbColorSpace, Rgba};
+use litchi_iwa_common::shape::stroke::{Pattern, Stroke, Width};
 use litchi_numbers::Package;
 use litchi_numbers::sheet::chart::style::{
     Property, PropertyKind, RadarGridShape, chart3d, corner, donut, gaps, legend, pie, radar,
@@ -129,6 +131,7 @@ fn host_write(source: &[u8], sheet: u64, chart: u64, value: Property) -> TestRes
             },
         )?,
         Property::GapSpacing(v) => e.set_sheet_chart_gap_spacing(sheet, chart, v)?,
+        Property::BorderStroke(v) => e.set_sheet_chart_border_stroke(sheet, chart, v)?,
         _ => return Err("unmapped property".into()),
     }
     Ok(e.to_bytes()?)
@@ -197,6 +200,7 @@ fn host_read(bytes: &[u8], sheet: u64, chart: u64, kind: PropertyKind) -> TestRe
                 == litchi_iwa::charts::ChartRadarGridShape::Curved
         ),
         PropertyKind::GapSpacing => format!("{:?}", e.sheet_chart_gap_spacing(sheet, chart)?),
+        PropertyKind::BorderStroke => format!("{:?}", e.sheet_chart_border_stroke(sheet, chart)?),
         _ => return Err("unmapped kind".into()),
     })
 }
@@ -223,6 +227,7 @@ fn leaf_read(bytes: &[u8], kind: PropertyKind) -> TestResult<String> {
         Property::BarShape3d(v) => format!("{v:?}"),
         Property::RadarGridShape(v) => format!("{:?}", v == RadarGridShape::Curved),
         Property::GapSpacing(v) => format!("{v:?}"),
+        Property::BorderStroke(v) => format!("{v:?}"),
         _ => return Err("unmapped property".into()),
     })
 }
@@ -362,6 +367,15 @@ fn option_cases() -> TestResult<Vec<(Kind, Property)>> {
             Kind::Radar2d,
             Property::RadarGridShape(RadarGridShape::Curved),
         ),
+        (
+            Kind::Column2d,
+            Property::BorderStroke(Some(Stroke::new(
+                Rgba::new(0.8, 0.1, 0.1, 1.0, RgbColorSpace::Srgb)?,
+                Width::new(3.0)?,
+                Pattern::RoundedDash,
+            ))),
+        ),
+        (Kind::Column2d, Property::BorderStroke(None)),
         (
             Kind::Column2d,
             Property::GapSpacing(gaps::Spacing::new(
