@@ -402,3 +402,98 @@ appearance) was then merged at `44e529905b`. On that merge, the following were r
 and exit 0 (logs `.coord/iwa-w4c/gates6b`): ledger, glossary, the clippy leg
 over the five touched crates, `cargo test -p litchi-numbers --all-features`,
 the chart parity cases, fmt and the bench matrix. Target 12 GB after pruning.
+
+## 13. Slice 6: legend font and font size
+
+12 rows flip (legend font and font size: set and read on each format).
+
+| Crate | What |
+|---|---|
+| `litchi-iwa-style` | `legend_style::Property::{Font(LegendFont), FontSize(LegendFontSize)}`, the host's `charts::legend_font` graph (`legend_style/typography.rs`) inside the existing legend-style lifecycle: the legend style is made exclusive (a derived variation when shared or not a variation), then field 2 of its extension, the index into the chart's `paragraph_styles` list (field 20), decides. With no index, a new font variation of the list's first style is inserted beside it (registered in its stylesheet, UUID, external reference), appended to the list and indexed. With an index, the variation keeps its other overrides. An exclusive one (no consumer besides the chart, its stylesheet and child styles, counted from metadata as the host does) is patched in place field by field (bold 1, italic 2, size 3, default-font 4 and font name 5 of the character properties, override count 10). A shared one is replaced by a fresh variation, and the chart's external reference to the old one is dropped when unused. A reset that empties the variation unindexes the legend, restores the list (pop or parent), and removes the variation (unregister, UUID, release) when exclusive. The legend style then collapses when it equals its parent again. The font write stores the font identity always and bold or italic only where they differ from the parent's effective traits, as the host does |
+| `litchi-iwa-text-wire` | `paragraph_style::{VariationOverrides, variation_overrides, variation_with}`: a variation's whole override set with its font subset editable, and a canonical variation of it |
+| `litchi-keynote` | The legend family passes chart fields `[11, 20]` for typography writes (and their inverse). The chart-property core admits paragraph styles (2022) among the rewritable types; the mutation scope still names each object |
+| `litchi-pages` | The locality verifier admits an in-place paragraph-style patch (outer fields 10 and 11 only) |
+
+Parity: the legend-style cases gain a font (Georgia bold) and a size (18 pt),
+each set and reset after a host set, plus five sequences on an existing
+variation: font after size and size after font (in-place patch), size after
+size, and font or size reset with the other override kept. All formats are
+Tier B (the inserted variation's UUID). Gap: the shared-variation path
+(`replace_shared_style`) is implemented but has no parity case. Building one
+needs a second chart that references the variation in its metadata, and the
+parity `publish` helper does not rewrite metadata.
+
+| Route | Host Ir | Leaf Ir | Leaf/host |
+|---|---:|---:|---:|
+| Keynote legend font set | 1,594,961,772 | 261,880,163 | 0.1642 |
+| Pages legend font set | 2,113,559,691 | 192,898,468 | 0.0913 |
+| Numbers legend font set | 570,407,936 | 185,136,912 | 0.3246 |
+
+Receipt `results/0414/callgrind-slice6.json`; raw captures in
+`.coord/iwa-w4c/cg6/`.
+
+Slice 6 gates: trunk `10af106c18` (W4-D slice 1) merged at `147881a72c`.
+Every command of §8 exits 0 (logs `.coord/iwa-w4c/gates7`), except the
+crate-boundary check, which first refused the Keynote `chart::legend_style`
+re-export of `litchi_iwa_text`. Those types are now re-exported through
+`slide_chart_font`, as the chart font family does. After that fix, the
+boundary check, clippy -D warnings and rustdoc for litchi-keynote, the
+Keynote legend parity cases and the glossary check exit 0.
+Trunk `b440f4b424` (W4-T comment threads) was then merged at `b07c024505`. On that
+merge the following re-ran and exit 0 (logs `.coord/iwa-w4c/gates7b`):
+ledger, glossary, clippy -D warnings on the six touched crates, the
+litchi-keynote and litchi-pages tests, the whole parity target (1043 passed),
+fmt, the crate-boundary check and the bench matrix. Target 3.4 GB after
+pruning.
+
+## 14. Slice 7: pie leader lines, value-label and error-bar auto-fit, value-label locations; the shared legend variation
+
+48 rows flip: the per-wedge and per-series routes (set all, set one, read
+all, read one) of pie leader lines, value-label auto-fit, error-bar
+auto-fit and value-label locations, on each format.
+
+| Crate | What |
+|---|---|
+| `litchi-iwa-style` | `series::property::LeaderLines`: a series non-style override, field 102 (`tschchartseriespieenablecalloutline`). It is read strictly as the host's reader does (one occurrence; a canonical `int32`, sign-extended when negative; unknown values kept as `LeaderLineVisibility::from_native`). Visible removes the field and an emptied extension. `series::style::Kind::{ValueLabelAutoFits, ErrorBarAutoFits, ValueLabelLocations}` with `AutoFit` and `ValueLabelLocation` values. As the host does, they are read from each series style's own payload, not its parent chain. Value-label auto-fit is field 100, a canonical boolean, true when disabled. Error-bar auto-fit is field 98, `int32` 0 or 1. The location is field 88 for bar and column kinds and 97 for stacked kinds (native 8/0/4/6; any other kind is `UnsupportedKind`). The default removes the field. The auto-fit writes also remove an emptied extension; the location write keeps it, as the host does. A location write makes every series style exclusive before it rewrites any (the host's order), while the auto-fit writes check only the series they change |
+| `litchi-numbers`, `litchi-keynote`, `litchi-pages` | `series::Property::{LeaderLines, ValueLabelAutoFits, ErrorBarAutoFits, ValueLabelLocations}` on the existing per-series family; re-exported `AutoFit`, `ValueLabelLocation`, `LeaderLineVisibility` |
+
+Parity: `{numbers_sheet,keynote_slide,pages_body}_chart_pie_leader_lines_parity`,
+`…_series_value_label_auto_fits_parity`, `…_series_error_bar_auto_fits_parity`
+and `…_series_value_label_locations_parity` (column and stacked bar). Each
+runs a set all, a change after a host set, and a set one through the
+read-replace-write route; the read cases are added to `…_series_read_parity`.
+All are Tier B, as the per-series family is.
+
+**Shared legend variation (coordinator):** the parity helper gains
+`chart_style_cases::publish_referencing`, which adds metadata object
+references along with a payload replacement.
+`numbers_sheet_chart_legend_font_shared_variation_parity` builds a second
+chart whose `paragraph_styles` list and metadata name the first chart's
+legend variation. It then sets a font, sets a size, and resets the font on
+the first chart. The host takes `replace_shared_style` (the case asserts
+that the first chart's list now names a fresh variation), and the leaf
+matches it (Tier B). This closes the §13 gap.
+
+Radar series style (2 rows per format) follows with the remaining items.
+
+| Route | Host Ir | Leaf Ir | Leaf/host |
+|---|---:|---:|---:|
+| keynote_leader_lines_set | 919,342,516 | 199,526,887 | 0.2170 |
+| keynote_label_locations_set | 878,658,629 | 78,483,327 | 0.0893 |
+| pages_leader_lines_set | 1,292,249,073 | 125,102,494 | 0.0968 |
+| pages_label_locations_set | 1,280,254,563 | 48,091,465 | 0.0376 |
+| numbers_leader_lines_set | 249,865,281 | 130,664,884 | 0.5229 |
+| numbers_label_locations_set | 241,202,892 | 60,372,687 | 0.2503 |
+
+Receipt `results/0414/callgrind-slice7.json`; raw captures in
+`.coord/iwa-w4c/cg7/`.
+
+Slice 7 gates: trunk `b667dc4246` merged at `52d072be1d`; every command of
+§8 exits 0 (logs `.coord/iwa-w4c/gates8`), except the first full clippy leg,
+which refused a redundant `TextFont::from` in the new shared-variation case.
+That was fixed, and the re-run full clippy leg exits 0 (`clippy_all2.log`).
+Trunk `1cafb9dfc2` (W4-T Numbers comment replies) was then merged at `2d1383251e`.
+The following re-ran on that merge and exit 0 (logs `.coord/iwa-w4c/gates8b`):
+ledger, glossary, clippy -D warnings on five crates, the litchi-numbers tests,
+the chart parity cases, fmt, boundaries and bench. Target 11 GB after
+pruning.

@@ -14,10 +14,12 @@
 use std::hint::black_box;
 
 use litchi_iwa::charts::{
-    Chart3dLightingStyle, ChartAxisGridline, ChartAxisGridlineStroke, ChartLegendFill,
-    ChartPieStartAngle, ChartSeriesConnectionLine, ChartShadow,
+    Chart3dLightingStyle, ChartAxisGridline, ChartAxisGridlineStroke, ChartFont, ChartLegendFill,
+    ChartLegendFont, ChartPieStartAngle, ChartSeriesConnectionLine, ChartSeriesValueLabelLocation,
+    ChartShadow,
 };
 use litchi_iwa::shapes::ShapeFill;
+use litchi_iwa::text::TextFont;
 use litchi_iwa::{keynote, numbers, pages};
 use litchi_iwa_common::chart::axis::Axis;
 use litchi_iwa_common::chart::axis::style::Visibility;
@@ -26,6 +28,7 @@ use litchi_iwa_common::chart::kind::Kind;
 use litchi_iwa_common::chart::number_format::{
     DecimalPlaces, LabelAffixes, NegativeStyle, NumberFormat,
 };
+use litchi_iwa_common::chart::pie::LeaderLineVisibility;
 use litchi_iwa_common::chart::pie::StartAngle;
 use litchi_iwa_common::chart::series::ConnectionLine;
 use litchi_iwa_common::color::{RgbColorSpace, Rgba};
@@ -36,7 +39,8 @@ use litchi_iwa_common::shape::shadow::{
 use litchi_iwa_common::shape::stroke::{Pattern, Stroke, Width};
 use litchi_iwa_style::chart_style::axis::{GridlineStroke, Property as AxisProperty};
 use litchi_iwa_style::chart_style::chart::{Property as ChartProperty, Shadow as LeafShadow};
-use litchi_iwa_style::legend_style::{LegendFill, Property as LegendProperty};
+use litchi_iwa_style::legend_style::{LegendFill, LegendFont, Property as LegendProperty};
+use litchi_iwa_style::series::style::ValueLabelLocation;
 
 use crate::chart_style_cases::{Input, Target, input};
 use crate::harness::{Format, TestResult};
@@ -56,6 +60,9 @@ enum Operation {
     GridlineStrokeSet,
     BorderSet,
     LegendFillSet,
+    LegendFontSet,
+    LeaderLinesSet,
+    LabelLocationsSet,
     BackgroundSet,
     LightingSet,
     ShadowSet,
@@ -184,11 +191,56 @@ const ROUTES: &[(&str, Format, Operation)] = &[
         Format::Numbers,
         Operation::CategoryLabelsSet,
     ),
+    (
+        "keynote_legend_font_set",
+        Format::Keynote,
+        Operation::LegendFontSet,
+    ),
+    (
+        "pages_legend_font_set",
+        Format::Pages,
+        Operation::LegendFontSet,
+    ),
+    (
+        "numbers_legend_font_set",
+        Format::Numbers,
+        Operation::LegendFontSet,
+    ),
+    (
+        "keynote_leader_lines_set",
+        Format::Keynote,
+        Operation::LeaderLinesSet,
+    ),
+    (
+        "keynote_label_locations_set",
+        Format::Keynote,
+        Operation::LabelLocationsSet,
+    ),
+    (
+        "pages_leader_lines_set",
+        Format::Pages,
+        Operation::LeaderLinesSet,
+    ),
+    (
+        "pages_label_locations_set",
+        Format::Pages,
+        Operation::LabelLocationsSet,
+    ),
+    (
+        "numbers_leader_lines_set",
+        Format::Numbers,
+        Operation::LeaderLinesSet,
+    ),
+    (
+        "numbers_label_locations_set",
+        Format::Numbers,
+        Operation::LabelLocationsSet,
+    ),
 ];
 
 const fn chart_kind(operation: Operation) -> Kind {
     match operation {
-        Operation::StyleSet | Operation::StyleRead => Kind::Pie2d,
+        Operation::StyleSet | Operation::StyleRead | Operation::LeaderLinesSet => Kind::Pie2d,
         Operation::SeriesSet | Operation::SeriesRead => Kind::Line2d,
         Operation::AxisSet
         | Operation::SeriesFillSet
@@ -197,6 +249,8 @@ const fn chart_kind(operation: Operation) -> Kind {
         | Operation::GridlineStrokeSet
         | Operation::BorderSet
         | Operation::LegendFillSet
+        | Operation::LegendFontSet
+        | Operation::LabelLocationsSet
         | Operation::BackgroundSet => Kind::Column2d,
         Operation::LightingSet => Kind::Column3d,
         Operation::ShadowSet | Operation::CategoryLabelsSet => Kind::Column2d,
@@ -241,6 +295,39 @@ fn stroke() -> TestResult<Stroke> {
 
 fn legend_fill_host() -> TestResult<ChartLegendFill> {
     Ok(ChartLegendFill::Fill(ShapeFill::Solid(fill()?)))
+}
+
+fn legend_font_host() -> TestResult<ChartLegendFont> {
+    Ok(ChartLegendFont::Font(
+        ChartFont::new(TextFont::named("Georgia")?).with_bold(true),
+    ))
+}
+
+fn leaders() -> Vec<LeaderLineVisibility> {
+    vec![
+        LeaderLineVisibility::Hidden,
+        LeaderLineVisibility::Visible,
+        LeaderLineVisibility::Hidden,
+    ]
+}
+
+fn locations() -> Vec<ValueLabelLocation> {
+    vec![ValueLabelLocation::Outside, ValueLabelLocation::Middle]
+}
+
+fn host_locations() -> Vec<ChartSeriesValueLabelLocation> {
+    vec![
+        ChartSeriesValueLabelLocation::Outside,
+        ChartSeriesValueLabelLocation::Middle,
+    ]
+}
+
+fn legend_font_leaf() -> TestResult<LegendProperty> {
+    Ok(LegendProperty::Font(LegendFont::Font {
+        font: TextFont::named("Georgia")?,
+        bold: true,
+        italic: false,
+    }))
 }
 
 fn legend_fill_leaf() -> TestResult<LegendProperty> {
@@ -326,6 +413,19 @@ fn host_operation(input: &Input, source: &[u8], operation: Operation) -> TestRes
                 Operation::LegendFillSet => {
                     e.set_slide_chart_legend_fill(slide, chart, &legend_fill_host()?)?;
                 },
+                Operation::LegendFontSet => {
+                    e.set_slide_chart_legend_font(slide, chart, &legend_font_host()?)?;
+                },
+                Operation::LeaderLinesSet => {
+                    e.set_slide_chart_pie_leader_line_visibilities(slide, chart, &leaders())?;
+                },
+                Operation::LabelLocationsSet => {
+                    e.set_slide_chart_series_value_label_locations(
+                        slide,
+                        chart,
+                        &host_locations(),
+                    )?;
+                },
                 Operation::AffixesSet => return Err("not a Keynote route".into()),
             }
             e.to_bytes()?
@@ -374,6 +474,15 @@ fn host_operation(input: &Input, source: &[u8], operation: Operation) -> TestRes
                 Operation::LegendFillSet => {
                     e.set_body_chart_legend_fill(chart, &legend_fill_host()?)?
                 },
+                Operation::LegendFontSet => {
+                    e.set_body_chart_legend_font(chart, &legend_font_host()?)?;
+                },
+                Operation::LeaderLinesSet => {
+                    e.set_body_chart_pie_leader_line_visibilities(chart, &leaders())?;
+                },
+                Operation::LabelLocationsSet => {
+                    e.set_body_chart_series_value_label_locations(chart, &host_locations())?;
+                },
                 Operation::AffixesSet => return Err("not a Pages route".into()),
             }
             e.to_bytes()?
@@ -416,6 +525,19 @@ fn host_operation(input: &Input, source: &[u8], operation: Operation) -> TestRes
                 },
                 Operation::LegendFillSet => {
                     e.set_sheet_chart_legend_fill(sheet, chart, &legend_fill_host()?)?;
+                },
+                Operation::LegendFontSet => {
+                    e.set_sheet_chart_legend_font(sheet, chart, &legend_font_host()?)?;
+                },
+                Operation::LeaderLinesSet => {
+                    e.set_sheet_chart_pie_leader_line_visibilities(sheet, chart, &leaders())?;
+                },
+                Operation::LabelLocationsSet => {
+                    e.set_sheet_chart_series_value_label_locations(
+                        sheet,
+                        chart,
+                        &host_locations(),
+                    )?;
                 },
                 _ => return Err("not a Numbers route".into()),
             }
@@ -503,6 +625,21 @@ fn keynote_operation(source: &[u8], operation: Operation) -> TestResult<Vec<u8>>
         Operation::LegendFillSet => {
             let mut edit = package.edit_slide_chart_legend_style(slide, chart)?;
             edit.set(legend_fill_leaf()?)?;
+            leaf_bytes!(edit.commit()?.package())
+        },
+        Operation::LegendFontSet => {
+            let mut edit = package.edit_slide_chart_legend_style(slide, chart)?;
+            edit.set(legend_font_leaf()?)?;
+            leaf_bytes!(edit.commit()?.package())
+        },
+        Operation::LeaderLinesSet => {
+            let mut edit = package.edit_slide_chart_series(slide, chart)?;
+            edit.set(series::Property::LeaderLines(leaders()))?;
+            leaf_bytes!(edit.commit()?.package())
+        },
+        Operation::LabelLocationsSet => {
+            let mut edit = package.edit_slide_chart_series(slide, chart)?;
+            edit.set(series::Property::ValueLabelLocations(locations()))?;
             leaf_bytes!(edit.commit()?.package())
         },
         Operation::AffixesSet => return Err("not a Keynote route".into()),
@@ -619,6 +756,27 @@ fn pages_operation(source: &[u8], operation: Operation) -> TestResult<Vec<u8>> {
                 .commit()?
                 .package()
         ),
+        Operation::LegendFontSet => leaf_bytes!(
+            package
+                .edit_body_chart_legend_style(chart)?
+                .set(legend_font_leaf()?)?
+                .commit()?
+                .package()
+        ),
+        Operation::LeaderLinesSet => leaf_bytes!(
+            package
+                .edit_body_chart_series(chart)?
+                .set(series::Property::LeaderLines(leaders()))?
+                .commit()?
+                .package()
+        ),
+        Operation::LabelLocationsSet => leaf_bytes!(
+            package
+                .edit_body_chart_series(chart)?
+                .set(series::Property::ValueLabelLocations(locations()))?
+                .commit()?
+                .package()
+        ),
         Operation::AffixesSet => return Err("not a Pages route".into()),
     })
 }
@@ -670,6 +828,21 @@ fn numbers_operation(source: &[u8], operation: Operation) -> TestResult<Vec<u8>>
         Operation::LegendFillSet => {
             let mut edit = package.edit_sheet_chart_legend_style(0, 1)?;
             edit.set(legend_fill_leaf()?)?;
+            Ok(leaf_bytes!(edit.commit()?.package()))
+        },
+        Operation::LegendFontSet => {
+            let mut edit = package.edit_sheet_chart_legend_style(0, 1)?;
+            edit.set(legend_font_leaf()?)?;
+            Ok(leaf_bytes!(edit.commit()?.package()))
+        },
+        Operation::LeaderLinesSet => {
+            let mut edit = package.edit_sheet_chart_series(0, 1)?;
+            edit.set(series::Property::LeaderLines(leaders()))?;
+            Ok(leaf_bytes!(edit.commit()?.package()))
+        },
+        Operation::LabelLocationsSet => {
+            let mut edit = package.edit_sheet_chart_series(0, 1)?;
+            edit.set(series::Property::ValueLabelLocations(locations()))?;
             Ok(leaf_bytes!(edit.commit()?.package()))
         },
         _ => Err("not a Numbers route".into()),

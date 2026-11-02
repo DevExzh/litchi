@@ -389,6 +389,15 @@ impl MutationScope {
         }
     }
 
+    /// Admit chart drawable extension `fields`.
+    pub(crate) fn allow_chart_fields(&mut self, fields: &[u32]) {
+        for field in fields {
+            if !self.chart_fields.contains(field) {
+                self.chart_fields.push(*field);
+            }
+        }
+    }
+
     /// Admit extension or outer `fields`.
     pub(crate) fn allow_fields(&mut self, fields: &[u32]) {
         for field in fields {
@@ -2106,7 +2115,9 @@ pub mod property {
     };
     use litchi_iwa_common::chart::kind::Kind;
     use litchi_iwa_common::chart::number_format::{LabelAffixes, NumberFormat};
-    use litchi_iwa_common::chart::pie::{LabelDistance, LabelVisibility, WedgeExplosion};
+    use litchi_iwa_common::chart::pie::{
+        LabelDistance, LabelVisibility, LeaderLineVisibility, WedgeExplosion,
+    };
     use litchi_iwa_common::chart::series::{
         ConnectionLine, ConnectionLineFamily, SymbolFamily, SymbolShape, SymbolSize, Trendline,
         TrendlineType,
@@ -2436,6 +2447,114 @@ pub mod property {
                 payload,
                 &rules::pie_wedge_explosion(value.native_fraction()),
             )
+        }
+    }
+
+    /// `tschchartseriespieenablecalloutline` (series non-style).
+    const PIE_LEADER_LINE_FIELD: u32 = 102;
+
+    /// The leader line between each pie wedge and its label (the host's
+    /// `pie_leader_lines`): read strictly as a canonical `int32`, the
+    /// native default (visible) removes the field and an emptied
+    /// extension.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+    pub struct LeaderLines;
+
+    impl LeaderLines {
+        fn stored(extension: &[u8]) -> Result<Option<LeaderLineVisibility>> {
+            let mut found = None;
+            for field in wire::WireView::parse(extension, litchi_iwa_common::WireLimits::DEFAULT)?
+                .fields()
+                .filter(|field| field.number() == PIE_LEADER_LINE_FIELD)
+            {
+                if found.is_some() || field.wire_type() != 0 {
+                    return Err(Error::Invalid("a malformed pie leader-line field"));
+                }
+                let raw = field.payload();
+                let (value, consumed) = litchi_iwa_common::varint::decode_varint_from_bytes(raw)
+                    .map_err(|_| Error::Invalid("a malformed pie leader-line field"))?;
+                #[allow(
+                    clippy::cast_possible_truncation,
+                    reason = "an int32 varint, sign-extended when negative"
+                )]
+                let native = match value {
+                    0..=0x7fff_ffff | 0xffff_ffff_8000_0000..=u64::MAX => value as i32,
+                    _ => return Err(Error::Invalid("a pie leader-line value outside int32")),
+                };
+                let canonical = if native < 0 {
+                    10
+                } else {
+                    litchi_iwa_common::varint::encode_varint(value).len()
+                };
+                if consumed != raw.len() || consumed != canonical {
+                    return Err(Error::Invalid("a non-canonical pie leader-line field"));
+                }
+                found = Some(LeaderLineVisibility::from_native(native));
+            }
+            Ok(found)
+        }
+    }
+
+    impl Property for LeaderLines {
+        type Value = LeaderLineVisibility;
+
+        fn base(&self) -> Base {
+            Base::Unstyled
+        }
+
+        fn default_value(&self) -> LeaderLineVisibility {
+            LeaderLineVisibility::Visible
+        }
+
+        fn read(&self, payload: &[u8]) -> Result<LeaderLineVisibility> {
+            let properties = codec::decode(payload, Archive::SeriesNonStyle, CodecLimits::DEFAULT)?;
+            Ok(match properties.extension() {
+                Some(extension) => Self::stored(extension)?.unwrap_or_default(),
+                None => LeaderLineVisibility::Visible,
+            })
+        }
+
+        fn patch(&self, payload: &[u8], value: &LeaderLineVisibility) -> Result<Vec<u8>> {
+            let properties = codec::decode(payload, Archive::SeriesNonStyle, CodecLimits::DEFAULT)?;
+            let existing = properties.extension();
+            #[allow(
+                clippy::cast_sign_loss,
+                reason = "a negative int32 is stored sign-extended"
+            )]
+            let native = i64::from(value.native_value()) as u64;
+            let visible = *value == LeaderLineVisibility::Visible;
+            let patched = match existing {
+                None if visible => payload.to_vec(),
+                None => {
+                    let mut extension = Vec::new();
+                    wire::append_varint_field(&mut extension, PIE_LEADER_LINE_FIELD, native)?;
+                    wire::patch_length_delimited_field(
+                        payload,
+                        codec::EXTENSION_FIELD,
+                        false,
+                        Some(&extension),
+                    )?
+                },
+                Some(extension) => {
+                    let present = Self::stored(extension)?.is_some();
+                    let extension = wire::patch_varint_field(
+                        extension,
+                        PIE_LEADER_LINE_FIELD,
+                        present,
+                        (!visible).then_some(native),
+                    )?;
+                    wire::patch_length_delimited_field(
+                        payload,
+                        codec::EXTENSION_FIELD,
+                        true,
+                        (!extension.is_empty()).then_some(extension.as_slice()),
+                    )?
+                },
+            };
+            if self.read(&patched)? != *value {
+                return Err(Error::Invalid("a pie leader-line write does not read back"));
+            }
+            Ok(patched)
         }
     }
 

@@ -40,6 +40,10 @@ use crate::series::{
 use crate::shape::property::{encode_shadow, shadow_of};
 use crate::shape::{register, unregister};
 
+mod typography;
+
+pub use typography::{LegendFont, LegendFontSize};
+
 const CHART_MESSAGE_TYPE: u32 = 5_021;
 const LEGEND_STYLE_MESSAGE_TYPE: u32 = 5_024;
 const STYLESHEET_MESSAGE_TYPE: u32 = 401;
@@ -108,6 +112,10 @@ pub enum Property {
     Stroke(LegendStroke),
     /// The legend shadow.
     Shadow(LegendShadow),
+    /// The legend label font identity and face traits.
+    Font(LegendFont),
+    /// The legend label point size.
+    FontSize(LegendFontSize),
 }
 
 /// The property a [`Property`] value sets, for reads and resets.
@@ -120,6 +128,10 @@ pub enum PropertyKind {
     Stroke,
     /// [`Property::Shadow`].
     Shadow,
+    /// [`Property::Font`].
+    Font,
+    /// [`Property::FontSize`].
+    FontSize,
 }
 
 impl Property {
@@ -130,6 +142,8 @@ impl Property {
             Self::Fill(_) => PropertyKind::Fill,
             Self::Stroke(_) => PropertyKind::Stroke,
             Self::Shadow(_) => PropertyKind::Shadow,
+            Self::Font(_) => PropertyKind::Font,
+            Self::FontSize(_) => PropertyKind::FontSize,
         }
     }
 }
@@ -142,15 +156,25 @@ impl PropertyKind {
             Self::Fill => Property::Fill(LegendFill::Inherited),
             Self::Stroke => Property::Stroke(LegendStroke::Inherited),
             Self::Shadow => Property::Shadow(LegendShadow::Inherited),
+            Self::Font => Property::Font(LegendFont::Inherited),
+            Self::FontSize => Property::FontSize(LegendFontSize::Inherited),
         }
     }
 
-    const fn field(self) -> u32 {
+    /// The legend style field, `None` for the typography stored by the
+    /// chart's paragraph styles.
+    const fn field(self) -> Option<u32> {
         match self {
-            Self::Fill => FILL_FIELD,
-            Self::Stroke => STROKE_FIELD,
-            Self::Shadow => SHADOW_FIELD,
+            Self::Fill => Some(FILL_FIELD),
+            Self::Stroke => Some(STROKE_FIELD),
+            Self::Shadow => Some(SHADOW_FIELD),
+            Self::Font | Self::FontSize => None,
         }
+    }
+
+    /// Whether the property is the legend label typography.
+    const fn typography(self) -> bool {
+        matches!(self, Self::Font | Self::FontSize)
     }
 }
 
@@ -174,7 +198,10 @@ fn wire_error(error: litchi_iwa_common::Error) -> SymbolError {
 pub fn value(payload: &[u8], kind: PropertyKind) -> SymbolResult<Property> {
     let properties =
         codec::decode(payload, Archive::LegendStyle, CodecLimits::DEFAULT).map_err(codec_error)?;
-    let stored = properties.message(kind.field()).map_err(codec_error)?;
+    let field = kind.field().ok_or(SymbolError::Invalid(
+        "the legend typography is read from the chart's paragraph styles",
+    ))?;
+    let stored = properties.message(field).map_err(codec_error)?;
     Ok(match kind {
         PropertyKind::Fill => Property::Fill(match stored {
             None => LegendFill::Inherited,
@@ -206,6 +233,11 @@ pub fn value(payload: &[u8], kind: PropertyKind) -> SymbolResult<Property> {
                 },
             },
         }),
+        PropertyKind::Font | PropertyKind::FontSize => {
+            return Err(SymbolError::Invalid(
+                "the legend typography is read from the chart's paragraph styles",
+            ));
+        },
     })
 }
 
@@ -215,7 +247,9 @@ pub fn value(payload: &[u8], kind: PropertyKind) -> SymbolResult<Property> {
 ///
 /// [`Refusal::ImageFill`], an invalid payload.
 pub fn rewrite(payload: &[u8], value: &Property) -> SymbolResult<Vec<u8>> {
-    let field = value.kind().field();
+    let field = value.kind().field().ok_or(SymbolError::Invalid(
+        "the legend typography is written through the chart's paragraph styles",
+    ))?;
     let encoded: Option<Vec<u8>>;
     let (write, empty) = match value {
         Property::Fill(fill) => {
@@ -263,6 +297,11 @@ pub fn rewrite(payload: &[u8], value: &Property) -> SymbolResult<Vec<u8>> {
                 None => Write::Message { field, value: None },
             };
             (write, codec::EmptyExtension::Remove)
+        },
+        Property::Font(_) | Property::FontSize(_) => {
+            return Err(SymbolError::Invalid(
+                "the legend typography is written through the chart's paragraph styles",
+            ));
         },
     };
     Ok(codec::rewrite(
@@ -629,6 +668,51 @@ fn collapse_if_equivalent(
     Ok(parent)
 }
 
+/// Widen the scope of a legend typography write: the chart's paragraph
+/// styles and their stylesheets, the chart's `paragraph_styles` list
+/// (field 20), the legend's paragraph-style index (legend extension field
+/// 2) and the paragraph-style override fields.
+fn typography_scope(
+    workspace: &Workspace<'_>,
+    chart: u64,
+    budget: &mut SymbolBudget,
+) -> SymbolResult<()> {
+    let (_, payload) = bounded_chart_payload(workspace, chart, budget)?;
+    let styles = bounded_references(payload, budget)?
+        .paragraph_styles()
+        .to_vec();
+    let mut related = Vec::new();
+    for &style in &styles {
+        let location = workspace.locate(style).map_err(SymbolError::from)?;
+        related.push((style, workspace.member(location).to_owned(), 2_022));
+        let (_, style_payload) = workspace
+            .unique_payload(
+                style,
+                2_022,
+                "a paragraph style must have exactly one payload",
+            )
+            .map_err(SymbolError::from)?;
+        if let Some(sheet) = typography::stylesheet_of(style_payload)? {
+            let location = workspace.locate(sheet).map_err(SymbolError::from)?;
+            related.push((
+                sheet,
+                workspace.member(location).to_owned(),
+                STYLESHEET_MESSAGE_TYPE,
+            ));
+        }
+    }
+    budget.preflight_allocations(related.len().max(1))?;
+    budget.allocations(related.len().max(1))?;
+    if let Some(scope) = budget.scope_mut() {
+        for (object, member, message_type) in &related {
+            scope.allow(*object, member, *message_type);
+        }
+        scope.allow_fields(&[10, 11, 20]);
+        scope.allow_chart_fields(&[20]);
+    }
+    Ok(())
+}
+
 /// The scope of a legend write: the chart, its legend style, the
 /// stylesheet, the parent and the package metadata.
 fn scope(
@@ -700,6 +784,15 @@ fn current(
     kind: PropertyKind,
     budget: &mut SymbolBudget,
 ) -> SymbolResult<Property> {
+    match kind {
+        PropertyKind::Font => {
+            return typography::font(workspace, chart, budget).map(Property::Font);
+        },
+        PropertyKind::FontSize => {
+            return typography::size(workspace, chart, budget).map(Property::FontSize);
+        },
+        _ => {},
+    }
     let style = legend_style_of(workspace, chart, budget)?;
     let (_, payload) = style_payload(workspace, style, budget)?;
     value(payload, kind)
@@ -750,12 +843,33 @@ pub fn write(
     let style = legend_style_of(workspace, chart, &mut budget)?;
     let scope = scope(workspace, chart, style, &mut budget)?;
     budget.set_scope(scope);
+    if kind.typography() {
+        typography_scope(workspace, chart, &mut budget)?;
+    }
     let target = ensure_exclusive(workspace, chart, style, &mut budget)?;
-    let (message, payload) = style_payload(workspace, target, &mut budget)?;
-    let data = charged_patch(payload, &mut budget, |payload| rewrite(payload, value))?;
-    workspace
-        .replace_payload(target, message, data)
-        .map_err(SymbolError::from)?;
+    match value {
+        Property::Font(font) => typography::apply_change(
+            workspace,
+            chart,
+            target,
+            typography::Change::Font(font),
+            &mut budget,
+        )?,
+        Property::FontSize(size) => typography::apply_change(
+            workspace,
+            chart,
+            target,
+            typography::Change::Size(*size),
+            &mut budget,
+        )?,
+        _ => {
+            let (message, payload) = style_payload(workspace, target, &mut budget)?;
+            let data = charged_patch(payload, &mut budget, |payload| rewrite(payload, value))?;
+            workspace
+                .replace_payload(target, message, data)
+                .map_err(SymbolError::from)?;
+        },
+    }
     collapse_if_equivalent(workspace, chart, target, &mut budget)?;
     if current(workspace, chart, kind, &mut budget)? != *value {
         return Err(SymbolError::Invalid(

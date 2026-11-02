@@ -362,27 +362,56 @@ impl Components {
 /// republish every changed component once through exact-source reassembly.
 pub(crate) fn publish(
     source: &[u8],
-    mut components: Components,
+    components: Components,
     replacements: Vec<(u64, u32, Vec<u8>)>,
 ) -> TestResult<Vec<u8>> {
+    publish_referencing(
+        source,
+        components,
+        replacements
+            .into_iter()
+            .map(|(object, message_type, data)| (object, message_type, data, Vec::new()))
+            .collect(),
+    )
+}
+
+/// [`publish`], also adding object references to each replaced message's
+/// metadata (a fixture that makes another object consume a style).
+pub(crate) fn publish_referencing(
+    source: &[u8],
+    mut components: Components,
+    replacements: Vec<(u64, u32, Vec<u8>, Vec<u64>)>,
+) -> TestResult<Vec<u8>> {
     let mut changed = std::collections::BTreeSet::new();
-    for (object, message_type, data) in replacements {
+    for (object, message_type, data, references) in replacements {
         let (component, index) = components.locate(object, message_type)?;
-        if components.payload(object, (component, index))? == data.as_slice() {
+        if components.payload(object, (component, index))? == data.as_slice()
+            && references.is_empty()
+        {
             continue;
         }
-        components.archives[component]
+        let target = components.archives[component]
             .1
             .object_mut(object)
-            .ok_or("object vanished")?
-            .replace_message_preserving_header(
-                index,
-                RawMessage {
-                    type_: message_type,
-                    data,
-                },
-                CoreLimits::default(),
-            )?;
+            .ok_or("object vanished")?;
+        target.replace_message_preserving_header(
+            index,
+            RawMessage {
+                type_: message_type,
+                data,
+            },
+            CoreLimits::default(),
+        )?;
+        let info = target
+            .archive_info
+            .message_infos
+            .get_mut(index)
+            .ok_or("message metadata vanished")?;
+        for reference in references {
+            if !info.object_references.contains(&reference) {
+                info.object_references.push(reference);
+            }
+        }
         changed.insert(component);
     }
     if changed.is_empty() {
