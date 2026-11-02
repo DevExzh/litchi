@@ -699,10 +699,10 @@ keynote/editor/slide_tables/formula.rs	set_slide_table_formula	1	keynote	table.f
 keynote/editor/slide_tables/formula.rs	slide_table_formula	1	keynote	table.formula	migrated	litchi_keynote::Package::slide_table_cells	keynote_slide_table_formula_read_parity	A	test-data/iwork/keynote/slide-table-read-native-receipt.json	-
 keynote/editor/slide_tables/hidden_axes.rs	set_slide_table_hidden_axes	1	keynote	table.hidden_axes	migrated	litchi_keynote::Package::edit_slide_table_hidden_axes	keynote_slide_table_hidden_axes_set_parity	B	-	-
 keynote/editor/slide_tables/hidden_axes.rs	slide_table_hidden_axes	1	keynote	table.hidden_axes	migrated	litchi_keynote::Package::slide_table_hidden_axes	keynote_slide_table_hidden_axes_read_parity	A	-	-
-keynote/editor/slide_tables/topology.rs	insert_slide_table_column	1	keynote	table.topology	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_tables/topology.rs	insert_slide_table_row	1	keynote	table.topology	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_tables/topology.rs	remove_slide_table_column	1	keynote	table.topology	host-only	litchi-keynote	-	-	-	-
-keynote/editor/slide_tables/topology.rs	remove_slide_table_row	1	keynote	table.topology	host-only	litchi-keynote	-	-	-	-
+keynote/editor/slide_tables/topology.rs	insert_slide_table_column	1	keynote	table.topology	migrated	litchi_keynote::Package::edit_slide_table_topology	keynote_slide_table_insert_column_parity	A	-	-
+keynote/editor/slide_tables/topology.rs	insert_slide_table_row	1	keynote	table.topology	migrated	litchi_keynote::Package::edit_slide_table_topology	keynote_slide_table_insert_row_parity	A	-	-
+keynote/editor/slide_tables/topology.rs	remove_slide_table_column	1	keynote	table.topology	migrated	litchi_keynote::Package::edit_slide_table_topology	keynote_slide_table_remove_column_parity	A	-	-
+keynote/editor/slide_tables/topology.rs	remove_slide_table_row	1	keynote	table.topology	migrated	litchi_keynote::Package::edit_slide_table_topology	keynote_slide_table_remove_row_parity	A	-	-
 keynote/editor/text_box_create.rs	add_slide_text_box	1	keynote	drawable.text_box_lifecycle	migrated	litchi_keynote::slide::drawable::Edit::add_text_box	keynote_slide_text_box_add_parity	B	-	-
 lib.rs	publication_error	1	shared	other	retired	-	-	-	-	retired: accessor of the host Error for its legacy package save; each leaf save returns a typed SaveError whose Publication variant carries the litchi_iwa_archive::publication::Error directly (litchi_pages::SaveError, litchi_keynote::SaveError, litchi_numbers::SaveError) (record 0417)
 lib.rs	publication_was_committed	1	shared	other	retired	-	-	-	-	retired: accessor of the host Error for its legacy package save; the leaf typed save errors answer it directly: litchi_pages::SaveError::was_committed, litchi_keynote::SaveError::was_committed, and litchi_numbers::SaveError::Publication(litchi_iwa_archive::publication::Error::was_committed) (record 0417)
@@ -2053,10 +2053,10 @@ pages/editor/tables/semantic.rs	tables	1	pages	table.lifecycle	migrated	litchi_p
 pages/editor/tables/semantic.rs	unmerge_table_cells	1	pages	table.merge	migrated	litchi_pages::Package::edit_body_table_merges	pages_body_table_unmerge_parity	A	-	-
 pages/editor/tables/sort.rs	apply_table_sort_order	1	pages	table.sort	migrated	litchi_pages::Package::edit_body_table_sort_execution	pages_body_table_sort_apply_parity	A	-	-
 pages/editor/tables/sort.rs	apply_table_sort_order_to_rows	1	pages	table.sort	migrated	litchi_pages::Package::edit_body_table_sort_execution	pages_body_table_sort_apply_to_rows_parity	A	-	-
-pages/editor/tables/topology.rs	insert_table_column	1	pages	table.topology	host-only	litchi-pages	-	-	-	-
-pages/editor/tables/topology.rs	insert_table_row	1	pages	table.topology	host-only	litchi-pages	-	-	-	-
-pages/editor/tables/topology.rs	remove_table_column	1	pages	table.topology	host-only	litchi-pages	-	-	-	-
-pages/editor/tables/topology.rs	remove_table_row	1	pages	table.topology	host-only	litchi-pages	-	-	-	-
+pages/editor/tables/topology.rs	insert_table_column	1	pages	table.topology	migrated	litchi_pages::Package::edit_body_table_topology	pages_body_table_insert_column_parity	A	-	-
+pages/editor/tables/topology.rs	insert_table_row	1	pages	table.topology	migrated	litchi_pages::Package::edit_body_table_topology	pages_body_table_insert_row_parity	A	-	-
+pages/editor/tables/topology.rs	remove_table_column	1	pages	table.topology	migrated	litchi_pages::Package::edit_body_table_topology	pages_body_table_remove_column_parity	A	-	-
+pages/editor/tables/topology.rs	remove_table_row	1	pages	table.topology	migrated	litchi_pages::Package::edit_body_table_topology	pages_body_table_remove_row_parity	A	-	-
 pages/editor/text_box_create.rs	add_text_box	1	pages	drawable.text_box_lifecycle	migrated	litchi_pages::drawable::lifecycle::Edit::add_text_box	pages_text_box_add_parity	B	-	-
 shapes/fill/image.rs	embedded	1	shared	drawable.shape	migrated	litchi_iwa_common::shape::fill::Image::embedded	keynote_shape_image_fill_read_parity	A	-	-
 shapes/fill/image.rs	new	1	shared	io	migrated	litchi_iwa_common::shape::fill::ImageData::new	numbers_shape_image_fill_read_parity	A	-	-
