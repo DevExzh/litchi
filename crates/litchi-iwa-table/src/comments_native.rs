@@ -34,6 +34,10 @@ use litchi_iwa_protos::table_info_codec;
 
 use crate::structure::{self, Fault as StructureFault, TableLeaf, Working, metadata};
 
+mod thread;
+
+pub use thread::{ReplyOperation, rewrite_reply};
+
 /// The resource dimensions specific to the native comment wire codecs.
 ///
 /// These stay at the comment-native boundary instead of widening the shared
@@ -660,18 +664,14 @@ pub fn rewrite_root<P: TableLeaf>(
                     &mut transition,
                 )?;
                 inserted.push(root);
-                if author.new_author {
-                    create_author(&mut working, &author, &registry, &mut transition)?;
-                    inserted.push(author.author_identifier.ok_or(Fault::Invalid)?);
-                    if author.new_storage {
-                        create_author_storage(&mut working, &author, &registry, &mut transition)?;
-                        inserted.push(author.storage_identifier.ok_or(Fault::Invalid)?);
-                    } else if profile.update_author_storage {
-                        append_author_storage(&mut working, &author)?;
-                    } else if author.new_author {
-                        rewrite_author_storage_payload(&mut working, &author)?;
-                    }
-                }
+                materialize_author(
+                    &mut working,
+                    &author,
+                    profile,
+                    &registry,
+                    &mut transition,
+                    &mut inserted,
+                )?;
                 if let Some(list) =
                     attach_root(&mut working, selection, root, profile, &mut transition)?
                 {
@@ -681,18 +681,41 @@ pub fn rewrite_root<P: TableLeaf>(
         },
         RootOperation::Clear => {
             let root = selection.root_identifier.ok_or(Fault::Invalid)?;
-            validate_clear_source(&working, selection, root)?;
+            // The host's clear removes the root's whole unreferenced graph:
+            // the root, its direct replies and any generated author left
+            // without a referrer.
+            let replies = thread::direct_replies(&working, &census, root)?;
+            validate_clear_source(&working, selection, root, &replies)?;
             ensure_unique_root(&working, &census, selection, root)?;
-            let author = ensure_empty_thread(&working, root)?;
+            let mut authors = Vec::new();
+            structure::reserve(&mut authors, replies.len().saturating_add(1))?;
+            if let Some(author) = thread_author(&working, root, replies.len())? {
+                authors.push(author);
+            }
+            for reply in &replies {
+                if let Some(author) = thread_author(&working, *reply, 0)? {
+                    if !authors.contains(&author) {
+                        authors.push(author);
+                    }
+                }
+            }
             detach_root(&mut working, selection, root)?;
+            structure::reserve(&mut removed, replies.len())?;
             removed.push(root);
             working.remove(root)?;
-            if let Some(author) = author {
+            for reply in &replies {
+                removed.push(*reply);
+                working.remove(*reply)?;
+            }
+            let mut storages = Vec::new();
+            structure::reserve(&mut storages, removed.len())?;
+            storages.extend_from_slice(&removed);
+            for author in authors {
                 remove_generated_author_if_unshared(
                     &mut working,
                     &census,
                     author,
-                    root,
+                    &storages,
                     &mut removed,
                 )?;
             }
@@ -747,6 +770,33 @@ pub fn rewrite_root<P: TableLeaf>(
         touched_components: published.touched_components,
         deleted_previews: published.deleted_previews,
     })
+}
+
+/// Write a planned new author (and its registry storage) after the comment
+/// storage that references it.
+fn materialize_author<P: TableLeaf>(
+    working: &mut Working<'_, P>,
+    author: &AuthorPlan,
+    profile: Profile,
+    registry: &metadata::Registry,
+    transition: &mut metadata::Transition,
+    inserted: &mut Vec<u64>,
+) -> FaultResult<()> {
+    if !author.new_author {
+        return Ok(());
+    }
+    create_author(working, author, registry, transition)?;
+    structure::reserve(inserted, 2)?;
+    inserted.push(author.author_identifier.ok_or(Fault::Invalid)?);
+    if author.new_storage {
+        create_author_storage(working, author, registry, transition)?;
+        inserted.push(author.storage_identifier.ok_or(Fault::Invalid)?);
+    } else if profile.update_author_storage {
+        append_author_storage(working, author)?;
+    } else {
+        rewrite_author_storage_payload(working, author)?;
+    }
+    Ok(())
 }
 
 fn validate_selection<P: TableLeaf>(
@@ -881,9 +931,52 @@ fn validate_clear_source<P: TableLeaf>(
     working: &Working<'_, P>,
     selection: &Selection,
     root: u64,
+    replies: &[u64],
 ) -> FaultResult<()> {
     strict_clear_reference_census(working, selection, root)?;
-    let object = working.object(root)?;
+    validate_clear_storage(working, root, replies)?;
+    for reply in replies {
+        validate_clear_storage(working, *reply, &[])?;
+        validate_clear_comment_storage_payload(
+            working
+                .object(*reply)?
+                .messages
+                .first()
+                .ok_or(Fault::Invalid)?
+                .data
+                .as_slice(),
+        )?;
+        validate_metadata_ownership(working, *reply)?;
+    }
+    validate_selected_list_header(working, selection)?;
+    validate_clear_table_payloads(working)?;
+    validate_metadata_ownership(working, root)?;
+    for component in working.component_names() {
+        for candidate in &working.archive(&component)?.objects {
+            for candidate_message in candidate
+                .messages
+                .iter()
+                .filter(|candidate_message| candidate_message.type_ == TABLE_INFO_MESSAGE_TYPE)
+            {
+                let view = WireView::parse(candidate_message.data.as_slice(), WireLimits::DEFAULT)
+                    .map_err(map_wire_error)?;
+                if view.fields().next().is_none() {
+                    return Err(Fault::Invalid);
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
+/// Admit one comment storage a clear deletes: a single 3056 payload whose
+/// header references exactly its author and its direct `replies`.
+fn validate_clear_storage<P: TableLeaf>(
+    working: &Working<'_, P>,
+    storage: u64,
+    replies: &[u64],
+) -> FaultResult<()> {
+    let object = working.object(storage)?;
     if object.messages.len() != 1 || object.archive_info.message_infos.len() != 1 {
         return Err(Fault::Dependency);
     }
@@ -920,26 +1013,7 @@ fn validate_clear_source<P: TableLeaf>(
         structure::reserve(&mut expected, 1)?;
         expected.push(author.identifier());
     }
-    validate_comment_message_header(object, 0, &expected)?;
-    validate_selected_list_header(working, selection)?;
-    validate_clear_table_payloads(working)?;
-    validate_metadata_ownership(working, selection, root)?;
-    for component in working.component_names() {
-        for candidate in &working.archive(&component)?.objects {
-            for candidate_message in candidate
-                .messages
-                .iter()
-                .filter(|candidate_message| candidate_message.type_ == TABLE_INFO_MESSAGE_TYPE)
-            {
-                let view = WireView::parse(candidate_message.data.as_slice(), WireLimits::DEFAULT)
-                    .map_err(map_wire_error)?;
-                if view.fields().next().is_none() {
-                    return Err(Fault::Invalid);
-                }
-            }
-        }
-    }
-    Ok(())
+    validate_comment_message_header(object, 0, &expected, replies)
 }
 
 /// Run the deletion-grade archive census before any clear mutation is staged.
@@ -1123,6 +1197,7 @@ fn validate_comment_message_header(
     object: &ArchiveObject,
     message_index: usize,
     expected: &[u64],
+    replies: &[u64],
 ) -> FaultResult<()> {
     validate_archive_header_shape(object)?;
     if object.archive_info.should_merge == Some(true) {
@@ -1141,20 +1216,50 @@ fn validate_comment_message_header(
     {
         return Err(Fault::Invalid);
     }
-    if info.object_references != expected {
-        return Err(Fault::Dependency);
+    if replies.is_empty() {
+        if info.object_references != expected {
+            return Err(Fault::Dependency);
+        }
+    } else {
+        // A reply-bearing root's aggregate list names its author and every
+        // direct reply once; the host appends replies after the author, so
+        // only the multiset is checked.
+        let mut actual = Vec::new();
+        structure::reserve(&mut actual, info.object_references.len())?;
+        actual.extend_from_slice(&info.object_references);
+        let mut wanted = Vec::new();
+        structure::reserve(&mut wanted, expected.len().saturating_add(replies.len()))?;
+        wanted.extend_from_slice(expected);
+        wanted.extend_from_slice(replies);
+        actual.sort_unstable();
+        wanted.sort_unstable();
+        if actual != wanted {
+            return Err(Fault::Dependency);
+        }
     }
     let mut field_references = Vec::new();
     structure::reserve(&mut field_references, expected.len())?;
     for field in &info.field_infos {
-        if !field.object_references.is_empty()
-            && (field.effective_type() != FieldType::ObjectReference
-                || field.path.path.as_slice() != [3])
-        {
+        if field.object_references.is_empty() {
+            continue;
+        }
+        if field.effective_type() != FieldType::ObjectReference {
             return Err(Fault::Dependency);
         }
-        for identifier in &field.object_references {
-            field_references.push(*identifier);
+        if field.path.path.as_slice() == [3] {
+            for identifier in &field.object_references {
+                structure::reserve(&mut field_references, 1)?;
+                field_references.push(*identifier);
+            }
+        } else if field.path.path.first() == Some(&4)
+            && field
+                .object_references
+                .iter()
+                .all(|identifier| replies.contains(identifier))
+        {
+            continue;
+        } else {
+            return Err(Fault::Dependency);
         }
     }
     if !field_references.is_empty() && field_references != expected {
@@ -1265,7 +1370,6 @@ fn validate_selected_list_header<P: TableLeaf>(
 
 fn validate_metadata_ownership<P: TableLeaf>(
     working: &Working<'_, P>,
-    selection: &Selection,
     root: u64,
 ) -> FaultResult<()> {
     let Some(registry) = metadata::registry(working)? else {
@@ -1291,7 +1395,6 @@ fn validate_metadata_ownership<P: TableLeaf>(
     {
         return Err(Fault::Dependency);
     }
-    let _ = selection;
     Ok(())
 }
 
@@ -1394,9 +1497,12 @@ fn map_table_info_error(error: table_info_codec::DecodeError) -> Fault {
     Fault::Invalid
 }
 
-fn ensure_empty_thread<P: TableLeaf>(
+/// The author of a storage a clear deletes, after checking it holds exactly
+/// `replies` direct replies.
+fn thread_author<P: TableLeaf>(
     working: &Working<'_, P>,
     root: u64,
+    replies: usize,
 ) -> FaultResult<Option<u64>> {
     let object = working.object(root)?;
     let storage_index = comment_storage_message_index(object)?;
@@ -1418,7 +1524,7 @@ fn ensure_empty_thread<P: TableLeaf>(
     let (snapshot, report) =
         comment_codec::decode_comment_storage_archive_with_report(source, options)
             .map_err(map_comment_decode_error)?;
-    if report.replies() != 0 {
+    if report.replies() != replies {
         return Err(Fault::Dependency);
     }
     Ok(snapshot.author().map(|author| author.identifier()))
@@ -1442,13 +1548,13 @@ fn remove_generated_author_if_unshared<P: TableLeaf>(
     working: &mut Working<'_, P>,
     census: &structure::collect::Census,
     author: u64,
-    removed_root: u64,
+    removed_storages: &[u64],
     removed: &mut Vec<u64>,
 ) -> FaultResult<()> {
     let remaining_referrers = census
         .referrers(author)
         .iter()
-        .filter(|identifier| **identifier != removed_root)
+        .filter(|identifier| !removed_storages.contains(identifier))
         .count();
     if remaining_referrers != 0 && remaining_referrers != 1 {
         return Ok(());

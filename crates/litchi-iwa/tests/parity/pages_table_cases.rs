@@ -25,19 +25,19 @@ const CELLS: &str = "iwork/pages/body-table-cells-native.pages";
 /// cells that take part in a formula graph, as `body-table-cells-native`
 /// has).
 const CATALOG: &str = "iwork/pages/body-table-catalog-native.pages";
-const TABLE: usize = 0;
-const COMMENT_ROW: usize = 1;
-const COMMENT_COLUMN: usize = 1;
+pub(crate) const TABLE: usize = 0;
+pub(crate) const COMMENT_ROW: usize = 1;
+pub(crate) const COMMENT_COLUMN: usize = 1;
 const AUTHOR_MESSAGE_TYPE: u32 = 212;
 
-fn comment_position() -> TestResult<At> {
+pub(crate) fn comment_position() -> TestResult<At> {
     Ok(At::new(
         u32::try_from(COMMENT_ROW)?,
         u32::try_from(COMMENT_COLUMN)?,
     ))
 }
 
-fn host_comment_thread(bytes: &[u8]) -> TestResult<String> {
+pub(crate) fn host_comment_thread(bytes: &[u8]) -> TestResult<String> {
     let editor = pages::Draft::from_bytes(bytes)?;
     let model = host_model(&editor)?;
     let comment = editor.table_cell_comment(model, COMMENT_ROW, COMMENT_COLUMN)?;
@@ -56,7 +56,7 @@ fn host_comment_thread(bytes: &[u8]) -> TestResult<String> {
     ))
 }
 
-fn leaf_comment_thread(bytes: &[u8]) -> TestResult<String> {
+pub(crate) fn leaf_comment_thread(bytes: &[u8]) -> TestResult<String> {
     let package = Package::from_bytes(bytes)?;
     let position = comment_position()?;
     let comment = package.body_table_cell_comment(TABLE, position)?;
@@ -239,7 +239,7 @@ fn assert_populated_comment_semantics(bytes: &[u8]) -> TestResult {
     Ok(())
 }
 
-fn comment_case(
+pub(crate) fn comment_case(
     name: &'static str,
     tier: Tier,
     evidence: Evidence,
@@ -1750,7 +1750,7 @@ fn validate_new_comment_storage_wire(data: &[u8]) -> Result<(), String> {
 }
 
 #[allow(deprecated)]
-fn masked_new_pages_comment_storage(data: &[u8]) -> Result<Decoded, prost::DecodeError> {
+pub(crate) fn masked_new_pages_comment_storage(data: &[u8]) -> Result<Decoded, prost::DecodeError> {
     validate_new_comment_storage_wire(data).map_err(prost::DecodeError::new)?;
     // Patch only the two creation-time fields in place. This keeps the
     // selected payload's field order and every untouched byte intact while
@@ -1803,7 +1803,7 @@ fn narrow_append_nested_comment_bytes(
     Ok(output)
 }
 
-fn host_model(editor: &pages::Draft) -> TestResult<u64> {
+pub(crate) fn host_model(editor: &pages::Draft) -> TestResult<u64> {
     Ok(editor
         .tables()?
         .get(TABLE)
@@ -1950,7 +1950,7 @@ fn pages_body_table_cells_read_parity() -> TestResult {
     Ok(())
 }
 
-const COMMENTS: &str = "iwork/pages/body-table-comment-hidden-native-saved.pages";
+pub(crate) const COMMENTS: &str = "iwork/pages/body-table-comment-hidden-native-saved.pages";
 
 /// The table list, merges and cell comments read the same through the host
 /// (`tables`, `Table::{merges, get_comment, iter_comments, comment_count}`,
