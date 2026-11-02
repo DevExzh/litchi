@@ -82,6 +82,7 @@ mod numbers_chart_series_cases;
 mod numbers_chart_series_style_cases;
 mod numbers_chart_shared_style_cases;
 mod numbers_chart_style_cases;
+mod numbers_comment_thread_cases;
 mod numbers_conditional_highlight_cases;
 mod numbers_drawable_cases;
 mod numbers_drawable_comment_cases;
