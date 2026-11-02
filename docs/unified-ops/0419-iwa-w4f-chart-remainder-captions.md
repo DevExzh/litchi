@@ -68,3 +68,36 @@ fmt, clippy -D warnings on the five touched crates, the parity chart cases
 (328 passed), the crate-boundary check, the glossary, the ledger and the
 bench matrix exit 0 (logs `.coord/iwa-w4f/gates1b`). Target 13 GB after
 pruning.
+
+## 2. Slice 2: reference lines
+
+6 rows flip (set and read on each format).
+
+| Crate | What |
+|---|---|
+| `litchi-iwa-style` | `reference_line::{read_lines, write_lines}`: the W1-E graph engine (`lines`, `set_lines`, already host-differential since 0375a) under a residual `series::Limits` profile, returning a `Report` whose scope names the chart, every retained, removed and created line object, the chart and metadata members, the chart, line (5031) and package-metadata message types, and `REFERENCE_LINES_FIELD` (10005, the chart archive's `TSCH.ChartReferenceLinesArchive`) among the chart fields; created lines are planned new and removed ones planned removed. `series::MutationScope::allow_member` |
+| `litchi-numbers` | `sheet::chart::reference_lines` (`Package::sheet_chart_reference_lines`, `edit_sheet_chart_reference_lines` → `Edit::set(Vec<Line>)`, `apply_sheet_chart_reference_lines`): the legend-style shape, published through the chart-series workspace path |
+| `litchi-keynote` | `chart::reference_lines` on the chart-property core. The locality check admits the chart archive's field 10005 beside the generated extension when the write's chart fields name it, and line objects (5031) among the rewritable types |
+| `litchi-pages` | `chart::reference_lines` on the chart-property core. The locality check admits field 10005 of the chart message when the plan allows it, and a planned line object rewritten whole |
+
+The families share their format's chart-series `Error`, `LimitKind` and
+`Refusal`. More than five lines, a repeated kind or a line another chart
+lists refuse as the host does (`Error::InvalidSource`).
+
+Parity: `{numbers_sheet,keynote_slide,pages_body}_chart_reference_lines_set_parity`
+run five sequences per format through the facade with the inverse replayed:
+allocate two lines into an empty axis, patch one in place (name and value
+label), append one, remove one, remove all. Allocations are Tier B (the
+host draws random item UUIDs; compared with the UUIDs zeroed, as in 0375a);
+Numbers and Pages in-place and removal writes are byte-identical; Keynote
+is Tier B throughout (root previews). `…_reference_lines_read_parity` reads
+every state on each format (Tier A). Six macOS-queue rows added.
+
+| Route | Host Ir | Leaf Ir | Leaf/host |
+|---|---:|---:|---:|
+| keynote_reference_lines_set | 879,854,138 | 139,136,007 | 0.1581 |
+| pages_reference_lines_set | 1,276,021,892 | 88,109,646 | 0.0691 |
+| numbers_reference_lines_set | 214,628,424 | 115,862,233 | 0.5398 |
+
+Receipt `results/0419/callgrind-reference-lines.json`; raw captures in
+`.coord/iwa-w4f/cg2/`.
