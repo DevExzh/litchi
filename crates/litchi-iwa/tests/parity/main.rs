@@ -54,6 +54,7 @@ mod keynote_chart_style_property_cases;
 mod keynote_drawable_cases;
 mod keynote_hidden_axes_cases;
 mod keynote_image_cases;
+mod keynote_media_asset_cases;
 mod keynote_named_style_cases;
 mod keynote_shape_style_cases;
 mod keynote_slide_cases;
