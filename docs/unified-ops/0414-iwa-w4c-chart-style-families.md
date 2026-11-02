@@ -395,3 +395,10 @@ Receipt `results/0414/callgrind-slice5.json`; raw captures in
 `.coord/iwa-w4c/cg5/`. The style engines' public surface only grew (new
 variants of `#[non_exhaustive]` enums and new payload functions), so W4-D's
 chart lifecycle work is unaffected. Legend font and font size follow.
+
+Slice 5 gates: trunk `8010cc9fb4` merged at `3fb4b2bb82`; every command of
+§8 exits 0 (logs `.coord/iwa-w4c/gates6`). Trunk `0c9838a622` (W4-T cell
+appearance) was then merged at `44e529905b`. On that merge, the following were re-run
+and exit 0 (logs `.coord/iwa-w4c/gates6b`): ledger, glossary, the clippy leg
+over the five touched crates, `cargo test -p litchi-numbers --all-features`,
+the chart parity cases, fmt and the bench matrix. Target 12 GB after pruning.
