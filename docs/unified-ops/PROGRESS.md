@@ -7584,3 +7584,10 @@ See [0063](0063-source-pptx-modern-comments.md).
   - W4-T 0412d (`a19162dfed`, Numbers replies on the shared engine; the 3,423-line private engine is deleted).
 - W4-D stopped at a clean commit (context). Its remainder (chart add/duplicate/remove, Pages chart geometry, Numbers captions and image fill, Pages body_table from scratch, Keynote moved onto the shared helpers) is assigned to new agent W4-E (0418).
 - Ledger: 1,959 migrated, 47 retired and 228 host-only rows (Numbers 66, shared 58, Pages 56, Keynote 48). Nothing pushed.
+- Merged W4-C slice 7 (`69aebdf388`, 48 rows: leader lines, auto-fit switches, value-label locations; shared legend-variation parity) and W4-R 0417 (`02ad1c3981`). W4-R covers:
+  - Keynote builder, 10 rows, 37–79% cheaper than the host;
+  - the `slide::media::asset_data` family;
+  - `prune_unreferenced` on all three formats, plus an additive `Transition::data_record_removals`;
+  - 69 host owner I/O and plumbing rows retired, each naming the leaf API that covers it.
+- W4-C and W4-R are finished and their worktrees retired. W4-F (0419) takes the remaining chart rows: radar, reference lines, value axis, image fills, and the shared caption lift with Numbers and chart captions. W4-E keeps chart add/duplicate/remove, Pages geometry, Numbers image fill, Pages body_table and the Keynote shared-helper moves.
+- Ledger: 2,024 migrated, 116 retired and 94 host-only rows (Numbers 41, Pages 31, Keynote 21, shared 1). Nothing pushed.
