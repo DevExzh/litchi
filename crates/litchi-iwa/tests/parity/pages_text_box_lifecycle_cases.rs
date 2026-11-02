@@ -335,3 +335,231 @@ fn pages_body_shape_preset_read_parity() -> TestResult {
     let _ = (Tier::A, Evidence::Queued);
     Ok(())
 }
+
+// ---- additions ------------------------------------------------------------------
+
+use litchi_iwa::shapes::DrawableSize;
+use litchi_iwa_common::color::{RgbColorSpace, Rgba};
+use litchi_iwa_common::shape::line::{Endpoint, Endpoints};
+use litchi_iwa_common::shape::stroke::{LineStyle, Pattern, Stroke, Width};
+use litchi_pages::drawable::Size;
+use litchi_pages::drawable::style::{Fill, Property as StyleProperty};
+
+/// One creation, expressed once for both routes. Anchors are at the end of
+/// the body.
+#[derive(Clone)]
+enum Add {
+    TextBox(&'static str),
+    Shape(&'static str, Preset),
+    ShapeWithFill(Preset, Fill),
+    Line,
+    LineWithEndpoints(Endpoints),
+    LineWithStyle(LineStyle),
+}
+
+const START: (f32, f32) = (40.0, 60.0);
+const END: (f32, f32) = (240.0, 160.0);
+
+fn body_end(bytes: &[u8]) -> TestResult<usize> {
+    Ok(pages::Draft::from_bytes(bytes)?
+        .body_text()?
+        .encode_utf16()
+        .count())
+}
+
+fn host_add(source: &[u8], add: &Add) -> TestResult<Vec<u8>> {
+    let mut e = pages::Draft::from_bytes(source)?;
+    let at = body_end(source)?;
+    let position = DrawablePoint { x: 72.0, y: 96.0 };
+    let size = DrawableSize {
+        width: 160.0,
+        height: 90.0,
+    };
+    let start = DrawablePoint {
+        x: START.0,
+        y: START.1,
+    };
+    let end = DrawablePoint { x: END.0, y: END.1 };
+    match add {
+        Add::TextBox(text) => drop(e.add_text_box(at, text, position, size)?),
+        Add::Shape(text, Preset::Rectangle) => {
+            drop(e.add_body_rectangle(at, text, position, size)?);
+        },
+        Add::Shape(text, preset) => drop(e.add_body_shape(at, text, position, size, *preset)?),
+        Add::ShapeWithFill(preset, Fill::Solid(color)) => drop(e.add_body_shape_with_fill(
+            at,
+            "",
+            position,
+            size,
+            *preset,
+            litchi_iwa::shapes::ShapeFill::Solid(*color),
+        )?),
+        Add::ShapeWithFill(..) => return Err("solid fills only".into()),
+        Add::Line => drop(e.add_body_line(at, start, end)?),
+        Add::LineWithEndpoints(endpoints) => {
+            drop(e.add_body_line_with_endpoints(at, start, end, *endpoints)?);
+        },
+        Add::LineWithStyle(style) => drop(e.add_body_line_with_style(at, start, end, *style)?),
+    }
+    Ok(e.to_bytes()?)
+}
+
+/// The leaf route: the creation, then (for the host's combined routes) the
+/// style the host writes after creating, each through its family.
+fn leaf_add(source: &[u8], add: &Add) -> TestResult<LeafRun> {
+    let package = Package::from_bytes(source)?;
+    let at = litchi_pages::TextPosition::from_utf16_index(body_end(source)?)?;
+    let position = Point { x: 72.0, y: 96.0 };
+    let size = Size {
+        width: 160.0,
+        height: 90.0,
+    };
+    let segment = Segment::new(
+        Point {
+            x: START.0,
+            y: START.1,
+        },
+        Point { x: END.0, y: END.1 },
+    )?;
+    let mut edit = package.edit_body_media();
+    match add {
+        Add::TextBox(text) => {
+            edit.add_text_box(at, text, position, size)?;
+        },
+        Add::Shape(text, preset) => {
+            edit.add_shape(at, text, position, size, *preset)?;
+        },
+        Add::ShapeWithFill(preset, _) => {
+            edit.add_shape(at, "", position, size, *preset)?;
+        },
+        Add::Line | Add::LineWithEndpoints(_) | Add::LineWithStyle(_) => {
+            {
+                edit.add_line(at, segment)?;
+            };
+        },
+    }
+    let commit = edit.commit()?;
+    let restored = commit
+        .package()
+        .apply_body_media(&commit.patch().inverse())?;
+    if leaf_bytes!(restored.package()) != source {
+        return Err("the creation's inverse does not restore the source".into());
+    }
+    let mut package = commit.into_package();
+    let styles: Vec<StyleProperty> = match add {
+        Add::ShapeWithFill(_, fill) => vec![StyleProperty::Fill(fill.clone())],
+        Add::LineWithEndpoints(endpoints) => vec![StyleProperty::LineEndpoints(*endpoints)],
+        Add::LineWithStyle(style) => vec![
+            StyleProperty::Stroke(Some(style.stroke)),
+            StyleProperty::LineEndpoints(style.endpoints),
+        ],
+        _ => Vec::new(),
+    };
+    for property in styles {
+        // The new shape is the body's last.
+        let mut index = 0;
+        while package
+            .body_drawable_properties(DrawableSelector::shape(index + 1))
+            .is_ok()
+        {
+            index += 1;
+        }
+        let mut edit = package.edit_body_drawable_style(DrawableSelector::shape(index))?;
+        edit.set(property)?;
+        package = edit.commit()?.into_package();
+    }
+    Ok(LeafRun::output(leaf_bytes!(package)))
+}
+
+fn add_case(name: &'static str, input: &Fixture, add: Add) -> TestResult {
+    let add = &add;
+    Case::new(name, Format::Pages, Tier::B, Evidence::Queued, input)
+        .leaf_structural_metadata()
+        .host(|source| host_add(source, add))
+        .leaf(|source| leaf_add(source, add))
+        .read("host texts", host_texts)
+        .read("leaf texts", leaf_texts)
+        .read("host presets", host_presets)
+        .read("leaf presets", leaf_presets)
+        .run()?;
+    Ok(())
+}
+
+fn basic() -> TestResult<Fixture> {
+    crate::harness::fixture("iwork/pages/basic.pages")
+}
+
+fn red() -> TestResult<Rgba> {
+    Ok(Rgba::new(0.9, 0.1, 0.1, 1.0, RgbColorSpace::Srgb)?)
+}
+
+#[test]
+fn pages_text_box_add_parity() -> TestResult {
+    let _ = (Tier::B, Evidence::Queued);
+    add_case(
+        "pages_text_box_add_parity",
+        &basic()?,
+        Add::TextBox("New box"),
+    )?;
+    add_case(
+        "pages_text_box_add_parity",
+        &text_box_fixture()?,
+        Add::TextBox("Third box"),
+    )
+}
+
+#[test]
+fn pages_body_shape_add_parity() -> TestResult {
+    let _ = (Tier::B, Evidence::Queued);
+    let input = basic()?;
+    add_case(
+        "pages_body_shape_add_parity",
+        &input,
+        Add::Shape("Rect", Preset::Rectangle),
+    )?;
+    for preset in preset_samples()? {
+        add_case(
+            "pages_body_shape_add_parity",
+            &input,
+            Add::Shape("Shape", preset),
+        )
+        .map_err(|e| format!("{preset:?}: {e}"))?;
+    }
+    Ok(())
+}
+
+#[test]
+fn pages_body_shape_add_with_fill_parity() -> TestResult {
+    let _ = (Tier::B, Evidence::Queued);
+    add_case(
+        "pages_body_shape_add_with_fill_parity",
+        &basic()?,
+        Add::ShapeWithFill(Preset::Ellipse, Fill::Solid(red()?)),
+    )
+}
+
+#[test]
+fn pages_body_line_add_parity() -> TestResult {
+    let _ = (Tier::B, Evidence::Queued);
+    let input = basic()?;
+    add_case("pages_body_line_add_parity", &input, Add::Line)?;
+    add_case(
+        "pages_body_line_add_parity",
+        &input,
+        Add::LineWithEndpoints(Endpoints {
+            start: Endpoint::FilledCircle,
+            end: Endpoint::OpenArrow,
+        }),
+    )?;
+    add_case(
+        "pages_body_line_add_parity",
+        &input,
+        Add::LineWithStyle(
+            LineStyle::new(Stroke::new(red()?, Width::new(3.0)?, Pattern::MediumDash))
+                .with_endpoints(Endpoints {
+                    start: Endpoint::None,
+                    end: Endpoint::FilledArrow,
+                }),
+        ),
+    )
+}
