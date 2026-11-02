@@ -96,6 +96,7 @@ mod numbers_text_box_list_cases;
 mod numbers_text_box_named_style_cases;
 mod numbers_volatile_highlight_cases;
 mod numbers_w2a_cost;
+mod owner_io_cases;
 mod pages_builder_cases;
 mod pages_caption_cases;
 mod pages_cases;
