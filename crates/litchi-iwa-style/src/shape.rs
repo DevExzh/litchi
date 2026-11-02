@@ -2269,7 +2269,12 @@ fn repoint_drawable(
     Ok(())
 }
 
-fn register(workspace: &mut Workspace<'_>, stylesheet: u64, parent: u64, style: u64) -> Result<()> {
+pub(crate) fn register(
+    workspace: &mut Workspace<'_>,
+    stylesheet: u64,
+    parent: u64,
+    style: u64,
+) -> Result<()> {
     let (message, payload) = workspace.unique_payload(
         stylesheet,
         STYLESHEET_MESSAGE_TYPE,
@@ -2292,7 +2297,7 @@ fn register(workspace: &mut Workspace<'_>, stylesheet: u64, parent: u64, style: 
     Ok(())
 }
 
-fn unregister(
+pub(crate) fn unregister(
     workspace: &mut Workspace<'_>,
     stylesheet: u64,
     parent: u64,
@@ -2902,7 +2907,7 @@ pub mod property {
         }
     }
 
-    fn shadow_of(bytes: &[u8]) -> Result<Shadow> {
+    pub(crate) fn shadow_of(bytes: &[u8]) -> Result<Shadow> {
         let invalid = |_| Error::Invalid("a stored shadow is invalid");
         let numbers = super::field_numbers(bytes)?;
         if numbers.is_empty() {
@@ -2977,7 +2982,7 @@ pub mod property {
         }
     }
 
-    fn encode_shadow(shadow: Shadow) -> Vec<u8> {
+    pub(crate) fn encode_shadow(shadow: Shadow) -> Vec<u8> {
         let mut output = Vec::new();
         let (appearance, angle, kind) = match shadow {
             Shadow::Drop(drop) => (drop.appearance(), angle_native(drop.angle()), 0),
