@@ -13,7 +13,7 @@
 //! (`chart_style_codec::property`).
 //!
 //! Two layers: [`effective`] and [`rewrite`] work on payloads for an owner
-//! that publishes its own in-place rewrites; [`read`] and [`write`] run the
+//! that publishes its own in-place rewrites; [`read()`] and [`write()`] run the
 //! same rules over a [`Workspace`] under a residual [`Limits`] profile and
 //! return the source-derived mutation scope.
 

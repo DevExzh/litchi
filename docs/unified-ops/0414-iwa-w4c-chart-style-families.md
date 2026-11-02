@@ -201,3 +201,31 @@ Build env of the coordinator rules (`CARGO_BUILD_JOBS=6`,
 
 The remaining coordinator gates are listed with their exit codes in the
 hand-off (§8, added when the slice is handed over).
+
+## 8. Hand-off gates (slice 1)
+
+Run on the branch with trunk merged (`2b8c473445`, trunk `fc7a879e7c`),
+build env of the coordinator rules. Logs: `.coord/iwa-w4c/gates1`, `gates2`.
+
+| Command | Exit |
+|---|---|
+| `cargo fmt --all --check` | 0 |
+| `cargo clippy -p litchi-iwa-style -p litchi-numbers -p litchi-keynote -p litchi-pages -p litchi-iwa -p litchi-ops -p litchi -p litchi-py --all-targets --all-features -- -D warnings` | 0 |
+| `cargo clippy -p litchi-pages -p litchi-numbers -p litchi-keynote -p litchi-iwa-style --all-targets -- -D warnings` | 0 |
+| `cargo clippy -p litchi-ops --no-default-features --all-targets -- -D warnings`, and with `--features numbers`, `pages`, `keynote` | 0, 0, 0, 0 |
+| `RUSTDOCFLAGS=-Dwarnings cargo doc --no-deps --all-features -p litchi-iwa-style -p litchi-numbers -p litchi-keynote -p litchi-pages` | 0 (after the `series::style` link fix) |
+| `RUSTC_BOOTSTRAP=1 python3 tools/check_api_glossary.py` (73 profiles, 731 families) | 0 |
+| `cargo test -p litchi-iwa-style -p litchi-numbers -p litchi-keynote -p litchi-pages --all-features` | 0 |
+| `cargo test -p litchi-iwa --all-features` (parity target included) | 0 |
+| `cargo test -p litchi --all-features` | 0 |
+| `cargo test -p litchi-ops --all-features`: `--lib`, `--doc`, nine groups of ≤20 `--test` targets | 0 each |
+| `crates/pyo3-litchi/tests/run_tests.sh` | 0 |
+| `cd tools/perf-baseline && cargo check --locked --all-targets` | 0 |
+| `python3 tools/check_feature_matrix.py` (31 legs) | 0 |
+| `python3 tools/check_crate_boundaries.py`; `python3 tools/non_iwork_gate.py verify` | 0; 0 |
+| `python3 -m unittest tools.test_officecli_corpus tools.test_officecli_capability_delta tools.test_no_3rdparty_references tools.test_check_crate_boundaries tools.test_non_iwork_gate tools.test_iwa_exit_ledger` | 0 |
+| `python3 tools/iwa_exit_ledger.py --check`; `officecli_capability_delta.py --check`; `officecli_corpus.py --check`; `unified_bench_matrix.py --check` | 0 each (bench: after the 0414 exemption) |
+
+No litchi-ops dispatch, capability or corpus-visible behaviour changed (D7),
+so the goldens and the corpus were not re-blessed. Both pre-commit size checks
+printed nothing for every commit.
