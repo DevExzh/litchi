@@ -217,8 +217,8 @@ impl Edit<'_> {
 
     /// Stage the removal of every data record nothing references: no
     /// component data-reference owner, object data reference or
-    /// `DataMetadataMap` entry names it. Each materialized record's
-    /// `DataInfo` leaves the package metadata and its `Data/` member is
+    /// `DataMetadataMap` entry names it. Each record's `DataInfo` leaves the
+    /// package metadata and its `Data/` member, when it has one, is
     /// deleted (the host's `media::Draft::remove_unreferenced`, over the
     /// shared `litchi_iwa_style::media::unreferenced_data` rule and the
     /// shared data-owner transition's data removals, record 0417). A
@@ -349,7 +349,7 @@ fn drawable_asset(
     AssetId::new(value).map_err(|_error| Error::InvalidSource)
 }
 
-/// Remove every materialized unreferenced data record through the shared
+/// Remove every unreferenced data record through the shared
 /// data-owner transition (see [`Edit::prune_unreferenced`]).
 fn prune(package: &Package) -> Result<Option<Published>, Error> {
     let mut working = Working::new(package)?;
@@ -371,10 +371,10 @@ fn prune(package: &Package) -> Result<Option<Published>, Error> {
         if let Some(member) = member {
             structure::reserve(&mut transition.data_removals, 1)?;
             transition.data_removals.push((data.get(), member));
+        } else {
+            structure::reserve(&mut transition.data_record_removals, 1)?;
+            transition.data_record_removals.push(data.get());
         }
-    }
-    if transition.data_removals.is_empty() {
-        return Ok(None);
     }
     Ok(Some(working.publish(&transition)?))
 }

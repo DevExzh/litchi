@@ -377,6 +377,9 @@ pub struct Transition {
     /// Embedded data no surviving object references: its `DataInfo` record
     /// leaves the registry and its package entry is deleted.
     pub data_removals: Vec<(u64, String)>,
+    /// Unreferenced data with no package entry (an unmaterialized record):
+    /// only its `DataInfo` record leaves the registry (record 0417).
+    pub data_record_removals: Vec<u64>,
     /// Data-reference owner records of new objects (a duplicate sharing its
     /// source's embedded data).
     pub data_owner_additions: Vec<DataOwner>,
@@ -438,6 +441,7 @@ impl Transition {
             && self.data_owner_additions.is_empty()
             && self.data_additions.is_empty()
             && self.data_removals.is_empty()
+            && self.data_record_removals.is_empty()
     }
 
     /// The package entries this transition deletes (unreferenced data).
@@ -647,6 +651,7 @@ pub fn apply(
         && transition.data_owner_additions.is_empty()
         && transition.data_additions.is_empty()
         && transition.data_removals.is_empty()
+        && transition.data_record_removals.is_empty()
     {
         payload(working, route)?
     } else {
@@ -989,8 +994,17 @@ fn rewrite_media(
         );
     }
     let mut removals = Vec::new();
-    reserve(&mut removals, transition.data_removals.len())?;
+    reserve(
+        &mut removals,
+        transition
+            .data_removals
+            .len()
+            .saturating_add(transition.data_record_removals.len()),
+    )?;
     for (data, _) in &transition.data_removals {
+        removals.push(DataInfoRemoval::new(*data));
+    }
+    for data in &transition.data_record_removals {
         removals.push(DataInfoRemoval::new(*data));
     }
     // The owner and DataInfo planner walks every record of the source per
