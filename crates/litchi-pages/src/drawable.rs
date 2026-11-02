@@ -35,6 +35,7 @@ pub mod properties {
     pub use crate::package::body_drawable_properties::{
         Commit, Diagnostics, Edit, Error, LimitKind, Patch, Refusal, Snapshot,
     };
+    pub use litchi_iwa_common::shape::line::Segment;
 }
 
 /// Exact-source lifecycle transactions (removal, duplication) for body images, movies
