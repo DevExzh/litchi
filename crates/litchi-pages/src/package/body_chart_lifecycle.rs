@@ -93,6 +93,9 @@ pub enum Refusal {
     /// The source cannot publish an exact changed artifact.
     #[error("source representation does not support chart-lifecycle edits")]
     UnsupportedSource,
+    /// A frame needs a position and finite parts with non-negative sizes.
+    #[error("the chart frame is invalid")]
+    InvalidGeometry,
 }
 
 impl Refusal {
@@ -102,7 +105,9 @@ impl Refusal {
         use litchi_core::edit::RefusalKind;
         match self {
             Self::ChartNotFound { .. } => RefusalKind::NotFound,
-            Self::UnsupportedKind | Self::UnsupportedDirection => RefusalKind::InvalidValue,
+            Self::UnsupportedKind | Self::UnsupportedDirection | Self::InvalidGeometry => {
+                RefusalKind::InvalidValue
+            },
             Self::NoStagedOperation => RefusalKind::UnsupportedOperation,
             Self::UnsupportedSource => RefusalKind::UnsupportedContent,
         }
@@ -149,6 +154,7 @@ impl From<graph::GraphError> for Error {
 enum Change {
     Kind(Kind),
     Direction(Direction),
+    Geometry(crate::drawable::Geometry),
 }
 
 /// The kind and series direction a chart stores.
@@ -200,6 +206,26 @@ impl Edit<'_> {
         Ok(self)
     }
 
+    /// Stage a new frame (the host's `set_body_chart_geometry`). Pages
+    /// keeps a chart's body attachment offsets in step with its position,
+    /// so the commit moves them too: the horizontal offset from the body's
+    /// left margin, the vertical offset from the page.
+    ///
+    /// # Errors
+    ///
+    /// [`Refusal::InvalidGeometry`] for a frame without a position or with
+    /// non-finite parts or negative sizes.
+    pub fn set_geometry(
+        &mut self,
+        geometry: crate::drawable::Geometry,
+    ) -> Result<&mut Self, Error> {
+        if !geometry.is_valid() || geometry.position.is_none() {
+            return Err(Refusal::InvalidGeometry.into());
+        }
+        self.changes.push(Change::Geometry(geometry));
+        Ok(self)
+    }
+
     /// Validate and atomically publish the staged changes. Changes that
     /// leave the chart as it is make an exact no-op.
     ///
@@ -214,9 +240,15 @@ impl Edit<'_> {
         let (target, before_payload) = select(self.source, self.selector)?;
         let before = engine::values(&before_payload, WireLimits::DEFAULT)?;
         let mut after = before;
+        let before_frame = geometry(&before_payload)?;
+        let mut frame = before_frame;
         let mut payload = before_payload;
         for change in &self.changes {
             payload = match *change {
+                Change::Geometry(new) => {
+                    frame = Some(new);
+                    with_geometry(&payload, new)?
+                },
                 Change::Kind(kind) => {
                     after.0 = Some(kind);
                     engine::with_kind(&payload, kind, WireLimits::DEFAULT)?
@@ -228,7 +260,7 @@ impl Edit<'_> {
             };
         }
         let source_bytes = self.source.state.source.shared_source();
-        if after == before {
+        if after == before && frame == before_frame {
             return Ok(Commit {
                 package: self.source.clone(),
                 patch: Patch {
@@ -243,17 +275,25 @@ impl Edit<'_> {
         if !self.source.state.source.source_is_exact() {
             return Err(Refusal::UnsupportedSource.into());
         }
-        let candidate = graph::publish(
-            self.source,
-            vec![MessageRewrite {
-                component: Arc::clone(&target.component_name),
-                object: target.drawable_identifier,
-                message_index: target.drawable_message_index,
-                message_type: CHART_MESSAGE_TYPE,
-                data: payload,
-            }],
-        )?;
-        if values(&candidate, self.selector)? != after {
+        let mut rewrites = vec![MessageRewrite {
+            component: Arc::clone(&target.component_name),
+            object: target.drawable_identifier,
+            message_index: target.drawable_message_index,
+            message_type: CHART_MESSAGE_TYPE,
+            data: payload,
+        }];
+        let moved =
+            frame.and_then(|frame| frame.position) != before_frame.and_then(|frame| frame.position);
+        if moved {
+            let position = frame
+                .and_then(|frame| frame.position)
+                .ok_or(Error::InvalidSource)?;
+            rewrites.push(attachment_rewrite(self.source, &target, position)?);
+        }
+        let candidate = graph::publish(self.source, rewrites)?;
+        if values(&candidate, self.selector)? != after
+            || geometry(&select(&candidate, self.selector)?.1)? != frame
+        {
             return Err(Error::Verification);
         }
         let target_bytes = candidate.state.source.shared_source();
@@ -268,6 +308,105 @@ impl Edit<'_> {
             diagnostics: Diagnostics { changed: true },
         })
     }
+}
+
+/// `payload` with the chart drawable's frame set to `frame` (only the
+/// parts that differ are rewritten).
+fn with_geometry(payload: &[u8], frame: crate::drawable::Geometry) -> Result<Vec<u8>, Error> {
+    use litchi_iwa_protos::shape_properties_codec as codec;
+    let current = geometry(payload)?;
+    let mut write = codec::GeometryWrite::preserve();
+    if current.and_then(|current| current.position) != frame.position {
+        write = write.with_position(
+            frame
+                .position
+                .map(|point| codec::Point::new(point.x, point.y)),
+        );
+    }
+    if current.and_then(|current| current.size) != frame.size {
+        write = write.with_size(
+            frame
+                .size
+                .map(|size| codec::Size::new(size.width, size.height)),
+        );
+    }
+    if current.and_then(|current| current.flags) != frame.flags {
+        write = write.with_flags(frame.flags.map(crate::drawable::GeometryFlags::bits));
+    }
+    if current.and_then(|current| current.angle).map(f32::to_bits) != frame.angle.map(f32::to_bits)
+    {
+        write = write.with_angle(frame.angle);
+    }
+    litchi_iwa_common::wire::transform_length_delimited_field(payload, CHART_DRAWABLE, |drawable| {
+        codec::rewrite_drawable_archive(
+            drawable,
+            write,
+            codec::DrawablePropertiesWrite::preserve(),
+            codec::DecodeOptions::for_source(drawable),
+        )
+        .map(codec::RewriteOutput::into_bytes)
+        .map_err(|_error| litchi_iwa_common::Error::InvalidFormat("chart frame".to_owned()))
+    })
+    .map_err(|_error| Error::InvalidSource)
+}
+
+const ATTACHMENT_H_OFFSET: u32 = 3;
+const ATTACHMENT_V_OFFSET: u32 = 5;
+
+/// The chart's body attachment with its offsets moved to `position` (the
+/// host's `set_chart_attachment_position`).
+fn attachment_rewrite(
+    package: &Package,
+    target: &ChartTarget,
+    position: crate::drawable::Point,
+) -> Result<MessageRewrite, Error> {
+    use litchi_iwa_common::wire::patch_fixed32_field;
+    let component = package
+        .state
+        .source
+        .components()
+        .get_index(target.attachment_component_index)
+        .ok_or(Error::InvalidSource)?;
+    let object = component
+        .archive()
+        .objects
+        .get(target.attachment_object_index)
+        .ok_or(Error::InvalidSource)?;
+    if object.archive_info.identifier != Some(target.attachment_identifier.get()) {
+        return Err(Error::InvalidSource);
+    }
+    let message = object
+        .messages
+        .get(target.attachment_message_index)
+        .ok_or(Error::InvalidSource)?;
+    let left_margin = {
+        let mut budget = super::body_drawable_graph::Budget::new(package)?;
+        let index = super::body_drawable_graph::ObjectIndex::new(package, &mut budget)?;
+        graph::resolve_body(&index, &mut budget)?
+            .root
+            .left_margin
+            .unwrap_or_default()
+    };
+    let horizontal = position.x - left_margin;
+    if !horizontal.is_finite() {
+        return Err(Refusal::InvalidGeometry.into());
+    }
+    let data = patch_fixed32_field(
+        &message.data,
+        ATTACHMENT_H_OFFSET,
+        true,
+        Some(horizontal.to_bits()),
+    )
+    .map_err(|_error| Error::InvalidSource)?;
+    let data = patch_fixed32_field(&data, ATTACHMENT_V_OFFSET, true, Some(position.y.to_bits()))
+        .map_err(|_error| Error::InvalidSource)?;
+    Ok(MessageRewrite {
+        component: Arc::from(component.name()),
+        object: target.attachment_identifier,
+        message_index: target.attachment_message_index,
+        message_type: message.type_,
+        data,
+    })
 }
 
 /// The selected chart and an owned copy of its chart payload.
@@ -305,7 +444,7 @@ impl Patch {
     /// Whether applying the patch changes nothing.
     #[must_use]
     pub fn is_noop(&self) -> bool {
-        self.before == self.after
+        self.artifacts.is_byte_noop()
     }
 
     /// The patch that restores the source.

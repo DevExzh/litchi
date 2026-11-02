@@ -35,7 +35,9 @@ pub(crate) mod style {
         inverse_plan,
     };
 
-    pub use chart_engine::{Lighting3d, Property, PropertyKind, RadarGridShape, Shadow};
+    pub use chart_engine::{
+        Lighting3d, Property, PropertyKind, RadarGridShape, RadarSeriesStyle, Shadow,
+    };
     pub use litchi_iwa_common::shape::shadow::Drop;
 
     /// A compact exact-source patch of one chart-level style property.
@@ -394,6 +396,7 @@ fn read_style(
             workspace,
             target.chart.drawable_identifier.get(),
             target.kind,
+            target.series,
             kind,
             limits,
         )
@@ -442,6 +445,7 @@ impl StyleEdit<'_> {
                     workspace,
                     target.chart.drawable_identifier.get(),
                     target.kind,
+                    target.series,
                     &value,
                     limits,
                 )

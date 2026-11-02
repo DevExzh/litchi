@@ -193,7 +193,7 @@ fn numbers_sheet_charts_read_parity() -> TestResult {
 
 const PAGES_NATIVE: &str = "iwork/pages/chart-data-native.pages";
 
-fn pages_fixture() -> TestResult<Fixture> {
+pub(crate) fn pages_fixture() -> TestResult<Fixture> {
     let mut editor = pages::Draft::from_bytes(&fixture(PAGES_NATIVE)?.bytes)?;
     editor.add_body_chart(
         0,
@@ -215,7 +215,7 @@ fn pages_fixture() -> TestResult<Fixture> {
     })
 }
 
-fn pages_host_geometry(
+pub(crate) fn pages_host_geometry(
     geometry: litchi_pages::drawable::Geometry,
 ) -> litchi_iwa::shapes::DrawableGeometry {
     litchi_iwa::shapes::DrawableGeometry {
@@ -285,7 +285,7 @@ fn pages_leaf(source: &[u8], op: &Op) -> TestResult<LeafRun> {
     ))
 }
 
-fn pages_host_list(bytes: &[u8]) -> TestResult<String> {
+pub(crate) fn pages_host_list(bytes: &[u8]) -> TestResult<String> {
     let editor = pages::Draft::from_bytes(bytes)?;
     let mut out = String::new();
     for chart in editor.body_charts()? {
@@ -297,7 +297,7 @@ fn pages_host_list(bytes: &[u8]) -> TestResult<String> {
     Ok(out)
 }
 
-fn pages_leaf_list(bytes: &[u8]) -> TestResult<String> {
+pub(crate) fn pages_leaf_list(bytes: &[u8]) -> TestResult<String> {
     let package = litchi_pages::Package::from_bytes(bytes)?;
     let mut out = String::new();
     for index in 0..package.body_chart_arrangements()?.len() {

@@ -1026,6 +1026,18 @@ fn target_from_selection(
     })
 }
 
+/// The chart drawable, kind and visible series count of one sheet chart
+/// (the chart-level radar series style of `sheet_chart_style` reads them).
+pub(super) fn chart_series(
+    package: &Package,
+    sheet: usize,
+    chart: ChartSelector,
+) -> Result<(u64, ChartKind, usize), Error> {
+    let mut budget = ChartBudget::for_package(package).map_err(map_arrangement)?;
+    let target = target(package, sheet, chart, &mut budget)?;
+    Ok((target.chart, target.kind, target.series))
+}
+
 /// The visible series of `components` data rows or columns (the host's
 /// `chart_series_count`): one per component, except a scatter (`X + Y`) or
 /// bubble (`X + Y + size`) chart and the multi-data point charts, which show

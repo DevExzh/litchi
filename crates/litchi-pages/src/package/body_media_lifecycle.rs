@@ -32,6 +32,8 @@ use super::body_drawable_graph::{
     self as graph, Budget, GraphError, GraphLimit, ObjectIndex, kind_name,
 };
 use super::body_storage_objects as objects;
+
+mod chart;
 use crate::selector::DrawableSelector;
 
 const ZORDER_MESSAGE_TYPE: u32 = 10_015;
@@ -160,6 +162,10 @@ pub enum Refusal {
     /// its preset does not fit the frame.
     #[error("the new Pages drawable's frame is invalid")]
     InvalidGeometry,
+    /// A new chart's kind is not a supported concrete kind, or its data
+    /// cannot form that kind.
+    #[error("invalid kind or data for a new chart")]
+    InvalidChart,
     /// The theme lists no style preset for the new drawable.
     #[error("the Pages theme has no style preset for the new drawable")]
     MissingThemeStyle,
@@ -190,9 +196,11 @@ impl Refusal {
                 RefusalKind::NotFound
             },
             Self::NotMedia { .. } | Self::NoPoster { .. } => RefusalKind::UnsupportedTarget,
-            Self::EmptyData | Self::MismatchedType | Self::InvalidMedia | Self::InvalidGeometry => {
-                RefusalKind::InvalidValue
-            },
+            Self::EmptyData
+            | Self::MismatchedType
+            | Self::InvalidMedia
+            | Self::InvalidGeometry
+            | Self::InvalidChart => RefusalKind::InvalidValue,
             Self::NotMaterialized | Self::MissingThemeStyle => RefusalKind::UnsupportedContent,
             Self::Commented | Self::SharedGraph | Self::UnsupportedSource => {
                 RefusalKind::UnsupportedContent
@@ -262,6 +270,7 @@ enum Operation {
     PruneUnreferenced,
     Add(TextPosition, NewMedia),
     AddTextShape(TextPosition, NewTextShape),
+    AddChart(TextPosition, Box<chart::NewChart>),
 }
 
 /// A new body text box, preset shape or straight line (the host's
@@ -596,6 +605,60 @@ impl Edit<'_> {
         ))
     }
 
+    /// Stage a new chart of `kind` over the inline `data`, anchored at a
+    /// UTF-16 body position and framed by `position` and `size` (the host's
+    /// `add_body_chart`): the shared chart author's graph in the body
+    /// component, its styles in the document stylesheet and its preset in
+    /// the theme. Its series are the data's rows.
+    ///
+    /// ```no_run
+    /// use litchi_pages::chart::lifecycle::Kind;
+    /// use litchi_pages::drawable::{Point, Size};
+    /// use litchi_pages::{ChartData, Package, TextPosition};
+    ///
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let package = Package::open("input.pages")?;
+    /// let data = ChartData::new(
+    ///     vec!["2025".into()],
+    ///     vec!["North".into(), "South".into()],
+    ///     vec![vec![Some(1.0), Some(2.0)]],
+    /// )?;
+    /// let mut edit = package.edit_body_media();
+    /// edit.add_chart(
+    ///     TextPosition::ZERO,
+    ///     Kind::Bar2d,
+    ///     data,
+    ///     Point { x: 72.0, y: 144.0 },
+    ///     Size { width: 320.0, height: 240.0 },
+    /// )?;
+    /// let commit = edit.commit()?;
+    /// # let _ = commit;
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
+    /// # Errors
+    ///
+    /// [`Refusal::InvalidChart`] for an unassignable kind or data that
+    /// cannot form it; [`Refusal::InvalidGeometry`]; a second operation.
+    pub fn add_chart(
+        &mut self,
+        anchor: TextPosition,
+        kind: litchi_iwa_common::chart::kind::Kind,
+        data: litchi_iwa_common::chart::data::ChartData,
+        position: crate::drawable::Point,
+        size: crate::drawable::Size,
+    ) -> Result<&mut Self, Error> {
+        let new = chart::NewChart {
+            kind,
+            data,
+            position,
+            size,
+        };
+        new.validate()?;
+        self.stage(Operation::AddChart(anchor, Box::new(new)))
+    }
+
     fn add_text_shape(
         &mut self,
         anchor: TextPosition,
@@ -674,6 +737,7 @@ impl Edit<'_> {
             },
             Operation::Add(anchor, media) => add(self.source, anchor, &media)?,
             Operation::AddTextShape(anchor, shape) => add_text_shape(self.source, anchor, &shape)?,
+            Operation::AddChart(anchor, new) => chart::add(self.source, anchor, &new)?,
             Operation::ReplaceAsset(asset, data) => {
                 if !media_assets(self.source, graph::ROOT_OBJECT_IDENTIFIER)?
                     .iter()
