@@ -124,8 +124,9 @@ pub enum Refusal {
     /// The drawable was already removed by an earlier operation of this edit.
     #[error("the drawable was removed earlier in this edit")]
     AlreadyRemoved,
-    /// The operation does not apply to the selected kind (removing a table
-    /// or chart, or duplicating a table or chart, through this family).
+    /// The operation does not apply to the selected kind (removing or
+    /// duplicating a table, or duplicating a text box without new text,
+    /// through this family).
     #[error("{operation} does not apply to a Numbers sheet {kind}")]
     UnsupportedOperation {
         /// The refused verb.
@@ -346,7 +347,9 @@ impl Edit<'_> {
     /// Stage the removal of a text box, ordinary shape, image, movie or
     /// audio clip and the objects only it references (its text storage,
     /// title and caption stand-ins, direct comment graph), with the embedded
-    /// data nothing else references.
+    /// data nothing else references. A chart's whole private graph goes
+    /// (mediator, preset and styles included); its styles leave the
+    /// document stylesheet and its preset the theme.
     ///
     /// # Errors
     ///
@@ -501,7 +504,9 @@ impl Edit<'_> {
     /// (the drawable, its title and caption stand-ins and a shape's text
     /// storage) under fresh identifiers, offset by 10 points on both axes
     /// as Numbers places a duplicate, sharing its style, comment and
-    /// embedded data. The copy joins the front of the sheet's list.
+    /// embedded data. A chart's copy also clones its mediator, preset and
+    /// styles, registered like the source's. The copy joins the front of the
+    /// sheet's list.
     ///
     /// # Errors
     ///
