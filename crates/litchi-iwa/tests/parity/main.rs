@@ -90,6 +90,8 @@ mod pages_caption_cases;
 mod pages_cases;
 mod pages_cell_appearance_cases;
 mod pages_cell_format_cases;
+mod pages_cell_list_cases;
+mod pages_cell_text_cases;
 mod pages_chart_series_symbol_cases;
 mod pages_chart_series_symbol_cost;
 mod pages_cost_probes;

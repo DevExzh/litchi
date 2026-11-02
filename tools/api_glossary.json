@@ -26053,7 +26053,9 @@
         "litchi_pages::date_time",
         "litchi_pages::number_attachment",
         "litchi_pages::table::format",
-        "litchi_pages::table::comments"
+        "litchi_pages::table::comments",
+        "litchi_pages::table::cell_text",
+        "litchi_pages::table::cell_list"
       ],
       "immutable_owners": [
         "litchi_pages::Package",
@@ -26195,6 +26197,14 @@
         {
           "method": "litchi_pages::Package::apply_body_table_cell_format",
           "ok": "litchi_pages::table::format::Commit"
+        },
+        {
+          "method": "litchi_pages::Package::apply_body_table_cell_text",
+          "ok": "litchi_pages::table::cell_text::Commit"
+        },
+        {
+          "method": "litchi_pages::Package::apply_body_table_cell_lists",
+          "ok": "litchi_pages::table::cell_list::Commit"
         },
         {
           "method": "litchi_pages::Package::apply_body_table_cell_comment",
