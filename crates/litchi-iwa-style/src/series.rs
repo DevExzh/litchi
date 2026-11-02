@@ -239,6 +239,39 @@ pub enum SymbolError {
     Invalid(&'static str),
     /// The package-wide identifier space is exhausted.
     IdentifierOverflow,
+    /// A well-formed request the shared chart engine refuses.
+    Refused(Refusal),
+}
+
+/// A well-formed chart-property request the shared engine refuses.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum Refusal {
+    /// The property does not apply to the chart's kind.
+    UnsupportedKind,
+    /// The style the write would change is shared with another chart (or
+    /// with another series of the same chart).
+    SharedStyle,
+    /// An image fill needs the embedded-data graph the property does not
+    /// write.
+    ImageFill,
+    /// The chart has no style object of the property's archive (or no
+    /// primary axis of the requested direction).
+    MissingStyle,
+    /// The property does not exist on the requested axis.
+    UnsupportedAxis,
+}
+
+impl fmt::Display for Refusal {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(match self {
+            Self::UnsupportedKind => "the property does not apply to this chart kind",
+            Self::SharedStyle => "the style is shared with another chart",
+            Self::ImageFill => "image fills are not written by this property",
+            Self::MissingStyle => "the chart has no style object for the property",
+            Self::UnsupportedAxis => "the property does not exist on this axis",
+        })
+    }
 }
 
 impl fmt::Display for SymbolError {
@@ -258,6 +291,7 @@ impl fmt::Display for SymbolError {
             },
             Self::Invalid(reason) => formatter.write_str(reason),
             Self::IdentifierOverflow => formatter.write_str("series symbol identifier overflow"),
+            Self::Refused(refusal) => refusal.fmt(formatter),
         }
     }
 }
@@ -270,7 +304,8 @@ impl From<Error> for SymbolError {
     }
 }
 
-type SymbolResult<T> = std::result::Result<T, SymbolError>;
+/// Result of a bounded chart-series or chart-style engine operation.
+pub type SymbolResult<T> = std::result::Result<T, SymbolError>;
 
 /// Source-derived mutation scope for one symbol operation.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -284,9 +319,47 @@ pub struct MutationScope {
     planned_removed_objects: Vec<u64>,
     planned_new_members: Vec<String>,
     planned_removed_members: Vec<String>,
+    chart_fields: Vec<u32>,
 }
 
+/// The chart-drawable extension fields a series write may change (the
+/// sparse series override and private-style arrays).
+const SERIES_CHART_FIELDS: [u32; 2] = [17, 19];
+
 impl MutationScope {
+    /// A scope of in-place payload rewrites: `objects` (in `members`) may
+    /// change messages of `message_types`; the fields start with `fields`
+    /// and grow with every generated-extension field a bounded patch
+    /// changes. Nothing is allocated or removed.
+    pub(crate) fn in_place(
+        selected_chart: u64,
+        objects: Vec<u64>,
+        members: Vec<String>,
+        message_types: Vec<u32>,
+        fields: Vec<u32>,
+        chart_fields: Vec<u32>,
+    ) -> Self {
+        Self {
+            selected_chart,
+            allowed_objects: objects,
+            allowed_members: members,
+            allowed_message_types: message_types,
+            allowed_fields: fields,
+            planned_new_objects: Vec::new(),
+            planned_removed_objects: Vec::new(),
+            planned_new_members: Vec::new(),
+            planned_removed_members: Vec::new(),
+            chart_fields,
+        }
+    }
+
+    /// The fields of the chart drawable's generated extension the operation
+    /// may change.
+    #[must_use]
+    pub fn allowed_chart_fields(&self) -> &[u32] {
+        &self.chart_fields
+    }
+
     #[must_use]
     pub const fn selected_chart(&self) -> u64 {
         self.selected_chart
@@ -419,7 +492,7 @@ impl Report {
 }
 
 #[derive(Debug, Clone)]
-struct SymbolBudget {
+pub(crate) struct SymbolBudget {
     limits: Limits,
     input_bytes: usize,
     output_bytes: usize,
@@ -436,7 +509,7 @@ struct SymbolBudget {
 }
 
 impl SymbolBudget {
-    const fn new(limits: Limits) -> Self {
+    pub(crate) const fn new(limits: Limits) -> Self {
         Self {
             limits,
             input_bytes: 0,
@@ -454,7 +527,7 @@ impl SymbolBudget {
         }
     }
 
-    fn limit(kind: LimitKind, observed: usize, maximum: usize) -> SymbolError {
+    pub(crate) fn limit(kind: LimitKind, observed: usize, maximum: usize) -> SymbolError {
         SymbolError::Limit {
             kind,
             observed,
@@ -462,7 +535,7 @@ impl SymbolBudget {
         }
     }
 
-    fn add(
+    pub(crate) fn add(
         kind: LimitKind,
         current: &mut usize,
         amount: usize,
@@ -478,7 +551,7 @@ impl SymbolBudget {
         Ok(())
     }
 
-    fn preflight(
+    pub(crate) fn preflight(
         &self,
         kind: LimitKind,
         current: usize,
@@ -494,7 +567,7 @@ impl SymbolBudget {
         Ok(())
     }
 
-    fn preflight_output(&self, amount: usize) -> SymbolResult<()> {
+    pub(crate) fn preflight_output(&self, amount: usize) -> SymbolResult<()> {
         self.preflight(
             LimitKind::OutputBytes,
             self.output_bytes,
@@ -503,7 +576,7 @@ impl SymbolBudget {
         )
     }
 
-    fn preflight_retained(&self, amount: usize) -> SymbolResult<()> {
+    pub(crate) fn preflight_retained(&self, amount: usize) -> SymbolResult<()> {
         self.preflight(
             LimitKind::RetainedBytes,
             self.retained_bytes,
@@ -512,7 +585,7 @@ impl SymbolBudget {
         )
     }
 
-    fn preflight_scratch(&self, amount: usize) -> SymbolResult<()> {
+    pub(crate) fn preflight_scratch(&self, amount: usize) -> SymbolResult<()> {
         self.preflight(
             LimitKind::ScratchBytes,
             self.scratch_bytes,
@@ -521,7 +594,7 @@ impl SymbolBudget {
         )
     }
 
-    fn preflight_allocations(&self, amount: usize) -> SymbolResult<()> {
+    pub(crate) fn preflight_allocations(&self, amount: usize) -> SymbolResult<()> {
         self.preflight(
             LimitKind::Allocations,
             self.allocations,
@@ -530,7 +603,7 @@ impl SymbolBudget {
         )
     }
 
-    fn source(&mut self, amount: usize) -> SymbolResult<()> {
+    pub(crate) fn source(&mut self, amount: usize) -> SymbolResult<()> {
         Self::add(
             LimitKind::InputBytes,
             &mut self.input_bytes,
@@ -539,7 +612,7 @@ impl SymbolBudget {
         )
     }
 
-    fn output(&mut self, amount: usize) -> SymbolResult<()> {
+    pub(crate) fn output(&mut self, amount: usize) -> SymbolResult<()> {
         Self::add(
             LimitKind::OutputBytes,
             &mut self.output_bytes,
@@ -548,7 +621,7 @@ impl SymbolBudget {
         )
     }
 
-    fn fields(&mut self, amount: usize) -> SymbolResult<()> {
+    pub(crate) fn fields(&mut self, amount: usize) -> SymbolResult<()> {
         Self::add(
             LimitKind::Fields,
             &mut self.fields,
@@ -557,7 +630,7 @@ impl SymbolBudget {
         )
     }
 
-    fn work(&mut self, amount: usize) -> SymbolResult<()> {
+    pub(crate) fn work(&mut self, amount: usize) -> SymbolResult<()> {
         Self::add(
             LimitKind::Work,
             &mut self.work_bytes,
@@ -566,7 +639,7 @@ impl SymbolBudget {
         )
     }
 
-    fn allocations(&mut self, amount: usize) -> SymbolResult<()> {
+    pub(crate) fn allocations(&mut self, amount: usize) -> SymbolResult<()> {
         Self::add(
             LimitKind::Allocations,
             &mut self.allocations,
@@ -575,7 +648,7 @@ impl SymbolBudget {
         )
     }
 
-    fn retained(&mut self, amount: usize) -> SymbolResult<()> {
+    pub(crate) fn retained(&mut self, amount: usize) -> SymbolResult<()> {
         Self::add(
             LimitKind::RetainedBytes,
             &mut self.retained_bytes,
@@ -584,7 +657,7 @@ impl SymbolBudget {
         )
     }
 
-    fn scratch(&mut self, amount: usize) -> SymbolResult<()> {
+    pub(crate) fn scratch(&mut self, amount: usize) -> SymbolResult<()> {
         Self::add(
             LimitKind::ScratchBytes,
             &mut self.scratch_bytes,
@@ -593,7 +666,7 @@ impl SymbolBudget {
         )
     }
 
-    fn references(&mut self, amount: usize) -> SymbolResult<()> {
+    pub(crate) fn references(&mut self, amount: usize) -> SymbolResult<()> {
         Self::add(
             LimitKind::References,
             &mut self.references,
@@ -602,7 +675,7 @@ impl SymbolBudget {
         )
     }
 
-    fn registry_entries(&mut self, amount: usize) -> SymbolResult<()> {
+    pub(crate) fn registry_entries(&mut self, amount: usize) -> SymbolResult<()> {
         Self::add(
             LimitKind::RegistryEntries,
             &mut self.registry_entries,
@@ -611,7 +684,7 @@ impl SymbolBudget {
         )
     }
 
-    fn identifiers(&mut self, amount: usize) -> SymbolResult<()> {
+    pub(crate) fn identifiers(&mut self, amount: usize) -> SymbolResult<()> {
         Self::add(
             LimitKind::Identifiers,
             &mut self.identifiers,
@@ -620,7 +693,7 @@ impl SymbolBudget {
         )
     }
 
-    fn depth(&mut self, depth: u32) -> SymbolResult<()> {
+    pub(crate) fn depth(&mut self, depth: u32) -> SymbolResult<()> {
         if depth > self.limits.max_nesting {
             return Err(Self::limit(
                 LimitKind::Nesting,
@@ -632,7 +705,7 @@ impl SymbolBudget {
         Ok(())
     }
 
-    fn remaining(kind: LimitKind, maximum: usize, used: usize) -> SymbolResult<usize> {
+    pub(crate) fn remaining(kind: LimitKind, maximum: usize, used: usize) -> SymbolResult<usize> {
         let remaining = maximum.saturating_sub(used);
         if remaining == 0 {
             return Err(Self::limit(kind, used.saturating_add(1), maximum));
@@ -640,7 +713,7 @@ impl SymbolBudget {
         Ok(remaining)
     }
 
-    fn wire_limits(&self) -> SymbolResult<WireLimits> {
+    pub(crate) fn wire_limits(&self) -> SymbolResult<WireLimits> {
         if self.limits.max_nesting == 0 {
             return Err(Self::limit(LimitKind::Nesting, 1, 0));
         }
@@ -664,7 +737,7 @@ impl SymbolBudget {
             .map_err(|error| SymbolError::Graph(Error::Wire(error)))
     }
 
-    fn codec_limits(&self) -> SymbolResult<CodecLimits> {
+    pub(crate) fn codec_limits(&self) -> SymbolResult<CodecLimits> {
         let bytes = Self::remaining(
             LimitKind::InputBytes,
             self.limits.max_input_bytes,
@@ -684,7 +757,7 @@ impl SymbolBudget {
             .map_err(|error| SymbolError::Graph(Error::Codec(error)))
     }
 
-    fn reserve<T>(&mut self, count: usize, scratch: bool) -> SymbolResult<()> {
+    pub(crate) fn reserve<T>(&mut self, count: usize, scratch: bool) -> SymbolResult<()> {
         self.allocations(1)?;
         let bytes = count.checked_mul(size_of::<T>()).ok_or_else(|| {
             Self::limit(
@@ -700,7 +773,7 @@ impl SymbolBudget {
         Ok(())
     }
 
-    fn reserve_vec<T>(
+    pub(crate) fn reserve_vec<T>(
         &mut self,
         values: &mut Vec<T>,
         count: usize,
@@ -713,7 +786,10 @@ impl SymbolBudget {
         Ok(())
     }
 
-    fn admit_registry_inspection(&mut self, workspace: &Workspace<'_>) -> SymbolResult<()> {
+    pub(crate) fn admit_registry_inspection(
+        &mut self,
+        workspace: &Workspace<'_>,
+    ) -> SymbolResult<()> {
         let Some(report) = workspace
             .registry_inspection_requirements()
             .map_err(SymbolError::from)?
@@ -738,7 +814,7 @@ impl SymbolBudget {
         Ok(())
     }
 
-    fn preflight_codec_report(
+    pub(crate) fn preflight_codec_report(
         &self,
         report: litchi_iwa_protos::chart_style_codec::Report,
     ) -> SymbolResult<()> {
@@ -747,7 +823,7 @@ impl SymbolBudget {
         self.preflight_scratch(report.input_bytes())
     }
 
-    fn charge_codec_report(
+    pub(crate) fn charge_codec_report(
         &mut self,
         report: litchi_iwa_protos::chart_style_codec::Report,
     ) -> SymbolResult<()> {
@@ -760,7 +836,11 @@ impl SymbolBudget {
         Ok(())
     }
 
-    fn parse_fields(&mut self, source: &[u8], depth: u32) -> SymbolResult<Vec<wire::WireField>> {
+    pub(crate) fn parse_fields(
+        &mut self,
+        source: &[u8],
+        depth: u32,
+    ) -> SymbolResult<Vec<wire::WireField>> {
         self.depth(depth)?;
         let limits = self.wire_limits()?;
         self.allocations(1)?;
@@ -789,7 +869,7 @@ impl SymbolBudget {
             .map_err(|error| SymbolError::Graph(Error::Wire(error)))
     }
 
-    fn report(self, changed: bool) -> Report {
+    pub(crate) fn report(self, changed: bool) -> Report {
         Report {
             input_bytes: self.input_bytes,
             output_bytes: self.output_bytes,
@@ -807,23 +887,45 @@ impl SymbolBudget {
         }
     }
 
-    fn set_scope(&mut self, scope: MutationScope) {
+    pub(crate) fn set_scope(&mut self, scope: MutationScope) {
         self.scope = Some(scope);
     }
 
-    fn planned_new_object(&mut self, identifier: u64) {
+    /// Admit one more extension field into the mutation scope.
+    pub(crate) fn allow_field(&mut self, field: u32) -> SymbolResult<()> {
+        if self
+            .scope
+            .as_ref()
+            .is_none_or(|scope| scope.allowed_fields.contains(&field))
+        {
+            return Ok(());
+        }
+        self.preflight_allocations(1)?;
+        self.preflight_retained(size_of::<u32>())?;
+        self.allocations(1)?;
+        self.retained(size_of::<u32>())?;
+        let scope = self.scope.as_mut().expect("scope exists");
+        scope
+            .allowed_fields
+            .try_reserve(1)
+            .map_err(|_| SymbolError::Allocation { amount: 1 })?;
+        scope.allowed_fields.push(field);
+        Ok(())
+    }
+
+    pub(crate) fn planned_new_object(&mut self, identifier: u64) {
         if let Some(scope) = self.scope.as_mut() {
             scope.planned_new_objects.push(identifier);
         }
     }
 
-    fn planned_removed_object(&mut self, identifier: u64) {
+    pub(crate) fn planned_removed_object(&mut self, identifier: u64) {
         if let Some(scope) = self.scope.as_mut() {
             scope.planned_removed_objects.push(identifier);
         }
     }
 
-    fn planned_member(&mut self, new_member: bool, member: &str) -> SymbolResult<()> {
+    pub(crate) fn planned_member(&mut self, new_member: bool, member: &str) -> SymbolResult<()> {
         if self.scope.is_none() {
             return Ok(());
         }
@@ -1944,6 +2046,8 @@ pub fn set_style_values<P: StyleProperty>(
     }
     Ok(changed)
 }
+
+pub mod style;
 
 /// The per-series properties of the chart Format panel.
 pub mod property {
@@ -3145,7 +3249,7 @@ pub mod property {
     }
 }
 
-fn bounded_references(
+pub(crate) fn bounded_references(
     payload: &[u8],
     budget: &mut SymbolBudget,
 ) -> SymbolResult<codec::StyleReferences> {
@@ -3180,7 +3284,7 @@ fn bounded_references(
     Ok(references)
 }
 
-fn bounded_payload<'a>(
+pub(crate) fn bounded_payload<'a>(
     workspace: &'a Workspace<'_>,
     identifier: u64,
     message_type: u32,
@@ -3194,7 +3298,7 @@ fn bounded_payload<'a>(
     Ok((message, payload))
 }
 
-fn bounded_chart_payload<'a>(
+pub(crate) fn bounded_chart_payload<'a>(
     workspace: &'a Workspace<'_>,
     chart: u64,
     budget: &mut SymbolBudget,
@@ -3508,7 +3612,7 @@ fn bounded_read_sizes(
 fn bounded_mutation_scope(
     workspace: &Workspace<'_>,
     chart: u64,
-    family: litchi_iwa_common::chart::series::SymbolFamily,
+    property_fields: &[u32],
     series_count: usize,
     budget: &mut SymbolBudget,
 ) -> SymbolResult<MutationScope> {
@@ -3597,7 +3701,7 @@ fn bounded_mutation_scope(
             amount: message_types.len(),
         })?;
     allowed_message_types.extend_from_slice(&message_types);
-    let fields = [
+    let leading = [
         codec::EXTENSION_FIELD,
         17,
         18,
@@ -3611,21 +3715,25 @@ fn bounded_mutation_scope(
         REFERENCE_IDENTIFIER_FIELD,
         1,
         2,
-        family.show_field(),
-        family.type_field(),
-        family.size_field(),
-        3,
-        6,
-        11,
     ];
-    budget.reserve::<u32>(fields.len(), true)?;
+    let trailing = [3, 6, 11];
+    let field_count = leading
+        .len()
+        .saturating_add(property_fields.len())
+        .saturating_add(trailing.len());
+    budget.reserve::<u32>(field_count, true)?;
     let mut allowed_fields = Vec::new();
     allowed_fields
-        .try_reserve_exact(fields.len())
+        .try_reserve_exact(field_count)
         .map_err(|_| SymbolError::Allocation {
-            amount: fields.len(),
+            amount: field_count,
         })?;
-    for field in fields {
+    for field in leading
+        .iter()
+        .chain(property_fields)
+        .chain(trailing.iter())
+        .copied()
+    {
         if !allowed_fields.contains(&field) {
             allowed_fields.push(field);
         }
@@ -3649,6 +3757,7 @@ fn bounded_mutation_scope(
         planned_removed_objects,
         planned_new_members,
         planned_removed_members,
+        chart_fields: SERIES_CHART_FIELDS.to_vec(),
     })
 }
 
@@ -4294,6 +4403,7 @@ fn bounded_insert_container(
         identifiers.push(identifier);
     }
     let container_data = bounded_encode_container(&identifiers, budget)?;
+    budget.planned_new_object(container.component);
     let mut container_object = ArchiveObject::new(
         container.component,
         vec![RawMessage {
@@ -4867,6 +4977,7 @@ fn bounded_set_values<P: BoundedProperty>(
             bounded_remove_from_container(workspace, location, &objects, budget)?
         {
             budget.planned_member(false, &member)?;
+            budget.planned_removed_object(identifier);
             released_containers.push(identifier);
         }
     }
@@ -5056,7 +5167,17 @@ pub fn set_symbols(
     }
     let mut budget = SymbolBudget::new(limits);
     budget.work(workspace.source_work())?;
-    let scope = bounded_mutation_scope(workspace, chart, family, expected.len(), &mut budget)?;
+    let scope = bounded_mutation_scope(
+        workspace,
+        chart,
+        &[
+            family.show_field(),
+            family.type_field(),
+            family.size_field(),
+        ],
+        expected.len(),
+        &mut budget,
+    )?;
     budget.set_scope(scope);
     budget.reserve::<property::Mark>(expected.len(), true)?;
     budget.reserve::<Option<litchi_iwa_common::chart::series::SymbolSize>>(expected.len(), true)?;
@@ -5182,7 +5303,17 @@ pub fn symbols(
 )> {
     let mut budget = SymbolBudget::new(limits);
     budget.work(workspace.source_work())?;
-    let scope = bounded_mutation_scope(workspace, chart, family, series_count, &mut budget)?;
+    let scope = bounded_mutation_scope(
+        workspace,
+        chart,
+        &[
+            family.show_field(),
+            family.type_field(),
+            family.size_field(),
+        ],
+        series_count,
+        &mut budget,
+    )?;
     budget.set_scope(scope);
     let graph = bounded_series_graph(workspace, chart, series_count, &mut budget)?;
     let marks = bounded_read_values(
@@ -5215,6 +5346,235 @@ pub fn symbols(
         );
     }
     Ok((values, budget.report(false)))
+}
+
+/// Extra output a property patch may emit beyond its source payload before
+/// the bounded adapter refuses it: the largest generated value the series
+/// properties write (a custom error-bar vector or a number format) fits.
+const PROPERTY_PATCH_GROWTH: usize = 64 * 1024;
+
+/// The bounded adapter of any [`Property`]: every payload a property reads or
+/// patches is charged to the operation's residual profile, and the
+/// extension fields a patch changes join the source-derived mutation scope
+/// before publication.
+struct Charged<'p, P>(&'p P);
+
+impl<P: Property> Property for Charged<'_, P> {
+    type Value = P::Value;
+
+    fn base(&self) -> Base {
+        self.0.base()
+    }
+
+    fn default_value(&self) -> P::Value {
+        self.0.default_value()
+    }
+
+    fn read(&self, payload: &[u8]) -> Result<P::Value> {
+        self.0.read(payload)
+    }
+
+    fn patch(&self, payload: &[u8], value: &P::Value) -> Result<Vec<u8>> {
+        self.0.patch(payload, value)
+    }
+}
+
+impl<P: Property> BoundedProperty for Charged<'_, P> {
+    fn read_bounded(&self, payload: &[u8], budget: &mut SymbolBudget) -> SymbolResult<P::Value> {
+        budget.source(payload.len())?;
+        budget.work(payload.len())?;
+        self.0.read(payload).map_err(SymbolError::from)
+    }
+
+    fn patch_bounded(
+        &self,
+        payload: &[u8],
+        value: &P::Value,
+        budget: &mut SymbolBudget,
+    ) -> SymbolResult<Vec<u8>> {
+        charged_patch(payload, budget, |payload| {
+            self.0.patch(payload, value).map_err(SymbolError::from)
+        })
+    }
+}
+
+/// Run one payload patch under the residual profile and admit the
+/// extension fields it changes into the mutation scope.
+pub(crate) fn charged_patch(
+    payload: &[u8],
+    budget: &mut SymbolBudget,
+    patch: impl FnOnce(&[u8]) -> SymbolResult<Vec<u8>>,
+) -> SymbolResult<Vec<u8>> {
+    let bound = payload.len().saturating_add(PROPERTY_PATCH_GROWTH);
+    budget.preflight_output(bound)?;
+    budget.preflight_retained(bound)?;
+    budget.preflight_scratch(payload.len())?;
+    budget.preflight_allocations(1)?;
+    budget.source(payload.len())?;
+    budget.work(payload.len())?;
+    budget.allocations(1)?;
+    budget.scratch(payload.len())?;
+    let patched = patch(payload)?;
+    budget.output(patched.len())?;
+    budget.retained(patched.len())?;
+    admit_changed_fields(payload, &patched, budget)?;
+    Ok(patched)
+}
+
+/// The fields of the generated extension (field 10,000) of a style payload.
+fn bounded_extension_fields<'a>(
+    payload: &'a [u8],
+    budget: &mut SymbolBudget,
+) -> SymbolResult<(&'a [u8], Vec<wire::WireField>)> {
+    let outer = budget.parse_fields(payload, 1)?;
+    let mut extension: &[u8] = &[];
+    let mut found = false;
+    for field in outer
+        .iter()
+        .filter(|field| field.number() == codec::EXTENSION_FIELD)
+    {
+        if found {
+            return Err(SymbolError::Invalid(
+                "a style payload repeats its generated extension",
+            ));
+        }
+        found = true;
+        extension = field
+            .payload(payload)
+            .map_err(|error| SymbolError::Graph(Error::Wire(error)))?;
+    }
+    let fields = budget.parse_fields(extension, 2)?;
+    Ok((extension, fields))
+}
+
+/// Admit into the mutation scope every generated-extension field whose
+/// stored bytes differ between `before` and `after`.
+pub(crate) fn admit_changed_fields(
+    before: &[u8],
+    after: &[u8],
+    budget: &mut SymbolBudget,
+) -> SymbolResult<()> {
+    if budget.scope.is_none() || before == after {
+        return Ok(());
+    }
+    let (source, source_fields) = bounded_extension_fields(before, budget)?;
+    let (target, target_fields) = bounded_extension_fields(after, budget)?;
+    let raw = |data: &[u8], field: &wire::WireField| {
+        field
+            .raw(data)
+            .map(<[u8]>::to_vec)
+            .map_err(|error| SymbolError::Graph(Error::Wire(error)))
+    };
+    let mut numbers = Vec::new();
+    budget.reserve_vec(
+        &mut numbers,
+        source_fields.len().saturating_add(target_fields.len()),
+        true,
+    )?;
+    for field in source_fields.iter().chain(&target_fields) {
+        if !numbers.contains(&field.number()) {
+            numbers.push(field.number());
+        }
+    }
+    for number in numbers {
+        budget.work(1)?;
+        let left = source_fields
+            .iter()
+            .filter(|field| field.number() == number)
+            .map(|field| raw(source, field))
+            .collect::<SymbolResult<Vec<_>>>()?;
+        let right = target_fields
+            .iter()
+            .filter(|field| field.number() == number)
+            .map(|field| raw(target, field))
+            .collect::<SymbolResult<Vec<_>>>()?;
+        if left != right {
+            budget.allow_field(number)?;
+        }
+    }
+    Ok(())
+}
+
+/// The number of series the Format panel shows for a chart of `kind` whose
+/// data has `components` series components: a scatter chart pairs X and Y
+/// (and a bubble chart X, Y and size) into one series; `None` for an
+/// incomplete scatter or bubble grid or a chart without series.
+#[must_use]
+pub const fn visible_series(
+    kind: litchi_iwa_common::chart::kind::Kind,
+    components: usize,
+) -> Option<usize> {
+    use litchi_iwa_common::chart::kind::Kind;
+    let count = match kind {
+        Kind::Scatter2d if components == 2 => 1,
+        Kind::Bubble2d if components == 3 => 1,
+        Kind::Scatter2d | Kind::Bubble2d => return None,
+        Kind::MultiDataScatter2d | Kind::MultiDataBubble2d => 1,
+        _ => components,
+    };
+    if count == 0 { None } else { Some(count) }
+}
+
+/// Read `property` for each of the `series_count` series of chart drawable
+/// `chart` under one explicit residual profile; the report carries the
+/// source-derived mutation scope of the chart's series graph.
+///
+/// # Errors
+///
+/// An invalid chart, sparse array or override, a value the property
+/// rejects, or an exhausted limit.
+pub fn read<P: Property>(
+    workspace: &Workspace<'_>,
+    chart: u64,
+    series_count: usize,
+    property: &P,
+    limits: Limits,
+) -> SymbolResult<(Vec<P::Value>, Report)> {
+    let mut budget = SymbolBudget::new(limits);
+    budget.work(workspace.source_work())?;
+    let scope = bounded_mutation_scope(workspace, chart, &[], series_count, &mut budget)?;
+    budget.set_scope(scope);
+    let graph = bounded_series_graph(workspace, chart, series_count, &mut budget)?;
+    let values = bounded_read_values(workspace, &graph, &Charged(property), &mut budget)?;
+    Ok((values, budget.report(false)))
+}
+
+/// Write `property` for every series (`expected.len()` is the series
+/// count) under one explicit residual profile, allocating, copying,
+/// patching or releasing the series overrides as [`set_values`] does.
+/// Returns whether anything changed and the report with the mutation scope
+/// (every object, member, message type and extension field the write may
+/// change).
+///
+/// The workspace is copy-on-write: after a failure the caller discards it.
+///
+/// # Errors
+///
+/// An invalid chart or override, a value the property rejects, an
+/// exhausted limit, or a write that does not read back.
+pub fn write<P: Property>(
+    workspace: &mut Workspace<'_>,
+    chart: u64,
+    property: &P,
+    expected: &[P::Value],
+    limits: Limits,
+) -> SymbolResult<(bool, Report)> {
+    if expected.is_empty() {
+        return Err(SymbolError::Invalid("a chart series write names no series"));
+    }
+    let mut budget = SymbolBudget::new(limits);
+    budget.work(workspace.source_work())?;
+    let scope = bounded_mutation_scope(workspace, chart, &[], expected.len(), &mut budget)?;
+    budget.set_scope(scope);
+    let charged = Charged(property);
+    let changed = bounded_set_values(workspace, chart, &charged, expected, &mut budget)?;
+    let graph = bounded_series_graph(workspace, chart, expected.len(), &mut budget)?;
+    if bounded_read_values(workspace, &graph, &charged, &mut budget)? != expected {
+        return Err(SymbolError::Invalid(
+            "a chart series write does not read back",
+        ));
+    }
+    Ok((changed, budget.report(changed)))
 }
 
 #[cfg(test)]

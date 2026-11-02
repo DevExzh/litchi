@@ -19,12 +19,11 @@
 use std::fmt;
 
 use litchi_iwa_common::chart::kind::Kind as ChartKind;
-use litchi_iwa_common::chart::{corner, donut, gaps, legend, pie, radar};
-use litchi_iwa_common::chart3d::{self, Scale};
+use litchi_iwa_common::chart::legend;
 use litchi_iwa_core::RawMessage;
-use litchi_iwa_protos::chart_style_codec::{
-    self as codec, Archive, Limits, Properties, field, property,
-};
+use litchi_iwa_protos::chart_style_codec::{self as codec, Archive, Limits};
+use litchi_iwa_style::chart_style::chart as engine;
+use litchi_iwa_style::series::{Refusal as EngineRefusal, SymbolError};
 use thiserror::Error as ThisError;
 
 use super::Package;
@@ -35,159 +34,7 @@ use crate::sheet::drawable::DrawableSelector;
 
 structure::structural_family!("chart-style");
 
-/// One chart-level style property with its value.
-#[derive(Debug, Clone, Copy, PartialEq)]
-#[non_exhaustive]
-pub enum Property {
-    /// Wedges rotation of a pie or donut chart.
-    PieStartAngle(pie::StartAngle),
-    /// Segment inner radius of a donut chart.
-    DonutInnerRadius(donut::InnerRadius),
-    /// Rotation of a radar chart.
-    RadarStartAngle(radar::StartAngle),
-    /// Gap between series of a 3D line or area chart.
-    SeriesGap3d(chart3d::SeriesGap),
-    /// Scene rotation of a 3D chart.
-    Rotation3d(chart3d::Rotation),
-    /// Depth of a 3D chart.
-    Depth3d(chart3d::Depth),
-    /// Rounded corners of bars and columns.
-    RoundedCorners(corner::Rounding),
-    /// Placement of the legend (automatic or an explicit frame).
-    LegendFrame(legend::Frame),
-    /// Whether the legend shows.
-    LegendVisible(bool),
-    /// Whether the chart area shows its border.
-    BorderVisible(bool),
-    /// Whether data in hidden table rows and columns is plotted.
-    IncludesHiddenData(bool),
-    /// The bar shape of a 3D bar or column chart.
-    BarShape3d(chart3d::BarShape),
-    /// The radius gridlines of a radar chart.
-    RadarGridShape(RadarGridShape),
-    /// The gaps between bars or columns and between their sets.
-    GapSpacing(gaps::Spacing),
-}
-
-/// The radius gridlines of a radar chart.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
-#[non_exhaustive]
-pub enum RadarGridShape {
-    /// Straight segments forming a polygon (the native default).
-    #[default]
-    Straight,
-    /// Circular arcs.
-    Curved,
-}
-
-/// The property a [`Property`] value sets, for reads and resets.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-#[non_exhaustive]
-pub enum PropertyKind {
-    /// [`Property::PieStartAngle`].
-    PieStartAngle,
-    /// [`Property::DonutInnerRadius`].
-    DonutInnerRadius,
-    /// [`Property::RadarStartAngle`].
-    RadarStartAngle,
-    /// [`Property::SeriesGap3d`].
-    SeriesGap3d,
-    /// [`Property::Rotation3d`].
-    Rotation3d,
-    /// [`Property::Depth3d`].
-    Depth3d,
-    /// [`Property::RoundedCorners`].
-    RoundedCorners,
-    /// [`Property::LegendFrame`].
-    LegendFrame,
-    /// [`Property::LegendVisible`].
-    LegendVisible,
-    /// [`Property::BorderVisible`].
-    BorderVisible,
-    /// [`Property::IncludesHiddenData`].
-    IncludesHiddenData,
-    /// [`Property::BarShape3d`].
-    BarShape3d,
-    /// [`Property::RadarGridShape`].
-    RadarGridShape,
-    /// [`Property::GapSpacing`].
-    GapSpacing,
-}
-
-impl Property {
-    /// The property this value sets.
-    #[must_use]
-    pub const fn kind(&self) -> PropertyKind {
-        match self {
-            Self::PieStartAngle(_) => PropertyKind::PieStartAngle,
-            Self::DonutInnerRadius(_) => PropertyKind::DonutInnerRadius,
-            Self::RadarStartAngle(_) => PropertyKind::RadarStartAngle,
-            Self::SeriesGap3d(_) => PropertyKind::SeriesGap3d,
-            Self::Rotation3d(_) => PropertyKind::Rotation3d,
-            Self::Depth3d(_) => PropertyKind::Depth3d,
-            Self::RoundedCorners(_) => PropertyKind::RoundedCorners,
-            Self::LegendFrame(_) => PropertyKind::LegendFrame,
-            Self::LegendVisible(_) => PropertyKind::LegendVisible,
-            Self::BorderVisible(_) => PropertyKind::BorderVisible,
-            Self::IncludesHiddenData(_) => PropertyKind::IncludesHiddenData,
-            Self::BarShape3d(_) => PropertyKind::BarShape3d,
-            Self::RadarGridShape(_) => PropertyKind::RadarGridShape,
-            Self::GapSpacing(_) => PropertyKind::GapSpacing,
-        }
-    }
-}
-
-impl PropertyKind {
-    /// The native default of this property (what a reset writes).
-    #[must_use]
-    pub const fn native_default(self) -> Property {
-        match self {
-            Self::PieStartAngle => Property::PieStartAngle(pie::StartAngle::ZERO),
-            Self::DonutInnerRadius => Property::DonutInnerRadius(donut::InnerRadius::DEFAULT),
-            Self::RadarStartAngle => Property::RadarStartAngle(radar::StartAngle::ZERO),
-            Self::SeriesGap3d => Property::SeriesGap3d(chart3d::SeriesGap::NATIVE_DEFAULT),
-            Self::Rotation3d => Property::Rotation3d(chart3d::Rotation::DEFAULT),
-            Self::Depth3d => Property::Depth3d(chart3d::Depth::DEFAULT),
-            Self::RoundedCorners => Property::RoundedCorners(corner::Rounding::NONE),
-            Self::LegendFrame => Property::LegendFrame(legend::Frame::Automatic),
-            Self::LegendVisible => Property::LegendVisible(false),
-            Self::BorderVisible => Property::BorderVisible(false),
-            Self::IncludesHiddenData => Property::IncludesHiddenData(true),
-            Self::BarShape3d => Property::BarShape3d(chart3d::BarShape::Rectangle),
-            Self::RadarGridShape => Property::RadarGridShape(RadarGridShape::Straight),
-            Self::GapSpacing => Property::GapSpacing(gaps::Spacing::DEFAULT),
-        }
-    }
-
-    const fn archive(self) -> Archive {
-        match self {
-            Self::RoundedCorners
-            | Self::BorderVisible
-            | Self::RadarGridShape
-            | Self::GapSpacing => Archive::ChartStyle,
-            _ => Archive::ChartNonStyle,
-        }
-    }
-
-    const fn applies_to(self, kind: ChartKind) -> bool {
-        match self {
-            Self::PieStartAngle => kind.supports_pie_start_angle(),
-            Self::DonutInnerRadius => kind.supports_donut_inner_radius(),
-            Self::RadarStartAngle => kind.supports_radar_start_angle(),
-            Self::SeriesGap3d => kind.supports_3d_series_gap(),
-            Self::Rotation3d => kind.supports_3d_scene(),
-            Self::Depth3d => kind.supports_3d_depth(),
-            Self::BarShape3d => kind.supports_3d_bar_shape(),
-            Self::RadarGridShape => kind.supports_radar_grid_shape(),
-            Self::RoundedCorners
-            | Self::LegendFrame
-            | Self::LegendVisible
-            | Self::BorderVisible
-            | Self::IncludesHiddenData
-            | Self::GapSpacing => true,
-        }
-    }
-}
+pub use litchi_iwa_style::chart_style::chart::{Property, PropertyKind, RadarGridShape};
 
 /// A typed, content-redacted chart-style failure.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
@@ -284,9 +131,14 @@ impl From<codec::Error> for Error {
     }
 }
 
-/// A stored value outside its semantic range.
-fn invalid<E>(_error: E) -> Error {
-    Error::InvalidSource
+impl From<SymbolError> for Error {
+    fn from(error: SymbolError) -> Self {
+        match error {
+            SymbolError::Refused(EngineRefusal::UnsupportedKind) => Refusal::UnsupportedKind.into(),
+            SymbolError::Graph(litchi_iwa_style::graph::Error::Codec(error)) => error.into(),
+            _ => Self::InvalidSource,
+        }
+    }
 }
 
 /// One staged change.
@@ -404,10 +256,9 @@ fn chart_drawable(
 fn read_legend(package: &Package, sheet: usize, chart: ChartSelector) -> Result<Property, Error> {
     let (identifier, index) = chart_drawable(package, sheet, chart)?;
     let object = graph::object(package, identifier)?;
-    let stored = codec::legend_frame(&object.messages[index].data, Limits::DEFAULT)?;
-    Ok(Property::LegendFrame(
-        legend::Frame::from_native(stored).map_err(invalid)?,
-    ))
+    Ok(Property::LegendFrame(engine::legend_frame(
+        &object.messages[index].data,
+    )?))
 }
 
 fn apply_legend(
@@ -421,12 +272,10 @@ fn apply_legend(
     }
     let (identifier, index) = chart_drawable(source, sheet, chart)?;
     let object = graph::object(source, identifier)?;
-    let rewritten = codec::rewrite_legend_frame(
+    let mut data = Some(engine::rewrite_legend_frame(
         &object.messages[index].data,
-        frame.native(),
-        Limits::DEFAULT,
-    )?;
-    let mut data = Some(rewritten.into_bytes().into_owned());
+        frame,
+    )?);
     let mut replace = |object: &mut litchi_iwa_core::ArchiveObject,
                        limits: litchi_iwa_core::Limits| {
         object
@@ -480,248 +329,15 @@ fn target(
     })
 }
 
-const fn scale3d(scale: Scale) -> property::Scale3d {
-    match scale {
-        Scale::Area => property::Scale3d::Area,
-        Scale::Bar => property::Scale3d::Bar,
-        Scale::Column => property::Scale3d::Column,
-        Scale::Line => property::Scale3d::Line,
-        _ => property::Scale3d::Pie,
-    }
-}
-
-/// The 3D depth field of a chart kind.
-const fn depth_field(scale: Scale) -> u32 {
-    scale3d(scale).field()
-}
-
-/// The stored value of `kind`.
-fn read_value(
-    properties: &Properties<'_>,
-    kind: PropertyKind,
-    chart: ChartKind,
-) -> Result<Property, Error> {
-    use field::{chart_non_style as non_style, chart_style as style};
-    Ok(match kind {
-        PropertyKind::PieStartAngle => Property::PieStartAngle(
-            properties
-                .float(non_style::PIE_START_ANGLE)?
-                .map(pie::StartAngle::from_degrees)
-                .transpose()
-                .map_err(invalid)?
-                .unwrap_or_default(),
-        ),
-        PropertyKind::DonutInnerRadius => Property::DonutInnerRadius(
-            properties
-                .float(non_style::DONUT_INNER_RADIUS)?
-                .map(donut::InnerRadius::from_native)
-                .transpose()
-                .map_err(invalid)?
-                .unwrap_or_default(),
-        ),
-        PropertyKind::RadarStartAngle => Property::RadarStartAngle(
-            properties
-                .float(non_style::RADAR_START_ANGLE)?
-                .map(radar::StartAngle::from_degrees)
-                .transpose()
-                .map_err(invalid)?
-                .unwrap_or_default(),
-        ),
-        PropertyKind::SeriesGap3d => Property::SeriesGap3d(
-            properties
-                .float(non_style::SERIES_GAP_3D)?
-                .map(chart3d::SeriesGap::from_native_ratio)
-                .transpose()
-                .map_err(invalid)?
-                .unwrap_or_default(),
-        ),
-        PropertyKind::Rotation3d => Property::Rotation3d(
-            properties
-                .vector(non_style::ROTATION_3D)?
-                .map(|v| chart3d::Rotation::from_native([v.x, v.y, v.z, v.w]))
-                .transpose()
-                .map_err(invalid)?
-                .unwrap_or_default(),
-        ),
-        PropertyKind::Depth3d => {
-            let scale = Scale::for_kind(chart).ok_or(Refusal::UnsupportedKind)?;
-            Property::Depth3d(
-                properties
-                    .vector(depth_field(scale))?
-                    .map(|v| chart3d::Depth::from_native(scale, [v.x, v.y, v.z, v.w]))
-                    .transpose()
-                    .map_err(invalid)?
-                    .unwrap_or_default(),
-            )
-        },
-        PropertyKind::RoundedCorners => Property::RoundedCorners(corner::Rounding::new(
-            properties
-                .float(style::ROUNDED_CORNER_RADIUS)?
-                .map(corner::Radius::from_native)
-                .transpose()
-                .map_err(invalid)?
-                .unwrap_or(corner::Radius::ZERO),
-            properties
-                .bool(style::ROUNDED_CORNER_OUTER_END_ONLY)?
-                .unwrap_or(false),
-        )),
-        PropertyKind::LegendVisible => {
-            Property::LegendVisible(properties.bool(scalar::LEGEND_VISIBLE)?.unwrap_or(false))
-        },
-        PropertyKind::BorderVisible => {
-            Property::BorderVisible(properties.bool(scalar::BORDER_VISIBLE)?.unwrap_or(false))
-        },
-        PropertyKind::IncludesHiddenData => Property::IncludesHiddenData(
-            !properties.bool(scalar::SKIP_HIDDEN_DATA)?.unwrap_or(false),
-        ),
-        PropertyKind::BarShape3d => Property::BarShape3d(
-            properties
-                .int32(scalar::BAR_SHAPE_3D)?
-                .map_or(chart3d::BarShape::Rectangle, chart3d::BarShape::from_native),
-        ),
-        PropertyKind::RadarGridShape => Property::RadarGridShape(
-            if properties.bool(scalar::RADAR_GRID_CURVE)? == Some(true) {
-                RadarGridShape::Curved
-            } else {
-                RadarGridShape::Straight
-            },
-        ),
-        PropertyKind::GapSpacing => {
-            let gap = |field: u32, default: gaps::Percentage| -> Result<gaps::Percentage, Error> {
-                Ok(match properties.float(field)? {
-                    Some(value) => gaps::Percentage::new(value).map_err(invalid)?,
-                    None => default,
-                })
-            };
-            Property::GapSpacing(gaps::Spacing::new(
-                gap(
-                    scalar::GAP_BETWEEN_ITEMS,
-                    gaps::Spacing::DEFAULT.between_items(),
-                )?,
-                gap(
-                    scalar::GAP_BETWEEN_SETS,
-                    gaps::Spacing::DEFAULT.between_sets(),
-                )?,
-            ))
-        },
-        PropertyKind::LegendFrame => return Err(Error::InvalidSource),
-    })
-}
-
-/// The extension fields of the chart-level scalar properties (the host's
-/// `charts::{options, border, hidden_data, bar_shape_3d, radar_grid_shape,
-/// gaps}` constants).
-mod scalar {
-    /// `tschchartinfodefaultshowlegend` (chart non-style).
-    pub(super) const LEGEND_VISIBLE: u32 = 20;
-    /// `tschchartinfodefaultskiphiddendata` (chart non-style).
-    pub(super) const SKIP_HIDDEN_DATA: u32 = 22;
-    /// `tschchartinfodefault3dbarshape` (chart non-style).
-    pub(super) const BAR_SHAPE_3D: u32 = 1;
-    /// `tschchartinfodefaultshowborder` (chart style).
-    pub(super) const BORDER_VISIBLE: u32 = 18;
-    /// `tschchartinfodefaultradarradiusgridlinecurve` (chart style).
-    pub(super) const RADAR_GRID_CURVE: u32 = 29;
-    /// `tschchartinfodefaultinterbargap` and `…intersetgap` (chart style).
-    pub(super) const GAP_BETWEEN_ITEMS: u32 = 16;
-    pub(super) const GAP_BETWEEN_SETS: u32 = 17;
-}
-
-/// The writes of a chart-level scalar property, as the host patches it.
-fn scalar_writes(value: Property) -> Option<Vec<codec::Write<'static>>> {
-    use codec::Write;
-    Some(match value {
-        Property::LegendVisible(visible) => vec![Write::Bool {
-            field: scalar::LEGEND_VISIBLE,
-            value: Some(visible),
-        }],
-        Property::BorderVisible(visible) => vec![Write::BoolUnlessAbsentDefault {
-            field: scalar::BORDER_VISIBLE,
-            value: visible,
-            default: false,
-        }],
-        Property::IncludesHiddenData(included) => vec![Write::BoolUnlessAbsentDefault {
-            field: scalar::SKIP_HIDDEN_DATA,
-            value: !included,
-            default: false,
-        }],
-        Property::BarShape3d(shape) => vec![Write::Int32 {
-            field: scalar::BAR_SHAPE_3D,
-            value: (shape != chart3d::BarShape::Rectangle).then_some(shape.native_value()),
-        }],
-        Property::RadarGridShape(shape) => vec![Write::Bool {
-            field: scalar::RADAR_GRID_CURVE,
-            value: (shape == RadarGridShape::Curved).then_some(true),
-        }],
-        Property::GapSpacing(spacing) => {
-            if spacing == gaps::Spacing::DEFAULT {
-                vec![
-                    Write::Float {
-                        field: scalar::GAP_BETWEEN_ITEMS,
-                        value: None,
-                    },
-                    Write::Float {
-                        field: scalar::GAP_BETWEEN_SETS,
-                        value: None,
-                    },
-                ]
-            } else {
-                vec![
-                    Write::FloatUnlessAbsentDefault {
-                        field: scalar::GAP_BETWEEN_ITEMS,
-                        value: spacing.between_items().percent(),
-                        default: gaps::Spacing::DEFAULT.between_items().percent(),
-                    },
-                    Write::FloatUnlessAbsentDefault {
-                        field: scalar::GAP_BETWEEN_SETS,
-                        value: spacing.between_sets().percent(),
-                        default: gaps::Spacing::DEFAULT.between_sets().percent(),
-                    },
-                ]
-            }
-        },
-        _ => return None,
-    })
-}
-
-/// The codec's library write rule for `value`.
-fn write_for(value: Property, chart: ChartKind) -> Result<property::PropertyWrite<'static>, Error> {
-    Ok(match value {
-        Property::PieStartAngle(angle) => property::pie_start_angle(angle.degrees()),
-        Property::DonutInnerRadius(radius) => {
-            property::donut_inner_radius(radius.native_fraction())
-        },
-        Property::RadarStartAngle(angle) => property::radar_start_angle(angle.degrees()),
-        Property::SeriesGap3d(gap) => property::series_gap_3d(gap.native_ratio()),
-        Property::Rotation3d(rotation) => {
-            property::rotation_3d(rotation.x_degrees(), rotation.y_degrees())
-        },
-        Property::Depth3d(depth) => {
-            let scale = Scale::for_kind(chart).ok_or(Refusal::UnsupportedKind)?;
-            property::depth_3d(
-                scale3d(scale),
-                depth.native_ratio(scale),
-                (depth != chart3d::Depth::DEFAULT).then(|| depth.native_vector(scale)),
-            )
-        },
-        Property::RoundedCorners(rounding) => property::rounded_corners(
-            rounding.radius().native_fraction(),
-            rounding.outside_corners_only(),
-        ),
-        _ => return Err(Error::InvalidSource),
-    })
-}
-
 fn read(
     package: &Package,
     sheet: usize,
     chart: ChartSelector,
     kind: PropertyKind,
 ) -> Result<Property, Error> {
-    if kind == PropertyKind::LegendFrame {
+    let Some(archive) = kind.archive() else {
         return read_legend(package, sheet, chart);
-    }
-    let archive = kind.archive();
+    };
     let target = target(package, sheet, chart, archive)?;
     if !kind.applies_to(target.kind) {
         return Err(Refusal::UnsupportedKind.into());
@@ -732,7 +348,7 @@ fn read(
         archive,
         Limits::DEFAULT,
     )?;
-    read_value(&properties, kind, target.kind)
+    Ok(engine::value(&properties, kind, target.kind)?)
 }
 
 fn apply_one(
@@ -745,7 +361,7 @@ fn apply_one(
         return apply_legend(source, sheet, chart, frame);
     }
     let kind = value.kind();
-    let archive = kind.archive();
+    let archive = kind.archive().ok_or(Error::InvalidSource)?;
     let target = target(source, sheet, chart, archive)?;
     if !kind.applies_to(target.kind) {
         return Err(Refusal::UnsupportedKind.into());
@@ -753,31 +369,14 @@ fn apply_one(
     let object = graph::object(source, target.style)?;
     let payload = &object.messages[target.index].data;
     let properties = codec::decode(payload, archive, Limits::DEFAULT)?;
-    if read_value(&properties, kind, target.kind)? == value {
+    if engine::value(&properties, kind, target.kind)? == value {
         return Ok(None);
     }
-    let rewritten = if let Some(writes) = scalar_writes(value) {
-        codec::rewrite(
-            payload,
-            archive,
-            &writes,
-            codec::EmptyExtension::Keep,
-            Limits::DEFAULT,
-        )?
-    } else {
-        let write = write_for(value, target.kind)?;
-        codec::rewrite(
-            payload,
-            archive,
-            write.writes(),
-            write.empty(),
-            Limits::DEFAULT,
-        )?
-    };
-    if !rewritten.changed() {
+    let rewritten = engine::rewrite(payload, value, target.kind)?;
+    if rewritten == *payload {
         return Ok(None);
     }
-    let mut data = Some(rewritten.into_bytes().into_owned());
+    let mut data = Some(rewritten);
     let message_type = archive.message_type();
     let index = target.index;
     let mut replace = |object: &mut litchi_iwa_core::ArchiveObject,

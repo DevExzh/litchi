@@ -1,0 +1,130 @@
+{
+  "record": "0414",
+  "slice": 1,
+  "source_head": "4b26bb3379 + uncommitted slice-1 tree (see record)",
+  "binary": "target/release/deps/parity-1f3d24c6f41199cf",
+  "binary_sha256": "182393d014c111957f0a9b3d484dfe929ca4563eea5285dd5ab7803bb103cb08",
+  "build": "CARGO_PROFILE_RELEASE_DEBUG=1 cargo test --release -p litchi-iwa --all-features --test parity --no-run",
+  "run": "W4C_ROUTE=<route> taskset -c 3 valgrind --tool=callgrind <binary> --ignored --exact chart_property_cost::chart_property_route_cost_abba --test-threads=1",
+  "metric": "inclusive Ir of w4c_host_route / w4c_leaf_route, two calls each (ABBA)",
+  "captures_dir": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-w4c/cg (outside the repository)",
+  "routes": [
+    {
+      "route": "keynote_axis_set",
+      "host_ir": 754839783,
+      "leaf_ir": 57657006,
+      "leaf_over_host": 0.076383,
+      "capture": "keynote_axis_set.cg",
+      "capture_bytes": 1131506,
+      "capture_sha256": "55ba5452f94e4ff4d4ff5ef570f047b5a753b7b7b1dd0bf4883bd198b9437c8b"
+    },
+    {
+      "route": "keynote_series_fill_set",
+      "host_ir": 1194151488,
+      "leaf_ir": 78255757,
+      "leaf_over_host": 0.065533,
+      "capture": "keynote_series_fill_set.cg",
+      "capture_bytes": 1345194,
+      "capture_sha256": "24b6b904c5d41ac28a2debabedfd40590c9b746be8d3a0fc727c89f10110f110"
+    },
+    {
+      "route": "keynote_series_read",
+      "host_ir": 371483334,
+      "leaf_ir": 53124301,
+      "leaf_over_host": 0.143006,
+      "capture": "keynote_series_read.cg",
+      "capture_bytes": 1137988,
+      "capture_sha256": "4cee4b70b35ad97393ad891d59fda377e6c3982080bbf3bd1b04eb779da82586"
+    },
+    {
+      "route": "keynote_series_set",
+      "host_ir": 1297246578,
+      "leaf_ir": 246910290,
+      "leaf_over_host": 0.190334,
+      "capture": "keynote_series_set.cg",
+      "capture_bytes": 1424456,
+      "capture_sha256": "7e35d689c19807627a02eed1b0947d9f9a81f7c9deab2145b01579a3c3c99bff"
+    },
+    {
+      "route": "keynote_style_read",
+      "host_ir": 376252244,
+      "leaf_ir": 52919552,
+      "leaf_over_host": 0.140649,
+      "capture": "keynote_style_read.cg",
+      "capture_bytes": 1123411,
+      "capture_sha256": "88165a8d7fbc19d530a1c50d94becb989c87a83401b8a00d8be594a735db63f4"
+    },
+    {
+      "route": "keynote_style_set",
+      "host_ir": 772434471,
+      "leaf_ir": 77178517,
+      "leaf_over_host": 0.099916,
+      "capture": "keynote_style_set.cg",
+      "capture_bytes": 1291983,
+      "capture_sha256": "93709866898a14942ff83c46ab4199620aa3a3eca82ce2f8a5c429e477411c74"
+    },
+    {
+      "route": "numbers_affixes_set",
+      "host_ir": 312990903,
+      "leaf_ir": 148475400,
+      "leaf_over_host": 0.474376,
+      "capture": "numbers_affixes_set.cg",
+      "capture_bytes": 1326077,
+      "capture_sha256": "b7029f62a9062c8853abe9f2d8368f6dddd19ec979a383325e173469d92bc123"
+    },
+    {
+      "route": "pages_axis_set",
+      "host_ir": 1178854276,
+      "leaf_ir": 32827392,
+      "leaf_over_host": 0.027847,
+      "capture": "pages_axis_set.cg",
+      "capture_bytes": 1163138,
+      "capture_sha256": "214af653817bc3c81a5a24c43bdcac3ae7f323a74e45ceca1b02c71a53d31440"
+    },
+    {
+      "route": "pages_series_fill_set",
+      "host_ir": 1830096259,
+      "leaf_ir": 47879836,
+      "leaf_over_host": 0.026162,
+      "capture": "pages_series_fill_set.cg",
+      "capture_bytes": 1309447,
+      "capture_sha256": "9da2777ba950a0da4b6b9517c6a1dc8e89d7f7dc422a1d606e64f11b73e334cd"
+    },
+    {
+      "route": "pages_series_read",
+      "host_ir": 584838669,
+      "leaf_ir": 31539645,
+      "leaf_over_host": 0.053929,
+      "capture": "pages_series_read.cg",
+      "capture_bytes": 1169324,
+      "capture_sha256": "bb4e628d11601f07689bf65aa853382d55e4d92eebaf2b400ee89fe99c887ef0"
+    },
+    {
+      "route": "pages_series_set",
+      "host_ir": 1903402743,
+      "leaf_ir": 179796160,
+      "leaf_over_host": 0.09446,
+      "capture": "pages_series_set.cg",
+      "capture_bytes": 1389545,
+      "capture_sha256": "140704589a4bac5f6347b641d0381dc5316290eed15bca330c81bb826d4dd347"
+    },
+    {
+      "route": "pages_style_read",
+      "host_ir": 589348198,
+      "leaf_ir": 31368732,
+      "leaf_over_host": 0.053226,
+      "capture": "pages_style_read.cg",
+      "capture_bytes": 1154193,
+      "capture_sha256": "db5a5fe13dc82c94ed2f0f225922694862ace155c5691d18efc7e65da91dedcb"
+    },
+    {
+      "route": "pages_style_set",
+      "host_ir": 1198021880,
+      "leaf_ir": 46916193,
+      "leaf_over_host": 0.039161,
+      "capture": "pages_style_set.cg",
+      "capture_bytes": 1260951,
+      "capture_sha256": "437dbce6f42d9562e6cb2f45f529d48a53ab1c03498bff62a0fff98178db9e96"
+    }
+  ]
+}

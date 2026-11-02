@@ -17,7 +17,7 @@ use litchi_iwa::charts::{ChartSeriesSymbol, ChartSeriesSymbolShape, ChartSeriesS
 use litchi_iwa::keynote;
 use litchi_iwa_common::chart::kind::Kind;
 use litchi_iwa_common::chart::series::{Symbol, SymbolShape, SymbolSize};
-use litchi_keynote::chart::series::Property;
+use litchi_keynote::chart::series::{Property, PropertyKind};
 use litchi_keynote::{ChartSelector, Package, SlideSelector};
 
 use crate::chart_style_cases::input;
@@ -72,7 +72,9 @@ fn host_symbols_read_cost(source: &[u8], chart: u64) -> TestResult<Vec<Option<Ch
 #[inline(never)]
 fn leaf_symbols_read_cost(source: &[u8]) -> TestResult<Vec<Option<Symbol>>> {
     let package = Package::from_bytes(source)?;
-    let Property::Symbols(values) = package.slide_chart_series(LEAF_SLIDE, CHART)? else {
+    let Property::Symbols(values) =
+        package.slide_chart_series(LEAF_SLIDE, CHART, PropertyKind::Symbols)?
+    else {
         return Err("unexpected chart-series property".into());
     };
     Ok(values)
@@ -91,7 +93,9 @@ fn host_symbol_read_cost(
 #[inline(never)]
 fn leaf_symbol_read_cost(source: &[u8], index: usize) -> TestResult<Option<Symbol>> {
     let package = Package::from_bytes(source)?;
-    let Property::Symbols(values) = package.slide_chart_series(LEAF_SLIDE, CHART)? else {
+    let Property::Symbols(values) =
+        package.slide_chart_series(LEAF_SLIDE, CHART, PropertyKind::Symbols)?
+    else {
         return Err("unexpected chart-series property".into());
     };
     values
@@ -111,7 +115,7 @@ fn host_symbols_set_cost(source: &[u8], chart: u64) -> TestResult<Vec<u8>> {
 fn leaf_symbols_set_cost(source: &[u8]) -> TestResult<Vec<u8>> {
     let package = Package::from_bytes(source)?;
     let mut edit = package.edit_slide_chart_series(LEAF_SLIDE, CHART)?;
-    edit.set(leaf_symbols())?;
+    edit.set(Property::Symbols(leaf_symbols()))?;
     Ok(leaf_bytes!(edit.commit()?.package()))
 }
 
@@ -130,12 +134,14 @@ fn host_symbol_set_cost(source: &[u8], chart: u64) -> TestResult<Vec<u8>> {
 #[inline(never)]
 fn leaf_symbol_set_cost(source: &[u8]) -> TestResult<Vec<u8>> {
     let package = Package::from_bytes(source)?;
-    let Property::Symbols(mut values) = package.slide_chart_series(LEAF_SLIDE, CHART)? else {
+    let Property::Symbols(mut values) =
+        package.slide_chart_series(LEAF_SLIDE, CHART, PropertyKind::Symbols)?
+    else {
         return Err("unexpected chart-series property".into());
     };
     values[0] = leaf_symbols()[0];
     let mut edit = package.edit_slide_chart_series(LEAF_SLIDE, CHART)?;
-    edit.set(values)?;
+    edit.set(Property::Symbols(values))?;
     Ok(leaf_bytes!(edit.commit()?.package()))
 }
 
