@@ -75,6 +75,17 @@ pub mod size {
         Commit, Diagnostics, Edit, Error, LimitKind, Patch, Refusal,
     };
 }
+/// Ordered conditional-highlight rules of body-table cells over the shared
+/// conditional-highlight engine (record 0412f).
+pub mod conditional_highlight {
+    pub use crate::package::body_table_conditional_highlight::{
+        Commit, Diagnostics, Edit, Error, LimitKind, Patch, Refusal,
+    };
+    pub use litchi_iwa_common::table::cell::conditional_highlight::{
+        Condition, Date, DateRange, Error as ValueError, Number, Offset, OffsetDirection, Period,
+        PeriodUnit, Range, Rule, Style, Text,
+    };
+}
 /// Exact-source row and column insertion and removal in one rooted body
 /// table over the shared table-topology engine (record 0412e).
 pub mod topology {

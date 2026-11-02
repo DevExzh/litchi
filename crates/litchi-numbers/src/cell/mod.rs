@@ -98,12 +98,6 @@ pub(crate) mod wire {
             .expect("source-derived BNC limits stay within the checked hard ceilings")
     }
 
-    /// Encode one owned native cell under the package adapter's bounded raw
-    /// profile. Callers still handle the native error at their own boundary.
-    pub(crate) fn encode(cell: &native::BncCell, limits: &Limits) -> Result<Vec<u8>, Error> {
-        cell.encode(limits)
-    }
-
     /// A finite scalar accepted by the private BNC rewrite adapter.
     #[derive(Debug, Clone, Copy, PartialEq)]
     pub(crate) enum ScalarValue {

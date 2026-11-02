@@ -38,7 +38,7 @@ enum Operation {
 }
 
 /// `TST.TableModelArchive` without its conditional-style owner UUID.
-fn table_model_without_owner(data: &[u8]) -> Result<Decoded, prost::DecodeError> {
+pub(crate) fn table_model_without_owner(data: &[u8]) -> Result<Decoded, prost::DecodeError> {
     let mut model = litchi_iwa_protos::tst::TableModelArchive::decode(data)?;
     model.conditional_style_formula_owner_id = None;
     Ok(decoded(model, data))
@@ -156,7 +156,7 @@ fn color(red: f32, green: f32, blue: f32) -> TestResult<Rgba> {
 
 /// One rule per non-volatile condition kind, with fill, text colour and
 /// bold styles in turn.
-fn samples() -> TestResult<Vec<Rule>> {
+pub(crate) fn samples() -> TestResult<Vec<Rule>> {
     let date = Date::from_ymd(2024, 3, 15)?;
     let later = Date::from_ymd(2024, 4, 1)?;
     let conditions = vec![
@@ -205,7 +205,7 @@ fn samples() -> TestResult<Vec<Rule>> {
         .collect())
 }
 
-fn report(failures: Vec<String>, cases: usize, minimum: usize) -> TestResult {
+pub(crate) fn report(failures: Vec<String>, cases: usize, minimum: usize) -> TestResult {
     eprintln!("conditional-highlight cases: {cases}");
     if failures.is_empty() {
         assert!(cases >= minimum, "only {cases} cases ran");

@@ -1,7 +1,7 @@
 //! Native formula graphs for date-period conditional-highlight predicates.
 
 use super::*;
-use crate::package::conditional_highlight::native::{
+use crate::conditional_highlight::native::{
     DATE_ADD_MONTHS_FUNCTION_INDEX, DATE_DIFFERENCE_FUNCTION_INDEX,
     DATE_DURATION_FROM_WEEKS_DAYS_FUNCTION_INDEX, DatePeriodPredicateKind,
 };
@@ -24,7 +24,7 @@ const LAST_OTHER_QUANTITY_INDEX: i32 = 2;
 const OFFSET_DAYS_QUANTITY_INDEX: i32 = 3;
 const OFFSET_OTHER_QUANTITY_INDEX: i32 = 2;
 
-pub(in crate::package::conditional_highlight::formula) fn quantity_node_index(
+pub(in crate::conditional_highlight::formula) fn quantity_node_index(
     kind: DatePeriodPredicateKind,
     unit: PeriodUnit,
 ) -> i32 {
@@ -38,7 +38,7 @@ pub(in crate::package::conditional_highlight::formula) fn quantity_node_index(
     }
 }
 
-pub(in crate::package::conditional_highlight::formula) fn nodes(
+pub(in crate::conditional_highlight::formula) fn nodes(
     kind: DatePeriodPredicateKind,
     period: Period,
     direction: Option<OffsetDirection>,
@@ -54,7 +54,7 @@ pub(in crate::package::conditional_highlight::formula) fn nodes(
     }
 }
 
-pub(in crate::package::conditional_highlight::formula) fn validate(
+pub(in crate::conditional_highlight::formula) fn validate(
     formula: &tsce::FormulaArchive,
     kind: DatePeriodPredicateKind,
     period: Period,

@@ -26108,7 +26108,8 @@
         "litchi_pages::table::comments",
         "litchi_pages::table::cell_text",
         "litchi_pages::table::cell_list",
-        "litchi_pages::table::topology"
+        "litchi_pages::table::topology",
+        "litchi_pages::table::conditional_highlight"
       ],
       "immutable_owners": [
         "litchi_pages::Package",
@@ -26314,6 +26315,10 @@
         {
           "method": "litchi_pages::Package::apply_body_table_topology",
           "ok": "litchi_pages::table::topology::Commit"
+        },
+        {
+          "method": "litchi_pages::Package::apply_body_table_cell_conditional_highlights",
+          "ok": "litchi_pages::table::conditional_highlight::Commit"
         },
         {
           "method": "litchi_pages::Package::apply_body_table_cell_comment",
@@ -27749,7 +27754,8 @@
         "litchi_keynote::slide::table::comments",
         "litchi_keynote::slide::table::cell_text",
         "litchi_keynote::slide::table::cell_list",
-        "litchi_keynote::slide::table::topology"
+        "litchi_keynote::slide::table::topology",
+        "litchi_keynote::slide::table::conditional_highlight"
       ],
       "immutable_owners": [
         "litchi_keynote::Package",
@@ -27980,6 +27986,10 @@
         {
           "method": "litchi_keynote::Package::apply_slide_table_topology",
           "ok": "litchi_keynote::slide::table::topology::Commit"
+        },
+        {
+          "method": "litchi_keynote::Package::apply_slide_table_cell_conditional_highlights",
+          "ok": "litchi_keynote::slide::table::conditional_highlight::Commit"
         },
         {
           "method": "litchi_keynote::Package::apply_slide_table_hidden_axes",
@@ -29414,7 +29424,8 @@
         "litchi_keynote::slide::table::comments",
         "litchi_keynote::slide::table::cell_text",
         "litchi_keynote::slide::table::cell_list",
-        "litchi_keynote::slide::table::topology"
+        "litchi_keynote::slide::table::topology",
+        "litchi_keynote::slide::table::conditional_highlight"
       ],
       "immutable_owners": [
         "litchi_keynote::Package",
@@ -29645,6 +29656,10 @@
         {
           "method": "litchi_keynote::Package::apply_slide_table_topology",
           "ok": "litchi_keynote::slide::table::topology::Commit"
+        },
+        {
+          "method": "litchi_keynote::Package::apply_slide_table_cell_conditional_highlights",
+          "ok": "litchi_keynote::slide::table::conditional_highlight::Commit"
         },
         {
           "method": "litchi_keynote::Package::apply_slide_table_hidden_axes",
