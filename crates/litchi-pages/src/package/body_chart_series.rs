@@ -18,7 +18,9 @@ use litchi_iwa_archive::unstable::{
 use litchi_iwa_common::chart::error_bar::Series as ErrorBarSeries;
 use litchi_iwa_common::chart::kind::Kind as ChartKind;
 use litchi_iwa_common::chart::number_format::{LabelAffixes, NumberFormat};
-use litchi_iwa_common::chart::pie::{LabelDistance, LabelVisibility, WedgeExplosion};
+use litchi_iwa_common::chart::pie::{
+    LabelDistance, LabelVisibility, LeaderLineVisibility, WedgeExplosion,
+};
 use litchi_iwa_common::chart::series::{
     ConnectionLine, ConnectionLineFamily, Stroke, Symbol, SymbolFamily, SymbolFill, Trendline,
 };
@@ -35,6 +37,7 @@ use litchi_iwa_style::graph::{self as style_graph, Components, Workspace};
 use litchi_iwa_style::series as series_engine;
 use litchi_iwa_style::series::property as series_property;
 use litchi_iwa_style::series::style as style_engine;
+pub use litchi_iwa_style::series::style::{AutoFit, ValueLabelLocation};
 use thiserror::Error as ThisError;
 
 use super::body_chart_arrangement::{self as arrangement, ArrangementBudget, ChartTarget};
@@ -284,6 +287,8 @@ pub enum Property {
     ConnectionLines(Vec<ConnectionLine>),
     /// How far each wedge is pulled out of a pie or donut.
     WedgeExplosions(Vec<WedgeExplosion>),
+    /// Whether each pie wedge's label draws a leader line.
+    LeaderLines(Vec<LeaderLineVisibility>),
     /// How far each wedge's label sits from the pie centre.
     LabelDistances(Vec<LabelDistance>),
     /// One optional symbol value per visible chart series; `None` hides it.
@@ -304,6 +309,12 @@ pub enum Property {
     Strokes(Vec<Option<Stroke>>),
     /// The fill of each series.
     Fills(Vec<Fill>),
+    /// Where each bar or column series draws its value labels.
+    ValueLabelLocations(Vec<ValueLabelLocation>),
+    /// Whether each series' error bars are spaced automatically.
+    ErrorBarAutoFits(Vec<AutoFit>),
+    /// Whether each series' value labels move to fit.
+    ValueLabelAutoFits(Vec<AutoFit>),
     /// The fill of each series' data symbols.
     SymbolFills(Vec<SymbolFill>),
     /// The outline of each series' data symbols (`None`: no outline).
@@ -318,6 +329,8 @@ pub enum PropertyKind {
     ConnectionLines,
     /// [`Property::WedgeExplosions`].
     WedgeExplosions,
+    /// [`Property::LeaderLines`].
+    LeaderLines,
     /// [`Property::LabelDistances`].
     LabelDistances,
     /// [`Property::Symbols`].
@@ -338,6 +351,12 @@ pub enum PropertyKind {
     Strokes,
     /// [`Property::Fills`].
     Fills,
+    /// [`Property::ValueLabelLocations`].
+    ValueLabelLocations,
+    /// [`Property::ErrorBarAutoFits`].
+    ErrorBarAutoFits,
+    /// [`Property::ValueLabelAutoFits`].
+    ValueLabelAutoFits,
     /// [`Property::SymbolFills`].
     SymbolFills,
     /// [`Property::SymbolOutlines`].
@@ -351,6 +370,9 @@ impl PropertyKind {
         match self {
             Self::Strokes => Some(style_engine::Kind::Strokes),
             Self::Fills => Some(style_engine::Kind::Fills),
+            Self::ValueLabelLocations => Some(style_engine::Kind::ValueLabelLocations),
+            Self::ErrorBarAutoFits => Some(style_engine::Kind::ErrorBarAutoFits),
+            Self::ValueLabelAutoFits => Some(style_engine::Kind::ValueLabelAutoFits),
             Self::SymbolFills => Some(style_engine::Kind::SymbolFills),
             Self::SymbolOutlines => Some(style_engine::Kind::SymbolOutlines),
             _ => None,
@@ -365,6 +387,7 @@ impl Property {
         match self {
             Self::ConnectionLines(_) => PropertyKind::ConnectionLines,
             Self::WedgeExplosions(_) => PropertyKind::WedgeExplosions,
+            Self::LeaderLines(_) => PropertyKind::LeaderLines,
             Self::LabelDistances(_) => PropertyKind::LabelDistances,
             Self::Symbols(_) => PropertyKind::Symbols,
             Self::Trendlines(_) => PropertyKind::Trendlines,
@@ -375,6 +398,9 @@ impl Property {
             Self::ValueLabelNumberFormats(_) => PropertyKind::ValueLabelNumberFormats,
             Self::Strokes(_) => PropertyKind::Strokes,
             Self::Fills(_) => PropertyKind::Fills,
+            Self::ValueLabelLocations(_) => PropertyKind::ValueLabelLocations,
+            Self::ErrorBarAutoFits(_) => PropertyKind::ErrorBarAutoFits,
+            Self::ValueLabelAutoFits(_) => PropertyKind::ValueLabelAutoFits,
             Self::SymbolFills(_) => PropertyKind::SymbolFills,
             Self::SymbolOutlines(_) => PropertyKind::SymbolOutlines,
         }
@@ -386,6 +412,7 @@ impl Property {
         match self {
             Self::ConnectionLines(values) => values.len(),
             Self::WedgeExplosions(values) => values.len(),
+            Self::LeaderLines(values) => values.len(),
             Self::LabelDistances(values) => values.len(),
             Self::Symbols(values) => values.len(),
             Self::Trendlines(values) => values.len(),
@@ -396,6 +423,9 @@ impl Property {
             Self::ValueLabelNumberFormats(values) => values.len(),
             Self::Strokes(values) | Self::SymbolOutlines(values) => values.len(),
             Self::Fills(values) => values.len(),
+            Self::ValueLabelLocations(values) => values.len(),
+            Self::ErrorBarAutoFits(values) => values.len(),
+            Self::ValueLabelAutoFits(values) => values.len(),
             Self::SymbolFills(values) => values.len(),
         }
     }
@@ -416,6 +446,18 @@ impl Property {
             Self::Fills(values) => values
                 .iter()
                 .map(|value| Some(style_engine::Value::Fill(value.clone())))
+                .collect(),
+            Self::ValueLabelLocations(values) => values
+                .iter()
+                .map(|value| Some(style_engine::Value::ValueLabelLocation(*value)))
+                .collect(),
+            Self::ErrorBarAutoFits(values) => values
+                .iter()
+                .map(|value| Some(style_engine::Value::AutoFit(*value)))
+                .collect(),
+            Self::ValueLabelAutoFits(values) => values
+                .iter()
+                .map(|value| Some(style_engine::Value::AutoFit(*value)))
                 .collect(),
             Self::SymbolFills(values) => values
                 .iter()
@@ -2741,6 +2783,9 @@ fn read_property(
             PropertyKind::WedgeExplosions => {
                 generic!(WedgeExplosions, series_property::WedgeExplosions)
             },
+            PropertyKind::LeaderLines => {
+                generic!(LeaderLines, series_property::LeaderLines)
+            },
             PropertyKind::LabelDistances => {
                 generic!(LabelDistances, series_property::LabelDistances)
             },
@@ -2756,6 +2801,9 @@ fn read_property(
             },
             PropertyKind::Strokes
             | PropertyKind::Fills
+            | PropertyKind::ValueLabelLocations
+            | PropertyKind::ErrorBarAutoFits
+            | PropertyKind::ValueLabelAutoFits
             | PropertyKind::SymbolFills
             | PropertyKind::SymbolOutlines => {
                 return Err(series_engine::SymbolError::Invalid("a series-style kind"));
@@ -2791,6 +2839,13 @@ fn write_property(
             workspace,
             chart,
             &series_property::WedgeExplosions,
+            values,
+            limits,
+        ),
+        Property::LeaderLines(values) => series_engine::write(
+            workspace,
+            chart,
+            &series_property::LeaderLines,
             values,
             limits,
         ),
@@ -2841,6 +2896,9 @@ fn write_property(
         ),
         Property::Strokes(_)
         | Property::Fills(_)
+        | Property::ValueLabelLocations(_)
+        | Property::ErrorBarAutoFits(_)
+        | Property::ValueLabelAutoFits(_)
         | Property::SymbolFills(_)
         | Property::SymbolOutlines(_) => {
             Err(series_engine::SymbolError::Invalid("a series-style value"))
@@ -2874,6 +2932,33 @@ fn from_style_values(
                 .into_iter()
                 .map(|value| match value {
                     style_engine::Value::Fill(fill) => Ok(fill),
+                    _ => Err(invalid()),
+                })
+                .collect::<series_engine::SymbolResult<_>>()?,
+        ),
+        PropertyKind::ValueLabelLocations => Property::ValueLabelLocations(
+            values
+                .into_iter()
+                .map(|value| match value {
+                    style_engine::Value::ValueLabelLocation(fill) => Ok(fill),
+                    _ => Err(invalid()),
+                })
+                .collect::<series_engine::SymbolResult<_>>()?,
+        ),
+        PropertyKind::ErrorBarAutoFits => Property::ErrorBarAutoFits(
+            values
+                .into_iter()
+                .map(|value| match value {
+                    style_engine::Value::AutoFit(fill) => Ok(fill),
+                    _ => Err(invalid()),
+                })
+                .collect::<series_engine::SymbolResult<_>>()?,
+        ),
+        PropertyKind::ValueLabelAutoFits => Property::ValueLabelAutoFits(
+            values
+                .into_iter()
+                .map(|value| match value {
+                    style_engine::Value::AutoFit(fill) => Ok(fill),
                     _ => Err(invalid()),
                 })
                 .collect::<series_engine::SymbolResult<_>>()?,

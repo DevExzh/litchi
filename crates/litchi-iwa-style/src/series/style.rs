@@ -54,6 +54,62 @@ pub enum Kind {
     SymbolFills,
     /// The outline of the series' data symbols.
     SymbolOutlines,
+    /// Whether value labels move to fit (each series style's own field
+    /// 100, "show labels in front").
+    ValueLabelAutoFits,
+    /// Whether error bars are spaced automatically (each series style's
+    /// own field 98).
+    ErrorBarAutoFits,
+    /// Where bar and column value labels sit (each series style's own
+    /// field 88, or 97 for the stacked kinds).
+    ValueLabelLocations,
+}
+
+/// Whether a series lets iWork fit its value labels or error bars.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+#[non_exhaustive]
+pub enum AutoFit {
+    /// iWork fits them (the native default).
+    #[default]
+    Enabled,
+    /// Fixed placement.
+    Disabled,
+}
+
+/// Where a bar or column series draws its value labels.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+#[non_exhaustive]
+pub enum ValueLabelLocation {
+    /// Inside the base of the bar.
+    Bottom,
+    /// Inside the middle of the bar.
+    Middle,
+    /// Inside the end of the bar (the native default).
+    #[default]
+    Top,
+    /// Past the end of the bar.
+    Outside,
+}
+
+impl ValueLabelLocation {
+    const fn native(self) -> u64 {
+        match self {
+            Self::Bottom => 8,
+            Self::Middle => 0,
+            Self::Top => 4,
+            Self::Outside => 6,
+        }
+    }
+
+    fn from_native(value: u64) -> SymbolResult<Self> {
+        Ok(match value {
+            8 => Self::Bottom,
+            0 => Self::Middle,
+            4 => Self::Top,
+            6 => Self::Outside,
+            _ => return Err(SymbolError::Invalid("an unsupported value-label location")),
+        })
+    }
 }
 
 /// One series' value of a series-style property.
@@ -67,6 +123,181 @@ pub enum Value {
     Fill(Fill),
     /// A data-symbol fill ([`Kind::SymbolFills`]).
     SymbolFill(SymbolFill),
+    /// An auto-fit switch ([`Kind::ValueLabelAutoFits`],
+    /// [`Kind::ErrorBarAutoFits`]).
+    AutoFit(AutoFit),
+    /// A value-label location ([`Kind::ValueLabelLocations`]).
+    ValueLabelLocation(ValueLabelLocation),
+}
+
+/// `tschchartseriesdefaultshowlabelsinfront`.
+const SHOW_LABELS_IN_FRONT_FIELD: u32 = 100;
+/// `tschchartseriesdefaulterrorbarspacing`.
+const ERROR_BAR_SPACING_FIELD: u32 = 98;
+
+/// The value-label location field of a chart kind (the host's
+/// `LocationStorage`).
+const fn location_field(chart: ChartKind) -> Option<u32> {
+    match chart {
+        ChartKind::Column2d
+        | ChartKind::Column3d
+        | ChartKind::Bar2d
+        | ChartKind::Bar3d
+        | ChartKind::MultiDataColumn2d
+        | ChartKind::MultiDataBar2d => Some(88),
+        ChartKind::StackedColumn2d
+        | ChartKind::StackedColumn3d
+        | ChartKind::StackedBar2d
+        | ChartKind::StackedBar3d => Some(97),
+        _ => None,
+    }
+}
+
+/// A singular canonical varint of the extension: its value and whether it
+/// is a canonical boolean, as the host's strict readers check.
+fn strict_varint(extension: &[u8], field: u32) -> SymbolResult<Option<(u64, usize)>> {
+    let mut found = None;
+    for candidate in
+        litchi_iwa_common::wire::WireView::parse(extension, litchi_iwa_common::WireLimits::DEFAULT)
+            .map_err(invalid)?
+            .fields()
+            .filter(|candidate| candidate.number() == field)
+    {
+        if found.is_some() || candidate.wire_type() != 0 {
+            return Err(SymbolError::Invalid("a malformed series-style switch"));
+        }
+        let raw = candidate.payload();
+        let (value, consumed) =
+            litchi_iwa_common::varint::decode_varint_from_bytes(raw).map_err(invalid)?;
+        if consumed != raw.len()
+            || litchi_iwa_common::varint::encode_varint(value).len() != consumed
+        {
+            return Err(SymbolError::Invalid("a non-canonical series-style switch"));
+        }
+        found = Some((value, consumed));
+    }
+    Ok(found)
+}
+
+/// The value and definedness of a switch kind in one style's own payload
+/// (the host reads the slot itself, not its parent chain).
+fn own_switch(payload: &[u8], chart: ChartKind, kind: Kind) -> SymbolResult<(Value, bool)> {
+    let properties = decode(payload)?;
+    let extension = properties.extension().unwrap_or_default();
+    Ok(match kind {
+        Kind::ValueLabelAutoFits => {
+            let stored = strict_varint(extension, SHOW_LABELS_IN_FRONT_FIELD)?;
+            if stored.is_some_and(|(value, consumed)| consumed != 1 || value > 1) {
+                return Err(SymbolError::Invalid("a non-canonical series-style boolean"));
+            }
+            let fit = if stored.is_some_and(|(value, _)| value == 1) {
+                AutoFit::Disabled
+            } else {
+                AutoFit::Enabled
+            };
+            (Value::AutoFit(fit), stored.is_some())
+        },
+        Kind::ErrorBarAutoFits => {
+            let stored = strict_varint(extension, ERROR_BAR_SPACING_FIELD)?;
+            let fit = match stored {
+                None | Some((0, _)) => AutoFit::Enabled,
+                Some((1, _)) => AutoFit::Disabled,
+                Some(_) => {
+                    return Err(SymbolError::Invalid("an unsupported error-bar spacing"));
+                },
+            };
+            (Value::AutoFit(fit), stored.is_some())
+        },
+        Kind::ValueLabelLocations => {
+            let field =
+                location_field(chart).ok_or(SymbolError::Refused(Refusal::UnsupportedKind))?;
+            let stored = strict_varint(extension, field)?;
+            let location = stored
+                .map(|(value, _)| ValueLabelLocation::from_native(value))
+                .transpose()?
+                .unwrap_or_default();
+            (Value::ValueLabelLocation(location), stored.is_some())
+        },
+        _ => return Err(SymbolError::Invalid("not a series-style switch")),
+    })
+}
+
+/// The payload storing switch `value` (`None`: the default), as the
+/// host's `patch_auto_fit` / `patch_location`: the default removes the
+/// field; the auto-fit switches also remove an emptied extension.
+fn rewrite_switch(
+    payload: &[u8],
+    chart: ChartKind,
+    kind: Kind,
+    value: Option<&Value>,
+) -> SymbolResult<Vec<u8>> {
+    let wire_error = |error| SymbolError::Graph(Error::Wire(error));
+    let (field, stored, remove_empty) = match (kind, value) {
+        (Kind::ValueLabelAutoFits, Some(Value::AutoFit(fit))) => (
+            SHOW_LABELS_IN_FRONT_FIELD,
+            (*fit == AutoFit::Disabled).then_some(1),
+            true,
+        ),
+        (Kind::ErrorBarAutoFits, Some(Value::AutoFit(fit))) => (
+            ERROR_BAR_SPACING_FIELD,
+            (*fit == AutoFit::Disabled).then_some(1),
+            true,
+        ),
+        (Kind::ValueLabelAutoFits, None) => (SHOW_LABELS_IN_FRONT_FIELD, None, true),
+        (Kind::ErrorBarAutoFits, None) => (ERROR_BAR_SPACING_FIELD, None, true),
+        (Kind::ValueLabelLocations, value) => {
+            let field =
+                location_field(chart).ok_or(SymbolError::Refused(Refusal::UnsupportedKind))?;
+            let location = match value {
+                Some(Value::ValueLabelLocation(location)) => *location,
+                None => ValueLabelLocation::Top,
+                Some(_) => return Err(SymbolError::Invalid("a value of another property")),
+            };
+            (
+                field,
+                (location != ValueLabelLocation::Top).then_some(location.native()),
+                false,
+            )
+        },
+        _ => return Err(SymbolError::Invalid("a value of another property")),
+    };
+    let properties = decode(payload)?;
+    let existing = properties.extension();
+    let Some(extension) = existing else {
+        let Some(stored) = stored else {
+            return Ok(payload.to_vec());
+        };
+        let mut extension = Vec::new();
+        litchi_iwa_common::wire::append_varint_field(&mut extension, field, stored)
+            .map_err(wire_error)?;
+        return litchi_iwa_common::wire::patch_length_delimited_field(
+            payload,
+            codec::EXTENSION_FIELD,
+            false,
+            Some(&extension),
+        )
+        .map_err(wire_error);
+    };
+    // Validate the stored switch as the host's strict reader does.
+    let _ = own_switch(payload, chart, kind)?;
+    let present = strict_varint(extension, field)?.is_some();
+    let extension = litchi_iwa_common::wire::patch_varint_field(extension, field, present, stored)
+        .map_err(wire_error)?;
+    litchi_iwa_common::wire::patch_length_delimited_field(
+        payload,
+        codec::EXTENSION_FIELD,
+        true,
+        (!(remove_empty && extension.is_empty())).then_some(extension.as_slice()),
+    )
+    .map_err(wire_error)
+}
+
+/// Whether `kind` is a switch read from each style's own payload.
+const fn is_switch(kind: Kind) -> bool {
+    matches!(
+        kind,
+        Kind::ValueLabelAutoFits | Kind::ErrorBarAutoFits | Kind::ValueLabelLocations
+    )
 }
 
 fn invalid<E>(_error: E) -> SymbolError {
@@ -147,6 +378,8 @@ pub fn applies_to(chart: ChartKind, kind: Kind) -> bool {
         Kind::SymbolOutlines => SymbolOutlineFamily::for_chart_kind(chart).is_some(),
         Kind::Fills => FillFamily::for_chart_kind(chart).is_some(),
         Kind::SymbolFills => SymbolFillFamily::for_chart_kind(chart).is_some(),
+        Kind::ValueLabelAutoFits | Kind::ErrorBarAutoFits => true,
+        Kind::ValueLabelLocations => location_field(chart).is_some(),
     }
 }
 
@@ -187,6 +420,9 @@ pub fn effective<'a>(
     kind: Kind,
     mut payload: impl FnMut(u64) -> SymbolResult<&'a [u8]>,
 ) -> SymbolResult<(Value, bool)> {
+    if is_switch(kind) {
+        return own_switch(payload(style)?, chart, kind);
+    }
     let local = decode(payload(style)?)?;
     Ok(match kind {
         Kind::Strokes | Kind::SymbolOutlines => {
@@ -216,6 +452,11 @@ pub fn effective<'a>(
                 .unwrap_or_else(|| family.default_fill());
             (Value::SymbolFill(value), defined)
         },
+        Kind::ValueLabelAutoFits | Kind::ErrorBarAutoFits | Kind::ValueLabelLocations => {
+            return Err(SymbolError::Invalid(
+                "a switch is read from the style itself",
+            ));
+        },
     })
 }
 
@@ -234,6 +475,9 @@ pub fn rewrite(
     kind: Kind,
     value: Option<&Value>,
 ) -> SymbolResult<Vec<u8>> {
+    if is_switch(kind) {
+        return rewrite_switch(payload, chart, kind, value);
+    }
     let encoded: Vec<u8>;
     let write = match (kind, value) {
         (Kind::Strokes, value) => {
@@ -298,6 +542,11 @@ pub fn rewrite(
                 stored,
             )
             .ok_or(SymbolError::Refused(Refusal::UnsupportedKind))?
+        },
+        (Kind::ValueLabelAutoFits | Kind::ErrorBarAutoFits | Kind::ValueLabelLocations, _) => {
+            return Err(SymbolError::Invalid(
+                "a switch is written by rewrite_switch",
+            ));
         },
     };
     let rewritten = codec::rewrite(
@@ -411,6 +660,20 @@ pub fn write(
     budget.set_scope(scope);
     let styles = bounded_style_slots(workspace, chart, values.len(), &mut budget)?;
     let current = read_effective(workspace, chart_kind, kind, &styles, &mut budget)?;
+    // The host's location write makes every series style exclusive before
+    // it rewrites any of them.
+    if kind == Kind::ValueLabelLocations
+        && current
+            .iter()
+            .zip(values)
+            .any(|((value, _), expected)| expected.as_ref() != Some(value))
+    {
+        for &style in &styles {
+            if bounded_style_owner_count(workspace, style, &mut budget)? != 1 {
+                return Err(SymbolError::Refused(Refusal::SharedStyle));
+            }
+        }
+    }
     let mut replacements: Vec<(u64, usize, Vec<u8>)> = Vec::new();
     budget.reserve_vec(&mut replacements, styles.len(), true)?;
     for ((&style, (value, defined)), expected) in styles.iter().zip(&current).zip(values) {
