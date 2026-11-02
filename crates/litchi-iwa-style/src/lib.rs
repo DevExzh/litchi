@@ -10,7 +10,8 @@
 //! - [`chart_font`]: the chart-font graph engine (paragraph-style font
 //!   variations of a chart's text);
 //! - [`chart_lifecycle`]: the chart kind and series direction a chart
-//!   drawable stores, read and rewritten in place;
+//!   drawable stores, read and rewritten in place, and the private graph
+//!   of a new chart (`chart_lifecycle::author`, record 0418);
 //! - [`chart_style`]: the chart-level and axis-level style properties and
 //!   their in-place rewrites;
 //! - [`chart_text`]: the shared chart title and axis-title wire engine
