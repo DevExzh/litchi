@@ -4,14 +4,18 @@
 //! a chart shadow write refuses a series style another chart references (the
 //! host's `ChartSeriesStyleSlot::ensure_exclusive`).
 
-use litchi_iwa::charts::{ChartCornerRadius, ChartRoundedCorners, ChartShadow};
+use litchi_iwa::charts::{
+    ChartCornerRadius, ChartRadarSeriesStyle, ChartRoundedCorners, ChartShadow,
+};
 use litchi_iwa::numbers;
 use litchi_iwa::shapes::{DrawablePoint, DrawableSize};
 use litchi_iwa_common::chart::ChartData;
 use litchi_iwa_common::chart::kind::Kind;
 use litchi_iwa_protos::chart_style_codec::{self as codec, Limits};
 use litchi_numbers::Package;
-use litchi_numbers::sheet::chart::style::{Error, Property, Refusal, Shadow, corner};
+use litchi_numbers::sheet::chart::style::{
+    Error, Property, RadarSeriesStyle, Refusal, Shadow, corner,
+};
 
 use crate::chart_style_cases::{Components, Target, input, publish};
 use crate::harness::{Format, TestResult};
@@ -26,24 +30,28 @@ const SERIES_THEME_STYLES_FIELD: u32 = 17;
 /// Two host-added charts, the second pointed at the first one's chart
 /// style.
 fn shared_source() -> TestResult<(Vec<u8>, u64, u64)> {
-    shared_reference(CHART_STYLE_FIELD, |references| references.chart_style())
+    shared_reference(Kind::Column2d, CHART_STYLE_FIELD, |references| {
+        references.chart_style()
+    })
 }
 
-/// Two host-added charts, the second chart's first series theme style
-/// pointed at the first chart's first one.
-fn shared_series_source() -> TestResult<(Vec<u8>, u64, u64)> {
-    shared_reference(SERIES_THEME_STYLES_FIELD, |references| {
+/// Two host-added charts (the first of `kind`), the second chart's first
+/// series theme style pointed at the first chart's first one.
+fn shared_series_source(kind: Kind) -> TestResult<(Vec<u8>, u64, u64)> {
+    shared_reference(kind, SERIES_THEME_STYLES_FIELD, |references| {
         references.series_theme_styles().first().copied()
     })
 }
 
-/// Two host-added charts; the first `field` reference of the second chart
-/// is pointed at the first chart's object `pick` selects.
+/// Two host-added charts (the first of `kind`); the first `field`
+/// reference of the second chart is pointed at the first chart's object
+/// `pick` selects.
 fn shared_reference(
+    kind: Kind,
     field: u32,
     pick: impl Fn(&codec::StyleReferences) -> Option<u64>,
 ) -> TestResult<(Vec<u8>, u64, u64)> {
-    let input = input(Format::Numbers, Kind::Column2d)?;
+    let input = input(Format::Numbers, kind)?;
     let Target::Numbers { sheet } = input.target else {
         return Err("not a Numbers target".into());
     };
@@ -123,7 +131,7 @@ fn numbers_sheet_chart_style_shared_style_refuses() -> TestResult {
 
 #[test]
 fn numbers_sheet_chart_shadow_shared_series_style_refuses() -> TestResult {
-    let (source, sheet, chart) = shared_series_source()?;
+    let (source, sheet, chart) = shared_series_source(Kind::Column2d)?;
     let mut host = numbers::Draft::from_bytes(&source)?;
     assert!(
         host.set_sheet_chart_shadow(sheet, chart, ChartShadow::None)
@@ -134,6 +142,29 @@ fn numbers_sheet_chart_shadow_shared_series_style_refuses() -> TestResult {
     let before = leaf_bytes!(package);
     let mut edit = package.edit_sheet_chart_style(0, 1)?;
     edit.set(Property::Shadow(Shadow::None))?;
+    assert!(matches!(
+        edit.commit(),
+        Err(Error::Refused(Refusal::SharedStyle))
+    ));
+    assert_eq!(leaf_bytes!(package), before);
+    Ok(())
+}
+
+/// The chart-wide radar series style rewrites the series styles; one that
+/// another chart references makes the write refuse in the host and the leaf.
+#[test]
+fn numbers_sheet_chart_radar_series_style_shared_series_style_refuses() -> TestResult {
+    let (source, sheet, chart) = shared_series_source(Kind::Radar2d)?;
+    let mut host = numbers::Draft::from_bytes(&source)?;
+    assert!(
+        host.set_sheet_chart_radar_series_style(sheet, chart, ChartRadarSeriesStyle::Fill)
+            .is_err(),
+        "the host refuses a shared series style"
+    );
+    let package = Package::from_bytes(&source)?;
+    let before = leaf_bytes!(package);
+    let mut edit = package.edit_sheet_chart_style(0, 1)?;
+    edit.set(Property::RadarSeriesStyle(RadarSeriesStyle::Fill))?;
     assert!(matches!(
         edit.commit(),
         Err(Error::Refused(Refusal::SharedStyle))

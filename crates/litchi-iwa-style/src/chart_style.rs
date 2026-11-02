@@ -159,6 +159,25 @@ pub mod chart {
         /// The drop shadow of the chart's series, drawn per series or
         /// grouped. Stored in every series style and the chart style.
         Shadow(Shadow),
+        /// The chart-wide appearance of a radar chart's series, stored in
+        /// every series style.
+        RadarSeriesStyle(RadarSeriesStyle),
+    }
+
+    /// The Radar inspector's chart-wide series "Style" control (the host's
+    /// `ChartRadarSeriesStyle`): one coordinated fill and stroke
+    /// representation applied to every series.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+    #[non_exhaustive]
+    pub enum RadarSeriesStyle {
+        /// Translucent series-color fills without outlines.
+        Fill,
+        /// Series-color outlines without an area fill.
+        Stroke,
+        /// Series-color outlines with a derived translucent area fill (the
+        /// native default).
+        #[default]
+        FillAndStroke,
     }
 
     /// The shadow of a chart's series (the host's `ChartShadow`).
@@ -340,6 +359,8 @@ pub mod chart {
         Lighting3d,
         /// [`Property::Shadow`].
         Shadow,
+        /// [`Property::RadarSeriesStyle`].
+        RadarSeriesStyle,
     }
 
     impl Property {
@@ -365,6 +386,7 @@ pub mod chart {
                 Self::BackgroundFill(_) => PropertyKind::BackgroundFill,
                 Self::Lighting3d(_) => PropertyKind::Lighting3d,
                 Self::Shadow(_) => PropertyKind::Shadow,
+                Self::RadarSeriesStyle(_) => PropertyKind::RadarSeriesStyle,
             }
         }
     }
@@ -392,15 +414,20 @@ pub mod chart {
                 Self::BackgroundFill => Property::BackgroundFill(default_background()),
                 Self::Lighting3d => Property::Lighting3d(Lighting3d::Default),
                 Self::Shadow => Property::Shadow(Shadow::NATIVE_DEFAULT),
+                Self::RadarSeriesStyle => {
+                    Property::RadarSeriesStyle(RadarSeriesStyle::FillAndStroke)
+                },
             }
         }
 
         /// The style archive storing the property; `None` for the legend
-        /// frame, which the chart drawable stores.
+        /// frame, which the chart drawable stores. The radar series style
+        /// is stored by the series styles.
         #[must_use]
         pub const fn archive(self) -> Option<Archive> {
             Some(match self {
                 Self::LegendFrame => return None,
+                Self::RadarSeriesStyle => Archive::SeriesStyle,
                 Self::RoundedCorners
                 | Self::BorderVisible
                 | Self::RadarGridShape
@@ -425,6 +452,7 @@ pub mod chart {
                 Self::Depth3d => kind.supports_3d_depth(),
                 Self::BarShape3d => kind.supports_3d_bar_shape(),
                 Self::RadarGridShape => kind.supports_radar_grid_shape(),
+                Self::RadarSeriesStyle => kind.supports_radar_series_style(),
                 Self::Lighting3d => lighting_field(kind).is_some(),
                 Self::RoundedCorners
                 | Self::LegendFrame
@@ -632,6 +660,11 @@ pub mod chart {
             PropertyKind::Shadow => {
                 return Err(SymbolError::Invalid(
                     "the chart shadow is stored by the series styles too",
+                ));
+            },
+            PropertyKind::RadarSeriesStyle => {
+                return Err(SymbolError::Invalid(
+                    "the radar series style is stored by the series styles",
                 ));
             },
             PropertyKind::LegendFrame => {
@@ -1612,11 +1645,16 @@ fn chart_value(
     workspace: &Workspace<'_>,
     chart: u64,
     chart_kind: ChartKind,
+    series_count: usize,
     kind: chart::PropertyKind,
     budget: &mut SymbolBudget,
 ) -> SymbolResult<chart::Property> {
     if !kind.applies_to(chart_kind) {
         return Err(SymbolError::Refused(Refusal::UnsupportedKind));
+    }
+    if kind == chart::PropertyKind::RadarSeriesStyle {
+        return crate::series::style::radar::read(workspace, chart, series_count, budget)
+            .map(chart::Property::RadarSeriesStyle);
     }
     let Some(archive) = kind.archive() else {
         return read_payload(workspace, chart, CHART_MESSAGE_TYPE, budget, |payload| {
@@ -1646,7 +1684,8 @@ fn chart_value(
 }
 
 /// Read chart-level property `kind` of chart drawable `chart` (of kind
-/// `chart_kind`) under one residual profile.
+/// `chart_kind`, with `series_count` visible series) under one residual
+/// profile.
 ///
 /// # Errors
 ///
@@ -1656,18 +1695,28 @@ pub fn read_chart(
     workspace: &Workspace<'_>,
     chart: u64,
     chart_kind: ChartKind,
+    series_count: usize,
     kind: chart::PropertyKind,
     limits: Limits,
 ) -> SymbolResult<(chart::Property, Report)> {
     let mut budget = SymbolBudget::new(limits);
-    let value = chart_value(workspace, chart, chart_kind, kind, &mut budget)?;
+    let value = chart_value(
+        workspace,
+        chart,
+        chart_kind,
+        series_count,
+        kind,
+        &mut budget,
+    )?;
     Ok((value, budget.report(false)))
 }
 
 /// Store chart-level `value` for chart drawable `chart` (of kind
-/// `chart_kind`) under one residual profile: the style object is rewritten
-/// in place (the legend frame: the chart drawable). Returns whether
-/// anything changed and the report with the in-place mutation scope.
+/// `chart_kind`, with `series_count` visible series) under one residual
+/// profile: the style object is rewritten in place (the legend frame: the
+/// chart drawable; the radar series style: the series styles of the visible
+/// series). Returns whether anything changed and the report with the
+/// in-place mutation scope.
 ///
 /// # Errors
 ///
@@ -1678,16 +1727,32 @@ pub fn write_chart(
     workspace: &mut Workspace<'_>,
     chart: u64,
     chart_kind: ChartKind,
+    series_count: usize,
     value: &chart::Property,
     limits: Limits,
 ) -> SymbolResult<(bool, Report)> {
     let mut budget = SymbolBudget::new(limits);
     let kind = value.kind();
-    if chart_value(workspace, chart, chart_kind, kind, &mut budget)? == *value {
+    if chart_value(
+        workspace,
+        chart,
+        chart_kind,
+        series_count,
+        kind,
+        &mut budget,
+    )? == *value
+    {
         return Ok((false, budget.report(false)));
     }
-    let changed = match kind.archive() {
-        None => {
+    let changed = match (kind.archive(), value) {
+        (_, chart::Property::RadarSeriesStyle(style)) => {
+            // The host's `set_chart_radar_series_style` checks no chart
+            // style; the scope is the chart's series graph.
+            let scope = crate::series::radar_scope(workspace, chart, series_count, &mut budget)?;
+            budget.set_scope(scope);
+            crate::series::style::radar::write(workspace, chart, series_count, *style, &mut budget)?
+        },
+        (None, _) => {
             in_place_scope(
                 workspace,
                 chart,
@@ -1707,7 +1772,7 @@ pub fn write_chart(
                 |payload| chart::rewrite_legend_frame(payload, frame),
             )?
         },
-        Some(archive) => {
+        (Some(archive), _) => {
             let style = style_object(workspace, chart, archive, None, &mut budget)?;
             if owners(workspace, style, archive, &mut budget)? != 1 {
                 return Err(SymbolError::Refused(Refusal::SharedStyle));
@@ -1743,7 +1808,16 @@ pub fn write_chart(
             series || style_changed
         },
     };
-    if changed && chart_value(workspace, chart, chart_kind, kind, &mut budget)? != *value {
+    if changed
+        && chart_value(
+            workspace,
+            chart,
+            chart_kind,
+            series_count,
+            kind,
+            &mut budget,
+        )? != *value
+    {
         return Err(SymbolError::Invalid(
             "a chart style write does not read back",
         ));

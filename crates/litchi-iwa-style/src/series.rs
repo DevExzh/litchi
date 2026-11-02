@@ -3949,6 +3949,18 @@ fn bounded_mutation_scope(
     })
 }
 
+/// The series-graph mutation scope of chart drawable `chart` with
+/// `series_count` visible series (the chart-level radar series style
+/// rewrites the series styles in it).
+pub(crate) fn radar_scope(
+    workspace: &Workspace<'_>,
+    chart: u64,
+    series_count: usize,
+    budget: &mut SymbolBudget,
+) -> SymbolResult<MutationScope> {
+    bounded_mutation_scope(workspace, chart, &[], series_count, budget)
+}
+
 fn bounded_stylesheet_of(payload: &[u8], budget: &mut SymbolBudget) -> SymbolResult<Option<u64>> {
     let fields = budget.parse_fields(payload, 1)?;
     let parent = fields
