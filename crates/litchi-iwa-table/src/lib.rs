@@ -56,6 +56,7 @@ pub mod comments;
 pub mod comments_native;
 
 pub mod structure;
+pub mod topology;
 
 /// A located native object: its messages and its position in the component
 /// catalog.

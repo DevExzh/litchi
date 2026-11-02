@@ -1110,7 +1110,9 @@ impl Package {
     }
 
     /// Return the raw Numbers-wire profile selected by this package's
-    /// retained archive and semantic ingress limits.
+    /// retained archive and semantic ingress limits (the table-topology
+    /// engine derives the same profile from `TableSource::archive_limits`).
+    #[cfg(test)]
     pub(crate) fn numbers_wire_limits(&self) -> Result<litchi_numbers_wire::Limits> {
         let maximum = self
             .profile()

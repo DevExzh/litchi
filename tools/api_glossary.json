@@ -26107,7 +26107,8 @@
         "litchi_pages::table::format",
         "litchi_pages::table::comments",
         "litchi_pages::table::cell_text",
-        "litchi_pages::table::cell_list"
+        "litchi_pages::table::cell_list",
+        "litchi_pages::table::topology"
       ],
       "immutable_owners": [
         "litchi_pages::Package",
@@ -26309,6 +26310,10 @@
         {
           "method": "litchi_pages::Package::apply_body_table_cell_lists",
           "ok": "litchi_pages::table::cell_list::Commit"
+        },
+        {
+          "method": "litchi_pages::Package::apply_body_table_topology",
+          "ok": "litchi_pages::table::topology::Commit"
         },
         {
           "method": "litchi_pages::Package::apply_body_table_cell_comment",
@@ -27744,7 +27749,8 @@
         "litchi_keynote::slide::table::lifecycle",
         "litchi_keynote::slide::table::comments",
         "litchi_keynote::slide::table::cell_text",
-        "litchi_keynote::slide::table::cell_list"
+        "litchi_keynote::slide::table::cell_list",
+        "litchi_keynote::slide::table::topology"
       ],
       "immutable_owners": [
         "litchi_keynote::Package",
@@ -27975,6 +27981,10 @@
         {
           "method": "litchi_keynote::Package::apply_slide_table_cell_lists",
           "ok": "litchi_keynote::slide::table::cell_list::Commit"
+        },
+        {
+          "method": "litchi_keynote::Package::apply_slide_table_topology",
+          "ok": "litchi_keynote::slide::table::topology::Commit"
         },
         {
           "method": "litchi_keynote::Package::apply_slide_table_hidden_axes",
@@ -29409,7 +29419,8 @@
         "litchi_keynote::slide::table::lifecycle",
         "litchi_keynote::slide::table::comments",
         "litchi_keynote::slide::table::cell_text",
-        "litchi_keynote::slide::table::cell_list"
+        "litchi_keynote::slide::table::cell_list",
+        "litchi_keynote::slide::table::topology"
       ],
       "immutable_owners": [
         "litchi_keynote::Package",
@@ -29640,6 +29651,10 @@
         {
           "method": "litchi_keynote::Package::apply_slide_table_cell_lists",
           "ok": "litchi_keynote::slide::table::cell_list::Commit"
+        },
+        {
+          "method": "litchi_keynote::Package::apply_slide_table_topology",
+          "ok": "litchi_keynote::slide::table::topology::Commit"
         },
         {
           "method": "litchi_keynote::Package::apply_slide_table_hidden_axes",

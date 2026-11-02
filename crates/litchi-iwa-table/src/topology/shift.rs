@@ -52,14 +52,14 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 
 use litchi_iwa_common::wire as w;
 
-use super::super::Package;
-use super::super::structure::{Fault, map_wire, references, reserve};
 use super::storage::bnc_cells;
 use super::wire::{
     bytes_field, fields, push_varint, push_varint_field, rebuild, repeated_bytes, repeated_varints,
     single_bytes, single_reference, single_varint,
 };
 use super::{LIST_MESSAGE_TYPE, LIST_SEGMENT_MESSAGE_TYPE, TILE_MESSAGE_TYPE, Unsupported};
+use crate::TableSource;
+use crate::structure::{Fault, map_wire, references, reserve};
 
 /// `TSCE.FormulaOwnerDependenciesArchive`.
 const OWNER_TYPE: u32 = 4_008;
@@ -82,7 +82,7 @@ const FORMULA_LIST: u64 = 3;
 
 /// Why the shift failed: a malformed source, or a typed refusal.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(super) enum Failure {
+pub(crate) enum Failure {
     Fault(Fault),
     Refused(Unsupported),
 }
@@ -107,25 +107,25 @@ const fn refuse<T>(reason: Unsupported) -> Out<T> {
 
 /// One axis edit, as the calculation engine sees it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(super) struct Shift {
+pub(crate) struct Shift {
     /// A row edit (else a column edit).
-    pub(super) row_axis: bool,
+    pub(crate) row_axis: bool,
     /// The physical index inserted before, or removed.
-    pub(super) position: u32,
+    pub(crate) position: u32,
     /// An insertion (else a removal).
-    pub(super) insert: bool,
+    pub(crate) insert: bool,
     /// A body-row insertion: a footer range ending on the row before it
     /// grows.
-    pub(super) expand_footer: bool,
+    pub(crate) expand_footer: bool,
     /// A check before the removed axis is cleared: formula hosts on it are
     /// left as they are (the clear removes them).
-    pub(super) pending_clear: bool,
+    pub(crate) pending_clear: bool,
     /// The removed axis was not cleared through the cell writer (record
     /// 0329): the formula hosts on it are dropped here, with their
     /// dependency records and formula-list references, and no dependent
     /// cache is recomputed, so a surviving range over the removed axis is
     /// refused.
-    pub(super) drop_hosts: bool,
+    pub(crate) drop_hosts: bool,
 }
 
 impl Shift {
@@ -182,10 +182,10 @@ impl Shift {
 }
 
 /// One planned payload replacement.
-pub(super) struct Rewrite {
-    pub(super) object: u64,
-    pub(super) message: usize,
-    pub(super) data: Vec<u8>,
+pub(crate) struct Rewrite {
+    pub(crate) object: u64,
+    pub(crate) message: usize,
+    pub(crate) data: Vec<u8>,
 }
 
 /// One formula owner of the calculation engine.
@@ -223,18 +223,18 @@ impl Adjustment {
 }
 
 /// The table being edited.
-pub(super) struct Table<'a> {
+pub(crate) struct Table<'a> {
     /// The table drawable (`TST.TableInfoArchive`).
-    pub(super) info: u64,
+    pub(crate) info: u64,
     /// The table model payload.
-    pub(super) model: &'a [u8],
+    pub(crate) model: &'a [u8],
     /// Rows before the edit.
-    pub(super) rows: u32,
+    pub(crate) rows: u32,
     /// Footer rows before the edit.
-    pub(super) footer_rows: u32,
+    pub(crate) footer_rows: u32,
     /// The references removed cells hold per formula-list key, when the
     /// cell writer could not clear them (record 0329).
-    pub(super) dropped_formulas: &'a BTreeMap<u64, u64>,
+    pub(crate) dropped_formulas: &'a BTreeMap<u64, u64>,
 }
 
 fn u32_of(value: u64) -> Out<u32> {
@@ -279,9 +279,9 @@ fn required_u32(data: &[u8], number: u32) -> Out<u32> {
 }
 
 /// Every formula owner of the package, in catalog order.
-fn owners(package: &Package) -> Out<Vec<Owner<'_>>> {
+fn owners(package: &dyn TableSource) -> Out<Vec<Owner<'_>>> {
     let mut output = Vec::new();
-    for component in package.state.components.catalog().iter() {
+    for component in package.catalog().iter() {
         for object in &component.archive().objects {
             for (index, message) in object.messages.iter().enumerate() {
                 if message.type_ == OWNER_TYPE {
@@ -299,8 +299,8 @@ fn owners(package: &Package) -> Out<Vec<Owner<'_>>> {
 }
 
 /// The unique message of `identifier` with type `type_`.
-fn object_message(package: &Package, identifier: u64, type_: u32) -> Out<(usize, &[u8])> {
-    for component in package.state.components.catalog().iter() {
+fn object_message(package: &dyn TableSource, identifier: u64, type_: u32) -> Out<(usize, &[u8])> {
+    for component in package.catalog().iter() {
         if let Some(object) = component.archive().object(identifier) {
             let mut found = None;
             for (index, message) in object.messages.iter().enumerate() {
@@ -440,7 +440,12 @@ struct Incoming {
 ///
 /// Returns the merge-proxy ranges to rewrite, if any; any other incoming
 /// reference is a refusal.
-fn incoming(package: &Package, owner: &[u8], internal: u64, uid: &[u8]) -> Out<Option<Incoming>> {
+fn incoming(
+    package: &dyn TableSource,
+    owner: &[u8],
+    internal: u64,
+    uid: &[u8],
+) -> Out<Option<Incoming>> {
     let mut edges = false;
     if let Some(dependencies) = single_bytes(owner, 4)? {
         for record in records(dependencies, 1)? {
@@ -1368,7 +1373,7 @@ struct Container<'p> {
 }
 
 /// The formula-list containers of the table.
-fn formula_containers<'p>(package: &'p Package, store: &[u8]) -> Out<Vec<Container<'p>>> {
+fn formula_containers<'p>(package: &'p dyn TableSource, store: &[u8]) -> Out<Vec<Container<'p>>> {
     let list = single_reference(store, 6)?.ok_or(Fault::Invalid)?;
     let (message, data) = object_message(package, list, LIST_MESSAGE_TYPE)?;
     if optional_varint(data, 1)? != Some(FORMULA_LIST) {
@@ -1430,7 +1435,7 @@ fn formula_entries<'p>(containers: &[Container<'p>]) -> Out<BTreeMap<u64, Entry<
 }
 
 /// The formula-list key of the stored formula cell `(row, column)`.
-fn formula_key(package: &Package, store: &[u8], row: u32, column: u32) -> Out<u64> {
+fn formula_key(package: &dyn TableSource, store: &[u8], row: u32, column: u32) -> Out<u64> {
     let (tiles, size) = super::tiles(store).map_err(|_error| Failure::Fault(Fault::Invalid))?;
     let size = u32_of(size)?;
     let key = row / size;
@@ -1451,7 +1456,7 @@ fn formula_key(package: &Package, store: &[u8], row: u32, column: u32) -> Out<u6
             }
             let cell = litchi_numbers_wire::BncCell::parse(
                 bytes,
-                &crate::cell::wire::limits_for_source(bytes),
+                &crate::cell_format::bnc_limits_for_source(bytes),
             )
             .map_err(|_error| Failure::Fault(Fault::Invalid))?;
             let key = cell
@@ -1830,7 +1835,7 @@ fn rewrite_uuid_references(references: &[u8], shift: Shift) -> Out<Vec<u8>> {
 }
 
 /// The hosts of the own owner's range dependencies and range tiles.
-fn range_dependency_hosts(package: &Package, owner: &[u8]) -> Out<HashSet<(u32, u32)>> {
+fn range_dependency_hosts(package: &dyn TableSource, owner: &[u8]) -> Out<HashSet<(u32, u32)>> {
     let mut hosts = HashSet::new();
     if let Some(ranges) = single_bytes(owner, 5)? {
         for dependency in repeated_bytes(ranges, 2)? {
@@ -1850,7 +1855,7 @@ fn range_dependency_hosts(package: &Package, owner: &[u8]) -> Out<HashSet<(u32, 
 
 /// The dependency records of an owner: `(row, column)` of every record,
 /// inline and tiled.
-fn formula_hosts(package: &Package, owner: &[u8]) -> Out<Vec<(u32, u32)>> {
+fn formula_hosts(package: &dyn TableSource, owner: &[u8]) -> Out<Vec<(u32, u32)>> {
     let mut hosts = Vec::new();
     if let Some(dependencies) = single_bytes(owner, 4)? {
         for record in records(dependencies, 1)? {
@@ -1872,17 +1877,17 @@ fn formula_hosts(package: &Package, owner: &[u8]) -> Out<Vec<(u32, u32)>> {
 
 /// One cell rewrite the topology applies to a table's tiles (record 0329).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(super) struct CellPatch {
+pub(crate) struct CellPatch {
     /// The drawable of the table holding the cell.
-    pub(super) info: u64,
+    pub(crate) info: u64,
     /// The cell's row before the edit.
-    pub(super) row: u32,
+    pub(crate) row: u32,
     /// The cell's column before the edit.
-    pub(super) column: u32,
+    pub(crate) column: u32,
     /// The formula reads `#REF!`: its cached result becomes an error.
-    pub(super) error: bool,
+    pub(crate) error: bool,
     /// The cell moves to this formula-list entry (a shared formula split).
-    pub(super) formula_key: Option<u32>,
+    pub(crate) formula_key: Option<u32>,
 }
 
 /// One formula cell of a list entry and its rewritten formula.
@@ -1906,7 +1911,7 @@ struct Moved {
     reason = "the formula list of one table, with the plan it feeds"
 )]
 fn rewrite_formulas(
-    package: &Package,
+    package: &dyn TableSource,
     store: &[u8],
     info: u64,
     hosts: &[Host],
@@ -2095,7 +2100,7 @@ fn rewrite_formulas(
 }
 
 /// The data store of the table whose drawable is `info`.
-fn table_store(package: &Package, info: u64) -> Out<&[u8]> {
+fn table_store(package: &dyn TableSource, info: u64) -> Out<&[u8]> {
     let info_data = match object_message(package, info, 6_000) {
         Ok((_, data)) => data,
         Err(_) => object_message(package, info, 6_003)?.1,
@@ -2109,7 +2114,7 @@ fn table_store(package: &Package, info: u64) -> Out<&[u8]> {
 /// table (`internal`, `uid`): their references into it, the precedent edges
 /// and ranges naming it; its hosts stay.
 fn rewrite_reader(
-    package: &Package,
+    package: &dyn TableSource,
     owner: &Owner<'_>,
     incoming: &Incoming,
     shift: Shift,
@@ -2214,8 +2219,8 @@ fn rewrite_reader(
 ///
 /// The own owner's table extents are not rewritten here; the caller applies
 /// [`super::calc::rewrite_extents`] to the returned own-owner payload.
-pub(super) fn plan(
-    package: &Package,
+pub(crate) fn plan(
+    package: &dyn TableSource,
     table: &Table<'_>,
     shift: Shift,
     check_only: bool,
@@ -2505,15 +2510,15 @@ fn rewrite_incoming_rect(rect: &[u8], shift: Shift) -> Out<Vec<u8>> {
 /// The planned rewrites: the own owner's payload (before its extents), and
 /// every other payload.
 #[derive(Default)]
-pub(super) struct Plan {
-    pub(super) own: Option<(u64, usize, Vec<u8>)>,
-    pub(super) rewrites: Vec<Rewrite>,
+pub(crate) struct Plan {
+    pub(crate) own: Option<(u64, usize, Vec<u8>)>,
+    pub(crate) rewrites: Vec<Rewrite>,
     /// Cells whose tiles change with the formulas (record 0329): error
     /// caches of `#REF!` formulas, cells of split shared formulas.
-    pub(super) cells: Vec<CellPatch>,
+    pub(crate) cells: Vec<CellPatch>,
     /// Dependency tiles emptied by dropped hosts, which go with their
     /// owner's references to them (record 0329).
-    pub(super) removed: Vec<u64>,
+    pub(crate) removed: Vec<u64>,
 }
 
 impl Plan {
