@@ -5,7 +5,7 @@
 //! Numbers owners share it.
 
 use litchi_iwa_common::WireLimits;
-use litchi_iwa_common::shape::line::Endpoint;
+use litchi_iwa_common::shape::line::{Endpoint, Endpoints};
 use litchi_iwa_common::varint::encode_varint_into;
 use litchi_iwa_common::wire::WireView;
 use thiserror::Error as ThisError;
@@ -326,6 +326,246 @@ pub fn decode(payload: Option<&[u8]>, limits: WireLimits) -> Result<Endpoint, De
         "line" => Endpoint::Line,
         _ => return Err(UnknownLineEnd.into()),
     })
+}
+
+// ---- The endpoints of a straight-line shape (the host's
+// `shapes::line_end` read and `set_shape_line_endpoints`), shared by the
+// Pages and Numbers owners over a style workspace ----
+
+const SHAPE_INFO_MESSAGE_TYPE: u32 = 2_011;
+const SHAPE_INFO_SHAPE: u32 = 1;
+const SHAPE_PATH_SOURCE: u32 = 3;
+const SHAPE_HEAD_LINE_END: u32 = 4;
+const SHAPE_TAIL_LINE_END: u32 = 5;
+const PATH_SOURCE_HORIZONTAL_FLIP: u32 = 1;
+
+/// Why a line-endpoint read or write failed. No change escapes a failed
+/// write's workspace step.
+#[derive(Debug)]
+#[non_exhaustive]
+pub enum EndpointsError {
+    /// The shape or style graph failed (the engine's typed failure).
+    Graph(crate::graph::Error),
+    /// A stored line end is malformed, outside the standard set or over the
+    /// caller's wire limits.
+    Decode(DecodeError),
+    /// The default decorations would clear an exclusive variation that has
+    /// no parent style.
+    Orphan,
+    /// The written decorations did not read back.
+    Verification,
+}
+
+impl From<crate::graph::Error> for EndpointsError {
+    fn from(error: crate::graph::Error) -> Self {
+        Self::Graph(error)
+    }
+}
+
+impl From<DecodeError> for EndpointsError {
+    fn from(error: DecodeError) -> Self {
+        Self::Decode(error)
+    }
+}
+
+impl From<litchi_iwa_common::Error> for EndpointsError {
+    fn from(error: litchi_iwa_common::Error) -> Self {
+        Self::Decode(DecodeError::Wire(error))
+    }
+}
+
+/// The shape's own (legacy per-shape) head and tail decorations and its
+/// horizontal flip.
+struct Own {
+    head: Option<Vec<u8>>,
+    tail: Option<Vec<u8>>,
+    flipped: bool,
+}
+
+fn single<'a>(view: &WireView<'a>, number: u32) -> Result<Option<&'a [u8]>, EndpointsError> {
+    let mut found = None;
+    for field in view.fields() {
+        if field.number() != number {
+            continue;
+        }
+        if field.wire_type() != 2 || found.replace(field.payload()).is_some() {
+            return Err(
+                crate::graph::Error::Invalid("a shape field is repeated or mistyped").into(),
+            );
+        }
+    }
+    Ok(found)
+}
+
+fn own(
+    workspace: &crate::graph::Workspace<'_>,
+    drawable: u64,
+    limits: WireLimits,
+) -> Result<Own, EndpointsError> {
+    let (_, payload) = workspace.unique_payload(
+        drawable,
+        SHAPE_INFO_MESSAGE_TYPE,
+        "a shape must have exactly one ShapeInfo payload",
+    )?;
+    let info = WireView::parse(payload, limits)?;
+    let shape = single(&info, SHAPE_INFO_SHAPE)?
+        .ok_or(crate::graph::Error::Invalid("a shape info has no shape"))?;
+    let shape = WireView::parse(shape, limits)?;
+    let mut flipped = false;
+    if let Some(source) = single(&shape, SHAPE_PATH_SOURCE)? {
+        let source = WireView::parse(source, limits)?;
+        for field in source.fields() {
+            if field.number() != PATH_SOURCE_HORIZONTAL_FLIP {
+                continue;
+            }
+            if field.wire_type() != 0 {
+                return Err(crate::graph::Error::Invalid("a path flip is mistyped").into());
+            }
+            let (value, length) = litchi_iwa_common::decode_varint_from_bytes(field.payload())
+                .map_err(|_error| crate::graph::Error::Invalid("a path flip is malformed"))?;
+            if length != field.payload().len() {
+                return Err(crate::graph::Error::Invalid("a path flip is malformed").into());
+            }
+            flipped = value != 0;
+        }
+    }
+    let owned = |payload: Option<&[u8]>| -> Result<Option<Vec<u8>>, EndpointsError> {
+        let Some(payload) = payload else {
+            return Ok(None);
+        };
+        WireView::parse(payload, limits)?;
+        let mut owned = Vec::new();
+        owned.try_reserve_exact(payload.len()).map_err(|_error| {
+            DecodeError::Wire(litchi_iwa_common::Error::Allocation {
+                resource: "line end",
+                amount: payload.len(),
+            })
+        })?;
+        owned.extend_from_slice(payload);
+        Ok(Some(owned))
+    };
+    Ok(Own {
+        head: owned(single(&shape, SHAPE_HEAD_LINE_END)?)?,
+        tail: owned(single(&shape, SHAPE_TAIL_LINE_END)?)?,
+        flipped,
+    })
+}
+
+/// The effective head and tail of a style chain, each inherited on its own.
+fn inherited(
+    workspace: &crate::graph::Workspace<'_>,
+    style: u64,
+) -> Result<(Option<Vec<u8>>, Option<Vec<u8>>), EndpointsError> {
+    Ok((
+        crate::shape::effective(workspace, style, crate::shape::Slot::HeadLineEnd)?,
+        crate::shape::effective(workspace, style, crate::shape::Slot::TailLineEnd)?,
+    ))
+}
+
+fn resolved(
+    workspace: &crate::graph::Workspace<'_>,
+    own: &Own,
+    drawable: u64,
+    limits: WireLimits,
+) -> Result<Endpoints, EndpointsError> {
+    let (mut head, mut tail) = (own.head.clone(), own.tail.clone());
+    if head.is_none() || tail.is_none() {
+        let style = crate::shape::target(workspace, drawable)?.style();
+        let (inherited_head, inherited_tail) = inherited(workspace, style)?;
+        head = head.or(inherited_head);
+        tail = tail.or(inherited_tail);
+    }
+    let mut endpoints = Endpoints {
+        start: decode(tail.as_deref(), limits)?,
+        end: decode(head.as_deref(), limits)?,
+    };
+    if own.flipped {
+        std::mem::swap(&mut endpoints.start, &mut endpoints.end);
+    }
+    Ok(endpoints)
+}
+
+/// The directed start and end decorations straight-line shape `drawable`
+/// shows: its own legacy decorations, else its style chain's, swapped when
+/// its path is flipped horizontally (the host's `shape_line_endpoints`).
+///
+/// # Errors
+///
+/// [`EndpointsError`] for an invalid shape or style graph or a line end
+/// outside the standard set or the limits.
+pub fn endpoints(
+    workspace: &crate::graph::Workspace<'_>,
+    drawable: u64,
+    limits: WireLimits,
+) -> Result<Endpoints, EndpointsError> {
+    resolved(
+        workspace,
+        &own(workspace, drawable, limits)?,
+        drawable,
+        limits,
+    )
+}
+
+/// Store `wanted` as straight-line shape `drawable`'s decorations through
+/// the shape-style plan layer (the host's `set_shape_line_endpoints`): an
+/// exclusive variation whose parent shows no decorations is cleared for the
+/// default, any other write stores both slots. Returns whether anything
+/// changed.
+///
+/// # Errors
+///
+/// As [`endpoints`]; [`EndpointsError::Orphan`] and
+/// [`EndpointsError::Verification`].
+pub fn set_endpoints(
+    workspace: &mut crate::graph::Workspace<'_>,
+    drawable: u64,
+    wanted: Endpoints,
+    limits: WireLimits,
+) -> Result<bool, EndpointsError> {
+    use crate::shape::{self as engine, Slot, Styles as _, Value};
+    let own = own(workspace, drawable, limits)?;
+    if resolved(workspace, &own, drawable, limits)? == wanted {
+        return Ok(false);
+    }
+    let mut stored = wanted;
+    if own.flipped {
+        std::mem::swap(&mut stored.start, &mut stored.end);
+    }
+    let target = engine::target(workspace, drawable)?;
+    let payload = workspace
+        .shape_style(target.style())
+        .ok_or(crate::graph::Error::Invalid("a shape style is missing"))?
+        .to_vec();
+    let disposable = target.exclusive() && engine::direct_slots(&payload)?.is_some();
+    let mut clear = false;
+    if disposable && wanted == Endpoints::default() {
+        let parent = engine::parent_of(&payload)?.ok_or(EndpointsError::Orphan)?;
+        let (head, tail) = inherited(workspace, parent)?;
+        let inherited = Endpoints {
+            start: decode(tail.as_deref(), limits)?,
+            end: decode(head.as_deref(), limits)?,
+        };
+        clear = inherited == Endpoints::default();
+    }
+    let writes = if clear {
+        vec![(Slot::HeadLineEnd, None), (Slot::TailLineEnd, None)]
+    } else {
+        vec![
+            (Slot::HeadLineEnd, Some(Value::message(encode(stored.end)))),
+            (
+                Slot::TailLineEnd,
+                Some(Value::message(encode(stored.start))),
+            ),
+        ]
+    };
+    // A shared or non-minimal style takes a derived child (the host's
+    // copy-on-write); the plan layer decides exactly as the host does.
+    let plan = engine::plan_set(&*workspace, target, &writes)?;
+    engine::apply(workspace, drawable, plan)?;
+    if resolved(workspace, &own, drawable, limits)? != wanted {
+        return Err(EndpointsError::Verification);
+    }
+    Ok(true)
 }
 
 #[cfg(test)]
