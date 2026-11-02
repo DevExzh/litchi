@@ -174,6 +174,57 @@ pub mod named_style {
     };
 }
 
+/// Plain-text Drop Caps of the paragraphs of the text a body text box or
+/// shape owns (record 0413).
+pub mod drop_cap {
+    pub use crate::package::text_box_drop_cap::{
+        Commit, Diagnostics, Edit, Error, LimitKind, Patch, Refusal,
+    };
+    pub use litchi_iwa_text::TextPosition;
+    pub use litchi_iwa_text::paragraph::drop_cap::{
+        CharacterCount, DropCap, LineCount, Outdent, Padding, RaisedLines, Wrap,
+    };
+}
+
+/// Highlights, text comments and replies of the text a body text box or
+/// shape owns (record 0413).
+pub mod annotation {
+    pub use crate::package::text_box_annotation::{
+        Comment, Commit, Diagnostics, Edit, Error, Highlight, LimitKind, Patch, Refusal,
+    };
+    pub use litchi_iwa_text::position::{TextPosition, TextRange};
+}
+
+/// Date & Time fields of the text a body text box or shape owns (record
+/// 0413).
+pub mod date_time {
+    pub use crate::package::text_box_date_time::{
+        Commit, DateTimeField, Diagnostics, Edit, Error, LimitKind, Patch, Refusal,
+    };
+    pub use litchi_iwa_text::date_time::{
+        DisplayText, Format, FormatterStyle, Instant, LocaleIdentifier, Settings, UpdatePlan,
+    };
+    pub use litchi_iwa_text::position::{TextPosition, TextRange};
+}
+
+/// Hyperlinks of the text a body text box or shape owns (record 0413).
+pub mod hyperlink {
+    pub use crate::package::text_box_hyperlink::{
+        Commit, Diagnostics, Edit, Error, Hyperlink, LimitKind, Patch, Refusal,
+    };
+    pub use litchi_iwa_text::hyperlink::TextHyperlinkTarget;
+    pub use litchi_iwa_text::position::{TextPosition, TextRange};
+}
+
+/// Language runs of the text a body text box or shape owns (record 0413).
+pub mod language {
+    pub use crate::package::text_box_language::{
+        Commit, Diagnostics, Edit, Error, LimitKind, Patch, Refusal,
+    };
+    pub use litchi_iwa_text::TextPosition;
+    pub use litchi_iwa_text::language::{TextLanguage, TextLanguageRun};
+}
+
 /// Exact-source transactions for the body drawables' layer order.
 pub mod order {
     pub use crate::package::drawable_order::{

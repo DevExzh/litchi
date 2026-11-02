@@ -119,6 +119,13 @@ pub enum Refusal {
     /// The source does not keep an exact artifact for a changed publication.
     #[error("this Pages source does not support exact body number attachment edits")]
     UnsupportedSource,
+    /// The selected body drawable owns no text (an image, movie or audio
+    /// clip).
+    #[error("a Pages body {kind} owns no text")]
+    NoText {
+        /// The selected kind.
+        kind: &'static str,
+    },
 }
 
 impl Refusal {
@@ -131,6 +138,7 @@ impl Refusal {
             Self::InvalidRange | Self::Overlap => RefusalKind::InvalidValue,
             Self::SharedObject | Self::UnsupportedSource => RefusalKind::UnsupportedContent,
             Self::OperationAlreadyStaged => RefusalKind::UnsupportedOperation,
+            Self::NoText { .. } => RefusalKind::UnsupportedTarget,
         }
     }
 }
@@ -175,6 +183,8 @@ pub enum Target<'a> {
     Body,
     /// One header or footer slot.
     HeaderFooter(HeaderFooterSelector<'a>),
+    /// The storage a body text box or shape owns (record 0413).
+    Drawable(crate::selector::DrawableSelector),
 }
 
 /// One number attachment of a storage.
@@ -479,6 +489,25 @@ fn storage_identifier(package: &Package, target: Target<'_>) -> Result<u64, Erro
                     _ => Error::InvalidSource,
                 }
             })
+        },
+        Target::Drawable(selector) => {
+            use super::body_drawable_graph::{self as graph, Budget, ObjectIndex};
+            if !matches!(
+                selector,
+                crate::selector::DrawableSelector::Shape(_)
+                    | crate::selector::DrawableSelector::TextBox(_)
+            ) {
+                return Err(Refusal::NoText {
+                    kind: graph::kind_name(selector),
+                }
+                .into());
+            }
+            let mut budget = Budget::new(package)?;
+            let index = ObjectIndex::new(package, &mut budget)?;
+            let body = graph::resolve_body(&index, &mut budget)?;
+            let selected = graph::select_drawable(&index, &body, selector, &mut budget)?
+                .ok_or(Refusal::NotFound)?;
+            Ok(selected.storage.ok_or(Error::InvalidSource)?.get())
         },
     }
 }
