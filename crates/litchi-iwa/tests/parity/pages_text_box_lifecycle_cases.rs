@@ -335,3 +335,517 @@ fn pages_body_shape_preset_read_parity() -> TestResult {
     let _ = (Tier::A, Evidence::Queued);
     Ok(())
 }
+
+// ---- additions ------------------------------------------------------------------
+
+use litchi_iwa::shapes::DrawableSize;
+use litchi_iwa_common::color::{RgbColorSpace, Rgba};
+use litchi_iwa_common::shape::line::{Endpoint, Endpoints};
+use litchi_iwa_common::shape::stroke::{LineStyle, Pattern, Stroke, Width};
+use litchi_pages::drawable::Size;
+use litchi_pages::drawable::style::{Fill, Property as StyleProperty};
+
+/// One creation, expressed once for both routes. Anchors are at the end of
+/// the body.
+#[derive(Clone)]
+enum Add {
+    TextBox(&'static str),
+    Shape(&'static str, Preset),
+    ShapeWithFill(Preset, Fill),
+    Line,
+    LineWithEndpoints(Endpoints),
+    LineWithStyle(LineStyle),
+}
+
+const START: (f32, f32) = (40.0, 60.0);
+const END: (f32, f32) = (240.0, 160.0);
+
+fn body_end(bytes: &[u8]) -> TestResult<usize> {
+    Ok(pages::Draft::from_bytes(bytes)?
+        .body_text()?
+        .encode_utf16()
+        .count())
+}
+
+fn host_add(source: &[u8], add: &Add) -> TestResult<Vec<u8>> {
+    let mut e = pages::Draft::from_bytes(source)?;
+    let at = body_end(source)?;
+    let position = DrawablePoint { x: 72.0, y: 96.0 };
+    let size = DrawableSize {
+        width: 160.0,
+        height: 90.0,
+    };
+    let start = DrawablePoint {
+        x: START.0,
+        y: START.1,
+    };
+    let end = DrawablePoint { x: END.0, y: END.1 };
+    match add {
+        Add::TextBox(text) => drop(e.add_text_box(at, text, position, size)?),
+        Add::Shape(text, Preset::Rectangle) => {
+            drop(e.add_body_rectangle(at, text, position, size)?);
+        },
+        Add::Shape(text, preset) => drop(e.add_body_shape(at, text, position, size, *preset)?),
+        Add::ShapeWithFill(preset, Fill::Solid(color)) => drop(e.add_body_shape_with_fill(
+            at,
+            "",
+            position,
+            size,
+            *preset,
+            litchi_iwa::shapes::ShapeFill::Solid(*color),
+        )?),
+        Add::ShapeWithFill(..) => return Err("solid fills only".into()),
+        Add::Line => drop(e.add_body_line(at, start, end)?),
+        Add::LineWithEndpoints(endpoints) => {
+            drop(e.add_body_line_with_endpoints(at, start, end, *endpoints)?);
+        },
+        Add::LineWithStyle(style) => drop(e.add_body_line_with_style(at, start, end, *style)?),
+    }
+    Ok(e.to_bytes()?)
+}
+
+/// The leaf route: the creation, then (for the host's combined routes) the
+/// style the host writes after creating, each through its family.
+fn leaf_add(source: &[u8], add: &Add) -> TestResult<LeafRun> {
+    let package = Package::from_bytes(source)?;
+    let at = litchi_pages::TextPosition::from_utf16_index(body_end(source)?)?;
+    let position = Point { x: 72.0, y: 96.0 };
+    let size = Size {
+        width: 160.0,
+        height: 90.0,
+    };
+    let segment = Segment::new(
+        Point {
+            x: START.0,
+            y: START.1,
+        },
+        Point { x: END.0, y: END.1 },
+    )?;
+    let mut edit = package.edit_body_media();
+    match add {
+        Add::TextBox(text) => {
+            edit.add_text_box(at, text, position, size)?;
+        },
+        Add::Shape(text, preset) => {
+            edit.add_shape(at, text, position, size, *preset)?;
+        },
+        Add::ShapeWithFill(preset, _) => {
+            edit.add_shape(at, "", position, size, *preset)?;
+        },
+        Add::Line | Add::LineWithEndpoints(_) | Add::LineWithStyle(_) => {
+            {
+                edit.add_line(at, segment)?;
+            };
+        },
+    }
+    let commit = edit.commit()?;
+    let restored = commit
+        .package()
+        .apply_body_media(&commit.patch().inverse())?;
+    if leaf_bytes!(restored.package()) != source {
+        return Err("the creation's inverse does not restore the source".into());
+    }
+    let mut package = commit.into_package();
+    let styles: Vec<StyleProperty> = match add {
+        Add::ShapeWithFill(_, fill) => vec![StyleProperty::Fill(fill.clone())],
+        Add::LineWithEndpoints(endpoints) => vec![StyleProperty::LineEndpoints(*endpoints)],
+        Add::LineWithStyle(style) => vec![
+            StyleProperty::Stroke(Some(style.stroke)),
+            StyleProperty::LineEndpoints(style.endpoints),
+        ],
+        _ => Vec::new(),
+    };
+    for property in styles {
+        // The new shape is the body's last.
+        let mut index = 0;
+        while package
+            .body_drawable_properties(DrawableSelector::shape(index + 1))
+            .is_ok()
+        {
+            index += 1;
+        }
+        let mut edit = package.edit_body_drawable_style(DrawableSelector::shape(index))?;
+        edit.set(property)?;
+        package = edit.commit()?.into_package();
+    }
+    Ok(LeafRun::output(leaf_bytes!(package)))
+}
+
+fn add_case(name: &'static str, input: &Fixture, add: Add) -> TestResult {
+    let add = &add;
+    Case::new(name, Format::Pages, Tier::B, Evidence::Queued, input)
+        .leaf_structural_metadata()
+        .host(|source| host_add(source, add))
+        .leaf(|source| leaf_add(source, add))
+        .read("host texts", host_texts)
+        .read("leaf texts", leaf_texts)
+        .read("host presets", host_presets)
+        .read("leaf presets", leaf_presets)
+        .run()?;
+    Ok(())
+}
+
+fn basic() -> TestResult<Fixture> {
+    crate::harness::fixture("iwork/pages/basic.pages")
+}
+
+fn red() -> TestResult<Rgba> {
+    Ok(Rgba::new(0.9, 0.1, 0.1, 1.0, RgbColorSpace::Srgb)?)
+}
+
+#[test]
+fn pages_text_box_add_parity() -> TestResult {
+    let _ = (Tier::B, Evidence::Queued);
+    add_case(
+        "pages_text_box_add_parity",
+        &basic()?,
+        Add::TextBox("New box"),
+    )?;
+    add_case(
+        "pages_text_box_add_parity",
+        &text_box_fixture()?,
+        Add::TextBox("Third box"),
+    )
+}
+
+#[test]
+fn pages_body_shape_add_parity() -> TestResult {
+    let _ = (Tier::B, Evidence::Queued);
+    let input = basic()?;
+    add_case(
+        "pages_body_shape_add_parity",
+        &input,
+        Add::Shape("Rect", Preset::Rectangle),
+    )?;
+    for preset in preset_samples()? {
+        add_case(
+            "pages_body_shape_add_parity",
+            &input,
+            Add::Shape("Shape", preset),
+        )
+        .map_err(|e| format!("{preset:?}: {e}"))?;
+    }
+    Ok(())
+}
+
+#[test]
+fn pages_body_shape_add_with_fill_parity() -> TestResult {
+    let _ = (Tier::B, Evidence::Queued);
+    add_case(
+        "pages_body_shape_add_with_fill_parity",
+        &basic()?,
+        Add::ShapeWithFill(Preset::Ellipse, Fill::Solid(red()?)),
+    )
+}
+
+#[test]
+fn pages_body_line_add_parity() -> TestResult {
+    let _ = (Tier::B, Evidence::Queued);
+    let input = basic()?;
+    add_case("pages_body_line_add_parity", &input, Add::Line)?;
+    add_case(
+        "pages_body_line_add_parity",
+        &input,
+        Add::LineWithEndpoints(Endpoints {
+            start: Endpoint::FilledCircle,
+            end: Endpoint::OpenArrow,
+        }),
+    )?;
+    add_case(
+        "pages_body_line_add_parity",
+        &input,
+        Add::LineWithStyle(
+            LineStyle::new(Stroke::new(red()?, Width::new(3.0)?, Pattern::MediumDash))
+                .with_endpoints(Endpoints {
+                    start: Endpoint::None,
+                    end: Endpoint::FilledArrow,
+                }),
+        ),
+    )
+}
+
+/// A commented drawable's removal clears its comment thread first, as the
+/// host does.
+#[test]
+fn pages_commented_drawable_remove_parity() -> TestResult {
+    let _ = (Tier::B, Evidence::Queued);
+    let commented = |input: Fixture, shape: bool| -> TestResult<Fixture> {
+        let mut e = pages::Draft::from_bytes(&input.bytes)?;
+        let d = if shape {
+            e.body_shapes()?
+                .first()
+                .ok_or("no shape")?
+                .drawable_object_id
+        } else {
+            host_text_box(&e, 0)?
+        };
+        e.set_drawable_comment(d, "Root")?;
+        e.add_drawable_comment_reply(
+            litchi_iwa_common::comment::DrawableId::try_from(d)?,
+            "Reply",
+        )?;
+        Ok(Fixture {
+            path: "fixture + host drawable comment thread",
+            bytes: e.to_bytes()?,
+        })
+    };
+    remove_case(
+        "pages_commented_drawable_remove_parity",
+        &commented(text_box_fixture()?, false)?,
+        |source| {
+            let mut e = pages::Draft::from_bytes(source)?;
+            let d = host_text_box(&e, 0)?;
+            e.remove_text_box(d)?;
+            Ok(e.to_bytes()?)
+        },
+        DrawableSelector::text_box(0),
+    )?;
+    remove_case(
+        "pages_commented_drawable_remove_parity",
+        &commented(shape_fixture()?, true)?,
+        |source| {
+            let mut e = pages::Draft::from_bytes(source)?;
+            let d = e
+                .body_shapes()?
+                .first()
+                .ok_or("no shape")?
+                .drawable_object_id;
+            e.remove_body_shape(d)?;
+            Ok(e.to_bytes()?)
+        },
+        DrawableSelector::shape(0),
+    )
+}
+
+// ---- duplication -------------------------------------------------------------------
+
+fn duplicate_case(
+    name: &'static str,
+    input: &Fixture,
+    host: impl FnOnce(&[u8]) -> TestResult<Vec<u8>>,
+    selector: DrawableSelector,
+    text: Option<&'static str>,
+) -> TestResult {
+    Case::new(name, Format::Pages, Tier::B, Evidence::Queued, input)
+        .leaf_structural_metadata()
+        .host(host)
+        .leaf(|source| {
+            let package = Package::from_bytes(source)?;
+            let at = litchi_pages::TextPosition::from_utf16_index(body_end(source)?)?;
+            let mut edit = package.edit_body_media();
+            match text {
+                Some(text) => {
+                    edit.duplicate_text_box(selector, at, text)?;
+                },
+                None => {
+                    edit.duplicate(selector, at)?;
+                },
+            }
+            let commit = edit.commit()?;
+            let restored = commit
+                .package()
+                .apply_body_media(&commit.patch().inverse())?;
+            Ok(LeafRun::with_inverse(
+                leaf_bytes!(commit.package()),
+                leaf_bytes!(restored.package()),
+            ))
+        })
+        .read("host texts", host_texts)
+        .read("leaf texts", leaf_texts)
+        .read("host presets", host_presets)
+        .read("leaf presets", leaf_presets)
+        .run()?;
+    Ok(())
+}
+
+#[test]
+fn pages_text_box_duplicate_parity() -> TestResult {
+    let _ = (Tier::B, Evidence::Queued);
+    let input = text_box_fixture()?;
+    for index in [0, 1] {
+        duplicate_case(
+            "pages_text_box_duplicate_parity",
+            &input,
+            |source| {
+                let mut e = pages::Draft::from_bytes(source)?;
+                let d = host_text_box(&e, index)?;
+                let at = body_end(source)?;
+                e.duplicate_text_box(d, at, "Copied box")?;
+                Ok(e.to_bytes()?)
+            },
+            DrawableSelector::text_box(index),
+            Some("Copied box"),
+        )
+        .map_err(|e| format!("text box {index}: {e}"))?;
+    }
+    Ok(())
+}
+
+#[test]
+fn pages_body_shape_duplicate_parity() -> TestResult {
+    let _ = (Tier::B, Evidence::Queued);
+    for input in [shape_fixture()?, line_fixture()?] {
+        duplicate_case(
+            "pages_body_shape_duplicate_parity",
+            &input,
+            |source| {
+                let mut e = pages::Draft::from_bytes(source)?;
+                let d = e
+                    .body_shapes()?
+                    .first()
+                    .ok_or("no shape")?
+                    .drawable_object_id;
+                let at = body_end(source)?;
+                e.duplicate_body_shape(d, at)?;
+                Ok(e.to_bytes()?)
+            },
+            DrawableSelector::shape(0),
+            None,
+        )?;
+    }
+    Ok(())
+}
+
+// ---- the body shape listing -------------------------------------------------------
+
+/// Every body shape as (text, preset, line endpoints, frame, properties)
+/// through the host's `body_shapes`.
+fn host_shape_list(bytes: &[u8]) -> TestResult<String> {
+    let e = pages::Draft::from_bytes(bytes)?;
+    let shapes = e
+        .body_shapes()?
+        .into_iter()
+        .map(|shape| {
+            format!(
+                "{:?} {:?} {:?} {:?} {:?} {:?}",
+                shape.storage.storage.text(),
+                shape.preset,
+                shape.line_segment.map(|segment| {
+                    (
+                        (segment.start().x, segment.start().y),
+                        (segment.end().x, segment.end().y),
+                    )
+                }),
+                shape.line_endpoints,
+                shape.geometry,
+                shape.properties
+            )
+        })
+        .collect::<Vec<_>>();
+    Ok(shapes.join("\n"))
+}
+
+/// The same through the leaf reads.
+fn leaf_shape_list(bytes: &[u8]) -> TestResult<String> {
+    use litchi_pages::drawable::style::PropertyKind as Kind;
+    let package = Package::from_bytes(bytes)?;
+    let mut shapes = Vec::new();
+    let mut index = 0;
+    while let Ok(snapshot) = package.body_drawable_properties(DrawableSelector::shape(index)) {
+        let selector = DrawableSelector::shape(index);
+        let endpoints = snapshot
+            .line_segment()
+            .map(|_| package.body_drawable_style(selector, Kind::LineEndpoints))
+            .transpose()?
+            .map(|property| match property {
+                StyleProperty::LineEndpoints(endpoints) => Ok(endpoints),
+                _ => Err("endpoints"),
+            })
+            .transpose()?;
+        shapes.push(format!(
+            "{:?} {:?} {:?} {:?} {:?} {:?}",
+            package.body_drawable_text(selector)?,
+            snapshot.preset(),
+            snapshot.line_segment().map(|segment| {
+                (
+                    (segment.start().x, segment.start().y),
+                    (segment.end().x, segment.end().y),
+                )
+            }),
+            endpoints,
+            crate::pages_drawable_cases::host_geometry(snapshot.geometry().ok_or("frame")?),
+            crate::pages_drawable_cases::host_properties(snapshot.properties()),
+        ));
+        index += 1;
+    }
+    Ok(shapes.join("\n"))
+}
+
+#[test]
+fn pages_body_shapes_read_parity() -> TestResult {
+    let mut inputs = vec![shape_fixture()?, line_fixture()?];
+    let with_line = host_add(&shape_fixture()?.bytes, &Add::Line)?;
+    inputs.push(Fixture {
+        path: "rectangle + host line",
+        bytes: with_line,
+    });
+    for input in inputs {
+        assert_eq!(
+            host_shape_list(&input.bytes)?,
+            leaf_shape_list(&input.bytes)?
+        );
+    }
+    let _ = (Tier::A, Evidence::Queued);
+    Ok(())
+}
+
+#[test]
+#[ignore = "callgrind cost probe (record 0413b)"]
+fn text_box_add_cost_abba() -> TestResult {
+    let add = Add::TextBox("New box");
+    crate::pages_cost_probes::abba(
+        &basic()?,
+        |source| host_add(source, &add),
+        |source| Ok(leaf_add(source, &add)?.output),
+    )
+}
+
+#[test]
+#[ignore = "callgrind cost probe (record 0413b)"]
+fn shape_duplicate_cost_abba() -> TestResult {
+    crate::pages_cost_probes::abba(
+        &shape_fixture()?,
+        |source| {
+            let mut e = pages::Draft::from_bytes(source)?;
+            let d = e
+                .body_shapes()?
+                .first()
+                .ok_or("no shape")?
+                .drawable_object_id;
+            let at = body_end(source)?;
+            e.duplicate_body_shape(d, at)?;
+            Ok(e.to_bytes()?)
+        },
+        |source| {
+            let package = Package::from_bytes(source)?;
+            let at = litchi_pages::TextPosition::from_utf16_index(body_end(source)?)?;
+            let mut edit = package.edit_body_media();
+            edit.duplicate(DrawableSelector::shape(0), at)?;
+            Ok(leaf_bytes!(edit.commit()?.package()))
+        },
+    )
+}
+
+#[test]
+#[ignore = "callgrind cost probe (record 0413b)"]
+fn shape_preset_set_cost_abba() -> TestResult {
+    crate::pages_cost_probes::abba(
+        &shape_fixture()?,
+        |source| {
+            let mut e = pages::Draft::from_bytes(source)?;
+            let d = e
+                .body_shapes()?
+                .first()
+                .ok_or("no shape")?
+                .drawable_object_id;
+            e.set_body_shape_preset(d, Preset::Ellipse)?;
+            Ok(e.to_bytes()?)
+        },
+        |source| {
+            let package = Package::from_bytes(source)?;
+            let mut edit = package.edit_body_drawable_properties(DrawableSelector::shape(0))?;
+            edit.set_preset(Preset::Ellipse)?;
+            Ok(leaf_bytes!(edit.commit()?.package()))
+        },
+    )
+}
