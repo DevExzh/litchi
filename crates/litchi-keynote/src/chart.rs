@@ -20,15 +20,18 @@ use litchi_core::Position;
 pub mod axis {
     pub use crate::package::slide_chart_series::{Diagnostics, Error, LimitKind, Refusal};
     pub use crate::package::slide_chart_style::AxisEdit as Edit;
-    pub use crate::package::slide_chart_style::axis::{Commit, Patch, Property, PropertyKind};
+    pub use crate::package::slide_chart_style::axis::{
+        Commit, GridlineStroke, Patch, Property, PropertyKind,
+    };
+    pub use litchi_iwa_common::chart::axis::label_angle::LabelAngle;
+    pub use litchi_iwa_common::chart::axis::label_position_3d::LabelPosition3d;
     pub use litchi_iwa_common::chart::axis::style::Visibility;
     pub use litchi_iwa_common::chart::axis::{
         Axis, Bound, Bounds, MajorStepCount, MinorStepCount, Scale, Steps, TickMarkLocation,
         ValueAxisSettings,
     };
-    pub use litchi_iwa_style::chart_style::axis::{
-        GridlineStroke, LabelAffixes, LabelAngle, LabelPosition3d, NumberFormat, Stroke,
-    };
+    pub use litchi_iwa_common::chart::number_format::{LabelAffixes, NumberFormat};
+    pub use litchi_iwa_common::shape::stroke::Stroke;
 }
 
 /// Preserve the historical `litchi_keynote::chart::ChartArrangement` path.

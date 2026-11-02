@@ -159,7 +159,7 @@ pub(crate) mod axis {
         Axis, Diagnostics, ExactArtifacts, MutationPlan, Package, Position, axis_engine, fmt,
     };
 
-    pub use axis_engine::{Property, PropertyKind};
+    pub use axis_engine::{GridlineStroke, Property, PropertyKind};
 
     /// A compact exact-source patch of one axis-style property.
     #[derive(Clone, PartialEq)]
