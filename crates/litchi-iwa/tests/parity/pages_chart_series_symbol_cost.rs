@@ -11,7 +11,7 @@ use litchi_iwa::pages;
 use litchi_iwa::shapes::{DrawablePoint, DrawableSize};
 use litchi_iwa_common::chart::ChartData;
 use litchi_iwa_common::chart::kind::Kind;
-use litchi_pages::chart::series::{Property, Symbol, SymbolShape, SymbolSize};
+use litchi_pages::chart::series::{Property, PropertyKind, Symbol, SymbolShape, SymbolSize};
 use litchi_pages::{BodyChartSelector, Package};
 
 use crate::harness::{Fixture, TestResult, fixture};
@@ -161,11 +161,15 @@ fn pages_symbols_leaf_route(source: &[u8], route: Route) -> TestResult<Vec<u8>> 
     let package = Package::from_bytes(source)?;
     match route {
         Route::AllRead => {
-            black_box(package.body_chart_series(BodyChartSelector::index(0))?);
+            black_box(
+                package.body_chart_series(BodyChartSelector::index(0), PropertyKind::Symbols)?,
+            );
             Ok(leaf_bytes!(&package))
         },
         Route::SingleRead => {
-            let values = match package.body_chart_series(BodyChartSelector::index(0))? {
+            let values = match package
+                .body_chart_series(BodyChartSelector::index(0), PropertyKind::Symbols)?
+            {
                 Property::Symbols(values) => values,
                 _ => return Err("unexpected Pages series property".into()),
             };
@@ -178,7 +182,9 @@ fn pages_symbols_leaf_route(source: &[u8], route: Route) -> TestResult<Vec<u8>> 
             Ok(leaf_bytes!(edit.commit()?.package()))
         },
         Route::SingleSet => {
-            let current = match package.body_chart_series(BodyChartSelector::index(0))? {
+            let current = match package
+                .body_chart_series(BodyChartSelector::index(0), PropertyKind::Symbols)?
+            {
                 Property::Symbols(values) => values,
                 _ => return Err("unexpected Pages series property".into()),
             };
