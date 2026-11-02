@@ -36,6 +36,7 @@ pub mod properties {
         Commit, Diagnostics, Edit, Error, LimitKind, Patch, Refusal, Snapshot,
     };
     pub use litchi_iwa_common::shape::line::Segment;
+    pub use litchi_iwa_common::shape::path::Preset;
 }
 
 /// Exact-source lifecycle transactions (removal, duplication) for body images, movies

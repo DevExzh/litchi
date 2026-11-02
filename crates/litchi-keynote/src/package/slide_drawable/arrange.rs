@@ -353,7 +353,7 @@ pub(super) fn set_preset(
 ) -> Result<(), Error> {
     use litchi_iwa_common::wire::parse_wire_fields;
     let wire = workspace.wire;
-    let replacement = super::author::path_source(preset, geometry.width, geometry.height)?.finish();
+    let replacement = super::author::path_source(preset, geometry.width, geometry.height)?;
     let replacement_fields =
         parse_wire_fields(&replacement, wire).map_err(|_| Error::InvalidSource)?;
     let family = replacement_fields

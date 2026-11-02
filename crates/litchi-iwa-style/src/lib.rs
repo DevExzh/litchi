@@ -27,7 +27,9 @@
 //! - [`reference_line`]: the reference-line graph engine of a chart's
 //!   primary value axis;
 //! - [`shape`]: the shape-style variation graph engine (copy-on-write
-//!   `TSWP.ShapeStyleArchive` variations) and the fill and stroke.
+//!   `TSWP.ShapeStyleArchive` variations) and the fill and stroke;
+//! - [`shape_path`]: the preset path sources a shape draws, in both
+//!   directions.
 //!
 //! Every entry point that reads untrusted bytes takes explicit limits.
 
@@ -45,3 +47,4 @@ pub mod number_format;
 pub mod reference_line;
 pub mod series;
 pub mod shape;
+pub mod shape_path;

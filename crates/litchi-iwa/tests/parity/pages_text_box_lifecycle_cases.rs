@@ -243,3 +243,95 @@ fn pages_body_line_segment_read_parity() -> TestResult {
     let _ = (Tier::A, Evidence::Queued);
     Ok(())
 }
+
+// ---- shape presets -------------------------------------------------------------
+
+use litchi_pages::drawable::properties::Preset;
+
+fn host_presets(bytes: &[u8]) -> TestResult<String> {
+    let e = pages::Draft::from_bytes(bytes)?;
+    let presets = e
+        .body_shapes()?
+        .into_iter()
+        .map(|shape| e.body_shape_preset(shape.drawable_object_id))
+        .collect::<Result<Vec<_>, _>>()?;
+    Ok(format!("{presets:?}"))
+}
+
+fn leaf_presets(bytes: &[u8]) -> TestResult<String> {
+    let package = Package::from_bytes(bytes)?;
+    let mut presets = Vec::new();
+    let mut index = 0;
+    while let Ok(snapshot) = package.body_drawable_properties(DrawableSelector::shape(index)) {
+        presets.push(snapshot.preset());
+        index += 1;
+    }
+    Ok(format!("{presets:?}"))
+}
+
+fn preset_samples() -> TestResult<Vec<Preset>> {
+    use litchi_iwa_common::shape::path::{InnerRadiusRatio, StarPoints};
+    Ok(vec![
+        Preset::Ellipse,
+        Preset::ROUNDED_RECTANGLE,
+        Preset::RightArrow,
+        Preset::DoubleArrow,
+        Preset::PENTAGON,
+        Preset::Star {
+            points: StarPoints::new(6)?,
+            inner_radius: InnerRadiusRatio::new(0.4)?,
+        },
+    ])
+}
+
+#[test]
+fn pages_body_shape_preset_parity() -> TestResult {
+    let _ = (Tier::A, Evidence::Queued);
+    let input = shape_fixture()?;
+    for preset in preset_samples()? {
+        Case::new(
+            "pages_body_shape_preset_parity",
+            Format::Pages,
+            Tier::A,
+            Evidence::Queued,
+            &input,
+        )
+        .host(|source| {
+            let mut e = pages::Draft::from_bytes(source)?;
+            let d = e
+                .body_shapes()?
+                .first()
+                .ok_or("no shape")?
+                .drawable_object_id;
+            e.set_body_shape_preset(d, preset)?;
+            Ok(e.to_bytes()?)
+        })
+        .leaf(|source| {
+            let package = Package::from_bytes(source)?;
+            let mut edit = package.edit_body_drawable_properties(DrawableSelector::shape(0))?;
+            edit.set_preset(preset)?;
+            let commit = edit.commit()?;
+            let restored = commit
+                .package()
+                .apply_body_drawable_properties(&commit.patch().inverse())?;
+            Ok(LeafRun::with_inverse(
+                leaf_bytes!(commit.package()),
+                leaf_bytes!(restored.package()),
+            ))
+        })
+        .read("host presets", host_presets)
+        .read("leaf presets", leaf_presets)
+        .run()
+        .map_err(|e| format!("{preset:?}: {e}"))?;
+    }
+    Ok(())
+}
+
+#[test]
+fn pages_body_shape_preset_read_parity() -> TestResult {
+    for input in [shape_fixture()?, line_fixture()?] {
+        assert_eq!(host_presets(&input.bytes)?, leaf_presets(&input.bytes)?);
+    }
+    let _ = (Tier::A, Evidence::Queued);
+    Ok(())
+}

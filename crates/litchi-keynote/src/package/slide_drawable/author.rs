@@ -33,7 +33,6 @@ const WRAP_MARGIN: f32 = 12.0;
 const WRAP_ALPHA: f32 = 0.5;
 const STANDARD_VERSION: [u32; 3] = [1, 0, 5];
 const STANDIN_VERSION: [u32; 3] = [10, 1, 0];
-const ELLIPSE_CONTROL_FACTOR: f32 = 0.552_284_8;
 
 /// Theme and document context shared by every authored drawable.
 pub(super) struct Context {
@@ -285,116 +284,35 @@ pub(super) fn drawable_archive(geometry: Geometry, slide: u64, title: u64, capti
         .boolean(13, false)
 }
 
-fn element(kind: u64, points: &[(f32, f32)]) -> Writer {
-    let mut element = Writer::new().varint(1, kind);
-    for (x, y) in points {
-        element = element.message(2, &point(*x, *y));
-    }
-    element
-}
-
-fn path(elements: &[Writer]) -> Writer {
-    let mut path = Writer::new();
-    for item in elements {
-        path = path.message(1, item);
-    }
-    path
-}
-
-/// The host's `shape_path_source` for every preset.
-pub(super) fn path_source(preset: Preset, width: f32, height: f32) -> Result<Writer, Error> {
-    let size = point(width, height);
-    let source = Writer::new().boolean(1, false).boolean(2, false);
-    Ok(match preset {
-        Preset::Rectangle => source.message(
-            5,
-            &Writer::new().message(2, &size).message(
-                3,
-                &path(&[
-                    element(1, &[(0.0, 0.0)]),
-                    element(2, &[(width, 0.0)]),
-                    element(2, &[(width, height)]),
-                    element(2, &[(0.0, height)]),
-                    element(5, &[]),
-                    element(1, &[(0.0, 0.0)]),
-                ]),
-            ),
-        ),
+/// The host's `shape_path_source` for every preset, on the shared
+/// `litchi_iwa_style::shape_path` builder (record 0413b).
+pub(super) fn path_source(preset: Preset, width: f32, height: f32) -> Result<Vec<u8>, Error> {
+    use litchi_iwa_common::shape::path::{CornerRadius, Preset as Shared};
+    let invalid = || Error::Refused(crate::slide::drawable::Refusal::InvalidGeometry);
+    let shared = match preset {
+        Preset::Rectangle => Shared::Rectangle,
         Preset::RoundedRectangle { radius } => {
             if !radius.is_finite() || radius < 0.0 || radius > width.min(height) / 2.0 {
-                return Err(Error::Refused(
-                    crate::slide::drawable::Refusal::InvalidGeometry,
-                ));
+                return Err(invalid());
             }
-            source.message(
-                4,
-                &Writer::new()
-                    .varint(1, 0)
-                    .float(2, radius)
-                    .message(3, &size)
-                    .boolean(4, true),
-            )
+            Shared::RoundedRectangle {
+                corner_radius: CornerRadius::new(radius).map_err(|_| invalid())?,
+            }
         },
-        Preset::Ellipse => {
-            let (cx, cy) = (width / 2.0, height / 2.0);
-            let (kx, ky) = (cx * ELLIPSE_CONTROL_FACTOR, cy * ELLIPSE_CONTROL_FACTOR);
-            source.message(
-                5,
-                &Writer::new().message(2, &size).message(
-                    3,
-                    &path(&[
-                        element(1, &[(cx, 0.0)]),
-                        element(4, &[(cx + kx, 0.0), (width, cy - ky), (width, cy)]),
-                        element(4, &[(width, cy + ky), (cx + kx, height), (cx, height)]),
-                        element(4, &[(cx - kx, height), (0.0, cy + ky), (0.0, cy)]),
-                        element(4, &[(0.0, cy - ky), (cx - kx, 0.0), (cx, 0.0)]),
-                        element(5, &[]),
-                        element(1, &[(cx, 0.0)]),
-                    ]),
-                ),
-            )
-        },
-        Preset::LeftArrow => {
-            source.message(3, &arrow(0, SINGLE_ARROW_HEAD_START_RATIO, width, &size))
-        },
-        Preset::RightArrow => {
-            source.message(3, &arrow(1, SINGLE_ARROW_HEAD_START_RATIO, width, &size))
-        },
-        Preset::DoubleArrow => {
-            source.message(3, &arrow(10, DOUBLE_ARROW_HEAD_END_RATIO, width, &size))
-        },
-        Preset::RegularPolygon { sides } => source.message(
-            4,
-            &Writer::new()
-                .varint(1, 1)
-                .float(2, f32::from(sides.count()))
-                .message(3, &size)
-                .boolean(4, false),
-        ),
+        Preset::Ellipse => Shared::Ellipse,
+        Preset::LeftArrow => Shared::LeftArrow,
+        Preset::RightArrow => Shared::RightArrow,
+        Preset::DoubleArrow => Shared::DoubleArrow,
+        Preset::RegularPolygon { sides } => Shared::RegularPolygon { sides },
         Preset::Star {
             points,
             inner_radius,
-        } => source.message(
-            3,
-            &Writer::new()
-                .varint(1, 100)
-                .message(2, &point(f32::from(points.count()), inner_radius.ratio()))
-                .message(3, &size),
-        ),
-    })
-}
-
-/// The host's native arrow proportions (`TSD.PointPathSourceArchive`).
-const SINGLE_ARROW_HEAD_START_RATIO: f32 = 0.64;
-const DOUBLE_ARROW_HEAD_END_RATIO: f32 = 0.40;
-const ARROW_SHAFT_RATIO: f32 = 0.34;
-
-/// A `TSD.PointPathSourceArchive` arrow of native `kind`.
-fn arrow(kind: u64, head_ratio: f32, width: f32, size: &Writer) -> Writer {
-    Writer::new()
-        .varint(1, kind)
-        .message(2, &point(width * head_ratio, ARROW_SHAFT_RATIO))
-        .message(3, size)
+        } => Shared::Star {
+            points,
+            inner_radius,
+        },
+    };
+    litchi_iwa_style::shape_path::path_source(shared, width, height).ok_or_else(invalid)
 }
 
 fn native_object(
@@ -546,17 +464,6 @@ pub(super) fn add_text_shape(
     )
 }
 
-/// The host's `line_path_source`: a two-element Bézier of the line's length.
-fn line_path_source(length: f32) -> Writer {
-    Writer::new().boolean(1, false).boolean(2, false).message(
-        5,
-        &Writer::new().message(2, &point(length, 0.0)).message(
-            3,
-            &path(&[element(1, &[(0.0, 0.0)]), element(2, &[(length, 0.0)])]),
-        ),
-    )
-}
-
 /// Add a native straight line along `segment` (host `add_slide_line`).
 pub(super) fn add_line(
     workspace: &mut Workspace<'_>,
@@ -577,7 +484,7 @@ pub(super) fn add_line(
         context,
         slide,
         geometry,
-        &line_path_source(segment.length()),
+        &litchi_iwa_style::shape_path::line_path_source(segment.length()),
         false,
         "",
     )
@@ -588,7 +495,7 @@ fn add_path_shape(
     context: &Context,
     slide: u64,
     geometry: Geometry,
-    shape_path: &Writer,
+    shape_path: &[u8],
     text_box: bool,
     text: &str,
 ) -> Result<u64, Error> {
@@ -610,7 +517,7 @@ fn add_path_shape(
             &Writer::new()
                 .message(1, &drawable_archive(geometry, slide, title, caption))
                 .reference(2, style)
-                .message(3, shape_path)
+                .bytes(3, shape_path)
                 .float(6, 0.0),
         )
         .reference(2, storage)

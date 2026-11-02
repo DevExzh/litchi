@@ -31,10 +31,6 @@ const WRAP_DIRECTION_BOTH: u64 = 2;
 const WRAP_FIT_TEXT: u64 = 1;
 const WRAP_MARGIN: f32 = 12.0;
 const WRAP_ALPHA: f32 = 0.5;
-const ELLIPSE_CONTROL_FACTOR: f32 = 0.552_284_8;
-const SINGLE_ARROW_HEAD_START_RATIO: f32 = 0.64;
-const DOUBLE_ARROW_HEAD_END_RATIO: f32 = 0.40;
-const ARROW_SHAFT_RATIO: f32 = 0.34;
 
 /// A minimal canonical protobuf writer (fields in call order).
 #[derive(Default)]
@@ -219,111 +215,6 @@ fn point(x: f32, y: f32) -> Writer {
     Writer::new().float(1, x).float(2, y)
 }
 
-fn element(kind: u64, points: &[(f32, f32)]) -> Writer {
-    let mut element = Writer::new().varint(1, kind);
-    for (x, y) in points {
-        element = element.message(2, &point(*x, *y));
-    }
-    element
-}
-
-fn path(elements: &[Writer]) -> Writer {
-    let mut path = Writer::new();
-    for item in elements {
-        path = path.message(1, item);
-    }
-    path
-}
-
-fn arrow(kind: u64, head_ratio: f32, width: f32, size: &Writer) -> Writer {
-    Writer::new()
-        .varint(1, kind)
-        .message(2, &point(width * head_ratio, ARROW_SHAFT_RATIO))
-        .message(3, size)
-}
-
-/// The host's `shape_path_source` for every preset, or `None` for a
-/// rounded-rectangle radius above half the shorter side.
-fn path_source(preset: Preset, width: f32, height: f32) -> Option<Writer> {
-    let size = point(width, height);
-    let source = Writer::new().boolean(1, false).boolean(2, false);
-    Some(match preset {
-        Preset::Rectangle => source.message(
-            5,
-            &Writer::new().message(2, &size).message(
-                3,
-                &path(&[
-                    element(1, &[(0.0, 0.0)]),
-                    element(2, &[(width, 0.0)]),
-                    element(2, &[(width, height)]),
-                    element(2, &[(0.0, height)]),
-                    element(5, &[]),
-                    element(1, &[(0.0, 0.0)]),
-                ]),
-            ),
-        ),
-        Preset::RoundedRectangle { corner_radius } => {
-            if corner_radius.points() > width.min(height) / 2.0 {
-                return None;
-            }
-            source.message(
-                4,
-                &Writer::new()
-                    .varint(1, 0)
-                    .float(2, corner_radius.points())
-                    .message(3, &size)
-                    .boolean(4, true),
-            )
-        },
-        Preset::Ellipse => {
-            let (cx, cy) = (width / 2.0, height / 2.0);
-            let (kx, ky) = (cx * ELLIPSE_CONTROL_FACTOR, cy * ELLIPSE_CONTROL_FACTOR);
-            source.message(
-                5,
-                &Writer::new().message(2, &size).message(
-                    3,
-                    &path(&[
-                        element(1, &[(cx, 0.0)]),
-                        element(4, &[(cx + kx, 0.0), (width, cy - ky), (width, cy)]),
-                        element(4, &[(width, cy + ky), (cx + kx, height), (cx, height)]),
-                        element(4, &[(cx - kx, height), (0.0, cy + ky), (0.0, cy)]),
-                        element(4, &[(0.0, cy - ky), (cx - kx, 0.0), (cx, 0.0)]),
-                        element(5, &[]),
-                        element(1, &[(cx, 0.0)]),
-                    ]),
-                ),
-            )
-        },
-        Preset::LeftArrow => {
-            source.message(3, &arrow(0, SINGLE_ARROW_HEAD_START_RATIO, width, &size))
-        },
-        Preset::RightArrow => {
-            source.message(3, &arrow(1, SINGLE_ARROW_HEAD_START_RATIO, width, &size))
-        },
-        Preset::DoubleArrow => {
-            source.message(3, &arrow(10, DOUBLE_ARROW_HEAD_END_RATIO, width, &size))
-        },
-        Preset::RegularPolygon { sides } => source.message(
-            4,
-            &Writer::new()
-                .varint(1, 1)
-                .float(2, f32::from(sides.count()))
-                .message(3, &size)
-                .boolean(4, false),
-        ),
-        Preset::Star {
-            points,
-            inner_radius,
-        } => source.message(
-            3,
-            &Writer::new()
-                .varint(1, 100)
-                .message(2, &point(f32::from(points.count()), inner_radius.ratio()))
-                .message(3, &size),
-        ),
-    })
-}
-
 /// The objects of one new text box or shape, in insertion order.
 pub(super) struct Authored {
     /// drawable, caption, title, storage.
@@ -369,7 +260,9 @@ pub(super) fn author(
     let (Some(position), Some(size)) = (geometry.position, geometry.size) else {
         return Err(Fault::Invalid);
     };
-    let Some(path_source) = path_source(preset, size.width, size.height) else {
+    let Some(path_source) =
+        litchi_iwa_style::shape_path::path_source(preset, size.width, size.height)
+    else {
         return Ok(None);
     };
     let frame = Writer::new()
@@ -399,7 +292,7 @@ pub(super) fn author(
     let shape = Writer::new()
         .message(1, &drawable_archive)
         .reference(2, context.shape_style)
-        .message(3, &path_source)
+        .bytes(3, &path_source)
         .float(6, 0.0);
     let shape_info = Writer::new()
         .message(1, &shape)
