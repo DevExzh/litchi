@@ -20,9 +20,9 @@ use crate::leaf_bytes;
 use crate::text_glue::Workspace;
 
 const TABLE: &str = "iwork/keynote/table-discovery.key";
-const SLIDE: usize = 0;
-const COMMENT_ROW: usize = 0;
-const COMMENT_COLUMN: usize = 0;
+pub(crate) const SLIDE: usize = 0;
+pub(crate) const COMMENT_ROW: usize = 0;
+pub(crate) const COMMENT_COLUMN: usize = 0;
 const AUTHOR_MESSAGE_TYPE: u32 = 212;
 
 /// Normalize identities only for the object created by the root-create case.
@@ -124,7 +124,7 @@ fn leaf_comment_thread_at(bytes: &[u8], row: usize, column: usize) -> TestResult
     ))
 }
 
-fn populated_comment_fixture(with_reply: bool) -> TestResult<Fixture> {
+pub(crate) fn populated_comment_fixture(with_reply: bool) -> TestResult<Fixture> {
     // Build the source through the host first, outside the differential
     // Case.  This is deliberately not the leaf's own writer: clear and read
     // must consume the same host-authored populated bytes.
@@ -167,7 +167,7 @@ fn populated_comment_fixture(with_reply: bool) -> TestResult<Fixture> {
     })
 }
 
-fn comment_case(
+pub(crate) fn comment_case(
     name: &'static str,
     tier: Tier,
     evidence: Evidence,
@@ -450,7 +450,7 @@ fn assert_comment_semantics(
     Ok(())
 }
 
-fn host_model(editor: &keynote::Draft) -> TestResult<u64> {
+pub(crate) fn host_model(editor: &keynote::Draft) -> TestResult<u64> {
     Ok(editor
         .slide_tables(SLIDE)?
         .first()

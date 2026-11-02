@@ -19,7 +19,7 @@ use super::{
 };
 use crate::selector::SlideSelector;
 use crate::slide::table::TableSelector;
-use litchi_iwa_common::table::read::Comment;
+use litchi_iwa_common::table::read::{Comment, CommentReply};
 
 type CellPosition = At;
 
@@ -178,6 +178,12 @@ pub enum SlideTableCommentError {
     /// No root comment is attached to the selected cell.
     #[error("the selected Keynote body-table cell has no comment")]
     CommentNotFound,
+    /// The selected comment has no direct reply at the requested ordinal.
+    #[error("the selected Keynote body-table comment has no reply at ordinal {index}")]
+    ReplyNotFound {
+        /// The requested zero-based reply ordinal.
+        index: usize,
+    },
     /// A valid graph dependency is outside the focused writer profile.
     #[error("the Keynote body-table comment graph has an unsupported dependency")]
     UnsupportedDependency,
@@ -247,6 +253,9 @@ struct TableCommentSnapshot {
 enum Operation {
     Set(Box<str>),
     Clear,
+    AddReply(Box<str>),
+    SetReply { index: usize, text: Box<str> },
+    RemoveReply { index: usize },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -395,11 +404,37 @@ impl SlideTableCommentEdit<'_> {
         Ok(self)
     }
 
-    /// Stage removal of a root comment with no replies.
-    ///
-    /// Reply-bearing roots are refused by this root-only route.
+    /// Stage removal of the root comment and its direct replies.
     pub fn clear(mut self) -> Result<Self, SlideTableCommentError> {
         self.operation = Some(Operation::Clear);
+        Ok(self)
+    }
+
+    /// Stage one direct reply appended after the root comment's replies.
+    pub fn add_reply(mut self, text: impl AsRef<str>) -> Result<Self, SlideTableCommentError> {
+        self.operation = Some(Operation::AddReply(copy_text(
+            text.as_ref(),
+            &mut self.budget,
+        )?));
+        Ok(self)
+    }
+
+    /// Stage new text for the direct reply at zero-based ordinal `index`.
+    pub fn set_reply(
+        mut self,
+        index: usize,
+        text: impl AsRef<str>,
+    ) -> Result<Self, SlideTableCommentError> {
+        self.operation = Some(Operation::SetReply {
+            index,
+            text: copy_text(text.as_ref(), &mut self.budget)?,
+        });
+        Ok(self)
+    }
+
+    /// Stage removal of the direct reply at zero-based ordinal `index`.
+    pub fn remove_reply(mut self, index: usize) -> Result<Self, SlideTableCommentError> {
+        self.operation = Some(Operation::RemoveReply { index });
         Ok(self)
     }
 
@@ -673,34 +708,15 @@ fn commit_edit(
             source, edit.slide, edit.table, edit.cell, before,
         ));
     }
-    if matches!(operation, Operation::Set(_))
-        && before
-            .comment
-            .as_ref()
-            .and_then(Comment::replies)
-            .is_some_and(|replies| !replies.is_empty())
-    {
-        // The first shared slice owns root-only threads.  Replacing the text
-        // of a reply-bearing root is deferred until reply metadata and
-        // topology transitions are lifted into the shared engine.
-        return Err(SlideTableCommentError::UnsupportedDependency);
-    }
-    if matches!(operation, Operation::Set(_) | Operation::Clear) {
-        return commit_shared_root(edit);
-    }
-    unreachable!("root-only operation set is exhaustive")
+    commit_shared(edit)
 }
 
-fn commit_shared_root(
+fn commit_shared(
     edit: SlideTableCommentEdit<'_>,
 ) -> Result<SlideTableCommentCommit, SlideTableCommentError> {
     let source = edit.source;
     let before = edit.before.clone();
     let operation = edit.operation.ok_or(SlideTableCommentError::Verification)?;
-    let native_operation = match &operation {
-        Operation::Set(text) => litchi_iwa_table::comments_native::RootOperation::Set(text.clone()),
-        Operation::Clear => litchi_iwa_table::comments_native::RootOperation::Clear,
-    };
     let selection = litchi_iwa_table::comments_native::Selection {
         model_component: edit.selection.component.clone(),
         tile_component: edit.selection.tile_component.clone(),
@@ -717,13 +733,40 @@ fn commit_shared_root(
         list_identifier: edit.selection.list_identifier,
         root_identifier: edit.selection.root_identifier,
     };
-    let native = litchi_iwa_table::comments_native::rewrite_root(
-        source,
-        &selection,
-        &native_operation,
-        litchi_iwa_table::comments_native::Profile::KEYNOTE,
-    )
-    .map_err(map_native_fault)?;
+    let profile = litchi_iwa_table::comments_native::Profile::KEYNOTE;
+    let (native, expected) = match &operation {
+        Operation::Set(text) => (
+            litchi_iwa_table::comments_native::rewrite_root(
+                source,
+                &selection,
+                &litchi_iwa_table::comments_native::RootOperation::Set(text.clone()),
+                profile,
+            ),
+            Some(Comment::new(text.as_ref())),
+        ),
+        Operation::Clear => (
+            litchi_iwa_table::comments_native::rewrite_root(
+                source,
+                &selection,
+                &litchi_iwa_table::comments_native::RootOperation::Clear,
+                profile,
+            ),
+            None,
+        ),
+        Operation::AddReply(_) | Operation::SetReply { .. } | Operation::RemoveReply { .. } => {
+            let (reply_operation, expected) = plan_reply(&before, &operation)?;
+            (
+                litchi_iwa_table::comments_native::rewrite_reply(
+                    source,
+                    &selection,
+                    &reply_operation,
+                    profile,
+                ),
+                Some(expected),
+            )
+        },
+    };
+    let native = native.map_err(map_native_fault)?;
     let target = native.target();
     let mut budget = edit.budget;
     budget.wire_work(target.len()).map_err(map_writer_error)?;
@@ -736,10 +779,6 @@ fn commit_shared_root(
         TableSelector::index(edit.table),
         edit.cell,
     )?;
-    let expected = match operation {
-        Operation::Set(text) => Some(Comment::new(text.as_ref())),
-        Operation::Clear => None,
-    };
     if !snapshot_matches(&after, &TableCommentSnapshot { comment: expected }) {
         return Err(SlideTableCommentError::Verification);
     }
@@ -899,10 +938,73 @@ fn noop_commit(
     }
 }
 
+/// The shared reply operation and the expected thread after it.  An appended
+/// reply carries no source metadata; a replaced reply keeps its timestamp and
+/// author (the host clones the reply storage).
+fn plan_reply(
+    before: &TableCommentSnapshot,
+    operation: &Operation,
+) -> Result<(litchi_iwa_table::comments_native::ReplyOperation, Comment), SlideTableCommentError> {
+    use litchi_iwa_table::comments_native::ReplyOperation;
+    let comment = before
+        .comment
+        .as_ref()
+        .ok_or(SlideTableCommentError::CommentNotFound)?;
+    let source = comment.replies().unwrap_or(&[]);
+    let mut replies = Vec::new();
+    replies
+        .try_reserve_exact(source.len().saturating_add(1))
+        .map_err(|_| SlideTableCommentError::Allocation {
+            amount: source.len().saturating_add(1),
+        })?;
+    replies.extend(source.iter().cloned());
+    let reply_operation = match operation {
+        Operation::AddReply(text) => {
+            replies.push(CommentReply::new(text.as_ref()));
+            ReplyOperation::Append(text.clone())
+        },
+        Operation::SetReply { index, text } => {
+            let reply = replies
+                .get_mut(*index)
+                .ok_or(SlideTableCommentError::ReplyNotFound { index: *index })?;
+            *reply = CommentReply::with_metadata(
+                text.as_ref(),
+                reply.timestamp(),
+                reply.author().cloned(),
+            );
+            ReplyOperation::Replace {
+                index: *index,
+                text: text.clone(),
+            }
+        },
+        Operation::RemoveReply { index } => {
+            if *index >= replies.len() {
+                return Err(SlideTableCommentError::ReplyNotFound { index: *index });
+            }
+            replies.remove(*index);
+            ReplyOperation::Remove { index: *index }
+        },
+        Operation::Set(_) | Operation::Clear => return Err(SlideTableCommentError::Verification),
+    };
+    Ok((
+        reply_operation,
+        Comment::with_replies(
+            comment.text(),
+            comment.timestamp(),
+            comment.author().cloned(),
+            replies,
+        ),
+    ))
+}
+
 fn operation_is_noop(before: &TableCommentSnapshot, operation: &Operation) -> bool {
     match (before.comment.as_ref(), operation) {
         (None, Operation::Clear) => true,
         (Some(comment), Operation::Set(text)) => comment.text() == text.as_ref(),
+        (Some(comment), Operation::SetReply { index, text }) => comment
+            .replies()
+            .and_then(|replies| replies.get(*index))
+            .is_some_and(|reply| reply.text() == text.as_ref()),
         _ => false,
     }
 }
