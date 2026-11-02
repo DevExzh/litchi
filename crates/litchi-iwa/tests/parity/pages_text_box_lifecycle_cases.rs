@@ -923,3 +923,36 @@ fn pages_body_shape_image_fill_parity() -> TestResult {
     }
     Ok(())
 }
+
+#[test]
+#[ignore = "callgrind cost probe (record 0413b)"]
+fn shape_image_fill_cost_abba() -> TestResult {
+    use litchi_iwa::shapes::ShapeImageFillTechnique;
+    use litchi_pages::drawable::style::ImageTechnique;
+    let png = crate::harness::fixture("iwork/keynote/media-replacement-assets/poster.png")?.bytes;
+    crate::pages_cost_probes::abba(
+        &shape_fixture()?,
+        |source| {
+            let mut e = pages::Draft::from_bytes(source)?;
+            let d = e
+                .body_shapes()?
+                .first()
+                .ok_or("no shape")?
+                .drawable_object_id;
+            e.set_body_shape_image_fill(
+                d,
+                "poster.png",
+                &png,
+                ShapeImageFillTechnique::Tile,
+                None,
+            )?;
+            Ok(e.to_bytes()?)
+        },
+        |source| {
+            let package = Package::from_bytes(source)?;
+            let mut edit = package.edit_body_drawable_style(DrawableSelector::shape(0))?;
+            edit.set_image_fill(&png, "poster.png", ImageTechnique::Tile, None);
+            Ok(leaf_bytes!(edit.commit()?.package()))
+        },
+    )
+}
