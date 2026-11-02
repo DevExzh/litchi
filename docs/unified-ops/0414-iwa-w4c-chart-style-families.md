@@ -340,3 +340,7 @@ Receipt `results/0414/callgrind-slice4.json`; raw captures in
 receipt's build line names `CARGO_PROFILE_RELEASE_DEBUG=1`, which the build
 environment never set; the measured symbols are the probe's `#[inline(never)]`
 routes either way). Chart shadow, category labels and legend fonts follow.
+
+Slice 4 gates (trunk `d67a878026` merged at `b7ca9b584f`; logs
+`.coord/iwa-w4c/gates5`): every command of §8 exits 0; target 15 GB after
+pruning.
