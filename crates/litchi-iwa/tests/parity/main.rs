@@ -100,6 +100,7 @@ mod pages_shape_style_cases;
 mod pages_table_cases;
 mod pages_text_box_annotation_cases;
 mod pages_text_box_cases;
+mod pages_text_box_lifecycle_cases;
 mod pages_text_box_list_cases;
 mod pages_text_box_named_style_cases;
 mod pages_text_cases;

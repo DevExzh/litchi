@@ -1427,7 +1427,7 @@ pages/editor.rs	package	1	pages	io	host-only	litchi-pages	-	-	-	-
 pages/editor.rs	redefine_applied_text_box_named_paragraph_style	1	pages	text.paragraph_style	migrated	litchi_pages::drawable::named_style::Edit::redefine	pages_text_box_named_style_redefine_parity	B	-	-
 pages/editor.rs	remove_drawable_comment_reply	1	pages	drawable.comment	host-only	litchi-pages	-	-	-	-
 pages/editor.rs	remove_section	1	pages	section.lifecycle	migrated	litchi_pages::Package::edit_section_lifecycle	pages_section_remove_parity	B	-	-
-pages/editor.rs	remove_text_box	1	pages	drawable.text_box_lifecycle	host-only	litchi-pages	-	-	-	-
+pages/editor.rs	remove_text_box	1	pages	drawable.text_box_lifecycle	migrated	litchi_pages::drawable::lifecycle::Edit::remove	pages_text_box_remove_parity	B	-	-
 pages/editor.rs	remove_text_box_comment	1	pages	text.comment	migrated	litchi_pages::drawable::annotation::Edit::remove_comment	pages_text_box_comment_remove_parity	B	-	-
 pages/editor.rs	remove_text_box_comment_reply	1	pages	text.comment	migrated	litchi_pages::drawable::annotation::Edit::remove_reply	pages_text_box_comment_reply_parity	B	-	-
 pages/editor.rs	remove_text_box_highlight	1	pages	text.highlight	migrated	litchi_pages::drawable::annotation::Edit::remove_highlight	pages_text_box_highlight_remove_parity	B	-	-
@@ -1604,7 +1604,7 @@ pages/editor/body_shapes.rs	body_shapes	1	pages	drawable.shape	host-only	litchi-
 pages/editor/body_shapes.rs	clear_body_shape_text	1	pages	drawable.shape	migrated	litchi_pages::Package::edit_body_drawable_text	pages_body_shape_text_clear_parity	A	-	-
 pages/editor/body_shapes.rs	duplicate_body_shape	1	pages	drawable.shape	host-only	litchi-pages	-	-	-	-
 pages/editor/body_shapes.rs	flip_body_shape	1	pages	drawable.shape	migrated	litchi_pages::Package::edit_body_drawable_properties	pages_body_shape_flip_parity	A	-	-
-pages/editor/body_shapes.rs	remove_body_shape	1	pages	drawable.shape	host-only	litchi-pages	-	-	-	-
+pages/editor/body_shapes.rs	remove_body_shape	1	pages	drawable.shape	migrated	litchi_pages::drawable::lifecycle::Edit::remove	pages_body_shape_remove_parity	B	-	-
 pages/editor/body_shapes.rs	replace_body_shape_text	1	pages	drawable.shape	migrated	litchi_pages::Package::edit_body_drawable_text	pages_body_shape_text_replace_parity	A	-	-
 pages/editor/body_shapes.rs	reset_body_line_endpoints	1	pages	drawable.shape	migrated	litchi_pages::Package::edit_body_drawable_style	pages_body_line_endpoints_reset_parity	A	-	-
 pages/editor/body_shapes.rs	reset_body_shape_effects	1	pages	drawable.shape	migrated	litchi_pages::Package::edit_body_drawable_style	pages_body_shape_style_reset_parity	A	-	-
