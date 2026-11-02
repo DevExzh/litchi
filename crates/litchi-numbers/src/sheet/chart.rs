@@ -82,6 +82,17 @@ pub mod series {
     pub use litchi_iwa_common::shape::fill::{Fill, Gradient};
 }
 
+/// Chart lifecycle of a sheet chart: the native kind and series direction
+/// (record 0416). The frame is [`crate::sheet::drawable::properties`], the
+/// grid [`data`].
+pub mod lifecycle {
+    pub use crate::package::sheet_chart_lifecycle::{
+        Commit, Diagnostics, Edit, Error, LimitKind, Patch, Refusal,
+    };
+    pub use litchi_iwa_common::chart::Direction;
+    pub use litchi_iwa_common::chart::kind::Kind;
+}
+
 /// Selector-first exact-source chart-level style transactions on the
 /// shared chart style engine: [`crate::Package::edit_sheet_chart_style`].
 pub mod style {

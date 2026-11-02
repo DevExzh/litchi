@@ -961,7 +961,27 @@ impl Draft {
             || created.storage.storage != source.info.storage.storage
             || created.kind != source.info.kind
             || created.preset != source.info.preset
-            || created.line_segment != source.info.line_segment
+            // Host defect fixed by record 0416 (as 0413b for Pages): an
+            // offset copy of a line sits DRAWABLE_DUPLICATE_OFFSET from its
+            // source, so its segment is the source's moved by that offset
+            // (the old equality refused every line duplication).
+            || !match (created.line_segment, source.info.line_segment) {
+                (Some(created), Some(source)) => {
+                    let offset = if placement == ShapeClonePlacement::Offset {
+                        DRAWABLE_DUPLICATE_OFFSET
+                    } else {
+                        0.0
+                    };
+                    let moved = |point: DrawablePoint| DrawablePoint {
+                        x: point.x + offset,
+                        y: point.y + offset,
+                    };
+                    LineSegment::new(moved(source.start()), moved(source.end()))
+                        .is_ok_and(|expected| line_segments_match(created, expected))
+                },
+                (None, None) => true,
+                _ => false,
+            }
             || created.line_endpoints != source.info.line_endpoints
             || created.geometry.size != source.info.geometry.size
             || created.geometry.flags != source.info.geometry.flags
