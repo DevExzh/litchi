@@ -922,28 +922,17 @@ fn read_snapshot(
     })
 }
 
-/// The segment of a native straight line and whether its stored path runs
-/// backwards (the host's `body_line_segment`).
+/// The segment of a native straight line and whether its stored path
+/// runs backwards (the host's `body_line_segment`).
 fn line_of(shape_info: &[u8]) -> Result<(Option<Segment>, bool), Error> {
-    let Some(stored) = line_codec::line(shape_info, line_codec::Limits::DEFAULT)
-        .map_err(|_| Error::InvalidSource)?
-    else {
-        return Ok((None, false));
-    };
-    let [x, y] = stored.geometry.position.ok_or(Error::InvalidSource)?;
-    let [width, height] = stored.geometry.size.ok_or(Error::InvalidSource)?;
-    let segment = Segment::from_geometry(
-        Point { x, y },
-        Size { width, height },
-        stored.geometry.angle.ok_or(Error::InvalidSource)?,
-        stored.natural_width,
+    Ok(
+        match litchi_iwa_style::shape_path::line_segment(shape_info)
+            .map_err(|_| Error::InvalidSource)?
+        {
+            Some((segment, reversed)) => (Some(segment), reversed),
+            None => (None, false),
+        },
     )
-    .map_err(|_| Error::InvalidSource)?;
-    Ok(if stored.horizontal_flip {
-        (Some(segment.reversed()), true)
-    } else {
-        (Some(segment), false)
-    })
 }
 
 fn stored_size(
@@ -1145,7 +1134,7 @@ fn commit_edit(edit: Edit<'_>) -> Result<Commit, Error> {
     let mut expected = edit.after.clone();
     if line_changed
         && let (Some(wanted), Some(read)) = (expected.line_segment, reopened.line_segment)
-        && segments_match(wanted, read)
+        && litchi_iwa_style::shape_path::segments_match(wanted, read)
     {
         expected.line_segment = Some(read);
     }
@@ -1168,16 +1157,6 @@ fn commit_edit(edit: Edit<'_>) -> Result<Commit, Error> {
             touched_components,
         },
     })
-}
-
-/// Whether two line segments agree up to the `f32` rounding of a frame
-/// round trip.
-fn segments_match(left: Segment, right: Segment) -> bool {
-    let close = |a: f32, b: f32| (a - b).abs() <= 1e-3 * a.abs().max(b.abs()).max(1.0);
-    close(left.start().x, right.start().x)
-        && close(left.start().y, right.start().y)
-        && close(left.end().x, right.end().x)
-        && close(left.end().y, right.end().y)
 }
 
 fn find_object<'a>(
