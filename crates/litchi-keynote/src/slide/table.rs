@@ -120,6 +120,14 @@ pub mod conditional_highlight {
         PeriodUnit, Range, Rule, Style, Text,
     };
 }
+/// Exact-source resize and frame of one rooted slide table, rows and
+/// columns sized uniformly to fill the frame (record 0412g).
+pub mod layout {
+    pub use crate::package::slide_table_layout::{
+        Commit, Diagnostics, Edit, Error, LimitKind, Patch, Refusal,
+    };
+    pub use crate::slide::drawable::Geometry;
+}
 /// Exact-source row and column insertion and removal in one rooted slide
 /// table over the shared table-topology engine (record 0412e).
 pub mod topology {
