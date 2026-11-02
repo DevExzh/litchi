@@ -843,7 +843,21 @@ impl Draft {
             || created.storage.storage != source.info.storage.storage
             || created.kind != source.info.kind
             || created.preset != source.info.preset
-            || created.line_segment != source.info.line_segment
+            // Host defect fixed by record 0413b: a duplicated line sits
+            // 12 pt from its source, so its segment is the source's moved by
+            // the duplicate offset (the old equality refused every line).
+            || !match (created.line_segment, source.info.line_segment) {
+                (Some(created), Some(source)) => {
+                    let moved = |point: DrawablePoint| DrawablePoint {
+                        x: point.x + BODY_DRAWABLE_DUPLICATE_OFFSET,
+                        y: point.y + BODY_DRAWABLE_DUPLICATE_OFFSET,
+                    };
+                    LineSegment::new(moved(source.start()), moved(source.end()))
+                        .is_ok_and(|expected| line_segments_match(created, expected))
+                },
+                (None, None) => true,
+                _ => false,
+            }
             || created.line_endpoints != source.info.line_endpoints
             || created.geometry.size != source.info.geometry.size
             || created.geometry.flags != source.info.geometry.flags
