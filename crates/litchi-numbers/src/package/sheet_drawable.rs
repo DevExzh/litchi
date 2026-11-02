@@ -26,6 +26,7 @@ use litchi_core::Position;
 use thiserror::Error as ThisError;
 
 use super::Package;
+use super::sheet_drawable_chart as chart;
 use super::sheet_drawable_comment as comment;
 use super::sheet_drawable_comment_graph::Graph;
 use super::sheet_drawable_duplicate as duplicate;
@@ -116,6 +117,10 @@ pub enum Refusal {
     /// signature contradicting the extension).
     #[error("invalid media for a new drawable")]
     InvalidMedia,
+    /// A new chart's kind is not a supported concrete kind, or its data
+    /// cannot form that kind.
+    #[error("invalid kind or data for a new chart")]
+    InvalidChart,
     /// The drawable was already removed by an earlier operation of this edit.
     #[error("the drawable was removed earlier in this edit")]
     AlreadyRemoved,
@@ -148,9 +153,10 @@ impl Refusal {
             Self::SheetNotFound | Self::DrawableNotFound { .. } | Self::AlreadyRemoved => {
                 RefusalKind::NotFound
             },
-            Self::ZPositionOutOfRange { .. } | Self::InvalidGeometry | Self::InvalidMedia => {
-                RefusalKind::InvalidValue
-            },
+            Self::ZPositionOutOfRange { .. }
+            | Self::InvalidGeometry
+            | Self::InvalidMedia
+            | Self::InvalidChart => RefusalKind::InvalidValue,
             Self::UnsupportedOperation { .. } | Self::NoStagedOperation => {
                 RefusalKind::UnsupportedOperation
             },
@@ -179,6 +185,7 @@ enum Operation {
     },
     Add(Box<NewShape>),
     AddMedia(Box<media::NewMedia>),
+    AddChart(Box<chart::NewChart>),
     Duplicate {
         drawable: u64,
         /// The copy's text (a text box duplicate).
@@ -239,7 +246,10 @@ impl Edit<'_> {
             .filter(|operation| {
                 matches!(
                     operation,
-                    Operation::Add(_) | Operation::AddMedia(_) | Operation::Duplicate { .. }
+                    Operation::Add(_)
+                        | Operation::AddMedia(_)
+                        | Operation::AddChart(_)
+                        | Operation::Duplicate { .. }
                 )
             })
             .count();
@@ -346,7 +356,7 @@ impl Edit<'_> {
         let (identifier, kind) = self.resolve(drawable.into())?;
         if !matches!(
             kind,
-            Kind::TextBox | Kind::Shape | Kind::Image | Kind::Movie | Kind::Audio
+            Kind::TextBox | Kind::Shape | Kind::Image | Kind::Movie | Kind::Audio | Kind::Chart
         ) {
             return Err(Refusal::UnsupportedOperation {
                 operation: "remove",
@@ -413,6 +423,61 @@ impl Edit<'_> {
         })
     }
 
+    /// Stage a new chart of `kind` over the inline `data`, framed by
+    /// `geometry` (the host's `add_sheet_chart`): the chart graph of the
+    /// shared chart author in the CalculationEngine component, its styles
+    /// in the document stylesheet and its preset in the theme. It joins the
+    /// front of the sheet's list; its series are the data's rows.
+    ///
+    /// ```no_run
+    /// use litchi_numbers::Package;
+    /// use litchi_numbers::sheet::chart::lifecycle::Kind;
+    /// use litchi_numbers::sheet::drawable::{Geometry, Point, Size};
+    /// use litchi_numbers::ChartData;
+    ///
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let package = Package::open("input.numbers")?;
+    /// let data = ChartData::new(
+    ///     vec!["2025".into()],
+    ///     vec!["North".into(), "South".into()],
+    ///     vec![vec![Some(1.0), Some(2.0)]],
+    /// )?;
+    /// let mut edit = package.edit_sheet_drawables(0)?;
+    /// edit.add_chart(
+    ///     Kind::Bar2d,
+    ///     data,
+    ///     Geometry::new(
+    ///         Point { x: 40.0, y: 40.0 },
+    ///         Size { width: 320.0, height: 240.0 },
+    ///     ),
+    /// )?;
+    /// let commit = edit.commit()?;
+    /// # let _ = commit;
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
+    /// # Errors
+    ///
+    /// [`Refusal::InvalidChart`] for an unassignable kind or data that
+    /// cannot form it; [`Refusal::InvalidGeometry`]; [`Error::Allocation`].
+    pub fn add_chart(
+        &mut self,
+        kind: litchi_iwa_common::chart::kind::Kind,
+        data: litchi_iwa_common::chart::data::ChartData,
+        geometry: Geometry,
+    ) -> Result<&mut Self, Error> {
+        let chart = chart::NewChart {
+            kind,
+            data,
+            geometry,
+        };
+        chart.validate()?;
+        structure::reserve(&mut self.operations, 1)?;
+        self.operations.push(Operation::AddChart(Box::new(chart)));
+        Ok(self)
+    }
+
     /// Stage a new audio clip from a file name and its bytes. It joins the
     /// front of the sheet's list.
     ///
@@ -444,7 +509,10 @@ impl Edit<'_> {
     /// [`Refusal::UnsupportedOperation`] for the other kinds.
     pub fn duplicate(&mut self, drawable: impl Into<DrawableSelector>) -> Result<&mut Self, Error> {
         let (identifier, kind) = self.resolve(drawable.into())?;
-        if !matches!(kind, Kind::Shape | Kind::Image | Kind::Movie | Kind::Audio) {
+        if !matches!(
+            kind,
+            Kind::Shape | Kind::Image | Kind::Movie | Kind::Audio | Kind::Chart
+        ) {
             return Err(Refusal::UnsupportedOperation {
                 operation: "duplicate",
                 kind: kind.name(),
@@ -577,8 +645,10 @@ impl Edit<'_> {
         let base = self.base.identifiers();
         let mut copies = order.iter().filter(|identifier| !base.contains(identifier));
         for operation in &self.operations {
-            let (Operation::Add(_) | Operation::AddMedia(_) | Operation::Duplicate { .. }) =
-                operation
+            let (Operation::Add(_)
+            | Operation::AddMedia(_)
+            | Operation::AddChart(_)
+            | Operation::Duplicate { .. }) = operation
             else {
                 continue;
             };
@@ -697,6 +767,7 @@ fn publish_structural(
         .ok_or(Error::InvalidSource)?;
     let mut order = base.identifiers();
     let mut removed = Vec::new();
+    let mut removed_charts = Vec::new();
     let mut created: Vec<u64> = Vec::new();
     let mut context = None;
     let mut transition = Transition::default();
@@ -704,7 +775,29 @@ fn publish_structural(
         match operation {
             Operation::Remove { drawable } => {
                 order.retain(|identifier| identifier != drawable);
-                removed.push(*drawable);
+                if base
+                    .entries
+                    .iter()
+                    .any(|entry| entry.identifier == *drawable && entry.kind == Kind::Chart)
+                {
+                    removed_charts.push(*drawable);
+                } else {
+                    removed.push(*drawable);
+                }
+            },
+            Operation::AddChart(new) => {
+                let registry = registry
+                    .as_ref()
+                    .ok_or(Error::Refused(Refusal::UnsupportedSource))?;
+                let created_id = chart::add(
+                    &mut working,
+                    registry,
+                    &mut transition,
+                    (sheet.identifier, &sheet_member),
+                    new,
+                )?;
+                order.push(created_id);
+                created.push(created_id);
             },
             Operation::MoveTo { drawable, position } => move_in(&mut order, *drawable, *position)?,
             Operation::Add(shape) => {
@@ -770,6 +863,21 @@ fn publish_structural(
                     .iter()
                     .find(|entry| entry.identifier == *drawable)
                     .ok_or(Error::InvalidSource)?;
+                if entry.kind == Kind::Chart {
+                    let registry = registry
+                        .as_ref()
+                        .ok_or(Error::Refused(Refusal::UnsupportedSource))?;
+                    let copy = chart::duplicate(
+                        &mut working,
+                        registry,
+                        &mut transition,
+                        (sheet.identifier, &sheet_member),
+                        *drawable,
+                    )?;
+                    order.push(copy);
+                    created.push(copy);
+                    continue;
+                }
                 let (index, message_type) = entry.message.ok_or(Error::InvalidSource)?;
                 let copy = duplicate_graph(
                     &mut working,
@@ -783,7 +891,7 @@ fn publish_structural(
             },
         }
     }
-    if !removed.is_empty() {
+    if !removed.is_empty() || !removed_charts.is_empty() {
         // The host clears a removed drawable's direct comment first.
         let taken = registry
             .take()
@@ -793,7 +901,7 @@ fn publish_structural(
             registry: taken,
             transition: std::mem::take(&mut transition),
         };
-        for drawable in &removed {
+        for drawable in removed.iter().chain(&removed_charts) {
             comment::clear_in(&mut graph, *drawable)?;
         }
         let Graph {
@@ -817,6 +925,18 @@ fn publish_structural(
             .collect();
         census.require_detached(&closure, &detached)?;
     }
+    let chart_objects = match &registry {
+        Some(registry) => chart::remove(
+            &mut working,
+            registry,
+            &mut transition,
+            sheet.identifier,
+            &removed_charts,
+        )?,
+        None if removed_charts.is_empty() => Vec::new(),
+        None => return Err(Refusal::UnsupportedSource.into()),
+    };
+    removed.extend(&removed_charts);
     let limits = working.archive_limits();
     let object = working.object_mut(sheet.identifier)?;
     let data = references::rewrite(
@@ -846,6 +966,7 @@ fn publish_structural(
             transition.release_unreferenced_data(&working, registry)?;
         }
     }
+    closure.extend(chart_objects);
     let published = working.publish(&transition)?;
     verify_removed(&published.package, &closure)?;
     Ok((published, order))

@@ -65,6 +65,7 @@ pub(crate) mod sheet_chart_title;
 pub(crate) mod sheet_drawable;
 pub(crate) mod sheet_drawable_annotation;
 mod sheet_drawable_author;
+mod sheet_drawable_chart;
 pub(crate) mod sheet_drawable_comment;
 mod sheet_drawable_comment_graph;
 pub(crate) mod sheet_drawable_date_time;

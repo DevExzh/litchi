@@ -97,7 +97,7 @@ fn reference_paths(message_type: u32) -> Option<&'static [&'static [u32]]> {
         IMAGE_MESSAGE_TYPE => Some(IMAGE),
         MOVIE_MESSAGE_TYPE => Some(MOVIE),
         2_001 | 2_022 => Some(STORAGE),
-        _ => None,
+        _ => super::sheet_drawable_chart::reference_paths(message_type),
     }
 }
 
