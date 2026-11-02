@@ -7553,3 +7553,12 @@ See [0063](0063-source-pptx-modern-comments.md).
 - Full gate on frozen `4b26bb3379` (`full-4b26bb3379-r2`): 51 of 53 rows passed. Rows 48 (tooling unit tests) and 51 (bench matrix) failed for one reason. Record 0408's leaf-versus-host evidence had no bench-matrix row and no exemption, so the committed matrix was stale. This is fixed on trunk by `fc7a879e7c` (an exemption with the reason, and a regenerated matrix). It is not a green gate.
 - Merged W4-P slice 1 (`82c4d4fe32`, 86 Pages rows: text-box character, paragraph, frame, layout and plain text) and slice 2 (`f0aa2ad349`, 38 Pages rows: text-box lists and named paragraph styles, plus the shared `litchi_iwa_text_wire::list::publish`). Measured routes cost 70–91% less than the host. Post-merge checks pass.
 - A fresh full gate is running on `f0aa2ad349`.
+- W4 merges since `f0aa2ad349`:
+  - W4-P slice 3 (`0a13cdad8d`, 34 Pages rows: annotations, fields, links; Numbers moved onto the shared list publisher, deleting its 637-line copy);
+  - W4-P slice 4 (`a444331827`, 21 rows plus 1 retired: drawable removal, comments, drawables list, line segments; host `remove_text_box` reference fix, macOS-queued);
+  - W4-P 0413b (`5b5dad5c57`: `litchi_iwa_style::shape_path` shared by all three leaves, Pages shape presets);
+  - W4-C slice 1 (`cd89e91f63`, 200 rows: shared chart style, axis and series engines in `litchi-iwa-style`; Keynote and Pages chart families; Numbers moved onto them);
+  - W4-C slice 2 (`2ade7ad168`, 36 rows: axis gridline stroke, label angle, affixes, number format, 3D label position, border stroke);
+  - W4-T slices 1–3 (`d93ff8c882`, 164 rows: `litchi_iwa_table::cell_rich_text` lifted from Numbers; Pages and Keynote cell text and lists; Keynote appearance reader fix for rich-text cells).
+- Every slice's own full gate passes, and every merge passes the post-merge workspace, ledger, fuzz-lock and boundary checks. All measured routes cost 2–47% of the host route's instructions.
+- Ledger: 1,786 migrated, 44 retired and 401 host-only rows (Pages 123, Numbers 120, Keynote 100, shared 58). The full gate on `f0aa2ad349` is still running. Nothing pushed.
