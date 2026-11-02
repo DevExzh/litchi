@@ -7,9 +7,9 @@
 //! paragraph variations are stored beside their stylesheet and registered
 //! there, and the metadata registry gains or loses the matching UUIDs and
 //! cross-component references. This module is its package side over the
-//! table engines' [`Working`] set: [`Workspace`] maps the publisher's object,
+//! table engines' [`Working`](crate::structure::Working) set: [`Workspace`](crate::cell_rich_text::storage_list::Workspace) maps the publisher's object,
 //! header, identifier and registry requests onto the working set and its
-//! registry transition. The cell-list engine ([`super::list`]) runs it on a
+//! registry transition. The cell-list engine ([`list`](crate::cell_rich_text::list)) runs it on a
 //! cell's rich-text storage, and the Numbers sheet drawables on a text box's
 //! storage.
 

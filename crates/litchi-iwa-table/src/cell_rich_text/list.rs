@@ -16,7 +16,7 @@
 //!
 //! The list change itself runs W1-D's engine
 //! ([`litchi_iwa_text_wire::list`], record 0374) and is published by
-//! [`super::storage_list`].
+//! [`storage_list`](crate::cell_rich_text::storage_list).
 
 use litchi_iwa_common::WireLimits;
 use litchi_iwa_common::table::coordinate::At;
