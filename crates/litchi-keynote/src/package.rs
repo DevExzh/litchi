@@ -5,6 +5,7 @@
 //! and protobuf layers remain in their focused IWA infrastructure crates.
 
 mod blank_layout;
+pub(crate) use blank_layout::{FreshError, FreshSettings};
 #[cfg(feature = "internal-iwork-source")]
 mod catalog_table_appearance;
 mod chart_axis_support;

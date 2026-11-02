@@ -1,5 +1,8 @@
-//! Title and body placeholder frames of a fresh presentation for its slide
-//! size (record 0417; the migration host builder's `slide_size`).
+//! The fresh-presentation values of a [`crate::Builder`] in one publication
+//! (record 0417): language and locale (record 0372), the slide size with
+//! the title and body placeholder frames laid out for it (the migration
+//! host builder's `slide_size`), and the first slide's title, subtitle and
+//! notes text.
 //!
 //! The host builder lays out the title and body placeholders of the
 //! template and the first slide as fractions of the slide size: the title
@@ -14,7 +17,7 @@ use litchi_iwa_core::RawMessage;
 use super::structure::StructureError;
 use super::structure::wire::{Fields, Writer};
 use super::structure::workspace::Workspace;
-use super::{Package, ReadError, ReadResult};
+use super::{Package, ReadError};
 use crate::show::Size;
 
 const PLACEHOLDER_MESSAGE_TYPE: u32 = 7;
@@ -163,10 +166,170 @@ fn placeholder(
     Ok((rewritten != payload).then_some(rewritten))
 }
 
+/// The fresh-presentation values a [`crate::Builder`] writes in one
+/// publication: the document language and locale (`super::locale`), the
+/// show's slide size with the title and body placeholder frames laid out
+/// for it, and the first slide's title, subtitle and notes text.
+#[derive(Debug, Clone, Copy, Default)]
+pub(crate) struct FreshSettings<'a> {
+    pub(crate) language: Option<&'a str>,
+    pub(crate) locale: Option<&'a str>,
+    pub(crate) size: Option<Size>,
+    pub(crate) title: Option<&'a str>,
+    pub(crate) subtitle: Option<&'a str>,
+    pub(crate) notes: Option<&'a str>,
+}
+
+/// A failure of [`Package::with_fresh_settings`], typed by the value it
+/// concerns.
+#[derive(Debug)]
+pub(crate) enum FreshError {
+    /// The language, locale or size rewrite, or the publication.
+    Read(ReadError),
+    /// The title or subtitle text.
+    Text(super::slide_text::Error),
+    /// The speaker notes text.
+    Notes(super::slide_notes::Error),
+}
+
+impl From<ReadError> for FreshError {
+    fn from(error: ReadError) -> Self {
+        Self::Read(error)
+    }
+}
+
+/// `KN.ShowArchive.size`.
+const SHOW_SIZE: u32 = 4;
+/// `TSWP.ShapeInfoArchive.owned_storage`.
+const SHAPE_INFO_OWNED_STORAGE: u32 = 4;
+/// `TSD.DrawableArchive.parent`.
+const DRAWABLE_PARENT: u32 = 2;
+/// `KN.NoteArchive.contained_storage`.
+const NOTE_STORAGE: u32 = 1;
+const STORAGE_MESSAGE_TYPE: u32 = 2_001;
+
+/// Rewrite the show's size; `None` when it already has it.
+fn show(
+    payload: &[u8],
+    size: Size,
+    wire: litchi_iwa_common::WireLimits,
+) -> Result<Option<Vec<u8>>, StructureError> {
+    let mut fields = Fields::parse(payload, wire)?;
+    fields.set_message(SHOW_SIZE, &point(size.width(), size.height()).finish());
+    let rewritten = fields.encode();
+    Ok((rewritten != payload).then_some(rewritten))
+}
+
+/// The nested reference `number` of `payload`, when present.
+fn reference(
+    payload: &[u8],
+    number: u32,
+    wire: litchi_iwa_common::WireLimits,
+) -> Result<Option<u64>, StructureError> {
+    match Fields::parse(payload, wire)?.unique(number)? {
+        Some(field) => Ok(Some(super::structure::wire::reference_identifier(
+            field.message()?,
+            wire,
+        )?)),
+        None => Ok(None),
+    }
+}
+
+/// The (kind, parent, owned storage) of a title or body placeholder.
+fn placeholder_storage(
+    payload: &[u8],
+    wire: litchi_iwa_common::WireLimits,
+) -> Result<Option<(u64, Option<u64>, Option<u64>)>, StructureError> {
+    let placeholder = Fields::parse(payload, wire)?;
+    let kind = match placeholder.unique(PLACEHOLDER_KIND)? {
+        Some(field) => field.varint()?,
+        None => return Ok(None),
+    };
+    if kind != KIND_TITLE && kind != KIND_BODY {
+        return Ok(None);
+    }
+    let Some(shape_info) = placeholder.unique(SUPER)? else {
+        return Ok(None);
+    };
+    let shape_info = shape_info.message()?;
+    let storage = reference(shape_info, SHAPE_INFO_OWNED_STORAGE, wire)?;
+    let Some(shape) = Fields::parse(shape_info, wire)?
+        .unique(SUPER)?
+        .map(|f| f.message().map(<[u8]>::to_vec))
+        .transpose()?
+    else {
+        return Ok(Some((kind, None, storage)));
+    };
+    let Some(drawable) = Fields::parse(&shape, wire)?
+        .unique(SUPER)?
+        .map(|f| f.message().map(<[u8]>::to_vec))
+        .transpose()?
+    else {
+        return Ok(Some((kind, None, storage)));
+    };
+    Ok(Some((
+        kind,
+        reference(&drawable, DRAWABLE_PARENT, wire)?,
+        storage,
+    )))
+}
+
+/// Which storage a text value replaces.
+#[derive(Clone, Copy)]
+enum Role {
+    Title,
+    Subtitle,
+    Notes,
+}
+
 impl Package {
-    /// Return a reopened copy whose title and body placeholders (template
-    /// and slides) have the host builder's frames for a slide of `size`.
-    pub(crate) fn with_placeholder_frames(&self, size: Size) -> ReadResult<Self> {
+    /// Return a reopened copy with `settings` written where the host builder
+    /// writes them, in one workspace publication (one reopen); values left
+    /// `None` are kept. Called on the blank presentation only. The first
+    /// slide's text storages are rewritten through the shared text engine
+    /// exactly as the slide-text and speaker-notes transactions rewrite
+    /// them (the slide preview is invalidated when the title or subtitle
+    /// changes), and the candidate is verified by reading them back.
+    pub(crate) fn with_fresh_settings(
+        &self,
+        settings: FreshSettings<'_>,
+    ) -> Result<Self, FreshError> {
+        let FreshSettings {
+            language,
+            locale,
+            size,
+            title,
+            subtitle,
+            notes,
+        } = settings;
+        for (role, text) in [
+            (Role::Title, title),
+            (Role::Subtitle, subtitle),
+            (Role::Notes, notes),
+        ] {
+            if text.is_some_and(|text| text.contains('\u{000e}') || text.contains('\u{fffc}')) {
+                return Err(match role {
+                    Role::Notes => FreshError::Notes(super::slide_notes::Error::Refused(
+                        super::slide_notes::Refusal::ObjectMarkerReplacement,
+                    )),
+                    _ => FreshError::Text(super::slide_text::Error::Refused(
+                        super::slide_text::Refusal::ObjectMarkerReplacement,
+                    )),
+                });
+            }
+        }
+        if language.is_none()
+            && locale.is_none()
+            && size.is_none()
+            && title.is_none()
+            && subtitle.is_none()
+            && notes.is_none()
+        {
+            return Ok(self.snapshot());
+        }
+        let record = self
+            .slide_record_at(0)?
+            .ok_or_else(|| ReadError::InvalidFormat("no first slide".to_owned()))?;
         let mut workspace = Workspace::new(self).map_err(invalid)?;
         let wire = workspace.wire;
         let mut identifiers = self
@@ -177,41 +340,194 @@ impl Package {
             .collect::<Vec<_>>();
         identifiers.sort_unstable();
         identifiers.dedup();
+
+        // The first slide's title, subtitle and notes storages.
+        let mut texts: Vec<(u64, Role, &str)> = Vec::new();
+        if title.is_some() || subtitle.is_some() || notes.is_some() {
+            for &identifier in &identifiers {
+                let object = workspace.require(identifier).map_err(invalid)?;
+                for message in &object.messages {
+                    match message.type_ {
+                        PLACEHOLDER_MESSAGE_TYPE => {
+                            if let Some((kind, Some(parent), Some(storage))) =
+                                placeholder_storage(&message.data, wire).map_err(invalid)?
+                                && parent == record.slide_identifier
+                            {
+                                match (kind, title, subtitle) {
+                                    (KIND_TITLE, Some(text), _) => {
+                                        texts.push((storage, Role::Title, text))
+                                    },
+                                    (KIND_BODY, _, Some(text)) => {
+                                        texts.push((storage, Role::Subtitle, text))
+                                    },
+                                    _ => {},
+                                }
+                            }
+                        },
+                        super::NOTE_MESSAGE_TYPE => {
+                            if let (Some(text), Some(storage)) = (
+                                notes,
+                                reference(&message.data, NOTE_STORAGE, wire).map_err(invalid)?,
+                            ) {
+                                texts.push((storage, Role::Notes, text));
+                            }
+                        },
+                        _ => {},
+                    }
+                }
+            }
+            let expected = usize::from(title.is_some())
+                + usize::from(subtitle.is_some())
+                + usize::from(notes.is_some());
+            if texts.len() != expected {
+                return Err(ReadError::InvalidFormat("blank text storages".to_owned()).into());
+            }
+        }
+        let archive_limits = workspace.archive_limits();
+        let max_message_bytes = self
+            .state
+            .options
+            .archive()
+            .effective_archive_limits()
+            .map_err(|error| ReadError::InvalidFormat(error.to_string()))?
+            .max_message_bytes();
+        let mut slide_text_changed = false;
         let mut changed = false;
         for identifier in identifiers {
             let object = workspace.require(identifier).map_err(invalid)?;
             let mut rewrites = Vec::new();
             for (index, message) in object.messages.iter().enumerate() {
-                if message.type_ != PLACEHOLDER_MESSAGE_TYPE {
-                    continue;
+                let mut data = match message.type_ {
+                    PLACEHOLDER_MESSAGE_TYPE => match size {
+                        Some(size) => placeholder(&message.data, size, wire),
+                        None => Ok(None),
+                    },
+                    super::SHOW_MESSAGE_TYPE => match size {
+                        Some(size) => show(&message.data, size, wire),
+                        None => Ok(None),
+                    },
+                    other => super::locale::rewrite(other, &message.data, language, locale, wire),
                 }
-                if let Some(data) = placeholder(&message.data, size, wire).map_err(invalid)? {
-                    rewrites.push((index, data));
+                .map_err(invalid)?;
+                if message.type_ == STORAGE_MESSAGE_TYPE
+                    && let Some(&(_, role, text)) =
+                        texts.iter().find(|(storage, ..)| *storage == identifier)
+                {
+                    let current = data.as_deref().unwrap_or(&message.data);
+                    let rewritten = match role {
+                        Role::Notes => {
+                            let limits =
+                                super::slide_notes::storage_rewrite_limits(self, max_message_bytes)
+                                    .map_err(FreshError::Notes)?;
+                            rewrite_storage(current, text, limits).map_err(|error| {
+                                FreshError::Notes(super::slide_notes::map_text_rewrite_error(error))
+                            })?
+                        },
+                        Role::Title | Role::Subtitle => {
+                            let limits =
+                                super::slide_text::storage_rewrite_limits(self, max_message_bytes)
+                                    .map_err(FreshError::Text)?;
+                            rewrite_storage(current, text, limits).map_err(|error| {
+                                FreshError::Text(super::slide_text::map_text_rewrite_error(error))
+                            })?
+                        },
+                    };
+                    if let Some(rewritten) = rewritten {
+                        slide_text_changed |= !matches!(role, Role::Notes);
+                        data = Some(rewritten);
+                    }
+                }
+                if let Some(data) = data {
+                    rewrites.push((index, message.type_, data));
                 }
             }
-            let limits = workspace.archive_limits();
-            for (index, data) in rewrites {
+            for (index, message_type, data) in rewrites {
                 workspace
                     .object_mut(identifier)
                     .map_err(invalid)?
                     .replace_message_preserving_header(
                         index,
                         RawMessage {
-                            type_: PLACEHOLDER_MESSAGE_TYPE,
+                            type_: message_type,
                             data,
                         },
-                        limits,
+                        archive_limits,
                     )
                     .map_err(|error| invalid(error.into()))?;
                 changed = true;
             }
         }
+        if slide_text_changed {
+            let wire_limits = self
+                .wire_limits()
+                .map_err(|error| ReadError::InvalidFormat(error.to_string()))?;
+            let node = workspace
+                .object_mut(record.node_identifier)
+                .map_err(invalid)?;
+            super::slide_preview::invalidate(node, archive_limits, wire_limits).map_err(
+                |error| {
+                    ReadError::InvalidFormat(format!(
+                        "Keynote slide preview invalidation: {error:?}"
+                    ))
+                },
+            )?;
+        }
         if !changed {
             return Ok(self.snapshot());
         }
         let bytes = workspace.publish().map_err(invalid)?;
-        self.structure_reopen(bytes)
+        let candidate = self.structure_reopen(bytes)?;
+        let first = crate::SlideSelector::index(0);
+        let verified = title.is_none_or(|text| {
+            candidate
+                .slide_title(first)
+                .ok()
+                .flatten()
+                .as_deref()
+                .unwrap_or("")
+                == text
+        }) && subtitle.is_none_or(|text| {
+            candidate
+                .slide_body(first)
+                .ok()
+                .flatten()
+                .as_deref()
+                .unwrap_or("")
+                == text
+        }) && notes.is_none_or(|text| {
+            candidate
+                .slide_notes(first)
+                .ok()
+                .flatten()
+                .as_deref()
+                .unwrap_or("")
+                == text
+        });
+        if !verified {
+            return Err(ReadError::InvalidFormat("fresh text verification".to_owned()).into());
+        }
+        Ok(candidate)
     }
+}
+
+/// Replace the whole text of a storage payload through the shared text
+/// engine (`PreserveOnEqualText`); `None` when it already has `text`.
+fn rewrite_storage(
+    payload: &[u8],
+    text: &str,
+    limits: litchi_iwa_text_wire::RewriteLimits,
+) -> Result<Option<Vec<u8>>, litchi_iwa_text_wire::RewriteError> {
+    let current = litchi_iwa_text_wire::decode_storage(payload, limits)?
+        .into_storage()
+        .into_text();
+    let rewrite = litchi_iwa_text_wire::rewrite_storage_text_with_behavior(
+        payload,
+        0..current.encode_utf16().count(),
+        text,
+        litchi_iwa_text_wire::RewriteBehavior::PreserveOnEqualText,
+        limits,
+    )?;
+    Ok(rewrite.changed().then(|| rewrite.into_bytes()))
 }
 
 #[cfg(test)]
@@ -278,7 +594,10 @@ mod tests {
     fn placeholder_frames_follow_the_slide_size() {
         let size = Size::new(1024.0, 768.0).expect("size");
         let laid_out = Package::new()
-            .with_placeholder_frames(size)
+            .with_fresh_settings(FreshSettings {
+                size: Some(size),
+                ..FreshSettings::default()
+            })
             .expect("layout");
         let title = [
             1024.0_f32 * 0.1,
@@ -312,7 +631,12 @@ mod tests {
     fn the_blank_size_is_a_no_op() {
         let blank = Package::new();
         let size = Size::new(1_920.0, 1_080.0).expect("size");
-        let same = blank.with_placeholder_frames(size).expect("layout");
+        let same = blank
+            .with_fresh_settings(FreshSettings {
+                size: Some(size),
+                ..FreshSettings::default()
+            })
+            .expect("layout");
         assert_eq!(frames(&same), frames(&blank));
         let mut before = Vec::new();
         let mut after = Vec::new();

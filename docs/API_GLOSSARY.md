@@ -2868,8 +2868,8 @@ not an alias (no second name exists).
 
 | Name | Status |
 |---|---|
-| `litchi_keynote::Builder::slide_number_visible(bool)` | adopted (0417); the host builder's slide-number option, through `Package::edit_slide_placeholder_visibility` with `slide::placeholder::Kind::SlideNumber`; `builder::Error::PlaceholderVisibility` |
-| `litchi_keynote::Builder::slide_size` | adopted (0298); since 0417 also lays out the title and body placeholders for the size, as the host builder does (`builder::Error::Layout`) |
+| `litchi_keynote::Builder::slide_number_visible(bool)` | adopted (0417); the host builder's slide-number option, through `Package::edit_slide_placeholder_visibility` with `slide::placeholder::Kind::SlideNumber` (`builder::Error::PlaceholderVisibility`) |
+| `litchi_keynote::Builder::slide_size` | adopted (0298); since 0417 also lays out the title and body placeholders for the size, as the host builder does; the language, locale, size, title, subtitle and notes are written in one publication, and `builder::Error::{Locale, ShowSettings}` become `builder::Error::Settings` |
 | `litchi_keynote::slide::media::asset_data::{Edit, Patch, Commit, Diagnostics, EditOptions, Error, Refusal, LimitKind}` | Registered family in `keynote-minimal` / `keynote-full` (0417); `Package::{edit_media_asset_data, edit_media_asset_data_with_options, apply_media_asset_data}` replace one reachable asset by its `MediaAsset` handle (host `keynote::Draft::replace_media`, `media::Draft::replace`); `EditOptions::max_replacement_bytes(NonZeroUsize)` replaces the host setter `set_max_replacement_bytes`; `Refusal::{AssetNotReachable, AssetNotMaterialized}` join the shared slide-media refusals |
 
 ## Pages body media, shapes and text out of the host (record 0371)

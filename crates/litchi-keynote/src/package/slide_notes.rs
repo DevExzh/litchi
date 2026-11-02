@@ -1218,7 +1218,7 @@ fn validate_exact_reference_shape(package: &Package, payload: &[u8]) -> Result<(
     Ok(())
 }
 
-fn storage_rewrite_limits(
+pub(super) fn storage_rewrite_limits(
     package: &Package,
     max_message_bytes: usize,
 ) -> Result<RewriteLimits, Error> {
@@ -1474,7 +1474,7 @@ fn map_wire_error(error: litchi_iwa_common::Error) -> Error {
     }
 }
 
-fn map_text_rewrite_error(error: litchi_iwa_text_wire::RewriteError) -> Error {
+pub(super) fn map_text_rewrite_error(error: litchi_iwa_text_wire::RewriteError) -> Error {
     match error {
         litchi_iwa_text_wire::RewriteError::LimitExceeded {
             resource,

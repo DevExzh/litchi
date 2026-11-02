@@ -297,3 +297,24 @@ fn builder_shows_the_slide_number() -> TestResult {
     );
     Ok(())
 }
+
+#[test]
+fn builder_refuses_object_markers_in_text() -> TestResult {
+    use litchi_keynote::slide::{notes, text};
+    assert!(matches!(
+        Builder::new()
+            .identity(fixed(6)?)
+            .title("a\u{fffc}b")
+            .build(),
+        Err(BuilderError::Text(text::Error::Refused(
+            text::Refusal::ObjectMarkerReplacement
+        )))
+    ));
+    assert!(matches!(
+        Builder::new().identity(fixed(6)?).notes("\u{000e}").build(),
+        Err(BuilderError::Notes(notes::Error::Refused(
+            notes::Refusal::ObjectMarkerReplacement
+        )))
+    ));
+    Ok(())
+}

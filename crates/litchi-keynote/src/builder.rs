@@ -2,9 +2,11 @@
 //!
 //! [`Builder`] starts from the same embedded blank presentation as
 //! [`Package::new`] — one title-and-subtitle slide at 1920×1080 points —
-//! stamps the caller's required [`Identity`] on it, and applies each
-//! requested value through the crate's ordinary exact-source transactions
-//! (slide text, speaker notes, show settings). [`Builder::build`] returns the
+//! stamps the caller's required [`Identity`] on it, writes the requested
+//! values (language, locale, slide size with its placeholder layout, title,
+//! subtitle and speaker notes) in one publication through the same wire
+//! rewrites the crate's transactions use, and shows the slide number through
+//! the slide placeholder-visibility transaction. [`Builder::build`] returns the
 //! resulting [`Package`]; publication belongs to [`Package::write_to`] and
 //! [`Package::save`].
 //!
@@ -35,7 +37,7 @@ use thiserror::Error as ThisError;
 use crate::identity::Identity;
 use crate::package::ReadError;
 use crate::show::Size;
-use crate::{Package, SlideSelector, show, slide};
+use crate::{Package, SlideSelector, slide};
 
 /// An error raised by [`Builder::build`].
 #[derive(Debug, ThisError)]
@@ -53,13 +55,6 @@ pub enum Error {
     /// The speaker notes could not be written.
     #[error(transparent)]
     Notes(#[from] slide::notes::Error),
-    /// The slide size could not be written.
-    #[error(transparent)]
-    ShowSettings(#[from] show::Error),
-    /// The title and body placeholder frames could not be laid out for the
-    /// slide size.
-    #[error("could not lay out the Keynote placeholders for the slide size: {0}")]
-    Layout(#[source] ReadError),
     /// The slide-number placeholder's visibility could not be written.
     #[error(transparent)]
     PlaceholderVisibility(#[from] slide::placeholder::Error),
@@ -69,9 +64,11 @@ pub enum Error {
     /// The document locale is empty or contains a NUL character.
     #[error("a Keynote document locale must be non-empty text without NUL")]
     InvalidLocale,
-    /// The language or locale could not be written.
-    #[error("could not write the Keynote document language or locale: {0}")]
-    Locale(#[source] ReadError),
+    /// The language, locale or slide size (with the placeholder layout)
+    /// could not be written, or the one publication of the fresh values
+    /// failed.
+    #[error("could not write the Keynote document settings: {0}")]
+    Settings(#[source] ReadError),
 }
 
 /// Builder for a fresh one-slide Keynote presentation.
@@ -151,8 +148,8 @@ impl Builder {
     }
 
     /// Show (`true`) or hide (`false`) the first slide's slide-number
-    /// placeholder, as [`Package::edit_slide_placeholder_visibility`] with
-    /// [`slide::placeholder::Kind::SlideNumber`] does. Unset, it stays
+    /// placeholder, the state [`Package::edit_slide_placeholder_visibility`]
+    /// with [`slide::placeholder::Kind::SlideNumber`] edits. Unset, it stays
     /// hidden. The show-wide slide-number preference is not changed.
     pub const fn slide_number_visible(mut self, visible: bool) -> Self {
         self.slide_number_visible = Some(visible);
@@ -163,8 +160,9 @@ impl Builder {
     ///
     /// # Costs
     ///
-    /// Each requested value is one exact-source transaction that rewrites
-    /// one component and reopens the candidate; values left at their
+    /// The language, locale, slide size, title, subtitle and notes are
+    /// written together in one publication and one reopen; a visible slide
+    /// number is one more exact-source transaction. Values left at their
     /// defaults cost nothing.
     ///
     /// # Errors
@@ -186,36 +184,20 @@ impl Builder {
         let mut package = Package::new()
             .with_identity(&identity)
             .map_err(Error::Identity)?;
-        if self.language.is_some() || self.locale.is_some() {
-            package = package
-                .with_language_and_locale(self.language.as_deref(), self.locale.as_deref())
-                .map_err(Error::Locale)?;
-        }
-        let first = SlideSelector::index(0);
-        if let Some(title) = self.title.as_deref() {
-            let mut edit = package.edit_slide_title(first)?;
-            edit.set(title)?;
-            package = edit.commit()?.into_package();
-        }
-        if let Some(subtitle) = self.subtitle.as_deref() {
-            let mut edit = package.edit_slide_body(first)?;
-            edit.set(subtitle)?;
-            package = edit.commit()?.into_package();
-        }
-        if let Some(notes) = self.notes.as_deref() {
-            let mut edit = package.edit_slide_notes(first)?;
-            edit.set(notes)?;
-            package = edit.commit()?.into_package();
-        }
-        if let Some(size) = self.slide_size {
-            let edit = package.edit_show_settings()?;
-            let mut settings = edit.settings();
-            settings.set_size(size);
-            package = edit.set(settings).commit()?.into_package();
-            package = package
-                .with_placeholder_frames(size)
-                .map_err(Error::Layout)?;
-        }
+        package = package
+            .with_fresh_settings(crate::package::FreshSettings {
+                language: self.language.as_deref(),
+                locale: self.locale.as_deref(),
+                size: self.slide_size,
+                title: self.title.as_deref(),
+                subtitle: self.subtitle.as_deref(),
+                notes: self.notes.as_deref(),
+            })
+            .map_err(|error| match error {
+                crate::package::FreshError::Read(error) => Error::Settings(error),
+                crate::package::FreshError::Text(error) => Error::Text(error),
+                crate::package::FreshError::Notes(error) => Error::Notes(error),
+            })?;
         if let Some(visible) = self.slide_number_visible {
             let state = if visible {
                 slide::placeholder::State::Visible
@@ -223,7 +205,10 @@ impl Builder {
                 slide::placeholder::State::Hidden
             };
             package = package
-                .edit_slide_placeholder_visibility(first, slide::placeholder::Kind::SlideNumber)?
+                .edit_slide_placeholder_visibility(
+                    SlideSelector::index(0),
+                    slide::placeholder::Kind::SlideNumber,
+                )?
                 .set(state)
                 .commit()?
                 .into_package();
