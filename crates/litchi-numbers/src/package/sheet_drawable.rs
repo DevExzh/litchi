@@ -39,9 +39,12 @@ use super::structure::{
 };
 use crate::selector::SheetSelector;
 use crate::sheet::drawable::{
-    AudioOptions, Drawable, DrawableSelector, Geometry, ImageOptions, Kind, MovieOptions,
+    AudioOptions, Drawable, DrawableSelector, Geometry, GeometryFlags, ImageOptions, Kind,
+    MovieOptions,
 };
+use litchi_iwa_common::shape::line::Segment;
 use litchi_iwa_common::shape::path::Preset;
+use litchi_iwa_protos::shape_style_codec::LINE_FLAGS;
 
 use super::sheet_drawable_author::{self as author, Context};
 
@@ -117,7 +120,7 @@ pub enum Refusal {
     #[error("the drawable was removed earlier in this edit")]
     AlreadyRemoved,
     /// The operation does not apply to the selected kind (removing a table
-    /// or chart, or duplicating a shape or table, through this family).
+    /// or chart, or duplicating a table or chart, through this family).
     #[error("{operation} does not apply to a Numbers sheet {kind}")]
     UnsupportedOperation {
         /// The refused verb.
@@ -183,10 +186,10 @@ enum Operation {
     },
 }
 
-/// One staged text box or preset shape.
+/// One staged text box, preset shape or straight line.
 #[derive(Debug, Clone, PartialEq)]
 struct NewShape {
-    preset: Preset,
+    path: author::Path,
     geometry: Geometry,
     text: String,
     text_box: bool,
@@ -265,7 +268,7 @@ impl Edit<'_> {
         owned.push_str(text);
         structure::reserve(&mut self.operations, 1)?;
         self.operations.push(Operation::Add(Box::new(NewShape {
-            preset,
+            path: author::Path::Preset(preset),
             geometry,
             text: owned,
             text_box,
@@ -299,6 +302,35 @@ impl Edit<'_> {
         text: &str,
     ) -> Result<&mut Self, Error> {
         self.stage_shape(preset, geometry, text, false)
+    }
+
+    /// Stage a new native straight line along `segment` (the host's
+    /// `add_sheet_line`), styled by the theme's text-box preset with empty
+    /// text. It joins the front of the sheet's list. Its decorations and
+    /// stroke are set through [`crate::Package::edit_sheet_drawable_style`].
+    ///
+    /// # Errors
+    ///
+    /// [`Refusal::InvalidGeometry`] for a segment with a non-finite point.
+    pub fn add_line(&mut self, segment: Segment) -> Result<&mut Self, Error> {
+        let (position, size, angle) = segment.geometry();
+        let geometry = Geometry {
+            position: Some(position),
+            size: Some(size),
+            flags: Some(GeometryFlags::from_bits(LINE_FLAGS)),
+            angle: Some(angle),
+        };
+        if !geometry.is_valid() || size.width <= 0.0 {
+            return Err(Refusal::InvalidGeometry.into());
+        }
+        structure::reserve(&mut self.operations, 1)?;
+        self.operations.push(Operation::Add(Box::new(NewShape {
+            path: author::Path::Line(segment.length()),
+            geometry,
+            text: String::new(),
+            text_box: false,
+        })));
+        Ok(self)
     }
 
     /// Stage the removal of a text box, ordinary shape, image, movie or
@@ -400,11 +432,11 @@ impl Edit<'_> {
         })
     }
 
-    /// Stage a copy of an image, movie or audio clip: its graph (the
-    /// drawable and its title and caption stand-ins) under fresh
-    /// identifiers, offset by 10 points on both axes as Numbers places a
-    /// duplicate, sharing its style, comment and embedded data. The copy
-    /// joins the front of the sheet's list.
+    /// Stage a copy of a shape, line, image, movie or audio clip: its graph
+    /// (the drawable, its title and caption stand-ins and a shape's text
+    /// storage) under fresh identifiers, offset by 10 points on both axes
+    /// as Numbers places a duplicate, sharing its style, comment and
+    /// embedded data. The copy joins the front of the sheet's list.
     ///
     /// # Errors
     ///
@@ -412,7 +444,7 @@ impl Edit<'_> {
     /// [`Refusal::UnsupportedOperation`] for the other kinds.
     pub fn duplicate(&mut self, drawable: impl Into<DrawableSelector>) -> Result<&mut Self, Error> {
         let (identifier, kind) = self.resolve(drawable.into())?;
-        if !matches!(kind, Kind::Image | Kind::Movie | Kind::Audio) {
+        if !matches!(kind, Kind::Shape | Kind::Image | Kind::Movie | Kind::Audio) {
             return Err(Refusal::UnsupportedOperation {
                 operation: "duplicate",
                 kind: kind.name(),
@@ -689,7 +721,7 @@ fn publish_structural(
                     identifiers,
                     sheet.identifier,
                     shape.geometry,
-                    shape.preset,
+                    shape.path,
                     &shape.text,
                     shape.text_box,
                     working.archive_limits(),

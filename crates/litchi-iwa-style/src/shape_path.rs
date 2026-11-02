@@ -1,6 +1,7 @@
 //! Preset shape paths (record 0413b): the `TSD.PathSourceArchive` a
 //! [`Preset`] draws at a frame size, a straight line's path source, and the
-//! preset an existing shape's path source draws.
+//! preset an existing shape's path source draws, and the segment a
+//! straight line draws.
 //!
 //! This is the legacy host's `shapes::path::{shape_path_source,
 //! shape_preset}`. The Numbers sheet-drawable author (record 0378), the
@@ -513,6 +514,60 @@ pub fn preset(shape_info: &[u8], limits: WireLimits) -> Result<Option<Preset>> {
         });
     }
     Ok(None)
+}
+
+/// The segment a native straight line draws and whether its stored path
+/// runs backwards (the host's `shape_line_segment`); `None` for a shape
+/// that is not a straight line.
+///
+/// # Errors
+///
+/// [`Error::Invalid`] for a malformed shape or a line without a complete
+/// frame.
+pub fn line_segment(
+    shape_info: &[u8],
+) -> Result<Option<(litchi_iwa_common::shape::line::Segment, bool)>> {
+    use litchi_iwa_common::shape::geometry::{Point, Size};
+    use litchi_iwa_protos::shape_style_codec as line_codec;
+    let Some(stored) = line_codec::line(shape_info, line_codec::Limits::DEFAULT)
+        .map_err(|_error| invalid("the line path is malformed"))?
+    else {
+        return Ok(None);
+    };
+    let [x, y] = stored
+        .geometry
+        .position
+        .ok_or(invalid("a line has no position"))?;
+    let [width, height] = stored.geometry.size.ok_or(invalid("a line has no size"))?;
+    let segment = litchi_iwa_common::shape::line::Segment::from_geometry(
+        Point { x, y },
+        Size { width, height },
+        stored
+            .geometry
+            .angle
+            .ok_or(invalid("a line has no angle"))?,
+        stored.natural_width,
+    )
+    .map_err(|_error| invalid("a line's frame is not a segment"))?;
+    Ok(Some(if stored.horizontal_flip {
+        (segment.reversed(), true)
+    } else {
+        (segment, false)
+    }))
+}
+
+/// Whether two line segments agree up to the `f32` rounding of a frame
+/// round trip (how a written segment reads back).
+#[must_use]
+pub fn segments_match(
+    left: litchi_iwa_common::shape::line::Segment,
+    right: litchi_iwa_common::shape::line::Segment,
+) -> bool {
+    let close = |a: f32, b: f32| (a - b).abs() <= 1e-3 * a.abs().max(b.abs()).max(1.0);
+    close(left.start().x, right.start().x)
+        && close(left.start().y, right.start().y)
+        && close(left.end().x, right.end().x)
+        && close(left.end().y, right.end().y)
 }
 
 /// Replace the path family of a `TSWP.ShapeInfoArchive` payload's path
