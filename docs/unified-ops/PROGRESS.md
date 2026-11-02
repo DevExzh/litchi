@@ -7553,3 +7553,14 @@ See [0063](0063-source-pptx-modern-comments.md).
 - Full gate on frozen `4b26bb3379` (`full-4b26bb3379-r2`): 51 of 53 rows passed. Rows 48 (tooling unit tests) and 51 (bench matrix) failed for one reason. Record 0408's leaf-versus-host evidence had no bench-matrix row and no exemption, so the committed matrix was stale. This is fixed on trunk by `fc7a879e7c` (an exemption with the reason, and a regenerated matrix). It is not a green gate.
 - Merged W4-P slice 1 (`82c4d4fe32`, 86 Pages rows: text-box character, paragraph, frame, layout and plain text) and slice 2 (`f0aa2ad349`, 38 Pages rows: text-box lists and named paragraph styles, plus the shared `litchi_iwa_text_wire::list::publish`). Measured routes cost 70–91% less than the host. Post-merge checks pass.
 - A fresh full gate is running on `f0aa2ad349`.
+- W4 merges since `f0aa2ad349`:
+  - W4-P slice 3 (`0a13cdad8d`, 34 Pages rows: annotations, fields, links; Numbers moved onto the shared list publisher, deleting its 637-line copy);
+  - W4-P slice 4 (`a444331827`, 21 rows plus 1 retired: drawable removal, comments, drawables list, line segments; host `remove_text_box` reference fix, macOS-queued);
+  - W4-P 0413b (`5b5dad5c57`: `litchi_iwa_style::shape_path` shared by all three leaves, Pages shape presets);
+  - W4-C slice 1 (`cd89e91f63`, 200 rows: shared chart style, axis and series engines in `litchi-iwa-style`; Keynote and Pages chart families; Numbers moved onto them);
+  - W4-C slice 2 (`2ade7ad168`, 36 rows: axis gridline stroke, label angle, affixes, number format, 3D label position, border stroke);
+  - W4-T slices 1–3 (`d93ff8c882`, 164 rows: `litchi_iwa_table::cell_rich_text` lifted from Numbers; Pages and Keynote cell text and lists; Keynote appearance reader fix for rich-text cells).
+- Every slice's own full gate passes, and every merge passes the post-merge workspace, ledger, fuzz-lock and boundary checks. All measured routes cost 2–47% of the host route's instructions.
+- Ledger: 1,786 migrated, 44 retired and 401 host-only rows (Pages 123, Numbers 120, Keynote 100, shared 58). The full gate on `f0aa2ad349` is still running. Nothing pushed.
+- Full gate on `f0aa2ad349` (`.coord/resume-20261028/full-f0aa2ad349/`): all 53 rows passed (`DONE failed=0`, finished 2026-11-02T11:41:13Z; summary SHA-256 `5bc9b7f645cc40b38d434e0004a036198b5304c8fe9a4f00d701fd3763b2d8d1`). It is the first complete green gate since `e0e297a82b`. Instruction qualification for this candidate is not run; final performance qualification waits for the end of wave W4 on one frozen commit.
+- Merged W4-P 0413b lifecycle (`07b612e0a2`, 10 Pages rows: text-box, shape and line adds, duplicates, body_shapes; clear-on-remove for commented drawables; host line-duplicate fix, macOS-queued). A full gate on `07b612e0a2` is starting.
