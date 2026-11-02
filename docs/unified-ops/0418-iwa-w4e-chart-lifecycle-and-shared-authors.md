@@ -1,7 +1,8 @@
 # 0418 — W4-E: shared chart author, Numbers chart lifecycle, Keynote on the shared modules
 
-- Status: slice 1 on branch `uo2/iwa-w4e` (cut from trunk `b667dc4246`).
-  The package continues (§6).
+- Status: slices 1 and 2 on branch `uo2/iwa-w4e` (cut from trunk
+  `b667dc4246`; trunk `2604268add` merged). Slice 2 (§7) adds Pages chart
+  creation and frame writes. The rest is left (§6).
 - Date: 2026-11-02.
 - Scope (coordinator, after record 0416a §5): chart add, duplicate and
   remove on Numbers and Pages over a shared chart author; Pages chart
@@ -101,10 +102,29 @@ Both pre-commit size checks printed nothing for every commit.
 
 | Item | Rows | Next |
 |---|---:|---|
-| Pages chart add, duplicate and remove | 3 | `chart::lifecycle` (or `drawable::lifecycle`) verbs over the shared author: body attachment, U+FFFC in the body storage, z-order (created on first use), `owned_preset`, theme preset and edges |
-| Pages `set_body_chart_geometry` | 1 | a frame write that also moves the body attachment's offsets (the host's `set_chart_attachment_position`) |
+| Pages chart duplicate and remove | 2 | Pages `DrawableSelector` has no chart variant; add chart verbs (`chart::lifecycle::Edit::{duplicate, remove}` or a `DrawableSelector::Chart`) over the body-media graph proof: clone or delete the private graph, the attachment and U+FFFC, unregister styles and preset (as the Numbers module `sheet_drawable_chart` does) |
 | shared `document.rs charts` | 1 | aggregate read: retire with the three leaf chart lists, or a `litchi-iwa-structured` aggregate |
 | Numbers shape image fill | 1 | `style` image fill through `litchi_iwa_style::shape::{ReleasingFills, stored_fill}` (Pages 0413b/0415) |
-| Numbers shape, image and movie titles and captions | 15 | lift the caption graph seam (Pages `body_drawable_caption`, Keynote `slide_movie_caption`), then a Numbers family |
+| Numbers shape, image and movie titles and captions | 15 | reassigned by the coordinator to W4-F (with chart captions) |
 | Pages `Builder::body_table` | 1 | from-scratch table graph in `litchi_numbers_wire::table_create` |
 | Keynote line endpoints | — | `line_end::{endpoints, set_endpoints}` once Keynote's shape-style workspace is the shared `graph::Workspace` |
+
+## 7. Slice 2 — Pages chart creation and frame
+
+| Commit | What |
+|---|---|
+| *(this slice)* | Pages `drawable::lifecycle::Edit::add_chart(TextPosition, Kind, ChartData, Point, Size)` and `Refusal::InvalidChart` (submodule `body_media_lifecycle/chart.rs`): the shared author's graph with the Pages profile in the body component, attachment, U+FFFC, z-order created on first use, styles appended to the stylesheet and the preset to the theme's chart presets, UUIDs at the body component and the host's cross-component edges. `chart::lifecycle::Edit::set_geometry(Geometry)` and `Refusal::InvalidGeometry`: the frame parts that differ are rewritten in place and a moved chart's attachment offsets follow (horizontal from the body's left margin, vertical from the page). `chart::lifecycle::Patch::is_noop` is now byte-based, so a frame-only patch and its inverse replay |
+
+| Host route | Destination | Tier |
+|---|---|---|
+| `add_body_chart` | `drawable::lifecycle::Edit::add_chart` | B |
+| `set_body_chart_geometry` | `chart::lifecycle::Edit::set_geometry` | B |
+
+Both are macOS-queued (no host native evidence). Ledger: 2 Pages rows flip.
+
+| Route | Host Ir | Leaf Ir | Δ |
+|---|---:|---:|---:|
+| Pages chart add | 970,320,609 | 172,192,318 | −82.3% |
+| Pages chart frame | 1,930,034,438 | 44,007,224 | −97.7% |
+
+Same probe (`W4E_CHART_ROUTE=pages_add|pages_geometry`).
