@@ -13,17 +13,23 @@
 
 use std::hint::black_box;
 
-use litchi_iwa::charts::{ChartPieStartAngle, ChartSeriesConnectionLine};
+use litchi_iwa::charts::{
+    ChartAxisGridline, ChartAxisGridlineStroke, ChartPieStartAngle, ChartSeriesConnectionLine,
+};
 use litchi_iwa::shapes::ShapeFill;
 use litchi_iwa::{keynote, numbers, pages};
 use litchi_iwa_common::chart::axis::Axis;
 use litchi_iwa_common::chart::axis::style::Visibility;
 use litchi_iwa_common::chart::kind::Kind;
-use litchi_iwa_common::chart::number_format::LabelAffixes;
+use litchi_iwa_common::chart::number_format::{
+    DecimalPlaces, LabelAffixes, NegativeStyle, NumberFormat,
+};
 use litchi_iwa_common::chart::pie::StartAngle;
 use litchi_iwa_common::chart::series::ConnectionLine;
 use litchi_iwa_common::color::{RgbColorSpace, Rgba};
 use litchi_iwa_common::shape::fill::Fill;
+use litchi_iwa_common::shape::stroke::{Pattern, Stroke, Width};
+use litchi_iwa_style::chart_style::axis::{GridlineStroke, Property as AxisProperty};
 
 use crate::chart_style_cases::{Input, Target, input};
 use crate::harness::{Format, TestResult};
@@ -39,6 +45,9 @@ enum Operation {
     SeriesRead,
     SeriesFillSet,
     AffixesSet,
+    AxisFormatSet,
+    GridlineStrokeSet,
+    BorderSet,
 }
 
 const ROUTES: &[(&str, Format, Operation)] = &[
@@ -71,18 +80,68 @@ const ROUTES: &[(&str, Format, Operation)] = &[
         Format::Numbers,
         Operation::AffixesSet,
     ),
+    (
+        "keynote_axis_format_set",
+        Format::Keynote,
+        Operation::AxisFormatSet,
+    ),
+    (
+        "keynote_gridline_stroke_set",
+        Format::Keynote,
+        Operation::GridlineStrokeSet,
+    ),
+    ("keynote_border_set", Format::Keynote, Operation::BorderSet),
+    (
+        "pages_axis_format_set",
+        Format::Pages,
+        Operation::AxisFormatSet,
+    ),
+    (
+        "pages_gridline_stroke_set",
+        Format::Pages,
+        Operation::GridlineStrokeSet,
+    ),
+    ("pages_border_set", Format::Pages, Operation::BorderSet),
+    (
+        "numbers_axis_format_set",
+        Format::Numbers,
+        Operation::AxisFormatSet,
+    ),
+    (
+        "numbers_gridline_stroke_set",
+        Format::Numbers,
+        Operation::GridlineStrokeSet,
+    ),
+    ("numbers_border_set", Format::Numbers, Operation::BorderSet),
 ];
 
 const fn chart_kind(operation: Operation) -> Kind {
     match operation {
         Operation::StyleSet | Operation::StyleRead => Kind::Pie2d,
         Operation::SeriesSet | Operation::SeriesRead => Kind::Line2d,
-        Operation::AxisSet | Operation::SeriesFillSet | Operation::AffixesSet => Kind::Column2d,
+        Operation::AxisSet
+        | Operation::SeriesFillSet
+        | Operation::AffixesSet
+        | Operation::AxisFormatSet
+        | Operation::GridlineStrokeSet
+        | Operation::BorderSet => Kind::Column2d,
     }
 }
 
 fn fill() -> TestResult<Rgba> {
     Ok(Rgba::new(0.1, 0.4, 0.9, 1.0, RgbColorSpace::Srgb)?)
+}
+
+fn label_format() -> TestResult<NumberFormat> {
+    Ok(NumberFormat::new(
+        DecimalPlaces::fixed(2)?,
+        NegativeStyle::Parentheses,
+        true,
+    ))
+}
+
+fn stroke() -> TestResult<Stroke> {
+    Ok(Stroke::new(fill()?, Width::new(2.0)?, Pattern::Solid))
 }
 
 fn affixes() -> TestResult<Vec<LabelAffixes>> {
@@ -131,6 +190,24 @@ fn host_operation(input: &Input, source: &[u8], operation: Operation) -> TestRes
                 Operation::SeriesFillSet => {
                     e.set_slide_chart_series_fills(slide, chart, &fills()?)?;
                 },
+                Operation::AxisFormatSet => {
+                    e.set_slide_chart_axis_number_format(
+                        slide,
+                        chart,
+                        Axis::Value,
+                        label_format()?,
+                    )?;
+                },
+                Operation::GridlineStrokeSet => e.set_slide_chart_axis_gridline_stroke(
+                    slide,
+                    chart,
+                    Axis::Value,
+                    ChartAxisGridline::Major,
+                    ChartAxisGridlineStroke::Stroke(stroke()?),
+                )?,
+                Operation::BorderSet => {
+                    e.set_slide_chart_border_stroke(slide, chart, Some(stroke()?))?;
+                },
                 Operation::AffixesSet => return Err("not a Keynote route".into()),
             }
             e.to_bytes()?
@@ -154,6 +231,16 @@ fn host_operation(input: &Input, source: &[u8], operation: Operation) -> TestRes
                     );
                 },
                 Operation::SeriesFillSet => e.set_body_chart_series_fills(chart, &fills()?)?,
+                Operation::AxisFormatSet => {
+                    e.set_body_chart_axis_number_format(chart, Axis::Value, label_format()?)?;
+                },
+                Operation::GridlineStrokeSet => e.set_body_chart_axis_gridline_stroke(
+                    chart,
+                    Axis::Value,
+                    ChartAxisGridline::Major,
+                    ChartAxisGridlineStroke::Stroke(stroke()?),
+                )?,
+                Operation::BorderSet => e.set_body_chart_border_stroke(chart, Some(stroke()?))?,
                 Operation::AffixesSet => return Err("not a Pages route".into()),
             }
             e.to_bytes()?
@@ -163,6 +250,24 @@ fn host_operation(input: &Input, source: &[u8], operation: Operation) -> TestRes
             match operation {
                 Operation::AffixesSet => {
                     e.set_sheet_chart_series_value_label_affixes(sheet, chart, &affixes()?)?;
+                },
+                Operation::AxisFormatSet => {
+                    e.set_sheet_chart_axis_number_format(
+                        sheet,
+                        chart,
+                        Axis::Value,
+                        label_format()?,
+                    )?;
+                },
+                Operation::GridlineStrokeSet => e.set_sheet_chart_axis_gridline_stroke(
+                    sheet,
+                    chart,
+                    Axis::Value,
+                    ChartAxisGridline::Major,
+                    ChartAxisGridlineStroke::Stroke(stroke()?),
+                )?,
+                Operation::BorderSet => {
+                    e.set_sheet_chart_border_stroke(sheet, chart, Some(stroke()?))?;
                 },
                 _ => return Err("not a Numbers route".into()),
             }
@@ -217,7 +322,24 @@ fn keynote_operation(source: &[u8], operation: Operation) -> TestResult<Vec<u8>>
             ]))?;
             leaf_bytes!(edit.commit()?.package())
         },
+        Operation::AxisFormatSet | Operation::GridlineStrokeSet => {
+            let mut edit = package.edit_slide_chart_axis(slide, chart)?;
+            edit.set(Axis::Value, axis_value(operation)?)?;
+            leaf_bytes!(edit.commit()?.package())
+        },
+        Operation::BorderSet => {
+            let mut edit = package.edit_slide_chart_style(slide, chart)?;
+            edit.set(style::Property::BorderStroke(Some(stroke()?)))?;
+            leaf_bytes!(edit.commit()?.package())
+        },
         Operation::AffixesSet => return Err("not a Keynote route".into()),
+    })
+}
+
+fn axis_value(operation: Operation) -> TestResult<AxisProperty> {
+    Ok(match operation {
+        Operation::AxisFormatSet => AxisProperty::NumberFormat(label_format()?),
+        _ => AxisProperty::MajorGridlineStroke(GridlineStroke::Stroke(stroke()?)),
     })
 }
 
@@ -275,6 +397,20 @@ fn pages_operation(source: &[u8], operation: Operation) -> TestResult<Vec<u8>> {
                 .commit()?
                 .package()
         ),
+        Operation::AxisFormatSet | Operation::GridlineStrokeSet => leaf_bytes!(
+            package
+                .edit_body_chart_axis(chart)?
+                .set(Axis::Value, axis_value(operation)?)?
+                .commit()?
+                .package()
+        ),
+        Operation::BorderSet => leaf_bytes!(
+            package
+                .edit_body_chart_style(chart)?
+                .set(style::Property::BorderStroke(Some(stroke()?)))?
+                .commit()?
+                .package()
+        ),
         Operation::AffixesSet => return Err("not a Pages route".into()),
     })
 }
@@ -286,6 +422,18 @@ fn numbers_operation(source: &[u8], operation: Operation) -> TestResult<Vec<u8>>
         Operation::AffixesSet => {
             let mut edit = package.edit_sheet_chart_series(0, 1)?;
             edit.set(series::Property::ValueLabelAffixes(affixes()?))?;
+            Ok(leaf_bytes!(edit.commit()?.package()))
+        },
+        Operation::AxisFormatSet | Operation::GridlineStrokeSet => {
+            let mut edit = package.edit_sheet_chart_axis(0, 1)?;
+            edit.set(Axis::Value, axis_value(operation)?)?;
+            Ok(leaf_bytes!(edit.commit()?.package()))
+        },
+        Operation::BorderSet => {
+            let mut edit = package.edit_sheet_chart_style(0, 1)?;
+            edit.set(litchi_numbers::sheet::chart::style::Property::BorderStroke(
+                Some(stroke()?),
+            ))?;
             Ok(leaf_bytes!(edit.commit()?.package()))
         },
         _ => Err("not a Numbers route".into()),

@@ -1,6 +1,6 @@
 # 0414 — W4-C: the chart style families on all three formats
 
-- Status: slice 1 merge-ready on branch `uo2/iwa-w4c` (cut from trunk
+- Status: slice 1 merged (`cd89e91f63`); slice 2 merge-ready on branch `uo2/iwa-w4c` (cut from trunk
   `feat/unified-ops-api` at `4b26bb3379`); the wave continues (§6).
 - Date: 2026-11-02.
 - Plan: [0363](0363-iwa-monolith-exit-plan.md) (§0 wave table, §3.2 API
@@ -229,3 +229,39 @@ build env of the coordinator rules. Logs: `.coord/iwa-w4c/gates1`, `gates2`.
 No litchi-ops dispatch, capability or corpus-visible behaviour changed (D7),
 so the goldens and the corpus were not re-blessed. Both pre-commit size checks
 printed nothing for every commit.
+
+## 9. Slice 2: axis label and gridline properties, border stroke
+
+36 rows flip (12 per format).
+
+| Crate | What |
+|---|---|
+| `litchi-iwa-style` | `chart_style::axis::Property::{MajorGridlineStroke, MinorGridlineStroke, LabelAngle, LabelAffixes, NumberFormat, LabelPosition3d}` with `GridlineStroke::{Inherited, None, Stroke}`; the axis-label dual formatter (`Fields { legacy: 2, current: 42, format_type: 3 }`) on the shared `number_format` codec; `PropertyKind::applies_to(axis, chart kind)` (the 3D label position needs a 3D kind); `read_axis`/`write_axis` take the chart kind and a borrowed value (axis values are no longer `Copy`). `chart_style::chart::Property::BorderStroke(Option<Stroke>)` with `chart::default_border()` (black, 1 pt, solid; the stored field is removed when the default is written, as the host does) |
+| `litchi-numbers` | `sheet::chart::axis` re-exports the new values, gains `Refusal::UnsupportedKind`, and reads the chart kind only for the 3D label position |
+| `litchi-keynote`, `litchi-pages` | `chart::axis` re-exports the new values; `axis::Patch::{before, after}` return references |
+| `litchi-iwa` (tests) | Numbers axis cases gain the six properties (the 3D label position on a Column3d chart), style cases the border stroke (set, none, reset); Keynote and Pages re-ported; nine cost-probe routes |
+
+| Format | Rows | Parity tests | Tier |
+|---|---:|---|---|
+| Keynote | 12 | `keynote_slide_chart_axis_{set,read}_parity`, `keynote_slide_chart_options_{set,read}_parity` | B |
+| Pages | 12 | `pages_body_chart_axis_{set,read}_parity`, `pages_body_chart_options_{set,read}_parity` | A |
+| Numbers | 12 | `numbers_sheet_chart_axis_{set,read}_parity`, `numbers_sheet_chart_options_{set,read}_parity` | A |
+
+The Pages and Numbers writes are byte-identical to the host on the tracked
+fixtures. All flipped routes already had macOS-queue rows (the family routes
+of slice 1 and 0378).
+
+Performance (same probe and method as §5; receipt
+`results/0414/callgrind-slice2.json`, raw captures in `.coord/iwa-w4c/cg2/`):
+
+| Route | Host Ir | Leaf Ir | Leaf/host |
+|---|---:|---:|---:|
+| Keynote axis number format set | 767,569,222 | 77,373,265 | 0.1008 |
+| Keynote major gridline stroke set | 767,543,195 | 77,274,616 | 0.1007 |
+| Keynote border stroke set | 1,087,487,175 | 77,247,654 | 0.0710 |
+| Pages axis number format set | 1,193,184,273 | 47,095,918 | 0.0395 |
+| Pages major gridline stroke set | 1,193,029,441 | 46,994,157 | 0.0394 |
+| Pages border stroke set | 1,746,969,037 | 46,973,465 | 0.0269 |
+| Numbers axis number format set | 151,129,897 | 44,413,081 | 0.2939 |
+| Numbers major gridline stroke set | 150,993,816 | 44,326,587 | 0.2936 |
+| Numbers border stroke set | 187,014,852 | 44,512,260 | 0.2380 |
