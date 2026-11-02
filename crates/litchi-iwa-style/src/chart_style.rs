@@ -68,12 +68,15 @@ fn apply_writes(
     )
 }
 
+mod lighting_presets;
+
 /// The chart-level properties.
 pub mod chart {
     use litchi_iwa_common::chart::kind::Kind as ChartKind;
     use litchi_iwa_common::chart::{corner, donut, gaps, legend, pie, radar};
     use litchi_iwa_common::chart3d::{self, Scale};
-    use litchi_iwa_common::color::Rgba;
+    use litchi_iwa_common::color::{RgbColorSpace, Rgba};
+    use litchi_iwa_common::shape::fill::{Angle, Fill, Gradient};
     use litchi_iwa_common::shape::stroke::{Pattern, Stroke, Width};
     use litchi_iwa_protos::chart_style_codec::{
         self as codec, Archive, Limits as CodecLimits, Properties, Write, field, property,
@@ -81,6 +84,19 @@ pub mod chart {
     use litchi_iwa_protos::shape_style_codec::native as stored;
 
     use crate::drawing;
+
+    /// The fill a chart style without a stored background fill draws (the
+    /// host's `native_default_chart_background_fill`: a linear gradient from
+    /// 67% gray to white at 0 degrees).
+    #[must_use]
+    pub fn default_background() -> Fill {
+        let gray = 2.0 / 3.0;
+        Fill::Gradient(Gradient::linear(
+            Rgba::new(gray, gray, gray, 1.0, RgbColorSpace::Srgb).expect("opaque gray"),
+            Rgba::new(1.0, 1.0, 1.0, 1.0, RgbColorSpace::Srgb).expect("opaque white"),
+            Angle::from_degrees(0.0).expect("zero angle"),
+        ))
+    }
 
     /// The chart border a chart style without a stored border draws (the
     /// host's `native_default_chart_border_stroke`: black, one point, solid).
@@ -93,7 +109,7 @@ pub mod chart {
     use crate::series::{Refusal, SymbolError, SymbolResult};
 
     /// One chart-level style property with its value.
-    #[derive(Debug, Clone, Copy, PartialEq)]
+    #[derive(Debug, Clone, PartialEq)]
     #[non_exhaustive]
     pub enum Property {
         /// Wedges rotation of a pie or donut chart.
@@ -126,6 +142,113 @@ pub mod chart {
         GapSpacing(gaps::Spacing),
         /// The chart-area border stroke (`None`: no border line).
         BorderStroke(Option<Stroke>),
+        /// The fill behind the plot area. Image fills move data references
+        /// and media and are refused here.
+        BackgroundFill(Fill),
+        /// The lighting preset of a 3D chart.
+        Lighting3d(Lighting3d),
+    }
+
+    /// One native choice from the Chart inspector's Lighting Style menu of
+    /// a 3D chart (the host's `Chart3dLightingStyle`).
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+    #[non_exhaustive]
+    pub enum Lighting3d {
+        /// No stored lighting package (the native default).
+        #[default]
+        Default,
+        /// "Soft Light".
+        SoftLight,
+        /// "Soft Fill".
+        SoftFill,
+        /// "Medium Center".
+        MediumCenter,
+        /// "Medium Right".
+        MediumRight,
+        /// "Medium Left".
+        MediumLeft,
+        /// "Glossy".
+        Glossy,
+    }
+
+    impl Lighting3d {
+        const ALL: [Self; 7] = [
+            Self::Default,
+            Self::SoftLight,
+            Self::SoftFill,
+            Self::MediumCenter,
+            Self::MediumRight,
+            Self::MediumLeft,
+            Self::Glossy,
+        ];
+
+        /// The label the native Chart inspector shows (the stored package
+        /// name).
+        #[must_use]
+        pub const fn inspector_label(self) -> &'static str {
+            match self {
+                Self::Default => "Default",
+                Self::SoftLight => "Soft Light",
+                Self::SoftFill => "Soft Fill",
+                Self::MediumCenter => "Medium Center",
+                Self::MediumRight => "Medium Right",
+                Self::MediumLeft => "Medium Left",
+                Self::Glossy => "Glossy",
+            }
+        }
+
+        /// The encoded package the host writes; `None` for the default,
+        /// which removes the package.
+        const fn package(self) -> Option<&'static [u8]> {
+            use super::lighting_presets as preset;
+            Some(match self {
+                Self::Default => return None,
+                Self::SoftLight => preset::SOFT_LIGHT,
+                Self::SoftFill => preset::SOFT_FILL,
+                Self::MediumCenter => preset::MEDIUM_CENTER,
+                Self::MediumRight => preset::MEDIUM_RIGHT,
+                Self::MediumLeft => preset::MEDIUM_LEFT,
+                Self::Glossy => preset::GLOSSY,
+            })
+        }
+
+        /// The preset a stored package names. The host refuses a package
+        /// without a light or with a name outside the menu.
+        fn from_package(package: &[u8]) -> SymbolResult<Self> {
+            use litchi_iwa_common::WireLimits;
+            use litchi_iwa_common::wire::WireView;
+            let view = WireView::parse(package, WireLimits::DEFAULT)
+                .map_err(|_| SymbolError::Invalid("an invalid 3D lighting package"))?;
+            let mut name = None;
+            let mut lights = 0usize;
+            for field in view.fields() {
+                match (field.number(), field.wire_type()) {
+                    (1, 2) => name = Some(field.payload()),
+                    (2, 2) => lights += 1,
+                    _ => {},
+                }
+            }
+            let name = name.filter(|_| lights > 0).ok_or(SymbolError::Invalid(
+                "a 3D lighting package without a name or a light",
+            ))?;
+            Self::ALL
+                .into_iter()
+                .find(|preset| preset.inspector_label().as_bytes() == name)
+                .ok_or(SymbolError::Invalid("an unsupported 3D lighting package"))
+        }
+    }
+
+    /// The chart style extension field storing the lighting package of a
+    /// chart of kind `chart` (the host's `LightingField`).
+    const fn lighting_field(chart: ChartKind) -> Option<u32> {
+        Some(match chart {
+            ChartKind::Area3d | ChartKind::StackedArea3d => 2,
+            ChartKind::Bar3d | ChartKind::StackedBar3d => 3,
+            ChartKind::Column3d | ChartKind::StackedColumn3d => 4,
+            ChartKind::Line3d => 6,
+            ChartKind::Pie3d | ChartKind::Donut3d => 7,
+            _ => return None,
+        })
     }
 
     /// The radius gridlines of a radar chart.
@@ -173,6 +296,10 @@ pub mod chart {
         GapSpacing,
         /// [`Property::BorderStroke`].
         BorderStroke,
+        /// [`Property::BackgroundFill`].
+        BackgroundFill,
+        /// [`Property::Lighting3d`].
+        Lighting3d,
     }
 
     impl Property {
@@ -195,6 +322,8 @@ pub mod chart {
                 Self::RadarGridShape(_) => PropertyKind::RadarGridShape,
                 Self::GapSpacing(_) => PropertyKind::GapSpacing,
                 Self::BorderStroke(_) => PropertyKind::BorderStroke,
+                Self::BackgroundFill(_) => PropertyKind::BackgroundFill,
+                Self::Lighting3d(_) => PropertyKind::Lighting3d,
             }
         }
     }
@@ -219,6 +348,8 @@ pub mod chart {
                 Self::RadarGridShape => Property::RadarGridShape(RadarGridShape::Straight),
                 Self::GapSpacing => Property::GapSpacing(gaps::Spacing::DEFAULT),
                 Self::BorderStroke => Property::BorderStroke(Some(default_border())),
+                Self::BackgroundFill => Property::BackgroundFill(default_background()),
+                Self::Lighting3d => Property::Lighting3d(Lighting3d::Default),
             }
         }
 
@@ -232,7 +363,9 @@ pub mod chart {
                 | Self::BorderVisible
                 | Self::RadarGridShape
                 | Self::GapSpacing
-                | Self::BorderStroke => Archive::ChartStyle,
+                | Self::BorderStroke
+                | Self::BackgroundFill
+                | Self::Lighting3d => Archive::ChartStyle,
                 _ => Archive::ChartNonStyle,
             })
         }
@@ -249,13 +382,15 @@ pub mod chart {
                 Self::Depth3d => kind.supports_3d_depth(),
                 Self::BarShape3d => kind.supports_3d_bar_shape(),
                 Self::RadarGridShape => kind.supports_radar_grid_shape(),
+                Self::Lighting3d => lighting_field(kind).is_some(),
                 Self::RoundedCorners
                 | Self::LegendFrame
                 | Self::LegendVisible
                 | Self::BorderVisible
                 | Self::IncludesHiddenData
                 | Self::GapSpacing
-                | Self::BorderStroke => true,
+                | Self::BorderStroke
+                | Self::BackgroundFill => true,
             }
         }
     }
@@ -274,6 +409,8 @@ pub mod chart {
         pub(super) const BORDER_VISIBLE: u32 = 18;
         /// `tschchartinfodefaultradarradiusgridlinecurve` (chart style).
         pub(super) const RADAR_GRID_CURVE: u32 = 29;
+        /// `tschchartinfodefaultgridbackgroundfill` (chart style).
+        pub(super) const BACKGROUND_FILL: u32 = 14;
         /// `tschchartinfodefaultborderstroke` (chart style).
         pub(super) const BORDER_STROKE: u32 = 12;
         /// `tschchartinfodefaultinterbargap` and `…intersetgap` (chart
@@ -426,6 +563,26 @@ pub mod chart {
                     .map_err(out_of_range)?,
                 },
             ),
+            PropertyKind::BackgroundFill => Property::BackgroundFill(
+                match properties
+                    .message(scalar::BACKGROUND_FILL)
+                    .map_err(codec_error)?
+                {
+                    None => default_background(),
+                    Some(bytes) => drawing::fill(
+                        &stored::fill(bytes, CodecLimits::DEFAULT).map_err(out_of_range)?,
+                    )
+                    .map_err(out_of_range)?,
+                },
+            ),
+            PropertyKind::Lighting3d => {
+                let field =
+                    lighting_field(chart).ok_or(SymbolError::Refused(Refusal::UnsupportedKind))?;
+                Property::Lighting3d(match properties.message(field).map_err(codec_error)? {
+                    None => Lighting3d::Default,
+                    Some(package) => Lighting3d::from_package(package)?,
+                })
+            },
             PropertyKind::LegendFrame => {
                 return Err(SymbolError::Invalid(
                     "the legend frame is stored by the chart drawable",
@@ -526,11 +683,42 @@ pub mod chart {
     ///
     /// [`Refusal::UnsupportedKind`], an invalid payload, or the legend
     /// frame (written with [`rewrite_legend_frame`]).
-    pub fn rewrite(payload: &[u8], value: Property, chart: ChartKind) -> SymbolResult<Vec<u8>> {
+    pub fn rewrite(payload: &[u8], value: &Property, chart: ChartKind) -> SymbolResult<Vec<u8>> {
         let archive = value.kind().archive().ok_or(SymbolError::Invalid(
             "the legend frame is stored by the chart drawable",
         ))?;
-        if let Property::BorderStroke(stroke) = value {
+        if let Property::BackgroundFill(fill) = value {
+            if matches!(fill, Fill::Image(_)) {
+                return Err(SymbolError::Refused(Refusal::ImageFill));
+            }
+            let encoded = (*fill != default_background()).then(|| drawing::encode_fill(fill));
+            let write = match encoded.as_deref() {
+                Some(value) => Write::MergeMessage {
+                    field: scalar::BACKGROUND_FILL,
+                    value,
+                    schema: codec::merge::schema::FILL,
+                },
+                None => Write::Message {
+                    field: scalar::BACKGROUND_FILL,
+                    value: None,
+                },
+            };
+            return apply_writes(payload, archive, &[write], codec::EmptyExtension::Remove);
+        }
+        if let Property::Lighting3d(lighting) = *value {
+            let field =
+                lighting_field(chart).ok_or(SymbolError::Refused(Refusal::UnsupportedKind))?;
+            return apply_writes(
+                payload,
+                archive,
+                &[Write::Message {
+                    field,
+                    value: lighting.package(),
+                }],
+                codec::EmptyExtension::Keep,
+            );
+        }
+        if let Property::BorderStroke(stroke) = *value {
             let encoded =
                 (stroke != Some(default_border())).then(|| drawing::encode_stroke(stroke));
             return apply_writes(
@@ -543,10 +731,10 @@ pub mod chart {
                 codec::EmptyExtension::Keep,
             );
         }
-        if let Some(writes) = scalar_writes(value) {
+        if let Some(writes) = scalar_writes(value.clone()) {
             return apply_writes(payload, archive, &writes, codec::EmptyExtension::Keep);
         }
-        let write = rule(value, chart)?;
+        let write = rule(value.clone(), chart)?;
         apply_writes(payload, archive, write.writes(), write.empty())
     }
 
@@ -1190,12 +1378,12 @@ pub fn write_chart(
     workspace: &mut Workspace<'_>,
     chart: u64,
     chart_kind: ChartKind,
-    value: chart::Property,
+    value: &chart::Property,
     limits: Limits,
 ) -> SymbolResult<(bool, Report)> {
     let mut budget = SymbolBudget::new(limits);
     let kind = value.kind();
-    if chart_value(workspace, chart, chart_kind, kind, &mut budget)? == value {
+    if chart_value(workspace, chart, chart_kind, kind, &mut budget)? == *value {
         return Ok((false, budget.report(false)));
     }
     let changed = match kind.archive() {
@@ -1208,7 +1396,7 @@ pub fn write_chart(
                 &[LEGEND_FRAME_FIELD],
                 &mut budget,
             )?;
-            let chart::Property::LegendFrame(frame) = value else {
+            let chart::Property::LegendFrame(frame) = *value else {
                 return Err(SymbolError::Invalid("not a legend frame"));
             };
             rewrite_in_place(
@@ -1241,7 +1429,7 @@ pub fn write_chart(
             )?
         },
     };
-    if changed && chart_value(workspace, chart, chart_kind, kind, &mut budget)? != value {
+    if changed && chart_value(workspace, chart, chart_kind, kind, &mut budget)? != *value {
         return Err(SymbolError::Invalid(
             "a chart style write does not read back",
         ));
