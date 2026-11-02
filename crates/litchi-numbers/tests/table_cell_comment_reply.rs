@@ -1135,7 +1135,7 @@ fn append_set_remove_and_a1_wrappers_are_reversible() -> TestResult {
 }
 
 #[test]
-fn reply_text_edits_preserve_metadata_and_append_inherits_the_source_leaf() -> TestResult {
+fn reply_text_edits_preserve_metadata_and_append_uses_the_commenting_author() -> TestResult {
     let source = fixture(FixtureMode::SingleRoot, None)?;
     let package = load_package(&source)?;
     let original = package.table_cell_comment_replies(
@@ -1162,15 +1162,16 @@ fn reply_text_edits_preserve_metadata_and_append_inherits_the_source_leaf() -> T
     assert_eq!(appended.patch().before(), original.as_ref());
     assert_eq!(appended.patch().after(), appended_replies.as_ref());
     assert_eq!(appended_replies[0], *original_reply);
-    assert_eq!(
-        appended_replies[1].timestamp(),
-        original_reply.timestamp(),
-        "an appended reply must inherit its source leaf timestamp"
+    // The host's reply writer stamps a new reply with the package's
+    // commenting author and a creation date; it does not copy a sibling's.
+    assert!(
+        appended_replies[1].timestamp().is_some(),
+        "an appended reply must carry a creation date"
     );
     assert_eq!(
         appended_replies[1].author(),
         original_reply.author(),
-        "an appended reply must inherit its source leaf author"
+        "an appended reply must be written by the package's commenting author"
     );
 
     let replaced = package.set_table_cell_comment_reply(

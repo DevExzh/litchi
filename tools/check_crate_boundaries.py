@@ -13099,6 +13099,9 @@ NUMBERS_TABLE_CELL_COMMENT_REPLY_MUTATION_OWNER_SOURCE = (
 NUMBERS_TABLE_CELL_COMMENT_REPLY_MUTATION_OWNER_HELPER_ROOT = Path(
     "crates/litchi-numbers/src/package"
 )
+NUMBERS_TABLE_CELL_COMMENT_REPLY_SHARED_ENGINE_ROOT = Path(
+    "crates/litchi-iwa-table/src/comments_native"
+)
 NUMBERS_TABLE_CELL_COMMENT_REPLY_MUTATION_CODEC_SOURCE = (
     NUMBERS_TABLE_CELL_COMMENT_REPLY_CODEC_SOURCE
 )
@@ -50289,6 +50292,14 @@ def audit_numbers_table_cell_comment_reply_mutation_facade_source_topology(
     if helper_root.is_dir():
         owner_paths.update(
             path for path in helper_root.glob("comments_reply*.rs") if path.is_file()
+        )
+    # Record 0412d: the Numbers reply transaction delegates its native
+    # transition to the shared copy-on-write reply engine, which owns the
+    # prepared reply-reference codec call.
+    shared_engine_root = root / NUMBERS_TABLE_CELL_COMMENT_REPLY_SHARED_ENGINE_ROOT
+    if shared_engine_root.is_dir():
+        owner_paths.update(
+            path for path in shared_engine_root.glob("*.rs") if path.is_file()
         )
     owner_sources = {
         path: production(path) for path in sorted(owner_paths) if path.is_file()
