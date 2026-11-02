@@ -106,9 +106,12 @@ pub mod legend_style {
     pub use crate::package::body_chart_series::{Diagnostics, Error, LimitKind, Refusal};
     pub use crate::package::body_chart_style::LegendStyleEdit as Edit;
     pub use crate::package::body_chart_style::legend_style::{
-        Commit, LegendFill, LegendShadow, LegendStroke, Patch, Property, PropertyKind,
+        Commit, LegendFill, LegendFont, LegendFontSize, LegendShadow, LegendStroke, Patch,
+        Property, PropertyKind,
     };
     pub use litchi_iwa_common::shape::fill::{Fill, Gradient};
     pub use litchi_iwa_common::shape::shadow::Drop;
     pub use litchi_iwa_common::shape::stroke::Stroke;
+    pub use litchi_iwa_text::character::TextPointSize;
+    pub use litchi_iwa_text::font::Font;
 }
