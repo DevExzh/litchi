@@ -42,13 +42,16 @@ pub use crate::package::sheet_drawable::{
 };
 
 /// Exact-source shape and text-frame style transactions for one sheet shape
-/// or text box: fill, stroke, effects, frame layout and text columns.
+/// or text box: fill, stroke, shadow, effects, frame layout, text columns
+/// and a straight line's endpoint decorations.
 pub mod style {
     pub use crate::package::sheet_drawable_style::{
         Commit, Diagnostics, Edit, Error, LimitKind, Patch, Refusal,
     };
     pub use litchi_iwa_common::shape::effects::Effects;
     pub use litchi_iwa_common::shape::fill::Fill;
+    pub use litchi_iwa_common::shape::line::{Endpoint, Endpoints};
+    pub use litchi_iwa_common::shape::shadow::Shadow;
     pub use litchi_iwa_common::shape::stroke::Stroke;
     pub use litchi_iwa_common::text::layout::Layout;
     pub use litchi_iwa_text::columns::Columns;
@@ -67,6 +70,10 @@ pub mod style {
         TextLayout(Layout),
         /// Uniform columns in a text box.
         Columns(Columns),
+        /// The shadow of a shape.
+        Shadow(Shadow),
+        /// The decorations at a straight line's directed start and end.
+        LineEndpoints(Endpoints),
     }
 
     /// Which [`Property`] a read or reset addresses.
@@ -83,6 +90,10 @@ pub mod style {
         TextLayout,
         /// The text-frame columns.
         Columns,
+        /// The shadow.
+        Shadow,
+        /// A straight line's endpoint decorations.
+        LineEndpoints,
     }
 
     impl Property {
@@ -95,6 +106,8 @@ pub mod style {
                 Self::Effects(_) => PropertyKind::Effects,
                 Self::TextLayout(_) => PropertyKind::TextLayout,
                 Self::Columns(_) => PropertyKind::Columns,
+                Self::Shadow(_) => PropertyKind::Shadow,
+                Self::LineEndpoints(_) => PropertyKind::LineEndpoints,
             }
         }
     }
@@ -106,6 +119,8 @@ pub mod properties {
     pub use crate::package::sheet_drawable_properties::{
         Commit, Diagnostics, Edit, Error, LimitKind, Patch, Refusal, Snapshot,
     };
+    pub use litchi_iwa_common::shape::line::Segment;
+    pub use litchi_iwa_common::shape::path::Preset;
 }
 
 /// Exact-source Drop Cap transactions for the paragraphs of the text a

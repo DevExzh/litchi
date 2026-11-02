@@ -18,7 +18,7 @@ use litchi_iwa_core::Limits;
 use litchi_iwa_style::graph::Workspace;
 use litchi_iwa_style::shape::{
     self as engine, ShapeProperty, Slot, Styles,
-    property::{Fills, ShapeEffects, Strokes, TextColumns, TextLayout},
+    property::{Fills, Shadows, ShapeEffects, Strokes, TextColumns, TextLayout},
 };
 use thiserror::Error as ThisError;
 
@@ -26,7 +26,7 @@ use super::Package;
 use super::sheet_drawable_graph::{self as graph, SHAPE_INFO_MESSAGE_TYPE};
 use super::{structure, style_graph as numbers_style_graph};
 use crate::selector::SheetSelector;
-use crate::sheet::drawable::style::{Columns, Fill, Property, PropertyKind};
+use crate::sheet::drawable::style::{Columns, Endpoints, Fill, Property, PropertyKind};
 use crate::sheet::drawable::{DrawableSelector, Kind};
 
 structure::structural_family!("sheet drawable style", Wire(litchi_iwa_common::LimitKind));
@@ -198,8 +198,13 @@ fn property_index(kind: PropertyKind) -> usize {
         PropertyKind::Effects => 2,
         PropertyKind::TextLayout => 3,
         PropertyKind::Columns => 4,
+        PropertyKind::Shadow => 5,
+        PropertyKind::LineEndpoints => 6,
     }
 }
+
+/// One entry per [`PropertyKind`].
+const PROPERTY_COUNT: usize = 7;
 
 fn reset_slots(kind: PropertyKind) -> &'static [Slot] {
     match kind {
@@ -213,6 +218,8 @@ fn reset_slots(kind: PropertyKind) -> &'static [Slot] {
             Slot::Padding,
         ],
         PropertyKind::Columns => &[Slot::ColumnsNull, Slot::Columns],
+        PropertyKind::Shadow => &[Slot::Shadow],
+        PropertyKind::LineEndpoints => &[Slot::HeadLineEnd, Slot::TailLineEnd],
     }
 }
 
@@ -265,8 +272,10 @@ fn ensure_property(kind: Kind, property: PropertyKind) -> Result<(), Error> {
             property,
             PropertyKind::Fill
                 | PropertyKind::Stroke
+                | PropertyKind::Shadow
                 | PropertyKind::Effects
                 | PropertyKind::TextLayout
+                | PropertyKind::LineEndpoints
         ),
         Kind::TextBox => matches!(property, PropertyKind::Columns | PropertyKind::TextLayout),
         _ => false,
@@ -313,7 +322,51 @@ fn read(workspace: &Workspace<'_>, drawable: u64, kind: PropertyKind) -> Result<
         PropertyKind::Columns => {
             Property::Columns(engine::value(workspace, drawable, &TextColumns)?)
         },
+        PropertyKind::Shadow => Property::Shadow(engine::value(workspace, drawable, &Shadows)?),
+        PropertyKind::LineEndpoints => Property::LineEndpoints(
+            litchi_iwa_style::line_end::endpoints(workspace, drawable, line_end_limits())
+                .map_err(from_line_end)?,
+        ),
     })
+}
+
+/// The wire limits line-end payloads are read under.
+const fn line_end_limits() -> litchi_iwa_common::WireLimits {
+    litchi_iwa_common::WireLimits::DEFAULT
+}
+
+fn from_line_end(error: litchi_iwa_style::line_end::EndpointsError) -> Error {
+    use litchi_iwa_style::line_end::{DecodeError, EndpointsError};
+    match error {
+        EndpointsError::Graph(error) => error.into(),
+        EndpointsError::Decode(DecodeError::Wire(error)) => {
+            litchi_iwa_style::graph::Error::Wire(error).into()
+        },
+        EndpointsError::Verification => Error::Verification,
+        _ => Refusal::UnsupportedStyle.into(),
+    }
+}
+
+/// Whether shape `drawable` is a native straight line (its endpoints are
+/// only stored on lines, as the host's `set_sheet_line_endpoints` requires).
+fn ensure_line(package: &Package, drawable: u64) -> Result<(), Error> {
+    use litchi_iwa_protos::shape_style_codec as line_codec;
+    let object = graph::object(package, drawable).map_err(Error::from)?;
+    let payload = object
+        .messages
+        .iter()
+        .find(|message| message.type_ == SHAPE_INFO_MESSAGE_TYPE)
+        .ok_or(Error::InvalidSource)?;
+    let line = line_codec::line(&payload.data, line_codec::Limits::DEFAULT)
+        .map_err(|_error| Error::InvalidSource)?;
+    if line.is_none() {
+        return Err(Refusal::UnsupportedProperty {
+            kind: Kind::Shape.name(),
+            property: PropertyKind::LineEndpoints,
+        }
+        .into());
+    }
+    Ok(())
 }
 
 fn apply_change(
@@ -335,6 +388,24 @@ fn apply_change(
         Change::Set(Property::Columns(columns)) => {
             engine::set(workspace, drawable, &TextColumns, columns)?
         },
+        Change::Set(Property::Shadow(shadow)) => {
+            engine::set(workspace, drawable, &Shadows, shadow)?
+        },
+        Change::Set(Property::LineEndpoints(wanted)) => litchi_iwa_style::line_end::set_endpoints(
+            workspace,
+            drawable,
+            *wanted,
+            line_end_limits(),
+        )
+        .map_err(from_line_end)?,
+        Change::Reset(PropertyKind::LineEndpoints) => litchi_iwa_style::line_end::set_endpoints(
+            workspace,
+            drawable,
+            Endpoints::default(),
+            line_end_limits(),
+        )
+        .map_err(from_line_end)?,
+        Change::Reset(PropertyKind::Shadow) => engine::reset(workspace, drawable, &Shadows)?,
         Change::Reset(PropertyKind::Fill) => engine::reset(workspace, drawable, &Fills)?,
         Change::Reset(PropertyKind::Stroke) => engine::reset(workspace, drawable, &Strokes)?,
         Change::Reset(PropertyKind::Effects) => engine::reset(workspace, drawable, &ShapeEffects)?,
@@ -383,6 +454,10 @@ fn inherited_reset_value(
         PropertyKind::Columns => {
             Property::Columns(inherited_property(workspace, parent, &TextColumns)?)
         },
+        PropertyKind::Shadow => Property::Shadow(inherited_property(workspace, parent, &Shadows)?),
+        // A line-endpoint reset stores the undecorated default (the host's
+        // `reset_sheet_line_endpoints`); it is verified as a set.
+        PropertyKind::LineEndpoints => Property::LineEndpoints(Endpoints::default()),
     })
 }
 
@@ -390,8 +465,8 @@ fn reset_baselines(
     workspace: &Workspace<'_>,
     drawable: u64,
     changes: &[Change],
-) -> Result<[Option<Property>; 5], Error> {
-    let mut baselines: [Option<Property>; 5] = std::array::from_fn(|_| None);
+) -> Result<[Option<Property>; PROPERTY_COUNT], Error> {
+    let mut baselines: [Option<Property>; PROPERTY_COUNT] = std::array::from_fn(|_| None);
     for change in changes {
         let Change::Reset(kind) = change else {
             continue;
@@ -557,9 +632,24 @@ impl Edit<'_> {
         let source_view = Workspace::new(&components, limits)?;
         let reset_baselines = reset_baselines(&source_view, self.drawable, &self.changes)?;
         let mut working = Workspace::new(&components, limits)?;
-        let mut final_states: [Option<FinalState>; 5] = std::array::from_fn(|_| None);
+        let mut final_states: [Option<FinalState>; PROPERTY_COUNT] = std::array::from_fn(|_| None);
+        if self.changes.iter().any(|change| {
+            matches!(
+                change,
+                Change::Set(Property::LineEndpoints(_))
+                    | Change::Reset(PropertyKind::LineEndpoints)
+            )
+        }) {
+            ensure_line(self.source, self.drawable)?;
+        }
         for change in &self.changes {
             match change {
+                Change::Reset(PropertyKind::LineEndpoints) => {
+                    apply_change(&mut working, self.drawable, change)?;
+                    final_states[property_index(PropertyKind::LineEndpoints)] = Some(
+                        FinalState::Set(Property::LineEndpoints(Endpoints::default())),
+                    );
+                },
                 Change::Set(property) => {
                     apply_change(&mut working, self.drawable, change)?;
                     final_states[property_index(property.kind())] =
@@ -616,6 +706,9 @@ impl Package {
         let sheet = resolve_sheet(self, sheet.into())?;
         let (drawable, drawable_kind) = resolve_drawable(self, sheet, drawable.into())?;
         ensure_property(drawable_kind, kind)?;
+        if kind == PropertyKind::LineEndpoints {
+            ensure_line(self, drawable)?;
+        }
         let (components, limits) = workspace(self)?;
         let workspace = Workspace::new(&components, limits)?;
         read(&workspace, drawable, kind)
