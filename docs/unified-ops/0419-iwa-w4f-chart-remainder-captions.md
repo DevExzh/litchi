@@ -47,3 +47,24 @@ Probe `crates/litchi-iwa/tests/parity/chart_property_cost.rs` (the 0414
 method: release, CPU 3, ABBA, inclusive Ir of `w4c_host_route` and
 `w4c_leaf_route`). Receipt `results/0419/callgrind-radar.json`; raw captures
 in `.coord/iwa-w4f/cg1/`.
+
+### 1.1 Slice 1 gates
+
+Branch with trunk `56df8948b0` merged at `3c67e8b134`; logs
+`.coord/iwa-w4f/gates1`. Every command of the 0414 §8 list exits 0: fmt;
+clippy -D warnings on the five touched crates with `litchi-ops`, `litchi`
+and `litchi-py` (all features), the leaf crates without features, and
+`litchi-ops` with no features and with each of `numbers`, `pages`,
+`keynote`; rustdoc -Dwarnings; the glossary check; the leaf, `litchi-iwa`
+(parity included), `litchi`, `litchi-ops` (`--lib`, `--doc`, nine `--test`
+groups) tests; pyo3; perf-baseline; the feature matrix; crate boundaries;
+non-iWork gate; the tool unit tests; ledger, OfficeCLI delta and corpus
+checks; the bench matrix (regenerated for 0419). No dispatch, capability or
+corpus-visible behaviour changed, so no golden was re-blessed.
+
+Trunk `ee40f1a375` (W4-E slice 1, W4-T 0412e) was then merged at
+`befda82d89` (bench-matrix conflict resolved by regeneration). On that merge
+fmt, clippy -D warnings on the five touched crates, the parity chart cases
+(328 passed), the crate-boundary check, the glossary, the ledger and the
+bench matrix exit 0 (logs `.coord/iwa-w4f/gates1b`). Target 13 GB after
+pruning.
