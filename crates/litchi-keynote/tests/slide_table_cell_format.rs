@@ -6,7 +6,6 @@ use litchi_iwa_common::table::cell::data_format::Checkbox;
 use litchi_iwa_common::table::cell::data_format::number::{
     DecimalPlaces, NegativeStyle, Number, Percentage, ThousandsSeparator,
 };
-use litchi_iwa_common::table::cell::data_format::pop_up_menu::PopUpMenu;
 use litchi_keynote::Package;
 use litchi_keynote::slide::table::format::{At, DataFormat, Error, Refusal};
 
@@ -107,13 +106,6 @@ fn refusals_are_typed() -> TestResult {
     assert_eq!(missing, Some(Error::Refused(Refusal::CellNotFound)));
     let table = source.slide_table_cell_format(0, 99, B2).err();
     assert_eq!(table, Some(Error::Refused(Refusal::TableNotFound)));
-    // Pop-Up Menus also rewrite the metadata registry: refused (record 0412).
-    let menu = source
-        .edit_slide_table_cell_format(0, 0, B2)?
-        .set(PopUpMenu::new(["a", "b"])?)
-        .commit()
-        .err();
-    assert_eq!(menu, Some(Error::Refused(Refusal::UnsupportedFormat)));
     // Scalar controls and Automatic to Percentage on the native cell's
     // implicit Number entry are written since record 0412.
     let control = source

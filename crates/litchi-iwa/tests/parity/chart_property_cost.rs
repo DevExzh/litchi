@@ -14,8 +14,8 @@
 use std::hint::black_box;
 
 use litchi_iwa::charts::{
-    ChartAxisGridline, ChartAxisGridlineStroke, ChartLegendFill, ChartPieStartAngle,
-    ChartSeriesConnectionLine,
+    Chart3dLightingStyle, ChartAxisGridline, ChartAxisGridlineStroke, ChartLegendFill,
+    ChartPieStartAngle, ChartSeriesConnectionLine,
 };
 use litchi_iwa::shapes::ShapeFill;
 use litchi_iwa::{keynote, numbers, pages};
@@ -51,6 +51,8 @@ enum Operation {
     GridlineStrokeSet,
     BorderSet,
     LegendFillSet,
+    BackgroundSet,
+    LightingSet,
 }
 
 const ROUTES: &[(&str, Format, Operation)] = &[
@@ -131,6 +133,32 @@ const ROUTES: &[(&str, Format, Operation)] = &[
         Format::Numbers,
         Operation::LegendFillSet,
     ),
+    (
+        "keynote_background_set",
+        Format::Keynote,
+        Operation::BackgroundSet,
+    ),
+    (
+        "keynote_lighting_set",
+        Format::Keynote,
+        Operation::LightingSet,
+    ),
+    (
+        "pages_background_set",
+        Format::Pages,
+        Operation::BackgroundSet,
+    ),
+    ("pages_lighting_set", Format::Pages, Operation::LightingSet),
+    (
+        "numbers_background_set",
+        Format::Numbers,
+        Operation::BackgroundSet,
+    ),
+    (
+        "numbers_lighting_set",
+        Format::Numbers,
+        Operation::LightingSet,
+    ),
 ];
 
 const fn chart_kind(operation: Operation) -> Kind {
@@ -143,7 +171,9 @@ const fn chart_kind(operation: Operation) -> Kind {
         | Operation::AxisFormatSet
         | Operation::GridlineStrokeSet
         | Operation::BorderSet
-        | Operation::LegendFillSet => Kind::Column2d,
+        | Operation::LegendFillSet
+        | Operation::BackgroundSet => Kind::Column2d,
+        Operation::LightingSet => Kind::Column3d,
     }
 }
 
@@ -235,6 +265,12 @@ fn host_operation(input: &Input, source: &[u8], operation: Operation) -> TestRes
                 Operation::BorderSet => {
                     e.set_slide_chart_border_stroke(slide, chart, Some(stroke()?))?;
                 },
+                Operation::BackgroundSet => {
+                    e.set_slide_chart_background_fill(slide, chart, &ShapeFill::Solid(fill()?))?;
+                },
+                Operation::LightingSet => {
+                    e.set_slide_chart_3d_lighting_style(slide, chart, Chart3dLightingStyle::Glossy)?
+                },
                 Operation::LegendFillSet => {
                     e.set_slide_chart_legend_fill(slide, chart, &legend_fill_host()?)?;
                 },
@@ -271,6 +307,12 @@ fn host_operation(input: &Input, source: &[u8], operation: Operation) -> TestRes
                     ChartAxisGridlineStroke::Stroke(stroke()?),
                 )?,
                 Operation::BorderSet => e.set_body_chart_border_stroke(chart, Some(stroke()?))?,
+                Operation::BackgroundSet => {
+                    e.set_body_chart_background_fill(chart, &ShapeFill::Solid(fill()?))?;
+                },
+                Operation::LightingSet => {
+                    e.set_body_chart_3d_lighting_style(chart, Chart3dLightingStyle::Glossy)?;
+                },
                 Operation::LegendFillSet => {
                     e.set_body_chart_legend_fill(chart, &legend_fill_host()?)?
                 },
@@ -301,6 +343,12 @@ fn host_operation(input: &Input, source: &[u8], operation: Operation) -> TestRes
                 )?,
                 Operation::BorderSet => {
                     e.set_sheet_chart_border_stroke(sheet, chart, Some(stroke()?))?;
+                },
+                Operation::BackgroundSet => {
+                    e.set_sheet_chart_background_fill(sheet, chart, &ShapeFill::Solid(fill()?))?;
+                },
+                Operation::LightingSet => {
+                    e.set_sheet_chart_3d_lighting_style(sheet, chart, Chart3dLightingStyle::Glossy)?
                 },
                 Operation::LegendFillSet => {
                     e.set_sheet_chart_legend_fill(sheet, chart, &legend_fill_host()?)?;
@@ -366,6 +414,16 @@ fn keynote_operation(source: &[u8], operation: Operation) -> TestResult<Vec<u8>>
         Operation::BorderSet => {
             let mut edit = package.edit_slide_chart_style(slide, chart)?;
             edit.set(style::Property::BorderStroke(Some(stroke()?)))?;
+            leaf_bytes!(edit.commit()?.package())
+        },
+        Operation::BackgroundSet => {
+            let mut edit = package.edit_slide_chart_style(slide, chart)?;
+            edit.set(style::Property::BackgroundFill(Fill::Solid(fill()?)))?;
+            leaf_bytes!(edit.commit()?.package())
+        },
+        Operation::LightingSet => {
+            let mut edit = package.edit_slide_chart_style(slide, chart)?;
+            edit.set(style::Property::Lighting3d(style::Lighting3d::Glossy))?;
             leaf_bytes!(edit.commit()?.package())
         },
         Operation::LegendFillSet => {
@@ -452,6 +510,20 @@ fn pages_operation(source: &[u8], operation: Operation) -> TestResult<Vec<u8>> {
                 .commit()?
                 .package()
         ),
+        Operation::BackgroundSet => leaf_bytes!(
+            package
+                .edit_body_chart_style(chart)?
+                .set(style::Property::BackgroundFill(Fill::Solid(fill()?)))?
+                .commit()?
+                .package()
+        ),
+        Operation::LightingSet => leaf_bytes!(
+            package
+                .edit_body_chart_style(chart)?
+                .set(style::Property::Lighting3d(style::Lighting3d::Glossy))?
+                .commit()?
+                .package()
+        ),
         Operation::LegendFillSet => leaf_bytes!(
             package
                 .edit_body_chart_legend_style(chart)?
@@ -482,6 +554,19 @@ fn numbers_operation(source: &[u8], operation: Operation) -> TestResult<Vec<u8>>
             edit.set(litchi_numbers::sheet::chart::style::Property::BorderStroke(
                 Some(stroke()?),
             ))?;
+            Ok(leaf_bytes!(edit.commit()?.package()))
+        },
+        Operation::BackgroundSet => {
+            let mut edit = package.edit_sheet_chart_style(0, 1)?;
+            edit.set(
+                litchi_numbers::sheet::chart::style::Property::BackgroundFill(Fill::Solid(fill()?)),
+            )?;
+            Ok(leaf_bytes!(edit.commit()?.package()))
+        },
+        Operation::LightingSet => {
+            use litchi_numbers::sheet::chart::style::{Lighting3d, Property};
+            let mut edit = package.edit_sheet_chart_style(0, 1)?;
+            edit.set(Property::Lighting3d(Lighting3d::Glossy))?;
             Ok(leaf_bytes!(edit.commit()?.package()))
         },
         Operation::LegendFillSet => {

@@ -782,6 +782,36 @@ impl Registry {
         Ok(removals)
     }
 
+    /// The removals of the `edges` the registry records; an edge without a
+    /// record is skipped (Pages and Keynote register no menu-model edge,
+    /// record 0412a).
+    pub fn recorded_external_removals(
+        &self,
+        edges: &[ExternalEdge],
+    ) -> Result<Vec<ExternalReferenceRemoval<'_>>> {
+        let mut removals: Vec<ExternalReferenceRemoval<'_>> = Vec::new();
+        removals
+            .try_reserve_exact(edges.len())
+            .map_err(|_| MetadataError::allocation(edges.len()))?;
+        for &edge in edges {
+            match self.external_removal(edge) {
+                Ok(removal) => {
+                    if removals.iter().any(|existing| {
+                        existing.source() == removal.source()
+                            && existing.target() == removal.target()
+                            && existing.object_identifier() == removal.object_identifier()
+                    }) {
+                        return Err(MetadataError::kind(FailureKind::Conflict));
+                    }
+                    removals.push(removal);
+                },
+                Err(error) if error.kind == FailureKind::MissingRoute => {},
+                Err(error) => return Err(error),
+            }
+        }
+        Ok(removals)
+    }
+
     /// Reject any existing ownership record before appending a fresh UUID.
     pub fn require_uuid_absent(&self, object_identifier: u64) -> Result<()> {
         if self.physical_identifiers.contains(&object_identifier)

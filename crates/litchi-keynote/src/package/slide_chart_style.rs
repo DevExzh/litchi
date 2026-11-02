@@ -46,7 +46,7 @@ const fn chart_fields(kind: chart_engine::PropertyKind) -> &'static [u32] {
 pub(crate) mod style {
     use super::{Diagnostics, ExactArtifacts, MutationPlan, Package, Position, chart_engine, fmt};
 
-    pub use chart_engine::{Property, PropertyKind, RadarGridShape};
+    pub use chart_engine::{Lighting3d, Property, PropertyKind, RadarGridShape};
 
     /// A compact exact-source patch of one chart-level style property.
     #[derive(Clone, PartialEq)]
@@ -85,8 +85,8 @@ pub(crate) mod style {
                 artifacts: self.artifacts.inverse(),
                 slide: self.slide,
                 chart: self.chart,
-                before: self.after,
-                after: self.before,
+                before: self.after.clone(),
+                after: self.before.clone(),
                 plan: super::super::slide_chart_font::inverse_mutation_plan(&self.plan),
             }
         }
@@ -105,14 +105,14 @@ pub(crate) mod style {
 
         /// The source value.
         #[must_use]
-        pub const fn before(&self) -> Property {
-            self.before
+        pub const fn before(&self) -> &Property {
+            &self.before
         }
 
         /// The target value.
         #[must_use]
-        pub const fn after(&self) -> Property {
-            self.after
+        pub const fn after(&self) -> &Property {
+            &self.after
         }
     }
 
@@ -482,7 +482,7 @@ impl StyleEdit<'_> {
                         workspace,
                         target.selection.identifier,
                         target.kind,
-                        value,
+                        &value,
                         limits,
                     )
                 },
@@ -495,7 +495,7 @@ impl StyleEdit<'_> {
                     artifacts: noop_artifacts(self.source)?,
                     slide: target.selection.slide,
                     chart: target.selection.chart,
-                    before,
+                    before: before.clone(),
                     after: before,
                     plan: MutationPlan::default(),
                 },
