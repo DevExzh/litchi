@@ -286,7 +286,7 @@ fn numbers_sheet_chart_legend_font_shared_variation_parity() -> TestResult {
                         sheet,
                         chart,
                         &ChartLegendFont::Font(
-                            ChartFont::new(TextFont::from(font.clone()))
+                            ChartFont::new(font.clone())
                                 .with_bold(*bold)
                                 .with_italic(*italic),
                         ),

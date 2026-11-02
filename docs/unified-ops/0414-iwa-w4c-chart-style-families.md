@@ -487,3 +487,8 @@ Radar series style (2 rows per format) follows with the remaining items.
 
 Receipt `results/0414/callgrind-slice7.json`; raw captures in
 `.coord/iwa-w4c/cg7/`.
+
+Slice 7 gates: trunk `b667dc4246` merged at `52d072be1d`; every command of
+§8 exits 0 (logs `.coord/iwa-w4c/gates8`), except the first full clippy leg,
+which refused a redundant `TextFont::from` in the new shared-variation case.
+That was fixed, and the re-run full clippy leg exits 0 (`clippy_all2.log`).
