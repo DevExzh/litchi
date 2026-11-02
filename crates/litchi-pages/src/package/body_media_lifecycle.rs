@@ -2534,7 +2534,7 @@ fn style_preset(package: &Package, field: u32) -> Result<NonZeroU64, Error> {
 }
 
 /// A new embedded asset's `Data/` file name (`stem-identifier.extension`).
-fn materialized_name(preferred: &str, identifier: u64) -> Result<String, Error> {
+pub(super) fn materialized_name(preferred: &str, identifier: u64) -> Result<String, Error> {
     let path = std::path::Path::new(preferred);
     if path.file_name().and_then(|name| name.to_str()) != Some(preferred)
         || preferred.contains(['\0', '\\'])

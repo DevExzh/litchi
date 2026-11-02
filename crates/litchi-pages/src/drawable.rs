@@ -62,7 +62,7 @@ pub mod style {
         Commit, Diagnostics, Edit, Error, LimitKind, Patch, Refusal,
     };
     pub use litchi_iwa_common::shape::effects::Effects;
-    pub use litchi_iwa_common::shape::fill::Fill;
+    pub use litchi_iwa_common::shape::fill::{Fill, ImageTechnique};
     pub use litchi_iwa_common::shape::line::{Endpoint, Endpoints};
     pub use litchi_iwa_common::shape::shadow::Shadow;
     pub use litchi_iwa_common::shape::stroke::Stroke;
@@ -73,8 +73,8 @@ pub mod style {
     #[derive(Debug, Clone, PartialEq)]
     #[non_exhaustive]
     pub enum Property {
-        /// The fill (none, a color, a gradient; image fills read back but are
-        /// not written by this family).
+        /// The fill (none, a color, a gradient; image fills read back and
+        /// are written by [`Edit::set_image_fill`]).
         Fill(Fill),
         /// The stroke (`None`: the hidden stroke).
         Stroke(Option<Stroke>),
