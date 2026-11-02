@@ -4,7 +4,7 @@
 //!
 //! The list change runs W1-D's engine ([`litchi_iwa_text_wire::list`],
 //! record 0374) and is published by the shared storage-list publisher
-//! ([`super::storage_list`], record 0370b) that the cell-list family uses.
+//! (`litchi_iwa_text_wire::list::publish`, record 0370b) that the cell-list family uses.
 //! Host `set_x`/`reset_x` pairs collapse into one property verb
 //! ([`Edit::set`]/[`Edit::reset`]); `reset_sheet_text_box_paragraph_list`
 //! and `reset_sheet_text_box_paragraph_list_level` are [`Edit::set_list`]
@@ -29,13 +29,16 @@ use thiserror::Error as ThisError;
 
 use super::Package;
 use super::sheet_drawable_graph::{self as graph, TextTarget};
-use super::storage_list::{self, Failure, ListStyles, Publisher};
 use super::structure::{
     self, Published, Working,
     metadata::{self, Transition},
 };
 use crate::selector::SheetSelector;
 use crate::sheet::drawable::DrawableSelector;
+use litchi_iwa_table::structure::list_workspace::{
+    ListWorkspace, ReadStyles as ListStyles, storage_payload,
+};
+use litchi_iwa_text_wire::list::publish::{Failure, Publisher};
 
 structure::structural_family!("text-box list", Wire(litchi_iwa_common::LimitKind));
 
@@ -163,10 +166,10 @@ fn from_list(error: list::Error) -> Error {
     }
 }
 
-impl From<Failure> for Error {
-    fn from(failure: Failure) -> Self {
+impl From<Failure<structure::Fault>> for Error {
+    fn from(failure: Failure<structure::Fault>) -> Self {
         match failure {
-            Failure::Fault(fault) => fault.into(),
+            Failure::Workspace(fault) => fault.into(),
             Failure::List(error) => from_list(error),
         }
     }
@@ -361,7 +364,7 @@ impl<'p> Reader<'p> {
     }
 
     fn payload(&self) -> Result<Vec<u8>, Error> {
-        Ok(storage_list::storage(&self.working, self.storage)?.payload)
+        Ok(storage_payload(&self.working, self.storage)?)
     }
 
     fn list(&self) -> Result<ParagraphList, Error> {
@@ -438,12 +441,12 @@ fn apply_one(
     let registry =
         metadata::registry(&working)?.ok_or(Error::Refused(Refusal::UnsupportedSource))?;
     let mut transition = Transition::default();
-    let mut publisher = Publisher {
+    let mut workspace = ListWorkspace {
         working: &mut working,
         registry: &registry,
         transition: &mut transition,
-        limits,
     };
+    let mut publisher = Publisher::new(&mut workspace, limits);
     let changed = match change {
         Staged::List(preset) => publisher.set_list(storage, *preset)?,
         Staged::Lists(placements) => publisher.set_lists(storage, placements)?,

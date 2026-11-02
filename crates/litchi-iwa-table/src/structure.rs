@@ -21,6 +21,7 @@ pub mod budget;
 pub mod collect;
 pub mod duplicate;
 pub mod formula;
+pub mod list_workspace;
 pub mod metadata;
 pub mod plan;
 pub mod references;

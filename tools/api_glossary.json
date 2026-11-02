@@ -26058,6 +26058,11 @@
         "litchi_pages::drawable::properties",
         "litchi_pages::drawable::text",
         "litchi_pages::drawable::style",
+        "litchi_pages::drawable::annotation",
+        "litchi_pages::drawable::date_time",
+        "litchi_pages::drawable::hyperlink",
+        "litchi_pages::drawable::drop_cap",
+        "litchi_pages::drawable::language",
         "litchi_pages::drawable::named_style",
         "litchi_pages::drawable::list",
         "litchi_pages::drawable::text_box_text",
@@ -26075,6 +26080,26 @@
         {
           "method": "litchi_pages::Package::apply_metadata",
           "ok": "litchi_pages::metadata::Commit"
+        },
+        {
+          "method": "litchi_pages::Package::apply_body_drawable_annotations",
+          "ok": "litchi_pages::drawable::annotation::Commit"
+        },
+        {
+          "method": "litchi_pages::Package::apply_body_drawable_date_time_fields",
+          "ok": "litchi_pages::drawable::date_time::Commit"
+        },
+        {
+          "method": "litchi_pages::Package::apply_body_drawable_hyperlinks",
+          "ok": "litchi_pages::drawable::hyperlink::Commit"
+        },
+        {
+          "method": "litchi_pages::Package::apply_body_drawable_drop_caps",
+          "ok": "litchi_pages::drawable::drop_cap::Commit"
+        },
+        {
+          "method": "litchi_pages::Package::apply_body_drawable_text_languages",
+          "ok": "litchi_pages::drawable::language::Commit"
         },
         {
           "method": "litchi_pages::Package::apply_body_text_box_named_styles",
