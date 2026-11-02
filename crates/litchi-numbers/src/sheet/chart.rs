@@ -90,3 +90,17 @@ pub mod style {
     pub use litchi_iwa_common::chart::{corner, donut, gaps, legend, pie, radar};
     pub use litchi_iwa_common::chart3d;
 }
+
+/// Exact-source legend fill, border and shadow transactions of one sheet
+/// chart on the shared legend-style variation graph:
+/// [`crate::Package::edit_sheet_chart_legend_style`].
+pub mod legend_style {
+    pub use crate::package::sheet_chart_legend_style::{
+        Commit, Diagnostics, Edit, LegendFill, LegendShadow, LegendStroke, Patch, Property,
+        PropertyKind,
+    };
+    pub use crate::package::sheet_chart_series::{Error, LimitKind, Refusal};
+    pub use litchi_iwa_common::shape::fill::{Fill, Gradient};
+    pub use litchi_iwa_common::shape::shadow::Drop;
+    pub use litchi_iwa_common::shape::stroke::Stroke;
+}

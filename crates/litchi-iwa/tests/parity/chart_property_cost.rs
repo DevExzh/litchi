@@ -14,7 +14,8 @@
 use std::hint::black_box;
 
 use litchi_iwa::charts::{
-    ChartAxisGridline, ChartAxisGridlineStroke, ChartPieStartAngle, ChartSeriesConnectionLine,
+    ChartAxisGridline, ChartAxisGridlineStroke, ChartLegendFill, ChartPieStartAngle,
+    ChartSeriesConnectionLine,
 };
 use litchi_iwa::shapes::ShapeFill;
 use litchi_iwa::{keynote, numbers, pages};
@@ -30,6 +31,7 @@ use litchi_iwa_common::color::{RgbColorSpace, Rgba};
 use litchi_iwa_common::shape::fill::Fill;
 use litchi_iwa_common::shape::stroke::{Pattern, Stroke, Width};
 use litchi_iwa_style::chart_style::axis::{GridlineStroke, Property as AxisProperty};
+use litchi_iwa_style::legend_style::{LegendFill, Property as LegendProperty};
 
 use crate::chart_style_cases::{Input, Target, input};
 use crate::harness::{Format, TestResult};
@@ -48,6 +50,7 @@ enum Operation {
     AxisFormatSet,
     GridlineStrokeSet,
     BorderSet,
+    LegendFillSet,
 }
 
 const ROUTES: &[(&str, Format, Operation)] = &[
@@ -113,6 +116,21 @@ const ROUTES: &[(&str, Format, Operation)] = &[
         Operation::GridlineStrokeSet,
     ),
     ("numbers_border_set", Format::Numbers, Operation::BorderSet),
+    (
+        "keynote_legend_fill_set",
+        Format::Keynote,
+        Operation::LegendFillSet,
+    ),
+    (
+        "pages_legend_fill_set",
+        Format::Pages,
+        Operation::LegendFillSet,
+    ),
+    (
+        "numbers_legend_fill_set",
+        Format::Numbers,
+        Operation::LegendFillSet,
+    ),
 ];
 
 const fn chart_kind(operation: Operation) -> Kind {
@@ -124,7 +142,8 @@ const fn chart_kind(operation: Operation) -> Kind {
         | Operation::AffixesSet
         | Operation::AxisFormatSet
         | Operation::GridlineStrokeSet
-        | Operation::BorderSet => Kind::Column2d,
+        | Operation::BorderSet
+        | Operation::LegendFillSet => Kind::Column2d,
     }
 }
 
@@ -142,6 +161,14 @@ fn label_format() -> TestResult<NumberFormat> {
 
 fn stroke() -> TestResult<Stroke> {
     Ok(Stroke::new(fill()?, Width::new(2.0)?, Pattern::Solid))
+}
+
+fn legend_fill_host() -> TestResult<ChartLegendFill> {
+    Ok(ChartLegendFill::Fill(ShapeFill::Solid(fill()?)))
+}
+
+fn legend_fill_leaf() -> TestResult<LegendProperty> {
+    Ok(LegendProperty::Fill(LegendFill::Fill(Fill::Solid(fill()?))))
 }
 
 fn affixes() -> TestResult<Vec<LabelAffixes>> {
@@ -208,6 +235,9 @@ fn host_operation(input: &Input, source: &[u8], operation: Operation) -> TestRes
                 Operation::BorderSet => {
                     e.set_slide_chart_border_stroke(slide, chart, Some(stroke()?))?;
                 },
+                Operation::LegendFillSet => {
+                    e.set_slide_chart_legend_fill(slide, chart, &legend_fill_host()?)?;
+                },
                 Operation::AffixesSet => return Err("not a Keynote route".into()),
             }
             e.to_bytes()?
@@ -241,6 +271,9 @@ fn host_operation(input: &Input, source: &[u8], operation: Operation) -> TestRes
                     ChartAxisGridlineStroke::Stroke(stroke()?),
                 )?,
                 Operation::BorderSet => e.set_body_chart_border_stroke(chart, Some(stroke()?))?,
+                Operation::LegendFillSet => {
+                    e.set_body_chart_legend_fill(chart, &legend_fill_host()?)?
+                },
                 Operation::AffixesSet => return Err("not a Pages route".into()),
             }
             e.to_bytes()?
@@ -268,6 +301,9 @@ fn host_operation(input: &Input, source: &[u8], operation: Operation) -> TestRes
                 )?,
                 Operation::BorderSet => {
                     e.set_sheet_chart_border_stroke(sheet, chart, Some(stroke()?))?;
+                },
+                Operation::LegendFillSet => {
+                    e.set_sheet_chart_legend_fill(sheet, chart, &legend_fill_host()?)?;
                 },
                 _ => return Err("not a Numbers route".into()),
             }
@@ -330,6 +366,11 @@ fn keynote_operation(source: &[u8], operation: Operation) -> TestResult<Vec<u8>>
         Operation::BorderSet => {
             let mut edit = package.edit_slide_chart_style(slide, chart)?;
             edit.set(style::Property::BorderStroke(Some(stroke()?)))?;
+            leaf_bytes!(edit.commit()?.package())
+        },
+        Operation::LegendFillSet => {
+            let mut edit = package.edit_slide_chart_legend_style(slide, chart)?;
+            edit.set(legend_fill_leaf()?)?;
             leaf_bytes!(edit.commit()?.package())
         },
         Operation::AffixesSet => return Err("not a Keynote route".into()),
@@ -411,6 +452,13 @@ fn pages_operation(source: &[u8], operation: Operation) -> TestResult<Vec<u8>> {
                 .commit()?
                 .package()
         ),
+        Operation::LegendFillSet => leaf_bytes!(
+            package
+                .edit_body_chart_legend_style(chart)?
+                .set(legend_fill_leaf()?)?
+                .commit()?
+                .package()
+        ),
         Operation::AffixesSet => return Err("not a Pages route".into()),
     })
 }
@@ -434,6 +482,11 @@ fn numbers_operation(source: &[u8], operation: Operation) -> TestResult<Vec<u8>>
             edit.set(litchi_numbers::sheet::chart::style::Property::BorderStroke(
                 Some(stroke()?),
             ))?;
+            Ok(leaf_bytes!(edit.commit()?.package()))
+        },
+        Operation::LegendFillSet => {
+            let mut edit = package.edit_sheet_chart_legend_style(0, 1)?;
+            edit.set(legend_fill_leaf()?)?;
             Ok(leaf_bytes!(edit.commit()?.package()))
         },
         _ => Err("not a Numbers route".into()),

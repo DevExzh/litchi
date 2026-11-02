@@ -1,0 +1,56 @@
+{
+  "record": "0414",
+  "slice": 3,
+  "binary_sha256": "8c9cffea6557357c9b4593557fc00ae226825e98283204601ae21a91c30c9e3d",
+  "build": "CARGO_PROFILE_RELEASE_DEBUG=1 cargo test --release -p litchi-iwa --all-features --test parity --no-run",
+  "run": "W4C_ROUTE=<route> taskset -c 3 valgrind --tool=callgrind <binary> --ignored --exact chart_property_cost::chart_property_route_cost_abba --test-threads=1",
+  "metric": "inclusive Ir of w4c_host_route / w4c_leaf_route, two calls each (ABBA)",
+  "captures_dir": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-w4c/cg3 (outside the repository)",
+  "routes": [
+    {
+      "route": "keynote_legend_fill_set",
+      "host_ir": 1360819650,
+      "leaf_ir": 193136722,
+      "leaf_over_host": 0.141927,
+      "capture": "keynote_legend_fill_set.cg",
+      "capture_bytes": 1423565,
+      "capture_sha256": "22e0c60cdf6b8bedfe0e13bbe9bd29abf6c33a4784bff6d2b93af4799efd8fcb"
+    },
+    {
+      "route": "keynote_style_set",
+      "host_ir": 772366808,
+      "leaf_ir": 77179079,
+      "leaf_over_host": 0.099925,
+      "capture": "keynote_style_set.cg",
+      "capture_bytes": 1290796,
+      "capture_sha256": "0bb721c2d79012fede3fcc026921190dd4f94ec0d1e7ca567635962a29cbd367"
+    },
+    {
+      "route": "numbers_legend_fill_set",
+      "host_ir": 394627348,
+      "leaf_ir": 137355663,
+      "leaf_over_host": 0.348064,
+      "capture": "numbers_legend_fill_set.cg",
+      "capture_bytes": 1335901,
+      "capture_sha256": "46cc92724bab195f1398aafa12f36fda34452dddaba14cb0df33684837e80c10"
+    },
+    {
+      "route": "pages_legend_fill_set",
+      "host_ir": 1946581978,
+      "leaf_ir": 147347931,
+      "leaf_over_host": 0.075696,
+      "capture": "pages_legend_fill_set.cg",
+      "capture_bytes": 1379511,
+      "capture_sha256": "e71e4ce6e2a7a06ddcedfcdfa18efdd95be4708ea81656e9ea2038a322502fef"
+    },
+    {
+      "route": "pages_style_set",
+      "host_ir": 1197838136,
+      "leaf_ir": 46892401,
+      "leaf_over_host": 0.039148,
+      "capture": "pages_style_set.cg",
+      "capture_bytes": 1261458,
+      "capture_sha256": "8dad7d1b75fda4039112274525a4783d5e35175c89ae8cc59ac9e77e108c4733"
+    }
+  ]
+}

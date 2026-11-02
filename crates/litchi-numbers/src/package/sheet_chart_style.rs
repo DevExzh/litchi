@@ -89,6 +89,11 @@ pub enum Refusal {
     /// The chart has no style object of the property's archive.
     #[error("the chart has no style object for the property")]
     MissingStyle,
+    /// Another chart uses the style object the write would change (the
+    /// host's `ensure_exclusive` refusal; editing it would restyle that
+    /// chart too).
+    #[error("the chart style is shared with another chart")]
+    SharedStyle,
     /// Commit was requested before staging a change.
     #[error("no chart-style change is staged")]
     NoStagedOperation,
@@ -109,7 +114,7 @@ impl Refusal {
             Self::SheetNotFound | Self::ChartNotFound => RefusalKind::NotFound,
             Self::UnsupportedKind | Self::MissingStyle => RefusalKind::UnsupportedTarget,
             Self::NoStagedOperation => RefusalKind::UnsupportedOperation,
-            Self::UnsupportedDependency | Self::UnsupportedSource => {
+            Self::SharedStyle | Self::UnsupportedDependency | Self::UnsupportedSource => {
                 RefusalKind::UnsupportedContent
             },
         }
@@ -372,6 +377,9 @@ fn apply_one(
     if engine::value(&properties, kind, target.kind)? == value {
         return Ok(None);
     }
+    if !exclusive(source, target.style, archive)? {
+        return Err(Refusal::SharedStyle.into());
+    }
     let rewritten = engine::rewrite(payload, value, target.kind)?;
     if rewritten == *payload {
         return Ok(None);
@@ -398,6 +406,23 @@ fn apply_one(
         return Err(Error::Verification);
     }
     Ok(Some(published))
+}
+
+/// Whether only one chart references `style` as its `archive` style (the
+/// host's `ChartStyleSlot`/`ChartNonStyleSlot::ensure_exclusive`).
+fn exclusive(package: &Package, style: u64, archive: Archive) -> Result<bool, Error> {
+    let mut owners = 0_usize;
+    for object in package.state.components.iter_objects() {
+        for message in &object.messages {
+            if message.type_ == CHART_MESSAGE_TYPE
+                && codec::references(&message.data, Limits::DEFAULT)?.chart_level(archive)
+                    == Some(style)
+            {
+                owners += 1;
+            }
+        }
+    }
+    Ok(owners == 1)
 }
 
 fn resolve_sheet(package: &Package, selector: SheetSelector<'_>) -> Result<usize, Error> {

@@ -1,6 +1,6 @@
 # 0414 — W4-C: the chart style families on all three formats
 
-- Status: slice 1 merged (`cd89e91f63`); slice 2 merge-ready on branch `uo2/iwa-w4c` (cut from trunk
+- Status: slices 1 and 2 merged (`cd89e91f63`, `2ade7ad168`); slice 3 merge-ready on branch `uo2/iwa-w4c` (cut from trunk
   `feat/unified-ops-api` at `4b26bb3379`); the wave continues (§6).
 - Date: 2026-11-02.
 - Plan: [0363](0363-iwa-monolith-exit-plan.md) (§0 wave table, §3.2 API
@@ -273,3 +273,35 @@ family modules, which the crate-boundary check requires), the leaf, `litchi-iwa`
 (parity included), `litchi` and nine `litchi-ops` test groups, pyo3,
 perf-baseline, the feature matrix (31 legs), boundaries, non-iWork, tool unit
 tests, ledger, OfficeCLI delta and corpus, bench matrix.
+
+## 10. Slice 3: the legend-style variation graph; shared chart styles refused on Numbers
+
+18 rows flip (legend fill, border and shadow: set and read on each format).
+
+| Crate | What |
+|---|---|
+| `litchi-iwa-style` | new `legend_style`: the host's `LegendStyleSlot` lifecycle over a workspace. `ensure_exclusive` derives a private variation (copy of the legend style under a new identifier whose `TSS.StyleArchive` names the old style as parent, is a variation and names the stylesheet; registered with the stylesheet through the shape engine's `register`; placed beside the old style; object UUID; external references from the stylesheet's and the chart's components; chart `legend_style` repointed in payload and metadata; watermark raised). The value is written (`LegendFill`, `LegendStroke`, `LegendShadow`; a shadow is merged into a stored one with the new `merge::schema::SHADOW`, as the host's strict merge does). `collapse_if_equivalent` reverts a variation equal to its parent except for the style archive. Image fills refuse (`Refusal::ImageFill`; step 6). The mutation scope plans the derived object and the collapsed one |
+| `litchi-iwa-protos` | `chart_style_codec::merge::schema::SHADOW` (`TSD.ShadowArchive`) |
+| `litchi-numbers`, `litchi-keynote`, `litchi-pages` | `legend_style` family on each format: `Package::{sheet,slide,body}_chart_legend_style(.., PropertyKind)`, `edit_*_chart_legend_style` → `Edit::{set, reset}`, `apply_*_chart_legend_style`. Keynote's `chart::legend` (visibility) is a separate, earlier family, hence the name. Numbers publishes through its chart-series workspace path; Keynote and Pages through their chart-property cores. The Pages locality verifier now admits stylesheet field 5 (the parent-children map a variation registration writes, as Keynote's does) |
+| `litchi-numbers` | **fidelity fix (coordinator):** `sheet::chart::style` writes now refuse a chart-level style object another chart references (`Refusal::SharedStyle`), as the host's `ChartStyleSlot`/`ChartNonStyleSlot::ensure_exclusive` does; before, the leaf rewrote the shared style and silently restyled the other chart. Regression: `numbers_sheet_chart_style_shared_style_refuses` (two charts sharing one chart style; the host refuses, the leaf refuses with the source unchanged) |
+
+Parity: `{numbers_sheet,keynote_slide,pages_body}_chart_legend_style_{set,read}_parity`
+(six values, set and reset-after-host-set each; the derived variation and its
+collapse agree with the host on every known field). Writes are Tier B (the
+derived variation's object UUID is deterministic in the leaf, random in the
+host); reads Tier A. Seven macOS-queue routes added.
+
+| Route | Host Ir | Leaf Ir | Leaf/host |
+|---|---:|---:|---:|
+| Keynote legend fill set (derive) | 1,360,819,650 | 193,136,722 | 0.1419 |
+| Pages legend fill set (derive) | 1,946,581,978 | 147,347,931 | 0.0757 |
+| Numbers legend fill set (derive) | 394,627,348 | 137,355,663 | 0.3481 |
+| Keynote style set (re-run) | 772,366,808 | 77,179,079 | 0.0999 |
+| Pages style set (re-run) | 1,197,838,136 | 46,892,401 | 0.0391 |
+
+Receipt `results/0414/callgrind-slice3.json`; raw captures in
+`.coord/iwa-w4c/cg3/`. Legend font and font size (a paragraph-style graph like
+`chart_font`) follow in the next slice.
+
+Slice 3 gates (trunk `5b5dad5c57` merged at `9cfdf2f69d`; logs
+`.coord/iwa-w4c/gates4`): every command of §8 exits 0.

@@ -541,6 +541,10 @@ pub enum Refusal {
     /// write.
     #[error("image fills are not written by this family")]
     ImageFill,
+    /// The chart has no style object for the property (a chart without a
+    /// legend style).
+    #[error("the chart has no style object for the property")]
+    MissingStyle,
     /// Commit was requested before staging a change.
     #[error("no chart-series change is staged")]
     NoStagedOperation,
@@ -564,6 +568,7 @@ impl Refusal {
             },
             Self::UnsupportedKind | Self::NotResettable => RefusalKind::UnsupportedTarget,
             Self::SharedStyle | Self::ImageFill => RefusalKind::UnsupportedContent,
+            Self::MissingStyle => RefusalKind::UnsupportedTarget,
             Self::SeriesCount { .. } => RefusalKind::InvalidValue,
             Self::NoStagedOperation => RefusalKind::UnsupportedOperation,
             Self::UnsupportedDependency | Self::UnsupportedSource => {
@@ -698,6 +703,15 @@ impl From<litchi_iwa_style::series::SymbolError> for Error {
             },
             litchi_iwa_style::series::SymbolError::Invalid(_)
             | litchi_iwa_style::series::SymbolError::IdentifierOverflow => Error::InvalidSource,
+            litchi_iwa_style::series::SymbolError::Refused(refusal) => match refusal {
+                litchi_iwa_style::series::Refusal::UnsupportedKind => {
+                    Refusal::UnsupportedKind.into()
+                },
+                litchi_iwa_style::series::Refusal::SharedStyle => Refusal::SharedStyle.into(),
+                litchi_iwa_style::series::Refusal::ImageFill => Refusal::ImageFill.into(),
+                litchi_iwa_style::series::Refusal::MissingStyle => Refusal::MissingStyle.into(),
+                _ => Refusal::UnsupportedDependency.into(),
+            },
             _ => Error::InvalidSource,
         }
     }
@@ -876,13 +890,13 @@ impl Edit<'_> {
 }
 
 /// The chart drawable's identifier, kind and series count.
-struct Target {
-    chart: u64,
-    kind: ChartKind,
+pub(super) struct Target {
+    pub(super) chart: u64,
+    pub(super) kind: ChartKind,
     series: usize,
 }
 
-fn target(
+pub(super) fn target(
     package: &Package,
     sheet: usize,
     chart: ChartSelector,
@@ -975,7 +989,7 @@ fn series_count(kind: ChartKind, components: usize) -> Result<usize, Error> {
     engine::visible_series(kind, components).ok_or(Error::InvalidSource)
 }
 
-fn map_arrangement(error: arrangement::Error) -> Error {
+pub(super) fn map_arrangement(error: arrangement::Error) -> Error {
     match error {
         arrangement::Error::Refused(refusal) => match refusal {
             arrangement::Refusal::UnsupportedSource => Refusal::UnsupportedSource.into(),
@@ -1187,7 +1201,7 @@ fn map_metadata_error(error: &metadata_codec::DecodeError) -> Error {
     }
 }
 
-struct PreparedComponents<'a> {
+pub(super) struct PreparedComponents<'a> {
     components: Vec<LeafComponents<'a>>,
     limits: litchi_iwa_core::Limits,
     requirements: litchi_iwa_style::graph::ConstructionRequirements,
@@ -1195,7 +1209,7 @@ struct PreparedComponents<'a> {
 }
 
 impl PreparedComponents<'_> {
-    fn workspace(&self) -> Result<Workspace<'_>, Error> {
+    pub(super) fn workspace(&self) -> Result<Workspace<'_>, Error> {
         Workspace::new_bounded(
             &self.components[0],
             self.limits,
@@ -1303,7 +1317,7 @@ fn encode_and_compress_member(
         .map_err(map_candidate_core_error)
 }
 
-fn prepare_components<'a>(
+pub(super) fn prepare_components<'a>(
     package: &'a Package,
     budget: &mut ChartBudget,
 ) -> Result<PreparedComponents<'a>, Error> {
@@ -1342,7 +1356,7 @@ fn prepare_components<'a>(
     })
 }
 
-fn publish_changes_exact(
+pub(super) fn publish_changes_exact(
     package: &Package,
     changes: &litchi_iwa_style::graph::Changes,
     budget: &mut ChartBudget,

@@ -1,0 +1,198 @@
+//! Numbers sheet-chart legend-style parity (wave W4-C, record 0414): the
+//! host `set_sheet_chart_legend_{fill, stroke, shadow}` routes (the host's
+//! legend-style variation lifecycle: derive, update, collapse) against
+//! `litchi_numbers::Package::edit_sheet_chart_legend_style` on the shared
+//! legend-style graph.
+
+use litchi_iwa::charts::{ChartLegendFill, ChartLegendShadow, ChartLegendStroke};
+use litchi_iwa::numbers;
+use litchi_iwa::shapes::ShapeFill;
+use litchi_iwa_common::chart::kind::Kind;
+use litchi_iwa_common::color::{RgbColorSpace, Rgba};
+use litchi_iwa_common::shape::fill::Fill;
+use litchi_iwa_common::shape::shadow::{Angle, Appearance, BlurRadius, Drop, Offset, Opacity};
+use litchi_iwa_common::shape::stroke::{Pattern, Stroke, Width};
+use litchi_numbers::Package;
+use litchi_numbers::sheet::chart::legend_style::{
+    LegendFill, LegendShadow, LegendStroke, Property, PropertyKind,
+};
+
+use crate::chart_style_cases::{Target, input};
+use crate::harness::{Case, Evidence, Format, LeafRun, TestResult, Tier};
+use crate::leaf_bytes;
+
+/// The host-added chart follows the fixture's native chart.
+fn last_chart(_bytes: &[u8]) -> TestResult<usize> {
+    Ok(1)
+}
+
+fn color(red: f32) -> TestResult<Rgba> {
+    Ok(Rgba::new(red, 0.3, 0.6, 1.0, RgbColorSpace::Srgb)?)
+}
+
+fn host_fill(fill: &LegendFill) -> TestResult<ChartLegendFill> {
+    Ok(match fill {
+        LegendFill::Fill(Fill::None) => ChartLegendFill::Fill(ShapeFill::None),
+        LegendFill::Fill(Fill::Solid(color)) => ChartLegendFill::Fill(ShapeFill::Solid(*color)),
+        LegendFill::Fill(Fill::Gradient(gradient)) => {
+            ChartLegendFill::Fill(ShapeFill::Gradient(gradient.clone()))
+        },
+        _ => ChartLegendFill::Inherited,
+    })
+}
+
+const fn host_stroke(stroke: LegendStroke) -> ChartLegendStroke {
+    match stroke {
+        LegendStroke::Stroke(stroke) => ChartLegendStroke::Stroke(stroke),
+        LegendStroke::None => ChartLegendStroke::NoStroke,
+        _ => ChartLegendStroke::Inherited,
+    }
+}
+
+const fn host_shadow(shadow: LegendShadow) -> ChartLegendShadow {
+    match shadow {
+        LegendShadow::Shadow(drop) => ChartLegendShadow::Shadow(drop),
+        LegendShadow::None => ChartLegendShadow::NoShadow,
+        _ => ChartLegendShadow::Inherited,
+    }
+}
+
+fn host_write(source: &[u8], sheet: u64, chart: u64, value: &Property) -> TestResult<Vec<u8>> {
+    let mut e = numbers::Draft::from_bytes(source)?;
+    match value {
+        Property::Fill(v) => e.set_sheet_chart_legend_fill(sheet, chart, &host_fill(v)?)?,
+        Property::Stroke(v) => e.set_sheet_chart_legend_stroke(sheet, chart, host_stroke(*v))?,
+        Property::Shadow(v) => e.set_sheet_chart_legend_shadow(sheet, chart, host_shadow(*v))?,
+        _ => return Err("unmapped property".into()),
+    }
+    Ok(e.to_bytes()?)
+}
+
+fn host_read(bytes: &[u8], sheet: u64, chart: u64, kind: PropertyKind) -> TestResult<String> {
+    let e = numbers::Draft::from_bytes(bytes)?;
+    Ok(match kind {
+        PropertyKind::Fill => format!("{:?}", e.sheet_chart_legend_fill(sheet, chart)?),
+        PropertyKind::Stroke => format!("{:?}", e.sheet_chart_legend_stroke(sheet, chart)?),
+        PropertyKind::Shadow => format!("{:?}", e.sheet_chart_legend_shadow(sheet, chart)?),
+        _ => return Err("unmapped kind".into()),
+    })
+}
+
+/// The leaf read in the host read's rendering.
+fn leaf_read(bytes: &[u8], kind: PropertyKind) -> TestResult<String> {
+    let value =
+        Package::from_bytes(bytes)?.sheet_chart_legend_style(0, last_chart(bytes)?, kind)?;
+    Ok(match value {
+        Property::Fill(v) => format!("{:?}", host_fill(&v)?),
+        Property::Stroke(v) => format!("{:?}", host_stroke(v)),
+        Property::Shadow(v) => format!("{:?}", host_shadow(v)),
+        _ => return Err("unmapped property".into()),
+    })
+}
+
+fn cases() -> TestResult<Vec<Property>> {
+    Ok(vec![
+        Property::Fill(LegendFill::Fill(Fill::Solid(color(0.9)?))),
+        Property::Fill(LegendFill::Fill(Fill::None)),
+        Property::Stroke(LegendStroke::Stroke(Stroke::new(
+            color(0.2)?,
+            Width::new(2.0)?,
+            Pattern::Solid,
+        ))),
+        Property::Stroke(LegendStroke::None),
+        Property::Shadow(LegendShadow::Shadow(Drop::new(
+            Appearance::new(
+                color(0.1)?,
+                BlurRadius::TEN_POINTS,
+                Offset::SIX_POINTS,
+                Opacity::THREE_QUARTERS,
+            ),
+            Angle::FORTY_FIVE_DEGREES,
+        ))),
+        Property::Shadow(LegendShadow::None),
+    ])
+}
+
+/// Set `value` on a host-added chart (or reset it after a host set).
+fn legend_case(name: &'static str, value: &Property, reset: bool) -> TestResult {
+    let mut input = input(Format::Numbers, Kind::Column2d)?;
+    let Target::Numbers { sheet } = input.target else {
+        return Err("not a Numbers target".into());
+    };
+    let chart = input.chart;
+    let kind = value.kind();
+    if reset {
+        input.fixture.bytes = host_write(&input.fixture.bytes, sheet, chart, value)?;
+    }
+    let target = if reset {
+        kind.inherited()
+    } else {
+        value.clone()
+    };
+    let staged = target.clone();
+    Case::new(
+        name,
+        Format::Numbers,
+        Tier::B,
+        Evidence::Queued,
+        &input.fixture,
+    )
+    .host(|source| host_write(source, sheet, chart, &target))
+    .leaf(|source| {
+        let package = Package::from_bytes(source)?;
+        let mut edit = package.edit_sheet_chart_legend_style(0, last_chart(source)?)?;
+        if reset {
+            edit.reset(kind)?;
+        } else {
+            edit.set(staged.clone())?;
+        }
+        let commit = edit.commit()?;
+        let restored = commit
+            .package()
+            .apply_sheet_chart_legend_style(&commit.patch().inverse())?;
+        Ok(LeafRun::with_inverse(
+            leaf_bytes!(commit.package()),
+            leaf_bytes!(restored.package()),
+        ))
+    })
+    .read("host legend property", move |bytes| {
+        host_read(bytes, sheet, chart, kind)
+    })
+    .read("leaf legend property", move |bytes| leaf_read(bytes, kind))
+    .leaf_structural_metadata()
+    .run()
+    .map_err(|error| format!("{value:?} reset={reset}: {error}"))?;
+    Ok(())
+}
+
+#[test]
+fn numbers_sheet_chart_legend_style_set_parity() -> TestResult {
+    let _ = (Tier::B, Evidence::Queued);
+    for value in cases()? {
+        legend_case("numbers_sheet_chart_legend_style_set_parity", &value, false)?;
+        legend_case("numbers_sheet_chart_legend_style_set_parity", &value, true)?;
+    }
+    Ok(())
+}
+
+#[test]
+fn numbers_sheet_chart_legend_style_read_parity() -> TestResult {
+    for value in cases()? {
+        let input = input(Format::Numbers, Kind::Column2d)?;
+        let Target::Numbers { sheet } = input.target else {
+            return Err("not a Numbers target".into());
+        };
+        for bytes in [
+            input.fixture.bytes.clone(),
+            host_write(&input.fixture.bytes, sheet, input.chart, &value)?,
+        ] {
+            assert_eq!(
+                host_read(&bytes, sheet, input.chart, value.kind())?,
+                leaf_read(&bytes, value.kind())?,
+                "{value:?}"
+            );
+        }
+    }
+    let _ = (Tier::A, Evidence::Queued);
+    Ok(())
+}

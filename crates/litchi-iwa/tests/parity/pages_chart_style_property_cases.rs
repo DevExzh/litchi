@@ -33,7 +33,7 @@ fn input(kind: Kind) -> TestResult<(Fixture, (), u64)> {
     Ok((input.fixture, (), input.chart))
 }
 
-fn host_write(source: &[u8], __sheet: (), chart: u64, value: Property) -> TestResult<Vec<u8>> {
+fn host_write(source: &[u8], ____sheet: (), chart: u64, value: Property) -> TestResult<Vec<u8>> {
     let mut e = pages::Draft::from_bytes(source)?;
     match value {
         Property::PieStartAngle(v) => {
@@ -92,7 +92,7 @@ fn host_write(source: &[u8], __sheet: (), chart: u64, value: Property) -> TestRe
     Ok(e.to_bytes()?)
 }
 
-fn host_read(bytes: &[u8], __sheet: (), chart: u64, kind: PropertyKind) -> TestResult<String> {
+fn host_read(bytes: &[u8], ____sheet: (), chart: u64, kind: PropertyKind) -> TestResult<String> {
     let e = pages::Draft::from_bytes(bytes)?;
     Ok(match kind {
         PropertyKind::PieStartAngle => {

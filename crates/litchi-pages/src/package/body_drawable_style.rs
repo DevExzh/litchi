@@ -23,9 +23,12 @@ use litchi_iwa_core::Archive;
 use litchi_iwa_style::graph::{Components, Workspace};
 use litchi_iwa_style::shape::{
     self as engine,
-    property::{Fills, Shadows, ShapeEffects, Strokes, TextColumns, TextLayout},
+    property::{Fills, ReleasingFills, Shadows, ShapeEffects, Strokes, TextColumns, TextLayout},
 };
 use thiserror::Error as ThisError;
+
+use litchi_iwa_common::shape::fill::ImageTechnique;
+use litchi_iwa_common::shape::geometry::Size as FillSize;
 
 use super::Package;
 use super::body_drawable_graph::{self as graph, Budget, GraphError, ObjectIndex, kind_name};
@@ -47,9 +50,15 @@ pub enum Refusal {
     /// Only ordinary body shapes carry these styles.
     #[error("only body shapes carry drawing styles")]
     NotAShape,
-    /// Image fills are not written by this family.
-    #[error("image fills are not written by this family")]
+    /// An image fill is replaced or reset, or a second image fill is
+    /// staged in one edit (its data reference and media are not released
+    /// here).
+    #[error("an existing image fill cannot be replaced here")]
     ImageFill,
+    /// The image-fill bytes are not an image, or the file name is not a
+    /// safe basename.
+    #[error("the image-fill data or file name is unusable")]
+    InvalidImage,
     /// The shape's style graph holds overrides this family cannot rewrite.
     #[error("the shape's style cannot be rewritten safely")]
     UnsupportedStyle,
@@ -72,6 +81,7 @@ impl Refusal {
             Self::ImageFill | Self::UnsupportedStyle | Self::UnsupportedSource => {
                 RefusalKind::UnsupportedContent
             },
+            Self::InvalidImage => RefusalKind::InvalidValue,
         }
     }
 }
@@ -551,6 +561,20 @@ fn set_endpoints(
 enum Change {
     Set(Property),
     Reset(PropertyKind),
+    ImageFill {
+        bytes: Arc<[u8]>,
+        file_name: Box<str>,
+        technique: ImageTechnique,
+        tint: Option<litchi_iwa_common::color::Rgba>,
+    },
+}
+
+/// A new embedded image an image fill references (record 0413b).
+struct NewImage {
+    data: u64,
+    bytes: Arc<[u8]>,
+    file_name: Box<str>,
+    stored_name: String,
 }
 
 /// Drawing-style changes staged against one body shape.
@@ -573,7 +597,9 @@ impl fmt::Debug for Edit<'_> {
 
 impl Edit<'_> {
     /// Stage the shape's own value of one property (an image fill is
-    /// refused).
+    /// staged by [`Self::set_image_fill`]; a fill set or reset over an
+    /// image fill releases its data reference and, when nothing else uses
+    /// it, its media).
     ///
     /// # Errors
     ///
@@ -584,6 +610,33 @@ impl Edit<'_> {
         }
         self.changes.push(Change::Set(property));
         Ok(self)
+    }
+
+    /// Stage embedding `bytes` as a new `Data/` member and making them the
+    /// shape's or text box's image fill, laid out by `technique` over its
+    /// frame size and optionally tinted (the host's
+    /// `set_body_shape_image_fill`). The new data asset is owned by the
+    /// shape's style variation.
+    ///
+    /// # Errors
+    ///
+    /// At commit: [`Refusal::InvalidImage`] for bytes that are not an image
+    /// or an unsafe file name; [`Refusal::ImageFill`] when the shape
+    /// already shows an image fill or a second one is staged.
+    pub fn set_image_fill(
+        &mut self,
+        bytes: &[u8],
+        file_name: &str,
+        technique: ImageTechnique,
+        tint: Option<litchi_iwa_common::color::Rgba>,
+    ) -> &mut Self {
+        self.changes.push(Change::ImageFill {
+            bytes: bytes.into(),
+            file_name: file_name.into(),
+            technique,
+            tint,
+        });
+        self
     }
 
     /// Stage removing the shape's own value of one property, so it shows its
@@ -611,8 +664,45 @@ impl Edit<'_> {
         let mut workspace = Workspace::new(&components, limits).map_err(from_engine)?;
         let mut applied = 0;
         let own = line_ends(self.source, self.shape)?;
+        let mut image: Option<NewImage> = None;
+        let mut releases: Vec<Release> = Vec::new();
         for change in &self.changes {
             let changed = match change {
+                Change::ImageFill {
+                    bytes,
+                    file_name,
+                    technique,
+                    tint,
+                } => {
+                    if image.is_some() {
+                        return Err(Refusal::ImageFill.into());
+                    }
+                    if let Some(release) = released_image(&workspace, self.shape)? {
+                        releases.push(release);
+                    }
+                    let staged = stage_image(self.source, self.selector, bytes, file_name)?;
+                    let size = self
+                        .source
+                        .body_drawable_properties(self.selector)
+                        .map_err(|_| Error::InvalidSource)?
+                        .geometry()
+                        .and_then(|geometry| geometry.size)
+                        .ok_or(Refusal::UnsupportedStyle)?;
+                    let fill = embedded_fill(staged.data, *technique, size, *tint)?;
+                    let writes = [(
+                        engine::Slot::Fill,
+                        Some(engine::Value::message(
+                            litchi_iwa_style::drawing::encode_fill(&fill),
+                        )),
+                    )];
+                    let target = engine::target(&workspace, self.shape).map_err(from_engine)?;
+                    let plan =
+                        engine::plan_set(&workspace, target, &writes).map_err(from_engine)?;
+                    let changed = plan.changed();
+                    engine::apply(&mut workspace, self.shape, plan).map_err(from_engine)?;
+                    image = Some(staged);
+                    Ok(changed)
+                },
                 Change::Set(Property::LineEndpoints(wanted)) => {
                     applied +=
                         usize::from(set_endpoints(&mut workspace, &own, self.shape, *wanted)?);
@@ -628,7 +718,13 @@ impl Edit<'_> {
                     continue;
                 },
                 Change::Set(Property::Fill(fill)) => {
-                    engine::set(&mut workspace, self.shape, &Fills, fill)
+                    match released_image(&workspace, self.shape)? {
+                        Some(release) => {
+                            releases.push(release);
+                            engine::set(&mut workspace, self.shape, &ReleasingFills, fill)
+                        },
+                        None => engine::set(&mut workspace, self.shape, &Fills, fill),
+                    }
                 },
                 Change::Set(Property::Stroke(stroke)) => {
                     engine::set(&mut workspace, self.shape, &Strokes, stroke)
@@ -646,7 +742,13 @@ impl Edit<'_> {
                     engine::set(&mut workspace, self.shape, &TextColumns, columns)
                 },
                 Change::Reset(PropertyKind::Fill) => {
-                    engine::reset(&mut workspace, self.shape, &Fills)
+                    match released_image(&workspace, self.shape)? {
+                        Some(release) => {
+                            releases.push(release);
+                            engine::reset(&mut workspace, self.shape, &ReleasingFills)
+                        },
+                        None => engine::reset(&mut workspace, self.shape, &Fills),
+                    }
                 },
                 Change::Reset(PropertyKind::Stroke) => {
                     engine::reset(&mut workspace, self.shape, &Strokes)
@@ -672,7 +774,7 @@ impl Edit<'_> {
             .iter()
             .filter_map(|change| match change {
                 Change::Set(property) => Some(property.clone()),
-                Change::Reset(_) => None,
+                Change::Reset(_) | Change::ImageFill { .. } => None,
             })
             .collect::<Vec<_>>();
         let changes = workspace.finish();
@@ -682,12 +784,27 @@ impl Edit<'_> {
             if !changes.insertions.is_empty() || !changes.deletions.is_empty() {
                 return Err(Refusal::UnsupportedStyle.into());
             }
-            let archives = changes
+            let mut archives: Vec<(Arc<str>, Archive)> = changes
                 .edits
                 .into_iter()
                 .map(|(name, archive)| (Arc::<str>::from(name), archive))
                 .collect();
-            graph::publish_changes(self.source, archives, &[], &[], &[])?
+            let deletions = release_images(self.source, &mut archives, &releases)?;
+            let deletions = deletions.iter().map(String::as_str).collect::<Vec<_>>();
+            match &image {
+                Some(image) => {
+                    own_image(self.source, &mut archives, self.shape, image)?;
+                    let member = format!("Data/{}", image.stored_name);
+                    graph::publish_changes(
+                        self.source,
+                        archives,
+                        &[(member.as_str(), image.bytes.as_ref())],
+                        &[],
+                        &deletions,
+                    )?
+                },
+                None => graph::publish_changes(self.source, archives, &[], &[], &deletions)?,
+            }
         };
         // The last staged value of each property reads back.
         let (components, limits) = self::workspace(&package)?;
@@ -871,4 +988,342 @@ impl Package {
             },
         })
     }
+}
+
+/// Validate an image fill's bytes and name and allocate its data asset
+/// (the host media draft's `insert_unreferenced`: the next data
+/// identifier, `stem-identifier.extension`).
+fn stage_image(
+    source: &Package,
+    selector: DrawableSelector,
+    bytes: &Arc<[u8]>,
+    file_name: &str,
+) -> Result<NewImage, Error> {
+    let _ = selector;
+    if litchi_iwa_common::media::Type::from_bytes(bytes) != litchi_iwa_common::media::Type::Image {
+        return Err(Refusal::InvalidImage.into());
+    }
+    let metadata = super::body_storage_objects::metadata(source)?.ok_or(Error::InvalidSource)?;
+    let data = super::body_storage_objects::max_data_identifier(&metadata.payload)?
+        .checked_add(1)
+        .ok_or(Error::InvalidSource)?;
+    let stored_name = super::body_media_lifecycle::materialized_name(file_name, data)
+        .map_err(|_| Refusal::InvalidImage)?;
+    if source
+        .state
+        .source
+        .package()
+        .iter()
+        .any(|entry| entry.name() == format!("Data/{stored_name}"))
+    {
+        return Err(Error::InvalidSource);
+    }
+    Ok(NewImage {
+        data,
+        bytes: Arc::clone(bytes),
+        file_name: file_name.into(),
+        stored_name,
+    })
+}
+
+/// The embedded image fill of data `data` over a `size` frame.
+fn embedded_fill(
+    data: u64,
+    technique: ImageTechnique,
+    size: crate::drawable::Size,
+    tint: Option<litchi_iwa_common::color::Rgba>,
+) -> Result<Fill, Error> {
+    let image = litchi_iwa_common::shape::fill::Image::embedded(
+        litchi_iwa_common::shape::fill::ImageData::new(data).map_err(|_| Error::InvalidSource)?,
+        technique,
+        FillSize {
+            width: size.width,
+            height: size.height,
+        },
+    )
+    .map_err(|_| Refusal::UnsupportedStyle)?;
+    Ok(Fill::Image(match tint {
+        Some(tint) => image.with_tint(tint),
+        None => image,
+    }))
+}
+
+/// Give the shape's (new) style variation the image's data reference and
+/// register the asset: its `DataInfo` and the variation's data-reference
+/// owner in the package metadata (the media family's data-owner
+/// transition, record 0371; Keynote's image fills, record 0372).
+fn own_image(
+    source: &Package,
+    archives: &mut Vec<(Arc<str>, Archive)>,
+    shape: u64,
+    image: &NewImage,
+) -> Result<(), Error> {
+    use sha1::Digest as _;
+    let objects = super::body_storage_objects::metadata(source)?.ok_or(Error::InvalidSource)?;
+    let editable = |archives: &mut Vec<(Arc<str>, Archive)>, name: &str| -> Result<usize, Error> {
+        if let Some(position) = archives
+            .iter()
+            .position(|(member, _)| member.as_ref() == name)
+        {
+            return Ok(position);
+        }
+        archives.push((Arc::from(name), graph::editable_archive(source, name)?));
+        Ok(archives.len() - 1)
+    };
+    // The variation the shape now points at.
+    let style = archives
+        .iter()
+        .find_map(|(_, archive)| archive.object(shape))
+        .or_else(|| {
+            source
+                .state
+                .source
+                .components()
+                .iter()
+                .find_map(|component| component.archive().object(shape))
+        })
+        .and_then(|object| object.messages.first())
+        .map(|message| shape_style_of(&message.data))
+        .transpose()?
+        .flatten()
+        .ok_or(Error::InvalidSource)?;
+    let style_member = archives
+        .iter()
+        .find(|(_, archive)| archive.object(style).is_some())
+        .map(|(name, _)| Arc::clone(name))
+        .ok_or(Refusal::UnsupportedStyle)?;
+    let position = editable(archives, &style_member)?;
+    let variation = archives[position]
+        .1
+        .object_mut(style)
+        .ok_or(Error::InvalidSource)?;
+    let info = variation
+        .archive_info
+        .message_infos
+        .first_mut()
+        .ok_or(Error::InvalidSource)?;
+    if !info.data_references.contains(&image.data) {
+        info.data_references.push(image.data);
+    }
+    let component = objects
+        .component_for_entry(&style_member)?
+        .ok_or(Error::InvalidSource)?;
+    let position = editable(archives, &objects.component)?;
+    let metadata = archives[position]
+        .1
+        .object_mut(objects.object)
+        .ok_or(Error::InvalidSource)?;
+    let payload = metadata
+        .messages
+        .get(objects.message_index)
+        .ok_or(Error::InvalidSource)?
+        .data
+        .clone();
+    let payload = super::body_storage_objects::append_data_info(
+        &payload,
+        image.data,
+        &sha1::Sha1::digest(image.bytes.as_ref()),
+        &image.file_name,
+        &image.stored_name,
+        image.bytes.len() as u64,
+    )?;
+    let payload = super::body_storage_objects::adjust_data_reference(
+        &payload, component, image.data, style, true,
+    )?;
+    let limits = source
+        .state
+        .source
+        .limits()
+        .effective_archive_limits()
+        .map_err(|_| Error::InvalidSource)?;
+    metadata
+        .replace_message_preserving_header(
+            objects.message_index,
+            litchi_iwa_core::RawMessage {
+                type_: 11_006,
+                data: payload,
+            },
+            limits,
+        )
+        .map_err(|_| Error::InvalidSource)?;
+    Ok(())
+}
+
+/// `TSWP.ShapeInfoArchive.super.style` of a shape-info payload.
+fn shape_style_of(payload: &[u8]) -> Result<Option<u64>, Error> {
+    let limits = WireLimits::default();
+    let parse = |payload| {
+        litchi_iwa_common::wire::WireView::parse(payload, limits).map_err(|_| Error::InvalidSource)
+    };
+    let view = parse(payload)?;
+    let Some(shape) = view.fields().find(|field| field.number() == 1) else {
+        return Ok(None);
+    };
+    let shape = parse(shape.payload())?;
+    let Some(style) = shape.fields().find(|field| field.number() == 2) else {
+        return Ok(None);
+    };
+    let reference = parse(style.payload())?;
+    Ok(reference
+        .fields()
+        .find(|field| field.number() == 1)
+        .and_then(|field| decode_varint_from_bytes(field.payload()).ok())
+        .map(|(value, _)| value))
+}
+
+/// An image fill a change replaces or resets: the style that held it and
+/// its data identifier.
+struct Release {
+    style: u64,
+    data: u64,
+}
+
+/// The image fill shape `shape` shows from its own style, if any.
+fn released_image(workspace: &Workspace<'_>, shape: u64) -> Result<Option<Release>, Error> {
+    let Fill::Image(image) = engine::value(workspace, shape, &Fills).map_err(from_engine)? else {
+        return Ok(None);
+    };
+    let Some(data) = image.data() else {
+        return Ok(None);
+    };
+    let target = engine::target(workspace, shape).map_err(from_engine)?;
+    Ok(Some(Release {
+        style: target.style(),
+        data: data.get(),
+    }))
+}
+
+/// The data-owner transition of released image fills (the host's
+/// `remove_style_data_reference` and `remove_orphaned_image_asset`): a
+/// style that no longer stores the image drops its data reference and its
+/// registered owner (a removed variation drops its owner), and data nothing
+/// references any more loses its `DataInfo` and `Data/` member. Returns the
+/// members to delete.
+fn release_images(
+    source: &Package,
+    archives: &mut Vec<(Arc<str>, Archive)>,
+    releases: &[Release],
+) -> Result<Vec<String>, Error> {
+    if releases.is_empty() {
+        return Ok(Vec::new());
+    }
+    let objects = super::body_storage_objects::metadata(source)?.ok_or(Error::InvalidSource)?;
+    let editable = |archives: &mut Vec<(Arc<str>, Archive)>, name: &str| -> Result<usize, Error> {
+        if let Some(position) = archives
+            .iter()
+            .position(|(member, _)| member.as_ref() == name)
+        {
+            return Ok(position);
+        }
+        archives.push((Arc::from(name), graph::editable_archive(source, name)?));
+        Ok(archives.len() - 1)
+    };
+    let position = editable(archives, &objects.component)?;
+    let mut payload = archives[position]
+        .1
+        .object(objects.object)
+        .and_then(|object| object.messages.get(objects.message_index))
+        .ok_or(Error::InvalidSource)?
+        .data
+        .clone();
+    let mut deletions = Vec::new();
+    for release in releases {
+        let member = source
+            .state
+            .source
+            .components()
+            .iter()
+            .find(|component| component.archive().object(release.style).is_some())
+            .map(|component| component.name().to_owned())
+            .ok_or(Error::InvalidSource)?;
+        let component = objects
+            .component_for_entry(&member)?
+            .ok_or(Error::InvalidSource)?;
+        // The released style as published: kept with another fill
+        // (rewritten), untouched (a shared style the shape left) or removed.
+        let edited = archives
+            .iter()
+            .find(|(name, _)| name.as_ref() == member)
+            .map(|(_, archive)| archive.object(release.style).is_some());
+        let still_stores = match edited {
+            Some(true) => {
+                let position = editable(archives, &member)?;
+                let object = archives[position]
+                    .1
+                    .object(release.style)
+                    .ok_or(Error::InvalidSource)?;
+                let fill = engine::ShapeProperty::read(
+                    &Fills,
+                    &[engine::stored_fill(
+                        object
+                            .messages
+                            .first()
+                            .map(|message| message.data.as_slice())
+                            .ok_or(Error::InvalidSource)?,
+                    )
+                    .map_err(from_engine)?],
+                )
+                .ok();
+                matches!(fill, Some(Fill::Image(image)) if image.data().map(|data| data.get()) == Some(release.data))
+            },
+            Some(false) => false,
+            None => true,
+        };
+        if still_stores {
+            continue;
+        }
+        if edited == Some(true) {
+            let position = editable(archives, &member)?;
+            let object = archives[position]
+                .1
+                .object_mut(release.style)
+                .ok_or(Error::InvalidSource)?;
+            for info in &mut object.archive_info.message_infos {
+                info.data_references.retain(|data| *data != release.data);
+            }
+        }
+        payload = super::body_storage_objects::adjust_data_reference(
+            &payload,
+            component,
+            release.data,
+            release.style,
+            false,
+        )?;
+        if objects.data_metadata_map.is_none()
+            && !super::body_storage_objects::referenced_data(&payload)?.contains(&release.data)
+        {
+            if let Some(member) = super::body_storage_objects::data_member(&payload, release.data)?
+                && source
+                    .state
+                    .source
+                    .package()
+                    .iter()
+                    .any(|entry| entry.name() == member)
+            {
+                deletions.push(member);
+            }
+            payload = super::body_storage_objects::remove_data_info(&payload, release.data)?;
+        }
+    }
+    let limits = source
+        .state
+        .source
+        .limits()
+        .effective_archive_limits()
+        .map_err(|_| Error::InvalidSource)?;
+    let position = editable(archives, &objects.component)?;
+    archives[position]
+        .1
+        .object_mut(objects.object)
+        .ok_or(Error::InvalidSource)?
+        .replace_message_preserving_header(
+            objects.message_index,
+            litchi_iwa_core::RawMessage {
+                type_: 11_006,
+                data: payload,
+            },
+            limits,
+        )
+        .map_err(|_| Error::InvalidSource)?;
+    Ok(deletions)
 }

@@ -90,6 +90,25 @@ pub mod schema {
     const FRAME: &[KnownField] = &[known(2, KnownKind::Bytes), known(3, KnownKind::Fixed32)];
     const PATTERNED_STROKE: &[KnownField] = &[known(2, KnownKind::Bytes)];
 
+    const CONTACT_SHADOW: &[KnownField] =
+        &[known(2, KnownKind::Fixed32), known(4, KnownKind::Fixed32)];
+    const CURVED_SHADOW: &[KnownField] = &[known(1, KnownKind::Fixed32)];
+    const EMPTY: &[KnownField] = &[];
+
+    /// `TSD.ShadowArchive` (the host's legend-shadow strict schema).
+    pub const SHADOW: &[KnownField] = &[
+        known(1, KnownKind::Message(COLOR)),
+        known(2, KnownKind::Fixed32),
+        known(3, KnownKind::Fixed32),
+        known(4, KnownKind::Varint),
+        known(5, KnownKind::Fixed32),
+        known(6, KnownKind::Varint),
+        known(7, KnownKind::Varint),
+        known(8, KnownKind::Message(EMPTY)),
+        known(9, KnownKind::Message(CONTACT_SHADOW)),
+        known(10, KnownKind::Message(CURVED_SHADOW)),
+    ];
+
     /// `TSD.StrokeArchive`.
     pub const STROKE: &[KnownField] = &[
         known(1, KnownKind::Message(COLOR)),

@@ -1845,6 +1845,16 @@ impl Plan {
     }
 }
 
+/// The fill a `TSWP.ShapeStyleArchive` payload stores directly, if any
+/// (for a format family's image-fill release check, record 0415).
+///
+/// # Errors
+///
+/// A malformed style payload.
+pub fn stored_fill(style: &[u8]) -> Result<Option<&[u8]>> {
+    stored_slot(style, Slot::Fill)
+}
+
 fn stored_slot(payload: &[u8], slot: Slot) -> Result<Option<&[u8]>> {
     let (text, number) = slot.location();
     let properties = if text {
@@ -2269,7 +2279,12 @@ fn repoint_drawable(
     Ok(())
 }
 
-fn register(workspace: &mut Workspace<'_>, stylesheet: u64, parent: u64, style: u64) -> Result<()> {
+pub(crate) fn register(
+    workspace: &mut Workspace<'_>,
+    stylesheet: u64,
+    parent: u64,
+    style: u64,
+) -> Result<()> {
     let (message, payload) = workspace.unique_payload(
         stylesheet,
         STYLESHEET_MESSAGE_TYPE,
@@ -2292,7 +2307,7 @@ fn register(workspace: &mut Workspace<'_>, stylesheet: u64, parent: u64, style: 
     Ok(())
 }
 
-fn unregister(
+pub(crate) fn unregister(
     workspace: &mut Workspace<'_>,
     stylesheet: u64,
     parent: u64,
@@ -2585,6 +2600,32 @@ pub mod property {
                 ));
             }
             Ok(())
+        }
+    }
+
+    /// [`Fills`] for a format family that releases the data reference and
+    /// media of an image fill it replaces or resets itself (record 0415):
+    /// the same slots and values, but a stored image fill is replaceable.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+    pub struct ReleasingFills;
+
+    impl ShapeProperty for ReleasingFills {
+        type Value = Fill;
+
+        fn groups(&self) -> &'static [&'static [Slot]] {
+            Fills.groups()
+        }
+
+        fn read(&self, stored: &[Option<&[u8]>]) -> Result<Fill> {
+            Fills.read(stored)
+        }
+
+        fn writes(&self, value: &Fill) -> Result<Vec<(Slot, Option<Value>)>> {
+            Fills.writes(value)
+        }
+
+        fn lenient_reset(&self) -> bool {
+            Fills.lenient_reset()
         }
     }
 
@@ -2902,7 +2943,7 @@ pub mod property {
         }
     }
 
-    fn shadow_of(bytes: &[u8]) -> Result<Shadow> {
+    pub(crate) fn shadow_of(bytes: &[u8]) -> Result<Shadow> {
         let invalid = |_| Error::Invalid("a stored shadow is invalid");
         let numbers = super::field_numbers(bytes)?;
         if numbers.is_empty() {
@@ -2977,7 +3018,7 @@ pub mod property {
         }
     }
 
-    fn encode_shadow(shadow: Shadow) -> Vec<u8> {
+    pub(crate) fn encode_shadow(shadow: Shadow) -> Vec<u8> {
         let mut output = Vec::new();
         let (appearance, angle, kind) = match shadow {
             Shadow::Drop(drop) => (drop.appearance(), angle_native(drop.angle()), 0),

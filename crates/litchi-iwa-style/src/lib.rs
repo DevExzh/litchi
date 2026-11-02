@@ -40,6 +40,7 @@ pub mod chart_style;
 pub mod chart_text;
 pub mod drawing;
 pub mod graph;
+pub mod legend_style;
 pub mod line_end;
 pub mod media;
 pub mod number_format;
