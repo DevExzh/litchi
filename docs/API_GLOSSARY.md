@@ -2946,6 +2946,27 @@ identifiers and archive values do not cross the public boundary.
 |---|---|---|
 | `litchi_pages::chart::series::{Property, PropertyKind, Edit, Patch, Commit, Diagnostics, Error, LimitKind, Refusal, Symbol, SymbolShape, SymbolSize}` | Selector-first `Package::{body_chart_series, edit_body_chart_series, apply_body_chart_series}` for per-series visibility, shape and optional point size. `Property::Symbols(Vec<Option<Symbol>>)` is the sole write value; `Edit::set` preserves exact-source no-op/inverse/reopen/locality and maps unsupported kinds, series-count mismatch, shared styles and resource ceilings to typed refusals/errors. | ⏳ 0400: Pages host differential and scoped facade checks pass; native queue, full-facade performance and final integrated gate pending |
 
+## W4-C chart style families on the shared chart engines (record 0414)
+
+The chart-level, axis-level and per-series chart properties of all three
+formats are thin selector adapters over `litchi_iwa_style::{chart_style,
+series, series::style}`. The property values are the engines' shared
+vocabulary (`chart_style::{chart, axis}::{Property, PropertyKind}`), re-exported
+at each family path; host single-series and all-series setters collapse into
+one per-series vector property, host per-property setters into one
+`Edit::set` per family. Native identifiers and archive values do not cross the
+public boundary.
+
+| Canonical name | Meaning | Status |
+|---|---|---|
+| `litchi_keynote::chart::style::{Edit, Patch, Commit, Diagnostics, Error, LimitKind, Refusal, Property, PropertyKind, RadarGridShape, corner, donut, gaps, legend, pie, radar, chart3d}` | Registered family; `Package::{slide_chart_style(slide, chart, PropertyKind), edit_slide_chart_style(slide, chart), apply_slide_chart_style}`; `Edit::{set(Property), reset(PropertyKind)}` (reset writes the native default) for pie/donut/radar angles, 3D gap/rotation/depth/bar shape, rounded corners, legend frame, border, radar grid and gaps; a shared style is `Refusal::SharedStyle`, a property the kind lacks `Refusal::UnsupportedKind` | ⏳ 0414: Keynote host differential (Tier B) passes; native queue pending |
+| `litchi_keynote::chart::axis::{Edit, Patch, Commit, Diagnostics, Error, LimitKind, Refusal, Property, PropertyKind, Visibility, TickMarkLocation}` (beside the existing axis values) | Registered family; `Package::{slide_chart_axis(slide, chart, Axis, PropertyKind), edit_slide_chart_axis, apply_slide_chart_axis}`; `Edit::set(Axis, Property)` for the primary axis's line, gridlines, minor ticks, tick-mark location, minimum label, labels and series names | ⏳ 0414: Tier B; native queue pending |
+| `litchi_keynote::chart::series::{Edit, Patch, Commit, Diagnostics, Error, LimitKind, Refusal, Property, PropertyKind, …values}` | Registered family; `Package::slide_chart_series(slide, chart, PropertyKind)` (was symbols-only, no kind); `Edit::{set(Property), reset(PropertyKind, series)}` for connection lines, wedge explosions, label distances, symbols, trendlines, error bars, pie labels, value labels, value-label affixes and number formats, strokes, fills, symbol fills and outlines (`set` now takes a `Property`, was a symbol vector) | ⏳ 0414: Tier B; native queue pending |
+| `litchi_pages::chart::style::{…}` and `litchi_pages::chart::axis::{…}` | Registered families with the Keynote meanings over a `BodyChartSelector`: `Package::{body_chart_style, edit_body_chart_style, apply_body_chart_style}`, `Package::{body_chart_axis, edit_body_chart_axis, apply_body_chart_axis}`; by-value `Edit` builders as the other Pages chart families | ⏳ 0414: byte-identical to the host on the tracked fixture; native queue pending |
+| `litchi_pages::chart::series::{…}` | `Package::body_chart_series(selector, PropertyKind)` (was symbols-only); `Edit::{set(Property), reset(PropertyKind, series)}` over the same per-series property set as Keynote | ⏳ 0414: native queue pending |
+| `litchi_numbers::sheet::chart::{style, axis}::{Property, PropertyKind, RadarGridShape}` | Now re-exports of the engine values (same names and variants); `sheet::chart::series::Property::{ValueLabelAffixes, ValueLabelNumberFormats}` added with `LabelAffixes`, `NumberFormat` | ⏳ 0414: native queue pending |
+| `litchi_iwa_style::chart_style::{chart, axis, read_chart, write_chart, read_axis, write_axis}`, `litchi_iwa_style::series::{read, write, visible_series, Refusal, style::{Kind, Value, effective, rewrite, read, write}}` | Format-neutral engines (not re-exported by a facade except the value enums): bounded workspace reads/writes returning the source-derived `MutationScope` (now with `allowed_chart_fields`) the owners publish under | engine, record 0414 |
+
 ## iWork facade retirement and iWork open options (record 0306)
 
 | Canonical name | Banned | Status |

@@ -26027,6 +26027,8 @@
         "litchi_pages::chart::title",
         "litchi_pages::chart::axis_title",
         "litchi_pages::chart::series",
+        "litchi_pages::chart::style",
+        "litchi_pages::chart::axis",
         "litchi_pages::drawable::order",
         "litchi_pages::image::adjustments",
         "litchi_pages::table::appearance::transaction",
@@ -26083,6 +26085,14 @@
         {
           "method": "litchi_pages::Package::apply_body_chart_series",
           "ok": "litchi_pages::chart::series::Commit"
+        },
+        {
+          "method": "litchi_pages::Package::apply_body_chart_style",
+          "ok": "litchi_pages::chart::style::Commit"
+        },
+        {
+          "method": "litchi_pages::Package::apply_body_chart_axis",
+          "ok": "litchi_pages::chart::axis::Commit"
         },
         {
           "method": "litchi_pages::Package::apply_body_drawable_order",
@@ -27580,6 +27590,9 @@
         "litchi_keynote::chart::title",
         "litchi_keynote::chart::value_axis",
         "litchi_keynote::chart::data",
+        "litchi_keynote::chart::series",
+        "litchi_keynote::chart::style",
+        "litchi_keynote::chart::axis",
         "litchi_keynote::background",
         "litchi_keynote::build::order",
         "litchi_keynote::slide::image::adjustments",
@@ -27682,6 +27695,18 @@
         {
           "method": "litchi_keynote::Package::apply_slide_chart_value_axis_settings",
           "ok": "litchi_keynote::chart::value_axis::Commit"
+        },
+        {
+          "method": "litchi_keynote::Package::apply_slide_chart_series",
+          "ok": "litchi_keynote::chart::series::Commit"
+        },
+        {
+          "method": "litchi_keynote::Package::apply_slide_chart_style",
+          "ok": "litchi_keynote::chart::style::Commit"
+        },
+        {
+          "method": "litchi_keynote::Package::apply_slide_chart_axis",
+          "ok": "litchi_keynote::chart::axis::Commit"
         },
         {
           "method": "litchi_keynote::Package::apply_slide_creation",
@@ -29210,6 +29235,9 @@
         "litchi_keynote::chart::title",
         "litchi_keynote::chart::value_axis",
         "litchi_keynote::chart::data",
+        "litchi_keynote::chart::series",
+        "litchi_keynote::chart::style",
+        "litchi_keynote::chart::axis",
         "litchi_keynote::background",
         "litchi_keynote::build::order",
         "litchi_keynote::slide::image::adjustments",
@@ -29312,6 +29340,18 @@
         {
           "method": "litchi_keynote::Package::apply_slide_chart_value_axis_settings",
           "ok": "litchi_keynote::chart::value_axis::Commit"
+        },
+        {
+          "method": "litchi_keynote::Package::apply_slide_chart_series",
+          "ok": "litchi_keynote::chart::series::Commit"
+        },
+        {
+          "method": "litchi_keynote::Package::apply_slide_chart_style",
+          "ok": "litchi_keynote::chart::style::Commit"
+        },
+        {
+          "method": "litchi_keynote::Package::apply_slide_chart_axis",
+          "ok": "litchi_keynote::chart::axis::Commit"
         },
         {
           "method": "litchi_keynote::Package::apply_slide_creation",
