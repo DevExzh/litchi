@@ -793,10 +793,13 @@ numbers/editor/semantic/media.rs	replace_media	1	numbers	media.asset	migrated	li
 numbers/editor/semantic/media.rs	save	1	numbers	io	host-only	litchi-numbers	-	-	-	-
 numbers/editor/semantic/media.rs	sheet_media_assets	1	numbers	media.asset	migrated	litchi_numbers::Package::sheet_media_assets	numbers_media_assets_read_parity	A	-	-
 numbers/editor/semantic/media.rs	to_bytes	1	numbers	io	host-only	litchi-numbers	-	-	-	-
+numbers/editor/semantic/table.rs	__parity_add_table_cell_comment_reply_legacy	1	numbers	table.cell_comment	retired	-	-	-	-	parity-only hidden legacy host oracle, not a supported Numbers API; removed with the differential host harness in W3
 numbers/editor/semantic/table.rs	__parity_clear_table_cell_comment_legacy	1	numbers	table.cell_comment	retired	-	-	-	-	parity-only hidden legacy host oracle, not a supported Numbers API; removed with the differential host harness in W3
 numbers/editor/semantic/table.rs	__parity_read_table_cell_comment	1	numbers	table.cell_comment	retired	-	-	-	-	parity-only hidden selector witness, not a supported Numbers API; removed with the differential host harness in W3
+numbers/editor/semantic/table.rs	__parity_remove_table_cell_comment_reply_legacy	1	numbers	table.cell_comment	retired	-	-	-	-	parity-only hidden legacy host oracle, not a supported Numbers API; removed with the differential host harness in W3
 numbers/editor/semantic/table.rs	__parity_set_table_cell_comment_legacy	1	numbers	table.cell_comment	retired	-	-	-	-	parity-only hidden legacy host oracle, not a supported Numbers API; removed with the differential host harness in W3
-numbers/editor/semantic/table.rs	add_cell_comment_reply	1	numbers	table.cell_comment	host-only	-	-	-	-	root-only shared slice; reply-thread lifecycle remains deferred
+numbers/editor/semantic/table.rs	__parity_set_table_cell_comment_reply_legacy	1	numbers	table.cell_comment	retired	-	-	-	-	parity-only hidden legacy host oracle, not a supported Numbers API; removed with the differential host harness in W3
+numbers/editor/semantic/table.rs	add_cell_comment_reply	1	numbers	table.cell_comment	migrated	litchi_numbers::Package::add_table_cell_comment_reply	numbers_table_cell_comment_reply_add_parity	B	-	-
 numbers/editor/semantic/table.rs	cell_comment_replies	1	numbers	table.cell_comment	migrated	litchi_numbers::Package::table_cell_comment_replies	numbers_table_cell_comment_replies_read_parity	A	-	-
 numbers/editor/semantic/table.rs	cell_conditional_highlight_rules	1	numbers	table.conditional_highlight	migrated	litchi_numbers::Package::table_cell_conditional_highlight	numbers_conditional_highlight_read_parity	A	-	-
 numbers/editor/semantic/table.rs	cell_conditional_highlighting	1	numbers	table.conditional_highlight	migrated	litchi_numbers::Package::table_cell_conditional_highlight	numbers_conditional_highlight_read_parity	A	-	-
@@ -804,7 +807,7 @@ numbers/editor/semantic/table.rs	clear_cell_conditional_highlighting	1	numbers	t
 numbers/editor/semantic/table.rs	clear_table_cell_border	1	numbers	table.cell_appearance	migrated	litchi_numbers::Package::edit_table_cell_appearance	numbers_table_cell_border_clear_parity	B	-	-
 numbers/editor/semantic/table.rs	merge_cells	1	numbers	table.merge	migrated	litchi_numbers::Package::edit_table_merges	numbers_table_merge_parity	A	-	-
 numbers/editor/semantic/table.rs	pivot_categories	1	numbers	table.pivot	host-only	litchi-numbers	-	-	-	-
-numbers/editor/semantic/table.rs	remove_cell_comment_reply	1	numbers	table.cell_comment	host-only	-	-	-	-	root-only shared slice; reply-thread lifecycle remains deferred
+numbers/editor/semantic/table.rs	remove_cell_comment_reply	1	numbers	table.cell_comment	migrated	litchi_numbers::Package::remove_table_cell_comment_reply	numbers_table_cell_comment_reply_remove_parity	B	-	-
 numbers/editor/semantic/table.rs	reset_table_cell_fill	1	numbers	table.cell_appearance	migrated	litchi_numbers::Package::edit_table_cell_appearance	numbers_table_cell_fill_reset_parity	B	-	-
 numbers/editor/semantic/table.rs	reset_table_cell_layout	1	numbers	table.cell_appearance	migrated	litchi_numbers::Package::edit_table_cell_appearance	numbers_table_cell_layout_reset_parity	B	-	-
 numbers/editor/semantic/table.rs	reset_table_cell_numeral_system_format	1	numbers	table.cell_format	migrated	litchi_numbers::Package::edit_table_cell_data_format	numbers_table_cell_numeral_system_format_parity	B	-	-
@@ -834,8 +837,8 @@ numbers/editor/semantic/table.rs	reset_table_cell_text_outline	1	numbers	table.c
 numbers/editor/semantic/table.rs	reset_table_cell_text_script	1	numbers	table.cell_rich_text	migrated	litchi_numbers::Package::edit_table_cell_text	numbers_cell_text_property_parity	B	-	-
 numbers/editor/semantic/table.rs	reset_table_cell_text_shadow	1	numbers	table.cell_rich_text	migrated	litchi_numbers::Package::edit_table_cell_text	numbers_cell_text_property_parity	B	-	-
 numbers/editor/semantic/table.rs	reset_table_cell_text_style	1	numbers	table.cell_rich_text	migrated	litchi_numbers::Package::edit_table_cell_text	numbers_cell_text_property_parity	B	-	-
-numbers/editor/semantic/table.rs	set_cell_comment	1	numbers	table.cell_comment	host-only	-	-	-	-	root replacement with replies remains deferred; no full host coverage claim
-numbers/editor/semantic/table.rs	set_cell_comment_reply	1	numbers	table.cell_comment	host-only	-	-	-	-	root-only shared slice; reply-thread lifecycle remains deferred
+numbers/editor/semantic/table.rs	set_cell_comment	1	numbers	table.cell_comment	migrated	litchi_numbers::Package::set_table_cell_comment	numbers_table_cell_comment_set_with_replies_parity	B	-	-
+numbers/editor/semantic/table.rs	set_cell_comment_reply	1	numbers	table.cell_comment	migrated	litchi_numbers::Package::set_table_cell_comment_reply	numbers_table_cell_comment_reply_set_parity	B	-	-
 numbers/editor/semantic/table.rs	set_cell_conditional_highlighting	1	numbers	table.conditional_highlight	migrated	litchi_numbers::Package::edit_table_cell_conditional_highlights	numbers_conditional_highlight_set_parity	B	-	-
 numbers/editor/semantic/table.rs	set_table_cell_border	1	numbers	table.cell_appearance	migrated	litchi_numbers::Package::edit_table_cell_appearance	numbers_table_cell_border_parity	B	-	-
 numbers/editor/semantic/table.rs	set_table_cell_data_format	1	numbers	table.cell_format	migrated	litchi_numbers::Package::edit_table_cell_data_format	numbers_table_cell_data_format_set_parity	B	-	-

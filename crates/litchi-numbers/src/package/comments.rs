@@ -1369,9 +1369,10 @@ impl Package {
     /// Remove a table-cell comment.
     ///
     /// A changed clear is supported only for an exact, globally unshared root
-    /// comment graph with strict PackageMetadata ownership and save-token
-    /// attribution. Shared, segmented, reply-bearing, metadata-owned, or
-    /// otherwise ambiguous graphs fail closed with
+    /// comment graph (the root and its direct leaf replies) with strict
+    /// PackageMetadata ownership and save-token attribution. Shared,
+    /// segmented, nested-reply, metadata-owned, or otherwise ambiguous graphs
+    /// fail closed with
     /// [`Refusal::UnsupportedDependency`]. Clearing an already-empty cell is an
     /// exact no-op.
     pub fn clear_table_cell_comment<'sheet, 'table>(
@@ -1444,10 +1445,12 @@ impl Package {
             let Some(entry) = located.entry.as_ref() else {
                 return Err(Error::PatchConflict);
             };
+            // A text replacement keeps a reply-bearing root's replies; only a
+            // clear still requires a reply-free root here.
             if !entry.owner.supports_text_rewrite()
                 || entry.entry.refcount != 1
                 || entry.storage_occurrences != 1
-                || located.replies != 0
+                || (located.replies != 0 && patch.after.is_none())
             {
                 return Err(Error::Refused(Refusal::UnsupportedDependency {
                     path: patch.path,
@@ -3126,15 +3129,8 @@ fn commit_edit(edit: Edit<'_>) -> Result<Commit, Error> {
         });
     }
     if !edit.axis_removal {
-        // The first shared native slice owns root-only lifecycle.  Preserve
-        // the established Numbers refusal for an ordinary replacement of a
-        // root that already has replies; a reply-bearing thread must not be
-        // silently rewritten through the scalar path.
-        if edit.before.is_some() && edit.after.is_some() && located.replies != 0 {
-            return Err(Error::Refused(Refusal::UnsupportedDependency {
-                path: edit.target.path,
-            }));
-        }
+        // The shared native engine rewrites a reply-bearing root's text in
+        // place (its replies stay) and clears a root with its direct replies.
         return commit_shared_root(edit, located);
     }
     if edit.after.is_some() && located.comment.is_none() {

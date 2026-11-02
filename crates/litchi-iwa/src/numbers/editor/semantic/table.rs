@@ -3092,6 +3092,79 @@ impl Draft {
         Ok(())
     }
 
+    /// Run the pre-focused Numbers reply append for the parity oracle.
+    ///
+    /// Like [`Self::__parity_set_table_cell_comment_legacy`], this invokes
+    /// the legacy package writer directly, never the focused owner that
+    /// [`Self::add_cell_comment_reply`] delegates to.
+    #[cfg(feature = "parity-host-oracle")]
+    #[doc(hidden)]
+    pub fn __parity_add_table_cell_comment_reply_legacy(
+        &mut self,
+        selector: litchi_numbers::TableSelector<'_>,
+        row: usize,
+        column: usize,
+        text: impl Into<String>,
+    ) -> Result<u64> {
+        let table_id = selectors::table_id(self, selector)?;
+        let mut staged = self.package.clone();
+        let reply =
+            add_cell_comment_reply_in_package(&mut staged, table_id, row, column, text.into())?;
+        HostPackage::from_bytes(&staged.to_bytes()?)?;
+        self.package = staged;
+        Ok(reply)
+    }
+
+    /// Run the pre-focused Numbers reply replacement for the parity oracle.
+    #[cfg(feature = "parity-host-oracle")]
+    #[doc(hidden)]
+    pub fn __parity_set_table_cell_comment_reply_legacy(
+        &mut self,
+        selector: litchi_numbers::TableSelector<'_>,
+        row: usize,
+        column: usize,
+        reply_storage_object_id: u64,
+        text: impl Into<String>,
+    ) -> Result<u64> {
+        let table_id = selectors::table_id(self, selector)?;
+        let mut staged = self.package.clone();
+        let reply = set_cell_comment_reply_in_package(
+            &mut staged,
+            table_id,
+            row,
+            column,
+            reply_storage_object_id,
+            text.into(),
+        )?;
+        HostPackage::from_bytes(&staged.to_bytes()?)?;
+        self.package = staged;
+        Ok(reply)
+    }
+
+    /// Run the pre-focused Numbers reply removal for the parity oracle.
+    #[cfg(feature = "parity-host-oracle")]
+    #[doc(hidden)]
+    pub fn __parity_remove_table_cell_comment_reply_legacy(
+        &mut self,
+        selector: litchi_numbers::TableSelector<'_>,
+        row: usize,
+        column: usize,
+        reply_storage_object_id: u64,
+    ) -> Result<()> {
+        let table_id = selectors::table_id(self, selector)?;
+        let mut staged = self.package.clone();
+        remove_cell_comment_reply_in_package(
+            &mut staged,
+            table_id,
+            row,
+            column,
+            reply_storage_object_id,
+        )?;
+        HostPackage::from_bytes(&staged.to_bytes()?)?;
+        self.package = staged;
+        Ok(())
+    }
+
     /// Inspect the conditional-highlight style set attached to a writable BNC cell.
     pub fn cell_conditional_highlighting(
         &self,
