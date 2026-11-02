@@ -68,6 +68,7 @@ fn apply_writes(
     )
 }
 
+mod lighting_package;
 mod lighting_presets;
 
 /// The chart-level properties.
@@ -213,27 +214,13 @@ pub mod chart {
         }
 
         /// The preset a stored package names. The host refuses a package
-        /// without a light or with a name outside the menu.
+        /// without a light, with an invalid light or with a name outside
+        /// the menu.
         fn from_package(package: &[u8]) -> SymbolResult<Self> {
-            use litchi_iwa_common::WireLimits;
-            use litchi_iwa_common::wire::WireView;
-            let view = WireView::parse(package, WireLimits::DEFAULT)
-                .map_err(|_| SymbolError::Invalid("an invalid 3D lighting package"))?;
-            let mut name = None;
-            let mut lights = 0usize;
-            for field in view.fields() {
-                match (field.number(), field.wire_type()) {
-                    (1, 2) => name = Some(field.payload()),
-                    (2, 2) => lights += 1,
-                    _ => {},
-                }
-            }
-            let name = name.filter(|_| lights > 0).ok_or(SymbolError::Invalid(
-                "a 3D lighting package without a name or a light",
-            ))?;
+            let name = super::lighting_package::validated_name(package)?;
             Self::ALL
                 .into_iter()
-                .find(|preset| preset.inspector_label().as_bytes() == name)
+                .find(|preset| preset.inspector_label() == name)
                 .ok_or(SymbolError::Invalid("an unsupported 3D lighting package"))
         }
     }
