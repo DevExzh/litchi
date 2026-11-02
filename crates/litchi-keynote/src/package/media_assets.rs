@@ -100,6 +100,12 @@ impl MediaAsset {
         }
     }
 
+    /// The private data identifier (never public; the replacement
+    /// transaction keys its patch on it).
+    pub(in crate::package) const fn data_identifier(&self) -> AssetId {
+        self.data
+    }
+
     /// The name Keynote prefers when exporting the asset.
     #[must_use]
     pub fn preferred_file_name(&self) -> &str {

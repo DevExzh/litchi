@@ -176,6 +176,7 @@ enum Role {
 #[derive(Debug, Clone)]
 enum Target {
     Asset(AssetId),
+    Prune,
     Drawable(usize, DrawableSelector, Role),
 }
 
@@ -212,6 +213,24 @@ impl Edit<'_> {
     /// [`Refusal::EmptyData`], [`Error::Allocation`].
     pub fn replace_asset(&mut self, asset: AssetId, data: &[u8]) -> Result<&mut Self, Error> {
         self.stage(Target::Asset(asset), data)
+    }
+
+    /// Stage the removal of every data record nothing references: no
+    /// component data-reference owner, object data reference or
+    /// `DataMetadataMap` entry names it. Each record's `DataInfo` leaves the
+    /// package metadata and its `Data/` member, when it has one, is
+    /// deleted (the host's `media::Draft::remove_unreferenced`, over the
+    /// shared `litchi_iwa_style::media::unreferenced_data` rule and the
+    /// shared data-owner transition's data removals, record 0417). A
+    /// package without such records is an exact no-op.
+    ///
+    /// # Errors
+    ///
+    /// [`Error::Allocation`].
+    pub fn prune_unreferenced(&mut self) -> Result<&mut Self, Error> {
+        structure::reserve(&mut self.changes, 1)?;
+        self.changes.push((Target::Prune, Arc::from(&[][..])));
+        Ok(self)
     }
 
     /// Stage new bytes for the media data of one sheet image, movie or
@@ -262,6 +281,13 @@ impl Edit<'_> {
         for (target, data) in &self.changes {
             let base = current.as_ref().unwrap_or(self.source);
             let asset = match target {
+                Target::Prune => {
+                    if let Some(published) = prune(base)? {
+                        touched = touched.saturating_add(published.touched_components);
+                        current = Some(published.package);
+                    }
+                    continue;
+                },
                 Target::Asset(asset) => *asset,
                 Target::Drawable(sheet, selector, role) => {
                     drawable_asset(base, *sheet, *selector, *role)?
@@ -321,6 +347,36 @@ fn drawable_asset(
     let (value, _) = litchi_iwa_common::decode_varint_from_bytes(identifier.payload())
         .map_err(|_error| Error::InvalidSource)?;
     AssetId::new(value).map_err(|_error| Error::InvalidSource)
+}
+
+/// Remove every unreferenced data record through the shared
+/// data-owner transition (see [`Edit::prune_unreferenced`]).
+fn prune(package: &Package) -> Result<Option<Published>, Error> {
+    let mut working = Working::new(package)?;
+    working.keep_previews();
+    let Ok((_, _, payload)) = metadata_payload(&working) else {
+        return Ok(None);
+    };
+    let all: Vec<_> = package.state.components.iter_objects().collect();
+    let Some(pruning) =
+        litchi_iwa_style::media::unreferenced_data(&payload, all.iter().copied(), |path| {
+            member_size(package, path)
+        })
+        .map_err(|_error| Error::InvalidSource)?
+    else {
+        return Ok(None);
+    };
+    let mut transition = Transition::default();
+    for (data, member) in pruning.records {
+        if let Some(member) = member {
+            structure::reserve(&mut transition.data_removals, 1)?;
+            transition.data_removals.push((data.get(), member));
+        } else {
+            structure::reserve(&mut transition.data_record_removals, 1)?;
+            transition.data_record_removals.push(data.get());
+        }
+    }
+    Ok(Some(working.publish(&transition)?))
 }
 
 /// The metadata payload's (object, message index, payload).

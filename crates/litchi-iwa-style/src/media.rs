@@ -155,6 +155,79 @@ pub fn embedded_assets<'a>(
     Ok(feed.inventory.finish(member_size)?)
 }
 
+/// `TSP.PackageMetadata.datas` and `TSP.DataInfo.identifier`.
+const METADATA_DATAS_FIELD: u32 = 4;
+const DATA_INFO_IDENTIFIER_FIELD: u32 = 1;
+
+/// The data records of a package that nothing references, and the package
+/// metadata without them (see [`unreferenced_data`]).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Pruning {
+    /// Each pruned record with its materialized `Data/` member, when it has
+    /// one, in data-identifier order.
+    pub records: Vec<(litchi_iwa_common::media::embedded::AssetId, Option<String>)>,
+    /// The `TSP.PackageMetadata` payload without their `DataInfo` entries.
+    pub metadata: Vec<u8>,
+}
+
+/// The shared media data-owner rule for pruning (record 0417; the host's
+/// `media::Draft::remove_unreferenced`): a data record is unreferenced when
+/// no component data-reference owner, no object's `MessageInfo` data
+/// reference and no `DataMetadataMap` entry names it. Returns `None` when
+/// every record is referenced; otherwise the records to delete (with their
+/// `Data/` members) and the metadata payload without them. The format
+/// owners publish the result through their own transactions.
+///
+/// # Errors
+///
+/// As [`embedded_assets`], and [`Error::Metadata`] when a `DataInfo` cannot
+/// be removed.
+pub fn unreferenced_data<'a>(
+    metadata: &[u8],
+    objects: impl IntoIterator<Item = &'a ArchiveObject> + Clone,
+    member_size: impl Fn(&str) -> Option<u64>,
+) -> Result<Option<Pruning>, Error> {
+    let records = embedded_assets(metadata, objects, member_size)?
+        .into_iter()
+        .filter(|asset| {
+            asset.component_reference_record_count() == 0
+                && asset.message_reference_count() == 0
+                && !asset.has_data_metadata()
+        })
+        .map(|asset| (asset.data(), asset.package_path().map(str::to_owned)))
+        .collect::<Vec<_>>();
+    if records.is_empty() {
+        return Ok(None);
+    }
+    let mut payload = metadata.to_vec();
+    for (data, _) in &records {
+        let identifier = data.get();
+        payload = litchi_iwa_common::wire::remove_repeated_length_delimited_field_where(
+            &payload,
+            METADATA_DATAS_FIELD,
+            |info| {
+                let view = litchi_iwa_common::wire::WireView::parse(
+                    info,
+                    litchi_iwa_common::WireLimits::default(),
+                )?;
+                let found = view
+                    .fields()
+                    .find(|field| field.number() == DATA_INFO_IDENTIFIER_FIELD)
+                    .and_then(|field| {
+                        litchi_iwa_common::decode_varint_from_bytes(field.payload()).ok()
+                    })
+                    .map(|(value, _)| value);
+                Ok::<bool, litchi_iwa_common::Error>(found == Some(identifier))
+            },
+        )
+        .map_err(|_error| Error::Metadata(DecodeError::invalid_for_adapter()))?;
+    }
+    Ok(Some(Pruning {
+        records,
+        metadata: payload,
+    }))
+}
+
 #[cfg(test)]
 mod tests {
     #[test]

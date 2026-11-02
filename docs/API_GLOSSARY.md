@@ -2865,6 +2865,15 @@ not an alias (no second name exists).
 | `shape_properties_codec::{decode_shape_properties, rewrite_shape_properties}` | banned donor aliases: use `decode_drawable_archive`, `rewrite_drawable_archive` (never ported) | ✅ 0368 |
 | `{theme_codec, keynote_theme_codec}::ThemeReferenceSnapshot::encode -> Result<Vec<u8>, DecodeError>` | a zero identifier is a typed error; the panicking `encode`/`encode_checked` pair is replaced, `encode_checked` banned | ✅ 0368a |
 
+## Keynote builder options and media-asset replacement (record 0417)
+
+| Name | Status |
+|---|---|
+| `litchi_keynote::Builder::slide_number_visible(bool)` | adopted (0417); the host builder's slide-number option, through `Package::edit_slide_placeholder_visibility` with `slide::placeholder::Kind::SlideNumber` (`builder::Error::PlaceholderVisibility`) |
+| `litchi_keynote::Builder::slide_size` | adopted (0298); since 0417 also lays out the title and body placeholders for the size, as the host builder does; the language, locale, size, title, subtitle and notes are written in one publication, and `builder::Error::{Locale, ShowSettings}` become `builder::Error::Settings` |
+| `litchi_keynote::slide::media::asset_data::{Edit, Patch, Commit, Diagnostics, EditOptions, Error, Refusal, LimitKind}` | Registered family in `keynote-minimal` / `keynote-full` (0417); `Package::{edit_media_asset_data, edit_media_asset_data_with_options, apply_media_asset_data}` replace one reachable asset by its `MediaAsset` handle (host `keynote::Draft::replace_media`, `media::Draft::replace`); `EditOptions::max_replacement_bytes(NonZeroUsize)` replaces the host setter `set_max_replacement_bytes`; `Refusal::{AssetNotReachable, AssetNotMaterialized}` join the shared slide-media refusals |
+| `prune_unreferenced` on `litchi_keynote::slide::media::asset_data::Edit` (from `Package::edit_media_assets`), `litchi_pages::drawable::lifecycle::Edit` and `litchi_numbers::sheet::drawable::media::Edit`; `litchi_iwa_style::media::{unreferenced_data, Pruning}`; `asset_data::Diagnostics::pruned` | adopted (0417); removes every data record no owner, object data reference or `DataMetadataMap` entry names (host `media::Draft::remove_unreferenced`), one shared rule with thin format facades |
+
 ## Pages body media, shapes and text out of the host (record 0371)
 
 Wave W1-B of record 0363 moves the host's Pages body editors into
