@@ -26049,6 +26049,7 @@
         "litchi_pages::drawable::properties",
         "litchi_pages::drawable::text",
         "litchi_pages::drawable::style",
+        "litchi_pages::drawable::text_box_text",
         "litchi_pages::bookmark",
         "litchi_pages::date_time",
         "litchi_pages::number_attachment",
@@ -26063,6 +26064,10 @@
         {
           "method": "litchi_pages::Package::apply_metadata",
           "ok": "litchi_pages::metadata::Commit"
+        },
+        {
+          "method": "litchi_pages::Package::apply_body_text_box_text",
+          "ok": "litchi_pages::drawable::text_box_text::Commit"
         },
         {
           "method": "litchi_pages::Package::apply_body_chart_arrangement",

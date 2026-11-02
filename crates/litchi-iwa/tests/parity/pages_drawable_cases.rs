@@ -84,7 +84,7 @@ pub(crate) fn shape_fixture() -> TestResult<Fixture> {
     })
 }
 
-fn host_geometry(geometry: Geometry) -> DrawableGeometry {
+pub(crate) fn host_geometry(geometry: Geometry) -> DrawableGeometry {
     DrawableGeometry {
         position: geometry.position.map(|point| DrawablePoint {
             x: point.x,
@@ -99,7 +99,7 @@ fn host_geometry(geometry: Geometry) -> DrawableGeometry {
     }
 }
 
-fn host_properties(properties: &Properties) -> DrawableProperties {
+pub(crate) fn host_properties(properties: &Properties) -> DrawableProperties {
     DrawableProperties {
         hyperlink_url: properties.hyperlink.clone(),
         locked: properties.locked,
@@ -115,7 +115,7 @@ fn host_axis(axis: FlipAxis) -> DrawableFlipAxis {
     }
 }
 
-fn properties() -> Properties {
+pub(crate) fn properties() -> Properties {
     Properties {
         hyperlink: Some("https://example.test/litchi".to_owned()),
         locked: Some(true),
