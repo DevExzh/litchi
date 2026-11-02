@@ -259,6 +259,7 @@ enum Operation {
     Duplicate(DrawableSelector, TextPosition, Option<Box<str>>),
     Replace(DrawableSelector, Asset, Arc<[u8]>),
     ReplaceAsset(AssetId, Arc<[u8]>),
+    PruneUnreferenced,
     Add(TextPosition, NewMedia),
     AddTextShape(TextPosition, NewTextShape),
 }
@@ -420,6 +421,21 @@ impl Edit<'_> {
             return Err(Refusal::EmptyData.into());
         }
         self.stage(Operation::Replace(selector, Asset::Poster, Arc::from(data)))
+    }
+
+    /// Stage the removal of every data record nothing references: no
+    /// component data-reference owner, object data reference or
+    /// `DataMetadataMap` entry names it. Each record's `DataInfo` leaves the
+    /// package metadata and its `Data/` member is deleted (the host's
+    /// `media::Draft::remove_unreferenced`, over the shared
+    /// `litchi_iwa_style::media::unreferenced_data` rule, record 0417). A
+    /// package without such records commits as an exact no-op.
+    ///
+    /// # Errors
+    ///
+    /// Refuses a second operation.
+    pub fn prune_unreferenced(&mut self) -> Result<&mut Self, Error> {
+        self.stage(Operation::PruneUnreferenced)
     }
 
     /// Stage new bytes for one embedded asset reachable from the document,
@@ -666,6 +682,10 @@ impl Edit<'_> {
                     return Err(Refusal::AssetNotFound.into());
                 }
                 replace(self.source, asset.get(), &data)?
+            },
+            Operation::PruneUnreferenced => match prune_unreferenced(self.source)? {
+                Some(published) => published,
+                None => (self.source.clone(), Diagnostics::default()),
             },
         };
         let target = package.state.source.shared_source();
@@ -2239,6 +2259,78 @@ fn replace(
             ..Diagnostics::default()
         },
     ))
+}
+
+/// Remove every unreferenced data record (see [`Edit::prune_unreferenced`]);
+/// `None` when there is none.
+fn prune_unreferenced(source: &Package) -> Result<Option<(Package, Diagnostics)>, Error> {
+    let Some(metadata) = objects::metadata(source)? else {
+        return Ok(None);
+    };
+    let all = source
+        .state
+        .source
+        .components()
+        .iter()
+        .flat_map(|component| component.archive().objects.iter())
+        .collect::<Vec<_>>();
+    let package = source.state.source.package();
+    let Some(pruning) = litchi_iwa_style::media::unreferenced_data(
+        &metadata.payload,
+        all.iter().copied(),
+        |path| {
+            package
+                .iter()
+                .find(|entry| entry.name() == path)
+                .map(|entry| entry.data().len() as u64)
+        },
+    )
+    .map_err(|_error| Error::InvalidSource)?
+    else {
+        return Ok(None);
+    };
+    let archive_limits = source
+        .state
+        .source
+        .limits()
+        .effective_archive_limits()
+        .map_err(graph::map_archive_error)?;
+    let mut archives: Vec<(Arc<str>, Archive)> = Vec::new();
+    let archive = editable(source, &mut archives, &metadata.component)?;
+    archive
+        .object_mut(metadata.object)
+        .ok_or(Error::InvalidSource)?
+        .replace_message_preserving_header(
+            metadata.message_index,
+            RawMessage {
+                type_: METADATA_MESSAGE_TYPE,
+                data: pruning.metadata,
+            },
+            archive_limits,
+        )
+        .map_err(graph::map_core_error)?;
+    let deletions = pruning
+        .records
+        .iter()
+        .filter_map(|(_, member)| member.as_deref())
+        .collect::<Vec<_>>();
+    let candidate = graph::publish_changes(source, archives, &[], &[], &deletions)?;
+    if candidate
+        .state
+        .source
+        .package()
+        .iter()
+        .any(|entry| deletions.contains(&entry.name()))
+    {
+        return Err(Error::Verification);
+    }
+    Ok(Some((
+        candidate,
+        Diagnostics {
+            changed: true,
+            ..Diagnostics::default()
+        },
+    )))
 }
 
 /// The assets reachable from the document root (object 1) through object

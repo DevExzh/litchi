@@ -128,3 +128,21 @@ fn refusals_are_typed() -> TestResult {
     ));
     Ok(())
 }
+
+#[test]
+fn pruning_a_package_without_orphans_is_a_no_op() -> TestResult {
+    let package = Package::from_bytes(SOURCE)?;
+    let mut edit = package.edit_media_assets();
+    assert!(edit.asset().is_none());
+    assert!(matches!(
+        edit.set(PNG),
+        Err(Error::Refused(Refusal::AssetNotReachable))
+    ));
+    edit.prune_unreferenced();
+    let commit = edit.commit()?;
+    assert!(!commit.diagnostics().changed());
+    assert_eq!(commit.diagnostics().pruned(), 0);
+    assert!(commit.patch().is_noop());
+    assert_eq!(bytes(commit.package())?, SOURCE);
+    Ok(())
+}

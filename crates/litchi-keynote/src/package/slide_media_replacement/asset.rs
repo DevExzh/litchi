@@ -71,10 +71,11 @@ impl EditOptions {
 /// One media-asset replacement staged against an immutable package.
 pub struct Edit<'a> {
     source: &'a Package,
-    asset: MediaAsset,
+    asset: Option<MediaAsset>,
     options: EditOptions,
     before: &'a [u8],
     after: Option<Arc<[u8]>>,
+    prune: bool,
 }
 
 impl fmt::Debug for Edit<'_> {
@@ -117,17 +118,33 @@ impl<'a> Edit<'a> {
         let (asset, before) = resolve(source, asset.data_identifier())?;
         Ok(Self {
             source,
-            asset,
+            asset: Some(asset),
             options,
             before,
             after: None,
+            prune: false,
         })
     }
 
-    /// The selected asset as the source package lists it.
+    /// The selected asset as the source package lists it; `None` for an
+    /// edit from [`Package::edit_media_assets`].
     #[must_use]
-    pub const fn asset(&self) -> &MediaAsset {
-        &self.asset
+    pub const fn asset(&self) -> Option<&MediaAsset> {
+        self.asset.as_ref()
+    }
+
+    /// Stage the removal of every data record nothing references: no
+    /// component data-reference owner, object data reference or
+    /// `DataMetadataMap` entry names it. Each record's `DataInfo` leaves the
+    /// package metadata and its `Data/` member is deleted (the host's
+    /// `media::Draft::remove_unreferenced`, over the shared
+    /// `litchi_iwa_style::media::unreferenced_data` rule, record 0417). It
+    /// replaces a staged replacement. A package without such records
+    /// commits as an exact no-op.
+    pub fn prune_unreferenced(&mut self) -> &mut Self {
+        self.after = None;
+        self.prune = true;
+        self
     }
 
     /// The asset's current bytes.
@@ -152,6 +169,9 @@ impl<'a> Edit<'a> {
     /// media family than the asset's file name (the host's rule);
     /// [`Error::Allocation`].
     pub fn set(&mut self, replacement: &[u8]) -> Result<&mut Self, Error> {
+        let Some(asset) = self.asset.as_ref() else {
+            return Err(Refusal::AssetNotReachable.into());
+        };
         if replacement.is_empty() {
             return Err(Refusal::EmptyReplacement.into());
         }
@@ -161,7 +181,7 @@ impl<'a> Edit<'a> {
         {
             return Err(Refusal::ReplacementTooLarge.into());
         }
-        let declared = media_type(self.asset.kind());
+        let declared = media_type(asset.kind());
         let detected = MediaType::from_bytes(replacement);
         if declared != MediaType::Unknown && detected != MediaType::Unknown && declared != detected
         {
@@ -175,6 +195,7 @@ impl<'a> Edit<'a> {
             })?;
         owned.extend_from_slice(replacement);
         self.after = Some(Arc::from(owned));
+        self.prune = false;
         Ok(self)
     }
 
@@ -189,11 +210,18 @@ impl<'a> Edit<'a> {
     /// [`Refusal::UnsupportedSource`] for a source without exact ZIP bytes,
     /// [`Error::Limit`], [`Error::InvalidSource`], [`Error::Verification`].
     pub fn commit(self) -> Result<Commit, Error> {
+        if self.prune {
+            return prune(self.source);
+        }
+        let asset = self
+            .asset
+            .as_ref()
+            .ok_or(Error::Refused(Refusal::EmptyReplacement))?;
         let replacement = self
             .after
             .clone()
             .ok_or(Error::Refused(Refusal::EmptyReplacement))?;
-        let identifier = self.asset.data_identifier();
+        let identifier = asset.data_identifier();
         let before_digest: [u8; SHA1_BYTES] = Sha1::digest(self.before).into();
         let after_digest: [u8; SHA1_BYTES] = Sha1::digest(&replacement).into();
         let catalog = physical_catalog(self.source)?;
@@ -203,7 +231,7 @@ impl<'a> Edit<'a> {
                 package: self.source.snapshot(),
                 patch: Patch {
                     artifacts: ExactArtifacts::new(Arc::clone(&source_bytes), source_bytes),
-                    asset: identifier,
+                    asset: Some(identifier),
                     before_digest,
                     after_digest,
                 },
@@ -213,15 +241,11 @@ impl<'a> Edit<'a> {
         if !catalog.source_is_exact() {
             return Err(Refusal::UnsupportedSource.into());
         }
-        let digest: [u8; SHA1_BYTES] = self
-            .asset
+        let digest: [u8; SHA1_BYTES] = asset
             .digest()
             .try_into()
             .map_err(|_error| Error::InvalidSource)?;
-        let path = self
-            .asset
-            .package_path()
-            .ok_or(Refusal::AssetNotMaterialized)?;
+        let path = asset.package_path().ok_or(Refusal::AssetNotMaterialized)?;
         let mut budget = MediaBudget::for_package(self.source)?;
         budget.charge_catalog(catalog)?;
         budget.media_bytes(replacement.len())?;
@@ -248,13 +272,14 @@ impl<'a> Edit<'a> {
             package,
             patch: Patch {
                 artifacts: ExactArtifacts::new(source_bytes, target_bytes),
-                asset: identifier,
+                asset: Some(identifier),
                 before_digest,
                 after_digest,
             },
             diagnostics: Diagnostics {
                 changed: true,
                 deleted_previews,
+                pruned: 0,
             },
         })
     }
@@ -264,7 +289,8 @@ impl<'a> Edit<'a> {
 #[derive(Clone, PartialEq, Eq)]
 pub struct Patch {
     artifacts: ExactArtifacts,
-    asset: AssetId,
+    /// The replaced asset; `None` for a pruning patch.
+    asset: Option<AssetId>,
     before_digest: [u8; SHA1_BYTES],
     after_digest: [u8; SHA1_BYTES],
 }
@@ -341,6 +367,7 @@ impl Commit {
 pub struct Diagnostics {
     changed: bool,
     deleted_previews: usize,
+    pruned: usize,
 }
 
 impl Diagnostics {
@@ -348,6 +375,12 @@ impl Diagnostics {
     #[must_use]
     pub const fn changed(self) -> bool {
         self.changed
+    }
+
+    /// How many unreferenced data records a pruning removed.
+    #[must_use]
+    pub const fn pruned(self) -> usize {
+        self.pruned
     }
 
     /// How many root previews the replacement invalidated.
@@ -368,6 +401,20 @@ impl Package {
     /// [`Error::InvalidSource`].
     pub fn edit_media_asset_data(&self, asset: &MediaAsset) -> Result<Edit<'_>, Error> {
         Edit::new(self, asset, EditOptions::new())
+    }
+
+    /// Start an asset edit that selects no asset, for
+    /// [`Edit::prune_unreferenced`].
+    #[must_use]
+    pub fn edit_media_assets(&self) -> Edit<'_> {
+        Edit {
+            source: self,
+            asset: None,
+            options: EditOptions::new(),
+            before: &[],
+            after: None,
+            prune: false,
+        }
     }
 
     /// [`Package::edit_media_asset_data`] with explicit options.
@@ -395,9 +442,11 @@ impl Package {
         if !patch.artifacts.authorizes_source(&source) {
             return Err(Error::PatchConflict);
         }
-        let (_, before) = resolve(self, patch.asset).map_err(|_error| Error::PatchConflict)?;
-        if <[u8; SHA1_BYTES]>::from(Sha1::digest(before)) != patch.before_digest {
-            return Err(Error::PatchConflict);
+        if let Some(asset) = patch.asset {
+            let (_, before) = resolve(self, asset).map_err(|_error| Error::PatchConflict)?;
+            if <[u8; SHA1_BYTES]>::from(Sha1::digest(before)) != patch.before_digest {
+                return Err(Error::PatchConflict);
+            }
         }
         if patch.is_noop() {
             return Ok(Commit {
@@ -410,9 +459,11 @@ impl Package {
             Package::from_source_with_options(patch.artifacts.target(), self.state.options)
                 .map_err(|_error| Error::PatchConflict)?;
         candidate.validate().map_err(|_error| Error::Verification)?;
-        let (_, after) = resolve(&candidate, patch.asset).map_err(|_error| Error::Verification)?;
-        if <[u8; SHA1_BYTES]>::from(Sha1::digest(after)) != patch.after_digest {
-            return Err(Error::Verification);
+        if let Some(asset) = patch.asset {
+            let (_, after) = resolve(&candidate, asset).map_err(|_error| Error::Verification)?;
+            if <[u8; SHA1_BYTES]>::from(Sha1::digest(after)) != patch.after_digest {
+                return Err(Error::Verification);
+            }
         }
         let deleted_previews =
             super::super::rendering_invalidation::root_preview_deletions(catalog.package())
@@ -431,7 +482,99 @@ impl Package {
             diagnostics: Diagnostics {
                 changed: true,
                 deleted_previews,
+                pruned: 0,
             },
         })
     }
+}
+
+/// The unreferenced data records of `package` (the shared rule) and its
+/// package metadata objects.
+fn unreferenced(package: &Package) -> Result<Option<litchi_iwa_style::media::Pruning>, Error> {
+    let Some(metadata) = package
+        .structure_component(super::METADATA_COMPONENT)
+        .and_then(|archive| {
+            archive.objects.iter().find_map(|object| {
+                object
+                    .messages
+                    .iter()
+                    .find(|message| message.type_ == super::PACKAGE_METADATA_MESSAGE_TYPE)
+            })
+        })
+    else {
+        return Ok(None);
+    };
+    let objects = package
+        .state
+        .source
+        .components()
+        .iter()
+        .flat_map(|component| component.archive().objects.iter())
+        .collect::<Vec<_>>();
+    litchi_iwa_style::media::unreferenced_data(&metadata.data, objects.iter().copied(), |name| {
+        package
+            .structure_member_bytes(name)
+            .map(|bytes| bytes.len() as u64)
+    })
+    .map_err(|_error| Error::InvalidSource)
+}
+
+/// Publish the removal of every unreferenced data record: its `DataInfo`
+/// leaves the registry and its `Data/` member is deleted, in one workspace
+/// publication.
+fn prune(source: &Package) -> Result<Commit, Error> {
+    let catalog = physical_catalog(source)?;
+    let source_bytes = catalog.shared_source();
+    let Some(pruning) = unreferenced(source)? else {
+        return Ok(Commit {
+            package: source.snapshot(),
+            patch: Patch {
+                artifacts: ExactArtifacts::new(Arc::clone(&source_bytes), source_bytes),
+                asset: None,
+                before_digest: [0; SHA1_BYTES],
+                after_digest: [0; SHA1_BYTES],
+            },
+            diagnostics: Diagnostics::default(),
+        });
+    };
+    if !catalog.source_is_exact() {
+        return Err(Refusal::UnsupportedSource.into());
+    }
+    let mut workspace = crate::package::structure::workspace::Workspace::new(source)
+        .map_err(|_error| Error::InvalidSource)?;
+    let wire = workspace.wire;
+    for (data, member) in &pruning.records {
+        workspace
+            .registry
+            .remove_data_info(data.get(), wire)
+            .map_err(|_error| Error::InvalidSource)?
+            .ok_or(Error::InvalidSource)?;
+        if let Some(member) = member {
+            workspace
+                .delete_member(member)
+                .map_err(|_error| Error::InvalidSource)?;
+        }
+    }
+    let bytes = workspace.publish().map_err(|_error| Error::InvalidSource)?;
+    let package = source
+        .structure_reopen(bytes)
+        .map_err(|_error| Error::Verification)?;
+    if unreferenced(&package)?.is_some() {
+        return Err(Error::Verification);
+    }
+    let target_bytes = physical_catalog(&package)?.shared_source();
+    Ok(Commit {
+        package,
+        patch: Patch {
+            artifacts: ExactArtifacts::new(source_bytes, target_bytes),
+            asset: None,
+            before_digest: [0; SHA1_BYTES],
+            after_digest: [0; SHA1_BYTES],
+        },
+        diagnostics: Diagnostics {
+            changed: true,
+            deleted_previews: 0,
+            pruned: pruning.records.len(),
+        },
+    })
 }
