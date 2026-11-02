@@ -35,6 +35,7 @@ pub mod properties {
     pub use crate::package::body_drawable_properties::{
         Commit, Diagnostics, Edit, Error, LimitKind, Patch, Refusal, Snapshot,
     };
+    pub use litchi_iwa_common::shape::line::Segment;
 }
 
 /// Exact-source lifecycle transactions (removal, duplication) for body images, movies
@@ -223,6 +224,14 @@ pub mod language {
     };
     pub use litchi_iwa_text::TextPosition;
     pub use litchi_iwa_text::language::{TextLanguage, TextLanguageRun};
+}
+
+/// The comment attached directly to a body drawable and its replies
+/// (record 0413).
+pub mod comment {
+    pub use crate::package::text_box_drawable_comment::{
+        Commit, Diagnostics, DrawableComment, Edit, Error, LimitKind, Patch, Refusal,
+    };
 }
 
 /// Exact-source transactions for the body drawables' layer order.
