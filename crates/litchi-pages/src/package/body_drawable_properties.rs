@@ -21,6 +21,7 @@ use litchi_iwa_protos::shape_properties_codec as codec;
 use thiserror::Error as ThisError;
 
 use litchi_iwa_common::shape::line::Segment;
+use litchi_iwa_common::shape::path::Preset;
 use litchi_iwa_protos::shape_style_codec as line_codec;
 
 use super::Package;
@@ -228,9 +229,17 @@ pub struct Snapshot {
     natural_size: Option<Size>,
     line_segment: Option<Segment>,
     line_reversed: bool,
+    preset: Option<Preset>,
 }
 
 impl Snapshot {
+    /// The preset a shape's or text box's path draws (`None` for a path no
+    /// preset draws, such as a line, and for media).
+    #[must_use]
+    pub const fn preset(&self) -> Option<Preset> {
+        self.preset
+    }
+
     /// The segment a native straight line draws, from its start to its end
     /// (`None` for every other drawable).
     #[must_use]
@@ -474,6 +483,39 @@ impl Edit<'_> {
             angle: Some(angle),
         });
         self.after.line_segment = Some(segment);
+        Ok(self)
+    }
+
+    /// Replace a shape's or text box's path with `preset` drawn in its
+    /// frame, keeping its text and style (the host's
+    /// `set_body_shape_preset`).
+    ///
+    /// # Errors
+    ///
+    /// Refuses media, a drawable without a frame size, and a preset that
+    /// does not fit the frame (a corner radius above half the shorter side).
+    pub fn set_preset(&mut self, preset: Preset) -> Result<&mut Self, Error> {
+        if !matches!(
+            self.target.selector,
+            DrawableSelector::Shape(_) | DrawableSelector::TextBox(_)
+        ) {
+            return Err(Refusal::UnsupportedOperation {
+                operation: "set_preset",
+                kind: self.kind_name(),
+            }
+            .into());
+        }
+        let size = self.stored_geometry()?.size.ok_or(Refusal::MissingState {
+            kind: self.kind_name(),
+            missing: "frame size",
+        })?;
+        if litchi_iwa_style::shape_path::path_source(preset, size.width, size.height).is_none() {
+            return Err(Refusal::InvalidValue {
+                reason: "the preset does not fit the frame",
+            }
+            .into());
+        }
+        self.after.preset = Some(preset);
         Ok(self)
     }
 
@@ -860,6 +902,13 @@ fn read_snapshot(
         DrawableSelector::Shape(_) => line_of(payload)?,
         _ => (None, false),
     };
+    let preset = match selector {
+        DrawableSelector::Shape(_) | DrawableSelector::TextBox(_) => {
+            litchi_iwa_style::shape_path::preset(payload, budget.wire_limits())
+                .map_err(|_| Error::InvalidSource)?
+        },
+        _ => None,
+    };
     Ok(Snapshot {
         selector,
         geometry,
@@ -869,6 +918,7 @@ fn read_snapshot(
         natural_size,
         line_segment,
         line_reversed,
+        preset,
     })
 }
 
@@ -931,10 +981,16 @@ fn commit_edit(edit: Edit<'_>) -> Result<Commit, Error> {
     let properties_changed = edit.after.properties != edit.before.properties;
     let playback_changed = edit.after.playback != edit.before.playback;
     let line_changed = edit.after.line_segment != edit.before.line_segment;
+    let preset_changed = edit.after.preset != edit.before.preset;
     let position_changed = edit.move_attachment
         && edit.after.geometry.and_then(|geometry| geometry.position)
             != edit.before.geometry.and_then(|geometry| geometry.position);
-    if !geometry_changed && !properties_changed && !playback_changed && !position_changed {
+    if !geometry_changed
+        && !properties_changed
+        && !playback_changed
+        && !position_changed
+        && !preset_changed
+    {
         return Ok(Commit {
             package: source.clone(),
             patch: Patch {
@@ -966,6 +1022,25 @@ fn commit_edit(edit: Edit<'_>) -> Result<Commit, Error> {
         .data
         .clone();
     let mut before = edit.before.clone();
+    if preset_changed {
+        let preset = edit.after.preset.ok_or(Error::InvalidSource)?;
+        let size = edit
+            .after
+            .geometry
+            .and_then(|geometry| geometry.size)
+            .ok_or(Error::InvalidSource)?;
+        payload = litchi_iwa_style::shape_path::with_preset(
+            &payload,
+            preset,
+            size.width,
+            size.height,
+            budget.wire_limits(),
+        )
+        .map_err(|_| Error::InvalidSource)?
+        .ok_or(Refusal::InvalidValue {
+            reason: "the preset does not fit the frame",
+        })?;
+    }
     if line_changed {
         let directed = edit.after.geometry.ok_or(Error::InvalidSource)?;
         let segment = edit.after.line_segment.ok_or(Error::InvalidSource)?;
