@@ -492,3 +492,8 @@ Slice 7 gates: trunk `b667dc4246` merged at `52d072be1d`; every command of
 §8 exits 0 (logs `.coord/iwa-w4c/gates8`), except the first full clippy leg,
 which refused a redundant `TextFont::from` in the new shared-variation case.
 That was fixed, and the re-run full clippy leg exits 0 (`clippy_all2.log`).
+Trunk `1cafb9dfc2` (W4-T Numbers comment replies) was then merged at `2d1383251e`.
+The following re-ran on that merge and exit 0 (logs `.coord/iwa-w4c/gates8b`):
+ledger, glossary, clippy -D warnings on five crates, the litchi-numbers tests,
+the chart parity cases, fmt, boundaries and bench. Target 11 GB after
+pruning.
