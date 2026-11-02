@@ -99,6 +99,8 @@ mod pages_media_lifecycle_cases;
 mod pages_shape_style_cases;
 mod pages_table_cases;
 mod pages_text_box_cases;
+mod pages_text_box_list_cases;
+mod pages_text_box_named_style_cases;
 mod pages_text_cases;
 mod physical_cases;
 mod reference_line_cases;

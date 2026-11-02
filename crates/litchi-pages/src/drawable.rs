@@ -143,6 +143,37 @@ pub mod text_box_text {
     pub use litchi_iwa_text_wire::paragraph_style::{Property, PropertyKind};
 }
 
+/// Paragraph lists, list levels, numbering and per-level list properties
+/// of the text a body text box or shape owns, over the shared list engine
+/// and storage-list publisher (record 0413).
+pub mod list {
+    pub use crate::package::text_box_list::{
+        Commit, Diagnostics, Edit, Error, LimitKind, Patch, Refusal,
+    };
+    pub use litchi_iwa_text::TextPosition;
+    pub use litchi_iwa_text::paragraph::list::{
+        ParagraphList, ParagraphListBullet, ParagraphListBulletBaselineOffset,
+        ParagraphListBulletGeometry, ParagraphListBulletScale, ParagraphListIndentation,
+        ParagraphListLabelColor, ParagraphListLabelIndent, ParagraphListLevel,
+        ParagraphListLevelPlacement, ParagraphListNumberFormat, ParagraphListNumberPunctuation,
+        ParagraphListNumberScale, ParagraphListNumberSequence, ParagraphListNumberTiering,
+        ParagraphListNumbering, ParagraphListPlacement, ParagraphListStart, ParagraphListTextGap,
+    };
+    pub use litchi_iwa_text_wire::list::{Property, PropertyKind};
+}
+
+/// Named paragraph styles of the text a body text box or shape owns:
+/// apply, create, rename, delete and redefine, over the shared named-style
+/// engine (record 0413).
+pub mod named_style {
+    pub use crate::package::text_box_named_style::{
+        Commit, Diagnostics, Edit, Error, LimitKind, Patch, Refusal,
+    };
+    pub use litchi_iwa_text::paragraph::style::{
+        NamedParagraphStyle, ParagraphStyleId, ParagraphStyleName,
+    };
+}
+
 /// Exact-source transactions for the body drawables' layer order.
 pub mod order {
     pub use crate::package::drawable_order::{
