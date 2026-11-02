@@ -58,6 +58,9 @@ pub mod axis {
     };
     pub use litchi_iwa_common::chart::axis::style::Visibility;
     pub use litchi_iwa_common::chart::axis::{Axis, TickMarkLocation};
+    pub use litchi_iwa_style::chart_style::axis::{
+        GridlineStroke, LabelAffixes, LabelAngle, LabelPosition3d, NumberFormat, Stroke,
+    };
 }
 
 /// Exact-source per-series chart properties (one value per series):

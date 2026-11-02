@@ -26,6 +26,9 @@ pub mod axis {
         Axis, Bound, Bounds, MajorStepCount, MinorStepCount, Scale, Steps, TickMarkLocation,
         ValueAxisSettings,
     };
+    pub use litchi_iwa_style::chart_style::axis::{
+        GridlineStroke, LabelAffixes, LabelAngle, LabelPosition3d, NumberFormat, Stroke,
+    };
 }
 
 /// Preserve the historical `litchi_keynote::chart::ChartArrangement` path.

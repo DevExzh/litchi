@@ -90,4 +90,7 @@ pub mod axis {
     pub use crate::package::body_chart_style::axis::{Commit, Patch, Property, PropertyKind};
     pub use litchi_iwa_common::chart::axis::style::Visibility;
     pub use litchi_iwa_common::chart::axis::{Axis, TickMarkLocation};
+    pub use litchi_iwa_style::chart_style::axis::{
+        GridlineStroke, LabelAffixes, LabelAngle, LabelPosition3d, NumberFormat, Stroke,
+    };
 }
