@@ -90,6 +90,50 @@ pub mod schema {
     const FRAME: &[KnownField] = &[known(2, KnownKind::Bytes), known(3, KnownKind::Fixed32)];
     const PATTERNED_STROKE: &[KnownField] = &[known(2, KnownKind::Bytes)];
 
+    const DATA_REFERENCE: &[KnownField] = &[known(1, KnownKind::Varint)];
+    const POINT: &[KnownField] = &[known(1, KnownKind::Fixed32), known(2, KnownKind::Fixed32)];
+    const GRADIENT_STOP: &[KnownField] = &[
+        known(1, KnownKind::Message(COLOR)),
+        known(2, KnownKind::Fixed32),
+        known(3, KnownKind::Fixed32),
+    ];
+    const ANGLE_GRADIENT: &[KnownField] = &[known(2, KnownKind::Fixed32)];
+    const TRANSFORM_GRADIENT: &[KnownField] = &[
+        known(1, KnownKind::Message(POINT)),
+        known(2, KnownKind::Message(POINT)),
+        known(3, KnownKind::Message(POINT)),
+    ];
+    const GRADIENT: &[KnownField] = &[
+        known(1, KnownKind::Varint),
+        KnownField {
+            number: 2,
+            kind: KnownKind::Message(GRADIENT_STOP),
+            repeated: true,
+        },
+        known(3, KnownKind::Fixed32),
+        known(4, KnownKind::Varint),
+        known(5, KnownKind::Message(ANGLE_GRADIENT)),
+        known(6, KnownKind::Message(TRANSFORM_GRADIENT)),
+    ];
+    const IMAGE_FILL: &[KnownField] = &[
+        known(1, KnownKind::Message(REFERENCE)),
+        known(2, KnownKind::Varint),
+        known(3, KnownKind::Message(COLOR)),
+        known(4, KnownKind::Message(POINT)),
+        known(5, KnownKind::Message(REFERENCE)),
+        known(6, KnownKind::Message(DATA_REFERENCE)),
+        known(7, KnownKind::Message(DATA_REFERENCE)),
+        known(8, KnownKind::Varint),
+        known(9, KnownKind::Message(COLOR)),
+    ];
+
+    /// `TSD.FillArchive` (the host's chart background-fill schema).
+    pub const FILL: &[KnownField] = &[
+        known(1, KnownKind::Message(COLOR)),
+        known(2, KnownKind::Message(GRADIENT)),
+        known(3, KnownKind::Message(IMAGE_FILL)),
+    ];
+
     const CONTACT_SHADOW: &[KnownField] =
         &[known(2, KnownKind::Fixed32), known(4, KnownKind::Fixed32)];
     const CURVED_SHADOW: &[KnownField] = &[known(1, KnownKind::Fixed32)];
