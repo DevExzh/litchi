@@ -679,6 +679,7 @@ mod tests {
 /// on the shared legend-style variation graph:
 /// [`crate::Package::edit_slide_chart_legend_style`].
 pub mod legend_style {
+    pub use crate::package::slide_chart_font::{Font, TextPointSize};
     pub use crate::package::slide_chart_series::{Diagnostics, Error, LimitKind, Refusal};
     pub use crate::package::slide_chart_style::LegendStyleEdit as Edit;
     pub use crate::package::slide_chart_style::legend_style::{
@@ -688,6 +689,4 @@ pub mod legend_style {
     pub use litchi_iwa_common::shape::fill::{Fill, Gradient};
     pub use litchi_iwa_common::shape::shadow::Drop;
     pub use litchi_iwa_common::shape::stroke::Stroke;
-    pub use litchi_iwa_text::character::TextPointSize;
-    pub use litchi_iwa_text::font::Font;
 }

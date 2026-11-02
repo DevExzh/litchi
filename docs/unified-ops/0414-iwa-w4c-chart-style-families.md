@@ -431,3 +431,11 @@ parity `publish` helper does not rewrite metadata.
 
 Receipt `results/0414/callgrind-slice6.json`; raw captures in
 `.coord/iwa-w4c/cg6/`.
+
+Slice 6 gates: trunk `10af106c18` (W4-D slice 1) merged at `147881a72c`.
+Every command of §8 exits 0 (logs `.coord/iwa-w4c/gates7`), except the
+crate-boundary check, which first refused the Keynote `chart::legend_style`
+re-export of `litchi_iwa_text`. Those types are now re-exported through
+`slide_chart_font`, as the chart font family does. After that fix, the
+boundary check, clippy -D warnings and rustdoc for litchi-keynote, the
+Keynote legend parity cases and the glossary check exit 0.
