@@ -445,3 +445,45 @@ ledger, glossary, clippy -D warnings on the six touched crates, the
 litchi-keynote and litchi-pages tests, the whole parity target (1043 passed),
 fmt, the crate-boundary check and the bench matrix. Target 3.4 GB after
 pruning.
+
+## 14. Slice 7: pie leader lines, value-label and error-bar auto-fit, value-label locations; the shared legend variation
+
+48 rows flip: the per-wedge and per-series routes (set all, set one, read
+all, read one) of pie leader lines, value-label auto-fit, error-bar
+auto-fit and value-label locations, on each format.
+
+| Crate | What |
+|---|---|
+| `litchi-iwa-style` | `series::property::LeaderLines`: a series non-style override, field 102 (`tschchartseriespieenablecalloutline`). It is read strictly as the host's reader does (one occurrence; a canonical `int32`, sign-extended when negative; unknown values kept as `LeaderLineVisibility::from_native`). Visible removes the field and an emptied extension. `series::style::Kind::{ValueLabelAutoFits, ErrorBarAutoFits, ValueLabelLocations}` with `AutoFit` and `ValueLabelLocation` values. As the host does, they are read from each series style's own payload, not its parent chain. Value-label auto-fit is field 100, a canonical boolean, true when disabled. Error-bar auto-fit is field 98, `int32` 0 or 1. The location is field 88 for bar and column kinds and 97 for stacked kinds (native 8/0/4/6; any other kind is `UnsupportedKind`). The default removes the field. The auto-fit writes also remove an emptied extension; the location write keeps it, as the host does. A location write makes every series style exclusive before it rewrites any (the host's order), while the auto-fit writes check only the series they change |
+| `litchi-numbers`, `litchi-keynote`, `litchi-pages` | `series::Property::{LeaderLines, ValueLabelAutoFits, ErrorBarAutoFits, ValueLabelLocations}` on the existing per-series family; re-exported `AutoFit`, `ValueLabelLocation`, `LeaderLineVisibility` |
+
+Parity: `{numbers_sheet,keynote_slide,pages_body}_chart_pie_leader_lines_parity`,
+`…_series_value_label_auto_fits_parity`, `…_series_error_bar_auto_fits_parity`
+and `…_series_value_label_locations_parity` (column and stacked bar). Each
+runs a set all, a change after a host set, and a set one through the
+read-replace-write route; the read cases are added to `…_series_read_parity`.
+All are Tier B, as the per-series family is.
+
+**Shared legend variation (coordinator):** the parity helper gains
+`chart_style_cases::publish_referencing`, which adds metadata object
+references along with a payload replacement.
+`numbers_sheet_chart_legend_font_shared_variation_parity` builds a second
+chart whose `paragraph_styles` list and metadata name the first chart's
+legend variation. It then sets a font, sets a size, and resets the font on
+the first chart. The host takes `replace_shared_style` (the case asserts
+that the first chart's list now names a fresh variation), and the leaf
+matches it (Tier B). This closes the §13 gap.
+
+Radar series style (2 rows per format) follows with the remaining items.
+
+| Route | Host Ir | Leaf Ir | Leaf/host |
+|---|---:|---:|---:|
+| keynote_leader_lines_set | 919,342,516 | 199,526,887 | 0.2170 |
+| keynote_label_locations_set | 878,658,629 | 78,483,327 | 0.0893 |
+| pages_leader_lines_set | 1,292,249,073 | 125,102,494 | 0.0968 |
+| pages_label_locations_set | 1,280,254,563 | 48,091,465 | 0.0376 |
+| numbers_leader_lines_set | 249,865,281 | 130,664,884 | 0.5229 |
+| numbers_label_locations_set | 241,202,892 | 60,372,687 | 0.2503 |
+
+Receipt `results/0414/callgrind-slice7.json`; raw captures in
+`.coord/iwa-w4c/cg7/`.

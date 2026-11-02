@@ -1,0 +1,65 @@
+{
+  "record": "0414",
+  "slice": 7,
+  "binary_sha256": "3c43d3132277597ad9e33903466c1342caa7ce9f3fa1a03c1013b3bab9de484a",
+  "build": "source .coord/iwa-w4c/env.sh; cargo test --release -p litchi-iwa --all-features --test parity --no-run",
+  "run": "W4C_ROUTE=<route> taskset -c 3 valgrind --tool=callgrind <binary> --ignored --exact chart_property_cost::chart_property_route_cost_abba --test-threads=1",
+  "metric": "inclusive Ir of w4c_host_route / w4c_leaf_route, two calls each (ABBA)",
+  "captures_dir": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-w4c/cg7 (outside the repository)",
+  "routes": [
+    {
+      "route": "keynote_leader_lines_set",
+      "host_ir": 919342516,
+      "leaf_ir": 199526887,
+      "leaf_over_host": 0.217032,
+      "capture": "keynote_leader_lines_set.cg",
+      "capture_bytes": 467902,
+      "capture_sha256": "bc79ad03f1e91714ab18f199e7dc19bbd2eaa1f073662e83aad743da57ab3bb7"
+    },
+    {
+      "route": "keynote_label_locations_set",
+      "host_ir": 878658629,
+      "leaf_ir": 78483327,
+      "leaf_over_host": 0.089322,
+      "capture": "keynote_label_locations_set.cg",
+      "capture_bytes": 428602,
+      "capture_sha256": "cb3627cdaa57522933f9c97c248935297aa97f355d480a404196bfe3520be430"
+    },
+    {
+      "route": "pages_leader_lines_set",
+      "host_ir": 1292249073,
+      "leaf_ir": 125102494,
+      "leaf_over_host": 0.09681,
+      "capture": "pages_leader_lines_set.cg",
+      "capture_bytes": 453856,
+      "capture_sha256": "055528ea891683002784e0fef42438931bb4b3044ea9c6434d2b7c07134f2457"
+    },
+    {
+      "route": "pages_label_locations_set",
+      "host_ir": 1280254563,
+      "leaf_ir": 48091465,
+      "leaf_over_host": 0.037564,
+      "capture": "pages_label_locations_set.cg",
+      "capture_bytes": 416844,
+      "capture_sha256": "160eaeb2791d9c7817be50b28a6e2d89b2d320919421ee96b2f8fcbfd22b2072"
+    },
+    {
+      "route": "numbers_leader_lines_set",
+      "host_ir": 249865281,
+      "leaf_ir": 130664884,
+      "leaf_over_host": 0.522941,
+      "capture": "numbers_leader_lines_set.cg",
+      "capture_bytes": 436143,
+      "capture_sha256": "e15447485a7b13651b6a070cd9b7c7c1ba2a12aed9e00c97e2dc18dfc6855b9b"
+    },
+    {
+      "route": "numbers_label_locations_set",
+      "host_ir": 241202892,
+      "leaf_ir": 60372687,
+      "leaf_over_host": 0.250298,
+      "capture": "numbers_label_locations_set.cg",
+      "capture_bytes": 404828,
+      "capture_sha256": "f82494d3483ca93b2c172d54d825c031b0bd8d52bff4f65bfbac003c00245ab8"
+    }
+  ]
+}
