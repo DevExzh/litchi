@@ -2270,7 +2270,23 @@ impl Draft {
         let anchor = graph.anchor_character_index as usize;
         text_editor.replace_text(self.body_storage_id, anchor..anchor + 1, "")?;
         let mut staged = text_editor.into_package();
+        // Host defect fixed by record 0413: like the media and shape
+        // removals, drop the removed attachment from the body storage header
+        // and the document component's external references to the removed
+        // graph (the text box's own style reference among them).
+        prune_removed_body_attachment(
+            &mut staged,
+            self.body_storage_id.get(),
+            graph.attachment_id,
+        )?;
         patch_pages_zorder(&mut staged, Some(drawable_object_id), None)?;
+        for identifier in &graph.object_ids {
+            remove_component_external_references_to_object(
+                &mut staged,
+                DOCUMENT_OBJECT_ID,
+                *identifier,
+            )?;
+        }
 
         let mut object_index = PagesObjectIndex::build(&staged, &graph.object_ids)?;
         for identifier in &graph.object_ids {
