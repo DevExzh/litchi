@@ -56,6 +56,13 @@ pub enum Error {
     /// The slide size could not be written.
     #[error(transparent)]
     ShowSettings(#[from] show::Error),
+    /// The title and body placeholder frames could not be laid out for the
+    /// slide size.
+    #[error("could not lay out the Keynote placeholders for the slide size: {0}")]
+    Layout(#[source] ReadError),
+    /// The slide-number placeholder's visibility could not be written.
+    #[error(transparent)]
+    PlaceholderVisibility(#[from] slide::placeholder::Error),
     /// The document language is not a valid language tag.
     #[error("invalid Keynote document language: {0}")]
     InvalidLanguage(#[source] litchi_iwa_text::language::Error),
@@ -71,8 +78,8 @@ pub enum Error {
 ///
 /// Unset values keep the blank presentation's defaults: title
 /// "Presentation Title", subtitle "Presentation Subtitle", no speaker notes,
-/// a 1920×1080-point slide, language `en` and locale `en_US`. The
-/// [`Identity`] has no default.
+/// a 1920×1080-point slide, language `en`, locale `en_US` and a hidden
+/// slide number. The [`Identity`] has no default.
 #[derive(Debug, Clone, Default, PartialEq)]
 #[must_use = "a Keynote builder does nothing until `build` is called"]
 pub struct Builder {
@@ -83,6 +90,7 @@ pub struct Builder {
     slide_size: Option<Size>,
     language: Option<String>,
     locale: Option<String>,
+    slide_number_visible: Option<bool>,
 }
 
 impl Builder {
@@ -117,6 +125,9 @@ impl Builder {
 
     /// Set the presentation's slide size in points.
     ///
+    /// The title and body placeholders of the layout and the first slide are
+    /// laid out for the size: the title at 10 % × 24 % of the slide,
+    /// 80 % × 20 % of it, the body at 15 % × 52 %, 70 % × 14 %.
     /// [`Size`] is validated at construction (finite, strictly positive).
     pub const fn slide_size(mut self, size: Size) -> Self {
         self.slide_size = Some(size);
@@ -136,6 +147,15 @@ impl Builder {
     /// Unset, the blank presentation's `"en_US"` stays.
     pub fn locale(mut self, locale: impl Into<String>) -> Self {
         self.locale = Some(locale.into());
+        self
+    }
+
+    /// Show (`true`) or hide (`false`) the first slide's slide-number
+    /// placeholder, as [`Package::edit_slide_placeholder_visibility`] with
+    /// [`slide::placeholder::Kind::SlideNumber`] does. Unset, it stays
+    /// hidden. The show-wide slide-number preference is not changed.
+    pub const fn slide_number_visible(mut self, visible: bool) -> Self {
+        self.slide_number_visible = Some(visible);
         self
     }
 
@@ -192,6 +212,21 @@ impl Builder {
             let mut settings = edit.settings();
             settings.set_size(size);
             package = edit.set(settings).commit()?.into_package();
+            package = package
+                .with_placeholder_frames(size)
+                .map_err(Error::Layout)?;
+        }
+        if let Some(visible) = self.slide_number_visible {
+            let state = if visible {
+                slide::placeholder::State::Visible
+            } else {
+                slide::placeholder::State::Hidden
+            };
+            package = package
+                .edit_slide_placeholder_visibility(first, slide::placeholder::Kind::SlideNumber)?
+                .set(state)
+                .commit()?
+                .into_package();
         }
         Ok(package)
     }

@@ -4,6 +4,7 @@
 //! package member in its original byte stream. The archive, Snappy, detection,
 //! and protobuf layers remain in their focused IWA infrastructure crates.
 
+mod blank_layout;
 #[cfg(feature = "internal-iwork-source")]
 mod catalog_table_appearance;
 mod chart_axis_support;
