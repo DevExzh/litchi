@@ -36,6 +36,7 @@ use super::snappy_failure::SnappyFailure;
 use super::{MOVIE_MESSAGE_TYPE, Package, PhysicalSource, SLIDE_MESSAGE_TYPE, SemanticPath};
 use crate::{MovieKind, MovieSelector, SlideSelector};
 
+pub(crate) mod asset;
 mod budget;
 mod closure;
 pub(in crate::package) use budget::{MediaBudget, MediaBudgetUsage};
@@ -267,6 +268,12 @@ pub enum Refusal {
     /// Replacement bytes do not retain the selected media family.
     #[error("Keynote media replacement has an incompatible media type")]
     ReplacementType,
+    /// The media asset is not reachable from the Keynote document.
+    #[error("the media asset is not reachable from the Keynote document")]
+    AssetNotReachable,
+    /// The media asset has no materialized package member.
+    #[error("the media asset is not materialized in the Keynote package")]
+    AssetNotMaterialized,
 }
 
 impl Refusal {
@@ -284,7 +291,9 @@ impl Refusal {
             | Self::ReplacementTooLarge { .. } => RefusalKind::InvalidValue,
             Self::SlideNameNotFound { .. }
             | Self::SlidePositionNotFound { .. }
-            | Self::MoviePositionNotFound { .. } => RefusalKind::NotFound,
+            | Self::MoviePositionNotFound { .. }
+            | Self::AssetNotReachable => RefusalKind::NotFound,
+            Self::AssetNotMaterialized => RefusalKind::UnsupportedTarget,
         }
     }
 }
@@ -2111,18 +2120,44 @@ fn rewrite_media(
         .ok_or(Error::InvalidSource)?
         .data();
     validate_replacement(replacement, part, old, source.state.options.archive())?;
-    let metadata = rewrite_metadata_entry(
+    let data_name = copy_data_path(record.current_name.as_ref(), budget)?;
+    rewrite_member(
         source,
-        catalog,
         selection.identifier(part).ok_or(Error::InvalidSource)?,
         &record.digest,
         record.materialized_length.ok_or(Error::InvalidSource)?,
+        &data_name,
+        replacement,
+        budget,
+    )
+}
+
+/// Replace the materialized `Data/` member `data_name` of data record
+/// `identifier` (whose `DataInfo` declares `digest` and `length`) and patch
+/// that record's digest and materialized length, invalidating the root
+/// previews; returns the reopened candidate and the deleted preview count.
+/// The identifier and every reference to it stay unchanged.
+fn rewrite_member(
+    source: &Package,
+    identifier: u64,
+    digest: &[u8; SHA1_BYTES],
+    length: usize,
+    data_name: &str,
+    replacement: &[u8],
+    budget: &mut MediaBudget,
+) -> Result<(Package, usize), Error> {
+    let catalog = physical_catalog(source)?;
+    let metadata = rewrite_metadata_entry(
+        source,
+        catalog,
+        identifier,
+        digest,
+        length,
         replacement,
         budget,
     )?;
-    let data_name = copy_data_path(record.current_name.as_ref(), budget)?;
     let edits = [
-        EntryEdit::new(&data_name, replacement),
+        EntryEdit::new(data_name, replacement),
         EntryEdit::new(METADATA_COMPONENT, &metadata),
     ];
     let preview_plan = super::rendering_invalidation::root_preview_deletions(catalog.package())

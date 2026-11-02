@@ -167,6 +167,8 @@ fn map_media_error(error: SlideMediaDataError) -> Error {
         | SlideMediaDataError::Refused(crate::slide::media::data::Refusal::EmptyReplacement)
         | SlideMediaDataError::Refused(crate::slide::media::data::Refusal::ReplacementTooLarge)
         | SlideMediaDataError::Refused(crate::slide::media::data::Refusal::ReplacementType)
+        | SlideMediaDataError::Refused(crate::slide::media::data::Refusal::AssetNotReachable)
+        | SlideMediaDataError::Refused(crate::slide::media::data::Refusal::AssetNotMaterialized)
         | SlideMediaDataError::Verification
         | SlideMediaDataError::PatchConflict => Error::InvalidSource,
     }
