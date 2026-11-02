@@ -7,8 +7,10 @@
 
 use litchi_iwa::charts::{
     ChartPieLabelDistance, ChartPieWedgeExplosion, ChartPieWedgeIndex, ChartSeriesConnectionLine,
-    ChartSeriesSymbol, ChartSeriesSymbolShape, ChartSeriesSymbolSize, ChartSeriesTrendline,
-    ChartSeriesTrendlineMovingAveragePeriod, ChartSeriesTrendlinePolynomialOrder, Index,
+    ChartSeriesErrorBarAutoFit, ChartSeriesSymbol, ChartSeriesSymbolShape, ChartSeriesSymbolSize,
+    ChartSeriesTrendline, ChartSeriesTrendlineMovingAveragePeriod,
+    ChartSeriesTrendlinePolynomialOrder, ChartSeriesValueLabelAutoFit,
+    ChartSeriesValueLabelLocation, Index,
 };
 use litchi_iwa::pages;
 use litchi_iwa_common::chart::error_bar::{
@@ -18,14 +20,16 @@ use litchi_iwa_common::chart::kind::Kind;
 use litchi_iwa_common::chart::number_format::{
     DecimalPlaces, LabelAffixes, NegativeStyle, NumberFormat,
 };
-use litchi_iwa_common::chart::pie::{LabelDistance, LabelVisibility, WedgeExplosion};
+use litchi_iwa_common::chart::pie::{
+    LabelDistance, LabelVisibility, LeaderLineVisibility, WedgeExplosion,
+};
 use litchi_iwa_common::chart::series::{
     ConnectionLine, MovingAveragePeriod, PolynomialOrder, Symbol, SymbolShape, SymbolSize,
     Trendline,
 };
 use litchi_iwa_common::chart::series_labels::Visibility;
 use litchi_pages::Package;
-use litchi_pages::chart::series::{Property, PropertyKind};
+use litchi_pages::chart::series::{AutoFit, Property, PropertyKind, ValueLabelLocation};
 
 use crate::chart_style_cases::{Input, input};
 use crate::harness::{Case, Evidence, Format, LeafRun, TestResult, Tier};
@@ -78,6 +82,10 @@ impl Trend {
 enum Values {
     Lines(Kind, Vec<ConnectionLine>),
     Wedges(Vec<f32>),
+    Leaders(Vec<LeaderLineVisibility>),
+    LabelFits(Vec<AutoFit>),
+    ErrorFits(Vec<AutoFit>),
+    Locations(Kind, Vec<ValueLabelLocation>),
     Labels(Vec<f32>),
     Symbols(Kind, Vec<Option<(SymbolShape, Option<f32>)>>),
     Trends(Vec<Trend>),
@@ -92,7 +100,11 @@ impl Values {
     const fn chart(&self) -> Kind {
         match self {
             Self::Lines(kind, _) | Self::Symbols(kind, _) => *kind,
-            Self::Wedges(_) | Self::Labels(_) | Self::PieLabels(_) => Kind::Pie2d,
+            Self::Wedges(_) | Self::Leaders(_) | Self::Labels(_) | Self::PieLabels(_) => {
+                Kind::Pie2d
+            },
+            Self::LabelFits(_) | Self::ErrorFits(_) => Kind::Column2d,
+            Self::Locations(kind, _) => *kind,
             Self::Trends(_) => Kind::Scatter2d,
             Self::Errors(_) | Self::ValueLabels(_) | Self::Affixes(_) | Self::Formats(_) => {
                 Kind::Column2d
@@ -104,6 +116,10 @@ impl Values {
         match self {
             Self::Lines(..) => PropertyKind::ConnectionLines,
             Self::Wedges(_) => PropertyKind::WedgeExplosions,
+            Self::Leaders(_) => PropertyKind::LeaderLines,
+            Self::LabelFits(_) => PropertyKind::ValueLabelAutoFits,
+            Self::ErrorFits(_) => PropertyKind::ErrorBarAutoFits,
+            Self::Locations(..) => PropertyKind::ValueLabelLocations,
             Self::Labels(_) => PropertyKind::LabelDistances,
             Self::Symbols(..) => PropertyKind::Symbols,
             Self::Trends(_) => PropertyKind::Trendlines,
@@ -118,6 +134,10 @@ impl Values {
     fn leaf(&self) -> TestResult<Property> {
         Ok(match self {
             Self::Lines(_, values) => Property::ConnectionLines(values.clone()),
+            Self::Leaders(values) => Property::LeaderLines(values.clone()),
+            Self::LabelFits(values) => Property::ValueLabelAutoFits(values.clone()),
+            Self::ErrorFits(values) => Property::ErrorBarAutoFits(values.clone()),
+            Self::Locations(_, values) => Property::ValueLabelLocations(values.clone()),
             Self::Wedges(values) => Property::WedgeExplosions(
                 values
                     .iter()
@@ -193,7 +213,7 @@ fn host_symbol(value: Option<(SymbolShape, Option<f32>)>) -> TestResult<Option<C
 /// through the one-series route.
 fn host_write(
     source: &[u8],
-    ______sheet: (),
+    _sheet: (),
     chart: u64,
     values: &Values,
     one: Option<usize>,
@@ -216,6 +236,47 @@ fn host_write(
             set_body_chart_series_connection_line,
             series,
             v.iter().copied().map(host_line).collect::<Vec<_>>()
+        ),
+        Values::LabelFits(v) => route!(
+            set_body_chart_series_value_label_auto_fits,
+            set_body_chart_series_value_label_auto_fit,
+            series,
+            v.iter()
+                .map(|fit| match fit {
+                    AutoFit::Disabled => ChartSeriesValueLabelAutoFit::Disabled,
+                    _ => ChartSeriesValueLabelAutoFit::Enabled,
+                })
+                .collect::<Vec<_>>()
+        ),
+        Values::ErrorFits(v) => route!(
+            set_body_chart_series_error_bar_auto_fits,
+            set_body_chart_series_error_bar_auto_fit,
+            series,
+            v.iter()
+                .map(|fit| match fit {
+                    AutoFit::Disabled => ChartSeriesErrorBarAutoFit::Disabled,
+                    _ => ChartSeriesErrorBarAutoFit::Enabled,
+                })
+                .collect::<Vec<_>>()
+        ),
+        Values::Locations(_, v) => route!(
+            set_body_chart_series_value_label_locations,
+            set_body_chart_series_value_label_location,
+            series,
+            v.iter()
+                .map(|location| match location {
+                    ValueLabelLocation::Bottom => ChartSeriesValueLabelLocation::Bottom,
+                    ValueLabelLocation::Middle => ChartSeriesValueLabelLocation::Middle,
+                    ValueLabelLocation::Outside => ChartSeriesValueLabelLocation::Outside,
+                    _ => ChartSeriesValueLabelLocation::Top,
+                })
+                .collect::<Vec<_>>()
+        ),
+        Values::Leaders(v) => route!(
+            set_body_chart_pie_leader_line_visibilities,
+            set_body_chart_pie_leader_line_visibility,
+            wedge,
+            v.clone()
         ),
         Values::Wedges(v) => route!(
             set_body_chart_pie_wedge_explosions,
@@ -285,11 +346,15 @@ fn host_write(
 }
 
 /// The host's read of the property, as comparable text.
-fn host_read(bytes: &[u8], ______sheet: (), chart: u64, values: &Values) -> TestResult<String> {
+fn host_read(bytes: &[u8], _sheet: (), chart: u64, values: &Values) -> TestResult<String> {
     let e = pages::Draft::from_bytes(bytes)?;
     Ok(match values {
         Values::Lines(..) => format!("{:?}", e.body_chart_series_connection_lines(chart)?),
         Values::Wedges(_) => format!("{:?}", e.body_chart_pie_wedge_explosions(chart)?),
+        Values::LabelFits(_) => format!("{:?}", e.body_chart_series_value_label_auto_fits(chart)?),
+        Values::ErrorFits(_) => format!("{:?}", e.body_chart_series_error_bar_auto_fits(chart)?),
+        Values::Locations(..) => format!("{:?}", e.body_chart_series_value_label_locations(chart)?),
+        Values::Leaders(_) => format!("{:?}", e.body_chart_pie_leader_line_visibilities(chart)?),
         Values::Labels(_) => format!("{:?}", e.body_chart_pie_label_distances(chart)?),
         Values::Symbols(..) => format!("{:?}", e.body_chart_series_symbols(chart)?),
         Values::Trends(_) => format!("{:?}", e.body_chart_series_trendlines(chart)?),
@@ -354,6 +419,10 @@ fn replace(current: &mut Property, wanted: &Property, i: usize) -> TestResult {
     take!(
         ConnectionLines,
         WedgeExplosions,
+        LeaderLines,
+        ValueLabelAutoFits,
+        ErrorBarAutoFits,
+        ValueLabelLocations,
         LabelDistances,
         Symbols,
         Trendlines,
@@ -466,6 +535,86 @@ fn pages_body_chart_pie_wedge_explosions_parity() -> TestResult {
         None,
     )?;
     run(name, Tier::B, &[], &exploded, Some(2))?;
+    Ok(())
+}
+
+#[test]
+fn pages_body_chart_pie_leader_lines_parity() -> TestResult {
+    let _ = Evidence::Queued;
+    let name = "pages_body_chart_pie_leader_lines_parity";
+    let hidden = Values::Leaders(vec![
+        LeaderLineVisibility::Hidden,
+        LeaderLineVisibility::Visible,
+        LeaderLineVisibility::Hidden,
+    ]);
+    run(name, Tier::B, &[], &hidden, None)?;
+    run(
+        name,
+        Tier::B,
+        std::slice::from_ref(&hidden),
+        &Values::Leaders(vec![LeaderLineVisibility::Visible; 3]),
+        None,
+    )?;
+    run(name, Tier::B, &[], &hidden, Some(2))?;
+    Ok(())
+}
+
+#[test]
+fn pages_body_chart_series_value_label_auto_fits_parity() -> TestResult {
+    let _ = Evidence::Queued;
+    let name = "pages_body_chart_series_value_label_auto_fits_parity";
+    let off = Values::LabelFits(vec![AutoFit::Disabled, AutoFit::Enabled]);
+    run(name, Tier::B, &[], &off, None)?;
+    run(
+        name,
+        Tier::B,
+        std::slice::from_ref(&off),
+        &Values::LabelFits(vec![AutoFit::Enabled; 2]),
+        None,
+    )?;
+    run(name, Tier::B, &[], &off, Some(0))?;
+    Ok(())
+}
+
+#[test]
+fn pages_body_chart_series_error_bar_auto_fits_parity() -> TestResult {
+    let _ = Evidence::Queued;
+    let name = "pages_body_chart_series_error_bar_auto_fits_parity";
+    let off = Values::ErrorFits(vec![AutoFit::Enabled, AutoFit::Disabled]);
+    run(name, Tier::B, &[], &off, None)?;
+    run(
+        name,
+        Tier::B,
+        std::slice::from_ref(&off),
+        &Values::ErrorFits(vec![AutoFit::Enabled; 2]),
+        None,
+    )?;
+    run(name, Tier::B, &[], &off, Some(1))?;
+    Ok(())
+}
+
+#[test]
+fn pages_body_chart_series_value_label_locations_parity() -> TestResult {
+    let _ = Evidence::Queued;
+    let name = "pages_body_chart_series_value_label_locations_parity";
+    for kind in [Kind::Column2d, Kind::StackedBar2d] {
+        let moved = Values::Locations(
+            kind,
+            vec![ValueLabelLocation::Outside, ValueLabelLocation::Middle],
+        );
+        run(name, Tier::B, &[], &moved, None)?;
+        run(
+            name,
+            Tier::B,
+            std::slice::from_ref(&moved),
+            &Values::Locations(
+                kind,
+                vec![ValueLabelLocation::Top, ValueLabelLocation::Bottom],
+            ),
+            None,
+        )?;
+        run(name, Tier::B, &[], &moved, Some(1))?;
+    }
     Ok(())
 }
 
@@ -591,6 +740,13 @@ fn pages_body_chart_series_read_parity() -> TestResult {
     for values in [
         curved,
         Values::Wedges(vec![10.0, 0.0, 25.0]),
+        Values::Leaders(vec![LeaderLineVisibility::Hidden; 3]),
+        Values::LabelFits(vec![AutoFit::Disabled; 2]),
+        Values::ErrorFits(vec![AutoFit::Disabled; 2]),
+        Values::Locations(
+            Kind::StackedColumn2d,
+            vec![ValueLabelLocation::Bottom, ValueLabelLocation::Outside],
+        ),
         Values::Labels(vec![40.0, 55.0, 70.0]),
         Values::Trends(vec![Trend::Polynomial]),
         errors()?,
