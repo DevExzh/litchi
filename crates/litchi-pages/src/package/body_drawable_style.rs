@@ -23,7 +23,7 @@ use litchi_iwa_core::Archive;
 use litchi_iwa_style::graph::{Components, Workspace};
 use litchi_iwa_style::shape::{
     self as engine,
-    property::{Fills, Shadows, ShapeEffects, Strokes, TextLayout},
+    property::{Fills, Shadows, ShapeEffects, Strokes, TextColumns, TextLayout},
 };
 use thiserror::Error as ThisError;
 
@@ -228,7 +228,10 @@ impl Components for PackageComponents<'_> {
 
 /// The shape drawable `selector` names.
 fn drawable(package: &Package, selector: DrawableSelector) -> Result<u64, Error> {
-    if !matches!(selector, DrawableSelector::Shape(_)) {
+    if !matches!(
+        selector,
+        DrawableSelector::Shape(_) | DrawableSelector::TextBox(_)
+    ) {
         return Err(Refusal::NotAShape.into());
     }
     let mut budget = Budget::new(package)?;
@@ -274,6 +277,9 @@ fn read(
         PropertyKind::TextLayout => {
             Property::TextLayout(engine::value(workspace, shape, &TextLayout).map_err(from_engine)?)
         },
+        PropertyKind::TextColumns => Property::TextColumns(
+            engine::value(workspace, shape, &TextColumns).map_err(from_engine)?,
+        ),
         PropertyKind::LineEndpoints => {
             Property::LineEndpoints(endpoints(workspace, &line_ends(source, shape)?, shape)?)
         },
@@ -636,6 +642,9 @@ impl Edit<'_> {
                 Change::Set(Property::TextLayout(layout)) => {
                     engine::set(&mut workspace, self.shape, &TextLayout, layout)
                 },
+                Change::Set(Property::TextColumns(columns)) => {
+                    engine::set(&mut workspace, self.shape, &TextColumns, columns)
+                },
                 Change::Reset(PropertyKind::Fill) => {
                     engine::reset(&mut workspace, self.shape, &Fills)
                 },
@@ -650,6 +659,9 @@ impl Edit<'_> {
                 },
                 Change::Reset(PropertyKind::TextLayout) => {
                     engine::reset(&mut workspace, self.shape, &TextLayout)
+                },
+                Change::Reset(PropertyKind::TextColumns) => {
+                    engine::reset(&mut workspace, self.shape, &TextColumns)
                 },
             }
             .map_err(from_engine)?;

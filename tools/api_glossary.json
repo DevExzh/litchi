@@ -20604,6 +20604,15 @@
           "limits_type": "litchi_iwa_common::WireLimits"
         },
         {
+          "method": "litchi_iwa_text_wire::list::publish::Publisher::new",
+          "inputs": [
+            "workspace",
+            "limits"
+          ],
+          "limits_argument": "limits",
+          "limits_type": "litchi_iwa_common::WireLimits"
+        },
+        {
           "method": "litchi_iwa_text_wire::list::with_level",
           "inputs": [
             "storage",
@@ -26049,6 +26058,9 @@
         "litchi_pages::drawable::properties",
         "litchi_pages::drawable::text",
         "litchi_pages::drawable::style",
+        "litchi_pages::drawable::named_style",
+        "litchi_pages::drawable::list",
+        "litchi_pages::drawable::text_box_text",
         "litchi_pages::bookmark",
         "litchi_pages::date_time",
         "litchi_pages::number_attachment",
@@ -26065,6 +26077,18 @@
         {
           "method": "litchi_pages::Package::apply_metadata",
           "ok": "litchi_pages::metadata::Commit"
+        },
+        {
+          "method": "litchi_pages::Package::apply_body_text_box_named_styles",
+          "ok": "litchi_pages::drawable::named_style::Commit"
+        },
+        {
+          "method": "litchi_pages::Package::apply_body_text_box_lists",
+          "ok": "litchi_pages::drawable::list::Commit"
+        },
+        {
+          "method": "litchi_pages::Package::apply_body_text_box_text",
+          "ok": "litchi_pages::drawable::text_box_text::Commit"
         },
         {
           "method": "litchi_pages::Package::apply_body_chart_arrangement",
