@@ -53,8 +53,8 @@ pub mod caption {
     };
 }
 
-/// Drawing styles of body shapes: fill, stroke, shadow, effects, text
-/// layout and line endpoints, over the shared shape-style variation engine (record 0371).
+/// Drawing styles of body shapes and text boxes: fill, stroke, shadow,
+/// effects, text layout, text columns and line endpoints, over the shared shape-style variation engine (record 0371).
 pub mod style {
     pub use crate::package::body_drawable_style::{
         Commit, Diagnostics, Edit, Error, LimitKind, Patch, Refusal,
@@ -65,6 +65,7 @@ pub mod style {
     pub use litchi_iwa_common::shape::shadow::Shadow;
     pub use litchi_iwa_common::shape::stroke::Stroke;
     pub use litchi_iwa_common::text::layout::Layout;
+    pub use litchi_iwa_text::columns::Columns;
 
     /// One drawing property of a body shape.
     #[derive(Debug, Clone, PartialEq)]
@@ -81,6 +82,8 @@ pub mod style {
         Effects(Effects),
         /// Vertical alignment, insets and autosizing of the text frame.
         TextLayout(Layout),
+        /// The text frame's columns (count, widths and gaps).
+        TextColumns(Columns),
         /// The decorations at a straight line's directed start and end.
         LineEndpoints(Endpoints),
     }
@@ -99,6 +102,8 @@ pub mod style {
         Effects,
         /// The text-frame layout.
         TextLayout,
+        /// The text-frame columns.
+        TextColumns,
         /// A straight line's endpoint decorations.
         LineEndpoints,
     }
@@ -113,6 +118,7 @@ pub mod style {
                 Self::Shadow(_) => PropertyKind::Shadow,
                 Self::Effects(_) => PropertyKind::Effects,
                 Self::TextLayout(_) => PropertyKind::TextLayout,
+                Self::TextColumns(_) => PropertyKind::TextColumns,
                 Self::LineEndpoints(_) => PropertyKind::LineEndpoints,
             }
         }
@@ -125,6 +131,16 @@ pub mod text {
     pub use crate::package::body_drawable_text::{
         Commit, Diagnostics, Edit, Error, LimitKind, Patch, Refusal,
     };
+}
+
+/// Character and paragraph properties of the whole text a body text box
+/// or shape owns, over the shared paragraph-style engine (record 0413).
+pub mod text_box_text {
+    pub use crate::package::text_box_text::{
+        Commit, Diagnostics, Edit, Error, LimitKind, Patch, Refusal,
+    };
+    pub use litchi_iwa_text::{appearance, character, font, paragraph};
+    pub use litchi_iwa_text_wire::paragraph_style::{Property, PropertyKind};
 }
 
 /// Exact-source transactions for the body drawables' layer order.

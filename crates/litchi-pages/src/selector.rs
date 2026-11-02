@@ -318,13 +318,15 @@ impl ImageSelector {
     }
 }
 
-/// Selects one body-anchored image, movie, audio clip or shape by its kind
-/// and its zero-based text-flow position among drawables of that kind.
+/// Selects one body-anchored image, movie, audio clip, shape or text box by
+/// its kind and its zero-based text-flow position among drawables of that
+/// kind.
 ///
 /// Images are the ordinary `ImageArchive` attachments of the rooted body
 /// storage; movies and audio are its file-backed movie attachments, split by
 /// their audio-only flag (live video is neither); shapes are its text-bearing
-/// shapes that are not text boxes. Native identifiers are not representable
+/// shapes that are not text boxes; text boxes are its shapes flagged as text
+/// boxes that own their storage. Native identifiers are not representable
 /// here.
 #[allow(
     clippy::module_name_repetitions,
@@ -341,6 +343,8 @@ pub enum DrawableSelector {
     Audio(Position),
     /// The shape at this zero-based position among body shapes.
     Shape(Position),
+    /// The text box at this zero-based position among body text boxes.
+    TextBox(Position),
 }
 
 impl DrawableSelector {
@@ -368,6 +372,12 @@ impl DrawableSelector {
         Self::Shape(Position::new(index))
     }
 
+    /// Select a body text box by zero-based index.
+    #[must_use]
+    pub const fn text_box(index: usize) -> Self {
+        Self::TextBox(Position::new(index))
+    }
+
     /// The selected position within its kind.
     #[must_use]
     pub const fn position(self) -> Position {
@@ -375,7 +385,8 @@ impl DrawableSelector {
             Self::Image(position)
             | Self::Movie(position)
             | Self::Audio(position)
-            | Self::Shape(position) => position,
+            | Self::Shape(position)
+            | Self::TextBox(position) => position,
         }
     }
 }

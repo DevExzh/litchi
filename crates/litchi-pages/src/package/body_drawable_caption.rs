@@ -717,7 +717,10 @@ fn repoint(slot: &Slot, payload: &[u8], replacement: u64) -> Result<Vec<u8>, Err
     let patch = |drawable: &[u8]| {
         patch_length_delimited_field(drawable, slot.kind.field(), true, Some(&reference))
     };
-    let result = if matches!(slot.selector, DrawableSelector::Shape(_)) {
+    let result = if matches!(
+        slot.selector,
+        DrawableSelector::Shape(_) | DrawableSelector::TextBox(_)
+    ) {
         transform_length_delimited_field(payload, 1, |shape| {
             transform_length_delimited_field(shape, 1, patch)
         })

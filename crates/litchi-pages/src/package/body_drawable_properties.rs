@@ -406,7 +406,7 @@ impl Edit<'_> {
     pub fn restore_original_size(&mut self) -> Result<&mut Self, Error> {
         if matches!(
             self.target.selector,
-            DrawableSelector::Audio(_) | DrawableSelector::Shape(_)
+            DrawableSelector::Audio(_) | DrawableSelector::Shape(_) | DrawableSelector::TextBox(_)
         ) {
             return Err(Refusal::UnsupportedOperation {
                 operation: "restore_original_size",
@@ -449,7 +449,7 @@ impl Edit<'_> {
     pub fn set_playback(&mut self, settings: MediaPlaybackSettings) -> Result<&mut Self, Error> {
         if matches!(
             self.target.selector,
-            DrawableSelector::Image(_) | DrawableSelector::Shape(_)
+            DrawableSelector::Image(_) | DrawableSelector::Shape(_) | DrawableSelector::TextBox(_)
         ) {
             return Err(Refusal::UnsupportedOperation {
                 operation: "set_playback",
@@ -793,7 +793,7 @@ fn read_snapshot(
         DrawableSelector::Movie(_) | DrawableSelector::Audio(_) => {
             Some((MOVIE_ORIGINAL_SIZE_FIELD, MOVIE_NATURAL_SIZE_FIELD))
         },
-        DrawableSelector::Shape(_) => None,
+        DrawableSelector::Shape(_) | DrawableSelector::TextBox(_) => None,
     };
     let (original_size, natural_size) = match sizes {
         Some((original_field, natural_field)) => {
@@ -806,7 +806,9 @@ fn read_snapshot(
         None => (None, None),
     };
     let playback = match selector {
-        DrawableSelector::Image(_) | DrawableSelector::Shape(_) => None,
+        DrawableSelector::Image(_) | DrawableSelector::Shape(_) | DrawableSelector::TextBox(_) => {
+            None
+        },
         DrawableSelector::Movie(_) | DrawableSelector::Audio(_) => Some(
             __decode_movie_playback_payload(payload, budget.wire_limits())
                 .map_err(|_| Error::InvalidSource)?,
@@ -893,7 +895,10 @@ fn commit_edit(edit: Edit<'_>) -> Result<Commit, Error> {
     if geometry_changed || properties_changed {
         let rewrite =
             |drawable: &[u8]| rewrite_drawable(drawable, &edit.before, &edit.after, &budget);
-        payload = if matches!(current.selector, DrawableSelector::Shape(_)) {
+        payload = if matches!(
+            current.selector,
+            DrawableSelector::Shape(_) | DrawableSelector::TextBox(_)
+        ) {
             transform_length_delimited_field(&payload, MEDIA_DRAWABLE_FIELD, |shape| {
                 transform_length_delimited_field(shape, SHAPE_INFO_SHAPE_FIELD, rewrite)
             })?

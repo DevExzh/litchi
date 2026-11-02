@@ -2883,6 +2883,20 @@ text-flow position, never a native identifier.
 | `litchi_pages::date_time::{Field, Edit, Patch, Commit, Diagnostics, Error, LimitKind, Refusal, TextRange, DisplayText, Format, FormatterStyle, Instant, LocaleIdentifier, Settings, UpdatePlan}` | Registered family in `pages`; `Package::{body_date_time_fields, edit_body_date_time_fields, apply_body_date_time_fields}`; `Edit::{add(TextRange, Settings), insert(TextPosition, DisplayText, Settings), update(position, TextRange, Settings), remove(position)}`, one operation per edit; `Field::{range, settings}` | ✅ 0371 |
 | `litchi_pages::number_attachment::{Attachment, Target, Edit, Patch, Commit, Diagnostics, Error, LimitKind, Refusal, TextNumberAttachmentSettings, TextNumberAttachmentKind, TextNumberAttachmentFormat, TextNumberAttachmentText}` | Registered family in `pages`; `Package::{number_attachments, edit_number_attachments, apply_number_attachments}` over `Target::{Body, HeaderFooter(HeaderFooterSelector)}`; `Edit::{insert(TextPosition, settings), update(position, settings), remove(position)}`; `Attachment::{position, settings}` carries no native identifier (the host's `TextNumberAttachmentId` stays out) | ✅ 0371 |
 
+## Pages text boxes, annotations, fields, shapes and comments out of the host (record 0413)
+
+Wave W4-P of record 0363 moves the host's Pages text-box, shape and
+drawable-comment editors into `litchi-pages` families, ported from the
+Numbers sheet-drawable families of records 0378 and 0378a. Text boxes are
+body-anchored drawables selected by text-flow position, never by a native
+identifier.
+
+| Name | Meaning | Status |
+|---|---|---|
+| `litchi_pages::DrawableSelector::TextBox` (`text_box`) | One body text box (a `TSWP.ShapeInfoArchive` flagged as a text box that owns its storage) by its text-flow position among body text boxes; `drawable::properties`, `drawable::text` and `drawable::style` accept it | ✅ 0413 |
+| `litchi_pages::drawable::style::{Property::TextColumns, PropertyKind::TextColumns, Columns}` | The text frame's columns on the shared `litchi_iwa_style::shape` engine; with `TextLayout` they replace the host's `{,set_,reset_}text_box_{text_layout,columns}` | ✅ 0413 |
+| `litchi_pages::drawable::text_box_text::{Edit, Patch, Commit, Diagnostics, Error, LimitKind, Refusal, Property, PropertyKind, appearance, character, font, paragraph}` | Registered family in `pages`; `Package::{body_text_box_text(drawable, PropertyKind), edit_body_text_box_text(drawable), apply_body_text_box_text}`; `Edit::{set(Property), reset(PropertyKind)}` over the shared paragraph-style engine replace the host's 72 `set_/reset_/text_box_{text,paragraph}_*` methods and the following-style triple; text that is not uniformly styled is `Refusal::MixedParagraphStyles`, a drawable without text `Refusal::NoText` | ✅ 0413 |
+
 ## Numbers sheet drawables out of the host (record 0378)
 
 Wave W2-A of record 0363 moves the host's Numbers sheet-drawable editors

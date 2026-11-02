@@ -74,6 +74,8 @@ pub(crate) mod sidecars;
 mod structure;
 pub(crate) mod table_cells;
 pub(crate) mod table_lock;
+mod text_box_structure;
+pub(crate) mod text_box_text;
 #[cfg(feature = "internal-iwork-source")]
 mod text_storage;
 

@@ -459,7 +459,10 @@ impl Package {
 }
 
 fn resolve(package: &Package, selector: DrawableSelector) -> Result<(Target, Arc<str>), Error> {
-    if !matches!(selector, DrawableSelector::Shape(_)) {
+    if !matches!(
+        selector,
+        DrawableSelector::Shape(_) | DrawableSelector::TextBox(_)
+    ) {
         return Err(Refusal::NoText {
             kind: kind_name(selector),
         }

@@ -795,7 +795,10 @@ impl Package {
 }
 
 fn media_kind(selector: DrawableSelector) -> Result<(), Error> {
-    if matches!(selector, DrawableSelector::Shape(_)) {
+    if matches!(
+        selector,
+        DrawableSelector::Shape(_) | DrawableSelector::TextBox(_)
+    ) {
         return Err(Refusal::NotMedia {
             kind: kind_name(selector),
         }
