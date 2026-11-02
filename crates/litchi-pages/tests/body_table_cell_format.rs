@@ -6,6 +6,7 @@ use litchi_iwa_common::table::cell::data_format::Checkbox;
 use litchi_iwa_common::table::cell::data_format::number::{
     DecimalPlaces, NegativeStyle, Number, Percentage, ThousandsSeparator,
 };
+use litchi_iwa_common::table::cell::data_format::pop_up_menu::PopUpMenu;
 use litchi_pages::Package;
 use litchi_pages::table::format::{At, DataFormat, Error, Refusal};
 
@@ -101,26 +102,35 @@ fn refusals_are_typed() -> TestResult {
     assert_eq!(missing, Some(Error::Refused(Refusal::CellNotFound)));
     let table = source.body_table_cell_format(99, B2).err();
     assert_eq!(table, Some(Error::Refused(Refusal::TableNotFound)));
+    // Pop-Up Menus also rewrite the metadata registry: refused (record 0412).
+    let menu = source
+        .edit_body_table_cell_format(0, B2)?
+        .set(PopUpMenu::new(["a", "b"])?)
+        .commit()
+        .err();
+    assert_eq!(menu, Some(Error::Refused(Refusal::UnsupportedFormat)));
+    // Scalar controls and Automatic to Percentage on the native cell's
+    // implicit Number entry are written since record 0412.
     let control = source
         .edit_body_table_cell_format(0, B2)?
         .set(Checkbox)
-        .commit()
-        .err();
-    assert_eq!(control, Some(Error::Refused(Refusal::UnsupportedFormat)));
-    // Automatic to a decimal family other than Number on a number cell is
-    // outside the engine (record 0379 §5).
-    let percentage = source
-        .edit_body_table_cell_format(0, B2)?
-        .set(Percentage::new(
-            DecimalPlaces::fixed(1)?,
-            NegativeStyle::MinusSign,
-            ThousandsSeparator::Hidden,
-        ))
-        .commit()
-        .err();
+        .commit()?;
     assert_eq!(
-        percentage,
-        Some(Error::Refused(Refusal::UnsupportedDependency))
+        control.package().body_table_cell_format(0, B2)?,
+        DataFormat::Checkbox(Checkbox)
+    );
+    let percentage = Percentage::new(
+        DecimalPlaces::fixed(1)?,
+        NegativeStyle::MinusSign,
+        ThousandsSeparator::Hidden,
+    );
+    let written = source
+        .edit_body_table_cell_format(0, B2)?
+        .set(percentage)
+        .commit()?;
+    assert_eq!(
+        written.package().body_table_cell_format(0, B2)?,
+        DataFormat::Percentage(percentage)
     );
     Ok(())
 }

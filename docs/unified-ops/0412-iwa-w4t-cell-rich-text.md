@@ -132,11 +132,65 @@ The Numbers list leaf is at its pre-lift cost (record 0370b: 274,527,749):
 a first lift build that located the table model twice per change measured
 291,397,972 and was fixed before commit.
 
+## 4a. Slice 4: Pages and Keynote cell formats
+
+Engine (`litchi_iwa_table::cell_format`):
+
+- `data_format::rewrite_family` routes a scalar control (Checkbox, Star
+  Rating, Slider, Stepper) through the existing
+  `control::rewrite_scalar_control` writer and every display family through
+  `rewrite`; `maximum_members` admits the scalar writer's three members
+  (tile, format list, control list). Pop-Up Menus stay refused
+  (`Refusal::UnsupportedFormat` in the facades): they allocate a menu model
+  and rewrite the package metadata registry, which needs the Numbers Pop-Up
+  publication lifted (§5).
+- **The 0370k gap is closed.** Native Pages and Keynote cells name an
+  implicit Number entry (no explicit-format flag). A write of another
+  decimal-kind display family (numeral system, Percentage, Scientific,
+  Fraction) on such a cell no longer decodes that entry as the requested
+  family: it interns a fresh canonical entry and releases the cell's
+  reference to the implicit one, as the host's compatibility writer does.
+  Explicit entries, Number on an implicit Number entry and every Numbers
+  route behave as before (all Numbers format parity passes).
+
+Facades: `edit_body_table_cell_format` / `edit_slide_table_cell_format`
+now write the four scalar controls and numeral systems; the Pages and
+Keynote format docs and refusal docs say so.
+
+| Test (`pages_body_table_` / `keynote_slide_table_` prefix) | Routes | Tier |
+|---|---|---|
+| `cell_control_format_set_parity` | Automatic to Checkbox, Star Rating, Slider, Stepper, host family setters | B |
+| `cell_control_format_reset_parity` | each control reset on the host's output, host family resets | B |
+| `cell_control_format_read_parity` | host family reads against the leaf read on host-written controls | A |
+| `cell_numeral_system_format_set_parity` / `_reset_parity` | Automatic to three numeral systems; their resets | B |
+| `cell_data_format_set_parity` (extended) | Automatic to Number, Percentage, Scientific, Fraction | B |
+| `pages_body_table_cell_text_format_read_parity` | host Text read against the leaf read on a host-written Text cell | A |
+
+Ledger: 15 Pages and 14 Keynote `table.cell_format` rows migrate (set,
+reset and read for the four controls; numeral set and reset; Pages Text
+read). Five native queue rows are appended.
+
+Callgrind (binary SHA-256
+`062c9a6d7e564ef12e6bf62143dfeeffc286a7a3c9127d69eba3f38281a24752`, same
+method as §4, `*_cell_{control,numeral}_format_cost_abba`):
+
+| Route | Host Ir | Leaf Ir | Leaf/host |
+|---|---:|---:|---:|
+| Pages Automatic to Checkbox | 3,363,059,780 | 284,307,548 | 0.085 |
+| Pages Automatic to numeral system | 3,358,583,373 | 398,422,531 | 0.119 |
+| Keynote Automatic to Checkbox | 794,548,069 | 642,839,475 | 0.809 |
+| Keynote Automatic to numeral system | 785,135,341 | 801,984,020 | 1.021 (within 5%) |
+
 ## 5. Gaps
 
 | Item | Next step |
 |---|---|
 | shared rich-text payloads | refused, as on Numbers (0370b §5) |
+| Pop-Up Menu writes and reads (Pages, Keynote; 3+3 rows) | the host refuses menus on the fixtures' number cells; leaf writes need the Numbers Pop-Up publication (menu model, metadata registry) lifted into `litchi-iwa-table` with a leaf trait for reassembly and reopen |
+| Custom format (3+3 rows) | needs a document-scoped custom format in a fixture and the custom registry rewrite on Pages/Keynote |
+| Date and Time, Duration (6+6 rows) | the host writes a number under a date/duration kind, which the engine reads as an invalid cell (0379 §5); a macOS run must decide the native shape |
+| Text writes (2+2 rows) and Keynote Text read (1 row) | Text on a cell naming an implicit Number entry needs the converted-text metadata (secondary generic identifier); Keynote fixtures refuse the leaf/host cell writers (table formulas) |
+| Automatic to Currency on an implicit Number entry | the cell's format kind changes too; still refused (pinned by the divergence cases) |
 | no native rich-text cell in any corpus | macOS queue rows (§2) |
 
 ## 6. Verification
@@ -163,3 +217,17 @@ On the merge of trunk `1bc0d4c996` (sequential gate script
 | `cargo check -q --locked --offline --manifest-path crates/{litchi-numbers,litchi-pages,litchi-keynote,litchi}/fuzz/Cargo.toml --bins`; `cargo metadata --locked --offline` on the FIN harness | 0 each |
 | `cargo test -p litchi-iwa --all-features --test parity -- numbers_cell_ numbers_text_box numbers_sheet_text_box keynote_cell_ pages_cell_text_ numbers_conditional` | 0 (92 passed) |
 | release parity binary: `pages_cell_list_cases keynote_cell_list_cases numbers_cell_list` | 0 (24 passed) |
+
+Slice 4 (`6aac7d8f6c`, the pinned-refusal test update after it), merged
+with trunk `5b5dad5c57`: the same gate script passes every row (fmt, all
+Clippy configurations, litchi/ops tests in six chunks, rustdoc, six
+glossary profiles, boundaries, non-iWork, ledger, tool unit tests, delta,
+corpus, bench and feature matrices, pyo3, perf-baseline, four fuzz locks,
+FIN lock, debug parity filters). Its first leaf-test row failed on two
+integration tests that pinned the old refusals (`refusals_are_typed` in
+`litchi-pages/tests/body_table_cell_format.rs` and
+`litchi-keynote/tests/slide_table_cell_format.rs`); they now assert the
+Pop-Up refusal and the new Checkbox/Percentage writes, and
+`cargo test --no-fail-fast` of the five changed crates passes, as do the
+36 format parity cases.
+

@@ -12,9 +12,10 @@
 //! intermediate candidate; the patch keeps only the source and final
 //! artifacts, so its inverse restores the source byte for byte.
 //!
-//! Checkbox, Star Rating, Slider, Stepper, Pop-Up Menu and numeral-system
-//! formats also rewrite the package metadata registry; they are read but
-//! refused for writing ([`Refusal::UnsupportedFormat`]).
+//! Checkbox, Star Rating, Slider and Stepper cells are written through the
+//! engine's scalar-control writer (record 0412). Pop-Up Menus also allocate
+//! a menu model and rewrite the package metadata registry; they are read
+//! but refused for writing ([`Refusal::UnsupportedFormat`]).
 
 use std::fmt;
 
@@ -141,8 +142,8 @@ pub enum Refusal {
     /// The table is locked.
     #[error("the slide table is locked")]
     TableLocked,
-    /// The format is a control, a Pop-Up Menu or a numeral system, whose
-    /// writes also rewrite the package metadata registry.
+    /// The format is a Pop-Up Menu, whose writes also allocate a menu model
+    /// and rewrite the package metadata registry.
     #[error("this slide-table cell format is not written by this route")]
     UnsupportedFormat,
     /// A native dependency of the cell is outside the shared engine.
@@ -439,8 +440,7 @@ impl Edit<'_> {
     ///
     /// # Errors
     ///
-    /// [`Refusal::UnsupportedFormat`] for a control, Pop-Up Menu or
-    /// numeral-system change; [`Refusal::TableLocked`]; the engine's source,
+    /// [`Refusal::UnsupportedFormat`] for a Pop-Up Menu change; [`Refusal::TableLocked`]; the engine's source,
     /// dependency and resource failures; [`Error::Verification`]. A failure
     /// never publishes a partial package.
     pub fn commit(self) -> Result<Commit, Error> {
@@ -461,7 +461,7 @@ impl Edit<'_> {
         }
         for format in [&self.before, &self.after] {
             if let Some(family) = data_format::family(format)
-                && !data_format::is_display_family(family)
+                && family == data_format::Family::PopUpMenu
             {
                 return Err(Error::Refused(Refusal::UnsupportedFormat));
             }
@@ -611,7 +611,7 @@ fn rewrite(
     budget.charge_package_source(catalog, path)?;
     let bound =
         engine::control::preflight_copy_on_write_scalar_control(source, target, path, &mut budget)?;
-    let output = data_format::rewrite(source, target, before, after, path, &mut budget)?;
+    let output = data_format::rewrite_family(source, target, before, after, path, &mut budget)?;
     let family = data_format::family(before)
         .or_else(|| data_format::family(after))
         .ok_or(Error::Verification)?;

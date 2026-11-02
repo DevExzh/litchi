@@ -250,19 +250,31 @@ fn host_formatted(input: &Fixture, at: At, format: &DataFormat) -> TestResult<Fi
     })
 }
 
-/// Automatic to Number on a stored cell through the host's generic setter.
+/// Automatic to each decimal family on a stored cell through the host's
+/// generic setter. The native cell names an implicit Number entry: Number
+/// rewrites it in place, Percentage, Scientific and Fraction intern a fresh
+/// entry (record 0412 closes that part of the record 0379 §5 gap).
 #[test]
 fn pages_body_table_cell_data_format_set_parity() -> TestResult {
     let input = fixture(CATALOG)?;
     let at = automatic_cell(&input.bytes)?;
-    set_case(
-        "pages_body_table_cell_data_format_set_parity",
-        Tier::B,
-        Evidence::Queued,
-        &input,
-        at,
-        &samples()?[0].1,
-    )
+    // Currency changes the cell's format kind as well; the engine does not
+    // convert it yet (pinned by the divergence case).
+    for (_, format) in samples()?
+        .iter()
+        .take(ADMITTED)
+        .filter(|(family, _)| *family != "currency")
+    {
+        set_case(
+            "pages_body_table_cell_data_format_set_parity",
+            Tier::B,
+            Evidence::Queued,
+            &input,
+            at,
+            format,
+        )?;
+    }
+    Ok(())
 }
 
 /// A replacement inside each admitted family on the host's formatted
@@ -370,9 +382,9 @@ fn pages_body_table_cell_format_read_parity() -> TestResult {
     Ok(())
 }
 
-/// Where the routes differ (record 0379 §5): the engine refuses what the
-/// host's compatibility writer converts. Automatic to a family other than
-/// Number on a decimal cell, and a cell the host formatted as Date and
+/// Where the routes differ (record 0379 §5; record 0412 closed Automatic to
+/// Percentage, Scientific and Fraction): the engine refuses Automatic to
+/// Currency, Date and Time and Duration on a number cell, and a cell the host formatted as Date and
 /// Time or Duration (the host leaves the stored number under a date or
 /// duration kind, which the engine reads as an invalid cell). The host
 /// refuses Text on a number cell; the leaf refuses it too.
@@ -381,7 +393,11 @@ fn pages_body_table_cell_format_divergence_is_reported() -> TestResult {
     let input = fixture(CATALOG)?;
     let at = automatic_cell(&input.bytes)?;
     let samples = samples()?;
-    for (family, format) in &samples[1..] {
+    for (family, format) in samples
+        .iter()
+        .filter(|(family, _)| *family == "currency")
+        .chain(&samples[ADMITTED..])
+    {
         assert!(host_set(&input.bytes, at, format).is_ok() || *family == "text");
         assert!(leaf_set(&input.bytes, at, format).is_err(), "{family}");
     }
@@ -425,10 +441,7 @@ fn pages_cell_format_cost_abba() -> TestResult {
 }
 
 /// Numeral systems (record 0370k): the leaf reads every numeral system the
-/// host writes. Writing one is refused on these native cells, which name an
-/// implicit Number format entry the engine keeps in place (the host's
-/// compatibility writer interns a new entry instead); a numeral write is
-/// covered on Numbers (`numbers_cell_data_format_cases`).
+/// host writes.
 #[test]
 fn pages_body_table_cell_numeral_system_format_read_parity() -> TestResult {
     let input = fixture(CATALOG)?;
@@ -453,7 +466,371 @@ fn pages_body_table_cell_numeral_system_format_read_parity() -> TestResult {
         .run()?;
         assert_eq!(host_read(&formatted.bytes, at)?, format);
         assert_eq!(leaf_read(&formatted.bytes, at)?, format);
-        assert!(leaf_set(&input.bytes, at, &format).is_err());
     }
     Ok(())
+}
+
+/// One sample of each scalar control (record 0412).
+pub(crate) fn control_samples() -> TestResult<Vec<(&'static str, DataFormat)>> {
+    use litchi_iwa_common::table::cell::data_format::control::{
+        DisplayFormat, Range, Slider, Stepper,
+    };
+    use litchi_iwa_common::table::cell::data_format::{Checkbox, StarRating};
+    let number = Number::new(
+        DecimalPlaces::fixed(2)?,
+        NegativeStyle::MinusSign,
+        ThousandsSeparator::Hidden,
+    );
+    Ok(vec![
+        ("checkbox", Checkbox.into()),
+        ("star_rating", StarRating.into()),
+        (
+            "slider",
+            Slider::new(Range::new(0.0, 10.0, 1.0)?, DisplayFormat::Number(number)).into(),
+        ),
+        (
+            "stepper",
+            Stepper::new(Range::new(0.0, 10.0, 2.0)?, DisplayFormat::Number(number)).into(),
+        ),
+    ])
+}
+
+/// The host's control family setter for `format`.
+fn host_control_set(source: &[u8], at: At, format: &DataFormat) -> TestResult<Vec<u8>> {
+    let mut editor = pages::Draft::from_bytes(source)?;
+    let model = host_model(&editor)?;
+    let (row, column) = (at.row() as usize, at.column() as usize);
+    match format {
+        DataFormat::Checkbox(value) => {
+            editor.set_table_cell_checkbox_format(model, row, column, *value)?
+        },
+        DataFormat::StarRating(value) => {
+            editor.set_table_cell_star_rating_format(model, row, column, *value)?
+        },
+        DataFormat::Slider(value) => {
+            editor.set_table_cell_slider_format(model, row, column, value.clone())?
+        },
+        DataFormat::Stepper(value) => {
+            editor.set_table_cell_stepper_format(model, row, column, value.clone())?
+        },
+        _ => return Err("not a scalar control".into()),
+    }
+    Ok(editor.to_bytes()?)
+}
+
+/// The host's control family reset for `format`'s family.
+fn host_control_reset(source: &[u8], at: At, format: &DataFormat) -> TestResult<Vec<u8>> {
+    let mut editor = pages::Draft::from_bytes(source)?;
+    let model = host_model(&editor)?;
+    let (row, column) = (at.row() as usize, at.column() as usize);
+    let changed = match format {
+        DataFormat::Checkbox(_) => editor.reset_table_cell_checkbox_format(model, row, column)?,
+        DataFormat::StarRating(_) => {
+            editor.reset_table_cell_star_rating_format(model, row, column)?
+        },
+        DataFormat::Slider(_) => editor.reset_table_cell_slider_format(model, row, column)?,
+        DataFormat::Stepper(_) => editor.reset_table_cell_stepper_format(model, row, column)?,
+        _ => return Err("not a scalar control".into()),
+    };
+    if !changed {
+        return Err("host reset reported no change".into());
+    }
+    Ok(editor.to_bytes()?)
+}
+
+/// The host's control family read of `format`'s family.
+fn host_control_read(bytes: &[u8], at: At, format: &DataFormat) -> TestResult<String> {
+    let editor = pages::Draft::from_bytes(bytes)?;
+    let model = host_model(&editor)?;
+    let (row, column) = (at.row() as usize, at.column() as usize);
+    Ok(match format {
+        DataFormat::Checkbox(_) => {
+            format!(
+                "{:?}",
+                editor
+                    .table_cell_checkbox_format(model, row, column)?
+                    .map(DataFormat::from)
+            )
+        },
+        DataFormat::StarRating(_) => format!(
+            "{:?}",
+            editor
+                .table_cell_star_rating_format(model, row, column)?
+                .map(DataFormat::from)
+        ),
+        DataFormat::Slider(_) => {
+            format!(
+                "{:?}",
+                editor
+                    .table_cell_slider_format(model, row, column)?
+                    .map(DataFormat::from)
+            )
+        },
+        DataFormat::Stepper(_) => {
+            format!(
+                "{:?}",
+                editor
+                    .table_cell_stepper_format(model, row, column)?
+                    .map(DataFormat::from)
+            )
+        },
+        _ => return Err("not a scalar control".into()),
+    })
+}
+
+/// Automatic to each scalar control through the host's family setters
+/// (record 0412).
+#[test]
+fn pages_body_table_cell_control_format_set_parity() -> TestResult {
+    let input = fixture(CATALOG)?;
+    let at = automatic_cell(&input.bytes)?;
+    for (_, format) in control_samples()? {
+        Case::new(
+            "pages_body_table_cell_control_format_set_parity",
+            Format::Pages,
+            Tier::B,
+            Evidence::Queued,
+            &input,
+        )
+        .host(|source| host_control_set(source, at, &format))
+        .leaf(|source| leaf_set(source, at, &format))
+        .read("host family read", |bytes| {
+            host_control_read(bytes, at, &format)
+        })
+        .read("leaf cell format", move |bytes| {
+            leaf_read(bytes, at).map(|value| format!("{:?}", Some(value)))
+        })
+        .run()?;
+    }
+    Ok(())
+}
+
+/// Each scalar control reset to Automatic on the host's output, through the
+/// host's family resets (record 0412).
+#[test]
+fn pages_body_table_cell_control_format_reset_parity() -> TestResult {
+    let input = fixture(CATALOG)?;
+    let at = automatic_cell(&input.bytes)?;
+    for (_, format) in control_samples()? {
+        let formatted = Fixture {
+            path: input.path,
+            bytes: host_control_set(&input.bytes, at, &format)?,
+        };
+        Case::new(
+            "pages_body_table_cell_control_format_reset_parity",
+            Format::Pages,
+            Tier::B,
+            Evidence::Queued,
+            &formatted,
+        )
+        .host(|source| host_control_reset(source, at, &format))
+        .leaf(|source| leaf_set(source, at, &DataFormat::Automatic))
+        .read("host table_cell_data_format", move |bytes| {
+            host_read(bytes, at)
+        })
+        .read("leaf cell format", move |bytes| leaf_read(bytes, at))
+        .run()?;
+    }
+    Ok(())
+}
+
+/// The host's control family reads and the leaf's single read agree on the
+/// host's output of every scalar control (record 0412).
+#[test]
+fn pages_body_table_cell_control_format_read_parity() -> TestResult {
+    let input = fixture(CATALOG)?;
+    let at = automatic_cell(&input.bytes)?;
+    for (_, format) in control_samples()? {
+        let formatted = Fixture {
+            path: input.path,
+            bytes: host_control_set(&input.bytes, at, &format)?,
+        };
+        Case::new(
+            "pages_body_table_cell_control_format_read_parity",
+            Format::Pages,
+            Tier::A,
+            Evidence::Queued,
+            &formatted,
+        )
+        .read_only()
+        .host(|source| Ok(pages::Draft::from_bytes(source)?.to_bytes()?))
+        .leaf(|source| Ok(LeafRun::output(leaf_bytes!(Package::from_bytes(source)?))))
+        .read("host family read", |bytes| {
+            host_control_read(bytes, at, &format)
+        })
+        .read("leaf cell format", move |bytes| {
+            leaf_read(bytes, at).map(|value| format!("{:?}", Some(value)))
+        })
+        .run()?;
+        assert_eq!(leaf_read(&formatted.bytes, at)?, format);
+    }
+    Ok(())
+}
+
+/// Automatic to each numeral system through the host's family setter: the
+/// native cell names an implicit Number entry, which both routes leave for
+/// a freshly interned numeral entry (record 0412, the 0370k gap).
+#[test]
+fn pages_body_table_cell_numeral_system_format_set_parity() -> TestResult {
+    let input = fixture(CATALOG)?;
+    let at = automatic_cell(&input.bytes)?;
+    for numeral in crate::numbers_cell_data_format_cases::numeral_samples()? {
+        let format = DataFormat::from(numeral);
+        Case::new(
+            "pages_body_table_cell_numeral_system_format_set_parity",
+            Format::Pages,
+            Tier::B,
+            Evidence::Queued,
+            &input,
+        )
+        .host(|source| {
+            let mut editor = pages::Draft::from_bytes(source)?;
+            let model = host_model(&editor)?;
+            let (row, column) = (at.row() as usize, at.column() as usize);
+            editor.set_table_cell_numeral_system_format(model, row, column, numeral)?;
+            Ok(editor.to_bytes()?)
+        })
+        .leaf(|source| leaf_set(source, at, &format))
+        .read("host table_cell_data_format", move |bytes| {
+            host_read(bytes, at)
+        })
+        .read("leaf cell format", move |bytes| leaf_read(bytes, at))
+        .run()?;
+    }
+    Ok(())
+}
+
+/// Each numeral system reset to Automatic on the host's output, through the
+/// host's family reset (record 0412).
+#[test]
+fn pages_body_table_cell_numeral_system_format_reset_parity() -> TestResult {
+    let input = fixture(CATALOG)?;
+    let at = automatic_cell(&input.bytes)?;
+    for numeral in crate::numbers_cell_data_format_cases::numeral_samples()? {
+        let formatted = host_formatted(&input, at, &DataFormat::from(numeral))?;
+        Case::new(
+            "pages_body_table_cell_numeral_system_format_reset_parity",
+            Format::Pages,
+            Tier::B,
+            Evidence::Queued,
+            &formatted,
+        )
+        .host(|source| {
+            let mut editor = pages::Draft::from_bytes(source)?;
+            let model = host_model(&editor)?;
+            let (row, column) = (at.row() as usize, at.column() as usize);
+            if !editor.reset_table_cell_numeral_system_format(model, row, column)? {
+                return Err("host reset reported no change".into());
+            }
+            Ok(editor.to_bytes()?)
+        })
+        .leaf(|source| leaf_set(source, at, &DataFormat::Automatic))
+        .read("host table_cell_data_format", move |bytes| {
+            host_read(bytes, at)
+        })
+        .read("leaf cell format", move |bytes| leaf_read(bytes, at))
+        .run()?;
+    }
+    Ok(())
+}
+
+/// The automatic cell rewritten by the leaf's cell writer to hold text,
+/// which the host formats as Text (it refuses Text on a number cell,
+/// record 0412).
+fn text_input(input: &Fixture) -> TestResult<(Fixture, At)> {
+    let at = automatic_cell(&input.bytes)?;
+    let package = Package::from_bytes(&input.bytes)?;
+    let mut edit = package.edit_body_table_values(TABLE)?;
+    edit.set(
+        at.row(),
+        at.column(),
+        litchi_pages::table::values::Value::Text("abc".into()),
+    )?;
+    let written = edit.commit()?.into_package();
+    Ok((
+        Fixture {
+            path: input.path,
+            bytes: leaf_bytes!(written),
+        },
+        at,
+    ))
+}
+
+/// The host's Text read and the leaf's read agree on the host's output
+/// (record 0412).
+#[test]
+fn pages_body_table_cell_text_format_read_parity() -> TestResult {
+    let (input, at) = text_input(&fixture(CATALOG)?)?;
+    let formatted = host_formatted(&input, at, &DataFormat::Text(Text))?;
+    Case::new(
+        "pages_body_table_cell_text_format_read_parity",
+        Format::Pages,
+        Tier::A,
+        Evidence::Queued,
+        &formatted,
+    )
+    .read_only()
+    .host(|source| Ok(pages::Draft::from_bytes(source)?.to_bytes()?))
+    .leaf(|source| Ok(LeafRun::output(leaf_bytes!(Package::from_bytes(source)?))))
+    .read("host family read", |bytes| {
+        let editor = pages::Draft::from_bytes(bytes)?;
+        let model = host_model(&editor)?;
+        let (row, column) = (at.row() as usize, at.column() as usize);
+        Ok(format!(
+            "{:?}",
+            editor
+                .table_cell_text_format(model, row, column)?
+                .map(DataFormat::from)
+        ))
+    })
+    .read("leaf cell format", move |bytes| {
+        leaf_read(bytes, at).map(|value| format!("{:?}", Some(value)))
+    })
+    .run()?;
+    assert_eq!(leaf_read(&formatted.bytes, at)?, DataFormat::Text(Text));
+    Ok(())
+}
+
+/// Callgrind probe (record 0412): Automatic to a control format on the first
+/// automatic stored cell, host family setter against the leaf, ABBA.
+#[test]
+#[ignore = "callgrind probe; run explicitly"]
+fn pages_body_table_cell_control_format_cost_abba() -> TestResult {
+    let input = fixture(CATALOG)?;
+    let at = automatic_cell(&input.bytes)?;
+    let format = control_samples()?[0].1.clone();
+    crate::pages_cost_probes::abba(
+        &input,
+        |source| host_control_set(source, at, &format),
+        |source| {
+            let package = Package::from_bytes(source)?;
+            let commit = package
+                .edit_body_table_cell_format(TABLE, at)?
+                .set(format.clone())
+                .commit()?;
+            Ok(leaf_bytes!(commit.package()))
+        },
+    )
+}
+
+/// Callgrind probe (record 0412): Automatic to a numeral format on the first
+/// automatic stored cell, host family setter against the leaf, ABBA.
+#[test]
+#[ignore = "callgrind probe; run explicitly"]
+fn pages_body_table_cell_numeral_format_cost_abba() -> TestResult {
+    let input = fixture(CATALOG)?;
+    let at = automatic_cell(&input.bytes)?;
+    let format = DataFormat::from(crate::numbers_cell_data_format_cases::numeral_samples()?[0]);
+    crate::pages_cost_probes::abba(
+        &input,
+        |source| host_set(source, at, &format),
+        |source| {
+            let package = Package::from_bytes(source)?;
+            let commit = package
+                .edit_body_table_cell_format(TABLE, at)?
+                .set(format.clone())
+                .commit()?;
+            Ok(leaf_bytes!(commit.package()))
+        },
+    )
 }
