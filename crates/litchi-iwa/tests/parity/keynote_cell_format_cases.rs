@@ -258,13 +258,9 @@ fn host_formatted(input: &Fixture, at: At, format: &DataFormat) -> TestResult<Fi
 fn keynote_slide_table_cell_data_format_set_parity() -> TestResult {
     let input = fixture(CATALOG)?;
     let at = automatic_cell(&input.bytes)?;
-    // Currency changes the cell's format kind as well; the engine does not
-    // convert it yet (pinned by the divergence case).
-    for (_, format) in samples()?
-        .iter()
-        .take(ADMITTED)
-        .filter(|(family, _)| *family != "currency")
-    {
+    // Currency, Date and Time and Duration convert the cell's kind and
+    // scalar as the host's compatibility writer does (record 0412a).
+    for (_, format) in samples()?.iter().filter(|(family, _)| *family != "text") {
         set_case(
             "keynote_slide_table_cell_data_format_set_parity",
             Tier::B,
@@ -412,19 +408,9 @@ fn keynote_slide_table_cell_format_divergence_is_reported() -> TestResult {
     let input = fixture(CATALOG)?;
     let at = automatic_cell(&input.bytes)?;
     let samples = samples()?;
-    for (family, format) in samples
-        .iter()
-        .filter(|(family, _)| *family == "currency")
-        .chain(&samples[ADMITTED..])
-    {
-        assert!(host_set(&input.bytes, at, format).is_ok() || *family == "text");
+    for (family, format) in samples.iter().filter(|(family, _)| *family == "text") {
+        assert!(host_set(&input.bytes, at, format).is_err(), "{family}");
         assert!(leaf_set(&input.bytes, at, format).is_err(), "{family}");
-    }
-    for (family, format) in &samples[ADMITTED..] {
-        let Ok(host) = host_set(&input.bytes, at, format) else {
-            continue;
-        };
-        assert!(leaf_read(&host, at).is_err(), "{family}");
     }
     Ok(())
 }
@@ -793,6 +779,562 @@ fn keynote_slide_table_cell_numeral_format_cost_abba() -> TestResult {
     crate::pages_cost_probes::abba(
         &input,
         |source| host_set(source, at, &format),
+        |source| {
+            let package = Package::from_bytes(source)?;
+            let commit = package
+                .edit_slide_table_cell_format(SLIDE, TABLE, at)?
+                .set(format.clone())
+                .commit()?;
+            Ok(leaf_bytes!(commit.package()))
+        },
+    )
+}
+
+/// The host's Date and Time or Duration family setter, reset and read
+/// (record 0412a).
+fn host_date_set(source: &[u8], at: At, format: &DataFormat) -> TestResult<Vec<u8>> {
+    let mut editor = keynote::Draft::from_bytes(source)?;
+    let model = host_model(&editor)?;
+    let (row, column) = (at.row() as usize, at.column() as usize);
+    match format {
+        DataFormat::DateTime(value) => editor.set_slide_table_cell_date_time_format(
+            SLIDE,
+            model,
+            row,
+            column,
+            value.clone(),
+        )?,
+        DataFormat::Duration(value) => {
+            editor.set_slide_table_cell_duration_format(SLIDE, model, row, column, *value)?
+        },
+        _ => return Err("not a date or duration".into()),
+    }
+    Ok(editor.to_bytes()?)
+}
+
+fn host_date_reset(source: &[u8], at: At, format: &DataFormat) -> TestResult<Vec<u8>> {
+    let mut editor = keynote::Draft::from_bytes(source)?;
+    let model = host_model(&editor)?;
+    let (row, column) = (at.row() as usize, at.column() as usize);
+    let changed = match format {
+        DataFormat::DateTime(_) => {
+            editor.reset_slide_table_cell_date_time_format(SLIDE, model, row, column)?
+        },
+        DataFormat::Duration(_) => {
+            editor.reset_slide_table_cell_duration_format(SLIDE, model, row, column)?
+        },
+        _ => return Err("not a date or duration".into()),
+    };
+    if !changed {
+        return Err("host reset reported no change".into());
+    }
+    Ok(editor.to_bytes()?)
+}
+
+fn host_date_read(bytes: &[u8], at: At, format: &DataFormat) -> TestResult<String> {
+    let editor = keynote::Draft::from_bytes(bytes)?;
+    let model = host_model(&editor)?;
+    let (row, column) = (at.row() as usize, at.column() as usize);
+    Ok(match format {
+        DataFormat::DateTime(_) => format!(
+            "{:?}",
+            editor
+                .slide_table_cell_date_time_format(SLIDE, model, row, column)?
+                .map(DataFormat::from)
+        ),
+        DataFormat::Duration(_) => format!(
+            "{:?}",
+            editor
+                .slide_table_cell_duration_format(SLIDE, model, row, column)?
+                .map(DataFormat::from)
+        ),
+        _ => return Err("not a date or duration".into()),
+    })
+}
+
+fn date_samples() -> TestResult<Vec<DataFormat>> {
+    Ok(samples()?
+        .into_iter()
+        .filter(|(family, _)| *family == "date_time" || *family == "duration")
+        .map(|(_, format)| format)
+        .collect())
+}
+
+/// Automatic to Date and Time and Duration on a native number cell through
+/// the host's family setters: both routes convert the cell (record 0412a).
+#[test]
+fn keynote_slide_table_cell_date_duration_format_set_parity() -> TestResult {
+    let input = fixture(CATALOG)?;
+    let at = automatic_cell(&input.bytes)?;
+    for format in date_samples()? {
+        Case::new(
+            "keynote_slide_table_cell_date_duration_format_set_parity",
+            Format::Keynote,
+            Tier::B,
+            Evidence::Queued,
+            &input,
+        )
+        .host(|source| host_date_set(source, at, &format))
+        .leaf(|source| leaf_set(source, at, &format))
+        .read("host family read", |bytes| {
+            host_date_read(bytes, at, &format)
+        })
+        .read("leaf cell format", move |bytes| {
+            leaf_read(bytes, at).map(|value| format!("{:?}", Some(value)))
+        })
+        .run()?;
+    }
+    Ok(())
+}
+
+/// Each converted cell reset to Automatic through the host's family resets
+/// (record 0412a).
+#[test]
+fn keynote_slide_table_cell_date_duration_format_reset_parity() -> TestResult {
+    let input = fixture(CATALOG)?;
+    let at = automatic_cell(&input.bytes)?;
+    for format in date_samples()? {
+        let formatted = Fixture {
+            path: input.path,
+            bytes: host_date_set(&input.bytes, at, &format)?,
+        };
+        Case::new(
+            "keynote_slide_table_cell_date_duration_format_reset_parity",
+            Format::Keynote,
+            Tier::B,
+            Evidence::Queued,
+            &formatted,
+        )
+        .host(|source| host_date_reset(source, at, &format))
+        .leaf(|source| leaf_set(source, at, &DataFormat::Automatic))
+        .read("host table_cell_data_format", move |bytes| {
+            host_read(bytes, at)
+        })
+        .read("leaf cell format", move |bytes| leaf_read(bytes, at))
+        .run()?;
+    }
+    Ok(())
+}
+
+/// The host's Date and Time and Duration reads and the leaf's read agree on
+/// the host's converted cells (record 0412a; a leaf control-reader defect
+/// refused them before).
+#[test]
+fn keynote_slide_table_cell_date_duration_format_read_parity() -> TestResult {
+    let input = fixture(CATALOG)?;
+    let at = automatic_cell(&input.bytes)?;
+    for format in date_samples()? {
+        let formatted = Fixture {
+            path: input.path,
+            bytes: host_date_set(&input.bytes, at, &format)?,
+        };
+        Case::new(
+            "keynote_slide_table_cell_date_duration_format_read_parity",
+            Format::Keynote,
+            Tier::A,
+            Evidence::Queued,
+            &formatted,
+        )
+        .read_only()
+        .host(|source| Ok(keynote::Draft::from_bytes(source)?.to_bytes()?))
+        .leaf(|source| Ok(LeafRun::output(leaf_bytes!(Package::from_bytes(source)?))))
+        .read("host family read", |bytes| {
+            host_date_read(bytes, at, &format)
+        })
+        .read("leaf cell format", move |bytes| {
+            leaf_read(bytes, at).map(|value| format!("{:?}", Some(value)))
+        })
+        .run()?;
+        assert_eq!(leaf_read(&formatted.bytes, at)?, format);
+    }
+    Ok(())
+}
+
+/// B2 rewritten to hold text by the host's cell writer on
+/// `table-discovery.key`: the read fixture's table holds formulas whose
+/// cached values both cell writers refuse to refresh (record 0412a).
+fn text_input(input: &Fixture) -> TestResult<(Fixture, At)> {
+    let at = At::new(1, 1);
+    let mut editor = keynote::Draft::from_bytes(&input.bytes)?;
+    let model = host_model(&editor)?;
+    editor.set_slide_table_cell(
+        SLIDE,
+        model,
+        at.row() as usize,
+        at.column() as usize,
+        litchi_iwa::keynote::TableCellValue::Text("abc".into()),
+    )?;
+    Ok((
+        Fixture {
+            path: input.path,
+            bytes: editor.to_bytes()?,
+        },
+        at,
+    ))
+}
+
+/// A Keynote deck whose slide table holds no formulas.
+const TEXT_FIXTURE: &str = "iwork/keynote/table-discovery.key";
+
+/// Text on a text cell naming an implicit Number entry through the host's
+/// family setter (the cell is converted to an explicit Text cell), then its
+/// reset on the host's output (record 0412a).
+#[test]
+fn keynote_slide_table_cell_text_format_parity() -> TestResult {
+    let (input, at) = text_input(&fixture(TEXT_FIXTURE)?)?;
+    let format = DataFormat::Text(Text);
+    Case::new(
+        "keynote_slide_table_cell_text_format_parity",
+        Format::Keynote,
+        Tier::B,
+        Evidence::Queued,
+        &input,
+    )
+    .host(|source| {
+        let mut editor = keynote::Draft::from_bytes(source)?;
+        let model = host_model(&editor)?;
+        let (row, column) = (at.row() as usize, at.column() as usize);
+        editor.set_slide_table_cell_text_format(SLIDE, model, row, column)?;
+        Ok(editor.to_bytes()?)
+    })
+    .leaf(|source| leaf_set(source, at, &format))
+    .read("host table_cell_data_format", move |bytes| {
+        host_read(bytes, at)
+    })
+    .read("leaf cell format", move |bytes| leaf_read(bytes, at))
+    .run()?;
+    let formatted = host_formatted(&input, at, &format)?;
+    Case::new(
+        "keynote_slide_table_cell_text_format_parity",
+        Format::Keynote,
+        Tier::B,
+        Evidence::Queued,
+        &formatted,
+    )
+    .host(|source| {
+        let mut editor = keynote::Draft::from_bytes(source)?;
+        let model = host_model(&editor)?;
+        let (row, column) = (at.row() as usize, at.column() as usize);
+        if !editor.reset_slide_table_cell_text_format(SLIDE, model, row, column)? {
+            return Err("host reset reported no change".into());
+        }
+        Ok(editor.to_bytes()?)
+    })
+    .leaf(|source| leaf_set(source, at, &DataFormat::Automatic))
+    .read("host table_cell_data_format", move |bytes| {
+        host_read(bytes, at)
+    })
+    .read("leaf cell format", move |bytes| leaf_read(bytes, at))
+    .run()?;
+    Ok(())
+}
+
+/// The host's Text read and the leaf's read agree on the host's output
+/// (record 0412a).
+#[test]
+fn keynote_slide_table_cell_text_format_read_parity() -> TestResult {
+    let (input, at) = text_input(&fixture(TEXT_FIXTURE)?)?;
+    let formatted = host_formatted(&input, at, &DataFormat::Text(Text))?;
+    Case::new(
+        "keynote_slide_table_cell_text_format_read_parity",
+        Format::Keynote,
+        Tier::A,
+        Evidence::Queued,
+        &formatted,
+    )
+    .read_only()
+    .host(|source| Ok(keynote::Draft::from_bytes(source)?.to_bytes()?))
+    .leaf(|source| Ok(LeafRun::output(leaf_bytes!(Package::from_bytes(source)?))))
+    .read("host family read", |bytes| {
+        let editor = keynote::Draft::from_bytes(bytes)?;
+        let model = host_model(&editor)?;
+        let (row, column) = (at.row() as usize, at.column() as usize);
+        Ok(format!(
+            "{:?}",
+            editor
+                .slide_table_cell_text_format(SLIDE, model, row, column)?
+                .map(DataFormat::from)
+        ))
+    })
+    .read("leaf cell format", move |bytes| {
+        leaf_read(bytes, at).map(|value| format!("{:?}", Some(value)))
+    })
+    .run()?;
+    assert_eq!(leaf_read(&formatted.bytes, at)?, DataFormat::Text(Text));
+    Ok(())
+}
+
+/// One custom Number format (record 0412a).
+fn custom_sample() -> TestResult<DataFormat> {
+    use litchi_iwa_common::table::cell::data_format::Custom;
+    use litchi_iwa_common::table::cell::data_format::custom::{
+        Name, Number as CustomNumber, NumberPattern,
+    };
+    Ok(DataFormat::Custom(Custom::from(CustomNumber::new(
+        Name::new("Grouped")?,
+        NumberPattern::new("#,##0.00")?,
+    ))))
+}
+
+fn host_custom_set(source: &[u8], at: At, format: &DataFormat) -> TestResult<Vec<u8>> {
+    let DataFormat::Custom(custom) = format else {
+        return Err("not a custom format".into());
+    };
+    let mut editor = keynote::Draft::from_bytes(source)?;
+    let model = host_model(&editor)?;
+    let (row, column) = (at.row() as usize, at.column() as usize);
+    editor.set_slide_table_cell_custom_format(SLIDE, model, row, column, custom.clone())?;
+    Ok(editor.to_bytes()?)
+}
+
+fn host_custom_read(bytes: &[u8], at: At) -> TestResult<String> {
+    let editor = keynote::Draft::from_bytes(bytes)?;
+    let model = host_model(&editor)?;
+    let (row, column) = (at.row() as usize, at.column() as usize);
+    Ok(format!(
+        "{:?}",
+        editor
+            .slide_table_cell_custom_format(SLIDE, model, row, column)?
+            .map(DataFormat::Custom)
+    ))
+}
+
+/// Automatic to a custom Number format through the host's family setter,
+/// then its reset (the registry is the document's `TSA.DocumentArchive`
+/// custom-format list, record 0412a). The host mints a random registry
+/// UUID, so the outputs are compared as a read differential: both reopen,
+/// every host and leaf read of both outputs agrees, the leaf inverse
+/// restores the source, and the reset of each route's output restores
+/// Automatic on both (tier B with a queued native check).
+#[test]
+fn keynote_slide_table_cell_custom_format_parity() -> TestResult {
+    let (_tier, _evidence) = (Tier::B, Evidence::Queued);
+    let input = fixture(CATALOG)?;
+    let at = automatic_cell(&input.bytes)?;
+    let format = custom_sample()?;
+    let host = host_custom_set(&input.bytes, at, &format)?;
+    let leaf = leaf_set(&input.bytes, at, &format)?;
+    assert_eq!(leaf.restored.as_deref(), Some(input.bytes.as_slice()));
+    for bytes in [&host, &leaf.output] {
+        Package::from_bytes(bytes)?;
+        assert_eq!(host_custom_read(bytes, at)?, format!("{:?}", Some(&format)));
+        assert_eq!(leaf_read(bytes, at)?, format);
+        assert_eq!(host_read(bytes, at)?, format);
+    }
+    for bytes in [&host, &leaf.output] {
+        let mut editor = keynote::Draft::from_bytes(bytes)?;
+        let model = host_model(&editor)?;
+        let (row, column) = (at.row() as usize, at.column() as usize);
+        assert!(editor.reset_slide_table_cell_custom_format(SLIDE, model, row, column)?);
+        let host_reset = editor.to_bytes()?;
+        let leaf_reset = leaf_set(bytes, at, &DataFormat::Automatic)?;
+        for reset in [&host_reset, &leaf_reset.output] {
+            assert_eq!(leaf_read(reset, at)?, DataFormat::Automatic);
+            assert_eq!(host_read(reset, at)?, DataFormat::Automatic);
+        }
+    }
+    Ok(())
+}
+
+/// The host's custom read and the leaf's read agree on the host's output
+/// (record 0412a).
+#[test]
+fn keynote_slide_table_cell_custom_format_read_parity() -> TestResult {
+    let input = fixture(CATALOG)?;
+    let at = automatic_cell(&input.bytes)?;
+    let format = custom_sample()?;
+    let formatted = Fixture {
+        path: input.path,
+        bytes: host_custom_set(&input.bytes, at, &format)?,
+    };
+    Case::new(
+        "keynote_slide_table_cell_custom_format_read_parity",
+        Format::Keynote,
+        Tier::A,
+        Evidence::Queued,
+        &formatted,
+    )
+    .read_only()
+    .host(|source| Ok(keynote::Draft::from_bytes(source)?.to_bytes()?))
+    .leaf(|source| Ok(LeafRun::output(leaf_bytes!(Package::from_bytes(source)?))))
+    .read("host family read", |bytes| host_custom_read(bytes, at))
+    .read("leaf cell format", move |bytes| {
+        leaf_read(bytes, at).map(|value| format!("{:?}", Some(value)))
+    })
+    .run()?;
+    assert_eq!(leaf_read(&formatted.bytes, at)?, format);
+    Ok(())
+}
+
+fn host_pop_up(
+    source: &[u8],
+    at: At,
+    menu: Option<&litchi_iwa_common::table::cell::data_format::pop_up_menu::PopUpMenu>,
+) -> TestResult<Vec<u8>> {
+    let mut editor = keynote::Draft::from_bytes(source)?;
+    let model = host_model(&editor)?;
+    let (row, column) = (at.row() as usize, at.column() as usize);
+    match menu {
+        Some(menu) => editor.set_slide_table_cell_pop_up_menu_format(
+            SLIDE,
+            model,
+            row,
+            column,
+            menu.clone(),
+        )?,
+        None => {
+            if !editor.reset_slide_table_cell_pop_up_menu_format(SLIDE, model, row, column)? {
+                return Err("host reset reported no change".into());
+            }
+        },
+    }
+    Ok(editor.to_bytes()?)
+}
+
+fn host_pop_up_read(bytes: &[u8], at: At) -> TestResult<String> {
+    let editor = keynote::Draft::from_bytes(bytes)?;
+    let model = host_model(&editor)?;
+    let (row, column) = (at.row() as usize, at.column() as usize);
+    Ok(format!(
+        "{:?}",
+        editor
+            .slide_table_cell_pop_up_menu_format(SLIDE, model, row, column)?
+            .map(DataFormat::from)
+    ))
+}
+
+/// A Pop-Up Menu on a text cell through the host's family setter, a second
+/// menu on the host's output, and its reset, against the leaf over the
+/// shared Pop-Up Menu publication (record 0412a).
+#[test]
+fn keynote_slide_table_cell_pop_up_menu_format_parity() -> TestResult {
+    use litchi_iwa_common::table::cell::data_format::pop_up_menu::PopUpMenu;
+    let (input, at) = text_input(&fixture(TEXT_FIXTURE)?)?;
+    let first = PopUpMenu::new(["abc", "def"])?;
+    let second = PopUpMenu::new(["abc", "ghi", "jkl"])?;
+    let menu = |value: &PopUpMenu| DataFormat::PopUpMenu(value.clone());
+    let cases = [
+        (input.bytes.clone(), Some(first.clone())),
+        (
+            host_pop_up(&input.bytes, at, Some(&first))?,
+            Some(second.clone()),
+        ),
+        (host_pop_up(&input.bytes, at, Some(&first))?, None),
+    ];
+    for (bytes, target) in cases {
+        let fixture = Fixture {
+            path: input.path,
+            bytes,
+        };
+        let format = target.as_ref().map_or(DataFormat::Automatic, menu);
+        Case::new(
+            "keynote_slide_table_cell_pop_up_menu_format_parity",
+            Format::Keynote,
+            Tier::B,
+            Evidence::Queued,
+            &fixture,
+        )
+        .leaf_structural_metadata()
+        .host(|source| host_pop_up(source, at, target.as_ref()))
+        .leaf(|source| leaf_set(source, at, &format))
+        .read("host table_cell_data_format", move |bytes| {
+            host_read(bytes, at)
+        })
+        .read("leaf cell format", move |bytes| leaf_read(bytes, at))
+        .run()?;
+    }
+    Ok(())
+}
+
+/// The host's Pop-Up Menu read and the leaf's read agree on the host's
+/// output (record 0412a).
+#[test]
+fn keynote_slide_table_cell_pop_up_menu_format_read_parity() -> TestResult {
+    use litchi_iwa_common::table::cell::data_format::pop_up_menu::PopUpMenu;
+    let (input, at) = text_input(&fixture(TEXT_FIXTURE)?)?;
+    let menu = PopUpMenu::new(["abc", "def"])?;
+    let formatted = Fixture {
+        path: input.path,
+        bytes: host_pop_up(&input.bytes, at, Some(&menu))?,
+    };
+    Case::new(
+        "keynote_slide_table_cell_pop_up_menu_format_read_parity",
+        Format::Keynote,
+        Tier::A,
+        Evidence::Queued,
+        &formatted,
+    )
+    .read_only()
+    .host(|source| Ok(keynote::Draft::from_bytes(source)?.to_bytes()?))
+    .leaf(|source| Ok(LeafRun::output(leaf_bytes!(Package::from_bytes(source)?))))
+    .read("host family read", |bytes| host_pop_up_read(bytes, at))
+    .read("leaf cell format", move |bytes| {
+        leaf_read(bytes, at).map(|value| format!("{:?}", Some(value)))
+    })
+    .run()?;
+    assert_eq!(
+        leaf_read(&formatted.bytes, at)?,
+        DataFormat::PopUpMenu(menu)
+    );
+    Ok(())
+}
+
+/// Callgrind probe (record 0412a): a Pop-Up Menu on the text cell, host
+/// family setter against the leaf, ABBA.
+#[test]
+#[ignore = "callgrind probe; run explicitly"]
+fn keynote_slide_table_cell_pop_up_menu_format_cost_abba() -> TestResult {
+    use litchi_iwa_common::table::cell::data_format::pop_up_menu::PopUpMenu;
+    let (input, at) = text_input(&fixture(TEXT_FIXTURE)?)?;
+    let menu = PopUpMenu::new(["abc", "def"])?;
+    let format = DataFormat::PopUpMenu(menu.clone());
+    crate::pages_cost_probes::abba(
+        &input,
+        |source| host_pop_up(source, at, Some(&menu)),
+        |source| {
+            let package = Package::from_bytes(source)?;
+            let commit = package
+                .edit_slide_table_cell_format(SLIDE, TABLE, at)?
+                .set(format.clone())
+                .commit()?;
+            Ok(leaf_bytes!(commit.package()))
+        },
+    )
+}
+
+/// Callgrind probe (record 0412a): Automatic to Date and Time on the native
+/// number cell, host family setter against the leaf, ABBA.
+#[test]
+#[ignore = "callgrind probe; run explicitly"]
+fn keynote_slide_table_cell_date_time_format_cost_abba() -> TestResult {
+    let input = fixture(CATALOG)?;
+    let at = automatic_cell(&input.bytes)?;
+    let format = date_samples()?.into_iter().next().ok_or("no date sample")?;
+    crate::pages_cost_probes::abba(
+        &input,
+        |source| host_date_set(source, at, &format),
+        |source| {
+            let package = Package::from_bytes(source)?;
+            let commit = package
+                .edit_slide_table_cell_format(SLIDE, TABLE, at)?
+                .set(format.clone())
+                .commit()?;
+            Ok(leaf_bytes!(commit.package()))
+        },
+    )
+}
+
+/// Callgrind probe (record 0412a): Automatic to a custom Number format,
+/// host family setter against the leaf, ABBA.
+#[test]
+#[ignore = "callgrind probe; run explicitly"]
+fn keynote_slide_table_cell_custom_format_cost_abba() -> TestResult {
+    let input = fixture(CATALOG)?;
+    let at = automatic_cell(&input.bytes)?;
+    let format = custom_sample()?;
+    crate::pages_cost_probes::abba(
+        &input,
+        |source| host_custom_set(source, at, &format),
         |source| {
             let package = Package::from_bytes(source)?;
             let commit = package

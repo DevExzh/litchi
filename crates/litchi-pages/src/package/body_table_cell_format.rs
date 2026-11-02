@@ -11,9 +11,9 @@
 //! artifacts, so its inverse restores the source byte for byte.
 //!
 //! Checkbox, Star Rating, Slider and Stepper cells are written through the
-//! engine's scalar-control writer (record 0412). Pop-Up Menus also allocate
-//! a menu model and rewrite the package metadata registry; they are read
-//! but refused for writing ([`Refusal::UnsupportedFormat`]).
+//! engine's scalar-control writer (record 0412); Pop-Up Menus through the
+//! shared Pop-Up Menu publication, which also allocates the menu model and
+//! rewrites the package metadata registry (record 0412a).
 
 use std::fmt;
 
@@ -135,10 +135,6 @@ pub enum Refusal {
     /// The table is locked.
     #[error("the body table is locked")]
     TableLocked,
-    /// The format is a Pop-Up Menu, whose writes also allocate a menu model
-    /// and rewrite the package metadata registry.
-    #[error("this body-table cell format is not written by this route")]
-    UnsupportedFormat,
     /// A native dependency of the cell is outside the shared engine.
     #[error("the body-table cell has an unsupported native dependency")]
     UnsupportedDependency,
@@ -155,7 +151,6 @@ impl Refusal {
         match self {
             Self::TableNotFound | Self::CellNotFound => RefusalKind::NotFound,
             Self::TableLocked => RefusalKind::Protected,
-            Self::UnsupportedFormat => RefusalKind::UnsupportedOperation,
             Self::UnsupportedDependency | Self::UnsupportedSource => {
                 RefusalKind::UnsupportedContent
             },
@@ -419,7 +414,7 @@ impl Edit<'_> {
     ///
     /// # Errors
     ///
-    /// [`Refusal::UnsupportedFormat`] for a Pop-Up Menu change; [`Refusal::TableLocked`]; the engine's source,
+    /// [`Refusal::TableLocked`]; the engine's source,
     /// dependency and resource failures; [`Error::Verification`]. A failure
     /// never publishes a partial package.
     pub fn commit(self) -> Result<Commit, Error> {
@@ -436,13 +431,6 @@ impl Edit<'_> {
                 },
                 diagnostics: Diagnostics::default(),
             });
-        }
-        for format in [&self.before, &self.after] {
-            if let Some(family) = data_format::family(format)
-                && family == data_format::Family::PopUpMenu
-            {
-                return Err(Error::Refused(Refusal::UnsupportedFormat));
-            }
         }
         let cross_family = matches!(
             (data_format::family(&self.before), data_format::family(&self.after)),
@@ -540,6 +528,33 @@ fn rewrite(
         return Err(Error::Refused(Refusal::UnsupportedSource));
     }
     let path = target.path();
+    let pop_up = |format: &DataFormat| match format {
+        DataFormat::PopUpMenu(menu) => Some(menu.clone()),
+        _ => None,
+    };
+    if matches!(before, DataFormat::PopUpMenu(_)) || matches!(after, DataFormat::PopUpMenu(_)) {
+        // The shared Pop-Up Menu publication (record 0412a): the menu model,
+        // its metadata registry entry and the cell's control spec, with the
+        // host's root-preview policy (kept) and list-key policy (append).
+        let published = engine::pop_up_publish::publish(
+            source,
+            target,
+            pop_up(before).as_ref(),
+            pop_up(after).as_ref(),
+            false,
+            engine::ListKeys::Append,
+            false,
+            |bytes| {
+                Package::from_bytes_with_archive_limits(&bytes, catalog.limits())
+                    .map_err(|_| engine::Error::Verification)
+            },
+            |candidate| {
+                resolve(candidate, BodyTableSelector::index(table), at)
+                    .map_err(|_| engine::Error::Verification)
+            },
+        )?;
+        return Ok(published.package);
+    }
     // Pages and Keynote append list keys at the watermark and hand a removed
     // last key back; the Numbers owners reuse free keys (record 0379).
     let mut budget =

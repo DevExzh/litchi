@@ -8,11 +8,10 @@
 
 use std::fmt;
 
-use litchi_iwa_archive::package::{EntryEdit, OwnedExactArtifacts};
+use litchi_iwa_archive::package::OwnedExactArtifacts;
 use litchi_iwa_table::cell_format as table;
 use litchi_iwa_table::cell_format::pop_up_menu::{
-    changed_member_count, map_popup_metadata_error, pack_metadata_payload, popup_metadata_options,
-    read_popup, read_popup_with_budget, rewrite_native_entry, rewrite_popup_metadata,
+    changed_member_count, read_popup, read_popup_with_budget,
 };
 pub(super) use litchi_iwa_table::cell_format::pop_up_menu::{
     read_cell_control, rewrite_component_save_tokens,
@@ -20,7 +19,7 @@ pub(super) use litchi_iwa_table::cell_format::pop_up_menu::{
 pub(super) use litchi_iwa_table::cell_format::{Target as CellTarget, TransactionBudget};
 use thiserror::Error as ThisError;
 
-use super::{Package, table_cell_pop_up_menu_metadata as popup_metadata};
+use super::Package;
 use crate::{SheetSelector, TableSelector, cell::data_format::PopUpMenu, table::At};
 
 /// A content-free location associated with a Pop-Up Menu operation.
@@ -665,161 +664,35 @@ fn rewrite_transaction(
     if target.locked {
         return Err(Error::Refused(Refusal::TableLocked { path }));
     }
-    let mut budget = TransactionBudget::new(source);
-    let catalog = super::table_headers::rewrite::physical_source(source)
-        .map_err(|_| Error::Refused(Refusal::UnsupportedSource))?;
-    if !catalog.source_is_exact() {
-        return Err(Error::Refused(Refusal::UnsupportedSource));
-    }
-    budget.charge_package_source(catalog, path.into())?;
-    let observed = read_popup_with_budget(source, target, &mut budget, false)?;
-    if observed != before {
-        return Err(Error::PatchConflict);
-    }
-    let metadata_source = popup_metadata::strict_source(source)
-        .map_err(|error| map_popup_metadata_error(error, path.into()))?;
-    budget.charge_wire_bytes(metadata_source.payload.len(), path.into())?;
-    let metadata_options = popup_metadata_options(metadata_source.payload.len(), 1, &budget);
-    let metadata_facts = popup_metadata::inspect(source, metadata_options)
-        .map_err(|error| map_popup_metadata_error(error, path.into()))?;
-    let metadata_report = metadata_facts.report();
-    budget.charge_wire_fields(metadata_report.fields(), path.into())?;
-    budget.charge_wire_work(metadata_report.work_bytes(), path.into())?;
-    budget.charge_wire_nesting(metadata_report.max_depth(), path.into())?;
-    budget.charge_payload_items(metadata_report.components_scanned(), path.into())?;
-    budget.charge_payload_references(metadata_report.references_scanned(), path.into())?;
-    budget.charge_transaction_work(
-        metadata_report
-            .input_bytes()
-            .saturating_add(metadata_report.output_bytes()),
-        path.into(),
-    )?;
-    if metadata_facts.has_physical_alias() {
-        return Err(Error::Refused(Refusal::UnsupportedDependency { path }));
-    }
-    metadata_facts
-        .require_single_current_component(core::slice::from_ref(&target.component_index))
-        .map_err(|error| map_popup_metadata_error(error, path.into()))?;
-    let fresh = metadata_facts
-        .allocate_identifiers(1)
-        .map_err(|error| map_popup_metadata_error(error, path.into()))?
-        .into_iter()
-        .next()
-        .ok_or(Error::InvalidSource { path })?;
-    let native = rewrite_native_entry(
+    let source_owner = super::table_headers::rewrite::physical_source(source)
+        .map_err(|_| Error::Refused(Refusal::UnsupportedSource))?
+        .__source_owner();
+    let published = table::pop_up_publish::publish(
         source,
         target,
+        before.as_ref(),
         after.as_ref(),
-        fresh.identifier,
-        path.into(),
-        &metadata_facts,
-        &mut budget,
-    )?;
-    let native_component_indices = native
-        .member_edits
-        .iter()
-        .map(|edit| edit.component_index)
-        .collect::<Vec<_>>();
-    let touched_component_indices = metadata_facts
-        .dedupe_touched_components(&native_component_indices)
-        .map_err(|error| map_popup_metadata_error(error, path.into()))?;
-    // Resolve the complete current/effective selector set before staging the
-    // metadata candidate. This is also the source of truth for the one-token
-    // transition across every changed native member.
-    metadata_facts
-        .touched_selectors(&touched_component_indices)
-        .map_err(|error| map_popup_metadata_error(error, path.into()))?;
-    let metadata_payload = rewrite_popup_metadata(
-        source,
-        &metadata_facts,
-        &touched_component_indices,
-        fresh,
-        native.added_model,
-        native.added_model_component,
-        native.control_component_index,
-        &native.removed_models,
-        &native.removed_model_components,
-        path.into(),
-        &mut budget,
-    )?;
-    let metadata_bytes = pack_metadata_payload(
-        source,
-        metadata_facts.route(),
-        metadata_payload,
-        path.into(),
-        &mut budget,
-    )?;
-    let previews = super::table_headers::rewrite::root_preview_deletions(catalog)
-        .map_err(|_| Error::InvalidSource { path })?;
-    let mut edits = Vec::new();
-    edits
-        .try_reserve_exact(native.member_edits.len().saturating_add(1))
-        .map_err(|_| Error::Allocation {
-            amount: native.member_edits.len().saturating_add(1),
-            path,
-        })?;
-    for edit in &native.member_edits {
-        edits.push(EntryEdit::new(
-            edit.member_name.as_str(),
-            edit.member_bytes.as_slice(),
-        ));
-    }
-    edits.push(EntryEdit::new(super::metadata::ENTRY_NAME, &metadata_bytes));
-    let prepared = catalog
-        .package()
-        .prepare_reassembly_with_deletions(&edits, &previews, catalog.limits())
-        .map_err(|_| Error::Verification)?;
-    let requirements = prepared.execution_requirements();
-    // Candidate reassembly and the subsequent full Package reopen are both
-    // precharged before the final ZIP output allocation.  This owner retains a
-    // staged-private policy: native/metadata candidates are private until the
-    // ZIP candidate and semantic readback succeed.
-    budget.preflight_reassembly(requirements, path.into())?;
-    budget.charge_transaction_work(
-        requirements
-            .output_bytes()
-            .saturating_mul(2)
-            .saturating_add(source.state.components.catalog().len().saturating_mul(1024)),
-        path.into(),
-    )?;
-    budget.charge_candidate_input_bytes(requirements.output_bytes(), path.into())?;
-    let bytes = prepared
-        .execute(requirements.exact_limits())
-        .map_err(|_| Error::Verification)?;
-    let candidate = Package::from_owned_bytes_with_options(bytes, source.state.options)
-        .map_err(|_| Error::Verification)?;
-    let candidate_catalog = super::table_headers::rewrite::physical_source(&candidate)
-        .map_err(|_| Error::Verification)?;
-    budget.charge_candidate_reopen(candidate_catalog, path.into())?;
-    let native_member_names = native
-        .member_edits
-        .iter()
-        .map(|edit| edit.member_name.as_str())
-        .collect::<Vec<_>>();
-    verify_package_locality_for_members(source, &candidate, &native_member_names)?;
-    let reread = read_popup_with_budget(
-        &candidate,
-        resolve_cell(
-            &candidate,
-            SheetSelector::index(sheet),
-            TableSelector::index(table),
-            position,
-        )?,
-        &mut budget,
         true,
+        table::ListKeys::Reuse,
+        true,
+        |bytes| {
+            Package::from_owned_bytes_with_options(bytes, source.state.options)
+                .map_err(|_| table::Error::Verification)
+        },
+        |candidate| {
+            resolve_cell(
+                candidate,
+                SheetSelector::index(sheet),
+                TableSelector::index(table),
+                position,
+            )
+            .map_err(|_| table::Error::Verification)
+        },
     )?;
-    if reread != after {
-        return Err(Error::Verification);
-    }
-    let source_owner = catalog.__source_owner();
+    let candidate = published.package;
     let target_owner = super::table_headers::rewrite::physical_source(&candidate)
         .map_err(|_| Error::Verification)?
         .__source_owner();
-    let mut diagnostic_components = touched_component_indices.clone();
-    if !diagnostic_components.contains(&metadata_facts.route().component_index) {
-        diagnostic_components.push(metadata_facts.route().component_index);
-    }
-    let touched_components = diagnostic_components.len();
     Ok(Commit {
         package: candidate,
         patch: Patch {
@@ -830,8 +703,8 @@ fn rewrite_transaction(
         },
         diagnostics: Diagnostics {
             changed: true,
-            touched_components,
-            deleted_previews: previews.len(),
+            touched_components: published.touched_components,
+            deleted_previews: published.deleted_previews,
             full_reparse_performed: true,
         },
     })
@@ -851,88 +724,12 @@ pub(super) fn verify_package_locality_for_members(
         super::table_headers::rewrite::physical_source(source).map_err(|_| Error::Verification)?;
     let candidate_catalog = super::table_headers::rewrite::physical_source(candidate)
         .map_err(|_| Error::Verification)?;
-    if native_members.iter().enumerate().any(|(index, name)| {
-        name.is_empty()
-            || *name == super::metadata::ENTRY_NAME
-            || name.starts_with("preview")
-            || native_members[..index].contains(name)
-    }) {
-        return Err(Error::Verification);
-    }
-    let selected =
-        |name: &str| native_members.contains(&name) || name == super::metadata::ENTRY_NAME;
-
-    for name in native_members
-        .iter()
-        .copied()
-        .chain(std::iter::once(super::metadata::ENTRY_NAME))
-    {
-        let mut source_matches = source_catalog
-            .package()
-            .iter()
-            .filter(|entry| entry.name() == name);
-        let source_entry = source_matches.next().ok_or(Error::Verification)?;
-        if source_matches.next().is_some() {
-            return Err(Error::Verification);
-        }
-        let mut candidate_matches = candidate_catalog
-            .package()
-            .iter()
-            .filter(|entry| entry.name() == name);
-        let candidate_entry = candidate_matches.next().ok_or(Error::Verification)?;
-        if candidate_matches.next().is_some()
-            || !super::table_headers::rewrite::selected_package_member_preserved(
-                source_entry,
-                candidate_entry,
-            )
-        {
-            return Err(Error::Verification);
-        }
-    }
-
-    // Preview invalidation may delete source previews, but it may neither add
-    // one nor rewrite a retained preview's physical ZIP record.
-    for candidate_entry in candidate_catalog
-        .package()
-        .iter()
-        .filter(|entry| entry.name().starts_with("preview"))
-    {
-        let mut source_matches = source_catalog
-            .package()
-            .iter()
-            .filter(|entry| entry.name() == candidate_entry.name());
-        let source_entry = source_matches.next().ok_or(Error::Verification)?;
-        if source_matches.next().is_some()
-            || !super::table_headers::rewrite::package_member_preserved(
-                source_entry,
-                candidate_entry,
-            )
-        {
-            return Err(Error::Verification);
-        }
-    }
-
-    let mut source_untouched = source_catalog
-        .package()
-        .iter()
-        .filter(|entry| !selected(entry.name()) && !entry.name().starts_with("preview"));
-    let mut candidate_untouched = candidate_catalog
-        .package()
-        .iter()
-        .filter(|entry| !selected(entry.name()) && !entry.name().starts_with("preview"));
-    loop {
-        match (source_untouched.next(), candidate_untouched.next()) {
-            (Some(source_entry), Some(candidate_entry))
-                if source_entry.name() == candidate_entry.name()
-                    && super::table_headers::rewrite::package_member_preserved(
-                        source_entry,
-                        candidate_entry,
-                    ) => {},
-            (None, None) => break,
-            _ => return Err(Error::Verification),
-        }
-    }
-    Ok(())
+    Ok(table::pop_up_publish::verify_locality(
+        source_catalog,
+        candidate_catalog,
+        native_members,
+        table::Path::Package,
+    )?)
 }
 
 pub(super) fn resolve_cell<'sheet, 'table>(

@@ -34,7 +34,9 @@ use crate::sheet::drawable::DrawableSelector;
 
 structure::structural_family!("chart-style");
 
-pub use litchi_iwa_style::chart_style::chart::{Property, PropertyKind, RadarGridShape};
+pub use litchi_iwa_style::chart_style::chart::{
+    Lighting3d, Property, PropertyKind, RadarGridShape,
+};
 
 /// A typed, content-redacted chart-style failure.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
@@ -147,7 +149,7 @@ impl From<SymbolError> for Error {
 }
 
 /// One staged change.
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 enum Staged {
     Set(Property),
     Reset(PropertyKind),
@@ -211,8 +213,8 @@ impl Edit<'_> {
         let mut touched = 0_usize;
         for change in &self.changes {
             let base = current.as_ref().unwrap_or(self.source);
-            let property = match *change {
-                Staged::Set(property) => property,
+            let property = match change {
+                Staged::Set(property) => property.clone(),
                 Staged::Reset(kind) => kind.native_default(),
             };
             if let Some(published) = apply_one(base, self.sheet, self.chart, property)? {
@@ -380,7 +382,7 @@ fn apply_one(
     if !exclusive(source, target.style, archive)? {
         return Err(Refusal::SharedStyle.into());
     }
-    let rewritten = engine::rewrite(payload, value, target.kind)?;
+    let rewritten = engine::rewrite(payload, &value, target.kind)?;
     if rewritten == *payload {
         return Ok(None);
     }

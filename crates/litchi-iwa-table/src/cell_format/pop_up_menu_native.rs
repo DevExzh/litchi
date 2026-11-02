@@ -506,6 +506,26 @@ fn rewrite_native_popup_menu_transition(
         budget,
         input.path,
     )?;
+    // The selected table's own tiles: a component may hold several tables'
+    // tiles (native Pages and Keynote), whose cells name other format and
+    // control lists (record 0412a).
+    let table_tiles = {
+        let mut visitor = TileReferenceVisitor::default();
+        let (_, report) = storage_codec::decode_tile_storage_with_visitor(
+            store.tiles(),
+            budget.residual_storage_options(store.tiles()),
+            &mut visitor,
+        )
+        .map_err(map_storage_codec_error)?;
+        budget
+            .charge_storage_decode_report(report, true, input.path)
+            .map_err(map_budget_error)?;
+        visitor
+            .tiles
+            .into_iter()
+            .map(|tile| tile.1)
+            .collect::<Vec<_>>()
+    };
     if tile_identifier != input.tile_identifier {
         return Err(NativePopUpError::InvalidSource);
     }
@@ -520,9 +540,19 @@ fn rewrite_native_popup_menu_transition(
     .map_err(|_| NativePopUpError::InvalidSource)?;
     let old_format = cell.format_identifier();
     let old_control = cell.control_cell_spec_identifier();
-    if old_format.is_some() != old_control.is_some() {
+    // A native cell naming an implicit Number entry (no control, no
+    // explicit-format flag) gives that entry up when it becomes a Pop-Up
+    // Menu, as the host's compatibility writer does (record 0412a).
+    let implicit_format = old_format.filter(|_| {
+        old_control.is_none()
+            && cell.explicit_format_flags() == 0
+            && cell.cell_format_kind() == Some(litchi_numbers_wire::DECIMAL_CELL_FORMAT_KIND)
+            && cell.has_only_decimal_format_metadata()
+    });
+    if old_format.is_some() != old_control.is_some() && implicit_format.is_none() {
         return Err(NativePopUpError::InvalidSource);
     }
+    let paired_format = old_format.filter(|_| implicit_format.is_none());
 
     let control_list_object = unique_object(source, input.control_table_identifier)?;
     let control = unique_list_message(
@@ -540,7 +570,7 @@ fn rewrite_native_popup_menu_transition(
         budget,
         input.path,
     )?;
-    let bnc_references = census_bnc_references(source, budget, input.path)?;
+    let bnc_references = census_bnc_references(source, &table_tiles, budget, input.path)?;
     validate_bnc_refcounts(&bnc_references, format.payload, LIST_FORMAT, model_options)?;
     validate_bnc_refcounts(
         &bnc_references,
@@ -575,7 +605,7 @@ fn rewrite_native_popup_menu_transition(
         source,
         control.payload,
         old_control,
-        old_format,
+        paired_format,
         model_options,
     )?;
     if input.desired.is_none() {
@@ -624,14 +654,14 @@ fn rewrite_native_popup_menu_transition(
     let desired_format_payload = input.format_payload;
     let (format_bytes, format_key) = rewrite_list_for_format(
         format.payload,
-        old_state.map(|state| state.format_key),
+        old_state.map(|state| state.format_key).or(implicit_format),
         desired_state.as_ref().map(|state| state.format_key),
         desired_state.as_ref().map(|_| desired_format_payload),
         model_options,
         budget,
         input.path,
     )?;
-    let (control_bytes, control_key, desired_popup_identifier) = rewrite_control_list(
+    let (mut control_bytes, control_key, desired_popup_identifier) = rewrite_control_list(
         control.payload,
         old_state,
         desired_state.as_ref(),
@@ -639,6 +669,15 @@ fn rewrite_native_popup_menu_transition(
         budget,
         input.path,
     )?;
+    // Pages and Keynote append list keys and hand a released last key back
+    // (record 0379); a cleared menu's CellSpec key returns to the watermark
+    // as the host's writer does (record 0412a).
+    if desired_state.is_none()
+        && budget.list_keys == super::ListKeys::Append
+        && let Some(old) = old_state
+    {
+        control_bytes = hand_back_last_key(control_bytes, old.control_key, model_options)?;
+    }
 
     replace_message_preserving_header(
         &mut candidate,
@@ -760,7 +799,8 @@ fn rewrite_native_popup_menu_transition(
     // private graph transition as well.  This catches a stale refcount before
     // the candidate leaves the native owner, including the final-reset/cull
     // branch where the selected list entry disappears.
-    let candidate_bnc_references = census_bnc_references(&candidate, budget, input.path)?;
+    let candidate_bnc_references =
+        census_bnc_references(&candidate, &table_tiles, budget, input.path)?;
     let candidate_format = unique_list_message(
         unique_object(&candidate, input.format_table_identifier)?,
         LIST_FORMAT,
@@ -1725,11 +1765,17 @@ impl storage_codec::StorageVisitor for BncReferenceVisitor<'_> {
 
 fn census_bnc_references(
     archive: &Archive,
+    table_tiles: &[u64],
     budget: &mut TransactionBudget,
     path: Path,
 ) -> Result<BncReferenceCounts> {
     let mut counts = BncReferenceCounts::default();
-    for object in &archive.objects {
+    for object in archive.objects.iter().filter(|object| {
+        object
+            .archive_info
+            .identifier
+            .is_some_and(|id| table_tiles.contains(&id))
+    }) {
         let mut messages = object
             .messages
             .iter()
@@ -1817,19 +1863,30 @@ fn census_bnc_row(
 fn census_bnc_cell(bytes: &[u8], counts: &mut BncReferenceCounts) -> Result<()> {
     let cell = BncCell::parse(bytes, &crate::cell_format::bnc_limits_for_source(bytes))
         .map_err(|_| NativePopUpError::InvalidSource)?;
+    // Native Pages and Keynote tables hold format-only cells (an implicit
+    // Number entry, an explicit display format, a secondary generic entry);
+    // each names its format-list entries without a control (record 0412a).
+    for format in [cell.format_identifier(), cell.secondary_format_identifier()]
+        .into_iter()
+        .flatten()
+    {
+        if format == 0 {
+            return Err(NativePopUpError::InvalidSource);
+        }
+        BncReferenceCounts::increment(&mut counts.format, format)?;
+    }
     match (
         cell.format_identifier(),
         cell.control_cell_spec_identifier(),
     ) {
-        (None, None) => Ok(()),
-        (Some(format), Some(control)) => {
-            if format == 0 || control == 0 {
+        (_, None) => Ok(()),
+        (Some(_), Some(control)) => {
+            if control == 0 {
                 return Err(NativePopUpError::InvalidSource);
             }
-            BncReferenceCounts::increment(&mut counts.format, format)?;
             BncReferenceCounts::increment(&mut counts.control, control)
         },
-        _ => Err(NativePopUpError::InvalidSource),
+        (None, Some(_)) => Err(NativePopUpError::InvalidSource),
     }
 }
 
@@ -3470,6 +3527,23 @@ fn patch_row_buffer(
         replacement_offsets = Some(encoded_offsets);
     }
     Ok((output, replacement_offsets))
+}
+
+/// Lower `next_list_id` to `key` when `key` was the last allocated key and
+/// no entry holds it any more.
+fn hand_back_last_key(
+    list: Vec<u8>,
+    key: u32,
+    options: storage_codec::DecodeOptions,
+) -> Result<Vec<u8>> {
+    let decoded = decode_list_entries(&list, options)?;
+    if decoded.next_list_id != key.saturating_add(1)
+        || decoded.entries.iter().any(|entry| entry.key == key)
+    {
+        return Ok(list);
+    }
+    litchi_iwa_common::wire::patch_varint_field(&list, 2, true, Some(u64::from(key)))
+        .map_err(|_| NativePopUpError::InvalidSource)
 }
 
 #[cfg(test)]

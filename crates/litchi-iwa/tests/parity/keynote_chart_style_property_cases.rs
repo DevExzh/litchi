@@ -4,16 +4,19 @@
 //! engine wrapped by the Keynote family).
 
 use litchi_iwa::charts::{
-    Chart3dDepth, Chart3dRotation, Chart3dSeriesGap, ChartCornerRadius, ChartDonutInnerRadius,
-    ChartPieStartAngle, ChartRadarStartAngle, ChartRoundedCorners,
+    Chart3dDepth, Chart3dLightingStyle, Chart3dRotation, Chart3dSeriesGap, ChartCornerRadius,
+    ChartDonutInnerRadius, ChartPieStartAngle, ChartRadarStartAngle, ChartRoundedCorners,
 };
 use litchi_iwa::keynote;
+use litchi_iwa::shapes::ShapeFill;
 use litchi_iwa_common::chart::kind::Kind;
 use litchi_iwa_common::color::{RgbColorSpace, Rgba};
+use litchi_iwa_common::shape::fill::{Angle, Fill, Gradient};
 use litchi_iwa_common::shape::stroke::{Pattern, Stroke, Width};
 use litchi_keynote::Package;
 use litchi_keynote::chart::style::{
-    Property, PropertyKind, RadarGridShape, chart3d, corner, donut, gaps, legend, pie, radar,
+    Lighting3d, Property, PropertyKind, RadarGridShape, chart3d, corner, donut, gaps, legend, pie,
+    radar,
 };
 
 use crate::chart_style_cases::{self, Target};
@@ -31,6 +34,27 @@ fn input(kind: Kind) -> TestResult<(Fixture, usize, u64)> {
         return Err("not a Keynote target".into());
     };
     Ok((input.fixture, slide, input.chart))
+}
+
+fn shape_fill(fill: &Fill) -> TestResult<ShapeFill> {
+    Ok(match fill {
+        Fill::None => ShapeFill::None,
+        Fill::Solid(color) => ShapeFill::Solid(*color),
+        Fill::Gradient(gradient) => ShapeFill::Gradient(gradient.clone()),
+        _ => return Err("image fills are not covered".into()),
+    })
+}
+
+const fn host_lighting(lighting: Lighting3d) -> Chart3dLightingStyle {
+    match lighting {
+        Lighting3d::SoftLight => Chart3dLightingStyle::SoftLight,
+        Lighting3d::SoftFill => Chart3dLightingStyle::SoftFill,
+        Lighting3d::MediumCenter => Chart3dLightingStyle::MediumCenter,
+        Lighting3d::MediumRight => Chart3dLightingStyle::MediumRight,
+        Lighting3d::MediumLeft => Chart3dLightingStyle::MediumLeft,
+        Lighting3d::Glossy => Chart3dLightingStyle::Glossy,
+        _ => Chart3dLightingStyle::Default,
+    }
 }
 
 fn host_write(source: &[u8], sheet: usize, chart: u64, value: Property) -> TestResult<Vec<u8>> {
@@ -93,6 +117,12 @@ fn host_write(source: &[u8], sheet: usize, chart: u64, value: Property) -> TestR
         )?,
         Property::GapSpacing(v) => e.set_slide_chart_gap_spacing(sheet, chart, v)?,
         Property::BorderStroke(v) => e.set_slide_chart_border_stroke(sheet, chart, v)?,
+        Property::BackgroundFill(v) => {
+            e.set_slide_chart_background_fill(sheet, chart, &shape_fill(&v)?)?;
+        },
+        Property::Lighting3d(v) => {
+            e.set_slide_chart_3d_lighting_style(sheet, chart, host_lighting(v))?;
+        },
         _ => return Err("unmapped property".into()),
     }
     Ok(e.to_bytes()?)
@@ -158,6 +188,13 @@ fn host_read(bytes: &[u8], sheet: usize, chart: u64, kind: PropertyKind) -> Test
         ),
         PropertyKind::GapSpacing => format!("{:?}", e.slide_chart_gap_spacing(sheet, chart)?),
         PropertyKind::BorderStroke => format!("{:?}", e.slide_chart_border_stroke(sheet, chart)?),
+        PropertyKind::BackgroundFill => {
+            format!("{:?}", e.slide_chart_background_fill(sheet, chart)?)
+        },
+        PropertyKind::Lighting3d => e
+            .slide_chart_3d_lighting_style(sheet, chart)?
+            .inspector_label()
+            .to_owned(),
         _ => return Err("unmapped kind".into()),
     })
 }
@@ -185,6 +222,8 @@ fn leaf_read(bytes: &[u8], kind: PropertyKind) -> TestResult<String> {
         Property::RadarGridShape(v) => format!("{:?}", v == RadarGridShape::Curved),
         Property::GapSpacing(v) => format!("{v:?}"),
         Property::BorderStroke(v) => format!("{v:?}"),
+        Property::BackgroundFill(v) => format!("{:?}", shape_fill(&v)?),
+        Property::Lighting3d(v) => v.inspector_label().to_owned(),
         _ => return Err("unmapped property".into()),
     })
 }
@@ -195,24 +234,24 @@ fn style_case(name: &'static str, kind: Kind, value: Property, reset: bool) -> T
     let (mut input, sheet, chart) = input(kind)?;
     let property = value.kind();
     if reset {
-        input.bytes = host_write(&input.bytes, sheet, chart, value)?;
+        input.bytes = host_write(&input.bytes, sheet, chart, value.clone())?;
     }
     let target = if reset {
         property.native_default()
     } else {
-        value
+        value.clone()
     };
     Case::new(name, Format::Keynote, Tier::B, Evidence::Queued, &input)
         .leaf_invalidates_root_previews()
         .leaf_structural_metadata()
-        .host(|source| host_write(source, sheet, chart, target))
+        .host(|source| host_write(source, sheet, chart, target.clone()))
         .leaf(|source| {
             let package = Package::from_bytes(source)?;
             let mut edit = package.edit_slide_chart_style(0, CHART)?;
             if reset {
                 edit.reset(property)?;
             } else {
-                edit.set(value)?;
+                edit.set(value.clone())?;
             }
             let commit = edit.commit()?;
             let restored = commit
@@ -276,8 +315,13 @@ fn cases() -> TestResult<Vec<(Kind, Property)>> {
 fn keynote_slide_chart_style_set_parity() -> TestResult {
     let _ = (Tier::B, Evidence::Queued);
     for (kind, value) in cases()? {
-        style_case("keynote_slide_chart_style_set_parity", kind, value, false)
-            .map_err(|error| format!("{kind:?} {value:?}: {error}"))?;
+        style_case(
+            "keynote_slide_chart_style_set_parity",
+            kind,
+            value.clone(),
+            false,
+        )
+        .map_err(|error| format!("{kind:?} {value:?}: {error}"))?;
     }
     Ok(())
 }
@@ -286,8 +330,13 @@ fn keynote_slide_chart_style_set_parity() -> TestResult {
 fn keynote_slide_chart_style_reset_parity() -> TestResult {
     let _ = (Tier::B, Evidence::Queued);
     for (kind, value) in cases()? {
-        style_case("keynote_slide_chart_style_reset_parity", kind, value, true)
-            .map_err(|error| format!("{kind:?} {value:?}: {error}"))?;
+        style_case(
+            "keynote_slide_chart_style_reset_parity",
+            kind,
+            value.clone(),
+            true,
+        )
+        .map_err(|error| format!("{kind:?} {value:?}: {error}"))?;
     }
     Ok(())
 }
@@ -298,7 +347,7 @@ fn keynote_slide_chart_style_read_parity() -> TestResult {
         let (input, sheet, chart) = input(kind)?;
         for bytes in [
             input.bytes.clone(),
-            host_write(&input.bytes, sheet, chart, value)?,
+            host_write(&input.bytes, sheet, chart, value.clone())?,
         ] {
             assert_eq!(
                 host_read(&bytes, sheet, chart, value.kind())?,
@@ -335,6 +384,34 @@ fn option_cases() -> TestResult<Vec<(Kind, Property)>> {
         (Kind::Column2d, Property::BorderStroke(None)),
         (
             Kind::Column2d,
+            Property::BackgroundFill(Fill::Solid(Rgba::new(
+                0.2,
+                0.4,
+                0.9,
+                1.0,
+                RgbColorSpace::Srgb,
+            )?)),
+        ),
+        (Kind::Pie2d, Property::BackgroundFill(Fill::None)),
+        (
+            Kind::Bar2d,
+            Property::BackgroundFill(Fill::Gradient(Gradient::linear(
+                Rgba::new(1.0, 0.8, 0.0, 1.0, RgbColorSpace::Srgb)?,
+                Rgba::new(0.1, 0.1, 0.5, 1.0, RgbColorSpace::Srgb)?,
+                Angle::from_degrees(90.0)?,
+            ))),
+        ),
+        (Kind::Column3d, Property::Lighting3d(Lighting3d::Glossy)),
+        (
+            Kind::StackedBar3d,
+            Property::Lighting3d(Lighting3d::SoftLight),
+        ),
+        (Kind::Area3d, Property::Lighting3d(Lighting3d::SoftFill)),
+        (Kind::Line3d, Property::Lighting3d(Lighting3d::MediumCenter)),
+        (Kind::Pie3d, Property::Lighting3d(Lighting3d::MediumRight)),
+        (Kind::Donut3d, Property::Lighting3d(Lighting3d::MediumLeft)),
+        (
+            Kind::Column2d,
             Property::GapSpacing(gaps::Spacing::new(
                 gaps::Percentage::new(25.0)?,
                 gaps::Percentage::new(80.0)?,
@@ -347,10 +424,20 @@ fn option_cases() -> TestResult<Vec<(Kind, Property)>> {
 fn keynote_slide_chart_options_set_parity() -> TestResult {
     let _ = (Tier::B, Evidence::Queued);
     for (kind, value) in option_cases()? {
-        style_case("keynote_slide_chart_options_set_parity", kind, value, false)
-            .map_err(|error| format!("{kind:?} {value:?}: {error}"))?;
-        style_case("keynote_slide_chart_options_set_parity", kind, value, true)
-            .map_err(|error| format!("{kind:?} {value:?} reset: {error}"))?;
+        style_case(
+            "keynote_slide_chart_options_set_parity",
+            kind,
+            value.clone(),
+            false,
+        )
+        .map_err(|error| format!("{kind:?} {value:?}: {error}"))?;
+        style_case(
+            "keynote_slide_chart_options_set_parity",
+            kind,
+            value.clone(),
+            true,
+        )
+        .map_err(|error| format!("{kind:?} {value:?} reset: {error}"))?;
     }
     Ok(())
 }
@@ -361,7 +448,7 @@ fn keynote_slide_chart_options_read_parity() -> TestResult {
         let (input, sheet, chart) = input(kind)?;
         for bytes in [
             input.bytes.clone(),
-            host_write(&input.bytes, sheet, chart, value)?,
+            host_write(&input.bytes, sheet, chart, value.clone())?,
         ] {
             assert_eq!(
                 host_read(&bytes, sheet, chart, value.kind())?,

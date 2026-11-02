@@ -84,8 +84,8 @@ pub mod series {
 /// shared chart style engine: [`crate::Package::edit_sheet_chart_style`].
 pub mod style {
     pub use crate::package::sheet_chart_style::{
-        Commit, Diagnostics, Edit, Error, LimitKind, Patch, Property, PropertyKind, RadarGridShape,
-        Refusal,
+        Commit, Diagnostics, Edit, Error, Lighting3d, LimitKind, Patch, Property, PropertyKind,
+        RadarGridShape, Refusal,
     };
     pub use litchi_iwa_common::chart::{corner, donut, gaps, legend, pie, radar};
     pub use litchi_iwa_common::chart3d;

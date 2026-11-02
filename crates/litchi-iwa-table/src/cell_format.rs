@@ -25,6 +25,8 @@ pub mod control;
 pub mod data_format;
 /// The display-format families of an existing cell.
 pub mod display;
+/// Exact ZIP-record locality checks of reassembled candidates.
+pub mod locality;
 pub(crate) mod metadata;
 /// The Pop-Up Menu reads, native graph rewrite and metadata transition.
 pub mod pop_up_menu;
@@ -33,6 +35,8 @@ pub mod pop_up_menu;
 pub mod pop_up_menu_metadata;
 /// Native Pop-Up Menu graph transitions below the Pop-Up Menu engine.
 pub mod pop_up_menu_native;
+/// Exact-source publication of a Pop-Up Menu change.
+pub mod pop_up_publish;
 /// Exact-source reassembly of the members a display-format rewrite returns.
 pub mod publish;
 
