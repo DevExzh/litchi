@@ -101,7 +101,7 @@ pub mod lifecycle {
 pub mod style {
     pub use crate::package::sheet_chart_style::{
         Commit, Diagnostics, Drop, Edit, Error, Lighting3d, LimitKind, Patch, Property,
-        PropertyKind, RadarGridShape, Refusal, Shadow,
+        PropertyKind, RadarGridShape, RadarSeriesStyle, Refusal, Shadow,
     };
     pub use litchi_iwa_common::chart::{corner, donut, gaps, legend, pie, radar};
     pub use litchi_iwa_common::chart3d;

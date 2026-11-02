@@ -5,8 +5,8 @@
 
 use litchi_iwa::charts::{
     Chart3dDepth, Chart3dLightingStyle, Chart3dRotation, Chart3dSeriesGap, ChartCornerRadius,
-    ChartDonutInnerRadius, ChartPieStartAngle, ChartRadarStartAngle, ChartRoundedCorners,
-    ChartShadow,
+    ChartDonutInnerRadius, ChartPieStartAngle, ChartRadarSeriesStyle, ChartRadarStartAngle,
+    ChartRoundedCorners, ChartShadow,
 };
 use litchi_iwa::numbers;
 use litchi_iwa::shapes::{DrawablePoint, DrawableSize, ShapeFill};
@@ -20,8 +20,8 @@ use litchi_iwa_common::shape::shadow::{
 use litchi_iwa_common::shape::stroke::{Pattern, Stroke, Width};
 use litchi_numbers::Package;
 use litchi_numbers::sheet::chart::style::{
-    Drop, Lighting3d, Property, PropertyKind, RadarGridShape, Shadow, chart3d, corner, donut, gaps,
-    legend, pie, radar,
+    Drop, Lighting3d, Property, PropertyKind, RadarGridShape, RadarSeriesStyle, Shadow, chart3d,
+    corner, donut, gaps, legend, pie, radar,
 };
 
 use crate::harness::{Case, Evidence, Fixture, Format, LeafRun, TestResult, Tier, fixture};
@@ -92,6 +92,14 @@ const fn host_lighting(lighting: Lighting3d) -> Chart3dLightingStyle {
         Lighting3d::MediumLeft => Chart3dLightingStyle::MediumLeft,
         Lighting3d::Glossy => Chart3dLightingStyle::Glossy,
         _ => Chart3dLightingStyle::Default,
+    }
+}
+
+const fn host_radar(style: RadarSeriesStyle) -> ChartRadarSeriesStyle {
+    match style {
+        RadarSeriesStyle::Fill => ChartRadarSeriesStyle::Fill,
+        RadarSeriesStyle::Stroke => ChartRadarSeriesStyle::Stroke,
+        _ => ChartRadarSeriesStyle::FillAndStroke,
     }
 }
 
@@ -186,6 +194,9 @@ fn host_write(source: &[u8], sheet: u64, chart: u64, value: Property) -> TestRes
             e.set_sheet_chart_3d_lighting_style(sheet, chart, host_lighting(v))?;
         },
         Property::Shadow(v) => e.set_sheet_chart_shadow(sheet, chart, host_shadow(v))?,
+        Property::RadarSeriesStyle(v) => {
+            e.set_sheet_chart_radar_series_style(sheet, chart, host_radar(v))?;
+        },
         _ => return Err("unmapped property".into()),
     }
     Ok(e.to_bytes()?)
@@ -266,6 +277,9 @@ fn host_read(bytes: &[u8], sheet: u64, chart: u64, kind: PropertyKind) -> TestRe
             let shadow = e.sheet_chart_shadow(sheet, chart)?;
             format!("{:?}", (shadow.drop_shadow(), shadow.groups_series()))
         },
+        PropertyKind::RadarSeriesStyle => {
+            format!("{:?}", e.sheet_chart_radar_series_style(sheet, chart)?)
+        },
         _ => return Err("unmapped kind".into()),
     })
 }
@@ -296,6 +310,7 @@ fn leaf_read(bytes: &[u8], kind: PropertyKind) -> TestResult<String> {
         Property::BackgroundFill(v) => format!("{:?}", shape_fill(&v)?),
         Property::Lighting3d(v) => v.inspector_label().to_owned(),
         Property::Shadow(v) => format!("{:?}", (v.drop_shadow(), v.groups_series())),
+        Property::RadarSeriesStyle(v) => format!("{:?}", host_radar(v)),
         _ => return Err("unmapped property".into()),
     })
 }
@@ -444,6 +459,14 @@ fn option_cases() -> TestResult<Vec<(Kind, Property)>> {
         (
             Kind::Radar2d,
             Property::RadarGridShape(RadarGridShape::Curved),
+        ),
+        (
+            Kind::Radar2d,
+            Property::RadarSeriesStyle(RadarSeriesStyle::Fill),
+        ),
+        (
+            Kind::Radar2d,
+            Property::RadarSeriesStyle(RadarSeriesStyle::Stroke),
         ),
         (
             Kind::Column2d,
