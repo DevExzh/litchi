@@ -42,7 +42,7 @@ host-only.
 | `media/package.rs replace` | same | `media_draft_replace_parity` (host `media::Draft::replace`) | B |
 | `media/package.rs set_max_replacement_bytes` | `slide::media::asset_data::EditOptions::max_replacement_bytes` | `media_asset_replacement_limit_parity` | B |
 | `pages/editor.rs create`, `create_with_text` | `litchi_pages::builder::Builder::{build, body_text}` | `pages_builder_create_parity` | B |
-| `media/package.rs remove_unreferenced` | one shared rule, `litchi_iwa_style::media::unreferenced_data` (no component owner, object data reference or `DataMetadataMap` entry), with facades `prune_unreferenced` on Keynote `slide::media::asset_data::Edit` (from the new `Package::edit_media_assets`), Pages `drawable::lifecycle::Edit` and Numbers `sheet::drawable::media::Edit` (through the shared data-owner transition's `data_removals`); the leaf prunes every orphan in one commit, the host one identifier at a time | `media_prune_unreferenced_parity` (three formats; one and three orphans; inverse) | B |
+| `media/package.rs remove_unreferenced` | one shared rule, `litchi_iwa_style::media::unreferenced_data` (no component owner, object data reference or `DataMetadataMap` entry), with facades `prune_unreferenced` on Keynote `slide::media::asset_data::Edit` (from the new `Package::edit_media_assets`), Pages `drawable::lifecycle::Edit` and Numbers `sheet::drawable::media::Edit` (through the shared data-owner transition's `data_removals`, and its new `data_record_removals` for an unmaterialized record); the leaf prunes every orphan in one commit, the host one identifier at a time | `media_prune_unreferenced_parity` (three formats; one and three orphans; inverse), `media_prune_unmaterialized_parity` | B |
 | `numbers/editor/semantic/text_box.rs sheet_text_boxes` | `litchi_numbers::Package::sheet_drawable_list` (`Kind::TextBox`) with `sheet_drawable_plain_text` | `numbers_sheet_text_boxes_read_parity` | A |
 
 `Builder::slide_number_visible` has no ledger row (the host method is a
@@ -97,10 +97,12 @@ keynote_media_asset_cases, owner_io_cases, pages_builder_cases}.rs`.
   `remove_unreferenced`, the leaf prunes them in one commit. Tier B: the
   host re-encodes `TSP.PackageMetadata` with Prost; Keynote also
   invalidates the root previews (its structural-publication policy). The
-  inverse restores the input. Numbers prunes materialized records only
-  (the shared transition's data removals delete a member); an
-  unmaterialized orphan stays on Numbers, where Pages and Keynote remove
-  its `DataInfo`.
+  inverse restores the input. An unmaterialized orphan (no `Data/`
+  member) loses its `DataInfo` on all three formats
+  (`media_prune_unmaterialized_parity`); for Numbers the shared
+  `litchi_iwa_table::structure::metadata::Transition` gains the additive
+  `data_record_removals` (a `DataInfo` removal without a member), the
+  member-removing `data_removals` path unchanged.
 
 macOS queue: 11 Keynote rows (builder values, the empty-text form, asset
 replacement) and 3 shared rows (format-neutral replace, the ceiling, pruning) in
@@ -130,7 +132,6 @@ are already measured (records 0296, 0306); no new hot path.
 
 ## 5. Gaps and follow-ups
 
-- Numbers pruning keeps unmaterialized orphan records (above).
 - The Keynote builder keeps the slide-number visibility as its own
   transaction (it also adds the slide-number drawable to the slide's
   drawables and z-order); folding it into the single publication would

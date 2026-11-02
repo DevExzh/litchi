@@ -402,3 +402,56 @@ fn media_prune_unreferenced_parity() -> TestResult {
     }
     Ok(())
 }
+
+/// `source` with one unreferenced, unmaterialized data record: a host
+/// orphan whose `Data/` member is then removed through the host raw edit.
+fn with_unmaterialized_orphan(source: &[u8]) -> TestResult<Vec<u8>> {
+    let bytes = with_orphans(source, 1)?;
+    let member = litchi_iwa::media::Draft::from_bytes(&bytes)?
+        .assets()
+        .iter()
+        .find(|asset| !asset.is_referenced())
+        .and_then(|asset| asset.package_path.clone())
+        .ok_or("orphan member")?;
+    let package = litchi_iwa::Package::from_bytes(&bytes)?;
+    let mut edit = package.edit();
+    edit.remove_entry(&member).ok_or("member")?;
+    let unmaterialized = edit.commit()?.into_package().to_bytes()?;
+    let draft = litchi_iwa::media::Draft::from_bytes(&unmaterialized)?;
+    assert!(
+        draft
+            .assets()
+            .iter()
+            .any(|asset| !asset.is_referenced() && asset.package_path.is_none())
+    );
+    Ok(unmaterialized)
+}
+
+/// An unreferenced record without a `Data/` member: the host drops its
+/// `DataInfo`; every leaf prunes it too (Numbers through the shared
+/// transition's `data_record_removals`).
+#[test]
+fn media_prune_unmaterialized_parity() -> TestResult {
+    let _ = (Tier::B, Evidence::Queued);
+    for &(path, format) in PRUNE_FIXTURES {
+        let input = crate::harness::Fixture {
+            path,
+            bytes: with_unmaterialized_orphan(&fixture(path)?.bytes)?,
+        };
+        let mut case = Case::new(
+            "media_prune_unmaterialized_parity",
+            format,
+            Tier::B,
+            Evidence::Queued,
+            &input,
+        );
+        if format == Format::Keynote {
+            case = case.leaf_invalidates_root_previews();
+        }
+        case.host(host_prune)
+            .leaf(move |source| leaf_prune(format, source))
+            .run()
+            .map_err(|error| format!("{path}: {error}"))?;
+    }
+    Ok(())
+}
