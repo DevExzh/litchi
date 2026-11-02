@@ -80,7 +80,7 @@ fn numbers_leaf(source: &[u8], op: &Op) -> TestResult<LeafRun> {
 }
 
 /// The host's chart list: kind, direction, data, frame and Arrange flags.
-fn numbers_host_list(bytes: &[u8]) -> TestResult<String> {
+pub(crate) fn numbers_host_list(bytes: &[u8]) -> TestResult<String> {
     let editor = numbers::Draft::from_bytes(bytes)?;
     let sheet = first_sheet(&editor)?;
     let mut out = String::new();
@@ -93,7 +93,7 @@ fn numbers_host_list(bytes: &[u8]) -> TestResult<String> {
     Ok(out)
 }
 
-fn numbers_leaf_list(bytes: &[u8]) -> TestResult<String> {
+pub(crate) fn numbers_leaf_list(bytes: &[u8]) -> TestResult<String> {
     use litchi_numbers::sheet::drawable::{DrawableSelector, Kind as DrawableKind};
     let package = litchi_numbers::Package::from_bytes(bytes)?;
     let count = package

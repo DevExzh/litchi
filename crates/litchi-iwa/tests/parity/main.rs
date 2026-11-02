@@ -23,6 +23,7 @@
 //! The harness lives in the host's tests so that W3 deletes it with the host.
 
 mod archive_diff;
+mod chart_create_cases;
 mod chart_font_admission_cases;
 mod chart_font_cases;
 mod chart_lifecycle_cases;

@@ -13,6 +13,7 @@ use std::sync::Arc;
 
 use litchi_iwa_archive::package::ExactArtifacts;
 use litchi_iwa_common::chart::{Direction, kind::Kind};
+use litchi_iwa_style::chart_lifecycle as engine;
 use thiserror::Error as ThisError;
 
 use super::slide_chart_title::{self, select_chart};
@@ -31,8 +32,6 @@ const CHART_DRAWABLE: u32 = 1;
 const DRAWABLE_GEOMETRY: u32 = 1;
 /// The `TSCH.ChartArchive` extension of the chart drawable.
 const CHART_UNITY: u32 = 10_000;
-const CHART_TYPE: u32 = 1;
-const CHART_SERIES_DIRECTION: u32 = 5;
 const CHART_GRID: u32 = 7;
 const CHART_IS_DIRTY: u32 = 24;
 
@@ -408,22 +407,12 @@ fn edit_nested(
 fn chart_values(
     payload: &[u8],
     wire: litchi_iwa_common::WireLimits,
-) -> Result<(Option<u64>, Option<u64>, Option<Geometry>), Error> {
+) -> Result<(Option<Kind>, Option<Direction>, Option<Geometry>), Error> {
     let fields = Fields::parse(payload, wire).map_err(lift)?;
-    let unity = fields.unique(CHART_UNITY).map_err(lift)?;
-    let (kind, direction) = match unity {
-        Some(unity) => {
-            let unity = Fields::parse(unity.message().map_err(lift)?, wire).map_err(lift)?;
-            let value = |number| -> Result<Option<u64>, Error> {
-                unity
-                    .unique(number)
-                    .map_err(lift)?
-                    .map(|field| field.varint().map_err(lift))
-                    .transpose()
-            };
-            (value(CHART_TYPE)?, value(CHART_SERIES_DIRECTION)?)
-        },
-        None => (None, None),
+    let (kind, direction) = if fields.unique(CHART_UNITY).map_err(lift)?.is_some() {
+        engine::values(payload, wire).map_err(|_error| Error::InvalidSource)?
+    } else {
+        (None, None)
     };
     let geometry = match fields.unique(CHART_DRAWABLE).map_err(lift)? {
         Some(drawable) => {
@@ -433,11 +422,6 @@ fn chart_values(
         None => None,
     };
     Ok((kind, direction, geometry))
-}
-
-#[allow(clippy::cast_sign_loss, reason = "protobuf enum varints")]
-fn native(value: i32) -> u64 {
-    i64::from(value) as u64
 }
 
 fn commit_operations(source: &Package, operations: &[Operation]) -> Result<Commit, Error> {
@@ -496,16 +480,12 @@ fn commit_operations(source: &Package, operations: &[Operation]) -> Result<Commi
                     Ok(())
                 })
             },
-            &Change::Kind(kind) => edit_nested(&payload, &[CHART_UNITY], wire, &mut |fields| {
-                fields.set_varint(CHART_TYPE, native(kind.native_value()));
-                Ok(())
-            }),
-            &Change::Direction(direction) => {
-                edit_nested(&payload, &[CHART_UNITY], wire, &mut |fields| {
-                    fields.set_varint(CHART_SERIES_DIRECTION, native(direction.native_value()));
-                    Ok(())
-                })
+            &Change::Kind(kind) => {
+                Ok(engine::with_kind(&payload, kind, wire)
+                    .map_err(|_error| Error::InvalidSource)?)
             },
+            &Change::Direction(direction) => Ok(engine::with_direction(&payload, direction, wire)
+                .map_err(|_error| Error::InvalidSource)?),
             &Change::Geometry(geometry) => {
                 let current = chart_values(&payload, wire)?.2;
                 let geometry = Geometry {
@@ -568,15 +548,15 @@ fn commit_operations(source: &Package, operations: &[Operation]) -> Result<Commi
                     .map_err(|_error| Error::Verification)?
                     == *expected
             },
-            &Change::Kind(expected) => kind == Some(native(expected.native_value())),
-            &Change::Direction(expected) => direction == Some(native(expected.native_value())),
+            &Change::Kind(expected) => kind == Some(expected),
+            &Change::Direction(expected) => direction == Some(expected),
             &Change::Geometry(expected) => geometry.is_some_and(|geometry| {
                 (geometry.x, geometry.y, geometry.width, geometry.height)
                     == (expected.x, expected.y, expected.width, expected.height)
             }),
             Change::Add(chart) => {
-                kind == Some(native(chart.kind.native_value()))
-                    && direction == Some(1)
+                kind == Some(chart.kind)
+                    && direction == Some(Direction::Rows)
                     && geometry.is_some_and(|geometry| {
                         (geometry.x, geometry.y, geometry.width, geometry.height)
                             == (
@@ -1255,9 +1235,9 @@ impl Package {
             .iter()
             .find(|message| message.type_ == CHART_MESSAGE_TYPE)
             .ok_or(Error::InvalidSource)?;
-        let direction = chart_values(&payload.data, wire)?.1.unwrap_or(0);
-        #[allow(clippy::cast_possible_truncation, reason = "protobuf enum varints")]
-        Ok(Direction::from_native(direction as i32))
+        Ok(chart_values(&payload.data, wire)?
+            .1
+            .unwrap_or(Direction::from_native(0)))
     }
 
     /// Apply a chart-lifecycle patch only to its exact immutable source.
