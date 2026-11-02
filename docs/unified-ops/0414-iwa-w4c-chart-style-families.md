@@ -439,3 +439,9 @@ re-export of `litchi_iwa_text`. Those types are now re-exported through
 `slide_chart_font`, as the chart font family does. After that fix, the
 boundary check, clippy -D warnings and rustdoc for litchi-keynote, the
 Keynote legend parity cases and the glossary check exit 0.
+Trunk `b440f4b424` (W4-T comment threads) was then merged at `b07c024505`. On that
+merge the following re-ran and exit 0 (logs `.coord/iwa-w4c/gates7b`):
+ledger, glossary, clippy -D warnings on the six touched crates, the
+litchi-keynote and litchi-pages tests, the whole parity target (1043 passed),
+fmt, the crate-boundary check and the bench matrix. Target 3.4 GB after
+pruning.
