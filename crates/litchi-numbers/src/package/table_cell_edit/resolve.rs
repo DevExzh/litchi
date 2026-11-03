@@ -333,13 +333,8 @@ fn resolve_target_with_remaining(
     let ownership =
         table_headers::ownership::validate_selected_ownership_with_report(source, native)
             .map_err(map_header_failure)?;
-    table_headers::dependencies::validate_dependencies(
-        source,
-        native,
-        native.settings,
-        native.settings,
-    )
-    .map_err(map_header_failure)?;
+    table_headers::dependencies::validate_cell_dependencies(source, native, native.settings)
+        .map_err(map_header_failure)?;
     let payload =
         table_headers::rewrite::selected_payload(source, native).map_err(map_header_failure)?;
     let mut budget = ResolutionBudget::new(source, remaining, path)?;
@@ -697,7 +692,7 @@ fn validate_model_owners(
                 field
                     .validate_canonical_framing()
                     .map_err(|_error| Error::InvalidSource { path })?;
-                if !inactive_deprecated_category_owner(field.payload(), path)? {
+                if !well_formed_deprecated_category_owner(field.payload(), path)? {
                     return Err(Error::Refused(
                         crate::package::table_cells::Refusal::UnsupportedDependency {
                             path,
@@ -742,14 +737,9 @@ fn validate_model_owners(
             ));
         }
     }
-    if model.pivot_owner().is_some() {
-        return Err(Error::Refused(
-            crate::package::table_cells::Refusal::UnsupportedDependency {
-                path,
-                kind: DependencyKind::Pivot,
-            },
-        ));
-    }
+    // A pivot owner (field 85) or an active category does not refuse a cell
+    // edit: the host writes cells of pivot and categorized tables and leaves
+    // their group-by state for Numbers to recompute (record 0424a).
     if let Some(reference) = filter_reference {
         validate_inert_filter_set(
             source,
@@ -761,17 +751,9 @@ fn validate_model_owners(
         )?;
     }
     if let Some(reference) = category_reference {
-        let active =
-            table_headers::dependencies::category_owner_reference_active(source, native, reference)
-                .map_err(map_header_failure)?;
-        if active {
-            return Err(Error::Refused(
-                crate::package::table_cells::Refusal::UnsupportedDependency {
-                    path,
-                    kind: DependencyKind::Category,
-                },
-            ));
-        }
+        // Validates the owner and its group-bys; activity no longer refuses.
+        table_headers::dependencies::category_owner_reference_active(source, native, reference)
+            .map_err(map_header_failure)?;
     } else if model.category_owner().is_some() {
         return Err(Error::InvalidSource { path });
     }
@@ -800,7 +782,7 @@ fn validate_model_owners(
     })
 }
 
-fn inactive_deprecated_category_owner(source: &[u8], path: Path) -> Result<bool, Error> {
+fn well_formed_deprecated_category_owner(source: &[u8], path: Path) -> Result<bool, Error> {
     let view =
         litchi_iwa_common::wire::WireView::parse(source, litchi_iwa_common::WireLimits::DEFAULT)
             .map_err(|_error| Error::InvalidSource { path })?;
@@ -818,9 +800,10 @@ fn inactive_deprecated_category_owner(source: &[u8], path: Path) -> Result<bool,
     if owner.is_none() {
         return Ok(false);
     }
-    let active = table_headers::dependencies::deprecated_category_grouping_active(source)
+    // Validates the inline group-bys; activity no longer refuses (0424a).
+    table_headers::dependencies::deprecated_category_grouping_active(source)
         .map_err(map_header_failure)?;
-    Ok(!active)
+    Ok(true)
 }
 
 fn parse_single_uuid_owner(source: &[u8]) -> Option<UuidKey> {
