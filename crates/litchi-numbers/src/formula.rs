@@ -351,6 +351,7 @@ pub(crate) enum Node {
     TableRows(Table, AxisReference, AxisReference),
     TableColumns(Table, AxisReference, AxisReference),
     Range(CellReference, CellReference),
+    PivotCategory(PivotReference),
     Function {
         name: Box<str>,
         arguments: Box<[Expression]>,
@@ -361,6 +362,16 @@ pub(crate) enum Node {
     },
     Negate(Box<[Expression]>),
     Percent(Box<[Expression]>),
+}
+
+/// A pivot category as a formula references it: its native identity and the
+/// summary function and group level the referencing formula expects (the
+/// host's `FormulaPivotCategoryReference`, never exposed).
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(crate) struct PivotReference {
+    pub(crate) key: crate::table::pivot::CategoryKey,
+    pub(crate) aggregate_type: u32,
+    pub(crate) group_level: i32,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -408,6 +419,24 @@ impl Expression {
     #[must_use]
     pub fn table_cell(table: &Table, reference: CellReference) -> Self {
         Self::leaf(Node::TableCell(table.clone(), reference))
+    }
+
+    /// Construct an absolute reference to a pivot aggregate category read
+    /// by [`Package::pivot_categories`].
+    ///
+    /// The category is resolved when the formula is authored, as the host
+    /// resolves it: the edited package must hold the category's group-by,
+    /// column and group with the same summary function and group level, or
+    /// the edit is refused
+    /// ([`Refusal::PivotCategoryNotFound`](crate::table::cells::Refusal::PivotCategoryNotFound),
+    /// [`Refusal::PivotCategoryChanged`](crate::table::cells::Refusal::PivotCategoryChanged)).
+    #[must_use]
+    pub const fn pivot_category(category: &crate::table::pivot::Category) -> Self {
+        Self::leaf(Node::PivotCategory(PivotReference {
+            key: category.key(),
+            aggregate_type: category.aggregate().code(),
+            group_level: category.group_level(),
+        }))
     }
 
     /// Construct a local rectangular range.
@@ -564,6 +593,19 @@ impl Expression {
 
     pub(crate) const fn node_count(&self) -> usize {
         self.metrics.nodes
+    }
+
+    /// Whether the expression references a pivot category (bounded by
+    /// [`MAX_DEPTH`]).
+    pub(crate) fn contains_pivot_category(&self) -> bool {
+        match &self.node {
+            Node::PivotCategory(_) => true,
+            Node::Function { arguments, .. } => arguments.iter().any(Self::contains_pivot_category),
+            Node::Binary { operands, .. } | Node::Negate(operands) | Node::Percent(operands) => {
+                operands.iter().any(Self::contains_pivot_category)
+            },
+            _ => false,
+        }
     }
 
     pub(crate) fn validate_for(
@@ -839,7 +881,7 @@ fn validate_expression(
         Node::Binary { operands, .. } | Node::Negate(operands) | Node::Percent(operands) => {
             validate_children(operands, source, local, depth)
         },
-        Node::Number(_) | Node::Text(_) | Node::Boolean(_) => Ok(()),
+        Node::Number(_) | Node::Text(_) | Node::Boolean(_) | Node::PivotCategory(_) => Ok(()),
     }
 }
 

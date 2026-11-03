@@ -22,6 +22,9 @@ use crate::harness::{Case, Evidence, Fixture, Format, LeafRun, TestResult, Tier,
 use crate::leaf_bytes;
 
 const ENGINE: &str = "Index/CalculationEngine.iwa";
+/// The owner kind of `basic.numbers`' registered category formula owner
+/// (internal identifier 13), which its native group-by names.
+const NATIVE_OWNER_KIND: i32 = 8;
 
 fn uuid(lower: u64, upper: u64) -> tsp::Uuid {
     tsp::Uuid { lower, upper }
@@ -122,10 +125,13 @@ fn owner(kind: u32, internal: u32) -> Vec<u8> {
 }
 
 /// The group-by objects: (identifier, message type, payload).
-fn objects() -> Vec<(u64, u32, Vec<u8>)> {
+/// `first_aggregate` is the summary-function code of the inline tree's
+/// first aggregated column.
+fn objects(first_aggregate: u32) -> Vec<(u64, u32, Vec<u8>)> {
     let mut objects = Vec::new();
-    // Formula owners: kind 40 names one owner, kind 41 two.
-    objects.push((9_100_001, 4_008, owner(40, 77)));
+    // Formula owners: the group-bys name `basic.numbers`' registered
+    // category owner (kind 8, the owner its native disabled group-by names;
+    // record 0424), and kind 41 names two owners.
     objects.push((9_100_002, 4_008, owner(41, 78)));
     objects.push((9_100_003, 4_008, owner(41, 79)));
     // An inline tree with two aggregated columns.
@@ -145,10 +151,13 @@ fn objects() -> Vec<(u64, u32, Vec<u8>)> {
             group_by_uid: uuid(5, 9),
             group_node_root: Some(root),
             aggregator: columns.iter().map(|column| aggregator(*column)).collect(),
-            column_agg_type: vec![aggregate_type(columns[0], 1), aggregate_type(columns[1], 4)],
+            column_agg_type: vec![
+                aggregate_type(columns[0], first_aggregate),
+                aggregate_type(columns[1], 4),
+            ],
             is_enabled: true,
             grouping_columns_formula: Some(coordinate(9, 1)),
-            owner_index: Some(40),
+            owner_index: Some(NATIVE_OWNER_KIND),
             ..Default::default()
         }
         .encode_to_vec(),
@@ -171,13 +180,15 @@ fn objects() -> Vec<(u64, u32, Vec<u8>)> {
             column_agg_type: vec![aggregate_type((13, 2), 2)],
             is_enabled: true,
             grouping_columns_formula: Some(coordinate(8, 1)),
-            owner_index: Some(40),
+            owner_index: Some(NATIVE_OWNER_KIND),
             ..Default::default()
         }
         .encode_to_vec(),
     ));
     // Disabled, and an ambiguous owner kind: no categories.
-    for (identifier, enabled, kind) in [(9_100_030, false, 40), (9_100_031, true, 41)] {
+    for (identifier, enabled, kind) in
+        [(9_100_030, false, NATIVE_OWNER_KIND), (9_100_031, true, 41)]
+    {
         objects.push((
             identifier,
             6_373,
@@ -206,7 +217,7 @@ fn objects() -> Vec<(u64, u32, Vec<u8>)> {
             column_agg_type: vec![aggregate_type(columns[0], 1)],
             is_enabled: true,
             grouping_columns_formula: Some(coordinate(9, 1)),
-            owner_index: Some(40),
+            owner_index: Some(NATIVE_OWNER_KIND),
             ..Default::default()
         }
         .encode_to_vec(),
@@ -215,7 +226,13 @@ fn objects() -> Vec<(u64, u32, Vec<u8>)> {
 }
 
 /// `basic.numbers` with the group-by graphs added to its calculation engine.
-fn pivot_fixture() -> TestResult<Fixture> {
+pub(crate) fn pivot_fixture() -> TestResult<Fixture> {
+    pivot_fixture_with(1)
+}
+
+/// The synthetic fixture whose inline tree's first column uses the
+/// summary-function code `first_aggregate`.
+pub(crate) fn pivot_fixture_with(first_aggregate: u32) -> TestResult<Fixture> {
     let input = fixture("iwork/numbers/basic.numbers")?;
     let catalog = Catalog::from_bytes(&input.bytes, Default::default())?;
     let entry = catalog
@@ -224,7 +241,7 @@ fn pivot_fixture() -> TestResult<Fixture> {
         .ok_or("basic.numbers has no calculation engine")?;
     let stream = SnappyStream::decompress(entry.data(), Default::default())?;
     let mut archive = Archive::parse(stream.as_bytes(), Default::default())?;
-    for (identifier, message_type, data) in objects() {
+    for (identifier, message_type, data) in objects(first_aggregate) {
         archive.objects.push(ArchiveObject::new(
             identifier,
             vec![RawMessage {
@@ -243,31 +260,54 @@ fn pivot_fixture() -> TestResult<Fixture> {
     })
 }
 
-/// The categories both routes report: label, level and aggregate type, in
-/// order.
-fn host_read(bytes: &[u8]) -> TestResult<Vec<(Option<String>, i32, u32)>> {
-    Ok(numbers::Draft::from_bytes(bytes)?
-        .pivot_categories()?
-        .into_iter()
-        .map(|category| {
-            (
-                category.label,
-                category.reference.group_level,
-                category.reference.aggregate_type,
-            )
+/// Number equal values by first occurrence: two lists of summary functions
+/// agree when they partition the categories identically (the leaf's
+/// `Aggregate` exposes no native code, record 0424).
+fn classes<T: PartialEq>(values: &[T]) -> Vec<usize> {
+    values
+        .iter()
+        .map(|value| {
+            values
+                .iter()
+                .position(|candidate| candidate == value)
+                .unwrap_or(usize::MAX)
         })
+        .collect()
+}
+
+/// The categories both routes report: label, level and summary-function
+/// class, in order.
+fn host_read(bytes: &[u8]) -> TestResult<Vec<(Option<String>, i32, usize)>> {
+    let categories = numbers::Draft::from_bytes(bytes)?.pivot_categories()?;
+    let aggregates = classes(
+        &categories
+            .iter()
+            .map(|category| category.reference.aggregate_type)
+            .collect::<Vec<_>>(),
+    );
+    Ok(categories
+        .into_iter()
+        .zip(aggregates)
+        .map(|(category, aggregate)| (category.label, category.reference.group_level, aggregate))
         .collect())
 }
 
-fn leaf_read(bytes: &[u8]) -> TestResult<Vec<(Option<String>, i32, u32)>> {
-    Ok(Package::from_bytes(bytes)?
-        .pivot_categories()?
+fn leaf_read(bytes: &[u8]) -> TestResult<Vec<(Option<String>, i32, usize)>> {
+    let categories = Package::from_bytes(bytes)?.pivot_categories()?;
+    let aggregates = classes(
+        &categories
+            .iter()
+            .map(litchi_numbers::table::pivot::Category::aggregate)
+            .collect::<Vec<_>>(),
+    );
+    Ok(categories
         .into_iter()
-        .map(|category| {
+        .zip(aggregates)
+        .map(|(category, aggregate)| {
             (
                 category.label().map(str::to_owned),
                 category.group_level(),
-                category.aggregate_type(),
+                aggregate,
             )
         })
         .collect())
@@ -297,6 +337,14 @@ fn numbers_pivot_categories_read_parity() -> TestResult {
     }
     let categories = leaf_read(&pivot.bytes)?;
     assert!(categories.len() >= 8, "{categories:?}");
+    // The synthetic group-bys use three summary-function codes (1, 2, 4).
+    let mut distinct = categories
+        .iter()
+        .map(|(_, _, class)| *class)
+        .collect::<Vec<_>>();
+    distinct.sort_unstable();
+    distinct.dedup();
+    assert_eq!(distinct.len(), 3, "{categories:?}");
     for label in ["North", "2.5", "TRUE", "Grand Total"] {
         assert!(
             categories
