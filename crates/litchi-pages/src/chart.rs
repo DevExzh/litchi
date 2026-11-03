@@ -35,6 +35,14 @@ pub mod metadata {
     pub use crate::package::body_chart_metadata::{Error, LimitKind};
 }
 
+/// Exact-source caption transactions of one rooted body chart (the label
+/// below it): [`crate::Package::edit_body_chart_caption`]. The errors,
+/// refusals and diagnostics are the drawable caption family's.
+pub mod caption {
+    pub use crate::package::body_chart_caption::{Commit, Edit, Patch};
+    pub use crate::package::body_drawable_caption::{Diagnostics, Error, LimitKind, Refusal};
+}
+
 /// Exact-source visible title transactions of one rooted body chart:
 /// [`crate::Package::edit_body_chart_title`].
 pub mod title {

@@ -26,11 +26,12 @@ use litchi_iwa_style::caption;
 use thiserror::Error as ThisError;
 
 use super::Package;
+use super::body_chart_arrangement::{self as arrangement, ArrangementBudget};
 use super::body_drawable_graph::{
     self as graph, Budget, GraphError, GraphLimit, ObjectIndex, kind_name,
 };
 use super::body_storage_objects as objects;
-use crate::selector::DrawableSelector;
+use crate::selector::{BodyChartSelector, DrawableSelector};
 
 use caption::{
     CAPTION_INFO_MESSAGE_TYPE, CAPTION_PLACEMENT_MESSAGE_TYPE, SHAPE_STYLE_MESSAGE_TYPE,
@@ -223,6 +224,7 @@ impl From<GraphError> for Error {
 /// One label change staged against an immutable package.
 pub struct Edit<'a> {
     source: &'a Package,
+    selector: DrawableSelector,
     slot: Slot,
     operation: Option<Option<Box<str>>>,
 }
@@ -231,11 +233,29 @@ impl fmt::Debug for Edit<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
             .debug_struct("Edit")
-            .field("selector", &self.slot.selector)
+            .field("selector", &self.selector)
             .field("kind", &self.slot.kind)
             .field("staged", &self.operation.is_some())
             .finish_non_exhaustive()
     }
+}
+
+/// Validate one staged label text (shared with the chart caption family).
+pub(super) fn stage(
+    operation: &mut Option<Option<Box<str>>>,
+    text: Option<&str>,
+) -> Result<(), Error> {
+    if operation.is_some() {
+        return Err(Refusal::OperationAlreadyStaged.into());
+    }
+    if text.is_some_and(|text| {
+        text.chars()
+            .any(|character| matches!(character, '\u{fffc}' | '\u{000e}' | '\u{0004}'))
+    }) {
+        return Err(Refusal::ReservedMarker.into());
+    }
+    *operation = Some(text.map(Box::from));
+    Ok(())
 }
 
 impl Edit<'_> {
@@ -251,16 +271,7 @@ impl Edit<'_> {
     ///
     /// Refuses a reserved text marker and a second operation.
     pub fn set(&mut self, text: &str) -> Result<&mut Self, Error> {
-        if self.operation.is_some() {
-            return Err(Refusal::OperationAlreadyStaged.into());
-        }
-        if text
-            .chars()
-            .any(|character| matches!(character, '\u{fffc}' | '\u{000e}' | '\u{0004}'))
-        {
-            return Err(Refusal::ReservedMarker.into());
-        }
-        self.operation = Some(Some(Box::from(text)));
+        stage(&mut self.operation, Some(text))?;
         Ok(self)
     }
 
@@ -270,10 +281,7 @@ impl Edit<'_> {
     ///
     /// Refuses a second operation.
     pub fn clear(&mut self) -> Result<&mut Self, Error> {
-        if self.operation.is_some() {
-            return Err(Refusal::OperationAlreadyStaged.into());
-        }
-        self.operation = Some(None);
+        stage(&mut self.operation, None)?;
         Ok(self)
     }
 
@@ -350,8 +358,8 @@ impl Patch {
 /// Content-free diagnostics of one body-drawable label publication.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Diagnostics {
-    changed: bool,
-    created_objects: usize,
+    pub(super) changed: bool,
+    pub(super) created_objects: usize,
 }
 
 impl Diagnostics {
@@ -410,18 +418,38 @@ impl Commit {
     }
 }
 
+/// What a label belongs to: a body image, movie or shape, or a body chart
+/// (caption only).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum Selection {
+    Drawable(DrawableSelector),
+    Chart(BodyChartSelector),
+}
+
+impl Selection {
+    const fn nesting(self) -> caption::Nesting {
+        match self {
+            Self::Drawable(DrawableSelector::Shape(_) | DrawableSelector::TextBox(_)) => {
+                caption::Nesting::Shape
+            },
+            Self::Drawable(_) => caption::Nesting::Drawable,
+            Self::Chart(_) => caption::Nesting::Chart,
+        }
+    }
+}
+
 /// The private native target of one label.
 #[derive(Debug, Clone, PartialEq)]
-struct Slot {
-    selector: DrawableSelector,
-    kind: Kind,
+pub(super) struct Slot {
+    selection: Selection,
+    pub(super) kind: Kind,
     drawable: NonZeroU64,
     component: Arc<str>,
     message_index: usize,
     message_type: u32,
     reference: NonZeroU64,
     storage: Option<NonZeroU64>,
-    text: Option<Arc<str>>,
+    pub(super) text: Option<Arc<str>>,
     width: Option<f32>,
     /// The label's private objects: the stand-in, or the CaptionInfo, its
     /// style, storage and placement.
@@ -456,9 +484,11 @@ impl Package {
         selector: impl Into<DrawableSelector>,
         kind: Kind,
     ) -> Result<Edit<'_>, Error> {
+        let selector = selector.into();
         Ok(Edit {
             source: self,
-            slot: resolve(self, selector.into(), kind)?,
+            selector,
+            slot: resolve(self, selector, kind)?,
             operation: None,
         })
     }
@@ -525,6 +555,16 @@ fn resolve(package: &Package, selector: DrawableSelector, kind: Kind) -> Result<
     resolve_any(package, selector, kind)
 }
 
+/// The drawable a label belongs to, after its selection proof.
+struct Owner<'a> {
+    drawable: NonZeroU64,
+    component_index: usize,
+    /// The `TSD.DrawableArchive` inside the drawable's message.
+    archive: &'a [u8],
+    message_index: usize,
+    message_type: u32,
+}
+
 fn resolve_any(package: &Package, selector: DrawableSelector, kind: Kind) -> Result<Slot, Error> {
     let mut budget = Budget::new(package)?;
     let index = ObjectIndex::new(package, &mut budget)?;
@@ -534,16 +574,121 @@ fn resolve_any(package: &Package, selector: DrawableSelector, kind: Kind) -> Res
             kind: kind_name(selector),
             position: selector.position(),
         })?;
-    let drawable = selected.anchor.drawable;
-    let component = index.component_name(selected.drawable.component_index)?;
-    let view = budget.parse(selected.drawable_payload, 3)?;
+    let owner = Owner {
+        drawable: selected.anchor.drawable,
+        component_index: selected.drawable.component_index,
+        archive: selected.drawable_payload,
+        message_index: selected.message_index,
+        message_type: graph::message_type(selector),
+    };
+    label_slot(
+        package,
+        &index,
+        &mut budget,
+        Selection::Drawable(selector),
+        kind,
+        &owner,
+    )
+}
+
+/// The caption of the body chart `selector` (the rooted chart selection of
+/// the chart families; the chart message stores its `TSD.DrawableArchive`
+/// at field 1).
+pub(super) fn resolve_chart(package: &Package, selector: BodyChartSelector) -> Result<Slot, Error> {
+    let mut arrangement_budget = ArrangementBudget::new(package).map_err(map_arrangement_error)?;
+    let chart = arrangement::resolve_target(package, selector, &mut arrangement_budget)
+        .map_err(map_arrangement_error)?;
+    let payload =
+        arrangement::selected_chart_payload(package, &chart).map_err(map_arrangement_error)?;
+    let mut budget = Budget::new(package)?;
+    let index = ObjectIndex::new(package, &mut budget)?;
+    let located = index.get(chart.drawable_identifier)?;
+    if located.component_index != chart.component_index {
+        return Err(Error::InvalidSource);
+    }
+    let view = budget.parse(payload, 2)?;
+    let archive = graph::unique_field(&view, 1, 2)?
+        .ok_or(Error::InvalidSource)?
+        .payload();
+    let owner = Owner {
+        drawable: chart.drawable_identifier,
+        component_index: chart.component_index,
+        archive,
+        message_index: chart.drawable_message_index,
+        message_type: chart.drawable_message_type,
+    };
+    label_slot(
+        package,
+        &index,
+        &mut budget,
+        Selection::Chart(selector),
+        Kind::Caption,
+        &owner,
+    )
+}
+
+fn map_arrangement_error(error: arrangement::Error) -> Error {
+    match error {
+        arrangement::Error::Refused(
+            arrangement::Refusal::ChartNotFound { position }
+            | arrangement::Refusal::ChartPositionNotFound { position },
+        ) => Refusal::NotFound {
+            kind: "chart",
+            position,
+        }
+        .into(),
+        arrangement::Error::Refused(arrangement::Refusal::UnsupportedSource) => {
+            Refusal::UnsupportedSource.into()
+        },
+        arrangement::Error::Limit {
+            kind,
+            observed,
+            maximum,
+        } => {
+            use arrangement::LimitKind as Arrangement;
+            Error::Limit {
+                kind: match kind {
+                    Arrangement::OutputBytes | Arrangement::WireOutputBytes => {
+                        LimitKind::OutputBytes
+                    },
+                    Arrangement::WireFields => LimitKind::WireFields,
+                    Arrangement::WireNesting => LimitKind::WireNesting,
+                    Arrangement::PayloadObjects
+                    | Arrangement::PayloadMessages
+                    | Arrangement::PayloadItems
+                    | Arrangement::PayloadReferences => LimitKind::PayloadItems,
+                    Arrangement::WireWork
+                    | Arrangement::WireAllocations
+                    | Arrangement::WireRetainedBytes
+                    | Arrangement::WireScratchBytes => LimitKind::WireWork,
+                    _ => LimitKind::InputBytes,
+                },
+                observed,
+                maximum,
+            }
+        },
+        arrangement::Error::Allocation { amount } => Error::Allocation { amount },
+        _ => Error::InvalidSource,
+    }
+}
+
+fn label_slot(
+    package: &Package,
+    index: &ObjectIndex<'_>,
+    budget: &mut Budget,
+    selection: Selection,
+    kind: Kind,
+    owner: &Owner<'_>,
+) -> Result<Slot, Error> {
+    let drawable = owner.drawable;
+    let component = index.component_name(owner.component_index)?;
+    let view = budget.parse(owner.archive, 3)?;
     let reference =
         graph::unique_field(&view, kind.label().field(), 2)?.ok_or(Error::InvalidSource)?;
-    let reference = graph::parse_reference(reference.payload(), &mut budget)?;
-    let width =
-        caption::archive_width(selected.drawable_payload).map_err(|_| Error::InvalidSource)?;
+    let reference = graph::parse_reference(reference.payload(), budget)?;
+    let width = caption::archive_width(owner.archive).map_err(|_| Error::InvalidSource)?;
     let located = index.get(reference)?;
-    if located.component_index != selected.drawable.component_index {
+    if located.component_index != owner.component_index {
         return Err(Error::InvalidSource);
     }
     let Some((info_index, info)) =
@@ -554,12 +699,12 @@ fn resolve_any(package: &Package, selector: DrawableSelector, kind: Kind) -> Res
             return Err(Error::InvalidSource);
         }
         return Ok(Slot {
-            selector,
+            selection,
             kind,
             drawable,
             component,
-            message_index: selected.message_index,
-            message_type: graph::message_type(selector),
+            message_index: owner.message_index,
+            message_type: owner.message_type,
             reference,
             storage: None,
             text: None,
@@ -585,24 +730,32 @@ fn resolve_any(package: &Package, selector: DrawableSelector, kind: Kind) -> Res
     ] {
         let object = index.get(identifier)?;
         graph::unique_message(object.object, message_type)?;
-        if private && object.component_index != selected.drawable.component_index {
+        if private && object.component_index != owner.component_index {
             return Err(Error::InvalidSource);
         }
     }
     let text = objects::storage_by_identifier(package, storage.get())?.text;
     Ok(Slot {
-        selector,
+        selection,
         kind,
         drawable,
         component,
-        message_index: selected.message_index,
-        message_type: graph::message_type(selector),
+        message_index: owner.message_index,
+        message_type: owner.message_type,
         reference,
         storage: Some(storage),
         text: Some(Arc::from(text)),
         width,
         objects: vec![reference, style, storage, placement],
     })
+}
+
+/// Re-resolve `slot` against `package` (the edit's source).
+fn reresolve(package: &Package, slot: &Slot) -> Result<Slot, Error> {
+    match slot.selection {
+        Selection::Drawable(selector) => resolve(package, selector, slot.kind),
+        Selection::Chart(selector) => resolve_chart(package, selector),
+    }
 }
 
 /// The theme's document stylesheet and first caption paragraph-style
@@ -687,7 +840,7 @@ fn unchanged(edit: Edit<'_>) -> Commit {
         package: edit.source.clone(),
         patch: Patch {
             artifacts: ExactArtifacts::new(Arc::clone(&source_bytes), source_bytes),
-            selector: edit.slot.selector,
+            selector: edit.selector,
             kind: edit.slot.kind,
             before: edit.slot.text.clone(),
             after: edit.slot.text,
@@ -708,18 +861,52 @@ fn commit_edit(edit: Edit<'_>) -> Result<Commit, Error> {
     if after == edit.slot.text {
         return Ok(unchanged(edit));
     }
+    let Some((candidate, created)) = publish(source, &edit.slot, after.as_ref())? else {
+        return Ok(unchanged(edit));
+    };
+    let target_bytes = candidate.state.source.shared_source();
+    Ok(Commit {
+        package: candidate,
+        patch: Patch {
+            artifacts: ExactArtifacts::new(source.state.source.shared_source(), target_bytes),
+            selector: edit.selector,
+            kind: edit.slot.kind,
+            before: edit.slot.text,
+            after,
+        },
+        diagnostics: Diagnostics {
+            changed: true,
+            created_objects: created,
+        },
+    })
+}
+
+/// Publish `after` as the label of `staged` (resolved from `source`) and
+/// strictly reopen: the candidate and the number of created objects, or
+/// `None` when nothing changes. Shared with the chart caption family.
+pub(super) fn publish(
+    source: &Package,
+    staged: &Slot,
+    after: Option<&Arc<str>>,
+) -> Result<Option<(Package, usize)>, Error> {
     if !source.state.source.source_is_exact() {
         return Err(Refusal::UnsupportedSource.into());
     }
-    let slot = resolve(source, edit.slot.selector, edit.slot.kind)?;
-    if slot != edit.slot {
+    let slot = reresolve(source, staged)?;
+    if slot != *staged {
         return Err(Error::PatchConflict);
     }
-    let other = match slot.kind {
-        Kind::Title => Kind::Caption,
-        Kind::Caption => Kind::Title,
+    let other = match slot.selection {
+        Selection::Drawable(selector) => {
+            let other = match slot.kind {
+                Kind::Title => Kind::Caption,
+                Kind::Caption => Kind::Title,
+            };
+            Some((other, resolve(source, selector, other)?.text))
+        },
+        // A chart's title is the chart-title family's, not a label graph.
+        Selection::Chart(_) => None,
     };
-    let other_before = resolve(source, slot.selector, other)?.text;
     let archive_limits = source
         .state
         .source
@@ -728,7 +915,7 @@ fn commit_edit(edit: Edit<'_>) -> Result<Commit, Error> {
         .map_err(graph::map_archive_error)?;
     let mut archive = graph::editable_archive(source, &slot.component)?;
     let mut created = Vec::new();
-    match (&after, slot.storage) {
+    match (after, slot.storage) {
         (Some(text), Some(storage)) => {
             // A present label: rewrite its storage text.
             let mut located = objects::storage_by_identifier(source, storage.get())?;
@@ -775,12 +962,19 @@ fn commit_edit(edit: Edit<'_>) -> Result<Commit, Error> {
             repoint_drawable(&mut archive, &slot, standin, archive_limits)?;
             created.push(standin);
         },
-        (None, None) => return Ok(unchanged(edit)),
+        (None, None) => return Ok(None),
     }
     let mut archives: Vec<(Arc<str>, Archive)> = vec![(Arc::clone(&slot.component), archive)];
     if let (Some(last), Some(metadata)) = (created.last(), objects::metadata(source)?) {
-        let payload =
-            metadata.registered(source, DOCUMENT_COMPONENT_IDENTIFIER, &created, *last)?;
+        // Body drawables register in the document component; a chart in
+        // the component that stores it (the host's `source.component_id`).
+        let component = match slot.selection {
+            Selection::Drawable(_) => DOCUMENT_COMPONENT_IDENTIFIER,
+            Selection::Chart(_) => metadata
+                .component_for_entry(&slot.component)?
+                .ok_or(Error::InvalidSource)?,
+        };
+        let payload = metadata.registered(source, component, &created, *last)?;
         let mut metadata_archive = graph::editable_archive(source, &metadata.component)?;
         metadata_archive
             .object_mut(metadata.object)
@@ -797,26 +991,15 @@ fn commit_edit(edit: Edit<'_>) -> Result<Commit, Error> {
         archives.push((Arc::clone(&metadata.component), metadata_archive));
     }
     let candidate = graph::publish_archives(source, archives)?;
-    if resolve(&candidate, slot.selector, slot.kind)?.text != after
-        || resolve(&candidate, slot.selector, other)?.text != other_before
+    if reresolve(&candidate, &slot)?.text.as_ref() != after {
+        return Err(Error::Verification);
+    }
+    if let (Selection::Drawable(selector), Some((other, before))) = (slot.selection, other)
+        && resolve(&candidate, selector, other)?.text != before
     {
         return Err(Error::Verification);
     }
-    let target_bytes = candidate.state.source.shared_source();
-    Ok(Commit {
-        package: candidate,
-        patch: Patch {
-            artifacts: ExactArtifacts::new(source.state.source.shared_source(), target_bytes),
-            selector: slot.selector,
-            kind: slot.kind,
-            before: slot.text,
-            after,
-        },
-        diagnostics: Diagnostics {
-            changed: true,
-            created_objects: created.len(),
-        },
-    })
+    Ok(Some((candidate, created.len())))
 }
 
 fn repoint_drawable(
@@ -834,14 +1017,7 @@ fn repoint_drawable(
         .ok_or(Error::InvalidSource)?
         .data
         .clone();
-    let nesting = if matches!(
-        slot.selector,
-        DrawableSelector::Shape(_) | DrawableSelector::TextBox(_)
-    ) {
-        caption::Nesting::Shape
-    } else {
-        caption::Nesting::Drawable
-    };
+    let nesting = slot.selection.nesting();
     let data = caption::repoint(&payload, nesting, slot.kind.label(), replacement)
         .map_err(|error| Error::from(graph::map_wire_error(error)))?;
     object
@@ -859,10 +1035,6 @@ fn repoint_drawable(
         .message_infos
         .get_mut(slot.message_index)
         .ok_or(Error::InvalidSource)?;
-    caption::replace_reference(
-        &mut info.object_references,
-        slot.reference.get(),
-        replacement,
-    );
-    Ok(())
+    caption::retarget_references(info, nesting, slot.reference.get(), replacement)
+        .map_err(|_| Error::InvalidSource)
 }
