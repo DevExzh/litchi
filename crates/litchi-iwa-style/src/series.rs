@@ -389,6 +389,14 @@ impl MutationScope {
         }
     }
 
+    /// Admit `member` without an object (the metadata members a
+    /// registration rewrites).
+    pub(crate) fn allow_member(&mut self, member: &str) {
+        if !self.allowed_members.iter().any(|known| known == member) {
+            self.allowed_members.push(member.to_owned());
+        }
+    }
+
     /// Admit chart drawable extension `fields`.
     pub(crate) fn allow_chart_fields(&mut self, fields: &[u32]) {
         for field in fields {

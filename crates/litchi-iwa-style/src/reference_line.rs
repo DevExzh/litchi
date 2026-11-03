@@ -793,3 +793,102 @@ pub fn set_lines(workspace: &mut Workspace<'_>, chart: u64, expected: &[Line]) -
     }
     Ok(true)
 }
+
+/// The chart archive field holding `TSCH.ChartReferenceLinesArchive`. A
+/// facade's locality check admits it beside the generated extension when a
+/// reference-line write's scope names it among the chart fields.
+pub const REFERENCE_LINES_FIELD: u32 = 10_005;
+
+/// The line objects of chart drawable `chart`, with their members.
+fn line_objects(workspace: &Workspace<'_>, chart: u64) -> Result<Vec<(u64, String)>> {
+    Ok(line_graph(workspace, chart)?
+        .slots
+        .into_iter()
+        .map(|slot| (slot.object, workspace.member(slot.location).to_owned()))
+        .collect())
+}
+
+/// [`lines`] under one residual profile (the bounded read the format
+/// facades run).
+///
+/// # Errors
+///
+/// An invalid chart, extension or reference-line object, or an exhausted
+/// limit.
+pub fn read_lines(
+    workspace: &Workspace<'_>,
+    chart: u64,
+    limits: crate::series::Limits,
+) -> crate::series::SymbolResult<(Vec<Line>, crate::series::Report)> {
+    let mut budget = crate::series::SymbolBudget::new(limits);
+    budget.work(workspace.source_work())?;
+    let value = lines(workspace, chart)?;
+    budget.work(value.len())?;
+    Ok((value, budget.report(false)))
+}
+
+/// [`set_lines`] under one residual profile, returning whether anything
+/// changed and the report with the mutation scope: the chart and every
+/// retained, removed and created line object, the chart's and metadata
+/// members, the chart and line message types, [`REFERENCE_LINES_FIELD`]
+/// among the chart fields, the created objects planned new and the removed
+/// ones planned removed.
+///
+/// # Errors
+///
+/// As [`set_lines`], or an exhausted limit.
+pub fn write_lines(
+    workspace: &mut Workspace<'_>,
+    chart: u64,
+    expected: &[Line],
+    limits: crate::series::Limits,
+) -> crate::series::SymbolResult<(bool, crate::series::Report)> {
+    let mut budget = crate::series::SymbolBudget::new(limits);
+    budget.work(workspace.source_work())?;
+    let before = line_objects(workspace, chart)?;
+    let chart_member = workspace.member(workspace.locate(chart)?).to_owned();
+    if !set_lines(workspace, chart, expected)? {
+        return Ok((false, budget.report(false)));
+    }
+    let after = line_objects(workspace, chart)?;
+    budget.work(before.len().saturating_add(after.len()))?;
+    let mut scope = crate::series::MutationScope::in_place(
+        chart,
+        vec![chart],
+        vec![chart_member.clone()],
+        vec![CHART_MESSAGE_TYPE, MESSAGE_TYPE, 11_006],
+        // The chart's generated extension and reference lines; the
+        // package-metadata UUID registrations and watermark.
+        vec![
+            EXTENSION_FIELD,
+            REFERENCE_LINES_FIELD,
+            1,
+            2,
+            3,
+            6,
+            8,
+            10,
+            11,
+            12,
+        ],
+        vec![REFERENCE_LINES_FIELD],
+    );
+    for member in [graph::METADATA_MEMBER, graph::DOCUMENT_METADATA_MEMBER] {
+        if workspace.has_member(member) {
+            scope.allow_member(member);
+        }
+    }
+    for (object, member) in &before {
+        scope.allow(*object, member, MESSAGE_TYPE);
+        if after.iter().all(|(kept, _)| kept != object) {
+            scope.plan(*object, member, MESSAGE_TYPE, false);
+        }
+    }
+    for (object, member) in &after {
+        if before.iter().all(|(kept, _)| kept != object) {
+            scope.plan(*object, member, MESSAGE_TYPE, true);
+        }
+    }
+    budget.set_scope(scope);
+    Ok((true, budget.report(true)))
+}

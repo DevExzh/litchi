@@ -10,6 +10,7 @@ pub(crate) mod body_chart_data;
 pub(crate) mod body_chart_font;
 pub(crate) mod body_chart_lifecycle;
 pub(crate) mod body_chart_metadata;
+pub(crate) mod body_chart_reference_lines;
 pub(crate) mod body_chart_series;
 pub(crate) mod body_chart_style;
 pub(crate) mod body_chart_text;

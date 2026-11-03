@@ -23356,6 +23356,7 @@
         "litchi_numbers::sheet::chart::style",
         "litchi_numbers::sheet::chart::lifecycle",
         "litchi_numbers::sheet::chart::legend_style",
+        "litchi_numbers::sheet::chart::reference_lines",
         "litchi_numbers::sheet::chart::font",
         "litchi_numbers::sheet::order",
         "litchi_numbers::sheet::chart::arrangement",
@@ -23492,6 +23493,10 @@
         {
           "method": "litchi_numbers::Package::apply_sheet_chart_legend_style",
           "ok": "litchi_numbers::sheet::chart::legend_style::Commit"
+        },
+        {
+          "method": "litchi_numbers::Package::apply_sheet_chart_reference_lines",
+          "ok": "litchi_numbers::sheet::chart::reference_lines::Commit"
         },
         {
           "method": "litchi_numbers::Package::apply_sheet_order",
@@ -24302,6 +24307,7 @@
         "litchi_numbers::sheet::chart::style",
         "litchi_numbers::sheet::chart::lifecycle",
         "litchi_numbers::sheet::chart::legend_style",
+        "litchi_numbers::sheet::chart::reference_lines",
         "litchi_numbers::sheet::chart::font",
         "litchi_numbers::sheet::order",
         "litchi_numbers::sheet::chart::arrangement",
@@ -24438,6 +24444,10 @@
         {
           "method": "litchi_numbers::Package::apply_sheet_chart_legend_style",
           "ok": "litchi_numbers::sheet::chart::legend_style::Commit"
+        },
+        {
+          "method": "litchi_numbers::Package::apply_sheet_chart_reference_lines",
+          "ok": "litchi_numbers::sheet::chart::reference_lines::Commit"
         },
         {
           "method": "litchi_numbers::Package::apply_sheet_order",
@@ -26070,6 +26080,7 @@
         "litchi_pages::chart::style",
         "litchi_pages::chart::axis",
         "litchi_pages::chart::legend_style",
+        "litchi_pages::chart::reference_lines",
         "litchi_pages::drawable::order",
         "litchi_pages::image::adjustments",
         "litchi_pages::table::appearance::transaction",
@@ -26191,6 +26202,10 @@
         {
           "method": "litchi_pages::Package::apply_body_chart_legend_style",
           "ok": "litchi_pages::chart::legend_style::Commit"
+        },
+        {
+          "method": "litchi_pages::Package::apply_body_chart_reference_lines",
+          "ok": "litchi_pages::chart::reference_lines::Commit"
         },
         {
           "method": "litchi_pages::Package::apply_body_drawable_order",
@@ -27708,6 +27723,7 @@
         "litchi_keynote::chart::style",
         "litchi_keynote::chart::axis",
         "litchi_keynote::chart::legend_style",
+        "litchi_keynote::chart::reference_lines",
         "litchi_keynote::background",
         "litchi_keynote::build::order",
         "litchi_keynote::slide::image::adjustments",
@@ -27832,6 +27848,10 @@
         {
           "method": "litchi_keynote::Package::apply_slide_chart_legend_style",
           "ok": "litchi_keynote::chart::legend_style::Commit"
+        },
+        {
+          "method": "litchi_keynote::Package::apply_slide_chart_reference_lines",
+          "ok": "litchi_keynote::chart::reference_lines::Commit"
         },
         {
           "method": "litchi_keynote::Package::apply_slide_creation",
@@ -29388,6 +29408,7 @@
         "litchi_keynote::chart::style",
         "litchi_keynote::chart::axis",
         "litchi_keynote::chart::legend_style",
+        "litchi_keynote::chart::reference_lines",
         "litchi_keynote::background",
         "litchi_keynote::build::order",
         "litchi_keynote::slide::image::adjustments",
@@ -29512,6 +29533,10 @@
         {
           "method": "litchi_keynote::Package::apply_slide_chart_legend_style",
           "ok": "litchi_keynote::chart::legend_style::Commit"
+        },
+        {
+          "method": "litchi_keynote::Package::apply_slide_chart_reference_lines",
+          "ok": "litchi_keynote::chart::reference_lines::Commit"
         },
         {
           "method": "litchi_keynote::Package::apply_slide_creation",
