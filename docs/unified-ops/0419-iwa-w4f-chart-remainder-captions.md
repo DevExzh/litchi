@@ -101,3 +101,24 @@ every state on each format (Tier A). Six macOS-queue rows added.
 
 Receipt `results/0419/callgrind-reference-lines.json`; raw captures in
 `.coord/iwa-w4f/cg2/`.
+
+### 2.1 Rows already served by a leaf route
+
+Three host-only rows needed only parity and a ledger flip:
+
+- Pages `body_chart_legend_visible` / `set_body_chart_legend_visible`:
+  `chart::style::Property::LegendVisible` (0414 slice 1) on
+  `pages_body_chart_options_{read,set}_parity` (Tier A); the existing W4-C
+  Pages style queue rows cover them.
+- Keynote `slide_chart_catalog`: the host route already reopens the package
+  through `litchi_keynote::Package::slide_chart_catalog`; the new
+  `keynote_slide_chart_catalog_read_parity` compares both on every slide of
+  the native chart fixture and of `basic.key` with a host-added chart (Tier
+  A, one queue row).
+
+### 2.2 Slice 2 gates
+
+Branch with trunk `4fc8e11883` merged at `c22d1206c0`; logs
+`.coord/iwa-w4f/gates2`: every command of the 0414 §8 list exits 0 (the
+same list as §1.1), plus the Python gates (boundaries, non-iWork, tool unit
+tests, ledger, OfficeCLI delta and corpus, bench matrix).

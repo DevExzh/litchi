@@ -416,3 +416,26 @@ fn keynote_slide_chart_add_parity() -> TestResult {
     .run()?;
     Ok(())
 }
+
+/// The host's `slide_chart_catalog` (which already reopens the package
+/// through the leaf) and the leaf catalog agree on a native chart fixture
+/// with a host-added chart, on every slide (record 0419).
+#[test]
+fn keynote_slide_chart_catalog_read_parity() -> TestResult {
+    let _ = (Tier::A, Evidence::Queued);
+    for bytes in [
+        chart_fixture()?.bytes,
+        fixture("iwork/keynote/chart-data-native.key")?.bytes,
+    ] {
+        let editor = keynote::Draft::from_bytes(&bytes)?;
+        let package = Package::from_bytes(&bytes)?;
+        for slide in 0..package.slides()?.len() {
+            assert_eq!(
+                editor.slide_chart_catalog(slide)?,
+                package.slide_chart_catalog(SlideSelector::index(slide))?,
+                "slide {slide}"
+            );
+        }
+    }
+    Ok(())
+}
