@@ -70,6 +70,7 @@ enum Operation {
     ShadowSet,
     CategoryLabelsSet,
     RadarSet,
+    ReferenceLinesSet,
 }
 
 const ROUTES: &[(&str, Format, Operation)] = &[
@@ -242,6 +243,21 @@ const ROUTES: &[(&str, Format, Operation)] = &[
     ("keynote_radar_set", Format::Keynote, Operation::RadarSet),
     ("pages_radar_set", Format::Pages, Operation::RadarSet),
     ("numbers_radar_set", Format::Numbers, Operation::RadarSet),
+    (
+        "keynote_reference_lines_set",
+        Format::Keynote,
+        Operation::ReferenceLinesSet,
+    ),
+    (
+        "pages_reference_lines_set",
+        Format::Pages,
+        Operation::ReferenceLinesSet,
+    ),
+    (
+        "numbers_reference_lines_set",
+        Format::Numbers,
+        Operation::ReferenceLinesSet,
+    ),
 ];
 
 const fn chart_kind(operation: Operation) -> Kind {
@@ -261,6 +277,7 @@ const fn chart_kind(operation: Operation) -> Kind {
         Operation::LightingSet => Kind::Column3d,
         Operation::ShadowSet | Operation::CategoryLabelsSet => Kind::Column2d,
         Operation::RadarSet => Kind::Radar2d,
+        Operation::ReferenceLinesSet => Kind::Column2d,
     }
 }
 
@@ -282,6 +299,10 @@ fn drop_shadow() -> TestResult<Drop> {
 
 fn layout() -> TestResult<Layout> {
     Ok(Layout::new(Frequency::Every(Interval::new(3)?), false))
+}
+
+fn reference_lines() -> Vec<litchi_iwa_common::chart::reference_line::Line> {
+    vec![litchi_iwa_common::chart::reference_line::Line::average()]
 }
 
 const fn radar_leaf() -> ChartProperty {
@@ -418,6 +439,9 @@ fn host_operation(input: &Input, source: &[u8], operation: Operation) -> TestRes
                 Operation::ShadowSet => {
                     e.set_slide_chart_shadow(slide, chart, ChartShadow::Grouped(drop_shadow()?))?;
                 },
+                Operation::ReferenceLinesSet => {
+                    e.set_slide_chart_reference_lines(slide, chart, &reference_lines())?;
+                },
                 Operation::RadarSet => {
                     e.set_slide_chart_radar_series_style(
                         slide,
@@ -486,6 +510,9 @@ fn host_operation(input: &Input, source: &[u8], operation: Operation) -> TestRes
                 Operation::ShadowSet => {
                     e.set_body_chart_shadow(chart, ChartShadow::Grouped(drop_shadow()?))?;
                 },
+                Operation::ReferenceLinesSet => {
+                    e.set_body_chart_reference_lines(chart, &reference_lines())?;
+                },
                 Operation::RadarSet => {
                     e.set_body_chart_radar_series_style(chart, ChartRadarSeriesStyle::Fill)?;
                 },
@@ -540,6 +567,9 @@ fn host_operation(input: &Input, source: &[u8], operation: Operation) -> TestRes
                 },
                 Operation::ShadowSet => {
                     e.set_sheet_chart_shadow(sheet, chart, ChartShadow::Grouped(drop_shadow()?))?;
+                },
+                Operation::ReferenceLinesSet => {
+                    e.set_sheet_chart_reference_lines(sheet, chart, &reference_lines())?;
                 },
                 Operation::RadarSet => {
                     e.set_sheet_chart_radar_series_style(
@@ -643,6 +673,11 @@ fn keynote_operation(source: &[u8], operation: Operation) -> TestResult<Vec<u8>>
         Operation::ShadowSet => {
             let mut edit = package.edit_slide_chart_style(slide, chart)?;
             edit.set(shadow_leaf()?)?;
+            leaf_bytes!(edit.commit()?.package())
+        },
+        Operation::ReferenceLinesSet => {
+            let mut edit = package.edit_slide_chart_reference_lines(slide, chart)?;
+            edit.set(reference_lines())?;
             leaf_bytes!(edit.commit()?.package())
         },
         Operation::RadarSet => {
@@ -768,6 +803,13 @@ fn pages_operation(source: &[u8], operation: Operation) -> TestResult<Vec<u8>> {
                 .commit()?
                 .package()
         ),
+        Operation::ReferenceLinesSet => leaf_bytes!(
+            package
+                .edit_body_chart_reference_lines(chart)?
+                .set(reference_lines())?
+                .commit()?
+                .package()
+        ),
         Operation::RadarSet => leaf_bytes!(
             package
                 .edit_body_chart_style(chart)?
@@ -858,6 +900,11 @@ fn numbers_operation(source: &[u8], operation: Operation) -> TestResult<Vec<u8>>
         Operation::ShadowSet => {
             let mut edit = package.edit_sheet_chart_style(0, 1)?;
             edit.set(shadow_leaf()?)?;
+            Ok(leaf_bytes!(edit.commit()?.package()))
+        },
+        Operation::ReferenceLinesSet => {
+            let mut edit = package.edit_sheet_chart_reference_lines(0, 1)?;
+            edit.set(reference_lines())?;
             Ok(leaf_bytes!(edit.commit()?.package()))
         },
         Operation::RadarSet => {

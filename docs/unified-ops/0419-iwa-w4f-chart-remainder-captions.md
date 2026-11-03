@@ -1,6 +1,6 @@
 # 0419 — W4-F: the remaining chart rows, captions and titles
 
-- Status: in progress on branch `uo2/iwa-w4f` (cut from trunk
+- Status: slices 1 and 2 merge-ready; the wave continues (§3). Branch `uo2/iwa-w4f` (cut from trunk
   `feat/unified-ops-api` at `02ad1c3981`).
 - Date: 2026-11-02.
 - Plan: [0363](0363-iwa-monolith-exit-plan.md) (§0 wave table, §3.2 API
@@ -68,3 +68,85 @@ fmt, clippy -D warnings on the five touched crates, the parity chart cases
 (328 passed), the crate-boundary check, the glossary, the ledger and the
 bench matrix exit 0 (logs `.coord/iwa-w4f/gates1b`). Target 13 GB after
 pruning.
+
+## 2. Slice 2: reference lines
+
+6 rows flip (set and read on each format).
+
+| Crate | What |
+|---|---|
+| `litchi-iwa-style` | `reference_line::{read_lines, write_lines}`: the W1-E graph engine (`lines`, `set_lines`, already host-differential since 0375a) under a residual `series::Limits` profile, returning a `Report` whose scope names the chart, every retained, removed and created line object, the chart and metadata members, the chart, line (5031) and package-metadata message types, and `REFERENCE_LINES_FIELD` (10005, the chart archive's `TSCH.ChartReferenceLinesArchive`) among the chart fields; created lines are planned new and removed ones planned removed. `series::MutationScope::allow_member` |
+| `litchi-numbers` | `sheet::chart::reference_lines` (`Package::sheet_chart_reference_lines`, `edit_sheet_chart_reference_lines` → `Edit::set(Vec<Line>)`, `apply_sheet_chart_reference_lines`): the legend-style shape, published through the chart-series workspace path |
+| `litchi-keynote` | `chart::reference_lines` on the chart-property core. The locality check admits the chart archive's field 10005 beside the generated extension when the write's chart fields name it, and line objects (5031) among the rewritable types |
+| `litchi-pages` | `chart::reference_lines` on the chart-property core. The locality check admits field 10005 of the chart message when the plan allows it, and a planned line object rewritten whole |
+
+The families share their format's chart-series `Error`, `LimitKind` and
+`Refusal`. More than five lines, a repeated kind or a line another chart
+lists refuse as the host does (`Error::InvalidSource`).
+
+Parity: `{numbers_sheet,keynote_slide,pages_body}_chart_reference_lines_set_parity`
+run five sequences per format through the facade with the inverse replayed:
+allocate two lines into an empty axis, patch one in place (name and value
+label), append one, remove one, remove all. Allocations are Tier B (the
+host draws random item UUIDs; compared with the UUIDs zeroed, as in 0375a);
+Numbers and Pages in-place and removal writes are byte-identical; Keynote
+is Tier B throughout (root previews). `…_reference_lines_read_parity` reads
+every state on each format (Tier A). Six macOS-queue rows added.
+
+| Route | Host Ir | Leaf Ir | Leaf/host |
+|---|---:|---:|---:|
+| keynote_reference_lines_set | 879,854,138 | 139,136,007 | 0.1581 |
+| pages_reference_lines_set | 1,276,021,892 | 88,109,646 | 0.0691 |
+| numbers_reference_lines_set | 214,628,424 | 115,862,233 | 0.5398 |
+
+Receipt `results/0419/callgrind-reference-lines.json`; raw captures in
+`.coord/iwa-w4f/cg2/`.
+
+### 2.1 Rows already served by a leaf route
+
+Three host-only rows needed only parity and a ledger flip:
+
+- Pages `body_chart_legend_visible` / `set_body_chart_legend_visible`:
+  `chart::style::Property::LegendVisible` (0414 slice 1) on
+  `pages_body_chart_options_{read,set}_parity` (Tier A); the existing W4-C
+  Pages style queue rows cover them.
+- Keynote `slide_chart_catalog`: the host route already reopens the package
+  through `litchi_keynote::Package::slide_chart_catalog`; the new
+  `keynote_slide_chart_catalog_read_parity` compares both on every slide of
+  the native chart fixture and of `basic.key` with a host-added chart (Tier
+  A, one queue row).
+
+### 2.2 Slice 2 gates
+
+Branch with trunk `4fc8e11883` merged at `c22d1206c0`; logs
+`.coord/iwa-w4f/gates2`: every command of the 0414 §8 list exits 0 (the
+same list as §1.1), plus the Python gates (boundaries, non-iWork, tool unit
+tests, ledger, OfficeCLI delta and corpus, bench matrix).
+
+## 3. Remaining rows and successor brief
+
+Still host-only in W4-F's scope after slice 2:
+
+| Item | Rows (K / P / N) | Plan |
+|---|---|---|
+| value-axis bounds, scale, steps (`chart.legend_axis`) | – / 6 / 6 | Lift the value types (`ValueAxisSettings`, `Bounds`, `Bound`, `Steps`, `MajorStepCount`, `MinorStepCount`, `Scale`, now in `litchi_keynote::chart::axis`) to `litchi-iwa-common::chart::axis` (Keynote re-exports at the same path) and the payload rules over `litchi_iwa_protos::keynote_chart_axis_value_settings_codec` (`common_settings`, `validate_settings`, `codec_settings`/`codec_write` in `crates/litchi-keynote/src/package/slide_chart_value_axis.rs`) into a `litchi_iwa_style::value_axis` module with a bounded read/write behind the chart-property cores (in-place scope of the value-axis style object 5027, as `chart_style::write_axis`). Keynote's 2,600-line bespoke transaction then calls the engine; Pages and Numbers get `{body,sheet}_chart_value_axis_settings` / `edit_…` (`set`, `set_bounds`, `set_steps`, `set_scale`) / `apply_…`. Host routes: `{pages,numbers}/editor/charts/axis_{bounds,scale,steps}.rs` over `charts/axis_{bounds,scale,steps}.rs` |
+| image fills: chart background, series, symbol (`chart.style`) | 3 / 3 / 3 | Media-backed fills through the data-owner transitions; model: Pages 0413b/0415 and `litchi_iwa_style::shape::{ReleasingFills, stored_fill}`. Today `Refusal::ImageFill` in `chart_style::chart::rewrite`, `series::style::rewrite` and the legend-style engine |
+| shared caption lift | – | One commit lifting the Keynote (W1-C, 0372) and Pages caption code into `litchi-iwa-style` (shapes, images, movies, chart drawables), Keynote and Pages moved onto it, copies deleted |
+| Numbers drawable captions and titles | – / – / 15 | `numbers/editor/{sheet_shapes/caption.rs, sheet_images.rs, sheet_movies/caption.rs}` on the lifted engine |
+| chart captions (`chart.text`) | – / 3 / 3 | `{pages,numbers}/editor/…/caption.rs` on the lifted engine |
+
+Patterns that worked here: a chart-wide property stored in series styles
+goes in the chart style family and receives the visible series count
+(`read_chart`/`write_chart`); an allocating engine reports a `MutationScope`
+whose new objects are only *planned* (never `allow`ed: the Pages plan
+requires allowed objects to exist in the source) and whose allowed fields
+include every outer field the locality checks must exempt; the Numbers
+family follows `sheet_chart_legend_style.rs` (workspace + `publish_changes_exact`).
+The cost probe is `chart_property_cost.rs` (`W4C_ROUTE`), the receipt
+writer `.coord/iwa-w4f/tools/receipt.py`.
+
+Post-merge (trunk `d4121f4af7` merged at `c5effae1c6`, mac-queue conflict
+resolved by keeping both sides): fmt, clippy -D warnings on the five touched
+crates, the parity chart cases (337 passed), glossary, crate boundaries,
+ledger and bench matrix exit 0 (logs `.coord/iwa-w4f/gates2b`). Target
+13 GB.
