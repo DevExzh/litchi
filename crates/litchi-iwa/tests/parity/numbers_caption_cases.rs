@@ -263,10 +263,6 @@ fn numbers_sheet_movie_caption_remove_parity() -> TestResult {
 }
 
 /// Replacing a present chart caption's text (the host-added caption).
-/// Authoring a new caption on a chart stored beside the calculation engine
-/// needs the host's componentized layout, which the leaf refuses
-/// (`numbers_sheet_chart_caption_componentized_refuses`), so
-/// `set_sheet_chart_caption` stays host-only.
 #[test]
 fn numbers_sheet_chart_caption_replace_parity() -> TestResult {
     let _ = (Tier::B, Evidence::Queued);
@@ -279,20 +275,18 @@ fn numbers_sheet_chart_caption_replace_parity() -> TestResult {
     )
 }
 
-/// The leaf refuses a new caption in the componentized layout (typed),
-/// leaving the source unchanged, where the host authors one.
+/// A new caption on a chart stored beside the calculation engine: the
+/// componentized graph (style in the document stylesheet, registered there
+/// and referenced from the chart's component; swapped placement anchors),
+/// then text replacement on the host-labelled chart.
 #[test]
-fn numbers_sheet_chart_caption_componentized_refuses() -> TestResult {
-    use litchi_numbers::sheet::drawable::caption::{Error, Refusal};
-    let source = input(Kind::Chart)?;
-    host_route(&source.bytes, Kind::Chart, Label::Caption, Some("New"))?;
-    let package = Package::from_bytes(&source.bytes)?;
-    let mut edit = package.edit_sheet_drawable_caption(0, selector(Kind::Chart), Label::Caption)?;
-    edit.set("New")?;
-    match edit.commit() {
-        Err(Error::Refused(Refusal::ComponentizedLayout)) => Ok(()),
-        other => Err(format!("expected the componentized refusal, got {other:?}").into()),
-    }
+fn numbers_sheet_chart_caption_set_parity() -> TestResult {
+    let _ = (Tier::B, Evidence::Queued);
+    set_cases(
+        "numbers_sheet_chart_caption_set_parity",
+        Kind::Chart,
+        Label::Caption,
+    )
 }
 
 #[test]
@@ -351,6 +345,13 @@ const COST_ROUTES: &[(&str, Kind, Label, Option<&str>, bool)] = &[
         Label::Caption,
         None,
         true,
+    ),
+    (
+        "chart_caption_create",
+        Kind::Chart,
+        Label::Caption,
+        Some("Zürich — 2026"),
+        false,
     ),
 ];
 

@@ -7,9 +7,10 @@
 //! info with a private text storage, shape style and placement in the
 //! drawable's component, an absent one an empty stand-in. Setting a present
 //! label rewrites its storage text; setting an absent one authors the
-//! native inline graph; clearing a present label points the drawable at a
-//! fresh stand-in and keeps the old graph, as the application does for
-//! undo. New objects get UUIDs in the drawable's component and raise the
+//! native graph (inline; for a chart stored beside the calculation engine,
+//! the componentized graph whose style lives in the document stylesheet);
+//! clearing a present label points the drawable at a fresh stand-in and
+//! keeps the old graph, as the application does for undo. New objects get UUIDs in the drawable's component and raise the
 //! identifier watermark (the host's `set_sheet_{shape,image,movie}_{title,
 //! caption}`, `remove_*` and `set_sheet_chart_caption`). A chart has a
 //! caption only; its title is the chart-title family's.
@@ -97,12 +98,6 @@ pub enum Refusal {
     /// Authoring a new label needs a positive displayed width.
     #[error("the drawable has no displayed width for a new label")]
     NoWidth,
-    /// A new chart caption in a chart stored beside the calculation engine
-    /// needs the host's componentized graph (its style in the document
-    /// stylesheet), which this family does not author; replacing or
-    /// removing a present caption is supported.
-    #[error("a new caption of this chart needs the componentized caption layout")]
-    ComponentizedLayout,
     /// A second operation was staged on one edit.
     #[error("one label edit stages one operation")]
     OperationAlreadyStaged,
@@ -127,7 +122,6 @@ impl Refusal {
             Self::NoLabel { .. } => RefusalKind::UnsupportedTarget,
             Self::ReservedMarker => RefusalKind::InvalidValue,
             Self::DependentContent
-            | Self::ComponentizedLayout
             | Self::NoWidth
             | Self::UnsupportedDependency
             | Self::UnsupportedSource => RefusalKind::UnsupportedContent,
@@ -295,19 +289,18 @@ impl Edit<'_> {
             ..self.target
         };
         let other_before = caption::read(&working, other)?;
-        if self.chart
-            && text.is_some()
-            && self.before.is_none()
+        let layout = if self.chart
             && caption::component_holds(
                 &working,
                 self.target.drawable,
                 CALCULATION_ENGINE_MESSAGE_TYPE,
-            )?
-        {
-            return Err(Refusal::ComponentizedLayout.into());
-        }
+            )? {
+            caption::Layout::Componentized
+        } else {
+            caption::Layout::Inline
+        };
         let source = self.source;
-        let written = caption::write(&mut working, self.target, text, |_| {
+        let written = caption::write(&mut working, self.target, text, layout, |_| {
             theme(source).map_err(|_| {
                 caption::Error::Graph(litchi_iwa_style::graph::Error::Invalid(
                     "a document without a caption theme",
@@ -391,9 +384,8 @@ fn resolve(
         .ok_or(Refusal::DrawableNotFound { selector })?;
     let nesting = match (entry.kind, label) {
         (Kind::Shape, _) => caption::Nesting::Shape,
-        (Kind::Image | Kind::Movie, _) | (Kind::Chart, Label::Caption) => {
-            caption::Nesting::Drawable
-        },
+        (Kind::Image | Kind::Movie, _) => caption::Nesting::Drawable,
+        (Kind::Chart, Label::Caption) => caption::Nesting::Chart,
         _ => {
             return Err(Refusal::NoLabel {
                 kind: entry.kind.name(),

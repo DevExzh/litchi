@@ -1,0 +1,61 @@
+{
+  "record": "0427",
+  "binary_sha256": "2d24d046d805177b300662ae46b564d274283994307d8fa29d79b6ee2b87bbf2",
+  "build": "source .coord/iwa-w4n/env.sh; cargo test --release -p litchi-iwa --all-features --test parity --no-run",
+  "run": "cd crates/litchi-iwa; <VAR>=<route> taskset -c 3 valgrind --tool=callgrind <binary> --ignored --exact <probe> --test-threads=1 (Numbers: W4L_ROUTE, numbers_caption_cases::numbers_caption_route_cost_abba; Pages: W4N_ROUTE, pages_chart_caption_cases::pages_chart_caption_route_cost_abba)",
+  "metric": "inclusive Ir of the probe host route / leaf route functions, two calls each (ABBA)",
+  "budget": "leaf <= 1.05 x host",
+  "captures_dir": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-w4n/cg (outside the repository)",
+  "routes": [
+    {
+      "format": "numbers",
+      "route": "chart_caption_create",
+      "host_ir": 349426883,
+      "leaf_ir": 133027390,
+      "leaf_over_host": 0.380702,
+      "capture": "chart_caption_create.cg",
+      "capture_bytes": 436243,
+      "capture_sha256": "4bf25b28c574fe75dd85fff37a995fe35531b8b02b0bd083b8334f5ed04b312e"
+    },
+    {
+      "format": "numbers",
+      "route": "chart_caption_remove",
+      "host_ir": 283406844,
+      "leaf_ir": 84125663,
+      "leaf_over_host": 0.296837,
+      "capture": "chart_caption_remove.cg",
+      "capture_bytes": 431512,
+      "capture_sha256": "df0c567f995571327a02ad03c54fd3e51e08bf58ac54b6a97dd56b7d147cf711"
+    },
+    {
+      "format": "pages",
+      "route": "pages_chart_caption_create",
+      "host_ir": 721996966,
+      "leaf_ir": 77019605,
+      "leaf_over_host": 0.106676,
+      "capture": "pages_chart_caption_create.cg",
+      "capture_bytes": 371379,
+      "capture_sha256": "923e136984a25f654451de3e71188c71bcd290866fde425522fb666947965a09"
+    },
+    {
+      "format": "pages",
+      "route": "pages_chart_caption_replace",
+      "host_ir": 854289806,
+      "leaf_ir": 52913733,
+      "leaf_over_host": 0.061939,
+      "capture": "pages_chart_caption_replace.cg",
+      "capture_bytes": 371198,
+      "capture_sha256": "f00d477094cd5458ad4c54b571de86a76bbbbbc03cbeff1b1fb38cad48b4587e"
+    },
+    {
+      "format": "pages",
+      "route": "pages_chart_caption_remove",
+      "host_ir": 824412075,
+      "leaf_ir": 76218406,
+      "leaf_over_host": 0.092452,
+      "capture": "pages_chart_caption_remove.cg",
+      "capture_bytes": 370381,
+      "capture_sha256": "4eade6c4edf121f3bac499f3ccf217b869ac0d781620e1f5c77d82040d6f72a8"
+    }
+  ]
+}
