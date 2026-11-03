@@ -1518,7 +1518,7 @@ fn axis_objects(references: &StyleReferences, axis: Axis, archive: Archive) -> &
 
 /// How many chart references in the workspace name `style` in the role of
 /// `archive` (chart-level, or any axis).
-fn owners(
+pub(crate) fn owners(
     workspace: &Workspace<'_>,
     style: u64,
     archive: Archive,
@@ -1550,7 +1550,7 @@ fn owners(
 }
 
 /// The style object of `archive` the chart (on `axis`) references.
-fn style_object(
+pub(crate) fn style_object(
     workspace: &Workspace<'_>,
     chart: u64,
     archive: Archive,
@@ -1571,7 +1571,7 @@ fn style_object(
 }
 
 /// The in-place scope of rewriting `object` (messages of `message_type`).
-fn in_place_scope(
+pub(crate) fn in_place_scope(
     workspace: &Workspace<'_>,
     chart: u64,
     object: u64,
@@ -1598,7 +1598,7 @@ fn in_place_scope(
 
 /// Rewrite the unique `message_type` payload of `object` with `rewrite`,
 /// returning whether it changed.
-fn rewrite_in_place(
+pub(crate) fn rewrite_in_place(
     workspace: &mut Workspace<'_>,
     object: u64,
     message_type: u32,
@@ -1622,7 +1622,7 @@ fn rewrite_in_place(
     Ok(true)
 }
 
-fn read_payload<T>(
+pub(crate) fn read_payload<T>(
     workspace: &Workspace<'_>,
     object: u64,
     message_type: u32,

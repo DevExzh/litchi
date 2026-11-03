@@ -32,7 +32,9 @@
 //! - [`shape`]: the shape-style variation graph engine (copy-on-write
 //!   `TSWP.ShapeStyleArchive` variations) and the fill and stroke;
 //! - [`shape_path`]: the preset path sources a shape draws, in both
-//!   directions.
+//!   directions;
+//! - [`value_axis`]: the bounds, step counts and scale of a chart's primary
+//!   value axis.
 //!
 //! Every entry point that reads untrusted bytes takes explicit limits.
 
@@ -52,3 +54,4 @@ pub mod reference_line;
 pub mod series;
 pub mod shape;
 pub mod shape_path;
+pub mod value_axis;

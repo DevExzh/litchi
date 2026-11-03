@@ -260,6 +260,10 @@ pub enum Refusal {
     MissingStyle,
     /// The property does not exist on the requested axis.
     UnsupportedAxis,
+    /// The value cannot be stored natively (value-axis settings with a
+    /// non-finite endpoint, an inverted range, or a non-positive endpoint
+    /// on a logarithmic axis).
+    InvalidSettings,
 }
 
 impl fmt::Display for Refusal {
@@ -270,6 +274,7 @@ impl fmt::Display for Refusal {
             Self::ImageFill => "image fills are not written by this property",
             Self::MissingStyle => "the chart has no style object for the property",
             Self::UnsupportedAxis => "the property does not exist on this axis",
+            Self::InvalidSettings => "the value cannot be stored natively",
         })
     }
 }
