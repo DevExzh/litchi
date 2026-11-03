@@ -411,3 +411,44 @@ fn leaf_tables(bytes: &[u8]) -> TestResult<String> {
             .collect::<Vec<_>>()
     ))
 }
+
+#[inline(never)]
+fn w4m_first_table_host(source: &[u8]) -> TestResult<Vec<u8>> {
+    let mut editor = litchi_iwa::pages::Draft::from_bytes(source)?;
+    drop(editor.add_table(6, "Litchi table", 3, 4)?);
+    Ok(editor.to_bytes()?)
+}
+
+#[inline(never)]
+fn w4m_first_table_leaf(source: &[u8]) -> TestResult<Vec<u8>> {
+    let package = litchi_pages::Package::from_bytes(source)?;
+    let commit = package
+        .edit_body_table_creation()
+        .insert(
+            litchi_core::Position::new(6),
+            litchi_pages::table::creation::NewTable::new(3, 4).with_name("Litchi table"),
+        )?
+        .commit()?;
+    Ok(leaf_bytes!(commit.package()))
+}
+
+/// Paired host-vs-leaf cost of the first-table insertion (record 0426):
+/// open + insert + commit + serialize, ABBA; read the inclusive cost of
+/// `w4m_first_table_{host,leaf}` under callgrind.
+#[test]
+#[ignore = "callgrind cost probe (record 0426)"]
+fn w4m_first_table_cost_abba() -> TestResult {
+    let input = leaf_bytes!(
+        &litchi_pages::builder::Builder::new()
+            .identity(litchi_pages::builder::Identity::from_bytes([7; 16]))
+            .body_text("Hello table world")
+            .build()?
+    );
+    let a1 = std::hint::black_box(w4m_first_table_host(&input)?);
+    let b1 = std::hint::black_box(w4m_first_table_leaf(&input)?);
+    let b2 = std::hint::black_box(w4m_first_table_leaf(&input)?);
+    let a2 = std::hint::black_box(w4m_first_table_host(&input)?);
+    assert_eq!(b1, b2, "the leaf route is deterministic");
+    assert!(!a1.is_empty() && !a2.is_empty());
+    Ok(())
+}
