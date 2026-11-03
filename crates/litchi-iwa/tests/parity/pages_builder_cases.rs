@@ -160,6 +160,83 @@ fn pages_builder_create_parity() -> TestResult {
     Ok(())
 }
 
+/// Host `pages::Builder::body_table` against the leaf builder's
+/// from-scratch table graph (record 0420): one table after body text, and
+/// two tables (the second cloned from the first by both sides). The host
+/// draws the table, owner, UID-map and object UUIDs at random; they are
+/// compared by form.
+#[test]
+fn pages_builder_body_table_parity() -> TestResult {
+    let _ = (Tier::B, Evidence::Queued);
+    for (text, tables) in [
+        ("", vec![("Table 1", 3, 2)]),
+        ("Budget", vec![("Q1", 5, 4)]),
+        ("Two", vec![("First", 2, 2), ("Second", 4, 3)]),
+    ] {
+        let mut host = litchi_iwa::pages::Builder::new().body_text(text);
+        for (name, rows, columns) in &tables {
+            host = host.body_table(*name, *rows, *columns);
+        }
+        let host_bytes = host.build()?.to_bytes()?;
+        let identity = identity(&host_bytes)?;
+        let leaf_tables = tables.clone();
+        let leaf = move |_source: &[u8]| -> TestResult<LeafRun> {
+            let mut builder = litchi_pages::builder::Builder::new()
+                .identity(identity)
+                .body_text(text);
+            for (name, rows, columns) in &leaf_tables {
+                builder =
+                    builder.body_table(*name, u32::try_from(*rows)?, u32::try_from(*columns)?);
+            }
+            Ok(LeafRun::output(leaf_bytes!(&builder.build()?)))
+        };
+        let input = Fixture {
+            path: "builder",
+            bytes: leaf_bytes!(&litchi_pages::Package::new()?),
+        };
+        Case::new(
+            "pages_builder_body_table_parity",
+            Format::Pages,
+            Tier::B,
+            Evidence::Queued,
+            &input,
+        )
+        .known_fields(|known| {
+            known
+                .with(
+                    11_006,
+                    "TSP.PackageMetadata (object UUIDs by form)",
+                    metadata_without_object_uuids,
+                )
+                .with(
+                    6_001,
+                    "TST.TableModelArchive (table UUID by form)",
+                    crate::numbers_builder_cases::model_without_table_uuid,
+                )
+                .with(
+                    4_008,
+                    "TSCE.FormulaOwnerDependenciesArchive (owner UUID by form)",
+                    crate::numbers_builder_cases::owner_without_uuid,
+                )
+                .with(
+                    4_000,
+                    "TSCE.CalculationEngineArchive (owner-map UUIDs by form)",
+                    crate::numbers_builder_cases::engine_without_owner_uuids,
+                )
+                .with(
+                    6_267,
+                    "TST.ColumnRowUIDMapArchive (UIDs by form)",
+                    crate::numbers_builder_cases::uid_map_by_form,
+                )
+        })
+        .host(move |_source| Ok(host_bytes.clone()))
+        .leaf(leaf)
+        .run()
+        .map_err(|error| format!("{text:?} {tables:?}: {error}"))?;
+    }
+    Ok(())
+}
+
 #[test]
 #[ignore = "callgrind cost probe (record 0371)"]
 fn builder_language_locale_cost_abba() -> TestResult {
