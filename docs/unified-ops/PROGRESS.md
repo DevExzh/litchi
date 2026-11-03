@@ -7607,3 +7607,10 @@ See [0063](0063-source-pptx-modern-comments.md).
   - W4-I (0422): value axis, chart image fills, the shared caption lift and captions;
   - W4-J (0423): Keynote add_slide_table, Pages chart duplicate/remove, Numbers shape image fill, Keynote line-end on the shared workspace.
 - Ledger: 2,065 migrated, 117 retired and 52 host-only rows (Numbers 34, Pages 14, Keynote 4). Nothing pushed.
+- Full gate on `ba2d1dbd82`: all 53 rows passed (finished 2026-11-03T07:23:30Z; summary SHA-256 `0469aba803e37267e8991f233d1a6832ab5cb1ea8eb61eee38da8b600fe48c2e`).
+- Merged since then:
+  - W4-H 0421 (`d6842ba024`, shared `litchi_iwa_table::sort` lifted from Pages; Numbers sort order, Sort Now and pivot categories) and 0421a (`cf6bca9146`, Keynote sort on the shared executor, about 670 lines deleted, byte-identical);
+  - W4-I 0422 (`41ee75653b`, `0ea106b34c`): shared `value_axis` and `data_owner`; value axis on Pages and Numbers; chart background images on all three formats;
+  - W4-J 0423 (`a077aeeb43`): shared `structure::create`; Keynote add_slide_table; Numbers shape image fill on `data_owner`;
+  - W4-K 0424 (`e98363dbd1`): opaque `#[non_exhaustive] Aggregate` (no source names the codes, so the names are mac-queued); pivot-category formula references with host validation.
+- Active: W4-L (0425: series/symbol image fills, shared caption lift, Numbers and chart captions) and W4-M (0426: Pages chart duplicate/remove, Numbers image-fill replace, Keynote line-end on the shared workspace, Pages table insert into a table-less document).
