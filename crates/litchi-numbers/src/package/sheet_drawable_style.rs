@@ -5,6 +5,13 @@
 //! `style_graph` performs the bounded exact-source reassembly and strict
 //! candidate reopen.  The public surface intentionally keeps native object
 //! identifiers, archives and protobuf payloads private.
+//!
+//! An image fill (record 0423, the host's `set_sheet_shape_image_fill`)
+//! follows the Pages sequence of record 0413b: the fill is planned on the
+//! style graph, then the graph's edits are composed on the structural
+//! working set, where the bytes become a new `Data/` member with its
+//! `DataInfo` record and the drawable's style variation becomes the
+//! registered owner of the data reference.
 
 #![allow(
     clippy::arbitrary_source_item_ordering,
@@ -13,9 +20,12 @@
 
 use std::fmt;
 use std::mem::{size_of, size_of_val};
+use std::sync::Arc;
 
+use litchi_iwa_common::color::Rgba;
+use litchi_iwa_common::shape::fill::ImageTechnique;
 use litchi_iwa_core::Limits;
-use litchi_iwa_style::graph::Workspace;
+use litchi_iwa_style::graph::{Changes, Workspace};
 use litchi_iwa_style::shape::{
     self as engine, ShapeProperty, Slot, Styles,
     property::{Fills, Shadows, ShapeEffects, Strokes, TextColumns, TextLayout},
@@ -53,9 +63,16 @@ pub enum Refusal {
         /// The requested semantic property.
         property: PropertyKind,
     },
-    /// Image fills require the format family's media/reference transaction.
-    #[error("image fills are not written by the sheet-drawable style family")]
+    /// An image fill is staged through [`Property::Fill`] instead of
+    /// [`Edit::set_image_fill`], the drawable already shows an image fill
+    /// (replacing or releasing one is not supported here), or a second
+    /// image fill is staged.
+    #[error("this image fill cannot be written by the sheet-drawable style family")]
     ImageFill,
+    /// The image-fill bytes are not an image, the file name has no stem, or
+    /// the shape has no frame size to lay the image out on.
+    #[error("the image-fill data, file name or frame is unusable")]
+    InvalidImage,
     /// The selected style graph contains overrides this route cannot rewrite.
     #[error("the selected drawable's style cannot be rewritten safely")]
     UnsupportedStyle,
@@ -78,6 +95,7 @@ impl Refusal {
         match self {
             Self::SheetNotFound | Self::DrawableNotFound { .. } => RefusalKind::NotFound,
             Self::UnsupportedProperty { .. } => RefusalKind::UnsupportedTarget,
+            Self::InvalidImage => RefusalKind::InvalidValue,
             Self::ImageFill
             | Self::UnsupportedStyle
             | Self::UnsupportedDependency
@@ -159,6 +177,27 @@ impl From<litchi_iwa_style::graph::Error> for Error {
 enum Change {
     Set(Property),
     Reset(PropertyKind),
+    ImageFill(Box<NewImageFill>),
+}
+
+/// A staged image fill: the bytes, their preferred file name, the layout
+/// and the optional tint.
+#[derive(Debug, Clone, PartialEq)]
+struct NewImageFill {
+    bytes: Arc<[u8]>,
+    file_name: String,
+    technique: ImageTechnique,
+    tint: Option<Rgba>,
+}
+
+/// The data asset an image fill embeds (the host media draft's
+/// `insert_unreferenced`: the next data identifier, stored as
+/// `stem-identifier.extension`).
+struct StagedImage {
+    data: u64,
+    bytes: Arc<[u8]>,
+    file_name: String,
+    stored_name: String,
 }
 
 /// A deliberately small bound on caller-controlled staging.  The value is
@@ -188,6 +227,8 @@ fn change_cost(change: &Change) -> usize {
         .saturating_add(match change {
             Change::Set(property) => property_heap_bytes(property),
             Change::Reset(_) => 0,
+            // The bytes are shared, not copied; only the name is staged.
+            Change::ImageFill(image) => image.file_name.len(),
         })
 }
 
@@ -233,6 +274,7 @@ struct ResetExpectation {
 enum FinalState {
     Set(Property),
     Reset(ResetExpectation),
+    ImageFill(u64),
 }
 
 fn resolve_sheet(package: &Package, selector: SheetSelector<'_>) -> Result<usize, Error> {
@@ -305,13 +347,7 @@ fn workspace(
 
 fn read(workspace: &Workspace<'_>, drawable: u64, kind: PropertyKind) -> Result<Property, Error> {
     Ok(match kind {
-        PropertyKind::Fill => {
-            let fill = engine::value(workspace, drawable, &Fills)?;
-            if matches!(fill, Fill::Image(_)) {
-                return Err(Refusal::ImageFill.into());
-            }
-            Property::Fill(fill)
-        },
+        PropertyKind::Fill => Property::Fill(engine::value(workspace, drawable, &Fills)?),
         PropertyKind::Stroke => Property::Stroke(engine::value(workspace, drawable, &Strokes)?),
         PropertyKind::Effects => {
             Property::Effects(engine::value(workspace, drawable, &ShapeEffects)?)
@@ -411,6 +447,7 @@ fn apply_change(
         Change::Reset(PropertyKind::Effects) => engine::reset(workspace, drawable, &ShapeEffects)?,
         Change::Reset(PropertyKind::TextLayout) => engine::reset(workspace, drawable, &TextLayout)?,
         Change::Reset(PropertyKind::Columns) => engine::reset(workspace, drawable, &TextColumns)?,
+        Change::ImageFill(_) => return Err(Refusal::ImageFill.into()),
     })
 }
 
@@ -617,6 +654,35 @@ impl Edit<'_> {
         self.stage(Change::Set(property))
     }
 
+    /// Stage embedding `bytes` as a new `Data/` member and making them the
+    /// selected shape's or text box's image fill, laid out by `technique`
+    /// over its frame size and optionally tinted (the host's
+    /// `set_sheet_shape_image_fill`). The drawable's style variation owns
+    /// the new data reference.
+    ///
+    /// # Errors
+    ///
+    /// [`Refusal::UnsupportedProperty`] for a line; at commit,
+    /// [`Refusal::InvalidImage`] for bytes that are not an image, a file
+    /// name without a stem or a drawable without a frame size, and
+    /// [`Refusal::ImageFill`] when the drawable already shows an image fill
+    /// or a second one is staged.
+    pub fn set_image_fill(
+        &mut self,
+        bytes: &[u8],
+        file_name: &str,
+        technique: ImageTechnique,
+        tint: Option<Rgba>,
+    ) -> Result<&mut Self, Error> {
+        ensure_property(self.kind, PropertyKind::Fill)?;
+        self.stage(Change::ImageFill(Box::new(NewImageFill {
+            bytes: Arc::from(bytes),
+            file_name: file_name.to_owned(),
+            technique,
+            tint,
+        })))
+    }
+
     /// Stage removal of the selected drawable's own override.
     pub fn reset(&mut self, kind: PropertyKind) -> Result<&mut Self, Error> {
         ensure_property(self.kind, kind)?;
@@ -642,8 +708,24 @@ impl Edit<'_> {
         }) {
             ensure_line(self.source, self.drawable)?;
         }
+        let mut image: Option<StagedImage> = None;
         for change in &self.changes {
             match change {
+                Change::ImageFill(request) => {
+                    if image.is_some()
+                        || matches!(
+                            engine::value(&working, self.drawable, &Fills)?,
+                            Fill::Image(_)
+                        )
+                    {
+                        return Err(Refusal::ImageFill.into());
+                    }
+                    let staged = stage_image(self.source, request)?;
+                    apply_image_fill(self.source, &mut working, self.drawable, &staged, request)?;
+                    final_states[property_index(PropertyKind::Fill)] =
+                        Some(FinalState::ImageFill(staged.data));
+                    image = Some(staged);
+                },
                 Change::Reset(PropertyKind::LineEndpoints) => {
                     apply_change(&mut working, self.drawable, change)?;
                     final_states[property_index(PropertyKind::LineEndpoints)] = Some(
@@ -674,7 +756,10 @@ impl Edit<'_> {
         if changes.is_empty() {
             return Commit::unchanged(self.source);
         }
-        let published = numbers_style_graph::publish(self.source, changes).map_err(Error::from)?;
+        let published = match &image {
+            Some(image) => publish_image(self.source, changes, self.drawable, image)?,
+            None => numbers_style_graph::publish(self.source, changes).map_err(Error::from)?,
+        };
         let (components, limits) = workspace(&published.package)?;
         let reopened = Workspace::new(&components, limits)?;
         for state in final_states.into_iter().flatten() {
@@ -688,6 +773,15 @@ impl Edit<'_> {
                 FinalState::Reset(expectation) => {
                     let kind = expectation.effective.kind();
                     verify_reset_candidate(&reopened, self.drawable, kind, &expectation)?;
+                },
+                FinalState::ImageFill(data) => {
+                    let Fill::Image(image) = engine::value(&reopened, self.drawable, &Fills)?
+                    else {
+                        return Err(Error::Verification);
+                    };
+                    if image.data().map(|data| data.get()) != Some(data) {
+                        return Err(Error::Verification);
+                    }
                 },
             }
         }
@@ -739,3 +833,162 @@ impl Package {
         apply_patch(self, patch)
     }
 }
+
+/// Validate an image fill's bytes and name and allocate its data asset.
+fn stage_image(source: &Package, request: &NewImageFill) -> Result<StagedImage, Error> {
+    if litchi_iwa_common::media::Type::from_bytes(&request.bytes)
+        != litchi_iwa_common::media::Type::Image
+    {
+        return Err(Refusal::InvalidImage.into());
+    }
+    let working = structure::Working::new(source)?;
+    let data = structure::metadata::next_data_identifier(
+        &working,
+        &structure::metadata::Transition::default(),
+    )?;
+    let stored_name = super::sheet_drawable_media::materialized_name(&request.file_name, data)
+        .map_err(|_error| Refusal::InvalidImage)?;
+    let member = format!("Data/{stored_name}");
+    if structure::exact_source(source)?
+        .package()
+        .iter()
+        .any(|entry| entry.name() == member)
+    {
+        return Err(Error::InvalidSource);
+    }
+    Ok(StagedImage {
+        data,
+        bytes: Arc::clone(&request.bytes),
+        file_name: request.file_name.clone(),
+        stored_name,
+    })
+}
+
+/// Plan the embedded image fill of `image` over the drawable's frame size
+/// on the style graph.
+fn apply_image_fill(
+    source: &Package,
+    workspace: &mut Workspace<'_>,
+    drawable: u64,
+    image: &StagedImage,
+    request: &NewImageFill,
+) -> Result<(), Error> {
+    use litchi_iwa_common::shape::fill::{Image, ImageData};
+    use litchi_iwa_common::shape::geometry::Size as FillSize;
+    let object = graph::object(source, drawable)?;
+    let payload = object
+        .messages
+        .iter()
+        .find(|message| message.type_ == SHAPE_INFO_MESSAGE_TYPE)
+        .ok_or(Error::InvalidSource)?;
+    let frame = graph::drawable_payload(SHAPE_INFO_MESSAGE_TYPE, &payload.data)?;
+    let (geometry, _) = graph::frame_and_properties(frame)?;
+    let size = geometry
+        .and_then(|geometry| geometry.size)
+        .ok_or(Refusal::InvalidImage)?;
+    let fill = Image::embedded(
+        ImageData::new(image.data).map_err(|_error| Error::InvalidSource)?,
+        request.technique,
+        FillSize {
+            width: size.width,
+            height: size.height,
+        },
+    )
+    .map_err(|_error| Refusal::InvalidImage)?;
+    let fill = Fill::Image(match request.tint {
+        Some(tint) => fill.with_tint(tint),
+        None => fill,
+    });
+    let writes = [(
+        Slot::Fill,
+        Some(engine::Value::message(
+            litchi_iwa_style::drawing::encode_fill(&fill),
+        )),
+    )];
+    let target = engine::target(workspace, drawable)?;
+    let plan = engine::plan_set(workspace, target, &writes)?;
+    engine::apply(workspace, drawable, plan)?;
+    Ok(())
+}
+
+/// Publish the style graph's edits with the image asset on the structural
+/// working set: the `Data/` member and its `DataInfo` record, the data
+/// reference on the drawable's (new) style variation and that variation's
+/// data-reference owner record (the media family's data-owner transition).
+fn publish_image(
+    source: &Package,
+    changes: Changes,
+    drawable: u64,
+    image: &StagedImage,
+) -> Result<structure::Published, Error> {
+    use sha1::Digest as _;
+    use structure::metadata::{DataAddition, DataOwner, Transition};
+    if !changes.insertions.is_empty() || !changes.deletions.is_empty() {
+        return Err(Refusal::UnsupportedStyle.into());
+    }
+    let mut working = structure::Working::new(source)?;
+    working.keep_previews();
+    let mut edited = Vec::new();
+    structure::reserve(&mut edited, changes.edits.len())?;
+    for (name, archive) in changes.edits {
+        *working.archive_mut(&name)? = archive;
+        edited.push(name);
+    }
+    let object = working.object(drawable)?;
+    let index = structure::unique_message(object, &[SHAPE_INFO_MESSAGE_TYPE])?;
+    let style = match structure::references::identifiers(
+        &object.messages[index].data,
+        &[SHAPE_STYLE_PATH[0], SHAPE_STYLE_PATH[1]],
+    )?
+    .as_slice()
+    {
+        [style] => *style,
+        _ => return Err(Error::InvalidSource),
+    };
+    // A variation the graph derived lives only in the edited archives.
+    let mut member = None;
+    for name in &edited {
+        if working.archive(name)?.object(style).is_some() {
+            member = Some(name.clone());
+        }
+    }
+    let member = match member {
+        Some(member) => member,
+        None => working.locate(style)?.ok_or(Error::InvalidSource)?,
+    };
+    let info = working
+        .archive_mut(&member)?
+        .object_mut(style)
+        .ok_or(Error::InvalidSource)?
+        .archive_info
+        .message_infos
+        .first_mut()
+        .ok_or(Error::InvalidSource)?;
+    if !info.data_references.contains(&image.data) {
+        info.data_references.push(image.data);
+    }
+    let registry = structure::metadata::registry(&working)?.ok_or(Error::InvalidSource)?;
+    let component = registry.component_for_entry(&member)?.identifier;
+    let mut transition = Transition::default();
+    transition.data_additions.push(DataAddition {
+        identifier: image.data,
+        digest: sha1::Sha1::digest(image.bytes.as_ref()).to_vec(),
+        preferred: image.file_name.clone(),
+        file: image.stored_name.clone(),
+        length: u64::try_from(image.bytes.len()).map_err(|_error| Error::InvalidSource)?,
+    });
+    transition.entry_insertions.push((
+        format!("Data/{}", image.stored_name),
+        structure::copy_bytes(&image.bytes)?,
+    ));
+    transition.data_owner_additions.push(DataOwner {
+        component,
+        data: image.data,
+        object: style,
+        count: 1,
+    });
+    Ok(working.publish(&transition)?)
+}
+
+/// `TSWP.ShapeInfoArchive.super` (`TSD.ShapeArchive`) and its `style`.
+const SHAPE_STYLE_PATH: [u32; 2] = [1, 2];

@@ -1979,3 +1979,55 @@ fn keynote_slide_table_add_cost_abba() -> TestResult {
     black_box(host_slide_table_add(&input)?);
     Ok(())
 }
+
+#[inline(never)]
+fn host_shape_image_fill(source: &[u8], png: &[u8]) -> TestResult<Vec<u8>> {
+    let mut editor = numbers::Draft::from_bytes(source)?;
+    let (sheet, identifier) = crate::numbers_drawable_cases::host_drawable(
+        &editor,
+        litchi_numbers::sheet::drawable::Kind::Shape,
+        0,
+    )?;
+    editor.set_sheet_shape_image_fill(
+        sheet,
+        identifier,
+        "poster.png",
+        png,
+        litchi_iwa::shapes::ShapeImageFillTechnique::Tile,
+        None,
+    )?;
+    Ok(editor.to_bytes()?)
+}
+
+#[inline(never)]
+fn leaf_shape_image_fill(source: &[u8], png: &[u8]) -> TestResult<Vec<u8>> {
+    let package = litchi_numbers::Package::from_bytes(source)?;
+    let mut edit = package.edit_sheet_drawable_style(
+        0,
+        litchi_numbers::sheet::drawable::DrawableSelector::of(
+            litchi_numbers::sheet::drawable::Kind::Shape,
+            0,
+        ),
+    )?;
+    edit.set_image_fill(
+        png,
+        "poster.png",
+        litchi_iwa_common::shape::fill::ImageTechnique::Tile,
+        None,
+    )?;
+    Ok(leaf_bytes!(edit.commit()?.package()))
+}
+
+/// A tiled image fill on the first shape of the authored Numbers fixture
+/// (record 0423).
+#[test]
+#[ignore = "callgrind cost probe; run explicitly"]
+fn numbers_shape_image_fill_cost_abba() -> TestResult {
+    let input = crate::numbers_drawable_cases::authored_fixture()?.bytes;
+    let png = fixture("iwork/keynote/media-replacement-assets/poster.png")?.bytes;
+    black_box(host_shape_image_fill(&input, &png)?);
+    black_box(leaf_shape_image_fill(&input, &png)?);
+    black_box(leaf_shape_image_fill(&input, &png)?);
+    black_box(host_shape_image_fill(&input, &png)?);
+    Ok(())
+}
