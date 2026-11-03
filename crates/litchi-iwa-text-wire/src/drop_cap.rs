@@ -5,7 +5,7 @@
 //! cap when it names a variation of its stylesheet's Drop Cap base style
 //! (found by the format package in its theme's Drop Cap presets). The
 //! engine reads the placements ([`placements`]) and a variation's model
-//! ([`model`]), plans a set or removal as the `litchi-iwa` host does
+//! ([`model`]), plans a set or removal as the retired host (commit `27b4840684`) did
 //! ([`plan`]), encodes canonical variations ([`variation`]) and repoints
 //! one paragraph's table entry ([`point`]).
 

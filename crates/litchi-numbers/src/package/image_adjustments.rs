@@ -1,8 +1,9 @@
 //! Bounded Numbers image-adjustment projection and source-preserving rewrite.
 //!
-//! This module is the private native bridge for the legacy `litchi-iwa` host.
-//! The complete `TSD.ImageArchive` payload remains byte-authoritative in the
-//! host; this focused owner projects only the three semantic Image inspector
+//! This module was the private native bridge for the retired migration host
+//! (deleted by record 0429; last present at commit `27b4840684`). The
+//! complete `TSD.ImageArchive` payload stays byte-authoritative; this focused
+//! owner projects only the three semantic Image inspector
 //! controls and delegates wire validation and rewriting to the strict Buffa
 //! codec.
 

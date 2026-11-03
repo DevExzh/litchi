@@ -1,7 +1,7 @@
 //! The shape-style variation graph engine (record 0375a): the copy-on-write
 //! `TSWP.ShapeStyleArchive` variations through which iWork gives one shape
 //! or text box its own fill, stroke, shadow, effects, text layout or text
-//! columns. It is the `litchi-iwa` host's `shapes::line_end::registry`
+//! columns. It is the retired host's (commit `27b4840684`) `shapes::line_end::registry`
 //! lifecycle (`direct_shape_style_overrides`, `shape_style_is_exclusive`,
 //! the variation object, insert/replace/collapse and the stylesheet
 //! registry), ported operation for operation.

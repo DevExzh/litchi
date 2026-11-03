@@ -1,6 +1,7 @@
 # ADR 0028: Ordered exit of the legacy IWA migration host
 
-- Status: Accepted
+- Status: Accepted; host deleted by unified-ops record 0429 (W3) on a branch
+  held until the macOS queue passes (amendment of 2026-11-03 below)
 - Date: 2026-08-08
 - Amends: ADR 0002, ADR 0010, and the IWA record now stored as
   `0029-iwa-index-foundation.md`
@@ -12348,3 +12349,38 @@ The boundary regression suite passed 1,129 tests, and the final live audit
 reported 64 workspace packages, 241 internal dependency declarations, and the
 same 11 explicit migration debt items. Strict workspace library lint passed
 without lint exceptions.
+
+## 2026-11-03 amendment: the host is deleted (unified-ops record 0429, W3)
+
+Unified-ops record [0429](../unified-ops/0429-iwa-w3-delete-host.md) executes
+W3 of the exit plan ([0363](../unified-ops/0363-iwa-monolith-exit-plan.md))
+on branch `uo2/iwa-w3`, cut from trunk `27b4840684`, the last commit that
+contains `crates/litchi-iwa`. The branch merges only after the macOS queue
+([`0363-mac-queue.md`](../unified-ops/0363-mac-queue.md)) passes on a Mac
+(owner decision D1). Deletion gate:
+
+1. No manifest depends on `litchi-iwa`: held before the deletion (no
+   workspace crate, fuzz workspace, `tools/perf-baseline` or
+   `tools/native-resave` manifest named it) and now holds trivially.
+2. Every module, example, test and fixture has an owner: the exit ledger
+   (`docs/unified-ops/results/0363/iwa-exit-ledger.tsv`) has 0 host-only rows,
+   2,117 migrated and 119 retired, and `tools/iwa_exit_ledger.py --check` now
+   validates it without the crate. The host's tests and examples are deleted
+   with it; the generated-schema build path no longer reads host sources
+   (`crates/litchi-iwa-protos/build.rs`). Inputs the host built at test time
+   for the macOS queue are frozen in `test-data/iwork/mac-queue/`.
+3. Semantic parity: every migrated route has a parity case (Tier A or B) that
+   passed at `27b4840684` (1,190 passed); the routes without host native
+   evidence are the macOS queue.
+4. Native open/save/reopen for mutation paths: pending, the macOS queue.
+5. No root-facade re-export, feature alias or type alias of the host: holds.
+6. No host or host debt in the boundary policy: `migration_hosts` and
+   `migration_debt` are empty. `tools/check_crate_boundaries.py` reports 69
+   workspace packages, 303 internal dependency declarations and 0 explicit
+   debt items; its host audits and their tests are deleted. The migration-host
+   mechanism of the policy stays, and its tests use a synthetic host.
+
+The Verification section's requirement that the boundary tool report
+`litchi-iwa` as a migration host is superseded: the tool reports no migration
+host.
+

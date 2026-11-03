@@ -1,5 +1,5 @@
 //! The validation the host applies to a stored 3D lighting package before
-//! it names the preset (`litchi-iwa` `charts::lighting_3d::
+//! it names the preset (retired host at commit `27b4840684`, `charts::lighting_3d::
 //! validate_native_package`), at the wire level with `prost`'s decode
 //! semantics: the last occurrence of a scalar wins, repeated occurrences of
 //! a singular submessage merge, and a field with the wrong wire type is a

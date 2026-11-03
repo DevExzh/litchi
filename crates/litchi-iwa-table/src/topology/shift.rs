@@ -3,12 +3,13 @@
 //! An inserted or removed row or column moves every cell after it, so every
 //! coordinate the calculation engine holds for the edited table moves too.
 //! This is a wire-level port of the retired host editor's
-//! `formula_dependency_shift` (`litchi-iwa`, over Prost archives) onto the
+//! `formula_dependency_shift` (over Prost archives, at commit `27b4840684`) onto the
 //! exact payloads this crate rewrites. It uses the same bounded wire
 //! primitives (`litchi_iwa_common::wire`) in the same order, so a payload it
-//! rewrites carries the bytes the host editor writes; the differential test
-//! `litchi-iwa/tests/numbers_topology_formula_differential.rs` checks that
-//! over the corpus and over synthetic workbooks.
+//! rewrites carries the bytes the host editor wrote; the host's differential
+//! test `numbers_topology_formula_differential.rs` checked that over the
+//! corpus and over synthetic workbooks until the host was deleted (record
+//! 0429).
 //!
 //! What moves:
 //!

@@ -59,15 +59,13 @@ crate. Shared Office package and drawing behavior lives in the crates named by t
 map below.
 
 For iWork, the concrete Pages, Keynote, and Numbers matrices own user-facing semantic and package
-claims. Shared `litchi-iwa-*` crates are substrate, not a fourth format. Capabilities that remain
-only in the legacy `litchi-iwa` migration host do not count as focused-owner support unless the
-relevant detailed matrix labels them explicitly as host-only.
+claims. Shared `litchi-iwa-*` crates are substrate, not a fourth format. The legacy `litchi-iwa`
+migration host was deleted by record [0429](unified-ops/0429-iwa-w3-delete-host.md) (last present
+at commit `27b4840684`); its exit ledger is
+[`iwa-exit-ledger.tsv`](unified-ops/results/0363/iwa-exit-ledger.tsv).
 
-The current iWork migration inventory is 64 workspace packages, 238 internal dependency
-declarations, 227 canonical edges, 11 development-only edges, 11 ordered migration debts
-`[1, 2, 4, 8, 10, 12, 13, 14, 15, 16, 17]`, and one migration host. These are topology facts,
-not evidence that the concrete format owners or the monolith deletion gate are complete; the
-focused Keynote physical-sort slice closes no debt or gate.
+After record 0429 the workspace has 69 packages and 303 internal dependency declarations,
+with no migration host and no ordered migration debt (`tools/check_crate_boundaries.py`).
 
 The Pages matrix now records a bounded existing body-table hidden-axis owner. Its public surface
 uses `BodyTableSelector` (checked position or exact visible name) with archive-free
@@ -88,8 +86,8 @@ candidate-reopened, local to the selected component, invalidate the three canoni
 and provide exact source-bound apply/inverse patches. This remains visibility metadata, not
 cell/formula, filter/pivot, sorting, or row/column topology support.
 
-The Pages raw-ID `litchi_iwa::pages::Draft` hidden-axis route and the shared Numbers/Keynote adapter remain
-migration-host compatibility until creation parity and native mutation gates pass. Focused Pages
+The Pages raw-ID hidden-axis route and the shared Numbers/Keynote adapter of the retired migration
+host were deleted with it (record 0429). Focused Pages
 graph, codec, identity/COW, and concurrency tests cover the E1 source/self-round-trip contract. The
 checked-in [`body-table-visible.pages`](../test-data/iwork/pages/body-table-visible.pages) fixture
 is a native Pages 14.4 baseline: its visible body table is 5 by 4 with a body marker. Disposable
@@ -146,13 +144,13 @@ to the recorded marker shapes and cells and does not claim broad native acceptan
 producer parity, native byte parity, or package-wide performance.
 
 The eight scalar owners and the bounded Custom registry owner do not retire every compatibility path: generic
-source-built or cross-format `DataFormat` mutation remains host-owned. The
-dedicated raw-ID `litchi_iwa::numbers::Draft` routes for Number, Percentage, Currency,
+source-built or cross-format `DataFormat` mutation remained in the retired migration host until
+its deletion (record 0429). The dedicated raw-ID migration-host routes for Number, Percentage, Currency,
 Scientific, Fraction, Date & Time, Duration, and Custom are retired, and there is no dedicated
 host Text route. Generic source-built/cross-format
 `DataFormat::Custom`, `DataFormat::DateTime`, and `DataFormat::Duration`, the
 broad `TextDateTimeField` smart-field lifecycle, and attached Pages/Keynote
-table compatibility remain host-owned. Numbers persisted-sort compatibility is
+table compatibility also remained there. Numbers persisted-sort compatibility is
 narrower still: exact package snapshots use the semantic persisted-sort owner
 and any refusal is terminal; only historical source-built snapshots may use the
 private physical bridge for field 44. This bridge is not a public owner and has
@@ -181,9 +179,8 @@ not current-owner E3/E4 promotion; the checked-in native fixture
 has no table and the checked-in evidence test records hashes without launching Keynote. Native
 acceptance remains pending; see the [Keynote matrix](../crates/litchi-keynote/docs/FEATURE_MATRIX.md)
 and [ADR 0008](adr/0008-migration-and-verification.md#2026-09-02-amendment-keynote-physical-sort-now-evidence-status).
-For exact packages, focused physical-sort refusals are terminal. The legacy host
-retains only the explicitly source-built compatibility route and broader
-table/cell graph work; it is not a general physical-sort fallback.
+For exact packages, focused physical-sort refusals are terminal; there is no
+host fallback.
 
 The Keynote matrix also records a bounded owner for existing slide-media data.
 `Package::{slide_media_data, edit_slide_media_data, apply_slide_media_data}`
@@ -195,9 +192,8 @@ native IDs, `DataInfo` records, and ZIP paths private. Exact no-op/inverse and
 stale-patch refusal, candidate reread, locality, unrelated-member preservation,
 and preview invalidation are source-level contracts. The narrow host wrappers
 `replace_slide_movie_data`, `replace_slide_movie_poster`, and
-`replace_slide_audio_data` are retired; generic `replace_media` and broad
-asset creation, duplication, removal, properties, and lifecycle remain
-host-owned. The checked-in
+`replace_slide_audio_data` are retired, and the host's generic `replace_media`
+was deleted with it (record 0429). The checked-in
 [`media-replacement-native.key`](../test-data/iwork/keynote/media-replacement-native.key)
 is a 752,060-byte native Audio/Audio/File/File baseline with SHA-256
 `f5763984974612f078486cb2310f408cbcb7cd06ef6adca494aae19eaf62609d`; it was

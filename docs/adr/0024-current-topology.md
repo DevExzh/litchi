@@ -5084,3 +5084,27 @@ package for the non-iWork release gate (18 iWork packages, 21 excluded).
 `tools/check_crate_boundaries.py` reports 70 workspace packages and 309
 internal dependency declarations with 12 explicit debt items, after trunk
 `c4f00f3a35` (which adds `litchi-iwa-style`) was merged.
+
+## 2026-11-03 amendment: `litchi-iwa` deleted (unified-ops record 0429)
+
+Unified-ops record [0429](../unified-ops/0429-iwa-w3-delete-host.md) deletes
+the iWork migration host `crates/litchi-iwa` (ADR 0028 W3) on a branch held
+until the macOS queue passes. The workspace now has 69 packages and 303
+internal dependency declarations (`tools/check_crate_boundaries.py`), with no
+migration host and no migration debt: the 12 `litchi-iwa -> *` debt edges
+(orders 1, 2, 4, 8, 10, 11, 12, 13, 14, 15, 16, 17) close together. The
+iWork family is now:
+
+- application package owners: `litchi-pages`, `litchi-numbers`,
+  `litchi-keynote`;
+- shared physical and wire substrate: `litchi-iwa-archive`, `litchi-iwa-core`,
+  `litchi-iwa-cache`, `litchi-iwa-detect`, `litchi-iwa-index`,
+  `litchi-iwa-graph`, `litchi-iwa-package`, `litchi-iwa-protos`,
+  `litchi-numbers-wire`;
+- shared engines and neutral values: `litchi-iwa-common`, `litchi-iwa-style`,
+  `litchi-iwa-table`, `litchi-iwa-text`, `litchi-iwa-text-wire`,
+  `litchi-iwa-structured`.
+
+The non-iWork release gate counts 18 iWork packages and 21 excluded
+packages. No boundary rule changes for the remaining crates.
+

@@ -1,9 +1,9 @@
 //! Physical-only persisted-sort admission for legacy migration snapshots.
 //!
-//! Some historical `litchi-iwa` builder snapshots contain valid native table
-//! models whose cell-storage projection is not accepted by the strict
-//! semantic package reader.  The migration host may still need to configure
-//! field 44 for those snapshots.  Keep that exception here, in the focused
+//! Some historical snapshots built by the retired migration host (deleted by
+//! record 0429; last present at commit `27b4840684`) contain valid native
+//! table models whose cell-storage projection is not accepted by the strict
+//! semantic package reader, and may still need field 44 configured.  Keep that exception here, in the focused
 //! Numbers owner: only the rooted sheet/table graph and the sort payload are
 //! admitted, and the same source-preserving codec is used for the rewrite.
 

@@ -1,7 +1,7 @@
 //! Conversions between the private native models and the archive-free
 //! semantic values of `litchi-iwa-text` and `litchi-iwa-common`.
 //!
-//! These are the host's (`litchi-iwa`) native adapters, ported unchanged in
+//! These are the retired host's (commit `27b4840684`) native adapters, ported unchanged in
 //! behaviour: every value the host accepts is accepted, every value it
 //! rejects is rejected, and every value it writes is written with the same
 //! fields.

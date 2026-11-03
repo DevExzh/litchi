@@ -1,9 +1,9 @@
 //! Host-parity regressions for the focused Keynote direct-drawable comment
 //! owner.
 //!
-//! These cases deliberately build the small graph shapes which the old
-//! `litchi_iwa::keynote::Draft` comment methods accepted but which a native fixture cannot
-//! express on its own: two drawables sharing one root, two roots sharing one
+//! These cases deliberately build the small graph shapes which the retired
+//! migration host's Keynote comment methods (last present at commit
+//! `27b4840684`) accepted but which a native fixture cannot express on its own: two drawables sharing one root, two roots sharing one
 //! reply, and a package with no annotation-author storage.  The physical
 //! oracle is shared with the cross-component parity tests so the public
 //! assertions remain selector and value based.

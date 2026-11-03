@@ -7,7 +7,7 @@
 //! named style: the engine either rewrites the storage's own managed
 //! variation in place, derives a new child variation of the current style,
 //! or collapses the variation back to its parent when no override is left.
-//! This is the behaviour of the `litchi-iwa` host's `text::Draft`
+//! This is the behaviour of the retired host's (commit `27b4840684`) `text::Draft`
 //! `set_text_*`/`reset_text_*`/`set_paragraph_*`/`reset_paragraph_*`
 //! families, collapsed into one property verb ([`Change`]).
 //!

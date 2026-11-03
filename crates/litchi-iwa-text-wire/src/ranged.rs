@@ -5,7 +5,7 @@
 //! comments (field 23) with an `ObjectAttributeTable`: sorted boundaries at
 //! UTF-16 indexes, each naming the object that covers the text up to the
 //! next boundary (or none). This engine reads those ranges and adds, moves
-//! or removes one object's range, exactly as the `litchi-iwa` host's
+//! or removes one object's range, exactly as the retired host's (commit `27b4840684`)
 //! hyperlink, bookmark and annotation families do: boundaries keep their
 //! bytes unless their object changes, neighbouring boundaries naming the
 //! same object coalesce, and the table is dropped when no object is left.

@@ -1,8 +1,9 @@
 //! Numbers sheet shape and text-frame style transactions (W2-A, record 0380).
 //!
 //! These tests exercise the selector-first facade on a source-built drawable
-//! pair. Differential host cases live in `litchi-iwa/tests/parity`; this crate
-//! suite focuses on exact no-op, inverse and typed-refusal behavior.
+//! pair. The host differential cases ran in the retired host's parity
+//! harness (last present at commit `27b4840684`); this crate suite focuses on
+//! exact no-op, inverse and typed-refusal behavior.
 
 use std::path::PathBuf;
 

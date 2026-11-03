@@ -34,9 +34,10 @@
 //! # }
 //! ```
 //!
-//! The built-in template was authored once by the legacy
-//! `litchi_iwa::pages::Builder` (record 0299 lists its provenance and digest); the
-//! crate embeds the bytes, so building performs no protobuf authoring.
+//! The built-in template was authored once by the retired migration host's
+//! Pages builder (last present at commit `27b4840684`; record 0299 lists the
+//! template's provenance and digest); the crate embeds the bytes, so building
+//! performs no protobuf authoring.
 
 use std::fmt;
 

@@ -3,7 +3,7 @@
 //! This suite exercises only the configuration marker in
 //! `TST.TableModelArchive.sort_order` (field 44).  It deliberately does not
 //! invoke Keynote's physical “Sort Now” executor: row movement, formulas,
-//! tiles, and view state remain compatibility-host behavior in `litchi-iwa`.
+//! tiles, and view state are not part of this owner.
 
 use std::error::Error as StdError;
 

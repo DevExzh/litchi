@@ -3,7 +3,7 @@
 //! A storage's `table_language` (field 19) is a `StringAttributeTable`:
 //! sorted boundaries at UTF-16 indexes, each naming the BCP 47 tag of the
 //! text up to the next boundary (no tag: automatic). The engine reads the
-//! runs and sets, removes or resets boundaries as the `litchi-iwa` host's
+//! runs and sets, removes or resets boundaries as the retired host's (commit `27b4840684`)
 //! `text::Draft` language family does: touched entries keep their other
 //! bytes, neighbouring entries with the same tag coalesce, and every other
 //! storage byte is kept.
