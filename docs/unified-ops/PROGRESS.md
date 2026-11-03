@@ -7614,3 +7614,9 @@ See [0063](0063-source-pptx-modern-comments.md).
   - W4-J 0423 (`a077aeeb43`): shared `structure::create`; Keynote add_slide_table; Numbers shape image fill on `data_owner`;
   - W4-K 0424 (`e98363dbd1`): opaque `#[non_exhaustive] Aggregate` (no source names the codes, so the names are mac-queued); pivot-category formula references with host validation.
 - Active: W4-L (0425: series/symbol image fills, shared caption lift, Numbers and chart captions) and W4-M (0426: Pages chart duplicate/remove, Numbers image-fill replace, Keynote line-end on the shared workspace, Pages table insert into a table-less document).
+- Full gate on `226a4b47a2`: all 53 rows passed (finished 2026-11-03T11:44:46Z; summary SHA-256 `570a0c6f4528f19ef555298ac79fd9899eb8816ebd191df4bc0816b88df7b86a`).
+- Merged since then:
+  - W4-L 0425 (`bab7c866b4`, `27939b7955`): series and symbol image fills; shared `litchi_iwa_style::caption` with the Pages and Keynote copies deleted; Numbers drawable and chart captions;
+  - W4-M 0426 (`32d5cc36ed`): Pages chart duplicate/remove with the host `remove_body_chart` defect fixed; Numbers image-fill release; Keynote line ends on shared code; Pages first-table insert;
+  - W4-K 0424a (`baa2644511`): Numbers cell edits on pivot/category tables admitted, matching the host (capability gap closed).
+- Remaining: 4 host-only rows (Numbers chart caption set; Pages chart captions) with W4-N (0427), and W4-K 0424b (Pages image-fill release onto the shared helper). After both land, the final frozen gate and the instruction-count qualification run on one commit.
