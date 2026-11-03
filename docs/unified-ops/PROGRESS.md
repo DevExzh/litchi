@@ -7631,3 +7631,9 @@ See [0063](0063-source-pptx-modern-comments.md).
   - text: list publishing;
   - style: chart style/axis/series/legend/lifecycle/value axis, `data_owner`, `shape_path`, `line_end`, `caption`.
 - Next, on one frozen commit: the 53-row gate, the instruction-count qualification (iWork routes extended with the W4 probes, plus the FIN matrix), then W3 preparation. W3 itself, deleting `litchi-iwa`, still requires the macOS queue to pass on a Mac. That cannot run on this host. Nothing pushed.
+- Instruction qualification on frozen `a9ff2679e2` (receipt `.coord/final-qual/final-a9ff2679e2-instruction-receipt.md`):
+  - iWork: 198 manifest routes (19 base + 179 W4); 190 required host/leaf routes measured over 392 callgrind captures; median leaf/host 0.209; worst required route +3.46%; none over 5%. The only route over 5% is the optional sort-order oracle (+69.9%), already recorded in 0421; the real host route measures −36.7%.
+  - FIN: 14 rows, maximum median ratio 1.032, all within 1.05.
+  - One finding: the Keynote and Pages custom-format probes were nondeterministic (random leaf registry UUIDs).
+- Fixed by W4-O 0428 (`7406748e95`): four leaf random-UUID sites now derive their UUIDs (the 0375a scheme): custom-format registry, Pages smart fields, Keynote audio creation, Keynote comment storage. Two documented exceptions: comment creation dates, which the host also writes from the clock, and the opt-in `Identity::generate`. Byte-identical replay tests added; the probes pass 20/20; Keynote +3.425%, Pages −87.6%.
+- `7406748e95` becomes the final candidate. It needs the 53-row gate and an iWork re-qualification; FIN is unaffected because the Office crates are unchanged.
