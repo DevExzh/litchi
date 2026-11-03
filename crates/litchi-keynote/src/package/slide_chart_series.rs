@@ -394,6 +394,9 @@ pub enum Refusal {
     /// write.
     #[error("image fills are not written by this family")]
     ImageFill,
+    /// The bytes of an image fill are not an image.
+    #[error("the image-fill bytes are not an image")]
+    InvalidImage,
     /// The property does not exist on the requested axis, or the chart has
     /// no primary axis of that direction.
     #[error("the chart axis has no such property")]
@@ -430,6 +433,7 @@ impl Refusal {
             Self::SeriesNotFound { .. } => RefusalKind::NotFound,
             Self::UnsupportedAxis | Self::MissingStyle => RefusalKind::UnsupportedTarget,
             Self::SharedStyle | Self::ImageFill => RefusalKind::UnsupportedContent,
+            Self::InvalidImage => RefusalKind::InvalidValue,
             Self::NotResettable | Self::NoStagedOperation => RefusalKind::UnsupportedOperation,
         }
     }
@@ -1535,6 +1539,7 @@ fn execute_publication(prepared: PreparedPublication<'_>) -> Result<Vec<u8>, Err
 fn publish_changes(
     source: &Package,
     changes: graph::Changes,
+    data: Option<(&str, &[u8])>,
     selected_chart: u64,
     scope: &engine::MutationScope,
     budget: &mut TransactionBudget,
@@ -1566,6 +1571,7 @@ fn publish_changes(
     let candidate = publish_series_with_prepared_policy(
         source,
         changes,
+        data,
         budget,
         fields,
         &plan,
@@ -1579,6 +1585,7 @@ fn publish_changes(
 fn publish_series_with_prepared_policy(
     package: &Package,
     changes: graph::Changes,
+    data: Option<(&str, &[u8])>,
     budget: &mut TransactionBudget,
     fields: &mut FieldLedger,
     plan: &slide_chart_font::MutationPlan,
@@ -1761,6 +1768,13 @@ fn publish_series_with_prepared_policy(
                 None => EntryInsertion::new(name, data.as_slice()),
             }),
     );
+    if let Some((name, bytes)) = data {
+        budget.work(bytes.len()).map_err(map_transaction_error)?;
+        insertions
+            .try_reserve(1)
+            .map_err(|_| Error::Allocation { amount: 1 })?;
+        insertions.push(EntryInsertion::new(name, bytes));
+    }
 
     let output = slide_chart_font::reassemble_prepared_payloads(
         package,
@@ -1868,6 +1882,41 @@ impl Ledger {
             engine::Limits,
         ) -> engine::SymbolResult<(bool, engine::Report)>,
     ) -> Result<Option<Published>, Error> {
+        self.write_data(
+            source,
+            target,
+            chart_extension_fields,
+            None,
+            |workspace, limits| {
+                write(workspace, limits).map(|(changed, report)| {
+                    (
+                        changed,
+                        report,
+                        litchi_iwa_style::chart_style::DataChanges::default(),
+                    )
+                })
+            },
+        )
+    }
+
+    /// As [`Self::write`], for a write that also registers or releases
+    /// embedded data: the engine's `DataChanges` name the `Data/` member
+    /// published with `data` and the orphaned member deleted.
+    pub(super) fn write_data(
+        &mut self,
+        source: &Package,
+        target: &Target,
+        chart_extension_fields: &[u32],
+        data: Option<&[u8]>,
+        write: impl FnOnce(
+            &mut Workspace<'_>,
+            engine::Limits,
+        ) -> engine::SymbolResult<(
+            bool,
+            engine::Report,
+            litchi_iwa_style::chart_style::DataChanges,
+        )>,
+    ) -> Result<Option<Published>, Error> {
         if !source.structure_is_exact() {
             return Err(Refusal::UnsupportedSource.into());
         }
@@ -1883,17 +1932,27 @@ impl Ledger {
             Workspace::new_bounded(&*components, graph_limits(source)?, requirements, limits)
                 .map_err(map_construction)?;
         let limits = series_limits(source, &self.budget, &self.fields)?;
-        let (changed, report) = write(&mut workspace, limits).map_err(map_series_error)?;
+        let (changed, report, data_changes) =
+            write(&mut workspace, limits).map_err(map_series_error)?;
         if !changed {
             charge_series_report(&mut self.budget, &mut self.fields, report)?;
             return Ok(None);
         }
         let scope = report.scope().cloned().ok_or(Error::Verification)?;
         charge_series_report(&mut self.budget, &mut self.fields, report)?;
-        let changes = finish_workspace(workspace, &mut self.budget)?;
+        let mut changes = finish_workspace(workspace, &mut self.budget)?;
+        if let Some(member) = data_changes.deleted {
+            changes.deletions.push(member);
+        }
+        let inserted = match (&data_changes.inserted, data) {
+            (Some((_, name)), Some(bytes)) => Some((name.as_str(), bytes)),
+            (None, None) => None,
+            _ => return Err(Error::Verification),
+        };
         let (package, touched, plan) = publish_changes(
             source,
             changes,
+            inserted,
             target.selection.identifier,
             &scope,
             &mut self.budget,
