@@ -1451,6 +1451,7 @@ fn map_package_error(error: PackageError) -> Error {
         | PackageError::MissingIdentity
         | PackageError::InvalidLanguage(_)
         | PackageError::InvalidLocale
+        | PackageError::InvalidTable { .. }
         | PackageError::InvalidLimit { .. }
         | PackageError::Limit { .. } => Error::Refused(Refusal::UnsupportedSource),
         PackageError::PayloadLimit { observed, limit } => Error::Limit {

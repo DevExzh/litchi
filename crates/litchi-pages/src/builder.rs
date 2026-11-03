@@ -73,6 +73,17 @@ const fn version_four(mut bytes: [u8; 16]) -> [u8; 16] {
 }
 
 impl Identity {
+    /// A deterministic seed for the identities a build derives.
+    fn seed(&self) -> u64 {
+        let mut seed = 0x6c69_7463_6869_0420_u64;
+        for chunk in self.document.chunks(8).chain(self.version.chunks(8)) {
+            let mut word = [0_u8; 8];
+            word.copy_from_slice(chunk);
+            seed = litchi_numbers_wire::table_create::mix(seed ^ u64::from_le_bytes(word));
+        }
+        seed
+    }
+
     /// A fresh identity from the operating system's randomness, as Pages
     /// creates for a new document.
     #[must_use]
@@ -153,6 +164,7 @@ pub struct Builder {
     body_text: String,
     language: Option<String>,
     locale: Option<String>,
+    tables: Vec<(String, u32, u32)>,
 }
 
 impl Builder {
@@ -189,13 +201,27 @@ impl Builder {
         self
     }
 
+    /// Add an empty body table `name` of `rows` × `columns` cells (one
+    /// header row and one header column included), anchored after the body
+    /// text and the tables added before it, as the host builder's
+    /// `body_table` places it. The first table is the host builder's
+    /// from-scratch table graph (its own stylesheet, calculation engine and
+    /// formula owner); later ones are cloned from it with
+    /// [`crate::table::creation`].
+    pub fn body_table(mut self, name: impl Into<String>, rows: u32, columns: u32) -> Self {
+        self.tables.push((name.into(), rows, columns));
+        self
+    }
+
     /// Build the document.
     ///
     /// # Errors
     ///
     /// [`PackageError::MissingIdentity`] without an identity;
     /// [`PackageError::InvalidLanguage`] and [`PackageError::InvalidLocale`]
-    /// for an invalid language tag or locale; a typed text error
+    /// for an invalid language tag or locale;
+    /// [`PackageError::InvalidTable`] for a body table with an empty or NUL
+    /// name or a size a table cannot take; a typed text error
     /// ([`PackageError::InvalidFormat`]) when the body text holds a reserved
     /// Pages marker character.
     pub fn build(self) -> PackageResult<Package> {
@@ -210,6 +236,17 @@ impl Builder {
             .is_some_and(|locale| locale.trim().is_empty() || locale.contains('\0'))
         {
             return Err(PackageError::InvalidLocale);
+        }
+        for (name, rows, columns) in &self.tables {
+            if name.is_empty()
+                || name.contains('\0')
+                || !litchi_numbers_wire::table_create::admits_size(*rows, *columns)
+            {
+                return Err(PackageError::InvalidTable {
+                    rows: *rows,
+                    columns: *columns,
+                });
+            }
         }
         let template = Package::new()?;
         let body_text = if self.body_text.is_empty() {
@@ -236,6 +273,30 @@ impl Builder {
             return Err(PackageError::InvalidFormat(
                 "the built Pages body text failed verification".to_owned(),
             ));
+        }
+        let mut tables = self.tables.iter();
+        let Some((name, rows, columns)) = tables.next() else {
+            return Ok(package);
+        };
+        let mut package = super::package::builder_table::install(
+            &package,
+            name,
+            *rows,
+            *columns,
+            self.locale.as_deref().unwrap_or("en_US"),
+            identity.seed(),
+        )?;
+        for (name, rows, columns) in tables {
+            let anchor = package.text()?.encode_utf16().count();
+            package = package
+                .edit_body_table_creation()
+                .insert(
+                    litchi_core::Position::new(anchor),
+                    crate::table::creation::NewTable::new(*rows, *columns).with_name(name.clone()),
+                )
+                .and_then(crate::table::creation::Edit::commit)
+                .map_err(|error| PackageError::InvalidFormat(error.to_string()))?
+                .into_package();
         }
         Ok(package)
     }
@@ -369,6 +430,42 @@ mod tests {
             .build()
             .unwrap_or_else(|error| panic!("build: {error}"));
         assert_eq!(built.text().ok().as_deref(), Some("Bonjour"));
+    }
+
+    #[test]
+    fn body_tables_are_built_from_scratch() {
+        let build = |seed: u8| {
+            Builder::new()
+                .identity(Identity::from_bytes([seed; 16]))
+                .body_text("Budget")
+                .body_table("Q1", 4, 3)
+                .body_table("Q2", 2, 2)
+                .build()
+                .unwrap_or_else(|error| panic!("build: {error}"))
+        };
+        let (first, again) = (build(5), build(5));
+        assert_eq!(first.to_bytes().ok(), again.to_bytes().ok());
+        let tables = first
+            .body_tables()
+            .unwrap_or_else(|error| panic!("tables: {error}"));
+        let shapes: Vec<_> = tables
+            .iter()
+            .map(|table| (table.name().to_owned(), table.rows(), table.columns()))
+            .collect();
+        assert_eq!(shapes, [("Q1".to_owned(), 4, 3), ("Q2".to_owned(), 2, 2)]);
+        assert_eq!(first.text().ok().as_deref(), Some("Budget\u{fffc}\u{fffc}"));
+        let builder = || Builder::new().identity(Identity::from_bytes([3; 16]));
+        assert!(matches!(
+            builder().body_table("", 2, 2).build(),
+            Err(PackageError::InvalidTable { .. })
+        ));
+        assert!(matches!(
+            builder().body_table("T", 0, 2).build(),
+            Err(PackageError::InvalidTable {
+                rows: 0,
+                columns: 2
+            })
+        ));
     }
 
     #[test]

@@ -15,13 +15,17 @@
 //! drawables and a sidebar node. No clock or randomness is consulted: fresh
 //! identities derive from the registry payload and the allocated
 //! identifiers, so the same edit of the same source is byte-identical.
+//!
+//! The payloads come from `litchi_numbers_wire::table_create`, shared with
+//! the Pages and Keynote table owners. A workbook with no table left to
+//! clone takes the shared from-scratch graph (`table_create::fresh`,
+//! record 0420) styled by its theme's first table preset, as the host
+//! editor's `bootstrap_empty_table_graph` builds it.
 
-use std::collections::{BTreeMap, HashMap};
+use std::collections::HashMap;
 
 use litchi_iwa_common::wire::{
-    append_length_delimited_field, append_varint_field, parse_wire_view,
-    repeated_length_delimited_payloads, transform_length_delimited_field,
-    transform_length_delimited_fields_at_path,
+    append_length_delimited_field, parse_wire_view, transform_length_delimited_field,
 };
 
 use super::super::Package;
@@ -32,6 +36,8 @@ use super::super::structure::{
     references,
 };
 use super::{Error, rewrite_list};
+use litchi_numbers_wire::table_create::{self, OwnerGeometry, Shape, TableUuid, fresh};
+use litchi_numbers_wire::table_write::WriteError;
 
 /// `TST.TableModelArchive`.
 const TABLE_MODEL_MESSAGE_TYPE: u32 = 6_001;
@@ -41,22 +47,19 @@ const CALCULATION_ENGINE_MESSAGE_TYPE: u32 = 4_000;
 const FORMULA_OWNER_MESSAGE_TYPE: u32 = 4_008;
 /// The header versions native Numbers writes on a formula owner.
 const FORMULA_OWNER_VERSIONS: [u32; 3] = [3, 2, 10];
-/// `owner_kind` of a table's own formula owner.
-const TABLE_FORMULA_OWNER_KIND: u64 = 1;
 /// The most row and column identities one table may need (the native
 /// editor's ceiling).
 const MAX_TABLE_UIDS: u64 = 1_100_000;
 /// How far a new table is offset from a template on the same sheet.
 const POSITION_OFFSET: f32 = 40.0;
+/// `TN.DocumentArchive.theme`.
+const DOCUMENT_THEME_FIELD: u32 = 6;
+/// `TN.ThemeArchive`.
+const THEME_MESSAGE_TYPE: u32 = 12_009;
+/// The theme's table style presets: `TSS.ThemeArchive` (field 1), its
+/// `TST.ThemePresetsArchive` extension (200), `table_style_presets` (1).
+const THEME_TABLE_PRESETS: [u32; 3] = [1, 200, 1];
 
-/// Model fields the clone drops: the template's identity of origin and
-/// every owner or provider object beyond its storage.
-const DROPPED_MODEL_FIELDS: [u32; 21] = [
-    43, 5, 34, 35, 38, 39, 44, 45, 47, 52, 70, 81, 82, 83, 84, 85, 86, 90, 91, 92, 93,
-];
-/// Model counters reset to zero (hidden, user-hidden and filtered rows and
-/// columns).
-const ZEROED_MODEL_FIELDS: [u32; 5] = [14, 15, 41, 42, 40];
 /// Table-info fields the clone drops, as the host editor clears them:
 /// editing state, summary and category models, view UIDs and pivot state
 /// (record 0370f; the group and hidden-state UUIDs, the pasteboard mapping
@@ -65,35 +68,6 @@ const DROPPED_INFO_FIELDS: [u32; 6] = [3, 4, 5, 6, 15, 17];
 /// Drawable fields the clone drops: comment, pencil annotations, title and
 /// caption.
 const DROPPED_DRAWABLE_FIELDS: [u32; 4] = [6, 9, 10, 11];
-
-/// The role of one storage object the template's model owns.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum Role {
-    Tile,
-    Header,
-    Data,
-    MergeMap,
-    UidMap,
-    Stroke,
-}
-
-/// The data-store reference fields and the role of the object each holds.
-const DATA_STORE_FIELDS: [(u32, Role); 14] = [
-    (4, Role::Data),
-    (5, Role::Data),
-    (6, Role::Data),
-    (11, Role::Data),
-    (12, Role::Data),
-    (13, Role::MergeMap),
-    (15, Role::Data),
-    (16, Role::Data),
-    (17, Role::Data),
-    (18, Role::Data),
-    (19, Role::Data),
-    (20, Role::Data),
-    (21, Role::Data),
-    (22, Role::Data),
-];
 
 /// The requested shape of the new table.
 pub(super) struct Request<'n> {
@@ -139,64 +113,11 @@ fn single_reference(data: &[u8], number: u32) -> FaultResult<Option<u64>> {
     }
 }
 
-/// Collect the storage objects the model owns, by role, in a stable order.
-fn owned_storage(model: &[u8]) -> FaultResult<BTreeMap<u64, Role>> {
-    let mut owned = BTreeMap::new();
-    let mut insert = |identifier: u64, role: Role| -> FaultResult<()> {
-        if let Some(previous) = owned.insert(identifier, role)
-            && previous != role
-        {
-            return Err(Fault::Invalid);
-        }
-        Ok(())
-    };
-    let stores = repeated_length_delimited_payloads(model, 4)
-        .map_err(|error| structure::map_wire(&error))?;
-    let [store] = stores.as_slice() else {
-        return Err(Fault::Invalid);
-    };
-    for bucket in references::identifiers(store, &[1, 2])? {
-        insert(bucket, Role::Header)?;
-    }
-    if let Some(column_headers) = single_reference(store, 2)? {
-        insert(column_headers, Role::Header)?;
-    }
-    let tiles = repeated_length_delimited_payloads(store, 3)
-        .map_err(|error| structure::map_wire(&error))?;
-    for storage in tiles {
-        for entry in repeated_length_delimited_payloads(storage, 1)
-            .map_err(|error| structure::map_wire(&error))?
-        {
-            if let Some(tile) = single_reference(entry, 2)? {
-                insert(tile, Role::Tile)?;
-            }
-        }
-    }
-    for (field, role) in DATA_STORE_FIELDS {
-        if let Some(identifier) = single_reference(store, field)? {
-            insert(identifier, role)?;
-        }
-    }
-    if let Some(identifier) = single_reference(model, 46)? {
-        insert(identifier, Role::UidMap)?;
-    }
-    if let Some(identifier) = single_reference(model, 49)? {
-        insert(identifier, Role::Stroke)?;
-    }
-    Ok(owned)
-}
-
-/// Replace every `TSP.Reference` at `path` of `data` whose identifier is in
-/// `remap`.
-fn remap_at(data: &[u8], path: &[u32], remap: &HashMap<u64, u64>) -> FaultResult<Vec<u8>> {
-    transform_length_delimited_fields_at_path(data, path, |reference| {
-        let identifier = references::reference_identifier(reference).map_err(WireFault)?;
-        Ok::<_, WireFault>(match remap.get(&identifier) {
-            Some(replacement) => references::reference_payload(*replacement).map_err(WireFault)?,
-            None => structure::copy_bytes(reference).map_err(WireFault)?,
-        })
-    })
-    .map_err(|error| error.0)
+/// Encode `value` as a protobuf string payload of a canonical UUID.
+fn table_uuid(seed: u64) -> TableUuid {
+    let high = metadata::mix(seed ^ 0x7461_626c_6555_5549);
+    let low = metadata::mix(high ^ seed);
+    TableUuid::from_halves(high, low)
 }
 
 /// A [`Fault`] carried through the common wire transform callbacks.
@@ -206,67 +127,6 @@ impl From<litchi_iwa_common::Error> for WireFault {
     fn from(error: litchi_iwa_common::Error) -> Self {
         Self(structure::map_wire(&error))
     }
-}
-
-/// Encode `value` as a protobuf string payload of a canonical UUID.
-fn table_uuid(seed: u64) -> (String, u64, u64) {
-    let high = metadata::mix(seed ^ 0x7461_626c_6555_5549);
-    let low = metadata::mix(high ^ seed);
-    // RFC 4122 version 4 / variant 1 bit layout, as the app writes.
-    let high = (high & 0xffff_ffff_ffff_0fff) | 0x0000_0000_0000_4000;
-    let low = (low & 0x3fff_ffff_ffff_ffff) | 0x8000_0000_0000_0000;
-    let text = format!(
-        "{:08X}-{:04X}-{:04X}-{:04X}-{:012X}",
-        high >> 32,
-        (high >> 16) & 0xffff,
-        high & 0xffff,
-        low >> 48,
-        low & 0xffff_ffff_ffff
-    );
-    // The CalculationEngine reads the 128-bit value with `lower` holding the
-    // low half of the hexadecimal text.
-    (text, low, high)
-}
-
-/// The model of the new table.
-fn model_payload(
-    template: &[u8],
-    remap: &HashMap<u64, u64>,
-    uuid: &str,
-    request: &Request<'_>,
-) -> FaultResult<Vec<u8>> {
-    let mut data = structure::strip_fields(template, &DROPPED_MODEL_FIELDS)?;
-    data = structure::put_bytes(&data, 1, uuid.as_bytes())?;
-    data = structure::put_varint(&data, 50, 0)?;
-    data = structure::put_bytes(&data, 8, request.name.as_bytes())?;
-    data = structure::put_varint(&data, 6, u64::from(request.rows))?;
-    data = structure::put_varint(&data, 7, u64::from(request.columns))?;
-    for (field, limit) in [(9, request.rows), (10, request.columns), (11, request.rows)] {
-        let values = litchi_iwa_common::wire::repeated_varint_values(&data, field)
-            .map_err(|error| structure::map_wire(&error))?;
-        if let [value] = values.as_slice() {
-            data = structure::put_varint(&data, field, (*value).min(u64::from(limit)))?;
-        }
-    }
-    for field in ZEROED_MODEL_FIELDS {
-        data = structure::put_varint(&data, field, 0)?;
-    }
-    data = transform_length_delimited_field(&data, 4, |store| {
-        let mut store = remap_at(store, &[1, 2], remap).map_err(WireFault)?;
-        store = remap_at(&store, &[2], remap).map_err(WireFault)?;
-        store = remap_at(&store, &[3, 1, 2], remap).map_err(WireFault)?;
-        for (field, _) in DATA_STORE_FIELDS {
-            store = remap_at(&store, &[field], remap).map_err(WireFault)?;
-        }
-        store = structure::put_varint(&store, 7, 1).map_err(WireFault)?;
-        store = structure::put_varint(&store, 8, 0).map_err(WireFault)?;
-        store = structure::put_bytes(&store, 9, &[]).map_err(WireFault)?;
-        store = structure::put_bytes(&store, 10, &[]).map_err(WireFault)?;
-        Ok::<_, WireFault>(store)
-    })
-    .map_err(|error| error.0)?;
-    data = remap_at(&data, &[46], remap)?;
-    remap_at(&data, &[49], remap)
 }
 
 /// The drawable of the new table.
@@ -325,93 +185,6 @@ fn offset_point(point: &[u8]) -> FaultResult<Vec<u8>> {
     Ok(output)
 }
 
-fn encode_uuid(lower: u64, upper: u64) -> FaultResult<Vec<u8>> {
-    let mut output = Vec::new();
-    append_varint_field(&mut output, 1, lower).map_err(|error| structure::map_wire(&error))?;
-    append_varint_field(&mut output, 2, upper).map_err(|error| structure::map_wire(&error))?;
-    Ok(output)
-}
-
-/// An emptied copy of one storage object's payload.
-fn empty_storage(
-    role: Role,
-    payload: &[u8],
-    rows: u32,
-    columns: u32,
-    seed: u64,
-) -> FaultResult<Vec<u8>> {
-    let wire = |error: litchi_iwa_common::Error| structure::map_wire(&error);
-    Ok(match role {
-        Role::Tile => {
-            let mut data = structure::strip_fields(payload, &[5])?;
-            for field in [1, 2, 3, 4] {
-                data = structure::put_varint(&data, field, 0)?;
-            }
-            data
-        },
-        Role::Header => structure::strip_fields(payload, &[2])?,
-        Role::Data => {
-            let data = structure::strip_fields(payload, &[3, 4])?;
-            structure::put_varint(&data, 2, 1)?
-        },
-        Role::MergeMap => structure::strip_fields(payload, &[1])?,
-        Role::UidMap => {
-            // The host editor's fresh map (record 0370f): identities in
-            // creation order derived from `seed` (the new model's
-            // identifier), so the sorted lists and both index permutations
-            // are the identity; the index lists are unpacked, as native maps
-            // store them.
-            let mut output = Vec::new();
-            for index in 0..columns {
-                let uuid = encode_uuid(
-                    seed.wrapping_mul(0x9e37_79b9)
-                        .wrapping_add(u64::from(index)),
-                    seed.rotate_left(29) ^ 0x434f_4c55_4d4e_0000,
-                )?;
-                append_length_delimited_field(
-                    &mut output,
-                    1,
-                    &uuid,
-                    litchi_iwa_common::WireLimits::DEFAULT,
-                )
-                .map_err(wire)?;
-            }
-            for field in [2, 3] {
-                for index in 0..columns {
-                    append_varint_field(&mut output, field, u64::from(index)).map_err(wire)?;
-                }
-            }
-            for index in 0..rows {
-                let uuid = encode_uuid(
-                    seed.wrapping_mul(0x517c_c1b7)
-                        .wrapping_add(u64::from(index)),
-                    seed.rotate_left(31) ^ 0x524f_5700_0000_0000,
-                )?;
-                append_length_delimited_field(
-                    &mut output,
-                    4,
-                    &uuid,
-                    litchi_iwa_common::WireLimits::DEFAULT,
-                )
-                .map_err(wire)?;
-            }
-            for field in [5, 6] {
-                for index in 0..rows {
-                    append_varint_field(&mut output, field, u64::from(index)).map_err(wire)?;
-                }
-            }
-            output
-        },
-        Role::Stroke => {
-            // The size alone, as the host editor writes a new sidecar.
-            let mut output = Vec::new();
-            append_varint_field(&mut output, 2, u64::from(columns)).map_err(wire)?;
-            append_varint_field(&mut output, 3, u64::from(rows)).map_err(wire)?;
-            output
-        },
-    })
-}
-
 /// The CalculationEngine root (component, object and message).
 fn engine(working: &Working<'_>) -> FaultResult<Option<(String, u64, usize)>> {
     let mut found = None;
@@ -433,271 +206,28 @@ fn engine(working: &Working<'_>) -> FaultResult<Option<(String, u64, usize)>> {
     Ok(found)
 }
 
-/// The next free internal formula-owner identifier of `engine`'s owners.
-fn next_internal_owner(
-    working: &Working<'_>,
-    component: &str,
-    engine_data: &[u8],
-) -> FaultResult<u32> {
-    let mut maximum = 0_u64;
-    for object in &working.archive(component)?.objects {
-        for message in &object.messages {
-            if message.type_ == FORMULA_OWNER_MESSAGE_TYPE {
-                for value in litchi_iwa_common::wire::repeated_varint_values(&message.data, 2)
-                    .map_err(|error| structure::map_wire(&error))?
-                {
-                    maximum = maximum.max(value);
-                }
-            }
-        }
-    }
-    // Registered and unregistered map entries also hold internal identifiers.
-    for tracker in repeated_length_delimited_payloads(engine_data, 2)
-        .map_err(|error| structure::map_wire(&error))?
-    {
-        for map in repeated_length_delimited_payloads(tracker, 3)
-            .map_err(|error| structure::map_wire(&error))?
-        {
-            for entry in repeated_length_delimited_payloads(map, 1)
-                .map_err(|error| structure::map_wire(&error))?
-            {
-                for value in litchi_iwa_common::wire::repeated_varint_values(entry, 1)
-                    .map_err(|error| structure::map_wire(&error))?
-                {
-                    maximum = maximum.max(value);
-                }
-            }
-        }
-    }
-    u32::try_from(maximum.checked_add(1).ok_or(Fault::Invalid)?).map_err(|_error| Fault::Invalid)
-}
-
-/// The geometry a table's own formula owner records.
-#[derive(Debug, Clone, Copy)]
-struct Geometry {
-    rows: u32,
-    columns: u32,
-    header_rows: u32,
-    header_columns: u32,
-    footer_rows: u32,
-}
-
-impl Geometry {
-    /// The header and footer counts of the new model.
-    fn of(model: &[u8], rows: u32, columns: u32) -> FaultResult<Self> {
-        let count = |field: u32| -> FaultResult<u32> {
-            let values = litchi_iwa_common::wire::repeated_varint_values(model, field)
-                .map_err(|error| structure::map_wire(&error))?;
-            Ok(values
-                .first()
-                .map_or(0, |value| u32::try_from(*value).unwrap_or(u32::MAX)))
-        };
-        Ok(Self {
-            rows,
-            columns,
-            header_rows: count(9)?,
-            header_columns: count(10)?,
-            footer_rows: count(11)?,
-        })
-    }
-
-    /// The spanning ranges of a table's own owner: the whole table
-    /// (`RangeContext` total) and its body, `[first column, first row, last
-    /// column, last row]`.
-    fn spanning(self) -> FaultResult<Vec<u8>> {
-        let wire = |error: litchi_iwa_common::Error| structure::map_wire(&error);
-        let last_column = u64::from(self.columns.saturating_sub(1));
-        let last_row = u64::from(self.rows.saturating_sub(1));
-        let body_last_row = u64::from(self.rows.saturating_sub(self.footer_rows).saturating_sub(1));
-        let mut output = Vec::new();
-        for (field, range) in [
-            (2, [0, 0, last_column, last_row]),
-            (
-                3,
-                [
-                    u64::from(self.header_columns),
-                    u64::from(self.header_rows),
-                    last_column,
-                    body_last_row,
-                ],
-            ),
-        ] {
-            let mut record = Vec::new();
-            for (number, value) in (1_u32..).zip(range) {
-                append_varint_field(&mut record, number, value).map_err(wire)?;
-            }
-            append_length_delimited_field(
-                &mut output,
-                field,
-                &record,
-                litchi_iwa_common::WireLimits::DEFAULT,
-            )
-            .map_err(wire)?;
-        }
-        Ok(output)
-    }
-}
-
-/// A table's own empty formula owner, field for field as the native writer
-/// emits it.
-fn owner_payload(
-    uid: (u64, u64),
-    internal: u32,
+/// The graph a new table starts from: its drawable, model, the component
+/// holding the drawable, its identity, its owner's geometry and every
+/// object it inserted with the object it was cloned from (`None` for an
+/// object built from scratch).
+struct Graph {
     info: u64,
-    geometry: Geometry,
-) -> FaultResult<Vec<u8>> {
-    let wire = |error: litchi_iwa_common::Error| structure::map_wire(&error);
-    let mut output = Vec::new();
-    append_length_delimited_field(
-        &mut output,
-        1,
-        &encode_uuid(uid.0, uid.1)?,
-        litchi_iwa_common::WireLimits::DEFAULT,
-    )
-    .map_err(wire)?;
-    append_varint_field(&mut output, 2, u64::from(internal)).map_err(wire)?;
-    append_varint_field(&mut output, 3, TABLE_FORMULA_OWNER_KIND).map_err(wire)?;
-    append_length_delimited_field(&mut output, 4, &[], litchi_iwa_common::WireLimits::DEFAULT)
-        .map_err(wire)?;
-    append_length_delimited_field(&mut output, 5, &[], litchi_iwa_common::WireLimits::DEFAULT)
-        .map_err(wire)?;
-    let mut volatile = Vec::new();
-    for field in [1, 2, 3, 4, 5, 7] {
-        append_length_delimited_field(
-            &mut volatile,
-            field,
-            &[],
-            litchi_iwa_common::WireLimits::DEFAULT,
-        )
-        .map_err(wire)?;
-    }
-    append_length_delimited_field(
-        &mut output,
-        6,
-        &volatile,
-        litchi_iwa_common::WireLimits::DEFAULT,
-    )
-    .map_err(wire)?;
-    let spanning = geometry.spanning()?;
-    append_length_delimited_field(
-        &mut output,
-        7,
-        &spanning,
-        litchi_iwa_common::WireLimits::DEFAULT,
-    )
-    .map_err(wire)?;
-    append_length_delimited_field(
-        &mut output,
-        8,
-        &spanning,
-        litchi_iwa_common::WireLimits::DEFAULT,
-    )
-    .map_err(wire)?;
-    let mut whole = Vec::new();
-    append_length_delimited_field(&mut whole, 1, &[], litchi_iwa_common::WireLimits::DEFAULT)
-        .map_err(wire)?;
-    append_length_delimited_field(
-        &mut output,
-        9,
-        &whole,
-        litchi_iwa_common::WireLimits::DEFAULT,
-    )
-    .map_err(wire)?;
-    append_length_delimited_field(&mut output, 10, &[], litchi_iwa_common::WireLimits::DEFAULT)
-        .map_err(wire)?;
-    append_length_delimited_field(
-        &mut output,
-        11,
-        &references::reference_payload(info)?,
-        litchi_iwa_common::WireLimits::DEFAULT,
-    )
-    .map_err(wire)?;
-    for field in [13, 14, 15, 16] {
-        append_length_delimited_field(
-            &mut output,
-            field,
-            &[],
-            litchi_iwa_common::WireLimits::DEFAULT,
-        )
-        .map_err(wire)?;
-    }
-    Ok(output)
+    info_component: String,
+    seed: u64,
+    uuid: TableUuid,
+    geometry: OwnerGeometry,
+    inserted: Vec<(u64, String)>,
+    origins: HashMap<u64, Option<u64>>,
 }
 
-/// Register the new owner in the engine's dependency tracker: its reference
-/// and its internal-identifier map entry.
-fn engine_payload(
-    engine: &[u8],
-    owner: u64,
-    internal: u32,
-    uid: (u64, u64),
-) -> FaultResult<Vec<u8>> {
-    let wire = |error: litchi_iwa_common::Error| structure::map_wire(&error);
-    let mut cfuuid = Vec::new();
-    for (field, word) in [
-        (2, uid.0 & 0xffff_ffff),
-        (3, uid.0 >> 32),
-        (4, uid.1 & 0xffff_ffff),
-        (5, uid.1 >> 32),
-    ] {
-        append_varint_field(&mut cfuuid, field, word).map_err(wire)?;
-    }
-    let mut entry = Vec::new();
-    append_varint_field(&mut entry, 1, u64::from(internal)).map_err(wire)?;
-    append_length_delimited_field(
-        &mut entry,
-        2,
-        &cfuuid,
-        litchi_iwa_common::WireLimits::DEFAULT,
-    )
-    .map_err(wire)?;
-    transform_length_delimited_field(engine, 2, |tracker| {
-        let mut tracker = litchi_iwa_common::wire::append_repeated_length_delimited_field(
-            tracker,
-            6,
-            &references::reference_payload(owner).map_err(WireFault)?,
-        )?;
-        if structure::has_field(&tracker, 3).map_err(WireFault)? {
-            tracker = transform_length_delimited_field(&tracker, 3, |map| {
-                litchi_iwa_common::wire::append_repeated_length_delimited_field(map, 1, &entry)
-            })?;
-        } else {
-            let mut map = Vec::new();
-            append_length_delimited_field(
-                &mut map,
-                1,
-                &entry,
-                litchi_iwa_common::WireLimits::DEFAULT,
-            )?;
-            tracker = structure::put_bytes(&tracker, 3, &map).map_err(WireFault)?;
-        }
-        Ok::<_, WireFault>(tracker)
-    })
-    .map_err(|error| error.0)
-}
-
-/// Add the new table and return the published candidate.
-pub(super) fn add_table(source: &Package, request: &Request<'_>) -> Result<Published, Error> {
-    check_size(request.rows, request.columns)?;
-    let mut working = Working::new(source)?;
-    working.keep_previews();
-    let document = working.object(1)?;
-    let document_index = structure::document_message(document)?;
-    let sheets = references::identifiers(
-        &document.messages[document_index].data,
-        &[DOCUMENT_SHEETS_FIELD],
-    )?;
-    let sidebar_root = references::identifiers(
-        &document.messages[document_index].data,
-        &[DOCUMENT_SIDEBAR_FIELD],
-    )?;
-    let sheet = *sheets.get(request.sheet).ok_or(Error::Refused(
-        crate::package::table_lifecycle::Refusal::SheetNotFound,
-    ))?;
-    let (template_sheet, template_info) = template(&working)?.ok_or(Error::Refused(
-        crate::package::table_lifecycle::Refusal::NoTemplate,
-    ))?;
-
+/// Clone the template table `template_info` of `template_sheet` for `sheet`.
+fn clone_template(
+    working: &mut Working<'_>,
+    request: &Request<'_>,
+    template_sheet: u64,
+    template_info: u64,
+    sheet: u64,
+) -> Result<Graph, Error> {
     // The template's drawable, model and owned storage.
     let info_object = working.object(template_info)?.clone();
     let info_component = working.locate(template_info)?.ok_or(Error::InvalidSource)?;
@@ -716,7 +246,7 @@ pub(super) fn add_table(source: &Package, request: &Request<'_>) -> Result<Publi
             crate::package::table_lifecycle::Refusal::UnsupportedSource,
         ));
     }
-    let owned = owned_storage(&model_object.messages[0].data)?;
+    let owned = table_create::owned_storage(&model_object.messages[0].data).map_err(write_fault)?;
 
     // Fresh identities.
     // The host editor's order: the drawable, the model and the owned
@@ -728,12 +258,13 @@ pub(super) fn add_table(source: &Package, request: &Request<'_>) -> Result<Publi
     for ((identifier, _), replacement) in owned.iter().zip(&fresh[2..]) {
         remap.insert(*identifier, *replacement);
     }
-    let seed = metadata::identity_seed(&working, new_info)?;
-    let (uuid_text, uuid_lower, uuid_upper) = table_uuid(seed);
+    let seed = metadata::identity_seed(working, new_info)?;
+    let uuid = table_uuid(seed);
     let limits = working.archive_limits();
 
     // The storage clones, in their sources' components.
     let mut inserted: Vec<(u64, String)> = Vec::new();
+    let mut origins: HashMap<u64, Option<u64>> = HashMap::new();
     for (identifier, role) in &owned {
         let object = working.object(*identifier)?.clone();
         if object.messages.len() != 1 {
@@ -742,13 +273,14 @@ pub(super) fn add_table(source: &Package, request: &Request<'_>) -> Result<Publi
             ));
         }
         let component = working.locate(*identifier)?.ok_or(Error::InvalidSource)?;
-        let data = empty_storage(
+        let data = table_create::empty_storage(
             *role,
             &object.messages[0].data,
             request.rows,
             request.columns,
             new_model,
-        )?;
+        )
+        .map_err(write_fault)?;
         let clone = structure::new_object(
             remap[identifier],
             Some(&object),
@@ -759,11 +291,25 @@ pub(super) fn add_table(source: &Package, request: &Request<'_>) -> Result<Publi
         )?;
         working.insert(&component, clone)?;
         inserted.push((remap[identifier], component));
+        origins.insert(remap[identifier], Some(*identifier));
     }
 
     // The model, with its styles shared and its storage remapped.
-    let model_data = model_payload(&model_object.messages[0].data, &remap, &uuid_text, request)?;
-    let geometry = Geometry::of(&model_data, request.rows, request.columns)?;
+    let model_data = table_create::model_payload(
+        &model_object.messages[0].data,
+        &|identifier| remap.get(&identifier).copied(),
+        &uuid,
+        &Shape {
+            name: request.name,
+            rows: request.rows,
+            columns: request.columns,
+            row_height: None,
+            column_width: None,
+        },
+    )
+    .map_err(write_fault)?;
+    let geometry =
+        OwnerGeometry::of(&model_data, request.rows, request.columns).map_err(write_fault)?;
     let model_references = model_references(&model_data)?;
     let new_model_object = structure::new_object(
         new_model,
@@ -775,6 +321,7 @@ pub(super) fn add_table(source: &Package, request: &Request<'_>) -> Result<Publi
     )?;
     working.insert(&model_component, new_model_object)?;
     inserted.push((new_model, model_component.clone()));
+    origins.insert(new_model, Some(model));
 
     // The drawable, parented to the target sheet.
     let info_data = info_payload(
@@ -802,6 +349,162 @@ pub(super) fn add_table(source: &Package, request: &Request<'_>) -> Result<Publi
     )?;
     working.insert(&info_component, new_info_object)?;
     inserted.push((new_info, info_component.clone()));
+    origins.insert(new_info, Some(template_info));
+
+    Ok(Graph {
+        info: new_info,
+        info_component,
+        seed,
+        uuid,
+        geometry,
+        inserted,
+        origins,
+    })
+}
+
+/// Build a table from scratch for a workbook with no table left to clone,
+/// as the host editor's `bootstrap_empty_table_graph` does (record 0420):
+/// the shared graph of `table_create::fresh` with the theme's first table
+/// preset, every object in the sheet's component and registered.
+fn bootstrap(working: &mut Working<'_>, request: &Request<'_>, sheet: u64) -> Result<Graph, Error> {
+    let styles = theme_styles(working)?;
+    let component = working.locate(sheet)?.ok_or(Error::InvalidSource)?;
+    let first = *working
+        .allocate(fresh::Ids::consecutive(0, fresh::Profile::Bootstrap).count())?
+        .first()
+        .ok_or(Error::InvalidSource)?;
+    let ids = fresh::Ids::consecutive(first, fresh::Profile::Bootstrap);
+    let seed = metadata::identity_seed(working, ids.info)?;
+    let uuid = table_uuid(seed);
+    let shape = Shape {
+        name: request.name,
+        rows: request.rows,
+        columns: request.columns,
+        row_height: None,
+        column_width: None,
+    };
+    let objects = fresh::table(
+        &ids,
+        fresh::Placement {
+            parent: sheet,
+            frame: fresh::DEFAULT_FRAME,
+        },
+        &styles,
+        &shape,
+        &uuid.text,
+        ids.model,
+        fresh::Profile::Bootstrap,
+    )
+    .map_err(write_fault)?;
+    let geometry = OwnerGeometry::of(&objects[1].payload, request.rows, request.columns)
+        .map_err(write_fault)?;
+    let limits = working.archive_limits();
+    let mut inserted = Vec::with_capacity(objects.len());
+    let mut origins = HashMap::with_capacity(objects.len());
+    for object in objects {
+        let mut built = structure::new_object(
+            object.identifier,
+            None,
+            object.message_type,
+            object.payload,
+            object.references,
+            limits,
+        )?;
+        built.archive_info.message_infos[0].versions = fresh::OBJECT_VERSIONS.to_vec().into();
+        working.insert(&component, built)?;
+        inserted.push((object.identifier, component.clone()));
+        origins.insert(object.identifier, None);
+    }
+    Ok(Graph {
+        info: ids.info,
+        info_component: component,
+        seed,
+        uuid,
+        geometry,
+        inserted,
+        origins,
+    })
+}
+
+/// The theme's first table preset and the styles its network names (the
+/// host's `theme_table_style`).
+fn theme_styles(working: &Working<'_>) -> Result<fresh::Styles, Error> {
+    let document = working.object(1)?;
+    let index = structure::document_message(document)?;
+    let theme = references::identifiers(&document.messages[index].data, &[DOCUMENT_THEME_FIELD])?;
+    let [theme] = theme.as_slice() else {
+        return Err(Error::InvalidSource);
+    };
+    let payload = |identifier: u64, message_type: u32| -> Result<Vec<u8>, Error> {
+        let object = working.object(identifier)?;
+        let index = structure::unique_message(object, &[message_type])?;
+        Ok(object.messages[index].data.clone())
+    };
+    let theme = payload(*theme, THEME_MESSAGE_TYPE)?;
+    let presets = references::identifiers(&theme, &THEME_TABLE_PRESETS)?;
+    let (position, preset) = presets
+        .iter()
+        .copied()
+        .enumerate()
+        .find(|(_, identifier)| *identifier != 0)
+        .ok_or(Error::Refused(
+            crate::package::table_lifecycle::Refusal::NoTemplate,
+        ))?;
+    let preset_data = payload(preset, fresh::PRESET_MESSAGE_TYPE)?;
+    let network = fresh::preset_network(&preset_data).map_err(write_fault)?;
+    let network_data = payload(network, fresh::STYLE_NETWORK_MESSAGE_TYPE)?;
+    let position = u32::try_from(position).map_err(|_error| Error::InvalidSource)?;
+    let styles =
+        fresh::preset_styles(preset, position, &preset_data, &network_data).map_err(write_fault)?;
+    for identifier in styles.objects() {
+        working.locate(identifier)?.ok_or(Error::InvalidSource)?;
+    }
+    Ok(styles)
+}
+
+/// A shared payload builder's error as a structural fault.
+fn write_fault(error: WriteError) -> Fault {
+    match error {
+        WriteError::Unsupported => Fault::Unsupported,
+        WriteError::Allocation { requested } => Fault::Allocation { amount: requested },
+        _ => Fault::Invalid,
+    }
+}
+
+/// Add the new table and return the published candidate.
+pub(super) fn add_table(source: &Package, request: &Request<'_>) -> Result<Published, Error> {
+    check_size(request.rows, request.columns)?;
+    let mut working = Working::new(source)?;
+    working.keep_previews();
+    let document = working.object(1)?;
+    let document_index = structure::document_message(document)?;
+    let sheets = references::identifiers(
+        &document.messages[document_index].data,
+        &[DOCUMENT_SHEETS_FIELD],
+    )?;
+    let sidebar_root = references::identifiers(
+        &document.messages[document_index].data,
+        &[DOCUMENT_SIDEBAR_FIELD],
+    )?;
+    let sheet = *sheets.get(request.sheet).ok_or(Error::Refused(
+        crate::package::table_lifecycle::Refusal::SheetNotFound,
+    ))?;
+    let graph = match template(&working)? {
+        Some((template_sheet, template_info)) => {
+            clone_template(&mut working, request, template_sheet, template_info, sheet)?
+        },
+        None => bootstrap(&mut working, request, sheet)?,
+    };
+    let Graph {
+        info: new_info,
+        info_component,
+        seed,
+        uuid,
+        geometry,
+        mut inserted,
+        origins,
+    } = graph;
+    let limits = working.archive_limits();
 
     // Attach to the sheet's drawables.
     let sheet_object = working.object(sheet)?;
@@ -828,9 +531,19 @@ pub(super) fn add_table(source: &Package, request: &Request<'_>) -> Result<Publi
         let engine_data = working.object(engine_id)?.messages[engine_index]
             .data
             .clone();
-        let internal = next_internal_owner(&working, &component, &engine_data)?;
-        let uid = (uuid_upper.swap_bytes(), uuid_lower.swap_bytes());
-        let owner_data = owner_payload(uid, internal, new_info, geometry)?;
+        let owners: Vec<&[u8]> = working
+            .archive(&component)?
+            .objects
+            .iter()
+            .flat_map(|object| object.messages.iter())
+            .filter(|message| message.type_ == FORMULA_OWNER_MESSAGE_TYPE)
+            .map(|message| message.data.as_slice())
+            .collect();
+        let internal =
+            table_create::next_internal_owner(&owners, &engine_data).map_err(write_fault)?;
+        let uid = uuid.owner_uid();
+        let owner_data =
+            table_create::owner_payload(uid, internal, new_info, geometry).map_err(write_fault)?;
         let mut owner_object = structure::new_object(
             new_owner,
             None,
@@ -843,7 +556,8 @@ pub(super) fn add_table(source: &Package, request: &Request<'_>) -> Result<Publi
             FORMULA_OWNER_VERSIONS.to_vec().into();
         working.insert(&component, owner_object)?;
         inserted.push((new_owner, component.clone()));
-        let engine_data = engine_payload(&engine_data, new_owner, internal, uid)?;
+        let engine_data = table_create::engine_payload(&engine_data, new_owner, internal, uid)
+            .map_err(write_fault)?;
         let engine_object = working.object_mut(engine_id)?;
         references::replace(
             engine_object,
@@ -930,19 +644,11 @@ pub(super) fn add_table(source: &Package, request: &Request<'_>) -> Result<Publi
                 .any(|binding| binding.object == identifier)
         };
         for (identifier, component) in &inserted {
-            let source_identifier = if *identifier == new_info {
-                Some(template_info)
-            } else if *identifier == new_model {
-                Some(model)
-            } else {
-                remap
-                    .iter()
-                    .find(|(_, new)| **new == *identifier)
-                    .map(|(old, _)| *old)
-            };
+            let source_identifier = origins.get(identifier).copied();
             let component_id = registry.component_for_entry(component)?.identifier;
             let needs_uuid = match source_identifier {
-                Some(source_identifier) => registered(source_identifier),
+                Some(Some(source_identifier)) => registered(source_identifier),
+                Some(None) => true,
                 None => Some(*identifier) == new_owner,
             };
             if needs_uuid {

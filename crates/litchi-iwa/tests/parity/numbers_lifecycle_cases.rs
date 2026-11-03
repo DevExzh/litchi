@@ -466,6 +466,28 @@ fn numbers_table_add_parity() -> TestResult {
     run_table_add("numbers_table_add_parity", Tier::B, &input, 0)
 }
 
+/// Adding a table to a workbook that has no table left to clone: the host
+/// editor's `bootstrap_empty_table_graph` against the leaf's shared
+/// from-scratch graph (record 0420), both styled by the theme's first
+/// table preset.
+#[test]
+fn numbers_table_add_without_template_parity() -> TestResult {
+    let _ = Evidence::Queued;
+    let blank = litchi_numbers::Package::new();
+    let tableless = blank.edit_table_lifecycle(0)?.remove(0)?.commit()?;
+    assert_eq!(tableless.package().sheets()[0].table_count(), 0);
+    let input = Fixture {
+        path: "builder-tableless",
+        bytes: leaf_bytes!(tableless.package()),
+    };
+    run_table_add(
+        "numbers_table_add_without_template_parity",
+        Tier::B,
+        &input,
+        0,
+    )
+}
+
 /// Adding a table to each corpus fixture's first sheet.
 #[test]
 fn numbers_table_add_corpus_parity() -> TestResult {
