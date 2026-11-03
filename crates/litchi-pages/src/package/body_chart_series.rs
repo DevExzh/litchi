@@ -220,6 +220,9 @@ pub enum Refusal {
     /// on a logarithmic axis).
     #[error("the value cannot be stored natively")]
     InvalidSettings,
+    /// The bytes of an image fill are not an image.
+    #[error("the image-fill bytes are not an image")]
+    InvalidImage,
 }
 
 impl Refusal {
@@ -240,7 +243,7 @@ impl Refusal {
             Self::SharedStyle | Self::ImageFill | Self::UnsupportedPublication => {
                 RefusalKind::UnsupportedContent
             },
-            Self::InvalidSettings => RefusalKind::InvalidValue,
+            Self::InvalidSettings | Self::InvalidImage => RefusalKind::InvalidValue,
         }
     }
 }
@@ -1395,6 +1398,7 @@ fn charge_candidate_plan(
 fn publish_changes(
     source: &Package,
     changes: style_graph::Changes,
+    data: Option<(&str, &[u8])>,
     budget: &mut ArrangementBudget,
 ) -> Result<(Package, usize), Error> {
     let touched_components = changes
@@ -1483,6 +1487,13 @@ fn publish_changes(
             None => EntryInsertion::new(name.as_str(), data.as_slice()),
         };
         insertions.push(insertion);
+    }
+    if let Some((name, bytes)) = data {
+        budget
+            .work(bytes.len())
+            .and_then(|_| budget.retained(bytes.len()))
+            .map_err(map_arrangement_error)?;
+        insertions.push(EntryInsertion::new(name, bytes));
     }
     let mut deletions = Vec::new();
     deletions
@@ -1918,7 +1929,9 @@ fn verify_message_unknowns(
         // count and character properties.
         PARAGRAPH_STYLE_MESSAGE_TYPE => &[10, 11],
         OBJECT_CONTAINER_MESSAGE_TYPE => &[2],
-        PACKAGE_METADATA_MESSAGE_TYPE => &[1, 3, 8, 10, 12],
+        // The registrations, watermark and, when the plan admits them, the
+        // `DataInfo` list (4) of an image-fill write.
+        PACKAGE_METADATA_MESSAGE_TYPE => &[1, 3, 4, 8, 10, 12],
         ROOT_MESSAGE_TYPE => &[7, 9],
         _ => return Err(Error::Verification),
     };
@@ -1973,10 +1986,12 @@ fn verify_message_unknowns(
             let candidate_view = budget
                 .parse(candidate_entry, 2)
                 .map_err(map_arrangement_error)?;
+            // Object UUIDs (6), data references (7, when admitted) and
+            // external references (11).
             same_wire_fields_except(
                 &source_view,
                 &candidate_view,
-                &[6, 11],
+                &[6, 7, 11],
                 &plan.allowed_fields,
                 budget,
             )?;
@@ -2376,6 +2391,33 @@ impl Ledger {
             series_engine::Limits,
         ) -> series_engine::SymbolResult<(bool, series_engine::Report)>,
     ) -> Result<Option<Published>, Error> {
+        self.write_data(source, None, |workspace, limits| {
+            write(workspace, limits).map(|(changed, report)| {
+                (
+                    changed,
+                    report,
+                    litchi_iwa_style::chart_style::DataChanges::default(),
+                )
+            })
+        })
+    }
+
+    /// As [`Self::write`], for a write that also registers or releases
+    /// embedded data: the engine's `DataChanges` name the `Data/` member
+    /// published with `data` and the orphaned member deleted.
+    pub(super) fn write_data(
+        &mut self,
+        source: &Package,
+        data: Option<&[u8]>,
+        write: impl FnOnce(
+            &mut Workspace<'_>,
+            series_engine::Limits,
+        ) -> series_engine::SymbolResult<(
+            bool,
+            series_engine::Report,
+            litchi_iwa_style::chart_style::DataChanges,
+        )>,
+    ) -> Result<Option<Published>, Error> {
         if !source.state.source.source_is_exact() {
             return Err(Refusal::UnsupportedSource.into());
         }
@@ -2391,7 +2433,8 @@ impl Ledger {
             Workspace::new_bounded(&components, limits, construction, census_limits)
                 .map_err(map_construction_error)?;
         let engine_limits = engine_limits(source, budget)?;
-        let (changed, report) = write(&mut workspace, engine_limits).map_err(map_symbol_error)?;
+        let (changed, report, data_changes) =
+            write(&mut workspace, engine_limits).map_err(map_symbol_error)?;
         if !changed {
             charge_engine_report(budget, &report)?;
             return Ok(None);
@@ -2405,6 +2448,15 @@ impl Ledger {
             .finish_bounded(finish_limits)
             .map_err(map_finish_error)?;
         charge_finish_report(budget, finish_report)?;
+        let mut changes = changes;
+        if let Some(member) = data_changes.deleted {
+            changes.deletions.push(member);
+        }
+        let inserted = match (&data_changes.inserted, data) {
+            (Some((_, name)), Some(bytes)) => Some((name.as_str(), bytes)),
+            (None, None) => None,
+            _ => return Err(Error::Verification),
+        };
         if changes.is_empty() {
             return Ok(None);
         }
@@ -2460,7 +2512,7 @@ impl Ledger {
                 ),
         );
         let plan = mutation_plan(source, &names, &changes, &scope, budget)?;
-        let (candidate, touched) = publish_changes(source, changes, budget)?;
+        let (candidate, touched) = publish_changes(source, changes, inserted, budget)?;
         verify_locality(source, &candidate, &plan, budget)?;
         Ok(Some(Published {
             package: candidate,

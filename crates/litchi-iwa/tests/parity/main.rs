@@ -39,6 +39,7 @@ mod harness;
 mod known_fields;
 mod media_cases;
 
+mod chart_image_fill_cases;
 mod keynote_build_cases;
 mod keynote_builder_cases;
 mod keynote_cases;

@@ -61,3 +61,29 @@ Ir of `w4c_host_route`/`w4c_leaf_route`; the route sets fixed bounds 0–50).
 Receipt `results/0422/callgrind-value-axis.json`; raw captures in
 `.coord/iwa-w4i/cg1/`. Keynote has no host value-axis route to compare; its
 transaction path is unchanged apart from the shared rule calls.
+
+## 2. Slice 2: shared data-owner transitions; Pages chart background image
+
+1 row flips (Pages `set_body_chart_background_image_fill`); the existing
+Pages background-fill set also gains the host's release of a replaced image.
+
+| Crate | What |
+|---|---|
+| `litchi-iwa-style` | New `data_owner`: the `TSP.PackageMetadata` payload helpers lifted from Pages (`adjust_data_reference`, `referenced_data`, `data_member`, `remove_data_info`, `data_metadata_entries`, `data_owners`, `max_data_identifier`, `append_data_info`), `materialized_name`, and two workspace transitions on the registry: `own_new` (next data identifier, `DataInfo`, the object as its component data-reference owner: the host's `insert_unreferenced` + `add_component_data_reference`) and `release` (drop the owner; data no component, data metadata map entry or message-info reference keeps loses its `DataInfo` and member: the host's `remove_component_data_reference` + `remove_orphaned_image_asset`). `chart_style::write_chart_background(…, Background::{Fill, Image(NewImage)})` stores a background with these transitions (exclusive chart style; new image owned by the chart style; a replaced image released) and reports `DataChanges` (inserted and deleted `Data/` members), with the metadata object, fields 3/4/7/11 and the planned members in its mutation scope. `chart::rewrite_background` is the image-admitting payload rule; `chart::rewrite` still refuses an image (`Refusal::ImageFill`) |
+| `litchi-pages` | `body_storage_objects` delegates its metadata helpers to `data_owner` (the copies are deleted). The chart-property core gains `Ledger::write_data` (publishes the new `Data/` member and deletes the orphaned one); its locality check admits the metadata `DataInfo` list (4) and component data references (7) when the plan allows them. `chart::style::Edit::set_background_image_fill(bytes, file_name, ImageTechnique, tint)` (frame size from `body_chart_geometry`), and `Edit::set(BackgroundFill)` now goes through the releasing write. Chart-series `Refusal::InvalidImage` |
+
+Parity `pages_body_chart_background_image_fill_parity` (Tier B, the ZIP
+layout of the new member; macOS-queued): a new image (scaled, tiled and
+tinted), a new image over a host image (the old one is released and its
+`Data/` member deleted), and a solid fill and no fill over a host image;
+each with the inverse replayed and the fill and media reads compared. The
+host keeps an unreferenced asset only when the data metadata map lists it;
+the leaf's `release` follows that rule (the first draft kept every asset of
+a package with a map, which the parity case caught).
+
+| Route | Host Ir | Leaf Ir | Leaf/host |
+|---|---:|---:|---:|
+| pages_background_image_set | 1,310,073,205 | 63,127,004 | 0.0482 |
+
+Receipt `results/0422/callgrind-background-image.json`; raw captures in
+`.coord/iwa-w4i/cg2/`.
