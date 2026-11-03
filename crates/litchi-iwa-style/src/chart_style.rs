@@ -2215,3 +2215,57 @@ pub fn write_chart_background(
     }
     Ok((changed, budget.report(changed), changes))
 }
+
+/// The frame size of chart drawable `chart`
+/// (`TSCH.ChartDrawableArchive.super.geometry.size`), or `None` when the
+/// drawable stores none; the frame an image background fills.
+///
+/// # Errors
+///
+/// An invalid chart payload, or an exhausted limit.
+pub fn read_frame_size(
+    workspace: &Workspace<'_>,
+    chart: u64,
+    limits: Limits,
+) -> SymbolResult<(Option<litchi_iwa_common::shape::geometry::Size>, Report)> {
+    use litchi_iwa_common::WireLimits;
+    use litchi_iwa_common::wire::WireView;
+    fn nested(payload: &[u8], number: u32) -> SymbolResult<Option<&[u8]>> {
+        let view = WireView::parse(payload, WireLimits::DEFAULT)
+            .map_err(|_| SymbolError::Invalid("an invalid chart drawable"))?;
+        Ok(view
+            .fields()
+            .filter(|field| field.number() == number && field.wire_type() == 2)
+            .last()
+            .map(|field| field.payload()))
+    }
+    fn float(payload: &[u8], number: u32) -> SymbolResult<Option<f32>> {
+        let view = WireView::parse(payload, WireLimits::DEFAULT)
+            .map_err(|_| SymbolError::Invalid("an invalid chart frame"))?;
+        Ok(view
+            .fields()
+            .filter(|field| field.number() == number && field.wire_type() == 5)
+            .last()
+            .and_then(|field| <[u8; 4]>::try_from(field.payload()).ok())
+            .map(f32::from_le_bytes))
+    }
+    let mut budget = SymbolBudget::new(limits);
+    let (_, payload) = bounded_chart_payload(workspace, chart, &mut budget)?;
+    budget.work(payload.len())?;
+    let size = match nested(payload, 1)? {
+        Some(drawable) => match nested(drawable, 1)? {
+            Some(geometry) => match nested(geometry, 2)? {
+                Some(size) => match (float(size, 1)?, float(size, 2)?) {
+                    (Some(width), Some(height)) => {
+                        Some(litchi_iwa_common::shape::geometry::Size { width, height })
+                    },
+                    _ => None,
+                },
+                None => None,
+            },
+            None => None,
+        },
+        None => None,
+    };
+    Ok((size, budget.report(false)))
+}

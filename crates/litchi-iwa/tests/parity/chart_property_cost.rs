@@ -275,6 +275,16 @@ const ROUTES: &[(&str, Format, Operation)] = &[
         Format::Pages,
         Operation::BackgroundImageSet,
     ),
+    (
+        "numbers_background_image_set",
+        Format::Numbers,
+        Operation::BackgroundImageSet,
+    ),
+    (
+        "keynote_background_image_set",
+        Format::Keynote,
+        Operation::BackgroundImageSet,
+    ),
 ];
 
 /// The image every chart image-fill route embeds (record 0422).
@@ -475,7 +485,16 @@ fn host_operation(input: &Input, source: &[u8], operation: Operation) -> TestRes
                 Operation::ValueAxisSet => {
                     return Err("Keynote has no host value-axis route".into());
                 },
-                Operation::BackgroundImageSet => return Err("not measured yet".into()),
+                Operation::BackgroundImageSet => {
+                    e.set_slide_chart_background_image_fill(
+                        slide,
+                        chart,
+                        "poster.png",
+                        &poster()?,
+                        litchi_iwa::shapes::ShapeImageFillTechnique::Tile,
+                        None,
+                    )?;
+                },
                 Operation::RadarSet => {
                     e.set_slide_chart_radar_series_style(
                         slide,
@@ -620,7 +639,16 @@ fn host_operation(input: &Input, source: &[u8], operation: Operation) -> TestRes
                 Operation::ValueAxisSet => {
                     e.set_sheet_chart_value_axis_bounds(sheet, chart, value_axis_bounds()?)?;
                 },
-                Operation::BackgroundImageSet => return Err("not measured yet".into()),
+                Operation::BackgroundImageSet => {
+                    e.set_sheet_chart_background_image_fill(
+                        sheet,
+                        chart,
+                        "poster.png",
+                        &poster()?,
+                        litchi_iwa::shapes::ShapeImageFillTechnique::Tile,
+                        None,
+                    )?;
+                },
                 Operation::RadarSet => {
                     e.set_sheet_chart_radar_series_style(
                         sheet,
@@ -730,7 +758,16 @@ fn keynote_operation(source: &[u8], operation: Operation) -> TestResult<Vec<u8>>
             edit.set(reference_lines())?;
             leaf_bytes!(edit.commit()?.package())
         },
-        Operation::BackgroundImageSet => return Err("not measured yet".into()),
+        Operation::BackgroundImageSet => {
+            let mut edit = package.edit_slide_chart_style(slide, chart)?;
+            edit.set_background_image_fill(
+                &poster()?,
+                "poster.png",
+                style::ImageTechnique::Tile,
+                None,
+            )?;
+            leaf_bytes!(edit.commit()?.package())
+        },
         Operation::ValueAxisSet => leaf_bytes!(
             package
                 .edit_slide_chart_value_axis_settings(slide, chart)?
@@ -984,7 +1021,16 @@ fn numbers_operation(source: &[u8], operation: Operation) -> TestResult<Vec<u8>>
             edit.set(reference_lines())?;
             Ok(leaf_bytes!(edit.commit()?.package()))
         },
-        Operation::BackgroundImageSet => Err("not measured yet".into()),
+        Operation::BackgroundImageSet => {
+            let mut edit = package.edit_sheet_chart_style(0, 1)?;
+            edit.set_background_image_fill(
+                &poster()?,
+                "poster.png",
+                litchi_numbers::sheet::chart::style::ImageTechnique::Tile,
+                None,
+            )?;
+            Ok(leaf_bytes!(edit.commit()?.package()))
+        },
         Operation::ValueAxisSet => {
             let mut edit = package.edit_sheet_chart_value_axis_settings(0, 1)?;
             edit.set_bounds(value_axis_bounds()?)?;

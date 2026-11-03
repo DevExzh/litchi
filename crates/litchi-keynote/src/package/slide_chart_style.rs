@@ -62,6 +62,8 @@ pub(crate) mod style {
     pub use chart_engine::{
         Lighting3d, Property, PropertyKind, RadarGridShape, RadarSeriesStyle, Shadow,
     };
+    pub use litchi_iwa_common::color::Rgba;
+    pub use litchi_iwa_common::shape::fill::ImageTechnique;
     pub use litchi_iwa_common::shape::shadow::Drop;
 
     /// A compact exact-source patch of one chart-level style property.
@@ -422,6 +424,15 @@ pub struct StyleEdit<'a> {
     slide: super::edit::OwnedSlideSelector,
     chart: super::edit::OwnedChartSelector,
     staged: Option<style::Property>,
+    image: Option<StagedImage>,
+}
+
+/// A background image staged by [`StyleEdit::set_background_image_fill`].
+struct StagedImage {
+    bytes: std::sync::Arc<[u8]>,
+    file_name: Box<str>,
+    technique: style::ImageTechnique,
+    tint: Option<style::Rgba>,
 }
 
 impl fmt::Debug for StyleEdit<'_> {
@@ -459,6 +470,7 @@ impl StyleEdit<'_> {
     /// None today; the signature matches the other chart families.
     pub fn set(&mut self, property: style::Property) -> Result<&mut Self, Error> {
         self.staged = Some(property);
+        self.image = None;
         Ok(self)
     }
 
@@ -469,6 +481,39 @@ impl StyleEdit<'_> {
     /// None today; the signature matches the other chart families.
     pub fn reset(&mut self, kind: style::PropertyKind) -> Result<&mut Self, Error> {
         self.staged = Some(kind.native_default());
+        self.image = None;
+        Ok(self)
+    }
+
+    /// Stage embedding `bytes` as a new `Data/` member and making them the
+    /// chart's background, laid out by `technique` over the chart frame and
+    /// optionally tinted (the host's `set_slide_chart_background_image_fill`),
+    /// replacing any staged value. The chart style becomes the image's data
+    /// owner; a replaced image fill is released, and its media removed when
+    /// nothing else references it.
+    ///
+    /// # Errors
+    ///
+    /// [`Refusal::InvalidImage`] for bytes that are not an image.
+    pub fn set_background_image_fill(
+        &mut self,
+        bytes: &[u8],
+        file_name: &str,
+        technique: style::ImageTechnique,
+        tint: Option<style::Rgba>,
+    ) -> Result<&mut Self, Error> {
+        if litchi_iwa_common::media::Type::from_bytes(bytes)
+            != litchi_iwa_common::media::Type::Image
+        {
+            return Err(Refusal::InvalidImage.into());
+        }
+        self.staged = None;
+        self.image = Some(StagedImage {
+            bytes: bytes.into(),
+            file_name: file_name.into(),
+            technique,
+            tint,
+        });
         Ok(self)
     }
 
@@ -481,17 +526,77 @@ impl StyleEdit<'_> {
     /// [`Refusal::MissingStyle`], [`Refusal::SharedStyle`], source, limit
     /// and verification errors.
     pub fn commit(self) -> Result<style::Commit, Error> {
-        let value = self.staged.ok_or(Refusal::NoStagedOperation)?;
         let mut ledger = Ledger::new(self.source)?;
         let target = ledger.target(
             self.source,
             self.slide.as_selector(),
             self.chart.as_selector(),
         )?;
-        let before = read_style(&mut ledger, self.source, &target, value.kind())?;
-        let published = if before == value {
+        let (value, image) = match (self.staged, &self.image) {
+            (_, Some(image)) => (None, Some(image)),
+            (Some(value), None) => (Some(value), None),
+            (None, None) => return Err(Refusal::NoStagedOperation.into()),
+        };
+        let kind = value
+            .as_ref()
+            .map_or(style::PropertyKind::BackgroundFill, style::Property::kind);
+        let before = read_style(&mut ledger, self.source, &target, kind)?;
+        let digest;
+        let published = if let Some(image) = image {
+            use sha1::Digest as _;
+            let size = ledger
+                .read(self.source, |workspace, limits| {
+                    engine::read_frame_size(workspace, target.selection.identifier, limits)
+                })?
+                .ok_or(Refusal::InvalidImage)?;
+            digest = sha1::Sha1::digest(image.bytes.as_ref());
+            let new = engine::NewImage {
+                data: litchi_iwa_style::data_owner::NewData {
+                    preferred_file_name: &image.file_name,
+                    digest: digest.as_slice(),
+                    length: image.bytes.len() as u64,
+                },
+                technique: image.technique,
+                size,
+                tint: image.tint,
+            };
+            ledger.write_data(
+                self.source,
+                &target,
+                chart_fields(kind),
+                Some(image.bytes.as_ref()),
+                |workspace, limits| {
+                    engine::write_chart_background(
+                        workspace,
+                        target.selection.identifier,
+                        target.kind,
+                        engine::Background::Image(new),
+                        limits,
+                    )
+                },
+            )?
+        } else if value.as_ref() == Some(&before) {
             None
+        } else if let Some(style::Property::BackgroundFill(fill)) = &value {
+            // The host's `set_chart_background_fill` releases a replaced
+            // image fill's data owner and orphaned media.
+            ledger.write_data(
+                self.source,
+                &target,
+                chart_fields(kind),
+                None,
+                |workspace, limits| {
+                    engine::write_chart_background(
+                        workspace,
+                        target.selection.identifier,
+                        target.kind,
+                        engine::Background::Fill(fill),
+                        limits,
+                    )
+                },
+            )?
         } else {
+            let value = value.as_ref().ok_or(Refusal::NoStagedOperation)?;
             ledger.write(
                 self.source,
                 &target,
@@ -502,7 +607,7 @@ impl StyleEdit<'_> {
                         target.selection.identifier,
                         target.kind,
                         target.series,
-                        &value,
+                        value,
                         limits,
                     )
                 },
@@ -527,9 +632,15 @@ impl StyleEdit<'_> {
             self.slide.as_selector(),
             self.chart.as_selector(),
         )?;
-        if candidate.kind != target.kind
-            || read_style(&mut ledger, &published.package, &candidate, value.kind())? != value
-        {
+        let after = read_style(&mut ledger, &published.package, &candidate, kind)?;
+        let expected = match &value {
+            Some(value) => after == *value,
+            None => matches!(
+                &after,
+                style::Property::BackgroundFill(litchi_iwa_common::shape::fill::Fill::Image(_))
+            ),
+        };
+        if candidate.kind != target.kind || !expected {
             return Err(Error::Verification);
         }
         Ok(style::Commit {
@@ -538,7 +649,7 @@ impl StyleEdit<'_> {
                 slide: target.selection.slide,
                 chart: target.selection.chart,
                 before,
-                after: value,
+                after,
                 plan: published.plan,
             },
             package: published.package,
@@ -841,6 +952,7 @@ impl Package {
             slide,
             chart,
             staged: None,
+            image: None,
         })
     }
 
