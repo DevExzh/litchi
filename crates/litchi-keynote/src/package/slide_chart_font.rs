@@ -2996,7 +2996,14 @@ fn message_unknown_fields_preserved(
             wire_unknown_fields_preserved(source, candidate, limits, &[1, 2], budget, fields)
         },
         PACKAGE_METADATA_MESSAGE_TYPE => {
-            wire_unknown_fields_preserved(source, candidate, limits, &[1, 3, 8, 11], budget, fields)
+            // The `DataInfo` list (4) changes only when the plan admits it
+            // (an image-fill write).
+            let known: &[u32] = if allowed_fields.contains(&4) {
+                &[1, 3, 4, 8, 11]
+            } else {
+                &[1, 3, 8, 11]
+            };
+            wire_unknown_fields_preserved(source, candidate, limits, known, budget, fields)
         },
         _ => Ok(true),
     }
@@ -3537,6 +3544,20 @@ pub(super) fn mutation_plan_for_series_scope(
     }
     for insertion in &changes.insertions {
         members.push(insertion.name.clone());
+    }
+    // Planned non-archive members (an image fill's new `Data/` entry).
+    for name in scope.planned_new_members() {
+        if !members.contains(name)
+            && changes
+                .insertions
+                .iter()
+                .all(|insertion| insertion.name != *name)
+        {
+            members
+                .try_reserve(1)
+                .map_err(|_| Error::Allocation { amount: 1 })?;
+            members.push(name.clone());
+        }
     }
     for name in &changes.deletions {
         members.push(name.clone());
