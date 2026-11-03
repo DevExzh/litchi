@@ -631,9 +631,11 @@ pub fn apply(
         }
         return Err(Fault::Unsupported);
     };
-    // Nothing to register: no transition, no allocation, no emptied
-    // component and no save token (the registry is not decoded).
+    // Nothing to register: no transition, no released or allocated
+    // identifier, no emptied component and no save token (the registry is
+    // not decoded).
     if transition.is_empty()
+        && transition.released.is_empty()
         && allocated.is_none()
         && emptied.is_empty()
         && working.save_token.is_none()
