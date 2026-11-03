@@ -191,6 +191,11 @@ required-features = ["xlsx", "docx", "pptx", "xls", "xlsb", "ods"]
 name              = "query_corpus_digest"
 required-features = ["xlsx", "docx", "pptx", "xls", "xlsb", "ods"]
 
+# Writes the File-route packages of the macOS queue (record 0430).
+[[example]]
+name              = "mac_queue_file_routes"
+required-features = ["pages", "keynote", "numbers"]
+
 [lints]
 workspace = true
 

@@ -271,6 +271,13 @@ impl<'a> Case<'a> {
         let leaf_run =
             leaf(input).map_err(|error| format!("{header}: leaf route failed: {error}"))?;
         let leaf_output = leaf_run.output.as_slice();
+        let mac_queue = mac_queue::Dump {
+            name: self.name,
+            format: self.format,
+            tier: self.tier,
+            fixture: self.fixture.path,
+            read_only: self.read_only,
+        };
         if self.read_only {
             for (route, bytes) in [("host", host_output.as_slice()), ("leaf", leaf_output)] {
                 if bytes != input {
@@ -344,6 +351,7 @@ impl<'a> Case<'a> {
             },
         }
 
+        mac_queue.write(input, &host_output, leaf_output, failures.is_empty())?;
         if failures.is_empty() {
             let mut text = format!("{header}: passed\n");
             text.push_str(&diff.render());
@@ -355,6 +363,102 @@ impl<'a> Case<'a> {
                 let _ = writeln!(text, "- {failure}");
             }
             Err(text.into())
+        }
+    }
+}
+
+/// The macOS queue dump (record 0430): when `LITCHI_MAC_QUEUE_DUMP` names a
+/// directory, every case run writes its input, host output and leaf output
+/// there, beside a small JSON sidecar, for `tools/mac_queue/generate.py`.
+/// Without the variable nothing is written.
+mod mac_queue {
+    use std::collections::HashMap;
+    use std::path::PathBuf;
+    use std::sync::Mutex;
+
+    use super::{Format, TestResult, Tier};
+
+    /// The environment variable naming the dump directory.
+    pub const VARIABLE: &str = "LITCHI_MAC_QUEUE_DUMP";
+
+    static OCCURRENCES: Mutex<Option<HashMap<&'static str, usize>>> = Mutex::new(None);
+
+    pub struct Dump {
+        pub name: &'static str,
+        pub format: Format,
+        pub tier: Tier,
+        pub fixture: &'static str,
+        pub read_only: bool,
+    }
+
+    fn directory() -> Option<PathBuf> {
+        std::env::var_os(VARIABLE)
+            .filter(|value| !value.is_empty())
+            .map(PathBuf::from)
+    }
+
+    fn json_string(value: &str) -> String {
+        let mut out = String::with_capacity(value.len() + 2);
+        out.push('"');
+        for ch in value.chars() {
+            match ch {
+                '"' => out.push_str("\\\""),
+                '\\' => out.push_str("\\\\"),
+                ch if u32::from(ch) < 0x20 => out.push_str(&format!("\\u{:04x}", u32::from(ch))),
+                ch => out.push(ch),
+            }
+        }
+        out.push('"');
+        out
+    }
+
+    impl Dump {
+        /// Write the three packages and the sidecar; a no-op without the
+        /// variable. The stem is the case name, suffixed `~N` from the
+        /// second run of the same name on.
+        pub fn write(&self, input: &[u8], host: &[u8], leaf: &[u8], passed: bool) -> TestResult {
+            let Some(directory) = directory() else {
+                return Ok(());
+            };
+            let occurrence = {
+                let mut guard = OCCURRENCES
+                    .lock()
+                    .map_err(|_| "mac-queue dump lock poisoned")?;
+                let counts = guard.get_or_insert_with(HashMap::new);
+                let count = counts.entry(self.name).or_insert(0);
+                *count += 1;
+                *count
+            };
+            let stem = if occurrence == 1 {
+                self.name.to_owned()
+            } else {
+                format!("{}~{occurrence}", self.name)
+            };
+            let extension = match self.format {
+                Format::Numbers => "numbers",
+                Format::Pages => "pages",
+                Format::Keynote => "key",
+            };
+            std::fs::create_dir_all(&directory)?;
+            for (role, bytes) in [("input", input), ("host", host), ("leaf", leaf)] {
+                std::fs::write(directory.join(format!("{stem}.{role}.{extension}")), bytes)?;
+            }
+            // libtest names each test's thread `module::test_fn`; a case
+            // whose name differs from its test function is found by it.
+            let test = std::thread::current().name().unwrap_or("-").to_owned();
+            let sidecar = format!(
+                "{{\"case\": {}, \"test\": {}, \"stem\": {}, \"occurrence\": {occurrence}, \"format\": {}, \"tier\": {}, \"fixture\": {}, \"read_only\": {}, \"passed\": {passed}, \"extension\": {}}}\n",
+                json_string(self.name),
+                json_string(&test),
+                json_string(&stem),
+                json_string(&format!("{:?}", self.format)),
+                json_string(&format!("{:?}", self.tier)),
+                json_string(self.fixture),
+                self.read_only,
+                json_string(extension),
+            );
+            std::fs::write(directory.join(format!("{stem}.json")), sidecar)?;
+            Ok(())
         }
     }
 }
