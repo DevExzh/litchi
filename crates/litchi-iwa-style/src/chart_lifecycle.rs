@@ -3,7 +3,8 @@
 //! drawable's `TSCH.ChartArchive` extension, read and rewritten in place
 //! (the host's `set_*_chart_kind` and `set_*_chart_direction`, which assign
 //! `chart_type` and `series_direction`). Every other byte of the payload is
-//! kept. [`author`] writes the private graph of a new chart.
+//! kept. [`author`] writes the private graph of a new chart; [`graph`]
+//! lists and remaps the private references of an existing one.
 
 use litchi_iwa_common::WireLimits;
 use litchi_iwa_common::chart::Direction;
@@ -11,6 +12,7 @@ use litchi_iwa_common::chart::kind::Kind;
 use litchi_iwa_common::wire::{WireView, patch_varint_field, transform_length_delimited_field};
 
 pub mod author;
+pub mod graph;
 
 /// The `TSCH.ChartArchive` extension of `TSCH.ChartDrawableArchive`.
 const CHART_UNITY: u32 = 10_000;
