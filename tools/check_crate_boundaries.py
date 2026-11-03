@@ -4999,6 +4999,35 @@ KEYNOTE_SLIDE_TABLE_PHYSICAL_SORT_CODEC_FLOW_MARKERS = {
         r"assemble_(?:tile|header|uid)|FieldSpan)\w*\b"
     ),
 }
+KEYNOTE_SLIDE_TABLE_PHYSICAL_SORT_SHARED_EXECUTOR_SOURCE = Path(
+    "crates/litchi-iwa-table/src/sort.rs"
+)
+KEYNOTE_SLIDE_TABLE_PHYSICAL_SORT_SHARED_EXECUTOR_MARKERS = (
+    re.compile(r"\bpub\s+fn\s+execute\b"),
+    re.compile(r"\bsame_tile_only\b"),
+    re.compile(r"\bTILE_ROWS_FIELD\b"),
+    re.compile(r"\bBUCKET_HEADERS_FIELD\b"),
+    re.compile(r"\bUID_ROW_UID_FOR_INDEX_FIELD\b"),
+    re.compile(r"\bworking\.publish\s*\("),
+)
+# Owner markers that remain once the rewrite is delegated (record 0421a): the
+# owner still verifies the reopened candidate and checks row and header
+# placement against its own scan.
+KEYNOTE_SLIDE_TABLE_PHYSICAL_SORT_DELEGATED_GROUPS = {
+    "candidate verification": (
+        re.compile(r"\b(?:candidate|reopen)\b"),
+        re.compile(r"\b(?:validate|verify)\w*\s*\("),
+    ),
+    "tile row affinity": (
+        re.compile(r"\b(?:tile_row_index|numrows)\b"),
+        re.compile(r"\bdestination_by_source\b"),
+    ),
+    "sparse header affinity": (
+        re.compile(
+            r"\b(?:row_header_indices|header_index|header_indices|sparse_headers)\b"
+        ),
+    ),
+}
 KEYNOTE_SLIDE_TABLE_PHYSICAL_SORT_OWNER_MARKER_GROUPS = {
     "selector-first exact admission": (
         re.compile(r"\bselect_table\s*\("),
@@ -65177,7 +65206,30 @@ def audit_keynote_slide_table_physical_sort_resource_source_topology(
     )
     violations: list[str] = []
 
+    # Record 0421a: the permutation and the tile/header/UID rewrite (and
+    # their reassembly) moved to the shared executor `litchi_iwa_table::sort`,
+    # called with Keynote's same-tile, preview-dropping hooks. The owner keeps
+    # admission and candidate verification; the rewrite-affinity groups are
+    # then proven by the shared executor's source instead.
+    shared_executor_path = root / KEYNOTE_SLIDE_TABLE_PHYSICAL_SORT_SHARED_EXECUTOR_SOURCE
+    shared_executor = (
+        _mask_rust_non_code(
+            _mask_rust_cfg_test_items(shared_executor_path.read_text(encoding="utf-8"))
+        )
+        if shared_executor_path.is_file()
+        else ""
+    )
+    delegates = (
+        re.search(r"\bsort_engine::execute\s*\(", owner) is not None
+        and re.search(r"\binvalidating_previews_same_tile\s*\(", owner) is not None
+        and all(
+            marker.search(shared_executor) is not None
+            for marker in KEYNOTE_SLIDE_TABLE_PHYSICAL_SORT_SHARED_EXECUTOR_MARKERS
+        )
+    )
     for label, markers in KEYNOTE_SLIDE_TABLE_PHYSICAL_SORT_OWNER_MARKER_GROUPS.items():
+        if delegates and label in KEYNOTE_SLIDE_TABLE_PHYSICAL_SORT_DELEGATED_GROUPS:
+            markers = KEYNOTE_SLIDE_TABLE_PHYSICAL_SORT_DELEGATED_GROUPS[label]
         # The row-affine admission proof belongs to the package owner. Do not
         # let a generic codec helper or semantic type name satisfy an owner
         # marker; otherwise removing an admitted structure from the actual

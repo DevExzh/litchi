@@ -57,7 +57,19 @@ three digest sorts, release `slide_table_physical_sort` test binaries
 |---|---:|---:|---:|
 | Keynote Sort Now (3 sorts) | 13,153,709 | 13,632,341 | 1.036 |
 
-## 4. Verification
+## 4. Boundary policy
 
-The gate list of `.coord/iwa-w4h/gates.sh` runs on the merge of trunk;
-its result is reported in the hand-off.
+`tools/check_crate_boundaries.py` required the Keynote owner itself to hold
+the tile, header-bucket and reassembly markers. When the owner calls
+`sort_engine::execute` with `Hooks::invalidating_previews_same_tile()` and
+the shared executor (`crates/litchi-iwa-table/src/sort.rs`) holds the tile,
+header, UID-map and publication markers, those three groups now require the
+owner to keep only its verification and placement checks
+(`candidate`/`verify`, `tile_row_index`/`destination_by_source`,
+`row_header_indices`). Every other Keynote physical-sort audit is unchanged.
+
+## 5. Verification
+
+The full gate list (`.coord/iwa-w4h/gates.sh`) on the merge of trunk
+`d6842ba024`: every row exits 0, including the full parity suite (1,133
+passed); the boundary tool and its unit tests pass after §4.
