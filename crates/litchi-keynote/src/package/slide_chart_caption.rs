@@ -2798,6 +2798,7 @@ fn caption_graph_objects(
             language,
         },
         label,
+        caption::Layout::Inline,
         wire,
         Default::default(),
     )

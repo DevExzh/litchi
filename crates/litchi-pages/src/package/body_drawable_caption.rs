@@ -653,6 +653,7 @@ fn label_graph(
             language: language.as_deref(),
         },
         slot.kind.label(),
+        caption::Layout::Inline,
         graph_codec::EncodeOptions::for_text(text),
         archive_limits(source)?,
     )

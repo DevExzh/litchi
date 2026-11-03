@@ -44,6 +44,16 @@ pub const STANDIN_MESSAGE_TYPE: u32 = 3_097;
 pub const GRAPH_VERSION: [u32; 3] = [1, 0, 5];
 /// The message version the host writes on a new stand-in.
 pub const STANDIN_VERSION: [u32; 3] = [10, 1, 0];
+/// The message version the host writes on a componentized graph's caption
+/// info and placement.
+pub const COMPONENTIZED_VERSION: [u32; 3] = [10, 1, 0];
+/// `TSS.StylesheetArchive`.
+const STYLESHEET_MESSAGE_TYPE: u32 = 401;
+/// `TSS.StylesheetArchive.styles`.
+const STYLESHEET_STYLES_FIELD: u32 = 1;
+/// The caption-info fields a componentized graph's metadata keeps with
+/// `IgnoreAndPreserve` (drawable text wrap, owned storage, drawable lock).
+const COMPONENTIZED_PRESERVED_FIELDS: [&[u32]; 3] = [&[1, 1, 1, 12], &[1, 6], &[1, 1, 1, 13]];
 
 const DRAWABLE_GEOMETRY_FIELD: u32 = 1;
 const GEOMETRY_SIZE_FIELD: u32 = 2;
@@ -108,6 +118,35 @@ pub enum Nesting {
     /// Field 1 of field 1 (`TSWP.ShapeInfoArchive.super.super`: shapes and
     /// text boxes).
     Shape,
+    /// Field 1 of a chart drawable (`TSCH.ChartDrawableArchive.super`).
+    /// Its message metadata moves a replaced label reference to the end of
+    /// the reference list and of each field list naming it (the host's
+    /// chart caption edge), where other drawables replace it in place.
+    Chart,
+}
+
+/// Where a new label graph's objects live (the host's
+/// `CaptionGraphProfile`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum Layout {
+    /// All four objects in the drawable's component.
+    Inline,
+    /// The cross-component graph current Numbers files use for a drawable
+    /// stored beside the calculation engine: the shape style lives in the
+    /// document stylesheet (registered in its styles and UUIDs, referenced
+    /// from the drawable's component), the placement anchors are swapped,
+    /// and the caption info and placement carry the componentized message
+    /// version and the info its preserved-field metadata.
+    Componentized,
+}
+
+impl Layout {
+    const fn profile(self) -> graph_codec::CaptionGraphProfile {
+        match self {
+            Self::Inline => graph_codec::CaptionGraphProfile::Inline,
+            Self::Componentized => graph_codec::CaptionGraphProfile::Componentized,
+        }
+    }
 }
 
 /// The four objects of a new label graph.
@@ -191,9 +230,12 @@ fn versioned(
     Ok(object)
 }
 
-/// The four objects of a new inline label graph of `drawable` (shape
-/// style, caption info, storage, placement; the host's
-/// `caption_objects`) under the archive `limits`, and the codec's report.
+/// The four objects of a new label graph of `drawable` in `layout` (shape
+/// style, caption info, storage, placement; the host's `caption_objects`
+/// and `componentized_caption_objects`) under the archive `limits`, and
+/// the codec's report. Placing them is the caller's: a componentized
+/// graph's style belongs in the document stylesheet ([`write()`] does
+/// this).
 ///
 /// # Errors
 ///
@@ -206,10 +248,11 @@ pub fn graph_objects(
     text: &str,
     theme: Theme<'_>,
     label: Label,
+    layout: Layout,
     options: graph_codec::EncodeOptions,
     limits: litchi_iwa_core::Limits,
 ) -> Result<(Vec<ArchiveObject>, graph_codec::EncodeReport), BuildError> {
-    let output = graph_codec::encode_caption_graph_with_kind_with_report(
+    let output = graph_codec::encode_caption_graph_with_profile_with_report(
         graph_codec::CaptionGraphWrite {
             drawable_identifier: drawable,
             style_identifier: ids.style,
@@ -223,11 +266,16 @@ pub fn graph_objects(
             language: theme.language,
         },
         label.graph_kind(),
+        layout.profile(),
         options,
     )
     .map_err(BuildError::Encode)?;
     let report = output.report();
     let [style, info, storage, placement] = output.into_payloads().into_parts();
+    let label_version = match layout {
+        Layout::Inline => GRAPH_VERSION,
+        Layout::Componentized => COMPONENTIZED_VERSION,
+    };
     let objects = vec![
         versioned(
             ids.style,
@@ -241,7 +289,7 @@ pub fn graph_objects(
             ids.info,
             CAPTION_INFO_MESSAGE_TYPE,
             info,
-            GRAPH_VERSION,
+            label_version,
             vec![ids.style, ids.storage, ids.placement],
             limits,
         ),
@@ -257,7 +305,7 @@ pub fn graph_objects(
             ids.placement,
             CAPTION_PLACEMENT_MESSAGE_TYPE,
             placement,
-            GRAPH_VERSION,
+            label_version,
             Vec::new(),
             limits,
         ),
@@ -265,6 +313,23 @@ pub fn graph_objects(
     .into_iter()
     .collect::<Result<Vec<_>, _>>()
     .map_err(BuildError::Archive)?;
+    let mut objects = objects;
+    if layout == Layout::Componentized {
+        let fields = COMPONENTIZED_PRESERVED_FIELDS
+            .into_iter()
+            .map(|path| {
+                let mut field = litchi_iwa_core::FieldInfo::new(
+                    litchi_iwa_core::FieldPath::new(path.to_vec(), limits)?,
+                    limits,
+                )?;
+                field.unknown_field_rule =
+                    Some(litchi_iwa_core::UnknownFieldRule::IgnoreAndPreserve);
+                Ok(field)
+            })
+            .collect::<Result<Vec<_>, litchi_iwa_core::Error>>()
+            .map_err(BuildError::Archive)?;
+        objects[1].archive_info.message_infos[0].field_infos = fields;
+    }
     Ok((objects, report))
 }
 
@@ -381,7 +446,7 @@ pub fn repoint(
         Nesting::Shape => transform_length_delimited_field(payload, 1, |shape| {
             transform_length_delimited_field(shape, 1, patch)
         }),
-        Nesting::Drawable => transform_length_delimited_field(payload, 1, patch),
+        Nesting::Drawable | Nesting::Chart => transform_length_delimited_field(payload, 1, patch),
     }
 }
 
@@ -689,7 +754,7 @@ pub fn component_holds(
 pub struct Written {
     /// Whether anything changed.
     pub changed: bool,
-    /// The new objects (a label graph or a stand-in).
+    /// The new objects (a label graph or a stand-in), in allocation order.
     pub created: Vec<u64>,
 }
 
@@ -709,17 +774,135 @@ fn point_drawable_at(
         .message_infos
         .get_mut(message)
         .ok_or(invalid("a drawable without a message info"))?;
-    replace_reference(&mut info.object_references, old, new);
+    retarget_references(info, target.nesting, old, new)
+        .map_err(|Malformed| invalid("an ambiguous drawable label reference"))
+}
+
+/// Move a drawable message's metadata from label object `old` to `new`
+/// after [`repoint`]: [`replace_reference`] for images, movies and shapes;
+/// for a chart (the host's chart caption edge) the message must list `old`
+/// once and no field twice, and `old` leaves every list naming it with
+/// `new` appended there.
+///
+/// # Errors
+///
+/// [`Malformed`] for ambiguous chart metadata.
+pub fn retarget_references(
+    info: &mut litchi_iwa_core::MessageInfo,
+    nesting: Nesting,
+    old: u64,
+    new: u64,
+) -> Result<(), Malformed> {
+    if nesting == Nesting::Chart {
+        move_reference(info, old, new)
+    } else {
+        replace_reference(&mut info.object_references, old, new);
+        Ok(())
+    }
+}
+
+fn move_reference(
+    info: &mut litchi_iwa_core::MessageInfo,
+    old: u64,
+    new: u64,
+) -> Result<(), Malformed> {
+    let listed = |references: &[u64], identifier: u64| {
+        references.iter().filter(|id| **id == identifier).count()
+    };
+    if old == new
+        || listed(&info.object_references, old) != 1
+        || listed(&info.object_references, new) != 0
+        || info.data_references.contains(&old)
+        || info.data_references.contains(&new)
+    {
+        return Err(Malformed);
+    }
+    let mut edges = 0usize;
+    for field in &info.field_infos {
+        let count = listed(&field.object_references, old);
+        if count > 1
+            || field.object_references.contains(&new)
+            || field.data_references.contains(&old)
+            || field.data_references.contains(&new)
+        {
+            return Err(Malformed);
+        }
+        edges += count;
+    }
+    if edges > 1 {
+        return Err(Malformed);
+    }
+    let lists = std::iter::once(&mut info.object_references).chain(
+        info.field_infos
+            .iter_mut()
+            .map(|field| &mut field.object_references),
+    );
+    for references in lists {
+        if references.contains(&old) {
+            references.retain(|id| *id != old);
+            references.push(new);
+        }
+    }
+    Ok(())
+}
+
+/// Register a componentized graph's shape `style` in the document
+/// `stylesheet` (the host's `insert_componentized_caption_style`): the
+/// stylesheet payload lists it in `styles` and its metadata references it,
+/// the object joins the stylesheet's member with a UUID in that component,
+/// and the drawable's component references it externally.
+fn insert_componentized_style(
+    workspace: &mut Workspace<'_>,
+    stylesheet: u64,
+    drawable_component: u64,
+    style: ArchiveObject,
+) -> Result<(), Error> {
+    let identifier = style
+        .archive_info
+        .identifier
+        .ok_or(invalid("a caption style without an identifier"))?;
+    let (message, payload) = workspace.unique_payload(
+        stylesheet,
+        STYLESHEET_MESSAGE_TYPE,
+        "a stylesheet must have exactly one payload",
+    )?;
+    let data = litchi_iwa_common::wire::append_repeated_length_delimited_field(
+        payload,
+        STYLESHEET_STYLES_FIELD,
+        &reference_payload(identifier),
+    )
+    .map_err(|error| Error::Graph(crate::graph::Error::Wire(error)))?;
+    workspace.replace_payload(stylesheet, message, data)?;
+    let info = workspace
+        .object_mut(stylesheet)?
+        .archive_info
+        .message_infos
+        .get_mut(message)
+        .ok_or(invalid("a stylesheet payload has no metadata"))?;
+    if info.object_references.contains(&identifier) {
+        return Err(invalid("the stylesheet already references a new style"));
+    }
+    info.object_references.push(identifier);
+    let location = workspace.locate(stylesheet)?;
+    workspace.insert(location, style)?;
+    let member = workspace.member(location).to_owned();
+    if let Some(style_component) = workspace.component_for_member(&member)? {
+        workspace.add_object_uuids(style_component, &[identifier])?;
+        if style_component != drawable_component {
+            workspace.add_external_reference(drawable_component, style_component, identifier)?;
+        }
+    }
     Ok(())
 }
 
 /// Store `text` as `target`'s label (`None`: clear it), as the host's
 /// `set_*_caption`/`remove_*_caption` do: a present label's storage text
-/// is replaced; an absent one gets a new inline graph (`theme` names its
-/// stylesheet, paragraph style and language); clearing points the drawable
-/// at a fresh stand-in and keeps the old graph. New objects take
+/// is replaced; an absent one gets a new graph in `layout` (`theme` names
+/// its stylesheet, paragraph style and language); clearing points the
+/// drawable at a fresh stand-in and keeps the old graph. New objects take
 /// identifiers from the package watermark, get UUIDs in the drawable's
-/// component and raise the watermark.
+/// component (a componentized style: in the stylesheet's) and raise the
+/// watermark.
 ///
 /// # Errors
 ///
@@ -729,6 +912,7 @@ pub fn write(
     workspace: &mut Workspace<'_>,
     target: Target,
     text: Option<&str>,
+    layout: Layout,
     theme: impl FnOnce(&Workspace<'_>) -> Result<(u64, u64, Option<String>), Error>,
 ) -> Result<Written, Error> {
     let slot = resolve(workspace, target)?;
@@ -742,7 +926,10 @@ pub fn write(
         .component_for_member(&member)?
         .ok_or(invalid("a drawable outside every component"))?;
     let location = workspace.locate(target.drawable)?;
-    let created = match (text, slot.graph) {
+    // A componentized graph's style, registered in the stylesheet's
+    // component rather than the drawable's.
+    let mut shared_style = None;
+    let mut created = match (text, slot.graph) {
         (Some(text), Some(graph)) => {
             let storage = workspace.object(graph.storage)?;
             let payload = storage.messages[0].data.clone();
@@ -794,6 +981,7 @@ pub fn write(
                     language: language.as_deref(),
                 },
                 target.label,
+                layout,
                 graph_codec::EncodeOptions::for_text(text),
                 litchi_iwa_core::Limits::default(),
             )
@@ -801,11 +989,24 @@ pub fn write(
                 BuildError::Encode(error) => Error::Encode(error),
                 BuildError::Archive(error) => Error::Graph(crate::graph::Error::Archive(error)),
             })?;
+            let mut objects = objects.into_iter();
+            if layout == Layout::Componentized {
+                let style = objects
+                    .next()
+                    .ok_or(invalid("a label graph without a style"))?;
+                insert_componentized_style(workspace, stylesheet, component, style)?;
+            }
             for object in objects {
                 workspace.insert(location, object)?;
             }
             point_drawable_at(workspace, target, slot.reference, ids.info)?;
-            ids.all().to_vec()
+            match layout {
+                Layout::Inline => ids.all().to_vec(),
+                Layout::Componentized => {
+                    shared_style = Some(ids.style);
+                    vec![ids.info, ids.storage, ids.placement]
+                },
+            }
         },
         (None, Some(_)) => {
             let identifier = workspace.next_object_identifier()?;
@@ -822,6 +1023,9 @@ pub fn write(
     if let Some(&last) = created.last() {
         workspace.add_object_uuids(component, &created)?;
         workspace.set_last_object_identifier(last)?;
+    }
+    if let Some(style) = shared_style {
+        created.insert(0, style);
     }
     if read(workspace, target)?.as_deref() != text {
         return Err(invalid("a label write does not read back"));
@@ -845,6 +1049,65 @@ mod tests {
         assert_eq!(references, vec![4, 7, 11]);
         replace_reference(&mut references, 3, 11);
         assert_eq!(references, vec![4, 7, 11]);
+    }
+
+    #[test]
+    fn chart_edge_moves_the_label_reference_to_the_end() {
+        let mut info =
+            litchi_iwa_core::MessageInfo::new(5021, 0, litchi_iwa_core::Limits::default())
+                .expect("info");
+        info.object_references = vec![9, 4, 7];
+        info.field_infos.push(litchi_iwa_core::FieldInfo {
+            object_references: vec![9, 5],
+            ..Default::default()
+        });
+        move_reference(&mut info, 9, 12).expect("move");
+        assert_eq!(info.object_references, vec![4, 7, 12]);
+        assert_eq!(info.field_infos[0].object_references, vec![5, 12]);
+        assert!(move_reference(&mut info, 9, 13).is_err());
+        assert!(move_reference(&mut info, 4, 7).is_err());
+    }
+
+    #[test]
+    fn componentized_graph_metadata_follows_the_host() {
+        let ids = GraphIds::allocate(351).expect("ids");
+        let (objects, _) = graph_objects(
+            ids,
+            149,
+            480.0,
+            "Native caption",
+            Theme {
+                stylesheet: 5,
+                paragraph_style: 41,
+                language: Some("en"),
+            },
+            Label::Caption,
+            Layout::Componentized,
+            graph_codec::EncodeOptions::for_text("Native caption"),
+            litchi_iwa_core::Limits::default(),
+        )
+        .expect("graph");
+        let versions = |index: usize| {
+            objects[index].archive_info.message_infos[0]
+                .versions
+                .to_vec()
+        };
+        assert_eq!(versions(0), GRAPH_VERSION);
+        assert_eq!(versions(1), COMPONENTIZED_VERSION);
+        assert_eq!(versions(2), GRAPH_VERSION);
+        assert_eq!(versions(3), COMPONENTIZED_VERSION);
+        let info = &objects[1].archive_info.message_infos[0];
+        assert_eq!(info.object_references, vec![351, 353, 354]);
+        assert_eq!(
+            info.field_infos
+                .iter()
+                .map(|field| field.path.as_slice())
+                .collect::<Vec<_>>(),
+            COMPONENTIZED_PRESERVED_FIELDS
+        );
+        assert!(info.field_infos.iter().all(|field| {
+            field.unknown_field_rule == Some(litchi_iwa_core::UnknownFieldRule::IgnoreAndPreserve)
+        }));
     }
 
     #[test]
