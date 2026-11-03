@@ -4,7 +4,7 @@
 //! `data_reference_registry` and `append_data_info`). Lifted from Pages
 //! (records 0371, 0413b, 0415) so the three format families share them.
 //!
-//! Payload functions edit a `TSP.PackageMetadata` payload; [`own`] and
+//! Payload functions edit a `TSP.PackageMetadata` payload; [`own_new`] and
 //! [`release`] apply one owner transition to the registry of a
 //! [`Workspace`].
 
