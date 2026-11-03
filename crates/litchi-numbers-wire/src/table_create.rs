@@ -28,6 +28,8 @@ use crate::table_write::WriteError;
 
 type Result<T> = std::result::Result<T, WriteError>;
 
+pub mod fresh;
+
 /// `TST.TableInfoArchive`.
 pub const TABLE_INFO_MESSAGE_TYPE: u32 = 6_000;
 /// `TST.TableModelArchive`.
@@ -323,7 +325,14 @@ impl TableUuid {
     #[must_use]
     pub fn derive(seed: u64) -> Self {
         let high = mix(seed ^ 0x7461_626c_6555_5549);
-        let low = mix(high ^ seed);
+        Self::from_halves(high, mix(high ^ seed))
+    }
+
+    /// The identity of a 128-bit value (`high` the first half of the text),
+    /// with the RFC 4122 version 4 and variant 1 bits the app writes; the
+    /// owners' seed policies derive the halves.
+    #[must_use]
+    pub fn from_halves(high: u64, low: u64) -> Self {
         let high = (high & 0xffff_ffff_ffff_0fff) | 0x0000_0000_0000_4000;
         let low = (low & 0x3fff_ffff_ffff_ffff) | 0x8000_0000_0000_0000;
         let text = format!(
