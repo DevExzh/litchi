@@ -124,6 +124,18 @@ pub mod reference_lines {
     pub use crate::package::body_chart_series::{Diagnostics, Error, LimitKind, Refusal};
 }
 
+/// Exact-source transactions of the bounds, step counts and scale of one
+/// chart's primary value axis, edited as one aggregate:
+/// [`crate::Package::edit_body_chart_value_axis_settings`].
+pub mod value_axis {
+    pub use crate::package::body_chart_series::{Diagnostics, Error, LimitKind, Refusal};
+    pub use crate::package::body_chart_value_axis::ValueAxisEdit as Edit;
+    pub use crate::package::body_chart_value_axis::value_axis::{
+        Bound, Bounds, Commit, MajorStepCount, MinorStepCount, Patch, Scale, Steps,
+        ValueAxisSettings,
+    };
+}
+
 /// Exact-source legend fill, border and shadow transactions of one chart
 /// on the shared legend-style variation graph:
 /// [`crate::Package::edit_body_chart_legend_style`].

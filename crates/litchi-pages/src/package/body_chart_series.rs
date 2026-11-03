@@ -215,6 +215,11 @@ pub enum Refusal {
     /// The engine produced a publication shape this route does not own.
     #[error("the series-symbol graph produced unsupported publication changes")]
     UnsupportedPublication,
+    /// The value cannot be stored natively (value-axis settings with a
+    /// non-finite endpoint, an inverted range, or a non-positive endpoint
+    /// on a logarithmic axis).
+    #[error("the value cannot be stored natively")]
+    InvalidSettings,
 }
 
 impl Refusal {
@@ -235,6 +240,7 @@ impl Refusal {
             Self::SharedStyle | Self::ImageFill | Self::UnsupportedPublication => {
                 RefusalKind::UnsupportedContent
             },
+            Self::InvalidSettings => RefusalKind::InvalidValue,
         }
     }
 }
@@ -722,6 +728,7 @@ fn map_symbol_error(error: series_engine::SymbolError) -> Error {
             series_engine::Refusal::ImageFill => Refusal::ImageFill.into(),
             series_engine::Refusal::UnsupportedAxis => Refusal::UnsupportedAxis.into(),
             series_engine::Refusal::MissingStyle => Refusal::MissingStyle.into(),
+            series_engine::Refusal::InvalidSettings => Refusal::InvalidSettings.into(),
             _ => Refusal::UnsupportedPublication.into(),
         },
         _ => Error::InvalidSource,

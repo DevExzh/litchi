@@ -14,6 +14,7 @@ pub(crate) mod body_chart_reference_lines;
 pub(crate) mod body_chart_series;
 pub(crate) mod body_chart_style;
 pub(crate) mod body_chart_text;
+pub(crate) mod body_chart_value_axis;
 pub(crate) mod body_date_time_fields;
 pub(crate) mod body_drawable_caption;
 pub(crate) mod body_drawable_graph;
