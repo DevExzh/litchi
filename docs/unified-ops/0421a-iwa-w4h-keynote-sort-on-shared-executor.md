@@ -71,5 +71,5 @@ owner to keep only its verification and placement checks
 ## 5. Verification
 
 The full gate list (`.coord/iwa-w4h/gates.sh`) on the merge of trunk
-`d6842ba024`: every row exits 0, including the full parity suite (1,133
+`d6842ba024`: every row exits 0, including the full parity suite (1,136
 passed); the boundary tool and its unit tests pass after §4.
