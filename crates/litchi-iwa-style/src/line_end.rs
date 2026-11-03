@@ -330,7 +330,8 @@ pub fn decode(payload: Option<&[u8]>, limits: WireLimits) -> Result<Endpoint, De
 
 // ---- The endpoints of a straight-line shape (the host's
 // `shapes::line_end` read and `set_shape_line_endpoints`), shared by the
-// Pages and Numbers owners over a style workspace ----
+// Pages and Numbers owners over the style workspace and by Keynote over its
+// own staging (record 0426) ----
 
 const SHAPE_INFO_MESSAGE_TYPE: u32 = 2_011;
 const SHAPE_INFO_SHAPE: u32 = 1;
@@ -374,6 +375,70 @@ impl From<litchi_iwa_common::Error> for EndpointsError {
     }
 }
 
+/// What the endpoint rules read from a staged package (record 0426): the
+/// shared [`crate::graph::Workspace`], or an owner's own staging that
+/// publishes shape-style plans itself (Keynote's slide-drawable workspace).
+pub trait Staged: crate::shape::Styles {
+    /// The owner's error; the rules' own failures convert into it.
+    type Error: From<EndpointsError>;
+    /// The unique `TSWP.ShapeInfoArchive` payload of `drawable`.
+    ///
+    /// # Errors
+    ///
+    /// The owner's error for a missing or repeated payload.
+    fn shape_info(&self, drawable: u64) -> Result<&[u8], Self::Error>;
+    /// The style `drawable` shows.
+    ///
+    /// # Errors
+    ///
+    /// The owner's error for a shape without a style.
+    fn style(&self, drawable: u64) -> Result<u64, Self::Error>;
+    /// The style `drawable` shows and whether only it uses that style.
+    ///
+    /// # Errors
+    ///
+    /// The owner's error for an invalid graph.
+    fn target(&self, drawable: u64) -> Result<crate::shape::Target, Self::Error>;
+}
+
+/// A [`Staged`] package that also publishes shape-style plans.
+pub trait Staging: Staged {
+    /// Publish `plan` (made for `drawable`'s current style).
+    ///
+    /// # Errors
+    ///
+    /// The owner's error when the plan cannot be published.
+    fn apply(&mut self, drawable: u64, plan: crate::shape::Plan) -> Result<(), Self::Error>;
+}
+
+impl Staged for crate::graph::Workspace<'_> {
+    type Error = EndpointsError;
+
+    fn shape_info(&self, drawable: u64) -> Result<&[u8], EndpointsError> {
+        Ok(self
+            .unique_payload(
+                drawable,
+                SHAPE_INFO_MESSAGE_TYPE,
+                "a shape must have exactly one ShapeInfo payload",
+            )?
+            .1)
+    }
+
+    fn style(&self, drawable: u64) -> Result<u64, EndpointsError> {
+        Ok(crate::shape::target(self, drawable)?.style())
+    }
+
+    fn target(&self, drawable: u64) -> Result<crate::shape::Target, EndpointsError> {
+        Ok(crate::shape::target(self, drawable)?)
+    }
+}
+
+impl Staging for crate::graph::Workspace<'_> {
+    fn apply(&mut self, drawable: u64, plan: crate::shape::Plan) -> Result<(), EndpointsError> {
+        Ok(crate::shape::apply(self, drawable, plan)?)
+    }
+}
+
 /// The shape's own (legacy per-shape) head and tail decorations and its
 /// horizontal flip.
 struct Own {
@@ -397,16 +462,15 @@ fn single<'a>(view: &WireView<'a>, number: u32) -> Result<Option<&'a [u8]>, Endp
     Ok(found)
 }
 
-fn own(
-    workspace: &crate::graph::Workspace<'_>,
+fn own<S: Staged + ?Sized>(
+    workspace: &S,
     drawable: u64,
     limits: WireLimits,
-) -> Result<Own, EndpointsError> {
-    let (_, payload) = workspace.unique_payload(
-        drawable,
-        SHAPE_INFO_MESSAGE_TYPE,
-        "a shape must have exactly one ShapeInfo payload",
-    )?;
+) -> Result<Own, S::Error> {
+    Ok(own_of(workspace.shape_info(drawable)?, limits)?)
+}
+
+fn own_of(payload: &[u8], limits: WireLimits) -> Result<Own, EndpointsError> {
     let info = WireView::parse(payload, limits)?;
     let shape = single(&info, SHAPE_INFO_SHAPE)?
         .ok_or(crate::graph::Error::Invalid("a shape info has no shape"))?;
@@ -453,7 +517,7 @@ fn own(
 
 /// The effective head and tail of a style chain, each inherited on its own.
 fn inherited(
-    workspace: &crate::graph::Workspace<'_>,
+    workspace: &(impl crate::shape::Styles + ?Sized),
     style: u64,
 ) -> Result<(Option<Vec<u8>>, Option<Vec<u8>>), EndpointsError> {
     Ok((
@@ -462,22 +526,22 @@ fn inherited(
     ))
 }
 
-fn resolved(
-    workspace: &crate::graph::Workspace<'_>,
+fn resolved<S: Staged + ?Sized>(
+    workspace: &S,
     own: &Own,
     drawable: u64,
     limits: WireLimits,
-) -> Result<Endpoints, EndpointsError> {
+) -> Result<Endpoints, S::Error> {
     let (mut head, mut tail) = (own.head.clone(), own.tail.clone());
     if head.is_none() || tail.is_none() {
-        let style = crate::shape::target(workspace, drawable)?.style();
+        let style = workspace.style(drawable)?;
         let (inherited_head, inherited_tail) = inherited(workspace, style)?;
         head = head.or(inherited_head);
         tail = tail.or(inherited_tail);
     }
     let mut endpoints = Endpoints {
-        start: decode(tail.as_deref(), limits)?,
-        end: decode(head.as_deref(), limits)?,
+        start: decode(tail.as_deref(), limits).map_err(EndpointsError::from)?,
+        end: decode(head.as_deref(), limits).map_err(EndpointsError::from)?,
     };
     if own.flipped {
         std::mem::swap(&mut endpoints.start, &mut endpoints.end);
@@ -491,13 +555,14 @@ fn resolved(
 ///
 /// # Errors
 ///
-/// [`EndpointsError`] for an invalid shape or style graph or a line end
-/// outside the standard set or the limits.
-pub fn endpoints(
-    workspace: &crate::graph::Workspace<'_>,
+/// [`EndpointsError`] (converted into the staging's error) for an invalid
+/// shape or style graph or a line end outside the standard set or the
+/// limits.
+pub fn endpoints<S: Staged + ?Sized>(
+    workspace: &S,
     drawable: u64,
     limits: WireLimits,
-) -> Result<Endpoints, EndpointsError> {
+) -> Result<Endpoints, S::Error> {
     resolved(
         workspace,
         &own(workspace, drawable, limits)?,
@@ -516,13 +581,13 @@ pub fn endpoints(
 ///
 /// As [`endpoints`]; [`EndpointsError::Orphan`] and
 /// [`EndpointsError::Verification`].
-pub fn set_endpoints(
-    workspace: &mut crate::graph::Workspace<'_>,
+pub fn set_endpoints<S: Staging + ?Sized>(
+    workspace: &mut S,
     drawable: u64,
     wanted: Endpoints,
     limits: WireLimits,
-) -> Result<bool, EndpointsError> {
-    use crate::shape::{self as engine, Slot, Styles as _, Value};
+) -> Result<bool, S::Error> {
+    use crate::shape::{self as engine, Slot, Value};
     let own = own(workspace, drawable, limits)?;
     if resolved(workspace, &own, drawable, limits)? == wanted {
         return Ok(false);
@@ -531,19 +596,24 @@ pub fn set_endpoints(
     if own.flipped {
         std::mem::swap(&mut stored.start, &mut stored.end);
     }
-    let target = engine::target(workspace, drawable)?;
+    let target = workspace.target(drawable)?;
     let payload = workspace
         .shape_style(target.style())
-        .ok_or(crate::graph::Error::Invalid("a shape style is missing"))?
+        .ok_or(EndpointsError::Graph(crate::graph::Error::Invalid(
+            "a shape style is missing",
+        )))?
         .to_vec();
-    let disposable = target.exclusive() && engine::direct_slots(&payload)?.is_some();
+    let graph = |error: crate::graph::Error| EndpointsError::Graph(error);
+    let disposable = target.exclusive() && engine::direct_slots(&payload).map_err(graph)?.is_some();
     let mut clear = false;
     if disposable && wanted == Endpoints::default() {
-        let parent = engine::parent_of(&payload)?.ok_or(EndpointsError::Orphan)?;
+        let parent = engine::parent_of(&payload)
+            .map_err(graph)?
+            .ok_or(EndpointsError::Orphan)?;
         let (head, tail) = inherited(workspace, parent)?;
         let inherited = Endpoints {
-            start: decode(tail.as_deref(), limits)?,
-            end: decode(head.as_deref(), limits)?,
+            start: decode(tail.as_deref(), limits).map_err(EndpointsError::from)?,
+            end: decode(head.as_deref(), limits).map_err(EndpointsError::from)?,
         };
         clear = inherited == Endpoints::default();
     }
@@ -560,10 +630,10 @@ pub fn set_endpoints(
     };
     // A shared or non-minimal style takes a derived child (the host's
     // copy-on-write); the plan layer decides exactly as the host does.
-    let plan = engine::plan_set(&*workspace, target, &writes)?;
-    engine::apply(workspace, drawable, plan)?;
+    let plan = engine::plan_set(&*workspace, target, &writes).map_err(graph)?;
+    workspace.apply(drawable, plan)?;
     if resolved(workspace, &own, drawable, limits)? != wanted {
-        return Err(EndpointsError::Verification);
+        return Err(EndpointsError::Verification.into());
     }
     Ok(true)
 }
