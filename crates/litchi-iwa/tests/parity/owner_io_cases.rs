@@ -392,8 +392,8 @@ fn document_charts_read_parity() -> TestResult {
         match format {
             Format::Pages => {
                 let package = litchi_pages::Package::from_bytes(&input.bytes)?;
-                while let Ok(chart) = package
-                    .body_chart_metadata(litchi_pages::BodyChartSelector::index(leaf.len()))
+                while let Ok(chart) =
+                    package.body_chart_metadata(litchi_pages::BodyChartSelector::index(leaf.len()))
                 {
                     leaf.push(format!("{chart:?}"));
                 }
