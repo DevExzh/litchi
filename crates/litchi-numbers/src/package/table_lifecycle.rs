@@ -103,8 +103,9 @@ pub enum Refusal {
         /// Requested columns.
         columns: u32,
     },
-    /// The workbook has no table whose structure a new table can copy.
-    #[error("the workbook has no table to copy a new table's structure from")]
+    /// The workbook has no table whose structure a new table can copy, and
+    /// its theme no table style preset to build one from.
+    #[error("the workbook has no table to copy and its theme no table style preset")]
     NoTemplate,
     /// This edit already holds its single operation.
     #[error("a table-lifecycle operation is already staged")]

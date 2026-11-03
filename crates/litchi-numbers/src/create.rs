@@ -52,7 +52,7 @@ use thiserror::Error as ThisError;
 use crate::package::{Package, Profile};
 
 /// The blank workbook every [`Package::new`] returns.
-const BLANK: &[u8] = include_bytes!("create/blank.numbers");
+pub(crate) const BLANK: &[u8] = include_bytes!("create/blank.numbers");
 
 const DOCUMENT_IDENTIFIER: &str = "Metadata/DocumentIdentifier";
 const PROPERTIES: &str = "Metadata/Properties.plist";
