@@ -3189,3 +3189,99 @@ pub fn set_image_fill(
     }
     Ok((data, name))
 }
+
+/// An image fill a shape style stores directly (record 0426): the style,
+/// the member holding it and the data identifier, captured before a change
+/// replaces or resets the fill so the owner can release it afterwards with
+/// [`release_image_fills`].
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct StoredImage {
+    style: u64,
+    member: String,
+    data: u64,
+}
+
+impl StoredImage {
+    /// The data identifier the fill shows.
+    #[must_use]
+    pub const fn data(&self) -> u64 {
+        self.data
+    }
+}
+
+/// The data identifier of the image fill `style` stores directly.
+fn stored_image_data(workspace: &Workspace<'_>, style: u64) -> Result<Option<u64>> {
+    use litchi_iwa_common::shape::fill::Fill;
+    let payload = &workspace
+        .object(style)?
+        .messages
+        .first()
+        .ok_or(Error::Invalid("a style without a message"))?
+        .data;
+    let Some(fill) = stored_fill(payload)? else {
+        return Ok(None);
+    };
+    Ok(match property::Fills.read(&[Some(fill)])? {
+        Fill::Image(image) => image.data().map(|data| data.get()),
+        _ => None,
+    })
+}
+
+/// The image fill shape or text box `drawable`'s own style stores, if any
+/// (an inherited image fill is not the drawable's to release).
+///
+/// # Errors
+///
+/// A malformed shape or style graph.
+pub fn stored_image(workspace: &Workspace<'_>, drawable: u64) -> Result<Option<StoredImage>> {
+    let style = target(workspace, drawable)?.style();
+    let Some(data) = stored_image_data(workspace, style)? else {
+        return Ok(None);
+    };
+    Ok(Some(StoredImage {
+        style,
+        member: workspace.member(workspace.locate(style)?).to_owned(),
+        data,
+    }))
+}
+
+/// Release every captured image fill its style no longer stores (the
+/// host's `remove_style_data_reference` and `remove_orphaned_image_asset`,
+/// record 0426): a style kept with another fill drops the data reference
+/// from its message info, the style's registered owner is dropped and data
+/// nothing references any more loses its `DataInfo`
+/// ([`crate::data_owner::release`]). Returns the `Data/` members the caller
+/// deletes.
+///
+/// # Errors
+///
+/// A malformed graph or registry, or an owner the registry does not list.
+pub fn release_image_fills(
+    workspace: &mut Workspace<'_>,
+    released: &[StoredImage],
+) -> Result<Vec<String>> {
+    let mut deletions = Vec::new();
+    for image in released {
+        let exists = workspace.locate(image.style).is_ok();
+        if exists && stored_image_data(workspace, image.style)? == Some(image.data) {
+            continue;
+        }
+        if exists {
+            for info in &mut workspace
+                .object_mut(image.style)?
+                .archive_info
+                .message_infos
+            {
+                info.data_references.retain(|data| *data != image.data);
+            }
+        }
+        if let Some(member) =
+            crate::data_owner::release(workspace, image.data, &image.member, image.style)?
+        {
+            if !deletions.contains(&member) {
+                deletions.push(member);
+            }
+        }
+    }
+    Ok(deletions)
+}

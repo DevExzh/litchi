@@ -12,6 +12,14 @@
 //! the shared data-owner transition (`litchi_iwa_style::data_owner`), the
 //! drawable's style variation owning them; the bytes are published as a
 //! new `Data/` member.
+//!
+//! A fill set, a fill reset or a new image fill over an image fill the
+//! drawable's own style stores releases it as the host's
+//! `remove_style_data_reference` and `remove_orphaned_image_asset` do
+//! (record 0426, the Pages route of record 0415): the style that no longer
+//! stores it drops the data reference and its registered owner
+//! (`litchi_iwa_style::data_owner::release`), and data nothing references
+//! any more loses its `DataInfo` and `Data/` member.
 
 #![allow(
     clippy::arbitrary_source_item_ordering,
@@ -28,7 +36,7 @@ use litchi_iwa_core::Limits;
 use litchi_iwa_style::graph::Workspace;
 use litchi_iwa_style::shape::{
     self as engine, ShapeProperty, Slot, Styles,
-    property::{Fills, Shadows, ShapeEffects, Strokes, TextColumns, TextLayout},
+    property::{Fills, ReleasingFills, Shadows, ShapeEffects, Strokes, TextColumns, TextLayout},
 };
 use thiserror::Error as ThisError;
 
@@ -64,9 +72,8 @@ pub enum Refusal {
         property: PropertyKind,
     },
     /// An image fill is staged through [`Property::Fill`] instead of
-    /// [`Edit::set_image_fill`], the drawable already shows an image fill
-    /// (replacing or releasing one is not supported here), or a second
-    /// image fill is staged.
+    /// [`Edit::set_image_fill`], or a second image fill is staged in one
+    /// edit.
     #[error("this image fill cannot be written by the sheet-drawable style family")]
     ImageFill,
     /// The image-fill bytes are not an image, the file name has no stem, or
@@ -405,8 +412,15 @@ fn apply_change(
     workspace: &mut Workspace<'_>,
     drawable: u64,
     change: &Change,
+    releasing: bool,
 ) -> Result<bool, Error> {
     Ok(match change {
+        Change::Set(Property::Fill(fill)) if releasing => {
+            engine::set(workspace, drawable, &ReleasingFills, fill)?
+        },
+        Change::Reset(PropertyKind::Fill) if releasing => {
+            engine::reset(workspace, drawable, &ReleasingFills)?
+        },
         Change::Set(Property::Fill(fill)) => engine::set(workspace, drawable, &Fills, fill)?,
         Change::Set(Property::Stroke(stroke)) => {
             engine::set(workspace, drawable, &Strokes, stroke)?
@@ -654,15 +668,16 @@ impl Edit<'_> {
     /// selected shape's or text box's image fill, laid out by `technique`
     /// over its frame size and optionally tinted (the host's
     /// `set_sheet_shape_image_fill`). The drawable's style variation owns
-    /// the new data reference.
+    /// the new data reference; an image fill the drawable's own style
+    /// showed before is released (its data, when nothing else uses it, is
+    /// deleted).
     ///
     /// # Errors
     ///
     /// [`Refusal::UnsupportedProperty`] for a line; at commit,
     /// [`Refusal::InvalidImage`] for bytes that are not an image, a file
     /// name without a stem or a drawable without a frame size, and
-    /// [`Refusal::ImageFill`] when the drawable already shows an image fill
-    /// or a second one is staged.
+    /// [`Refusal::ImageFill`] when a second image fill is staged.
     pub fn set_image_fill(
         &mut self,
         bytes: &[u8],
@@ -705,15 +720,28 @@ impl Edit<'_> {
             ensure_line(self.source, self.drawable)?;
         }
         let mut image: Option<StagedImage> = None;
+        let mut releases: Vec<engine::StoredImage> = Vec::new();
         for change in &self.changes {
+            let fill_change = matches!(
+                change,
+                Change::ImageFill(_)
+                    | Change::Set(Property::Fill(_))
+                    | Change::Reset(PropertyKind::Fill)
+            );
+            let releasing = if fill_change {
+                match engine::stored_image(&working, self.drawable)? {
+                    Some(release) => {
+                        releases.push(release);
+                        true
+                    },
+                    None => false,
+                }
+            } else {
+                false
+            };
             match change {
                 Change::ImageFill(request) => {
-                    if image.is_some()
-                        || matches!(
-                            engine::value(&working, self.drawable, &Fills)?,
-                            Fill::Image(_)
-                        )
-                    {
+                    if image.is_some() {
                         return Err(Refusal::ImageFill.into());
                     }
                     use sha1::Digest as _;
@@ -746,19 +774,19 @@ impl Edit<'_> {
                     });
                 },
                 Change::Reset(PropertyKind::LineEndpoints) => {
-                    apply_change(&mut working, self.drawable, change)?;
+                    apply_change(&mut working, self.drawable, change, releasing)?;
                     final_states[property_index(PropertyKind::LineEndpoints)] = Some(
                         FinalState::Set(Property::LineEndpoints(Endpoints::default())),
                     );
                 },
                 Change::Set(property) => {
-                    apply_change(&mut working, self.drawable, change)?;
+                    apply_change(&mut working, self.drawable, change, releasing)?;
                     final_states[property_index(property.kind())] =
                         Some(FinalState::Set(property.clone()));
                 },
                 Change::Reset(kind) => {
                     let before = engine::target(&working, self.drawable)?;
-                    let changed = apply_change(&mut working, self.drawable, change)?;
+                    let changed = apply_change(&mut working, self.drawable, change, releasing)?;
                     let expectation = ResetExpectation {
                         effective: reset_baselines[property_index(*kind)]
                             .clone()
@@ -771,10 +799,12 @@ impl Edit<'_> {
                 },
             }
         }
-        let changes = working.finish();
+        let deletions = engine::release_image_fills(&mut working, &releases)?;
+        let mut changes = working.finish();
         if changes.is_empty() {
             return Commit::unchanged(self.source);
         }
+        changes.deletions.extend(deletions);
         let data_members = image
             .iter()
             .map(|image| (image.member.as_str(), image.bytes.as_ref()))
