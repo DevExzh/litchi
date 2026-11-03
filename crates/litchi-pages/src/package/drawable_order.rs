@@ -1436,6 +1436,7 @@ fn map_package_error(error: super::PackageError) -> Error {
         | super::PackageError::MissingIdentity
         | super::PackageError::InvalidLanguage(_)
         | super::PackageError::InvalidLocale
+        | super::PackageError::InvalidTable { .. }
         | super::PackageError::InvalidLimit { .. }
         | super::PackageError::Limit { .. }
         | super::PackageError::Io(_)

@@ -48,6 +48,7 @@ pub(crate) mod body_table_sort_execution;
 pub(crate) mod body_table_title;
 pub(crate) mod body_table_topology;
 pub(crate) mod body_table_values;
+pub(crate) mod builder_table;
 #[cfg(feature = "internal-iwork-source")]
 mod catalog_body_table_appearance;
 mod directory;
@@ -279,6 +280,16 @@ pub enum PackageError {
     /// ([`crate::builder::Builder::locale`]).
     #[error("a Pages document locale must be non-empty text without NUL")]
     InvalidLocale,
+    /// A fresh document's body table has an empty name, a name holding a
+    /// NUL character, or a size a table cannot take
+    /// ([`crate::builder::Builder::body_table`]).
+    #[error("invalid Pages body table: {rows} x {columns}")]
+    InvalidTable {
+        /// The requested rows.
+        rows: u32,
+        /// The requested columns.
+        columns: u32,
+    },
     /// A limit profile was built with a value outside `1..=maximum`.
     #[error("invalid Pages {kind} limit {value} (allowed 1..={maximum})")]
     InvalidLimit {

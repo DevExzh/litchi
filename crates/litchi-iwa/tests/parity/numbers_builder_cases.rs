@@ -47,7 +47,7 @@ fn identity(bytes: &[u8]) -> TestResult<litchi_numbers::Identity> {
 }
 
 /// `TST.TableModelArchive` without its table UUID.
-fn model_without_table_uuid(data: &[u8]) -> Result<Decoded, prost::DecodeError> {
+pub(crate) fn model_without_table_uuid(data: &[u8]) -> Result<Decoded, prost::DecodeError> {
     let mut model = litchi_iwa_protos::tst::TableModelArchive::decode(data)?;
     assert_eq!(model.table_id.len(), 36, "table UUID form");
     model.table_id.clear();
@@ -55,14 +55,14 @@ fn model_without_table_uuid(data: &[u8]) -> Result<Decoded, prost::DecodeError> 
 }
 
 /// `TSCE.FormulaOwnerDependenciesArchive` without its owner UUID.
-fn owner_without_uuid(data: &[u8]) -> Result<Decoded, prost::DecodeError> {
+pub(crate) fn owner_without_uuid(data: &[u8]) -> Result<Decoded, prost::DecodeError> {
     let mut owner = litchi_iwa_protos::tsce::FormulaOwnerDependenciesArchive::decode(data)?;
     owner.formula_owner_uid = Default::default();
     Ok(decoded(owner, data))
 }
 
 /// `TSCE.CalculationEngineArchive` without its owner map's UUIDs.
-fn engine_without_owner_uuids(data: &[u8]) -> Result<Decoded, prost::DecodeError> {
+pub(crate) fn engine_without_owner_uuids(data: &[u8]) -> Result<Decoded, prost::DecodeError> {
     let mut engine = litchi_iwa_protos::tsce::CalculationEngineArchive::decode(data)?;
     if let Some(map) = engine.dependency_tracker.owner_id_map.as_mut() {
         for entry in &mut map.map_entry {
@@ -74,7 +74,7 @@ fn engine_without_owner_uuids(data: &[u8]) -> Result<Decoded, prost::DecodeError
 
 /// `TST.ColumnRowUIDMapArchive` by form: its axis lengths, each index list
 /// a permutation, and the sorted lists sorted.
-fn uid_map_by_form(data: &[u8]) -> Result<Decoded, prost::DecodeError> {
+pub(crate) fn uid_map_by_form(data: &[u8]) -> Result<Decoded, prost::DecodeError> {
     let map = litchi_iwa_protos::tst::ColumnRowUidMapArchive::decode(data)?;
     let permutation = |values: &[u32], length: usize| {
         let mut sorted = values.to_vec();

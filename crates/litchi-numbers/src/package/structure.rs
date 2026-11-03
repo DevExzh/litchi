@@ -24,8 +24,8 @@
 // document helpers, the patch artifacts and the family macro here.
 pub(super) use litchi_iwa_table::structure::{
     Fault, FaultLimit, FaultResult, allocation, budget, collect, copy_bytes, exact_source, formula,
-    has_field, map_archive, map_core, map_wire, metadata, new_object, plan, put_bytes, put_varint,
-    references, reserve, source_owner, strip_fields, unique_message,
+    map_archive, map_core, map_wire, metadata, new_object, plan, put_bytes, references, reserve,
+    source_owner, strip_fields, unique_message,
 };
 
 /// The Numbers working set: the shared engine over a Numbers [`Package`].

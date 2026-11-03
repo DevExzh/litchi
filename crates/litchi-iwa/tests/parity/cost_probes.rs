@@ -1745,6 +1745,24 @@ fn numbers_table_add_cost_abba() -> TestResult {
     Ok(())
 }
 
+/// Adding a 4×3 table to a workbook without a table (the blank workbook
+/// with its table removed): the host's bootstrap against the leaf's shared
+/// from-scratch graph (record 0420).
+#[test]
+#[ignore = "callgrind cost probe; run explicitly"]
+fn numbers_table_add_without_template_cost_abba() -> TestResult {
+    let tableless = litchi_numbers::Package::new()
+        .edit_table_lifecycle(0)?
+        .remove(0)?
+        .commit()?;
+    let input = leaf_bytes!(tableless.package());
+    black_box(host_table_add(&input)?);
+    black_box(leaf_table_add(&input)?);
+    black_box(leaf_table_add(&input)?);
+    black_box(host_table_add(&input)?);
+    Ok(())
+}
+
 #[inline(never)]
 fn host_lifecycle(source: &[u8], operation: u8) -> TestResult<Vec<u8>> {
     let mut editor = numbers::Draft::from_bytes(source)?;
