@@ -7,7 +7,8 @@
 //! columns' headers, the row/column UID map its trailing identities (new
 //! ones are allocated above every existing one), the stroke sidecar takes
 //! the new size, and the table's own formula owner moves its table and body
-//! extents. This is the host editor's `resize_table`.
+//! extents. This is the host editor's `resize_table`; the staged rewrite is
+//! the shared `litchi_iwa_table::topology::stage_resize` (record 0412g).
 
 #![allow(
     clippy::arbitrary_source_item_ordering,
@@ -19,28 +20,16 @@ use std::fmt;
 use thiserror::Error as ThisError;
 
 use super::Package;
-use super::structure::{self, Fault, Published, Working, metadata::Transition};
-use super::table_topology::wire::{
-    rebuild, repeated_bytes, single_bytes, single_reference, single_varint, varint_field,
-};
-use super::table_topology::{self as topology, TILE_MESSAGE_TYPE, storage};
+use litchi_iwa_table::topology as engine;
+
+use super::structure::{self, Published, Working, metadata::Transition};
+use super::table_topology as topology;
 use crate::selector::{SheetSelector, TableSelector};
 
 structure::structural_family!("table-resize");
 
-const HEADER_BUCKET_MESSAGE_TYPE: u32 = 6_006;
-const UID_MAP_MESSAGE_TYPES: [u32; 2] = [6_200, 6_267];
-const STROKE_SIDECAR_MESSAGE_TYPE: u32 = 6_305;
-const FORMULA_OWNER_MESSAGE_TYPE: u32 = 4_008;
-/// `TableModelArchive.number_of_rows` / `number_of_columns`.
-const MODEL_ROWS_FIELD: u32 = 6;
-const MODEL_COLUMNS_FIELD: u32 = 7;
-/// `TableModelArchive.base_column_row_uids`.
-const MODEL_UID_MAP_FIELD: u32 = 46;
-/// `TableModelArchive.stroke_sidecar`.
-const MODEL_STROKE_FIELD: u32 = 49;
 /// The most row and column identities one table may need.
-const MAX_TABLE_UIDS: u64 = 1_100_000;
+const MAX_TABLE_UIDS: u64 = litchi_iwa_table::topology::MAX_TABLE_UIDS;
 
 /// A typed, content-redacted resize failure.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
@@ -140,10 +129,17 @@ impl From<topology::Error> for Error {
     }
 }
 
-fn storage_fault(error: litchi_numbers_wire::table_topology::Error) -> Error {
-    match Fault::from(error) {
-        Fault::Unsupported => Error::Refused(Refusal::UnsupportedSource),
-        fault => fault.into(),
+impl From<engine::Error> for Error {
+    fn from(error: engine::Error) -> Self {
+        use engine::{Error as E, Refusal as R};
+        match error {
+            E::Refused(R::InvalidSize) => Self::Refused(Refusal::InvalidSize),
+            E::Refused(R::StoredCells) => Self::Refused(Refusal::StoredCells),
+            E::Refused(_) => Self::Refused(Refusal::UnsupportedSource),
+            E::Fault(fault) => Self::from(fault),
+            E::Allocation { amount } => Self::Allocation { amount },
+            _ => Self::InvalidSource,
+        }
     }
 }
 
@@ -208,20 +204,6 @@ impl Edit<'_> {
     }
 }
 
-fn replace(
-    working: &mut Working<'_>,
-    object: u64,
-    index: usize,
-    data: Vec<u8>,
-) -> Result<(), Error> {
-    super::table_cell_text_style::replace_message(working, object, index, data)?;
-    Ok(())
-}
-
-#[allow(
-    clippy::too_many_lines,
-    reason = "one resize: tiles, headers, UID map, strokes, owner extents and model"
-)]
 fn resize(
     source: &Package,
     sheet: usize,
@@ -232,171 +214,9 @@ fn resize(
     let mut working = Working::new(source)?;
     working.keep_previews();
     let target = topology::locate(&working, sheet, table)?;
-    let (model_index, model) = topology::message(&working, target.model, &[6_001])?;
-    let model = model.to_vec();
-    let before = topology::geometry(&model)?;
-    if (before.rows, before.columns) == (rows, columns) {
+    if !engine::stage_resize(&mut working, &target, rows, columns)? {
         return Ok(None);
     }
-    if rows <= before.header_rows + before.footer_rows || columns <= before.header_columns {
-        return Err(Error::Refused(Refusal::InvalidSize));
-    }
-    let store = single_bytes(&model, 4)?
-        .ok_or(Error::InvalidSource)?
-        .to_vec();
-
-    // Tiles: removed rows go; no stored cell may lie outside the new size.
-    let (tiles, size) = topology::tiles(&store)?;
-    for (key, tile) in &tiles {
-        let (index, data) = topology::message(&working, *tile, &[TILE_MESSAGE_TYPE])?;
-        let base = u64::from(*key) * size;
-        let mut removed = false;
-        let mut maximum: Option<u64> = None;
-        let mut fault = None;
-        let rewritten = rebuild(data, |field| {
-            if field.number != 5 {
-                return Ok(None);
-            }
-            let local = single_varint(field.payload, 1)?.ok_or(Fault::Invalid)?;
-            if single_bytes(field.payload, 6)?.is_none() {
-                fault.get_or_insert(Refusal::UnsupportedSource);
-                return Ok(None);
-            }
-            let cells = storage::bnc_cells(field.payload).map_err(Fault::from)?;
-            if base + local >= u64::from(rows) {
-                if !cells.is_empty() {
-                    fault.get_or_insert(Refusal::StoredCells);
-                    return Ok(None);
-                }
-                removed = true;
-                return Ok(Some(Vec::new()));
-            }
-            if cells.iter().any(|(column, _)| *column >= columns) {
-                fault.get_or_insert(Refusal::StoredCells);
-            }
-            maximum = maximum.max(Some(local));
-            Ok(None)
-        })?;
-        if let Some(refusal) = fault {
-            return Err(Error::Refused(refusal));
-        }
-        if removed {
-            // The host editor counts the tile's rows by extent here.
-            let numrows = maximum.map_or(0, |maximum| maximum + 1);
-            let rewritten = rebuild(&rewritten, |field| {
-                if field.number == 4 {
-                    return varint_field(4, numrows).map(Some);
-                }
-                Ok(None)
-            })?;
-            replace(&mut working, *tile, index, rewritten)?;
-        }
-    }
-
-    // Header buckets keep the headers inside the new size.
-    let headers = single_bytes(&store, 1)?.ok_or(Error::InvalidSource)?;
-    let mut buckets: Vec<(u64, u32)> = Vec::new();
-    for reference in repeated_bytes(headers, 2)? {
-        buckets.push((
-            single_varint(reference, 1)?.ok_or(Error::InvalidSource)?,
-            rows,
-        ));
-    }
-    if let Some(column_bucket) = single_reference(&store, 2)? {
-        buckets.push((column_bucket, columns));
-    }
-    for (bucket, limit) in buckets {
-        if bucket == 0 {
-            continue;
-        }
-        let (index, data) = topology::message(&working, bucket, &[HEADER_BUCKET_MESSAGE_TYPE])?;
-        let mut changed = false;
-        let rewritten = rebuild(data, |field| {
-            if field.number != 2 || single_varint(field.payload, 1)?.unwrap_or(0) < u64::from(limit)
-            {
-                return Ok(None);
-            }
-            changed = true;
-            Ok(Some(Vec::new()))
-        })?;
-        if changed {
-            replace(&mut working, bucket, index, rewritten)?;
-        }
-    }
-
-    // The row/column UID map.
-    if let Some(uids) = single_reference(&model, MODEL_UID_MAP_FIELD)? {
-        let (index, data) = topology::message(&working, uids, &UID_MAP_MESSAGE_TYPES)?;
-        let map =
-            storage::UidMap::read(data, before.rows, before.columns).map_err(storage_fault)?;
-        let rewritten = map
-            .resize(before.rows, rows, before.columns, columns)
-            .map_err(storage_fault)?;
-        replace(&mut working, uids, index, rewritten)?;
-    }
-
-    // The stroke sidecar's size.
-    if let Some(sidecar) = single_reference(&model, MODEL_STROKE_FIELD)? {
-        let (index, data) = topology::message(&working, sidecar, &[STROKE_SIDECAR_MESSAGE_TYPE])?;
-        let mut rewritten = data.to_vec();
-        for (field, value) in [(2, columns), (3, rows)] {
-            rewritten = litchi_iwa_common::wire::patch_varint_field(
-                &rewritten,
-                field,
-                single_varint(&rewritten, field)?.is_some(),
-                Some(u64::from(value)),
-            )
-            .map_err(|error| structure::map_wire(&error))?;
-        }
-        replace(&mut working, sidecar, index, rewritten)?;
-    }
-
-    // The table's own formula owner: its table and body extents.
-    let extents = |rows: u32, columns: u32| {
-        topology::calc::Extents::of(
-            rows,
-            columns,
-            before.header_rows,
-            before.header_columns,
-            before.footer_rows,
-        )
-    };
-    let mut owner = None;
-    for object in working.source().state.components.iter_objects() {
-        for (index, message) in object.messages.iter().enumerate() {
-            if message.type_ == FORMULA_OWNER_MESSAGE_TYPE
-                && single_reference(&message.data, 11)? == Some(target.info)
-            {
-                owner = Some((
-                    object.archive_info.identifier.ok_or(Error::InvalidSource)?,
-                    index,
-                    message.data.clone(),
-                ));
-            }
-        }
-    }
-    if let Some((identifier, index, data)) = owner
-        && let Some(rewritten) = topology::calc::resize_extents(
-            &data,
-            extents(before.rows, before.columns),
-            extents(rows, columns),
-        )
-        .map_err(storage_fault)?
-    {
-        replace(&mut working, identifier, index, rewritten)?;
-    }
-
-    // The model's size.
-    let mut data = model;
-    for (field, value) in [(MODEL_ROWS_FIELD, rows), (MODEL_COLUMNS_FIELD, columns)] {
-        data = rebuild(&data, |candidate| {
-            if candidate.number == field {
-                return varint_field(field, u64::from(value)).map(Some);
-            }
-            Ok(None)
-        })?;
-    }
-    replace(&mut working, target.model, model_index, data)?;
     Ok(Some(working.publish(&Transition::default())?))
 }
 
