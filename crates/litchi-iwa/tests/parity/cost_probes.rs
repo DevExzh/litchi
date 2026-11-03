@@ -1929,3 +1929,53 @@ fn numbers_cell_data_format_cost_abba() -> TestResult {
     black_box(host_data_format(&input.bytes)?);
     Ok(())
 }
+
+#[inline(never)]
+fn host_slide_table_add(source: &[u8]) -> TestResult<Vec<u8>> {
+    use litchi_iwa::shapes::{DrawablePoint, DrawableSize};
+    let mut editor = litchi_iwa::keynote::Draft::from_bytes(source)?;
+    editor.add_slide_table(
+        0,
+        "Litchi table",
+        3,
+        4,
+        DrawablePoint { x: 120.0, y: 140.0 },
+        DrawableSize {
+            width: 360.0,
+            height: 180.0,
+        },
+    )?;
+    Ok(editor.to_bytes()?)
+}
+
+#[inline(never)]
+fn leaf_slide_table_add(source: &[u8]) -> TestResult<Vec<u8>> {
+    let package = litchi_keynote::Package::from_bytes(source)?;
+    let commit = package
+        .edit_slide_table_lifecycle()
+        .add(
+            litchi_keynote::SlideSelector::index(0),
+            "Litchi table",
+            3,
+            4,
+            litchi_keynote::slide::drawable::Geometry::new(120.0, 140.0, 360.0, 180.0),
+        )?
+        .commit()?;
+    Ok(leaf_bytes!(commit.package()))
+}
+
+/// Adding a 3×4 slide table to a builder deck from its detached creation
+/// table (record 0423).
+#[test]
+#[ignore = "callgrind cost probe; run explicitly"]
+fn keynote_slide_table_add_cost_abba() -> TestResult {
+    let input = litchi_iwa::keynote::Builder::new()
+        .title("Tables")
+        .build()?
+        .to_bytes()?;
+    black_box(host_slide_table_add(&input)?);
+    black_box(leaf_slide_table_add(&input)?);
+    black_box(leaf_slide_table_add(&input)?);
+    black_box(host_slide_table_add(&input)?);
+    Ok(())
+}

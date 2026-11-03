@@ -4,7 +4,8 @@
 //! slide_table_cells, slide_table_merges}`; the host `duplicate_slide_table`
 //! against `slide::table::lifecycle::Edit::duplicate` on the shared table
 //! structure set (`litchi_iwa_table::structure`); and the pinned divergences
-//! of `remove_slide_table`, `add_slide_table` and the copied merge owner.
+//! of `remove_slide_table` and the copied merge owner; the host
+//! `add_slide_table` against `Edit::add` on a builder deck (record 0423).
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -15,9 +16,12 @@ use litchi_keynote::slide::table::lock::State;
 use litchi_keynote::{Package, SlideSelector, TableSelector};
 
 use crate::archive_diff::{self, MetadataPolicy};
-use crate::harness::{Case, Evidence, Format, LeafRun, TestResult, Tier, fixture};
-use crate::known_fields::KnownFields;
+use crate::harness::{Case, Evidence, Fixture, Format, LeafRun, TestResult, Tier, fixture};
+use crate::known_fields::{KnownFields, decode_as};
 use crate::leaf_bytes;
+use crate::numbers_lifecycle_cases::{
+    engine_without_owner_uuids, model_without_table_uuid, owner_without_uuid,
+};
 
 const DECKS: [&str; 3] = [
     "iwork/keynote/table-discovery.key",
@@ -483,25 +487,153 @@ const SIZE: DrawableSize = DrawableSize {
     height: 180.0,
 };
 
-/// Pinned divergence (record 0372): the host creates a slide table only
-/// from the detached creation scaffold a builder deck carries and refuses a
-/// deck without one; the leaf (record 0329) copies the deck's first slide
-/// table and refuses a deck without one. No deck admits both routes, so
-/// `add_slide_table` stays on the host.
+/// The builder deck the host's `add_slide_table` needs: it carries the
+/// detached creation table both routes copy (record 0423).
+fn builder_deck() -> TestResult<Fixture> {
+    Ok(Fixture {
+        path: "keynote Builder deck (title \"Tables\")",
+        bytes: keynote::Builder::new()
+            .title("Tables")
+            .build()?
+            .to_bytes()?,
+    })
+}
+
 #[test]
-fn keynote_slide_table_add_divergence_is_reported() -> TestResult {
-    let built = keynote::Builder::new()
-        .title("Tables")
-        .build()?
-        .to_bytes()?;
-    let native = fixture("iwork/keynote/table-discovery.key")?.bytes;
-    for (bytes, scaffold) in [(built, true), (native, false)] {
-        let mut editor = keynote::Draft::from_bytes(&bytes)?;
-        let host = editor.add_slide_table(0, "Litchi table", 3, 4, POINT, SIZE);
-        assert_eq!(host.is_ok(), scaffold);
-        let package = Package::from_bytes(&bytes)?;
+fn keynote_slide_table_add_parity() -> TestResult {
+    let input = builder_deck()?;
+    Case::new(
+        "keynote_slide_table_add_parity",
+        Format::Keynote,
+        Tier::B,
+        Evidence::Queued,
+        &input,
+    )
+    .host(|source| {
+        let mut editor = keynote::Draft::from_bytes(source)?;
+        editor.add_slide_table(0, "Litchi table", 3, 4, POINT, SIZE)?;
+        Ok(editor.to_bytes()?)
+    })
+    .leaf(|source| {
+        leaf_lifecycle(source, |edit| {
+            edit.add(
+                SlideSelector::index(0),
+                "Litchi table",
+                3,
+                4,
+                Geometry::new(POINT.x, POINT.y, SIZE.width, SIZE.height),
+            )
+        })
+    })
+    .leaf_invalidates_root_previews()
+    .leaf_structural_metadata()
+    .known_fields(|known| {
+        known
+            .with(
+                6_000,
+                "TST.TableInfoArchive",
+                decode_as::<litchi_iwa_protos::tst::TableInfoArchive>,
+            )
+            .with(
+                6_001,
+                "TST.TableModelArchive (table UUID by form)",
+                model_without_table_uuid,
+            )
+            .with(
+                4_008,
+                "TSCE.FormulaOwnerDependenciesArchive (owner UUID by form)",
+                owner_without_uuid,
+            )
+            .with(
+                4_000,
+                "TSCE.CalculationEngineArchive (owner-map UUIDs by form)",
+                engine_without_owner_uuids,
+            )
+    })
+    .read("host and leaf table frames agree", table_frames_agree)
+    .run()?;
+    Ok(())
+}
+
+/// The slide tables' names, sizes and frames, read by the host and the leaf
+/// (the appearance read of [`tables_agree`] refuses builder decks on both).
+fn table_frames_agree(bytes: &[u8]) -> TestResult<Vec<String>> {
+    let editor = keynote::Draft::from_bytes(bytes)?;
+    let package = Package::from_bytes(bytes)?;
+    let mut rows = Vec::new();
+    for slide in 0..editor.slides()?.len() {
+        let selector = SlideSelector::index(slide);
+        let mut frames = package
+            .slide_drawable_list(selector)?
+            .into_iter()
+            .filter(|drawable| drawable.kind() == Kind::Table)
+            .collect::<Vec<_>>();
+        frames.sort_by_key(|drawable| drawable.z_position().map(|z| z.get()));
+        let host = editor.slide_tables(slide)?;
+        assert_eq!(host.len(), frames.len(), "slide {slide} table count");
+        for (position, (info, frame)) in host.iter().zip(&frames).enumerate() {
+            let geometry = frame.geometry().ok_or("leaf table has no frame")?;
+            let read = package.slide_table_cells(selector, TableSelector::index(position))?;
+            assert_eq!(
+                (
+                    info.geometry.position.map(|p| (p.x, p.y)),
+                    info.geometry.size.map(|s| (s.width, s.height)),
+                    info.geometry.angle,
+                    info.name.as_str(),
+                    (info.rows, info.columns),
+                ),
+                (
+                    Some((geometry.x, geometry.y)),
+                    Some((geometry.width, geometry.height)),
+                    geometry.rotation,
+                    read.table().name(),
+                    (
+                        usize::try_from(read.table().row_count())?,
+                        usize::try_from(read.table().column_count())?
+                    ),
+                ),
+                "slide {slide} table {position}"
+            );
+            rows.push(format!("{slide}/{position}: {} {:?}", info.name, geometry));
+        }
+    }
+    Ok(rows)
+}
+
+/// A deck without the creation table: the host refuses `add_slide_table`
+/// and so does the leaf family (`Refusal::NoTemplate`); the drawable
+/// family's `add_table` copies the first slide table instead (record 0329).
+#[test]
+fn keynote_slide_table_add_without_template_is_refused() -> TestResult {
+    for path in DECKS {
+        let native = fixture(path)?.bytes;
+        let mut editor = keynote::Draft::from_bytes(&native)?;
+        assert!(
+            editor
+                .add_slide_table(0, "Litchi table", 3, 4, POINT, SIZE)
+                .is_err(),
+            "{path}"
+        );
+        let package = Package::from_bytes(&native)?;
+        let error = package
+            .edit_slide_table_lifecycle()
+            .add(
+                SlideSelector::index(0),
+                "Litchi table",
+                3,
+                4,
+                Geometry::new(POINT.x, POINT.y, SIZE.width, SIZE.height),
+            )?
+            .commit()
+            .expect_err("a deck without a creation table must refuse");
+        assert!(matches!(
+            error,
+            litchi_keynote::slide::table::lifecycle::Error::Refused(
+                litchi_keynote::slide::table::lifecycle::Refusal::NoTemplate
+            )
+        ));
         let mut edit = package.edit_slide_drawables();
-        let leaf = edit.add_table(
+        edit.add_table(
             SlideSelector::index(0),
             NewTable::new(
                 3,
@@ -509,8 +641,8 @@ fn keynote_slide_table_add_divergence_is_reported() -> TestResult {
                 Geometry::new(POINT.x, POINT.y, SIZE.width, SIZE.height),
             )
             .with_name("Litchi table"),
-        );
-        assert_eq!(leaf.is_ok(), !scaffold);
+        )?;
+        assert_eq!(edit.commit()?.created().len(), 1, "{path}");
     }
     Ok(())
 }
