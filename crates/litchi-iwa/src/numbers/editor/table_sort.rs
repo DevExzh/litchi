@@ -207,6 +207,80 @@ impl Draft {
         self.package = staged;
         Ok(true)
     }
+
+    /// Read a table's persisted sort order through the host's own codec
+    /// read for the differential oracle (record 0421).
+    ///
+    /// The supported reader delegates to the focused Numbers owner; this
+    /// hidden seam reads the native model through the host package instead,
+    /// so the parity harness compares two independent reads.
+    #[cfg(feature = "parity-host-oracle")]
+    #[doc(hidden)]
+    pub fn __parity_table_sort_order_legacy(
+        &self,
+        selector: TableSelector<'_>,
+    ) -> Result<Option<Order>> {
+        let table_id = super::selectors::table_id(self, selector)?;
+        read_attached_table_sort_order(&self.package, table_id)
+    }
+
+    /// Set (`Some`) or clear (`None`) a table's persisted sort order through
+    /// a Prost re-encoding of the table model, for the differential oracle
+    /// (record 0421).
+    ///
+    /// The supported writers delegate to the focused Numbers owner. This
+    /// hidden seam is the independent tier-B oracle: it decodes
+    /// `TST.TableModelArchive`, replaces `sort_order` (a clear keeps Numbers'
+    /// empty-order marker when the table has one) and re-encodes the model
+    /// through the host package writer.
+    #[cfg(feature = "parity-host-oracle")]
+    #[doc(hidden)]
+    pub fn __parity_set_table_sort_order_prost(
+        &mut self,
+        selector: TableSelector<'_>,
+        order: Option<&Order>,
+    ) -> Result<()> {
+        use tst::table_sort_order_archive::{SortRuleArchive, SortType, sort_rule_archive};
+        let table_id = super::selectors::table_id(self, selector)?;
+        let mut staged = self.package.clone();
+        update_table_sort_order(&mut staged, table_id, |_original, model| {
+            let mut model = model.clone();
+            match order {
+                Some(order) => {
+                    validate_sort_order(&model, order)?;
+                    model.sort_order = Some(tst::TableSortOrderArchive {
+                        r#type: match order.scope() {
+                            Scope::EntireTable => SortType::EntireTable,
+                            Scope::SelectedRows => SortType::RowRange,
+                        } as i32,
+                        rules: order
+                            .rules()
+                            .iter()
+                            .map(|rule| SortRuleArchive {
+                                index: rule.column().native_value(),
+                                direction: match rule.direction() {
+                                    Direction::Ascending => sort_rule_archive::Direction::Ascending,
+                                    Direction::Descending => {
+                                        sort_rule_archive::Direction::Descending
+                                    },
+                                } as i32,
+                            })
+                            .collect(),
+                    });
+                },
+                None => {
+                    if let Some(sort) = model.sort_order.as_mut() {
+                        sort.rules.clear();
+                    }
+                },
+            }
+            Ok(model.encode_to_vec())
+        })?;
+        let bytes = staged.to_bytes()?;
+        HostPackage::from_bytes(&bytes)?;
+        self.package = staged;
+        Ok(())
+    }
 }
 
 fn focused_sort_error(error: litchi_numbers::table::sort::transaction::Error) -> Error {
