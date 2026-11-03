@@ -6,6 +6,13 @@
 //! public semantic API.  The persisted sort order is read-only input; the
 //! operation changes the physical row order and therefore invalidates the
 //! root rendering previews.
+//!
+//! The permutation and the row rewrite are the shared executor
+//! `litchi_iwa_table::sort` (record 0421a), with Keynote's hooks: root
+//! previews dropped and row records moved only inside their storage tile.
+//! This module keeps what Keynote does differently: its selection and
+//! physical admission (`slide_table_core`), its strict key scan, and its
+//! post-publication verification of keys, UID maps, headers and locality.
 
 #![allow(
     clippy::arbitrary_source_item_ordering,
@@ -17,26 +24,24 @@
     reason = "The physical boundary keeps the complete admission and verification pipeline local."
 )]
 
-use std::cmp::Ordering as CompareOrdering;
 use std::collections::{HashMap, HashSet};
 use std::fmt;
 use std::mem::size_of;
 use std::sync::Arc;
 
 use litchi_core::Position;
-use litchi_iwa_archive::package::{EntryEdit, ExactArtifacts};
-use litchi_iwa_common::table::sort::planning::stable_body_row_permutation;
+use litchi_iwa_archive::package::ExactArtifacts;
 use litchi_iwa_common::{decode_varint_from_bytes, varint::encoded_len};
-use litchi_iwa_core::{Archive, ArchiveObject, RawMessage, SnappyStream};
+use litchi_iwa_core::{ArchiveObject, RawMessage};
 use litchi_iwa_protos::{
     numbers_table_cell_storage_codec as storage_codec,
     numbers_table_physical_sort_codec as physical_codec,
 };
+use litchi_iwa_table::sort as sort_engine;
 use litchi_numbers_wire::{BncCellView, CachedScalar, StoredValue};
 
 use super::slide_table_core as core;
 use super::slide_table_sort_order::Error as SlideTableSortError;
-use super::snappy_failure::SnappyFailure;
 use super::{Package, PayloadLimitKind, ReadError, SemanticLimitKind};
 use crate::SlideSelector;
 use crate::slide::table::TableSelector;
@@ -321,18 +326,6 @@ struct PhysicalScan {
     row_header_indices: Vec<u32>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-struct PhysicalPermutation {
-    destination_by_source: Arc<[u32]>,
-    moved_rows: usize,
-}
-
-impl PhysicalPermutation {
-    fn is_identity(&self) -> bool {
-        self.moved_rows == 0
-    }
-}
-
 #[derive(Debug, Default)]
 struct StringVisitor {
     entries: Vec<(u32, String)>,
@@ -576,6 +569,7 @@ impl Package {
             &patch.selection,
             &patch.destination_by_source,
             patch.moved_rows,
+            None,
             &mut budget,
         )?;
         let deleted_previews = preview_deletion_count(self, &candidate);
@@ -694,49 +688,80 @@ fn execute_transaction(
     budget: &mut core::Budget,
 ) -> Result<Commit> {
     let path = selection.path();
-    let scan = scan_table(source, selection, budget)?;
-    let permutation = plan_permutation(selection, &scan, budget)?;
-    if permutation.is_identity() {
-        let bytes = core::physical_catalog(source)
-            .map_err(|error| map_core(error, path))?
-            .shared_source();
+    // Keynote's strict physical admission (canonical BNC storage, string
+    // table shape, sort keys) and the source baseline of verification.
+    let source_scan = scan_table(source, selection, budget)?;
+    let catalog = core::physical_catalog(source).map_err(|error| map_core(error, path))?;
+    let total_rows =
+        usize::try_from(selection.target.rows).map_err(|_| Error::InvalidSource { path })?;
+    // The rewrite is the shared executor; Keynote drops the root previews
+    // and admits only same-tile row moves.
+    let executed = sort_engine::execute(
+        source,
+        &sort_engine::Target {
+            info: selection.target.table_info.identifier,
+            model: selection.target.model.identifier,
+        },
+        &selection.order,
+        selection.range,
+        || {
+            Err(sort_engine::Error::Refused(
+                sort_engine::Refusal::Unsupported(sort_engine::Unsupported::HiddenAxes),
+            ))
+        },
+        sort_engine::Hooks::invalidating_previews_same_tile(),
+    )
+    .map_err(|error| map_engine(error, selection, &source_scan))?;
+    let Some(published) = executed.published else {
+        let bytes = catalog.shared_source();
+        let mut identity = Vec::new();
+        identity
+            .try_reserve_exact(total_rows)
+            .map_err(|_| Error::Allocation {
+                amount: total_rows,
+                path,
+            })?;
+        for index in 0..total_rows {
+            identity.push(u32::try_from(index).map_err(|_| Error::InvalidSource { path })?);
+        }
         return Ok(Commit {
             package: source.snapshot(),
             patch: Patch {
                 artifacts: ExactArtifacts::new(Arc::clone(&bytes), bytes),
                 selection: selection.clone(),
-                destination_by_source: permutation.destination_by_source,
+                destination_by_source: Arc::from(identity),
                 moved_rows: 0,
             },
             diagnostics: Diagnostics::unchanged(),
         });
+    };
+    if executed.destinations.len() != total_rows {
+        return Err(Error::Verification { path });
     }
-    let catalog = core::physical_catalog(source).map_err(|error| map_core(error, path))?;
-    if !catalog.source_is_exact() {
-        return Err(Error::Refused(
-            crate::slide::table::physical_sort::transaction::Refusal::UnsupportedSource,
-        ));
+    let mut destination_by_source = Vec::new();
+    destination_by_source
+        .try_reserve_exact(total_rows)
+        .map_err(|_| Error::Allocation {
+            amount: total_rows,
+            path,
+        })?;
+    for destination in &executed.destinations {
+        destination_by_source
+            .push(u32::try_from(*destination).map_err(|_| Error::InvalidSource { path })?);
     }
-    let previews = super::rendering_invalidation::root_preview_deletions(catalog.package())
-        .map_err(|_| Error::Verification { path })?;
-    let candidate = rewrite_physical(
-        source,
-        selection,
-        &permutation.destination_by_source,
-        previews.names(),
-        budget,
-    )?;
+    let destination_by_source: Arc<[u32]> = Arc::from(destination_by_source);
+    let candidate = published.package;
+    candidate.validate().map_err(map_read)?;
     verify_candidate(
         source,
         &candidate,
         selection,
-        &permutation.destination_by_source,
-        permutation.moved_rows,
+        &destination_by_source,
+        executed.moved,
+        Some(source_scan),
         budget,
     )?;
-    let source_artifact = core::physical_catalog(source)
-        .map_err(|error| map_core(error, path))?
-        .shared_source();
+    let source_artifact = catalog.shared_source();
     let target_artifact = core::physical_catalog(&candidate)
         .map_err(|error| map_core(error, path))?
         .shared_source();
@@ -745,157 +770,103 @@ fn execute_transaction(
         patch: Patch {
             artifacts: ExactArtifacts::new(source_artifact, Arc::clone(&target_artifact)),
             selection: selection.clone(),
-            destination_by_source: permutation.destination_by_source,
-            moved_rows: permutation.moved_rows,
+            destination_by_source,
+            moved_rows: executed.moved,
         },
         diagnostics: Diagnostics::published(
-            permutation.moved_rows,
+            executed.moved,
             selection.topology_component_count(),
-            previews.len(),
+            published.deleted_previews,
         ),
     })
 }
 
-fn plan_permutation(
+/// Map a shared-executor failure onto this family's typed error. A mixed
+/// key column is located on Keynote's own key scan.
+fn map_engine(
+    error: sort_engine::Error,
     selection: &PhysicalSelection,
     scan: &PhysicalScan,
-    budget: &mut core::Budget,
-) -> Result<PhysicalPermutation> {
+) -> Error {
+    use crate::slide::table::physical_sort::transaction::Refusal;
+    use sort_engine::Unsupported as U;
     let path = selection.path();
-    let (range_start, range_end) = selection.range_bounds()?;
-    let selected_len = range_end.checked_sub(range_start).ok_or(Error::Refused(
-        crate::slide::table::physical_sort::transaction::Refusal::InvalidPermutation { path },
-    ))?;
-    if scan.selected_keys.len() != selected_len {
-        return Err(Error::Refused(
-            crate::slide::table::physical_sort::transaction::Refusal::InvalidPermutation { path },
-        ));
+    let feature = |feature| Error::Refused(Refusal::UnsupportedFeature { path, feature });
+    match error {
+        sort_engine::Error::Refused(sort_engine::Refusal::RowsOutOfRange) => {
+            Error::Refused(Refusal::InvalidPermutation { path })
+        },
+        sort_engine::Error::Refused(sort_engine::Refusal::Unsupported(reason)) => match reason {
+            U::Formula => feature(UnsupportedFeature::Formula),
+            U::ErrorCell => feature(UnsupportedFeature::FormulaError),
+            U::CellType => feature(UnsupportedFeature::UnsupportedCell),
+            U::MissingKey => feature(UnsupportedFeature::UnsupportedSortKey),
+            U::MergedCells => feature(UnsupportedFeature::MergedCells),
+            U::FilterOrGrouping => feature(UnsupportedFeature::FilteredRows),
+            U::ConditionalStyles => feature(UnsupportedFeature::ConditionalStyles),
+            U::HiddenAxes => feature(UnsupportedFeature::NonPositionalHiddenState),
+            U::MixedKinds => mixed_kinds(selection, scan),
+            _ => Error::Refused(Refusal::UnsupportedTopology { path }),
+        },
+        sort_engine::Error::Fault(fault) => match fault {
+            litchi_iwa_table::structure::Fault::Unsupported
+            | litchi_iwa_table::structure::Fault::Dependency => {
+                Error::Refused(Refusal::UnsupportedSource)
+            },
+            litchi_iwa_table::structure::Fault::Limit {
+                kind,
+                observed,
+                maximum,
+            } => Error::Limit {
+                kind: match kind {
+                    litchi_iwa_table::structure::FaultLimit::PackageBytes => {
+                        LimitKind::PackageBytes
+                    },
+                    _ => LimitKind::PayloadBytes,
+                },
+                observed,
+                maximum,
+                path,
+            },
+            litchi_iwa_table::structure::Fault::Allocation { amount } => {
+                Error::Allocation { amount, path }
+            },
+            litchi_iwa_table::structure::Fault::Verification => Error::Verification { path },
+            _ => Error::InvalidSource { path },
+        },
+        sort_engine::Error::Allocation { amount } => Error::Allocation { amount, path },
+        _ => Error::InvalidSource { path },
     }
-    // The common planner owns a source-offset vector and reserves it before
-    // returning its requirements.  Charge that storage before entering the
-    // planner so a ledger refusal cannot occur after the allocation.
-    let planner_bytes = selected_len
-        .checked_mul(size_of::<usize>())
-        .ok_or(Error::InvalidSource { path })?;
-    budget
-        .allocations(selected_len)
-        .map_err(|error| map_core(error, path))?;
-    budget
-        .retained(planner_bytes)
-        .map_err(|error| map_core(error, path))?;
-    let planner = stable_body_row_permutation(
-        &scan.selected_keys,
-        &selection.order,
-        PhysicalScalar::kind,
-        compare_scalars,
-    )
-    .map_err(|error| match error {
-        litchi_iwa_common::table::sort::planning::Error::MixedScalarKinds { row, rule } => {
-            Error::Refused(
+}
+
+/// The first selected row whose key kind differs from the first row's, for
+/// the first rule that mixes kinds.
+fn mixed_kinds(selection: &PhysicalSelection, scan: &PhysicalScan) -> Error {
+    let path = selection.path();
+    let start = selection.range_bounds().map_or(0, |(start, _)| start);
+    let rules = selection.order.rules().len();
+    for rule in 0..rules {
+        let mut kinds = scan
+            .selected_keys
+            .iter()
+            .enumerate()
+            .filter_map(|(row, keys)| keys.get(rule).map(|key| (row, key.kind())));
+        let Some((_, first)) = kinds.next() else {
+            continue;
+        };
+        if let Some((row, _)) = kinds.find(|(_, kind)| *kind != first) {
+            return Error::Refused(
                 crate::slide::table::physical_sort::transaction::Refusal::MixedSortKeyKinds {
                     path,
-                    row: Position::new(range_start.saturating_add(row.get())),
+                    row: Position::new(start.saturating_add(row)),
                     rule: Position::new(rule),
                 },
-            )
-        },
-        litchi_iwa_common::table::sort::planning::Error::Allocation { rows } => {
-            Error::Allocation { amount: rows, path }
-        },
-        _ => Error::Refused(
-            crate::slide::table::physical_sort::transaction::Refusal::InvalidPermutation { path },
-        ),
-    })?;
-    let body_rows = selection.body_rows()?;
-    let total_rows =
-        usize::try_from(selection.target.rows).map_err(|_| Error::InvalidSource { path })?;
-    let destination_bytes = total_rows
-        .checked_mul(size_of::<u32>())
-        .ok_or(Error::InvalidSource { path })?;
-    budget
-        .allocations(total_rows)
-        .map_err(|error| map_core(error, path))?;
-    budget
-        .retained(destination_bytes)
-        .map_err(|error| map_core(error, path))?;
-    let mut destination_by_source = Vec::new();
-    destination_by_source
-        .try_reserve_exact(total_rows)
-        .map_err(|_| Error::Allocation {
-            amount: total_rows,
-            path,
-        })?;
-    for index in 0..total_rows {
-        destination_by_source
-            .push(u32::try_from(index).map_err(|_| Error::InvalidSource { path })?);
-    }
-    for (destination_offset, source_offset) in planner.sources_by_destination().iter().enumerate() {
-        let source_body = range_start
-            .checked_add(source_offset.get())
-            .ok_or(Error::Refused(
-                crate::slide::table::physical_sort::transaction::Refusal::InvalidPermutation {
-                    path,
-                },
-            ))?;
-        let destination_body =
-            range_start
-                .checked_add(destination_offset)
-                .ok_or(Error::Refused(
-                    crate::slide::table::physical_sort::transaction::Refusal::InvalidPermutation {
-                        path,
-                    },
-                ))?;
-        if source_body >= body_rows || destination_body >= body_rows {
-            return Err(Error::Refused(
-                crate::slide::table::physical_sort::transaction::Refusal::InvalidPermutation {
-                    path,
-                },
-            ));
+            );
         }
-        let source_global = usize::try_from(selection.topology.header_rows())
-            .ok()
-            .and_then(|head| head.checked_add(source_body))
-            .ok_or(Error::Refused(
-                crate::slide::table::physical_sort::transaction::Refusal::InvalidPermutation {
-                    path,
-                },
-            ))?;
-        let destination_global = usize::try_from(selection.topology.header_rows())
-            .ok()
-            .and_then(|head| head.checked_add(destination_body))
-            .ok_or(Error::Refused(
-                crate::slide::table::physical_sort::transaction::Refusal::InvalidPermutation {
-                    path,
-                },
-            ))?;
-        destination_by_source[source_global] = u32::try_from(destination_global).map_err(|_| {
-            Error::Refused(
-                crate::slide::table::physical_sort::transaction::Refusal::InvalidPermutation {
-                    path,
-                },
-            )
-        })?;
     }
-    let moved_rows = destination_by_source
-        .iter()
-        .enumerate()
-        .filter(|(source, destination)| usize::try_from(**destination).ok() != Some(*source))
-        .count();
-    if total_rows != 0 {
-        // Converting a Vec into an Arc slice may allocate a new Arc control
-        // block while the Vec is still live.  Reserve that second event and
-        // peak retained storage before the conversion can take place.
-        budget
-            .allocations(1)
-            .map_err(|error| map_core(error, path))?;
-        budget
-            .retained(destination_bytes)
-            .map_err(|error| map_core(error, path))?;
-    }
-    Ok(PhysicalPermutation {
-        destination_by_source: Arc::from(destination_by_source),
-        moved_rows,
-    })
+    Error::Refused(
+        crate::slide::table::physical_sort::transaction::Refusal::InvalidPermutation { path },
+    )
 }
 
 fn scan_table(
@@ -1740,570 +1711,13 @@ fn read_uid_map(
     Ok(snapshot)
 }
 
-struct StagedComponent {
-    name: Arc<str>,
-    archive: Archive,
-}
-
-struct EncodedComponent {
-    name: Arc<str>,
-    compressed: Vec<u8>,
-}
-
-fn staged_component_archive<'a>(
-    source: &Package,
-    staged: &'a mut Vec<StagedComponent>,
-    name: &Arc<str>,
-    budget: &mut core::Budget,
-    path: Path,
-) -> Result<&'a mut Archive> {
-    if let Some(index) = staged
-        .iter()
-        .position(|component| component.name.as_ref() == name.as_ref())
-    {
-        return Ok(&mut staged[index].archive);
-    }
-    if staged.len() == staged.capacity() {
-        return Err(Error::InvalidSource { path });
-    }
-    let archive = core::component_archive(source, name.as_ref(), budget)
-        .map_err(|error| map_core(error, path))?;
-    staged.push(StagedComponent {
-        name: Arc::clone(name),
-        archive,
-    });
-    let index = staged
-        .len()
-        .checked_sub(1)
-        .ok_or(Error::InvalidSource { path })?;
-    Ok(&mut staged[index].archive)
-}
-
-fn rewrite_physical(
-    source: &Package,
-    selection: &PhysicalSelection,
-    destination_by_source: &[u32],
-    deleted_previews: &[&str],
-    budget: &mut core::Budget,
-) -> Result<Package> {
-    let path = selection.path();
-    let catalog = core::physical_catalog(source).map_err(|error| map_core(error, path))?;
-    let physical_limits = source.state.options.archive();
-    let snappy_limits = physical_limits
-        .snappy_limits()
-        .map_err(|_| Error::InvalidSource { path })?;
-    let archive_limits = physical_limits
-        .effective_archive_limits()
-        .map_err(|_| Error::InvalidSource { path })?;
-    let component_capacity = selection.topology_component_count();
-    budget
-        .allocations(component_capacity)
-        .map_err(|error| map_core(error, path))?;
-    budget
-        .retained(
-            component_capacity
-                .checked_mul(size_of::<StagedComponent>())
-                .ok_or(Error::InvalidSource { path })?,
-        )
-        .map_err(|error| map_core(error, path))?;
-    let mut staged_components = Vec::new();
-    staged_components
-        .try_reserve_exact(component_capacity)
-        .map_err(|_| Error::Allocation {
-            amount: component_capacity,
-            path,
-        })?;
-    let tile_size = selection.topology.tile_size();
-
-    // TileStorage is coordinate-addressed.  The first owner refuses a
-    // cross-tile move, because a whole-row rewrite must never synthesize a
-    // new tile or silently alter tile affinity.
-    for tile in selection.topology.tile_references() {
-        let move_count = destination_by_source.iter().copied().enumerate().try_fold(
-            0usize,
-            |count, (source_global, destination)| {
-                let source_global =
-                    u32::try_from(source_global).map_err(|_| Error::InvalidSource { path })?;
-                if source_global == destination {
-                    return Ok(count);
-                }
-                let source_tile = source_global
-                    .checked_div(tile_size)
-                    .ok_or(Error::InvalidSource { path })?;
-                let destination_tile = destination
-                    .checked_div(tile_size)
-                    .ok_or(Error::InvalidSource { path })?;
-                if source_tile != tile.tile_id && destination_tile != tile.tile_id {
-                    return Ok(count);
-                }
-                if source_tile != destination_tile {
-                    return Err(Error::Refused(crate::slide::table::physical_sort::transaction::Refusal::UnsupportedTopology { path }));
-                }
-                if source_tile == tile.tile_id {
-                    count.checked_add(1).ok_or(Error::InvalidSource { path })
-                } else {
-                    Ok(count)
-                }
-            },
-        )?;
-        if move_count == 0 {
-            continue;
-        }
-        let move_bytes = move_count
-            .checked_mul(size_of::<physical_codec::RowMove>())
-            .ok_or(Error::InvalidSource { path })?;
-        budget
-            .allocations(1)
-            .map_err(|error| map_core(error, path))?;
-        budget
-            .retained(move_bytes)
-            .map_err(|error| map_core(error, path))?;
-        let mut moves = Vec::new();
-        moves
-            .try_reserve_exact(move_count)
-            .map_err(|_| Error::Allocation {
-                amount: move_count,
-                path,
-            })?;
-        for (source_global, destination) in destination_by_source.iter().copied().enumerate() {
-            let source_global =
-                u32::try_from(source_global).map_err(|_| Error::InvalidSource { path })?;
-            if source_global == destination {
-                continue;
-            }
-            let source_tile = source_global
-                .checked_div(tile_size)
-                .ok_or(Error::InvalidSource { path })?;
-            let destination_tile = destination
-                .checked_div(tile_size)
-                .ok_or(Error::InvalidSource { path })?;
-            if source_tile != tile.tile_id && destination_tile != tile.tile_id {
-                continue;
-            }
-            if source_tile != destination_tile {
-                return Err(Error::Refused(
-                    crate::slide::table::physical_sort::transaction::Refusal::UnsupportedTopology {
-                        path,
-                    },
-                ));
-            }
-            if source_tile == tile.tile_id {
-                let source_local = source_global % tile_size;
-                let destination_local = destination % tile_size;
-                if moves.len() == moves.capacity() {
-                    return Err(Error::Allocation { amount: 1, path });
-                }
-                moves.push(physical_codec::RowMove::new(
-                    source_local,
-                    destination_local,
-                ));
-            }
-        }
-        debug_assert_eq!(moves.len(), move_count);
-        let archive = staged_component_archive(
-            source,
-            &mut staged_components,
-            &tile.location.component,
-            budget,
-            path,
-        )?;
-        let object = archive
-            .object(tile.location.identifier)
-            .ok_or(Error::InvalidSource { path })?;
-        let payload = message_payload(object, TILE_MESSAGE_TYPE, path)?;
-        let options = physical_options(
-            source,
-            budget,
-            payload.len(),
-            tile_size,
-            selection.target.columns,
-        )?;
-        let prepared = physical_codec::plan_tile_rows_rewrite(payload, tile_size, &moves, options)
-            .map_err(|error| map_physical_codec(error, path))?;
-        charge_rewrite_requirements(prepared.requirements(), budget, path)?;
-        let tile_snapshot = prepared.tile();
-        if tile_snapshot.storage_version() != Some(5)
-            || tile_snapshot.last_saved_in_bnc() != Some(true)
-        {
-            return Err(Error::InvalidSource { path });
-        }
-        if tile_snapshot.should_use_wide_rows() != selection.topology.wide_rows() {
-            return Err(Error::Refused(
-                crate::slide::table::physical_sort::transaction::Refusal::UnsupportedTopology {
-                    path,
-                },
-            ));
-        }
-        if prepared
-            .row_records()
-            .any(|record| record.snapshot().has_wide_offsets() != selection.topology.wide_rows())
-        {
-            return Err(Error::Refused(
-                crate::slide::table::physical_sort::transaction::Refusal::UnsupportedTopology {
-                    path,
-                },
-            ));
-        }
-        let (rewritten, report) = physical_codec::execute_tile_rows_rewrite(prepared, options)
-            .map_err(|error| map_physical_codec(error, path))?;
-        if report.changed_records() != moves.len() {
-            return Err(Error::Verification { path });
-        }
-        charge_decode_report(report.result(), budget, path)?;
-        replace_message(
-            archive,
-            tile.location.identifier,
-            TILE_MESSAGE_TYPE,
-            rewritten,
-            archive_limits,
-            path,
-        )?;
-    }
-
-    // Header buckets are sparse; only records that actually exist are moved.
-    // Empty slots are never materialized.  Each record remains in its source
-    // bucket, and the strict codec retains all unknown fields byte-for-byte.
-    for bucket in selection.topology.row_header_buckets() {
-        let bucket_start = bucket
-            .bucket_index
-            .checked_mul(HEADER_BUCKET_ROWS)
-            .ok_or(Error::InvalidSource { path })?;
-        let row_limit = bucket_start
-            .checked_add(HEADER_BUCKET_ROWS)
-            .map_or(selection.target.rows, |end| end.min(selection.target.rows));
-        let archive = staged_component_archive(
-            source,
-            &mut staged_components,
-            &bucket.location.component,
-            budget,
-            path,
-        )?;
-        let object = archive
-            .object(bucket.location.identifier)
-            .ok_or(Error::InvalidSource { path })?;
-        let payload = message_payload(object, HEADER_BUCKET_MESSAGE_TYPE, path)?;
-        let options = physical_options(
-            source,
-            budget,
-            payload.len(),
-            row_limit,
-            selection.target.columns,
-        )?;
-        let identity =
-            physical_codec::plan_header_storage_bucket_rows(payload, row_limit, &[], options)
-                .map_err(|error| map_physical_codec(error, path))?;
-        charge_rewrite_requirements(identity.requirements(), budget, path)?;
-        let move_count = identity.records().try_fold(0usize, |count, record| {
-            let source_index = record.snapshot().index();
-            let source_usize =
-                usize::try_from(source_index).map_err(|_| Error::InvalidSource { path })?;
-            let destination =
-                destination_by_source
-                    .get(source_usize)
-                    .copied()
-                    .ok_or(Error::Refused(
-                    crate::slide::table::physical_sort::transaction::Refusal::InvalidPermutation {
-                        path,
-                    },
-                ))?;
-            if source_index == destination {
-                return Ok(count);
-            }
-            if source_index / HEADER_BUCKET_ROWS != destination / HEADER_BUCKET_ROWS {
-                return Err(Error::Refused(
-                    crate::slide::table::physical_sort::transaction::Refusal::UnsupportedTopology {
-                        path,
-                    },
-                ));
-            }
-            count.checked_add(1).ok_or(Error::InvalidSource { path })
-        })?;
-        if move_count == 0 {
-            continue;
-        }
-        let move_bytes = move_count
-            .checked_mul(size_of::<physical_codec::RowMove>())
-            .ok_or(Error::InvalidSource { path })?;
-        budget
-            .allocations(1)
-            .map_err(|error| map_core(error, path))?;
-        budget
-            .retained(move_bytes)
-            .map_err(|error| map_core(error, path))?;
-        let mut moves = Vec::new();
-        moves
-            .try_reserve_exact(move_count)
-            .map_err(|_| Error::Allocation {
-                amount: move_count,
-                path,
-            })?;
-        for record in identity.records() {
-            let source_index = record.snapshot().index();
-            let source_usize =
-                usize::try_from(source_index).map_err(|_| Error::InvalidSource { path })?;
-            let Some(destination) = destination_by_source.get(source_usize).copied() else {
-                return Err(Error::Refused(
-                    crate::slide::table::physical_sort::transaction::Refusal::InvalidPermutation {
-                        path,
-                    },
-                ));
-            };
-            if source_index != destination {
-                if source_index / HEADER_BUCKET_ROWS != destination / HEADER_BUCKET_ROWS {
-                    return Err(Error::Refused(crate::slide::table::physical_sort::transaction::Refusal::UnsupportedTopology { path }));
-                }
-                if moves.len() == moves.capacity() {
-                    return Err(Error::Allocation { amount: 1, path });
-                }
-                moves.push(physical_codec::RowMove::new(source_index, destination));
-            }
-        }
-        debug_assert_eq!(moves.len(), move_count);
-        let options = physical_options(
-            source,
-            budget,
-            payload.len(),
-            row_limit,
-            selection.target.columns,
-        )?;
-        let prepared =
-            physical_codec::plan_header_storage_bucket_rows(payload, row_limit, &moves, options)
-                .map_err(|error| map_physical_codec(error, path))?;
-        charge_rewrite_requirements(prepared.requirements(), budget, path)?;
-        let (rewritten, report) =
-            physical_codec::execute_header_storage_bucket_rows(prepared, options)
-                .map_err(|error| map_physical_codec(error, path))?;
-        if report.changed_records() != moves.len() {
-            return Err(Error::Verification { path });
-        }
-        charge_decode_report(report.result(), budget, path)?;
-        replace_message(
-            archive,
-            bucket.location.identifier,
-            HEADER_BUCKET_MESSAGE_TYPE,
-            rewritten,
-            archive_limits,
-            path,
-        )?;
-    }
-
-    let row_count =
-        usize::try_from(selection.target.rows).map_err(|_| Error::InvalidSource { path })?;
-    let column_count =
-        usize::try_from(selection.target.columns).map_err(|_| Error::InvalidSource { path })?;
-    let uid_archive = staged_component_archive(
-        source,
-        &mut staged_components,
-        &selection.topology.row_uid_map().component,
-        budget,
-        path,
-    )?;
-    let uid_object = uid_archive
-        .object(selection.topology.row_uid_map().identifier)
-        .ok_or(Error::InvalidSource { path })?;
-    let uid_payload = message_payload_any(
-        uid_object,
-        &[
-            COLUMN_ROW_UID_MAP_MESSAGE_TYPE,
-            COLUMN_ROW_UID_MAP_LEGACY_MESSAGE_TYPE,
-        ],
-        path,
-    )?;
-    let permutation_bytes = destination_by_source
-        .len()
-        .checked_mul(size_of::<u32>())
-        .ok_or(Error::InvalidSource { path })?;
-    budget
-        .allocations(1)
-        .map_err(|error| map_core(error, path))?;
-    budget
-        .retained(permutation_bytes)
-        .map_err(|error| map_core(error, path))?;
-    let permutation = physical_codec::RowUidPermutation::new(destination_by_source)
-        .map_err(|error| map_physical_codec(error, path))?;
-    let options = physical_options(
-        source,
-        budget,
-        uid_payload.len(),
-        selection.target.rows,
-        selection.target.columns,
-    )?;
-    let prepared = physical_codec::plan_column_row_uid_map_rewrite(
-        uid_payload,
-        column_count,
-        row_count,
-        &permutation,
-        options,
-    )
-    .map_err(|error| map_physical_codec(error, path))?;
-    charge_rewrite_requirements(prepared.requirements(), budget, path)?;
-    let (rewritten_uid, report) = physical_codec::execute_column_row_uid_map_rewrite(
-        prepared,
-        column_count,
-        row_count,
-        options,
-    )
-    .map_err(|error| map_physical_codec(error, path))?;
-    charge_decode_report(report.result(), budget, path)?;
-    let uid_message_type = find_message_type(
-        uid_archive
-            .object(selection.topology.row_uid_map().identifier)
-            .ok_or(Error::InvalidSource { path })?,
-        &[
-            COLUMN_ROW_UID_MAP_MESSAGE_TYPE,
-            COLUMN_ROW_UID_MAP_LEGACY_MESSAGE_TYPE,
-        ],
-        path,
-    )?;
-    replace_message(
-        uid_archive,
-        selection.topology.row_uid_map().identifier,
-        uid_message_type,
-        rewritten_uid,
-        archive_limits,
-        path,
-    )?;
-
-    let encoded_capacity = staged_components.len();
-    budget
-        .allocations(
-            encoded_capacity
-                .checked_mul(2)
-                .ok_or(Error::InvalidSource { path })?,
-        )
-        .map_err(|error| map_core(error, path))?;
-    budget
-        .retained(
-            encoded_capacity
-                .checked_mul(size_of::<EncodedComponent>())
-                .ok_or(Error::InvalidSource { path })?,
-        )
-        .map_err(|error| map_core(error, path))?;
-    let mut encoded_components = Vec::new();
-    encoded_components
-        .try_reserve_exact(encoded_capacity)
-        .map_err(|_| Error::Allocation {
-            amount: encoded_capacity,
-            path,
-        })?;
-    let mut compressed_total = 0usize;
-    for component in staged_components {
-        let encoded_len = component
-            .archive
-            .encoded_len(archive_limits)
-            .map_err(|_| Error::InvalidSource { path })?;
-        let compressed_bound = SnappyStream::maximum_compressed_len(encoded_len, snappy_limits)
-            .map_err(|error| map_snappy_error(error, path))?;
-        budget
-            .output(
-                encoded_len
-                    .checked_add(compressed_bound)
-                    .ok_or(Error::InvalidSource { path })?,
-            )
-            .map_err(|error| map_core(error, path))?;
-        budget
-            .allocations(1)
-            .map_err(|error| map_core(error, path))?;
-        budget
-            .retained(encoded_len)
-            .map_err(|error| map_core(error, path))?;
-        budget
-            .scratch(encoded_len)
-            .map_err(|error| map_core(error, path))?;
-        let decoded = component
-            .archive
-            .to_bytes(archive_limits)
-            .map_err(|_| Error::InvalidSource { path })?;
-        if decoded.len() != encoded_len {
-            return Err(Error::Verification { path });
-        }
-        budget
-            .allocations(1)
-            .map_err(|error| map_core(error, path))?;
-        budget
-            .retained(compressed_bound)
-            .map_err(|error| map_core(error, path))?;
-        budget
-            .scratch(compressed_bound)
-            .map_err(|error| map_core(error, path))?;
-        let compressed = SnappyStream::compress(&decoded, snappy_limits)
-            .map_err(|error| map_snappy_error(error, path))?;
-        if compressed.len() > compressed_bound {
-            return Err(Error::Verification { path });
-        }
-        compressed_total = compressed_total
-            .checked_add(compressed.len())
-            .ok_or(Error::InvalidSource { path })?;
-        if encoded_components.len() == encoded_components.capacity() {
-            return Err(Error::Allocation { amount: 1, path });
-        }
-        encoded_components.push(EncodedComponent {
-            name: component.name,
-            compressed,
-        });
-    }
-    let edit_count = encoded_components.len();
-    budget
-        .allocations(1)
-        .map_err(|error| map_core(error, path))?;
-    budget
-        .retained(
-            edit_count
-                .checked_mul(size_of::<EntryEdit<'_>>())
-                .ok_or(Error::InvalidSource { path })?,
-        )
-        .map_err(|error| map_core(error, path))?;
-    let mut edits = Vec::new();
-    edits
-        .try_reserve_exact(encoded_components.len())
-        .map_err(|_| Error::Allocation {
-            amount: encoded_components.len(),
-            path,
-        })?;
-    for component in &encoded_components {
-        if edits.len() == edits.capacity() {
-            return Err(Error::Allocation { amount: 1, path });
-        }
-        edits.push(EntryEdit::new(
-            component.name.as_ref(),
-            component.compressed.as_slice(),
-        ));
-    }
-    budget
-        .preflight_reassembly(catalog, compressed_total, deleted_previews.len())
-        .map_err(|error| map_core(error, path))?;
-    let prepared = catalog
-        .prepare_reassembly_with_deletions(&edits, deleted_previews, physical_limits)
-        .map_err(map_archive)?;
-    let requirements = prepared.execution_requirements();
-    budget
-        .reassembly(requirements)
-        .map_err(|error| map_core(error, path))?;
-    let output = prepared
-        .execute(requirements.exact_limits())
-        .map_err(map_archive)?;
-    budget
-        .preflight_candidate(source, output.len())
-        .map_err(|error| map_core(error, path))?;
-    // `Arc<[u8]>` is the publication owner for the candidate.  Charge its
-    // control/storage allocation while the reassembly `Vec` is still live;
-    // the candidate parser's own inventory is charged by the preflight above.
-    budget
-        .allocations(1)
-        .map_err(|error| map_core(error, path))?;
-    budget
-        .retained(output.len())
-        .map_err(|error| map_core(error, path))?;
-    Package::from_source_with_options(Arc::<[u8]>::from(output), source.state.options)
-        .map_err(map_read)
-}
-
 fn verify_candidate(
     source: &Package,
     candidate: &Package,
     selection: &PhysicalSelection,
     destination_by_source: &[u32],
     moved_rows: usize,
+    source_scan: Option<PhysicalScan>,
     budget: &mut core::Budget,
 ) -> Result<()> {
     let path = selection.path();
@@ -2331,7 +1745,10 @@ fn verify_candidate(
     if persisted.as_ref() != Some(&selection.order) {
         return Err(Error::Verification { path });
     }
-    let source_scan = scan_table(source, selection, budget)?;
+    let source_scan = match source_scan {
+        Some(scan) => scan,
+        None => scan_table(source, selection, budget)?,
+    };
     let order_bytes = selection
         .order
         .rules()
@@ -3230,23 +2647,6 @@ impl PhysicalSelection {
     }
 }
 
-fn compare_scalars(left: &PhysicalScalar, right: &PhysicalScalar) -> CompareOrdering {
-    match (left, right) {
-        (PhysicalScalar::Text(left), PhysicalScalar::Text(right)) => left.cmp(right),
-        (PhysicalScalar::Number(left), PhysicalScalar::Number(right))
-        | (PhysicalScalar::Date(left), PhysicalScalar::Date(right))
-        | (PhysicalScalar::Duration(left), PhysicalScalar::Duration(right)) => {
-            if left == right {
-                CompareOrdering::Equal
-            } else {
-                left.total_cmp(right)
-            }
-        },
-        (PhysicalScalar::Boolean(left), PhysicalScalar::Boolean(right)) => left.cmp(right),
-        _ => CompareOrdering::Equal,
-    }
-}
-
 fn invert_permutation(values: &[u32]) -> Option<Vec<usize>> {
     let mut inverse = vec![usize::MAX; values.len()];
     for (source, destination) in values.iter().copied().enumerate() {
@@ -3422,50 +2822,6 @@ fn message_payload_any<'a>(
         }
     }
     selected.ok_or(Error::InvalidSource { path })
-}
-
-fn find_message_type(object: &ArchiveObject, message_types: &[u32], path: Path) -> Result<u32> {
-    let mut selected = None;
-    for message in &object.messages {
-        if message_types.contains(&message.type_) {
-            if selected.is_some() {
-                return Err(Error::InvalidSource { path });
-            }
-            selected = Some(message.type_);
-        }
-    }
-    selected.ok_or(Error::InvalidSource { path })
-}
-
-fn replace_message(
-    archive: &mut Archive,
-    identifier: u64,
-    message_type: u32,
-    data: Vec<u8>,
-    limits: litchi_iwa_core::Limits,
-    path: Path,
-) -> Result<()> {
-    let object = archive
-        .object_mut(identifier)
-        .ok_or(Error::InvalidSource { path })?;
-    let mut index = None;
-    for (candidate, message) in object.messages.iter().enumerate() {
-        if message.type_ == message_type && index.replace(candidate).is_some() {
-            return Err(Error::InvalidSource { path });
-        }
-    }
-    let index = index.ok_or(Error::InvalidSource { path })?;
-    object
-        .replace_message_preserving_header(
-            index,
-            RawMessage {
-                type_: message_type,
-                data,
-            },
-            limits,
-        )
-        .map_err(|_| Error::InvalidSource { path })?;
-    Ok(())
 }
 
 fn physical_options(
@@ -4021,36 +3377,6 @@ fn preview_deletion_count(source: &Package, candidate: &Package) -> usize {
     match (source, candidate) {
         (Some(source), Some(candidate)) => source.len().saturating_sub(candidate.len()),
         _ => 0,
-    }
-}
-
-/// Preserve a retained Snappy encoder refusal as a typed owner failure
-/// (see [`SnappyFailure`]).
-fn map_snappy_error(error: litchi_iwa_core::Error, path: Path) -> Error {
-    match SnappyFailure::from(error) {
-        SnappyFailure::CompressedBytes { observed, maximum } => Error::Limit {
-            kind: LimitKind::EntryBytes,
-            observed,
-            maximum,
-            path,
-        },
-        SnappyFailure::DecodedBytes { observed, maximum } => Error::Limit {
-            kind: LimitKind::PayloadBytes,
-            observed,
-            maximum,
-            path,
-        },
-        SnappyFailure::Work { observed, maximum } => Error::Limit {
-            kind: LimitKind::WireWork,
-            observed,
-            maximum,
-            path,
-        },
-        SnappyFailure::Allocation { requested } => Error::Allocation {
-            amount: requested,
-            path,
-        },
-        SnappyFailure::Invalid => Error::InvalidSource { path },
     }
 }
 
