@@ -209,6 +209,16 @@ impl Hooks {
             same_tile_only: false,
         }
     }
+
+    /// The hooks of a leaf that invalidates its root previews and moves row
+    /// records only inside their storage tile (Keynote).
+    #[must_use]
+    pub const fn invalidating_previews_same_tile() -> Self {
+        Self {
+            keep_previews: false,
+            same_tile_only: true,
+        }
+    }
 }
 
 /// The result of one execution.
