@@ -631,6 +631,15 @@ pub fn apply(
         }
         return Err(Fault::Unsupported);
     };
+    // Nothing to register: no transition, no allocation, no emptied
+    // component and no save token (the registry is not decoded).
+    if transition.is_empty()
+        && allocated.is_none()
+        && emptied.is_empty()
+        && working.save_token.is_none()
+    {
+        return Ok(());
+    }
     let registry = registry(working)?.ok_or(Fault::Invalid)?;
     let current = registry.last_object_identifier;
     let mut last = allocated.map_or(current, |allocated| allocated.max(current));

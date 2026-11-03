@@ -12,6 +12,14 @@ pub mod transaction {
     };
 }
 
+/// Exact-source execution of a table's persisted sort order: the body rows
+/// move, as Numbers' **Sort Now** does (record 0421).
+pub mod execution {
+    pub use crate::package::table_sort_execution::{
+        Commit, Diagnostics, Edit, Error, LimitKind, Patch, Refusal, Unsupported,
+    };
+}
+
 pub use litchi_iwa_common::table::sort::{
     ColumnIndex, Direction, Error, Order, Result, RowRange, Rule, Scope,
 };

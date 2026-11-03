@@ -13,6 +13,7 @@ use std::num::NonZeroU64;
 use std::sync::Arc;
 
 use litchi_iwa_archive::package::ExactArtifacts;
+use litchi_iwa_common::table::axis::AxisIndex;
 use litchi_iwa_common::table::sort::{Order, RowRange, Scope};
 use litchi_iwa_common::wire::WireView;
 use litchi_iwa_table::sort::{self as engine, Hooks, Target};
@@ -540,34 +541,30 @@ fn execute(
         info: resolved.drawable_identifier.get(),
         model: resolved.model_identifier.get(),
     };
-    // User-hidden rows and columns keep their positions in a native sort:
-    // their header records move with the rows and the positions are
-    // restored afterwards, as the host does.
-    let hidden = if engine::declares_hidden_axes(source, &target)? {
-        Some(
-            source
-                .body_table_hidden_axes(selector)
-                .map_err(|_error| Error::InvalidSource)?,
-        )
-        .filter(|hidden| !hidden.is_empty())
-    } else {
-        None
-    };
-    let hidden_rows = hidden.as_ref().map(|hidden| {
-        hidden
-            .iter()
-            .filter_map(|axis| match axis {
-                litchi_iwa_common::table::axis::AxisIndex::Row(index) => Some(index),
-                litchi_iwa_common::table::axis::AxisIndex::Column(_) => None,
-            })
-            .collect::<HashSet<_>>()
-    });
+    // User-hidden rows keep their positions in a native sort: the engine
+    // asks for them only when the table declares hidden axes and rows move.
+    let mut hidden = None;
     let executed = engine::execute(
         source,
         &target,
         &order,
         rows,
-        hidden_rows.as_ref(),
+        || {
+            let axes = source
+                .body_table_hidden_axes(selector)
+                .map_err(|_error| engine::Error::InvalidSource)?;
+            let rows = axes
+                .iter()
+                .filter_map(|axis| match axis {
+                    AxisIndex::Row(index) => Some(index),
+                    AxisIndex::Column(_) => None,
+                })
+                .collect::<HashSet<_>>();
+            if !axes.is_empty() {
+                hidden = Some(axes);
+            }
+            Ok(Some(rows))
+        },
         Hooks::keeping_previews(),
     )?;
     let Some(published) = executed.published else {

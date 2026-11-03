@@ -1345,8 +1345,8 @@ numbers/editor/table_hidden_axes.rs	set_table_hidden_axes	1	numbers	table.hidden
 numbers/editor/table_hidden_axes.rs	table_hidden_axes	1	numbers	table.hidden_axes	migrated	litchi_numbers::Package::table_hidden_axes	numbers_table_hidden_axes_read_parity	A	-	-
 numbers/editor/table_sort.rs	__parity_set_table_sort_order_prost	1	numbers	table.sort	retired	-	-	-	-	parity-only hidden legacy host oracle, not a supported Numbers API; removed with the differential host harness in W3
 numbers/editor/table_sort.rs	__parity_table_sort_order_legacy	1	numbers	table.sort	retired	-	-	-	-	parity-only hidden legacy host oracle, not a supported Numbers API; removed with the differential host harness in W3
-numbers/editor/table_sort.rs	apply_table_sort_order	1	numbers	table.sort	host-only	litchi-numbers	-	-	-	-
-numbers/editor/table_sort.rs	apply_table_sort_order_to_rows	1	numbers	table.sort	host-only	litchi-numbers	-	-	-	-
+numbers/editor/table_sort.rs	apply_table_sort_order	1	numbers	table.sort	migrated	litchi_numbers::Package::edit_table_sort_execution	numbers_table_sort_apply_parity	A	-	-
+numbers/editor/table_sort.rs	apply_table_sort_order_to_rows	1	numbers	table.sort	migrated	litchi_numbers::Package::edit_table_sort_execution	numbers_table_sort_apply_to_rows_parity	A	-	-
 numbers/editor/table_sort.rs	clear_table_sort_order	1	numbers	table.sort	migrated	litchi_numbers::Package::edit_table_sort_order	numbers_table_sort_order_clear_parity	B	-	-
 numbers/editor/table_sort.rs	set_table_sort_order	1	numbers	table.sort	migrated	litchi_numbers::Package::edit_table_sort_order	numbers_table_sort_order_set_parity	B	-	-
 numbers/editor/table_sort.rs	table_sort_order	1	numbers	table.sort	migrated	litchi_numbers::Package::table_sort_order	numbers_table_sort_order_read_parity	A	-	-

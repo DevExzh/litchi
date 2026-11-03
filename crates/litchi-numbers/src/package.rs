@@ -132,6 +132,7 @@ pub(crate) mod table_sort;
     reason = "The physical-only persisted-sort seam is retained solely for legacy migration snapshots."
 )]
 mod table_sort_compat;
+pub(crate) mod table_sort_execution;
 pub(crate) mod table_title;
 pub(crate) mod table_topology;
 

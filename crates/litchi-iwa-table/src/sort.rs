@@ -97,7 +97,9 @@ const UID_SORTED_ROWS_FIELD: u32 = 4;
 const LIST_ENTRIES_FIELD: u32 = 3;
 const LIST_ENTRY_KEY_FIELD: u32 = 1;
 const LIST_ENTRY_STRING_FIELD: u32 = 3;
-const HEADER_BUCKET_ROWS: usize = 256;
+/// Rows per row-header bucket (the host's and Numbers' 65,536; the Pages
+/// port used 256 and refused sorts that move a header past row 255).
+const HEADER_BUCKET_ROWS: usize = 65_536;
 const DEFAULT_TILE_SIZE: u64 = 256;
 
 /// What a sort execution cannot move safely.
@@ -422,18 +424,6 @@ fn tile_payload(
     rewrite_repeated_length_delimited_fields(&data, TILE_ROWS_FIELD, &records).map_err(wire)
 }
 
-/// Whether a table model declares hidden rows or columns (a leaf reads its
-/// user-hidden rows only then).
-///
-/// # Errors
-///
-/// A malformed model or a structural fault.
-pub fn declares_hidden_axes<P: TableLeaf>(source: &P, target: &Target) -> Result<bool, Error> {
-    let working = Working::new(source)?;
-    let (_, model) = message(&working, target.model, &[TABLE_MODEL_MESSAGE_TYPE])?;
-    declares_hidden(model)
-}
-
 fn declares_hidden(model: &[u8]) -> Result<bool, Error> {
     if single_bytes(model, MODEL_HIDDEN_STATES_OWNER_FIELD)?.is_some()
         || single_bytes(model, MODEL_HIDDEN_ROW_OWNER_FIELD)?.is_some()
@@ -462,9 +452,11 @@ struct Rewrite {
 }
 
 /// Execute `order` over the body rows of the located table (`rows`: a
-/// body-relative range, or every body row), moving `hidden_rows` (the
-/// table's user-hidden row positions, when it declares hidden axes) back to
-/// their positions.
+/// body-relative range, or every body row), moving the table's user-hidden
+/// rows back to their positions. `hidden_rows` reads those positions; it is
+/// called only when the table declares hidden axes and the rows move, after
+/// every content refusal, so a leaf whose hidden-axes reader refuses a graph
+/// reports the executor's refusal first.
 ///
 /// The leaf has resolved the table, read `order` and checked its scope and
 /// the table's merges.
@@ -477,7 +469,7 @@ pub fn execute<P: TableLeaf>(
     target: &Target,
     order: &Order,
     rows: Option<RowRange>,
-    hidden_rows: Option<&HashSet<usize>>,
+    hidden_rows: impl FnOnce() -> Result<Option<HashSet<usize>>, Error>,
     hooks: Hooks,
 ) -> Result<Executed<P>, Error> {
     let mut working = Working::new(source)?;
@@ -535,11 +527,7 @@ pub fn execute<P: TableLeaf>(
     {
         return Err(Unsupported::FilterOrGrouping.into());
     }
-    let hidden = if declares_hidden(model)? {
-        hidden_rows.filter(|rows| !rows.is_empty())
-    } else {
-        None
-    };
+    let declares_hidden = declares_hidden(model)?;
     let sidecar = single_reference(model, MODEL_STROKE_SIDECAR_FIELD)?;
     let uid_map = single_reference(model, MODEL_UID_MAP_FIELD)?.ok_or(Unsupported::NoRowUids)?;
     let store = single_bytes(model, MODEL_DATA_STORE_FIELD)?.ok_or(Error::InvalidSource)?;
@@ -598,10 +586,13 @@ pub fn execute<P: TableLeaf>(
                 return Err(Error::InvalidSource);
             }
             if (start..end).contains(&global) {
-                let cells = row_cells(raw)?.ok_or(Unsupported::Layout)?;
-                if cells.len() > columns {
+                let mut cells = row_cells(raw)?.ok_or(Unsupported::Layout)?;
+                // Numbers keeps a fixed-width offset table: slots past the
+                // last column must be empty.
+                if cells.iter().skip(columns).any(Option::is_some) {
                     return Err(Error::InvalidSource);
                 }
+                cells.truncate(columns);
                 let mut values = vec![None; rule_columns.len()];
                 for (column, cell) in cells.into_iter().enumerate() {
                     let Some(cell) = cell else {
@@ -831,7 +822,12 @@ pub fn execute<P: TableLeaf>(
             data,
         });
     }
-    if let Some(rows) = hidden {
+    let hidden = if declares_hidden {
+        hidden_rows()?.filter(|rows| !rows.is_empty())
+    } else {
+        None
+    };
+    if let Some(rows) = &hidden {
         let (index, model) = message(&working, target.model, &[TABLE_MODEL_MESSAGE_TYPE])?;
         let (_, info) = message(&working, target.info, &TABLE_INFO_MESSAGE_TYPES)?;
         if let Some(data) = restored_hidden_rows(model, info, &physical_row_uids, rows)? {
