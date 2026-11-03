@@ -622,6 +622,14 @@ impl Draft {
         let anchor = source.info.anchor_character_index as usize;
         text_editor.replace_text(self.body_storage_id, anchor..anchor + 1, "")?;
         let mut staged = text_editor.into_package();
+        // Host defect fixed by record 0426: like the media, shape and text-box
+        // removals, drop the removed attachment from the body storage header;
+        // without it every removal failed its own dangling-reference check.
+        super::prune_removed_body_attachment(
+            &mut staged,
+            self.body_storage_id.get(),
+            source.attachment_id,
+        )?;
         patch_pages_zorder(&mut staged, Some(drawable_object_id), None)?;
         let root = pages_document_root_facts(&staged)?;
         let theme_id = root
