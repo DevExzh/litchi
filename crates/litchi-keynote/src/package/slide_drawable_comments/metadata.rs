@@ -772,9 +772,17 @@ pub(super) fn allocate_identifier(
 }
 
 /// UUID allocation variant that includes already staged archives.
+///
+/// The host draws a random GUID. Leaf output must be a pure function of its
+/// input (record 0428), so the UUID is derived from `identifier`, the comment
+/// storage object it names, with the SplitMix64 scheme of record 0375a §2.1
+/// and a counter advanced until no comment storage in the working set uses
+/// it. The halves keep the RFC 4122 version 4, variant 1 bits of the GUIDs
+/// the host writes.
 pub(super) fn fresh_storage_uuid_in_working_set(
     source: &Package,
     working: &WorkingSet<'_>,
+    identifier: u64,
     budget: &mut Budget,
 ) -> Result<StorageUuid, Error> {
     let limits = source
@@ -843,13 +851,17 @@ pub(super) fn fresh_storage_uuid_in_working_set(
         }
         Ok(())
     })?;
+    let mut counter = 0u64;
     loop {
-        let bytes = litchi_core::id::generate_guid_bytes();
-        let mut lower = [0_u8; 8];
-        let mut upper = [0_u8; 8];
-        lower.copy_from_slice(&bytes[..8]);
-        upper.copy_from_slice(&bytes[8..]);
-        let uuid = StorageUuid::from_parts(u64::from_le_bytes(lower), u64::from_le_bytes(upper));
+        counter = counter.wrapping_add(1);
+        let lower = litchi_numbers_wire::table_create::mix(
+            identifier ^ 0x636f_6d6d_656e_7473 ^ counter.wrapping_mul(0x9e37_79b9_7f4a_7c15),
+        );
+        let upper =
+            litchi_numbers_wire::table_create::mix(lower ^ identifier.rotate_left(17) ^ counter);
+        let lower = (lower & !(0xf << 52)) | (0x4 << 52);
+        let upper = (upper & !0xc0) | 0x80;
+        let uuid = StorageUuid::from_parts(lower, upper);
         if uuid.lower() != 0 && uuid.upper() != 0 && existing.insert((uuid.lower(), uuid.upper())) {
             return Ok(uuid);
         }

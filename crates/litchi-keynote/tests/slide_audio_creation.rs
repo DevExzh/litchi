@@ -361,3 +361,21 @@ fn the_edit_stages_exactly_one_audio_creation() -> TestResult {
     assert_eq!(exact_bytes(&source)?, NATIVE_SOURCE);
     Ok(())
 }
+
+/// Record 0428: the new objects' metadata UUIDs, the build UUID and the build
+/// seed are derived, not drawn, so the same edit is byte-identical.
+#[test]
+fn audio_creation_output_is_deterministic() -> TestResult {
+    let data = audio();
+    let mut outputs = Vec::new();
+    for _ in 0..2 {
+        let source = Package::from_bytes(NATIVE_SOURCE)?;
+        let commit = source
+            .edit_slide_audio_creation()
+            .add(SlideSelector::index(0), "fresh-pcm.wav", &data, options()?)
+            .and_then(|edit| edit.commit())?;
+        outputs.push(exact_bytes(commit.package())?);
+    }
+    assert_eq!(outputs[0], outputs[1]);
+    Ok(())
+}

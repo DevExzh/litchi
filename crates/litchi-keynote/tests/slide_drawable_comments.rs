@@ -1255,3 +1255,38 @@ fn with_hostile_comment(source: &[u8], mutation: HostileMutation) -> TestResult<
         Limits::default(),
     )?)
 }
+
+/// Record 0428: new comment storages (root and reply) derive their storage
+/// UUIDs, so two runs of the same edits agree on every comment signature. The
+/// creation date is the documented exception: it is the wall-clock instant,
+/// as the host writes it, and is masked here.
+#[test]
+fn created_comment_storage_uuids_are_deterministic() -> TestResult {
+    let source = source_bytes()?;
+    let run = || -> TestResult<Vec<CommentSignature>> {
+        let package = Package::from_bytes(&source)?;
+        let slide = SlideSelector::index(0);
+        let created = package
+            .edit_slide_drawable_comment(slide, empty_target(&package)?)?
+            .set("deterministic root")?
+            .commit()?;
+        let replied = created
+            .package()
+            .edit_slide_drawable_comment(slide, existing_target(&package)?)?
+            .add_reply("deterministic reply")?
+            .commit()?;
+        let mut signatures = comment_signatures(&exact_bytes(replied.package())?)?;
+        for signature in &mut signatures {
+            signature.creation_date = None;
+        }
+        signatures.sort_by_key(|signature| signature.identifier);
+        Ok(signatures)
+    };
+    let first = run()?;
+    assert!(first.iter().any(
+        |signature| signature.text.as_deref() == Some("deterministic reply")
+            && signature.uuid.is_some()
+    ));
+    assert_eq!(first, run()?);
+    Ok(())
+}
