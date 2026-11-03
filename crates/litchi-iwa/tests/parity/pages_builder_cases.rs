@@ -266,3 +266,32 @@ fn builder_language_locale_cost_abba() -> TestResult {
         leaf,
     )
 }
+
+/// The builder with body text and one 5×4 body table (record 0420).
+#[test]
+#[ignore = "callgrind cost probe (record 0420)"]
+fn builder_body_table_cost_abba() -> TestResult {
+    let host = |_source: &[u8]| -> TestResult<Vec<u8>> {
+        Ok(litchi_iwa::pages::Builder::new()
+            .body_text("Budget")
+            .body_table("Q1", 5, 4)
+            .build()?
+            .to_bytes()?)
+    };
+    let leaf = |_source: &[u8]| -> TestResult<Vec<u8>> {
+        let package = litchi_pages::builder::Builder::new()
+            .identity(litchi_pages::builder::Identity::from_bytes([7; 16]))
+            .body_text("Budget")
+            .body_table("Q1", 5, 4)
+            .build()?;
+        Ok(leaf_bytes!(&package))
+    };
+    crate::pages_cost_probes::abba(
+        &Fixture {
+            path: "builder",
+            bytes: Vec::new(),
+        },
+        host,
+        leaf,
+    )
+}
