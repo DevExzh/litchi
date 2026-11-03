@@ -7596,3 +7596,14 @@ See [0063](0063-source-pptx-modern-comments.md).
   - W4-T 0412e (`2604268add`): `litchi_iwa_table::topology` lifted from Numbers; Pages/Keynote row and column insert/remove, Tier A;
   - W4-E 0418 slice 1 (`ee40f1a375`): shared chart author; Keynote moved onto the shared chart and line-end codecs, about 650 lines of copies deleted; Numbers chart add/duplicate/remove;
   - W4-F 0419 slice 1 (`9f43dabf61`): radar series style on all three formats.
+- Full gate on `b416fe328d` (with `LITCHI_MEM_MAX=40G`): all 53 rows passed (finished 2026-11-03T03:18:50Z; summary SHA-256 `499936f7679a2d9ee2c7b4c8d30591bcfd7d876ff8584704c9991db3e6ec8a88`).
+- Merged since then:
+  - W4-T 0412f (`4fc8e11883`, shared conditional-highlight engine; Pages/Keynote highlights) and 0412g (`d4121f4af7`, shared resize, uniform dimensions and frame; Keynote table layout and reads);
+  - W4-E 0418 slice 2 (`bbf1e3b812`, Pages chart add and geometry);
+  - W4-F 0419 slice 2 (`c599ef9cb8`, chart reference lines on three formats);
+  - W4-G 0420 (`bc588e1e6e`, `44aa1ee06d`): `litchi_numbers_wire::table_create::fresh`, a leaf-neutral from-scratch table graph. Numbers builder and table add moved onto it; a table-less workbook now gets a table, as on the host; Pages `Builder::body_table`; `document.rs charts` retired to the leaf chart-metadata reads.
+- W4-T, W4-E, W4-F and W4-G finished at clean commits; their worktrees are retired. Active:
+  - W4-H (0421): shared sort executor lifted from Pages, Keynote moved onto it, Numbers sort and pivot;
+  - W4-I (0422): value axis, chart image fills, the shared caption lift and captions;
+  - W4-J (0423): Keynote add_slide_table, Pages chart duplicate/remove, Numbers shape image fill, Keynote line-end on the shared workspace.
+- Ledger: 2,065 migrated, 117 retired and 52 host-only rows (Numbers 34, Pages 14, Keynote 4). Nothing pushed.
