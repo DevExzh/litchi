@@ -7620,3 +7620,14 @@ See [0063](0063-source-pptx-modern-comments.md).
   - W4-M 0426 (`32d5cc36ed`): Pages chart duplicate/remove with the host `remove_body_chart` defect fixed; Numbers image-fill release; Keynote line ends on shared code; Pages first-table insert;
   - W4-K 0424a (`baa2644511`): Numbers cell edits on pivot/category tables admitted, matching the host (capability gap closed).
 - Remaining: 4 host-only rows (Numbers chart caption set; Pages chart captions) with W4-N (0427), and W4-K 0424b (Pages image-fill release onto the shared helper). After both land, the final frozen gate and the instruction-count qualification run on one commit.
+
+## Exit ledger complete (2026-11-03)
+- Merged:
+  - W4-K 0424b (`5cb138127a`): Pages image-fill release on the shared helper. Native documents no longer keep orphaned images, matching the host's `is_referenced` rule.
+  - W4-N 0427 (`f0a258469a`): componentized chart captions in the shared caption engine; Numbers chart caption set; Pages chart captions.
+- **The exit ledger has 0 host-only rows: 2,117 migrated, 119 retired.** Every migrated row has a parity case. Every row without native host evidence is in `0363-mac-queue.md`.
+- At the start of this resume (2026-11-02) 983 rows were host-only. Wave W4 removed them with 14 work packages (records 0412–0427). Along the way these engines were lifted into shared crates and their leaf copies deleted:
+  - tables: cell rich text, comment threads, topology, conditional highlights, sort, layout, create/fresh;
+  - text: list publishing;
+  - style: chart style/axis/series/legend/lifecycle/value axis, `data_owner`, `shape_path`, `line_end`, `caption`.
+- Next, on one frozen commit: the 53-row gate, the instruction-count qualification (iWork routes extended with the W4 probes, plus the FIN matrix), then W3 preparation. W3 itself, deleting `litchi-iwa`, still requires the macOS queue to pass on a Mac. That cannot run on this host. Nothing pushed.
