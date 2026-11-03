@@ -1,6 +1,6 @@
 # 0422 — W4-I: value-axis settings, chart image fills, captions and titles
 
-- Status: slice 1 in progress; the wave continues (§4). Branch `uo2/iwa-w4i`
+- Status: slices 1 and 2 merge-ready; the wave continues (§4). Branch `uo2/iwa-w4i`
   (cut from trunk `feat/unified-ops-api` at `c599ef9cb8`).
 - Date: 2026-11-02.
 - Plan: [0363](0363-iwa-monolith-exit-plan.md) (§0 wave table, §3.2 API
@@ -87,3 +87,32 @@ a package with a map, which the parity case caught).
 
 Receipt `results/0422/callgrind-background-image.json`; raw captures in
 `.coord/iwa-w4i/cg2/`.
+
+### 2.1 Gates (slices 1 and 2)
+
+Branch with trunk `44aa1ee06d` (W4-G 0420) merged at `4ea803b0dc`
+(mac-queue conflict resolved by keeping both sides); logs
+`.coord/iwa-w4i/gates2`. Every command of the 0414 §8 list exits 0: fmt;
+clippy -D warnings on the five touched crates with `litchi-ops`, `litchi`
+and `litchi-py` (all features), the leaf crates without features, and
+`litchi-ops` with no features and with each of `numbers`, `pages`,
+`keynote`; the leaf, `litchi-iwa` (parity included), `litchi` and
+`litchi-ops` (`--lib`, `--doc`, nine `--test` groups) tests; pyo3;
+perf-baseline; the feature matrix; crate boundaries; non-iWork gate; the
+tool unit tests; ledger, OfficeCLI delta and corpus checks. Rustdoc
+-Dwarnings and the glossary first failed on one broken module doc link in
+`data_owner` (fixed in `5302ab5ffc`) and then exit 0. The bench matrix
+needed a 0422 `evidence_without_rows` entry (leaf-versus-host evidence, as
+for 0419) and a regeneration (`c55a619959`); then exit 0. No dispatch,
+capability or corpus-visible behaviour changed, so no golden was
+re-blessed. Target 13 GB after pruning.
+
+## 4. Remaining
+
+- Chart background image fills on Numbers and Keynote (2 rows), then
+  series and symbol image fills (6 rows): the engine and data-owner
+  transitions are shared (`write_chart_background`, `data_owner`); each
+  core needs the `Data/` member publication and the metadata admission
+  Pages got here.
+- The shared caption lift, then Numbers shape, image and movie captions
+  and titles (15 rows), then chart captions (Pages 3, Numbers 3).
