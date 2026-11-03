@@ -5,6 +5,13 @@
 //! `style_graph` performs the bounded exact-source reassembly and strict
 //! candidate reopen.  The public surface intentionally keeps native object
 //! identifiers, archives and protobuf payloads private.
+//!
+//! An image fill (record 0423, the host's `set_sheet_shape_image_fill`)
+//! goes through the shared `litchi_iwa_style::shape::set_image_fill`: the
+//! fill is planned on the style graph and the bytes are registered with
+//! the shared data-owner transition (`litchi_iwa_style::data_owner`), the
+//! drawable's style variation owning them; the bytes are published as a
+//! new `Data/` member.
 
 #![allow(
     clippy::arbitrary_source_item_ordering,
@@ -13,7 +20,10 @@
 
 use std::fmt;
 use std::mem::{size_of, size_of_val};
+use std::sync::Arc;
 
+use litchi_iwa_common::color::Rgba;
+use litchi_iwa_common::shape::fill::ImageTechnique;
 use litchi_iwa_core::Limits;
 use litchi_iwa_style::graph::Workspace;
 use litchi_iwa_style::shape::{
@@ -53,9 +63,16 @@ pub enum Refusal {
         /// The requested semantic property.
         property: PropertyKind,
     },
-    /// Image fills require the format family's media/reference transaction.
-    #[error("image fills are not written by the sheet-drawable style family")]
+    /// An image fill is staged through [`Property::Fill`] instead of
+    /// [`Edit::set_image_fill`], the drawable already shows an image fill
+    /// (replacing or releasing one is not supported here), or a second
+    /// image fill is staged.
+    #[error("this image fill cannot be written by the sheet-drawable style family")]
     ImageFill,
+    /// The image-fill bytes are not an image, the file name has no stem, or
+    /// the shape has no frame size to lay the image out on.
+    #[error("the image-fill data, file name or frame is unusable")]
+    InvalidImage,
     /// The selected style graph contains overrides this route cannot rewrite.
     #[error("the selected drawable's style cannot be rewritten safely")]
     UnsupportedStyle,
@@ -78,6 +95,7 @@ impl Refusal {
         match self {
             Self::SheetNotFound | Self::DrawableNotFound { .. } => RefusalKind::NotFound,
             Self::UnsupportedProperty { .. } => RefusalKind::UnsupportedTarget,
+            Self::InvalidImage => RefusalKind::InvalidValue,
             Self::ImageFill
             | Self::UnsupportedStyle
             | Self::UnsupportedDependency
@@ -159,6 +177,23 @@ impl From<litchi_iwa_style::graph::Error> for Error {
 enum Change {
     Set(Property),
     Reset(PropertyKind),
+    ImageFill(Box<NewImageFill>),
+}
+
+/// A staged image fill: the bytes, their preferred file name, the layout
+/// and the optional tint.
+#[derive(Debug, Clone, PartialEq)]
+struct NewImageFill {
+    bytes: Arc<[u8]>,
+    file_name: String,
+    technique: ImageTechnique,
+    tint: Option<Rgba>,
+}
+
+/// The data asset an image fill registered: its bytes and `Data/` member.
+struct StagedImage {
+    bytes: Arc<[u8]>,
+    member: String,
 }
 
 /// A deliberately small bound on caller-controlled staging.  The value is
@@ -188,6 +223,8 @@ fn change_cost(change: &Change) -> usize {
         .saturating_add(match change {
             Change::Set(property) => property_heap_bytes(property),
             Change::Reset(_) => 0,
+            // The bytes are shared, not copied; only the name is staged.
+            Change::ImageFill(image) => image.file_name.len(),
         })
 }
 
@@ -233,6 +270,7 @@ struct ResetExpectation {
 enum FinalState {
     Set(Property),
     Reset(ResetExpectation),
+    ImageFill(u64),
 }
 
 fn resolve_sheet(package: &Package, selector: SheetSelector<'_>) -> Result<usize, Error> {
@@ -305,13 +343,7 @@ fn workspace(
 
 fn read(workspace: &Workspace<'_>, drawable: u64, kind: PropertyKind) -> Result<Property, Error> {
     Ok(match kind {
-        PropertyKind::Fill => {
-            let fill = engine::value(workspace, drawable, &Fills)?;
-            if matches!(fill, Fill::Image(_)) {
-                return Err(Refusal::ImageFill.into());
-            }
-            Property::Fill(fill)
-        },
+        PropertyKind::Fill => Property::Fill(engine::value(workspace, drawable, &Fills)?),
         PropertyKind::Stroke => Property::Stroke(engine::value(workspace, drawable, &Strokes)?),
         PropertyKind::Effects => {
             Property::Effects(engine::value(workspace, drawable, &ShapeEffects)?)
@@ -411,6 +443,7 @@ fn apply_change(
         Change::Reset(PropertyKind::Effects) => engine::reset(workspace, drawable, &ShapeEffects)?,
         Change::Reset(PropertyKind::TextLayout) => engine::reset(workspace, drawable, &TextLayout)?,
         Change::Reset(PropertyKind::Columns) => engine::reset(workspace, drawable, &TextColumns)?,
+        Change::ImageFill(_) => return Err(Refusal::ImageFill.into()),
     })
 }
 
@@ -617,6 +650,35 @@ impl Edit<'_> {
         self.stage(Change::Set(property))
     }
 
+    /// Stage embedding `bytes` as a new `Data/` member and making them the
+    /// selected shape's or text box's image fill, laid out by `technique`
+    /// over its frame size and optionally tinted (the host's
+    /// `set_sheet_shape_image_fill`). The drawable's style variation owns
+    /// the new data reference.
+    ///
+    /// # Errors
+    ///
+    /// [`Refusal::UnsupportedProperty`] for a line; at commit,
+    /// [`Refusal::InvalidImage`] for bytes that are not an image, a file
+    /// name without a stem or a drawable without a frame size, and
+    /// [`Refusal::ImageFill`] when the drawable already shows an image fill
+    /// or a second one is staged.
+    pub fn set_image_fill(
+        &mut self,
+        bytes: &[u8],
+        file_name: &str,
+        technique: ImageTechnique,
+        tint: Option<Rgba>,
+    ) -> Result<&mut Self, Error> {
+        ensure_property(self.kind, PropertyKind::Fill)?;
+        self.stage(Change::ImageFill(Box::new(NewImageFill {
+            bytes: Arc::from(bytes),
+            file_name: file_name.to_owned(),
+            technique,
+            tint,
+        })))
+    }
+
     /// Stage removal of the selected drawable's own override.
     pub fn reset(&mut self, kind: PropertyKind) -> Result<&mut Self, Error> {
         ensure_property(self.kind, kind)?;
@@ -642,8 +704,47 @@ impl Edit<'_> {
         }) {
             ensure_line(self.source, self.drawable)?;
         }
+        let mut image: Option<StagedImage> = None;
         for change in &self.changes {
             match change {
+                Change::ImageFill(request) => {
+                    if image.is_some()
+                        || matches!(
+                            engine::value(&working, self.drawable, &Fills)?,
+                            Fill::Image(_)
+                        )
+                    {
+                        return Err(Refusal::ImageFill.into());
+                    }
+                    use sha1::Digest as _;
+                    if litchi_iwa_common::media::Type::from_bytes(&request.bytes)
+                        != litchi_iwa_common::media::Type::Image
+                        || litchi_iwa_style::data_owner::materialized_name(&request.file_name, 1)
+                            .is_none()
+                    {
+                        return Err(Refusal::InvalidImage.into());
+                    }
+                    let size = frame_size(self.source, self.drawable)?;
+                    let digest = sha1::Sha1::digest(request.bytes.as_ref());
+                    let (data, member) = litchi_iwa_style::shape::set_image_fill(
+                        &mut working,
+                        self.drawable,
+                        litchi_iwa_style::data_owner::NewData {
+                            preferred_file_name: &request.file_name,
+                            digest: digest.as_slice(),
+                            length: request.bytes.len() as u64,
+                        },
+                        request.technique,
+                        size,
+                        request.tint,
+                    )?;
+                    final_states[property_index(PropertyKind::Fill)] =
+                        Some(FinalState::ImageFill(data));
+                    image = Some(StagedImage {
+                        bytes: Arc::clone(&request.bytes),
+                        member,
+                    });
+                },
                 Change::Reset(PropertyKind::LineEndpoints) => {
                     apply_change(&mut working, self.drawable, change)?;
                     final_states[property_index(PropertyKind::LineEndpoints)] = Some(
@@ -674,7 +775,12 @@ impl Edit<'_> {
         if changes.is_empty() {
             return Commit::unchanged(self.source);
         }
-        let published = numbers_style_graph::publish(self.source, changes).map_err(Error::from)?;
+        let data_members = image
+            .iter()
+            .map(|image| (image.member.as_str(), image.bytes.as_ref()))
+            .collect::<Vec<_>>();
+        let published = numbers_style_graph::publish(self.source, changes, &data_members)
+            .map_err(Error::from)?;
         let (components, limits) = workspace(&published.package)?;
         let reopened = Workspace::new(&components, limits)?;
         for state in final_states.into_iter().flatten() {
@@ -688,6 +794,15 @@ impl Edit<'_> {
                 FinalState::Reset(expectation) => {
                     let kind = expectation.effective.kind();
                     verify_reset_candidate(&reopened, self.drawable, kind, &expectation)?;
+                },
+                FinalState::ImageFill(data) => {
+                    let Fill::Image(image) = engine::value(&reopened, self.drawable, &Fills)?
+                    else {
+                        return Err(Error::Verification);
+                    };
+                    if image.data().map(|data| data.get()) != Some(data) {
+                        return Err(Error::Verification);
+                    }
                 },
             }
         }
@@ -738,4 +853,27 @@ impl Package {
     pub fn apply_sheet_drawable_style(&self, patch: &Patch) -> Result<Commit, Error> {
         apply_patch(self, patch)
     }
+}
+
+/// The frame size of shape or text box `drawable`, which an image fill is
+/// laid out over.
+fn frame_size(
+    source: &Package,
+    drawable: u64,
+) -> Result<litchi_iwa_common::shape::geometry::Size, Error> {
+    let object = graph::object(source, drawable)?;
+    let payload = object
+        .messages
+        .iter()
+        .find(|message| message.type_ == SHAPE_INFO_MESSAGE_TYPE)
+        .ok_or(Error::InvalidSource)?;
+    let frame = graph::drawable_payload(SHAPE_INFO_MESSAGE_TYPE, &payload.data)?;
+    let (geometry, _) = graph::frame_and_properties(frame)?;
+    let size = geometry
+        .and_then(|geometry| geometry.size)
+        .ok_or(Refusal::InvalidImage)?;
+    Ok(litchi_iwa_common::shape::geometry::Size {
+        width: size.width,
+        height: size.height,
+    })
 }

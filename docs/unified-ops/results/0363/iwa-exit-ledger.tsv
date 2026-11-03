@@ -528,7 +528,7 @@ keynote/editor/slide_shapes/caption.rs	remove_slide_shape_title	1	keynote	drawab
 keynote/editor/slide_shapes/caption.rs	set_slide_shape_caption	1	keynote	drawable.shape	migrated	litchi_keynote::Package::edit_slide_shape_text	keynote_slide_shape_caption_create_parity	B	-	-
 keynote/editor/slide_shapes/caption.rs	set_slide_shape_title	1	keynote	drawable.shape	migrated	litchi_keynote::Package::edit_slide_shape_text	keynote_slide_shape_title_create_parity	B	-	-
 keynote/editor/slide_shapes/caption.rs	slide_shape_title_caption	1	keynote	drawable.shape	migrated	litchi_keynote::Package::slide_shape_text	keynote_slide_shape_text_read_parity	A	-	-
-keynote/editor/slide_tables.rs	add_slide_table	1	keynote	table.lifecycle	host-only	litchi-keynote	-	-	-	-
+keynote/editor/slide_tables.rs	add_slide_table	1	keynote	table.lifecycle	migrated	litchi_keynote::Package::edit_slide_table_lifecycle	keynote_slide_table_add_parity	B	-	-
 keynote/editor/slide_tables.rs	cell_count	1	keynote	table.cells	migrated	litchi_keynote::Package::slide_table_cells	keynote_slide_table_read_parity	A	test-data/iwork/keynote/slide-table-read-native-receipt.json	-
 keynote/editor/slide_tables.rs	clear_slide_table_cell	1	keynote	table.cells	migrated	litchi_keynote::slide::drawable::Edit::set_table_cell	keynote_slide_table_formula_refresh_clear_parity	B	-	-
 keynote/editor/slide_tables.rs	clear_slide_table_cell_border	1	keynote	table.cell_appearance	migrated	litchi_keynote::slide::table::cell_appearance::Edit::clear_border	keynote_slide_table_cell_border_clear_parity	B	-	-
@@ -1316,7 +1316,7 @@ numbers/editor/sheet_shapes.rs	set_sheet_line_segment	1	numbers	drawable.shape	m
 numbers/editor/sheet_shapes.rs	set_sheet_shape_effects	1	numbers	drawable.shape	migrated	litchi_numbers::Package::edit_sheet_drawable_style	numbers_shape_style_set_parity	B	-	W2-A 0380: selector-first Effects set; implementation destination only, parity/gates pending; native acceptance queued in 0363-mac-queue.md
 numbers/editor/sheet_shapes.rs	set_sheet_shape_fill	1	numbers	drawable.shape	migrated	litchi_numbers::Package::edit_sheet_drawable_style	numbers_shape_style_set_parity	B	-	W2-A 0380: selector-first Fill set; implementation destination only, parity/gates pending; native acceptance queued in 0363-mac-queue.md
 numbers/editor/sheet_shapes.rs	set_sheet_shape_geometry	1	numbers	drawable.shape	migrated	litchi_numbers::sheet::drawable::properties::Edit::set_geometry	numbers_sheet_shape_geometry_parity	A	-	-
-numbers/editor/sheet_shapes.rs	set_sheet_shape_image_fill	1	numbers	drawable.shape	host-only	litchi-numbers	-	-	-	-
+numbers/editor/sheet_shapes.rs	set_sheet_shape_image_fill	1	numbers	drawable.shape	migrated	litchi_numbers::Package::edit_sheet_drawable_style	numbers_shape_image_fill_parity	B	-	-
 numbers/editor/sheet_shapes.rs	set_sheet_shape_preset	1	numbers	drawable.shape	migrated	litchi_numbers::sheet::drawable::properties::Edit::set_preset	numbers_sheet_shape_preset_parity	A	-	-
 numbers/editor/sheet_shapes.rs	set_sheet_shape_properties	1	numbers	drawable.shape	migrated	litchi_numbers::sheet::drawable::properties::Edit::set_properties	numbers_sheet_shape_properties_parity	A	-	-
 numbers/editor/sheet_shapes.rs	set_sheet_shape_shadow	1	numbers	drawable.shape	migrated	litchi_numbers::Package::edit_sheet_drawable_style	numbers_sheet_shape_shadow_set_parity	B	-	-
