@@ -16,11 +16,12 @@
 //! - **Collapse**: the variation overrides nothing any more, so the drawable
 //!   points back at its parent and the variation goes away.
 //!
-//! Line endpoints and image fills use the plan layer with this module's own
-//! slot values: endpoints are read from the line's path (and its legacy
-//! per-shape overrides) and stored as a head/tail pair in the line's
-//! direction; an image fill also embeds its bytes and moves the style's data
-//! references.
+//! Line endpoints are the shared `litchi_iwa_style::line_end::{endpoints,
+//! set_endpoints}` rules over this module's staging (record 0426): read from
+//! the line's path (and its legacy per-shape overrides) and stored as a
+//! head/tail pair in the line's direction, published by the same plan
+//! steps. An image fill uses the plan layer with its own slot value, embeds
+//! its bytes and moves the style's data references.
 
 use std::sync::Arc;
 
@@ -28,7 +29,7 @@ use litchi_iwa_common::color::Rgba;
 use litchi_iwa_common::shape::effects::Effects;
 use litchi_iwa_common::shape::fill::{Fill, Image, ImageData, ImageTechnique};
 use litchi_iwa_common::shape::geometry::Size;
-use litchi_iwa_common::shape::line::{Endpoint, Endpoints};
+use litchi_iwa_common::shape::line::Endpoints;
 use litchi_iwa_common::shape::shadow::Shadow;
 use litchi_iwa_common::shape::stroke::Stroke;
 use litchi_iwa_common::text::layout::Layout;
@@ -40,17 +41,11 @@ use litchi_iwa_text::columns::Columns;
 use sha1::{Digest as _, Sha1};
 
 use super::super::structure::metadata::ExternalReference;
-use super::super::structure::wire::Fields;
 use super::super::structure::workspace::Workspace;
 use super::{Error, Refusal, Unsupported, lift};
 
 const SHAPE_INFO_MESSAGE_TYPE: u32 = 2_011;
 const STYLESHEET_MESSAGE_TYPE: u32 = 401;
-const SHAPE_ARCHIVE: u32 = 1;
-const SHAPE_PATH_SOURCE: u32 = 3;
-const SHAPE_HEAD_LINE_END: u32 = 4;
-const SHAPE_TAIL_LINE_END: u32 = 5;
-const PATH_SOURCE_HORIZONTAL_FLIP: u32 = 1;
 
 /// One drawing or frame property of a text box, shape or line.
 #[derive(Debug, Clone, PartialEq)]
@@ -712,82 +707,96 @@ fn reset<P: ShapeProperty>(
     Ok(())
 }
 
-// ---- Line endpoints (the host's `shapes::line_end`, own slot values) ----
+// ---- Line endpoints (the shared `litchi_iwa_style::line_end` rules) ----
 
-/// The line's legacy per-shape decorations and stored direction:
-/// (head, tail, horizontally flipped).
-fn shape_line_ends(
-    workspace: &Workspace<'_>,
-    drawable: u64,
-) -> Result<(Option<Vec<u8>>, Option<Vec<u8>>, bool), Error> {
-    let wire = workspace.wire;
-    let (_, payload) = shape_info(workspace, drawable)?;
-    let info = Fields::parse(&payload, wire).map_err(lift)?;
-    let shape = info
-        .unique(SHAPE_ARCHIVE)
-        .map_err(lift)?
-        .ok_or(Error::InvalidSource)?
-        .message()
-        .map_err(lift)?;
-    let shape = Fields::parse(shape, wire).map_err(lift)?;
-    let field = |number| -> Result<Option<Vec<u8>>, Error> {
-        Ok(match shape.unique(number).map_err(lift)? {
-            Some(field) => Some(field.message().map_err(lift)?.to_vec()),
-            None => None,
+/// The staged workspace as the shared line-end rules read it: shape infos,
+/// styles and the exclusivity rule.
+struct LineView<'w, 'p>(&'w Workspace<'p>);
+
+/// The staged workspace as the shared line-end rules write it: this
+/// module's plan publication besides the reads.
+struct LineStaging<'w, 'p>(&'w mut Workspace<'p>);
+
+/// A Keynote error carried through the shared line-end rules.
+struct LineError(Error);
+
+impl From<litchi_iwa_style::line_end::EndpointsError> for LineError {
+    fn from(error: litchi_iwa_style::line_end::EndpointsError) -> Self {
+        use litchi_iwa_style::line_end::{DecodeError, EndpointsError};
+        Self(match error {
+            EndpointsError::Graph(error) => from_engine(error),
+            EndpointsError::Decode(DecodeError::Unknown(_)) | EndpointsError::Orphan => refused(),
+            EndpointsError::Verification => Error::Verification,
+            _ => Error::InvalidSource,
         })
-    };
-    let flipped = match shape.unique(SHAPE_PATH_SOURCE).map_err(lift)? {
-        Some(source) => {
-            let source = Fields::parse(source.message().map_err(lift)?, wire).map_err(lift)?;
-            match source.unique(PATH_SOURCE_HORIZONTAL_FLIP).map_err(lift)? {
-                Some(flip) => flip.varint().map_err(lift)? != 0,
-                None => false,
+    }
+}
+
+fn style_bytes<'a>(workspace: &'a Workspace<'_>, identifier: u64) -> Option<&'a [u8]> {
+    workspace
+        .object(identifier)?
+        .messages
+        .iter()
+        .find(|message| message.type_ == engine::MESSAGE_TYPE)
+        .map(|message| message.data.as_slice())
+}
+
+fn shape_info_bytes<'a>(
+    workspace: &'a Workspace<'_>,
+    drawable: u64,
+) -> Result<&'a [u8], LineError> {
+    let object = workspace
+        .require(drawable)
+        .map_err(|error| LineError(lift(error)))?;
+    let mut found = object
+        .messages
+        .iter()
+        .filter(|message| message.type_ == SHAPE_INFO_MESSAGE_TYPE);
+    let message = found.next().ok_or(LineError(refused()))?;
+    if found.next().is_some() {
+        return Err(LineError(Error::InvalidSource));
+    }
+    Ok(&message.data)
+}
+
+macro_rules! line_reads {
+    ($adapter:ident) => {
+        impl Styles for $adapter<'_, '_> {
+            fn shape_style(&self, identifier: u64) -> Option<&[u8]> {
+                style_bytes(self.0, identifier)
             }
-        },
-        None => false,
+        }
+
+        impl litchi_iwa_style::line_end::Staged for $adapter<'_, '_> {
+            type Error = LineError;
+
+            fn shape_info(&self, drawable: u64) -> Result<&[u8], LineError> {
+                shape_info_bytes(self.0, drawable)
+            }
+
+            fn style(&self, drawable: u64) -> Result<u64, LineError> {
+                style_of(self.0, drawable).map_err(LineError)
+            }
+
+            fn target(&self, drawable: u64) -> Result<Target, LineError> {
+                target(self.0, drawable).map_err(LineError)
+            }
+        }
     };
-    Ok((
-        field(SHAPE_HEAD_LINE_END)?,
-        field(SHAPE_TAIL_LINE_END)?,
-        flipped,
-    ))
 }
 
-fn endpoint_of(workspace: &Workspace<'_>, line_end: Option<&[u8]>) -> Result<Endpoint, Error> {
-    litchi_iwa_style::line_end::decode(line_end, workspace.wire).map_err(|error| match error {
-        litchi_iwa_style::line_end::DecodeError::Unknown(_) => refused(),
-        _ => Error::InvalidSource,
-    })
-}
+line_reads!(LineView);
+line_reads!(LineStaging);
 
-/// The effective head and tail of a style chain, each inherited on its own.
-fn inherited_line_ends(
-    workspace: &Workspace<'_>,
-    style: u64,
-) -> Result<(Option<Vec<u8>>, Option<Vec<u8>>), Error> {
-    let styles = WorkspaceStyles(workspace);
-    Ok((
-        engine::effective(&styles, style, Slot::HeadLineEnd).map_err(from_engine)?,
-        engine::effective(&styles, style, Slot::TailLineEnd).map_err(from_engine)?,
-    ))
+impl litchi_iwa_style::line_end::Staging for LineStaging<'_, '_> {
+    fn apply(&mut self, drawable: u64, plan: Plan) -> Result<(), LineError> {
+        apply(self.0, drawable, plan, None).map_err(LineError)
+    }
 }
 
 fn endpoints(workspace: &Workspace<'_>, drawable: u64) -> Result<Endpoints, Error> {
-    let (mut head, mut tail, flipped) = shape_line_ends(workspace, drawable)?;
-    if head.is_none() || tail.is_none() {
-        let (inherited_head, inherited_tail) =
-            inherited_line_ends(workspace, style_of(workspace, drawable)?)?;
-        head = head.or(inherited_head);
-        tail = tail.or(inherited_tail);
-    }
-    let mut endpoints = Endpoints {
-        start: endpoint_of(workspace, tail.as_deref())?,
-        end: endpoint_of(workspace, head.as_deref())?,
-    };
-    if flipped {
-        std::mem::swap(&mut endpoints.start, &mut endpoints.end);
-    }
-    Ok(endpoints)
+    litchi_iwa_style::line_end::endpoints(&LineView(workspace), drawable, workspace.wire)
+        .map_err(|error| error.0)
 }
 
 /// Store `wanted` as the line's decorations (host `set_shape_line_endpoints`).
@@ -796,59 +805,10 @@ fn set_endpoints(
     drawable: u64,
     wanted: Endpoints,
 ) -> Result<(), Error> {
-    if endpoints(workspace, drawable)? == wanted {
-        return Ok(());
-    }
-    let (_, _, flipped) = shape_line_ends(workspace, drawable)?;
-    let mut stored = wanted;
-    if flipped {
-        std::mem::swap(&mut stored.start, &mut stored.end);
-    }
-    let target = target(workspace, drawable)?;
-    let payload = style_payload(workspace, target.style())?;
-    let disposable = target.exclusive()
-        && engine::direct_slots(payload)
-            .map_err(from_engine)?
-            .is_some();
-    let mut clear = false;
-    if disposable && wanted == Endpoints::default() {
-        let parent = engine::parent_of(payload)
-            .map_err(from_engine)?
-            .ok_or(refused())?;
-        let (head, tail) = inherited_line_ends(workspace, parent)?;
-        let inherited = Endpoints {
-            start: endpoint_of(workspace, tail.as_deref())?,
-            end: endpoint_of(workspace, head.as_deref())?,
-        };
-        clear = inherited == Endpoints::default();
-    }
-    let writes = if clear {
-        vec![(Slot::HeadLineEnd, None), (Slot::TailLineEnd, None)]
-    } else {
-        vec![
-            (
-                Slot::HeadLineEnd,
-                Some(Value::message(litchi_iwa_style::line_end::encode(
-                    stored.end,
-                ))),
-            ),
-            (
-                Slot::TailLineEnd,
-                Some(Value::message(litchi_iwa_style::line_end::encode(
-                    stored.start,
-                ))),
-            ),
-        ]
-    };
-    // A shared or non-minimal style takes a derived child (the host's
-    // copy-on-write); the plan layer decides exactly as the host does.
-    let plan =
-        engine::plan_set(&WorkspaceStyles(workspace), target, &writes).map_err(from_engine)?;
-    apply(workspace, drawable, plan, None)?;
-    if endpoints(workspace, drawable)? != wanted {
-        return Err(Error::Verification);
-    }
-    Ok(())
+    let limits = workspace.wire;
+    litchi_iwa_style::line_end::set_endpoints(&mut LineStaging(workspace), drawable, wanted, limits)
+        .map(|_changed| ())
+        .map_err(|error| error.0)
 }
 
 // ---- Image fills (own data references) ----

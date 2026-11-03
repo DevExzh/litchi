@@ -25,6 +25,12 @@
 //! Tier B against the host. Later tables go through
 //! [`crate::table::creation`], as the host builder adds them with its
 //! editor.
+//!
+//! The same graph is the first table [`crate::table::creation`] inserts
+//! into a table-less built-in-template document at any body position
+//! (record 0426; the host editor's `add_table` bootstraps it with
+//! `bootstrap_first_table_graph` on such a document and refuses any other
+//! table-less one).
 
 use litchi_iwa_archive::package::{EntryEdit, EntryInsertion};
 use litchi_iwa_common::WireLimits;
@@ -36,7 +42,7 @@ use litchi_numbers_wire::table_create::{Frame, OwnerGeometry, Shape, TableUuid, 
 use super::Package;
 use crate::{PackageError, PackageResult};
 
-const DOCUMENT_COMPONENT: &str = "Index/Document.iwa";
+pub(crate) const DOCUMENT_COMPONENT: &str = "Index/Document.iwa";
 const STYLESHEET_COMPONENT: &str = "Index/DocumentStylesheet.iwa";
 const METADATA_COMPONENT: &str = "Index/Metadata.iwa";
 const ENGINE_COMPONENT: &str = "Index/CalculationEngine.iwa";
@@ -96,6 +102,14 @@ const ENGINE_VERSIONS: [u32; 3] = [3, 2, 10];
 /// The host Pages builder's table frame.
 const TABLE_WIDTH: f32 = 468.0;
 const TABLE_ROW_HEIGHT: f32 = 22.73;
+
+/// The first identifier of the graph (the UUID seed's input), the new
+/// drawable, and the objects and components a creation adds or rewrites
+/// (the document, stylesheet and registry, and the new engine).
+pub(crate) const FIRST_IDENTIFIER: u64 = IDS.info;
+pub(crate) const DRAWABLE: u64 = IDS.info;
+pub(crate) const CREATED_OBJECTS: usize = DOCUMENT_OBJECTS.len() + STYLE_OBJECTS.len() + 3;
+pub(crate) const TOUCHED_COMPONENTS: usize = 4;
 
 /// The document objects the table adds, in the host's order.
 const DOCUMENT_OBJECTS: [u64; 15] = [
@@ -314,8 +328,11 @@ fn extend_component(
     Ok(output.0)
 }
 
-/// The registry with the table's component, UUIDs and references.
-fn metadata(payload: &[u8], seed: u64) -> PackageResult<Vec<u8>> {
+/// The registry with the table's component, UUIDs and references. The
+/// builder lists the engine component before the document component (the
+/// host builder's registry); an insertion appends it after the last
+/// component (the host editor's `add_component_registration`).
+fn metadata(payload: &[u8], seed: u64, appended: bool) -> PackageResult<Vec<u8>> {
     let uuids = |identifiers: &[u64]| -> Vec<Vec<u8>> {
         identifiers
             .iter()
@@ -342,20 +359,24 @@ fn metadata(payload: &[u8], seed: u64) -> PackageResult<Vec<u8>> {
     document_externals.push(external(ENGINE, None));
 
     let view = parse_wire_view(payload, WireLimits::DEFAULT).map_err(wire)?;
+    let last_component = view
+        .fields()
+        .enumerate()
+        .filter(|(_, field)| field.number() == 3)
+        .map(|(index, _)| index)
+        .last();
     let mut output = Writer::default();
     let mut seen = (false, false);
-    for field in view.fields() {
+    for (index, field) in view.fields().enumerate() {
         if field.number() != 3 {
             output.0.extend_from_slice(field.raw());
             continue;
         }
-        let identifier = litchi_iwa_common::wire::repeated_varint_values(field.payload(), 1)
-            .map_err(wire)?
-            .first()
-            .copied();
-        match identifier {
+        match identifier_of(field.payload())? {
             Some(DOCUMENT) => {
-                output.bytes(3, &engine.0);
+                if !appended {
+                    output.bytes(3, &engine.0);
+                }
                 output.bytes(
                     3,
                     &extend_component(
@@ -377,11 +398,24 @@ fn metadata(payload: &[u8], seed: u64) -> PackageResult<Vec<u8>> {
                 output.0.extend_from_slice(field.raw());
             },
         }
+        if appended && Some(index) == last_component {
+            output.bytes(3, &engine.0);
+        }
     }
     if seen != (true, true) {
         return Err(invalid("the template registry"));
     }
     Ok(output.0)
+}
+
+/// The identifier (field 1) of a registry component entry.
+fn identifier_of(component: &[u8]) -> PackageResult<Option<u64>> {
+    Ok(
+        litchi_iwa_common::wire::repeated_varint_values(component, 1)
+            .map_err(wire)?
+            .first()
+            .copied(),
+    )
 }
 
 /// The single message of `message_type` of object `identifier`.
@@ -424,38 +458,28 @@ fn replace(
     Ok(())
 }
 
-/// `package` (the built-in template with its identity, language, locale and
-/// body text written) with the host builder's first table, `name` of
-/// `rows` × `columns`, anchored at the end of the body text. `seed` derives
-/// the table and object UUIDs.
-pub(crate) fn install(
-    package: &Package,
-    name: &str,
-    rows: u32,
-    columns: u32,
-    locale: &str,
-    seed: u64,
-) -> PackageResult<Package> {
+/// Whether `package` is a table-less built-in-template document that can
+/// take the first table graph (the host's `require_scratch_table_slots`):
+/// no calculation engine, the template's body storage, document and
+/// stylesheet components, and every identifier of the graph free.
+pub(crate) fn admits(package: &Package) -> bool {
+    scratch_slots(package).is_ok()
+}
+
+fn scratch_slots(package: &Package) -> PackageResult<()> {
     let source = &package.state.source;
-    let limits = source.limits();
-    let archive_limits = limits.effective_archive_limits().map_err(wire)?;
-    let component = |name: &str| -> PackageResult<Archive> {
-        source
-            .components()
-            .get(name)
-            .map(|component| component.archive().clone())
-            .ok_or_else(|| invalid("a missing template component"))
-    };
     if source.components().get(ENGINE_COMPONENT).is_some() {
         return Err(invalid("the template already has a calculation engine"));
+    }
+    for member in [DOCUMENT_COMPONENT, STYLESHEET_COMPONENT, METADATA_COMPONENT] {
+        if source.components().get(member).is_none() {
+            return Err(invalid("a missing template component"));
+        }
     }
     let (body, _) = super::body_storage_objects::body_storage(package).map_err(wire)?;
     if body.identifier.get() != BODY {
         return Err(invalid("the template body"));
     }
-    let mut document = component(DOCUMENT_COMPONENT)?;
-    let mut stylesheet = component(STYLESHEET_COMPONENT)?;
-    let mut registry = component(METADATA_COMPONENT)?;
     let reserved: Vec<u64> = DOCUMENT_OBJECTS
         .iter()
         .chain(&STYLE_OBJECTS)
@@ -472,6 +496,35 @@ pub(crate) fn install(
             return Err(invalid("the template uses the table's identifiers"));
         }
     }
+    Ok(())
+}
+
+/// `package` (the built-in template with its identity, language, locale and
+/// body text written) with the host builder's first table, `name` of
+/// `rows` × `columns`, anchored at UTF-16 body position `anchor` (`None`:
+/// the end of the body text). `seed` derives the table and object UUIDs.
+pub(crate) fn install(
+    package: &Package,
+    (name, rows, columns): (&str, u32, u32),
+    locale: &str,
+    seed: u64,
+    anchor: Option<usize>,
+) -> PackageResult<Package> {
+    let source = &package.state.source;
+    let limits = source.limits();
+    let archive_limits = limits.effective_archive_limits().map_err(wire)?;
+    let component = |name: &str| -> PackageResult<Archive> {
+        source
+            .components()
+            .get(name)
+            .map(|component| component.archive().clone())
+            .ok_or_else(|| invalid("a missing template component"))
+    };
+    scratch_slots(package)?;
+    let (body, _) = super::body_storage_objects::body_storage(package).map_err(wire)?;
+    let mut document = component(DOCUMENT_COMPONENT)?;
+    let mut stylesheet = component(STYLESHEET_COMPONENT)?;
+    let mut registry = component(METADATA_COMPONENT)?;
 
     // The table graph, its preset and network, and the default styles.
     let uuid = TableUuid::derive(seed);
@@ -627,7 +680,12 @@ pub(crate) fn install(
         .get(body.message_index)
         .ok_or_else(|| invalid("the template body"))?;
     let body_type = body_payload.type_;
-    let anchor = super::body_table_creation::prepared_len(&body_payload.data).map_err(wire)?;
+    let end = super::body_table_creation::prepared_len(&body_payload.data).map_err(wire)?;
+    let inserted = anchor.is_some();
+    let anchor = anchor.unwrap_or(end);
+    if anchor > end {
+        return Err(invalid("the anchor is past the body text"));
+    }
     let anchored =
         super::body_table_creation::anchored_body(package, &body_payload.data, anchor, ATTACHMENT)
             .map_err(wire)?;
@@ -678,7 +736,7 @@ pub(crate) fn install(
         &mut registry,
         METADATA,
         METADATA_MESSAGE_TYPE,
-        |data| metadata(data, seed),
+        |data| metadata(data, seed, inserted),
         &[],
         archive_limits,
     )?;
@@ -696,12 +754,18 @@ pub(crate) fn install(
         encode(&registry)?,
         encode(&engine)?,
     );
-    let position = source
-        .package()
-        .iter()
-        .position(|entry| entry.name() == METADATA_COMPONENT)
-        .ok_or_else(|| invalid("the template registry member"))?
-        + 1;
+    // The builder lists the engine after the registry member; the host
+    // editor's insertion appends it to the package.
+    let position = if inserted {
+        source.package().len()
+    } else {
+        source
+            .package()
+            .iter()
+            .position(|entry| entry.name() == METADATA_COMPONENT)
+            .ok_or_else(|| invalid("the template registry member"))?
+            + 1
+    };
     let bytes = source
         .package()
         .reassemble_with_changes_to_bytes(

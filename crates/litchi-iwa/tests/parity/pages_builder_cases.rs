@@ -295,3 +295,160 @@ fn builder_body_table_cost_abba() -> TestResult {
         leaf,
     )
 }
+
+/// Table insertion into a table-less built-in-template document (record
+/// 0426): the host editor's `add_table` bootstraps the first table graph
+/// (`bootstrap_first_table_graph`) where the leaf `table::creation` used to
+/// refuse (`NoTemplate`); the leaf builds the same graph with the builder's
+/// `builder_table`. Anchored at the start, inside and at the end of the
+/// body text. The host draws the table, owner, UID-map and object UUIDs at
+/// random; they are compared by form.
+#[test]
+fn pages_body_table_insert_without_template_parity() -> TestResult {
+    let _ = (Tier::B, Evidence::Queued);
+    let text = "Hello table world";
+    let input = Fixture {
+        path: "built-in template + body text",
+        bytes: leaf_bytes!(
+            &litchi_pages::builder::Builder::new()
+                .identity(litchi_pages::builder::Identity::from_bytes([7; 16]))
+                .body_text(text)
+                .build()?
+        ),
+    };
+    for anchor in [0, 6, text.len()] {
+        Case::new(
+            "pages_body_table_insert_without_template_parity",
+            Format::Pages,
+            Tier::B,
+            Evidence::Queued,
+            &input,
+        )
+        .known_fields(|known| {
+            known
+                .with(
+                    11_006,
+                    "TSP.PackageMetadata (object UUIDs by form)",
+                    metadata_without_object_uuids,
+                )
+                .with(
+                    6_001,
+                    "TST.TableModelArchive (table UUID by form)",
+                    crate::numbers_builder_cases::model_without_table_uuid,
+                )
+                .with(
+                    4_008,
+                    "TSCE.FormulaOwnerDependenciesArchive (owner UUID by form)",
+                    crate::numbers_builder_cases::owner_without_uuid,
+                )
+                .with(
+                    4_000,
+                    "TSCE.CalculationEngineArchive (owner-map UUIDs by form)",
+                    crate::numbers_builder_cases::engine_without_owner_uuids,
+                )
+                .with(
+                    6_267,
+                    "TST.ColumnRowUIDMapArchive (UIDs by form)",
+                    crate::numbers_builder_cases::uid_map_by_form,
+                )
+        })
+        .host(|source| {
+            let mut editor = litchi_iwa::pages::Draft::from_bytes(source)?;
+            drop(editor.add_table(anchor, "Litchi table", 3, 4)?);
+            Ok(editor.to_bytes()?)
+        })
+        .leaf(|source| {
+            let package = litchi_pages::Package::from_bytes(source)?;
+            let commit = package
+                .edit_body_table_creation()
+                .insert(
+                    litchi_core::Position::new(anchor),
+                    litchi_pages::table::creation::NewTable::new(3, 4).with_name("Litchi table"),
+                )?
+                .commit()?;
+            let restored = commit
+                .package()
+                .apply_body_table_creation(&commit.patch().inverse())?;
+            Ok(LeafRun::with_inverse(
+                leaf_bytes!(commit.package()),
+                leaf_bytes!(restored.package()),
+            ))
+        })
+        .read("host tables", host_tables)
+        .read("leaf tables", leaf_tables)
+        .run()
+        .map_err(|error| format!("anchor {anchor}: {error}"))?;
+    }
+    Ok(())
+}
+
+fn host_tables(bytes: &[u8]) -> TestResult<String> {
+    let editor = litchi_iwa::pages::Draft::from_bytes(bytes)?;
+    Ok(format!(
+        "{:?} {:?}",
+        editor.body_text()?,
+        editor
+            .tables()?
+            .iter()
+            .map(|table| (table.name.clone(), table.rows, table.columns))
+            .collect::<Vec<_>>()
+    ))
+}
+
+fn leaf_tables(bytes: &[u8]) -> TestResult<String> {
+    let package = litchi_pages::Package::from_bytes(bytes)?;
+    let tables = package.body_tables()?;
+    Ok(format!(
+        "{:?} {:?}",
+        package.text()?,
+        tables
+            .iter()
+            .map(|table| (
+                table.name().to_owned(),
+                table.rows() as usize,
+                table.columns() as usize
+            ))
+            .collect::<Vec<_>>()
+    ))
+}
+
+#[inline(never)]
+fn w4m_first_table_host(source: &[u8]) -> TestResult<Vec<u8>> {
+    let mut editor = litchi_iwa::pages::Draft::from_bytes(source)?;
+    drop(editor.add_table(6, "Litchi table", 3, 4)?);
+    Ok(editor.to_bytes()?)
+}
+
+#[inline(never)]
+fn w4m_first_table_leaf(source: &[u8]) -> TestResult<Vec<u8>> {
+    let package = litchi_pages::Package::from_bytes(source)?;
+    let commit = package
+        .edit_body_table_creation()
+        .insert(
+            litchi_core::Position::new(6),
+            litchi_pages::table::creation::NewTable::new(3, 4).with_name("Litchi table"),
+        )?
+        .commit()?;
+    Ok(leaf_bytes!(commit.package()))
+}
+
+/// Paired host-vs-leaf cost of the first-table insertion (record 0426):
+/// open + insert + commit + serialize, ABBA; read the inclusive cost of
+/// `w4m_first_table_{host,leaf}` under callgrind.
+#[test]
+#[ignore = "callgrind cost probe (record 0426)"]
+fn w4m_first_table_cost_abba() -> TestResult {
+    let input = leaf_bytes!(
+        &litchi_pages::builder::Builder::new()
+            .identity(litchi_pages::builder::Identity::from_bytes([7; 16]))
+            .body_text("Hello table world")
+            .build()?
+    );
+    let a1 = std::hint::black_box(w4m_first_table_host(&input)?);
+    let b1 = std::hint::black_box(w4m_first_table_leaf(&input)?);
+    let b2 = std::hint::black_box(w4m_first_table_leaf(&input)?);
+    let a2 = std::hint::black_box(w4m_first_table_host(&input)?);
+    assert_eq!(b1, b2, "the leaf route is deterministic");
+    assert!(!a1.is_empty() && !a2.is_empty());
+    Ok(())
+}

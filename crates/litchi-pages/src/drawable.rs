@@ -39,8 +39,8 @@ pub mod properties {
     pub use litchi_iwa_common::shape::path::Preset;
 }
 
-/// Exact-source lifecycle transactions (removal, duplication) for body images, movies
-/// and audio clips.
+/// Exact-source lifecycle transactions (creation, removal, duplication) for
+/// body images, movies, audio clips, shapes, text boxes and charts.
 pub mod lifecycle {
     pub use crate::package::body_media_lifecycle::{
         Commit, Diagnostics, Edit, Error, LimitKind, Media, Patch, Refusal,

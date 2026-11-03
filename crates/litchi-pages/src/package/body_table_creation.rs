@@ -200,7 +200,8 @@ pub enum Refusal {
     #[error("this Pages source does not support structural edits")]
     UnsupportedSource,
     /// The document holds no body table whose structure a new table can
-    /// copy.
+    /// copy and is not a table-less built-in-template document, whose first
+    /// table is built from scratch (as the host refuses it).
     #[error("the Pages document has no body table to copy")]
     NoTemplate,
     /// The size is empty or past the native row and column identity
@@ -445,9 +446,12 @@ impl fmt::Debug for Edit<'_> {
 impl Edit<'_> {
     /// Stage a new, empty body table anchored at UTF-16 code unit `anchor`
     /// of the body story, cloned from the structure of the document's first
-    /// body table (record 0329). The anchor character joins the paragraph
-    /// holding `anchor`; seeded cells are written with the body-table value
-    /// writer.
+    /// body table (record 0329). A table-less document made from the
+    /// built-in template ([`crate::Package::new`], [`crate::builder::Builder`])
+    /// gets the host's from-scratch first table graph instead, with its
+    /// calculation engine (record 0426). The anchor character joins the
+    /// paragraph holding `anchor`; seeded cells are written with the
+    /// body-table value writer.
     ///
     /// # Errors
     ///
@@ -508,7 +512,7 @@ impl Edit<'_> {
     /// [`Refusal::NoStagedOperation`] for an empty edit,
     /// [`Refusal::UnsupportedSource`] for a source that is not exact,
     /// [`Refusal::NoTemplate`] for an insertion into a document without a
-    /// body table, [`Refusal::TableNotFound`] and
+    /// body table that is not a built-in-template document, [`Refusal::TableNotFound`] and
     /// [`Refusal::AmbiguousTableName`] for a duplication selector,
     /// [`Refusal::UnsupportedDependency`] for formula state a copy cannot
     /// remap, [`Refusal::PositionOutOfBounds`], [`Refusal::Unsupported`] for
@@ -890,13 +894,139 @@ pub(super) fn prepared_len(payload: &[u8]) -> Result<usize, Error> {
     Ok(length)
 }
 
+/// The locale the document root names (`TSK.DocumentArchive.locale_identifier`),
+/// `en_US` when absent, as the host's table bootstrap reads it.
+fn document_locale(source: &Package) -> Result<String, Error> {
+    let root = source
+        .state
+        .source
+        .components()
+        .get(super::builder_table::DOCUMENT_COMPONENT)
+        .and_then(|component| component.archive().object(1))
+        .ok_or(Error::InvalidSource)?;
+    let document = single(root, 10_000).map_err(|_error| Error::InvalidSource)?;
+    let field = |payload: &[u8], number: u32| -> Result<Option<Vec<u8>>, Error> {
+        Ok(repeated_length_delimited_payloads(payload, number)
+            .map_err(|_error| Error::InvalidSource)?
+            .last()
+            .map(|payload| payload.to_vec()))
+    };
+    let locale = match field(document, 15)? {
+        Some(application) => match field(&application, 1)? {
+            Some(document) => field(&document, 4)?,
+            None => None,
+        },
+        None => None,
+    };
+    match locale {
+        Some(bytes) => String::from_utf8(bytes).map_err(|_error| Error::InvalidSource),
+        None => Ok("en_US".to_owned()),
+    }
+}
+
+/// The first table of a table-less document made from the built-in
+/// template: the builder's from-scratch graph (`builder_table`) anchored at
+/// `anchor` (the host editor's `add_table`, which bootstraps it with
+/// `bootstrap_first_table_graph` and refuses any other table-less
+/// document).
+fn create_first(source: &Package, anchor: usize, table: &NewTable) -> Result<Commit, Error> {
+    if !super::builder_table::admits(source) {
+        return Err(Error::Refused(Refusal::NoTemplate));
+    }
+    let (body, _) =
+        super::body_storage_objects::body_storage(source).map_err(|_error| Error::InvalidSource)?;
+    if anchor > prepared_len(&body.payload)? {
+        return Err(Error::Refused(Refusal::PositionOutOfBounds));
+    }
+    let name = table.name.clone().unwrap_or_else(|| "Table 1".to_owned());
+    let locale = document_locale(source)?;
+    let seed = Working::new(source)?.identity_seed(super::builder_table::FIRST_IDENTIFIER)?;
+    let candidate = super::builder_table::install(
+        source,
+        (&name, table.rows, table.columns),
+        &locale,
+        seed,
+        Some(anchor),
+    )
+    .map_err(|_error| Error::InvalidSource)?;
+    finish(
+        source,
+        candidate,
+        (super::builder_table::DRAWABLE, &name, table),
+        0,
+        (
+            super::builder_table::CREATED_OBJECTS,
+            super::builder_table::TOUCHED_COMPONENTS,
+        ),
+    )
+}
+
+/// Read the new table (drawable `info`) back through the catalog and the
+/// cell reader, write the seeded cells and wrap the commit.
+fn finish(
+    source: &Package,
+    candidate: Package,
+    (info, name, table): (u64, &str, &NewTable),
+    source_tables: usize,
+    (created_objects, touched_components): (usize, usize),
+) -> Result<Commit, Error> {
+    let catalog = candidate
+        .body_tables()
+        .map_err(|_error| Error::Verification)?;
+    if catalog.len() != source_tables + 1 {
+        return Err(Error::Verification);
+    }
+    let mut budget = table_lock::WireBudget::new(candidate.state.source.limits())
+        .map_err(|_error| Error::Verification)?;
+    let position = table_lock::native_body_table_targets_with_budget(&candidate, &mut budget)
+        .map_err(|_error| Error::Verification)?
+        .iter()
+        .position(|target| target.drawable_identifier.get() == info)
+        .ok_or(Error::Verification)?;
+    let snapshot = catalog.get(position).ok_or(Error::Verification)?;
+    if snapshot.name() != name
+        || (snapshot.rows(), snapshot.columns()) != (table.rows, table.columns)
+    {
+        return Err(Error::Verification);
+    }
+    candidate
+        .body_table_cells(BodyTableSelector::index(position))
+        .map_err(|_error| Error::Verification)?;
+
+    // Seeded values, through the body-table value writer.
+    let mut package = candidate;
+    if !table.cells.is_empty() {
+        let mut edit = package
+            .edit_body_table_values(BodyTableSelector::index(position))
+            .map_err(Error::Values)?;
+        for (row, column, value) in &table.cells {
+            edit.set(*row, *column, value.clone())
+                .map_err(Error::Values)?;
+        }
+        package = edit.commit().map_err(Error::Values)?.into_package();
+    }
+    Ok(Commit {
+        patch: Patch {
+            artifacts: Artifacts::new(source, &package),
+            table: position,
+        },
+        package,
+        diagnostics: Diagnostics {
+            changed: true,
+            created_objects,
+            touched_components,
+            seeded_cells: table.cells.len(),
+        },
+    })
+}
+
 fn create(source: &Package, anchor: usize, table: &NewTable) -> Result<Commit, Error> {
     if source
         .body_tables()
         .map_err(|_error| Error::Refused(Refusal::Unsupported))?
         .is_empty()
     {
-        return Err(Error::Refused(Refusal::NoTemplate));
+        return create_first(source, anchor, table);
     }
     let mut budget = table_lock::WireBudget::new(source.state.source.limits())
         .map_err(|_| Error::InvalidSource)?;
@@ -1177,54 +1307,11 @@ fn create(source: &Package, anchor: usize, table: &NewTable) -> Result<Commit, E
     transition.external_additions = references.additions;
     let created_objects = inserted.len();
     let (candidate, touched_components) = working.publish(&transition)?;
-
-    // Read the new table back through the catalog and the cell reader.
-    let catalog = candidate
-        .body_tables()
-        .map_err(|_error| Error::Verification)?;
-    if catalog.len() != source_tables + 1 {
-        return Err(Error::Verification);
-    }
-    let mut budget = table_lock::WireBudget::new(candidate.state.source.limits())
-        .map_err(|_error| Error::Verification)?;
-    let position = table_lock::native_body_table_targets_with_budget(&candidate, &mut budget)
-        .map_err(|_error| Error::Verification)?
-        .iter()
-        .position(|target| target.drawable_identifier.get() == info)
-        .ok_or(Error::Verification)?;
-    let snapshot = catalog.get(position).ok_or(Error::Verification)?;
-    if snapshot.name() != name
-        || (snapshot.rows(), snapshot.columns()) != (table.rows, table.columns)
-    {
-        return Err(Error::Verification);
-    }
-    candidate
-        .body_table_cells(BodyTableSelector::index(position))
-        .map_err(|_error| Error::Verification)?;
-
-    // Seeded values, through the body-table value writer.
-    let mut package = candidate;
-    if !table.cells.is_empty() {
-        let mut edit = package
-            .edit_body_table_values(BodyTableSelector::index(position))
-            .map_err(Error::Values)?;
-        for (row, column, value) in &table.cells {
-            edit.set(*row, *column, value.clone())
-                .map_err(Error::Values)?;
-        }
-        package = edit.commit().map_err(Error::Values)?.into_package();
-    }
-    Ok(Commit {
-        patch: Patch {
-            artifacts: Artifacts::new(source, &package),
-            table: position,
-        },
-        package,
-        diagnostics: Diagnostics {
-            changed: true,
-            created_objects,
-            touched_components,
-            seeded_cells: table.cells.len(),
-        },
-    })
+    finish(
+        source,
+        candidate,
+        (info, &name, table),
+        source_tables,
+        (created_objects, touched_components),
+    )
 }

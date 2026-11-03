@@ -121,6 +121,7 @@ mod pages_cell_list_cases;
 mod pages_cell_text_cases;
 mod pages_chart_axis_property_cases;
 mod pages_chart_legend_style_property_cases;
+mod pages_chart_lifecycle_cases;
 mod pages_chart_series_property_cases;
 mod pages_chart_series_style_property_cases;
 mod pages_chart_series_symbol_cases;

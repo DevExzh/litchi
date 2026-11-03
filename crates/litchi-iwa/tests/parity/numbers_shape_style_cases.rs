@@ -454,3 +454,171 @@ fn numbers_shape_image_fill_parity() -> TestResult {
     }
     Ok(())
 }
+
+/// Replacing and resetting an image fill (record 0426, the Pages route of
+/// record 0415): a solid fill, a fill reset and a new image over the
+/// host's image fill each release the old style's data reference and
+/// registered owner; the old `DataInfo` and `Data/` member go once nothing
+/// else uses them, as the host's `set_sheet_shape_fill`,
+/// `reset_sheet_shape_fill` and `set_sheet_shape_image_fill` do.
+#[test]
+fn numbers_shape_image_fill_release_parity() -> TestResult {
+    use litchi_iwa::shapes::ShapeImageFillTechnique;
+    use litchi_iwa_common::shape::fill::ImageTechnique;
+    let _ = (Tier::B, Evidence::Queued);
+    let png = crate::harness::fixture("iwork/keynote/media-replacement-assets/poster.png")?.bytes;
+    let filled = {
+        let mut editor = numbers::Draft::from_bytes(&authored_fixture()?.bytes)?;
+        let (sheet, identifier) = host_drawable(&editor, Kind::Shape, 0)?;
+        editor.set_sheet_shape_image_fill(
+            sheet,
+            identifier,
+            "poster.png",
+            &png,
+            ShapeImageFillTechnique::Stretch,
+            None,
+        )?;
+        Fixture {
+            path: "source-built basic.numbers + authored drawables + host image fill",
+            bytes: editor.to_bytes()?,
+        }
+    };
+    #[derive(Clone, Copy, Debug)]
+    enum Op {
+        Solid,
+        Reset,
+        Image,
+    }
+    let red = color(0.9, 0.1, 0.1)?;
+    let data_members = |bytes: &[u8]| -> TestResult<Vec<String>> {
+        Ok(litchi_iwa::Package::from_bytes(bytes)?
+            .entry_names()
+            .filter(|name| name.starts_with("Data/"))
+            .map(str::to_owned)
+            .collect())
+    };
+    // The released image is gone from the leaf output (the case below
+    // proves the host agrees).
+    let solid = {
+        let package = Package::from_bytes(&filled.bytes)?;
+        let mut edit =
+            package.edit_sheet_drawable_style(SHEET, DrawableSelector::of(Kind::Shape, 0))?;
+        edit.set(Property::Fill(Fill::Solid(red)))?;
+        leaf_bytes!(edit.commit()?.package())
+    };
+    let (before, after) = (data_members(&filled.bytes)?, data_members(&solid)?);
+    if after.len() + 1 != before.len() || after.iter().any(|name| !before.contains(name)) {
+        return Err(format!("released data members: before {before:?}, after {after:?}").into());
+    }
+    for op in [Op::Solid, Op::Reset, Op::Image] {
+        Case::new(
+            "numbers_shape_image_fill_release_parity",
+            Format::Numbers,
+            Tier::B,
+            Evidence::Queued,
+            &filled,
+        )
+        .leaf_structural_metadata()
+        .host(|source| {
+            let mut editor = numbers::Draft::from_bytes(source)?;
+            let (sheet, identifier) = host_drawable(&editor, Kind::Shape, 0)?;
+            match op {
+                Op::Solid => {
+                    editor.set_sheet_shape_fill(sheet, identifier, &ShapeFill::Solid(red))?;
+                },
+                Op::Reset => drop(editor.reset_sheet_shape_fill(sheet, identifier)?),
+                Op::Image => {
+                    editor.set_sheet_shape_image_fill(
+                        sheet,
+                        identifier,
+                        "poster.png",
+                        &png,
+                        ShapeImageFillTechnique::Tile,
+                        None,
+                    )?;
+                },
+            }
+            Ok(editor.to_bytes()?)
+        })
+        .leaf(|source| {
+            let package = Package::from_bytes(source)?;
+            let mut edit =
+                package.edit_sheet_drawable_style(SHEET, DrawableSelector::of(Kind::Shape, 0))?;
+            match op {
+                Op::Solid => {
+                    edit.set(Property::Fill(Fill::Solid(red)))?;
+                },
+                Op::Reset => {
+                    edit.reset(PropertyKind::Fill)?;
+                },
+                Op::Image => {
+                    edit.set_image_fill(&png, "poster.png", ImageTechnique::Tile, None)?;
+                },
+            }
+            let commit = edit.commit()?;
+            let restored = commit
+                .package()
+                .apply_sheet_drawable_style(&commit.patch().inverse())?;
+            Ok(LeafRun::with_inverse(
+                leaf_bytes!(commit.package()),
+                leaf_bytes!(restored.package()),
+            ))
+        })
+        .read("host fill", |source| {
+            host_read(source, Kind::Shape, PropertyKind::Fill)
+        })
+        .read("leaf fill", |source| {
+            leaf_read(source, Kind::Shape, PropertyKind::Fill)
+        })
+        .run()
+        .map_err(|error| format!("{op:?}: {error}"))?;
+    }
+    Ok(())
+}
+
+// Paired host-vs-leaf cost probe of the image-fill release (record 0426):
+// a solid fill over a host image fill; read the inclusive cost of
+// `w4m_numbers_release_{host,leaf}` under callgrind.
+
+#[inline(never)]
+fn w4m_numbers_release_host(source: &[u8], red: Rgba) -> TestResult<Vec<u8>> {
+    let mut editor = numbers::Draft::from_bytes(source)?;
+    let (sheet, identifier) = host_drawable(&editor, Kind::Shape, 0)?;
+    editor.set_sheet_shape_fill(sheet, identifier, &ShapeFill::Solid(red))?;
+    Ok(editor.to_bytes()?)
+}
+
+#[inline(never)]
+fn w4m_numbers_release_leaf(source: &[u8], red: Rgba) -> TestResult<Vec<u8>> {
+    let package = Package::from_bytes(source)?;
+    let mut edit =
+        package.edit_sheet_drawable_style(SHEET, DrawableSelector::of(Kind::Shape, 0))?;
+    edit.set(Property::Fill(Fill::Solid(red)))?;
+    Ok(leaf_bytes!(edit.commit()?.package()))
+}
+
+#[test]
+#[ignore = "performance probe; run explicitly under callgrind"]
+fn w4m_numbers_image_fill_release_cost_abba() -> TestResult {
+    use litchi_iwa::shapes::ShapeImageFillTechnique;
+    let png = crate::harness::fixture("iwork/keynote/media-replacement-assets/poster.png")?.bytes;
+    let mut editor = numbers::Draft::from_bytes(&authored_fixture()?.bytes)?;
+    let (sheet, identifier) = host_drawable(&editor, Kind::Shape, 0)?;
+    editor.set_sheet_shape_image_fill(
+        sheet,
+        identifier,
+        "poster.png",
+        &png,
+        ShapeImageFillTechnique::Stretch,
+        None,
+    )?;
+    let input = editor.to_bytes()?;
+    let red = color(0.9, 0.1, 0.1)?;
+    let a1 = std::hint::black_box(w4m_numbers_release_host(&input, red)?);
+    let b1 = std::hint::black_box(w4m_numbers_release_leaf(&input, red)?);
+    let b2 = std::hint::black_box(w4m_numbers_release_leaf(&input, red)?);
+    let a2 = std::hint::black_box(w4m_numbers_release_host(&input, red)?);
+    assert_eq!(b1, b2, "the leaf route is deterministic");
+    assert!(!a1.is_empty() && !a2.is_empty());
+    Ok(())
+}
