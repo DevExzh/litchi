@@ -35,7 +35,12 @@
     reason = "the engine keeps its phases in plan order"
 )]
 
+mod layout;
 mod shift;
+
+pub use layout::{
+    Frame, MAX_TABLE_UIDS, frame, stage_frame, stage_resize, stage_uniform_dimensions,
+};
 
 use std::collections::BTreeMap;
 use std::fmt;
@@ -191,6 +196,13 @@ pub enum Refusal {
         /// What the table holds.
         reason: Unsupported,
     },
+    /// The size is zero, leaves no body row or column, or needs more row
+    /// and column identities than a table may hold.
+    InvalidSize,
+    /// The rows or columns a shrink removes hold stored cells.
+    StoredCells,
+    /// The table's storage uses a layout the resize does not rewrite.
+    UnsupportedLayout,
 }
 
 impl From<Fault> for Error {
@@ -1509,4 +1521,23 @@ fn fit_drawable_size(info: &[u8], width: f32, height: f32) -> Result<Vec<u8>, Er
             .map_err(wire_fault)?;
     litchi_iwa_common::wire::patch_length_delimited_field(info, 1, true, Some(&drawable))
         .map_err(wire_fault)
+}
+
+/// Replace one message of `object`, keeping its header (the shared
+/// replacement step of every staged layout change).
+pub(crate) fn replace_payload<P: TableLeaf>(
+    working: &mut Working<'_, P>,
+    object: u64,
+    index: usize,
+    data: Vec<u8>,
+) -> Result<(), Error> {
+    Ok(replace(
+        working,
+        Replacement {
+            object,
+            index,
+            data,
+            pruned: Vec::new(),
+        },
+    )?)
 }
