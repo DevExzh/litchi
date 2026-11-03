@@ -569,3 +569,50 @@ fn numbers_shape_image_fill_release_parity() -> TestResult {
     }
     Ok(())
 }
+
+// Paired host-vs-leaf cost probe of the image-fill release (record 0426):
+// a solid fill over a host image fill; read the inclusive cost of
+// `w4m_numbers_release_{host,leaf}` under callgrind.
+
+#[inline(never)]
+fn w4m_numbers_release_host(source: &[u8], red: Rgba) -> TestResult<Vec<u8>> {
+    let mut editor = numbers::Draft::from_bytes(source)?;
+    let (sheet, identifier) = host_drawable(&editor, Kind::Shape, 0)?;
+    editor.set_sheet_shape_fill(sheet, identifier, &ShapeFill::Solid(red))?;
+    Ok(editor.to_bytes()?)
+}
+
+#[inline(never)]
+fn w4m_numbers_release_leaf(source: &[u8], red: Rgba) -> TestResult<Vec<u8>> {
+    let package = Package::from_bytes(source)?;
+    let mut edit =
+        package.edit_sheet_drawable_style(SHEET, DrawableSelector::of(Kind::Shape, 0))?;
+    edit.set(Property::Fill(Fill::Solid(red)))?;
+    Ok(leaf_bytes!(edit.commit()?.package()))
+}
+
+#[test]
+#[ignore = "performance probe; run explicitly under callgrind"]
+fn w4m_numbers_image_fill_release_cost_abba() -> TestResult {
+    use litchi_iwa::shapes::ShapeImageFillTechnique;
+    let png = crate::harness::fixture("iwork/keynote/media-replacement-assets/poster.png")?.bytes;
+    let mut editor = numbers::Draft::from_bytes(&authored_fixture()?.bytes)?;
+    let (sheet, identifier) = host_drawable(&editor, Kind::Shape, 0)?;
+    editor.set_sheet_shape_image_fill(
+        sheet,
+        identifier,
+        "poster.png",
+        &png,
+        ShapeImageFillTechnique::Stretch,
+        None,
+    )?;
+    let input = editor.to_bytes()?;
+    let red = color(0.9, 0.1, 0.1)?;
+    let a1 = std::hint::black_box(w4m_numbers_release_host(&input, red)?);
+    let b1 = std::hint::black_box(w4m_numbers_release_leaf(&input, red)?);
+    let b2 = std::hint::black_box(w4m_numbers_release_leaf(&input, red)?);
+    let a2 = std::hint::black_box(w4m_numbers_release_host(&input, red)?);
+    assert_eq!(b1, b2, "the leaf route is deterministic");
+    assert!(!a1.is_empty() && !a2.is_empty());
+    Ok(())
+}

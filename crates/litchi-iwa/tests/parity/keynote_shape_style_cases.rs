@@ -1149,3 +1149,123 @@ fn keynote_slide_shape_text_read_parity() -> TestResult {
     .run()?;
     Ok(())
 }
+
+// ---------------------------------------------------------------------------
+// Line endpoints on the shared engine (record 0426): a digest of the leaf
+// outputs (unchanged by the move onto `litchi_iwa_style::line_end`) and a
+// paired host-vs-leaf cost probe (`w4m_keynote_endpoints_{host,leaf}`).
+
+fn endpoint_routes() -> TestResult<Vec<(&'static str, Fixture, (u64, usize), Op)>> {
+    let mut routes = Vec::new();
+    let (plain, id) = input(Shape::Line)?;
+    let position = leaf_position(&plain.bytes, id)?;
+    let mut arrows = Fixture {
+        path: plain.path,
+        bytes: plain.bytes.clone(),
+    };
+    {
+        let mut editor = keynote::Draft::from_bytes(&arrows.bytes)?;
+        host_op(
+            &mut editor,
+            Shape::Line,
+            id,
+            &Op::Set(Property::LineEndpoints(ARROWS)),
+        )?;
+        arrows.bytes = editor.to_bytes()?;
+    }
+    routes.push((
+        "set",
+        plain,
+        (id, position),
+        Op::Set(Property::LineEndpoints(ARROWS)),
+    ));
+    routes.push((
+        "rewrite",
+        Fixture {
+            path: arrows.path,
+            bytes: arrows.bytes.clone(),
+        },
+        (id, position),
+        Op::Set(Property::LineEndpoints(Endpoints {
+            start: Endpoint::OpenSquare,
+            end: Endpoint::Line,
+        })),
+    ));
+    routes.push((
+        "reset",
+        arrows,
+        (id, position),
+        Op::Reset(PropertyKind::LineEndpoints),
+    ));
+    Ok(routes)
+}
+
+#[inline(never)]
+fn w4m_keynote_endpoints_leaf(source: &[u8], position: usize, op: &Op) -> TestResult<Vec<u8>> {
+    let package = Package::from_bytes(source)?;
+    let mut edit = package.edit_slide_drawables();
+    let (slide, drawable) = (
+        SlideSelector::index(SLIDE),
+        DrawableSelector::index(position),
+    );
+    match op.clone() {
+        Op::Set(property) => edit.set_shape_style(slide, drawable, property)?,
+        Op::Reset(kind) => edit.reset_shape_style(slide, drawable, kind)?,
+    };
+    let commit: Commit = edit.commit()?;
+    let read = commit.package().slide_drawable_shape_style(
+        slide,
+        drawable,
+        PropertyKind::LineEndpoints,
+    )?;
+    std::hint::black_box(read);
+    Ok(leaf_bytes!(commit.package()))
+}
+
+#[inline(never)]
+fn w4m_keynote_endpoints_host(source: &[u8], id: u64, op: &Op) -> TestResult<Vec<u8>> {
+    let mut editor = keynote::Draft::from_bytes(source)?;
+    host_op(&mut editor, Shape::Line, id, op)?;
+    std::hint::black_box(editor.slide_line_endpoints(SLIDE, id)?);
+    Ok(editor.to_bytes()?)
+}
+
+/// Prints a digest of every leaf endpoint output; compare the lines before
+/// and after a refactor of the route.
+#[test]
+#[ignore = "digest probe; run explicitly"]
+fn w4m_keynote_endpoints_leaf_digest() -> TestResult {
+    use std::hash::{Hash, Hasher};
+    for (route, input, (_, position), op) in endpoint_routes()? {
+        let output = w4m_keynote_endpoints_leaf(&input.bytes, position, &op)?;
+        let mut hasher = std::collections::hash_map::DefaultHasher::new();
+        output.hash(&mut hasher);
+        println!(
+            "w4m-endpoints {route} {} {:016x}",
+            output.len(),
+            hasher.finish()
+        );
+    }
+    Ok(())
+}
+
+#[test]
+#[ignore = "performance probe; run explicitly under callgrind"]
+fn w4m_keynote_endpoints_cost_abba() -> TestResult {
+    let selected = std::env::var("W4M_ENDPOINTS_ROUTE").ok();
+    for (route, input, (id, position), op) in endpoint_routes()? {
+        if selected
+            .as_deref()
+            .is_some_and(|selected| selected != route)
+        {
+            continue;
+        }
+        let a1 = std::hint::black_box(w4m_keynote_endpoints_host(&input.bytes, id, &op)?);
+        let b1 = std::hint::black_box(w4m_keynote_endpoints_leaf(&input.bytes, position, &op)?);
+        let b2 = std::hint::black_box(w4m_keynote_endpoints_leaf(&input.bytes, position, &op)?);
+        let a2 = std::hint::black_box(w4m_keynote_endpoints_host(&input.bytes, id, &op)?);
+        assert_eq!(b1, b2, "{route}: the leaf route is deterministic");
+        assert!(!a1.is_empty() && !a2.is_empty());
+    }
+    Ok(())
+}
