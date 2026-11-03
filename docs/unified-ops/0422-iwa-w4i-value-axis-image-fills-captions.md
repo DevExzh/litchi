@@ -1,6 +1,6 @@
 # 0422 — W4-I: value-axis settings, chart image fills, captions and titles
 
-- Status: slices 1 and 2 merge-ready; the wave continues (§4). Branch `uo2/iwa-w4i`
+- Status: slices 1 and 2 merged (`41ee75653b`); slice 3 merge-ready; stopped at a clean commit (context) with a successor brief (§5). Branch `uo2/iwa-w4i`
   (cut from trunk `feat/unified-ops-api` at `c599ef9cb8`).
 - Date: 2026-11-02.
 - Plan: [0363](0363-iwa-monolith-exit-plan.md) (§0 wave table, §3.2 API
@@ -130,6 +130,17 @@ the Pages sequences (§2), Tier B (Keynote: root previews), macOS-queued.
 Receipt `results/0422/callgrind-background-image-numbers-keynote.json`; raw
 captures in `.coord/iwa-w4i/cg3/`.
 
+### 3.1 Slice 3 gates
+
+Branch with trunk `41ee75653b` merged at `f1425d9c6f` (mac-queue conflict
+resolved by keeping both sides); logs `.coord/iwa-w4i/gates3`: all 33 rows
+exit 0 (fmt; the seven Python gates including the ledger and the bench
+matrix; clippy -D warnings with all features, without features and per
+`litchi-ops` format feature; rustdoc -Dwarnings; the glossary; the leaf,
+`litchi-iwa` (parity included), `litchi` and `litchi-ops` tests in nine
+groups; pyo3; perf-baseline; the feature matrix). No golden re-blessed.
+Target 13 GB after pruning.
+
 ## 4. Remaining
 
 - Series and symbol image fills (6 rows). Every core now publishes data
@@ -145,3 +156,57 @@ captures in `.coord/iwa-w4i/cg3/`.
   and `DataChanges` as in `write_chart_background`.
 - The shared caption lift, then Numbers shape, image and movie captions
   and titles (15 rows), then chart captions (Pages 3, Numbers 3).
+
+## 5. Successor brief
+
+Ledger after slice 3: W4-I has flipped 15 rows (value axis 12, background
+images 3). Still host-only in this wave's scope: series and symbol image
+fills (Keynote, Pages, Numbers: 6), Numbers shape, image and movie captions
+and titles (15), Pages and Numbers chart captions (6).
+
+1. **Series and symbol image fills** (`{body,sheet,slide}/…/series_fill.rs`
+   and `series_symbol_fill.rs`, `set_*_chart_series_image_fill`,
+   `set_*_chart_series_symbol_image_fill`). Publication is done on all three
+   cores (`Ledger::write_data` on Pages and Keynote,
+   `sheet_chart_series::publish_changes_with_data` on Numbers; the metadata
+   `DataInfo` (4) and component data-reference (7) fields are admitted when
+   the scope allows them). The work left is in `litchi_iwa_style::series`:
+   `series::style` refuses `Fill::Image`. Follow the host's
+   `charts::series_fill::set_chart_series_image_fill_data` (insert media,
+   set the whole fill vector, `adjust_data_reference` per series style slot,
+   then `remove_orphaned_image_asset`) with `data_owner::{own_new, release}`
+   on the series style variation that ends up storing the fill (it may be
+   newly allocated, so own the data after the allocation), return a
+   `chart_style::DataChanges`, and add `metadata` + fields 3/4/7/11 and the
+   planned `Data/` members to the scope exactly as `write_chart_background`
+   does. Parity: copy `chart_image_fill_cases.rs` (the five sequences per
+   format). The coordinator asked that the `data_owner` API stay stable
+   (W4-J uses it for Numbers shape image fills).
+2. **Shared caption lift** (its own commit): Keynote
+   `slide_chart_caption.rs` (4,626 lines, record 0372) and
+   `slide_movie_caption.rs` (2,295), Pages `body_drawable_caption.rs`
+   (1,034; images, movies, shapes) into `litchi-iwa-style`, general for
+   shapes, images, movies and chart drawables; the codecs
+   (`keynote_chart_caption_graph_codec`, `pages_movie_caption_codec`,
+   `keynote_movie_caption_codec`) already live in `litchi-iwa-protos`.
+   Pages' module doc states the graph: title and caption are drawable
+   fields 10 and 11; a present label is a `TSA.CaptionInfoArchive` with
+   a private storage, shape style and placement in the drawable's
+   component; clearing points the drawable at a fresh
+   `TSD.StandinCaptionArchive`. Move Keynote and Pages onto it, delete
+   their copies.
+3. **Numbers drawable captions and titles** (15 rows:
+   `numbers/editor/{sheet_shapes/caption.rs, sheet_images.rs,
+   sheet_movies/caption.rs}`), then **chart captions** (Pages 3, Numbers 3:
+   `{pages/editor/charts, numbers/editor/sheet_charts}/caption.rs`) on the
+   lifted engine.
+
+Patterns from this wave: the host appends absent fields in its call order,
+so a shared rewrite that must be byte-identical applies components in that
+order (`value_axis::ordered_writes`); the host keeps an unreferenced asset
+only when the data metadata map lists it or a message info references it
+(`data_owner::release`); each core's locality check is where a new
+publication shape is admitted, gated on the scope's allowed fields. Cost
+probe `chart_property_cost.rs` (`W4C_ROUTE`); receipt writer
+`.coord/iwa-w4i/tools/receipt.py`; ledger flips with
+`.coord/iwa-w4i/tools/flip_rows.py` and a JSON spec.
