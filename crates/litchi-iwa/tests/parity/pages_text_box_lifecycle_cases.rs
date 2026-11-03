@@ -961,9 +961,173 @@ fn shape_image_fill_cost_abba() -> TestResult {
 /// reference and, when nothing else uses it, its media (record 0415).
 #[test]
 fn pages_body_shape_image_fill_release_parity() -> TestResult {
+    let png = crate::harness::fixture("iwork/keynote/media-replacement-assets/poster.png")?.bytes;
+    let filled = {
+        let input = shape_fixture()?;
+        let mut e = pages::Draft::from_bytes(&input.bytes)?;
+        let d = e
+            .body_shapes()?
+            .first()
+            .ok_or("no shape")?
+            .drawable_object_id;
+        e.set_body_shape_image_fill(
+            d,
+            "poster.png",
+            &png,
+            litchi_iwa::shapes::ShapeImageFillTechnique::Stretch,
+            None,
+        )?;
+        Fixture {
+            path: "source-built rectangle + host image fill",
+            bytes: e.to_bytes()?,
+        }
+    };
+    image_fill_release_cases("pages_body_shape_image_fill_release_parity", &filled)
+}
+
+/// `basic.pages` (a native document whose registry names a
+/// `DataMetadataMap`) with a host rectangle and a host image fill.
+fn native_filled_fixture() -> TestResult<Fixture> {
+    use litchi_iwa::shapes::{DrawablePoint, DrawableSize, ShapeImageFillTechnique};
+    let png = crate::harness::fixture("iwork/keynote/media-replacement-assets/poster.png")?.bytes;
+    let input = crate::harness::fixture("iwork/pages/basic.pages")?;
+    let mut e = pages::Draft::from_bytes(&input.bytes)?;
+    e.add_body_rectangle(
+        0,
+        "Shape text",
+        DrawablePoint { x: 72.0, y: 96.0 },
+        DrawableSize {
+            width: 144.0,
+            height: 72.0,
+        },
+    )?;
+    let d = e
+        .body_shapes()?
+        .first()
+        .ok_or("no shape")?
+        .drawable_object_id;
+    e.set_body_shape_image_fill(
+        d,
+        "poster.png",
+        &png,
+        ShapeImageFillTechnique::Stretch,
+        None,
+    )?;
+    Ok(Fixture {
+        path: "iwork/pages/basic.pages + host rectangle + host image fill",
+        bytes: e.to_bytes()?,
+    })
+}
+
+/// The release on a native document with a `DataMetadataMap` that does
+/// not name the image (record 0424b): the host deletes the orphaned
+/// `Data/` member, and so does the shared release. Record 0415's own copy
+/// kept every asset while any map existed, unlike the host.
+#[test]
+fn pages_body_shape_image_fill_release_native_map_parity() -> TestResult {
+    let filled = native_filled_fixture()?;
+    image_fill_release_cases(
+        "pages_body_shape_image_fill_release_native_map_parity",
+        &filled,
+    )?;
+    let data_members = |bytes: &[u8]| -> TestResult<usize> {
+        Ok(
+            litchi_iwa_archive::package::Catalog::from_bytes(bytes, Default::default())?
+                .iter()
+                .filter(|entry| entry.name().starts_with("Data/"))
+                .count(),
+        )
+    };
+    let package = Package::from_bytes(&filled.bytes)?;
+    let mut edit = package.edit_body_drawable_style(DrawableSelector::shape(0))?;
+    edit.set(StyleProperty::Fill(Fill::Solid(red()?)))?;
+    let output = leaf_bytes!(edit.commit()?.package());
+    assert_eq!(data_members(&filled.bytes)? - 1, data_members(&output)?);
+    Ok(())
+}
+
+fn image_fill_release_cases(name: &'static str, filled: &Fixture) -> TestResult {
     use litchi_iwa::shapes::{ShapeFill, ShapeImageFillTechnique};
     use litchi_pages::drawable::style::{ImageTechnique, PropertyKind as Kind};
     let _ = (Tier::B, Evidence::Queued);
+    let png = crate::harness::fixture("iwork/keynote/media-replacement-assets/poster.png")?.bytes;
+    #[derive(Clone, Copy)]
+    enum Op {
+        Solid,
+        Reset,
+        Image,
+    }
+    for op in [Op::Solid, Op::Reset, Op::Image] {
+        Case::new(name, Format::Pages, Tier::B, Evidence::Queued, filled)
+            .leaf_structural_metadata()
+            .host(|source| {
+                let mut e = pages::Draft::from_bytes(source)?;
+                let d = e
+                    .body_shapes()?
+                    .first()
+                    .ok_or("no shape")?
+                    .drawable_object_id;
+                match op {
+                    Op::Solid => e.set_body_shape_fill(d, &ShapeFill::Solid(red()?))?,
+                    Op::Reset => drop(e.reset_body_shape_fill(d)?),
+                    Op::Image => {
+                        e.set_body_shape_image_fill(
+                            d,
+                            "poster.png",
+                            &png,
+                            ShapeImageFillTechnique::Tile,
+                            None,
+                        )?;
+                    },
+                }
+                Ok(e.to_bytes()?)
+            })
+            .leaf(|source| {
+                let package = Package::from_bytes(source)?;
+                let mut edit = package.edit_body_drawable_style(DrawableSelector::shape(0))?;
+                match op {
+                    Op::Solid => {
+                        edit.set(StyleProperty::Fill(Fill::Solid(red()?)))?;
+                    },
+                    Op::Reset => {
+                        edit.reset(Kind::Fill);
+                    },
+                    Op::Image => {
+                        edit.set_image_fill(&png, "poster.png", ImageTechnique::Tile, None);
+                    },
+                }
+                let commit = edit.commit()?;
+                let restored = commit
+                    .package()
+                    .apply_body_drawable_style(&commit.patch().inverse())?;
+                Ok(LeafRun::with_inverse(
+                    leaf_bytes!(commit.package()),
+                    leaf_bytes!(restored.package()),
+                ))
+            })
+            .read("leaf fill", |bytes| {
+                Ok(format!(
+                    "{:?}",
+                    Package::from_bytes(bytes)?
+                        .body_drawable_style(DrawableSelector::shape(0), Kind::Fill)?
+                ))
+            })
+            .read("members", |bytes| {
+                let package = Package::from_bytes(bytes)?;
+                Ok(format!("{:?}", package.media_assets()?.len()))
+            })
+            .run()?;
+    }
+    Ok(())
+}
+
+/// Callgrind probe (record 0424b): a solid fill over a host image fill
+/// (the release route), host against leaf, ABBA (`*probe_host*` /
+/// `*probe_leaf*`).
+#[test]
+#[ignore = "callgrind cost probe (record 0424b)"]
+fn shape_image_fill_release_cost_abba() -> TestResult {
+    use litchi_iwa::shapes::{ShapeFill, ShapeImageFillTechnique};
     let png = crate::harness::fixture("iwork/keynote/media-replacement-assets/poster.png")?.bytes;
     let filled = {
         let input = shape_fixture()?;
@@ -985,78 +1149,23 @@ fn pages_body_shape_image_fill_release_parity() -> TestResult {
             bytes: e.to_bytes()?,
         }
     };
-    #[derive(Clone, Copy)]
-    enum Op {
-        Solid,
-        Reset,
-        Image,
-    }
-    for op in [Op::Solid, Op::Reset, Op::Image] {
-        Case::new(
-            "pages_body_shape_image_fill_release_parity",
-            Format::Pages,
-            Tier::B,
-            Evidence::Queued,
-            &filled,
-        )
-        .leaf_structural_metadata()
-        .host(|source| {
+    crate::pages_cost_probes::abba(
+        &filled,
+        |source| {
             let mut e = pages::Draft::from_bytes(source)?;
             let d = e
                 .body_shapes()?
                 .first()
                 .ok_or("no shape")?
                 .drawable_object_id;
-            match op {
-                Op::Solid => e.set_body_shape_fill(d, &ShapeFill::Solid(red()?))?,
-                Op::Reset => drop(e.reset_body_shape_fill(d)?),
-                Op::Image => {
-                    e.set_body_shape_image_fill(
-                        d,
-                        "poster.png",
-                        &png,
-                        ShapeImageFillTechnique::Tile,
-                        None,
-                    )?;
-                },
-            }
+            e.set_body_shape_fill(d, &ShapeFill::Solid(red()?))?;
             Ok(e.to_bytes()?)
-        })
-        .leaf(|source| {
+        },
+        |source| {
             let package = Package::from_bytes(source)?;
             let mut edit = package.edit_body_drawable_style(DrawableSelector::shape(0))?;
-            match op {
-                Op::Solid => {
-                    edit.set(StyleProperty::Fill(Fill::Solid(red()?)))?;
-                },
-                Op::Reset => {
-                    edit.reset(Kind::Fill);
-                },
-                Op::Image => {
-                    edit.set_image_fill(&png, "poster.png", ImageTechnique::Tile, None);
-                },
-            }
-            let commit = edit.commit()?;
-            let restored = commit
-                .package()
-                .apply_body_drawable_style(&commit.patch().inverse())?;
-            Ok(LeafRun::with_inverse(
-                leaf_bytes!(commit.package()),
-                leaf_bytes!(restored.package()),
-            ))
-        })
-        .read("leaf fill", |bytes| {
-            Ok(format!(
-                "{:?}",
-                Package::from_bytes(bytes)?
-                    .body_drawable_style(DrawableSelector::shape(0), Kind::Fill)?
-            ))
-        })
-        .read("members", |bytes| {
-            let package = Package::from_bytes(bytes)?;
-            Ok(format!("{:?}", package.media_assets()?.len()))
-        })
-        .run()?;
-    }
-    Ok(())
+            edit.set(StyleProperty::Fill(Fill::Solid(red()?)))?;
+            Ok(leaf_bytes!(edit.commit()?.package()))
+        },
+    )
 }

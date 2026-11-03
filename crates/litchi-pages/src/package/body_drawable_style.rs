@@ -490,7 +490,7 @@ impl Edit<'_> {
         let mut applied = 0;
         let line_limits = line_end_limits(self.source)?;
         let mut image: Option<NewImage> = None;
-        let mut releases: Vec<Release> = Vec::new();
+        let mut releases: Vec<engine::StoredImage> = Vec::new();
         for change in &self.changes {
             let changed = match change {
                 Change::ImageFill {
@@ -502,7 +502,9 @@ impl Edit<'_> {
                     if image.is_some() {
                         return Err(Refusal::ImageFill.into());
                     }
-                    if let Some(release) = released_image(&workspace, self.shape)? {
+                    if let Some(release) =
+                        engine::stored_image(&workspace, self.shape).map_err(from_engine)?
+                    {
                         releases.push(release);
                     }
                     let staged = stage_image(self.source, self.selector, bytes, file_name)?;
@@ -547,7 +549,7 @@ impl Edit<'_> {
                     continue;
                 },
                 Change::Set(Property::Fill(fill)) => {
-                    match released_image(&workspace, self.shape)? {
+                    match engine::stored_image(&workspace, self.shape).map_err(from_engine)? {
                         Some(release) => {
                             releases.push(release);
                             engine::set(&mut workspace, self.shape, &ReleasingFills, fill)
@@ -571,7 +573,7 @@ impl Edit<'_> {
                     engine::set(&mut workspace, self.shape, &TextColumns, columns)
                 },
                 Change::Reset(PropertyKind::Fill) => {
-                    match released_image(&workspace, self.shape)? {
+                    match engine::stored_image(&workspace, self.shape).map_err(from_engine)? {
                         Some(release) => {
                             releases.push(release);
                             engine::reset(&mut workspace, self.shape, &ReleasingFills)
@@ -606,6 +608,20 @@ impl Edit<'_> {
                 Change::Reset(_) | Change::ImageFill { .. } => None,
             })
             .collect::<Vec<_>>();
+        // The shared release (record 0426; record 0424b): a style that no
+        // longer stores a captured image fill drops its data reference and
+        // registered owner, and data nothing references loses its
+        // `DataInfo`. A `Data/` member the package does not hold is not
+        // deleted.
+        let deletions = if releases.is_empty() {
+            Vec::new()
+        } else {
+            let mut deletions =
+                engine::release_image_fills(&mut workspace, &releases).map_err(from_engine)?;
+            let entries = self.source.state.source.package();
+            deletions.retain(|member| entries.iter().any(|entry| entry.name() == member));
+            deletions
+        };
         let changes = workspace.finish();
         let package = if changes.is_empty() {
             self.source.clone()
@@ -618,7 +634,6 @@ impl Edit<'_> {
                 .into_iter()
                 .map(|(name, archive)| (Arc::<str>::from(name), archive))
                 .collect();
-            let deletions = release_images(self.source, &mut archives, &releases)?;
             let deletions = deletions.iter().map(String::as_str).collect::<Vec<_>>();
             match &image {
                 Some(image) => {
@@ -998,161 +1013,4 @@ fn shape_style_of(payload: &[u8]) -> Result<Option<u64>, Error> {
         .find(|field| field.number() == 1)
         .and_then(|field| decode_varint_from_bytes(field.payload()).ok())
         .map(|(value, _)| value))
-}
-
-/// An image fill a change replaces or resets: the style that held it and
-/// its data identifier.
-struct Release {
-    style: u64,
-    data: u64,
-}
-
-/// The image fill shape `shape` shows from its own style, if any.
-fn released_image(workspace: &Workspace<'_>, shape: u64) -> Result<Option<Release>, Error> {
-    let Fill::Image(image) = engine::value(workspace, shape, &Fills).map_err(from_engine)? else {
-        return Ok(None);
-    };
-    let Some(data) = image.data() else {
-        return Ok(None);
-    };
-    let target = engine::target(workspace, shape).map_err(from_engine)?;
-    Ok(Some(Release {
-        style: target.style(),
-        data: data.get(),
-    }))
-}
-
-/// The data-owner transition of released image fills (the host's
-/// `remove_style_data_reference` and `remove_orphaned_image_asset`): a
-/// style that no longer stores the image drops its data reference and its
-/// registered owner (a removed variation drops its owner), and data nothing
-/// references any more loses its `DataInfo` and `Data/` member. Returns the
-/// members to delete.
-fn release_images(
-    source: &Package,
-    archives: &mut Vec<(Arc<str>, Archive)>,
-    releases: &[Release],
-) -> Result<Vec<String>, Error> {
-    if releases.is_empty() {
-        return Ok(Vec::new());
-    }
-    let objects = super::body_storage_objects::metadata(source)?.ok_or(Error::InvalidSource)?;
-    let editable = |archives: &mut Vec<(Arc<str>, Archive)>, name: &str| -> Result<usize, Error> {
-        if let Some(position) = archives
-            .iter()
-            .position(|(member, _)| member.as_ref() == name)
-        {
-            return Ok(position);
-        }
-        archives.push((Arc::from(name), graph::editable_archive(source, name)?));
-        Ok(archives.len() - 1)
-    };
-    let position = editable(archives, &objects.component)?;
-    let mut payload = archives[position]
-        .1
-        .object(objects.object)
-        .and_then(|object| object.messages.get(objects.message_index))
-        .ok_or(Error::InvalidSource)?
-        .data
-        .clone();
-    let mut deletions = Vec::new();
-    for release in releases {
-        let member = source
-            .state
-            .source
-            .components()
-            .iter()
-            .find(|component| component.archive().object(release.style).is_some())
-            .map(|component| component.name().to_owned())
-            .ok_or(Error::InvalidSource)?;
-        let component = objects
-            .component_for_entry(&member)?
-            .ok_or(Error::InvalidSource)?;
-        // The released style as published: kept with another fill
-        // (rewritten), untouched (a shared style the shape left) or removed.
-        let edited = archives
-            .iter()
-            .find(|(name, _)| name.as_ref() == member)
-            .map(|(_, archive)| archive.object(release.style).is_some());
-        let still_stores = match edited {
-            Some(true) => {
-                let position = editable(archives, &member)?;
-                let object = archives[position]
-                    .1
-                    .object(release.style)
-                    .ok_or(Error::InvalidSource)?;
-                let fill = engine::ShapeProperty::read(
-                    &Fills,
-                    &[engine::stored_fill(
-                        object
-                            .messages
-                            .first()
-                            .map(|message| message.data.as_slice())
-                            .ok_or(Error::InvalidSource)?,
-                    )
-                    .map_err(from_engine)?],
-                )
-                .ok();
-                matches!(fill, Some(Fill::Image(image)) if image.data().map(|data| data.get()) == Some(release.data))
-            },
-            Some(false) => false,
-            None => true,
-        };
-        if still_stores {
-            continue;
-        }
-        if edited == Some(true) {
-            let position = editable(archives, &member)?;
-            let object = archives[position]
-                .1
-                .object_mut(release.style)
-                .ok_or(Error::InvalidSource)?;
-            for info in &mut object.archive_info.message_infos {
-                info.data_references.retain(|data| *data != release.data);
-            }
-        }
-        payload = super::body_storage_objects::adjust_data_reference(
-            &payload,
-            component,
-            release.data,
-            release.style,
-            false,
-        )?;
-        if objects.data_metadata_map.is_none()
-            && !super::body_storage_objects::referenced_data(&payload)?.contains(&release.data)
-        {
-            if let Some(member) = super::body_storage_objects::data_member(&payload, release.data)?
-                && source
-                    .state
-                    .source
-                    .package()
-                    .iter()
-                    .any(|entry| entry.name() == member)
-            {
-                deletions.push(member);
-            }
-            payload = super::body_storage_objects::remove_data_info(&payload, release.data)?;
-        }
-    }
-    let limits = source
-        .state
-        .source
-        .limits()
-        .effective_archive_limits()
-        .map_err(|_| Error::InvalidSource)?;
-    let position = editable(archives, &objects.component)?;
-    archives[position]
-        .1
-        .object_mut(objects.object)
-        .ok_or(Error::InvalidSource)?
-        .replace_message_preserving_header(
-            objects.message_index,
-            litchi_iwa_core::RawMessage {
-                type_: 11_006,
-                data: payload,
-            },
-            limits,
-        )
-        .map_err(|_| Error::InvalidSource)?;
-    Ok(deletions)
 }
