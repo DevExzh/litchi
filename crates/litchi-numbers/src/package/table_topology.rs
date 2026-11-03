@@ -55,7 +55,7 @@
 
 pub(super) use litchi_iwa_table::structure::wire;
 
-pub(super) use litchi_numbers_wire::table_topology::{extents as calc, storage};
+pub(super) use litchi_numbers_wire::table_topology::extents as calc;
 
 use std::fmt;
 
@@ -365,7 +365,8 @@ pub(super) fn geometry(model: &[u8]) -> Result<Geometry, Error> {
 
 /// The storage tiles of a data store: `(key, tile object)`, and the rows
 /// per tile.
-pub(super) fn tiles(store: &[u8]) -> Result<(Vec<(u32, u64)>, u64), Error> {
+#[cfg(test)]
+fn tiles(store: &[u8]) -> Result<(Vec<(u32, u64)>, u64), Error> {
     Ok(engine::tiles(store)?)
 }
 

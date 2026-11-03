@@ -1848,6 +1848,7 @@ fn map_package_error_with_kind(error: PackageError, payload_limit_kind: LimitKin
         | PackageError::MissingIdentity
         | PackageError::InvalidLanguage(_)
         | PackageError::InvalidLocale
+        | PackageError::InvalidTable { .. }
         | PackageError::InvalidLimit { .. }
         | PackageError::Limit { .. }
         | PackageError::InvalidFormat(_)

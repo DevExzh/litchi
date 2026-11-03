@@ -31,28 +31,44 @@ use litchi_iwa_core::SnappyStream;
 
 use super::document_locale;
 use super::structure::Fault;
-use super::table_topology::wire::{
-    rebuild, repeated_bytes, single_bytes, single_reference, single_varint, varint_field,
-};
-use super::table_topology::{self as topology, TILE_MESSAGE_TYPE, storage};
+use super::table_topology::wire::single_bytes;
+use super::table_topology::{self as topology, TILE_MESSAGE_TYPE};
 use super::{Package, Profile};
+use litchi_numbers_wire::table_create::{Shape, fresh};
 
 const DOCUMENT_COMPONENT: &str = "Index/Document.iwa";
 const ENGINE_COMPONENT: &str = "Index/CalculationEngine.iwa";
 const DOCUMENT_MESSAGE_TYPE: u32 = 1;
 const SHEET_MESSAGE_TYPE: u32 = 2;
 const MODEL_MESSAGE_TYPE: u32 = 6_001;
-const HEADER_BUCKET_MESSAGE_TYPE: u32 = 6_006;
 const UID_MAP_MESSAGE_TYPE: u32 = 6_267;
 const STROKE_SIDECAR_MESSAGE_TYPE: u32 = 6_305;
+/// The template's sheet, which parents its table.
+const TEMPLATE_SHEET: u64 = 8;
+/// The template table's identifiers (the host builder's).
+const TEMPLATE_TABLE: fresh::Ids = fresh::Ids {
+    info: 9,
+    model: 10,
+    tile: 22,
+    row_headers: 23,
+    column_headers: 24,
+    string_list: 25,
+    style_list: 26,
+    formula_list: 27,
+    format_list: 28,
+    control_cell_spec_list: None,
+    uid_map: 29,
+    stroke_sidecar: 30,
+};
+/// The template table's styles: preset, table, paragraph, cell and
+/// table-name shape style.
+const TEMPLATE_STYLES: fresh::Styles = fresh::Styles::uniform(20, 18, 12, 19, 14);
 const ENGINE_MESSAGE_TYPE: u32 = 4_000;
 const OWNER_MESSAGE_TYPE: u32 = 4_008;
 const SHEET_NAME_FIELD: u32 = 1;
 const MODEL_NAME_FIELD: u32 = 8;
 const MODEL_ROWS_FIELD: u32 = 6;
 const MODEL_COLUMNS_FIELD: u32 = 7;
-const MODEL_UID_MAP_FIELD: u32 = 46;
-const MODEL_STROKE_FIELD: u32 = 49;
 /// The most row and column identities one table may hold.
 const MAX_TABLE_UIDS: u64 = 1_100_000;
 
@@ -307,16 +323,6 @@ fn set_string(data: &[u8], number: u32, value: &str) -> Result<Vec<u8>, Failure>
     .map_err(|error| wire(&error))
 }
 
-/// `data` with each varint field of `values` set, in one pass.
-fn set_varints(data: &[u8], values: &[(u32, u64)]) -> Result<Vec<u8>, Failure> {
-    Ok(rebuild(data, |field| {
-        match values.iter().find(|(number, _)| *number == field.number) {
-            Some((number, value)) => varint_field(*number, *value).map(Some),
-            None => Ok(None),
-        }
-    })?)
-}
-
 /// The model's size and section counts and its data store, read in one
 /// pass (`table_topology::geometry` rereads the model per field).
 fn geometry(model: &[u8]) -> Result<topology::Geometry, Failure> {
@@ -379,134 +385,74 @@ fn document(
     let [model_location] = stream.of_type(MODEL_MESSAGE_TYPE)[..] else {
         return Err(Failure::Template);
     };
-    if let Some(name) = options.table_name {
-        let data = set_string(stream.message(model_location)?, MODEL_NAME_FIELD, name)?;
-        stream.set(model_location, data);
-    }
-    let Some((rows, columns)) = options.dimensions else {
-        return Ok(None);
+    let resize = match options.dimensions {
+        Some((rows, columns)) => {
+            if rows == 0 || columns == 0 || u64::from(rows) + u64::from(columns) > MAX_TABLE_UIDS {
+                return Err(Failure::InvalidSize);
+            }
+            let before = geometry(stream.message(model_location)?)?;
+            if rows <= before.header_rows + before.footer_rows || columns <= before.header_columns {
+                return Err(Failure::InvalidSize);
+            }
+            ((before.rows, before.columns) != (rows, columns)).then_some((before, rows, columns))
+        },
+        None => None,
     };
-    if rows == 0 || columns == 0 || u64::from(rows) + u64::from(columns) > MAX_TABLE_UIDS {
-        return Err(Failure::InvalidSize);
+    if options.table_name.is_none() && resize.is_none() {
+        return Ok(None);
     }
+    // The table is the shared from-scratch graph (record 0420) with the
+    // template's identifiers, styles and identity: the template is the
+    // host builder's table, which the graph reproduces byte for byte.
     let model = stream.message(model_location)?.to_vec();
     let before = geometry(&model)?;
-    if rows <= before.header_rows + before.footer_rows || columns <= before.header_columns {
-        return Err(Failure::InvalidSize);
-    }
-    if (before.rows, before.columns) == (rows, columns) {
-        return Ok(None);
-    }
-    let store = single_bytes(&model, 4)?.ok_or(Fault::Invalid)?.to_vec();
-
-    // Tiles: the removed rows go (the template's tiles store no cell), and
-    // each records the table's extent, as the host builder writes it.
-    let (tiles, size) = topology::tiles(&store)?;
-    for (key, tile) in &tiles {
-        let location = stream.locate(*tile, TILE_MESSAGE_TYPE)?;
-        let data = stream.message(location)?;
-        let base = u64::from(*key) * size;
-        let mut removed = false;
-        let mut maximum: Option<u64> = None;
-        let mut stored = false;
-        let rewritten = rebuild(data, |field| {
-            if field.number != 5 {
-                return Ok(None);
-            }
-            let local = single_varint(field.payload, 1)?.ok_or(Fault::Invalid)?;
-            let cells = storage::bnc_cells(field.payload).map_err(Fault::from)?;
-            if base + local >= u64::from(rows) {
-                stored |= !cells.is_empty();
-                removed = true;
-                return Ok(Some(Vec::new()));
-            }
-            stored |= cells.iter().any(|(column, _)| *column >= columns);
-            maximum = maximum.max(Some(local));
-            Ok(None)
-        })?;
-        if stored {
-            return Err(Fault::Unsupported.into());
-        }
-        let extent = [
-            (1, u64::from(columns - 1)),
-            (2, u64::from(rows - 1)),
-            (4, maximum.map_or(0, |maximum| maximum + 1)),
-        ];
-        let rewritten = set_varints(&rewritten, &extent[..if removed { 3 } else { 2 }])?;
-        stream.set(location, rewritten);
-    }
-
-    // Header buckets keep the headers inside the new size.
-    let headers = single_bytes(&store, 1)?.ok_or(Fault::Invalid)?;
-    let mut buckets: Vec<(u64, u32)> = Vec::new();
-    for reference in repeated_bytes(headers, 2)? {
-        buckets.push((single_varint(reference, 1)?.ok_or(Fault::Invalid)?, rows));
-    }
-    if let Some(column_bucket) = single_reference(&store, 2)? {
-        buckets.push((column_bucket, columns));
-    }
-    for (bucket, limit) in buckets {
-        if bucket == 0 {
-            continue;
-        }
-        let location = stream.locate(bucket, HEADER_BUCKET_MESSAGE_TYPE)?;
-        let mut changed = false;
-        let rewritten = rebuild(stream.message(location)?, |field| {
-            if field.number != 2 || single_varint(field.payload, 1)?.unwrap_or(0) < u64::from(limit)
-            {
-                return Ok(None);
-            }
-            changed = true;
-            Ok(Some(Vec::new()))
-        })?;
-        if changed {
-            stream.set(location, rewritten);
+    let (rows, columns) = resize.map_or((before.rows, before.columns), |(_, rows, columns)| {
+        (rows, columns)
+    });
+    let uuid = std::str::from_utf8(single_bytes(&model, 1)?.ok_or(Failure::Template)?)
+        .map_err(|_error| Failure::Template)?
+        .to_owned();
+    let template_name =
+        std::str::from_utf8(single_bytes(&model, MODEL_NAME_FIELD)?.ok_or(Failure::Template)?)
+            .map_err(|_error| Failure::Template)?
+            .to_owned();
+    let shape = Shape {
+        name: options.table_name.unwrap_or(&template_name),
+        rows,
+        columns,
+        row_height: None,
+        column_width: None,
+    };
+    let objects = fresh::table(
+        &TEMPLATE_TABLE,
+        fresh::Placement {
+            parent: TEMPLATE_SHEET,
+            frame: fresh::DEFAULT_FRAME,
+        },
+        &TEMPLATE_STYLES,
+        &shape,
+        &uuid,
+        TEMPLATE_TABLE.model,
+        fresh::Profile::Builder,
+    )
+    .map_err(|_error| Failure::Template)?;
+    for object in objects {
+        // The drawable, the buckets and the lists do not depend on the
+        // size or the name; the UID map is the template's own until the
+        // table is resized.
+        let changes = match object.message_type {
+            MODEL_MESSAGE_TYPE => true,
+            TILE_MESSAGE_TYPE | UID_MAP_MESSAGE_TYPE | STROKE_SIDECAR_MESSAGE_TYPE => {
+                resize.is_some()
+            },
+            _ => false,
+        };
+        if changes {
+            let location = stream.locate(object.identifier, object.message_type)?;
+            stream.set(location, object.payload);
         }
     }
-
-    // The row/column UID map: the template table stores no cell, so the
-    // fresh table takes a fresh map, as the host builder writes one (the
-    // editor's fresh-map identities, seeded with the model's identifier).
-    if let Some(uids) = single_reference(&model, MODEL_UID_MAP_FIELD)? {
-        let location = stream.locate(uids, UID_MAP_MESSAGE_TYPE)?;
-        let seed = stream.objects[model_location.0].identifier;
-        let rewritten = litchi_numbers_wire::table_create::empty_storage(
-            litchi_numbers_wire::table_create::Role::UidMap,
-            stream.message(location)?,
-            rows,
-            columns,
-            seed,
-        )
-        .map_err(|_error| Failure::Template)?;
-        stream.set(location, rewritten);
-    }
-
-    // The stroke sidecar's size.
-    if let Some(sidecar) = single_reference(&model, MODEL_STROKE_FIELD)? {
-        let location = stream.locate(sidecar, STROKE_SIDECAR_MESSAGE_TYPE)?;
-        let mut rewritten = stream.message(location)?.to_vec();
-        for (field, value) in [(2, columns), (3, rows)] {
-            rewritten = patch_varint_field(
-                &rewritten,
-                field,
-                single_varint(&rewritten, field)?.is_some(),
-                Some(u64::from(value)),
-            )
-            .map_err(|error| wire(&error))?;
-        }
-        stream.set(location, rewritten);
-    }
-
-    // The model's size.
-    let data = set_varints(
-        stream.message(model_location)?,
-        &[
-            (MODEL_ROWS_FIELD, u64::from(rows)),
-            (MODEL_COLUMNS_FIELD, u64::from(columns)),
-        ],
-    )?;
-    stream.set(model_location, data);
-    Ok(Some((before, rows, columns)))
+    Ok(resize)
 }
 
 /// The engine component with the locale and the owner's extents written.
@@ -590,4 +536,78 @@ pub(crate) fn synthesize(
         .reassemble_with_deletions_to_bytes(&edits, &[], limits)
         .map_err(|error| Failure::Package(error.into()))?;
     Package::from_shared_profile(Arc::from(bytes), profile).map_err(Failure::Package)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The template's table is the shared from-scratch graph (record 0420):
+    /// every object it builds, apart from the host builder's random UID
+    /// map, is the template's own payload byte for byte, and so are the
+    /// preset and style network.
+    #[test]
+    fn the_template_table_is_the_shared_fresh_graph() {
+        let profile = Profile::default();
+        let limits = profile.archive();
+        let catalog = Catalog::from_bytes(crate::create::BLANK, limits)
+            .unwrap_or_else(|error| panic!("catalog: {error:?}"));
+        let snappy = limits
+            .snappy_limits()
+            .unwrap_or_else(|error| panic!("limits: {error:?}"));
+        let entry = catalog
+            .iter()
+            .find(|entry| entry.name() == DOCUMENT_COMPONENT)
+            .unwrap_or_else(|| panic!("document"));
+        let bytes = SnappyStream::decompress(entry.data(), snappy)
+            .unwrap_or_else(|error| panic!("snappy: {error:?}"))
+            .into_bytes();
+        let stream = Stream::scan(bytes).unwrap_or_else(|_| panic!("scan"));
+        let model = stream
+            .message(stream.locate(10, MODEL_MESSAGE_TYPE).unwrap_or((0, 0)))
+            .unwrap_or_else(|_| panic!("model"))
+            .to_vec();
+        let uuid = std::str::from_utf8(single_bytes(&model, 1).ok().flatten().unwrap_or_default())
+            .unwrap_or_default()
+            .to_owned();
+        let objects = fresh::table(
+            &TEMPLATE_TABLE,
+            fresh::Placement {
+                parent: TEMPLATE_SHEET,
+                frame: fresh::DEFAULT_FRAME,
+            },
+            &TEMPLATE_STYLES,
+            &Shape {
+                name: "Table 1",
+                rows: 10,
+                columns: 5,
+                row_height: None,
+                column_width: None,
+            },
+            &uuid,
+            10,
+            fresh::Profile::Builder,
+        )
+        .unwrap_or_else(|error| panic!("fresh: {error:?}"));
+        let mut compared = 0;
+        for object in objects.into_iter().chain([
+            fresh::preset(20, 0, 32),
+            fresh::style_network(32, &TEMPLATE_STYLES),
+        ]) {
+            if object.message_type == fresh::UID_MAP_MESSAGE_TYPE {
+                continue;
+            }
+            let location = stream
+                .locate(object.identifier, object.message_type)
+                .unwrap_or_else(|_| panic!("object {}", object.identifier));
+            assert_eq!(
+                stream.message(location).ok(),
+                Some(object.payload.as_slice()),
+                "object {}",
+                object.identifier
+            );
+            compared += 1;
+        }
+        assert_eq!(compared, 12);
+    }
 }
