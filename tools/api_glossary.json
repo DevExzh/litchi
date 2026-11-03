@@ -23350,6 +23350,7 @@
         "litchi_numbers::sheet::drawable::list",
         "litchi_numbers::sheet::drawable::properties",
         "litchi_numbers::sheet::drawable::style",
+        "litchi_numbers::sheet::drawable::caption",
         "litchi_numbers::sheet::drawable::text",
         "litchi_numbers::sheet::drawable::plain_text",
         "litchi_numbers::sheet::drawable::language",
@@ -23471,6 +23472,10 @@
         {
           "method": "litchi_numbers::Package::apply_sheet_drawable_style",
           "ok": "litchi_numbers::sheet::drawable::style::Commit"
+        },
+        {
+          "method": "litchi_numbers::Package::apply_sheet_drawable_caption",
+          "ok": "litchi_numbers::sheet::drawable::caption::Commit"
         },
         {
           "method": "litchi_numbers::Package::apply_sheet_text_box_text",
@@ -24311,6 +24316,7 @@
         "litchi_numbers::sheet::drawable::list",
         "litchi_numbers::sheet::drawable::properties",
         "litchi_numbers::sheet::drawable::style",
+        "litchi_numbers::sheet::drawable::caption",
         "litchi_numbers::sheet::drawable::text",
         "litchi_numbers::sheet::drawable::plain_text",
         "litchi_numbers::sheet::drawable::language",
@@ -24432,6 +24438,10 @@
         {
           "method": "litchi_numbers::Package::apply_sheet_drawable_style",
           "ok": "litchi_numbers::sheet::drawable::style::Commit"
+        },
+        {
+          "method": "litchi_numbers::Package::apply_sheet_drawable_caption",
+          "ok": "litchi_numbers::sheet::drawable::caption::Commit"
         },
         {
           "method": "litchi_numbers::Package::apply_sheet_text_box_text",

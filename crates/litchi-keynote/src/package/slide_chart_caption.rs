@@ -2692,11 +2692,13 @@ struct CaptionGraphIds {
 
 impl CaptionGraphIds {
     fn allocate(first: u64) -> Result<Self, Error> {
+        let ids =
+            litchi_iwa_style::caption::GraphIds::allocate(first).ok_or(Error::InvalidSource)?;
         Ok(Self {
-            style: first,
-            info: first.checked_add(1).ok_or(Error::InvalidSource)?,
-            storage: first.checked_add(2).ok_or(Error::InvalidSource)?,
-            placement: first.checked_add(3).ok_or(Error::InvalidSource)?,
+            style: ids.style,
+            info: ids.info,
+            storage: ids.storage,
+            placement: ids.placement,
         })
     }
 
@@ -2746,17 +2748,7 @@ fn fresh_uuid(existing: &HashSet<(u64, u64)>, identifier: u64) -> UuidBits {
 }
 
 fn canonical_standin(identifier: u64) -> Result<ArchiveObject, Error> {
-    let mut object = ArchiveObject::new(
-        identifier,
-        vec![RawMessage {
-            type_: STANDIN_MESSAGE_TYPE,
-            data: graph_codec::canonical_standin_payload().to_vec(),
-        }],
-        Default::default(),
-    )
-    .map_err(map_core_error)?;
-    object.archive_info.message_infos[0].versions = vec![10, 1, 0].into();
-    Ok(object)
+    litchi_iwa_style::caption::standin(identifier, Default::default()).map_err(map_core_error)
 }
 
 fn caption_graph_objects(
@@ -2783,62 +2775,36 @@ fn caption_graph_objects(
                 .min(u32::try_from(limits.max_nesting()).unwrap_or(u32::MAX)),
         )
         .with_max_allocations(budget.remaining_allocations());
-    let graph_kind = if edge_kind.is_title() {
-        graph_codec::CaptionGraphKind::Title
+    use litchi_iwa_style::caption;
+    let label = if edge_kind.is_title() {
+        caption::Label::Title
     } else {
-        graph_codec::CaptionGraphKind::Caption
+        caption::Label::Caption
     };
-    let output = graph_codec::encode_caption_graph_with_kind_with_report(
-        graph_codec::CaptionGraphWrite {
-            drawable_identifier,
-            style_identifier: ids.style,
-            info_identifier: ids.info,
-            storage_identifier: ids.storage,
-            placement_identifier: ids.placement,
-            stylesheet_identifier,
-            paragraph_style_identifier,
-            drawable_width,
-            text,
+    budget.charge_allocation(1, 0)?;
+    let (objects, report) = caption::graph_objects(
+        caption::GraphIds {
+            style: ids.style,
+            info: ids.info,
+            storage: ids.storage,
+            placement: ids.placement,
+        },
+        drawable_identifier,
+        drawable_width,
+        text,
+        caption::Theme {
+            stylesheet: stylesheet_identifier,
+            paragraph_style: paragraph_style_identifier,
             language,
         },
-        graph_kind,
+        label,
         wire,
+        Default::default(),
     )
-    .map_err(map_graph_error)?;
-    let report = output.report();
-    let payloads = output.into_payloads().into_parts();
-    let types = [
-        SHAPE_STYLE_MESSAGE_TYPE,
-        CAPTION_INFO_MESSAGE_TYPE,
-        STORAGE_MESSAGE_TYPE,
-        CAPTION_PLACEMENT_MESSAGE_TYPE,
-    ];
-    let identifiers = [ids.style, ids.info, ids.storage, ids.placement];
-    let references = [
-        vec![paragraph_style_identifier],
-        vec![ids.style, ids.storage, ids.placement],
-        vec![paragraph_style_identifier],
-        Vec::new(),
-    ];
-    budget.charge_allocation(1, 0)?;
-    let mut objects = Vec::new();
-    objects
-        .try_reserve_exact(4)
-        .map_err(|_error| Error::Allocation { amount: 4 })?;
-    for (index, (payload, references)) in payloads.into_iter().zip(references).enumerate() {
-        let mut object = ArchiveObject::new(
-            identifiers[index],
-            vec![RawMessage {
-                type_: types[index],
-                data: payload,
-            }],
-            Default::default(),
-        )
-        .map_err(map_core_error)?;
-        object.archive_info.message_infos[0].versions = vec![1, 0, 5].into();
-        object.archive_info.message_infos[0].object_references = references;
-        objects.push(object);
-    }
+    .map_err(|error| match error {
+        caption::BuildError::Encode(error) => map_graph_error(error),
+        caption::BuildError::Archive(error) => map_core_error(error),
+    })?;
     Ok((objects, report))
 }
 
@@ -2984,41 +2950,21 @@ fn first_reference_identifier(
 }
 
 fn caption_drawable_width(package: &Package, drawable_identifier: u64) -> Result<f32, Error> {
-    let limits = package.wire_limits().map_err(map_wire_error)?;
+    use litchi_iwa_style::caption;
     let object = package
         .object(drawable_identifier)
         .ok_or(Error::InvalidSource)?;
     let message = object.messages.first().ok_or(Error::InvalidSource)?;
-    let outer = WireView::parse(&message.data, limits).map_err(map_wire_error)?;
-    let mut drawable = unique_payload_field(&outer, 1)?.ok_or(Error::InvalidSource)?;
     // A shape's drawable is its ShapeArchive's super (ShapeInfo.super.super).
-    let nested;
-    if message.type_ == CaptionEdgeKind::Shape.drawable_message_type() {
-        nested = WireView::parse(drawable, limits).map_err(map_wire_error)?;
-        drawable = unique_payload_field(&nested, 1)?.ok_or(Error::InvalidSource)?;
-    }
-    let drawable_view = WireView::parse(drawable, limits).map_err(map_wire_error)?;
-    let geometry = unique_payload_field(&drawable_view, 1)?.ok_or(Error::InvalidSource)?;
-    let geometry_view = WireView::parse(geometry, limits).map_err(map_wire_error)?;
-    let size = unique_payload_field(&geometry_view, 2)?.ok_or(Error::InvalidSource)?;
-    let size_view = WireView::parse(size, limits).map_err(map_wire_error)?;
-    let mut width = None;
-    for field in size_view.fields().filter(|field| field.number() == 1) {
-        if width.is_some() || field.wire_type() != 5 {
-            return Err(Error::InvalidSource);
-        }
-        field.validate_canonical_key().map_err(map_wire_error)?;
-        width = Some(field);
-    }
-    let width = width.ok_or(Error::InvalidSource)?;
-    if width.payload().len() != 4 {
-        return Err(Error::InvalidSource);
-    }
-    let value = f32::from_le_bytes(width.payload().try_into().unwrap_or([0; 4]));
-    if !value.is_finite() || value <= 0.0 {
-        return Err(Error::InvalidSource);
-    }
-    Ok(value)
+    let nesting = if message.type_ == CaptionEdgeKind::Shape.drawable_message_type() {
+        caption::Nesting::Shape
+    } else {
+        caption::Nesting::Drawable
+    };
+    caption::drawable_width(&message.data, nesting)
+        .map_err(|_| Error::InvalidSource)?
+        .filter(|value| value.is_finite() && *value > 0.0)
+        .ok_or(Error::InvalidSource)
 }
 
 fn patch_caption_edge(
