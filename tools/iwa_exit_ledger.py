@@ -1,27 +1,28 @@
 #!/usr/bin/env python3
-"""Checked ledger of the `litchi-iwa` exit (records 0363 and 0369).
+"""Checked historical ledger of the `litchi-iwa` exit (records 0363, 0369, 0429).
 
-The tool regenerates the host's public-function inventory from
-`crates/litchi-iwa/src` (the scan of record 0363 section 1.4), joins it with
-the tracked ledger `docs/unified-ops/results/0363/iwa-exit-ledger.tsv`, and
-fails when:
+`litchi-iwa` was deleted by record 0429 (W3). Its public-function inventory
+was frozen at commit 27b4840684, the last commit that contains the crate, in
+`docs/unified-ops/results/0363/iwa-exit-ledger.tsv`. The ledger is kept as the
+historical record of where every host function went; this tool checks it
+without the crate and fails when:
 
-- a host function has no ledger row, or a `host-only` row names a function
-  that no longer exists (stale);
-- a row has an unknown status, or a `retired` row has no reason;
+- a row has an unknown status, a `host-only` row remains (the exit is
+  complete), or a `retired` row has no reason;
 - a `migrated` row has no destination, or its destination path
   (`crate::Item::item`) does not resolve to public items of that crate;
-- a `migrated` row has no parity test, the test does not exist under
-  `crates/litchi-iwa/tests/parity/`, or the tier / native evidence the row
-  records differ from what the test declares (`Tier::A|B`,
-  `Evidence::Native("path")` or `Evidence::Queued` in the test body);
+- a `migrated` row has no parity test or a tier other than A or B (the
+  parity harness was deleted with the host; the test names are history);
 - a `migrated` row cites native evidence that does not exist, or has no
   native evidence and no row in `docs/unified-ops/0363-mac-queue.md` for its
-  format and destination (owner decision D1).
+  format and destination (owner decision D1);
+- a macOS input cited by the queue (`test-data/iwork/mac-queue/inputs/...`,
+  packed in `inputs.tar.xz`, or the host-local `.coord/iwa-w3/mac-inputs/...`)
+  has no row in `test-data/iwork/mac-queue/index.tsv`, or the archive is
+  missing.
 
 Usage:
   python3 tools/iwa_exit_ledger.py --check            # the gate
-  python3 tools/iwa_exit_ledger.py --update           # add new host fns as host-only, drop stale host-only rows
   python3 tools/iwa_exit_ledger.py --print-mac-queue  # routes that need a macOS run, and missing queue rows
   python3 tools/iwa_exit_ledger.py --summary          # counts per format and status
 """
@@ -38,18 +39,12 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-HOST_SRC = Path("crates/litchi-iwa/src")
-PARITY_DIR = Path("crates/litchi-iwa/tests/parity")
 LEDGER = Path("docs/unified-ops/results/0363/iwa-exit-ledger.tsv")
 MAC_QUEUE = Path("docs/unified-ops/0363-mac-queue.md")
-
-# The module scan of record 0363 section 1.4, in that order.
-SCANNED_MODULES = (
-    "numbers", "keynote", "pages", "charts", "text", "shapes", "media",
-    "comments.rs", "comments", "document.rs", "drawable_order.rs",
-    "application.rs", "lib.rs", "package.rs",
-)
-PUB_FN = re.compile(r"^\s*pub fn ([a-z0-9_]+)")
+MAC_QUEUE_INPUTS = ("test-data/iwork/mac-queue/inputs/", ".coord/iwa-w3/mac-inputs/")
+MAC_QUEUE_INDEX = Path("test-data/iwork/mac-queue/index.tsv")
+MAC_QUEUE_ARCHIVE = Path("test-data/iwork/mac-queue/inputs.tar.xz")
+HOST_COMMIT = "27b4840684"
 
 COLUMNS = (
     "path", "name", "occurrence", "format", "family", "status",
@@ -58,18 +53,6 @@ COLUMNS = (
 STATUSES = ("host-only", "migrated", "retired")
 FORMAT_NAMES = {"numbers": "Numbers", "pages": "Pages", "keynote": "Keynote"}
 EMPTY = ("", "-")
-
-
-@dataclasses.dataclass(frozen=True)
-class HostFn:
-    path: str
-    name: str
-    occurrence: int
-    line: int
-
-    @property
-    def key(self) -> tuple[str, str, int]:
-        return (self.path, self.name, self.occurrence)
 
 
 @dataclasses.dataclass
@@ -91,48 +74,8 @@ class Row:
         return (self.path, self.name, self.occurrence)
 
 
-@dataclasses.dataclass(frozen=True)
-class ParityTest:
-    name: str
-    file: str
-    tiers: frozenset[str]
-    evidence: frozenset[str]  # "-" for Evidence::Queued, else the cited path
-
-
 def _blank(value: str) -> bool:
     return value.strip() in EMPTY
-
-
-def format_of(path: str) -> str:
-    head = path.split("/")[0].split(".")[0]
-    return head if head in FORMAT_NAMES else "shared"
-
-
-def scan_inventory(root: Path = ROOT) -> list[HostFn]:
-    """Every `pub fn` of the scanned host modules, with per-file occurrence."""
-    src = root / HOST_SRC
-    found: list[HostFn] = []
-    seen: set[Path] = set()
-    for module in SCANNED_MODULES:
-        target = src / module
-        if target.is_file():
-            files = [target]
-        elif target.is_dir():
-            files = sorted(target.rglob("*.rs"))
-        else:
-            continue
-        for file in files:
-            if file in seen:
-                continue
-            seen.add(file)
-            relative = file.relative_to(src).as_posix()
-            counts: collections.Counter[str] = collections.Counter()
-            for number, text in enumerate(file.read_text(encoding="utf-8").splitlines(), 1):
-                match = PUB_FN.match(text)
-                if match:
-                    counts[match.group(1)] += 1
-                    found.append(HostFn(relative, match.group(1), counts[match.group(1)], number))
-    return found
 
 
 def read_ledger(path: Path) -> list[Row]:
@@ -155,30 +98,6 @@ def render_ledger(rows: list[Row]) -> str:
         values = dataclasses.asdict(row)
         out.write("\t".join(str(values[column]) or "-" for column in COLUMNS) + "\n")
     return out.getvalue()
-
-
-def parity_tests(root: Path = ROOT) -> dict[str, ParityTest]:
-    """`#[test]` functions of the parity harness with their declarations."""
-    tests: dict[str, ParityTest] = {}
-    directory = root / PARITY_DIR
-    if not directory.is_dir():
-        return tests
-    start = re.compile(r"#\[test\]\s*(?:#\[[^\]]*\]\s*)*fn\s+([a-z0-9_]+)\s*\(")
-    for file in sorted(directory.rglob("*.rs")):
-        text = file.read_text(encoding="utf-8")
-        for match in start.finditer(text):
-            end = text.find("\n}\n", match.end())
-            body = text[match.end(): end if end >= 0 else len(text)]
-            evidence = set(re.findall(r'Evidence::Native\(\s*"([^"]+)"\s*\)', body))
-            if "Evidence::Queued" in body:
-                evidence.add("-")
-            tests[match.group(1)] = ParityTest(
-                match.group(1),
-                file.relative_to(root).as_posix(),
-                frozenset(re.findall(r"Tier::([AB])\b", body)),
-                frozenset(evidence),
-            )
-    return tests
 
 
 def mac_queue(root: Path = ROOT) -> list[dict[str, str]]:
@@ -241,35 +160,42 @@ def destination_exists(destination: str, root: Path = ROOT, cache: dict | None =
     return None
 
 
+def queue_inputs(queue: list[dict[str, str]]) -> list[str]:
+    """macOS input paths cited by the queue's fixture column."""
+    found: list[str] = []
+    pattern = re.compile("(?:" + "|".join(map(re.escape, MAC_QUEUE_INPUTS)) + r")[A-Za-z0-9_.-]+")
+    for entry in queue:
+        for match in pattern.finditer(entry.get("fixture", "")):
+            path = match.group(0).rstrip(".,;:)")
+            if path not in found:
+                found.append(path)
+    return found
+
+
 def check(root: Path = ROOT, ledger_path: Path | None = None) -> list[str]:
     errors: list[str] = []
-    inventory = scan_inventory(root)
     rows = read_ledger(ledger_path or root / LEDGER)
-    tests = parity_tests(root)
     queue = mac_queue(root)
-    by_key: dict[tuple[str, str, int], Row] = {}
+    seen: set[tuple[str, str, int]] = set()
     for row in rows:
-        if row.key in by_key:
+        if row.key in seen:
             errors.append(f"duplicate ledger row {row.path} {row.name} #{row.occurrence}")
-        by_key[row.key] = row
-    present = {fn.key: fn for fn in inventory}
-    for fn in inventory:
-        if fn.key not in by_key:
-            errors.append(
-                f"unmapped host function {fn.path}:{fn.line} {fn.name} (occurrence {fn.occurrence}); "
-                "run --update and set its status"
-            )
+        seen.add(row.key)
     cache: dict = {}
     for row in rows:
         where = f"{row.path} {row.name} #{row.occurrence}"
         if row.status not in STATUSES:
             errors.append(f"{where}: status {row.status!r} is not one of {', '.join(STATUSES)}")
             continue
-        if row.key not in present and row.status == "host-only":
-            errors.append(f"{where}: stale host-only row (the host function no longer exists)")
-        if row.status == "retired" and _blank(row.reason):
-            errors.append(f"{where}: retired rows need a reason")
-        if row.status != "migrated":
+        if row.status == "host-only":
+            errors.append(
+                f"{where}: host-only row, but litchi-iwa was deleted (record 0429); "
+                "the row must be migrated or retired"
+            )
+            continue
+        if row.status == "retired":
+            if _blank(row.reason):
+                errors.append(f"{where}: retired rows need a reason")
             continue
         if _blank(row.destination):
             errors.append(f"{where}: migrated row has no destination")
@@ -279,21 +205,9 @@ def check(root: Path = ROOT, ledger_path: Path | None = None) -> list[str]:
                 errors.append(f"{where}: destination {row.destination} does not exist: {reason}")
         if _blank(row.parity_test):
             errors.append(f"{where}: migrated row has no parity test")
-            continue
-        test = tests.get(row.parity_test)
-        if test is None:
-            errors.append(f"{where}: parity test {row.parity_test} not found under {PARITY_DIR}")
-            continue
-        if test.tiers != {row.tier}:
-            errors.append(
-                f"{where}: ledger tier {row.tier!r} but {row.parity_test} declares {sorted(test.tiers) or 'none'}"
-            )
+        if row.tier not in ("A", "B"):
+            errors.append(f"{where}: migrated row tier {row.tier!r} is not A or B")
         evidence = "-" if _blank(row.native_evidence) else row.native_evidence
-        if test.evidence != {evidence}:
-            errors.append(
-                f"{where}: ledger native evidence {evidence!r} but {row.parity_test} declares "
-                f"{sorted(test.evidence) or 'none'}"
-            )
         if evidence != "-":
             if not (root / evidence).is_file():
                 errors.append(f"{where}: native evidence {evidence} does not exist")
@@ -302,23 +216,23 @@ def check(root: Path = ROOT, ledger_path: Path | None = None) -> list[str]:
                 f"{where}: migrated tier-{row.tier} route {row.destination} has no host native evidence "
                 f"and no {MAC_QUEUE} row (format {FORMAT_NAMES.get(row.format, row.format)})"
             )
+    cited = queue_inputs(queue)
+    if cited:
+        index = root / MAC_QUEUE_INDEX
+        listed: dict[str, str] = {}
+        if index.is_file():
+            with index.open(encoding="utf-8", newline="") as handle:
+                for record in csv.DictReader(handle, delimiter="\t", quoting=csv.QUOTE_NONE):
+                    listed[record.get("input", "")] = record.get("location", "")
+        else:
+            errors.append(f"{MAC_QUEUE}: cites macOS inputs but {MAC_QUEUE_INDEX} does not exist")
+        if any(path.startswith(MAC_QUEUE_INPUTS[0]) for path in cited) and not (root / MAC_QUEUE_ARCHIVE).is_file():
+            errors.append(f"{MAC_QUEUE}: cites archived macOS inputs but {MAC_QUEUE_ARCHIVE} does not exist")
+        for path in cited:
+            expected = "archive" if path.startswith(MAC_QUEUE_INPUTS[0]) else "external"
+            if listed.get(path) != expected:
+                errors.append(f"{MAC_QUEUE}: cited macOS input {path} has no {expected} row in {MAC_QUEUE_INDEX}")
     return errors
-
-
-def update(root: Path = ROOT) -> tuple[int, int]:
-    path = root / LEDGER
-    rows = read_ledger(path)
-    present = {fn.key: fn for fn in scan_inventory(root)}
-    kept = [row for row in rows if row.key in present or row.status != "host-only"]
-    known = {row.key for row in kept}
-    added = 0
-    for key, fn in present.items():
-        if key not in known:
-            kept.append(Row(fn.path, fn.name, fn.occurrence, format_of(fn.path), "-", "host-only",
-                            "-", "-", "-", "-", "-"))
-            added += 1
-    path.write_text(render_ledger(kept), encoding="utf-8")
-    return added, len(rows) - (len(kept) - added)
 
 
 def queue_report(root: Path = ROOT) -> str:
@@ -362,14 +276,9 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n", 1)[0])
     group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument("--check", action="store_true", help="validate the ledger (the gate)")
-    group.add_argument("--update", action="store_true", help="add new host functions, drop stale host-only rows")
     group.add_argument("--print-mac-queue", action="store_true", help="list routes that need a macOS run")
     group.add_argument("--summary", action="store_true", help="counts per format and status")
     args = parser.parse_args(argv)
-    if args.update:
-        added, dropped = update()
-        print(f"{LEDGER}: added {added} host-only rows, dropped {dropped} stale host-only rows")
-        return 0
     if args.print_mac_queue:
         sys.stdout.write(queue_report())
         return 0

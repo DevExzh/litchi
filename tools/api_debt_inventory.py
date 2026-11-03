@@ -315,7 +315,7 @@ def _rows(document, crate: str, result_rules=None, immutable_owners=None,
                 else:
                     target = target_family(name)
                 yield "mut_owner", text, receiver, target
-            elif receiver == "&mut self" and crate != "litchi_iwa" and not draft and (
+            elif receiver == "&mut self" and not draft and (
                     owner.startswith(("Mutable", "Flat")) or owner in DRAFT_NAMES) and not (
                     owner == "Reader" and "raw" in path[:-2]):
                 yield "mut_draft", text, receiver, "Builder draft or Edit verb; no Mutable* type"

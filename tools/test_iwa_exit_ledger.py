@@ -6,43 +6,10 @@ from pathlib import Path
 
 from tools import iwa_exit_ledger as ledger
 
-HOST = """\
-impl Draft {
-    pub fn merge_cells(&mut self) {}
-    pub fn table_cell_merges(&self) {}
-    pub(crate) fn hidden(&self) {}
-}
-mod nested {
-    pub fn merge_cells() {}
-}
-"""
-
 LEAF = """\
 pub struct Package;
 impl Package {
     pub fn edit_table_merges(&self) {}
-}
-"""
-
-PARITY = """\
-#[test]
-fn numbers_merge_parity() -> TestResult {
-    Case::new("numbers_merge_parity", Format::Numbers, Tier::A, Evidence::Queued, &input)
-        .run()?;
-    Ok(())
-}
-
-#[test]
-fn numbers_read_parity() -> TestResult {
-    Case::new(
-        "numbers_read_parity",
-        Format::Numbers,
-        Tier::B,
-        Evidence::Native("test-data/receipt.json"),
-        &input,
-    )
-    .run()?;
-    Ok(())
 }
 """
 
@@ -87,15 +54,12 @@ class LedgerTest(unittest.TestCase):
     def setUp(self) -> None:
         self.tmp = tempfile.TemporaryDirectory()
         self.root = Path(self.tmp.name)
-        self.write("crates/litchi-iwa/src/numbers/editor.rs", HOST)
-        self.write("crates/litchi-iwa/src/private.rs", "pub fn not_scanned() {}\n")
         self.write("crates/litchi-numbers/src/lib.rs", LEAF)
-        self.write("crates/litchi-iwa/tests/parity/numbers_cases.rs", PARITY)
         self.write("docs/unified-ops/0363-mac-queue.md", QUEUE)
         self.write("test-data/receipt.json", "{}\n")
         self.rows = [
             migrated("merge_cells", 1),
-            row("merge_cells", 2),
+            row("merge_cells", 2, "retired", reason="duplicate of merge_cells #1"),
             migrated(
                 "table_cell_merges",
                 destination="litchi_numbers::Package",
@@ -121,25 +85,12 @@ class LedgerTest(unittest.TestCase):
         errors = self.errors()
         self.assertTrue(any(fragment in error for error in errors), errors)
 
-    def test_scan_counts_occurrences_and_skips_unscanned_modules(self) -> None:
-        found = ledger.scan_inventory(self.root)
-        self.assertEqual(
-            [(fn.name, fn.occurrence, fn.line) for fn in found],
-            [("merge_cells", 1, 2), ("table_cell_merges", 1, 3), ("merge_cells", 2, 7)],
-        )
-
     def test_valid_ledger_passes(self) -> None:
         self.assertEqual(self.errors(), [])
 
-    def test_unmapped_host_function_fails(self) -> None:
-        del self.rows[1]
-        self.assert_error("unmapped host function numbers/editor.rs:7 merge_cells")
-
-    def test_stale_rows(self) -> None:
+    def test_host_only_rows_fail_after_the_deletion(self) -> None:
         self.rows.append(row("gone"))
-        self.assert_error("stale host-only row")
-        self.rows[-1] = migrated("gone")
-        self.assertEqual(self.errors(), [])
+        self.assert_error("host-only row, but litchi-iwa was deleted")
 
     def test_status_and_retired_reason(self) -> None:
         self.rows[1] = row("merge_cells", 2, "moved")
@@ -149,11 +100,11 @@ class LedgerTest(unittest.TestCase):
         self.rows[1] = row("merge_cells", 2, "retired", reason="duplicate of merge_cells #1")
         self.assertEqual(self.errors(), [])
 
-    def test_migrated_requires_an_existing_parity_test(self) -> None:
+    def test_migrated_requires_a_parity_test_and_tier(self) -> None:
         self.rows[0] = migrated("merge_cells", parity_test="-")
         self.assert_error("has no parity test")
-        self.rows[0] = migrated("merge_cells", parity_test="no_such_test")
-        self.assert_error("parity test no_such_test not found")
+        self.rows[0] = migrated("merge_cells", tier="C")
+        self.assert_error("tier 'C' is not A or B")
 
     def test_migrated_destination_must_exist(self) -> None:
         self.rows[0] = migrated("merge_cells", destination="-")
@@ -162,12 +113,6 @@ class LedgerTest(unittest.TestCase):
         self.assert_error("edit_gone is not a public item of litchi_numbers")
         self.rows[0] = migrated("merge_cells", destination="litchi_missing::Package")
         self.assert_error("crate litchi_missing has no source directory")
-
-    def test_tier_and_evidence_must_match_the_test(self) -> None:
-        self.rows[0] = migrated("merge_cells", tier="B")
-        self.assert_error("ledger tier 'B' but numbers_merge_parity declares ['A']")
-        self.rows[0] = migrated("merge_cells", native_evidence="test-data/receipt.json")
-        self.assert_error("declares ['-']")
 
     def test_native_evidence_must_exist(self) -> None:
         (self.root / "test-data/receipt.json").unlink()
@@ -186,20 +131,30 @@ class LedgerTest(unittest.TestCase):
         self.assertIn("[queued] Numbers litchi_numbers::Package::edit_table_merges", report)
         self.assertNotIn("Rows to append", report)
 
-    def test_update_adds_new_and_drops_stale_host_only_rows(self) -> None:
-        self.rows = [migrated("merge_cells", 1), row("gone"), migrated("removed_after_migration")]
-        self.write(str(ledger.LEDGER), ledger.render_ledger(self.rows))
-        self.assertEqual(ledger.update(self.root), (2, 1))
-        names = {(r.name, r.occurrence, r.status) for r in ledger.read_ledger(self.root / ledger.LEDGER)}
-        self.assertEqual(
-            names,
-            {
-                ("merge_cells", 1, "migrated"),
-                ("merge_cells", 2, "host-only"),
-                ("table_cell_merges", 1, "host-only"),
-                ("removed_after_migration", 1, "migrated"),
-            },
+    def test_cited_mac_queue_inputs_must_be_indexed(self) -> None:
+        self.write(
+            "docs/unified-ops/0363-mac-queue.md",
+            QUEUE.replace(
+                "| f |",
+                "| `test-data/iwork/mac-queue/inputs/a.numbers`, `.coord/iwa-w3/mac-inputs/b.numbers` |",
+            ),
         )
+        self.assert_error("index.tsv does not exist")
+        self.write(
+            "test-data/iwork/mac-queue/index.tsv",
+            "test\tcase\tfixture_label\tinput\tlocation\tbytes\tsha256\n"
+            "t\tc\tl\ttest-data/iwork/mac-queue/inputs/a.numbers\tarchive\t1\t00\n",
+        )
+        self.assert_error("inputs.tar.xz does not exist")
+        self.write("test-data/iwork/mac-queue/inputs.tar.xz", "x")
+        self.assert_error("cited macOS input .coord/iwa-w3/mac-inputs/b.numbers has no external row")
+        self.write(
+            "test-data/iwork/mac-queue/index.tsv",
+            "test\tcase\tfixture_label\tinput\tlocation\tbytes\tsha256\n"
+            "t\tc\tl\ttest-data/iwork/mac-queue/inputs/a.numbers\tarchive\t1\t00\n"
+            "t\tc\tl\t.coord/iwa-w3/mac-inputs/b.numbers\texternal\t1\t00\n",
+        )
+        self.assertEqual(self.errors(), [])
 
 
 class RepositoryLedgerTest(unittest.TestCase):

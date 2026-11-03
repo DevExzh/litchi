@@ -1322,8 +1322,8 @@ mod oracle {
         let build_script = include_str!("../build.rs");
         for marker in [
             "fn enforce_pages_native_message_provenance(",
-            "const ROUTE_DECLARATIONS: [(&str, &str, &str, &str); 21]",
-            "const PRODUCTION_ROUTE_MARKERS: [(&str, &str, usize); 40]",
+            "const ROUTE_DECLARATIONS: [(&str, &str, &str, &str); 9]",
+            "const PRODUCTION_ROUTE_MARKERS: [(&str, &str, usize); 17]",
             "let root = root_references_with_limits(components, package.state.source.limits())",
             r"let payload = unique_message_payload(\n            &reference.messages,\n            FOOTNOTE_REFERENCE_MESSAGE_TYPE,",
             r"let marker_payload = unique_message_payload(\n            &marker.messages,\n            TEXTUAL_ATTACHMENT_MESSAGE_TYPE,",

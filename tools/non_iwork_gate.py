@@ -68,9 +68,9 @@ IWORK_LEAF_PACKAGES = frozenset(
         "litchi-pages",
     }
 )
-IWORK_PACKAGE_PREFIX = "litchi-iwa"
-EXPECTED_IWORK_PACKAGES = 19
-EXPECTED_EXCLUDED_PACKAGES = 22
+IWORK_PACKAGE_PREFIX = "litchi-iwa-"
+EXPECTED_IWORK_PACKAGES = 18
+EXPECTED_EXCLUDED_PACKAGES = 21
 EXPECTED_BULK_PACKAGES = 47
 
 # The unified operations layer depends on the iWork leaves under its
@@ -85,7 +85,6 @@ EXPECTED_UNIFIED_PACKAGE_NAMES = frozenset({"litchi-cli", "litchi-ops"})
 # must update this inventory and its review before it can enter the gate.
 EXPECTED_IWORK_PACKAGE_NAMES = frozenset(
     {
-        "litchi-iwa",
         "litchi-iwa-archive",
         "litchi-iwa-cache",
         "litchi-iwa-common",
@@ -108,7 +107,6 @@ EXPECTED_IWORK_PACKAGE_NAMES = frozenset(
 )
 EXPECTED_EXCLUDED_PACKAGE_NAMES = frozenset(
     {
-        "litchi-iwa",
         "litchi-iwa-archive",
         "litchi-iwa-cache",
         "litchi-iwa-common",
@@ -199,7 +197,6 @@ EXPECTED_WORKSPACE_PACKAGE_NAMES = frozenset(
         "litchi-fonts",
         "litchi-formula",
         "litchi-imgconv",
-        "litchi-iwa",
         "litchi-iwa-archive",
         "litchi-iwa-cache",
         "litchi-iwa-common",
@@ -1010,9 +1007,7 @@ def _iwork_packages(package_names: Iterable[str]) -> frozenset[str]:
     return frozenset(
         name
         for name in package_names
-        if name == IWORK_PACKAGE_PREFIX
-        or name.startswith(f"{IWORK_PACKAGE_PREFIX}-")
-        or name in IWORK_LEAF_PACKAGES
+        if name.startswith(IWORK_PACKAGE_PREFIX) or name in IWORK_LEAF_PACKAGES
     )
 
 
