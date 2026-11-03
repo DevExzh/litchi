@@ -120,6 +120,24 @@ ABBA, inclusive Ir of `w4l_host_route`/`w4l_leaf_route`). Receipt
 `results/0425/callgrind-numbers-captions.json`; raw captures in
 `.coord/iwa-w4l/cg3/`.
 
+### 3.1 Slices 2–3 gates
+
+Trunk `bab7c866b4`-era head (W4-K pivot, W4-J structure::create) merged at
+`e6b0b42e2b` (mac-queue conflict resolved by keeping both sides, bench
+matrix regenerated); logs `.coord/iwa-w4l/gates2`. Every command of the
+0414 §8 list exits 0 except, in the first run, the leaf tests:
+`litchi-keynote`'s `known_caption_reference_theme_and_width_wire_variants_fail_closed`
+showed that the lifted wire readers were laxer than Keynote's (a
+non-canonical key or length must fail closed). `3ec545441e` makes the
+shared readers validate canonical keys and framing. The `litchi-iwa`
+doctest link failure in that run was caused by this mid-run change (rlibs
+rebuilt under the running test). On `3ec545441e`, fmt, clippy -D warnings
+(all features), rustdoc -Dwarnings, the glossary, and the leaf and
+`litchi-iwa` tests (parity included) all exit 0 (`*_r.log`). The remaining rows
+(`litchi`, `litchi-ops` in nine groups, pyo3, perf-baseline, the feature
+matrix, the Python gates) passed on the run and do not depend on the
+caption readers. No golden re-blessed. Target 13 GB after pruning.
+
 ## 4. Successor brief
 
 Still host-only in this wave's scope (4 rows):
