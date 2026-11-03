@@ -107,12 +107,41 @@ for 0419) and a regeneration (`c55a619959`); then exit 0. No dispatch,
 capability or corpus-visible behaviour changed, so no golden was
 re-blessed. Target 13 GB after pruning.
 
+## 3. Slice 3: chart background images on Numbers and Keynote
+
+2 rows flip (`set_sheet_chart_background_image_fill`,
+`set_slide_chart_background_image_fill`); on both formats a background set
+over a stored image now releases it, as on Pages.
+
+| Crate | What |
+|---|---|
+| `litchi-iwa-style` | `chart_style::read_frame_size`: the chart drawable's frame size (the image fill's layout frame, the host's `graph.info.geometry.size`) |
+| `litchi-numbers` | `sheet::chart::style::Edit::set_background_image_fill` and the image-releasing background set run on the chart-series workspace path (`write_chart_background`); `publish_changes_with_data` inserts the `Data/` member and the member-locality check counts it; frame size from `sheet_drawable_properties`. Chart-style and chart-series `Refusal::InvalidImage`; the chart-style family now maps the series family's `MissingStyle` refusal |
+| `litchi-keynote` | `chart::style::Edit::set_background_image_fill` on the chart-property core: `Ledger::write_data` publishes the data member; the series-scope mutation plan lists the engine's planned new members; the metadata locality admits the `DataInfo` list (4) when the plan allows it. Chart-series `Refusal::InvalidImage` |
+
+Parity `{numbers_sheet,keynote_slide}_chart_background_image_fill_parity`:
+the Pages sequences (§2), Tier B (Keynote: root previews), macOS-queued.
+
+| Route | Host Ir | Leaf Ir | Leaf/host |
+|---|---:|---:|---:|
+| numbers_background_image_set | 279,063,305 | 86,463,437 | 0.3098 |
+| keynote_background_image_set | 962,539,495 | 99,001,064 | 0.1029 |
+
+Receipt `results/0422/callgrind-background-image-numbers-keynote.json`; raw
+captures in `.coord/iwa-w4i/cg3/`.
+
 ## 4. Remaining
 
-- Chart background image fills on Numbers and Keynote (2 rows), then
-  series and symbol image fills (6 rows): the engine and data-owner
-  transitions are shared (`write_chart_background`, `data_owner`); each
-  core needs the `Data/` member publication and the metadata admission
-  Pages got here.
+- Series and symbol image fills (6 rows). Every core now publishes data
+  members (`write_data`, `publish_changes_with_data`) and admits the
+  metadata `DataInfo`/data-reference fields; what is missing is the engine:
+  `series::style` refuses `Fill::Image` (`Refusal::ImageFill`). The host
+  (`charts::series_fill::set_chart_series_image_fill_data`,
+  `series_symbol_fill`) inserts the media, sets the whole fill vector and
+  moves the data reference per series style slot
+  (`adjust_data_reference`, then `remove_orphaned_image_asset`). The engine
+  needs the same per-series owner transition on the (possibly newly
+  allocated) series style variation, with `data_owner::{own_new, release}`
+  and `DataChanges` as in `write_chart_background`.
 - The shared caption lift, then Numbers shape, image and movie captions
   and titles (15 rows), then chart captions (Pages 3, Numbers 3).
