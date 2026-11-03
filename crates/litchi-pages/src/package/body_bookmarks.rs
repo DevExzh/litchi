@@ -636,8 +636,11 @@ fn commit_edit(edit: Edit<'_>) -> Result<Commit, Error> {
                 )
                 .map_err(map_ranged_error)?,
             );
-            let uuid = smart_field::TextAttributeUuid::new(&objects::text_attribute_uuid()?)
-                .map_err(|_| Error::InvalidSource)?;
+            let uuid = smart_field::TextAttributeUuid::new(&objects::text_attribute_uuid(
+                identifier,
+                BOOKMARK_MESSAGE_TYPE,
+            )?)
+            .map_err(|_| Error::InvalidSource)?;
             let object = objects::new_object(
                 source,
                 identifier,

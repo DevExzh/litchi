@@ -74,3 +74,21 @@ fn insert_update_remove_round_trip_and_invert() {
         format!("2026-10-26{text}")
     );
 }
+
+/// Record 0428: a new field's text-attribute UUID is derived, not drawn, so
+/// the same edit on the same input is byte-identical.
+#[test]
+fn inserted_field_output_is_deterministic() {
+    let run = || {
+        let package = Package::from_bytes(BASIC).unwrap();
+        let mut edit = package.edit_body_date_time_fields().unwrap();
+        edit.insert(
+            TextPosition::from_utf16_index(0).unwrap(),
+            DisplayText::new("2026-10-26").unwrap(),
+            settings(1.0),
+        )
+        .unwrap();
+        bytes(edit.commit().unwrap().package())
+    };
+    assert_eq!(run(), run());
+}
