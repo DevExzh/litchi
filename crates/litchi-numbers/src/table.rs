@@ -30,6 +30,8 @@ pub mod lock;
 pub mod merge;
 /// Exact-source table order within a sheet.
 pub mod order;
+/// Pivot aggregate categories (record 0421).
+pub mod pivot;
 /// Exact-source transactions for moving a rooted table between sheets.
 pub mod relocation;
 /// Resizing a table at its trailing edges, started by

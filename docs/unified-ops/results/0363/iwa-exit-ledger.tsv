@@ -806,7 +806,7 @@ numbers/editor/semantic/table.rs	cell_conditional_highlighting	1	numbers	table.c
 numbers/editor/semantic/table.rs	clear_cell_conditional_highlighting	1	numbers	table.conditional_highlight	migrated	litchi_numbers::Package::edit_table_cell_conditional_highlights	numbers_conditional_highlight_clear_parity	B	-	-
 numbers/editor/semantic/table.rs	clear_table_cell_border	1	numbers	table.cell_appearance	migrated	litchi_numbers::Package::edit_table_cell_appearance	numbers_table_cell_border_clear_parity	B	-	-
 numbers/editor/semantic/table.rs	merge_cells	1	numbers	table.merge	migrated	litchi_numbers::Package::edit_table_merges	numbers_table_merge_parity	A	-	-
-numbers/editor/semantic/table.rs	pivot_categories	1	numbers	table.pivot	host-only	litchi-numbers	-	-	-	-
+numbers/editor/semantic/table.rs	pivot_categories	1	numbers	table.pivot	migrated	litchi_numbers::Package::pivot_categories	numbers_pivot_categories_read_parity	A	-	-
 numbers/editor/semantic/table.rs	remove_cell_comment_reply	1	numbers	table.cell_comment	migrated	litchi_numbers::Package::remove_table_cell_comment_reply	numbers_table_cell_comment_reply_remove_parity	B	-	-
 numbers/editor/semantic/table.rs	reset_table_cell_fill	1	numbers	table.cell_appearance	migrated	litchi_numbers::Package::edit_table_cell_appearance	numbers_table_cell_fill_reset_parity	B	-	-
 numbers/editor/semantic/table.rs	reset_table_cell_layout	1	numbers	table.cell_appearance	migrated	litchi_numbers::Package::edit_table_cell_appearance	numbers_table_cell_layout_reset_parity	B	-	-
@@ -1343,11 +1343,13 @@ numbers/editor/table_delete.rs	remove_table_column	1	numbers	table.topology	migr
 numbers/editor/table_delete.rs	remove_table_row	1	numbers	table.topology	migrated	litchi_numbers::Package::edit_table_topology	numbers_table_remove_row_parity	A	-	-
 numbers/editor/table_hidden_axes.rs	set_table_hidden_axes	1	numbers	table.hidden_axes	migrated	litchi_numbers::Package::edit_table_hidden_axes	numbers_table_hidden_axes_set_parity	B	-	-
 numbers/editor/table_hidden_axes.rs	table_hidden_axes	1	numbers	table.hidden_axes	migrated	litchi_numbers::Package::table_hidden_axes	numbers_table_hidden_axes_read_parity	A	-	-
-numbers/editor/table_sort.rs	apply_table_sort_order	1	numbers	table.sort	host-only	litchi-numbers	-	-	-	-
-numbers/editor/table_sort.rs	apply_table_sort_order_to_rows	1	numbers	table.sort	host-only	litchi-numbers	-	-	-	-
-numbers/editor/table_sort.rs	clear_table_sort_order	1	numbers	table.sort	host-only	litchi-numbers	-	-	-	-
-numbers/editor/table_sort.rs	set_table_sort_order	1	numbers	table.sort	host-only	litchi-numbers	-	-	-	-
-numbers/editor/table_sort.rs	table_sort_order	1	numbers	table.sort	host-only	litchi-numbers	-	-	-	-
+numbers/editor/table_sort.rs	__parity_set_table_sort_order_prost	1	numbers	table.sort	retired	-	-	-	-	parity-only hidden legacy host oracle, not a supported Numbers API; removed with the differential host harness in W3
+numbers/editor/table_sort.rs	__parity_table_sort_order_legacy	1	numbers	table.sort	retired	-	-	-	-	parity-only hidden legacy host oracle, not a supported Numbers API; removed with the differential host harness in W3
+numbers/editor/table_sort.rs	apply_table_sort_order	1	numbers	table.sort	migrated	litchi_numbers::Package::edit_table_sort_execution	numbers_table_sort_apply_parity	A	-	-
+numbers/editor/table_sort.rs	apply_table_sort_order_to_rows	1	numbers	table.sort	migrated	litchi_numbers::Package::edit_table_sort_execution	numbers_table_sort_apply_to_rows_parity	A	-	-
+numbers/editor/table_sort.rs	clear_table_sort_order	1	numbers	table.sort	migrated	litchi_numbers::Package::edit_table_sort_order	numbers_table_sort_order_clear_parity	B	-	-
+numbers/editor/table_sort.rs	set_table_sort_order	1	numbers	table.sort	migrated	litchi_numbers::Package::edit_table_sort_order	numbers_table_sort_order_set_parity	B	-	-
+numbers/editor/table_sort.rs	table_sort_order	1	numbers	table.sort	migrated	litchi_numbers::Package::table_sort_order	numbers_table_sort_order_read_parity	A	-	-
 numbers/editor/text_box_create.rs	add_sheet_text_box	1	numbers	drawable.text_box_lifecycle	migrated	litchi_numbers::sheet::drawable::Edit::add_text_box	numbers_sheet_text_box_add_parity	B	-	-
 numbers/editor/text_box_duplicate.rs	duplicate_sheet_text_box	1	numbers	drawable.text_box_lifecycle	migrated	litchi_numbers::sheet::drawable::Edit::duplicate_text_box	numbers_sheet_text_box_duplicate_parity	B	-	-
 numbers/editor/topology_oracle.rs	__edit_table_topology_unverified	1	numbers	other	retired	-	-	-	-	retired: doc(hidden) differential-test oracle of the host (stages a row/column edit without the host appearance reopen), used only by crates/litchi-iwa/tests/numbers_topology_formula_differential.rs against litchi_numbers table topology; not a supported API (record 0363 section 3.1: test-only helper) and deleted with the host test in W3 (record 0417)

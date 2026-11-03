@@ -23375,6 +23375,7 @@
         "litchi_numbers::table::relocation",
         "litchi_numbers::table::resize",
         "litchi_numbers::table::sort::transaction",
+        "litchi_numbers::table::sort::execution",
         "litchi_numbers::table::title",
         "litchi_numbers::table::topology",
         "litchi_numbers::table::hidden_axes::transaction",
@@ -23617,6 +23618,10 @@
         {
           "method": "litchi_numbers::Package::apply_table_sort_order",
           "ok": "litchi_numbers::table::sort::transaction::Commit"
+        },
+        {
+          "method": "litchi_numbers::Package::apply_table_sort_execution",
+          "ok": "litchi_numbers::table::sort::execution::Commit"
         },
         {
           "method": "litchi_numbers::Package::apply_table_title",
@@ -24326,6 +24331,7 @@
         "litchi_numbers::table::relocation",
         "litchi_numbers::table::resize",
         "litchi_numbers::table::sort::transaction",
+        "litchi_numbers::table::sort::execution",
         "litchi_numbers::table::title",
         "litchi_numbers::table::topology",
         "litchi_numbers::table::hidden_axes::transaction",
@@ -24568,6 +24574,10 @@
         {
           "method": "litchi_numbers::Package::apply_table_sort_order",
           "ok": "litchi_numbers::table::sort::transaction::Commit"
+        },
+        {
+          "method": "litchi_numbers::Package::apply_table_sort_execution",
+          "ok": "litchi_numbers::table::sort::execution::Commit"
         },
         {
           "method": "litchi_numbers::Package::apply_table_title",
