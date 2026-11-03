@@ -854,7 +854,12 @@ pub(super) fn execute(
             )?;
 
             let reply_identifier = metadata::allocate_identifier(source, &mut working, budget)?;
-            let reply_uuid = metadata::fresh_storage_uuid_in_working_set(source, &working, budget)?;
+            let reply_uuid = metadata::fresh_storage_uuid_in_working_set(
+                source,
+                &working,
+                reply_identifier,
+                budget,
+            )?;
             let reply_data = canonical_leaf(text, author_identifier, reply_uuid, budget)?;
             insert_storage_object(
                 source,
@@ -1147,7 +1152,12 @@ fn finalize_storage_clones<'source>(
     for clone in clones {
         let old_retained = working.find_object(clone.old_identifier).is_some();
         let new_uuid = if old_retained || clone.old_uuid.is_none() {
-            metadata::fresh_storage_uuid_in_working_set(source, working, budget)?
+            metadata::fresh_storage_uuid_in_working_set(
+                source,
+                working,
+                clone.new_identifier,
+                budget,
+            )?
         } else {
             clone.old_uuid.ok_or(Error::InvalidSource)?
         };
@@ -1300,7 +1310,7 @@ fn create_root(
     let author = metadata::ensure_generated_author(source, working, budget)?;
     let author_identifier = author.identifier();
     let identifier = metadata::allocate_identifier(source, working, budget)?;
-    let uuid = metadata::fresh_storage_uuid_in_working_set(source, working, budget)?;
+    let uuid = metadata::fresh_storage_uuid_in_working_set(source, working, identifier, budget)?;
     let data = canonical_leaf(text, author_identifier, uuid, budget)?;
     insert_storage_object(
         source,

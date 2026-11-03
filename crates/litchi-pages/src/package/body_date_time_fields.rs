@@ -846,7 +846,7 @@ fn commit_edit(edit: Edit<'_>) -> Result<Commit, Error> {
                     range,
                 },
             )?;
-            let uuid = objects::text_attribute_uuid()?;
+            let uuid = objects::text_attribute_uuid(identifier, DATE_TIME_MESSAGE_TYPE)?;
             let object = objects::new_object(
                 source,
                 identifier,

@@ -1431,7 +1431,15 @@ pub(super) fn allocate_ids(
     let last = first
         .checked_add(4)
         .ok_or(SlideAudioCreationError::InvalidSource)?;
-    let bytes = litchi_core::id::generate_guid_bytes();
+    // The host draws random GUIDs here. Leaf output must be a pure function
+    // of its input (record 0428), so every UUID is derived from the fresh
+    // identifier it names (above the package watermark) with the SplitMix64
+    // scheme of record 0375a §2.1; the build UUID is salted apart from the
+    // build object's own map UUID.
+    let build = first
+        .checked_add(3)
+        .ok_or(SlideAudioCreationError::InvalidSource)?;
+    let bytes = derived_guid(build, BUILD_UUID_SALT);
     let build_uuid = uuid_from_guid(&bytes);
     let random_number_seed = u32::from_le_bytes(
         bytes[..4]
@@ -1439,8 +1447,11 @@ pub(super) fn allocate_ids(
             .map_err(|_| SlideAudioCreationError::InvalidSource)?,
     );
     let mut object_uuids = [identity_codec::UuidBits::new(0, 0); 4];
-    for uuid in &mut object_uuids {
-        *uuid = uuid_from_guid(&litchi_core::id::generate_guid_bytes());
+    for (offset, uuid) in (0u64..).zip(&mut object_uuids) {
+        let identifier = first
+            .checked_add(offset)
+            .ok_or(SlideAudioCreationError::InvalidSource)?;
+        *uuid = uuid_from_guid(&derived_guid(identifier, OBJECT_UUID_SALT));
     }
     Ok(CreationIds {
         drawable: first,
@@ -1450,9 +1461,7 @@ pub(super) fn allocate_ids(
         caption: first
             .checked_add(2)
             .ok_or(SlideAudioCreationError::InvalidSource)?,
-        build: first
-            .checked_add(3)
-            .ok_or(SlideAudioCreationError::InvalidSource)?,
+        build,
         chunk: first
             .checked_add(4)
             .ok_or(SlideAudioCreationError::InvalidSource)?,
@@ -1542,6 +1551,23 @@ fn metadata_last_object_identifier(
 struct MetadataWatermarkVisitor;
 
 impl identity_codec::PackageMetadataVisitor for MetadataWatermarkVisitor {}
+
+const OBJECT_UUID_SALT: u64 = 0x6f62_6a65_6374_7575;
+const BUILD_UUID_SALT: u64 = 0x6275_696c_6475_7569;
+
+/// A deterministic RFC 4122 version 4, variant 1 GUID for `identifier`
+/// (SplitMix64, record 0375a §2.1; record 0428). Never nil.
+fn derived_guid(identifier: u64, salt: u64) -> [u8; 16] {
+    use litchi_numbers_wire::table_create::mix;
+    let lower = mix(identifier ^ salt);
+    let upper = mix(lower ^ identifier.rotate_left(17) ^ salt.rotate_left(32));
+    let mut bytes = [0_u8; 16];
+    bytes[..8].copy_from_slice(&lower.to_le_bytes());
+    bytes[8..].copy_from_slice(&upper.to_le_bytes());
+    bytes[6] = (bytes[6] & 0x0f) | 0x40;
+    bytes[8] = (bytes[8] & 0x3f) | 0x80;
+    bytes
+}
 
 fn uuid_from_guid(bytes: &[u8; 16]) -> identity_codec::UuidBits {
     let mut lower = [0u8; 8];

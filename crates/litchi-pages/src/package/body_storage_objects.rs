@@ -594,10 +594,25 @@ pub(crate) fn new_object(
     .map_err(graph::map_core_error)
 }
 
-/// A random lower-case hyphenated UUID for a smart field's
-/// `text_attribute_uuid_string`.
-pub(crate) fn text_attribute_uuid() -> GraphResult<String> {
-    let braced = litchi_core::id::generate_guid_braced();
+/// A hyphenated UUID for a smart field's `text_attribute_uuid_string`.
+///
+/// The host draws a random GUID. Leaf output must be a pure function of its
+/// input (record 0428), so the UUID is derived from the new field object's
+/// `identifier` (fresh above the package's identifier watermark) and its
+/// `message_type`, with the SplitMix64 scheme the shared engines use for new
+/// object UUIDs (record 0375a §2.1), keeping the RFC 4122 version 4,
+/// variant 1 bits of the GUIDs the host writes.
+pub(crate) fn text_attribute_uuid(identifier: u64, message_type: u32) -> GraphResult<String> {
+    use litchi_numbers_wire::table_create::mix;
+    let seed = identifier ^ u64::from(message_type).rotate_left(40) ^ 0x7465_7874_6174_7472;
+    let lower = mix(seed.wrapping_add(0x9e37_79b9_7f4a_7c15));
+    let upper = mix(lower ^ seed.rotate_left(17));
+    let mut bytes = [0_u8; 16];
+    bytes[..8].copy_from_slice(&lower.to_le_bytes());
+    bytes[8..].copy_from_slice(&upper.to_le_bytes());
+    bytes[6] = (bytes[6] & 0x0f) | 0x40;
+    bytes[8] = (bytes[8] & 0x3f) | 0x80;
+    let braced = litchi_core::id::format_guid_braced(&bytes);
     braced
         .strip_prefix('{')
         .and_then(|uuid| uuid.strip_suffix('}'))

@@ -87,3 +87,17 @@ fn overlaps_missing_selections_and_bad_ranges_are_refused() {
         Error::Refused(Refusal::InvalidRange)
     );
 }
+
+/// Record 0428: a new bookmark's text-attribute UUID is derived, not drawn,
+/// so the same edit on the same input is byte-identical.
+#[test]
+fn added_bookmark_output_is_deterministic() {
+    let run = || {
+        let package = Package::from_bytes(BASIC).unwrap();
+        let mut edit = package.edit_body_bookmarks().unwrap();
+        edit.add(TextRange::from_utf16_indexes(0, 4).unwrap(), named("Intro"))
+            .unwrap();
+        bytes(edit.commit().unwrap().package())
+    };
+    assert_eq!(run(), run());
+}

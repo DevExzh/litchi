@@ -4172,17 +4172,6 @@ fn custom_archive_encoded_len(
     Ok(length)
 }
 
-fn encode_custom_registry_entry(
-    uuid: CustomUuid,
-    value: &Custom,
-    path: Path,
-    budget: &mut TransactionBudget,
-) -> Result<(Vec<u8>, Vec<u8>), Error> {
-    let uuid_payload = encode_custom_uuid(uuid, path, budget)?;
-    let format_payload = encode_custom_archive(value, path, budget)?;
-    Ok((uuid_payload, format_payload))
-}
-
 fn encode_custom_archive(
     value: &Custom,
     path: Path,
@@ -4549,17 +4538,59 @@ fn rewrite_custom_cell_clear(
     )
 }
 
-fn fresh_custom_uuid(entries: &[CustomRegistryEntry]) -> CustomUuid {
+/// Derive the registry UUID of a new Custom format deterministically.
+///
+/// The host draws a random GUID here. Leaf output must be a pure function of
+/// its input (patch replay, content identity, record 0351), so the UUID is
+/// derived as the shared W4 engines derive object UUIDs (record 0375a §2.1,
+/// record 0298 §2.1): SplitMix64 over a seed made from package content and
+/// position — the registry object, the owning table, the new entry's index
+/// and a digest of the encoded format — with a counter that is advanced until
+/// the UUID is non-zero in both halves and unused by the registry. The bits
+/// keep the RFC 4122 version 4, variant 1 layout of the GUIDs the host writes
+/// (`litchi_core::id::generate_guid_bytes`, little-endian halves). Record 0428.
+fn derived_custom_uuid(
+    entries: &[CustomRegistryEntry],
+    registry_identifier: u64,
+    table_identifier: u64,
+    format_payload: &[u8],
+) -> CustomUuid {
+    const VERSION_MASK: u64 = 0xf << 52;
+    const VERSION_4: u64 = 0x4 << 52;
+    let seed = registry_identifier
+        ^ table_identifier.rotate_left(32)
+        ^ custom_payload_digest(format_payload)
+        ^ (entries.len() as u64).rotate_left(48);
+    let mut counter = 0u64;
     loop {
-        let bytes = litchi_core::id::generate_guid_bytes();
+        counter = counter.wrapping_add(1);
+        let lower = custom_uuid_mix(seed ^ 0x6375_7374_6f6d_6670, counter);
+        let upper = custom_uuid_mix(lower, seed.rotate_left(17) ^ 0x7265_6769_7374_7279);
         let uuid = CustomUuid {
-            lower: u64::from_le_bytes(bytes[..8].try_into().expect("GUID lower width")),
-            upper: u64::from_le_bytes(bytes[8..].try_into().expect("GUID upper width")),
+            lower: (lower & !VERSION_MASK) | VERSION_4,
+            upper: (upper & !0xc0) | 0x80,
         };
         if uuid.lower != 0 && uuid.upper != 0 && !entries.iter().any(|entry| entry.uuid == uuid) {
             return uuid;
         }
     }
+}
+
+/// FNV-1a over an encoded Custom format archive.
+fn custom_payload_digest(payload: &[u8]) -> u64 {
+    payload.iter().fold(0xcbf2_9ce4_8422_2325, |hash, byte| {
+        (hash ^ u64::from(*byte)).wrapping_mul(0x0000_0100_0000_01b3)
+    })
+}
+
+/// The SplitMix64 finaliser `litchi_iwa_style` uses for object UUIDs.
+const fn custom_uuid_mix(value: u64, salt: u64) -> u64 {
+    let mut z = value
+        .wrapping_add(salt.wrapping_mul(0x9e37_79b9_7f4a_7c15))
+        .wrapping_add(0x9e37_79b9_7f4a_7c15);
+    z = (z ^ (z >> 30)).wrapping_mul(0xbf58_476d_1ce4_e5b9);
+    z = (z ^ (z >> 27)).wrapping_mul(0x94d0_49bb_1331_11eb);
+    z ^ (z >> 31)
 }
 
 fn custom_uuid_is_referenced(
@@ -6009,13 +6040,14 @@ pub fn rewrite_custom_format(
     };
     let desired_reference = if let Some(after) = after {
         let expected_type = custom_format_type(after);
-        let uuid = registry
+        let existing = registry
             .entries
             .iter()
             .find(|entry| entry.format.as_ref().is_some_and(|format| format == after))
-            .map(|entry| entry.uuid)
-            .unwrap_or_else(|| fresh_custom_uuid(&registry.entries));
-        if !registry.entries.iter().any(|entry| entry.uuid == uuid) {
+            .map(|entry| entry.uuid);
+        let uuid = if let Some(uuid) = existing {
+            uuid
+        } else {
             // The source vectors are reserved to their exact input length by
             // the parser. Appending therefore has to be charged and reserved
             // before any new owned payload reaches the allocator.
@@ -6032,15 +6064,22 @@ pub fn rewrite_custom_format(
                 .entries
                 .try_reserve_exact(1)
                 .map_err(|_| Error::Allocation { amount: 1, path })?;
-            let (uuid_payload, format_payload) =
-                encode_custom_registry_entry(uuid, after, path, budget)?;
+            let format_payload = encode_custom_archive(after, path, budget)?;
+            let uuid = derived_custom_uuid(
+                &registry.entries,
+                registry_location.object_identifier,
+                graph.format_table_identifier,
+                &format_payload,
+            );
+            let uuid_payload = encode_custom_uuid(uuid, path, budget)?;
             registry.uuid_payloads.push(Cow::Owned(uuid_payload));
             registry.format_payloads.push(Cow::Owned(format_payload));
             registry
                 .entries
                 .push(CustomRegistryEntry { uuid, format: None });
             registry_changed = true;
-        }
+            uuid
+        };
         let payload = if let Some(old_payload) = old_reference_payload.as_deref() {
             rewrite_custom_reference(old_payload, expected_type, uuid, path, budget)?
         } else {
