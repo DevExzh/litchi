@@ -65,6 +65,7 @@ mod keynote_shape_style_cases;
 mod keynote_slide_cases;
 mod keynote_table_cases;
 mod keynote_table_cell_appearance_cases;
+mod keynote_table_layout_cases;
 mod keynote_table_lifecycle_cases;
 mod keynote_table_topology_cases;
 mod keynote_text_annotation_cases;

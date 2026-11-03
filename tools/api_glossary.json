@@ -27772,7 +27772,8 @@
         "litchi_keynote::slide::table::cell_text",
         "litchi_keynote::slide::table::cell_list",
         "litchi_keynote::slide::table::topology",
-        "litchi_keynote::slide::table::conditional_highlight"
+        "litchi_keynote::slide::table::conditional_highlight",
+        "litchi_keynote::slide::table::layout"
       ],
       "immutable_owners": [
         "litchi_keynote::Package",
@@ -28015,6 +28016,10 @@
         {
           "method": "litchi_keynote::Package::apply_slide_table_cell_conditional_highlights",
           "ok": "litchi_keynote::slide::table::conditional_highlight::Commit"
+        },
+        {
+          "method": "litchi_keynote::Package::apply_slide_table_layout",
+          "ok": "litchi_keynote::slide::table::layout::Commit"
         },
         {
           "method": "litchi_keynote::Package::apply_slide_table_hidden_axes",
@@ -29452,7 +29457,8 @@
         "litchi_keynote::slide::table::cell_text",
         "litchi_keynote::slide::table::cell_list",
         "litchi_keynote::slide::table::topology",
-        "litchi_keynote::slide::table::conditional_highlight"
+        "litchi_keynote::slide::table::conditional_highlight",
+        "litchi_keynote::slide::table::layout"
       ],
       "immutable_owners": [
         "litchi_keynote::Package",
@@ -29695,6 +29701,10 @@
         {
           "method": "litchi_keynote::Package::apply_slide_table_cell_conditional_highlights",
           "ok": "litchi_keynote::slide::table::conditional_highlight::Commit"
+        },
+        {
+          "method": "litchi_keynote::Package::apply_slide_table_layout",
+          "ok": "litchi_keynote::slide::table::layout::Commit"
         },
         {
           "method": "litchi_keynote::Package::apply_slide_table_hidden_axes",
