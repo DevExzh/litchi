@@ -215,6 +215,189 @@ impl FormulaWriteCellReference {
     }
 }
 
+/// One absolute pivot-category aggregate reference (`CATEGORY_REF_NODE`),
+/// resolved by the caller against the workbook's group-by model.
+///
+/// The node is written exactly as the iWork host compiler writes it: the
+/// group-by, column and absolute group UUIDs, the aggregate code and group
+/// level, preserve flags `(false, true, false, false)` and aggregate index
+/// level `u16::MAX`. Its two precedents are the group-by's grouping-columns
+/// cell and the category's aggregate cell, both in the group-by's formula
+/// owner. A formula holding one carries the host's translation flags.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct FormulaWriteCategoryReference {
+    group_by: FormulaWriteOwnerUid,
+    column: FormulaWriteOwnerUid,
+    group: FormulaWriteOwnerUid,
+    aggregate_type: u32,
+    group_level: i32,
+    internal_owner: u32,
+    grouping: (u32, u32),
+    aggregate: (u32, u32),
+}
+
+impl FormulaWriteCategoryReference {
+    /// A category of the group-by `group_by`, aggregated column `column`
+    /// and group node `group`, whose formula owner is `internal_owner`;
+    /// `grouping` and `aggregate` are `(row, column)` cells of that owner.
+    #[must_use]
+    #[allow(clippy::too_many_arguments)]
+    pub const fn new(
+        group_by: FormulaWriteOwnerUid,
+        column: FormulaWriteOwnerUid,
+        group: FormulaWriteOwnerUid,
+        aggregate_type: u32,
+        group_level: i32,
+        internal_owner: u32,
+        grouping: (u32, u32),
+        aggregate: (u32, u32),
+    ) -> Self {
+        Self {
+            group_by,
+            column,
+            group,
+            aggregate_type,
+            group_level,
+            internal_owner,
+            grouping,
+            aggregate,
+        }
+    }
+}
+
+/// The host's `FormulaTranslationFlagsArchive` for a formula holding a
+/// category reference, as root field 6: every flag explicit, only
+/// `returns_percent_formatted` set.
+const CATEGORY_TRANSLATION_FLAGS: [u8; 12] = [
+    0x32, 0x0a, 0x08, 0x00, 0x10, 0x00, 0x18, 0x00, 0x20, 0x00, 0x28, 0x01,
+];
+
+/// The most bytes one encoded `AST_category_ref` payload (field 39) needs.
+const CATEGORY_PAYLOAD_CAPACITY: usize = 128;
+
+/// One encoded `ASTCategoryReferenceArchive`, built without allocation.
+struct CategoryPayload {
+    bytes: [u8; CATEGORY_PAYLOAD_CAPACITY],
+    length: usize,
+}
+
+impl CategoryPayload {
+    fn as_bytes(&self) -> &[u8] {
+        &self.bytes[..self.length]
+    }
+}
+
+struct FixedWriter<'buffer> {
+    bytes: &'buffer mut [u8],
+    length: usize,
+}
+
+impl FixedWriter<'_> {
+    fn byte(&mut self, value: u8) -> Result<(), DecodeError> {
+        let slot = self.bytes.get_mut(self.length).ok_or_else(malformed)?;
+        *slot = value;
+        self.length += 1;
+        Ok(())
+    }
+
+    fn varint(&mut self, mut value: u64) -> Result<(), DecodeError> {
+        loop {
+            if value < 0x80 {
+                return self.byte(value as u8);
+            }
+            self.byte((value as u8 & 0x7f) | 0x80)?;
+            value >>= 7;
+        }
+    }
+
+    fn varint_field(&mut self, field: u32, value: u64) -> Result<(), DecodeError> {
+        self.varint(u64::from(field) << 3)?;
+        self.varint(value)
+    }
+
+    fn header(&mut self, field: u32, length: usize) -> Result<(), DecodeError> {
+        self.varint((u64::from(field) << 3) | 2)?;
+        self.varint(u64::try_from(length).map_err(|_error| malformed())?)
+    }
+
+    fn uuid_field(&mut self, field: u32, uid: FormulaWriteOwnerUid) -> Result<(), DecodeError> {
+        self.header(field, uuid_message_len(uid)?)?;
+        self.varint_field(1, uid.lower)?;
+        self.varint_field(2, uid.upper)
+    }
+}
+
+fn uuid_message_len(uid: FormulaWriteOwnerUid) -> Result<usize, DecodeError> {
+    checked(
+        varint_field_len(1, uid.lower)?,
+        varint_field_len(2, uid.upper)?,
+    )
+}
+
+/// `PreserveColumnRowFlagsArchive { false, true, Some(false), Some(false) }`.
+const CATEGORY_PRESERVE_FLAGS: [u8; 8] = [0x08, 0x00, 0x10, 0x01, 0x18, 0x00, 0x20, 0x00];
+const CATEGORY_AGG_INDEX_LEVEL: u64 = u16::MAX as u64;
+
+fn category_archive_len(reference: FormulaWriteCategoryReference) -> Result<usize, DecodeError> {
+    let mut length = length_delimited_field_len(1, uuid_message_len(reference.group_by)?)?;
+    length = checked(
+        length,
+        length_delimited_field_len(2, uuid_message_len(reference.column)?)?,
+    )?;
+    length = checked(
+        length,
+        varint_field_len(3, u64::from(reference.aggregate_type))?,
+    )?;
+    length = checked(
+        length,
+        varint_field_len(4, u64::from(zigzag_encode_32(reference.group_level)))?,
+    )?;
+    length = checked(
+        length,
+        length_delimited_field_len(7, CATEGORY_PRESERVE_FLAGS.len())?,
+    )?;
+    length = checked(
+        length,
+        length_delimited_field_len(10, uuid_message_len(reference.group)?)?,
+    )?;
+    checked(length, varint_field_len(13, CATEGORY_AGG_INDEX_LEVEL)?)
+}
+
+/// The `AST_category_ref` payload: `ASTCategoryReferenceArchive { 1:
+/// CategoryReferenceArchive }`, fields in the order Prost writes them.
+fn category_payload(
+    reference: FormulaWriteCategoryReference,
+) -> Result<CategoryPayload, DecodeError> {
+    let inner = category_archive_len(reference)?;
+    let mut bytes = [0_u8; CATEGORY_PAYLOAD_CAPACITY];
+    let mut writer = FixedWriter {
+        bytes: &mut bytes,
+        length: 0,
+    };
+    writer.header(1, inner)?;
+    writer.uuid_field(1, reference.group_by)?;
+    writer.uuid_field(2, reference.column)?;
+    writer.varint_field(3, u64::from(reference.aggregate_type))?;
+    writer.varint_field(4, u64::from(zigzag_encode_32(reference.group_level)))?;
+    writer.header(7, CATEGORY_PRESERVE_FLAGS.len())?;
+    for byte in CATEGORY_PRESERVE_FLAGS {
+        writer.byte(byte)?;
+    }
+    writer.uuid_field(10, reference.group)?;
+    writer.varint_field(13, CATEGORY_AGG_INDEX_LEVEL)?;
+    let length = writer.length;
+    if length != length_delimited_field_len(1, inner)? {
+        return Err(malformed());
+    }
+    Ok(CategoryPayload { bytes, length })
+}
+
+fn contains_category(nodes: &[FormulaWriteNode<'_>]) -> bool {
+    nodes
+        .iter()
+        .any(|node| matches!(node, FormulaWriteNode::CategoryReference(_)))
+}
+
 /// One semantic whole-row/whole-column endpoint.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct FormulaWriteAxisReference {
@@ -496,8 +679,8 @@ impl FormulaWriteAxis {
 ///
 /// This is an archive-boundary lowering type, not the public Numbers formula
 /// vocabulary. Higher layers privately resolve cross-table owners before
-/// constructing the resolved reference variants below. Pivot nodes remain
-/// absent until a semantic resolver can provide an exact native shape.
+/// constructing the resolved reference variants below. A pivot category is
+/// resolved by the caller against the group-by model (record 0424).
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum FormulaWriteNode<'text> {
     Number(f64),
@@ -534,6 +717,8 @@ pub enum FormulaWriteNode<'text> {
         argument_count: u32,
     },
     Range,
+    /// An absolute pivot-category aggregate reference.
+    CategoryReference(FormulaWriteCategoryReference),
 }
 
 /// Exact resources computed without allocating an output buffer.
@@ -1583,7 +1768,23 @@ fn plan_formula_archive_in<'nodes, 'text>(
     if nodes.is_empty() || stack != 1 {
         return Err(DecodeError::invalid(InvalidReason::InvalidPostfix));
     }
-    let output_bytes = length_delimited_field_len(1, ast_bytes)?;
+    let mut output_bytes = length_delimited_field_len(1, ast_bytes)?;
+    if contains_category(nodes) {
+        output_bytes = checked(output_bytes, CATEGORY_TRANSLATION_FLAGS.len())?;
+        fields = checked(fields, 6)?;
+        if output_bytes > maximum_output {
+            return Err(DecodeError::limited(DecodeLimit::Bytes {
+                observed: output_bytes,
+                maximum: maximum_output,
+            }));
+        }
+        if fields > options.max_fields {
+            return Err(DecodeError::limited(DecodeLimit::Fields {
+                observed: fields,
+                maximum: options.max_fields,
+            }));
+        }
+    }
     let (precedent_count, range_count) = formula_dependency_counts(nodes, context, owners)?;
     let dependency_work = checked(nodes.len(), checked(precedent_count, range_count)?)?;
     if precedent_count > dependency_limits.max_precedents {
@@ -1665,6 +1866,9 @@ pub fn execute_formula_archive_plan_with_visitor(
         );
         encode_write_node_in(&mut output, node, plan.context, plan.owners)?;
     }
+    if contains_category(plan.nodes) {
+        output.extend_from_slice(&CATEGORY_TRANSLATION_FLAGS);
+    }
     if output.len() != plan.requirements.output_bytes {
         return Err(malformed());
     }
@@ -1707,6 +1911,12 @@ fn validate_write_node(
             *stack = checked(*stack, 1)?;
         },
         FormulaWriteNode::Boolean(_) | FormulaWriteNode::CellReference { .. } => {
+            *stack = checked(*stack, 1)?;
+        },
+        FormulaWriteNode::CategoryReference(reference) => {
+            if reference.internal_owner == 0 {
+                return Err(DecodeError::invalid(InvalidReason::ExternalOwner));
+            }
             *stack = checked(*stack, 1)?;
         },
         FormulaWriteNode::ResolvedCellReference { owner, reference } => {
@@ -1928,8 +2138,18 @@ fn wire_node_requirements(
                 context.ok_or_else(|| DecodeError::invalid(InvalidReason::ExternalOwner))?;
             whole_axis_nested_field_count(*owner, *start, *end, false, context)?
         },
+        // `category_ref`, its seven fields, and the fields of its three
+        // UUIDs and preserve flags.
+        FormulaWriteNode::CategoryReference(_) => 18,
         _ => 0,
     };
+    if matches!(node, FormulaWriteNode::CategoryReference(_)) {
+        return Ok(WireNodeRequirements {
+            ast_bytes: length_delimited_field_len(1, node_bytes)?,
+            fields: checked(checked(1, direct_fields)?, nested_fields)?,
+            max_depth: 6,
+        });
+    }
     let resolved_deep = matches!(
         node,
         FormulaWriteNode::ResolvedCellReference { owner: Some(_), .. }
@@ -1965,6 +2185,7 @@ fn formula_dependency_counts(
     for node in nodes {
         let count = match node {
             FormulaWriteNode::ResolvedCellReference { .. } => 1,
+            FormulaWriteNode::CategoryReference(_) => 2,
             FormulaWriteNode::ResolvedRange { owner, start, end } => {
                 let target = resolved_target(context, owners, *owner)?;
                 let _internal_owner = target.internal_owner;
@@ -2031,6 +2252,15 @@ fn emit_formula_dependencies(
                 let end_cell =
                     FormulaWriteCellReference::new(target.rows - 1, end.index, false, end.absolute);
                 emit_rectangle(target, start_cell, end_cell, visitor)?;
+            },
+            FormulaWriteNode::CategoryReference(reference) => {
+                for (row, column) in [reference.grouping, reference.aggregate] {
+                    visitor.visit_precedent(FormulaWritePrecedent {
+                        internal_owner: reference.internal_owner,
+                        row,
+                        column,
+                    })?;
+                }
             },
             _ => {},
         }
@@ -2540,6 +2770,7 @@ fn write_node_kind(node: &FormulaWriteNode<'_>) -> u32 {
         FormulaWriteNode::Percent => 15,
         FormulaWriteNode::Function { .. } => 16,
         FormulaWriteNode::Range => 29,
+        FormulaWriteNode::CategoryReference(_) => 66,
     }
 }
 
@@ -2553,6 +2784,7 @@ const fn write_node_field_count(node: &FormulaWriteNode<'_>) -> usize {
         | FormulaWriteNode::WholeRows { .. }
         | FormulaWriteNode::WholeColumns { .. } => 3,
         FormulaWriteNode::Function { .. } => 3,
+        FormulaWriteNode::CategoryReference(_) => 2,
         FormulaWriteNode::Binary(_)
         | FormulaWriteNode::Negation
         | FormulaWriteNode::Percent
@@ -2630,6 +2862,13 @@ fn encoded_write_node_len_in(
         } => checked(
             checked(base, varint_field_len(2, u64::from(*identifier))?)?,
             varint_field_len(3, u64::from(*argument_count))?,
+        ),
+        FormulaWriteNode::CategoryReference(reference) => checked(
+            base,
+            length_delimited_field_len(
+                39,
+                length_delimited_field_len(1, category_archive_len(*reference)?)?,
+            )?,
         ),
         FormulaWriteNode::Binary(_)
         | FormulaWriteNode::Negation
@@ -2731,6 +2970,9 @@ fn encode_write_node_in(
         } => {
             put_varint_field(output, 2, u64::from(*identifier));
             put_varint_field(output, 3, u64::from(*argument_count));
+        },
+        FormulaWriteNode::CategoryReference(reference) => {
+            put_bytes_field(output, 39, category_payload(*reference)?.as_bytes())?;
         },
         FormulaWriteNode::Binary(_)
         | FormulaWriteNode::Negation
@@ -3015,10 +3257,19 @@ fn validate_canonical_formula_output(
     let mut remaining = source;
     let root = next_field(&mut remaining, &mut budget, 1)?
         .ok_or_else(|| DecodeError::invalid(InvalidReason::MissingRequired))?;
-    if root.number != 1 || !remaining.is_empty() {
+    if root.number != 1 {
         return Err(malformed());
     }
     let ast = root.bytes()?;
+    let expected_flags = contains_category(nodes).then_some(&CATEGORY_TRANSLATION_FLAGS[2..]);
+    let flags = match next_field(&mut remaining, &mut budget, 1)? {
+        None => None,
+        Some(field) if field.number == 6 => Some(field.bytes()?),
+        Some(_) => return Err(malformed()),
+    };
+    if !remaining.is_empty() || flags != expected_flags {
+        return Err(malformed());
+    }
     let view: projection::FormulaArchiveLazyView<'_> = options
         .buffa()
         .decode_lazy_view(source)
@@ -3029,7 +3280,7 @@ fn validate_canonical_formula_output(
         || view.host_row.is_some()
         || view.host_column_is_negative.is_some()
         || view.host_row_is_negative.is_some()
-        || view.translation_flags.is_some()
+        || view.translation_flags != expected_flags
         || view.host_table_uid.is_some()
         || view.host_column_uid.is_some()
         || view.host_row_uid.is_some()
@@ -3071,6 +3322,7 @@ struct WrittenNodeFields<'source> {
     cross_extra: Option<&'source [u8]>,
     sticky: Option<&'source [u8]>,
     colon: Option<&'source [u8]>,
+    category: Option<&'source [u8]>,
     decimal_low: Option<u64>,
     decimal_high: Option<u64>,
 }
@@ -3097,6 +3349,7 @@ fn validate_canonical_write_node(
             27 => set_once(&mut fields.row, field.bytes()?)?,
             28 => set_once(&mut fields.cross_extra, field.bytes()?)?,
             33 => set_once(&mut fields.sticky, field.bytes()?)?,
+            39 => set_once(&mut fields.category, field.bytes()?)?,
             40 => set_once(&mut fields.colon, field.bytes()?)?,
             42 => set_once(&mut fields.decimal_low, field.varint()?)?,
             43 => set_once(&mut fields.decimal_high, field.varint()?)?,
@@ -3193,6 +3446,8 @@ fn validate_canonical_write_node(
             argument_count,
         } if fields.function == Some(*identifier) && fields.arguments == Some(*argument_count) => {
         },
+        FormulaWriteNode::CategoryReference(reference)
+            if fields.category == Some(category_payload(*reference)?.as_bytes()) => {},
         FormulaWriteNode::Binary(_)
         | FormulaWriteNode::Negation
         | FormulaWriteNode::Percent
@@ -3210,6 +3465,7 @@ fn validate_canonical_write_node(
         || view.number.map(f64::to_bits) != fields.number
         || view.boolean != fields.boolean
         || view.string != fields.text
+        || view.category_ref != fields.category
         || view.local_cell_reference.is_some()
         || view.cross_table_cell_reference.is_some()
         || view.column != fields.column
@@ -5192,6 +5448,19 @@ fn decode_node<V: FormulaVisitor + ?Sized>(
         || view.category_ref != fields.category
     {
         return Err(DecodeError::invalid(InvalidReason::MalformedWire));
+    }
+    // A resolved pivot-category reference (record 0424): its precedents live
+    // in the group-by model, not in the AST, so the dependency projection
+    // tolerates it as an opaque operand and the formula is not evaluable.
+    // The payload is still strictly validated.
+    if kind == 66
+        && resolution.is_some()
+        && mode == DecodeMode::Dependencies
+        && fields.present == field_bit(1) | field_bit(39)
+    {
+        parse_render_category(required(fields.category)?, budget, depth + 1)?;
+        budget.unsupported_evaluator();
+        return unsupported_local(kind, None, mode, budget, visitor, emit);
     }
     if fields.cross.is_some()
         || fields.uid.is_some()
@@ -7928,6 +8197,117 @@ mod tests {
             validate_canonical_write_node(node, expected, None, &[], &mut budget, options).unwrap();
         }
         assert!(ast.is_empty());
+    }
+
+    /// Record 0424: a category reference is written exactly as the host's
+    /// Prost compiler writes it, streams its two group-by-owner precedents,
+    /// and reads back as an opaque, non-evaluable dependency operand.
+    #[test]
+    fn writer_category_reference_matches_prost_host_shape() {
+        use crate::{tsce, tsp};
+        use prost::Message as _;
+
+        let uuid = |lower: u64, upper: u64| tsp::Uuid { lower, upper };
+        let category = FormulaWriteCategoryReference::new(
+            FormulaWriteOwnerUid::from_halves(5, 9),
+            FormulaWriteOwnerUid::from_halves(11, 1),
+            FormulaWriteOwnerUid::from_halves(0x8000_0000_0000_0001, 0),
+            1,
+            -1,
+            13,
+            (9, 1),
+            (1, 4),
+        );
+        let nodes = [
+            FormulaWriteNode::CategoryReference(category),
+            FormulaWriteNode::Number(2.0),
+            FormulaWriteNode::Binary(BinaryOperator::Divide),
+        ];
+        let (context, owners) = resolved_context();
+        let options = broad_write_options();
+        let plan = plan_resolved_formula_archive(
+            &nodes,
+            context,
+            &owners,
+            FormulaWriteDependencyLimits::new(2, 0),
+            options,
+        )
+        .unwrap();
+        assert_eq!(plan.requirements().precedent_count(), 2);
+        struct Precedents(Vec<(u32, u32, u32)>);
+        impl FormulaWriteDependencyVisitor for Precedents {
+            fn visit_precedent(
+                &mut self,
+                precedent: FormulaWritePrecedent,
+            ) -> Result<(), DecodeError> {
+                self.0
+                    .push((precedent.internal_owner, precedent.row, precedent.column));
+                Ok(())
+            }
+        }
+        let mut precedents = Precedents(Vec::new());
+        let (output, _) =
+            execute_formula_archive_plan_with_visitor(plan, options, &mut precedents).unwrap();
+        assert_eq!(precedents.0, [(13, 9, 1), (13, 1, 4)]);
+
+        let oracle = tsce::FormulaArchive::decode(output.as_slice()).unwrap();
+        let mut host = oracle.clone();
+        host.ast_node_array.ast_node[0] = tsce::ast_node_array_archive::AstNodeArchive {
+            ast_node_type: tsce::ast_node_array_archive::AstNodeType::CategoryRefNode as i32,
+            ast_category_ref: Some(tsce::ast_node_array_archive::AstCategoryReferenceArchive {
+                category_ref: tsce::CategoryReferenceArchive {
+                    group_by_uid: uuid(5, 9),
+                    column_uid: uuid(11, 1),
+                    aggregate_type: 1,
+                    group_level: -1,
+                    preserve_flags: Some(tsce::PreserveColumnRowFlagsArchive {
+                        begin_row_is_absolute: false,
+                        begin_column_is_absolute: true,
+                        end_row_is_absolute: Some(false),
+                        end_column_is_absolute: Some(false),
+                    }),
+                    absolute_group_uid: Some(uuid(0x8000_0000_0000_0001, 0)),
+                    agg_index_level: Some(u32::from(u16::MAX)),
+                    ..Default::default()
+                },
+            }),
+            ..Default::default()
+        };
+        host.translation_flags = Some(tsce::FormulaTranslationFlagsArchive {
+            excel_import_translation: Some(false),
+            number_to_date_coercion_removal_translation: Some(false),
+            contains_uid_form_references: Some(false),
+            contains_frozen_references: Some(false),
+            returns_percent_formatted: Some(true),
+        });
+        assert_eq!(output, host.encode_to_vec());
+
+        let registry = read_registry(&[
+            ResolvedFormulaWriteOwner::new(
+                FormulaWriteOwnerUid::from_halves(1, 1),
+                context.internal_owner,
+                context.rows,
+                context.columns,
+            ),
+            owners[0],
+        ]);
+        let mut facts = ResolvedReadFacts::default();
+        let report = inspect_resolved_formula_dependencies_with_visitor(
+            &output, context, &registry, options, &mut facts,
+        )
+        .unwrap();
+        assert!(!report.evaluator_supported());
+        assert!(facts.precedents.is_empty());
+        assert!(
+            decode_resolved_formula_archive_with_visitor(
+                &output,
+                context,
+                &registry,
+                options,
+                &mut ResolvedReadFacts::default(),
+            )
+            .is_err()
+        );
     }
 
     #[test]
