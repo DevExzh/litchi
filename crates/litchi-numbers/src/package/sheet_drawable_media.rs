@@ -194,7 +194,7 @@ fn style_preset(package: &Package, field: u32) -> FaultResult<u64> {
 }
 
 /// A new asset's `Data/` file name (the host's `materialized_file_name`).
-pub(super) fn materialized_name(preferred: &str, identifier: u64) -> FaultResult<String> {
+fn materialized_name(preferred: &str, identifier: u64) -> FaultResult<String> {
     let path = std::path::Path::new(preferred);
     let stem = path
         .file_stem()
