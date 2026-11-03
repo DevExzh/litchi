@@ -34,7 +34,7 @@ use super::body_drawable_graph::{
 use super::body_storage_objects as objects;
 
 mod chart;
-use crate::selector::DrawableSelector;
+use crate::selector::{BodyChartSelector, DrawableSelector};
 
 const ZORDER_MESSAGE_TYPE: u32 = 10_015;
 const ZORDER_DRAWABLES_FIELD: u32 = 1;
@@ -271,6 +271,8 @@ enum Operation {
     Add(TextPosition, NewMedia),
     AddTextShape(TextPosition, NewTextShape),
     AddChart(TextPosition, Box<chart::NewChart>),
+    DuplicateChart(BodyChartSelector, TextPosition),
+    RemoveChart(BodyChartSelector),
 }
 
 /// A new body text box, preset shape or straight line (the host's
@@ -659,6 +661,58 @@ impl Edit<'_> {
         self.stage(Operation::AddChart(anchor, Box::new(new)))
     }
 
+    /// Stage a copy of one body chart anchored at a UTF-16 body position
+    /// (the host's `duplicate_body_chart`): its private graph (drawable,
+    /// caption and title objects, own preset and the styles only it uses,
+    /// attachment) is cloned under fresh identifiers, its frame moved 12 pt,
+    /// its styles joined to the document stylesheet and its preset to the
+    /// theme. Its data and opaque fields are kept.
+    ///
+    /// ```no_run
+    /// use litchi_pages::{Package, TextPosition};
+    ///
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let package = Package::open("input.pages")?;
+    /// let mut edit = package.edit_body_media();
+    /// edit.duplicate_chart(0, TextPosition::ZERO)?;
+    /// let commit = edit.commit()?;
+    /// let restored = commit
+    ///     .package()
+    ///     .apply_body_media(&commit.patch().inverse())?;
+    /// # let _ = restored;
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
+    /// # Errors
+    ///
+    /// Refuses a second operation; the chart and its graph are checked at
+    /// commit ([`Refusal::NotFound`], [`Refusal::SharedGraph`]).
+    pub fn duplicate_chart(
+        &mut self,
+        chart: impl Into<BodyChartSelector>,
+        anchor: TextPosition,
+    ) -> Result<&mut Self, Error> {
+        self.stage(Operation::DuplicateChart(chart.into(), anchor))
+    }
+
+    /// Stage the removal of one body chart (the host's `remove_body_chart`):
+    /// its U+FFFC and attachment entry, its z-order entry and private graph;
+    /// its styles leave the stylesheet and its preset the theme, and its
+    /// UUIDs, cross-component references, data owners and the data only it
+    /// used are released. A direct comment is cleared first.
+    ///
+    /// # Errors
+    ///
+    /// Refuses a second operation; the chart and its graph are checked at
+    /// commit.
+    pub fn remove_chart(
+        &mut self,
+        chart: impl Into<BodyChartSelector>,
+    ) -> Result<&mut Self, Error> {
+        self.stage(Operation::RemoveChart(chart.into()))
+    }
+
     fn add_text_shape(
         &mut self,
         anchor: TextPosition,
@@ -738,6 +792,10 @@ impl Edit<'_> {
             Operation::Add(anchor, media) => add(self.source, anchor, &media)?,
             Operation::AddTextShape(anchor, shape) => add_text_shape(self.source, anchor, &shape)?,
             Operation::AddChart(anchor, new) => chart::add(self.source, anchor, &new)?,
+            Operation::DuplicateChart(selector, anchor) => {
+                chart::duplicate(self.source, selector, anchor)?
+            },
+            Operation::RemoveChart(selector) => chart::remove(self.source, selector)?,
             Operation::ReplaceAsset(asset, data) => {
                 if !media_assets(self.source, graph::ROOT_OBJECT_IDENTIFIER)?
                     .iter()
@@ -1413,57 +1471,16 @@ fn remove(source: &Package, selector: DrawableSelector) -> Result<(Package, Diag
         let remaining = objects::max_identifier(source, &archives);
         payload = objects::released(&payload, metadata.last, &media.objects, remaining)?;
 
-        let mut referenced = objects::referenced_data(&payload)?;
-        for component in source.state.source.components().iter() {
-            let staged = archives
-                .iter()
-                .find(|(name, _)| name.as_ref() == component.name())
-                .map_or(component.archive(), |(_, archive)| archive);
-            for object in &staged.objects {
-                for info in &object.archive_info.message_infos {
-                    referenced.extend(info.data_references.iter().copied());
-                    referenced.extend(
-                        info.field_infos
-                            .iter()
-                            .flat_map(|field| field.data_references.iter().copied()),
-                    );
-                }
-                if metadata.data_metadata_map.is_some()
-                    && object.archive_info.identifier == metadata.data_metadata_map
-                {
-                    for message in &object.messages {
-                        if message.type_ == DATA_METADATA_MAP_MESSAGE_TYPE {
-                            referenced.extend(objects::data_metadata_entries(&message.data)?);
-                        }
-                    }
-                }
-            }
-        }
-        let mut candidates = media
+        let candidates = media
             .data_references
             .iter()
             .map(|(data, _)| *data)
             .collect::<Vec<_>>();
-        candidates.sort_unstable();
-        candidates.dedup();
-        for data in candidates {
-            if referenced.contains(&data) {
-                continue;
-            }
-            if let Some(member) = objects::data_member(&payload, data)? {
-                if source
-                    .state
-                    .source
-                    .package()
-                    .iter()
-                    .any(|entry| entry.name() == member)
-                {
-                    deletions.push(member);
-                }
-            }
-            payload = objects::remove_data_info(&payload, data)?;
-            removed_assets += 1;
-        }
+        let (released, members, count) =
+            release_orphans(source, &archives, &metadata, payload, candidates)?;
+        payload = released;
+        deletions.extend(members);
+        removed_assets += count;
         if payload != metadata.payload {
             let archive = editable(source, &mut archives, &metadata.component)?;
             archive
@@ -1492,6 +1509,72 @@ fn remove(source: &Package, selector: DrawableSelector) -> Result<(Package, Diag
             ..Diagnostics::default()
         },
     ))
+}
+
+/// `payload` without the `DataInfo` of every candidate data record nothing
+/// references any more (no component data-reference owner, data metadata
+/// map entry or message-info reference of the staged candidate), the
+/// `Data/` members to delete and their count (the host's
+/// `remove_orphaned_image_asset`).
+fn release_orphans(
+    source: &Package,
+    archives: &[(Arc<str>, Archive)],
+    metadata: &objects::Metadata,
+    mut payload: Vec<u8>,
+    mut candidates: Vec<u64>,
+) -> Result<(Vec<u8>, Vec<String>, usize), Error> {
+    let mut deletions = Vec::new();
+    let mut removed = 0usize;
+    if candidates.is_empty() {
+        return Ok((payload, deletions, removed));
+    }
+    let mut referenced = objects::referenced_data(&payload)?;
+    for component in source.state.source.components().iter() {
+        let staged = archives
+            .iter()
+            .find(|(name, _)| name.as_ref() == component.name())
+            .map_or(component.archive(), |(_, archive)| archive);
+        for object in &staged.objects {
+            for info in &object.archive_info.message_infos {
+                referenced.extend(info.data_references.iter().copied());
+                referenced.extend(
+                    info.field_infos
+                        .iter()
+                        .flat_map(|field| field.data_references.iter().copied()),
+                );
+            }
+            if metadata.data_metadata_map.is_some()
+                && object.archive_info.identifier == metadata.data_metadata_map
+            {
+                for message in &object.messages {
+                    if message.type_ == DATA_METADATA_MAP_MESSAGE_TYPE {
+                        referenced.extend(objects::data_metadata_entries(&message.data)?);
+                    }
+                }
+            }
+        }
+    }
+    candidates.sort_unstable();
+    candidates.dedup();
+    for data in candidates {
+        if referenced.contains(&data) {
+            continue;
+        }
+        if let Some(member) = objects::data_member(&payload, data)? {
+            if source
+                .state
+                .source
+                .package()
+                .iter()
+                .any(|entry| entry.name() == member)
+            {
+                deletions.push(member);
+            }
+        }
+        payload = objects::remove_data_info(&payload, data)?;
+        removed += 1;
+    }
+    Ok((payload, deletions, removed))
 }
 
 fn verify_removed(
@@ -1664,6 +1747,9 @@ fn clone_object(
                 .map_err(|_| Error::InvalidSource)?
             },
             STANDIN_MESSAGE_TYPE => message.data.clone(),
+            chart::CHART_MESSAGE_TYPE | chart::PRESET_MESSAGE_TYPE => {
+                chart::remap_message(message.type_, &message.data, &info.object_references, remap)?
+            },
             message_type => match reference_paths(message_type) {
                 Some(paths) => remap_paths(&message.data, paths, remap)?,
                 None => {

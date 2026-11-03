@@ -741,7 +741,30 @@ fn apply_one(
     selector: DrawableSelector,
     change: &Staged,
 ) -> Result<Option<Published>, Error> {
-    let target = target(source, selector)?;
+    apply_to(source, &target(source, selector)?, change)
+}
+
+/// Clear the direct comment of body chart `drawable` (its chart payload is
+/// message `index`) before the chart lifecycle removes it, as the host's
+/// `remove_body_chart` does; `None` when the chart has no comment.
+pub(super) fn clear_chart_comment(
+    source: &Package,
+    drawable: u64,
+    index: usize,
+) -> Result<Option<Package>, Error> {
+    let target = Target {
+        drawable,
+        index,
+        path: route(5_021).ok_or(Error::InvalidSource)?,
+    };
+    Ok(apply_to(source, &target, &Staged::Clear)?.map(|published| published.package))
+}
+
+fn apply_to(
+    source: &Package,
+    target: &Target,
+    change: &Staged,
+) -> Result<Option<Published>, Error> {
     let mut working = Working::new(source)?;
     working.keep_previews();
     let registry =
@@ -749,7 +772,7 @@ fn apply_one(
     let drawable_member = working
         .locate(target.drawable)?
         .ok_or(Error::InvalidSource)?;
-    let current = current_comment(&working, &target)?;
+    let current = current_comment(&working, target)?;
     let mut graph = Graph {
         working: &mut working,
         registry,
@@ -769,7 +792,7 @@ fn apply_one(
                     // Prove no other owner observes the storage: detach the
                     // selected edge in a scratch copy and take the census.
                     let mut scratch = Working::new(source)?;
-                    repoint(&mut scratch, &target, Some(storage), None)?;
+                    repoint(&mut scratch, target, Some(storage), None)?;
                     let registry = metadata::registry(&scratch)?
                         .ok_or(Error::Refused(Refusal::UnsupportedSource))?;
                     let scratch_graph = Graph {
@@ -792,7 +815,7 @@ fn apply_one(
                 } else {
                     let copy = allocate(graph.working)?;
                     graph.clone_with_body(storage, copy, body)?;
-                    repoint(graph.working, &target, Some(storage), Some(copy))?;
+                    repoint(graph.working, target, Some(storage), Some(copy))?;
                     graph.stamp(&storage_member)?;
                     graph.stamp(&drawable_member)?;
                 }
@@ -800,7 +823,7 @@ fn apply_one(
                 let author = graph.author()?;
                 let storage = allocate(graph.working)?;
                 graph.insert_comment_storage(&drawable_member, storage, body, author)?;
-                repoint(graph.working, &target, None, Some(storage))?;
+                repoint(graph.working, target, None, Some(storage))?;
                 graph.add_author_reference(&drawable_member, author)?;
                 graph.stamp(&drawable_member)?;
             }
@@ -810,7 +833,7 @@ fn apply_one(
                 return Ok(None);
             };
             replies_of(graph.working, storage)?;
-            repoint(graph.working, &target, Some(storage), None)?;
+            repoint(graph.working, target, Some(storage), None)?;
             graph.stamp(&drawable_member)?;
             graph.remove_unreferenced(storage)?;
         },
@@ -820,7 +843,7 @@ fn apply_one(
             let author = graph.author()?;
             let copy = allocate(graph.working)?;
             let root_member = graph.clone_exact(root, copy)?;
-            repoint(graph.working, &target, Some(root), Some(copy))?;
+            repoint(graph.working, target, Some(root), Some(copy))?;
             let reply = allocate(graph.working)?;
             graph.insert_comment_storage(&root_member, reply, body, author)?;
             let (index, _) = comment_storage(graph.working, copy)?;
@@ -847,7 +870,7 @@ fn apply_one(
             }
             let copy = allocate(graph.working)?;
             let root_member = graph.clone_exact(root, copy)?;
-            repoint(graph.working, &target, Some(root), Some(copy))?;
+            repoint(graph.working, target, Some(root), Some(copy))?;
             let new_reply = allocate(graph.working)?;
             let reply_member = graph.clone_exact(reply, new_reply)?;
             let (index, _) = comment_storage(graph.working, new_reply)?;
@@ -872,7 +895,7 @@ fn apply_one(
             })?;
             let copy = allocate(graph.working)?;
             let root_member = graph.clone_exact(root, copy)?;
-            repoint(graph.working, &target, Some(root), Some(copy))?;
+            repoint(graph.working, target, Some(root), Some(copy))?;
             let (index, _) = comment_storage(graph.working, copy)?;
             let data = engine::comment_storage_with_reply(
                 &graph.working.object(copy)?.messages[index].data,

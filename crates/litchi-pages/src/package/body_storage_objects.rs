@@ -391,29 +391,42 @@ impl Metadata {
         objects: &[u64],
         new_last: u64,
     ) -> GraphResult<Vec<u8>> {
-        let locator = self
-            .components
-            .iter()
-            .filter(|(identifier, _, current)| *current && *identifier == component)
-            .map(|(_, locator, _)| locator.as_str())
-            .collect::<Vec<_>>();
-        let [locator] = locator.as_slice() else {
-            return Err(GraphError::InvalidSource);
-        };
-        if objects.iter().any(|object| {
-            self.uuids
-                .iter()
-                .any(|(_, registered)| registered == object)
-        }) {
-            return Err(GraphError::InvalidSource);
-        }
-        let selector = ComponentSelector::new(component, locator);
+        self.registered_in(package, &[(component, objects)], new_last)
+    }
+
+    /// [`Self::registered`] for objects of several current components, in
+    /// one metadata rewrite.
+    pub(crate) fn registered_in(
+        &self,
+        package: &Package,
+        groups: &[(u64, &[u64])],
+        new_last: u64,
+    ) -> GraphResult<Vec<u8>> {
         let mut taken = self.uuid_bits.clone();
-        let mut additions = Vec::with_capacity(objects.len());
-        for object in objects {
-            let uuid = fresh_uuid(&taken, *object);
-            taken.insert((uuid.lower(), uuid.upper()));
-            additions.push(ObjectUuidAddition::new(selector, *object, uuid));
+        let mut additions = Vec::new();
+        for (component, objects) in groups {
+            let locator = self
+                .components
+                .iter()
+                .filter(|(identifier, _, current)| *current && identifier == component)
+                .map(|(_, locator, _)| locator.as_str())
+                .collect::<Vec<_>>();
+            let [locator] = locator.as_slice() else {
+                return Err(GraphError::InvalidSource);
+            };
+            if objects.iter().any(|object| {
+                self.uuids
+                    .iter()
+                    .any(|(_, registered)| registered == object)
+            }) {
+                return Err(GraphError::InvalidSource);
+            }
+            let selector = ComponentSelector::new(*component, locator);
+            for object in *objects {
+                let uuid = fresh_uuid(&taken, *object);
+                taken.insert((uuid.lower(), uuid.upper()));
+                additions.push(ObjectUuidAddition::new(selector, *object, uuid));
+            }
         }
         package_metadata_codec::rewrite_package_metadata(
             &self.payload,

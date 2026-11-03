@@ -312,7 +312,10 @@ impl Edit<'_> {
 
 /// `payload` with the chart drawable's frame set to `frame` (only the
 /// parts that differ are rewritten).
-fn with_geometry(payload: &[u8], frame: crate::drawable::Geometry) -> Result<Vec<u8>, Error> {
+pub(super) fn with_geometry(
+    payload: &[u8],
+    frame: crate::drawable::Geometry,
+) -> Result<Vec<u8>, Error> {
     use litchi_iwa_protos::shape_properties_codec as codec;
     let current = geometry(payload)?;
     let mut write = codec::GeometryWrite::preserve();
@@ -512,7 +515,7 @@ impl Commit {
 }
 
 /// The frame a chart payload's `TSD.DrawableArchive` stores.
-fn geometry(payload: &[u8]) -> Result<Option<crate::drawable::Geometry>, Error> {
+pub(super) fn geometry(payload: &[u8]) -> Result<Option<crate::drawable::Geometry>, Error> {
     use crate::drawable::{Geometry, GeometryFlags, Point, Size};
     use litchi_iwa_protos::shape_properties_codec as codec;
     let view = litchi_iwa_common::wire::WireView::parse(payload, WireLimits::DEFAULT)
