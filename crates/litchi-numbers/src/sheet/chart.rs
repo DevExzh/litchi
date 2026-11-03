@@ -82,7 +82,8 @@ pub mod series {
         SymbolFill, SymbolShape, SymbolSize, Trendline, TrendlineType,
     };
     pub use litchi_iwa_common::chart::series_labels::Visibility;
-    pub use litchi_iwa_common::shape::fill::{Fill, Gradient};
+    pub use litchi_iwa_common::color::Rgba;
+    pub use litchi_iwa_common::shape::fill::{Fill, Gradient, ImageTechnique};
 }
 
 /// Chart lifecycle of a sheet chart: the native kind and series direction
