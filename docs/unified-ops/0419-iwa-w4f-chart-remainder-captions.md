@@ -1,6 +1,6 @@
 # 0419 — W4-F: the remaining chart rows, captions and titles
 
-- Status: in progress on branch `uo2/iwa-w4f` (cut from trunk
+- Status: slices 1 and 2 merge-ready; the wave continues (§3). Branch `uo2/iwa-w4f` (cut from trunk
   `feat/unified-ops-api` at `02ad1c3981`).
 - Date: 2026-11-02.
 - Plan: [0363](0363-iwa-monolith-exit-plan.md) (§0 wave table, §3.2 API
@@ -122,3 +122,31 @@ Branch with trunk `4fc8e11883` merged at `c22d1206c0`; logs
 `.coord/iwa-w4f/gates2`: every command of the 0414 §8 list exits 0 (the
 same list as §1.1), plus the Python gates (boundaries, non-iWork, tool unit
 tests, ledger, OfficeCLI delta and corpus, bench matrix).
+
+## 3. Remaining rows and successor brief
+
+Still host-only in W4-F's scope after slice 2:
+
+| Item | Rows (K / P / N) | Plan |
+|---|---|---|
+| value-axis bounds, scale, steps (`chart.legend_axis`) | – / 6 / 6 | Lift the value types (`ValueAxisSettings`, `Bounds`, `Bound`, `Steps`, `MajorStepCount`, `MinorStepCount`, `Scale`, now in `litchi_keynote::chart::axis`) to `litchi-iwa-common::chart::axis` (Keynote re-exports at the same path) and the payload rules over `litchi_iwa_protos::keynote_chart_axis_value_settings_codec` (`common_settings`, `validate_settings`, `codec_settings`/`codec_write` in `crates/litchi-keynote/src/package/slide_chart_value_axis.rs`) into a `litchi_iwa_style::value_axis` module with a bounded read/write behind the chart-property cores (in-place scope of the value-axis style object 5027, as `chart_style::write_axis`). Keynote's 2,600-line bespoke transaction then calls the engine; Pages and Numbers get `{body,sheet}_chart_value_axis_settings` / `edit_…` (`set`, `set_bounds`, `set_steps`, `set_scale`) / `apply_…`. Host routes: `{pages,numbers}/editor/charts/axis_{bounds,scale,steps}.rs` over `charts/axis_{bounds,scale,steps}.rs` |
+| image fills: chart background, series, symbol (`chart.style`) | 3 / 3 / 3 | Media-backed fills through the data-owner transitions; model: Pages 0413b/0415 and `litchi_iwa_style::shape::{ReleasingFills, stored_fill}`. Today `Refusal::ImageFill` in `chart_style::chart::rewrite`, `series::style::rewrite` and the legend-style engine |
+| shared caption lift | – | One commit lifting the Keynote (W1-C, 0372) and Pages caption code into `litchi-iwa-style` (shapes, images, movies, chart drawables), Keynote and Pages moved onto it, copies deleted |
+| Numbers drawable captions and titles | – / – / 15 | `numbers/editor/{sheet_shapes/caption.rs, sheet_images.rs, sheet_movies/caption.rs}` on the lifted engine |
+| chart captions (`chart.text`) | – / 3 / 3 | `{pages,numbers}/editor/…/caption.rs` on the lifted engine |
+
+Patterns that worked here: a chart-wide property stored in series styles
+goes in the chart style family and receives the visible series count
+(`read_chart`/`write_chart`); an allocating engine reports a `MutationScope`
+whose new objects are only *planned* (never `allow`ed: the Pages plan
+requires allowed objects to exist in the source) and whose allowed fields
+include every outer field the locality checks must exempt; the Numbers
+family follows `sheet_chart_legend_style.rs` (workspace + `publish_changes_exact`).
+The cost probe is `chart_property_cost.rs` (`W4C_ROUTE`), the receipt
+writer `.coord/iwa-w4f/tools/receipt.py`.
+
+Post-merge (trunk `d4121f4af7` merged at `c5effae1c6`, mac-queue conflict
+resolved by keeping both sides): fmt, clippy -D warnings on the five touched
+crates, the parity chart cases (337 passed), glossary, crate boundaries,
+ledger and bench matrix exit 0 (logs `.coord/iwa-w4f/gates2b`). Target
+13 GB.
