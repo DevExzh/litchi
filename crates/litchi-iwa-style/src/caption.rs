@@ -658,6 +658,28 @@ pub fn read(workspace: &Workspace<'_>, target: Target) -> Result<Option<String>,
     Ok(resolve(workspace, target)?.text)
 }
 
+/// Whether the component storing `object` also stores an object with a
+/// message of `message_type` (Numbers stores a chart drawn in the document
+/// component, beside the calculation engine, with the host's componentized
+/// caption layout).
+///
+/// # Errors
+///
+/// A missing object.
+pub fn component_holds(
+    workspace: &Workspace<'_>,
+    object: u64,
+    message_type: u32,
+) -> Result<bool, Error> {
+    let archive = workspace.archive_at(workspace.locate(object)?)?;
+    Ok(archive.objects.iter().any(|object| {
+        object
+            .messages
+            .iter()
+            .any(|message| message.type_ == message_type)
+    }))
+}
+
 /// The objects a [`write()`] created.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Written {

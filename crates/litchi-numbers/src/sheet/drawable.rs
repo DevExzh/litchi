@@ -123,6 +123,15 @@ pub mod properties {
     pub use litchi_iwa_common::shape::path::Preset;
 }
 
+/// Exact-source title and caption transactions of a sheet shape, image,
+/// movie or chart (caption only), on the shared caption graph engine:
+/// [`crate::Package::edit_sheet_drawable_caption`].
+pub mod caption {
+    pub use crate::package::sheet_drawable_caption::{
+        Commit, Diagnostics, Edit, Error, Label, LimitKind, Patch, Refusal,
+    };
+}
+
 /// Exact-source Drop Cap transactions for the paragraphs of the text a
 /// sheet text box or shape owns: [`crate::Package::edit_sheet_drawable_drop_caps`].
 pub mod drop_cap {
