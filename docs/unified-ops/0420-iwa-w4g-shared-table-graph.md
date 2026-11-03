@@ -22,6 +22,7 @@
 | `0858c753d8` | Numbers on the shared graph. The builder's table rewrite (name, size) emits `fresh::table` with the template's identifiers, styles and identity; `the_template_table_is_the_shared_fresh_graph` proves the graph reproduces the template's twelve table, preset and network payloads byte for byte. `table::lifecycle::add` drops its private copies of the `table_create` payload builders (owned storage, model, emptied storage, owner, engine registration; about 400 lines) and, for a workbook without a table to clone, builds the shared graph from the theme's first table preset (previously `Refusal::NoTemplate`, which now means "no table and no theme table preset") |
 | `43724160de` | Pages `Builder::body_table(name, rows, columns)` and `PackageError::InvalidTable`. The first table is the host builder's graph under the host's identifiers 9–41: the shared table with its preset, network and default stylesheet, the attachment anchored by `U+FFFC` after the body text, the document root's engine, function-browser-state and custom-format-list references, the theme's table preset, a new `CalculationEngine` component (between the annotation storage and the document, as the host lists it) with the table's formula owner, and the registry's UUIDs and references. No bundled table template and no Pages→Numbers edge. Later tables clone the first through `table::creation`, as the host builder adds them with its editor |
 | `b63ffa6c95` | callgrind probes |
+| `11da80653b` | the shared `document.rs charts` row retires to the leaf chart-metadata reads (`document_charts_read_parity`, Tier A on `chart-data-native.{pages,numbers,key}`); helpers the trunk merge left unused |
 
 ## 2. Ledger and parity
 
@@ -30,7 +31,7 @@
 | `pages/creation.rs body_table` | `litchi_pages::builder::Builder::body_table` | `pages_builder_body_table_parity` (one table after body text, one in an empty body, two tables) | B |
 | `numbers add_empty_table` on a table-less workbook (row already migrated) | `edit_table_lifecycle().add` | `numbers_table_add_without_template_parity` | B |
 
-One ledger row flips (`pages/creation.rs body_table`); `python3
+One ledger row flips to migrated (`pages/creation.rs body_table`) and one retires (`document.rs charts`: the host's format-neutral list is the leaf `body_chart_metadata`, `sheet_chart_metadata` and `slide_chart_metadata` over every chart selector; `document_charts_read_parity` compares the host list with the leaf reads of every chart, as multisets, on one native file per format); `python3
 tools/iwa_exit_ledger.py --check` passes. Both routes have W4-G rows in
 `0363-mac-queue.md` (no host native evidence).
 
@@ -89,9 +90,8 @@ See §5.1 for the slice-1 gate.
 
 | Item | Rows | Next |
 |---|---:|---|
-| Keynote `add_slide_table` | 1 | clone the presentation's detached creation template (the host's `table_template_from_catalog` and `create_empty_table_graph`) with the `table_create` payloads, frame and uniform dimensions through `slide_table_layout` (0412g), attach to the slide's owned drawables and z-order; lift the template clone and owner creation from Numbers `table_lifecycle/add.rs` into `litchi_iwa_table::structure` first so both owners share them |
+| Keynote `add_slide_table` | 1 | The leaf `edit_slide_drawables().add_table` (record 0329) clones the deck's first slide table on Keynote's own drawable workspace; the host clones the deck's detached creation scaffold (a `TST.TableInfoArchive` with no parent, which builder decks carry), keeps the scaffold's frame, then sets the frame, flags 3 and angle 0 and sizes every row and column uniformly in the header buckets (`set_uniform_table_dimensions`). `keynote_slide_table_add_divergence_is_reported` pins that no deck admits both. Next: when a deck has exactly one detached scaffold, clone it instead of the first slide table, with the model's default sizes kept (`Shape::row_height`/`column_width` `None`), then run the frame and uniform-dimension staging of `litchi_iwa_table::topology::{stage_frame, stage_uniform_dimensions}` (record 0412g) on the clone; turn the divergence test into a Tier B parity case on a builder deck. A lift of Numbers' template clone and owner creation into `litchi_iwa_table::structure::create` (draft in `.coord/iwa-w4g/create.rs.draft`) serves it if Keynote moves the add onto the shared `Working` |
 | Pages table insertion without a template | — | route `table::creation` on a scratch document through `builder_table::install` at the anchor, as the host's `bootstrap_first_table_graph` |
 | Pages chart duplicate and remove | 2 | not started |
-| shared `document.rs charts` | 1 | not started |
 | Numbers shape image fill | 1 | not started |
 | Keynote line endpoints on the shared workspace | — | not started |
