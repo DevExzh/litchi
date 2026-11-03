@@ -19,6 +19,27 @@ pub(in crate::package) fn validate_dependencies(
     before: Settings,
     after: Settings,
 ) -> Result<(), Error> {
+    validate_dependencies_with(source, target, before, after, false)
+}
+
+/// The cell route's dependency check (record 0424a): a pivot owner alone
+/// does not refuse a cell edit, which changes no header or section count;
+/// the host writes cells of pivot tables. Every count-change rule applies.
+pub(in crate::package) fn validate_cell_dependencies(
+    source: &Package,
+    target: Target,
+    settings: Settings,
+) -> Result<(), Error> {
+    validate_dependencies_with(source, target, settings, settings, true)
+}
+
+fn validate_dependencies_with(
+    source: &Package,
+    target: Target,
+    before: Settings,
+    after: Settings,
+    pivot_owner_permitted: bool,
+) -> Result<(), Error> {
     let path = Path::Table {
         sheet: target.sheet_position,
         table: target.table_position,
@@ -109,7 +130,7 @@ pub(in crate::package) fn validate_dependencies(
             _ => {},
         }
     }
-    if unsupported_pivot_dependency {
+    if unsupported_pivot_dependency && !pivot_owner_permitted {
         return Err(Error::Refused(
             crate::package::table_headers::Refusal::UnsupportedDependency { path },
         ));

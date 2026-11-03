@@ -183,8 +183,10 @@ taskset -c 5 valgrind --tool=callgrind --toggle-collect='*pivot_host_route*' \
 - A pivot-category formula is never evaluated by the leaf cache engine.
   A supplied cache is kept; otherwise the host's zero placeholder is
   written. That is the host's own behaviour.
-- The leaf still refuses cell edits on tables that own pivot or category
-  state (unchanged; `DependencyKind::{Pivot, Category}`).
+- Cell edits on tables that own pivot or category state: the host allows
+  them (a host call on the same fixtures succeeds), so record
+  [0424a](0424a-iwa-w4k-cell-edits-on-pivot-and-category-tables.md)
+  admits them in the leaf.
 
 ## 6. Verification
 
