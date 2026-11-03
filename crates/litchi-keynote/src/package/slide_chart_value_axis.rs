@@ -29,19 +29,15 @@ use litchi_iwa_core::{
     SnappyLimits, SnappyStream,
 };
 use litchi_iwa_protos::keynote_chart_axis_value_settings_codec::{
-    AxisValueBound as CodecBound, AxisValueBounds as CodecBounds,
-    AxisValueSettingsSnapshot as CodecSnapshot, AxisValueSettingsWrite as CodecWrite,
-    AxisValueSteps as CodecSteps, DecodeError as CodecError, DecodeLimit as CodecLimit,
-    DecodeOptions as CodecOptions, DecodeReport as CodecReport,
-    RewriteExecutionRequirements as CodecRequirements, Scale as CodecScale,
+    DecodeError as CodecError, DecodeLimit as CodecLimit, DecodeOptions as CodecOptions,
+    DecodeReport as CodecReport, RewriteExecutionRequirements as CodecRequirements,
     decode_axis_value_settings_with_report, prepare_axis_value_settings_rewrite,
 };
+use litchi_iwa_style::value_axis;
 use thiserror::Error as ThisError;
 
 use super::{Package, PhysicalSource, ReadError, SemanticLimitKind};
-use crate::chart::axis::{
-    Bound, Bounds, MajorStepCount, MinorStepCount, Scale, Steps, ValueAxisSettings,
-};
+use crate::chart::axis::{Bounds, Scale, Steps, ValueAxisSettings};
 use crate::{ChartSelector, SlideSelector};
 
 const CHART_AXIS_MESSAGE_TYPE: u32 = 5_027;
@@ -1189,28 +1185,28 @@ impl<'a> Edit<'a> {
 
     /// Stage all value-axis settings atomically.
     pub fn set(mut self, settings: ValueAxisSettings) -> Result<Self, Error> {
-        self.after = validate_settings(settings)?;
+        self.after = validate_settings_refused(settings)?;
         Ok(self)
     }
 
     /// Stage replacement bounds while retaining steps and scale.
     pub fn set_bounds(mut self, bounds: Bounds) -> Result<Self, Error> {
         self.after = self.after.with_bounds(bounds);
-        self.after = validate_settings(self.after)?;
+        self.after = validate_settings_refused(self.after)?;
         Ok(self)
     }
 
     /// Stage replacement major/minor steps while retaining bounds and scale.
     pub fn set_steps(mut self, steps: Steps) -> Result<Self, Error> {
         self.after = self.after.with_steps(steps);
-        self.after = validate_settings(self.after)?;
+        self.after = validate_settings_refused(self.after)?;
         Ok(self)
     }
 
     /// Stage replacement scale while retaining bounds and steps.
     pub fn set_scale(mut self, scale: Scale) -> Result<Self, Error> {
         self.after = self.after.with_scale(scale);
-        self.after = validate_settings(self.after)?;
+        self.after = validate_settings_refused(self.after)?;
         Ok(self)
     }
 
@@ -1227,11 +1223,12 @@ impl<'a> Edit<'a> {
             &mut budget,
         )?;
         let current = read_value_axis_settings(self.source, &source_selection, &mut budget)?;
-        if !same_selection(&source_selection, &self) || !settings_equal_exact(current, self.before)
+        if !same_selection(&source_selection, &self)
+            || !value_axis::equal_exact(current, self.before)
         {
             return Err(Error::InvalidSource);
         }
-        if settings_equal_exact(self.before, self.after) {
+        if value_axis::equal_exact(self.before, self.after) {
             budget.scan_pass(self.source, 0)?;
             self.source.validate().map_err(map_read_error)?;
             return Ok(Commit {
@@ -1276,7 +1273,7 @@ impl<'a> Edit<'a> {
         let candidate_settings =
             read_value_axis_settings(&package, &candidate_selection, &mut budget)?;
         if !same_selection(&candidate_selection, &self)
-            || !settings_equal_exact(candidate_settings, self.after)
+            || !value_axis::equal_exact(candidate_settings, self.after)
         {
             return Err(Error::Verification);
         }
@@ -1386,7 +1383,7 @@ impl Patch {
     /// Return whether this patch preserves the exact source bytes.
     #[must_use]
     pub fn is_noop(&self) -> bool {
-        settings_equal_exact(self.before, self.after) && self.artifacts.is_byte_noop()
+        value_axis::equal_exact(self.before, self.after) && self.artifacts.is_byte_noop()
     }
 
     /// Return an exact reversible patch from target back to source.
@@ -1550,7 +1547,7 @@ impl Package {
         )?;
         let current = read_value_axis_settings(self, &selection, &mut budget)?;
         if !selection_matches_patch(&selection, patch)
-            || !settings_equal_exact(current, patch.before)
+            || !value_axis::equal_exact(current, patch.before)
         {
             return Err(Error::PatchConflict);
         }
@@ -1598,7 +1595,7 @@ impl Package {
         let expected_selected_message =
             patch.after_message.as_deref().ok_or(Error::InvalidSource)?;
         if !selection_matches_patch(&candidate_selection, patch)
-            || !settings_equal_exact(candidate_settings, patch.after)
+            || !value_axis::equal_exact(candidate_settings, patch.after)
         {
             return Err(Error::Verification);
         }
@@ -1677,7 +1674,7 @@ fn read_value_axis_settings(
     let (snapshot, report) =
         decode_axis_value_settings_with_report(extension, options).map_err(map_codec_error)?;
     budget.charge_codec_report(report)?;
-    common_settings(snapshot)
+    value_axis::from_snapshot(snapshot).map_err(|_| Error::InvalidSource)
 }
 
 fn same_selection(selection: &super::chart_axis_support::AxisSelection, edit: &Edit<'_>) -> bool {
@@ -1703,128 +1700,8 @@ fn selection_matches_patch(
         && selection.slide_identifier == patch.slide_identifier
 }
 
-fn common_settings(snapshot: CodecSnapshot<'_>) -> Result<ValueAxisSettings, Error> {
-    let bounds = snapshot.bounds();
-    let minimum = bounds
-        .minimum()
-        .map(|bound| Bound::new(bound.value()))
-        .transpose()
-        .map_err(|_| Error::InvalidSource)?;
-    let maximum = bounds
-        .maximum()
-        .map(|bound| Bound::new(bound.value()))
-        .transpose()
-        .map_err(|_| Error::InvalidSource)?;
-    let bounds = Bounds::new(minimum, maximum).map_err(|_| Error::InvalidSource)?;
-    let steps = snapshot.steps();
-    let major = steps
-        .major()
-        .map(MajorStepCount::new)
-        .transpose()
-        .map_err(|_| Error::InvalidSource)?;
-    let minor = steps
-        .minor()
-        .map(MinorStepCount::new)
-        .transpose()
-        .map_err(|_| Error::InvalidSource)?;
-    let settings = ValueAxisSettings::new(
-        bounds,
-        Steps::new(major, minor),
-        Scale::from_native(snapshot.scale().native_value()),
-    );
-    // A malformed source must not be silently promoted to a publishable
-    // value-axis state.  In particular, native logarithmic axes cannot have
-    // an explicit non-positive endpoint.
-    validate_settings(settings).map_err(|_| Error::InvalidSource)
-}
-
-fn validate_settings(settings: ValueAxisSettings) -> Result<ValueAxisSettings, Error> {
-    let minimum = settings.bounds().minimum();
-    let maximum = settings.bounds().maximum();
-    if minimum.is_some_and(|bound| !bound.value().is_finite())
-        || maximum.is_some_and(|bound| !bound.value().is_finite())
-        || matches!((minimum, maximum), (Some(low), Some(high)) if low.value() > high.value())
-    {
-        return Err(Error::Refused(Refusal::InvalidSettings));
-    }
-    if settings.scale() == Scale::Logarithmic
-        && (minimum.is_some_and(|bound| bound.value() <= 0.0)
-            || maximum.is_some_and(|bound| bound.value() <= 0.0))
-    {
-        return Err(Error::Refused(Refusal::InvalidSettings));
-    }
-    // Values 1 and 2 are canonicalized so a caller cannot stage an
-    // Unsupported variant which the native reader necessarily maps back to a
-    // known scale during candidate verification.
-    Ok(settings.with_scale(Scale::from_native(settings.scale().native_value())))
-}
-
-fn settings_equal_exact(left: ValueAxisSettings, right: ValueAxisSettings) -> bool {
-    let left_bounds = left.bounds();
-    let right_bounds = right.bounds();
-    let bounds_equal = match (
-        left_bounds.minimum(),
-        right_bounds.minimum(),
-        left_bounds.maximum(),
-        right_bounds.maximum(),
-    ) {
-        (Some(left), Some(right), Some(left_max), Some(right_max)) => {
-            left.value() == right.value() && left_max.value() == right_max.value()
-        },
-        (Some(left), Some(right), None, None) => left.value() == right.value(),
-        (None, None, Some(left), Some(right)) => left.value() == right.value(),
-        (None, None, None, None) => true,
-        _ => false,
-    };
-    bounds_equal
-        && left.steps() == right.steps()
-        && Scale::from_native(left.scale().native_value())
-            == Scale::from_native(right.scale().native_value())
-}
-
-fn codec_settings(
-    settings: ValueAxisSettings,
-) -> Result<litchi_iwa_protos::keynote_chart_axis_value_settings_codec::AxisValueSettings, Error> {
-    let bounds = settings.bounds();
-    let minimum = bounds
-        .minimum()
-        .map(|bound| CodecBound::new(bound.value()))
-        .transpose()
-        .map_err(|_| Error::Refused(Refusal::InvalidSettings))?;
-    let maximum = bounds
-        .maximum()
-        .map(|bound| CodecBound::new(bound.value()))
-        .transpose()
-        .map_err(|_| Error::Refused(Refusal::InvalidSettings))?;
-    let bounds =
-        CodecBounds::new(minimum, maximum).map_err(|_| Error::Refused(Refusal::InvalidSettings))?;
-    let steps = settings.steps();
-    let steps = CodecSteps::new(
-        steps.major().map(|value| value.value()),
-        steps.minor().map(|value| value.value()),
-    )
-    .map_err(|_| Error::Refused(Refusal::InvalidSettings))?;
-    let scale = CodecScale::from_native(settings.scale().native_value());
-    Ok(
-        litchi_iwa_protos::keynote_chart_axis_value_settings_codec::AxisValueSettings::new(
-            bounds, steps, scale,
-        ),
-    )
-}
-
-fn codec_write(
-    snapshot: CodecSnapshot<'_>,
-    settings: ValueAxisSettings,
-) -> Result<CodecWrite, Error> {
-    let native = codec_settings(settings)?;
-    let write = CodecWrite::preserve()
-        .with_bounds(native.bounds())
-        .with_steps(native.steps());
-    Ok(if snapshot.scale_present() {
-        write.with_explicit_scale(native.scale())
-    } else {
-        write.with_scale(native.scale())
-    })
+fn validate_settings_refused(settings: ValueAxisSettings) -> Result<ValueAxisSettings, Error> {
+    value_axis::validate(settings).map_err(|_| Error::Refused(Refusal::InvalidSettings))
 }
 
 fn map_support_error(error: super::chart_axis_support::AxisSupportError) -> Error {
@@ -2042,7 +1919,8 @@ fn rewrite_value_axis_settings(
         budget.charge_codec_report(report)?;
         (Vec::new(), snapshot)
     };
-    let write = codec_write(snapshot, after)?;
+    let write = value_axis::codec_write(snapshot, after)
+        .map_err(|_| Error::Refused(Refusal::InvalidSettings))?;
     let options = budget.codec_options(extension.len())?;
     let prepared =
         prepare_axis_value_settings_rewrite(&extension, write, options).map_err(map_codec_error)?;

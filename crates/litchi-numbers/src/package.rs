@@ -62,6 +62,7 @@ mod sheet_chart_series_style;
 pub(crate) mod sheet_chart_style;
 pub(crate) mod sheet_chart_text;
 pub(crate) mod sheet_chart_title;
+pub(crate) mod sheet_chart_value_axis;
 pub(crate) mod sheet_drawable;
 pub(crate) mod sheet_drawable_annotation;
 mod sheet_drawable_author;

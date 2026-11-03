@@ -3292,6 +3292,10 @@
    "reason": "iWork exit leaf-versus-host Callgrind evidence for the W4-F chart, caption and title routes on Keynote, Pages and Numbers (inclusive Ir, CPU 3), bound to the 0363 parity harness. It compares the leaf crates with the litchi-iwa host, not a leaf call with its unified call, so it contributes no bench-matrix row; record 0419 tabulates it."
   },
   {
+   "record": "0422",
+   "reason": "iWork exit leaf-versus-host Callgrind evidence for the W4-I value-axis and chart image-fill routes on Pages and Numbers (inclusive Ir, CPU 3), bound to the 0363 parity harness. It compares the leaf crates with the litchi-iwa host, not a leaf call with its unified call, so it contributes no bench-matrix row; record 0422 tabulates it."
+  },
+  {
    "record": "0363",
    "reason": "Planning record for the litchi-iwa exit: results/0363 holds a source scan of the host's public functions (crosswalk) and its classifier, no leaf-versus-unified timing or allocation measurement."
   },

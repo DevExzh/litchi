@@ -1,0 +1,20 @@
+{
+  "record": "0422",
+  "slice": "2",
+  "binary_sha256": "2f41bd9722fedffc6821c0b0b9ab0a9c63cfdfb89d3106f7960116b180466bea",
+  "build": "source .coord/iwa-w4i/env.sh; cargo test --release -p litchi-iwa --all-features --test parity --no-run",
+  "run": "W4C_ROUTE=<route> taskset -c 3 valgrind --tool=callgrind <binary> --ignored --exact chart_property_cost::chart_property_route_cost_abba --test-threads=1",
+  "metric": "inclusive Ir of w4c_host_route / w4c_leaf_route, two calls each (ABBA)",
+  "captures_dir": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-w4i/cg2 (outside the repository)",
+  "routes": [
+    {
+      "route": "pages_background_image_set",
+      "host_ir": 1310073205,
+      "leaf_ir": 63127004,
+      "leaf_over_host": 0.048186,
+      "capture": "pages_background_image_set.cg",
+      "capture_bytes": 455766,
+      "capture_sha256": "0c46ff386c0cc9c55222e6a8afee6fc27ec231cd7a05cf61adbf5d108cef969f"
+    }
+  ]
+}

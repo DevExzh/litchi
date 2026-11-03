@@ -260,6 +260,10 @@ pub enum Refusal {
     MissingStyle,
     /// The property does not exist on the requested axis.
     UnsupportedAxis,
+    /// The value cannot be stored natively (value-axis settings with a
+    /// non-finite endpoint, an inverted range, or a non-positive endpoint
+    /// on a logarithmic axis).
+    InvalidSettings,
 }
 
 impl fmt::Display for Refusal {
@@ -270,6 +274,7 @@ impl fmt::Display for Refusal {
             Self::ImageFill => "image fills are not written by this property",
             Self::MissingStyle => "the chart has no style object for the property",
             Self::UnsupportedAxis => "the property does not exist on this axis",
+            Self::InvalidSettings => "the value cannot be stored natively",
         })
     }
 }
@@ -391,6 +396,24 @@ impl MutationScope {
 
     /// Admit `member` without an object (the metadata members a
     /// registration rewrites).
+    /// Plan a new non-archive member (an embedded `Data/` entry).
+    pub(crate) fn plan_new_member(&mut self, member: &str) {
+        if !self.planned_new_members.iter().any(|name| name == member) {
+            self.planned_new_members.push(member.to_owned());
+        }
+    }
+
+    /// Plan removing a non-archive member (an orphaned `Data/` entry).
+    pub(crate) fn plan_removed_member(&mut self, member: &str) {
+        if !self
+            .planned_removed_members
+            .iter()
+            .any(|name| name == member)
+        {
+            self.planned_removed_members.push(member.to_owned());
+        }
+    }
+
     pub(crate) fn allow_member(&mut self, member: &str) {
         if !self.allowed_members.iter().any(|known| known == member) {
             self.allowed_members.push(member.to_owned());

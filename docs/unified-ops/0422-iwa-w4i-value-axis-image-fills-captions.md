@@ -1,0 +1,118 @@
+# 0422 — W4-I: value-axis settings, chart image fills, captions and titles
+
+- Status: slices 1 and 2 merge-ready; the wave continues (§4). Branch `uo2/iwa-w4i`
+  (cut from trunk `feat/unified-ops-api` at `c599ef9cb8`).
+- Date: 2026-11-02.
+- Plan: [0363](0363-iwa-monolith-exit-plan.md) (§0 wave table, §3.2 API
+  shape, §4 parity tiers, §5 performance); the predecessor's successor brief
+  [0419](0419-iwa-w4f-chart-remainder-captions.md) §3; the chart patterns
+  and gate list of [0414](0414-iwa-w4c-chart-style-families.md) (§8,
+  §11–§14); owner decision D1 and the [macOS queue](0363-mac-queue.md).
+- Scope, in order: value-axis bounds, steps and scale (`chart.legend_axis`,
+  Pages 6, Numbers 6); chart image fills (background, series, symbol; 3 per
+  format); the shared caption lift, then the Numbers shape, image and movie
+  captions and titles (15) and the chart captions (Pages 3, Numbers 3).
+  Chart add/duplicate/remove (`chart_lifecycle`) and `table_create` belong to
+  W4-G; table sort and pivot to W4-H.
+- `performance_claim`: every migrated route measured is cheaper than its
+  host route under callgrind (per-slice tables below); none misses the 5%
+  bar.
+
+## 1. Slice 1: value-axis bounds, steps and scale
+
+12 rows flip (Pages and Numbers: the three host setters and the three host
+reads each).
+
+| Crate | What |
+|---|---|
+| `litchi-iwa-style` | New `value_axis`: Keynote's rules, lifted. `validate` (finite endpoints, minimum ≤ maximum, no non-positive endpoint on a logarithmic axis; a known scale given by its native value is canonicalised), `equal_exact`, `from_snapshot` (a stored aggregate the native format could not have written is invalid), `codec_write` (presence-preserving: a component equal to the stored one keeps its bytes, an absent scale field stays absent while linear) over `litchi_iwa_protos::keynote_chart_axis_value_settings_codec`. Payload layer `settings`/`rewrite` on a `TSCH.ChartAxisNonStyleArchive` payload: the rewrite applies the components in the host's order (bounds, steps, scale; minimum before maximum, major before minor), so fields absent from the source are appended exactly where the host's `set_chart_value_axis_{bounds,steps,scale}` append them. Workspace layer `read`/`write`: the chart's primary value-axis non-style object, refused when another chart axis references it (the host's `AxisNonStyleSlot::ensure_exclusive`), rewritten in place under a residual `series::Limits` profile with the in-place `MutationScope` (extension field 10,000 of the axis object). New engine `Refusal::InvalidSettings`; `chart_style::{owners, style_object, in_place_scope, rewrite_in_place, read_payload}` are crate-visible for it |
+| `litchi-keynote` | `slide_chart_value_axis` keeps its bounded transaction (budget, selection, locality) and now calls the shared rules; its private `common_settings`, `validate_settings`, `settings_equal_exact`, `codec_settings` and `codec_write` (124 lines) are deleted. Behaviour unchanged (`tests/slide_chart_value_axis.rs`, `tests/chart_axis_api.rs`) |
+| `litchi-pages` | `chart::value_axis` (`Package::body_chart_value_axis_settings`, `edit_body_chart_value_axis_settings` → `Edit::{set, set_bounds, set_steps, set_scale}`, `apply_body_chart_value_axis_settings`) on the chart-property core, Keynote's aggregate shape. Chart-series `Refusal::InvalidSettings` (`RefusalKind::InvalidValue`) |
+| `litchi-numbers` | `sheet::chart::value_axis`, the same family on the chart-series workspace path (`&mut` staging, as the other Numbers chart families). Chart-series `Refusal::InvalidSettings` |
+
+Parity (`value_axis_cases.rs`): `{pages_body,numbers_sheet}_chart_value_axis_set_parity`
+run 13 sequences per format through the facade with the inverse replayed:
+bounds, steps and scale into an axis that does not store them, a single
+maximum, in-place bounds and steps, a scale over stored bounds, back to
+automatic bounds and steps, logarithmic back to linear (the stored scale
+stays explicit), both step fields removed and appended again, and two
+three-component edits (the host writes bounds, steps, scale in order). All
+Tier A (byte-identical, whole ZIP). `…_read_parity` compares the host's three
+reads with the aggregate read on every state (Tier A). Regressions:
+
+- `numbers_sheet_chart_value_axis_shared_axis_refuses`: a second chart whose
+  value axis references the first chart's non-style object; the host and the
+  leaf refuse, the source is unchanged.
+- `chart_value_axis_logarithmic_non_positive_bound_refuses` (stricter
+  admission, §4.2 of 0363): the host stores a logarithmic scale over a
+  negative minimum; the leaf refuses the staging (`Refusal::InvalidSettings`)
+  as Keynote always has, and reads such a source as invalid. Listed in the
+  macOS queue.
+
+Eight macOS-queue rows added (the six setters and two reads).
+
+| Route | Host Ir | Leaf Ir | Leaf/host |
+|---|---:|---:|---:|
+| pages_value_axis_set | 1,193,208,991 | 48,131,065 | 0.0403 |
+| numbers_value_axis_set | 151,334,720 | 77,925,554 | 0.5149 |
+
+Probe `chart_property_cost.rs` (`W4C_ROUTE`, release, CPU 3, ABBA, inclusive
+Ir of `w4c_host_route`/`w4c_leaf_route`; the route sets fixed bounds 0–50).
+Receipt `results/0422/callgrind-value-axis.json`; raw captures in
+`.coord/iwa-w4i/cg1/`. Keynote has no host value-axis route to compare; its
+transaction path is unchanged apart from the shared rule calls.
+
+## 2. Slice 2: shared data-owner transitions; Pages chart background image
+
+1 row flips (Pages `set_body_chart_background_image_fill`); the existing
+Pages background-fill set also gains the host's release of a replaced image.
+
+| Crate | What |
+|---|---|
+| `litchi-iwa-style` | New `data_owner`: the `TSP.PackageMetadata` payload helpers lifted from Pages (`adjust_data_reference`, `referenced_data`, `data_member`, `remove_data_info`, `data_metadata_entries`, `data_owners`, `max_data_identifier`, `append_data_info`), `materialized_name`, and two workspace transitions on the registry: `own_new` (next data identifier, `DataInfo`, the object as its component data-reference owner: the host's `insert_unreferenced` + `add_component_data_reference`) and `release` (drop the owner; data no component, data metadata map entry or message-info reference keeps loses its `DataInfo` and member: the host's `remove_component_data_reference` + `remove_orphaned_image_asset`). `chart_style::write_chart_background(…, Background::{Fill, Image(NewImage)})` stores a background with these transitions (exclusive chart style; new image owned by the chart style; a replaced image released) and reports `DataChanges` (inserted and deleted `Data/` members), with the metadata object, fields 3/4/7/11 and the planned members in its mutation scope. `chart::rewrite_background` is the image-admitting payload rule; `chart::rewrite` still refuses an image (`Refusal::ImageFill`) |
+| `litchi-pages` | `body_storage_objects` delegates its metadata helpers to `data_owner` (the copies are deleted). The chart-property core gains `Ledger::write_data` (publishes the new `Data/` member and deletes the orphaned one); its locality check admits the metadata `DataInfo` list (4) and component data references (7) when the plan allows them. `chart::style::Edit::set_background_image_fill(bytes, file_name, ImageTechnique, tint)` (frame size from `body_chart_geometry`), and `Edit::set(BackgroundFill)` now goes through the releasing write. Chart-series `Refusal::InvalidImage` |
+
+Parity `pages_body_chart_background_image_fill_parity` (Tier B, the ZIP
+layout of the new member; macOS-queued): a new image (scaled, tiled and
+tinted), a new image over a host image (the old one is released and its
+`Data/` member deleted), and a solid fill and no fill over a host image;
+each with the inverse replayed and the fill and media reads compared. The
+host keeps an unreferenced asset only when the data metadata map lists it;
+the leaf's `release` follows that rule (the first draft kept every asset of
+a package with a map, which the parity case caught).
+
+| Route | Host Ir | Leaf Ir | Leaf/host |
+|---|---:|---:|---:|
+| pages_background_image_set | 1,310,073,205 | 63,127,004 | 0.0482 |
+
+Receipt `results/0422/callgrind-background-image.json`; raw captures in
+`.coord/iwa-w4i/cg2/`.
+
+### 2.1 Gates (slices 1 and 2)
+
+Branch with trunk `44aa1ee06d` (W4-G 0420) merged at `4ea803b0dc`
+(mac-queue conflict resolved by keeping both sides); logs
+`.coord/iwa-w4i/gates2`. Every command of the 0414 §8 list exits 0: fmt;
+clippy -D warnings on the five touched crates with `litchi-ops`, `litchi`
+and `litchi-py` (all features), the leaf crates without features, and
+`litchi-ops` with no features and with each of `numbers`, `pages`,
+`keynote`; the leaf, `litchi-iwa` (parity included), `litchi` and
+`litchi-ops` (`--lib`, `--doc`, nine `--test` groups) tests; pyo3;
+perf-baseline; the feature matrix; crate boundaries; non-iWork gate; the
+tool unit tests; ledger, OfficeCLI delta and corpus checks. Rustdoc
+-Dwarnings and the glossary first failed on one broken module doc link in
+`data_owner` (fixed in `5302ab5ffc`) and then exit 0. The bench matrix
+needed a 0422 `evidence_without_rows` entry (leaf-versus-host evidence, as
+for 0419) and a regeneration (`c55a619959`); then exit 0. No dispatch,
+capability or corpus-visible behaviour changed, so no golden was
+re-blessed. Target 13 GB after pruning.
+
+## 4. Remaining
+
+- Chart background image fills on Numbers and Keynote (2 rows), then
+  series and symbol image fills (6 rows): the engine and data-owner
+  transitions are shared (`write_chart_background`, `data_owner`); each
+  core needs the `Data/` member publication and the metadata admission
+  Pages got here.
+- The shared caption lift, then Numbers shape, image and movie captions
+  and titles (15 rows), then chart captions (Pages 3, Numbers 3).
