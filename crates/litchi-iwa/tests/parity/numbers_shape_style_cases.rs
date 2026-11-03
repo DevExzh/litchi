@@ -527,14 +527,16 @@ fn numbers_shape_image_fill_release_parity() -> TestResult {
                     editor.set_sheet_shape_fill(sheet, identifier, &ShapeFill::Solid(red))?;
                 },
                 Op::Reset => drop(editor.reset_sheet_shape_fill(sheet, identifier)?),
-                Op::Image => drop(editor.set_sheet_shape_image_fill(
-                    sheet,
-                    identifier,
-                    "poster.png",
-                    &png,
-                    ShapeImageFillTechnique::Tile,
-                    None,
-                )?),
+                Op::Image => {
+                    editor.set_sheet_shape_image_fill(
+                        sheet,
+                        identifier,
+                        "poster.png",
+                        &png,
+                        ShapeImageFillTechnique::Tile,
+                        None,
+                    )?;
+                },
             }
             Ok(editor.to_bytes()?)
         })
@@ -543,10 +545,14 @@ fn numbers_shape_image_fill_release_parity() -> TestResult {
             let mut edit =
                 package.edit_sheet_drawable_style(SHEET, DrawableSelector::of(Kind::Shape, 0))?;
             match op {
-                Op::Solid => drop(edit.set(Property::Fill(Fill::Solid(red)))?),
-                Op::Reset => drop(edit.reset(PropertyKind::Fill)?),
+                Op::Solid => {
+                    edit.set(Property::Fill(Fill::Solid(red)))?;
+                },
+                Op::Reset => {
+                    edit.reset(PropertyKind::Fill)?;
+                },
                 Op::Image => {
-                    drop(edit.set_image_fill(&png, "poster.png", ImageTechnique::Tile, None)?);
+                    edit.set_image_fill(&png, "poster.png", ImageTechnique::Tile, None)?;
                 },
             }
             let commit = edit.commit()?;

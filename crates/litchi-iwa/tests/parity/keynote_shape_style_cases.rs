@@ -1269,3 +1269,71 @@ fn w4m_keynote_endpoints_cost_abba() -> TestResult {
     }
     Ok(())
 }
+
+/// Prints a digest of the leaf endpoint routes over leaf-built (so
+/// deterministic) lines: a plain line, one created with arrows, and the
+/// reads; identical before and after the move onto the shared rules.
+#[test]
+#[ignore = "digest probe; run explicitly"]
+fn w4m_keynote_endpoints_fixed_digest() -> TestResult {
+    use std::hash::{Hash, Hasher};
+    let deck = Package::from_bytes(&fixture(DECK)?.bytes)?;
+    let slide = SlideSelector::index(SLIDE);
+    let built = |styles: &[Property]| -> TestResult<Vec<u8>> {
+        let mut edit = deck.edit_slide_drawables();
+        edit.add_line_with_style(slide, segment()?, styles)?;
+        let commit: Commit = edit.commit()?;
+        Ok(leaf_bytes!(commit.package()))
+    };
+    let plain = built(&[])?;
+    let arrows = built(&[Property::LineEndpoints(ARROWS)])?;
+    let position = Package::from_bytes(&plain)?
+        .slide_drawable_list(slide)?
+        .len()
+        - 1;
+    let routes = [
+        ("create", &arrows, None),
+        (
+            "set",
+            &plain,
+            Some(Op::Set(Property::LineEndpoints(ARROWS))),
+        ),
+        (
+            "rewrite",
+            &arrows,
+            Some(Op::Set(Property::LineEndpoints(Endpoints {
+                start: Endpoint::OpenSquare,
+                end: Endpoint::Line,
+            }))),
+        ),
+        (
+            "reset",
+            &arrows,
+            Some(Op::Reset(PropertyKind::LineEndpoints)),
+        ),
+        (
+            "noop",
+            &arrows,
+            Some(Op::Set(Property::LineEndpoints(ARROWS))),
+        ),
+    ];
+    for (route, input, op) in routes {
+        let output = match op {
+            Some(op) => w4m_keynote_endpoints_leaf(input, position, &op)?,
+            None => input.clone(),
+        };
+        let read = Package::from_bytes(&output)?.slide_drawable_shape_style(
+            slide,
+            DrawableSelector::index(position),
+            PropertyKind::LineEndpoints,
+        )?;
+        let mut hasher = std::collections::hash_map::DefaultHasher::new();
+        output.hash(&mut hasher);
+        println!(
+            "w4m-fixed {route} {} {:016x} {read:?}",
+            output.len(),
+            hasher.finish()
+        );
+    }
+    Ok(())
+}
