@@ -1631,7 +1631,12 @@ impl<'s> Workspace<'s> {
         self.registry.is_some()
     }
 
-    fn registry_payload(&self) -> Result<Option<&[u8]>> {
+    /// The registry object's identifier.
+    pub(crate) fn registry_object(&self) -> Option<u64> {
+        self.registry.map(|(_, object, _)| object)
+    }
+
+    pub(crate) fn registry_payload(&self) -> Result<Option<&[u8]>> {
         let Some((position, object, message)) = self.registry else {
             return Ok(None);
         };
@@ -1671,7 +1676,7 @@ impl<'s> Workspace<'s> {
         Ok(())
     }
 
-    fn update_registry(
+    pub(crate) fn update_registry(
         &mut self,
         update: impl FnOnce(&[u8]) -> Result<Option<Vec<u8>>>,
     ) -> Result<()> {
@@ -1729,6 +1734,11 @@ impl<'s> Workspace<'s> {
     /// The registry's document save token.
     pub(crate) fn save_token(&self) -> Result<Option<u64>> {
         Ok(self.inspect()?.and_then(|root| root.save_token))
+    }
+
+    /// The `DataMetadataMap` object the registry names.
+    pub(crate) fn data_metadata_object(&self) -> Result<Option<u64>> {
+        Ok(self.inspect()?.and_then(|root| root.data_metadata_object))
     }
 
     /// Whether the registry names a `DataMetadataMap`.
@@ -2188,6 +2198,7 @@ struct Root {
     save_token: Option<u64>,
     maximum_identifier: u64,
     has_data_metadata_map: bool,
+    data_metadata_object: Option<u64>,
     /// `(identifier, effective locator)` of every current component.
     components: Vec<(u64, String)>,
 }
@@ -2248,6 +2259,7 @@ impl registry_codec::PackageMetadataVisitor for Root {
         _has_unknown_fields: bool,
     ) -> std::result::Result<(), RewriteError> {
         self.has_data_metadata_map = true;
+        self.data_metadata_object = Some(object_identifier);
         self.maximum_identifier = self.maximum_identifier.max(object_identifier);
         Ok(())
     }

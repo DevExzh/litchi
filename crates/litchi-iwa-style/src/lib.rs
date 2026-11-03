@@ -16,6 +16,8 @@
 //!   their in-place rewrites;
 //! - [`chart_text`]: the shared chart title and axis-title wire engine
 //!   (caption authoring remains a deferred host-only follow-up);
+//! - [`data_owner`]: the package-metadata owner transitions of embedded
+//!   data (`DataInfo` and component data references);
 //! - [`drawing`]: the stored drawing values (colors, strokes, fills) in both
 //!   directions;
 //! - [`media`]: the embedded-media inventory of a package;
@@ -44,6 +46,7 @@ pub mod chart_font;
 pub mod chart_lifecycle;
 pub mod chart_style;
 pub mod chart_text;
+pub mod data_owner;
 pub mod drawing;
 pub mod graph;
 pub mod legend_style;

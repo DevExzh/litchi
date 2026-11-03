@@ -396,6 +396,24 @@ impl MutationScope {
 
     /// Admit `member` without an object (the metadata members a
     /// registration rewrites).
+    /// Plan a new non-archive member (an embedded `Data/` entry).
+    pub(crate) fn plan_new_member(&mut self, member: &str) {
+        if !self.planned_new_members.iter().any(|name| name == member) {
+            self.planned_new_members.push(member.to_owned());
+        }
+    }
+
+    /// Plan removing a non-archive member (an orphaned `Data/` entry).
+    pub(crate) fn plan_removed_member(&mut self, member: &str) {
+        if !self
+            .planned_removed_members
+            .iter()
+            .any(|name| name == member)
+        {
+            self.planned_removed_members.push(member.to_owned());
+        }
+    }
+
     pub(crate) fn allow_member(&mut self, member: &str) {
         if !self.allowed_members.iter().any(|known| known == member) {
             self.allowed_members.push(member.to_owned());

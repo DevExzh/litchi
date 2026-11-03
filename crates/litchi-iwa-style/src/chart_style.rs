@@ -801,6 +801,23 @@ pub mod chart {
             if matches!(fill, Fill::Image(_)) {
                 return Err(SymbolError::Refused(Refusal::ImageFill));
             }
+            return rewrite_background(payload, fill);
+        }
+        rewrite_other(payload, value, chart, archive)
+    }
+
+    /// The chart style payload storing background `fill` (an image fill
+    /// included: its data owner is the caller's, see
+    /// [`super::write_chart_background`]).
+    ///
+    /// # Errors
+    ///
+    /// An invalid payload.
+    pub fn rewrite_background(payload: &[u8], fill: &Fill) -> SymbolResult<Vec<u8>> {
+        let archive = PropertyKind::BackgroundFill
+            .archive()
+            .ok_or(SymbolError::Invalid("no background archive"))?;
+        {
             let encoded = (*fill != default_background()).then(|| drawing::encode_fill(fill));
             let write = match encoded.as_deref() {
                 Some(value) => Write::MergeMessage {
@@ -813,8 +830,16 @@ pub mod chart {
                     value: None,
                 },
             };
-            return apply_writes(payload, archive, &[write], codec::EmptyExtension::Remove);
+            apply_writes(payload, archive, &[write], codec::EmptyExtension::Remove)
         }
+    }
+
+    fn rewrite_other(
+        payload: &[u8],
+        value: &Property,
+        chart: ChartKind,
+        archive: Archive,
+    ) -> SymbolResult<Vec<u8>> {
         if let Property::Shadow(shadow) = *value {
             // The host's `patch_chart_shadow_scope`: the native default
             // removes the switch; otherwise it is written when grouped or
@@ -2028,4 +2053,165 @@ pub fn write_axis(
         ));
     }
     Ok((changed, budget.report(changed)))
+}
+
+/// A new embedded image a chart image-fill write stores: the bytes'
+/// registration facts, the image layout over the chart frame and its tint.
+#[derive(Debug, Clone, Copy)]
+pub struct NewImage<'a> {
+    /// The data entry to register.
+    pub data: crate::data_owner::NewData<'a>,
+    /// How the image is laid out.
+    pub technique: litchi_iwa_common::shape::fill::ImageTechnique,
+    /// The chart frame size the image fills.
+    pub size: litchi_iwa_common::shape::geometry::Size,
+    /// The optional tint.
+    pub tint: Option<litchi_iwa_common::color::Rgba>,
+}
+
+/// What a fill write changes in the package's embedded data: the new
+/// `Data/` member (its data identifier and name; the caller publishes the
+/// bytes there) and the orphaned member to delete.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct DataChanges {
+    /// The data identifier and `Data/` member of a registered image.
+    pub inserted: Option<(u64, String)>,
+    /// The `Data/` member nothing references any more.
+    pub deleted: Option<String>,
+}
+
+/// The value a background write stores.
+#[derive(Debug, Clone, Copy)]
+pub enum Background<'a> {
+    /// A fill without new media (a stored image fill is released).
+    Fill(&'a litchi_iwa_common::shape::fill::Fill),
+    /// A new embedded image.
+    Image(NewImage<'a>),
+}
+
+/// The embedded image fill of data `data`.
+///
+/// # Errors
+///
+/// An out-of-range data identifier or frame size.
+pub fn embedded_image(
+    data: u64,
+    image: &NewImage<'_>,
+) -> SymbolResult<litchi_iwa_common::shape::fill::Fill> {
+    use litchi_iwa_common::shape::fill::{Fill, Image, ImageData};
+    let data = ImageData::new(data).map_err(|_| SymbolError::Invalid("a data identifier"))?;
+    let embedded = Image::embedded(data, image.technique, image.size)
+        .map_err(|_| SymbolError::Invalid("an image fill frame size"))?;
+    Ok(Fill::Image(match image.tint {
+        Some(tint) => embedded.with_tint(tint),
+        None => embedded,
+    }))
+}
+
+/// Store a background fill on chart drawable `chart` with the host's
+/// data-owner transitions (`set_chart_background_fill` and
+/// `set_chart_background_image_fill_data`): the chart style must be
+/// exclusive; a new image is registered (`DataInfo`, the chart style as
+/// its component data-reference owner); a replaced image fill releases the
+/// style's owner and, when nothing references the data any more, its
+/// `DataInfo` and member. The report's scope plans the inserted and deleted
+/// `Data/` members.
+///
+/// # Errors
+///
+/// [`Refusal::SharedStyle`], [`Refusal::MissingStyle`], an invalid chart,
+/// style or registry, an exhausted limit, or a write that does not read
+/// back.
+pub fn write_chart_background(
+    workspace: &mut Workspace<'_>,
+    chart: u64,
+    chart_kind: ChartKind,
+    value: Background<'_>,
+    limits: Limits,
+) -> SymbolResult<(bool, Report, DataChanges)> {
+    use litchi_iwa_common::shape::fill::Fill;
+    let mut budget = SymbolBudget::new(limits);
+    let kind = chart::PropertyKind::BackgroundFill;
+    let chart::Property::BackgroundFill(current) =
+        chart_value(workspace, chart, chart_kind, 0, kind, &mut budget)?
+    else {
+        return Err(SymbolError::Invalid("not a background fill"));
+    };
+    if let Background::Fill(fill) = value
+        && *fill == current
+    {
+        return Ok((false, budget.report(false), DataChanges::default()));
+    }
+    let archive = Archive::ChartStyle;
+    let style = style_object(workspace, chart, archive, None, &mut budget)?;
+    if owners(workspace, style, archive, &mut budget)? != 1 {
+        return Err(SymbolError::Refused(Refusal::SharedStyle));
+    }
+    in_place_scope(
+        workspace,
+        chart,
+        style,
+        archive.message_type(),
+        &[],
+        &mut budget,
+    )?;
+    let member = workspace
+        .member(workspace.locate(style).map_err(SymbolError::from)?)
+        .to_owned();
+    let mut changes = DataChanges::default();
+    let fill = match value {
+        Background::Fill(fill) => fill.clone(),
+        Background::Image(image) => {
+            let (data, name) = crate::data_owner::own_new(workspace, image.data, &member, style)?;
+            let fill = embedded_image(data, &image)?;
+            changes.inserted = Some((data, name));
+            fill
+        },
+    };
+    let changed = rewrite_in_place(
+        workspace,
+        style,
+        archive.message_type(),
+        &mut budget,
+        |payload| chart::rewrite_background(payload, &fill),
+    )?;
+    if let Fill::Image(old) = &current
+        && let Some(old) = old.data()
+    {
+        let new = match &fill {
+            Fill::Image(image) => image.data(),
+            _ => None,
+        };
+        if new != Some(old) {
+            changes.deleted = crate::data_owner::release(workspace, old.get(), &member, style)?;
+        }
+    }
+    let registry = workspace.registry_object();
+    if let Some(scope) = budget.scope_mut()
+        && (changes.inserted.is_some() || changes.deleted.is_some())
+    {
+        // The package metadata's `DataInfo` list and component data
+        // references.
+        if let Some(registry) = registry {
+            scope.allow(registry, crate::graph::METADATA_MEMBER, 11_006);
+        }
+        scope.allow_fields(&[3, 4, 7, 11]);
+    }
+    if let Some(scope) = budget.scope_mut() {
+        if let Some((_, name)) = &changes.inserted {
+            scope.plan_new_member(name);
+        }
+        if let Some(name) = &changes.deleted {
+            scope.plan_removed_member(name);
+        }
+    }
+    if changed
+        && chart_value(workspace, chart, chart_kind, 0, kind, &mut budget)?
+            != chart::Property::BackgroundFill(fill)
+    {
+        return Err(SymbolError::Invalid(
+            "a chart background write does not read back",
+        ));
+    }
+    Ok((changed, budget.report(changed), changes))
 }
