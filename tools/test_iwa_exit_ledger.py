@@ -131,32 +131,6 @@ class LedgerTest(unittest.TestCase):
         self.assertIn("[queued] Numbers litchi_numbers::Package::edit_table_merges", report)
         self.assertNotIn("Rows to append", report)
 
-    def test_cited_mac_queue_inputs_must_be_indexed(self) -> None:
-        self.write(
-            "docs/unified-ops/0363-mac-queue.md",
-            QUEUE.replace(
-                "| f |",
-                "| `test-data/iwork/mac-queue/inputs/a.numbers`, `.coord/iwa-w3/mac-inputs/b.numbers` |",
-            ),
-        )
-        self.assert_error("index.tsv does not exist")
-        self.write(
-            "test-data/iwork/mac-queue/index.tsv",
-            "test\tcase\tfixture_label\tinput\tlocation\tbytes\tsha256\n"
-            "t\tc\tl\ttest-data/iwork/mac-queue/inputs/a.numbers\tarchive\t1\t00\n",
-        )
-        self.assert_error("inputs.tar.xz does not exist")
-        self.write("test-data/iwork/mac-queue/inputs.tar.xz", "x")
-        self.assert_error("cited macOS input .coord/iwa-w3/mac-inputs/b.numbers has no external row")
-        self.write(
-            "test-data/iwork/mac-queue/index.tsv",
-            "test\tcase\tfixture_label\tinput\tlocation\tbytes\tsha256\n"
-            "t\tc\tl\ttest-data/iwork/mac-queue/inputs/a.numbers\tarchive\t1\t00\n"
-            "t\tc\tl\t.coord/iwa-w3/mac-inputs/b.numbers\texternal\t1\t00\n",
-        )
-        self.assertEqual(self.errors(), [])
-
-
 class RepositoryLedgerTest(unittest.TestCase):
     def test_tracked_ledger_passes(self) -> None:
         self.assertEqual(ledger.check(), [])

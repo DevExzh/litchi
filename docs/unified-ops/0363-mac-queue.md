@@ -7,6 +7,12 @@ open, save, close and reopen in Pages, Numbers or Keynote on macOS before W3
 deletes the host. Each wave appends its rows; the macOS run records the result
 and the artifact SHA-256.
 
+Record [0429](0429-iwa-w3-delete-host.md) (W3) deletes the host on a branch
+held until this queue passes. The packages for the Mac come from the record
+0430 generator; the inputs the host built for them (798) are listed in
+[`test-data/iwork/mac-queue/host-built-inputs.tsv`](../../test-data/iwork/mac-queue/host-built-inputs.tsv)
+and kept outside the repository (see its README).
+
 | Wave | Format | Route | Reason queued | Fixture | Result | Artifact SHA-256 |
 |---|---|---|---|---|---|---|
 | W1-E | Numbers | litchi-numbers::Package::sheet_chart_title | chart-title read is host-differential only; no native receipt proves a Litchi-mutated package survives native open/save/close/reopen (0375b) | test-data/iwork/numbers/chart-data-native.numbers; host-added Column2d chart; numbers_chart_title_and_axis_title_read_parity | pending | - |

@@ -12367,8 +12367,9 @@ contains `crates/litchi-iwa`. The branch merges only after the macOS queue
    2,117 migrated and 119 retired, and `tools/iwa_exit_ledger.py --check` now
    validates it without the crate. The host's tests and examples are deleted
    with it; the generated-schema build path no longer reads host sources
-   (`crates/litchi-iwa-protos/build.rs`). Inputs the host built at test time
-   for the macOS queue are frozen in `test-data/iwork/mac-queue/`.
+   (`crates/litchi-iwa-protos/build.rs`). The 798 inputs the host built for
+   the macOS queue packages (record 0430) are kept outside the repository and
+   listed, with SHA-256, in `test-data/iwork/mac-queue/host-built-inputs.tsv`.
 3. Semantic parity: every migrated route has a parity case (Tier A or B) that
    passed at `27b4840684` (1,190 passed); the routes without host native
    evidence are the macOS queue.

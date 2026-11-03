@@ -502,7 +502,7 @@ Mac, as owner decision D1 requires. State of the deletion gate (§6):
 | ADR 0028 gate item | State on `uo2/iwa-w3` |
 |---|---|
 | 1 no manifest depends on `litchi-iwa` | holds; the crate is gone |
-| 2 every module, example, fuzz target, schema/build path and fixture has an owner | exit ledger 0 host-only rows (2,117 migrated, 119 retired), checked without the crate; the protos build script no longer reads host sources; host-built macOS inputs frozen in `test-data/iwork/mac-queue/` |
+| 2 every module, example, fuzz target, schema/build path and fixture has an owner | exit ledger 0 host-only rows (2,117 migrated, 119 retired), checked without the crate; the protos build script no longer reads host sources; the 798 host-built macOS inputs of record 0430 are kept outside the repository, listed in `test-data/iwork/mac-queue/host-built-inputs.tsv` |
 | 3 semantic parity | every migrated route has a Tier-A/B parity case, all passing at `27b4840684` before deletion |
 | 4 native open/save/reopen | **pending**: the macOS queue |
 | 5 no root-facade re-export or alias | holds |

@@ -128,6 +128,12 @@ class RealQueueTests(unittest.TestCase):
                 if source.kind == "example":
                     self.assertIn(source.name, mac_queue.example_stems(), f"line {row.line}")
 
+    def test_parity_tests_come_from_the_snapshot_without_the_harness(self) -> None:
+        self.assertFalse((mac_queue.ROOT / mac_queue.PARITY_DIR).exists())
+        tests = mac_queue.parity_tests()
+        self.assertEqual(len(tests), 1400)
+        self.assertTrue(all(path.startswith(str(mac_queue.PARITY_DIR)) for path in tests.values()))
+
     def test_explicit_cases_exist(self) -> None:
         tests = mac_queue.parity_tests()
         self.assertEqual([case for case in mac_queue.explicit_cases() if case not in tests], [])

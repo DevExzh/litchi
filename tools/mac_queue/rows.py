@@ -17,6 +17,10 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 MAC_QUEUE = Path("docs/unified-ops/0363-mac-queue.md")
 PARITY_DIR = Path("crates/litchi-iwa/tests/parity")
+# The harness was deleted with `litchi-iwa` (record 0429); its test names
+# were frozen first, at trunk 4dbfe29241, the commit that built the queue's
+# packages (record 0430).
+PARITY_SNAPSHOT = Path("tools/mac_queue/parity-tests.tsv")
 RECORDS_DIR = Path("docs/unified-ops")
 LEDGER = Path("docs/unified-ops/results/0363/iwa-exit-ledger.tsv")
 
@@ -108,8 +112,16 @@ _MACRO_TEST = re.compile(r"^\s*([a-z0-9_]+_parity)\s*[:,]", re.MULTILINE)
 
 def parity_tests(root: Path = ROOT) -> dict[str, str]:
     """`#[test]` names of the parity harness (including macro-declared
-    ones), mapped to their source file."""
+    ones), mapped to their source file; from `PARITY_SNAPSHOT` once the
+    harness is gone."""
     tests: dict[str, str] = {}
+    if not (root / PARITY_DIR).is_dir():
+        snapshot = root / PARITY_SNAPSHOT
+        if snapshot.is_file():
+            for line in snapshot.read_text(encoding="utf-8").splitlines()[2:]:
+                name, _, relative = line.partition("\t")
+                tests[name] = relative
+        return tests
     for file in sorted((root / PARITY_DIR).rglob("*.rs")):
         text = file.read_text(encoding="utf-8")
         relative = file.relative_to(root).as_posix()

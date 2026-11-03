@@ -15,11 +15,7 @@ without the crate and fails when:
   parity harness was deleted with the host; the test names are history);
 - a `migrated` row cites native evidence that does not exist, or has no
   native evidence and no row in `docs/unified-ops/0363-mac-queue.md` for its
-  format and destination (owner decision D1);
-- a macOS input cited by the queue (`test-data/iwork/mac-queue/inputs/...`,
-  packed in `inputs.tar.xz`, or the host-local `.coord/iwa-w3/mac-inputs/...`)
-  has no row in `test-data/iwork/mac-queue/index.tsv`, or the archive is
-  missing.
+  format and destination (owner decision D1).
 
 Usage:
   python3 tools/iwa_exit_ledger.py --check            # the gate
@@ -41,9 +37,6 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 LEDGER = Path("docs/unified-ops/results/0363/iwa-exit-ledger.tsv")
 MAC_QUEUE = Path("docs/unified-ops/0363-mac-queue.md")
-MAC_QUEUE_INPUTS = ("test-data/iwork/mac-queue/inputs/", ".coord/iwa-w3/mac-inputs/")
-MAC_QUEUE_INDEX = Path("test-data/iwork/mac-queue/index.tsv")
-MAC_QUEUE_ARCHIVE = Path("test-data/iwork/mac-queue/inputs.tar.xz")
 HOST_COMMIT = "27b4840684"
 
 COLUMNS = (
@@ -160,18 +153,6 @@ def destination_exists(destination: str, root: Path = ROOT, cache: dict | None =
     return None
 
 
-def queue_inputs(queue: list[dict[str, str]]) -> list[str]:
-    """macOS input paths cited by the queue's fixture column."""
-    found: list[str] = []
-    pattern = re.compile("(?:" + "|".join(map(re.escape, MAC_QUEUE_INPUTS)) + r")[A-Za-z0-9_.-]+")
-    for entry in queue:
-        for match in pattern.finditer(entry.get("fixture", "")):
-            path = match.group(0).rstrip(".,;:)")
-            if path not in found:
-                found.append(path)
-    return found
-
-
 def check(root: Path = ROOT, ledger_path: Path | None = None) -> list[str]:
     errors: list[str] = []
     rows = read_ledger(ledger_path or root / LEDGER)
@@ -216,22 +197,6 @@ def check(root: Path = ROOT, ledger_path: Path | None = None) -> list[str]:
                 f"{where}: migrated tier-{row.tier} route {row.destination} has no host native evidence "
                 f"and no {MAC_QUEUE} row (format {FORMAT_NAMES.get(row.format, row.format)})"
             )
-    cited = queue_inputs(queue)
-    if cited:
-        index = root / MAC_QUEUE_INDEX
-        listed: dict[str, str] = {}
-        if index.is_file():
-            with index.open(encoding="utf-8", newline="") as handle:
-                for record in csv.DictReader(handle, delimiter="\t", quoting=csv.QUOTE_NONE):
-                    listed[record.get("input", "")] = record.get("location", "")
-        else:
-            errors.append(f"{MAC_QUEUE}: cites macOS inputs but {MAC_QUEUE_INDEX} does not exist")
-        if any(path.startswith(MAC_QUEUE_INPUTS[0]) for path in cited) and not (root / MAC_QUEUE_ARCHIVE).is_file():
-            errors.append(f"{MAC_QUEUE}: cites archived macOS inputs but {MAC_QUEUE_ARCHIVE} does not exist")
-        for path in cited:
-            expected = "archive" if path.startswith(MAC_QUEUE_INPUTS[0]) else "external"
-            if listed.get(path) != expected:
-                errors.append(f"{MAC_QUEUE}: cited macOS input {path} has no {expected} row in {MAC_QUEUE_INDEX}")
     return errors
 
 

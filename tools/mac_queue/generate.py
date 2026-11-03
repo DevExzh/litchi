@@ -26,6 +26,10 @@ Steps:
 
 `--reuse-dumps` skips steps 1 and 2. `--check` only proves that every queue
 row maps to sources or an explicit grouping (no build, no output).
+
+After record 0429 deleted `litchi-iwa`, step 1 cannot run: only
+`--reuse-dumps` on the frozen `.coord/mac-runbook/out` works, and `--check`
+reads the parity-test names from `tools/mac_queue/parity-tests.tsv`.
 """
 
 from __future__ import annotations
@@ -73,6 +77,12 @@ def git_head(root: Path = ROOT) -> str:
 
 def build(out: Path, root: Path = ROOT) -> None:
     """Run the parity harness and the File-route example with dumps on."""
+    if not (root / mac_queue.PARITY_DIR).is_dir():
+        raise SystemExit(
+            "the parity harness was deleted with litchi-iwa (record 0429): host-built inputs "
+            "draw random UUIDs and cannot be rebuilt; regenerate from the frozen dumps with "
+            "--reuse-dumps --out .coord/mac-runbook/out (see test-data/iwork/mac-queue/README.md)"
+        )
     raw = out / "raw"
     if raw.exists():
         shutil.rmtree(raw)
