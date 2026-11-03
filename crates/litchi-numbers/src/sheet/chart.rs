@@ -107,6 +107,16 @@ pub mod style {
     pub use litchi_iwa_common::chart3d;
 }
 
+/// Exact-source reference-line transactions of one sheet chart's primary
+/// value axis on the shared reference-line graph:
+/// [`crate::Package::edit_sheet_chart_reference_lines`].
+pub mod reference_lines {
+    pub use crate::package::sheet_chart_reference_lines::{
+        Commit, Diagnostics, Edit, Kind, Line, Patch, Unknown, Value,
+    };
+    pub use crate::package::sheet_chart_series::{Error, LimitKind, Refusal};
+}
+
 /// Exact-source legend fill, border and shadow transactions of one sheet
 /// chart on the shared legend-style variation graph:
 /// [`crate::Package::edit_sheet_chart_legend_style`].

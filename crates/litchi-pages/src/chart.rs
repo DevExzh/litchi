@@ -113,6 +113,17 @@ pub mod axis {
     pub use litchi_iwa_common::shape::stroke::Stroke;
 }
 
+/// Exact-source reference-line transactions of one chart's primary value
+/// axis on the shared reference-line graph:
+/// [`crate::Package::edit_body_chart_reference_lines`].
+pub mod reference_lines {
+    pub use crate::package::body_chart_reference_lines::ReferenceLinesEdit as Edit;
+    pub use crate::package::body_chart_reference_lines::reference_lines::{
+        Commit, Kind, Line, Patch, Unknown, Value,
+    };
+    pub use crate::package::body_chart_series::{Diagnostics, Error, LimitKind, Refusal};
+}
+
 /// Exact-source legend fill, border and shadow transactions of one chart
 /// on the shared legend-style variation graph:
 /// [`crate::Package::edit_body_chart_legend_style`].
