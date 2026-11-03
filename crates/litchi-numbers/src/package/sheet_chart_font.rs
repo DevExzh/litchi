@@ -750,7 +750,7 @@ impl Edit<'_> {
         budget
             .scratch(candidate_plan.scratch_bytes)
             .map_err(map_arrangement)?;
-        let published = style_graph::publish(self.source, changes).map_err(Error::from)?;
+        let published = style_graph::publish(self.source, changes, &[]).map_err(Error::from)?;
         let actual_candidate_bytes = published.package.source_bytes().len();
         if actual_candidate_bytes > candidate_plan.output_bytes {
             return Err(Error::Limit {

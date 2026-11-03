@@ -3125,3 +3125,67 @@ pub mod property {
         }
     }
 }
+
+/// Store a new embedded image fill on shape or text box `drawable` with
+/// the shared data-owner transition (the host's `set_*_shape_image_fill`,
+/// record 0423): the fill is planned like any fill (rewriting the
+/// drawable's exclusive variation or deriving one), the bytes described
+/// by `new` are registered as the next data entry (`DataInfo`) owned by
+/// the variation the drawable then shows ([`crate::data_owner::own_new`]),
+/// and that variation's message info records the data reference. Returns
+/// the data identifier and the `Data/` member the caller publishes the
+/// bytes under.
+///
+/// # Errors
+///
+/// A package without a registry, an invalid preferred name, frame size,
+/// shape or style graph, and the plan layer's errors.
+pub fn set_image_fill(
+    workspace: &mut Workspace<'_>,
+    drawable: u64,
+    new: crate::data_owner::NewData<'_>,
+    technique: litchi_iwa_common::shape::fill::ImageTechnique,
+    size: litchi_iwa_common::shape::geometry::Size,
+    tint: Option<litchi_iwa_common::color::Rgba>,
+) -> Result<(u64, String)> {
+    use litchi_iwa_common::shape::fill::{Fill, Image, ImageData};
+    let payload = workspace
+        .registry_payload()?
+        .ok_or(Error::Invalid("the package has no registry"))?;
+    let data = crate::data_owner::max_data_identifier(payload)
+        .map_err(Error::Wire)?
+        .checked_add(1)
+        .ok_or(Error::IdentifierOverflow)?;
+    let image = Image::embedded(
+        ImageData::new(data).map_err(|_| Error::Invalid("a data identifier"))?,
+        technique,
+        size,
+    )
+    .map_err(|_| Error::Invalid("an image fill frame size"))?;
+    let fill = Fill::Image(match tint {
+        Some(tint) => image.with_tint(tint),
+        None => image,
+    });
+    let writes = [(
+        Slot::Fill,
+        Some(Value::message(crate::drawing::encode_fill(&fill))),
+    )];
+    let plan = plan_set(workspace, target(workspace, drawable)?, &writes)?;
+    apply(workspace, drawable, plan)?;
+    let style = target(workspace, drawable)?.style();
+    let member = workspace.member(workspace.locate(style)?).to_owned();
+    let (owned, name) = crate::data_owner::own_new(workspace, new, &member, style)?;
+    if owned != data {
+        return Err(Error::Invalid("the data identifier moved"));
+    }
+    let info = workspace
+        .object_mut(style)?
+        .archive_info
+        .message_infos
+        .first_mut()
+        .ok_or(Error::Invalid("a style without a message"))?;
+    if !info.data_references.contains(&data) {
+        info.data_references.push(data);
+    }
+    Ok((data, name))
+}

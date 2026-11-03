@@ -391,3 +391,66 @@ fn numbers_shape_style_read_parity_rejects_mismatched_reader_values() -> TestRes
     );
     Ok(())
 }
+
+/// The host's `set_sheet_shape_image_fill` against `Edit::set_image_fill`
+/// (record 0423): a new `Data/` member, its `DataInfo` record, and the
+/// shape's derived style variation owning the data reference.
+#[test]
+fn numbers_shape_image_fill_parity() -> TestResult {
+    use litchi_iwa::shapes::ShapeImageFillTechnique;
+    use litchi_iwa_common::shape::fill::ImageTechnique;
+    let png = crate::harness::fixture("iwork/keynote/media-replacement-assets/poster.png")?.bytes;
+    let tint = color(0.9, 0.1, 0.1)?;
+    for (technique, host_technique, tint) in [
+        (
+            ImageTechnique::ScaleToFill,
+            ShapeImageFillTechnique::ScaleToFill,
+            Some(tint),
+        ),
+        (ImageTechnique::Tile, ShapeImageFillTechnique::Tile, None),
+    ] {
+        Case::new(
+            "numbers_shape_image_fill_parity",
+            Format::Numbers,
+            Tier::B,
+            Evidence::Queued,
+            &authored_fixture()?,
+        )
+        .leaf_structural_metadata()
+        .host(|source| {
+            let mut editor = numbers::Draft::from_bytes(source)?;
+            let (sheet, identifier) = host_drawable(&editor, Kind::Shape, 0)?;
+            editor.set_sheet_shape_image_fill(
+                sheet,
+                identifier,
+                "poster.png",
+                &png,
+                host_technique,
+                tint,
+            )?;
+            Ok(editor.to_bytes()?)
+        })
+        .leaf(|source| {
+            let package = Package::from_bytes(source)?;
+            let mut edit =
+                package.edit_sheet_drawable_style(SHEET, DrawableSelector::of(Kind::Shape, 0))?;
+            edit.set_image_fill(&png, "poster.png", technique, tint)?;
+            let commit = edit.commit()?;
+            let restored = commit
+                .package()
+                .apply_sheet_drawable_style(&commit.patch().inverse())?;
+            Ok(LeafRun::with_inverse(
+                leaf_bytes!(commit.package()),
+                leaf_bytes!(restored.package()),
+            ))
+        })
+        .read("host fill", |source| {
+            host_read(source, Kind::Shape, PropertyKind::Fill)
+        })
+        .read("leaf fill", |source| {
+            leaf_read(source, Kind::Shape, PropertyKind::Fill)
+        })
+        .run()?;
+    }
+    Ok(())
+}

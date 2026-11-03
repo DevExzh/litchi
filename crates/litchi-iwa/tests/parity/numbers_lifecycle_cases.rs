@@ -358,7 +358,7 @@ fn numbers_table_resize_corpus_parity() -> TestResult {
 /// `TST.TableModelArchive` without its table UUID: a new table's UUID is
 /// a fresh version-4 identity on the leaf and a model-derived one on the
 /// host (record 0370f, a documented policy: compared by form, below).
-fn model_without_table_uuid(data: &[u8]) -> Result<Decoded, prost::DecodeError> {
+pub(crate) fn model_without_table_uuid(data: &[u8]) -> Result<Decoded, prost::DecodeError> {
     let mut model = litchi_iwa_protos::tst::TableModelArchive::decode(data)?;
     assert_eq!(model.table_id.len(), 36, "table UUID form");
     model.table_id.clear();
@@ -367,7 +367,7 @@ fn model_without_table_uuid(data: &[u8]) -> Result<Decoded, prost::DecodeError> 
 
 /// `TSCE.FormulaOwnerDependenciesArchive` without its owner UUID (derived
 /// from the table UUID).
-fn owner_without_uuid(data: &[u8]) -> Result<Decoded, prost::DecodeError> {
+pub(crate) fn owner_without_uuid(data: &[u8]) -> Result<Decoded, prost::DecodeError> {
     let mut owner = litchi_iwa_protos::tsce::FormulaOwnerDependenciesArchive::decode(data)?;
     owner.formula_owner_uid = Default::default();
     Ok(decoded(owner, data))
@@ -375,7 +375,7 @@ fn owner_without_uuid(data: &[u8]) -> Result<Decoded, prost::DecodeError> {
 
 /// `TSCE.CalculationEngineArchive` without its owner map's UUIDs (one is
 /// derived from the new table UUID).
-fn engine_without_owner_uuids(data: &[u8]) -> Result<Decoded, prost::DecodeError> {
+pub(crate) fn engine_without_owner_uuids(data: &[u8]) -> Result<Decoded, prost::DecodeError> {
     let mut engine = litchi_iwa_protos::tsce::CalculationEngineArchive::decode(data)?;
     if let Some(map) = engine.dependency_tracker.owner_id_map.as_mut() {
         for entry in &mut map.map_entry {
