@@ -54,3 +54,20 @@ image). Receipt `results/0425/callgrind-series-image-fills.json`; raw
 captures in `.coord/iwa-w4l/cg1/` (outside the repository). The bench
 matrix lists 0425 under `evidence_without_rows` (leaf-versus-host
 evidence).
+
+### 1.1 Slice 1 gates
+
+Branch with trunk `a077aeeb43` (W4-J 0423) merged at `0049a606e5`
+(mac-queue conflict resolved by keeping both sides, bench matrix
+regenerated); logs `.coord/iwa-w4l/gates1`. Every command of the 0414 §8
+list exits 0: fmt; the seven Python gates (boundaries, non-iWork, ledger,
+OfficeCLI delta and corpus, bench matrix, tool unit tests); clippy
+-D warnings with all features, the leaf crates without features, and
+`litchi-ops` with no features and each of `numbers`, `pages`, `keynote`;
+the leaf, `litchi-iwa` (parity included), `litchi` and `litchi-ops`
+(`--lib`, `--doc`, nine `--test` groups) tests; pyo3; perf-baseline; the
+feature matrix. Rustdoc -Dwarnings and the glossary first failed on two
+ambiguous `write` links in `series::style` (the function and the `write!`
+macro); after the fix both exit 0 (`rustdoc2.log`, `glossary2.log`). No
+dispatch, capability or corpus-visible behaviour changed, so no golden was
+re-blessed. Target 21 GB after the gate run (test executables and examples included), 12 GB after pruning.

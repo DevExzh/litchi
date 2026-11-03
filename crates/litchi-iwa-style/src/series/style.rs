@@ -681,7 +681,7 @@ pub struct SeriesImage<'a> {
     pub image: crate::chart_style::NewImage<'a>,
 }
 
-/// [`write`] with the host's data-owner transitions for fills and
+/// [`write()`] with the host's data-owner transitions for fills and
 /// data-symbol fills (`set_chart_series_fills`,
 /// `set_chart_series_symbol_fills`, their resets and
 /// `set_chart_series_{,symbol_}image_fill_data`): `image`, when given,
@@ -695,7 +695,7 @@ pub struct SeriesImage<'a> {
 ///
 /// # Errors
 ///
-/// As [`write`]; [`Refusal::UnsupportedKind`] for an image on a property
+/// As [`write()`]; [`Refusal::UnsupportedKind`] for an image on a property
 /// other than fills and data-symbol fills; an image series out of range,
 /// an invalid registry or unknown data.
 pub fn write_data(
