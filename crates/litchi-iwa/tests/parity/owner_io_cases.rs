@@ -368,6 +368,70 @@ fn document_read_parity() -> TestResult {
     Ok(())
 }
 
+/// Host `Document::charts` (every chart of a document, format-neutral)
+/// against the leaf chart-metadata reads over every chart of the same
+/// file: `litchi_pages::Package::body_chart_metadata`,
+/// `litchi_numbers::Package::sheet_chart_metadata` and
+/// `litchi_keynote::Package::slide_chart_metadata` (record 0420). The host
+/// lists charts in object-index order, so the lists compare as multisets.
+#[test]
+fn document_charts_read_parity() -> TestResult {
+    let _ = (Tier::A, Evidence::Queued);
+    for (path, format) in [
+        ("iwork/pages/chart-data-native.pages", Format::Pages),
+        ("iwork/numbers/chart-data-native.numbers", Format::Numbers),
+        ("iwork/keynote/chart-data-native.key", Format::Keynote),
+    ] {
+        let input = fixture(path)?;
+        let mut host: Vec<String> = litchi_iwa::Document::from_bytes(&input.bytes)?
+            .charts()?
+            .iter()
+            .map(|chart| format!("{chart:?}"))
+            .collect();
+        let mut leaf: Vec<String> = Vec::new();
+        match format {
+            Format::Pages => {
+                let package = litchi_pages::Package::from_bytes(&input.bytes)?;
+                while let Ok(chart) = package
+                    .body_chart_metadata(litchi_pages::BodyChartSelector::index(leaf.len()))
+                {
+                    leaf.push(format!("{chart:?}"));
+                }
+            },
+            Format::Numbers => {
+                let package = litchi_numbers::Package::from_bytes(&input.bytes)?;
+                for sheet in 0..package.sheets().len() {
+                    let mut index = 0;
+                    while let Ok(chart) = package
+                        .sheet_chart_metadata(sheet, litchi_numbers::ChartSelector::index(index))
+                    {
+                        leaf.push(format!("{chart:?}"));
+                        index += 1;
+                    }
+                }
+            },
+            Format::Keynote => {
+                let package = litchi_keynote::Package::from_bytes(&input.bytes)?;
+                for slide in 0..package.slides()?.len() {
+                    let mut index = 0;
+                    while let Ok(chart) = package.slide_chart_metadata(
+                        litchi_keynote::SlideSelector::index(slide),
+                        litchi_keynote::ChartSelector::index(index),
+                    ) {
+                        leaf.push(format!("{chart:?}"));
+                        index += 1;
+                    }
+                }
+            },
+        }
+        host.sort();
+        leaf.sort();
+        assert!(!host.is_empty(), "{path}: no chart");
+        assert_eq!(host, leaf, "{path}");
+    }
+    Ok(())
+}
+
 /// Host `numbers::Draft::sheet_text_boxes` (the ordinary text boxes of a
 /// sheet, in drawable order, with their text) against
 /// `litchi_numbers::Package::sheet_drawable_list` filtered to
