@@ -73,6 +73,8 @@ enum Operation {
     ReferenceLinesSet,
     ValueAxisSet,
     BackgroundImageSet,
+    SeriesImageSet,
+    SymbolImageSet,
 }
 
 const ROUTES: &[(&str, Format, Operation)] = &[
@@ -285,6 +287,36 @@ const ROUTES: &[(&str, Format, Operation)] = &[
         Format::Keynote,
         Operation::BackgroundImageSet,
     ),
+    (
+        "pages_series_image_set",
+        Format::Pages,
+        Operation::SeriesImageSet,
+    ),
+    (
+        "numbers_series_image_set",
+        Format::Numbers,
+        Operation::SeriesImageSet,
+    ),
+    (
+        "keynote_series_image_set",
+        Format::Keynote,
+        Operation::SeriesImageSet,
+    ),
+    (
+        "pages_symbol_image_set",
+        Format::Pages,
+        Operation::SymbolImageSet,
+    ),
+    (
+        "numbers_symbol_image_set",
+        Format::Numbers,
+        Operation::SymbolImageSet,
+    ),
+    (
+        "keynote_symbol_image_set",
+        Format::Keynote,
+        Operation::SymbolImageSet,
+    ),
 ];
 
 /// The image every chart image-fill route embeds (record 0422).
@@ -315,9 +347,11 @@ const fn chart_kind(operation: Operation) -> Kind {
         Operation::LightingSet => Kind::Column3d,
         Operation::ShadowSet | Operation::CategoryLabelsSet => Kind::Column2d,
         Operation::RadarSet => Kind::Radar2d,
-        Operation::ReferenceLinesSet | Operation::ValueAxisSet | Operation::BackgroundImageSet => {
-            Kind::Column2d
-        },
+        Operation::ReferenceLinesSet
+        | Operation::ValueAxisSet
+        | Operation::BackgroundImageSet
+        | Operation::SeriesImageSet => Kind::Column2d,
+        Operation::SymbolImageSet => Kind::Line2d,
     }
 }
 
@@ -495,6 +529,28 @@ fn host_operation(input: &Input, source: &[u8], operation: Operation) -> TestRes
                         None,
                     )?;
                 },
+                Operation::SeriesImageSet => {
+                    e.set_slide_chart_series_image_fill(
+                        slide,
+                        chart,
+                        litchi_iwa::charts::Index::from_zero_based(0),
+                        "poster.png",
+                        &poster()?,
+                        litchi_iwa::shapes::ShapeImageFillTechnique::Tile,
+                        None,
+                    )?;
+                },
+                Operation::SymbolImageSet => {
+                    e.set_slide_chart_series_symbol_image_fill(
+                        slide,
+                        chart,
+                        litchi_iwa::charts::Index::from_zero_based(0),
+                        "poster.png",
+                        &poster()?,
+                        litchi_iwa::shapes::ShapeImageFillTechnique::Tile,
+                        None,
+                    )?;
+                },
                 Operation::RadarSet => {
                     e.set_slide_chart_radar_series_style(
                         slide,
@@ -578,6 +634,26 @@ fn host_operation(input: &Input, source: &[u8], operation: Operation) -> TestRes
                         None,
                     )?;
                 },
+                Operation::SeriesImageSet => {
+                    e.set_body_chart_series_image_fill(
+                        chart,
+                        litchi_iwa::charts::Index::from_zero_based(0),
+                        "poster.png",
+                        &poster()?,
+                        litchi_iwa::shapes::ShapeImageFillTechnique::Tile,
+                        None,
+                    )?;
+                },
+                Operation::SymbolImageSet => {
+                    e.set_body_chart_series_symbol_image_fill(
+                        chart,
+                        litchi_iwa::charts::Index::from_zero_based(0),
+                        "poster.png",
+                        &poster()?,
+                        litchi_iwa::shapes::ShapeImageFillTechnique::Tile,
+                        None,
+                    )?;
+                },
                 Operation::RadarSet => {
                     e.set_body_chart_radar_series_style(chart, ChartRadarSeriesStyle::Fill)?;
                 },
@@ -643,6 +719,28 @@ fn host_operation(input: &Input, source: &[u8], operation: Operation) -> TestRes
                     e.set_sheet_chart_background_image_fill(
                         sheet,
                         chart,
+                        "poster.png",
+                        &poster()?,
+                        litchi_iwa::shapes::ShapeImageFillTechnique::Tile,
+                        None,
+                    )?;
+                },
+                Operation::SeriesImageSet => {
+                    e.set_sheet_chart_series_image_fill(
+                        sheet,
+                        chart,
+                        litchi_iwa::charts::Index::from_zero_based(0),
+                        "poster.png",
+                        &poster()?,
+                        litchi_iwa::shapes::ShapeImageFillTechnique::Tile,
+                        None,
+                    )?;
+                },
+                Operation::SymbolImageSet => {
+                    e.set_sheet_chart_series_symbol_image_fill(
+                        sheet,
+                        chart,
+                        litchi_iwa::charts::Index::from_zero_based(0),
                         "poster.png",
                         &poster()?,
                         litchi_iwa::shapes::ShapeImageFillTechnique::Tile,
@@ -761,6 +859,28 @@ fn keynote_operation(source: &[u8], operation: Operation) -> TestResult<Vec<u8>>
         Operation::BackgroundImageSet => {
             let mut edit = package.edit_slide_chart_style(slide, chart)?;
             edit.set_background_image_fill(
+                &poster()?,
+                "poster.png",
+                style::ImageTechnique::Tile,
+                None,
+            )?;
+            leaf_bytes!(edit.commit()?.package())
+        },
+        Operation::SeriesImageSet => {
+            let mut edit = package.edit_slide_chart_series(slide, chart)?;
+            edit.set_image_fill(
+                0,
+                &poster()?,
+                "poster.png",
+                style::ImageTechnique::Tile,
+                None,
+            )?;
+            leaf_bytes!(edit.commit()?.package())
+        },
+        Operation::SymbolImageSet => {
+            let mut edit = package.edit_slide_chart_series(slide, chart)?;
+            edit.set_symbol_image_fill(
+                0,
                 &poster()?,
                 "poster.png",
                 style::ImageTechnique::Tile,
@@ -917,6 +1037,32 @@ fn pages_operation(source: &[u8], operation: Operation) -> TestResult<Vec<u8>> {
                 .commit()?
                 .package()
         ),
+        Operation::SeriesImageSet => leaf_bytes!(
+            package
+                .edit_body_chart_series(chart)?
+                .set_image_fill(
+                    0,
+                    &poster()?,
+                    "poster.png",
+                    style::ImageTechnique::Tile,
+                    None
+                )?
+                .commit()?
+                .package()
+        ),
+        Operation::SymbolImageSet => leaf_bytes!(
+            package
+                .edit_body_chart_series(chart)?
+                .set_symbol_image_fill(
+                    0,
+                    &poster()?,
+                    "poster.png",
+                    style::ImageTechnique::Tile,
+                    None,
+                )?
+                .commit()?
+                .package()
+        ),
         Operation::ValueAxisSet => leaf_bytes!(
             package
                 .edit_body_chart_value_axis_settings(chart)?
@@ -1027,6 +1173,28 @@ fn numbers_operation(source: &[u8], operation: Operation) -> TestResult<Vec<u8>>
                 &poster()?,
                 "poster.png",
                 litchi_numbers::sheet::chart::style::ImageTechnique::Tile,
+                None,
+            )?;
+            Ok(leaf_bytes!(edit.commit()?.package()))
+        },
+        Operation::SeriesImageSet => {
+            let mut edit = package.edit_sheet_chart_series(0, 1)?;
+            edit.set_image_fill(
+                0,
+                &poster()?,
+                "poster.png",
+                series::ImageTechnique::Tile,
+                None,
+            )?;
+            Ok(leaf_bytes!(edit.commit()?.package()))
+        },
+        Operation::SymbolImageSet => {
+            let mut edit = package.edit_sheet_chart_series(0, 1)?;
+            edit.set_symbol_image_fill(
+                0,
+                &poster()?,
+                "poster.png",
+                series::ImageTechnique::Tile,
                 None,
             )?;
             Ok(leaf_bytes!(edit.commit()?.package()))

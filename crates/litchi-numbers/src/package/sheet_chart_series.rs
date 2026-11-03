@@ -539,6 +539,17 @@ impl Property {
         }
     }
 
+    /// Whether series `series`' fill or data-symbol fill is an image.
+    fn is_image_at(&self, series: usize) -> bool {
+        match self {
+            Self::Fills(values) => matches!(values.get(series), Some(Fill::Image(_))),
+            Self::SymbolFills(values) => {
+                matches!(values.get(series), Some(SymbolFill::Custom(Fill::Image(_))))
+            },
+            _ => false,
+        }
+    }
+
     /// Whether the value names no series.
     #[must_use]
     pub fn is_empty(&self) -> bool {
@@ -790,6 +801,17 @@ pub struct Edit<'a> {
 enum Staged {
     Set(Property),
     Reset(PropertyKind, usize),
+    Image(PropertyKind, usize, StagedImage),
+}
+
+/// An image staged by [`Edit::set_image_fill`] or
+/// [`Edit::set_symbol_image_fill`].
+#[derive(Debug, Clone, PartialEq)]
+struct StagedImage {
+    bytes: std::sync::Arc<[u8]>,
+    file_name: Box<str>,
+    technique: litchi_iwa_common::shape::fill::ImageTechnique,
+    tint: Option<litchi_iwa_common::color::Rgba>,
 }
 
 impl fmt::Debug for Edit<'_> {
@@ -863,6 +885,99 @@ impl Edit<'_> {
         Ok(self)
     }
 
+    /// Stage embedding `bytes` as a new `Data/` member and making them
+    /// series `series`' fill, laid out by `technique` over the chart frame
+    /// and optionally tinted (the host's `set_sheet_chart_series_image_fill`).
+    /// The series' style becomes the image's data owner; a replaced own
+    /// image fill is released, and its media removed when nothing else
+    /// references it.
+    ///
+    /// # Errors
+    ///
+    /// [`Refusal::InvalidImage`] for bytes that are not an image,
+    /// [`Error::Allocation`].
+    pub fn set_image_fill(
+        &mut self,
+        series: usize,
+        bytes: &[u8],
+        file_name: &str,
+        technique: litchi_iwa_common::shape::fill::ImageTechnique,
+        tint: Option<litchi_iwa_common::color::Rgba>,
+    ) -> Result<&mut Self, Error> {
+        self.stage_image(
+            PropertyKind::Fills,
+            series,
+            bytes,
+            file_name,
+            technique,
+            tint,
+        )
+    }
+
+    /// As [`Self::set_image_fill`], for series `series`' data-symbol fill
+    /// (the host's `set_sheet_chart_series_symbol_image_fill`).
+    ///
+    /// # Errors
+    ///
+    /// [`Refusal::InvalidImage`] for bytes that are not an image,
+    /// [`Error::Allocation`].
+    pub fn set_symbol_image_fill(
+        &mut self,
+        series: usize,
+        bytes: &[u8],
+        file_name: &str,
+        technique: litchi_iwa_common::shape::fill::ImageTechnique,
+        tint: Option<litchi_iwa_common::color::Rgba>,
+    ) -> Result<&mut Self, Error> {
+        self.stage_image(
+            PropertyKind::SymbolFills,
+            series,
+            bytes,
+            file_name,
+            technique,
+            tint,
+        )
+    }
+
+    fn stage_image(
+        &mut self,
+        kind: PropertyKind,
+        series: usize,
+        bytes: &[u8],
+        file_name: &str,
+        technique: litchi_iwa_common::shape::fill::ImageTechnique,
+        tint: Option<litchi_iwa_common::color::Rgba>,
+    ) -> Result<&mut Self, Error> {
+        if litchi_iwa_common::media::Type::from_bytes(bytes)
+            != litchi_iwa_common::media::Type::Image
+        {
+            return Err(Refusal::InvalidImage.into());
+        }
+        if self.changes.len() >= MAX_STAGED_OPERATIONS {
+            return Err(Error::Limit {
+                kind: LimitKind::Engine(engine::LimitKind::Allocations),
+                observed: self.changes.len().saturating_add(1) as u64,
+                maximum: MAX_STAGED_OPERATIONS as u64,
+            });
+        }
+        self.budget
+            .preflight_allocations(1)
+            .map_err(map_arrangement)?;
+        structure::reserve(&mut self.changes, 1)?;
+        self.budget.allocations(1).map_err(map_arrangement)?;
+        self.changes.push(Staged::Image(
+            kind,
+            series,
+            StagedImage {
+                bytes: bytes.into(),
+                file_name: file_name.into(),
+                technique,
+                tint,
+            },
+        ));
+        Ok(self)
+    }
+
     /// Validate and atomically publish the staged changes. A change that
     /// leaves a property as it is is skipped; an edit whose changes are all
     /// skipped is an exact no-op.
@@ -884,7 +999,7 @@ impl Edit<'_> {
             let base = current.as_ref().unwrap_or(self.source);
             let kind = match change {
                 Staged::Set(property) => property.kind(),
-                Staged::Reset(kind, _) => *kind,
+                Staged::Reset(kind, _) | Staged::Image(kind, ..) => *kind,
             };
             let index = property_index(kind);
             if before[index].is_none() {
@@ -897,6 +1012,15 @@ impl Edit<'_> {
                 Staged::Reset(kind, series) => {
                     reset_one(base, self.sheet, self.chart, *kind, *series, &mut budget)?
                 },
+                Staged::Image(kind, series, image) => image_one(
+                    base,
+                    self.sheet,
+                    self.chart,
+                    *kind,
+                    *series,
+                    image,
+                    &mut budget,
+                )?,
             };
             if let Some(published) = published {
                 if let Staged::Set(property) = change
@@ -907,6 +1031,18 @@ impl Edit<'_> {
                         property.kind(),
                         &mut budget,
                     )? != *property
+                {
+                    return Err(Error::Verification);
+                }
+                if let Staged::Image(kind, series, _) = change
+                    && !read(
+                        &published.package,
+                        self.sheet,
+                        self.chart,
+                        *kind,
+                        &mut budget,
+                    )?
+                    .is_image_at(*series)
                 {
                     return Err(Error::Verification);
                 }
@@ -1920,6 +2056,10 @@ fn apply_one(
             .map_err(map_arrangement)?;
         budget.allocations(values.len()).map_err(map_arrangement)?;
         let values: Vec<Option<style::Value>> = values.into_iter().map(Some).collect();
+        if matches!(style_kind, style::Kind::Fills | style::Kind::SymbolFills) {
+            let published = write_style_data(source, &target, style_kind, &values, None, budget)?;
+            return publish_changes(published, sheet, chart, property.kind(), budget);
+        }
         let mut admission = StylePublicationAdmission { budget };
         let published = style::write(
             source,
@@ -2471,6 +2611,10 @@ fn reset_one(
         .enumerate()
         .map(|(index, value)| (index != series).then_some(value))
         .collect();
+    if matches!(style_kind, style::Kind::Fills | style::Kind::SymbolFills) {
+        let published = write_style_data(source, &target, style_kind, &values, None, budget)?;
+        return publish_changes(published, sheet, chart, kind, budget);
+    }
     let mut admission = StylePublicationAdmission { budget };
     let published = style::write(
         source,
@@ -2482,6 +2626,118 @@ fn reset_one(
     )
     .map_err(from_style)?;
     publish_changes(published, sheet, chart, kind, budget)
+}
+
+/// Stage series `series`' new image fill or data-symbol image fill (the
+/// host's `set_sheet_chart_series_{,symbol_}image_fill`).
+fn image_one(
+    source: &Package,
+    sheet: usize,
+    chart: ChartSelector,
+    kind: PropertyKind,
+    series: usize,
+    image: &StagedImage,
+    budget: &mut ChartBudget,
+) -> Result<Option<Published>, Error> {
+    use sha1::Digest as _;
+    let style_kind = kind.style().ok_or(Error::InvalidSource)?;
+    let target = target(source, sheet, chart, budget)?;
+    if series >= target.series {
+        return Err(Refusal::SeriesNotFound { series }.into());
+    }
+    let size = source
+        .sheet_drawable_properties(sheet, crate::sheet::drawable::DrawableSelector::from(chart))
+        .map_err(|_| Error::InvalidSource)?
+        .geometry()
+        .and_then(|geometry| geometry.size)
+        .ok_or(Refusal::InvalidImage)?;
+    let current = style::read(source, target.chart, target.kind, target.series, style_kind)
+        .map_err(from_style)?;
+    budget
+        .preflight_allocations(target.series)
+        .map_err(map_arrangement)?;
+    budget.allocations(target.series).map_err(map_arrangement)?;
+    let values: Vec<Option<style::Value>> = current.into_iter().map(Some).collect();
+    let digest = sha1::Sha1::digest(image.bytes.as_ref());
+    let new = litchi_iwa_style::series::style::SeriesImage {
+        series,
+        image: litchi_iwa_style::chart_style::NewImage {
+            data: litchi_iwa_style::data_owner::NewData {
+                preferred_file_name: &image.file_name,
+                digest: digest.as_slice(),
+                length: image.bytes.len() as u64,
+            },
+            technique: image.technique,
+            size: litchi_iwa_common::shape::geometry::Size {
+                width: size.width,
+                height: size.height,
+            },
+            tint: image.tint,
+        },
+    };
+    let published = write_style_data(
+        source,
+        &target,
+        style_kind,
+        &values,
+        Some((new, image.bytes.as_ref())),
+        budget,
+    )?;
+    publish_changes(published, sheet, chart, kind, budget)
+}
+
+/// A fill or data-symbol fill write on the chart-series workspace path with
+/// the shared data-owner transitions
+/// (`litchi_iwa_style::series::style::write_data`): a new image is
+/// published with its bytes, a replaced image released.
+fn write_style_data(
+    source: &Package,
+    target: &Target,
+    kind: style::Kind,
+    values: &[Option<style::Value>],
+    image: Option<(litchi_iwa_style::series::style::SeriesImage<'_>, &[u8])>,
+    budget: &mut ChartBudget,
+) -> Result<Option<Published>, Error> {
+    let prepared = prepare_components(source, budget)?;
+    let mut workspace = prepared.workspace()?;
+    let limits = budget.series_limits().map_err(map_arrangement)?;
+    let (new, bytes) = match image {
+        Some((new, bytes)) => (Some(new), Some(bytes)),
+        None => (None, None),
+    };
+    let (changed, report, changes) = litchi_iwa_style::series::style::write_data(
+        &mut workspace,
+        target.chart,
+        target.kind,
+        kind,
+        values,
+        new,
+        limits,
+    )?;
+    budget
+        .charge_series_report(report)
+        .map_err(map_arrangement)?;
+    if !changed {
+        return Ok(None);
+    }
+    let finish_limits = budget.finish_limits().map_err(map_arrangement)?;
+    workspace.finish_requirements().map_err(Error::from)?;
+    let (mut finished, finish_report) = workspace
+        .finish_bounded(finish_limits)
+        .map_err(Error::from)?;
+    budget
+        .charge_finish_report(finish_report)
+        .map_err(map_arrangement)?;
+    finished.deletions.extend(changes.deleted);
+    let inserted = match (&changes.inserted, bytes) {
+        (Some((_, name)), Some(bytes)) => Some((name.as_str(), bytes)),
+        (None, None) => None,
+        _ => return Err(Error::Verification),
+    };
+    if finished.is_empty() {
+        return Ok(None);
+    }
+    publish_changes_with_data(source, &finished, inserted, budget).map(Some)
 }
 
 fn from_style(failure: style::Failure) -> Error {

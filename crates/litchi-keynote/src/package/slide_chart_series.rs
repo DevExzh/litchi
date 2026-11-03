@@ -209,6 +209,16 @@ impl Property {
     }
 
     /// The per-series style values of a series-style property.
+    fn is_image_at(&self, series: usize) -> bool {
+        match self {
+            Self::Fills(values) => matches!(values.get(series), Some(Fill::Image(_))),
+            Self::SymbolFills(values) => {
+                matches!(values.get(series), Some(SymbolFill::Custom(Fill::Image(_))))
+            },
+            _ => false,
+        }
+    }
+
     fn style_values(&self) -> Option<Vec<Option<style_engine::Value>>> {
         Some(match self {
             Self::Strokes(values) | Self::SymbolOutlines(values) => values
@@ -1941,9 +1951,7 @@ impl Ledger {
         let scope = report.scope().cloned().ok_or(Error::Verification)?;
         charge_series_report(&mut self.budget, &mut self.fields, report)?;
         let mut changes = finish_workspace(workspace, &mut self.budget)?;
-        if let Some(member) = data_changes.deleted {
-            changes.deletions.push(member);
-        }
+        changes.deletions.extend(data_changes.deleted);
         let inserted = match (&data_changes.inserted, data) {
             (Some((_, name)), Some(bytes)) => Some((name.as_str(), bytes)),
             (None, None) => None,
@@ -2153,6 +2161,17 @@ impl Commit {
 enum Staged {
     Set(Property),
     Reset(PropertyKind, usize),
+    Image(PropertyKind, usize, StagedImage),
+}
+
+/// An image staged by [`Edit::set_image_fill`] or
+/// [`Edit::set_symbol_image_fill`].
+#[derive(Debug, Clone, PartialEq)]
+struct StagedImage {
+    bytes: Arc<[u8]>,
+    file_name: Box<str>,
+    technique: litchi_iwa_common::shape::fill::ImageTechnique,
+    tint: Option<litchi_iwa_common::color::Rgba>,
 }
 
 /// One immutable selector-first chart-series edit.
@@ -2240,6 +2259,85 @@ impl<'a> Edit<'a> {
         Ok(self)
     }
 
+    /// Stage embedding `bytes` as a new `Data/` member and making them
+    /// series `series`' fill, laid out by `technique` over the chart frame
+    /// and optionally tinted (the host's `set_slide_chart_series_image_fill`),
+    /// replacing any staged operation. The series' style becomes the
+    /// image's data owner; a replaced own image fill is released, and its
+    /// media removed when nothing else references it.
+    ///
+    /// # Errors
+    ///
+    /// [`Refusal::InvalidImage`] for bytes that are not an image.
+    pub fn set_image_fill(
+        &mut self,
+        series: usize,
+        bytes: &[u8],
+        file_name: &str,
+        technique: litchi_iwa_common::shape::fill::ImageTechnique,
+        tint: Option<litchi_iwa_common::color::Rgba>,
+    ) -> Result<&mut Self, Error> {
+        self.stage_image(
+            PropertyKind::Fills,
+            series,
+            bytes,
+            file_name,
+            technique,
+            tint,
+        )
+    }
+
+    /// As [`Self::set_image_fill`], for series `series`' data-symbol fill
+    /// (the host's `set_slide_chart_series_symbol_image_fill`).
+    ///
+    /// # Errors
+    ///
+    /// [`Refusal::InvalidImage`] for bytes that are not an image.
+    pub fn set_symbol_image_fill(
+        &mut self,
+        series: usize,
+        bytes: &[u8],
+        file_name: &str,
+        technique: litchi_iwa_common::shape::fill::ImageTechnique,
+        tint: Option<litchi_iwa_common::color::Rgba>,
+    ) -> Result<&mut Self, Error> {
+        self.stage_image(
+            PropertyKind::SymbolFills,
+            series,
+            bytes,
+            file_name,
+            technique,
+            tint,
+        )
+    }
+
+    fn stage_image(
+        &mut self,
+        kind: PropertyKind,
+        series: usize,
+        bytes: &[u8],
+        file_name: &str,
+        technique: litchi_iwa_common::shape::fill::ImageTechnique,
+        tint: Option<litchi_iwa_common::color::Rgba>,
+    ) -> Result<&mut Self, Error> {
+        if litchi_iwa_common::media::Type::from_bytes(bytes)
+            != litchi_iwa_common::media::Type::Image
+        {
+            return Err(Refusal::InvalidImage.into());
+        }
+        self.staged = Some(Staged::Image(
+            kind,
+            series,
+            StagedImage {
+                bytes: bytes.into(),
+                file_name: file_name.into(),
+                technique,
+                tint,
+            },
+        ));
+        Ok(self)
+    }
+
     /// Validate and atomically publish the staged operation. A value equal
     /// to the chart's is an exact no-op.
     ///
@@ -2247,8 +2345,9 @@ impl<'a> Edit<'a> {
     ///
     /// [`Refusal::NoStagedOperation`], [`Refusal::UnsupportedKind`],
     /// [`Refusal::SeriesCount`], [`Refusal::SeriesNotFound`],
-    /// [`Refusal::SharedStyle`], [`Refusal::ImageFill`], source, limit and
-    /// verification errors.
+    /// [`Refusal::SharedStyle`], [`Refusal::ImageFill`],
+    /// [`Refusal::InvalidImage`] (a chart without a frame size), source,
+    /// limit and verification errors.
     pub fn commit(self) -> Result<Commit, Error> {
         let staged = self.staged.ok_or(Refusal::NoStagedOperation)?;
         let mut ledger = Ledger::new(self.source)?;
@@ -2259,7 +2358,7 @@ impl<'a> Edit<'a> {
         )?;
         let kind = match &staged {
             Staged::Set(property) => property.kind(),
-            Staged::Reset(kind, _) => *kind,
+            Staged::Reset(kind, _) | Staged::Image(kind, ..) => *kind,
         };
         let before = read_property(&mut ledger, self.source, &target, kind)?;
         let published = match &staged {
@@ -2269,6 +2368,10 @@ impl<'a> Edit<'a> {
                 }
                 if before == *property {
                     None
+                } else if let (Some(style_kind), Some(values)) =
+                    (property.kind().style(), property.style_values())
+                {
+                    write_style_data(&mut ledger, self.source, &target, style_kind, &values, None)?
                 } else {
                     ledger.write(
                         self.source,
@@ -2285,20 +2388,45 @@ impl<'a> Edit<'a> {
                 let style_kind = kind.style().ok_or(Refusal::NotResettable)?;
                 let mut values = before.style_values().ok_or(Error::InvalidSource)?;
                 values[*series] = None;
-                ledger.write(
-                    self.source,
-                    &target,
-                    SERIES_CHART_FIELDS,
-                    |workspace, limits| {
-                        style_engine::write(
+                write_style_data(&mut ledger, self.source, &target, style_kind, &values, None)?
+            },
+            Staged::Image(kind, series, image) => {
+                if *series >= target.series {
+                    return Err(Refusal::SeriesNotFound { series: *series }.into());
+                }
+                use sha1::Digest as _;
+                let size = ledger
+                    .read(self.source, |workspace, limits| {
+                        litchi_iwa_style::chart_style::read_frame_size(
                             workspace,
                             target.selection.identifier,
-                            target.kind,
-                            style_kind,
-                            &values,
                             limits,
                         )
+                    })?
+                    .ok_or(Refusal::InvalidImage)?;
+                let style_kind = kind.style().ok_or(Error::InvalidSource)?;
+                let values = before.style_values().ok_or(Error::InvalidSource)?;
+                let digest = sha1::Sha1::digest(image.bytes.as_ref());
+                let new = style_engine::SeriesImage {
+                    series: *series,
+                    image: litchi_iwa_style::chart_style::NewImage {
+                        data: litchi_iwa_style::data_owner::NewData {
+                            preferred_file_name: &image.file_name,
+                            digest: digest.as_slice(),
+                            length: image.bytes.len() as u64,
+                        },
+                        technique: image.technique,
+                        size,
+                        tint: image.tint,
                     },
+                };
+                write_style_data(
+                    &mut ledger,
+                    self.source,
+                    &target,
+                    style_kind,
+                    &values,
+                    Some((new, image.bytes.as_ref())),
                 )?
             },
         };
@@ -2330,6 +2458,11 @@ impl<'a> Edit<'a> {
         {
             return Err(Error::Verification);
         }
+        if let Staged::Image(_, series, _) = &staged
+            && !after.is_image_at(*series)
+        {
+            return Err(Error::Verification);
+        }
         Ok(Commit {
             patch: Patch {
                 artifacts: artifacts(self.source, &published.package)?,
@@ -2343,6 +2476,42 @@ impl<'a> Edit<'a> {
             diagnostics: Diagnostics::published(published.touched),
         })
     }
+}
+
+/// A fill or data-symbol fill write with the shared data-owner
+/// transitions (a new image published with its bytes, a replaced image
+/// released); every other series-style write as [`write_property`].
+fn write_style_data(
+    ledger: &mut Ledger,
+    source: &Package,
+    target: &Target,
+    kind: style_engine::Kind,
+    values: &[Option<style_engine::Value>],
+    image: Option<(style_engine::SeriesImage<'_>, &[u8])>,
+) -> Result<Option<Published>, Error> {
+    let chart = target.selection.identifier;
+    let chart_kind = target.kind;
+    if !matches!(
+        kind,
+        style_engine::Kind::Fills | style_engine::Kind::SymbolFills
+    ) {
+        return ledger.write(source, target, SERIES_CHART_FIELDS, |workspace, limits| {
+            style_engine::write(workspace, chart, chart_kind, kind, values, limits)
+        });
+    }
+    let (new, bytes) = match image {
+        Some((new, bytes)) => (Some(new), Some(bytes)),
+        None => (None, None),
+    };
+    ledger.write_data(
+        source,
+        target,
+        SERIES_CHART_FIELDS,
+        bytes,
+        |workspace, limits| {
+            style_engine::write_data(workspace, chart, chart_kind, kind, values, new, limits)
+        },
+    )
 }
 
 fn connection_lines(kind: ChartKind) -> engine::SymbolResult<series_property::ConnectionLines> {

@@ -4,8 +4,8 @@
 //! `data_reference_registry` and `append_data_info`). Lifted from Pages
 //! (records 0371, 0413b, 0415) so the three format families share them.
 //!
-//! Payload functions edit a `TSP.PackageMetadata` payload; [`own_new`] and
-//! [`release`] apply one owner transition to the registry of a
+//! Payload functions edit a `TSP.PackageMetadata` payload; [`own_new`],
+//! [`own`] and [`release`] apply one owner transition to the registry of a
 //! [`Workspace`].
 
 use litchi_iwa_common::Result;
@@ -424,6 +424,37 @@ pub fn own_new(
             .map_err(wire)
     })?;
     Ok((data, name))
+}
+
+/// Make `object` (stored by `member`) one more owner of the existing data
+/// entry `data`, as the host's `add_component_data_reference` after its
+/// `validate_image_asset` (a fill that reuses data another owner already
+/// registered).
+///
+/// # Errors
+///
+/// A package without a registry, an object outside every component, or
+/// data without a `DataInfo`.
+pub fn own(
+    workspace: &mut Workspace<'_>,
+    data: u64,
+    member: &str,
+    object: u64,
+) -> crate::graph::Result<()> {
+    let component = workspace
+        .component_for_member(member)?
+        .ok_or(crate::graph::Error::Invalid(
+            "an owner outside every component",
+        ))?;
+    let payload = workspace
+        .registry_payload()?
+        .ok_or(crate::graph::Error::Invalid("the package has no registry"))?;
+    data_member(payload, data).map_err(wire)?;
+    workspace.update_registry(|payload| {
+        adjust_data_reference(payload, component, data, object, true)
+            .map(Some)
+            .map_err(wire)
+    })
 }
 
 /// Drop `object`'s (stored by `member`) owner count of `data`, as the

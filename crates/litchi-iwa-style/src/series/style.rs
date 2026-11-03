@@ -477,6 +477,16 @@ pub fn rewrite(
     kind: Kind,
     value: Option<&Value>,
 ) -> SymbolResult<Vec<u8>> {
+    rewrite_value(payload, chart, kind, value, false)
+}
+
+fn rewrite_value(
+    payload: &[u8],
+    chart: ChartKind,
+    kind: Kind,
+    value: Option<&Value>,
+    images: bool,
+) -> SymbolResult<Vec<u8>> {
     if is_switch(kind) {
         return rewrite_switch(payload, chart, kind, value);
     }
@@ -508,7 +518,7 @@ pub fn rewrite(
             let family = FillFamily::for_chart_kind(chart)
                 .ok_or(SymbolError::Refused(Refusal::UnsupportedKind))?;
             match value {
-                Some(Value::Fill(Fill::Image(_))) => {
+                Some(Value::Fill(Fill::Image(_))) if !images => {
                     return Err(SymbolError::Refused(Refusal::ImageFill));
                 },
                 Some(Value::Fill(fill)) => {
@@ -523,7 +533,7 @@ pub fn rewrite(
             let family = SymbolFillFamily::for_chart_kind(chart)
                 .ok_or(SymbolError::Refused(Refusal::UnsupportedKind))?;
             let stored = match value {
-                Some(Value::SymbolFill(SymbolFill::Custom(Fill::Image(_)))) => {
+                Some(Value::SymbolFill(SymbolFill::Custom(Fill::Image(_)))) if !images => {
                     return Err(SymbolError::Refused(Refusal::ImageFill));
                 },
                 Some(Value::SymbolFill(SymbolFill::Custom(fill))) => {
@@ -636,6 +646,10 @@ pub fn read(
 /// (`values.len()` is the series count), under one residual profile.
 /// Returns whether anything changed and the report with the mutation scope.
 ///
+/// A fill or data-symbol fill write that would change an image's data
+/// owners (a new image value, or a replaced or removed own image fill) is
+/// [`write_data`]'s.
+///
 /// # Errors
 ///
 /// [`Refusal::UnsupportedKind`], [`Refusal::SharedStyle`] (a style another
@@ -650,10 +664,108 @@ pub fn write(
     values: &[Option<Value>],
     limits: Limits,
 ) -> SymbolResult<(bool, Report)> {
+    write_values(
+        workspace, chart, chart_kind, kind, values, None, false, limits,
+    )
+    .map(|(changed, report, _)| (changed, report))
+}
+
+/// A new embedded image a series image-fill write stores in one series.
+#[derive(Debug, Clone, Copy)]
+pub struct SeriesImage<'a> {
+    /// The series (zero-based) whose fill or data-symbol fill becomes the
+    /// image.
+    pub series: usize,
+    /// The data entry, layout and tint
+    /// ([`crate::chart_style::NewImage`]).
+    pub image: crate::chart_style::NewImage<'a>,
+}
+
+/// [`write`] with the host's data-owner transitions for fills and
+/// data-symbol fills (`set_chart_series_fills`,
+/// `set_chart_series_symbol_fills`, their resets and
+/// `set_chart_series_{,symbol_}image_fill_data`): `image`, when given,
+/// registers a new data entry (`DataInfo`) owned by its series' effective
+/// style and replaces that series' value with the embedded image fill (its
+/// value in `values` is ignored); an image value naming stored data adds
+/// the style as one more owner; a replaced or removed own image fill
+/// releases the style's owner and, when nothing references the data any
+/// more, its `DataInfo` and member. The report's scope admits the package
+/// metadata and plans the inserted and deleted `Data/` members.
+///
+/// # Errors
+///
+/// As [`write`]; [`Refusal::UnsupportedKind`] for an image on a property
+/// other than fills and data-symbol fills; an image series out of range,
+/// an invalid registry or unknown data.
+pub fn write_data(
+    workspace: &mut Workspace<'_>,
+    chart: u64,
+    chart_kind: ChartKind,
+    kind: Kind,
+    values: &[Option<Value>],
+    image: Option<SeriesImage<'_>>,
+    limits: Limits,
+) -> SymbolResult<(bool, Report, crate::chart_style::DataChanges)> {
+    write_values(
+        workspace, chart, chart_kind, kind, values, image, true, limits,
+    )
+}
+
+/// The data identifier of the image fill `kind` stores in a style's own
+/// payload (the host's `read_local_fill`/`read_underlying_fill`: a
+/// data-symbol fill's fill message, whatever its switches say).
+fn own_image(
+    properties: &Properties<'_>,
+    chart: ChartKind,
+    kind: Kind,
+) -> SymbolResult<Option<u64>> {
+    let field = match kind {
+        Kind::Fills => FillFamily::for_chart_kind(chart).map(FillFamily::field),
+        Kind::SymbolFills => {
+            SymbolFillFamily::for_chart_kind(chart).map(SymbolFillFamily::fill_field)
+        },
+        _ => None,
+    };
+    let Some(field) = field else {
+        return Ok(None);
+    };
+    Ok(match fill_at(properties, field)? {
+        Some(Fill::Image(image)) => image.data().map(|data| data.get()),
+        _ => None,
+    })
+}
+
+/// The data identifier of an image value.
+fn value_image(value: Option<&Value>) -> Option<u64> {
+    match value {
+        Some(
+            Value::Fill(Fill::Image(image))
+            | Value::SymbolFill(SymbolFill::Custom(Fill::Image(image))),
+        ) => image.data().map(|data| data.get()),
+        _ => None,
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn write_values(
+    workspace: &mut Workspace<'_>,
+    chart: u64,
+    chart_kind: ChartKind,
+    kind: Kind,
+    values: &[Option<Value>],
+    image: Option<SeriesImage<'_>>,
+    data: bool,
+    limits: Limits,
+) -> SymbolResult<(bool, Report, crate::chart_style::DataChanges)> {
+    let mut changes = crate::chart_style::DataChanges::default();
     if values.is_empty() {
         return Err(SymbolError::Invalid("a chart series write names no series"));
     }
     if !applies_to(chart_kind, kind) {
+        return Err(SymbolError::Refused(Refusal::UnsupportedKind));
+    }
+    if image.is_some() && !matches!(kind, Kind::Fills | Kind::SymbolFills) {
         return Err(SymbolError::Refused(Refusal::UnsupportedKind));
     }
     let mut budget = SymbolBudget::new(limits);
@@ -662,6 +774,34 @@ pub fn write(
     budget.set_scope(scope);
     let styles = bounded_style_slots(workspace, chart, values.len(), &mut budget)?;
     let current = read_effective(workspace, chart_kind, kind, &styles, &mut budget)?;
+    let mut owned: Vec<Option<Value>> = Vec::new();
+    let values = match image {
+        None => values,
+        Some(new) => {
+            let style = *styles
+                .get(new.series)
+                .ok_or(SymbolError::Invalid("an image fill names no series"))?;
+            if bounded_style_owner_count(workspace, style, &mut budget)? != 1 {
+                return Err(SymbolError::Refused(Refusal::SharedStyle));
+            }
+            // The host inserts the media first (`insert_unreferenced`),
+            // then moves the data reference to the series style.
+            let member = workspace
+                .member(workspace.locate(style).map_err(SymbolError::from)?)
+                .to_owned();
+            let (identifier, name) =
+                crate::data_owner::own_new(workspace, new.image.data, &member, style)?;
+            let fill = crate::chart_style::embedded_image(identifier, &new.image)?;
+            budget.reserve_vec(&mut owned, values.len(), false)?;
+            owned.extend_from_slice(values);
+            owned[new.series] = Some(match kind {
+                Kind::SymbolFills => Value::SymbolFill(SymbolFill::Custom(fill)),
+                _ => Value::Fill(fill),
+            });
+            changes.inserted = Some((identifier, name));
+            &owned
+        },
+    };
     // The host's location write makes every series style exclusive before
     // it rewrites any of them.
     if kind == Kind::ValueLabelLocations
@@ -676,8 +816,11 @@ pub fn write(
             }
         }
     }
+    let fresh = changes.inserted.as_ref().map(|(identifier, _)| *identifier);
     let mut replacements: Vec<(u64, usize, Vec<u8>)> = Vec::new();
     budget.reserve_vec(&mut replacements, styles.len(), true)?;
+    let mut transitions: Vec<(u64, Option<u64>, Option<u64>)> = Vec::new();
+    budget.reserve_vec(&mut transitions, styles.len(), true)?;
     for ((&style, (value, defined)), expected) in styles.iter().zip(&current).zip(values) {
         budget.work(1)?;
         let unchanged = match expected {
@@ -699,19 +842,46 @@ pub fn write(
             "a series style must have exactly one payload",
             &mut budget,
         )?;
-        let data = charged_patch(payload, &mut budget, |payload| {
-            rewrite(payload, chart_kind, kind, expected.as_ref())
+        let old = own_image(&decode(payload)?, chart_kind, kind)?;
+        let new = value_image(expected.as_ref());
+        if old != new {
+            if !data {
+                return Err(SymbolError::Refused(Refusal::ImageFill));
+            }
+            transitions.push((style, old, new));
+        }
+        let rewritten = charged_patch(payload, &mut budget, |payload| {
+            rewrite_value(payload, chart_kind, kind, expected.as_ref(), data)
         })?;
-        if data != payload {
-            replacements.push((style, message, data));
+        if rewritten != payload {
+            replacements.push((style, message, rewritten));
         }
     }
     let changed = !replacements.is_empty();
-    for (style, message, data) in replacements {
+    for (style, message, rewritten) in replacements {
         workspace
-            .replace_payload(style, message, data)
+            .replace_payload(style, message, rewritten)
             .map_err(SymbolError::from)?;
     }
+    // The host's `adjust_data_reference` (old owner removed, new owner
+    // added) and `remove_orphaned_image_asset`, slot by slot.
+    for (style, old, new) in transitions {
+        budget.work(1)?;
+        let member = workspace
+            .member(workspace.locate(style).map_err(SymbolError::from)?)
+            .to_owned();
+        if let Some(new) = new
+            && Some(new) != fresh
+        {
+            crate::data_owner::own(workspace, new, &member, style)?;
+        }
+        if let Some(old) = old {
+            changes
+                .deleted
+                .extend(crate::data_owner::release(workspace, old, &member, style)?);
+        }
+    }
+    crate::chart_style::plan_data_changes(workspace, &mut budget, &changes);
     if changed {
         let actual = read_effective(workspace, chart_kind, kind, &styles, &mut budget)?;
         for ((value, defined), expected) in actual.iter().zip(values) {
@@ -726,7 +896,7 @@ pub fn write(
             }
         }
     }
-    Ok((changed, budget.report(changed)))
+    Ok((changed, budget.report(changed), changes))
 }
 
 /// `tschchartseriesdefaultshadow` of `TSCH.ChartSeriesStyleArchive`.

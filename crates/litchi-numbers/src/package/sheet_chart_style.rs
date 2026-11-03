@@ -817,9 +817,7 @@ fn apply_background(
         budget
             .charge_finish_report(finish_report)
             .map_err(series::map_arrangement)?;
-        if let Some(member) = changes.deleted {
-            finished.deletions.push(member);
-        }
+        finished.deletions.extend(changes.deleted);
         let inserted = match (&changes.inserted, data) {
             (Some((_, name)), Some(bytes)) => Some((name.as_str(), bytes)),
             (None, None) => None,

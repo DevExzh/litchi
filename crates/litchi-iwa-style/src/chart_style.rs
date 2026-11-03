@@ -2071,13 +2071,13 @@ pub struct NewImage<'a> {
 
 /// What a fill write changes in the package's embedded data: the new
 /// `Data/` member (its data identifier and name; the caller publishes the
-/// bytes there) and the orphaned member to delete.
+/// bytes there) and the orphaned members to delete.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct DataChanges {
     /// The data identifier and `Data/` member of a registered image.
     pub inserted: Option<(u64, String)>,
-    /// The `Data/` member nothing references any more.
-    pub deleted: Option<String>,
+    /// The `Data/` members nothing references any more.
+    pub deleted: Vec<String>,
 }
 
 /// The value a background write stores.
@@ -2087,6 +2087,32 @@ pub enum Background<'a> {
     Fill(&'a litchi_iwa_common::shape::fill::Fill),
     /// A new embedded image.
     Image(NewImage<'a>),
+}
+
+/// Admit `changes` to the budget's mutation scope: the package metadata
+/// object with its `DataInfo` list (4) and component (3, 11) data
+/// references (7), the inserted `Data/` member and the deleted ones.
+pub(crate) fn plan_data_changes(
+    workspace: &Workspace<'_>,
+    budget: &mut SymbolBudget,
+    changes: &DataChanges,
+) {
+    let registry = workspace.registry_object();
+    let Some(scope) = budget.scope_mut() else {
+        return;
+    };
+    if changes.inserted.is_some() || !changes.deleted.is_empty() {
+        if let Some(registry) = registry {
+            scope.allow(registry, crate::graph::METADATA_MEMBER, 11_006);
+        }
+        scope.allow_fields(&[3, 4, 7, 11]);
+    }
+    if let Some((_, name)) = &changes.inserted {
+        scope.plan_new_member(name);
+    }
+    for name in &changes.deleted {
+        scope.plan_removed_member(name);
+    }
 }
 
 /// The embedded image fill of data `data`.
@@ -2183,28 +2209,15 @@ pub fn write_chart_background(
             _ => None,
         };
         if new != Some(old) {
-            changes.deleted = crate::data_owner::release(workspace, old.get(), &member, style)?;
+            changes.deleted.extend(crate::data_owner::release(
+                workspace,
+                old.get(),
+                &member,
+                style,
+            )?);
         }
     }
-    let registry = workspace.registry_object();
-    if let Some(scope) = budget.scope_mut()
-        && (changes.inserted.is_some() || changes.deleted.is_some())
-    {
-        // The package metadata's `DataInfo` list and component data
-        // references.
-        if let Some(registry) = registry {
-            scope.allow(registry, crate::graph::METADATA_MEMBER, 11_006);
-        }
-        scope.allow_fields(&[3, 4, 7, 11]);
-    }
-    if let Some(scope) = budget.scope_mut() {
-        if let Some((_, name)) = &changes.inserted {
-            scope.plan_new_member(name);
-        }
-        if let Some(name) = &changes.deleted {
-            scope.plan_removed_member(name);
-        }
-    }
+    plan_data_changes(workspace, &mut budget, &changes);
     if changed
         && chart_value(workspace, chart, chart_kind, 0, kind, &mut budget)?
             != chart::Property::BackgroundFill(fill)
