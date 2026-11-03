@@ -569,8 +569,18 @@ pub(super) fn prepare_complete_final_formula_set<'formula, 'cache>(
             let change = changes
                 .get(formula.change_index)
                 .ok_or(Error::Verification { path })?;
-            let Some(Input::Formula { cached, .. }) = change.input_ref() else {
+            let Some(Input::Formula { expression, cached }) = change.input_ref() else {
                 return Err(Error::Verification { path });
+            };
+            // A pivot-category formula is not evaluable here; without a
+            // supplied cache it keeps the host's zero placeholder until
+            // Numbers recalculates (record 0424).
+            let supplied = match cached {
+                Some(cached) => Some(supplied_cache(cached)),
+                None if expression.contains_pivot_category() => Some(cache::SuppliedCache::Number(
+                    litchi_iwa_common::formula::FiniteF64::new(0.0).expect("zero is finite"),
+                )),
+                None => None,
             };
             authored_cache.push(cache::AuthoredFormulaCache {
                 owner: existing.identity.owner,
@@ -578,7 +588,7 @@ pub(super) fn prepare_complete_final_formula_set<'formula, 'cache>(
                     row: formula.position.row(),
                     column: formula.position.column(),
                 },
-                supplied: cached.as_ref().map(supplied_cache),
+                supplied,
             });
         }
         exact_capacity(&cells, plan.final_cells, path)?;

@@ -16,7 +16,7 @@ use litchi_iwa_common::WireLimits;
 use litchi_iwa_common::wire::parse_wire_view;
 
 use super::Package;
-use crate::table::pivot::{Category, Error};
+use crate::table::pivot::{Aggregate, Category, CategoryKey, Error};
 
 const FORMULA_OWNER_DEPENDENCIES_MESSAGE_TYPE: u32 = 4_008;
 const GROUP_BY_MESSAGE_TYPE: u32 = 6_373;
@@ -128,18 +128,22 @@ fn label(node: &[(u32, u8, &[u8])]) -> Option<String> {
 /// One category's identity and the native values that must agree when two
 /// group-bys describe it.
 #[derive(Debug, Clone, PartialEq)]
-struct Found {
-    owner: u64,
-    grouping: (u32, u32),
-    aggregate: (u32, u32),
-    aggregate_type: u32,
-    level: i32,
+pub(crate) struct Found {
+    /// The group-by's internal formula owner.
+    pub(crate) owner: u64,
+    /// The grouping-columns cell `(row, column)` of that owner.
+    pub(crate) grouping: (u32, u32),
+    /// The category's aggregate cell `(row, column)` of that owner.
+    pub(crate) aggregate: (u32, u32),
+    /// The native summary-function code.
+    pub(crate) aggregate_type: u32,
+    pub(crate) level: i32,
     label: Option<String>,
 }
 
-type Key = ((u64, u64), (u64, u64), (u64, u64));
-
-fn categories(package: &Package) -> Result<HashMap<Key, Found>, Error> {
+/// Every unambiguous category of the package by its native identity (the
+/// host's `formula_pivot_categories`).
+pub(crate) fn categories(package: &Package) -> Result<HashMap<CategoryKey, Found>, Error> {
     let mut engines = package
         .state
         .components
@@ -362,7 +366,14 @@ impl Package {
         });
         Ok(entries
             .into_iter()
-            .map(|(_, found)| Category::new(found.label, found.level, found.aggregate_type))
+            .map(|(key, found)| {
+                Category::new(
+                    key,
+                    found.label,
+                    found.level,
+                    Aggregate::from_code(found.aggregate_type),
+                )
+            })
             .collect())
     }
 }

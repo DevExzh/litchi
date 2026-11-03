@@ -144,6 +144,12 @@ pub enum Refusal {
         path: Path,
         kind: DependencyKind,
     },
+    /// A formula references a pivot category the edited package does not
+    /// hold (record 0424).
+    PivotCategoryNotFound,
+    /// A formula references a pivot category whose summary function or
+    /// group level differs in the edited package (record 0424).
+    PivotCategoryChanged,
 }
 
 impl Refusal {
@@ -152,11 +158,14 @@ impl Refusal {
     pub const fn kind(&self) -> litchi_core::edit::RefusalKind {
         use litchi_core::edit::RefusalKind;
         match self {
-            Self::SheetNotFound | Self::TableNotFound => RefusalKind::NotFound,
+            Self::SheetNotFound | Self::TableNotFound | Self::PivotCategoryNotFound => {
+                RefusalKind::NotFound
+            },
             Self::InvalidAddress
             | Self::AmbiguousSource { .. }
             | Self::OutOfBounds { .. }
-            | Self::DuplicatePosition { .. } => RefusalKind::InvalidValue,
+            | Self::DuplicatePosition { .. }
+            | Self::PivotCategoryChanged => RefusalKind::InvalidValue,
             Self::TableLocked { .. } => RefusalKind::Protected,
             Self::UnsupportedSource { .. } | Self::UnsupportedDependency { .. } => {
                 RefusalKind::UnsupportedContent
@@ -193,6 +202,11 @@ impl fmt::Display for Refusal {
             Self::UnsupportedDependency { .. } => {
                 formatter.write_str("the Numbers table-cell change has an unsupported dependency")
             },
+            Self::PivotCategoryNotFound => formatter
+                .write_str("the formula's pivot category is not in the Numbers group-by model"),
+            Self::PivotCategoryChanged => formatter.write_str(
+                "the formula's pivot category has another summary function or group level",
+            ),
         }
     }
 }
