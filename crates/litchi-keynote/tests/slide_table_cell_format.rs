@@ -131,3 +131,29 @@ fn refusals_are_typed() -> TestResult {
     );
     Ok(())
 }
+
+/// Record 0428: a new Custom format mints its document-registry UUID
+/// deterministically, so the same edit on the same input is byte-identical.
+#[test]
+fn custom_format_output_is_deterministic() -> TestResult {
+    use litchi_iwa_common::table::cell::data_format::Custom;
+    use litchi_iwa_common::table::cell::data_format::custom::{
+        Name, Number as CustomNumber, NumberPattern,
+    };
+    let custom = DataFormat::Custom(Custom::from(CustomNumber::new(
+        Name::new("Grouped")?,
+        NumberPattern::new("#,##0.00")?,
+    )));
+    let mut outputs = Vec::new();
+    for _ in 0..2 {
+        let source = package()?;
+        let commit = source
+            .edit_slide_table_cell_format(0, 0, B2)?
+            .set(custom.clone())
+            .commit()?;
+        assert_eq!(commit.package().slide_table_cell_format(0, 0, B2)?, custom);
+        outputs.push(bytes(commit.package())?);
+    }
+    assert_eq!(outputs[0], outputs[1]);
+    Ok(())
+}
