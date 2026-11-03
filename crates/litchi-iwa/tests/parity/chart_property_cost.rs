@@ -71,6 +71,8 @@ enum Operation {
     CategoryLabelsSet,
     RadarSet,
     ReferenceLinesSet,
+    ValueAxisSet,
+    BackgroundImageSet,
 }
 
 const ROUTES: &[(&str, Format, Operation)] = &[
@@ -258,7 +260,33 @@ const ROUTES: &[(&str, Format, Operation)] = &[
         Format::Numbers,
         Operation::ReferenceLinesSet,
     ),
+    (
+        "pages_value_axis_set",
+        Format::Pages,
+        Operation::ValueAxisSet,
+    ),
+    (
+        "numbers_value_axis_set",
+        Format::Numbers,
+        Operation::ValueAxisSet,
+    ),
+    (
+        "pages_background_image_set",
+        Format::Pages,
+        Operation::BackgroundImageSet,
+    ),
 ];
+
+/// The image every chart image-fill route embeds (record 0422).
+fn poster() -> TestResult<Vec<u8>> {
+    Ok(crate::harness::fixture("iwork/keynote/media-replacement-assets/poster.png")?.bytes)
+}
+
+/// The value-axis bounds every value-axis route sets (record 0422).
+fn value_axis_bounds() -> TestResult<litchi_iwa_common::chart::axis::Bounds> {
+    use litchi_iwa_common::chart::axis::{Bound, Bounds};
+    Ok(Bounds::fixed(Bound::new(0.0)?, Bound::new(50.0)?)?)
+}
 
 const fn chart_kind(operation: Operation) -> Kind {
     match operation {
@@ -277,7 +305,9 @@ const fn chart_kind(operation: Operation) -> Kind {
         Operation::LightingSet => Kind::Column3d,
         Operation::ShadowSet | Operation::CategoryLabelsSet => Kind::Column2d,
         Operation::RadarSet => Kind::Radar2d,
-        Operation::ReferenceLinesSet => Kind::Column2d,
+        Operation::ReferenceLinesSet | Operation::ValueAxisSet | Operation::BackgroundImageSet => {
+            Kind::Column2d
+        },
     }
 }
 
@@ -442,6 +472,10 @@ fn host_operation(input: &Input, source: &[u8], operation: Operation) -> TestRes
                 Operation::ReferenceLinesSet => {
                     e.set_slide_chart_reference_lines(slide, chart, &reference_lines())?;
                 },
+                Operation::ValueAxisSet => {
+                    return Err("Keynote has no host value-axis route".into());
+                },
+                Operation::BackgroundImageSet => return Err("not measured yet".into()),
                 Operation::RadarSet => {
                     e.set_slide_chart_radar_series_style(
                         slide,
@@ -513,6 +547,18 @@ fn host_operation(input: &Input, source: &[u8], operation: Operation) -> TestRes
                 Operation::ReferenceLinesSet => {
                     e.set_body_chart_reference_lines(chart, &reference_lines())?;
                 },
+                Operation::ValueAxisSet => {
+                    e.set_body_chart_value_axis_bounds(chart, value_axis_bounds()?)?;
+                },
+                Operation::BackgroundImageSet => {
+                    e.set_body_chart_background_image_fill(
+                        chart,
+                        "poster.png",
+                        &poster()?,
+                        litchi_iwa::shapes::ShapeImageFillTechnique::Tile,
+                        None,
+                    )?;
+                },
                 Operation::RadarSet => {
                     e.set_body_chart_radar_series_style(chart, ChartRadarSeriesStyle::Fill)?;
                 },
@@ -571,6 +617,10 @@ fn host_operation(input: &Input, source: &[u8], operation: Operation) -> TestRes
                 Operation::ReferenceLinesSet => {
                     e.set_sheet_chart_reference_lines(sheet, chart, &reference_lines())?;
                 },
+                Operation::ValueAxisSet => {
+                    e.set_sheet_chart_value_axis_bounds(sheet, chart, value_axis_bounds()?)?;
+                },
+                Operation::BackgroundImageSet => return Err("not measured yet".into()),
                 Operation::RadarSet => {
                     e.set_sheet_chart_radar_series_style(
                         sheet,
@@ -680,6 +730,14 @@ fn keynote_operation(source: &[u8], operation: Operation) -> TestResult<Vec<u8>>
             edit.set(reference_lines())?;
             leaf_bytes!(edit.commit()?.package())
         },
+        Operation::BackgroundImageSet => return Err("not measured yet".into()),
+        Operation::ValueAxisSet => leaf_bytes!(
+            package
+                .edit_slide_chart_value_axis_settings(slide, chart)?
+                .set_bounds(value_axis_bounds()?)?
+                .commit()?
+                .package()
+        ),
         Operation::RadarSet => {
             let mut edit = package.edit_slide_chart_style(slide, chart)?;
             edit.set(radar_leaf())?;
@@ -810,6 +868,25 @@ fn pages_operation(source: &[u8], operation: Operation) -> TestResult<Vec<u8>> {
                 .commit()?
                 .package()
         ),
+        Operation::BackgroundImageSet => leaf_bytes!(
+            package
+                .edit_body_chart_style(chart)?
+                .set_background_image_fill(
+                    &poster()?,
+                    "poster.png",
+                    style::ImageTechnique::Tile,
+                    None,
+                )?
+                .commit()?
+                .package()
+        ),
+        Operation::ValueAxisSet => leaf_bytes!(
+            package
+                .edit_body_chart_value_axis_settings(chart)?
+                .set_bounds(value_axis_bounds()?)?
+                .commit()?
+                .package()
+        ),
         Operation::RadarSet => leaf_bytes!(
             package
                 .edit_body_chart_style(chart)?
@@ -905,6 +982,12 @@ fn numbers_operation(source: &[u8], operation: Operation) -> TestResult<Vec<u8>>
         Operation::ReferenceLinesSet => {
             let mut edit = package.edit_sheet_chart_reference_lines(0, 1)?;
             edit.set(reference_lines())?;
+            Ok(leaf_bytes!(edit.commit()?.package()))
+        },
+        Operation::BackgroundImageSet => Err("not measured yet".into()),
+        Operation::ValueAxisSet => {
+            let mut edit = package.edit_sheet_chart_value_axis_settings(0, 1)?;
+            edit.set_bounds(value_axis_bounds()?)?;
             Ok(leaf_bytes!(edit.commit()?.package()))
         },
         Operation::RadarSet => {

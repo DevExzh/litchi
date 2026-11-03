@@ -39,6 +39,7 @@ mod harness;
 mod known_fields;
 mod media_cases;
 
+mod chart_image_fill_cases;
 mod keynote_build_cases;
 mod keynote_builder_cases;
 mod keynote_cases;
@@ -97,8 +98,10 @@ mod numbers_lifecycle_cases;
 mod numbers_media_add_cases;
 mod numbers_media_cases;
 mod numbers_owner_allocation;
+mod numbers_pivot_cases;
 mod numbers_shape_lifecycle_cases;
 mod numbers_shape_style_cases;
+mod numbers_sort_cases;
 #[cfg(feature = "parity-host-oracle")]
 mod numbers_table_comment_cases;
 mod numbers_text_box_cases;
@@ -156,3 +159,4 @@ mod text_language_cases;
 mod text_list_cases;
 mod text_named_style_cases;
 mod text_style_cases;
+mod value_axis_cases;

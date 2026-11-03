@@ -62,6 +62,7 @@ mod sheet_chart_series_style;
 pub(crate) mod sheet_chart_style;
 pub(crate) mod sheet_chart_text;
 pub(crate) mod sheet_chart_title;
+pub(crate) mod sheet_chart_value_axis;
 pub(crate) mod sheet_drawable;
 pub(crate) mod sheet_drawable_annotation;
 mod sheet_drawable_author;
@@ -99,6 +100,7 @@ pub(crate) mod table_cell_custom_format;
 pub(crate) mod table_cell_data_format;
 pub(crate) mod table_cell_date_time_format;
 pub(crate) use litchi_iwa_table::cell_format::display as table_cell_display_format_native;
+mod pivot_categories;
 pub(crate) mod table_cell_appearance;
 pub(crate) mod table_cell_duration_format;
 pub(crate) mod table_cell_edit;
@@ -133,6 +135,7 @@ pub(crate) mod table_sort;
     reason = "The physical-only persisted-sort seam is retained solely for legacy migration snapshots."
 )]
 mod table_sort_compat;
+pub(crate) mod table_sort_execution;
 pub(crate) mod table_title;
 pub(crate) mod table_topology;
 

@@ -656,27 +656,16 @@ pub(crate) fn splice_text(
     Ok(removed)
 }
 
-const METADATA_VERSIONED_COMPONENTS_FIELD: u32 = 11;
-const METADATA_DATAS_FIELD: u32 = 4;
-const COMPONENT_DATA_REFERENCES_FIELD: u32 = 7;
-const DATA_REFERENCE_IDENTIFIER_FIELD: u32 = 1;
-const DATA_REFERENCE_OWNERS_FIELD: u32 = 2;
-const OWNER_OBJECT_FIELD: u32 = 1;
-const OWNER_COUNT_FIELD: u32 = 2;
-const DATA_INFO_IDENTIFIER_FIELD: u32 = 1;
-const DATA_INFO_FILE_NAME_FIELD: u32 = 4;
+// The package-metadata data-owner helpers are shared with the other iWork
+// formats (`litchi_iwa_style::data_owner`, record 0422).
+use litchi_iwa_style::data_owner as data_owner_engine;
 
 fn view_varint(payload: &[u8], number: u32) -> litchi_iwa_common::Result<Option<u64>> {
     let view = WireView::parse(payload, litchi_iwa_common::WireLimits::default())?;
     Ok(varint_of(&view, number))
 }
 
-/// Add one count to, or remove one count from, `component`'s
-/// data-reference owner (`data`, `object`) in a metadata payload (the host's
-/// `{add,remove}_component_data_reference`): a removal that empties the
-/// only owner drops the whole data reference, one that empties an owner
-/// drops the owner, and an addition appends a new reference or owner when
-/// none exists.
+/// See `litchi_iwa_style::data_owner::adjust_data_reference`.
 pub(crate) fn adjust_data_reference(
     payload: &[u8],
     component: u64,
@@ -684,262 +673,33 @@ pub(crate) fn adjust_data_reference(
     object: u64,
     add: bool,
 ) -> GraphResult<Vec<u8>> {
-    let mut matched = 0usize;
-    let mut output = payload.to_vec();
-    for field in [
-        METADATA_COMPONENTS_FIELD,
-        METADATA_VERSIONED_COMPONENTS_FIELD,
-    ] {
-        output = transform_length_delimited_fields_at_path(&output, &[field], |info| {
-            if view_varint(info, COMPONENT_IDENTIFIER_FIELD)? != Some(component) {
-                return Ok(info.to_vec());
-            }
-            matched += 1;
-            adjust_component(info, data, object, add)
-        })
-        .map_err(map_wire_error)?;
-    }
-    if matched != 1 {
-        return Err(GraphError::InvalidSource);
-    }
-    Ok(output)
+    data_owner_engine::adjust_data_reference(payload, component, data, object, add)
+        .map_err(map_wire_error)
 }
 
-fn adjust_component(
-    info: &[u8],
-    data: u64,
-    object: u64,
-    add: bool,
-) -> litchi_iwa_common::Result<Vec<u8>> {
-    let invalid = || litchi_iwa_common::Error::InvalidFormat("data reference".to_owned());
-    let references = repeated_length_delimited_payloads(info, COMPONENT_DATA_REFERENCES_FIELD)?;
-    let mut matches = Vec::new();
-    for reference in references {
-        if view_varint(reference, DATA_REFERENCE_IDENTIFIER_FIELD)? == Some(data) {
-            matches.push(reference);
-        }
-    }
-    let is_data = |reference: &[u8]| -> litchi_iwa_common::Result<bool> {
-        Ok(view_varint(reference, DATA_REFERENCE_IDENTIFIER_FIELD)? == Some(data))
-    };
-    match (add, matches.as_slice()) {
-        (true, []) => {
-            let mut owner = Vec::new();
-            litchi_iwa_common::wire::append_varint_field(&mut owner, OWNER_OBJECT_FIELD, object)?;
-            litchi_iwa_common::wire::append_varint_field(&mut owner, OWNER_COUNT_FIELD, 1)?;
-            let mut reference = Vec::new();
-            litchi_iwa_common::wire::append_varint_field(
-                &mut reference,
-                DATA_REFERENCE_IDENTIFIER_FIELD,
-                data,
-            )?;
-            litchi_iwa_common::wire::append_length_delimited_field(
-                &mut reference,
-                DATA_REFERENCE_OWNERS_FIELD,
-                &owner,
-                litchi_iwa_common::WireLimits::default(),
-            )?;
-            litchi_iwa_common::wire::append_repeated_length_delimited_field(
-                info,
-                COMPONENT_DATA_REFERENCES_FIELD,
-                &reference,
-            )
-        },
-        (_, [reference]) => {
-            let owners =
-                repeated_length_delimited_payloads(reference, DATA_REFERENCE_OWNERS_FIELD)?;
-            let mut found = Vec::new();
-            for owner in &owners {
-                if view_varint(owner, OWNER_OBJECT_FIELD)? == Some(object) {
-                    found.push(view_varint(owner, OWNER_COUNT_FIELD)?.unwrap_or(0));
-                }
-            }
-            if !add && found == [1] && owners.len() == 1 {
-                return remove_repeated_length_delimited_field_where(
-                    info,
-                    COMPONENT_DATA_REFERENCES_FIELD,
-                    is_data,
-                );
-            }
-            transform_length_delimited_fields_at_path(
-                info,
-                &[COMPONENT_DATA_REFERENCES_FIELD],
-                |reference| {
-                    if !is_data(reference)? {
-                        return Ok(reference.to_vec());
-                    }
-                    adjust_owner(reference, object, add, &found)
-                },
-            )
-        },
-        _ => Err(invalid()),
-    }
-}
-
-fn adjust_owner(
-    reference: &[u8],
-    object: u64,
-    add: bool,
-    found: &[u64],
-) -> litchi_iwa_common::Result<Vec<u8>> {
-    let is_owner = |owner: &[u8]| -> litchi_iwa_common::Result<bool> {
-        Ok(view_varint(owner, OWNER_OBJECT_FIELD)? == Some(object))
-    };
-    match (add, found) {
-        (true, []) => {
-            let mut owner = Vec::new();
-            litchi_iwa_common::wire::append_varint_field(&mut owner, OWNER_OBJECT_FIELD, object)?;
-            litchi_iwa_common::wire::append_varint_field(&mut owner, OWNER_COUNT_FIELD, 1)?;
-            litchi_iwa_common::wire::append_repeated_length_delimited_field(
-                reference,
-                DATA_REFERENCE_OWNERS_FIELD,
-                &owner,
-            )
-        },
-        (false, [1]) => remove_repeated_length_delimited_field_where(
-            reference,
-            DATA_REFERENCE_OWNERS_FIELD,
-            is_owner,
-        ),
-        (_, [count]) => {
-            let count = if add {
-                count.checked_add(1)
-            } else {
-                count.checked_sub(1)
-            }
-            .ok_or_else(|| {
-                litchi_iwa_common::Error::InvalidFormat("data reference count".to_owned())
-            })?;
-            transform_length_delimited_fields_at_path(
-                reference,
-                &[DATA_REFERENCE_OWNERS_FIELD],
-                |owner| {
-                    if !is_owner(owner)? {
-                        return Ok(owner.to_vec());
-                    }
-                    patch_varint_field(owner, OWNER_COUNT_FIELD, true, Some(count))
-                },
-            )
-        },
-        _ => Err(litchi_iwa_common::Error::InvalidFormat(
-            "data reference owner".to_owned(),
-        )),
-    }
-}
-
-/// The data identifiers any component (current or versioned) still
-/// references in a metadata payload.
+/// See `litchi_iwa_style::data_owner::referenced_data`.
 pub(crate) fn referenced_data(payload: &[u8]) -> GraphResult<std::collections::HashSet<u64>> {
-    let mut referenced = std::collections::HashSet::new();
-    for field in [
-        METADATA_COMPONENTS_FIELD,
-        METADATA_VERSIONED_COMPONENTS_FIELD,
-    ] {
-        for info in repeated_length_delimited_payloads(payload, field).map_err(map_wire_error)? {
-            for reference in
-                repeated_length_delimited_payloads(info, COMPONENT_DATA_REFERENCES_FIELD)
-                    .map_err(map_wire_error)?
-            {
-                if let Some(data) = view_varint(reference, DATA_REFERENCE_IDENTIFIER_FIELD)
-                    .map_err(map_wire_error)?
-                {
-                    referenced.insert(data);
-                }
-            }
-        }
-    }
-    Ok(referenced)
+    data_owner_engine::referenced_data(payload).map_err(map_wire_error)
 }
 
-/// The `Data/` member name of a data entry, from its `DataInfo.file_name`.
+/// See `litchi_iwa_style::data_owner::data_member`.
 pub(crate) fn data_member(payload: &[u8], data: u64) -> GraphResult<Option<String>> {
-    let mut found = None;
-    for info in
-        repeated_length_delimited_payloads(payload, METADATA_DATAS_FIELD).map_err(map_wire_error)?
-    {
-        if view_varint(info, DATA_INFO_IDENTIFIER_FIELD).map_err(map_wire_error)? != Some(data) {
-            continue;
-        }
-        if found.is_some() {
-            return Err(GraphError::InvalidSource);
-        }
-        let view = WireView::parse(info, litchi_iwa_common::WireLimits::default())
-            .map_err(map_wire_error)?;
-        let name = view
-            .fields()
-            .find(|field| field.number() == DATA_INFO_FILE_NAME_FIELD)
-            .map(|field| std::str::from_utf8(field.payload()).map(str::to_owned))
-            .transpose()
-            .map_err(|_| GraphError::InvalidSource)?;
-        found = Some(name.filter(|name| !name.is_empty()));
-    }
-    let name = found.ok_or(GraphError::InvalidSource)?;
-    match name {
-        Some(name)
-            if !name.contains(['\0', '\\'])
-                && std::path::Path::new(&name)
-                    .components()
-                    .all(|part| matches!(part, std::path::Component::Normal(_))) =>
-        {
-            Ok(Some(format!("Data/{name}")))
-        },
-        Some(_) => Err(GraphError::InvalidSource),
-        None => Ok(None),
-    }
+    data_owner_engine::data_member(payload, data).map_err(map_wire_error)
 }
 
-/// The metadata payload without the `DataInfo` of `data`.
+/// See `litchi_iwa_style::data_owner::remove_data_info`.
 pub(crate) fn remove_data_info(payload: &[u8], data: u64) -> GraphResult<Vec<u8>> {
-    remove_repeated_length_delimited_field_where(payload, METADATA_DATAS_FIELD, |info| {
-        Ok::<bool, litchi_iwa_common::Error>(
-            view_varint(info, DATA_INFO_IDENTIFIER_FIELD)? == Some(data),
-        )
-    })
-    .map_err(map_wire_error)
+    data_owner_engine::remove_data_info(payload, data).map_err(map_wire_error)
 }
 
-/// The data identifiers listed by a `TSP.DataMetadataMap` payload.
+/// See `litchi_iwa_style::data_owner::data_metadata_entries`.
 pub(crate) fn data_metadata_entries(payload: &[u8]) -> GraphResult<Vec<u64>> {
-    let mut data = Vec::new();
-    for entry in repeated_length_delimited_payloads(payload, 1).map_err(map_wire_error)? {
-        data.push(
-            view_varint(entry, 1)
-                .map_err(map_wire_error)?
-                .ok_or(GraphError::InvalidSource)?,
-        );
-    }
-    Ok(data)
+    data_owner_engine::data_metadata_entries(payload).map_err(map_wire_error)
 }
 
-/// Every `(data, object)` component data-reference owner (current and
-/// versioned components) of a metadata payload.
+/// See `litchi_iwa_style::data_owner::data_owners`.
 pub(crate) fn data_owners(payload: &[u8]) -> GraphResult<Vec<(u64, u64)>> {
-    let mut owners = Vec::new();
-    for field in [
-        METADATA_COMPONENTS_FIELD,
-        METADATA_VERSIONED_COMPONENTS_FIELD,
-    ] {
-        for info in repeated_length_delimited_payloads(payload, field).map_err(map_wire_error)? {
-            for reference in
-                repeated_length_delimited_payloads(info, COMPONENT_DATA_REFERENCES_FIELD)
-                    .map_err(map_wire_error)?
-            {
-                let data = view_varint(reference, DATA_REFERENCE_IDENTIFIER_FIELD)
-                    .map_err(map_wire_error)?
-                    .ok_or(GraphError::InvalidSource)?;
-                for owner in
-                    repeated_length_delimited_payloads(reference, DATA_REFERENCE_OWNERS_FIELD)
-                        .map_err(map_wire_error)?
-                {
-                    let object = view_varint(owner, OWNER_OBJECT_FIELD)
-                        .map_err(map_wire_error)?
-                        .ok_or(GraphError::InvalidSource)?;
-                    owners.push((data, object));
-                }
-            }
-        }
-    }
-    Ok(owners)
+    data_owner_engine::data_owners(payload).map_err(map_wire_error)
 }
 
 /// Add `component`'s external reference to `object` in `target` unless it
@@ -980,23 +740,12 @@ pub(crate) fn add_external_reference(
     Ok(output)
 }
 
-/// The largest `DataInfo` identifier of a metadata payload (0 for none).
+/// See `litchi_iwa_style::data_owner::max_data_identifier`.
 pub(crate) fn max_data_identifier(payload: &[u8]) -> GraphResult<u64> {
-    let mut maximum = 0;
-    for info in
-        repeated_length_delimited_payloads(payload, METADATA_DATAS_FIELD).map_err(map_wire_error)?
-    {
-        maximum = maximum.max(
-            view_varint(info, DATA_INFO_IDENTIFIER_FIELD)
-                .map_err(map_wire_error)?
-                .ok_or(GraphError::InvalidSource)?,
-        );
-    }
-    Ok(maximum)
+    data_owner_engine::max_data_identifier(payload).map_err(map_wire_error)
 }
 
-/// The metadata payload with a new `DataInfo` appended (the host's
-/// `append_data_info`).
+/// See `litchi_iwa_style::data_owner::append_data_info`.
 pub(crate) fn append_data_info(
     payload: &[u8],
     data: u64,
@@ -1005,34 +754,13 @@ pub(crate) fn append_data_info(
     file_name: &str,
     length: u64,
 ) -> GraphResult<Vec<u8>> {
-    let limits = litchi_iwa_common::WireLimits::default();
-    let mut info = Vec::new();
-    litchi_iwa_common::wire::append_varint_field(&mut info, DATA_INFO_IDENTIFIER_FIELD, data)
-        .map_err(map_wire_error)?;
-    litchi_iwa_common::wire::append_length_delimited_field(&mut info, 2, digest, limits)
-        .map_err(map_wire_error)?;
-    litchi_iwa_common::wire::append_length_delimited_field(
-        &mut info,
-        3,
-        preferred_file_name.as_bytes(),
-        limits,
+    data_owner_engine::append_data_info(
+        payload,
+        data,
+        digest,
+        preferred_file_name,
+        file_name,
+        length,
     )
-    .map_err(map_wire_error)?;
-    litchi_iwa_common::wire::append_length_delimited_field(
-        &mut info,
-        DATA_INFO_FILE_NAME_FIELD,
-        file_name.as_bytes(),
-        limits,
-    )
-    .map_err(map_wire_error)?;
-    litchi_iwa_common::wire::append_varint_field(&mut info, 18, length).map_err(map_wire_error)?;
-    let mut output = payload.to_vec();
-    litchi_iwa_common::wire::append_length_delimited_field(
-        &mut output,
-        METADATA_DATAS_FIELD,
-        &info,
-        limits,
-    )
-    .map_err(map_wire_error)?;
-    Ok(output)
+    .map_err(map_wire_error)
 }

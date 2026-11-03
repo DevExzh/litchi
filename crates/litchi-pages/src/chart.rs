@@ -89,8 +89,8 @@ pub mod style {
     pub use crate::package::body_chart_series::{Diagnostics, Error, LimitKind, Refusal};
     pub use crate::package::body_chart_style::StyleEdit as Edit;
     pub use crate::package::body_chart_style::style::{
-        Commit, Drop, Lighting3d, Patch, Property, PropertyKind, RadarGridShape, RadarSeriesStyle,
-        Shadow,
+        Commit, Drop, ImageTechnique, Lighting3d, Patch, Property, PropertyKind, RadarGridShape,
+        RadarSeriesStyle, Rgba, Shadow,
     };
     pub use litchi_iwa_common::chart::{corner, donut, gaps, legend, pie, radar};
     pub use litchi_iwa_common::chart3d;
@@ -122,6 +122,18 @@ pub mod reference_lines {
         Commit, Kind, Line, Patch, Unknown, Value,
     };
     pub use crate::package::body_chart_series::{Diagnostics, Error, LimitKind, Refusal};
+}
+
+/// Exact-source transactions of the bounds, step counts and scale of one
+/// chart's primary value axis, edited as one aggregate:
+/// [`crate::Package::edit_body_chart_value_axis_settings`].
+pub mod value_axis {
+    pub use crate::package::body_chart_series::{Diagnostics, Error, LimitKind, Refusal};
+    pub use crate::package::body_chart_value_axis::ValueAxisEdit as Edit;
+    pub use crate::package::body_chart_value_axis::value_axis::{
+        Bound, Bounds, Commit, MajorStepCount, MinorStepCount, Patch, Scale, Steps,
+        ValueAxisSettings,
+    };
 }
 
 /// Exact-source legend fill, border and shadow transactions of one chart

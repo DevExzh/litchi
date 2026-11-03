@@ -26,6 +26,8 @@ const CHART_MESSAGE_TYPE: u32 = 5_021;
 const CHART_STYLE_FIELD: u32 = 9;
 /// `TSCH.ChartArchive.series_theme_styles`.
 const SERIES_THEME_STYLES_FIELD: u32 = 17;
+/// `TSCH.ChartArchive.value_axis_nonstyles`.
+const VALUE_AXIS_NON_STYLES_FIELD: u32 = 14;
 
 /// Two host-added charts, the second pointed at the first one's chart
 /// style.
@@ -360,5 +362,36 @@ fn numbers_sheet_chart_legend_font_shared_variation_parity() -> TestResult {
         .run()
         .map_err(|error| format!("{value:?}: {error}"))?;
     }
+    Ok(())
+}
+
+/// Regression (record 0422): a value-axis write on an axis non-style object
+/// another chart's value axis also references refuses in the host
+/// (`AxisNonStyleSlot::ensure_exclusive`) and in the leaf, with the source
+/// unchanged.
+#[test]
+fn numbers_sheet_chart_value_axis_shared_axis_refuses() -> TestResult {
+    use litchi_iwa::charts::{Bound, Bounds};
+    use litchi_numbers::sheet::chart::value_axis;
+    let (source, sheet, chart) =
+        shared_reference(Kind::Column2d, VALUE_AXIS_NON_STYLES_FIELD, |references| {
+            references.value_axis_non_styles().first().copied()
+        })?;
+    let bounds = Bounds::fixed(Bound::new(0.0)?, Bound::new(40.0)?)?;
+    let mut host = numbers::Draft::from_bytes(&source)?;
+    assert!(
+        host.set_sheet_chart_value_axis_bounds(sheet, chart, bounds)
+            .is_err(),
+        "the host refuses a shared value axis"
+    );
+    let package = Package::from_bytes(&source)?;
+    let before = leaf_bytes!(package);
+    let mut edit = package.edit_sheet_chart_value_axis_settings(0, 1)?;
+    edit.set_bounds(bounds)?;
+    assert!(matches!(
+        edit.commit(),
+        Err(value_axis::Error::Refused(value_axis::Refusal::SharedStyle))
+    ));
+    assert_eq!(leaf_bytes!(package), before);
     Ok(())
 }

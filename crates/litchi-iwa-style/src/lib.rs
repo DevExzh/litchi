@@ -16,6 +16,8 @@
 //!   their in-place rewrites;
 //! - [`chart_text`]: the shared chart title and axis-title wire engine
 //!   (caption authoring remains a deferred host-only follow-up);
+//! - [`data_owner`]: the package-metadata owner transitions of embedded
+//!   data (`DataInfo` and component data references);
 //! - [`drawing`]: the stored drawing values (colors, strokes, fills) in both
 //!   directions;
 //! - [`media`]: the embedded-media inventory of a package;
@@ -32,7 +34,9 @@
 //! - [`shape`]: the shape-style variation graph engine (copy-on-write
 //!   `TSWP.ShapeStyleArchive` variations) and the fill and stroke;
 //! - [`shape_path`]: the preset path sources a shape draws, in both
-//!   directions.
+//!   directions;
+//! - [`value_axis`]: the bounds, step counts and scale of a chart's primary
+//!   value axis.
 //!
 //! Every entry point that reads untrusted bytes takes explicit limits.
 
@@ -42,6 +46,7 @@ pub mod chart_font;
 pub mod chart_lifecycle;
 pub mod chart_style;
 pub mod chart_text;
+pub mod data_owner;
 pub mod drawing;
 pub mod graph;
 pub mod legend_style;
@@ -52,3 +57,4 @@ pub mod reference_line;
 pub mod series;
 pub mod shape;
 pub mod shape_path;
+pub mod value_axis;

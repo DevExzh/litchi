@@ -600,6 +600,11 @@ pub enum Refusal {
     /// The source cannot publish an exact changed artifact.
     #[error("source representation does not support chart-series edits")]
     UnsupportedSource,
+    /// The value cannot be stored natively (value-axis settings with a
+    /// non-finite endpoint, an inverted range, or a non-positive endpoint
+    /// on a logarithmic axis).
+    #[error("the value cannot be stored natively")]
+    InvalidSettings,
 }
 
 impl Refusal {
@@ -614,7 +619,7 @@ impl Refusal {
             Self::UnsupportedKind | Self::NotResettable => RefusalKind::UnsupportedTarget,
             Self::SharedStyle | Self::ImageFill => RefusalKind::UnsupportedContent,
             Self::MissingStyle => RefusalKind::UnsupportedTarget,
-            Self::SeriesCount { .. } => RefusalKind::InvalidValue,
+            Self::SeriesCount { .. } | Self::InvalidSettings => RefusalKind::InvalidValue,
             Self::NoStagedOperation => RefusalKind::UnsupportedOperation,
             Self::UnsupportedDependency | Self::UnsupportedSource => {
                 RefusalKind::UnsupportedContent
@@ -755,6 +760,9 @@ impl From<litchi_iwa_style::series::SymbolError> for Error {
                 litchi_iwa_style::series::Refusal::SharedStyle => Refusal::SharedStyle.into(),
                 litchi_iwa_style::series::Refusal::ImageFill => Refusal::ImageFill.into(),
                 litchi_iwa_style::series::Refusal::MissingStyle => Refusal::MissingStyle.into(),
+                litchi_iwa_style::series::Refusal::InvalidSettings => {
+                    Refusal::InvalidSettings.into()
+                },
                 _ => Refusal::UnsupportedDependency.into(),
             },
             _ => Error::InvalidSource,

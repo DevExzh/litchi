@@ -56,6 +56,7 @@ pub mod comments;
 pub mod comments_native;
 
 pub mod conditional_highlight;
+pub mod sort;
 pub mod structure;
 pub mod topology;
 

@@ -38,6 +38,8 @@ pub(crate) mod style {
     pub use chart_engine::{
         Lighting3d, Property, PropertyKind, RadarGridShape, RadarSeriesStyle, Shadow,
     };
+    pub use litchi_iwa_common::color::Rgba;
+    pub use litchi_iwa_common::shape::fill::ImageTechnique;
     pub use litchi_iwa_common::shape::shadow::Drop;
 
     /// A compact exact-source patch of one chart-level style property.
@@ -374,6 +376,15 @@ pub struct StyleEdit<'a> {
     source: &'a Package,
     selector: BodyChartSelector,
     staged: Option<style::Property>,
+    image: Option<StagedImage>,
+}
+
+/// A background image staged by [`StyleEdit::set_background_image_fill`].
+struct StagedImage {
+    bytes: std::sync::Arc<[u8]>,
+    file_name: Box<str>,
+    technique: style::ImageTechnique,
+    tint: Option<style::Rgba>,
 }
 
 impl fmt::Debug for StyleEdit<'_> {
@@ -411,6 +422,7 @@ impl StyleEdit<'_> {
     /// None today; the signature matches the other chart families.
     pub fn set(mut self, property: style::Property) -> Result<Self, Error> {
         self.staged = Some(property);
+        self.image = None;
         Ok(self)
     }
 
@@ -421,6 +433,39 @@ impl StyleEdit<'_> {
     /// None today; the signature matches the other chart families.
     pub fn reset(mut self, kind: style::PropertyKind) -> Result<Self, Error> {
         self.staged = Some(kind.native_default());
+        self.image = None;
+        Ok(self)
+    }
+
+    /// Stage embedding `bytes` as a new `Data/` member and making them the
+    /// chart's background, laid out by `technique` over the chart frame and
+    /// optionally tinted (the host's `set_body_chart_background_image_fill`),
+    /// replacing any staged value. The chart style becomes the image's data
+    /// owner; a replaced image fill is released, and its media removed when
+    /// nothing else references it.
+    ///
+    /// # Errors
+    ///
+    /// [`Refusal::InvalidImage`] for bytes that are not an image.
+    pub fn set_background_image_fill(
+        mut self,
+        bytes: &[u8],
+        file_name: &str,
+        technique: style::ImageTechnique,
+        tint: Option<style::Rgba>,
+    ) -> Result<Self, Error> {
+        if litchi_iwa_common::media::Type::from_bytes(bytes)
+            != litchi_iwa_common::media::Type::Image
+        {
+            return Err(Refusal::InvalidImage.into());
+        }
+        self.staged = None;
+        self.image = Some(StagedImage {
+            bytes: bytes.into(),
+            file_name: file_name.into(),
+            technique,
+            tint,
+        });
         Ok(self)
     }
 
@@ -433,12 +478,27 @@ impl StyleEdit<'_> {
     /// [`Refusal::MissingStyle`], [`Refusal::SharedStyle`], source, limit
     /// and verification errors.
     pub fn commit(self) -> Result<style::Commit, Error> {
+        if let Some(image) = self.image {
+            return commit_background_image(self.source, self.selector, &image);
+        }
         let value = self.staged.ok_or(Refusal::NoStagedOperation)?;
         let mut ledger = Ledger::new(self.source)?;
         let target = ledger.target(self.source, self.selector)?;
         let before = read_style(&mut ledger, self.source, &target, value.kind())?;
         let published = if before == value {
             None
+        } else if let style::Property::BackgroundFill(fill) = &value {
+            // The host's `set_chart_background_fill` releases a replaced
+            // image fill's data owner and orphaned media.
+            ledger.write_data(self.source, None, |workspace, limits| {
+                engine::write_chart_background(
+                    workspace,
+                    target.chart.drawable_identifier.get(),
+                    target.kind,
+                    engine::Background::Fill(fill),
+                    limits,
+                )
+            })?
         } else {
             ledger.write(self.source, |workspace, limits| {
                 engine::write_chart(
@@ -482,6 +542,71 @@ impl StyleEdit<'_> {
             diagnostics: Diagnostics::published(published.touched),
         })
     }
+}
+
+/// Publish a staged background image (the host's
+/// `set_body_chart_background_image_fill`).
+fn commit_background_image(
+    source: &Package,
+    selector: BodyChartSelector,
+    image: &StagedImage,
+) -> Result<style::Commit, Error> {
+    use sha1::Digest as _;
+    let size = source
+        .body_chart_geometry(selector)
+        .map_err(|_| Error::InvalidSource)?
+        .and_then(|geometry| geometry.size)
+        .ok_or(Refusal::InvalidImage)?;
+    let mut ledger = Ledger::new(source)?;
+    let target = ledger.target(source, selector)?;
+    let kind = style::PropertyKind::BackgroundFill;
+    let before = read_style(&mut ledger, source, &target, kind)?;
+    let digest = sha1::Sha1::digest(image.bytes.as_ref());
+    let new = engine::NewImage {
+        data: litchi_iwa_style::data_owner::NewData {
+            preferred_file_name: &image.file_name,
+            digest: digest.as_slice(),
+            length: image.bytes.len() as u64,
+        },
+        technique: image.technique,
+        size: litchi_iwa_common::shape::geometry::Size {
+            width: size.width,
+            height: size.height,
+        },
+        tint: image.tint,
+    };
+    let published = ledger
+        .write_data(source, Some(image.bytes.as_ref()), |workspace, limits| {
+            engine::write_chart_background(
+                workspace,
+                target.chart.drawable_identifier.get(),
+                target.kind,
+                engine::Background::Image(new),
+                limits,
+            )
+        })?
+        .ok_or(Error::Verification)?;
+    let candidate = ledger.target(&published.package, selector)?;
+    let after = read_style(&mut ledger, &published.package, &candidate, kind)?;
+    if candidate.kind != target.kind
+        || !matches!(
+            &after,
+            style::Property::BackgroundFill(litchi_iwa_common::shape::fill::Fill::Image(_))
+        )
+    {
+        return Err(Error::Verification);
+    }
+    Ok(style::Commit {
+        patch: style::Patch {
+            artifacts: artifacts(source, &published.package),
+            chart: target.chart.position,
+            before,
+            after,
+            plan: published.plan,
+        },
+        package: published.package,
+        diagnostics: Diagnostics::published(published.touched),
+    })
 }
 
 /// One immutable selector-first legend-style edit.
@@ -760,6 +885,7 @@ impl Package {
             source: self,
             selector,
             staged: None,
+            image: None,
         })
     }
 
