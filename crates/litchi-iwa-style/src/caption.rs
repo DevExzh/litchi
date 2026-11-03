@@ -386,13 +386,15 @@ pub fn repoint(
 }
 
 /// The single length-delimited field `number` of `view`; `Err` for a
-/// repeated field or another wire type.
+/// repeated field, another wire type or a non-canonical key or length.
 fn unique<'a>(view: &WireView<'a>, number: u32) -> Result<Option<&'a [u8]>, Malformed> {
     let mut found = None;
     for field in view.fields().filter(|field| field.number() == number) {
         if found.is_some() || field.wire_type() != 2 {
             return Err(Malformed);
         }
+        field.validate_canonical_key().map_err(|_| Malformed)?;
+        field.validate_canonical_framing().map_err(|_| Malformed)?;
         found = Some(field.payload());
     }
     Ok(found)
@@ -432,6 +434,7 @@ pub fn label_reference(
         if identifier.is_some() || field.wire_type() != 0 {
             return Err(Malformed);
         }
+        field.validate_canonical_key().map_err(|_| Malformed)?;
         let (value, _) =
             litchi_iwa_common::decode_varint_from_bytes(field.payload()).map_err(|_| Malformed)?;
         identifier = Some(value);
@@ -477,6 +480,7 @@ pub fn archive_width(drawable: &[u8]) -> Result<Option<f32>, Malformed> {
         if width.is_some() || field.wire_type() != 5 {
             return Err(Malformed);
         }
+        field.validate_canonical_key().map_err(|_| Malformed)?;
         let bytes: [u8; 4] = field.payload().try_into().map_err(|_| Malformed)?;
         width = Some(f32::from_le_bytes(bytes));
     }
