@@ -99,6 +99,7 @@ mod numbers_media_cases;
 mod numbers_owner_allocation;
 mod numbers_shape_lifecycle_cases;
 mod numbers_shape_style_cases;
+mod numbers_sort_cases;
 #[cfg(feature = "parity-host-oracle")]
 mod numbers_table_comment_cases;
 mod numbers_text_box_cases;
