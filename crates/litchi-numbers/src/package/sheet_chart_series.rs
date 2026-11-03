@@ -605,6 +605,9 @@ pub enum Refusal {
     /// on a logarithmic axis).
     #[error("the value cannot be stored natively")]
     InvalidSettings,
+    /// The bytes of an image fill are not an image.
+    #[error("the image-fill bytes are not an image")]
+    InvalidImage,
 }
 
 impl Refusal {
@@ -619,7 +622,9 @@ impl Refusal {
             Self::UnsupportedKind | Self::NotResettable => RefusalKind::UnsupportedTarget,
             Self::SharedStyle | Self::ImageFill => RefusalKind::UnsupportedContent,
             Self::MissingStyle => RefusalKind::UnsupportedTarget,
-            Self::SeriesCount { .. } | Self::InvalidSettings => RefusalKind::InvalidValue,
+            Self::SeriesCount { .. } | Self::InvalidSettings | Self::InvalidImage => {
+                RefusalKind::InvalidValue
+            },
             Self::NoStagedOperation => RefusalKind::UnsupportedOperation,
             Self::UnsupportedDependency | Self::UnsupportedSource => {
                 RefusalKind::UnsupportedContent
@@ -1426,6 +1431,17 @@ pub(super) fn publish_changes_exact(
     changes: &litchi_iwa_style::graph::Changes,
     budget: &mut ChartBudget,
 ) -> Result<Published, Error> {
+    publish_changes_with_data(package, changes, None, budget)
+}
+
+/// As [`publish_changes_exact`], also inserting one embedded `Data/`
+/// member (an image fill's new media).
+pub(super) fn publish_changes_with_data(
+    package: &Package,
+    changes: &litchi_iwa_style::graph::Changes,
+    data: Option<(&str, &[u8])>,
+    budget: &mut ChartBudget,
+) -> Result<Published, Error> {
     let catalog = structure::exact_source(package)?;
     let archive_limits = catalog
         .limits()
@@ -1551,6 +1567,13 @@ pub(super) fn publish_changes_exact(
             None => EntryInsertion::new(name, data),
         });
     }
+    if let Some((name, bytes)) = data {
+        budget.work(bytes.len()).map_err(map_arrangement)?;
+        insertions
+            .try_reserve(1)
+            .map_err(|_| Error::Allocation { amount: 1 })?;
+        insertions.push(EntryInsertion::new(name, bytes));
+    }
     let mut deletions = Vec::new();
     deletions
         .try_reserve_exact(deletion_capacity)
@@ -1586,7 +1609,13 @@ pub(super) fn publish_changes_exact(
         .map_err(|error| structure::map_archive(&error))?;
     let candidate = Package::from_owned_bytes_with_options(output, package.state.options)
         .map_err(map_candidate_package_error)?;
-    verify_member_locality(package, &candidate, changes, budget)?;
+    verify_member_locality(
+        package,
+        &candidate,
+        changes,
+        data.map(|(name, _)| name),
+        budget,
+    )?;
     Ok(Published {
         package: candidate,
         touched_components: edits.len() + insertions.len() + deletions.len(),
@@ -1598,6 +1627,7 @@ fn verify_member_locality(
     source: &Package,
     candidate: &Package,
     changes: &litchi_iwa_style::graph::Changes,
+    data: Option<&str>,
     budget: &mut ChartBudget,
 ) -> Result<(), Error> {
     let source_catalog = structure::exact_source(source).map_err(Error::from)?;
@@ -1618,10 +1648,11 @@ fn verify_member_locality(
     let source_changed = |name: &str| changes.edits.iter().any(|(edited, _)| edited == name);
     let source_deleted = |name: &str| changes.deletions.iter().any(|deleted| deleted == name);
     let source_inserted = |name: &str| {
-        changes
-            .insertions
-            .iter()
-            .any(|insertion| insertion.name == name)
+        data == Some(name)
+            || changes
+                .insertions
+                .iter()
+                .any(|insertion| insertion.name == name)
     };
     let source_expected_count = source_catalog
         .package()
@@ -1629,6 +1660,7 @@ fn verify_member_locality(
         .filter(|entry| !source_deleted(entry.name()))
         .count()
         .checked_add(changes.insertions.len())
+        .and_then(|count| count.checked_add(usize::from(data.is_some())))
         .ok_or(Error::InvalidSource)?;
     if candidate_catalog.package().iter().count() != source_expected_count {
         return Err(Error::Verification);

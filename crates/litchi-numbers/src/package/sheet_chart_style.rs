@@ -36,6 +36,8 @@ use crate::sheet::drawable::DrawableSelector;
 
 structure::structural_family!("chart-style");
 
+pub use litchi_iwa_common::color::Rgba;
+pub use litchi_iwa_common::shape::fill::ImageTechnique;
 pub use litchi_iwa_common::shape::shadow::Drop;
 pub use litchi_iwa_style::chart_style::chart::{
     Lighting3d, Property, PropertyKind, RadarGridShape, RadarSeriesStyle, Shadow,
@@ -108,6 +110,9 @@ pub enum Refusal {
     /// The source cannot publish an exact changed artifact.
     #[error("source representation does not support chart-style edits")]
     UnsupportedSource,
+    /// The bytes of an image fill are not an image.
+    #[error("the image-fill bytes are not an image")]
+    InvalidImage,
 }
 
 impl Refusal {
@@ -119,6 +124,7 @@ impl Refusal {
             Self::SheetNotFound | Self::ChartNotFound => RefusalKind::NotFound,
             Self::UnsupportedKind | Self::MissingStyle => RefusalKind::UnsupportedTarget,
             Self::NoStagedOperation => RefusalKind::UnsupportedOperation,
+            Self::InvalidImage => RefusalKind::InvalidValue,
             Self::SharedStyle | Self::UnsupportedDependency | Self::UnsupportedSource => {
                 RefusalKind::UnsupportedContent
             },
@@ -156,6 +162,16 @@ impl From<SymbolError> for Error {
 enum Staged {
     Set(Property),
     Reset(PropertyKind),
+    Image(Box<StagedImage>),
+}
+
+/// A background image staged by [`Edit::set_background_image_fill`].
+#[derive(Debug, Clone, PartialEq)]
+struct StagedImage {
+    bytes: std::sync::Arc<[u8]>,
+    file_name: Box<str>,
+    technique: ImageTechnique,
+    tint: Option<Rgba>,
 }
 
 /// Chart-style changes staged against one chart of an immutable package.
@@ -200,6 +216,38 @@ impl Edit<'_> {
         Ok(self)
     }
 
+    /// Stage embedding `bytes` as a new `Data/` member and making them the
+    /// chart's background, laid out by `technique` over the chart frame and
+    /// optionally tinted (the host's `set_sheet_chart_background_image_fill`).
+    /// The chart style becomes the image's data owner; a replaced image fill
+    /// is released, and its media removed when nothing else references it.
+    ///
+    /// # Errors
+    ///
+    /// [`Refusal::InvalidImage`] for bytes that are not an image;
+    /// [`Error::Allocation`].
+    pub fn set_background_image_fill(
+        &mut self,
+        bytes: &[u8],
+        file_name: &str,
+        technique: ImageTechnique,
+        tint: Option<Rgba>,
+    ) -> Result<&mut Self, Error> {
+        if litchi_iwa_common::media::Type::from_bytes(bytes)
+            != litchi_iwa_common::media::Type::Image
+        {
+            return Err(Refusal::InvalidImage.into());
+        }
+        structure::reserve(&mut self.changes, 1)?;
+        self.changes.push(Staged::Image(Box::new(StagedImage {
+            bytes: bytes.into(),
+            file_name: file_name.into(),
+            technique,
+            tint,
+        })));
+        Ok(self)
+    }
+
     /// Validate and atomically publish the staged changes. A change that
     /// leaves a property as it is is skipped; an edit whose changes are all
     /// skipped is an exact no-op.
@@ -216,11 +264,14 @@ impl Edit<'_> {
         let mut touched = 0_usize;
         for change in &self.changes {
             let base = current.as_ref().unwrap_or(self.source);
-            let property = match change {
-                Staged::Set(property) => property.clone(),
-                Staged::Reset(kind) => kind.native_default(),
+            let published = match change {
+                Staged::Set(property) => apply_one(base, self.sheet, self.chart, property.clone())?,
+                Staged::Reset(kind) => {
+                    apply_one(base, self.sheet, self.chart, kind.native_default())?
+                },
+                Staged::Image(image) => apply_image(base, self.sheet, self.chart, image)?,
             };
-            if let Some(published) = apply_one(base, self.sheet, self.chart, property)? {
+            if let Some(published) = published {
                 touched = touched.saturating_add(published.touched_components);
                 current = Some(published.package);
             }
@@ -351,6 +402,8 @@ fn from_series(error: super::sheet_chart_series::Error) -> Error {
         Series::Refused(Why::SharedStyle) => Refusal::SharedStyle.into(),
         Series::Refused(Why::UnsupportedDependency) => Refusal::UnsupportedDependency.into(),
         Series::Refused(Why::UnsupportedSource) => Refusal::UnsupportedSource.into(),
+        Series::Refused(Why::MissingStyle) => Refusal::MissingStyle.into(),
+        Series::Refused(Why::InvalidImage) => Refusal::InvalidImage.into(),
         Series::Limit {
             kind,
             observed,
@@ -668,6 +721,21 @@ fn apply_one(
     if current == value {
         return Ok(None);
     }
+    if let (
+        Property::BackgroundFill(litchi_iwa_common::shape::fill::Fill::Image(_)),
+        Property::BackgroundFill(fill),
+    ) = (&current, &value)
+    {
+        // The host's `set_chart_background_fill` releases the replaced
+        // image's data owner and orphaned media.
+        return apply_background(
+            source,
+            sheet,
+            chart,
+            litchi_iwa_style::chart_style::Background::Fill(fill),
+            None,
+        );
+    }
     if !exclusive(source, target.style, archive)? {
         return Err(Refusal::SharedStyle.into());
     }
@@ -703,6 +771,117 @@ fn apply_one(
     };
     let published = graph::publish_in_place(source, &mut [(target.style, &mut replace)])?;
     if read(&published.package, sheet, chart, kind)? != value {
+        return Err(Error::Verification);
+    }
+    Ok(Some(published))
+}
+
+/// Store a background with the shared data-owner transitions
+/// (`litchi_iwa_style::chart_style::write_chart_background`) through the
+/// chart-series workspace path, publishing `data` as the new image member.
+fn apply_background(
+    source: &Package,
+    sheet: usize,
+    chart: ChartSelector,
+    value: litchi_iwa_style::chart_style::Background<'_>,
+    data: Option<&[u8]>,
+) -> Result<Option<Published>, Error> {
+    use super::sheet_chart_series as series;
+    let run = || -> Result<Option<Published>, series::Error> {
+        let mut budget = super::chart_arrangement::ChartBudget::for_package(source)
+            .map_err(series::map_arrangement)?;
+        let selected = series::target(source, sheet, chart, &mut budget)?;
+        let prepared = series::prepare_components(source, &mut budget)?;
+        let mut workspace = prepared.workspace()?;
+        let limits = budget.series_limits().map_err(series::map_arrangement)?;
+        let (changed, report, changes) = litchi_iwa_style::chart_style::write_chart_background(
+            &mut workspace,
+            selected.chart,
+            selected.kind,
+            value,
+            limits,
+        )?;
+        budget
+            .charge_series_report(report)
+            .map_err(series::map_arrangement)?;
+        if !changed {
+            return Ok(None);
+        }
+        let finish_limits = budget.finish_limits().map_err(series::map_arrangement)?;
+        workspace
+            .finish_requirements()
+            .map_err(series::Error::from)?;
+        let (mut finished, finish_report) = workspace
+            .finish_bounded(finish_limits)
+            .map_err(series::Error::from)?;
+        budget
+            .charge_finish_report(finish_report)
+            .map_err(series::map_arrangement)?;
+        if let Some(member) = changes.deleted {
+            finished.deletions.push(member);
+        }
+        let inserted = match (&changes.inserted, data) {
+            (Some((_, name)), Some(bytes)) => Some((name.as_str(), bytes)),
+            (None, None) => None,
+            _ => return Err(series::Error::Verification),
+        };
+        let published =
+            series::publish_changes_with_data(source, &finished, inserted, &mut budget)?;
+        Ok(Some(Published {
+            package: published.package,
+            touched_components: published.touched_components,
+            deleted_previews: 0,
+        }))
+    };
+    run().map_err(from_series)
+}
+
+/// Publish a staged background image (the host's
+/// `set_sheet_chart_background_image_fill`).
+fn apply_image(
+    source: &Package,
+    sheet: usize,
+    chart: ChartSelector,
+    image: &StagedImage,
+) -> Result<Option<Published>, Error> {
+    use sha1::Digest as _;
+    let size = source
+        .sheet_drawable_properties(sheet, DrawableSelector::from(chart))
+        .map_err(|_| Error::InvalidSource)?
+        .geometry()
+        .and_then(|geometry| geometry.size)
+        .ok_or(Refusal::InvalidImage)?;
+    let digest = sha1::Sha1::digest(image.bytes.as_ref());
+    let new = litchi_iwa_style::chart_style::NewImage {
+        data: litchi_iwa_style::data_owner::NewData {
+            preferred_file_name: &image.file_name,
+            digest: digest.as_slice(),
+            length: image.bytes.len() as u64,
+        },
+        technique: image.technique,
+        size: litchi_iwa_common::shape::geometry::Size {
+            width: size.width,
+            height: size.height,
+        },
+        tint: image.tint,
+    };
+    let published = apply_background(
+        source,
+        sheet,
+        chart,
+        litchi_iwa_style::chart_style::Background::Image(new),
+        Some(image.bytes.as_ref()),
+    )?
+    .ok_or(Error::Verification)?;
+    if !matches!(
+        read(
+            &published.package,
+            sheet,
+            chart,
+            PropertyKind::BackgroundFill
+        )?,
+        Property::BackgroundFill(litchi_iwa_common::shape::fill::Fill::Image(_))
+    ) {
         return Err(Error::Verification);
     }
     Ok(Some(published))
