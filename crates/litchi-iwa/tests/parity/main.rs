@@ -97,6 +97,7 @@ mod numbers_lifecycle_cases;
 mod numbers_media_add_cases;
 mod numbers_media_cases;
 mod numbers_owner_allocation;
+mod numbers_pivot_cases;
 mod numbers_shape_lifecycle_cases;
 mod numbers_shape_style_cases;
 mod numbers_sort_cases;

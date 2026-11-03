@@ -806,7 +806,7 @@ numbers/editor/semantic/table.rs	cell_conditional_highlighting	1	numbers	table.c
 numbers/editor/semantic/table.rs	clear_cell_conditional_highlighting	1	numbers	table.conditional_highlight	migrated	litchi_numbers::Package::edit_table_cell_conditional_highlights	numbers_conditional_highlight_clear_parity	B	-	-
 numbers/editor/semantic/table.rs	clear_table_cell_border	1	numbers	table.cell_appearance	migrated	litchi_numbers::Package::edit_table_cell_appearance	numbers_table_cell_border_clear_parity	B	-	-
 numbers/editor/semantic/table.rs	merge_cells	1	numbers	table.merge	migrated	litchi_numbers::Package::edit_table_merges	numbers_table_merge_parity	A	-	-
-numbers/editor/semantic/table.rs	pivot_categories	1	numbers	table.pivot	host-only	litchi-numbers	-	-	-	-
+numbers/editor/semantic/table.rs	pivot_categories	1	numbers	table.pivot	migrated	litchi_numbers::Package::pivot_categories	numbers_pivot_categories_read_parity	A	-	-
 numbers/editor/semantic/table.rs	remove_cell_comment_reply	1	numbers	table.cell_comment	migrated	litchi_numbers::Package::remove_table_cell_comment_reply	numbers_table_cell_comment_reply_remove_parity	B	-	-
 numbers/editor/semantic/table.rs	reset_table_cell_fill	1	numbers	table.cell_appearance	migrated	litchi_numbers::Package::edit_table_cell_appearance	numbers_table_cell_fill_reset_parity	B	-	-
 numbers/editor/semantic/table.rs	reset_table_cell_layout	1	numbers	table.cell_appearance	migrated	litchi_numbers::Package::edit_table_cell_appearance	numbers_table_cell_layout_reset_parity	B	-	-
