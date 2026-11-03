@@ -7637,3 +7637,11 @@ See [0063](0063-source-pptx-modern-comments.md).
   - One finding: the Keynote and Pages custom-format probes were nondeterministic (random leaf registry UUIDs).
 - Fixed by W4-O 0428 (`7406748e95`): four leaf random-UUID sites now derive their UUIDs (the 0375a scheme): custom-format registry, Pages smart fields, Keynote audio creation, Keynote comment storage. Two documented exceptions: comment creation dates, which the host also writes from the clock, and the opt-in `Identity::generate`. Byte-identical replay tests added; the probes pass 20/20; Keynote +3.425%, Pages −87.6%.
 - `7406748e95` becomes the final candidate. It needs the 53-row gate and an iWork re-qualification; FIN is unaffected because the Office crates are unchanged.
+
+## Final candidate qualified (2026-11-03)
+- **`7c0efb1f47` is the qualified integrated source.**
+  - Correctness gate: all 53 rows pass (`.coord/resume-20261028/full-7c0efb1f47/`, finished 2026-11-03T19:34:36Z, summary SHA-256 `4d6cfe6b3d5a4992a2236aac0db6749798851694f8f486ab8d75a1552a5a4fcf`).
+  - iWork instruction qualification passes (receipt `.coord/final-qual/final-7c0efb1f47-instruction-receipt.md`): 191 required host/leaf routes; worst +3.625%; median leaf/host 0.208.
+  - FIN rows are carried from `a9ff2679e2` (max median 1.032), because the only change since then is iWork-only.
+  - Wall-clock and CLI timing remain held, as before.
+- `litchi-iwa` now has no dependents in the workspace; only its own tests, the parity harness and its examples use it. W3 (deleting the crate, its parity harness and the gate rows that reference it) is mechanical. It still waits on the macOS queue (`0363-mac-queue.md`), which must run on a Mac.
