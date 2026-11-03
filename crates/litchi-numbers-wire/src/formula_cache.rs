@@ -532,6 +532,11 @@ pub struct FormulaAnalysis {
     pub precedents: Vec<FormulaPrecedent>,
     pub ranges: Vec<FormulaRange>,
     pub evaluation_supported: bool,
+    /// Pivot-category references (record 0424). Their precedents are cells
+    /// of the group-by's formula owner, which has no table geometry; the
+    /// AST does not name them, so the dependency records are their
+    /// authority.
+    pub category_references: usize,
     pub usage: FormulaEvaluationUsage,
 }
 
@@ -752,6 +757,7 @@ impl CacheEvaluator for StrictEvaluator<'_> {
             maximum_precedents: precedent_count,
             maximum_ranges: range_count,
             evaluation_supported: true,
+            category_references: 0,
         };
         reserve(&mut visitor.precedents, precedent_count)?;
         reserve(&mut visitor.ranges, range_count)?;
@@ -798,6 +804,7 @@ impl CacheEvaluator for StrictEvaluator<'_> {
             precedents: visitor.precedents,
             ranges: visitor.ranges,
             evaluation_supported: visitor.evaluation_supported && report.evaluator_supported(),
+            category_references: visitor.category_references,
             usage,
         })
     }
@@ -878,6 +885,7 @@ struct FormulaPrecedentCollector {
     maximum_precedents: usize,
     maximum_ranges: usize,
     evaluation_supported: bool,
+    category_references: usize,
 }
 
 impl formula_codec::FormulaDependencyVisitor for FormulaPrecedentCollector {
@@ -928,9 +936,12 @@ impl formula_codec::FormulaDependencyVisitor for FormulaPrecedentCollector {
 
     fn visit_unsupported_local(
         &mut self,
-        _node: formula_codec::UnsupportedLocal,
+        node: formula_codec::UnsupportedLocal,
     ) -> Result<(), formula_codec::DecodeError> {
         self.evaluation_supported = false;
+        if node.node_type() == CATEGORY_REFERENCE_NODE {
+            self.category_references = self.category_references.saturating_add(1);
+        }
         Ok(())
     }
 }
@@ -1524,6 +1535,8 @@ fn unsupported_formula<T>() -> Result<T, Error> {
 }
 
 const FORMULA_LIST_TYPE: i32 = 3;
+/// `TSCE.ASTNodeArrayArchive.ASTNodeType.CATEGORY_REF_NODE`.
+const CATEGORY_REFERENCE_NODE: u32 = 66;
 
 /// One borrowed segment selected by the root formula-list reference.
 #[derive(Debug, Clone, Copy)]
@@ -2385,6 +2398,15 @@ fn plan_final_cache_internal(
     let mut dependency_hosts = Vec::new();
     let mut cycle_hosts = Vec::new();
     let mut selected_owner_seen = false;
+    // Registered owners without table geometry (group-by, conditional-style
+    // and other engine owners) that the logical graph may name as a
+    // precedent owner: a pivot-category reference reads two cells of its
+    // group-by's owner (record 0424).
+    let mut tableless_owners = Vec::new();
+    if logical.is_some() {
+        scratch_allocation::<u32>(&mut usage, engine_stage.owner_references.len(), limits)?;
+        reserve(&mut tableless_owners, engine_stage.owner_references.len())?;
+    }
     for owner_reference in engine_stage.owner_references.iter().copied() {
         let payload = indexed_payload(
             source.owners,
@@ -2445,6 +2467,7 @@ fn plan_final_cache_internal(
                 if logical.is_none() {
                     continue;
                 }
+                tableless_owners.push(owner_id);
                 None
             },
             Err(error) => return Err(error),
@@ -2604,6 +2627,7 @@ fn plan_final_cache_internal(
             source.formulas,
             &formula_index,
             source.tables,
+            &tableless_owners,
             source.selected_table.owner,
             logical,
             &mut usage,
@@ -2630,6 +2654,7 @@ fn plan_final_cache_internal(
         source.formulas,
         &formula_index,
         &edges,
+        &tableless_owners,
         logical,
         evaluator,
         limits,
@@ -3822,6 +3847,7 @@ fn validate_formula_edges(
     formulas: &[FormulaCell],
     formula_index: &[FormulaIndex],
     dependency_edges: &[Edge],
+    tableless_owners: &[u32],
     logical: Option<formula_dependencies::LogicalGraph<'_>>,
     evaluator: &mut dyn CacheEvaluator,
     limits: CacheLimits,
@@ -3829,6 +3855,9 @@ fn validate_formula_edges(
 ) -> Result<Vec<bool>, Error> {
     let mut formula_edges = Vec::new();
     let mut evaluation_support = Vec::new();
+    // Formulas with a pivot-category reference: their edges from owners
+    // without table geometry come from the group-by model, not the AST.
+    let mut category_hosts = Vec::new();
     scratch_allocation::<FormulaEdge>(usage, dependency_edges.len(), limits)?;
     reserve(&mut formula_edges, dependency_edges.len())?;
     scratch_allocation::<bool>(usage, formulas.len(), limits)?;
@@ -3842,6 +3871,16 @@ fn validate_formula_edges(
             validate_formula_ranges(formula, &analysis.ranges, logical, usage, limits)?;
         }
         evaluation_support.push(analysis.evaluation_supported);
+        if analysis.category_references != 0 {
+            if category_hosts.is_empty() {
+                scratch_allocation::<FormulaKey>(usage, formulas.len(), limits)?;
+                reserve(&mut category_hosts, formulas.len())?;
+            }
+            category_hosts.push(FormulaKey {
+                owner: formula.owner,
+                coordinate: formula.coordinate,
+            });
+        }
         for precedent in analysis.precedents {
             if formula_edges.len() == formula_edges.capacity() {
                 return Err(Error::UnsupportedDependency(Unsupported::Formula));
@@ -3866,7 +3905,17 @@ fn validate_formula_edges(
     let mut dependency_formula_edges = Vec::new();
     scratch_allocation::<FormulaEdge>(usage, dependency_edges.len(), limits)?;
     reserve(&mut dependency_formula_edges, dependency_edges.len())?;
+    graph_step(usage, sort_work(category_hosts.len())?, limits)?;
+    category_hosts.sort_unstable();
     for dependency in dependency_edges {
+        if !category_hosts.is_empty() {
+            graph_step(usage, binary_search_work(category_hosts.len()), limits)?;
+            if tableless_owners.contains(&dependency.source.owner)
+                && category_hosts.binary_search(&dependency.target).is_ok()
+            {
+                continue;
+            }
+        }
         if find_formula(formula_index, dependency.target, usage, limits)?.is_some() {
             dependency_formula_edges.push(FormulaEdge {
                 source: dependency.source,
@@ -3933,6 +3982,7 @@ fn replace_with_logical_graph(
     formulas: &[FormulaCell],
     formula_index: &[FormulaIndex],
     tables: &[TableGeometry],
+    tableless_owners: &[u32],
     selected_owner: u32,
     logical: formula_dependencies::LogicalGraph<'_>,
     usage: &mut CacheUsage,
@@ -4071,9 +4121,17 @@ fn replace_with_logical_graph(
             coordinate: target.coordinate,
         });
         for precedent in &host.precedents {
-            let table = table_by_owner(tables, precedent.target_owner)?;
-            if precedent.row >= table.rows || precedent.column >= table.columns {
-                return Err(Error::InvalidSource);
+            match table_by_owner(tables, precedent.target_owner) {
+                Ok(table) => {
+                    if precedent.row >= table.rows || precedent.column >= table.columns {
+                        return Err(Error::InvalidSource);
+                    }
+                },
+                // A cell of a registered owner without table geometry: no
+                // edit of a table cell writes it, so it is never dirty here.
+                Err(Error::UnsupportedDependency(Unsupported::MissingOwner))
+                    if tableless_owners.contains(&precedent.target_owner) => {},
+                Err(error) => return Err(error),
             }
             final_edges.push(Edge {
                 source: FormulaKey {
@@ -5165,6 +5223,7 @@ mod tests {
                 }],
                 ranges: Vec::new(),
                 evaluation_supported: true,
+                category_references: 0,
                 usage: FormulaEvaluationUsage {
                     formula_work: 1,
                     allocations: 1,
@@ -5220,6 +5279,7 @@ mod tests {
                 }],
                 ranges: Vec::new(),
                 evaluation_supported: true,
+                category_references: 0,
                 usage: FormulaEvaluationUsage {
                     formula_work: 1,
                     allocations: 1,
@@ -5653,6 +5713,7 @@ mod tests {
                     precedents: Vec::new(),
                     ranges: Vec::new(),
                     evaluation_supported: false,
+                    category_references: 0,
                     usage: FormulaEvaluationUsage::default(),
                 })
             }
@@ -5729,6 +5790,7 @@ mod tests {
                     precedents: Vec::new(),
                     ranges: Vec::new(),
                     evaluation_supported: false,
+                    category_references: 0,
                     usage: FormulaEvaluationUsage::default(),
                 })
             }
@@ -5777,6 +5839,7 @@ mod tests {
                     precedents: Vec::new(),
                     ranges: Vec::new(),
                     evaluation_supported: true,
+                    category_references: 0,
                     usage: FormulaEvaluationUsage::default(),
                 })
             }
@@ -5856,6 +5919,7 @@ mod tests {
                         .collect(),
                     ranges: Vec::new(),
                     evaluation_supported: formula.coordinate.column == 1,
+                    category_references: 0,
                     usage: FormulaEvaluationUsage::default(),
                 })
             }
@@ -5942,6 +6006,7 @@ mod tests {
                     }],
                     ranges: Vec::new(),
                     evaluation_supported: true,
+                    category_references: 0,
                     usage: FormulaEvaluationUsage::default(),
                 })
             }
