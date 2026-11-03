@@ -1,0 +1,56 @@
+{
+  "record": "0425",
+  "slice": "3",
+  "binary_sha256": "1cfee85f85434b2f7f8c6ddae6db2e422140ae04e3fe05ee791edc91f931bb1e",
+  "build": "source .coord/iwa-w4l/env.sh; cargo test --release -p litchi-iwa --all-features --test parity --no-run",
+  "run": "W4L_ROUTE=<route> taskset -c 3 valgrind --tool=callgrind <binary> --ignored --exact numbers_caption_cases::numbers_caption_route_cost_abba --test-threads=1",
+  "metric": "inclusive Ir of w4l_host_route / w4l_leaf_route, two calls each (ABBA)",
+  "captures_dir": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-w4l/cg3 (outside the repository)",
+  "routes": [
+    {
+      "route": "shape_title_create",
+      "host_ir": 345663742,
+      "leaf_ir": 88374469,
+      "leaf_over_host": 0.255666,
+      "capture": "shape_title_create.cg",
+      "capture_bytes": 442830,
+      "capture_sha256": "74b358a77b7ec7c65f2a77ff9ab3ec26e20f05cf2db46add2ba0ce8c1d40635a"
+    },
+    {
+      "route": "image_caption_create",
+      "host_ir": 276665634,
+      "leaf_ir": 94582727,
+      "leaf_over_host": 0.341867,
+      "capture": "image_caption_create.cg",
+      "capture_bytes": 367653,
+      "capture_sha256": "17f4746fafa09478df3d8a9bb586b729bf0e65717b7f8a7a070f99ea4f36c7db"
+    },
+    {
+      "route": "movie_caption_replace",
+      "host_ir": 237703642,
+      "leaf_ir": 57946532,
+      "leaf_over_host": 0.243776,
+      "capture": "movie_caption_replace.cg",
+      "capture_bytes": 444010,
+      "capture_sha256": "8b50885edf6ba9ea63ee29c2936000751716e5169135fb99703bc9c5a6d4af52"
+    },
+    {
+      "route": "image_title_remove",
+      "host_ir": 270770781,
+      "leaf_ir": 94340639,
+      "leaf_over_host": 0.348415,
+      "capture": "image_title_remove.cg",
+      "capture_bytes": 368338,
+      "capture_sha256": "af5ee9986b174fae6aecd76881366213a3ca6be2c3559a8ec872754634df72ed"
+    },
+    {
+      "route": "chart_caption_remove",
+      "host_ir": 283358265,
+      "leaf_ir": 84107402,
+      "leaf_over_host": 0.296824,
+      "capture": "chart_caption_remove.cg",
+      "capture_bytes": 431267,
+      "capture_sha256": "737acfa00abba7b0fd62af9fecd5de9bb12c70373e7aa066af716e4057c27291"
+    }
+  ]
+}

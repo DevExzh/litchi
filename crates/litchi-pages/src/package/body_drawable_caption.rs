@@ -20,11 +20,9 @@ use std::sync::Arc;
 
 use litchi_core::Position;
 use litchi_iwa_archive::package::ExactArtifacts;
-use litchi_iwa_common::wire::{patch_length_delimited_field, transform_length_delimited_field};
 use litchi_iwa_core::{Archive, ArchiveObject, RawMessage};
-use litchi_iwa_protos::{
-    keynote_chart_caption_graph_codec as graph_codec, pages_movie_caption_codec,
-};
+use litchi_iwa_protos::keynote_chart_caption_graph_codec as graph_codec;
+use litchi_iwa_style::caption;
 use thiserror::Error as ThisError;
 
 use super::Package;
@@ -34,26 +32,16 @@ use super::body_drawable_graph::{
 use super::body_storage_objects as objects;
 use crate::selector::DrawableSelector;
 
-const CAPTION_INFO_MESSAGE_TYPE: u32 = 633;
-const CAPTION_PLACEMENT_MESSAGE_TYPE: u32 = 634;
-const SHAPE_STYLE_MESSAGE_TYPE: u32 = 2_025;
-const STORAGE_MESSAGE_TYPE: u32 = 2_001;
-const STANDIN_MESSAGE_TYPE: u32 = 3_097;
+use caption::{
+    CAPTION_INFO_MESSAGE_TYPE, CAPTION_PLACEMENT_MESSAGE_TYPE, SHAPE_STYLE_MESSAGE_TYPE,
+    STANDIN_MESSAGE_TYPE, STORAGE_MESSAGE_TYPE,
+};
 const THEME_MESSAGE_TYPE: u32 = 10_001;
 const METADATA_MESSAGE_TYPE: u32 = 11_006;
-const DRAWABLE_TITLE_FIELD: u32 = 10;
-const DRAWABLE_CAPTION_FIELD: u32 = 11;
-const DRAWABLE_GEOMETRY_FIELD: u32 = 1;
-const GEOMETRY_SIZE_FIELD: u32 = 2;
-const SIZE_WIDTH_FIELD: u32 = 1;
 const THEME_SUPER_FIELD: u32 = 1;
 const THEME_DOCUMENT_STYLESHEET_FIELD: u32 = 4;
-const THEME_APPLICATION_PRESETS_FIELD: u32 = 210;
-const PRESETS_CAPTION_STYLES_FIELD: u32 = 1;
 /// The document component, which registers created objects' UUIDs.
 const DOCUMENT_COMPONENT_IDENTIFIER: u64 = 1;
-const STANDARD_VERSION: [u32; 3] = [1, 0, 5];
-const STANDIN_VERSION: [u32; 3] = [10, 1, 0];
 
 /// Which of a drawable's two labels an operation targets.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -65,24 +53,11 @@ pub enum Kind {
 }
 
 impl Kind {
-    const fn field(self) -> u32 {
+    /// The shared engine's label.
+    const fn label(self) -> caption::Label {
         match self {
-            Self::Title => DRAWABLE_TITLE_FIELD,
-            Self::Caption => DRAWABLE_CAPTION_FIELD,
-        }
-    }
-
-    const fn native_kind(self) -> i32 {
-        match self {
-            Self::Caption => 1,
-            Self::Title => 2,
-        }
-    }
-
-    const fn graph_kind(self) -> graph_codec::CaptionGraphKind {
-        match self {
-            Self::Caption => graph_codec::CaptionGraphKind::Caption,
-            Self::Title => graph_codec::CaptionGraphKind::Title,
+            Self::Title => caption::Label::Title,
+            Self::Caption => caption::Label::Caption,
         }
     }
 }
@@ -562,9 +537,11 @@ fn resolve_any(package: &Package, selector: DrawableSelector, kind: Kind) -> Res
     let drawable = selected.anchor.drawable;
     let component = index.component_name(selected.drawable.component_index)?;
     let view = budget.parse(selected.drawable_payload, 3)?;
-    let reference = graph::unique_field(&view, kind.field(), 2)?.ok_or(Error::InvalidSource)?;
+    let reference =
+        graph::unique_field(&view, kind.label().field(), 2)?.ok_or(Error::InvalidSource)?;
     let reference = graph::parse_reference(reference.payload(), &mut budget)?;
-    let width = drawable_width(&view, &mut budget)?;
+    let width =
+        caption::archive_width(selected.drawable_payload).map_err(|_| Error::InvalidSource)?;
     let located = index.get(reference)?;
     if located.component_index != selected.drawable.component_index {
         return Err(Error::InvalidSource);
@@ -593,30 +570,14 @@ fn resolve_any(package: &Package, selector: DrawableSelector, kind: Kind) -> Res
     graph::validate_message_metadata(located.object, info_index)?;
     let payload = info.data.as_slice();
     budget.work(payload.len())?;
-    let snapshot = pages_movie_caption_codec::decode_caption_info(
-        payload,
-        pages_movie_caption_codec::DecodeOptions::for_source(payload),
-    )
-    .map_err(|_| Error::InvalidSource)?;
-    let storage = snapshot
-        .owned_storage_identifier()
-        .and_then(NonZeroU64::new)
+    let info = caption::info_graph(payload, reference.get(), drawable.get(), kind.label())
         .ok_or(Error::InvalidSource)?;
-    if snapshot.child_info_kind() != Some(kind.native_kind())
-        || snapshot.parent_identifier() != drawable.get()
-        || snapshot.deprecated_storage_identifier() != Some(storage.get())
-        || snapshot.is_text_box() != Some(true)
-    {
-        return Err(Error::InvalidSource);
-    }
-    let style = snapshot
-        .style_identifier()
-        .and_then(NonZeroU64::new)
-        .ok_or(Error::InvalidSource)?;
-    let placement = snapshot
-        .placement_identifier()
-        .and_then(NonZeroU64::new)
-        .ok_or(Error::InvalidSource)?;
+    let nonzero = |identifier| NonZeroU64::new(identifier).ok_or(Error::InvalidSource);
+    let (style, storage, placement) = (
+        nonzero(info.style)?,
+        nonzero(info.storage)?,
+        nonzero(info.placement)?,
+    );
     for (identifier, message_type, private) in [
         (style, SHAPE_STYLE_MESSAGE_TYPE, false),
         (storage, STORAGE_MESSAGE_TYPE, true),
@@ -627,13 +588,6 @@ fn resolve_any(package: &Package, selector: DrawableSelector, kind: Kind) -> Res
         if private && object.component_index != selected.drawable.component_index {
             return Err(Error::InvalidSource);
         }
-    }
-    if [style, storage, placement].contains(&reference)
-        || style == storage
-        || storage == placement
-        || style == placement
-    {
-        return Err(Error::InvalidSource);
     }
     let text = objects::storage_by_identifier(package, storage.get())?.text;
     Ok(Slot {
@@ -651,29 +605,6 @@ fn resolve_any(package: &Package, selector: DrawableSelector, kind: Kind) -> Res
     })
 }
 
-/// The drawable's displayed width (`geometry.size.width`), when present.
-fn drawable_width(
-    drawable: &litchi_iwa_common::wire::WireView<'_>,
-    budget: &mut Budget,
-) -> Result<Option<f32>, Error> {
-    let Some(geometry) = graph::unique_field(drawable, DRAWABLE_GEOMETRY_FIELD, 2)? else {
-        return Ok(None);
-    };
-    let geometry = budget.parse(geometry.payload(), 4)?;
-    let Some(size) = graph::unique_field(&geometry, GEOMETRY_SIZE_FIELD, 2)? else {
-        return Ok(None);
-    };
-    let size = budget.parse(size.payload(), 5)?;
-    let Some(width) = graph::unique_field(&size, SIZE_WIDTH_FIELD, 5)? else {
-        return Ok(None);
-    };
-    let bytes: [u8; 4] = width
-        .payload()
-        .try_into()
-        .map_err(|_| Error::InvalidSource)?;
-    Ok(Some(f32::from_le_bytes(bytes)))
-}
-
 /// The theme's document stylesheet and first caption paragraph-style
 /// preset, and the document language (the host's `image_caption_theme`).
 pub(crate) fn caption_theme(package: &Package) -> Result<(u64, u64, Option<String>), Error> {
@@ -683,91 +614,22 @@ pub(crate) fn caption_theme(package: &Package) -> Result<(u64, u64, Option<Strin
     let theme = index.get(theme.ok_or(Error::InvalidSource)?)?;
     let (_, message) = graph::unique_message(theme.object, THEME_MESSAGE_TYPE)?;
     let wrapper = budget.parse(&message.data, 1)?;
-    let base = graph::unique_field(&wrapper, THEME_SUPER_FIELD, 2)?.ok_or(Error::InvalidSource)?;
-    let base = budget.parse(base.payload(), 2)?;
+    let base_field =
+        graph::unique_field(&wrapper, THEME_SUPER_FIELD, 2)?.ok_or(Error::InvalidSource)?;
+    let base = budget.parse(base_field.payload(), 2)?;
     let stylesheet = graph::unique_field(&base, THEME_DOCUMENT_STYLESHEET_FIELD, 2)?
         .ok_or(Error::InvalidSource)?;
     let stylesheet = graph::parse_reference(stylesheet.payload(), &mut budget)?;
-    let presets = graph::unique_field(&base, THEME_APPLICATION_PRESETS_FIELD, 2)?
+    let paragraph_style = caption::theme_paragraph_style(base_field.payload())
+        .and_then(NonZeroU64::new)
         .ok_or(Error::InvalidSource)?;
-    let presets = budget.parse(presets.payload(), 3)?;
-    let paragraph_style = presets
-        .fields()
-        .find(|field| field.number() == PRESETS_CAPTION_STYLES_FIELD)
-        .ok_or(Error::InvalidSource)?;
-    if paragraph_style.wire_type() != 2 {
-        return Err(Error::InvalidSource);
-    }
-    let paragraph_style = graph::parse_reference(paragraph_style.payload(), &mut budget)?;
     index.get(stylesheet)?;
     index.get(paragraph_style)?;
     Ok((stylesheet.get(), paragraph_style.get(), language))
 }
 
-/// A `TSP.Reference` payload naming `identifier`.
-fn reference_payload(identifier: u64) -> Vec<u8> {
-    let mut payload = vec![0x08];
-    litchi_iwa_common::varint::encode_varint_into(&mut payload, identifier);
-    payload
-}
-
-/// The drawable message with its label reference pointing at `replacement`.
-fn repoint(slot: &Slot, payload: &[u8], replacement: u64) -> Result<Vec<u8>, Error> {
-    let reference = reference_payload(replacement);
-    let patch = |drawable: &[u8]| {
-        patch_length_delimited_field(drawable, slot.kind.field(), true, Some(&reference))
-    };
-    let result = if matches!(
-        slot.selector,
-        DrawableSelector::Shape(_) | DrawableSelector::TextBox(_)
-    ) {
-        transform_length_delimited_field(payload, 1, |shape| {
-            transform_length_delimited_field(shape, 1, patch)
-        })
-    } else {
-        transform_length_delimited_field(payload, 1, patch)
-    };
-    result.map_err(|error| Error::from(graph::map_wire_error(error)))
-}
-
-/// The host's `replace_object_reference` over a message's reference list.
-fn replace_reference(references: &mut Vec<u64>, old: u64, new: u64) {
-    if let Some(index) = references.iter().position(|identifier| *identifier == old) {
-        references[index] = new;
-        let mut seen = false;
-        references.retain(|identifier| {
-            if *identifier != new {
-                return true;
-            }
-            let keep = !seen;
-            seen = true;
-            keep
-        });
-    } else if !references.contains(&new) {
-        references.push(new);
-    }
-}
-
-fn versioned_object(
-    source: &Package,
-    identifier: u64,
-    message_type: u32,
-    data: Vec<u8>,
-    version: [u32; 3],
-    references: Vec<u64>,
-) -> Result<ArchiveObject, Error> {
-    let mut object = objects::new_object(source, identifier, message_type, data)?;
-    let info = object
-        .archive_info
-        .message_infos
-        .first_mut()
-        .ok_or(Error::InvalidSource)?;
-    info.versions = version.to_vec().into();
-    info.object_references = references;
-    Ok(object)
-}
-
-/// The four native objects of a new inline label graph, starting at `first`.
+/// The four native objects of a new inline label graph, starting at `first`
+/// (the shared `caption::graph_objects`).
 fn label_graph(
     source: &Package,
     slot: &Slot,
@@ -779,75 +641,43 @@ fn label_graph(
         .filter(|width| width.is_finite() && *width > 0.0)
         .ok_or(Refusal::NoWidth)?;
     let (stylesheet, paragraph_style, language) = caption_theme(source)?;
-    let at = |offset: u64| first.checked_add(offset).ok_or(Error::InvalidSource);
-    let ids = [at(0)?, at(1)?, at(2)?, at(3)?];
-    let [style, info, storage, placement] = ids;
-    let output = graph_codec::encode_caption_graph_with_kind_with_report(
-        graph_codec::CaptionGraphWrite {
-            drawable_identifier: slot.drawable.get(),
-            style_identifier: style,
-            info_identifier: info,
-            storage_identifier: storage,
-            placement_identifier: placement,
-            stylesheet_identifier: stylesheet,
-            paragraph_style_identifier: paragraph_style,
-            drawable_width: width,
-            text,
+    let ids = caption::GraphIds::allocate(first).ok_or(Error::InvalidSource)?;
+    let (objects, _) = caption::graph_objects(
+        ids,
+        slot.drawable.get(),
+        width,
+        text,
+        caption::Theme {
+            stylesheet,
+            paragraph_style,
             language: language.as_deref(),
         },
-        slot.kind.graph_kind(),
+        slot.kind.label(),
         graph_codec::EncodeOptions::for_text(text),
+        archive_limits(source)?,
     )
     .map_err(|error| match error {
-        graph_codec::EncodeError::Resource(_) => Error::Limit {
+        caption::BuildError::Encode(graph_codec::EncodeError::Resource(_)) => Error::Limit {
             kind: LimitKind::OutputBytes,
             observed: text.len() as u64,
             maximum: text.len() as u64,
         },
-        graph_codec::EncodeError::Allocation { amount } => Error::Allocation { amount },
-        _ => Error::InvalidSource,
+        caption::BuildError::Encode(graph_codec::EncodeError::Allocation { amount }) => {
+            Error::Allocation { amount }
+        },
+        caption::BuildError::Archive(error) => Error::from(graph::map_core_error(error)),
+        caption::BuildError::Encode(_) => Error::InvalidSource,
     })?;
-    let [
-        style_payload,
-        info_payload,
-        storage_payload,
-        placement_payload,
-    ] = output.into_payloads().into_parts();
-    let objects = vec![
-        versioned_object(
-            source,
-            style,
-            SHAPE_STYLE_MESSAGE_TYPE,
-            style_payload,
-            STANDARD_VERSION,
-            vec![paragraph_style],
-        )?,
-        versioned_object(
-            source,
-            info,
-            CAPTION_INFO_MESSAGE_TYPE,
-            info_payload,
-            STANDARD_VERSION,
-            vec![style, storage, placement],
-        )?,
-        versioned_object(
-            source,
-            storage,
-            STORAGE_MESSAGE_TYPE,
-            storage_payload,
-            STANDARD_VERSION,
-            vec![paragraph_style],
-        )?,
-        versioned_object(
-            source,
-            placement,
-            CAPTION_PLACEMENT_MESSAGE_TYPE,
-            placement_payload,
-            STANDARD_VERSION,
-            Vec::new(),
-        )?,
-    ];
-    Ok((objects, ids))
+    Ok((objects, ids.all()))
+}
+
+fn archive_limits(source: &Package) -> Result<litchi_iwa_core::Limits, Error> {
+    source
+        .state
+        .source
+        .limits()
+        .effective_archive_limits()
+        .map_err(|error| Error::from(graph::map_archive_error(error)))
 }
 
 fn unchanged(edit: Edit<'_>) -> Commit {
@@ -936,14 +766,8 @@ fn commit_edit(edit: Edit<'_>) -> Result<Commit, Error> {
             // A present label: point the drawable at a fresh stand-in.
             let metadata = objects::metadata(source)?;
             let standin = objects::next_identifier(source, metadata.as_ref())?;
-            let object = versioned_object(
-                source,
-                standin,
-                STANDIN_MESSAGE_TYPE,
-                graph_codec::canonical_standin_payload().to_vec(),
-                STANDIN_VERSION,
-                Vec::new(),
-            )?;
+            let object = caption::standin(standin, archive_limits)
+                .map_err(|error| Error::from(graph::map_core_error(error)))?;
             archive
                 .insert_object(object, archive_limits)
                 .map_err(graph::map_core_error)?;
@@ -1009,7 +833,16 @@ fn repoint_drawable(
         .ok_or(Error::InvalidSource)?
         .data
         .clone();
-    let data = repoint(slot, &payload, replacement)?;
+    let nesting = if matches!(
+        slot.selector,
+        DrawableSelector::Shape(_) | DrawableSelector::TextBox(_)
+    ) {
+        caption::Nesting::Shape
+    } else {
+        caption::Nesting::Drawable
+    };
+    let data = caption::repoint(&payload, nesting, slot.kind.label(), replacement)
+        .map_err(|error| Error::from(graph::map_wire_error(error)))?;
     object
         .replace_message_preserving_header(
             slot.message_index,
@@ -1025,7 +858,7 @@ fn repoint_drawable(
         .message_infos
         .get_mut(slot.message_index)
         .ok_or(Error::InvalidSource)?;
-    replace_reference(
+    caption::replace_reference(
         &mut info.object_references,
         slot.reference.get(),
         replacement,
