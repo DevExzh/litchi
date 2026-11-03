@@ -1407,6 +1407,24 @@ pub(crate) fn select_table(
     select_table_after_inventory(package, slide_selector, table_selector, budget, false)
 }
 
+/// Resolve one slide of an exact source: its position and its slide
+/// object.
+pub(crate) fn select_slide(
+    package: &Package,
+    slide_selector: SlideSelector<'_>,
+    budget: &mut Budget,
+) -> Result<(Position, u64)> {
+    let catalog = physical_catalog(package)?;
+    budget.input(package.source_bytes().len())?;
+    budget.inventory(package, catalog)?;
+    let position = resolve_slide_position(package, slide_selector, budget)?;
+    let record = package
+        .slide_record_at(position.get())
+        .map_err(read_error)?
+        .ok_or(Error::SlidePositionNotFound(position))?;
+    Ok((position, record.slide_identifier))
+}
+
 /// Resolve a read-only table against an already checked component catalog.
 ///
 /// The semantic-only package source intentionally remains unsupported by the

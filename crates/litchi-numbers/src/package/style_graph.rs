@@ -98,7 +98,13 @@ pub(super) fn fault(error: &GraphError) -> StyleGraphFault {
 }
 
 /// Republish `changes` over `package` once and reopen the candidate.
-pub(super) fn publish(package: &Package, changes: Changes) -> FaultResult<Published> {
+/// Publish `changes` and the new non-IWA members `data` (embedded media
+/// a data-owner transition registered).
+pub(super) fn publish(
+    package: &Package,
+    changes: Changes,
+    data: &[(&str, &[u8])],
+) -> FaultResult<Published> {
     let catalog = structure::exact_source(package)?;
     let limits = catalog.limits();
     let archive_limits = limits
@@ -147,6 +153,10 @@ pub(super) fn publish(package: &Package, changes: Changes) -> FaultResult<Publis
             Some(position) => EntryInsertion::at(*position, name, data),
             None => EntryInsertion::new(name, data),
         })
+        .chain(
+            data.iter()
+                .map(|(name, bytes)| EntryInsertion::new(name, bytes)),
+        )
         .collect();
     let deletions: Vec<&str> = changes.deletions.iter().map(String::as_str).collect();
     let output = catalog

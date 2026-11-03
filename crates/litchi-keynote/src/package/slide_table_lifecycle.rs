@@ -1,6 +1,10 @@
-//! Slide-table duplication and removal (record 0372; the Keynote leaf of the
-//! host's `duplicate_slide_table` and `remove_slide_table`) over the shared
-//! table structure set (`litchi_iwa_table::structure`, record 0379).
+//! Slide-table addition, duplication and removal (records 0372 and 0423;
+//! the Keynote leaf of the host's `add_slide_table`,
+//! `duplicate_slide_table` and `remove_slide_table`) over the shared table
+//! structure set (`litchi_iwa_table::structure`, record 0379).
+//!
+//! Addition empties a copy of the deck's detached creation table and sizes
+//! it to the requested frame (see the `add` module).
 //!
 //! Duplication is the shared table-graph copy (record 0370h): fresh
 //! identifiers for the drawable, model and owned storage, the host's table
@@ -37,7 +41,10 @@ use thiserror::Error as ThisError;
 use super::structure::wire::{self, Fields, LENGTH_DELIMITED};
 use super::{Package, slide_table_core as core, slide_table_merges};
 use crate::SlideSelector;
+use crate::slide::drawable::Geometry;
 use crate::slide::table::TableSelector;
+
+mod add;
 
 /// `KN.SlideArchive`.
 const SLIDE_MESSAGE_TYPE: u32 = 5;
@@ -152,6 +159,26 @@ pub enum Refusal {
     /// The slide has no free copy name for the table.
     #[error("the Keynote slide has no free name for the table copy")]
     NoCopyName,
+    /// A new table's name is empty or contains NUL.
+    #[error("a Keynote table name must be non-empty and contain no NUL")]
+    InvalidName,
+    /// A new table has no row or column, or more row and column identities
+    /// than a table may hold.
+    #[error("a Keynote table cannot have {rows} rows and {columns} columns")]
+    InvalidSize {
+        /// The requested rows.
+        rows: u32,
+        /// The requested columns.
+        columns: u32,
+    },
+    /// A new table's frame is not finite or not positive.
+    #[error("the Keynote table frame is not finite and positive")]
+    InvalidGeometry,
+    /// The deck carries no detached creation table to add a table from (the
+    /// host refuses it too; `Package::edit_slide_drawables` adds a copy of a
+    /// slide table instead).
+    #[error("the Keynote deck has no table creation template")]
+    NoTemplate,
     /// This edit already holds its single operation.
     #[error("a Keynote slide-table lifecycle operation is already staged")]
     OperationAlreadyStaged,
@@ -167,10 +194,14 @@ impl Refusal {
         use litchi_core::edit::RefusalKind;
         match self {
             Self::TableNotFound => RefusalKind::NotFound,
-            Self::AmbiguousSelector => RefusalKind::InvalidValue,
-            Self::UnsupportedSource | Self::UnsupportedDependency | Self::NoCopyName => {
-                RefusalKind::UnsupportedContent
-            },
+            Self::AmbiguousSelector
+            | Self::InvalidName
+            | Self::InvalidSize { .. }
+            | Self::InvalidGeometry => RefusalKind::InvalidValue,
+            Self::UnsupportedSource
+            | Self::UnsupportedDependency
+            | Self::NoCopyName
+            | Self::NoTemplate => RefusalKind::UnsupportedContent,
             Self::OperationAlreadyStaged | Self::NoStagedOperation => {
                 RefusalKind::UnsupportedOperation
             },
@@ -332,15 +363,20 @@ fn map_merge_error(error: slide_table_merges::Error) -> Error {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Action {
+    Add,
     Duplicate,
     Remove,
 }
 
-/// The one staged operation and the table it resolved to.
+/// The one staged operation: an existing table it resolved to, or a new
+/// table.
 #[derive(Debug, Clone)]
-struct Staged {
-    action: Action,
-    target: core::Target,
+enum Staged {
+    Existing {
+        action: Action,
+        target: core::Target,
+    },
+    Add(add::Request),
 }
 
 /// One immutable edit that stages exactly one duplication or removal of a
@@ -357,7 +393,13 @@ impl fmt::Debug for Edit<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
             .debug_struct("Edit")
-            .field("staged", &self.staged.as_ref().map(|staged| staged.action))
+            .field(
+                "staged",
+                &self.staged.as_ref().map(|staged| match staged {
+                    Staged::Existing { action, .. } => *action,
+                    Staged::Add(_) => Action::Add,
+                }),
+            )
             .finish_non_exhaustive()
     }
 }
@@ -378,7 +420,60 @@ impl<'a> Edit<'a> {
         if matches!(action, Action::Duplicate) {
             reject_merged_duplicate(self.source, slide, table)?;
         }
-        self.staged = Some(Staged { action, target });
+        self.staged = Some(Staged::Existing { action, target });
+        Ok(self)
+    }
+
+    /// Stage a new empty table named `name` with `rows` rows and `columns`
+    /// columns on `slide`, placed in front of the slide's drawables, with
+    /// `frame` (flags 3; angle 0 unless the frame has a rotation) and every
+    /// row and column sized uniformly to fill it (host `add_slide_table`).
+    /// Its structure (styles, header rows and columns) is an emptied copy of
+    /// the deck's detached creation table, which builder decks carry.
+    ///
+    /// # Errors
+    ///
+    /// [`Refusal::InvalidName`], [`Refusal::InvalidSize`],
+    /// [`Refusal::InvalidGeometry`], [`Refusal::TableNotFound`] when the
+    /// slide selector resolves no slide, and
+    /// [`Refusal::OperationAlreadyStaged`] after one operation;
+    /// [`Refusal::NoTemplate`] is reported on commit.
+    pub fn add<'s>(
+        mut self,
+        slide: impl Into<SlideSelector<'s>>,
+        name: &str,
+        rows: u32,
+        columns: u32,
+        frame: Geometry,
+    ) -> Result<Self, Error> {
+        if self.staged.is_some() {
+            return Err(Error::Refused(Refusal::OperationAlreadyStaged));
+        }
+        if name.is_empty() || name.contains('\0') {
+            return Err(Error::Refused(Refusal::InvalidName));
+        }
+        if !litchi_numbers_wire::table_create::admits_size(rows, columns) {
+            return Err(Error::Refused(Refusal::InvalidSize { rows, columns }));
+        }
+        if !frame.is_valid() {
+            return Err(Error::Refused(Refusal::InvalidGeometry));
+        }
+        let mut budget = core::Budget::new(self.source).map_err(select_error)?;
+        let (position, slide) =
+            core::select_slide(self.source, slide.into(), &mut budget).map_err(select_error)?;
+        let mut owned = String::new();
+        owned
+            .try_reserve_exact(name.len())
+            .map_err(|_| Error::Allocation { amount: name.len() })?;
+        owned.push_str(name);
+        self.staged = Some(Staged::Add(add::Request {
+            slide_position: position.get(),
+            slide,
+            name: owned,
+            rows,
+            columns,
+            frame,
+        }));
         Ok(self)
     }
 
@@ -424,9 +519,31 @@ impl<'a> Edit<'a> {
     /// package does not show the slide's expected tables. Failure never
     /// publishes a partial package.
     pub fn commit(self) -> Result<Commit, Error> {
-        let Staged { action, target } = self
+        let staged = self
             .staged
             .ok_or(Error::Refused(Refusal::NoStagedOperation))?;
+        let (action, target) = match staged {
+            Staged::Existing { action, target } => (action, target),
+            Staged::Add(request) => {
+                let mut expected = slide_table_names(self.source, request.slide)?;
+                let (published, info) = add::add(self.source, &request)?;
+                expected
+                    .try_reserve(1)
+                    .map_err(|_| Error::Allocation { amount: 1 })?;
+                expected.push(request.name);
+                verify_table(
+                    &published.package,
+                    request.slide_position,
+                    info,
+                    expected.len() - 1,
+                    (request.rows, request.columns),
+                )?;
+                if slide_table_names(&published.package, request.slide)? != expected {
+                    return Err(Error::Verification);
+                }
+                return Commit::new(self.source, published);
+            },
+        };
         let slide = target.slide.identifier;
         let mut expected = slide_table_names(self.source, slide)?;
         let position = target.table_position.get();
@@ -441,9 +558,16 @@ impl<'a> Edit<'a> {
                     .try_reserve(1)
                     .map_err(|_| Error::Allocation { amount: 1 })?;
                 expected.push(name);
-                verify_copy(&published.package, &target, copy, expected.len() - 1)?;
+                verify_table(
+                    &published.package,
+                    target.slide_position.get(),
+                    copy,
+                    expected.len() - 1,
+                    (target.rows, target.columns),
+                )?;
                 published
             },
+            Action::Add => return Err(Error::InvalidSource),
             Action::Remove => {
                 if position >= expected.len() {
                     return Err(Error::InvalidSource);
@@ -697,25 +821,24 @@ fn duplicate(
     Ok((working.publish(&transition)?, copy.info))
 }
 
-/// Prove the copy is the selectable table at `position` with its source's
-/// dimensions.
-fn verify_copy(
+/// Prove the new table is the selectable table at `position` of the slide
+/// at `slide` with `size` rows and columns.
+fn verify_table(
     candidate: &Package,
-    source: &core::Target,
-    copy: u64,
+    slide: usize,
+    table: u64,
     position: usize,
+    size: (u32, u32),
 ) -> Result<(), Error> {
     let mut budget = core::Budget::new(candidate).map_err(select_error)?;
     let selected = core::select_table(
         candidate,
-        SlideSelector::index(source.slide_position.get()),
+        SlideSelector::index(slide),
         TableSelector::index(position),
         &mut budget,
     )
     .map_err(select_error)?;
-    if selected.table_info.identifier != copy
-        || (selected.rows, selected.columns) != (source.rows, source.columns)
-    {
+    if selected.table_info.identifier != table || (selected.rows, selected.columns) != size {
         return Err(Error::Verification);
     }
     Ok(())
