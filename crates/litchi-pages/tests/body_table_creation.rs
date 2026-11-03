@@ -1,9 +1,10 @@
 //! Body-table creation (record 0329): a new, empty table cloned from the
 //! structure of the document's first body table and anchored in the body
 //! story, read back through the catalog and cell reader, reopened and
-//! inverted exactly; documents without a body table refuse, typed. A
-//! duplication (record 0371) copies a populated table under the next free
-//! `"<name> copy"` name.
+//! inverted exactly; documents without a body table refuse, typed, except
+//! a table-less built-in-template document, whose first table is built from
+//! scratch (record 0426). A duplication (record 0371) copies a populated
+//! table under the next free `"<name> copy"` name.
 
 use std::path::{Path, PathBuf};
 
@@ -351,5 +352,45 @@ fn every_corpus_body_table_duplicates_or_refuses_typed() -> TestResult {
     }
     eprintln!("duplicated {duplicated}, refused {refused}");
     assert!(duplicated >= 17 && refused > 0);
+    Ok(())
+}
+
+/// A table-less document made from the built-in template takes the host's
+/// from-scratch first table (record 0426) at any body position, with seeded
+/// cells, and a second insertion clones it.
+#[test]
+fn a_built_in_template_document_takes_its_first_table() -> TestResult {
+    let built = litchi_pages::builder::Builder::new()
+        .identity(litchi_pages::builder::Identity::from_bytes([7; 16]))
+        .body_text("Hello table world")
+        .build()?;
+    for package in [Package::new()?, built] {
+        let length = package.text()?.encode_utf16().count();
+        for anchor in [0, length / 2, length] {
+            let commit = insert(
+                &package,
+                Position::new(anchor),
+                NewTable::new(3, 2).with_cell(1, 1, Value::Text("x".into())),
+            )?;
+            assert!(commit.diagnostics().changed());
+            let tables = commit.package().body_tables()?;
+            assert_eq!(tables.len(), 1);
+            let table = tables.get(0).ok_or("the new table")?;
+            assert_eq!(table.name(), "Table 1");
+            assert_eq!((table.rows(), table.columns()), (3, 2));
+            let reopened = Package::from_bytes(&bytes(commit.package())?)?;
+            assert_eq!(reopened.body_tables()?.len(), 1);
+            let restored = commit
+                .package()
+                .apply_body_table_creation(&commit.patch().inverse())?;
+            assert_eq!(bytes(restored.package())?, bytes(&package)?);
+            let second = insert(commit.package(), Position::new(0), NewTable::new(2, 2))?;
+            assert_eq!(second.package().body_tables()?.len(), 2);
+        }
+        assert!(matches!(
+            insert(&package, Position::new(length + 1), NewTable::new(2, 2)),
+            Err(Error::Refused(Refusal::PositionOutOfBounds))
+        ));
+    }
     Ok(())
 }

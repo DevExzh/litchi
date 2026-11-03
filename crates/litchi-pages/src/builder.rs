@@ -280,11 +280,10 @@ impl Builder {
         };
         let mut package = super::package::builder_table::install(
             &package,
-            name,
-            *rows,
-            *columns,
+            (name, *rows, *columns),
             self.locale.as_deref().unwrap_or("en_US"),
             identity.seed(),
+            None,
         )?;
         for (name, rows, columns) in tables {
             let anchor = package.text()?.encode_utf16().count();
