@@ -229,4 +229,29 @@ measure the native workbook, which has no earlier leaf cost either.
 
 ## 9. Verification
 
-GATES
+The two new fixtures join the corpus walks, so these change with no behaviour
+change on any existing file: `corpus_fidelity`'s report gains two rows,
+`query_corpus` re-blesses its 13 Numbers digests and no other format's, and the
+topology corpus test admits the typed `Unsupported::Pivot`. `exit_parity` pins the
+volatile fixture as a third file where the host's owner identifier collides with a
+map-only entry. `numbers_native_conditional_highlight_volatile_host_fails_leaf_registers`
+replaces the test that pinned the refusal.
+
+Gates ran on this branch at trunk `52f3d60714`, which had not moved. The first
+pass used the prescribed `TMPDIR`. `/tmp` hit its quota, so its doctest and pyo3
+failures (`ld` bus errors, `Disk quota exceeded`) were reruns with `TMPDIR` under
+`.coord/iwa-w5n/tmp`.
+
+| Gate | Result |
+|---|---|
+| `cargo fmt --all --check` | 0 |
+| clippy, changed crates + litchi-ops, litchi, litchi-py, all targets and features | 0 |
+| clippy, litchi-ops no features, numbers, pages, keynote | 0 |
+| tests: litchi-iwa-table, litchi-keynote, litchi-iwa-protos, litchi-numbers-wire, litchi-numbers, litchi-pages, litchi-iwa-style | 0 |
+| tests: litchi, all features | 0 (rerun) |
+| tests: litchi-ops lib, doc (rerun), every `--test` chunk (two after the bless) | 0 |
+| `cargo test -p litchi-iwa --all-features --test parity` | 0: 1191 passed, 210 ignored |
+| `cargo test -p litchi-iwa --all-features --lib` | 0 (after the `exit_parity` pin) |
+| `cargo doc` with `-Dwarnings`, boundaries, `non_iwork_gate`, glossary, ledger, tool unit tests, capability delta, corpus, feature matrix, fuzz locks, perf-baseline | 0 |
+| `tools/unified_bench_matrix.py --check` | 0 after regenerating for this record |
+| `crates/pyo3-litchi/tests/run_tests.sh` | 0 (rerun) |

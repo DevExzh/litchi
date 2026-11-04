@@ -188,7 +188,7 @@ fn native_pivot_codes_agree_with_headers_formulas_and_cached_results() -> TestRe
         let Some(CachedScalar::Number(value)) = cell.cached_scalar()? else {
             return Err(io::Error::other("no cached number").into());
         };
-        let value = f64::try_from(value)?;
+        let value = f64::from(value);
         assert!((value - cached).abs() < 1e-9, "{header}: {value}");
     }
     Ok(())

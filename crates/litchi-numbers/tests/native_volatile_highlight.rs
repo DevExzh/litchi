@@ -81,7 +81,7 @@ fn volatile_state(source: &[u8]) -> TestResult<(Vec<(u32, Vec<i32>)>, u64)> {
     }
     Ok((
         cells.ok_or_else(|| io::Error::other("no conditional-style owner"))?,
-        u64::from(count.ok_or_else(|| io::Error::other("no formula count"))?),
+        count.ok_or_else(|| io::Error::other("no formula count"))?,
     ))
 }
 
@@ -277,7 +277,6 @@ fn volatile_state_count(source: &[u8]) -> TestResult<u64> {
                 return archive
                     .dependency_tracker
                     .number_of_formulas
-                    .map(u64::from)
                     .ok_or_else(|| io::Error::other("no formula count").into());
             }
         }
