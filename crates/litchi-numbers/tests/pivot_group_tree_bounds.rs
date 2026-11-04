@@ -52,7 +52,7 @@ fn group_by(
         group_node_root: root,
         group_node_root_ref: root_reference.map(reference),
         aggregator: vec![tst::group_by_archive::AggregatorArchive {
-            column_uid: column.clone(),
+            column_uid: column,
             ..Default::default()
         }],
         column_agg_type: vec![tst::ColumnAggregateArchive {
@@ -110,7 +110,11 @@ fn on_small_stack<T: Send + 'static>(read: impl FnOnce() -> T + Send + 'static) 
 #[test]
 fn a_child_reference_cycle_terminates() -> TestResult {
     let mut root = node(1, 6);
-    root.child_ref = vec![reference(9_200_002), reference(9_200_002), reference(9_200_001)];
+    root.child_ref = vec![
+        reference(9_200_002),
+        reference(9_200_002),
+        reference(9_200_001),
+    ];
     let mut child = node(41, 7);
     child.child_ref = vec![reference(9_200_001), reference(9_200_002)];
     let bytes = with_objects(vec![

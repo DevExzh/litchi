@@ -1142,14 +1142,8 @@ fn uuid_reference_map(
         for inner in fields(entry.payload, limits).map_err(|_| Error::InvalidSource)? {
             if inner.number == 3 {
                 has_refs = true;
-                let refs = owner_cell_refs(
-                    inner.payload,
-                    owner_internal,
-                    row,
-                    column,
-                    add,
-                    limits,
-                )?;
+                let refs =
+                    owner_cell_refs(inner.payload, owner_internal, row, column, add, limits)?;
                 if !refs.is_empty() {
                     message_field(&mut rewritten, 3, &refs);
                 }
@@ -1206,12 +1200,11 @@ fn owner_cell_refs(
             continue;
         }
         matched = true;
-        let mut set = match single_bytes(entry.payload, 2, limits)
-            .map_err(|_| Error::InvalidSource)?
-        {
-            Some(set) => Coordinates::decode(set, limits)?,
-            None => Coordinates::default(),
-        };
+        let mut set =
+            match single_bytes(entry.payload, 2, limits).map_err(|_| Error::InvalidSource)? {
+                Some(set) => Coordinates::decode(set, limits)?,
+                None => Coordinates::default(),
+            };
         if add {
             set.add(row, column);
         } else {

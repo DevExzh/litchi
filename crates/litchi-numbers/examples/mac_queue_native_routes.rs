@@ -76,12 +76,7 @@ fn category<'a>(
 fn half_grand_average(categories: &[Category]) -> Result<Expression> {
     Ok(Expression::binary(
         BinaryOperator::Divide,
-        Expression::pivot_category(category(
-            categories,
-            "Grand Total",
-            0,
-            Aggregate::Average,
-        )?),
+        Expression::pivot_category(category(categories, "Grand Total", 0, Aggregate::Average)?),
         Expression::number(2.0)?,
     )?)
 }
@@ -162,12 +157,20 @@ fn volatile_routes(writer: &mut Writer) -> Result {
         .edit_table_cell_conditional_highlights(0usize, 0usize)?
         .set(At::new(1, 1), [today.clone()])?
         .commit()?;
-    writer.emit("numbers-native-first-rule-text-cell", BASIC, commit.package())?;
+    writer.emit(
+        "numbers-native-first-rule-text-cell",
+        BASIC,
+        commit.package(),
+    )?;
     let commit = basic
         .edit_table_cell_conditional_highlights(0usize, 0usize)?
         .set(At::new(3, 1), [today.clone()])?
         .commit()?;
-    writer.emit("numbers-native-first-rule-empty-cell", BASIC, commit.package())?;
+    writer.emit(
+        "numbers-native-first-rule-empty-cell",
+        BASIC,
+        commit.package(),
+    )?;
 
     // Six weeks of dates, each with the rule: Numbers evaluates volatile rules
     // when it opens a file and stores the applied rule in the cell, so the
@@ -189,7 +192,11 @@ fn volatile_routes(writer: &mut Writer) -> Result {
         rules = rules.set(*position, [today.clone()])?;
     }
     let commit = rules.commit()?;
-    writer.emit("numbers-native-first-rule-date-ladder", BASIC, commit.package())?;
+    writer.emit(
+        "numbers-native-first-rule-date-ladder",
+        BASIC,
+        commit.package(),
+    )?;
 
     // Numbers' own family.
     let native = open(VOLATILE)?;
@@ -197,12 +204,20 @@ fn volatile_routes(writer: &mut Writer) -> Result {
         .edit_table_cell_conditional_highlights(0usize, 0usize)?
         .set(At::new(3, 0), [red_rule(Condition::DateIsTomorrow)?])?
         .commit()?;
-    writer.emit("numbers-native-volatile-add-tomorrow", VOLATILE, commit.package())?;
+    writer.emit(
+        "numbers-native-volatile-add-tomorrow",
+        VOLATILE,
+        commit.package(),
+    )?;
     let commit = native
         .edit_table_cell_conditional_highlights(0usize, 0usize)?
         .clear(At::new(2, 0))?
         .commit()?;
-    writer.emit("numbers-native-volatile-clear-middle", VOLATILE, commit.package())?;
+    writer.emit(
+        "numbers-native-volatile-clear-middle",
+        VOLATILE,
+        commit.package(),
+    )?;
     Ok(())
 }
 

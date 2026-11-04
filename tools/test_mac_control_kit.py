@@ -79,5 +79,30 @@ class AddTests(unittest.TestCase):
                 control_kit.add_packages(kit, listing)
 
 
+class NoUuidMapVariantTests(unittest.TestCase):
+    """Record 0433: the date-ladder control without the engine's map entries."""
+
+    def test_only_the_map_changes(self) -> None:
+        native = (ROOT / "test-data/iwork/numbers/volatile-highlight-native.numbers").read_bytes()
+        variant = control_kit.Package(control_kit.variant_no_uuid_map(native))
+        source = control_kit.Package(native)
+
+        def engine(package: control_kit.Package) -> list:
+            for _, item in package.objects():
+                for message in item["messages"]:
+                    if next(v for n, _, v in message["info"] if n == 1) == control_kit.CALCULATION_ENGINE:
+                        return control_kit.fields(message["data"])
+            raise AssertionError("no engine")
+
+        before = engine(source)
+        after = engine(variant)
+        self.assertNotEqual([v for n, _, v in before if n == control_kit.UUID_REFERENCE_MAP], [b""])
+        self.assertEqual([v for n, _, v in after if n == control_kit.UUID_REFERENCE_MAP], [b""])
+        self.assertEqual(
+            [item for item in before if item[0] != control_kit.UUID_REFERENCE_MAP],
+            [item for item in after if item[0] != control_kit.UUID_REFERENCE_MAP],
+        )
+
+
 if __name__ == "__main__":
     unittest.main()
