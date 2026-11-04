@@ -525,7 +525,8 @@ fn leaf_allocator_avoids_the_host_owner_map_collision() {
         differing,
         [
             "chart-arrangement-native.numbers",
-            "shared-model-native.numbers"
+            "shared-model-native.numbers",
+            "volatile-highlight-native.numbers"
         ]
     );
 }

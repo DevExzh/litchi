@@ -105,6 +105,10 @@ pub struct Source<'a> {
     pub row: u32,
     /// The cell column.
     pub column: u32,
+    /// Whether the first volatile rule may give an existing family's
+    /// conditional-style owner its set and tile (Numbers' own shape, record
+    /// 0432). Only Numbers has native evidence.
+    pub creates_first_tile: bool,
 }
 
 /// One object the family creates.
@@ -133,6 +137,10 @@ pub struct Edit {
     /// `ArchiveInfo` references, with a `[2, 6]` object-reference field
     /// info).
     pub engine_references: Vec<u64>,
+    /// `(owner, tile)`: a created tile an existing owner now references
+    /// (append to the owner's `ArchiveInfo` references, with a `[13, 1]`
+    /// object-reference field info).
+    pub owner_references: Vec<(u64, u64)>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -612,7 +620,15 @@ pub fn ensure<'a>(
             .find(|facts| facts.uid == style_uid)
             .ok_or(Error::IncompleteFamily)?;
         let record = host_record(source, style.internal, table.internal);
-        return append(source, owner, &record, table.uid, true, object, limits);
+        return append(
+            source,
+            owner,
+            &record,
+            table.uid,
+            Some(next_identifier),
+            object,
+            limits,
+        );
     }
     let payloads: Vec<&[u8]> = source.owners.iter().map(|owner| owner.payload).collect();
     let first_internal =
@@ -726,6 +742,7 @@ pub fn ensure<'a>(
         payloads: vec![(source.engine.identifier, engine)],
         created,
         engine_references: owner_ids,
+        owner_references: Vec::new(),
     })
 }
 
@@ -796,21 +813,29 @@ pub fn remove<'a>(
         return Ok(Edit::default());
     };
     let table = table_owner(source, limits)?;
-    append(source, owner, &[], table.uid, false, object, limits)
+    append(source, owner, &[], table.uid, None, object, limits)
 }
 
 /// The shared append/remove of one host record on the conditional-style
-/// owner (`add`), its volatile-time set, its UUID references and its tile,
-/// with the engine's formula count.
+/// owner, its volatile-time set, its UUID references and its tile, with the
+/// engine's formula count. `add` holds the next free identifier when adding.
+///
+/// Every Numbers-saved table already registers the whole owner family; only
+/// its conditional-style owner has no volatile-time set and no tile until the
+/// first volatile rule (compare `basic.numbers` with
+/// `volatile-highlight-native.numbers`, record 0432). The first add creates
+/// them as Numbers does.
 fn append<'a>(
     source: Source<'a>,
     owner: Object<'_>,
     record: &[u8],
     table_uid: Uuid,
-    add: bool,
+    add: Option<u64>,
     object: &dyn Fn(u64) -> Option<&'a [u8]>,
     limits: &Limits,
 ) -> Result<Edit> {
+    let next_identifier = add;
+    let add = add.is_some();
     let row = i64::from(source.row);
     let column = source.column;
     let mut cells = Vec::new();
@@ -839,6 +864,7 @@ fn append<'a>(
     }
     let mut rebuilt = Vec::new();
     let mut tile = None;
+    let mut created_tile = None;
     for field in fields(owner.payload, limits).map_err(|_| Error::InvalidSource)? {
         match field.number {
             4 => message_field(&mut rebuilt, 4, &cells.concat()),
@@ -860,7 +886,18 @@ fn append<'a>(
                     }
                 }
                 if !seen {
-                    return Err(Error::IncompleteFamily);
+                    if !add || !source.creates_first_tile {
+                        return Err(Error::IncompleteFamily);
+                    }
+                    // Field 1 first, as Numbers writes the message.
+                    let mut first = Vec::new();
+                    message_field(
+                        &mut first,
+                        1,
+                        &Coordinates::single(source.row, column).encode(),
+                    );
+                    first.extend_from_slice(&volatile);
+                    volatile = first;
                 }
                 message_field(&mut rebuilt, 6, &volatile);
             },
@@ -927,10 +964,48 @@ fn append<'a>(
                     .transpose()
                     .map_err(|_| Error::InvalidSource)?
                     .flatten();
-                rebuilt.extend_from_slice(field.raw);
+                match (tile, next_identifier) {
+                    (None, Some(identifier))
+                        if field.payload.is_empty() && source.creates_first_tile =>
+                    {
+                        let mut tiled = Vec::new();
+                        message_field(&mut tiled, 1, &reference(identifier));
+                        message_field(&mut rebuilt, 13, &tiled);
+                        created_tile = Some(identifier);
+                    },
+                    _ => rebuilt.extend_from_slice(field.raw),
+                }
             },
             _ => rebuilt.extend_from_slice(field.raw),
         }
+    }
+    if let Some(identifier) = created_tile {
+        let internal = single_varint(owner.payload, 2, limits)
+            .map_err(|_| Error::InvalidSource)?
+            .and_then(|internal| u32::try_from(internal).ok())
+            .ok_or(Error::InvalidSource)?;
+        let engine = formula_graph::append_owners_to_engine(
+            source.engine.payload,
+            &[],
+            &[],
+            1,
+            &formula_graph::Limits::DEFAULT,
+        )
+        .map_err(Error::Rewrite)?;
+        return Ok(Edit {
+            payloads: vec![
+                (source.engine.identifier, engine),
+                (owner.identifier, rebuilt),
+            ],
+            created: vec![Created {
+                identifier,
+                message_type: 4_009,
+                payload: tile_payload(internal, &[record.to_vec()]),
+                references: Vec::new(),
+            }],
+            engine_references: Vec::new(),
+            owner_references: vec![(owner.identifier, identifier)],
+        });
     }
     let tile = tile.ok_or(Error::IncompleteFamily)?;
     let tile_payload = object(tile).ok_or(Error::IncompleteFamily)?;
@@ -992,6 +1067,7 @@ fn append<'a>(
         ],
         created: Vec::new(),
         engine_references: Vec::new(),
+        owner_references: Vec::new(),
     })
 }
 
@@ -1073,6 +1149,7 @@ mod tests {
             conditional_owner: CONDITIONAL_UID,
             row: 1,
             column: 1,
+            creates_first_tile: false,
         }
     }
 

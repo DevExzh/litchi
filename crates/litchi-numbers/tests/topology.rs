@@ -507,6 +507,7 @@ fn corpus_tables_round_trip_or_refuse_typed() -> TestResult {
             | Unsupported::Merges
             | Unsupported::Filters
             | Unsupported::Categories
+            | Unsupported::Pivot
             | Unsupported::StorageLayout
     )));
     Ok(())
