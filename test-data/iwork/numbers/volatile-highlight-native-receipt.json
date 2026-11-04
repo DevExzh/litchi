@@ -1,0 +1,27 @@
+{
+  "application": "Numbers",
+  "version": "14.4",
+  "macos": "26.5.2 (25F84)",
+  "verification_date": "2026-11-04",
+  "authored_by": "the repository owner, by hand, in Numbers 14.4",
+  "file": "volatile-highlight-native.numbers",
+  "authored_as": "volatile-is-today-native.numbers",
+  "size": 138300,
+  "sha256": "ab580f5b4dc7f4977ff03adec4f530352ab9c84d9af72c74157b643cf8df7062",
+  "sheet": "Sheet 1",
+  "table": "Table 1",
+  "timezone": "Asia/Shanghai",
+  "cells": {
+    "A2": "2026-11-04 (today when authored)",
+    "A3": "2026-11-03 (yesterday)",
+    "A4": "2026-11-05 (tomorrow)"
+  },
+  "rule": {
+    "range": "A2:A4",
+    "condition": "Date is today",
+    "fill": "Red Fill"
+  },
+  "observed": "Only the today cell was highlighted, before and after close and reopen.",
+  "note": "The queue row asked for B2 and a second file with C3 is tomorrow; this file holds the rule on A2:A4 and no second file was delivered.",
+  "scope": "Native volatile-highlight evidence for record 0432. Screenshots, accessibility dumps and the full receipt are kept outside the repository."
+}
