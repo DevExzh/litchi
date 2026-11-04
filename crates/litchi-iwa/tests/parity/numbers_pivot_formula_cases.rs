@@ -348,3 +348,46 @@ fn numbers_pivot_formula_author_cost_abba() -> TestResult {
     }
     Ok(())
 }
+
+/// The native pivot workbook (record 0432): the host reads only each column's
+/// first function, the leaf all 13; both write a category formula on the
+/// source table and on a pivot body cell.
+#[test]
+fn numbers_native_pivot_formula_host_and_leaf_both_write() -> TestResult {
+    use litchi_numbers::table::pivot::Aggregate;
+    let input =
+        crate::harness::fixture("iwork/numbers/pivot-all-summary-functions-native.numbers")?;
+    let host_categories = numbers::Draft::from_bytes(&input.bytes)?.pivot_categories()?;
+    let package = litchi_numbers::Package::from_bytes(&input.bytes)?;
+    let categories = package.pivot_categories()?;
+    assert_eq!(host_categories.len(), 13);
+    assert_eq!(categories.len(), 169);
+    let sum = categories
+        .iter()
+        .filter(|category| category.aggregate() == Aggregate::Sum)
+        .collect::<Vec<_>>();
+    assert_eq!(sum.len(), host_categories.len());
+    for (index, (model, sheet, row, column)) in
+        [(904_538_u64, 0_usize, 1_usize, 2_usize), (906_406, 1, 2, 1)]
+            .into_iter()
+            .enumerate()
+    {
+        let mut host = numbers::Draft::from_bytes(&input.bytes)?;
+        host.set_formula_with_cached_value(
+            model,
+            row,
+            column,
+            FormulaExpression::pivot_category(host_categories[index].reference),
+            FormulaCachedValue::number(1.0)?,
+        )?;
+        package
+            .edit_table_cells(sheet, 0usize)?
+            .set_formula_cached(
+                At::new(u32::try_from(row)?, u32::try_from(column)?),
+                Expression::pivot_category(sum[index]),
+                CachedValue::number(1.0)?,
+            )?
+            .commit()?;
+    }
+    Ok(())
+}

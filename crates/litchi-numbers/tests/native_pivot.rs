@@ -380,9 +380,8 @@ fn native_pivot_category_formula_on_source_table_keeps_each_function() -> TestRe
     Ok(())
 }
 
-/// A scalar over a pivot body cell, which holds a category formula: Numbers'
-/// UI does not edit pivot cells and the host has no scalar setter. The refusal
-/// is typed and nothing is published.
+/// A scalar over a pivot body cell, which holds a category formula. The host
+/// has no scalar setter; the refusal is typed and nothing is published.
 #[test]
 fn native_pivot_body_scalar_is_refused_without_publishing() -> TestResult {
     let package = Package::open(fixture())?;

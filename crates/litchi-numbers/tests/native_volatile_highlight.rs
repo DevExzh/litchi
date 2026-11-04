@@ -195,3 +195,92 @@ fn clearing_inside_a_native_range_splits_it() -> TestResult {
     assert_eq!(count, 7);
     Ok(())
 }
+
+/// The file before Numbers wrote its rule is not available, but `basic.numbers`
+/// registers the same 13 owners; the first volatile rule gives the
+/// conditional-style owner the set, UUID reference and tile Numbers gives it.
+#[test]
+fn first_volatile_rule_on_a_numbers_saved_table_builds_what_numbers_builds() -> TestResult {
+    let basic = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../test-data/iwork/numbers/basic.numbers");
+    let package = Package::open(basic)?;
+    let source = exact_bytes(&package)?;
+    let at = At::new(1, 1);
+    let rule = fill_rule(Condition::DateIsToday)?;
+    let commit = package
+        .edit_table_cell_conditional_highlights(0usize, 0usize)?
+        .set(at, [rule.clone()])?
+        .commit()?;
+    let bytes = exact_bytes(commit.package())?;
+    let reopened = Package::from_bytes(&bytes)?;
+    assert_eq!(
+        reopened.table_cell_conditional_highlight(0usize, 0usize, at)?,
+        Some(vec![rule])
+    );
+    let owner_of =
+        |source: &[u8], kind: u32| -> TestResult<tsce::FormulaOwnerDependenciesArchive> {
+            for object in &engine(source)?.objects {
+                for message in &object.messages {
+                    if message.type_ == 4_008 {
+                        let owner =
+                            tsce::FormulaOwnerDependenciesArchive::decode(message.data.as_slice())?;
+                        if owner.owner_kind == Some(kind) {
+                            return Ok(owner);
+                        }
+                    }
+                }
+            }
+            Err(io::Error::other("no owner").into())
+        };
+    // The same 13 owners, and only the conditional-style owner changed.
+    for kind in [1, 4, 5, 6, 7, 8, 9, 10, 11, 12, 35, 200] {
+        assert_eq!(owner_of(&source, kind)?, owner_of(&bytes, kind)?, "{kind}");
+    }
+    // The shape Numbers wrote for its own first rule.
+    let native = owner_of(&std::fs::read(fixture())?, 3)?;
+    let written = owner_of(&bytes, 3)?;
+    let shape = |owner: &tsce::FormulaOwnerDependenciesArchive| {
+        (
+            owner.cell_dependencies.as_ref().map(|cells| {
+                cells.cell_record[0]
+                    .expanded_edges
+                    .as_ref()
+                    .map(|edges| edges.edge_with_owner_rows.len())
+            }),
+            owner
+                .tiled_cell_dependencies
+                .as_ref()
+                .map(|tiled| tiled.cell_record_tiles.len()),
+            owner
+                .uuid_references
+                .as_ref()
+                .map(|refs| refs.table_refs.len()),
+        )
+    };
+    assert_eq!(shape(&written), shape(&native));
+    let (cells, count) = volatile_state(&bytes)?;
+    assert_eq!(cells, [(1, vec![1])]);
+    assert_eq!(count, volatile_state_count(&source)? + 1);
+    // Inverse.
+    let restored = commit
+        .package()
+        .apply_table_cell_conditional_highlights(&commit.patch().inverse())?;
+    assert_eq!(exact_bytes(restored.package())?, source);
+    Ok(())
+}
+
+fn volatile_state_count(source: &[u8]) -> TestResult<u64> {
+    for object in &engine(source)?.objects {
+        for message in &object.messages {
+            if message.type_ == 4_000 {
+                let archive = tsce::CalculationEngineArchive::decode(message.data.as_slice())?;
+                return archive
+                    .dependency_tracker
+                    .number_of_formulas
+                    .map(u64::from)
+                    .ok_or_else(|| io::Error::other("no formula count").into());
+            }
+        }
+    }
+    Err(io::Error::other("no engine").into())
+}

@@ -83,6 +83,7 @@ fn plan<P: TableLeaf>(
         conditional_owner: Uuid::new(owner.lower, owner.upper),
         row: position.row(),
         column: position.column(),
+        creates_first_tile: P::CREATES_FIRST_VOLATILE_TILE,
     };
     let object = |identifier: u64| first_message(working, identifier);
     let limits = litchi_numbers_wire::Limits::DEFAULT;
@@ -167,6 +168,24 @@ fn publish<P: TableLeaf>(
     for (identifier, payload) in edit.payloads {
         let index = 0;
         super::cells::replace_message(change.working, identifier, index, payload)?;
+    }
+    for (owner, tile) in edit.owner_references {
+        let info = change
+            .working
+            .object_mut(owner)?
+            .archive_info
+            .message_infos
+            .first_mut()
+            .ok_or(Error::InvalidSource)?;
+        structure::reserve(&mut info.object_references, 1)?;
+        info.object_references.push(tile);
+        structure::reserve(&mut info.field_infos, 1)?;
+        info.field_infos.push(FieldInfo {
+            path: FieldPath { path: vec![13, 1] },
+            r#type: Some(FieldType::ObjectReference),
+            unknown_field_rule: Some(UnknownFieldRule::IgnoreAndPreserveUntilModified),
+            ..Default::default()
+        });
     }
     if !edit.engine_references.is_empty() {
         let info = change

@@ -7279,22 +7279,46 @@ mod tests {
             ..Default::default()
         }
         .encode_to_vec();
-        let active_table_source = CacheSource {
-            owners: &[
-                DependencyPayload {
-                    identifier: 1,
-                    bytes: &selected,
-                },
-                DependencyPayload {
-                    identifier: 2,
-                    bytes: &active_table,
-                },
-            ],
-            ..source
-        };
+        // Another table's formula on the selected table: the edit dirties a
+        // formula this route has no geometry to recompute.
+        let reaching_tile = tsce::CellRecordTileArchive {
+            internal_owner_id: external_owner,
+            tile_column_begin: 0,
+            tile_row_begin: 0,
+            cell_records: vec![tsce::CellRecordExpandedArchive {
+                row: 0,
+                column: 1,
+                expanded_edges: Some(tsce::ExpandedEdgesArchive {
+                    edge_with_owner_rows: vec![0],
+                    edge_with_owner_columns: vec![0],
+                    internal_owner_id_for_edge: vec![OWNER],
+                    ..Default::default()
+                }),
+                ..Default::default()
+            }],
+        }
+        .encode_to_vec();
+        let active_owners = [
+            DependencyPayload {
+                identifier: 1,
+                bytes: &selected,
+            },
+            DependencyPayload {
+                identifier: 2,
+                bytes: &active_table,
+            },
+        ];
+        let reaching_tiles = [DependencyPayload {
+            identifier: 98,
+            bytes: &reaching_tile,
+        }];
         assert!(matches!(
             plan_final_cache(
-                active_table_source,
+                CacheSource {
+                    owners: &active_owners,
+                    record_tiles: &reaching_tiles,
+                    ..source
+                },
                 &overlay,
                 limits(),
                 &Baseline(Vec::new()),
@@ -7302,6 +7326,32 @@ mod tests {
             ),
             Err(Error::UnsupportedDependency(Unsupported::MissingOwner))
         ));
+
+        // Another table's formula that cannot be reached, as a native pivot's
+        // body from its source table (record 0432): it needs no geometry.
+        let unreached_tile = tsce::CellRecordTileArchive {
+            internal_owner_id: external_owner,
+            tile_column_begin: 0,
+            tile_row_begin: 0,
+            cell_records: vec![record(1, &[0], false)],
+        }
+        .encode_to_vec();
+        let unreached_tiles = [DependencyPayload {
+            identifier: 98,
+            bytes: &unreached_tile,
+        }];
+        plan_final_cache(
+            CacheSource {
+                owners: &active_owners,
+                record_tiles: &unreached_tiles,
+                ..source
+            },
+            &overlay,
+            limits(),
+            &Baseline(Vec::new()),
+            &mut evaluator,
+        )
+        .expect("an unreachable foreign formula needs no geometry");
     }
 
     #[test]
