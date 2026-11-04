@@ -20,6 +20,8 @@ use prost::Message;
 const NATIVE_CHART: &[u8] =
     include_bytes!("../../../test-data/iwork/numbers/chart-data-native.numbers");
 const NATIVE_BASIC: &[u8] = include_bytes!("../../../test-data/iwork/numbers/basic.numbers");
+const NATIVE_CAPTION: &[u8] =
+    include_bytes!("../../../test-data/iwork/numbers/chart-caption-native.numbers");
 const PACKAGE_METADATA: u32 = 11_006;
 
 type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
@@ -112,6 +114,37 @@ fn bytes(package: &Package) -> TestResult<Vec<u8>> {
 fn native_files_list_every_cross_component_reference() -> TestResult {
     assert_eq!(unlisted_references(NATIVE_BASIC)?, Vec::new());
     assert_eq!(unlisted_references(NATIVE_CHART)?, Vec::new());
+    assert_eq!(unlisted_references(NATIVE_CAPTION)?, Vec::new());
+    Ok(())
+}
+
+/// The caption Numbers 14.4 wrote (record 0433) reads back, and the leaf's
+/// replacement and removal keep the file's references listed.
+#[test]
+fn native_chart_caption_reads_and_edits() -> TestResult {
+    let selector = DrawableSelector::of(Kind::Chart, 0);
+    let package = Package::from_bytes(NATIVE_CAPTION)?;
+    assert_eq!(
+        package
+            .sheet_drawable_caption(0, selector, Label::Caption)?
+            .as_deref(),
+        Some("Native caption")
+    );
+    let mut edit = package.edit_sheet_drawable_caption(0, selector, Label::Caption)?;
+    edit.set("Replaced")?;
+    let replaced = edit.commit()?;
+    let bytes_replaced = bytes(replaced.package())?;
+    assert_eq!(unlisted_references(&bytes_replaced)?, Vec::new());
+    assert_eq!(
+        Package::from_bytes(&bytes_replaced)?
+            .sheet_drawable_caption(0, selector, Label::Caption)?
+            .as_deref(),
+        Some("Replaced")
+    );
+    let mut edit = package.edit_sheet_drawable_caption(0, selector, Label::Caption)?;
+    edit.clear()?;
+    let cleared = bytes(edit.commit()?.package())?;
+    assert_eq!(unlisted_references(&cleared)?, Vec::new());
     Ok(())
 }
 

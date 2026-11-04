@@ -662,7 +662,7 @@ fn kind_and_count(
     charge_metadata_report(budget, report)?;
     let kind = ChartKind::from_native(snapshot.chart_type());
     let series =
-        engine::visible_series(kind, snapshot.series_count()).ok_or(Error::InvalidSource)?;
+        engine::visible_series(kind, snapshot.series_components()).ok_or(Error::InvalidSource)?;
     Ok((kind, series))
 }
 

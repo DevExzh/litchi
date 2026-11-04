@@ -1205,7 +1205,7 @@ fn target_with_metadata(
     };
     charge_metadata_report(budget, report)?;
     let kind = ChartKind::from_native(snapshot.chart_type());
-    let series = series_count(kind, snapshot.series_count())?;
+    let series = series_count(kind, snapshot.series_components())?;
     Ok(Target {
         chart,
         kind,

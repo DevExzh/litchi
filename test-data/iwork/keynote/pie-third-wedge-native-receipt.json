@@ -1,0 +1,14 @@
+{
+  "application": "Keynote",
+  "version": "14.4",
+  "macos": "26.5.2 (25F84)",
+  "verification_date": "2026-11-05",
+  "authored_by": "the repository owner, by hand, in Keynote 14.4",
+  "file": "pie-third-wedge-native.key",
+  "authored_as": "native-pie-third-wedge.key",
+  "size": 487003,
+  "sha256": "c622bd5284bfc74678c2335b6d68a758a32b083fd575fdf4cafe53ae7822a15c",
+  "steps": "New presentation, insert a 2D pie chart, select only the third wedge, set Format > Wedges > Wedge Explosion to 25%, save.",
+  "chart": "One pie chart on the first slide, with six wedges",
+  "scope": "Native sparse series-array evidence for record 0433: six wedges, one override on the third, stored count 3. The full run output stays outside the repository."
+}
