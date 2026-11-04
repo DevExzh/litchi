@@ -16,7 +16,9 @@ Steps:
    `mac_queue`). Leaf rows take the leaf output, host rows the host output.
 2. `cargo run -p litchi-ops --example mac_queue_file_routes` writes the
    `litchi_ops::File` rows' packages (and the two builder documents) to
-   `<out>/raw/example`.
+   `<out>/raw/example`, and `cargo run -p litchi-numbers --example
+   mac_queue_native_routes` the packages of the routes proven on a workbook
+   Numbers saved.
 3. Every row is mapped (`rows.map_row`) to its sources; the packages are
    deduplicated by SHA-256 into `<out>/packages/<App>/`, and
    `<out>/manifest.json` and `<out>/queue.tsv` (the Mac runner's input) are
@@ -81,6 +83,8 @@ def build(out: Path, root: Path = ROOT) -> None:
         (["cargo", "test", "-p", "litchi-iwa", "--all-features", "--test", "parity"], env),
         (["cargo", "run", "-q", "-p", "litchi-ops", "--features", "pages,keynote,numbers",
           "--example", "mac_queue_file_routes", "--", str(raw / "example")], dict(os.environ)),
+        (["cargo", "run", "-q", "-p", "litchi-numbers",
+          "--example", "mac_queue_native_routes", "--", str(raw / "example")], dict(os.environ)),
     ]
     for command, environment in commands:
         print("+", " ".join(command), file=sys.stderr)
@@ -146,15 +150,16 @@ class ParityDumps:
 def load_example_dumps(directory: Path) -> dict[str, dict]:
     """Example stem -> its JSON line plus the package path."""
     stems: dict[str, dict] = {}
-    listing = directory / "file-routes.jsonl"
-    if not listing.is_file():
-        return stems
-    for line in listing.read_text(encoding="utf-8").splitlines():
-        if not line.strip():
+    for name in ("file-routes.jsonl", "native-routes.jsonl"):
+        listing = directory / name
+        if not listing.is_file():
             continue
-        record = json.loads(line)
-        record["path"] = directory / f"{record['stem']}.file.{record['extension']}"
-        stems[record["stem"]] = record
+        for line in listing.read_text(encoding="utf-8").splitlines():
+            if not line.strip():
+                continue
+            record = json.loads(line)
+            record["path"] = directory / f"{record['stem']}.file.{record['extension']}"
+            stems[record["stem"]] = record
     return stems
 
 

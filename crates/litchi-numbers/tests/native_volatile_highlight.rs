@@ -10,7 +10,7 @@ use std::path::PathBuf;
 use litchi_iwa_archive::package::Catalog;
 use litchi_iwa_common::color::{RgbColorSpace, Rgba};
 use litchi_iwa_core::{Archive, SnappyStream};
-use litchi_iwa_protos::tsce;
+use litchi_iwa_protos::{tsce, tst};
 use litchi_numbers::Package;
 use litchi_numbers::cell::conditional_highlight::{Condition, Rule, Style};
 use litchi_numbers::table::At;
@@ -200,6 +200,60 @@ fn native_second_rule_reads_in_order() -> TestResult {
     assert_eq!(cells, [(0, vec![1, 2, 3])]);
     assert_eq!(count, 8);
     Ok(())
+}
+
+/// The two rules the leaf writes on A2 hold the predicates Numbers wrote there:
+/// a rule set of its own, the same conditions, and no new volatile cell.
+#[test]
+fn leaf_second_rule_matches_what_numbers_wrote() -> TestResult {
+    let second = std::fs::read(
+        PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../../test-data/iwork/numbers/volatile-highlight-native-second.numbers"),
+    )?;
+    let at = At::new(1, 0);
+    let rules = Package::from_bytes(&second)?
+        .table_cell_conditional_highlight(0usize, 0usize, at)?
+        .ok_or_else(|| io::Error::other("no rule on A2"))?;
+    let package = Package::open(fixture())?;
+    let bytes = exact_bytes(
+        package
+            .edit_table_cell_conditional_highlights(0usize, 0usize)?
+            .set(at, rules.clone())?
+            .commit()?
+            .package(),
+    )?;
+    assert_eq!(
+        Package::from_bytes(&bytes)?.table_cell_conditional_highlight(0usize, 0usize, at)?,
+        Some(rules)
+    );
+    assert_eq!(two_rule_predicates(&bytes)?, two_rule_predicates(&second)?);
+    let (cells, count) = volatile_state(&bytes)?;
+    assert_eq!(cells, [(0, vec![1, 2, 3])]);
+    assert_eq!(count, 8);
+    Ok(())
+}
+
+/// The predicates of every two-rule set of the file's conditional-style list.
+fn two_rule_predicates(source: &[u8]) -> TestResult<Vec<tst::FormulaPredicateArchive>> {
+    let catalog = Catalog::from_bytes(source, Default::default())?;
+    let mut output = Vec::new();
+    for entry in catalog.iter() {
+        if !entry.name().ends_with(".iwa") {
+            continue;
+        }
+        let stream = SnappyStream::decompress(entry.data(), Default::default())?;
+        let archive = Archive::parse(stream.as_bytes(), Default::default())?;
+        for message in archive.objects.iter().flat_map(|object| &object.messages) {
+            if message.type_ == 6_010 {
+                let set = tst::ConditionalStyleSetArchive::decode(message.data.as_slice())?;
+                let rules = set.rules.map(|rules| rules.rule).unwrap_or_default();
+                if rules.len() == 2 {
+                    output.extend(rules.into_iter().filter_map(|rule| rule.predicate));
+                }
+            }
+        }
+    }
+    Ok(output)
 }
 
 /// A new volatile rule registers in Numbers' family, and clearing it restores
