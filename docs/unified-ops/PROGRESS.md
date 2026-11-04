@@ -7647,3 +7647,13 @@ See [0063](0063-source-pptx-modern-comments.md).
 - `litchi-iwa` now has no dependents in the workspace; only its own tests, the parity harness and its examples use it. W3 (deleting the crate, its parity harness and the gate rows that reference it) is mechanical. It still waits on the macOS queue (`0363-mac-queue.md`), which must run on a Mac.
 - Merged 0430 (`2d74fc4d06`), the macOS queue runbook. `tools/mac_queue/generate.py` maps all 766 queue rows to 1,153 distinct packages, plus 2 native-authoring rows. `run_on_mac.sh` does the open, Save As, close, reopen and PDF export through osascript, and `apply_results.py` folds the results back into the queue. The generated packages (262 MB), the 798 host-built inputs (175 MB) and the manifest stay outside the repository in `.coord/mac-runbook/out/`. The runner is untested on a real Mac, so the owner should start with a small `--only` run per app. Step-by-step instructions are in `docs/unified-ops/0430-mac-queue-runbook.md`.
 - The W3 deletion branch (`uo2/iwa-w3`, record 0429) is being prepared and held. It snapshots the host-built inputs from `.coord/mac-runbook/out/` and is not merged until the macOS queue passes.
+
+## macOS queue run 1 (2026-11-04)
+- The owner ran `tools/mac_queue/run_on_mac.sh` on the 0430 packages: Keynote, Pages and Numbers 14.4 on macOS 26.5.2. Results are in `docs/unified-ops/results/0430/results.tsv`, folded into `0363-mac-queue.md` with `apply_results.py`.
+- Packages: 1,138 pass, 15 fail. Queue rows: 755 pass, 9 FAIL, 2 native-authoring rows still pending. All package hashes match the manifest.
+- Failures cluster in three groups:
+  - pie wedge-explosion and leader-line writes, the same case on all three formats (7 packages, save stage: the app's `open` returned no document);
+  - Numbers chart captions on the host-built chart fixtures (4 packages, save stage);
+  - synthetic Numbers pivot fixtures (4 packages, open stage: error -609, the app connection dropped).
+- 12 further packages timed out once right after a failing package and passed on retry; the retries count.
+- W3 stays held. Diagnosis is in progress: whether each failure is a leaf defect, a host defect, or a test input that Numbers never accepted.
