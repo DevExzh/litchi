@@ -5,6 +5,7 @@ Three modes, all without third-party modules:
 
     control_kit.py audit FILE...          sparse arrays and unlisted references
     control_kit.py build --queue-out OUT --fixed DUMP --native TEST_DATA --out KIT
+    control_kit.py add KIT LIST           add another record's packages to a kit
     control_kit.py analyze KIT RESULTS    expected against actual Mac outcomes
 
 `audit` reports the two structural rules the failures isolate: an entry of a
@@ -14,6 +15,11 @@ in `external_references`. `build` writes a directory that
 `tools/mac_queue/run_on_mac.sh` runs (same `queue.tsv` layout as the 0430
 output). It reads OUT, which it never writes. `analyze` never touches the
 queue: a queue row passes only on a queue package's Mac result.
+
+`add` takes a TSV with the header `id app file expect source`. `file` is relative
+to the list; `expect` is opens, refused, crash or unknown. It refuses an id or a
+file hash already in the kit, and an existing kit keeps its order: added packages
+run last, so a kit's own controls still run first. Re-tar the kit afterwards.
 """
 
 from __future__ import annotations
@@ -630,6 +636,54 @@ class Kit:
         shutil.copy2(Path(__file__).parent / "run_on_mac.sh", self.out / "run_on_mac.sh")
 
 
+def add_packages(kit: Path, listing: Path) -> int:
+    """Append the packages of `listing` to the kit; nothing is written on a refusal."""
+    manifest_path = kit / "manifest.json"
+    manifest = json.loads(manifest_path.read_text())
+    rows = manifest["packages"]
+    ids = {row["id"] for row in rows}
+    hashes = {row["sha256"] for row in rows}
+    additions = []
+    with listing.open(encoding="utf-8", newline="") as source:
+        for line in csv.DictReader(source, delimiter="\t", quoting=csv.QUOTE_NONE):
+            if line["app"] not in EXTENSION:
+                raise ValueError(f"{line['id']}: unknown app {line['app']}")
+            if line["expect"] not in {"opens", "refused", "crash", "unknown"}:
+                raise ValueError(f"{line['id']}: unknown expectation {line['expect']}")
+            data = (listing.parent / line["file"]).read_bytes()
+            digest = hashlib.sha256(data).hexdigest()
+            if line["id"] in ids or digest in hashes:
+                raise ValueError(f"{line['id']}: id or bytes already in the kit")
+            Package(data)
+            ids.add(line["id"])
+            hashes.add(digest)
+            additions.append((line, data, digest))
+    with (kit / "queue.tsv").open("a", encoding="utf-8") as queue:
+        for line, data, digest in additions:
+            path = f"packages/{line['app']}/{line['id']}.{EXTENSION[line['app']]}"
+            target = kit / path
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_bytes(data)
+            queue.write(f"{line['id']}\t{line['app']}\t{path}\t{digest}\t0\n")
+            rows.append(
+                {
+                    "id": line["id"],
+                    "group": "added",
+                    "failing": "",
+                    "kind": "added",
+                    "app": line["app"],
+                    "path": path,
+                    "sha256": digest,
+                    "size": len(data),
+                    "expect": line["expect"],
+                    "source": line["source"],
+                }
+            )
+    manifest_path.write_text(json.dumps(manifest, indent=1) + "\n")
+    print(f"added {len(additions)} packages; {len(rows)} in the kit")
+    return 0
+
+
 def analyze(kit: Path, results: Path) -> int:
     rows = json.loads((kit / "manifest.json").read_text())["packages"]
     last = {}
@@ -661,6 +715,9 @@ def main() -> int:
     build.add_argument("--fixed", type=Path, required=True)
     build.add_argument("--native", type=Path, required=True)
     build.add_argument("--out", type=Path, required=True)
+    extra = commands.add_parser("add")
+    extra.add_argument("kit", type=Path)
+    extra.add_argument("listing", type=Path)
     check = commands.add_parser("analyze")
     check.add_argument("kit", type=Path)
     check.add_argument("results", type=Path)
@@ -672,6 +729,8 @@ def main() -> int:
             print("  sparse (chart, count, indexes):", sparse_arrays(package))
             print("  unlisted (owner, type, target, type):", unlisted_references(package))
         return 0
+    if arguments.command == "add":
+        return add_packages(arguments.kit, arguments.listing)
     if arguments.command == "analyze":
         return analyze(arguments.kit, arguments.results)
     if arguments.out.exists():

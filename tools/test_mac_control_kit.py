@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import json
+import shutil
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -53,6 +56,27 @@ class AuditTests(unittest.TestCase):
             control_kit.variant_sparse_count(CHART.read_bytes(), 3)
         with self.assertRaises(ValueError):
             control_kit.variant_drop_objects(BASIC.read_bytes(), {1})
+
+
+class AddTests(unittest.TestCase):
+    def test_add_appends_and_refuses_a_repeat(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            kit = root / "kit"
+            kit.mkdir()
+            (kit / "manifest.json").write_text(json.dumps({"packages": []}))
+            (kit / "queue.tsv").write_text("package_id\tapp\tpath\tsha256\trows\n")
+            shutil.copy2(BASIC, root / "extra.numbers")
+            listing = root / "list.tsv"
+            listing.write_text(
+                "id\tapp\tfile\texpect\tsource\n"
+                "N-1\tNumbers\textra.numbers\topens\ta test\n"
+            )
+            self.assertEqual(control_kit.add_packages(kit, listing), 0)
+            self.assertTrue((kit / "packages/Numbers/N-1.numbers").is_file())
+            self.assertIn("N-1\tNumbers", (kit / "queue.tsv").read_text())
+            with self.assertRaises(ValueError):
+                control_kit.add_packages(kit, listing)
 
 
 if __name__ == "__main__":
