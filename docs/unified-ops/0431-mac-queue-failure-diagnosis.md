@@ -290,5 +290,35 @@ Follow-ups after the control run:
 
 ## 8. Gates
 
-See the branch's final report for the commands and exit codes; logs are in
-`.coord/iwa-w5/gates/`.
+Logs are in `.coord/iwa-w5/gates/` (before merging trunk) and `gates2/` (after merging
+`72ebb6e117`, record 0432). All exit 0.
+
+| Gate | Before merge | After merge |
+|---|---:|---:|
+| `cargo fmt --all --check` | 0 | 0 |
+| `cargo clippy` of the changed crates, `litchi-ops`, `litchi`, `litchi-py`, all targets and features | 0 | 0 |
+| `cargo clippy -p litchi-ops --no-default-features`: none, numbers, keynote, pages | 0 | numbers only, 0 |
+| `RUSTDOCFLAGS=-Dwarnings cargo doc` of the changed crates | 0 | not rerun |
+| `cargo test --all-features`: `litchi-iwa-protos`, `litchi-keynote`, `litchi-pages` | 0 | not rerun |
+| `cargo test --all-features`: `litchi-iwa-style`, `litchi-numbers` | 0 | 0 |
+| `cargo test -p litchi-iwa --all-features` | 0 | `--test parity` only, 0 (1192 passed, 210 ignored) |
+| `cargo test -p litchi --all-features` | 0, see below | 0 |
+| `cargo test -p litchi-ops --all-features`: `--lib`, `--doc`, every `--test` in groups of 20 | 0, see below | `--lib`, `capabilities`, `registry`: 0 |
+| `cargo test -p litchi-cli --all-features --test officecli_corpus` | not run | 0 |
+| `check_crate_boundaries`, `non_iwork_gate verify`, `check_iwork_leaf_public_api`, `iwa_exit_ledger --check`, `generate.py --check`, `unified_bench_matrix --check`, `officecli_corpus --check`, glossary | 0 | 0 |
+| `officecli_capability_delta --check`, `check_feature_matrix` | 0 | not rerun |
+| Tool unit tests | 0 | the mac, gate and 3rdparty modules, 0 |
+| `crates/pyo3-litchi/tests/run_tests.sh` | 0, see below | not rerun |
+| `tools/perf-baseline`: `cargo check --locked --all-targets` | 0 | not rerun |
+
+The first run of the `litchi` tests, the `litchi-ops` doctests and the pyo3 tests failed
+at the linker or `cp` with a `/tmp` disk-quota error, not in a test. All three passed
+when rerun unchanged with `TMPDIR` on disk (`gates/rerun.txt`), which departs from the
+`TMPDIR` the rules name. No capability or registry golden was re-blessed: no capability
+changed, and those tests pass unblessed.
+
+The merge changed no package of the kit. The fixed packages rebuilt on the merged code
+differ only in the host's random UUIDs and metadata lengths (48 same form, 2
+byte-identical), so `out2` was not rebuilt. 0432's 8 packages were not regenerated: they
+edit cells and highlights, routes this record does not touch, and none has a populated
+sparse array or an unlisted reference.
