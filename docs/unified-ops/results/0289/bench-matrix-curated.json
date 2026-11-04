@@ -3322,6 +3322,10 @@
   {
    "record": "0367",
    "reason": "Substrate constructor and retained-header return (0361fda) and W0-A owner routes: callgrind instruction counts, allocation counts and tolerant (unqualified) ABBA of raw IWA constructors against baseline ddf2ac8ae2 and of the 0361fd owner probe against trunk. These are substrate micro-routes, not leaf-versus-unified rows."
+  },
+  {
+   "record": "0433",
+   "reason": "macOS run-2 results and a table of sparse-array counts: native open, save and reopen outcomes, no leaf-versus-unified timing or allocation measurement. Its one-route callgrind probes compare a build with its base, in the record's section 12."
   }
  ]
 }
