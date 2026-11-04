@@ -284,11 +284,12 @@ fn numbers_conditional_highlight_volatile_lifecycle_parity() -> TestResult {
     Ok(())
 }
 
-/// Numbers-saved tables register the conditional-style owner without the
-/// volatile family: the host fails ("dependency tile is missing") and the
-/// leaf refuses `UnsupportedDependency`.
+/// Every Numbers-saved table registers the owner family, without the
+/// conditional-style owner's tile until its first volatile rule: the host
+/// fails ("dependency tile is missing"); the leaf builds the tile as Numbers
+/// does (record 0432).
 #[test]
-fn numbers_native_conditional_highlight_volatile_is_refused() -> TestResult {
+fn numbers_native_conditional_highlight_volatile_host_fails_leaf_registers() -> TestResult {
     for path in [
         "iwork/numbers/basic.numbers",
         "iwork/numbers/custom-number-native.numbers",
@@ -300,19 +301,19 @@ fn numbers_native_conditional_highlight_volatile_is_refused() -> TestResult {
             host.is_err(),
             "{path}: the host registered the volatile family"
         );
+        // The leaf registers it as Numbers does (record 0432): the family is
+        // there; only the conditional-style owner's tile and set are new.
         let package = litchi_numbers::Package::from_bytes(&input.bytes)?;
-        let refused = package
+        let commit = package
             .edit_table_cell_conditional_highlights(0usize, 0usize)?
-            .set(At::new(1, 1), [rule(Condition::DateIsToday)?])
-            .and_then(|edit| edit.commit().map(|_| ()));
-        assert!(
-            matches!(
-                refused,
-                Err(litchi_numbers::cell::conditional_highlight::Error::Refused(
-                    litchi_numbers::cell::conditional_highlight::Refusal::UnsupportedDependency
-                ))
-            ),
-            "{path}: {refused:?}"
+            .set(At::new(1, 1), [rule(Condition::DateIsToday)?])?
+            .commit()?;
+        assert_eq!(
+            commit
+                .package()
+                .table_cell_conditional_highlight(0usize, 0usize, At::new(1, 1))?,
+            Some(vec![rule(Condition::DateIsToday)?]),
+            "{path}"
         );
     }
     Ok(())

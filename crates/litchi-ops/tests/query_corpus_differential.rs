@@ -27,7 +27,8 @@
 //! Keynote digests (the generated `unified-ops/0294/shapes.key`, which
 //! holds a line and a group). Each digest covers, file by file, every match's kind,
 //! path, positional path and text, and every error, so a changed result set
-//! on any file changes it. Set `LITCHI_BLESS_GOLDEN=1` to write the current
+//! on any file changes it. Record 0432 re-blessed the Numbers digests
+//! (two new native fixtures). Set `LITCHI_BLESS_GOLDEN=1` to write the current
 //! build's digests instead, after showing that a change of results is
 //! intended.
 

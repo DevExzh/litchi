@@ -34,6 +34,8 @@ pub(super) type Working<'p> = litchi_iwa_table::structure::Working<'p, Package>;
 pub(super) type Published = litchi_iwa_table::structure::Published<Package>;
 
 impl litchi_iwa_table::structure::TableLeaf for Package {
+    const CREATES_FIRST_VOLATILE_TILE: bool = true;
+
     fn reopen_candidate(&self, candidate: Arc<[u8]>) -> FaultResult<Self> {
         Self::reopen_candidate(self, candidate).map_err(reopen_fault)
     }

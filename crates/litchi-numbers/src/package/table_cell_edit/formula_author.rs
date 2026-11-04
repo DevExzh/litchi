@@ -1227,7 +1227,9 @@ fn resolve_pivot(
     let found = pivots.get(&reference.key).ok_or(Error::Refused(
         crate::package::table_cells::Refusal::PivotCategoryNotFound,
     ))?;
-    if found.aggregate_type != reference.aggregate_type || found.level != reference.group_level {
+    if !found.aggregate_types.contains(&reference.aggregate_type)
+        || found.level != reference.group_level
+    {
         return Err(Error::Refused(
             crate::package::table_cells::Refusal::PivotCategoryChanged,
         ));

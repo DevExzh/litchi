@@ -4,13 +4,18 @@
 //! A pivot table's group-by (`TST.GroupByArchive`, in the calculation
 //! engine component) groups rows into a tree of group nodes; each node
 //! carries, per aggregated column, the cell coordinate of its aggregate
-//! formula. A category is one (group node, aggregated column) pair of an
-//! enabled group-by whose formula owner kind names exactly one formula
-//! owner. Pairs that two group-bys describe differently are dropped as
+//! formula. A category is one (group node, aggregated column, summary
+//! function) of an enabled group-by whose formula owner kind names exactly
+//! one formula owner. Numbers summarizes one source column by several
+//! functions with one aggregator and one `column_agg_type` per function
+//! (record 0432), so a pair can hold several functions; the host read only
+//! the first. Pairs that two group-bys describe differently are dropped as
 //! ambiguous, as the host drops them. The walk is a bounded wire read that
 //! skips messages it cannot decode, as the host's Prost decode skips them.
 
+use std::collections::hash_map::Entry;
 use std::collections::{HashMap, HashSet};
+use std::rc::Rc;
 
 use litchi_iwa_common::WireLimits;
 use litchi_iwa_common::wire::parse_wire_view;
@@ -125,8 +130,8 @@ fn label(node: &[(u32, u8, &[u8])]) -> Option<String> {
         .map(|date| last_double(&date, 1).unwrap_or(0.0).to_string())
 }
 
-/// One category's identity and the native values that must agree when two
-/// group-bys describe it.
+/// One (group node, column) pair's identity and the native values that must
+/// agree when two group-bys describe it.
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) struct Found {
     /// The group-by's internal formula owner.
@@ -135,14 +140,14 @@ pub(crate) struct Found {
     pub(crate) grouping: (u32, u32),
     /// The category's aggregate cell `(row, column)` of that owner.
     pub(crate) aggregate: (u32, u32),
-    /// The native summary-function code.
-    pub(crate) aggregate_type: u32,
+    /// The native summary-function codes, in the pivot's value order.
+    pub(crate) aggregate_types: Rc<[u32]>,
     pub(crate) level: i32,
     label: Option<String>,
 }
 
-/// Every unambiguous category of the package by its native identity (the
-/// host's `formula_pivot_categories`).
+/// Every unambiguous (group node, column) pair of the package by its native
+/// identity (the host's `formula_pivot_categories`).
 pub(crate) fn categories(package: &Package) -> Result<HashMap<CategoryKey, Found>, Error> {
     let mut engines = package
         .state
@@ -243,14 +248,28 @@ pub(crate) fn categories(package: &Package) -> Result<HashMap<CategoryKey, Found
                     .flatten()
             })
             .collect::<Vec<_>>();
-        let aggregate_types = all_bytes(group, 5)
+        let declared_types = all_bytes(group, 5)
             .into_iter()
             .filter_map(fields)
             .map(|fields| {
                 (
                     last_bytes(&fields, 1).and_then(uuid),
-                    last_varint(&fields, 3).unwrap_or(0) & u64::from(u32::MAX),
+                    u32::try_from(last_varint(&fields, 3).unwrap_or(0) & u64::from(u32::MAX))
+                        .unwrap_or(u32::MAX),
                 )
+            })
+            .collect::<Vec<_>>();
+        // Each column's summary functions, in value order, once per code.
+        let aggregate_types = aggregate_columns
+            .iter()
+            .map(|column| {
+                let mut codes = Vec::new();
+                for (uid, code) in &declared_types {
+                    if uid == column && !codes.contains(code) {
+                        codes.push(*code);
+                    }
+                }
+                Rc::<[u32]>::from(codes)
             })
             .collect::<Vec<_>>();
         let root_reference = last_bytes(group, 18).and_then(reference);
@@ -281,30 +300,34 @@ pub(crate) fn categories(package: &Package) -> Result<HashMap<CategoryKey, Found
                 let Some(aggregate) = coordinates.get(index).copied().and_then(coordinate) else {
                     continue;
                 };
-                let Some(aggregate_type) = aggregate_types
-                    .iter()
-                    .find(|(uid, _)| *uid == *column)
-                    .map(|(_, kind)| *kind)
-                else {
+                let types = &aggregate_types[index];
+                if types.is_empty() {
                     continue;
-                };
+                }
                 let key = (group_by, column.unwrap_or((0, 0)), node_group);
+                if ambiguous.contains(&key) {
+                    continue;
+                }
                 let value = Found {
                     owner,
                     grouping,
                     aggregate,
-                    aggregate_type: u32::try_from(aggregate_type).unwrap_or(u32::MAX),
+                    aggregate_types: Rc::clone(types),
                     level,
                     label: label(&node).or_else(|| {
                         (level == 0 && node_group == (1, 0)).then(|| "Grand Total".to_owned())
                     }),
                 };
-                if !ambiguous.contains(&key)
-                    && let Some(previous) = result.insert(key, value.clone())
-                    && previous != value
-                {
-                    result.remove(&key);
-                    ambiguous.insert(key);
+                match result.entry(key) {
+                    Entry::Vacant(slot) => {
+                        slot.insert(value);
+                    },
+                    Entry::Occupied(slot) => {
+                        if *slot.get() != value {
+                            slot.remove();
+                            ambiguous.insert(key);
+                        }
+                    },
                 }
             }
             let child_depth = depth.saturating_add(1);
@@ -345,9 +368,10 @@ fn is_calculation_engine(name: &str) -> bool {
 }
 
 impl Package {
-    /// Read the workbook's pivot aggregate categories: one per group node
-    /// and aggregated column of each enabled pivot group-by, ordered by
-    /// group-by, column, level, label and group.
+    /// Read the workbook's pivot aggregate categories: one per group node,
+    /// aggregated column and summary function of each enabled pivot
+    /// group-by, ordered by group-by, column, level, label, group and the
+    /// pivot's value order.
     ///
     /// # Errors
     ///
@@ -366,13 +390,21 @@ impl Package {
         });
         Ok(entries
             .into_iter()
-            .map(|(key, found)| {
-                Category::new(
-                    key,
-                    found.label,
-                    found.level,
-                    Aggregate::from_code(found.aggregate_type),
-                )
+            .flat_map(|(key, found)| {
+                let Found {
+                    aggregate_types,
+                    label,
+                    level,
+                    ..
+                } = found;
+                (0..aggregate_types.len()).map(move |index| {
+                    Category::new(
+                        key,
+                        label.clone(),
+                        level,
+                        Aggregate::from_code(aggregate_types[index]),
+                    )
+                })
             })
             .collect())
     }
