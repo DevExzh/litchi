@@ -995,6 +995,22 @@ pub fn write(
                     .next()
                     .ok_or(invalid("a label graph without a style"))?;
                 insert_componentized_style(workspace, stylesheet, component, style)?;
+                // The new storage in the drawable's component names the
+                // caption paragraph style, which lives in the stylesheet's
+                // component. Native files list every such cross-component
+                // reference (record 0431).
+                let style_member = workspace
+                    .member(workspace.locate(paragraph_style)?)
+                    .to_owned();
+                if let Some(style_component) = workspace.component_for_member(&style_member)?
+                    && style_component != component
+                {
+                    workspace.add_external_reference(
+                        component,
+                        style_component,
+                        paragraph_style,
+                    )?;
+                }
             }
             for object in objects {
                 workspace.insert(location, object)?;

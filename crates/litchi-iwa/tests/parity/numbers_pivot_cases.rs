@@ -233,6 +233,28 @@ pub(crate) fn pivot_fixture() -> TestResult<Fixture> {
 /// The synthetic fixture whose inline tree's first column uses the
 /// summary-function code `first_aggregate`.
 pub(crate) fn pivot_fixture_with(first_aggregate: u32) -> TestResult<Fixture> {
+    pivot_fixture_of(
+        objects(first_aggregate),
+        "iwork/numbers/basic.numbers with synthetic pivot group-bys",
+    )
+}
+
+/// `basic.numbers` with only the inline group-by: no reference cycle, no
+/// repeated group-by identifier, no second owner kind. Numbers 14.4 drops its
+/// AppleEvent connection on the full synthetic fixture even unedited (record
+/// 0431); this one separates the fixture from the formula route.
+pub(crate) fn inline_pivot_fixture() -> TestResult<Fixture> {
+    const INLINE_GROUP_BY: u64 = 9_100_010;
+    pivot_fixture_of(
+        objects(1)
+            .into_iter()
+            .filter(|(identifier, _, _)| *identifier == INLINE_GROUP_BY)
+            .collect(),
+        "iwork/numbers/basic.numbers with one inline synthetic pivot group-by",
+    )
+}
+
+fn pivot_fixture_of(objects: Vec<(u64, u32, Vec<u8>)>, path: &'static str) -> TestResult<Fixture> {
     let input = fixture("iwork/numbers/basic.numbers")?;
     let catalog = Catalog::from_bytes(&input.bytes, Default::default())?;
     let entry = catalog
@@ -241,7 +263,7 @@ pub(crate) fn pivot_fixture_with(first_aggregate: u32) -> TestResult<Fixture> {
         .ok_or("basic.numbers has no calculation engine")?;
     let stream = SnappyStream::decompress(entry.data(), Default::default())?;
     let mut archive = Archive::parse(stream.as_bytes(), Default::default())?;
-    for (identifier, message_type, data) in objects(first_aggregate) {
+    for (identifier, message_type, data) in objects {
         archive.objects.push(ArchiveObject::new(
             identifier,
             vec![RawMessage {
@@ -254,7 +276,7 @@ pub(crate) fn pivot_fixture_with(first_aggregate: u32) -> TestResult<Fixture> {
     let compressed =
         SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
     Ok(Fixture {
-        path: "iwork/numbers/basic.numbers with synthetic pivot group-bys",
+        path,
         bytes: catalog
             .reassemble_to_bytes(&[EntryEdit::new(ENGINE, &compressed)], Default::default())?,
     })

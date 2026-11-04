@@ -3308,6 +3308,10 @@
    "reason": "macOS native open/save/reopen results for the 0363 queue packages (pass/fail and re-saved hashes), not a timing or allocation measurement."
   },
   {
+   "record": "0431",
+   "reason": "macOS failure diagnosis: structural discriminators over the queue packages, not a benchmark; its leaf-versus-host callgrind figures are in the record"
+  },
+  {
    "record": "0363",
    "reason": "Planning record for the litchi-iwa exit: results/0363 holds a source scan of the host's public functions (crosswalk) and its classifier, no leaf-versus-unified timing or allocation measurement."
   },

@@ -10,7 +10,9 @@ use prost::Message;
 
 use crate::archive::{Archive, ArchiveObject, FieldInfo, FieldPath, RawMessage, UnknownFieldRule};
 use crate::protobuf::{tsa, tsd, tsp, tss, tswp};
-use crate::text::style_registry::{insert_private_style, register_private_style};
+use crate::text::style_registry::{
+    insert_private_style, register_private_style, register_style_reference,
+};
 use crate::wire::{patch_length_delimited_field, transform_length_delimited_field};
 use crate::{Error, HostPackage, Result};
 
@@ -751,9 +753,10 @@ fn caption_objects_with_profile(
 pub(crate) fn insert_componentized_caption_style(
     package: &mut HostPackage,
     drawable_archive_name: &str,
-    stylesheet_id: u64,
+    theme: CaptionThemeStyle,
     style: ArchiveObject,
 ) -> Result<()> {
+    let stylesheet_id = theme.stylesheet_id;
     let style_id = style
         .archive_info
         .identifier
@@ -771,6 +774,17 @@ pub(crate) fn insert_componentized_caption_style(
         drawable_archive_name,
         &stylesheet_archive_name,
         style_id,
+    )?;
+    // The caption's storage, in the drawable's component, names the paragraph
+    // style across components. Native files list every such reference; Numbers
+    // 14.4 refused the ones without it (record 0431).
+    let paragraph_style_archive_name =
+        unique_object_archive_name(package, theme.paragraph_style_id)?;
+    register_style_reference(
+        package,
+        drawable_archive_name,
+        &paragraph_style_archive_name,
+        theme.paragraph_style_id,
     )
 }
 

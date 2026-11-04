@@ -1127,11 +1127,6 @@ fn series_graph(workspace: &Workspace<'_>, chart: u64, series_count: usize) -> R
     let references = codec::references(payload, CodecLimits::DEFAULT)?;
     let mut slots = vec![None; series_count];
     if let Some(sparse) = references.series_non_styles() {
-        if usize::try_from(sparse.count()).ok() != Some(sparse.entries().len()) {
-            return Err(Error::Invalid(
-                "a chart's series_non_styles count disagrees with its entries",
-            ));
-        }
         let mut seen = HashSet::new();
         for &(index, object) in sparse.entries() {
             let index = usize::try_from(index)
@@ -1992,11 +1987,6 @@ fn style_slots(workspace: &Workspace<'_>, chart: u64, series_count: usize) -> Re
         ));
     }
     if let Some(private) = references.series_private_styles() {
-        if usize::try_from(private.count()).ok() != Some(private.entries().len()) {
-            return Err(Error::Invalid(
-                "a chart's series_private_styles count disagrees with its entries",
-            ));
-        }
         let mut indices = HashSet::new();
         for &(index, identifier) in private.entries() {
             let index = usize::try_from(index)
@@ -3534,11 +3524,6 @@ fn bounded_series_graph(
         })?;
     slots.resize(series_count, None);
     if let Some(sparse) = references.series_non_styles() {
-        if usize::try_from(sparse.count()).ok() != Some(sparse.entries().len()) {
-            return Err(SymbolError::Invalid(
-                "a chart's series_non_styles count disagrees with its entries",
-            ));
-        }
         for &(index, object) in sparse.entries() {
             budget.work(1)?;
             let index = usize::try_from(index)
@@ -3645,11 +3630,6 @@ pub fn chart_series_styles(references: &codec::StyleReferences) -> SymbolResult<
         }
     }
     if let Some(private) = references.series_private_styles() {
-        if usize::try_from(private.count()).ok() != Some(private.entries().len()) {
-            return Err(SymbolError::Invalid(
-                "a chart's series_private_styles count disagrees with its entries",
-            ));
-        }
         for &(index, identifier) in private.entries() {
             let index = usize::try_from(index)
                 .map_err(|_| SymbolError::Invalid("a series index exceeds usize"))?;
@@ -6180,5 +6160,45 @@ mod symbol_tests {
                 .is_some_and(|sparse| sparse.entries().len() == 1)
         );
         assert!(workspace.object(4).is_ok());
+    }
+
+    /// Record 0431: Keynote, Pages and Numbers 14.4 refuse a document whose
+    /// sparse array holds an entry beyond `count`, so `count` is the array
+    /// length (one past the highest index), not the number of entries.
+    #[test]
+    fn sparse_count_is_one_past_the_highest_series_index() {
+        use litchi_iwa_common::chart::pie::WedgeExplosion;
+
+        use super::property::WedgeExplosions;
+
+        fn stored(workspace: &Workspace<'_>) -> (u32, Vec<u32>) {
+            let references = codec::references(
+                &workspace.object(1).expect("chart").messages[0].data,
+                CodecLimits::DEFAULT,
+            )
+            .expect("chart references");
+            let sparse = references.series_non_styles().expect("sparse array");
+            (
+                sparse.count(),
+                sparse.entries().iter().map(|entry| entry.0).collect(),
+            )
+        }
+        let wedge = |percent| WedgeExplosion::from_percent(percent).expect("explosion");
+        let (none, some) = (wedge(0.0), wedge(25.0));
+        let components = fresh_components();
+        for (values, expected) in [
+            // Only the last series: the case the applications refused as count 1.
+            ([none, none, some], (3, vec![2])),
+            ([none, some, none], (2, vec![1])),
+            ([some, none, some], (3, vec![0, 2])),
+            ([some, none, none], (1, vec![0])),
+        ] {
+            let mut workspace =
+                Workspace::new(&components, CoreLimits::default()).expect("workspace");
+            assert!(set_values(&mut workspace, 1, &WedgeExplosions, &values).expect("write"));
+            assert_eq!(stored(&workspace), expected);
+            // The array stays readable with fewer entries than its count.
+            assert!(!set_values(&mut workspace, 1, &WedgeExplosions, &values).expect("no-op"));
+        }
     }
 }

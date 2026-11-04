@@ -345,12 +345,11 @@ fn items(entry: &[u8]) -> Result<Vec<(u64, (u64, u64))>> {
         .collect()
 }
 
-/// `(index, object)` of a style axis entry's sparse array, and its count.
-fn style_entries(entry: &[u8]) -> Result<Option<(u64, Vec<(u64, u64, Vec<u8>)>)>> {
+/// `(index, object, raw entry)` of a style axis entry's sparse array.
+fn style_entries(entry: &[u8]) -> Result<Option<Vec<(u64, u64, Vec<u8>)>>> {
     let Some(sparse) = strict(entry, AXIS_STYLES, 2)? else {
         return Ok(None);
     };
-    let count = graph::varint(sparse, 1)?.unwrap_or(0);
     let entries = graph::repeated(sparse, 2)?
         .into_iter()
         .map(|raw| {
@@ -366,7 +365,7 @@ fn style_entries(entry: &[u8]) -> Result<Option<(u64, Vec<(u64, u64, Vec<u8>)>)>
             ))
         })
         .collect::<Result<Vec<_>>>()?;
-    Ok(Some((count, entries)))
+    Ok(Some(entries))
 }
 
 fn managed(extension: Option<&[u8]>) -> Result<Vec<u64>> {
@@ -382,7 +381,7 @@ fn managed(extension: Option<&[u8]>) -> Result<Vec<u64>> {
         }
     }
     for entry in graph::repeated(extension, STYLES_MAP)? {
-        if let Some((_, entries)) = style_entries(entry)? {
+        if let Some(entries) = style_entries(entry)? {
             for (_, object, _) in entries {
                 if object != 0 && !identifiers.contains(&object) {
                     identifiers.push(object);
@@ -471,9 +470,9 @@ fn line_graph(workspace: &Workspace<'_>, chart: u64) -> Result<LineGraph> {
         }
         let styles = axis_entries(extension, STYLES_MAP)?;
         if let Some(entry) = styles.iter().find(|entry| entry.primary)
-            && let Some((count, entries)) = style_entries(entry.raw)?
+            && let Some(entries) = style_entries(entry.raw)?
         {
-            if entries.len() > MAX_LINES || usize::try_from(count).ok() != Some(entries.len()) {
+            if entries.len() > MAX_LINES {
                 return Err(Error::Invalid(
                     "a chart's reference-line styles are inconsistent",
                 ));
@@ -626,7 +625,7 @@ fn next_extension(current: Option<&[u8]>, items: &[(u64, (u64, u64))]) -> Result
             styles.push(entry.raw.to_vec());
             continue;
         }
-        let Some((_, entries)) = style_entries(entry.raw)? else {
+        let Some(entries) = style_entries(entry.raw)? else {
             continue;
         };
         let kept = entries
@@ -637,7 +636,13 @@ fn next_extension(current: Option<&[u8]>, items: &[(u64, (u64, u64))]) -> Result
             continue;
         }
         let mut sparse = Vec::new();
-        push_varint_field(&mut sparse, 1, kept.len() as u64);
+        // The array length, one past the highest index (record 0431).
+        let count = kept
+            .iter()
+            .map(|(index, _, _)| index + 1)
+            .max()
+            .unwrap_or(0);
+        push_varint_field(&mut sparse, 1, count);
         for (_, _, raw) in &kept {
             push_message_field(&mut sparse, 2, raw);
         }

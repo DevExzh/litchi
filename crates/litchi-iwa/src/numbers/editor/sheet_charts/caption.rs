@@ -290,7 +290,7 @@ fn insert_sheet_chart_caption(
                 theme,
                 language,
             )?;
-            insert_componentized_caption_style(package, archive_name, theme.stylesheet_id, style)?;
+            insert_componentized_caption_style(package, archive_name, theme, style)?;
             let codec_limits = package.limits();
             package.update_archive(archive_name, |archive| {
                 for object in [info, storage, placement] {

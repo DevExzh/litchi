@@ -501,15 +501,6 @@ fn chart_series_non_style_graph(
         ))
     })?;
     let sparse = chart.series_non_styles.as_ref();
-    if let Some(sparse) = sparse
-        && usize::try_from(sparse.count).ok() != Some(sparse.entries.len())
-    {
-        return Err(Error::InvalidFormat(format!(
-            "{drawable_label} chart {drawable_object_id} declares {} series non-styles but stores {} entries",
-            sparse.count,
-            sparse.entries.len()
-        )));
-    }
     let mut slots = vec![None; series_count];
     let mut identifiers = HashSet::new();
     for entry in sparse.into_iter().flat_map(|sparse| &sparse.entries) {
@@ -696,12 +687,16 @@ fn patch_chart_series_non_style_references(
                 })
             })
             .collect::<Result<Vec<_>>>()?;
-        chart_payload.series_non_styles = Some(tsp::SparseReferenceArray {
-            count: u32::try_from(entries.len()).map_err(|_| {
+        // `count` is the array length, one past the highest index: iWork
+        // refuses a document with an entry beyond it (record 0431).
+        let count = entries
+            .iter()
+            .map(|entry| entry.index.checked_add(1))
+            .try_fold(0u32, |count, next| next.map(|next| count.max(next)))
+            .ok_or_else(|| {
                 Error::InvalidFormat("chart series non-style count exceeds u32".to_owned())
-            })?,
-            entries,
-        });
+            })?;
+        chart_payload.series_non_styles = Some(tsp::SparseReferenceArray { count, entries });
         let data = chart.encode()?;
         let previous_ids = object.archive_info.message_infos[chart_message_index]
             .object_references
