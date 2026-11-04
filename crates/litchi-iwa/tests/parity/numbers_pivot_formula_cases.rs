@@ -21,7 +21,7 @@ use litchi_numbers::table::{
 
 use crate::harness::{Case, Evidence, Fixture, Format, LeafRun, TestResult, Tier};
 use crate::leaf_bytes;
-use crate::numbers_pivot_cases::pivot_fixture;
+use crate::numbers_pivot_cases::{inline_pivot_fixture, pivot_fixture};
 
 /// The cell the formula is authored in: C3.
 const CELL: (usize, usize) = (2, 2);
@@ -262,6 +262,19 @@ fn numbers_pivot_formula_author_referenced_tree_parity() -> TestResult {
         "numbers_pivot_formula_author_referenced_tree_parity",
         &input,
         Authoring { index: 2, ..NORTH },
+    )
+}
+
+/// The same route on the fixture without the cycle and the repeated
+/// identifiers, to tell a refused fixture from a refused route on a Mac
+/// (record 0431).
+#[test]
+fn numbers_pivot_formula_author_inline_only_parity() -> TestResult {
+    let input = inline_pivot_fixture()?;
+    run(
+        "numbers_pivot_formula_author_inline_only_parity",
+        &input,
+        NORTH,
     )
 }
 
