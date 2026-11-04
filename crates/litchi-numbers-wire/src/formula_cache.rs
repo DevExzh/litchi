@@ -2403,10 +2403,12 @@ fn plan_final_cache_internal(
     // precedent owner: a pivot-category reference reads two cells of its
     // group-by's owner (record 0424).
     let mut tableless_owners = Vec::new();
-    if logical.is_some() {
-        scratch_allocation::<u32>(&mut usage, engine_stage.owner_references.len(), limits)?;
-        reserve(&mut tableless_owners, engine_stage.owner_references.len())?;
-    }
+    // Other tables' owners with records, and those records' edges, kept apart
+    // from the graph the edit evaluates (record 0432).
+    let mut foreign_owners = Vec::new();
+    let mut foreign_edges = Vec::new();
+    scratch_allocation::<u32>(&mut usage, engine_stage.owner_references.len(), limits)?;
+    reserve(&mut tableless_owners, engine_stage.owner_references.len())?;
     for owner_reference in engine_stage.owner_references.iter().copied() {
         let payload = indexed_payload(
             source.owners,
@@ -2428,6 +2430,7 @@ fn plan_final_cache_internal(
         charge_stage_usage(&mut usage, &stage, limits)?;
         charge_report(&mut usage, report, limits)?;
         let owner_id = owner.internal_formula_owner_id();
+        let mut foreign = false;
         graph_step(&mut usage, binary_search_work(source.tables.len()), limits)?;
         add_usage(&mut usage.lookup_work, 1)?;
         let owner_geometry = match table_by_owner(source.tables, owner_id) {
@@ -2459,15 +2462,27 @@ fn plan_final_cache_internal(
                         && stage.tile_references.is_empty()
                         && stage.range_references.is_empty()
                         && stage.components.is_empty();
-                    if !inert || !inert_foreign_owner(owner) {
+                    if inert && inert_foreign_owner(owner) {
+                        continue;
+                    }
+                    // Another table's formulas (a native pivot's body, record
+                    // 0432). They need no geometry while nothing the edit can
+                    // dirty reaches them; the check runs when the whole graph
+                    // is known.
+                    if !stage.ranges.is_empty()
+                        || !stage.range_references.is_empty()
+                        || !foreign_owner_has_only_cell_records(owner)
+                    {
                         return Err(Error::UnsupportedDependency(Unsupported::MissingOwner));
                     }
-                    continue;
+                    foreign_owners.push(owner_id);
+                    foreign = true;
+                } else {
+                    tableless_owners.push(owner_id);
+                    if logical.is_none() {
+                        continue;
+                    }
                 }
-                if logical.is_none() {
-                    continue;
-                }
-                tableless_owners.push(owner_id);
                 None
             },
             Err(error) => return Err(error),
@@ -2493,26 +2508,32 @@ fn plan_final_cache_internal(
             reject_unsupported_owner(owner, &stage, source, &mut usage, limits)?;
         }
         append_edges(
-            &mut edges,
+            if foreign {
+                &mut foreign_edges
+            } else {
+                &mut edges
+            },
             owner.internal_formula_owner_id(),
             &stage.records,
             limits,
             &mut usage,
         )?;
-        append_formula_hosts(
-            &mut dependency_hosts,
-            owner.internal_formula_owner_id(),
-            &stage.records,
-            limits,
-            &mut usage,
-        )?;
-        append_cycle_hosts(
-            &mut cycle_hosts,
-            owner.internal_formula_owner_id(),
-            &stage.records,
-            limits,
-            &mut usage,
-        )?;
+        if !foreign {
+            append_formula_hosts(
+                &mut dependency_hosts,
+                owner.internal_formula_owner_id(),
+                &stage.records,
+                limits,
+                &mut usage,
+            )?;
+            append_cycle_hosts(
+                &mut cycle_hosts,
+                owner.internal_formula_owner_id(),
+                &stage.records,
+                limits,
+                &mut usage,
+            )?;
+        }
         if !stage.ranges.is_empty() {
             if owner_geometry.is_none() {
                 return Err(Error::UnsupportedDependency(Unsupported::Formula));
@@ -2552,26 +2573,32 @@ fn plan_final_cache_internal(
                 return Err(Error::InvalidSource);
             }
             append_edges(
-                &mut edges,
+                if foreign {
+                    &mut foreign_edges
+                } else {
+                    &mut edges
+                },
                 tile.internal_owner_id(),
                 &tile_stage.records,
                 limits,
                 &mut usage,
             )?;
-            append_formula_hosts(
-                &mut dependency_hosts,
-                tile.internal_owner_id(),
-                &tile_stage.records,
-                limits,
-                &mut usage,
-            )?;
-            append_cycle_hosts(
-                &mut cycle_hosts,
-                tile.internal_owner_id(),
-                &tile_stage.records,
-                limits,
-                &mut usage,
-            )?;
+            if !foreign {
+                append_formula_hosts(
+                    &mut dependency_hosts,
+                    tile.internal_owner_id(),
+                    &tile_stage.records,
+                    limits,
+                    &mut usage,
+                )?;
+                append_cycle_hosts(
+                    &mut cycle_hosts,
+                    tile.internal_owner_id(),
+                    &tile_stage.records,
+                    limits,
+                    &mut usage,
+                )?;
+            }
         }
         for range_reference in stage.range_references.iter().copied() {
             if owner_geometry.is_none() {
@@ -2610,6 +2637,14 @@ fn plan_final_cache_internal(
     if (!overlay.is_empty() || !source.formulas.is_empty()) && !selected_owner_seen {
         return Err(Error::UnsupportedDependency(Unsupported::MissingOwner));
     }
+    reject_reachable_foreign_owners(
+        source.selected_table.owner,
+        &foreign_owners,
+        &edges,
+        &foreign_edges,
+        limits,
+        &mut usage,
+    )?;
     if let Some(logical) = logical {
         validate_selected_dependency_hosts(
             &dependency_hosts,
@@ -3340,9 +3375,13 @@ fn reject_unsupported_owner(
     {
         return Err(Error::UnsupportedDependency(Unsupported::WholeOwner));
     }
+    // A native pivot table's owner lists the group-by and group UUIDs its
+    // category formulas name (record 0432). The formula set itself is validated
+    // node by node: only a strictly decoded category node is admitted, so these
+    // references cannot hide an evaluable operand.
     if owner
         .uuid_references()
-        .is_some_and(|value| !empty_message(value))
+        .is_some_and(|value| !empty_message(value) && !well_formed_message(value))
     {
         return Err(Error::UnsupportedDependency(Unsupported::UuidReference));
     }
@@ -3400,6 +3439,65 @@ fn empty_whole_owner_dependencies(payload: &[u8]) -> bool {
 /// Whether another table's owner holds nothing but its own range contexts:
 /// no range, volatile, whole-owner, UUID, error or spill state, and spanning
 /// records only in the native total/body context shape (record 0301).
+/// Refuse when an edit of the selected table can dirty another table's
+/// formula: this route has no geometry to recompute it. Numbers keeps a pivot
+/// on its own snapshot of the source table (record 0432), so a source edit
+/// never reaches the pivot's formulas.
+fn reject_reachable_foreign_owners(
+    selected: u32,
+    foreign_owners: &[u32],
+    edges: &[Edge],
+    foreign_edges: &[Edge],
+    limits: CacheLimits,
+    usage: &mut CacheUsage,
+) -> Result<(), Error> {
+    if foreign_owners.is_empty() {
+        return Ok(());
+    }
+    let mut reached = vec![selected];
+    loop {
+        let before = reached.len();
+        graph_step(
+            usage,
+            edges.len().saturating_add(foreign_edges.len()),
+            limits,
+        )?;
+        for edge in edges.iter().chain(foreign_edges) {
+            if reached.contains(&edge.source.owner) && !reached.contains(&edge.target.owner) {
+                reached.push(edge.target.owner);
+            }
+        }
+        if reached.len() == before {
+            break;
+        }
+    }
+    if foreign_owners.iter().any(|owner| reached.contains(owner)) {
+        return Err(Error::UnsupportedDependency(Unsupported::MissingOwner));
+    }
+    Ok(())
+}
+
+/// A foreign owner the cell-record reach check covers: no evaluable
+/// dependency outside its cell records.
+fn foreign_owner_has_only_cell_records(
+    owner: dependency::FormulaOwnerDependenciesSnapshot<'_>,
+) -> bool {
+    owner.range_dependencies().is_none_or(empty_message)
+        && owner
+            .volatile_dependencies()
+            .is_none_or(empty_volatile_dependencies)
+        && owner
+            .whole_owner_dependencies()
+            .is_none_or(empty_whole_owner_dependencies)
+        && owner.uuid_references().is_none_or(well_formed_message)
+        && owner.cell_errors().is_none_or(empty_message)
+        && owner.spill_range_sizes().is_none_or(inactive_spill_sizes)
+}
+
+fn well_formed_message(payload: &[u8]) -> bool {
+    WireView::parse(payload, litchi_iwa_common::WireLimits::DEFAULT).is_ok()
+}
+
 fn inert_foreign_owner(owner: dependency::FormulaOwnerDependenciesSnapshot<'_>) -> bool {
     let context_shape = |payload: &[u8]| {
         let Ok(view) = WireView::parse(payload, litchi_iwa_common::WireLimits::DEFAULT) else {

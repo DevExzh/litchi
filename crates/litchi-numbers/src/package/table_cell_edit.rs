@@ -4241,18 +4241,19 @@ fn extend_formula_referenced_paths(
                 if target_owner == selected_owner {
                     continue;
                 }
-                let referenced = owner_index
+                // A precedent owner without a table (the group-by a category
+                // reference reads, record 0424) adds no table path: the cache
+                // engine validates it against the registered owners. A workbook
+                // with another table reaches this scan, as a native pivot's
+                // does (record 0432).
+                if let Some(referenced) = owner_index
                     .binary_search_by_key(&target_owner, |entry| entry.0)
                     .ok()
                     .and_then(|index| owner_index.get(index))
                     .map(|entry| entry.1)
-                    .ok_or(Error::Refused(
-                        crate::package::table_cells::Refusal::UnsupportedDependency {
-                            path,
-                            kind: crate::package::table_cells::DependencyKind::FormulaCache,
-                        },
-                    ))?;
-                final_paths.push(referenced);
+                {
+                    final_paths.push(referenced);
+                }
             }
         }
         final_paths.sort_unstable();

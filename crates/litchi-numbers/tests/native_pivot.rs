@@ -9,10 +9,12 @@ use std::path::PathBuf;
 
 use litchi_iwa_archive::package::Catalog;
 use litchi_iwa_core::{Archive, SnappyStream};
-use litchi_iwa_protos::tst;
+use litchi_iwa_protos::{tsce, tst};
 
 use litchi_numbers::cell::Value;
+use litchi_numbers::formula::{BinaryOperator, CachedValue, Expression};
 use litchi_numbers::table::At;
+use litchi_numbers::table::cells::{DependencyKind, Error as CellError, Input, Refusal, Storage};
 
 use litchi_numbers::Package;
 use litchi_numbers::table::pivot::{Aggregate, Category};
@@ -189,5 +191,213 @@ fn native_pivot_codes_agree_with_headers_formulas_and_cached_results() -> TestRe
         let value = f64::try_from(value)?;
         assert!((value - cached).abs() < 1e-9, "{header}: {value}");
     }
+    Ok(())
+}
+
+fn exact_bytes(package: &Package) -> TestResult<Vec<u8>> {
+    let mut bytes = Vec::new();
+    package.write_to(&mut bytes)?;
+    Ok(bytes)
+}
+
+fn engine(source: &[u8]) -> TestResult<Archive> {
+    member(source, "Index/CalculationEngine.iwa")
+}
+
+/// Every message of `message_type` in the calculation engine, by object.
+fn engine_messages(source: &[u8], message_type: u32) -> TestResult<Vec<(u64, Vec<u8>)>> {
+    Ok(engine(source)?
+        .objects
+        .iter()
+        .flat_map(|object| {
+            let identifier = object.archive_info.identifier.unwrap_or(0);
+            object
+                .messages
+                .iter()
+                .filter(move |message| message.type_ == message_type)
+                .map(move |message| (identifier, message.data.clone()))
+        })
+        .collect())
+}
+
+/// `(precedent row, column, owner)` of a cell's dependency record in the
+/// record tiles of `owner`.
+fn dependency_edges(
+    source: &[u8],
+    owner: u32,
+    (row, column): (u32, u32),
+) -> TestResult<Vec<(u32, u32, u32)>> {
+    for (_, data) in engine_messages(source, 4_009)? {
+        let tile = tsce::CellRecordTileArchive::decode(data.as_slice())?;
+        if tile.internal_owner_id != owner {
+            continue;
+        }
+        for record in &tile.cell_records {
+            if (record.row, record.column) == (row, column) {
+                let edges = record
+                    .expanded_edges
+                    .as_ref()
+                    .ok_or_else(|| io::Error::other("no expanded edges"))?;
+                return Ok(edges
+                    .edge_with_owner_rows
+                    .iter()
+                    .zip(&edges.edge_with_owner_columns)
+                    .zip(&edges.internal_owner_id_for_edge)
+                    .map(|((row, column), owner)| (*row, *column, *owner))
+                    .collect());
+            }
+        }
+    }
+    Err(io::Error::other("no dependency record").into())
+}
+
+/// The category reference of the pivot cell's formula.
+fn cell_category(
+    source: &[u8],
+    row: u32,
+    column: usize,
+) -> TestResult<tsce::CategoryReferenceArchive> {
+    let cell = pivot_cell(source, row, column)?;
+    let key = cell
+        .list_keys()
+        .find_map(|(kind, key)| (kind == ListKind::Formula).then_some(key))
+        .ok_or_else(|| io::Error::other("no formula key"))?;
+    let archive = member(source, FORMULA_LIST)?;
+    let list = tst::TableDataList::decode(archive.objects[0].messages[0].data.as_slice())?;
+    let entry = list
+        .entries
+        .iter()
+        .find(|entry| entry.key == key)
+        .ok_or_else(|| io::Error::other("no formula entry"))?;
+    let formula = entry
+        .formula
+        .as_ref()
+        .ok_or_else(|| io::Error::other("no formula"))?;
+    let node = &formula.ast_node_array.ast_node[0];
+    Ok(node
+        .ast_category_ref
+        .as_ref()
+        .ok_or_else(|| io::Error::other("no category node"))?
+        .category_ref
+        .clone())
+}
+
+/// The engine's owner map holds entries with no owner object (7 for a pivot's
+/// snapshot table); the old equal-count check refused every cell edit in the
+/// workbook, on any table.
+#[test]
+fn native_pivot_source_table_edit_publishes_and_inverts() -> TestResult {
+    let package = Package::open(fixture())?;
+    let source = exact_bytes(&package)?;
+    let commit = package
+        .edit_table_cells("Sheet 1", "Table 1")?
+        .set(At::new(1, 2), Input::number(55.0)?)?
+        .commit()?;
+    let edited = commit.package();
+    let cell = edited.table_cell("Sheet 1", "Table 1", At::new(1, 2))?;
+    assert!(matches!(
+        cell.storage(),
+        Storage::Stored(Value::Number(value)) if value.get() == 55.0
+    ));
+    // The pivot's state is Numbers' to refresh: nothing of it moves.
+    let bytes = exact_bytes(edited)?;
+    for message in [6_370, 6_372, 6_373, 6_382, 6_383] {
+        assert_eq!(
+            engine_messages(&source, message)?,
+            engine_messages(&bytes, message)?,
+            "message {message}"
+        );
+    }
+    assert_eq!(cell_category(&bytes, 2, 1)?, cell_category(&source, 2, 1)?);
+    assert_eq!(edited.pivot_categories()?, package.pivot_categories()?);
+    let restored = edited.apply_table_cells(&commit.patch().inverse())?;
+    assert_eq!(exact_bytes(restored.package())?, source);
+    Ok(())
+}
+
+/// A category formula the leaf writes over a native body cell is the one
+/// Numbers wrote there: the same reference and the same dependency edges.
+#[test]
+fn native_pivot_category_formula_matches_what_numbers_wrote() -> TestResult {
+    let package = Package::open(fixture())?;
+    let source = exact_bytes(&package)?;
+    let native = cell_category(&source, 4, 1)?;
+    let native_edges = dependency_edges(&source, 37, (4, 1))?;
+    let mut matched = 0;
+    for category in package.pivot_categories()?.iter().filter(|category| {
+        category.label() == Some("West")
+            && category.group_level() == 2
+            && category.aggregate() == Aggregate::Sum
+    }) {
+        let bytes = exact_bytes(
+            package
+                .edit_table_cells(PIVOT_SHEET, PIVOT_TABLE)?
+                .set_formula_cached(
+                    At::new(4, 1),
+                    Expression::pivot_category(category),
+                    CachedValue::number(1.0)?,
+                )?
+                .commit()?
+                .package(),
+        )?;
+        let written = cell_category(&bytes, 4, 1)?;
+        if written == native {
+            assert_eq!(dependency_edges(&bytes, 37, (4, 1))?, native_edges);
+            matched += 1;
+        }
+    }
+    assert_eq!(matched, 1);
+    Ok(())
+}
+
+/// Each of the 13 functions of one group can be referenced from the source
+/// table, and reopens with the function it was authored with.
+#[test]
+fn native_pivot_category_formula_on_source_table_keeps_each_function() -> TestResult {
+    let package = Package::open(fixture())?;
+    let categories = package.pivot_categories()?;
+    for category in categories.iter().take(13) {
+        let commit = package
+            .edit_table_cells("Sheet 1", "Table 1")?
+            .set_formula_cached(
+                At::new(1, 2),
+                Expression::binary(
+                    BinaryOperator::Divide,
+                    Expression::pivot_category(category),
+                    Expression::number(2.0)?,
+                )?,
+                CachedValue::number(1.0)?,
+            )?
+            .commit()?;
+        let reopened = Package::from_bytes(&exact_bytes(commit.package())?)?;
+        let cell = reopened.table_cell("Sheet 1", "Table 1", At::new(1, 2))?;
+        assert!(matches!(cell.storage(), Storage::Stored(Value::Formula(_))));
+        let restored = commit
+            .package()
+            .apply_table_cells(&commit.patch().inverse())?;
+        assert_eq!(exact_bytes(restored.package())?, exact_bytes(&package)?);
+    }
+    Ok(())
+}
+
+/// A scalar over a pivot body cell, which holds a category formula: Numbers'
+/// UI does not edit pivot cells and the host has no scalar setter. The refusal
+/// is typed and nothing is published.
+#[test]
+fn native_pivot_body_scalar_is_refused_without_publishing() -> TestResult {
+    let package = Package::open(fixture())?;
+    let before = exact_bytes(&package)?;
+    let result = package
+        .edit_table_cells(PIVOT_SHEET, PIVOT_TABLE)?
+        .set(At::new(2, 1), Input::number(55.0)?)?
+        .commit();
+    assert!(matches!(
+        result,
+        Err(CellError::Refused(Refusal::UnsupportedDependency {
+            kind: DependencyKind::FormulaCache,
+            ..
+        }))
+    ));
+    assert_eq!(exact_bytes(&package)?, before);
     Ok(())
 }
