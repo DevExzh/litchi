@@ -77,15 +77,6 @@ pub(crate) fn chart_series_style_slots(
         }
     }
     if let Some(private_styles) = chart.series_private_styles.as_ref() {
-        let private_count = usize::try_from(private_styles.count).map_err(|_| {
-            Error::InvalidFormat("chart private series-style count exceeds usize".to_owned())
-        })?;
-        if private_count != private_styles.entries.len() {
-            return Err(Error::InvalidFormat(format!(
-                "{drawable_label} chart {drawable_object_id} declares {private_count} private series styles but stores {} entries",
-                private_styles.entries.len()
-            )));
-        }
         let mut private_indices = HashSet::new();
         for entry in &private_styles.entries {
             let index = usize::try_from(entry.index).map_err(|_| {

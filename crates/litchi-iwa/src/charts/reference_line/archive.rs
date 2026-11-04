@@ -469,11 +469,6 @@ fn validate_reference_line_styles(
                 "{drawable_label} chart {drawable_object_id} has more than {MAX_REFERENCE_LINE_COUNT} reference-line styles"
             )));
         }
-        if usize::try_from(styles.count).ok() != Some(styles.entries.len()) {
-            return Err(Error::InvalidFormat(format!(
-                "{drawable_label} chart {drawable_object_id} reference-line style count is inconsistent"
-            )));
-        }
         let mut indexes = HashSet::with_capacity(styles.entries.len());
         for entry in &styles.entries {
             let index = usize::try_from(entry.index).map_err(|_| {
@@ -685,9 +680,15 @@ fn trim_primary_value_axis_styles(
             styles
                 .entries
                 .retain(|entry| usize::try_from(entry.index).is_ok_and(|index| index < line_count));
-            styles.count = u32::try_from(styles.entries.len()).map_err(|_| {
-                Error::InvalidFormat("chart reference-line style count exceeds u32".to_owned())
-            })?;
+            // The array length, one past the highest index (record 0431).
+            styles.count = styles
+                .entries
+                .iter()
+                .map(|entry| entry.index.checked_add(1))
+                .try_fold(0u32, |count, next| next.map(|next| count.max(next)))
+                .ok_or_else(|| {
+                    Error::InvalidFormat("chart reference-line style count exceeds u32".to_owned())
+                })?;
             if styles.entries.is_empty() {
                 axis.reference_line_styles = None;
             }

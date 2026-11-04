@@ -869,7 +869,11 @@ fn drawable_with(chart: &tsch::ChartArchive) -> Vec<u8> {
 
 fn sparse(entries: &[(u32, u64)]) -> tsp::SparseReferenceArray {
     tsp::SparseReferenceArray {
-        count: entries.len() as u32,
+        count: entries
+            .iter()
+            .map(|(index, _)| index + 1)
+            .max()
+            .unwrap_or(0),
         entries: entries
             .iter()
             .map(|&(index, identifier)| tsp::sparse_reference_array::Entry {
@@ -902,7 +906,7 @@ fn series_non_styles_match_the_generated_encoder() -> TestResult {
     let mut expected = chart.clone();
     expected.series_non_styles = Some(sparse(&[(0, 7), (2, 9)]));
     assert_eq!(added.as_bytes(), drawable_with(&expected).as_slice());
-    // Present: replaced in place, an empty array keeps its count.
+    // Present: replaced in place; `count` is one past the highest index.
     let emptied = super::rewrite_series_non_styles(added.as_bytes(), &[], Limits::DEFAULT)?;
     expected.series_non_styles = Some(sparse(&[]));
     assert_eq!(emptied.as_bytes(), drawable_with(&expected).as_slice());
