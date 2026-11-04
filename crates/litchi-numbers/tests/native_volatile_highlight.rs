@@ -10,7 +10,7 @@ use std::path::PathBuf;
 use litchi_iwa_archive::package::Catalog;
 use litchi_iwa_common::color::{RgbColorSpace, Rgba};
 use litchi_iwa_core::{Archive, SnappyStream};
-use litchi_iwa_protos::tsce;
+use litchi_iwa_protos::{tsce, tst};
 use litchi_numbers::Package;
 use litchi_numbers::cell::conditional_highlight::{Condition, Rule, Style};
 use litchi_numbers::table::At;
@@ -85,6 +85,51 @@ fn volatile_state(source: &[u8]) -> TestResult<(Vec<(u32, Vec<i32>)>, u64)> {
     ))
 }
 
+/// The engine's `uuid_reference_map`, as `(table UUID lower, owner, cells)`.
+fn engine_uuid_map(source: &[u8]) -> TestResult<Vec<(u64, u32, Vec<(u32, Vec<i32>)>)>> {
+    let mut output = Vec::new();
+    for object in &engine(source)?.objects {
+        for message in &object.messages {
+            if message.type_ != 4_000 {
+                continue;
+            }
+            let archive = tsce::CalculationEngineArchive::decode(message.data.as_slice())?;
+            for entry in archive
+                .uuid_reference_map
+                .iter()
+                .flat_map(|map| &map.cell_refs_for_uuid)
+            {
+                for owner in entry.cell_refs.iter().flat_map(|refs| &refs.owner_entries) {
+                    output.push((
+                        entry.uuid.lower,
+                        owner.owner_id,
+                        owner
+                            .coord_set
+                            .column_entries
+                            .iter()
+                            .map(|column| {
+                                (
+                                    column.column,
+                                    column
+                                        .row_set
+                                        .entries
+                                        .iter()
+                                        .flat_map(|range| {
+                                            range.range_begin
+                                                ..=range.range_end.unwrap_or(range.range_begin)
+                                        })
+                                        .collect(),
+                                )
+                            })
+                            .collect(),
+                    ));
+                }
+            }
+        }
+    }
+    Ok(output)
+}
+
 fn native_rule() -> TestResult<Rule> {
     Ok(Rule::new(
         Condition::DateIsToday,
@@ -128,6 +173,89 @@ fn native_rule_reads_on_every_cell_of_its_range() -> TestResult {
     Ok(())
 }
 
+/// The rule Numbers itself added to a cell that had one (record 0433): A2 holds
+/// tomorrow's date with "today" and "tomorrow", A3 and A4 keep "today" alone. The
+/// second rule's preset fill is read, not assumed.
+#[test]
+fn native_second_rule_reads_in_order() -> TestResult {
+    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../test-data/iwork/numbers/volatile-highlight-native-second.numbers");
+    let package = Package::open(path)?;
+    let first = native_rule()?;
+    let rules = package
+        .table_cell_conditional_highlight(0usize, 0usize, At::new(1, 0))?
+        .ok_or_else(|| io::Error::other("no rule on A2"))?;
+    assert_eq!(rules.len(), 2);
+    assert_eq!(rules[0], first);
+    assert!(format!("{:?}", rules[1]).contains("DateIsTomorrow"));
+    for row in [2, 3] {
+        assert_eq!(
+            package.table_cell_conditional_highlight(0usize, 0usize, At::new(row, 0))?,
+            Some(vec![first.clone()]),
+            "row {row}"
+        );
+    }
+    // The volatile set does not grow: A2 was registered by the first rule.
+    let (cells, count) = volatile_state(&exact_bytes(&package)?)?;
+    assert_eq!(cells, [(0, vec![1, 2, 3])]);
+    assert_eq!(count, 8);
+    Ok(())
+}
+
+/// The two rules the leaf writes on A2 hold the predicates Numbers wrote there:
+/// a rule set of its own, the same conditions, and no new volatile cell.
+#[test]
+fn leaf_second_rule_matches_what_numbers_wrote() -> TestResult {
+    let second = std::fs::read(
+        PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../../test-data/iwork/numbers/volatile-highlight-native-second.numbers"),
+    )?;
+    let at = At::new(1, 0);
+    let rules = Package::from_bytes(&second)?
+        .table_cell_conditional_highlight(0usize, 0usize, at)?
+        .ok_or_else(|| io::Error::other("no rule on A2"))?;
+    let package = Package::open(fixture())?;
+    let bytes = exact_bytes(
+        package
+            .edit_table_cell_conditional_highlights(0usize, 0usize)?
+            .set(at, rules.clone())?
+            .commit()?
+            .package(),
+    )?;
+    assert_eq!(
+        Package::from_bytes(&bytes)?.table_cell_conditional_highlight(0usize, 0usize, at)?,
+        Some(rules)
+    );
+    assert_eq!(two_rule_predicates(&bytes)?, two_rule_predicates(&second)?);
+    let (cells, count) = volatile_state(&bytes)?;
+    assert_eq!(cells, [(0, vec![1, 2, 3])]);
+    assert_eq!(count, 8);
+    Ok(())
+}
+
+/// The predicates of every two-rule set of the file's conditional-style list.
+fn two_rule_predicates(source: &[u8]) -> TestResult<Vec<tst::FormulaPredicateArchive>> {
+    let catalog = Catalog::from_bytes(source, Default::default())?;
+    let mut output = Vec::new();
+    for entry in catalog.iter() {
+        if !entry.name().ends_with(".iwa") {
+            continue;
+        }
+        let stream = SnappyStream::decompress(entry.data(), Default::default())?;
+        let archive = Archive::parse(stream.as_bytes(), Default::default())?;
+        for message in archive.objects.iter().flat_map(|object| &object.messages) {
+            if message.type_ == 6_010 {
+                let set = tst::ConditionalStyleSetArchive::decode(message.data.as_slice())?;
+                let rules = set.rules.map(|rules| rules.rule).unwrap_or_default();
+                if rules.len() == 2 {
+                    output.extend(rules.into_iter().filter_map(|rule| rule.predicate));
+                }
+            }
+        }
+    }
+    Ok(output)
+}
+
 /// A new volatile rule registers in Numbers' family, and clearing it restores
 /// the volatile cells and the formula count.
 #[test]
@@ -151,6 +279,9 @@ fn native_family_takes_a_new_cell_and_gives_it_back() -> TestResult {
     let (cells, count) = volatile_state(&bytes)?;
     assert_eq!(cells, [(0, vec![1, 2, 3]), (1, vec![2])]);
     assert_eq!(count, 9);
+    let map = engine_uuid_map(&bytes)?;
+    assert_eq!(map.len(), 1);
+    assert_eq!(map[0].2, [(0, vec![1, 2, 3]), (1, vec![2])]);
 
     let cleared = reopened
         .edit_table_cell_conditional_highlights(0usize, 0usize)?
@@ -165,6 +296,10 @@ fn native_family_takes_a_new_cell_and_gives_it_back() -> TestResult {
     let (cells, count) = volatile_state(&bytes)?;
     assert_eq!(cells, [(0, vec![1, 2, 3])]);
     assert_eq!(count, 8);
+    assert_eq!(
+        engine_uuid_map(&bytes)?,
+        engine_uuid_map(&std::fs::read(fixture())?)?
+    );
     Ok(())
 }
 
@@ -193,6 +328,7 @@ fn clearing_inside_a_native_range_splits_it() -> TestResult {
     let (cells, count) = volatile_state(&bytes)?;
     assert_eq!(cells, [(0, vec![1, 3])]);
     assert_eq!(count, 7);
+    assert_eq!(engine_uuid_map(&bytes)?[0].2, [(0, vec![1, 3])]);
     Ok(())
 }
 
@@ -261,6 +397,15 @@ fn first_volatile_rule_on_a_numbers_saved_table_builds_what_numbers_builds() -> 
     let (cells, count) = volatile_state(&bytes)?;
     assert_eq!(cells, [(1, vec![1])]);
     assert_eq!(count, volatile_state_count(&source)? + 1);
+    // Numbers lists the rule's cell under the table and the conditional-style
+    // owner (internal 9 in both files); its re-save keeps whatever the file holds.
+    let native_map = engine_uuid_map(&std::fs::read(fixture())?)?;
+    assert_eq!(native_map, [(native_map[0].0, 9, vec![(0, vec![1, 2, 3])])]);
+    assert_eq!(engine_uuid_map(&source)?, []);
+    assert_eq!(
+        engine_uuid_map(&bytes)?,
+        [(native_map[0].0, 9, vec![(1, vec![1])])]
+    );
     // Inverse.
     let restored = commit
         .package()

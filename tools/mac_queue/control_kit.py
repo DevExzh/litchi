@@ -7,6 +7,10 @@ Three modes, all without third-party modules:
     control_kit.py build --queue-out OUT --fixed DUMP --native TEST_DATA --out KIT
     control_kit.py add KIT LIST           add another record's packages to a kit
     control_kit.py analyze KIT RESULTS    expected against actual Mac outcomes
+    control_kit.py next-run --queue-out OUT --unproven LIST --out KIT
+                                          a kit of the queue packages no run has seen
+    control_kit.py variant-no-uuid-map IN OUT
+                                          IN with the engine's uuid_reference_map emptied
 
 `audit` reports the two structural rules the failures isolate: an entry of a
 chart `TSP.SparseReferenceArray` beyond its `count`, and a reference to a
@@ -36,6 +40,8 @@ import zipfile
 from pathlib import Path
 
 CHART_DRAWABLE = 5021
+CALCULATION_ENGINE = 4000
+UUID_REFERENCE_MAP = 7
 CHART_EXTENSION = 10000
 SERIES_NON_STYLES = 19
 PACKAGE_METADATA = 11006
@@ -684,6 +690,62 @@ def add_packages(kit: Path, listing: Path) -> int:
     return 0
 
 
+def next_run(queue_out: Path, unproven: Path, out: Path) -> int:
+    """A kit of the queue packages `unproven` lists (`apply_results --unproven`),
+    in the layout of `out/`. `apply_results.py` folds its results by hash, against
+    the queue manifest, not this kit's."""
+    manifest = json.loads((queue_out / "manifest.json").read_text())
+    by_id = {package["id"]: package for package in manifest["packages"]}
+    wanted = unproven.read_text(encoding="utf-8").split()
+    rows = []
+    queue = ["package_id\tapp\tpath\tsha256\trows"]
+    for identifier in wanted:
+        package = by_id[identifier]
+        data = (queue_out / package["path"]).read_bytes()
+        digest = hashlib.sha256(data).hexdigest()
+        if digest != package["sha256"]:
+            raise ValueError(f"{identifier}: the file does not match the manifest")
+        target = out / package["path"]
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(data)
+        queue.append("\t".join([identifier, package["app"], package["path"], digest, str(len(package["rows"]))]))
+        rows.append(
+            {
+                "id": identifier,
+                "group": "queue",
+                "kind": "queue",
+                "app": package["app"],
+                "path": package["path"],
+                "sha256": digest,
+                "size": len(data),
+                "expect": "opens",
+                "source": ", ".join(source["case"] for source in package["sources"]),
+            }
+        )
+    (out / "queue.tsv").write_text("\n".join(queue) + "\n", encoding="utf-8")
+    (out / "manifest.json").write_text(
+        json.dumps({"queue_manifest_sha256": hashlib.sha256((queue_out / "manifest.json").read_bytes()).hexdigest(),
+                    "packages": rows}, indent=1) + "\n"
+    )
+    shutil.copy2(Path(__file__).resolve().parent / "run_on_mac.sh", out / "run_on_mac.sh")
+    print(f"{len(rows)} queue packages in {out}")
+    return 0
+
+
+def variant_no_uuid_map(source: bytes) -> bytes:
+    """Only the calculation engine's `uuid_reference_map` (field 7) is emptied."""
+    package = Package(source)
+    for _, item in package.objects():
+        for message in item["messages"]:
+            if next(v for n, _, v in message["info"] if n == 1) != CALCULATION_ENGINE:
+                continue
+            message["data"] = encode(
+                [(n, w, b"" if n == UUID_REFERENCE_MAP else v) for n, w, v in fields(message["data"])]
+            )
+            return package.to_bytes({ENGINE})
+    raise ValueError("no calculation engine")
+
+
 def analyze(kit: Path, results: Path) -> int:
     rows = json.loads((kit / "manifest.json").read_text())["packages"]
     last = {}
@@ -721,6 +783,13 @@ def main() -> int:
     check = commands.add_parser("analyze")
     check.add_argument("kit", type=Path)
     check.add_argument("results", type=Path)
+    following = commands.add_parser("next-run")
+    following.add_argument("--queue-out", type=Path, required=True)
+    following.add_argument("--unproven", type=Path, required=True)
+    following.add_argument("--out", type=Path, required=True)
+    no_map = commands.add_parser("variant-no-uuid-map")
+    no_map.add_argument("input", type=Path)
+    no_map.add_argument("output", type=Path)
     arguments = parser.parse_args()
     if arguments.command == "audit":
         for path in arguments.files:
@@ -733,6 +802,14 @@ def main() -> int:
         return add_packages(arguments.kit, arguments.listing)
     if arguments.command == "analyze":
         return analyze(arguments.kit, arguments.results)
+    if arguments.command == "next-run":
+        if arguments.out.exists():
+            print(f"{arguments.out} exists; choose a new directory", file=sys.stderr)
+            return 2
+        return next_run(arguments.queue_out, arguments.unproven, arguments.out)
+    if arguments.command == "variant-no-uuid-map":
+        arguments.output.write_bytes(variant_no_uuid_map(arguments.input.read_bytes()))
+        return 0
     if arguments.out.exists():
         print(f"{arguments.out} exists; choose a new directory", file=sys.stderr)
         return 2

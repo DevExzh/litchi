@@ -28,7 +28,8 @@
 //! holds a line and a group). Each digest covers, file by file, every match's kind,
 //! path, positional path and text, and every error, so a changed result set
 //! on any file changes it. Record 0432 re-blessed the Numbers digests
-//! (two new native fixtures). Set `LITCHI_BLESS_GOLDEN=1` to write the current
+//! (two new native fixtures), and record 0433 those of Numbers and Keynote
+//! (three more). Set `LITCHI_BLESS_GOLDEN=1` to write the current
 //! build's digests instead, after showing that a change of results is
 //! intended.
 

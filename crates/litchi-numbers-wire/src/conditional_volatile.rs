@@ -39,6 +39,8 @@ const GLOBAL_OWNER_BASE_UID: Uuid = Uuid::new(466, 0);
 const WHOLE_ROW_COLUMN_SENTINEL: u64 = i16::MAX as u64;
 const WHOLE_COLUMN_ROW_SENTINEL: u64 = i32::MAX as u64;
 const TABLE_OWNER_KIND: u64 = 1;
+/// `TSCE.CalculationEngineArchive.uuid_reference_map`.
+const UUID_REFERENCE_MAP_FIELD: u32 = 7;
 
 /// The host's `ArchiveInfo` message versions of the created objects.
 pub const OWNER_MESSAGE_VERSION: [u32; 3] = [3, 2, 10];
@@ -862,6 +864,18 @@ fn append<'a>(
         message_field(&mut field, 1, record);
         cells.push(field);
     }
+    let owner_internal = single_varint(owner.payload, 2, limits)
+        .map_err(|_| Error::InvalidSource)?
+        .and_then(|internal| u32::try_from(internal).ok())
+        .ok_or(Error::InvalidSource)?;
+    // Numbers' own map; Keynote and Pages hold to the host's shape.
+    let listed = |engine: Vec<u8>| {
+        if source.creates_first_tile {
+            with_uuid_reference(engine, table_uid, owner_internal, row, column, add, limits)
+        } else {
+            Ok(engine)
+        }
+    };
     let mut rebuilt = Vec::new();
     let mut tile = None;
     let mut created_tile = None;
@@ -980,10 +994,6 @@ fn append<'a>(
         }
     }
     if let Some(identifier) = created_tile {
-        let internal = single_varint(owner.payload, 2, limits)
-            .map_err(|_| Error::InvalidSource)?
-            .and_then(|internal| u32::try_from(internal).ok())
-            .ok_or(Error::InvalidSource)?;
         let engine = formula_graph::append_owners_to_engine(
             source.engine.payload,
             &[],
@@ -994,13 +1004,13 @@ fn append<'a>(
         .map_err(Error::Rewrite)?;
         return Ok(Edit {
             payloads: vec![
-                (source.engine.identifier, engine),
+                (source.engine.identifier, listed(engine)?),
                 (owner.identifier, rebuilt),
             ],
             created: vec![Created {
                 identifier,
                 message_type: 4_009,
-                payload: tile_payload(internal, &[record.to_vec()]),
+                payload: tile_payload(owner_internal, &[record.to_vec()]),
                 references: Vec::new(),
             }],
             engine_references: Vec::new(),
@@ -1061,7 +1071,7 @@ fn append<'a>(
     };
     Ok(Edit {
         payloads: vec![
-            (source.engine.identifier, engine),
+            (source.engine.identifier, listed(engine)?),
             (owner.identifier, rebuilt),
             (tile, tile_rebuilt),
         ],
@@ -1069,6 +1079,147 @@ fn append<'a>(
         engine_references: Vec::new(),
         owner_references: Vec::new(),
     })
+}
+
+/// The engine with one coordinate added to or taken out of
+/// `uuid_reference_map` (field 7) under the table's UUID and the
+/// conditional-style owner, as Numbers lists its rule cells
+/// (`volatile-highlight-native.numbers`, record 0433). An engine without the
+/// field (a host-built document) stays as it is, and so does a removal of a
+/// coordinate the map does not list: leaf output of earlier records holds none.
+fn with_uuid_reference(
+    engine: Vec<u8>,
+    table_uid: Uuid,
+    owner_internal: u32,
+    row: i64,
+    column: u32,
+    add: bool,
+    limits: &Limits,
+) -> Result<Vec<u8>> {
+    let mut rebuilt = Vec::with_capacity(engine.len() + 32);
+    for field in fields(&engine, limits).map_err(|_| Error::InvalidSource)? {
+        if field.number == UUID_REFERENCE_MAP_FIELD {
+            let map = uuid_reference_map(
+                field.payload,
+                table_uid,
+                owner_internal,
+                row,
+                column,
+                add,
+                limits,
+            )?;
+            message_field(&mut rebuilt, UUID_REFERENCE_MAP_FIELD, &map);
+        } else {
+            rebuilt.extend_from_slice(field.raw);
+        }
+    }
+    Ok(rebuilt)
+}
+
+/// `TSCE.UuidReferenceMapArchive` with the coordinate added or removed.
+fn uuid_reference_map(
+    map: &[u8],
+    table_uid: Uuid,
+    owner_internal: u32,
+    row: i64,
+    column: u32,
+    add: bool,
+    limits: &Limits,
+) -> Result<Vec<u8>> {
+    let mut output = Vec::with_capacity(map.len() + 32);
+    let mut matched = false;
+    for entry in fields(map, limits).map_err(|_| Error::InvalidSource)? {
+        let uid = single_bytes(entry.payload, 1, limits)
+            .map_err(|_| Error::InvalidSource)?
+            .ok_or(Error::InvalidSource)?;
+        if entry.number != 1 || decode_uuid(uid, limits)? != table_uid {
+            output.extend_from_slice(entry.raw);
+            continue;
+        }
+        matched = true;
+        let mut rewritten = Vec::with_capacity(entry.payload.len() + 16);
+        let mut has_refs = false;
+        for inner in fields(entry.payload, limits).map_err(|_| Error::InvalidSource)? {
+            if inner.number == 3 {
+                has_refs = true;
+                let refs =
+                    owner_cell_refs(inner.payload, owner_internal, row, column, add, limits)?;
+                if !refs.is_empty() {
+                    message_field(&mut rewritten, 3, &refs);
+                }
+            } else {
+                rewritten.extend_from_slice(inner.raw);
+            }
+        }
+        if add && !has_refs {
+            let refs = owner_cell_refs(&[], owner_internal, row, column, add, limits)?;
+            message_field(&mut rewritten, 3, &refs);
+        }
+        // The UUID alone says nothing: the entry goes with its last cell.
+        if single_bytes(&rewritten, 3, limits)
+            .map_err(|_| Error::InvalidSource)?
+            .is_some()
+            || single_bytes(&rewritten, 2, limits)
+                .map_err(|_| Error::InvalidSource)?
+                .is_some()
+        {
+            message_field(&mut output, 1, &rewritten);
+        }
+    }
+    if add && !matched {
+        let mut entry = Vec::new();
+        message_field(&mut entry, 1, &uuid(table_uid));
+        let refs = owner_cell_refs(&[], owner_internal, row, column, add, limits)?;
+        message_field(&mut entry, 3, &refs);
+        message_field(&mut output, 1, &entry);
+    }
+    Ok(output)
+}
+
+/// `TSCE.InternalCellRefSetArchive` with the coordinate added or removed.
+fn owner_cell_refs(
+    refs: &[u8],
+    owner_internal: u32,
+    row: i64,
+    column: u32,
+    add: bool,
+    limits: &Limits,
+) -> Result<Vec<u8>> {
+    let mut output = Vec::with_capacity(refs.len() + 16);
+    let mut matched = false;
+    let owner_entry = |set: &Coordinates| {
+        let mut entry = Vec::new();
+        varint_field(&mut entry, 1, u64::from(owner_internal));
+        message_field(&mut entry, 2, &set.encode());
+        entry
+    };
+    for entry in fields(refs, limits).map_err(|_| Error::InvalidSource)? {
+        let owner = single_varint(entry.payload, 1, limits).map_err(|_| Error::InvalidSource)?;
+        if entry.number != 1 || owner != Some(u64::from(owner_internal)) {
+            output.extend_from_slice(entry.raw);
+            continue;
+        }
+        matched = true;
+        let mut set =
+            match single_bytes(entry.payload, 2, limits).map_err(|_| Error::InvalidSource)? {
+                Some(set) => Coordinates::decode(set, limits)?,
+                None => Coordinates::default(),
+            };
+        if add {
+            set.add(row, column);
+        } else {
+            set.remove(row, column);
+        }
+        if !set.0.is_empty() {
+            message_field(&mut output, 1, &owner_entry(&set));
+        }
+    }
+    if add && !matched {
+        let mut set = Coordinates::default();
+        set.add(row, column);
+        message_field(&mut output, 1, &owner_entry(&set));
+    }
+    Ok(output)
 }
 
 /// The engine's formula-owner references (tracker field 6), in order.
