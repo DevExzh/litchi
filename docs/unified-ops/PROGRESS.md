@@ -7657,3 +7657,7 @@ See [0063](0063-source-pptx-modern-comments.md).
   - synthetic Numbers pivot fixtures (4 packages, open stage: error -609, the app connection dropped).
 - 12 further packages timed out once right after a failing package and passed on retry; the retries count.
 - W3 stays held. Diagnosis is in progress: whether each failure is a leaf defect, a host defect, or a test input that Numbers never accepted.
+- Native evidence and failure diagnosis merged:
+  - W5-N 0432 (`72ebb6e117`): native pivot and volatile fixtures; 13 named pivot aggregates; native-disproved checks on pivot workbooks fixed; first volatile rule on Numbers-saved tables now built.
+  - W5 0431 (`b866937612`): the failed pie and chart-caption packages are classified as host defects the leaf copied, and both are fixed in host and leaf (sparse series-array `count`; caption paragraph-style external reference). The synthetic pivot failure is invalid test input. The causes of the pie and caption failures are not proven until the control run.
+- Control kit `.coord/mac-runbook/out2.tgz` (128 packages, SHA-256 `f45e2eee8f2edc9d9e726026d25ed4b5fd528ebf3d39bf904c7d969e171fe276`) goes to the owner for Mac run 2. No queue row changes until its results are back. 24 packages that passed in run 1 change bytes with the count fix; they back 11 queue rows, 4 of them already FAIL. W3 stays held. Nothing pushed since `4dbfe29241`.
