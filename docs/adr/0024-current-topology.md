@@ -5108,3 +5108,10 @@ iWork family is now:
 The non-iWork release gate counts 18 iWork packages and 21 excluded
 packages. No boundary rule changes for the remaining crates.
 
+## 2026-11-05 amendment: no `internal-iwork-source` feature (record 0436)
+
+The feature no longer exists, in the iWork crates or in `litchi-ops`. The
+`pages`, `keynote` and `numbers` features of `litchi-ops` reach the leaves'
+prepared-source ingress through the public `Package::from_prepared_source`.
+`litchi-iwa-style` no longer depends on `litchi-iwa-archive`, so the boundary
+tool reports one internal dependency declaration fewer.

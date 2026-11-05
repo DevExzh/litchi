@@ -1,5 +1,3 @@
-#![cfg(feature = "internal-iwork-source")]
-
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -27,7 +25,7 @@ fn prepared_source_handoff_preserves_bytes_and_semantics() -> Result<(), Box<dyn
     .ok_or_else(|| std::io::Error::other("native Keynote fixture was not detected"))?;
     assert_eq!(prepared.format(), Format::Keynote);
 
-    let package = Package::__from_prepared_source(prepared, SemanticLimits::default())?;
+    let package = Package::from_prepared_source(prepared, SemanticLimits::default())?;
     let direct = Package::from_bytes(&source)?;
 
     assert_eq!(exact_bytes(&package)?, source.as_ref());

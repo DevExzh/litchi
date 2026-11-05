@@ -9,8 +9,6 @@
 
 use std::{fmt, path::Path, sync::Arc};
 
-#[cfg(feature = "internal-iwork-source")]
-use litchi_iwa_archive::ComponentCatalog;
 use litchi_iwa_archive::{Error as ArchiveError, LimitKind as ArchiveLimitKind, SourceCatalog};
 
 use super::super::{Package, PayloadLimitKind, Profile, ReadError, read_source};
@@ -167,21 +165,6 @@ impl MergeReader {
         let components = Arc::new(source.into_components());
         let package =
             Package::from_merge_components(components, options).map_err(map_read_error)?;
-        Ok(Self { package })
-    }
-
-    /// Build a metadata-only reader from an already checked component
-    /// catalog.  The catalog and each shared archive allocation remain owned
-    /// by the coordinator; this call only adds the Keynote object index and a
-    /// shared reader handle.
-    #[cfg(feature = "internal-iwork-source")]
-    #[doc(hidden)]
-    pub fn __from_shared_catalog(
-        catalog: Arc<ComponentCatalog>,
-        options: OpenOptions,
-    ) -> Result<Self, Error> {
-        let options = Profile::from_options(options).map_err(map_read_error)?;
-        let package = Package::from_merge_components(catalog, options).map_err(map_read_error)?;
         Ok(Self { package })
     }
 
@@ -373,96 +356,13 @@ mod tests {
         );
     }
 
-    #[cfg(feature = "internal-iwork-source")]
-    #[allow(
-        deprecated,
-        reason = "The synthetic Keynote nodes exercise the legacy required envelope fields."
-    )]
-    #[test]
-    fn shared_catalog_keeps_original_archive_allocations() {
-        use litchi_iwa_archive::{ComponentCatalog, Limits};
-
-        let records = ComponentCatalog::from_bytes(NATIVE_SOURCE, Default::default())
-            .expect("native Keynote source")
-            .into_iter()
-            .map(|component| {
-                let (name, archive) = component.into_parts();
-                (name, std::sync::Arc::new(archive))
-            })
-            .collect::<Vec<_>>();
-        let lifetimes = records
-            .iter()
-            .map(|(_, archive)| std::sync::Arc::downgrade(archive))
-            .collect::<Vec<_>>();
-        let catalog = std::sync::Arc::new(
-            ComponentCatalog::__from_shared_archives(
-                records
-                    .iter()
-                    .map(|(name, archive)| (name.as_str(), std::sync::Arc::clone(archive))),
-                Limits::default(),
-            )
-            .expect("shared component catalog"),
-        );
-        let reader = MergeReader::__from_shared_catalog(
-            std::sync::Arc::clone(&catalog),
-            crate::OpenOptions::default(),
-        )
-        .expect("shared catalog reader");
-        assert_eq!(
-            reader
-                .package
-                .state
-                .semantic_decode_attempts
-                .load(Ordering::Relaxed),
-            0
-        );
-        for (name, archive) in &records {
-            assert!(std::ptr::eq(
-                catalog.get(name).expect("shared component").archive(),
-                std::sync::Arc::as_ptr(archive),
-            ));
-            assert_eq!(std::sync::Arc::strong_count(archive), 2);
-        }
-        assert_eq!(
-            reader
-                .slide_table_merges(SlideSelector::index(0), TableSelector::index(0))
-                .expect("shared catalog merge read"),
-            [Region::new(3, 1, 2, 2).expect("checked region")]
-        );
-        assert_eq!(
-            reader
-                .package
-                .state
-                .semantic_decode_attempts
-                .load(Ordering::Relaxed),
-            0
-        );
-        let clone = reader.clone();
-        drop(reader);
-        drop(catalog);
-        drop(records);
-        assert!(
-            lifetimes
-                .iter()
-                .all(|lifetime| lifetime.upgrade().is_some())
-        );
-        drop(clone);
-        assert!(
-            lifetimes
-                .iter()
-                .all(|lifetime| lifetime.upgrade().is_none())
-        );
-    }
-
-    #[cfg(feature = "internal-iwork-source")]
     #[test]
     fn missing_name_scan_accumulates_references_across_many_slides()
     -> Result<(), Box<dyn std::error::Error>> {
-        use std::sync::Arc;
-
         use crate::{OpenOptions, SemanticLimits};
+        use litchi_iwa_archive::package::{Catalog, EntryEdit};
         use litchi_iwa_archive::{ComponentCatalog, Limits};
-        use litchi_iwa_core::{ArchiveObject, RawMessage};
+        use litchi_iwa_core::{ArchiveObject, RawMessage, SnappyStream};
         use litchi_iwa_protos::{kn, tsp};
         use prost::Message as _;
 
@@ -549,15 +449,25 @@ mod tests {
             .1
             .objects
             .extend(extra_objects);
-        let catalog = Arc::new(ComponentCatalog::__from_shared_archives(
-            parts
-                .iter()
-                .map(|(name, archive)| (name.as_str(), Arc::new(archive.clone()))),
-            Limits::default(),
-        )?);
+        let compressed = parts
+            .iter()
+            .map(|(name, archive)| {
+                let stream = archive.to_bytes(Default::default())?;
+                Ok((
+                    name.as_str(),
+                    SnappyStream::compress(&stream, Default::default())?,
+                ))
+            })
+            .collect::<Result<Vec<_>, Box<dyn std::error::Error>>>()?;
+        let edits = compressed
+            .iter()
+            .map(|(name, bytes)| EntryEdit::new(name, bytes))
+            .collect::<Vec<_>>();
+        let source = Catalog::from_bytes(NATIVE_SOURCE, Default::default())?
+            .reassemble_to_bytes(&edits, Limits::default())?;
         let semantic = SemanticLimits::builder().max_references(5)?.build()?;
-        let reader = MergeReader::__from_shared_catalog(
-            catalog,
+        let reader = MergeReader::from_bytes_with_options(
+            &source,
             OpenOptions::new().semantic_limits(semantic),
         )?;
         assert!(matches!(
@@ -569,26 +479,5 @@ mod tests {
             })
         ));
         Ok(())
-    }
-
-    #[cfg(feature = "internal-iwork-source")]
-    #[test]
-    fn semantic_only_package_ingress_remains_unsupported_for_package_reads() {
-        let components = std::sync::Arc::new(
-            litchi_iwa_archive::ComponentCatalog::from_bytes(NATIVE_SOURCE, Default::default())
-                .expect("native Keynote components"),
-        );
-        let package = Package::from_classified_components(
-            components,
-            litchi_iwa_archive::Limits::default(),
-            crate::SemanticLimits::default(),
-        )
-        .expect("semantic-only Keynote package");
-        assert!(matches!(
-            package.slide_table_merges(SlideSelector::index(0), TableSelector::index(0)),
-            Err(super::super::Error::Refused(
-                crate::slide::table::merge::transaction::Refusal::UnsupportedSource
-            ))
-        ));
     }
 }

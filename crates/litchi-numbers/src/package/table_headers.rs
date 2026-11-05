@@ -335,7 +335,7 @@ impl Edit<'_> {
     /// one component, reassembles once, and fully reopens one candidate.
     pub fn commit(self) -> Result<Commit, Error> {
         let catalog = physical_source(self.source)?;
-        let source = catalog.__source_owner();
+        let source = catalog.source_owner();
         if self.before == self.settings {
             return Ok(Commit {
                 package: self.source.snapshot(),
@@ -376,7 +376,7 @@ impl Edit<'_> {
         let source_payload = clone_selected_payload(self.source, target)?;
         let (package, target_payload) = rewrite(self.source, target, self.settings, &previews)?;
         verify_exact_locality(self.source, &package, target, &previews, 0, &target_payload)?;
-        let target_bytes = physical_source(&package)?.__source_owner();
+        let target_bytes = physical_source(&package)?.source_owner();
         Ok(Commit {
             package,
             patch: Patch {

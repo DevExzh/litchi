@@ -29,7 +29,7 @@ use super::body_drawable_graph::{
     self as graph, Budget, GraphError, GraphLimit, MessageRewrite, ObjectIndex, kind_name,
     message_type,
 };
-use super::movie_playback::{__decode_movie_playback_payload, __rewrite_movie_playback_payload};
+use super::movie_playback::{decode_movie_playback_payload, rewrite_movie_playback_payload};
 use crate::drawable::{Geometry, GeometryFlags, Properties};
 use crate::selector::DrawableSelector;
 
@@ -894,7 +894,7 @@ fn read_snapshot(
             None
         },
         DrawableSelector::Movie(_) | DrawableSelector::Audio(_) => Some(
-            __decode_movie_playback_payload(payload, budget.wire_limits())
+            decode_movie_playback_payload(payload, budget.wire_limits())
                 .map_err(|_| Error::InvalidSource)?,
         ),
     };
@@ -1066,7 +1066,7 @@ fn commit_edit(edit: Edit<'_>) -> Result<Commit, Error> {
     }
     if playback_changed {
         let settings = edit.after.playback.ok_or(Error::InvalidSource)?;
-        payload = __rewrite_movie_playback_payload(&payload, settings, budget.wire_limits())
+        payload = rewrite_movie_playback_payload(&payload, settings, budget.wire_limits())
             .map_err(|_| Error::InvalidSource)?;
     }
     let message_type = message_type(current.selector);

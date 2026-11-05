@@ -851,65 +851,6 @@ def add_numbers_table_cell_comment_reply_mutation_scaffold(root: Path) -> None:
         (directory / "seed.hex").write_text("00\n", encoding="utf-8")
 
 
-def add_numbers_cell_comment_reader_compat_mutation_scaffold(
-    root: Path,
-    *,
-    module_declaration: str,
-    method_attributes: str = "#[doc(hidden)]\n",
-    extra_methods: str = "",
-) -> Path:
-    """Add the four source-byte readers to an active mutation-owner fixture."""
-
-    add_numbers_table_cell_comment_reply_mutation_scaffold(root)
-    owner = root / boundaries.NUMBERS_TABLE_CELL_COMMENT_REPLY_MUTATION_OWNER_SOURCE
-    owner.write_text(
-        owner.read_text(encoding="utf-8") + module_declaration,
-        encoding="utf-8",
-    )
-    compat = root / boundaries.IWA_NUMBERS_CELL_COMMENT_READER_COMPAT_SOURCE
-    compat.parent.mkdir(parents=True, exist_ok=True)
-    compat.write_text(
-        "impl Package {\n"
-        f"{method_attributes}"
-        "pub fn __table_cell_comment_from_bytes_for_compatibility<'sheet, 'table>(\n"
-        "    bytes: &[u8],\n"
-        "    sheet: impl Into<SheetSelector<'sheet>>,\n"
-        "    table: impl Into<TableSelector<'table>>,\n"
-        "    position: At,\n"
-        ") -> Result<Option<Comment>> { todo!() }\n"
-        f"{method_attributes}"
-        "pub fn __table_cell_comment_from_bytes_for_compatibility_with_options<'sheet, 'table>(\n"
-        "    bytes: &[u8],\n"
-        "    options: OpenOptions,\n"
-        "    sheet: impl Into<SheetSelector<'sheet>>,\n"
-        "    table: impl Into<TableSelector<'table>>,\n"
-        "    position: At,\n"
-        ") -> Result<Option<Comment>> { todo!() }\n"
-        f"{method_attributes}"
-        "pub fn __table_cell_comment_replies_from_bytes_for_compatibility<'sheet, 'table>(\n"
-        "    bytes: &[u8],\n"
-        "    sheet: impl Into<SheetSelector<'sheet>>,\n"
-        "    table: impl Into<TableSelector<'table>>,\n"
-        "    position: At,\n"
-        ") -> Result<Box<[CommentReply]>> { todo!() }\n"
-        f"{method_attributes}"
-        "pub fn __table_cell_comment_replies_from_bytes_for_compatibility_with_options<\n"
-        "    'sheet,\n"
-        "    'table,\n"
-        ">(\n"
-        "    bytes: &[u8],\n"
-        "    options: OpenOptions,\n"
-        "    sheet: impl Into<SheetSelector<'sheet>>,\n"
-        "    table: impl Into<TableSelector<'table>>,\n"
-        "    position: At,\n"
-        ") -> Result<Box<[CommentReply]>> { todo!() }\n"
-        f"{extra_methods}"
-        "}\n",
-        encoding="utf-8",
-    )
-    return compat
-
-
 def add_numbers_table_header_settings_canonical_scaffold(root: Path) -> None:
     semantic = root / boundaries.NUMBERS_TABLE_HEADER_SETTINGS_SEMANTIC_SOURCE
     semantic.parent.mkdir(parents=True, exist_ok=True)
@@ -1237,17 +1178,6 @@ def add_numbers_table_appearance_canonical_scaffold(root: Path) -> None:
         + "fn metadata_save_token_watermark() {}\n"
         + "fn transaction_budget_preflight() {}\n"
         + "fn verify_locality_candidate_reopen() {}\n"
-        + "#[cfg(feature = \"internal-iwork-source\")]\n"
-        + "#[doc(hidden)]\n"
-        + "pub fn __table_appearance_from_source_built(\n"
-        + "    model_payload: &[u8],\n"
-        + "    model_style_identifier: u64,\n"
-        + "    model_style_preset_identifier: Option<u64>,\n"
-        + "    lookup: impl FnMut(u64, SourceBuiltAppearancePayload, &mut dyn FnMut(&[u8])) -> Result<(), Error>,\n"
-        + ") -> Result<Appearance, Error> {\n"
-        + "    let _ = (model_payload, model_style_identifier, model_style_preset_identifier, lookup);\n"
-        + "    todo!()\n"
-        + "}\n"
         + "impl Package {\n"
         + "pub fn table_appearance<'sheet, 'table>(&self, "
         "sheet: impl Into<SheetSelector<'sheet>>, "
@@ -21346,130 +21276,6 @@ fn rewrite_movie_title_operation(
                 [],
             )
 
-    def test_numbers_comment_compatibility_bytes_are_allowed_only_for_exact_hidden_readers(
-        self,
-    ) -> None:
-        module = (
-            '#[cfg(feature = "internal-iwork-source")]\n'
-            "#[doc(hidden)]\n"
-            '#[path = "comments_compat.rs"]\n'
-            "mod comments_compat;\n"
-        )
-        with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
-            compat = add_numbers_cell_comment_reader_compat_mutation_scaffold(
-                root,
-                module_declaration=module,
-            )
-            self.assertEqual(
-                boundaries.audit_numbers_table_cell_comment_reply_mutation_facade_source_topology(
-                    root
-                ),
-                [],
-            )
-
-            compat.write_text(
-                compat.read_text(encoding="utf-8").replace(
-                    "position: At,\n",
-                    "position: At, raw: &[u8],\n",
-                    1,
-                ),
-                encoding="utf-8",
-            )
-            violations = boundaries.audit_numbers_table_cell_comment_reply_mutation_facade_source_topology(
-                root
-            )
-            self.assertTrue(
-                any(
-                    "raw byte slice &[u8]" in item
-                    and "comments_compat.rs" in item
-                    for item in violations
-                ),
-                violations,
-            )
-
-    def test_numbers_comment_compatibility_ordinary_bytes_remain_forbidden(self) -> None:
-        module = (
-            '#[cfg(feature = "internal-iwork-source")]\n'
-            "#[doc(hidden)]\n"
-            '#[path = "comments_compat.rs"]\n'
-            "mod comments_compat;\n"
-        )
-        with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
-            add_numbers_cell_comment_reader_compat_mutation_scaffold(
-                root,
-                module_declaration=module,
-                extra_methods="pub fn ordinary_bytes(&self, bytes: &[u8]) {}\n",
-            )
-            violations = boundaries.audit_numbers_table_cell_comment_reply_mutation_facade_source_topology(
-                root
-            )
-            self.assertTrue(
-                any(
-                    "raw byte slice &[u8]" in item
-                    and "comments_compat.rs" in item
-                    for item in violations
-                ),
-                violations,
-            )
-
-    def test_numbers_comment_compatibility_exception_requires_private_hidden_module_and_methods(
-        self,
-    ) -> None:
-        module_variants = (
-            (
-                "wrong module path",
-                '#[cfg(feature = "internal-iwork-source")]\n'
-                "#[doc(hidden)]\n"
-                '#[path = "other_comments.rs"]\n'
-                "mod comments_compat;\n",
-                "#[doc(hidden)]\n",
-            ),
-            (
-                "missing internal cfg",
-                "#[doc(hidden)]\n"
-                '#[path = "comments_compat.rs"]\n'
-                "mod comments_compat;\n",
-                "#[doc(hidden)]\n",
-            ),
-            (
-                "public module",
-                '#[cfg(feature = "internal-iwork-source")]\n'
-                "#[doc(hidden)]\n"
-                '#[path = "comments_compat.rs"]\n'
-                "pub mod comments_compat;\n",
-                "#[doc(hidden)]\n",
-            ),
-            (
-                "missing method doc",
-                '#[cfg(feature = "internal-iwork-source")]\n'
-                "#[doc(hidden)]\n"
-                '#[path = "comments_compat.rs"]\n'
-                "mod comments_compat;\n",
-                "",
-            ),
-        )
-        for label, module, method_attributes in module_variants:
-            with self.subTest(variant=label), tempfile.TemporaryDirectory() as directory:
-                root = Path(directory)
-                add_numbers_cell_comment_reader_compat_mutation_scaffold(
-                    root,
-                    module_declaration=module,
-                    method_attributes=method_attributes,
-                )
-                violations = boundaries.audit_numbers_table_cell_comment_reply_mutation_facade_source_topology(
-                    root
-                )
-                self.assertTrue(
-                    any(
-                        "raw byte slice &[u8]" in item
-                        and "comments_compat.rs" in item
-                        for item in violations
-                    ),
-                    violations,
-                )
-
     def test_numbers_table_cell_comment_reply_mutation_requires_each_api_and_index_accessor(
         self,
     ) -> None:
@@ -22738,27 +22544,34 @@ fn rewrite_movie_title_operation(
                 boundaries.audit_numbers_table_merge_reader_source_topology(root), []
             )
 
-    def test_numbers_table_merge_reader_internal_ingress_stays_hidden_and_bounded(self) -> None:
-        for removed, expected in (
-            ('#[cfg(feature = "internal-iwork-source")]', "feature-gated"),
-            ('#[doc(hidden)]', "doc(hidden)"),
-            ('Arc<ComponentCatalog>', "Arc<ComponentCatalog>"),
-            ('options: crate::OpenOptions', "OpenOptions"),
-        ):
-            with self.subTest(removed=removed), tempfile.TemporaryDirectory() as directory:
-                root = Path(directory)
-                copy_numbers_table_merge_reader_fixture(root)
-                reader = root / boundaries.NUMBERS_TABLE_MERGE_READER_SOURCE
-                source = reader.read_text(encoding="utf-8")
-                marker = source.index("    pub fn __from_shared_catalog")
-                start = source.rfind("    #[cfg", 0, marker)
-                end = source.index("    fn from_components_with_options", marker)
-                seam = source[start:end]
-                self.assertIn(removed, seam)
-                source = source[:start] + seam.replace(removed, "", 1) + source[end:]
-                reader.write_text(source, encoding="utf-8")
-                violations = boundaries.audit_numbers_table_merge_reader_source_topology(root)
-                self.assertTrue(any(expected in item for item in violations), violations)
+    def test_retired_host_seams_stay_out_of_every_crate(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            manifest = root / "crates/litchi-pages/Cargo.toml"
+            source = root / "crates/litchi-pages/src/lib.rs"
+            source.parent.mkdir(parents=True)
+            manifest.write_text("[features]\ndefault = []\n", encoding="utf-8")
+            source.write_text("pub fn decode_payload() {}\n", encoding="utf-8")
+            self.assertEqual(boundaries.audit_iwa_retired_host_seams(root), [])
+
+            manifest.write_text(
+                f"[features]\n{boundaries.IWA_RETIRED_HOST_FEATURE} = []\n",
+                encoding="utf-8",
+            )
+            source.write_text(
+                "pub fn __table_appearance_from_source_built() {}\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_iwa_retired_host_seams(root)
+            self.assertEqual(len(violations), 2, violations)
+            self.assertTrue(
+                any(boundaries.IWA_RETIRED_HOST_FEATURE in item for item in violations),
+                violations,
+            )
+            self.assertTrue(
+                any("__table_appearance_from_source_built" in item for item in violations),
+                violations,
+            )
 
     def test_numbers_table_merge_reader_boundary_rejects_raw_byte_methods_and_aliases(
         self,
@@ -22831,7 +22644,7 @@ fn rewrite_movie_title_operation(
                 copy_focused_table_merge_reader_fixture(root, format_name)
                 self.assertEqual(audit(root), [])
 
-    def test_pages_and_keynote_merge_readers_require_private_shared_ingress(self) -> None:
+    def test_pages_and_keynote_merge_readers_require_options_ingress(self) -> None:
         for format_name, audit, reader_relative in (
             (
                 "Pages",
@@ -22855,35 +22668,6 @@ fn rewrite_movie_title_operation(
                         else boundaries.KEYNOTE_TABLE_MERGE_SOURCE
                     )
                 source = source_path.read_text(encoding="utf-8")
-                marker = "    pub fn __from_shared_catalog"
-                start = source.index(marker)
-                attribute_start = source.rfind("    #[cfg", 0, start)
-                attribute_end = source.index(marker, attribute_start)
-                seam = source[attribute_start:attribute_end]
-                for removed, expected in (
-                    (
-                        '#[cfg(feature = "internal-iwork-source")]',
-                        "feature-gated",
-                    ),
-                    ("#[doc(hidden)]", "doc(hidden)"),
-                    ("Arc<ComponentCatalog>", "Arc<ComponentCatalog>"),
-                ):
-                    with self.subTest(removed=removed):
-                        mutated = source[:attribute_start] + seam.replace(removed, "", 1) + source[attribute_end:]
-                        if removed == "Arc<ComponentCatalog>":
-                            catalog_start = source.index("Arc<ComponentCatalog>", start)
-                            mutated = (
-                                source[:catalog_start]
-                                + source[catalog_start:].replace(
-                                    "Arc<ComponentCatalog>",
-                                    "ComponentCatalog",
-                                    1,
-                                )
-                            )
-                        source_path.write_text(mutated, encoding="utf-8")
-                        violations = audit(root)
-                        self.assertTrue(any(expected in item for item in violations), violations)
-
                 # Both readers take `OpenOptions` (record 0361 retired the
                 # Pages `*_with_limits` ingress).
                 before, after, expected = "options: OpenOptions", "options: ()", "options ingress"

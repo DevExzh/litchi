@@ -969,57 +969,6 @@ fn exact_no_op_skips_changed_target_resolution_but_changes_fail_closed() -> Test
     Ok(())
 }
 
-#[cfg(feature = "internal-iwork-source")]
-#[test]
-fn apply_rejects_semantic_prepared_source_but_keeps_noop_exact() -> TestResult {
-    use std::sync::Arc;
-
-    use litchi_iwa_detect::PreparedSource;
-
-    let source: Arc<[u8]> = body_fixture::direct_package()?.into();
-    let exact_prepared = PreparedSource::from_shared_bytes(
-        Arc::clone(&source),
-        litchi_iwa_detect::Limits::default(),
-    )?
-    .ok_or("fixture was not detected as Pages")?;
-    let exact_package = Package::__from_prepared_source(exact_prepared)?;
-    let semantic_prepared = PreparedSource::__from_shared_bytes_with_pages_metadata(
-        Arc::clone(&source),
-        litchi_iwa_detect::Limits::default(),
-    )?
-    .ok_or("fixture was not detected as Pages")?;
-    let semantic_package = Package::__from_prepared_source(semantic_prepared)?;
-    let before = semantic_package.exact_bytes();
-
-    let noop = semantic_package
-        .edit_body_table_appearance(0usize)?
-        .set(semantic_package.body_table_appearance(0usize)?)
-        .commit()?;
-    assert!(noop.patch().is_noop());
-    assert_eq!(noop.package().exact_bytes(), before);
-    assert_eq!(noop.diagnostics().touched_components(), 0);
-    assert!(!noop.diagnostics().full_reparse_performed());
-    assert_eq!(
-        semantic_package
-            .apply_body_table_appearance(noop.patch())?
-            .package()
-            .exact_bytes(),
-        before
-    );
-
-    let changed = exact_package
-        .edit_body_table_appearance(0usize)?
-        .set(changed_appearance())
-        .commit()?;
-    assert!(!changed.patch().is_noop());
-    assert!(matches!(
-        semantic_package.apply_body_table_appearance(changed.patch()),
-        Err(Error::PatchConflict)
-    ));
-    assert_eq!(semantic_package.exact_bytes(), before);
-    Ok(())
-}
-
 #[test]
 fn changed_appearance_cows_shared_style_preserves_unknowns_and_locality() -> TestResult {
     let source = body_fixture::direct_package()?;

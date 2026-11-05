@@ -203,7 +203,7 @@ impl Edit<'_> {
     /// resource ceiling is exceeded, or candidate verification fails.
     pub fn commit(self) -> Result<Commit, Error> {
         let source = physical_source(self.source)?;
-        let source_bytes = source.__source_owner();
+        let source_bytes = source.source_owner();
         let source_fingerprint = fingerprint(&source_bytes);
         if self.before == self.state {
             return Ok(Commit {
@@ -232,7 +232,7 @@ impl Edit<'_> {
             self.before,
             self.state,
         )?;
-        let target = physical_source(&package)?.__source_owner();
+        let target = physical_source(&package)?.source_owner();
         let target_fingerprint = fingerprint(&target);
         Ok(Commit {
             package,

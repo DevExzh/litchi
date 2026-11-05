@@ -1106,7 +1106,7 @@ impl Package {
     /// Apply a reversible exact-source persisted-sort patch.
     pub fn apply_table_sort_order(&self, patch: &Patch) -> Result<Commit, Error> {
         let catalog = physical_source(self)?;
-        let source = catalog.__source_owner();
+        let source = catalog.source_owner();
         if !patch.artifacts.authorizes_owner(&source) {
             return Err(Error::PatchConflict);
         }
@@ -1243,7 +1243,7 @@ fn resolve_at(
 
 fn commit_edit(edit: Edit<'_>) -> Result<Commit, Error> {
     if edit.target.before == edit.after {
-        let source = physical_source(edit.source)?.__source_owner();
+        let source = physical_source(edit.source)?.source_owner();
         return Ok(Commit {
             package: edit.source.snapshot(),
             patch: Patch {
@@ -1295,8 +1295,8 @@ fn commit_edit(edit: Edit<'_>) -> Result<Commit, Error> {
     )
     .map_err(map_header_error)?;
     verify_unchanged_entries(edit.source, &package, edit.target.native)?;
-    let source = catalog.__source_owner();
-    let target = physical_source(&package)?.__source_owner();
+    let source = catalog.source_owner();
+    let target = physical_source(&package)?.source_owner();
     Ok(Commit {
         package,
         patch: Patch {

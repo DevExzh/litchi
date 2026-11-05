@@ -12390,3 +12390,11 @@ The Verification section's requirement that the boundary tool report
 `litchi-iwa` as a migration host is superseded: the tool reports no migration
 host.
 
+## 2026-11-05 amendment: the host's seams are removed (record 0436)
+
+The `internal-iwork-source` feature and the leaves' hidden host seams are gone,
+as the follow-up of record 0429 §5. Prepared-source ingress, the one seam with a
+real non-test caller, is now the public `Package::from_prepared_source` of each
+leaf, which `litchi-ops` calls. `tools/check_crate_boundaries.py` rejects the
+feature and the retired seam names in every crate. The `*-full` glossary profiles,
+which differed from `*-minimal` only by that feature, are deleted.

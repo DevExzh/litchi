@@ -478,7 +478,7 @@ impl Package {
     pub fn apply_table_cell_scientific_format(&self, patch: &Patch) -> Result<Commit, Error> {
         let catalog = super::table_headers::rewrite::physical_source(self)
             .map_err(|_| Error::Refused(Refusal::UnsupportedSource))?;
-        let owner = catalog.__source_owner();
+        let owner = catalog.source_owner();
         if !patch.artifacts.authorizes_owner(&owner) {
             return Err(Error::PatchConflict);
         }
@@ -571,7 +571,7 @@ fn no_op_commit(
 ) -> Result<Commit, Error> {
     let catalog = super::table_headers::rewrite::physical_source(source)
         .map_err(|_| Error::Refused(Refusal::UnsupportedSource))?;
-    let owner = catalog.__source_owner();
+    let owner = catalog.source_owner();
     Ok(Commit {
         package: source.snapshot(),
         patch: Patch {
@@ -603,7 +603,7 @@ fn rewrite(
     if !source_catalog.source_is_exact() {
         return Err(Error::Refused(Refusal::UnsupportedSource));
     }
-    let source_owner = source_catalog.__source_owner();
+    let source_owner = source_catalog.source_owner();
     let snappy_limits = source_catalog
         .limits()
         .snappy_limits()
@@ -813,7 +813,7 @@ fn rewrite(
     }
     let touched_components =
         verify_scientific_package_locality_with_members(source, &candidate, &changed_names)?;
-    let target_owner = candidate_catalog.__source_owner();
+    let target_owner = candidate_catalog.source_owner();
     Ok(Commit {
         package: candidate,
         patch: Patch {

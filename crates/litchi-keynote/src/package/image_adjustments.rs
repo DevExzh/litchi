@@ -162,19 +162,6 @@ impl From<Refusal> for Error {
     }
 }
 
-/// Typed failures at the hidden host migration seam.
-#[doc(hidden)]
-#[cfg(feature = "internal-iwork-source")]
-#[derive(Debug, Clone, PartialEq, Eq, ThisError)]
-pub enum ImageAdjustmentsError {
-    /// The strict neutral codec rejected the source or candidate.
-    #[error("image-adjustments codec rejected the payload: {0}")]
-    Codec(#[from] image_adjustments_codec::DecodeError),
-    /// The common semantic image boundary rejected a projected value.
-    #[error("invalid image adjustment value: {0}")]
-    Semantic(#[from] litchi_iwa_common::shape::image::Error),
-}
-
 /// One mutable image-adjustment value staged against an immutable package.
 pub struct Edit<'a> {
     source: &'a Package,
@@ -915,42 +902,6 @@ pub(super) fn select_slide_image(
         image_identifier: selection.image_identifier,
         layout: selection.layout,
     })
-}
-
-/// Decode one borrowed complete `TSD.ImageArchive` payload for the legacy host.
-#[cfg(feature = "internal-iwork-source")]
-#[doc(hidden)]
-pub fn __decode_image_adjustments_payload(
-    source: &[u8],
-    wire_limits: WireLimits,
-) -> Result<ImageAdjustments, ImageAdjustmentsError> {
-    decode_image_adjustments_payload(source, wire_limits)
-}
-
-#[cfg(feature = "internal-iwork-source")]
-fn decode_image_adjustments_payload(
-    source: &[u8],
-    wire_limits: WireLimits,
-) -> Result<ImageAdjustments, ImageAdjustmentsError> {
-    Ok(decode_image_adjustments_snapshot(source, wire_limits)?.0)
-}
-
-#[cfg(feature = "internal-iwork-source")]
-fn decode_image_adjustments_snapshot(
-    source: &[u8],
-    wire_limits: WireLimits,
-) -> Result<(ImageAdjustments, image_adjustments_codec::DecodeReport), ImageAdjustmentsError> {
-    let recursion_limit = u32::try_from(wire_limits.max_nesting()).unwrap_or(u32::MAX);
-    let options = image_adjustments_codec::DecodeOptions::new(
-        wire_limits.max_input_bytes().min(source.len().max(1)),
-        wire_limits.max_fields(),
-        wire_limits.max_rewrite_work(),
-        recursion_limit,
-    )
-    .with_max_output_bytes(wire_limits.max_output_bytes());
-    let (snapshot, report) =
-        image_adjustments_codec::decode_image_adjustments_with_report(source, options)?;
-    Ok((adjustments_from_snapshot(snapshot)?, report))
 }
 
 fn image_adjustments_write(adjustments: ImageAdjustments) -> ImageAdjustmentsWrite {

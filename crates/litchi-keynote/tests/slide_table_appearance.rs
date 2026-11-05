@@ -947,35 +947,28 @@ fn typed_selectors_effective_values_and_z_order_are_publicly_stable() -> TestRes
     Ok(())
 }
 
-#[cfg(feature = "internal-iwork-source")]
 #[test]
-fn focused_batch_appearance_read_preserves_selector_order() -> TestResult {
+fn appearance_reads_follow_selector_order() -> TestResult {
     let source = synthetic_package(false, false)?;
     let package = Package::from_bytes(&source)?;
-    let batch = package.__slide_table_appearances(0)?;
-
-    assert_eq!(
-        batch,
-        vec![
-            direct_appearance(),
-            direct_appearance(),
-            preset_appearance(),
-            Appearance::default(),
-        ]
-    );
-    for (table, expected) in batch.iter().copied().enumerate() {
+    let expected = [
+        direct_appearance(),
+        direct_appearance(),
+        preset_appearance(),
+        Appearance::default(),
+    ];
+    for (table, expected) in expected.into_iter().enumerate() {
         assert_eq!(
             package.slide_table_appearance(0usize, table)?,
             expected,
-            "batch result diverged at table position {table}"
+            "appearance diverged at table position {table}"
         );
     }
     Ok(())
 }
 
-#[cfg(feature = "internal-iwork-source")]
 #[test]
-fn focused_batch_appearance_read_validates_unselected_tables() -> TestResult {
+fn appearance_read_rejects_a_malformed_preset_chain() -> TestResult {
     let source = rewrite_style_payload(
         &synthetic_package(false, false)?,
         PRESET_STYLE_ID,
@@ -986,7 +979,6 @@ fn focused_batch_appearance_read_validates_unselected_tables() -> TestResult {
     )?;
     let package = Package::from_bytes(&source)?;
     assert!(package.slide_table_appearance(0usize, 0usize).is_err());
-    assert!(package.__slide_table_appearances(0).is_err());
     Ok(())
 }
 

@@ -40,8 +40,6 @@ mod image_adjustments;
 mod index;
 mod limits;
 mod metadata;
-#[cfg(feature = "internal-iwork-source")]
-mod movie_playback;
 /// Exact-source sheet and table name transactions.
 pub(crate) mod names;
 mod physical_entry_index;
@@ -123,19 +121,8 @@ pub(crate) mod table_lock;
 pub(crate) mod table_merges;
 pub(crate) mod table_order;
 pub(crate) mod table_relocation;
-#[cfg(feature = "internal-iwork-source")]
-#[allow(
-    dead_code,
-    reason = "The physical-only relocation seam is retained solely for the legacy migration host."
-)]
-mod table_relocation_compat;
 pub(crate) mod table_resize;
 pub(crate) mod table_sort;
-#[allow(
-    dead_code,
-    reason = "The physical-only persisted-sort seam is retained solely for legacy migration snapshots."
-)]
-mod table_sort_compat;
 pub(crate) mod table_sort_execution;
 pub(crate) mod table_title;
 pub(crate) mod table_topology;
@@ -148,7 +135,7 @@ use std::path::Path;
 use std::sync::Arc;
 
 use litchi_iwa_archive::package::SharedBytes;
-use litchi_iwa_archive::{ComponentCatalog, OwnedSourceCatalog, SourceCatalog};
+use litchi_iwa_archive::{ComponentCatalog, SourceCatalog};
 use litchi_iwa_common::WireLimits;
 use litchi_iwa_common::wire::{WireDescent, preflight_wire_tree};
 use litchi_iwa_core::{Archive, RawMessage};
@@ -165,19 +152,10 @@ use extractor::TableDataExtractor;
 use index::{Index, Resolved};
 use sheet::DecodedSheet;
 
-#[cfg(feature = "internal-iwork-source")]
-#[doc(hidden)]
-pub use image_adjustments::{__decode_image_adjustments_payload, ImageAdjustmentsError};
-
 pub use crate::limits::{MAX_OBJECTS, MAX_REFERENCES, SemanticLimitKind, SemanticLimits};
 pub(crate) use limits::Profile;
 /// Physical ingress ceilings for a parsed Numbers package.
 pub(crate) use litchi_iwa_archive::Limits;
-#[cfg(feature = "internal-iwork-source")]
-#[doc(hidden)]
-pub use movie_playback::{
-    __movie_playback_settings, __rewrite_movie_playback_settings, MoviePlaybackError,
-};
 pub use save::SaveError;
 
 /// The focused transaction families whose owners stay private to the
@@ -507,7 +485,6 @@ pub type Result<T> = std::result::Result<T, Error>;
 #[derive(Debug)]
 enum Components {
     PhysicalShared(Box<SourceCatalog>),
-    PhysicalOwned(Box<OwnedSourceCatalog>),
     Semantic(Arc<ComponentCatalog>),
 }
 
@@ -525,14 +502,14 @@ impl Components {
     }
 
     fn from_owned_bytes(source: Vec<u8>, limits: Limits) -> Result<Self> {
-        Ok(Self::PhysicalOwned(Box::new(
-            OwnedSourceCatalog::__from_owned_bytes(source, limits)?,
+        Ok(Self::PhysicalShared(Box::new(
+            SourceCatalog::from_owned_bytes(source, limits)?,
         )))
     }
 
     fn from_source_owner(source: SharedBytes, limits: Limits) -> Result<Self> {
-        Ok(Self::PhysicalOwned(Box::new(
-            OwnedSourceCatalog::__from_source_owner(source, limits)?,
+        Ok(Self::PhysicalShared(Box::new(
+            SourceCatalog::from_source_owner(source, limits)?,
         )))
     }
 
@@ -543,7 +520,6 @@ impl Components {
     fn catalog(&self) -> &ComponentCatalog {
         match self {
             Self::PhysicalShared(source) => source.components(),
-            Self::PhysicalOwned(source) => source.__as_source_catalog().components(),
             Self::Semantic(catalog) => catalog,
         }
     }
@@ -551,7 +527,6 @@ impl Components {
     fn physical(&self) -> Option<&SourceCatalog> {
         match self {
             Self::PhysicalShared(source) => Some(source.as_ref()),
-            Self::PhysicalOwned(source) => Some(source.__as_source_catalog()),
             Self::Semantic(_) => None,
         }
     }
@@ -789,28 +764,13 @@ impl Package {
         Self::from_components_with_options(components, options)
     }
 
-    /// Parse an already-owned exact source without copying its bytes.
-    ///
-    /// This hidden migration handoff keeps the focused Numbers ingress and
-    /// semantic admission profile identical to [`Self::from_bytes_with_options`]
-    /// while allowing a coordinator that already owns the source allocation to
-    /// share it with this package owner.
-    #[cfg(feature = "internal-iwork-source")]
-    #[doc(hidden)]
-    pub fn __from_shared_source_with_options(
-        source: Arc<[u8]>,
-        options: OpenOptions,
-    ) -> Result<Self> {
-        Self::from_shared_bytes_with_options(source, options)
-    }
-
     /// Consume a package source prepared by a format coordinator.
     ///
-    /// This unstable handoff adopts the coordinator's parsed container
-    /// without a second ZIP traversal or IWA component decode, exactly as the
-    /// Pages and Keynote owners' prepared-source ingress does. The source's
-    /// physical profile remains authoritative; `semantic` selects the
-    /// semantic admission limits.
+    /// This adopts the coordinator's parsed container without a second ZIP
+    /// traversal or IWA component decode, exactly as the Pages and Keynote
+    /// owners' prepared-source ingress does. The source's physical profile
+    /// remains authoritative; `semantic` selects the semantic admission
+    /// limits.
     ///
     /// # Errors
     ///
@@ -818,12 +778,7 @@ impl Package {
     /// application, an [`Error::InvalidFormat`] for a directory-backed or
     /// semantic-only source, and the errors of [`Self::from_bytes_with_options`]
     /// when the package cannot become a semantic document.
-    #[cfg(feature = "internal-iwork-source")]
-    #[doc(hidden)]
-    pub fn __from_prepared_source(
-        source: PreparedSource,
-        semantic: SemanticLimits,
-    ) -> Result<Self> {
+    pub fn from_prepared_source(source: PreparedSource, semantic: SemanticLimits) -> Result<Self> {
         if source.format() != Format::Numbers {
             return Err(Error::UnexpectedFormat {
                 detected: crate::workbook::detected_format(source.format()),
@@ -889,7 +844,7 @@ impl Package {
                     "semantic-only Numbers components cannot construct a package".to_owned(),
                 )
             })?
-            .__source_owner();
+            .source_owner();
         validate_numbers_application(&components, options.archive())?;
         let semantic = options.semantic();
         let index = Index::from_components(&components, semantic.max_objects())?;
@@ -1435,54 +1390,6 @@ pub fn compatibility_tables_from_bytes_with_options(
     let options = Profile::from_options(options)?;
     let components = Components::from_bytes(bytes, options.archive())?;
     compatibility_tables_from_components(&components, options.archive(), options.semantic())
-}
-
-/// Consume one prepared source into the global Numbers compatibility view.
-///
-/// This explicitly unstable handoff is reserved for the root iWork
-/// coordinator. It retains detached/orphan table behavior while avoiding a
-/// second ZIP traversal and IWA component decode. The source's original
-/// physical profile remains authoritative; callers select only semantic
-/// projection limits here.
-///
-/// # Errors
-///
-/// Returns [`enum@Error`] when the source belongs to another application or the
-/// Numbers compatibility projection is malformed or over budget.
-#[cfg(feature = "internal-iwork-source")]
-#[doc(hidden)]
-pub fn __compatibility_tables_from_prepared_source(
-    source: PreparedSource,
-    semantic: SemanticLimits,
-) -> Result<Vec<crate::Table>> {
-    if source.format() != Format::Numbers {
-        return Err(Error::UnexpectedFormat {
-            detected: crate::workbook::detected_format(source.format()),
-        });
-    }
-    let (catalog, archive_limits) = source.__into_components();
-    let components = Components::from_catalog(catalog);
-    compatibility_tables_from_components(&components, archive_limits, semantic)
-}
-
-/// Consume a prepared Numbers source into an archive-free rooted document.
-///
-/// Exact source-package provenance is discarded before semantic publication.
-/// This unstable handoff exists for format coordinators and the focused
-/// [`Workbook`] source constructors.
-///
-/// # Errors
-///
-/// Returns [`enum@Error`] when the source belongs to another application, metadata
-/// diagnostics are malformed, or the rooted workbook exceeds a selected
-/// semantic ceiling.
-#[cfg(feature = "internal-iwork-source")]
-#[doc(hidden)]
-pub fn __semantic_document_from_prepared_source(
-    source: PreparedSource,
-    semantic: SemanticLimits,
-) -> Result<Workbook> {
-    semantic_document_from_prepared_source(source, semantic)
 }
 
 pub(crate) fn semantic_document_from_prepared_source(
@@ -2499,13 +2406,12 @@ mod tests {
         Ok(())
     }
 
-    #[cfg(feature = "internal-iwork-source")]
     #[test]
     fn shared_source_handoff_preserves_the_input_allocation() -> Result<()> {
         let source: Arc<[u8]> = package_bytes(&tn::DocumentArchive::default())?.into();
         let source_pointer = source.as_ptr();
         let package =
-            Package::__from_shared_source_with_options(Arc::clone(&source), OpenOptions::new())?;
+            Package::from_shared_bytes_with_options(Arc::clone(&source), OpenOptions::new())?;
         assert_eq!(package.state.source.as_ref().as_ptr(), source_pointer);
         assert_eq!(package.state.source.as_ref().len(), source.len());
         Ok(())

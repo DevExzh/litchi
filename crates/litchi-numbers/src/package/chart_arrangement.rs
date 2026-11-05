@@ -1420,7 +1420,7 @@ impl Package {
     /// Apply an exact-source checked chart-arrangement patch.
     pub fn apply_sheet_chart_arrangement(&self, patch: &Patch) -> Result<Commit, Error> {
         let catalog = physical_catalog(self)?;
-        let source_owner = catalog.__source_owner();
+        let source_owner = catalog.source_owner();
         if !patch.artifacts.authorizes_owner(&source_owner) {
             return Err(Error::PatchConflict);
         }
@@ -2066,7 +2066,7 @@ fn commit_edit(
     after: ChartArrangement,
 ) -> Result<Commit, Error> {
     let catalog = physical_catalog(source)?;
-    let source_owner = catalog.__source_owner();
+    let source_owner = catalog.source_owner();
     let mut budget = ChartBudget::for_package(source)?;
     budget.source(source.source_bytes().len())?;
     let current = select_chart_with_budget(
@@ -2098,7 +2098,7 @@ fn commit_edit(
     }
     let candidate = rewrite_chart(source, selection, after, &mut budget)?;
     let target_catalog = physical_catalog(&candidate)?;
-    let target_owner = target_catalog.__source_owner();
+    let target_owner = target_catalog.source_owner();
     let selected = select_chart_with_budget(
         &candidate,
         SheetSelector::position(selection.sheet_position),
@@ -3347,23 +3347,6 @@ fn map_codec_error(error: codec::DecodeError) -> Error {
         return Error::Allocation { amount };
     }
     Error::InvalidSource
-}
-
-fn physical_component_archive(
-    package: &Package,
-    component_index: usize,
-) -> Result<&Archive, Error> {
-    Ok(package_component(package, component_index)?.archive())
-}
-
-// Keep the archive helper visible to rustdoc's private-item lint without
-// exposing native identifiers through the public package API.
-#[allow(
-    dead_code,
-    reason = "Retained for the host migration's graph diagnostics."
-)]
-fn _component_archive(package: &Package, component_index: usize) -> Result<&Archive, Error> {
-    physical_component_archive(package, component_index)
 }
 
 #[cfg(test)]
