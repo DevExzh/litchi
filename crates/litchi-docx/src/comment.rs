@@ -276,11 +276,11 @@ impl Comment {
 
     /// Extract the comments of a comments-part payload.
     pub(crate) fn extract_from_payload(payload: &Arc<Vec<u8>>) -> Result<Vec<Comment>> {
-        // Preserve the Word 2023 tracked-change timestamp while selecting
-        // active MCE content in comments.xml.  The generic baseline has no
-        // knowledge of this DOCX extension and would drop an ignorable
-        // `w16du:dateUtc` attribute.
+        // Preserve modeled Word extensions while selecting active MCE
+        // content. Native Word marks w14 ignorable, but its paragraph IDs
+        // are the keys linking comments to reply and durable-ID metadata.
         let mut capabilities = litchi_ooxml_common::mce::Capabilities::default();
+        capabilities.understand_namespace(crate::paragraph::extensions::WORD_2010_NAMESPACE);
         capabilities.understand_namespace(crate::revision::WORD_2023_DATE_UTC_NAMESPACE);
         let source = match litchi_ooxml_common::mce::process_markup_compatibility(
             payload.as_slice(),
@@ -441,6 +441,14 @@ mod tests {
                 .windows(b"du:dateUtc".len())
                 .any(|window| window == b"du:dateUtc")
         );
+    }
+
+    #[test]
+    fn ignorable_word_2010_paragraph_ids_survive_comment_projection() {
+        let xml = br#"<w:comments xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:ids="http://schemas.microsoft.com/office/word/2010/wordml" mc:Ignorable="ids"><w:comment w:id="1"><w:p ids:paraId="12345678"/><w:p ids:paraId="9ABCDEF0"/></w:comment></w:comments>"#;
+        let comments = Comment::extract_from_part(&comments_part(xml)).unwrap();
+        assert_eq!(comments.len(), 1);
+        assert_eq!(comments[0].paragraph_id(), Some(0x9ABCDEF0));
     }
 
     #[test]

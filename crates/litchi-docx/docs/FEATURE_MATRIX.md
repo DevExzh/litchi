@@ -147,7 +147,7 @@ family has no typed model even if an untouched part can remain in a package-pres
 
 | Feature family | Status | Read | Write | Notes |
 |----------------|--------|------|-------|-------|
-| commentsExtended, people, commentsIds, and commentsExtensible parts | ✅ | ✅ | ✅ | [MS-DOCX] 2.1.2-2.1.5 are represented by bounded modern-comment metadata, people/presence, paragraph-to-durable-ID mappings, extension lists, UTC strings, and relationship/content-type maintenance |
+| commentsExtended, people, commentsIds, and commentsExtensible parts | ✅ | ✅ | ✅ | [MS-DOCX] 2.1.2-2.1.5 are represented by bounded modern-comment metadata, people/presence, paragraph-to-durable-ID mappings, extension lists, UTC strings, and relationship/content-type maintenance. Native ignorable w14 paragraph IDs survive comment projection and retain root/reply associations. |
 | Modern comment reactions and extension lists | ✅ | ✅ | ✅ | `commentsExtensible` reaction metadata follows [MS-OREACTXML], including typed reaction kinds, `cr:reactionInfo` UTC timestamps, users, unknown reaction entries, and ordered OEXTXML extension lists; the library does not contact collaboration services or interpret reaction policy |
 | rPr extension effects (glow, shadow, reflection, textOutline, textFill, scene3d, props3d) | ✅ | ✅ | ✅ | [MS-DOCX] 2.2.1 and 2.6 expose the seven Word 2010 visual effects through `Run::effects`, cached `RunProperties::effects`, and writer `MutableRun::{effects, effects_mut, set_effects}`. The typed model validates schema domains, preserves ordered bounded unknown direct children byte-for-byte, and does not render or evaluate effects |
 | rPr OpenType extensions (ligatures, numForm, numSpacing, stylisticSets, cntxtAlts) | ✅ | ✅ | ✅ | The contextual `font::open_type::{Snapshot, Transaction, Commit, Patch}` owner exposes bounded Word 2010 run-property edits with absent-versus-authored `ST_OnOff` semantics, source-checked patches, and ordered unknown-child preservation; font shaping and rendering remain outside the crate |
@@ -180,7 +180,7 @@ are not executed.
 | Tracked revision metadata and property changes | 🟡 | ✅ | 🟡 | `Document`, `DocumentPart`, pinned `source_backed::Document`, `Paragraph`, `Table`, `Row`, and `Cell` expose bounded `revisions`; the document reads honor `SemanticLimits::revisions` from `OpenOptions`, and `revision::Reader` reads any of them under explicit budgets (record 0355a). Document queries include body-final section and table metadata. `Revision::author()` is optional because table-grid history has only an identifier; Transitional numbering history exposes `original_numbering()`. Nested inline annotations retain separate metadata in source order and charge every retained text copy; XML references, CDATA, edge whitespace, line endings, and run controls are handled. Paragraph-mark, numbering, row, cell, and property-history metadata are distinguished from inline text. Writers emit non-nested inline wrappers and modeled property/row/cell markers. `MutableTable::set_row_revisions` checks one explicit metadata record per existing row atomically; WML has no whole-table insertion/deletion element. Section/table-grid/table-property-exception and Transitional numbering-history revisions are projected with namespace-bound owner, metadata, snapshot, and ordering checks. Complete property leaf and legacy property-envelope schema validation remain open; ordinary inline/move owner authoring is available through `revision::authoring`. |
 | Revision application and accept/reject | 🟡 | ✅ | 🟡 | `document::Edit::{apply_revision,accept_revision,reject_revision}` applies an explicit action to one direct inline insertion/deletion in a selected body paragraph. `revision::authoring::{Snapshot,Transaction,Commit,Patch}` and `Package::{tracked_revisions,apply_tracked_revisions,apply_tracked_revision_patch}` additionally provide bounded main-document ownership for inline `w:ins`/`w:del` and complete paired `w:moveFrom`/`w:moveTo` wrappers and range markers. Accept/reject preserves opaque payload bytes and required namespace/scope bindings, groups exact move metadata, reparses every candidate, and provides source-bound exact inverse/no-op/stale/limit and atomic package publication behavior. Unsupported nested, move-range ambiguity, property, paragraph/table, field, control, markup-compatibility, and other dependency-bearing owners are refused atomically; secondary-story actions and general property resolution remain unavailable. |
 | Fields and cached field results | 🟡 | ✅ | ✅ | `field::Field`/`writer::field::MutableField` and the field model cover typed instruction/result metadata, including building-block, mail-merge, layout, automation, bibliography, and index families where documented; instructions are preserved or authored as text and no field is recalculated, refreshed, or executed. |
-| Office Math (OMML) fragments | 🟡 | ✅ | ✅ | `OfficeMath` and `OfficeMathParagraph` validate and retain OMML fragments and support bounded fresh text/display authoring; equation layout, rendering, and evaluation remain outside the crate. |
+| Office Math (OMML) fragments | 🟡 | ✅ | ✅ | `OfficeMath` and `OfficeMathParagraph` validate and retain OMML fragments and support bounded fresh text/display authoring; native DOCX/DOTX reads distinguish inline `oMath` from display equations inside `oMathPara`. Inline authoring emits a direct paragraph child; typed reads retain inherited namespace bindings, while raw getters preserve exact XML. Equation layout, rendering, and evaluation remain outside the crate. |
 | Bibliography source stores | 🟡 | ✅ | ✅ | `bibliography::{BibliographySourceStore,SourceStore}` and package data-store operations read and mutate bounded Custom XML `Sources`/`Source` records with typed source kinds and contributor values; style resolution, citation matching, XSLT, and bibliography regeneration are inert. |
 | Smart tags | 🟡 | ✅ | ✅ | `smart_tag::SmartTag` parses run-level `smartTag` metadata and retains nested content as raw XML/text; `writer::MutableSmartTag` supports bounded nested-content authoring and round-trip tests; smart-tag services and host actions are never invoked. |
 | Bookmarks and bookmark anchors | 🟡 | ✅ | ✅ | `Bookmark`/`MutableBookmark` expose basic `bookmarkStart`/`bookmarkEnd` IDs and names and writer paragraph helpers; cross-story coordination, repair records, and bookmark-driven field/navigation behavior remain outside the owner. |
@@ -212,3 +212,28 @@ are not executed.
 - crates/litchi-docx/src/package.rs owns package graphs, parts, relationships, properties, mail merge, custom XML, glossary, web settings, encryption, and save modes.
 - crates/litchi-docx/src/document.rs, paragraph.rs, table.rs, section.rs, styles.rs, and numbering/ own the main typed WordprocessingML model.
 - crates/litchi-docx/src/field/, content_control.rs, revision.rs, comment.rs, modern_comments/, custom_xml.rs, alt/, drawing/, textbox.rs, chart.rs, smartart.rs, math.rs, font/, and writer/ provide feature-specific APIs and bounded codecs.
+
+## Native Microsoft Word regression scope
+
+`tests/microsoft_office_native.rs` uses the unmodified specimens in
+`test-data/microsoft-office/word/`. It checks 24 unencrypted DOCX, DOTX, DOCM,
+DOTM and extensionless child packages for body catalogs and no-op preservation
+of every OPC member. Targeted assertions cover nested and merged tables,
+section geometry, secondary stories, modern comment replies, both revision
+timestamps, tracked moves, inline/display math and reuse in a new package.
+
+Native title edits cover 13 source packages, preserve other member payloads,
+and restore every member through inverse patches. Protection and tracked
+revision policy refusals leave the source intact; an unprotected form accepts
+a title edit. The master/child fixture retains its external subdocument reference
+without fetching or merging the child. With `vba-inspection`, DOCM/DOTM
+project graphs, module source markers and payload hashes are checked inertly.
+With `encryption`, the native Agile AES-256/SHA-512 DOCX exercises
+absent/wrong/correct passwords and rekeying with clear-member preservation.
+The operations suite also checks nested table paths and atomic edits on eager
+and source-backed owners.
+
+The machine-readable scope is `tools/native_office_tests.json`. Package
+preservation does not establish typed coverage of every embedded feature, and
+these Litchi round trips do not claim a fresh Microsoft Word reopen. Historical
+fixture statuses in `coverage.json` remain separate from test assertions.

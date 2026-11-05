@@ -27,8 +27,16 @@ fn saves_and_reopens_inline_and_display_office_math() {
             .contains("xmlns:m=\"http://schemas.openxmlformats.org/officeDocument/2006/math\"")
     );
     let paragraphs = reopened.document().unwrap().paragraphs().unwrap();
-    assert_eq!(paragraphs[0].inline_office_math().unwrap(), vec![inline]);
-    assert_eq!(paragraphs[1].display_office_math().unwrap(), vec![display]);
+    assert_eq!(
+        paragraphs[0].omml_formulas().unwrap(),
+        vec![inline.into_xml()]
+    );
+    assert_eq!(
+        paragraphs[1].paragraph_level_formulas().unwrap(),
+        vec![display.into_xml()]
+    );
+    assert_eq!(paragraphs[0].inline_office_math().unwrap().len(), 1);
+    assert_eq!(paragraphs[1].display_office_math().unwrap().len(), 1);
 }
 
 #[test]

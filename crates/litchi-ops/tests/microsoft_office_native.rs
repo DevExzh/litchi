@@ -1,10 +1,12 @@
 //! Public operation contracts on native Microsoft Office specimens.
-#![cfg(feature = "pptx")]
+#![cfg(any(feature = "docx", feature = "pptx"))]
 
-use litchi_ops::{BatchItem, BatchMode, Code, OpenOptions, Props, SourceMode, props};
+use litchi_ops::{OpenOptions, SourceMode, props};
 
+#[cfg(feature = "pptx")]
 #[test]
 fn native_ink_deck_missing_notes_have_the_same_first_error_in_all_edit_forms() {
+    use litchi_ops::{BatchItem, BatchMode, Code, Props};
     let bytes =
         include_bytes!("../../../test-data/microsoft-office/powerpoint/powerpoint-ink-replay.pptx");
     for mode in [SourceMode::Auto, SourceMode::Eager] {
@@ -38,4 +40,98 @@ fn native_ink_deck_missing_notes_have_the_same_first_error_in_all_edit_forms() {
         assert_eq!(error.item(), Some(0));
         assert!(file.to_bytes().unwrap() == before);
     }
+}
+
+#[cfg(feature = "docx")]
+#[test]
+fn native_word_nested_table_paths_edit_and_restore_on_both_owners() {
+    let bytes = include_bytes!("../../../test-data/microsoft-office/word/word-tables-layout.docx");
+    let cell = "/body/tbl[1]/tr[3]/tc[4]/p[1]";
+    let nested = "/body/tbl[1]/tr[4]/tc[4]/tbl[1]/tr[2]/tc[2]/p[1]/r[1]";
+    for mode in [SourceMode::Auto, SourceMode::Eager] {
+        let options = OpenOptions::new().source_mode(mode);
+        let file = litchi_ops::open_bytes_with(bytes.to_vec(), &options).unwrap();
+        let before = file.to_bytes().unwrap();
+        assert_eq!(
+            file.get(cell).unwrap().view().text().unwrap().as_deref(),
+            Some("Unicode 中文")
+        );
+        assert_eq!(
+            file.get(nested).unwrap().view().text().unwrap().as_deref(),
+            Some("20")
+        );
+        let commit = file
+            .edit(|edit| {
+                edit.set(cell, props! {"text"=>"Unicode 中文 revised"})?;
+                edit.set(nested, props! {"text"=>"21"})
+            })
+            .unwrap();
+        let published = commit.file().to_bytes().unwrap();
+        let reopened = litchi_ops::open_bytes_with(published.clone(), &options).unwrap();
+        assert_eq!(
+            reopened
+                .get(cell)
+                .unwrap()
+                .view()
+                .text()
+                .unwrap()
+                .as_deref(),
+            Some("Unicode 中文 revised")
+        );
+        assert_eq!(
+            reopened
+                .get(nested)
+                .unwrap()
+                .view()
+                .text()
+                .unwrap()
+                .as_deref(),
+            Some("21")
+        );
+        let original_members = native_word_members(&before);
+        let changed_members = native_word_members(&published);
+        assert_eq!(
+            original_members.keys().collect::<Vec<_>>(),
+            changed_members.keys().collect::<Vec<_>>()
+        );
+        for (name, data) in &original_members {
+            if name != "word/document.xml" {
+                assert!(changed_members[name] == *data, "changed {name}");
+            }
+        }
+        let restored = commit
+            .patch()
+            .inverse()
+            .apply(commit.file())
+            .unwrap()
+            .to_bytes()
+            .unwrap();
+        let restored_members = native_word_members(&restored);
+        assert_eq!(
+            original_members.keys().collect::<Vec<_>>(),
+            restored_members.keys().collect::<Vec<_>>()
+        );
+        for (name, data) in original_members {
+            assert!(restored_members[&name] == data, "inverse changed {name}");
+        }
+        assert!(file.to_bytes().unwrap() == before);
+    }
+}
+
+#[cfg(feature = "docx")]
+fn native_word_members(bytes: &[u8]) -> std::collections::BTreeMap<String, Vec<u8>> {
+    let archive = litchi_opc::phys_pkg::OwnedPhysPkgReader::from_bytes(
+        bytes.to_vec(),
+        litchi_opc::SourceLimits::default(),
+    )
+    .unwrap();
+    archive
+        .member_names()
+        .unwrap()
+        .into_iter()
+        .map(|name| {
+            let data = archive.read_member(&name).unwrap();
+            (name, data)
+        })
+        .collect()
 }

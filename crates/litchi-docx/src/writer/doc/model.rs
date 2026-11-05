@@ -184,7 +184,8 @@ impl CollectGlyphs for Paragraph {
                 ParagraphElement::Run(r) => r.collect_glyphs(),
                 ParagraphElement::Hyperlink(h) => h.collect_glyphs(),
                 ParagraphElement::SmartTag(tag) => tag.collect_glyphs(),
-                ParagraphElement::DisplayOfficeMath(_)
+                ParagraphElement::InlineOfficeMath(_)
+                | ParagraphElement::DisplayOfficeMath(_)
                 | ParagraphElement::InlineImage(_)
                 | ParagraphElement::TextBox(_)
                 | ParagraphElement::OleObject(_)
@@ -214,7 +215,8 @@ impl CollectGlyphs for SmartTag {
                 ParagraphElement::Run(run) => run.collect_glyphs(),
                 ParagraphElement::Hyperlink(hyperlink) => hyperlink.collect_glyphs(),
                 ParagraphElement::SmartTag(tag) => tag.collect_glyphs(),
-                ParagraphElement::DisplayOfficeMath(_)
+                ParagraphElement::InlineOfficeMath(_)
+                | ParagraphElement::DisplayOfficeMath(_)
                 | ParagraphElement::InlineImage(_)
                 | ParagraphElement::TextBox(_)
                 | ParagraphElement::OleObject(_)

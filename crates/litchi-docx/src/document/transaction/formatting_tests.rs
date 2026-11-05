@@ -185,6 +185,72 @@ fn local_name(element: &[u8]) -> String {
     name.rsplit(':').next().unwrap().to_owned()
 }
 
+/// Property preservation concerns the root paragraph/run's direct property
+/// container. A drawing may contain nested text-box paragraphs with their
+/// own properties; those belong to the unchanged-content assertion instead.
+fn direct_property_children(xml: &[u8], container: &str) -> Vec<Vec<u8>> {
+    let mut reader = Reader::from_reader(xml);
+    let mut depth = 0usize;
+    let mut selected = false;
+    let mut child_start = 0usize;
+    let mut children = Vec::new();
+    loop {
+        let before = usize::try_from(reader.buffer_position()).unwrap();
+        let event = reader.read_event().unwrap();
+        let after = usize::try_from(reader.buffer_position()).unwrap();
+        match event {
+            Event::Start(element) => {
+                if depth == 1 && element.local_name().as_ref() == container.as_bytes() {
+                    selected = true;
+                }
+                depth += 1;
+                if selected && depth == 3 {
+                    child_start = before;
+                }
+            },
+            Event::Empty(element) => {
+                if selected && depth == 2 {
+                    children.push(xml[before..after].to_vec());
+                } else if depth == 1 && element.local_name().as_ref() == container.as_bytes() {
+                    return children;
+                }
+            },
+            Event::End(_) => {
+                if selected && depth == 3 {
+                    children.push(xml[child_start..after].to_vec());
+                } else if selected && depth == 2 {
+                    return children;
+                }
+                depth -= 1;
+            },
+            Event::Eof => return children,
+            _ => {},
+        }
+    }
+}
+
+#[test]
+fn property_preservation_oracle_excludes_nested_text_box_properties() {
+    let nested = "<w:r><w:pict><w:txbxContent><w:p><w:pPr><w:jc w:val=\"center\"/></w:pPr></w:p></w:txbxContent></w:pict></w:r>";
+    let before = format!("<w:p>{nested}</w:p>");
+    let after =
+        format!("<w:p><w:pPr><w:pStyle w:val=\"Heading1\"/><w:keepNext/></w:pPr>{nested}</w:p>");
+    assert!(direct_property_children(before.as_bytes(), "pPr").is_empty());
+    assert_eq!(
+        direct_property_children(after.as_bytes(), "pPr"),
+        [
+            b"<w:pStyle w:val=\"Heading1\"/>".to_vec(),
+            b"<w:keepNext/>".to_vec()
+        ]
+    );
+    assert_preserved(
+        before.as_bytes(),
+        after.as_bytes(),
+        "pPr",
+        &["pStyle", "keepNext"],
+    );
+}
+
 /// Every child of the container that is not `changed` survives byte for
 /// byte and in order.
 fn assert_preserved(before: &[u8], after: &[u8], container: &str, changed: &[&str]) {
@@ -195,8 +261,8 @@ fn assert_preserved(before: &[u8], after: &[u8], container: &str, changed: &[&st
             .collect::<Vec<_>>()
     };
     assert_eq!(
-        keep(container_children(before, container)),
-        keep(container_children(after, container)),
+        keep(direct_property_children(before, container)),
+        keep(direct_property_children(after, container)),
         "unchanged children of w:{container} moved or changed"
     );
 }

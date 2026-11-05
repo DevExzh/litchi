@@ -1386,6 +1386,247 @@
       "required_features": [
         "pptx"
       ]
+    },
+    {
+      "crate": "litchi-docx",
+      "target": "microsoft_office_native",
+      "name": "native_word_variants_read_body_catalogs_and_preserve_every_package_member",
+      "fixtures": [
+        "word/word-bidi-eastasia.docx",
+        "word/word-document-protection.docx",
+        "word/word-embedded-fonts-subset.docx",
+        "word/word-embedded-fonts.docx",
+        "word/word-glossary.docx",
+        "word/word-glossary.dotx",
+        "word/word-layout-extensions.docx",
+        "word/word-layout-extensions.dotx",
+        "word/word-legacy-form-unprotected.docx",
+        "word/word-legacy-form.docx",
+        "word/word-mailmerge-fields.docx",
+        "word/word-mailmerge-source.docx",
+        "word/word-master-document.docx",
+        "word/word-master-document/CHILD",
+        "word/word-math-navigation.docx",
+        "word/word-math-navigation.dotx",
+        "word/word-recorded-macro.docm",
+        "word/word-recorded-macro.dotm",
+        "word/word-review-controls.docx",
+        "word/word-tables-layout.docx",
+        "word/word-text-structure.docx",
+        "word/word-tracked-moves.docx",
+        "word/word-vector-diagram.docx",
+        "word/word-visual-objects.docx"
+      ],
+      "feature_rows": [
+        "docx-069",
+        "docx-072"
+      ],
+      "assertions": [
+        "Exact body paragraph/table catalogs and markers for 24 unencrypted Word variants; all paragraph runs read; every OPC member payload retained on no-op serialization."
+      ],
+      "scope_limit": "Container/body baseline only; counts and member preservation do not establish typed coverage of each embedded feature."
+    },
+    {
+      "crate": "litchi-docx",
+      "target": "microsoft_office_native",
+      "name": "native_word_inline_and_display_math_keep_distinct_semantic_boundaries",
+      "fixtures": [
+        "word/word-math-navigation.docx",
+        "word/word-math-navigation.dotx"
+      ],
+      "feature_rows": [
+        "docx-114",
+        "docx-076"
+      ],
+      "assertions": [
+        "One inline and one display equation in DOCX/DOTX; native superscript, fraction, radical and n-ary sum fragments retain their structural markers and values."
+      ],
+      "scope_limit": "Validated inert XML fragments only; no equation layout, evaluation, or full schema validation."
+    },
+    {
+      "crate": "litchi-docx",
+      "target": "microsoft_office_native",
+      "name": "native_word_equations_reuse_the_word_paragraph_envelope",
+      "fixtures": [
+        "word/word-math-navigation.docx"
+      ],
+      "feature_rows": [
+        "docx-114",
+        "docx-076"
+      ],
+      "assertions": [
+        "Reused native equations serialize beside text runs and under the display container in exact source order; reopen keeps both raw equation fragments."
+      ],
+      "scope_limit": "Fresh Litchi package round trip only; no Microsoft Word reopen or rendering claim."
+    },
+    {
+      "crate": "litchi-docx",
+      "target": "microsoft_office_native",
+      "name": "native_word_source_title_edits_preserve_other_members_and_invert_exactly",
+      "fixtures": [
+        "word/word-embedded-fonts-subset.docx",
+        "word/word-embedded-fonts.docx",
+        "word/word-glossary.dotx",
+        "word/word-master-document.docx",
+        "word/word-master-document/CHILD",
+        "word/word-math-navigation.docx",
+        "word/word-math-navigation.dotx",
+        "word/word-recorded-macro.docm",
+        "word/word-recorded-macro.dotm",
+        "word/word-review-controls.docx",
+        "word/word-text-structure.docx",
+        "word/word-vector-diagram.docx",
+        "word/word-visual-objects.docx"
+      ],
+      "feature_rows": [
+        "docx-073"
+      ],
+      "assertions": [
+        "Title replacement in 13 native DOCX/DOTX/DOCM/DOTM/child packages preserves every other member, retains source bytes and restores all member payloads with an inverse patch."
+      ],
+      "scope_limit": "Single title edit; ZIP container framing may change after reopening. Preserved fonts, diagrams, macros and glossary are not all semantically modeled by this assertion."
+    },
+    {
+      "crate": "litchi-docx",
+      "target": "microsoft_office_native",
+      "name": "native_word_tables_sections_and_secondary_stories_have_exact_structure",
+      "fixtures": [
+        "word/word-tables-layout.docx"
+      ],
+      "feature_rows": [
+        "docx-072",
+        "docx-076"
+      ],
+      "assertions": [
+        "Native outer/nested table values, physical cells, gridSpan and vertical merge state; two section geometries and columns; header/footer markers and exact endnote text."
+      ],
+      "scope_limit": "No pagination/rendering, effective formatting or comprehensive secondary-story CRUD claim."
+    },
+    {
+      "crate": "litchi-docx",
+      "target": "microsoft_office_native",
+      "name": "native_word_review_threads_and_revisions_keep_ids_authors_and_two_timestamps",
+      "fixtures": [
+        "word/word-review-controls.docx"
+      ],
+      "feature_rows": [
+        "docx-091",
+        "docx-099",
+        "docx-109",
+        "docx-111"
+      ],
+      "assertions": [
+        "Two comments with exact IDs, Word paragraph IDs, text, authors/dates and reply parent; four format/insert/delete revision IDs and both local/UTC timestamp fields."
+      ],
+      "scope_limit": "Read projection only; no reactions, presence, accept/reject, conflict resolution or comment editing."
+    },
+    {
+      "crate": "litchi-docx",
+      "target": "microsoft_office_native",
+      "name": "native_word_tracked_moves_keep_paragraph_marks_and_content_separate",
+      "fixtures": [
+        "word/word-tracked-moves.docx"
+      ],
+      "feature_rows": [
+        "docx-109",
+        "docx-111"
+      ],
+      "assertions": [
+        "Four move revisions distinguish paragraph marks from moved text; exact IDs, author, source/target text and both timestamps."
+      ],
+      "scope_limit": "Inert reads; no accepting/rejecting move ranges."
+    },
+    {
+      "crate": "litchi-docx",
+      "target": "microsoft_office_native",
+      "name": "native_word_protection_and_tracking_refuse_changed_publication_without_mutation",
+      "fixtures": [
+        "word/word-document-protection.docx",
+        "word/word-legacy-form-unprotected.docx",
+        "word/word-legacy-form.docx",
+        "word/word-tracked-moves.docx"
+      ],
+      "feature_rows": [
+        "docx-073",
+        "docx-131"
+      ],
+      "assertions": [
+        "Native comments/forms protection and tracking flags, typed Protected publication refusal, no-op preservation and unchanged sources; unprotected form accepts the title edit."
+      ],
+      "scope_limit": "Policy gate only; no password verification, Office UI protection execution or disabling protection."
+    },
+    {
+      "crate": "litchi-docx",
+      "target": "microsoft_office_native",
+      "name": "native_word_agile_password_ingress_and_rekey_preserve_clear_members",
+      "fixtures": [
+        "word/word-encrypted.docx"
+      ],
+      "feature_rows": [
+        "docx-085"
+      ],
+      "assertions": [
+        "Absent/wrong/correct password behavior, exact five paragraphs, Agile AES-256/SHA-512 profile, plaintext policy refusal, old-key rejection after rekey and all clear members preserved."
+      ],
+      "scope_limit": "Public disposable fixture password; in-memory decryption only, one native cipher/hash profile; no native Word reopen.",
+      "required_features": [
+        "encryption"
+      ]
+    },
+    {
+      "crate": "litchi-docx",
+      "target": "microsoft_office_native",
+      "name": "native_word_macro_variants_expose_inert_project_graph_and_source",
+      "fixtures": [
+        "word/word-recorded-macro.docm",
+        "word/word-recorded-macro.dotm"
+      ],
+      "feature_rows": [
+        "docx-087"
+      ],
+      "assertions": [
+        "DOCM/DOTM project and supplemental relationships, module names and count, reference count, recorded source markers and exact 12800-byte VBA hashes."
+      ],
+      "scope_limit": "Inert source decompression/decoding only; no compilation, execution, trust or native-app validation.",
+      "required_features": [
+        "vba-inspection"
+      ]
+    },
+    {
+      "crate": "litchi-docx",
+      "target": "microsoft_office_native",
+      "name": "native_word_master_keeps_external_child_inert_and_child_opens_independently",
+      "fixtures": [
+        "word/word-master-document.docx",
+        "word/word-master-document/CHILD"
+      ],
+      "feature_rows": [
+        "docx-090",
+        "docx-076"
+      ],
+      "assertions": [
+        "Parent subDoc inline and exact external relationship ID/target retained; child text is absent from parent and opens independently with four exact paragraphs."
+      ],
+      "scope_limit": "No external-target fetching, master-document assembly or Word layout behavior."
+    },
+    {
+      "crate": "litchi-ops",
+      "target": "microsoft_office_native",
+      "name": "native_word_nested_table_paths_edit_and_restore_on_both_owners",
+      "fixtures": [
+        "word/word-tables-layout.docx"
+      ],
+      "feature_rows": [
+        "docx-073",
+        "docx-076"
+      ],
+      "assertions": [
+        "Exact Unicode outer-cell and nested-table paths on eager/source-backed owners; two atomic text changes survive reopen, preserve unrelated members and restore every member by inverse."
+      ],
+      "scope_limit": "Two text replacements only; no merged-cell restructuring or native Word validation.",
+      "required_features": [
+        "docx"
+      ]
     }
   ]
 }

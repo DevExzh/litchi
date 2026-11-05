@@ -51,6 +51,8 @@ use super::vml_shape::VmlShape;
 #[derive(Debug, Clone)]
 pub(crate) enum ParagraphElement {
     Run(Run),
+    /// Inline `<m:oMath>` content beside ordinary text runs.
+    InlineOfficeMath(OfficeMath),
     /// Display `<m:oMathPara>` content directly inside the paragraph.
     DisplayOfficeMath(OfficeMathParagraph),
     Hyperlink(Hyperlink),
@@ -98,6 +100,10 @@ impl ParagraphElement {
     ) -> Result<()> {
         match self {
             Self::Run(run) => run.to_xml_mode(xml, mode),
+            Self::InlineOfficeMath(math) => {
+                xml.push_str(math.xml());
+                Ok(())
+            },
             Self::DisplayOfficeMath(math) => {
                 xml.push_str(math.xml());
                 Ok(())
@@ -199,6 +205,10 @@ impl ParagraphElement {
     ) -> Result<()> {
         match self {
             Self::Run(run) => run.to_xml_mode(xml, mode),
+            Self::InlineOfficeMath(math) => {
+                xml.push_str(math.xml());
+                Ok(())
+            },
             Self::DisplayOfficeMath(math) => {
                 xml.push_str(math.xml());
                 Ok(())
@@ -298,6 +308,7 @@ impl ParagraphElement {
             Self::SmartTag(tag) => tag.collect_hyperlink_urls(urls),
             Self::Revision(revision) => revision.collect_hyperlink_urls(urls),
             Self::Run(_)
+            | Self::InlineOfficeMath(_)
             | Self::DisplayOfficeMath(_)
             | Self::InlineImage(_)
             | Self::TextBox(_)
@@ -321,6 +332,7 @@ impl ParagraphElement {
             Self::SmartTag(tag) => tag.collect_images(images),
             Self::Revision(revision) => revision.collect_images(images),
             Self::Run(_)
+            | Self::InlineOfficeMath(_)
             | Self::DisplayOfficeMath(_)
             | Self::Hyperlink(_)
             | Self::TextBox(_)
@@ -342,7 +354,8 @@ impl ParagraphElement {
             Self::Revision(revision) => revision.append_run_text(text),
             Self::Conflict(conflict) => conflict.append_run_text(text),
             Self::CustomXmlConflictRange(range) => range.append_run_text(text),
-            Self::DisplayOfficeMath(_)
+            Self::InlineOfficeMath(_)
+            | Self::DisplayOfficeMath(_)
             | Self::Hyperlink(_)
             | Self::InlineImage(_)
             | Self::TextBox(_)
@@ -397,7 +410,8 @@ impl Paragraph {
         self.elements.push(ParagraphElement::Run(Run::new()));
         match self.elements.last_mut().unwrap() {
             ParagraphElement::Run(r) => r,
-            ParagraphElement::DisplayOfficeMath(_)
+            ParagraphElement::InlineOfficeMath(_)
+            | ParagraphElement::DisplayOfficeMath(_)
             | ParagraphElement::Hyperlink(_)
             | ParagraphElement::InlineImage(_)
             | ParagraphElement::TextBox(_)
@@ -423,10 +437,11 @@ impl Paragraph {
 
     /// Add an inline Office Math equation to this paragraph.
     ///
-    /// The equation is emitted as `<w:r><m:oMath>…</m:oMath></w:r>`, allowing
-    /// it to appear between ordinary text runs.
+    /// The equation is emitted as a direct `<m:oMath>` child of the paragraph,
+    /// between ordinary text runs, matching Word’s inline-math structure.
     pub fn add_inline_office_math(&mut self, equation: OfficeMath) -> &mut Self {
-        self.add_run().set_office_math(equation);
+        self.elements
+            .push(ParagraphElement::InlineOfficeMath(equation));
         self
     }
 
@@ -494,6 +509,7 @@ impl Paragraph {
         match self.elements.last_mut().unwrap() {
             ParagraphElement::Hyperlink(h) => h,
             ParagraphElement::Run(_)
+            | ParagraphElement::InlineOfficeMath(_)
             | ParagraphElement::DisplayOfficeMath(_)
             | ParagraphElement::InlineImage(_)
             | ParagraphElement::TextBox(_)
@@ -532,6 +548,7 @@ impl Paragraph {
         match self.elements.last_mut().unwrap() {
             ParagraphElement::InlineImage(img) => Ok(img),
             ParagraphElement::Run(_)
+            | ParagraphElement::InlineOfficeMath(_)
             | ParagraphElement::DisplayOfficeMath(_)
             | ParagraphElement::Hyperlink(_)
             | ParagraphElement::TextBox(_)
@@ -568,6 +585,7 @@ impl Paragraph {
         match self.elements.last_mut().unwrap() {
             ParagraphElement::InlineImage(img) => Ok(img),
             ParagraphElement::Run(_)
+            | ParagraphElement::InlineOfficeMath(_)
             | ParagraphElement::DisplayOfficeMath(_)
             | ParagraphElement::Hyperlink(_)
             | ParagraphElement::TextBox(_)
@@ -598,6 +616,7 @@ impl Paragraph {
         match self.elements.last_mut().unwrap() {
             ParagraphElement::TextBox(text_box) => text_box,
             ParagraphElement::Run(_)
+            | ParagraphElement::InlineOfficeMath(_)
             | ParagraphElement::DisplayOfficeMath(_)
             | ParagraphElement::Hyperlink(_)
             | ParagraphElement::InlineImage(_)
@@ -624,6 +643,7 @@ impl Paragraph {
         match self.elements.last_mut().unwrap() {
             ParagraphElement::OleObject(object) => object,
             ParagraphElement::Run(_)
+            | ParagraphElement::InlineOfficeMath(_)
             | ParagraphElement::DisplayOfficeMath(_)
             | ParagraphElement::Hyperlink(_)
             | ParagraphElement::InlineImage(_)
@@ -650,6 +670,7 @@ impl Paragraph {
         match self.elements.last_mut().unwrap() {
             ParagraphElement::SmartArt(smartart) => smartart,
             ParagraphElement::Run(_)
+            | ParagraphElement::InlineOfficeMath(_)
             | ParagraphElement::DisplayOfficeMath(_)
             | ParagraphElement::Hyperlink(_)
             | ParagraphElement::InlineImage(_)
@@ -676,6 +697,7 @@ impl Paragraph {
         match self.elements.last_mut().unwrap() {
             ParagraphElement::VmlShape(shape) => shape,
             ParagraphElement::Run(_)
+            | ParagraphElement::InlineOfficeMath(_)
             | ParagraphElement::DisplayOfficeMath(_)
             | ParagraphElement::Hyperlink(_)
             | ParagraphElement::InlineImage(_)
@@ -1286,6 +1308,7 @@ impl Paragraph {
                     range.validate_passive_children()?;
                 },
                 ParagraphElement::Run(_)
+                | ParagraphElement::InlineOfficeMath(_)
                 | ParagraphElement::DisplayOfficeMath(_)
                 | ParagraphElement::Hyperlink(_)
                 | ParagraphElement::InlineImage(_)
@@ -1510,7 +1533,8 @@ mod tests {
 
         let mut xml = String::new();
         paragraph.to_xml(&mut xml).unwrap();
-        assert!(xml.contains("<w:r><m:oMath"));
+        assert!(xml.contains("</w:r><m:oMath"));
+        assert!(!xml.contains("<w:r><m:oMath"));
         assert!(xml.contains("<m:oMathPara"));
 
         let parsed = ReadParagraph::new(xml.into_bytes());

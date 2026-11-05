@@ -8,9 +8,12 @@ use crate::drawing::{LegacyAnchor, Object, parse, parse_legacy};
 use crate::error::{Error, Result};
 use crate::image::{InlineImage, parse_inline_images};
 use crate::math::OfficeMath;
-use crate::namespace::scan_word_element_ranges;
 use crate::revision::{Revision, parse_revisions_with_context};
-use litchi_ooxml_common::xml::{omml_formula_xml, scan_omml_formula_ranges};
+use litchi_core::xml::ReaderOrigin;
+use litchi_ooxml_common::xml::{is_omml_name, omml_formula_xml};
+use quick_xml::events::Event;
+use quick_xml::name::{Namespace, PrefixDeclaration};
+use quick_xml::reader::NsReader;
 use smallvec::SmallVec;
 
 use super::super::model::Paragraph;
@@ -18,56 +21,30 @@ use super::super::model::Paragraph;
 impl Paragraph {
     /// Extract all OMML formulas from this paragraph.
     ///
-    /// Returns a vector of OMML formula strings found in any run within this paragraph.
-    /// This extracts inline formulas (formulas within runs).
+    /// Inline equations are `<m:oMath>` elements outside an `<m:oMathPara>`.
+    /// Word writes them beside ordinary runs; older run-nested equations are
+    /// also read. The returned strings preserve the source XML exactly.
     ///
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
     pub fn omml_formulas(&self) -> Result<Vec<String>> {
-        let _parser_admission = self.parser_admission()?;
-        let mut run_ranges = Vec::new();
-        scan_word_element_ranges(self.xml_bytes(), &[b"r".as_slice()], |_, start, length| {
-            let start = start as usize;
-            let end = start
-                .checked_add(length as usize)
-                .ok_or_else(|| Error::InvalidFormat("Word run range overflows".to_string()))?;
-            run_ranges.push((start, end));
-            Ok(())
-        })?;
-
-        let mut formulas = Vec::new();
-        scan_omml_formula_ranges(self.xml_bytes(), |start, length| {
-            let formula_start = start as usize;
-            let formula_end = formula_start
-                .checked_add(length as usize)
-                .ok_or_else(|| Error::InvalidFormat("OMML formula range overflows".to_string()))?;
-            let is_inline = run_ranges
-                .iter()
-                .any(|&(run_start, run_end)| formula_start >= run_start && formula_end <= run_end);
-            if is_inline {
-                formulas.push(omml_formula_xml(self.xml_bytes(), start, length)?);
-            }
-            Ok::<(), Error>(())
-        })?;
-        Ok(formulas)
+        self.raw_office_math(false)
     }
 
     /// Extract inline Office Math equations as validated typed fragments.
     ///
-    /// Inline equations are `<m:oMath>` elements nested in Word runs.  Their
+    /// Inline equations are `<m:oMath>` elements outside math paragraphs. Their
     /// exact raw XML remains available through [`Self::omml_formulas`]; this
     /// method turns each fragment into a validated [`OfficeMath`] value
-    /// suitable for reuse with the mutable writer.
+    /// suitable for reuse with the mutable writer. Inherited namespaces are
+    /// declared locally, preserving strict and aliased source bindings.
     ///
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
     pub fn inline_office_math(&self) -> Result<Vec<OfficeMath>> {
-        self.omml_formulas()?
-            .into_iter()
-            .map(OfficeMath::from_xml)
-            .collect()
+        self.typed_office_math(false)
     }
 
     /// Extract all inline and floating images from this paragraph.
@@ -213,8 +190,9 @@ impl Paragraph {
 
     /// Extract paragraph-level OMML formulas.
     ///
-    /// Returns a vector of OMML formula strings that are direct children of the paragraph
-    /// (display math), not nested within runs. These are block-level formulas.
+    /// Returns the original XML of equations enclosed by `<m:oMathPara>`
+    /// containers, in document order. A bare paragraph-child `<m:oMath>` is
+    /// inline math and is available through [`Self::omml_formulas`].
     ///
     /// # Example
     /// ```ignore
@@ -229,48 +207,137 @@ impl Paragraph {
     ///
     /// Returns an error if the operation cannot be completed.
     pub fn paragraph_level_formulas(&self) -> Result<Vec<String>> {
-        let _parser_admission = self.parser_admission()?;
-        let mut run_ranges = Vec::new();
-        scan_word_element_ranges(self.xml_bytes(), &[b"r".as_slice()], |_, start, length| {
-            let start = start as usize;
-            let end = start
-                .checked_add(length as usize)
-                .ok_or_else(|| Error::InvalidFormat("Word run range overflows".to_string()))?;
-            run_ranges.push((start, end));
-            Ok(())
-        })?;
-
-        let mut formulas = Vec::new();
-        scan_omml_formula_ranges(self.xml_bytes(), |start, length| {
-            let formula_start = start as usize;
-            let formula_end = formula_start
-                .checked_add(length as usize)
-                .ok_or_else(|| Error::InvalidFormat("OMML formula range overflows".to_string()))?;
-            let is_inline = run_ranges
-                .iter()
-                .any(|&(run_start, run_end)| formula_start >= run_start && formula_end <= run_end);
-            if !is_inline {
-                formulas.push(omml_formula_xml(self.xml_bytes(), start, length)?);
-            }
-            Ok::<(), Error>(())
-        })?;
-        Ok(formulas)
+        self.raw_office_math(true)
     }
 
     /// Extract display Office Math equations as validated typed fragments.
     ///
-    /// Display equations are `<m:oMath>` elements outside Word runs, normally
-    /// enclosed by an `<m:oMathPara>` math paragraph.  The result is flattened
+    /// Display equations are `<m:oMath>` elements enclosed by an
+    /// `<m:oMathPara>` math paragraph. The result is flattened
     /// into document order; use [`Self::paragraph_level_formulas`] when the
-    /// original XML strings are required.
+    /// original XML strings are required. Typed fragments declare their
+    /// inherited source namespaces locally.
     ///
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
     pub fn display_office_math(&self) -> Result<Vec<OfficeMath>> {
-        self.paragraph_level_formulas()?
+        self.typed_office_math(true)
+    }
+
+    fn raw_office_math(&self, display: bool) -> Result<Vec<String>> {
+        self.office_math_ranges(display)?
             .into_iter()
-            .map(OfficeMath::from_xml)
+            .map(|(start, length)| Ok(omml_formula_xml(self.xml_bytes(), start, length)?))
             .collect()
+    }
+
+    fn typed_office_math(&self, display: bool) -> Result<Vec<OfficeMath>> {
+        let ranges = self.office_math_ranges(display)?;
+        if ranges.is_empty() {
+            return Ok(Vec::new());
+        }
+        let source = self.xml_data.xml_ref()?;
+        ranges
+            .into_iter()
+            .map(|(start, length)| {
+                let fragment = source.subrange(start, length).ok_or_else(|| {
+                    Error::InvalidFormat("Office Math range exceeds its paragraph".into())
+                })?;
+                let xml = fragment.self_contained_bytes()?;
+                let text =
+                    std::str::from_utf8(&xml).map_err(|error| Error::Xml(error.to_string()))?;
+                OfficeMath::from_xml(text)
+            })
+            .collect()
+    }
+
+    /// Classify by the math-paragraph ancestor, not by a Word run envelope.
+    /// Namespace context includes bindings inherited from the owning part.
+    fn office_math_ranges(&self, display: bool) -> Result<Vec<(u32, u32)>> {
+        const MAX_DEPTH: usize = 128;
+        const MAX_NODES: usize = 1_000_000;
+
+        let _parser_admission = self.parser_admission()?;
+        let xml = self.xml_bytes();
+        let mut reader = NsReader::from_reader(xml);
+        for (prefix, namespace) in self.xml_data.inherited_namespaces()?.iter() {
+            let prefix = prefix
+                .as_deref()
+                .map_or(PrefixDeclaration::Default, PrefixDeclaration::Named);
+            reader
+                .resolver_mut()
+                .add(prefix, Namespace(namespace))
+                .map_err(|_| Error::Xml("invalid inherited Office Math namespace".into()))?;
+        }
+        let origin = ReaderOrigin::of(xml);
+        let mut ancestors = Vec::new();
+        let mut capture = None;
+        let mut ranges = Vec::new();
+        let mut nodes = 0usize;
+        loop {
+            let start = origin
+                .offset(reader.buffer_position())
+                .ok_or_else(|| Error::InvalidFormat("Office Math offset exceeds usize".into()))?;
+            let event = reader
+                .read_event()
+                .map_err(|error| Error::Xml(error.to_string()))?;
+            let end = origin
+                .offset(reader.buffer_position())
+                .ok_or_else(|| Error::InvalidFormat("Office Math offset exceeds usize".into()))?;
+            let (namespace, event) = reader.resolver().resolve_event(event);
+            if matches!(event, Event::Start(_) | Event::Empty(_)) {
+                nodes += 1;
+                if nodes > MAX_NODES || ancestors.len() >= MAX_DEPTH {
+                    return Err(Error::InvalidFormat(
+                        "Office Math scan limit exceeded".into(),
+                    ));
+                }
+            }
+            let completed = match event {
+                Event::Start(element) => {
+                    let in_display = ancestors.contains(&true);
+                    ancestors.push(is_omml_name(&namespace, element.name(), b"oMathPara"));
+                    if capture.is_none() && is_omml_name(&namespace, element.name(), b"oMath") {
+                        capture = Some((start, ancestors.len(), in_display));
+                    }
+                    None
+                },
+                Event::Empty(element)
+                    if capture.is_none() && is_omml_name(&namespace, element.name(), b"oMath") =>
+                {
+                    Some((start, ancestors.contains(&true)))
+                },
+                Event::End(_) => {
+                    let completed = if capture.is_some_and(|(_, depth, _)| depth == ancestors.len())
+                    {
+                        capture.take().map(|(start, _, display)| (start, display))
+                    } else {
+                        None
+                    };
+                    ancestors
+                        .pop()
+                        .ok_or_else(|| Error::Xml("invalid Office Math nesting".into()))?;
+                    completed
+                },
+                Event::Eof => {
+                    if !ancestors.is_empty() || capture.is_some() {
+                        return Err(Error::Xml("unterminated Office Math XML".into()));
+                    }
+                    break;
+                },
+                _ => None,
+            };
+            if let Some((start, _)) = completed.filter(|(_, value)| *value == display) {
+                let length = end
+                    .checked_sub(start)
+                    .and_then(|length| u32::try_from(length).ok())
+                    .ok_or_else(|| Error::InvalidFormat("Office Math length exceeds u32".into()))?;
+                let start = u32::try_from(start)
+                    .map_err(|_| Error::InvalidFormat("Office Math offset exceeds u32".into()))?;
+                ranges.push((start, length));
+            }
+        }
+        Ok(ranges)
     }
 }

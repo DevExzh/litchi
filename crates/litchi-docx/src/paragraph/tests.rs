@@ -357,13 +357,26 @@ fn omml_formulas_preserve_inline_and_display_xml_exactly() {
     );
     let inline = paragraph.inline_office_math().unwrap();
     assert_eq!(inline.len(), 2);
-    assert_eq!(
-        inline[1].xml(),
-        r#"<q:oMath q:id="2" xmlns:q="http://schemas.openxmlformats.org/officeDocument/2006/math"/>"#
+    // Typed fragments retain all source bindings, including the Word prefix
+    // used by properties inside a math run. Raw getters above remain exact.
+    assert!(
+        inline[0]
+            .xml()
+            .contains(r#"xmlns:wp="http://schemas.openxmlformats.org/wordprocessingml/2006/main""#)
     );
-    assert_eq!(
-        paragraph.display_office_math().unwrap()[0].xml(),
-        r#"<q:oMath xmlns:q="http://schemas.openxmlformats.org/officeDocument/2006/math"><q:r/></q:oMath>"#
+    for math in [&inline[1], &paragraph.display_office_math().unwrap()[0]] {
+        assert!(
+            math.xml().contains(
+                r#"xmlns:q="http://schemas.openxmlformats.org/officeDocument/2006/math""#
+            )
+        );
+        assert!(math.xml().starts_with("<q:oMath"));
+    }
+    assert!(inline[1].xml().contains(r#"q:id="2""#));
+    assert!(
+        paragraph.display_office_math().unwrap()[0]
+            .xml()
+            .ends_with("<q:r/></q:oMath>")
     );
 }
 
@@ -388,9 +401,17 @@ fn omml_formulas_accept_strict_and_inherited_prefixes() {
         br#"<w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns="http://schemas.openxmlformats.org/officeDocument/2006/math"><w:r><oMath><r/></oMath></w:r></w:p>"#
             .to_vec(),
     );
-    assert_eq!(
-        inherited_default.inline_office_math().unwrap()[0].xml(),
-        r#"<oMath xmlns="http://schemas.openxmlformats.org/officeDocument/2006/math"><r/></oMath>"#
+    let default_math = inherited_default.inline_office_math().unwrap();
+    assert!(
+        default_math[0]
+            .xml()
+            .contains(r#"xmlns="http://schemas.openxmlformats.org/officeDocument/2006/math""#)
+    );
+    assert!(default_math[0].xml().ends_with("<r/></oMath>"));
+    assert!(
+        strict.inline_office_math().unwrap()[0]
+            .xml()
+            .contains(r#"xmlns:math="http://purl.oclc.org/ooxml/officeDocument/math""#)
     );
 
     let foreign =
@@ -406,6 +427,75 @@ fn omml_formulas_reject_malformed_xml() {
     );
     assert!(paragraph.omml_formulas().is_err());
     assert!(paragraph.paragraph_level_formulas().is_err());
+}
+
+#[test]
+fn omml_uses_math_paragraph_ancestry_and_retains_source_namespace_context() {
+    let xml = br#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:q="http://purl.oclc.org/ooxml/officeDocument/math" xmlns:m="urn:foreign"><w:body><w:p><q:oMath/><w:ins><q:oMath><q:r/></q:oMath></w:ins><q:oMathPara><q:oMath/><q:oMath/></q:oMathPara><m:oMath/><m:oMathPara><q:oMath/></m:oMathPara></w:p></w:body></w:document>"#;
+    let start = xml.windows(5).position(|bytes| bytes == b"<w:p>").unwrap();
+    let end = xml.windows(6).position(|bytes| bytes == b"</w:p>").unwrap() + 6;
+    let namespaces = std::sync::Arc::from([
+        (
+            Some(b"w".to_vec()),
+            b"http://schemas.openxmlformats.org/wordprocessingml/2006/main".to_vec(),
+        ),
+        (
+            Some(b"q".to_vec()),
+            b"http://purl.oclc.org/ooxml/officeDocument/math".to_vec(),
+        ),
+        (Some(b"m".to_vec()), b"urn:foreign".to_vec()),
+    ]);
+    let paragraph = Paragraph::from_arc_range_with_context(
+        std::sync::Arc::new(xml.to_vec()),
+        start.try_into().unwrap(),
+        (end - start).try_into().unwrap(),
+        namespaces,
+    );
+    assert_eq!(
+        paragraph.omml_formulas().unwrap(),
+        ["<q:oMath/>", "<q:oMath><q:r/></q:oMath>", "<q:oMath/>"]
+    );
+    assert_eq!(
+        paragraph.paragraph_level_formulas().unwrap(),
+        ["<q:oMath/>", "<q:oMath/>"]
+    );
+    for equation in paragraph
+        .inline_office_math()
+        .unwrap()
+        .into_iter()
+        .chain(paragraph.display_office_math().unwrap())
+    {
+        assert!(
+            equation
+                .xml()
+                .contains(r#"xmlns:q="http://purl.oclc.org/ooxml/officeDocument/math""#)
+        );
+        assert!(equation.xml().contains(r#"xmlns:m="urn:foreign""#));
+    }
+}
+
+#[test]
+fn omml_scan_handles_bom_and_bounds_nesting() {
+    let paragraph = Paragraph::new(
+        b"\xef\xbb\xbf<w:p><m:oMath/><m:oMathPara><m:oMath/></m:oMathPara></w:p>".to_vec(),
+    );
+    assert_eq!(paragraph.omml_formulas().unwrap(), ["<m:oMath/>"]);
+    assert_eq!(
+        paragraph.paragraph_level_formulas().unwrap(),
+        ["<m:oMath/>"]
+    );
+    for xml in [
+        format!(
+            "<w:p>{}<m:oMath/>{}</w:p>",
+            "<w:ins>".repeat(128),
+            "</w:ins>".repeat(128)
+        ),
+        "<w:p><m:oMathPara><m:oMath/>".into(),
+    ] {
+        let paragraph = Paragraph::new(xml.into_bytes());
+        assert!(paragraph.inline_office_math().is_err());
+        assert!(paragraph.display_office_math().is_err());
+    }
 }
 
 #[test]
