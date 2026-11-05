@@ -1,0 +1,596 @@
+{
+  "schema_version": 1,
+  "fixture_id": "powerpoint-ink-010",
+  "generated_on": "2026-10-15",
+  "purpose": "Read-only inspection of two native Microsoft PowerPoint PPTX files containing one native pen InkML stroke, its picture fallback, and the persisted Replay animation timing. The record distinguishes InkML content-part ownership from PowerPoint 2014 InkAction owners and records typed-reader boundaries without changing either package.",
+  "native_ui_observation_source": "Root agent Computer Use session; this inspection process did not operate Office UI.",
+  "provenance": {
+    "producer_app": "Microsoft Office PowerPoint",
+    "app_version": "16.110.2",
+    "app_build": "16.110.26062818",
+    "package_application": "Microsoft Macintosh PowerPoint",
+    "package_app_version": "16.0000",
+    "platform": "macOS",
+    "authoring_method": "Computer Use / native Microsoft PowerPoint UI",
+    "source_title": "PPT_INK_STROKE_010",
+    "source_fixture": "Native PowerPoint one-slide ink baseline authored in the UI.",
+    "derivation_chain": [
+      "Native PowerPoint ink baseline",
+      "powerpoint-ink-stroke.pptx",
+      "powerpoint-ink-replay.pptx"
+    ],
+    "derivation_method": "The baseline was saved as native PPTX. PowerPoint was then reopened, the native Ink stroke was selected through Home > Animations > Replay, Start On Click was retained with a 2.00 second duration, and the second native PPTX was saved.",
+    "source_deck_unchanged": true,
+    "libreoffice_used": false,
+    "programmatic_office_generation_used": false,
+    "library_code_modified": false,
+    "all_documents_closed_before_hashing": true,
+    "lock_files_present_at_inspection": false,
+    "finder_or_os_show_launch_claimed": false
+  },
+  "scope_and_limits": {
+    "variants": [
+      "pptx"
+    ],
+    "native_reopen_verified": true,
+    "native_reopen_repair_prompt": false,
+    "native_reopen_observations": {
+      "powerpoint-ink-stroke.pptx": "Reopened directly in native PowerPoint with no repair prompt; the Ink object was present and had no animation.",
+      "powerpoint-ink-replay.pptx": "Reopened directly in native PowerPoint with no repair prompt; the Ink object was present with the saved animation state observed as HasAnimation/nativeInkShape."
+    },
+    "native_replay_invocation": "PowerPoint's native Replay command was clicked on the Ink stroke before the replay derivative was saved. This records the command and persisted timing evidence; it does not claim an automated visual playback capture.",
+    "picture_fallback_claim": "The package contains the native PowerPoint picture fallback and its PNG relationship. The fallback is recorded as package structure, without claiming pixel or renderer parity.",
+    "true_ink_action_claim": "No PowerPoint 2014 InkAction iact action part was found. The Replay derivative is a p:timing drawProgress animation over an InkML content part, not an iact action closure.",
+    "reader_boundary_claim": "Typed results below describe the current litchi-pptx readers. A pass with an empty result is recorded separately from a typed parse error; raw package bytes remain authoritative for the persisted native timing and InkML content.",
+    "external_links_followed": false,
+    "macros_or_external_code_executed": false
+  },
+  "expected_native_content": {
+    "slide_count": 1,
+    "slide_size_emu": [
+      12192000,
+      6858000
+    ],
+    "title": "PPT_INK_STROKE_010",
+    "subtitle": "Fixture ID: powerpoint-ink-010",
+    "description": "Native pen stroke and replay boundary specimen.",
+    "ink": {
+      "shape_name": "Ink 3",
+      "shape_id": 4,
+      "tool": "Draw > Pen",
+      "color_ui": "red",
+      "inkml_brush_color": "#E71224",
+      "width_mm": 0.35,
+      "height_mm": 0.35,
+      "screen_size_px": [
+        3200,
+        1614
+      ],
+      "native_drag_px": [
+        [
+          1250,
+          570
+        ],
+        [
+          2400,
+          650
+        ]
+      ],
+      "native_shape_bounds_emu": {
+        "choice": {
+          "x": 2360024,
+          "y": 1532238,
+          "cx": 7105320,
+          "cy": 494640
+        },
+        "fallback": {
+          "x": 2353904,
+          "y": 1526118,
+          "cx": 7117560,
+          "cy": 506880
+        }
+      }
+    },
+    "replay": {
+      "ui_command": "Replay",
+      "ui_location": "Home > Animations gallery",
+      "ui_help_text": "Plays drawing of ink strokes",
+      "start": "On Click",
+      "duration_seconds": 2.0,
+      "baseline_has_animation": false,
+      "replay_has_animation": true
+    },
+    "pictures_menu_observation": {
+      "available_items": [
+        "Photo Browser",
+        "Picture from File",
+        "Stock",
+        "Online"
+      ],
+      "photo_album_item_present": false
+    },
+    "native_text_markers": [
+      "PPT_INK_STROKE_010",
+      "Fixture ID: powerpoint-ink-010",
+      "Native pen stroke and replay boundary specimen."
+    ]
+  },
+  "package_graph": {
+    "kind": "OPC ZIP",
+    "zip_test": "pass",
+    "member_count": 39,
+    "relationship_part_count": 15,
+    "relationship_count": 36,
+    "external_relationships": 0,
+    "internal_relationship_target_misses": 0,
+    "content_types_part": {
+      "path": "[Content_Types].xml",
+      "bytes": 3268,
+      "sha256": "32b22dbabda0f9003eaca17727f961fd51bb676711fd18c9f7c444e6301f4405",
+      "inkml_override": {
+        "part_name": "/ppt/ink/ink1.xml",
+        "content_type": "application/inkml+xml"
+      }
+    },
+    "slide_part": "ppt/slides/slide1.xml",
+    "slide_relationship_part": "ppt/slides/_rels/slide1.xml.rels",
+    "slide_relationships": [
+      {
+        "id": "rId1",
+        "type": "http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideLayout",
+        "target_ref": "../slideLayouts/slideLayout1.xml",
+        "resolved_part": "/ppt/slideLayouts/slideLayout1.xml",
+        "target_mode": "Internal",
+        "target_content_type": "application/vnd.openxmlformats-officedocument.presentationml.slideLayout+xml"
+      },
+      {
+        "id": "rId2",
+        "type": "http://schemas.openxmlformats.org/officeDocument/2006/relationships/customXml",
+        "target_ref": "../ink/ink1.xml",
+        "resolved_part": "/ppt/ink/ink1.xml",
+        "target_mode": "Internal",
+        "target_content_type": "application/inkml+xml",
+        "target_exists": true,
+        "target_relationship_part_present": false
+      },
+      {
+        "id": "rId3",
+        "type": "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image",
+        "target_ref": "../media/image1.png",
+        "resolved_part": "/ppt/media/image1.png",
+        "target_mode": "Internal",
+        "target_content_type": "image/png",
+        "target_exists": true
+      }
+    ],
+    "closure_result": "pass",
+    "closure_notes": [
+      "The active p:contentPart rId2 resolves to the InkML part and its declared application/inkml+xml override.",
+      "The inactive p:pic fallback rId3 resolves to an existing image/png part.",
+      "The slide layout rId1 resolves to an existing PresentationML slide-layout part.",
+      "No relationship target in either 39-member package is external or unresolved."
+    ]
+  },
+  "mce_inkml_owner": {
+    "owner_element": "mc:AlternateContent",
+    "markup_compatibility_namespace": "http://schemas.openxmlformats.org/markup-compatibility/2006",
+    "choice": {
+      "element": "mc:Choice",
+      "requires_prefix": "p14",
+      "requires_namespace": "http://schemas.microsoft.com/office/powerpoint/2010/main",
+      "content_part_element": "p:contentPart",
+      "content_part_namespace": "http://schemas.openxmlformats.org/presentationml/2006/main",
+      "relationship_attribute_namespace": "http://schemas.openxmlformats.org/officeDocument/2006/relationships",
+      "relationship_id": "rId2",
+      "bw_mode_namespace": "http://schemas.microsoft.com/office/powerpoint/2010/main",
+      "bw_mode": "auto",
+      "owner_name": "Ink 3",
+      "owner_id": 4,
+      "xfrm_emu": {
+        "x": 2360024,
+        "y": 1532238,
+        "cx": 7105320,
+        "cy": 494640
+      }
+    },
+    "fallback": {
+      "element": "mc:Fallback",
+      "shape_element": "p:pic",
+      "picture_namespace": "http://schemas.openxmlformats.org/presentationml/2006/main",
+      "relationship_id": "rId3",
+      "owner_name": "Ink 3",
+      "owner_id": 4,
+      "xfrm_emu": {
+        "x": 2353904,
+        "y": 1526118,
+        "cx": 7117560,
+        "cy": 506880
+      }
+    },
+    "namespace_result": "pass",
+    "relationship_result": "pass",
+    "content_type_result": "pass",
+    "active_choice_and_fallback_id_match": true
+  },
+  "inkml_payload": {
+    "part": "ppt/ink/ink1.xml",
+    "content_type": "application/inkml+xml",
+    "bytes": 2424,
+    "sha256": "153cd907463545144a3cdf362afbc52a6308f4db40a49c5590cfde5233dc883c",
+    "root_element": "inkml:ink",
+    "root_namespace": "http://www.w3.org/2003/InkML",
+    "definitions_count": 1,
+    "contexts": [
+      "ctx0"
+    ],
+    "ink_sources": [
+      "inkSrc0"
+    ],
+    "timestamps": [
+      {
+        "id": "ts0",
+        "time_string": "2026-10-15T11:41:17.494"
+      }
+    ],
+    "trace_format_channels": [
+      {
+        "name": "X",
+        "type": "integer",
+        "min": "-2.14748E9",
+        "max": "2.14748E9",
+        "units": "cm"
+      },
+      {
+        "name": "Y",
+        "type": "integer",
+        "min": "-2.14748E9",
+        "max": "2.14748E9",
+        "units": "cm"
+      },
+      {
+        "name": "F",
+        "type": "integer",
+        "max": "32767",
+        "units": "dev"
+      }
+    ],
+    "channel_properties": [
+      {
+        "channel": "X",
+        "name": "resolution",
+        "value": "1000",
+        "units": "1/cm"
+      },
+      {
+        "channel": "Y",
+        "name": "resolution",
+        "value": "1000",
+        "units": "1/cm"
+      },
+      {
+        "channel": "F",
+        "name": "resolution",
+        "value": "0",
+        "units": "1/dev"
+      }
+    ],
+    "brush": {
+      "id": "br0",
+      "width": "0.035",
+      "height": "0.035",
+      "units": "cm",
+      "width_mm": 0.35,
+      "height_mm": 0.35,
+      "color": "#E71224"
+    },
+    "trace_count": 1,
+    "trace_group_count": 0,
+    "trace_context_ref": "#ctx0",
+    "trace_brush_ref": "#br0",
+    "trace_data_retained_exactly": true
+  },
+  "replay_timing": {
+    "stroke_file_has_p_timing": false,
+    "replay_file_has_p_timing": true,
+    "replay_slide_xml_bytes": 4704,
+    "replay_slide_xml_sha256": "e5df4fbddaeb1b8c106f19ee197103c70d56ffe45fa827f3d6d016b37c540214",
+    "timing_namespace": "http://schemas.openxmlformats.org/presentationml/2006/main",
+    "root_time_node": {
+      "id": "1",
+      "dur": "indefinite",
+      "restart": "never",
+      "node_type": "tmRoot"
+    },
+    "main_sequence": {
+      "id": "2",
+      "dur": "indefinite",
+      "concurrent": "1",
+      "next_action": "seek",
+      "node_type": "mainSeq"
+    },
+    "click_effect": {
+      "time_node_id": "5",
+      "preset_id": 63,
+      "preset_class": "entr",
+      "preset_subtype": 0,
+      "node_type": "clickEffect",
+      "start_condition": {
+        "delay": "0"
+      },
+      "target_shape_id": 4,
+      "target_shape_name": "Ink 3"
+    },
+    "visibility_set": {
+      "time_node_id": "6",
+      "target_shape_id": 4,
+      "attribute": "style.visibility",
+      "value": "visible"
+    },
+    "draw_progress_animation": {
+      "time_node_id": "7",
+      "target_shape_id": 4,
+      "attribute": "drawProgress",
+      "calculation_mode": "lin",
+      "value_type": "num",
+      "duration_ms": 2000,
+      "fill": "hold",
+      "keyframes": [
+        {
+          "time": 0,
+          "value": 0
+        },
+        {
+          "time": 100000,
+          "value": 1
+        }
+      ]
+    },
+    "sequence_navigation": {
+      "previous": {
+        "event": "onPrev",
+        "delay": "0",
+        "target": "slide"
+      },
+      "next": {
+        "event": "onNext",
+        "delay": "0",
+        "target": "slide"
+      }
+    },
+    "raw_timing_result": "pass",
+    "semantic_boundary": "This is a p:timing animation over spid=4. It does not add a PowerPoint 2014 inkAction namespace, iact action root, or text/xml action target."
+  },
+  "ink_action_distinction": {
+    "native_owner_requires_prefix": "p14",
+    "native_owner_requires_namespace": "http://schemas.microsoft.com/office/powerpoint/2010/main",
+    "native_owner_is_inkml_content_part": true,
+    "native_action_requires_namespace": "http://schemas.microsoft.com/office/powerpoint/2014/inkAction",
+    "native_action_target_content_type_expected_by_typed_owner": "text/xml",
+    "native_action_root_expected_by_typed_owner": "ia:actions",
+    "native_iact_action_part_present": false,
+    "native_iact_action_relationship_present": false,
+    "native_iact_text_xml_target_present": false,
+    "native_iact_namespace_in_slide_present": false,
+    "conclusion": "Both files contain a native InkML p:contentPart relationship with application/inkml+xml. Neither file contains a PowerPoint 2014 InkAction iact owner or action target; the saved Replay effect is represented by p:timing/drawProgress."
+  },
+  "typed_reader_boundaries": {
+    "read_pptx_example": {
+      "reader": "litchi-pptx example read_pptx",
+      "stroke": {
+        "exit": 0,
+        "slide_count": 1,
+        "slide_size_emu": [
+          12192000,
+          6858000
+        ],
+        "shape_count": 3,
+        "text": [
+          "PPT_INK_STROKE_010",
+          "Fixture ID: powerpoint-ink-010",
+          "Native pen stroke and replay boundary specimen."
+        ]
+      },
+      "replay": {
+        "exit": 0,
+        "slide_count": 1,
+        "slide_size_emu": [
+          12192000,
+          6858000
+        ],
+        "shape_count": 3,
+        "text": [
+          "PPT_INK_STROKE_010",
+          "Fixture ID: powerpoint-ink-010",
+          "Native pen stroke and replay boundary specimen."
+        ]
+      }
+    },
+    "package_open": {
+      "reader": "litchi_pptx::Package::open",
+      "stroke": {
+        "result": "pass",
+        "tolerance_defects": 0
+      },
+      "replay": {
+        "result": "pass",
+        "tolerance_defects": 0
+      }
+    },
+    "generic_content_parts": {
+      "reader": "Presentation::content_parts",
+      "stroke": {
+        "result": "pass",
+        "count": 1,
+        "slide_index": 0,
+        "relationship_id": "rId2",
+        "black_white_mode": "auto",
+        "part": "/ppt/ink/ink1.xml",
+        "content_type": "application/inkml+xml",
+        "payload_bytes": 2424
+      },
+      "replay": {
+        "result": "pass",
+        "count": 1,
+        "slide_index": 0,
+        "relationship_id": "rId2",
+        "black_white_mode": "auto",
+        "part": "/ppt/ink/ink1.xml",
+        "content_type": "application/inkml+xml",
+        "payload_bytes": 2424
+      },
+      "boundary": "The generic opaque content-part reader follows the active MCE Choice and recovers the native InkML payload and relationship metadata."
+    },
+    "typed_inkml_reader": {
+      "reader": "presentation::embedded::ink::load_slide",
+      "stroke": {
+        "result": "pass_empty",
+        "annotation_count": 0
+      },
+      "replay": {
+        "result": "pass_empty",
+        "annotation_count": 0
+      },
+      "boundary": "The specialized InkML scanner did not discover the native p:contentPart nested in this mc:AlternateContent owner. The package closure and the generic content-parts result above still prove the relationship and InkML part; no missing native bytes are inferred."
+    },
+    "typed_animation_reader": {
+      "reader": "Slide::animations",
+      "stroke": {
+        "result": "pass_empty",
+        "animation_count": 0,
+        "timing_tree": false,
+        "preserved_timing_xml": false,
+        "tolerance_defects": 0
+      },
+      "replay": {
+        "result": "error",
+        "error": "invalid PresentationML: animation has multiple shape targets",
+        "raw_timing_part_present": true,
+        "raw_timing_sha256": "e5df4fbddaeb1b8c106f19ee197103c70d56ffe45fa827f3d6d016b37c540214"
+      },
+      "boundary": "The native replay p:timing remains present and structurally inspectable in raw XML, while the current typed animation parser rejects this native tree because its visibility set and drawProgress entries target the same shape."
+    },
+    "typed_ink_action_reader": {
+      "reader": "Package::ink_actions / Presentation::ink_actions",
+      "stroke": {
+        "result": "pass",
+        "snapshot_count": 1,
+        "typed_anchor_count": 0,
+        "raw_action_anchor_count": 0,
+        "owner_relationship_count": 3
+      },
+      "replay": {
+        "result": "pass",
+        "snapshot_count": 1,
+        "typed_anchor_count": 0,
+        "raw_action_anchor_count": 0,
+        "owner_relationship_count": 3
+      },
+      "boundary": "The one returned snapshot represents the one slide; it contains no typed or raw InkAction anchors. The three owner relationships are the slide's ordinary layout, InkML customXml, and fallback image relationships."
+    }
+  },
+  "files": [
+    {
+      "path": "test-data/microsoft-office/powerpoint/powerpoint-ink-stroke.pptx",
+      "format": "pptx",
+      "bytes": 39302,
+      "sha256": "c1033a4e7427b9e1176ff5796ad33aaf0b5b386211883fae66667b9c43279df5",
+      "file_description": "Microsoft PowerPoint 2007+",
+      "native_state": "Baseline native InkML stroke; no Replay timing persisted.",
+      "container": {
+        "member_count": 39,
+        "relationship_part_count": 15,
+        "relationship_count": 36,
+        "zip_test": "pass",
+        "xml_or_rels_parse": "pass",
+        "external_relationships": 0,
+        "internal_relationship_target_misses": 0
+      },
+      "key_parts": {
+        "ppt/slides/slide1.xml": {
+          "bytes": 3140,
+          "sha256": "ded3e15d82d776fb70a5f56f4f6df206aac5cfcafa5bcc1ec61e824ae4bed170"
+        },
+        "ppt/slides/_rels/slide1.xml.rels": {
+          "bytes": 581,
+          "sha256": "dcf1bc6d825ca3a091d5fb817e6ae197d0a9ef4205d2f720c3b43335cdb6f0cd"
+        },
+        "ppt/ink/ink1.xml": {
+          "bytes": 2424,
+          "sha256": "153cd907463545144a3cdf362afbc52a6308f4db40a49c5590cfde5233dc883c"
+        },
+        "ppt/media/image1.png": {
+          "bytes": 1645,
+          "sha256": "f233c87a6418eb3f73de40c9a4ed3a93a45dbb5f3d0f0a5497dafb675d9fa183"
+        },
+        "[Content_Types].xml": {
+          "bytes": 3268,
+          "sha256": "32b22dbabda0f9003eaca17727f961fd51bb676711fd18c9f7c444e6301f4405"
+        }
+      }
+    },
+    {
+      "path": "test-data/microsoft-office/powerpoint/powerpoint-ink-replay.pptx",
+      "format": "pptx",
+      "bytes": 39729,
+      "sha256": "d124aa75d1cc219bd40d71ddb184074ec802bfae343792216b6d3e8cb83e3376",
+      "file_description": "Microsoft PowerPoint 2007+",
+      "native_state": "Native InkML stroke with PowerPoint Replay timing persisted.",
+      "container": {
+        "member_count": 39,
+        "relationship_part_count": 15,
+        "relationship_count": 36,
+        "zip_test": "pass",
+        "xml_or_rels_parse": "pass",
+        "external_relationships": 0,
+        "internal_relationship_target_misses": 0
+      },
+      "key_parts": {
+        "ppt/slides/slide1.xml": {
+          "bytes": 4704,
+          "sha256": "e5df4fbddaeb1b8c106f19ee197103c70d56ffe45fa827f3d6d016b37c540214"
+        },
+        "ppt/slides/_rels/slide1.xml.rels": {
+          "bytes": 581,
+          "sha256": "dcf1bc6d825ca3a091d5fb817e6ae197d0a9ef4205d2f720c3b43335cdb6f0cd"
+        },
+        "ppt/ink/ink1.xml": {
+          "bytes": 2424,
+          "sha256": "153cd907463545144a3cdf362afbc52a6308f4db40a49c5590cfde5233dc883c"
+        },
+        "ppt/media/image1.png": {
+          "bytes": 1645,
+          "sha256": "f233c87a6418eb3f73de40c9a4ed3a93a45dbb5f3d0f0a5497dafb675d9fa183"
+        },
+        "[Content_Types].xml": {
+          "bytes": 3268,
+          "sha256": "32b22dbabda0f9003eaca17727f961fd51bb676711fd18c9f7c444e6301f4405"
+        }
+      }
+    }
+  ],
+  "comparisons": {
+    "same_member_names": true,
+    "same_member_count": true,
+    "same_inkml_bytes": true,
+    "same_inkml_sha256": true,
+    "same_slide_relationship_bytes": true,
+    "same_content_types_bytes": true,
+    "same_fallback_image_bytes": true,
+    "changed_members_only": [
+      "docProps/app.xml",
+      "docProps/core.xml",
+      "ppt/slides/slide1.xml"
+    ],
+    "slide_xml_delta": "Replay adds one p:timing subtree after p:clrMapOvr; title, subtitle, MCE owner, InkML relationship IDs, and fallback picture remain byte-identical within slide1.xml's common source prefix/suffix.",
+    "metadata_delta": "PowerPoint increments app TotalTime and core revision/modified timestamp when saving the Replay derivative; these metadata differences do not alter the InkML or relationship closure.",
+    "relationship_and_content_type_delta": "None. Both files use rId2 customXml to /ppt/ink/ink1.xml, application/inkml+xml, and rId3 image to /ppt/media/image1.png."
+  },
+  "validation_methods": [
+    "Native files were inspected read-only after the root Computer Use session closed both PowerPoint documents.",
+    "unzip -t passed for both 39-member packages.",
+    "All XML and .rels members parsed successfully; the package graph had 36 relationships, zero external relationships, and zero unresolved internal targets per file.",
+    "[Content_Types].xml, slide1.xml, slide1.xml.rels, and ink1.xml were hashed and compared between baseline and Replay variants.",
+    "litchi-pptx read_pptx example opened both files and recovered one slide, the native slide size, three semantic shapes, and all text markers.",
+    "A scratch read-only litchi-pptx probe exercised Package::open, Presentation::content_parts, embedded::ink::load_slide, Slide::animations, and Package::ink_actions; no repository source was changed."
+  ]
+}

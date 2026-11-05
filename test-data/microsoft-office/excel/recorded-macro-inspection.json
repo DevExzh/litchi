@@ -1,0 +1,478 @@
+{
+  "schema_version": 1,
+  "fixture_id": "excel-recorded-macro-003",
+  "generated_on": "2026-10-15",
+  "purpose": "Fixture-specific, read-only inspection of five native Microsoft Excel macro-enabled and legacy derivatives created from one recorded formatting action.",
+  "provenance": {
+    "producer_app": "Microsoft Office Excel",
+    "app_version": "16.110.2",
+    "app_build": "16.110.26062818",
+    "package_application": "Microsoft Macintosh Excel",
+    "package_app_version": "16.0300",
+    "platform": "macOS",
+    "authoring_method": "Computer Use / native Microsoft Excel UI with Record New Macro",
+    "source": "Synthetic marker content entered in native Excel; FixtureBoldSelection was recorded with B2 selected and Cmd+B, stored in This Workbook, and saved through native Excel as XLSM, XLSB, XLTM, XLS and XLT.",
+    "macro_storage": "This Workbook/current workbook or template in every derivative; no Personal Macro Workbook or Normal workbook was used.",
+    "libreoffice_used": false,
+    "programmatic_office_generation_used": false,
+    "library_code_modified": false,
+    "macro_execution_during_authoring_or_inspection": false,
+    "all_documents_closed_before_hashing": true,
+    "lock_files_present_at_inspection": false
+  },
+  "scope_and_limits": {
+    "native_variants": [
+      "xlsm",
+      "xlsb",
+      "xltm",
+      "xls",
+      "xlt"
+    ],
+    "native_excel_reopen_verified": true,
+    "repair_prompt_observed": false,
+    "macro_security_action": "Disable Macros",
+    "macro_execution": false,
+    "external_links_followed": false,
+    "template_semantics_verified": false,
+    "vba_source_decoded_inertly": true,
+    "xlsb_biff12_values_decoded": false,
+    "xls_biff8_values_decoded": false,
+    "signature_present": false,
+    "form_controls_present": false,
+    "activex_parts_present": false,
+    "semantic_limit": "The fixtures prove native container storage, marker preservation, and inert VBA decoding. They do not execute VBA, certify template instantiation behavior, or claim complete BIFF12/BIFF8 feature parity."
+  },
+  "expected_native_content": {
+    "worksheet": "Sheet1",
+    "dimension": "A1:B5",
+    "cells": {
+      "A1": "EXCEL_MACRO_FIXTURE_003",
+      "B1": "Value",
+      "A2": "FORMATTING_TARGET_003",
+      "B2": 42,
+      "A3": "Fixture ID: excel-recorded-macro-003",
+      "A4": "Stored macro is recorded from a formatting action only.",
+      "A5": "EXCEL_MACRO_END_003"
+    },
+    "formatting": {
+      "selected_cell": "B2",
+      "selected_value": 42,
+      "selected_cell_bold": true,
+      "xlsx_style_evidence": "B2 has style index 1, whose font has a bold element."
+    }
+  },
+  "recorded_action": {
+    "procedure": "FixtureBoldSelection",
+    "module": "Module1",
+    "recording_action": "Cmd+B with B2 selected",
+    "recording_scope": "This Workbook",
+    "shortcut": null,
+    "automatic_execution": false,
+    "source_behavior": "Selection.Font.Bold = True sets the current selection bold when explicitly invoked; it is not an automatic event handler."
+  },
+  "vba_source": {
+    "project_name": "VBAProject",
+    "page_id": 10000,
+    "module_count": 1,
+    "reference_count": 2,
+    "reference_names": [
+      "MSForms",
+      "Office"
+    ],
+    "module": {
+      "name": "Module1",
+      "stream_name": "Module1",
+      "kind": "Procedural",
+      "text_offset": 1428,
+      "read_only": false,
+      "private": false,
+      "source_text": "Attribute VB_Name = \"Module1\"\nSub FixtureBoldSelection()\nAttribute FixtureBoldSelection.VB_Description = \"Synthetic fixture macro recorded from a bold-formatting action. No automatic execution.\"\nAttribute FixtureBoldSelection.VB_ProcData.VB_Invoke_Func = \" \\n14\"\n'\n' FixtureBoldSelection Macro\n' Synthetic fixture macro recorded from a bold-formatting action. No automatic execution.\n'\n\n'\n    Selection.Font.Bold = True\nEnd Sub\n"
+    },
+    "project_text_records": 11,
+    "document_modules_present": false,
+    "automatic_event_handlers_present": false,
+    "reader_scope": "MS-OVBA metadata and decompressed module source only; no compilation, interpretation or execution."
+  },
+  "macro_security_validation": {
+    "alert_shown_on_native_reopen": true,
+    "user_action": "Disable Macros",
+    "macro_execution_allowed": false,
+    "macro_execution_observed": false,
+    "scope": "Native Excel reopen validation only; the VBA source was inspected inertly by library readers."
+  },
+  "library_validation": {
+    "readers": [
+      "litchi-xlsx::Workbook::open",
+      "litchi::examples::xlsb_reader -> unified Workbook::open",
+      "litchi-xls::Workbook::new",
+      "litchi-vba::project::Project::read_with for OOXML vbaProject.bin",
+      "litchi-vba::project::Project::open at _VBA_PROJECT_CUR for legacy XLS/XLT"
+    ],
+    "macro_execution": false,
+    "all_five_vba_payloads_parsed": true,
+    "errors": [],
+    "commands": [
+      "cargo run -q -p litchi-xlsx --example open -- test-data/microsoft-office/excel/excel-recorded-macro.xlsm",
+      "cargo run -q -p litchi-xlsx --example open -- test-data/microsoft-office/excel/excel-recorded-macro.xltm",
+      "cargo run -q -p litchi --example xlsb_reader --features ooxml --no-default-features -- test-data/microsoft-office/excel/excel-recorded-macro.xlsb",
+      "cargo run -q -p litchi-xls --example read_xls -- test-data/microsoft-office/excel/excel-recorded-macro.xls",
+      "cargo run -q -p litchi-xls --example read_xls -- test-data/microsoft-office/excel/excel-recorded-macro.xlt",
+      "cargo test -p litchi-vba --test real_ooxml_fixtures"
+    ],
+    "result": "The XLSM, XLTM, XLSB, XLS and XLT worksheet readers all exposed Sheet1 and the A1:B5 marker dataset. The inert MS-OVBA reader decoded one Module1 module and two references in every variant. The existing real_ooxml_fixtures test also passed; it uses the repository's POI corpus as a codec regression suite."
+  },
+  "files": [
+    {
+      "path": "test-data/microsoft-office/excel/excel-recorded-macro.xlsm",
+      "format": "xlsm",
+      "bytes": 12750,
+      "sha256": "0f40ba95f9ed3cdeabf0dd2640497409d2134e69c60bf60c0581ec68fe232a55",
+      "file_description": "Microsoft Excel 2007+ macro-enabled workbook",
+      "container": {
+        "kind": "OPC ZIP",
+        "zip_test": "pass",
+        "member_count": 11,
+        "members": [
+          "[Content_Types].xml",
+          "_rels/.rels",
+          "docProps/app.xml",
+          "docProps/core.xml",
+          "xl/_rels/workbook.xml.rels",
+          "xl/sharedStrings.xml",
+          "xl/styles.xml",
+          "xl/theme/theme1.xml",
+          "xl/vbaProject.bin",
+          "xl/workbook.xml",
+          "xl/worksheets/sheet1.xml"
+        ],
+        "main_workbook_part": "/xl/workbook.xml",
+        "main_workbook_content_type": "application/vnd.ms-excel.sheet.macroEnabled.main+xml",
+        "vba_project_content_type": "application/vnd.ms-office.vbaProject",
+        "vba_relationship": {
+          "source_part": "xl/workbook.xml",
+          "relationship_type": "http://schemas.microsoft.com/office/2006/relationships/vbaProject",
+          "target": "vbaProject.bin",
+          "target_exists": true
+        }
+      },
+      "vba_container": {
+        "part": "xl/vbaProject.bin",
+        "bytes": 10752,
+        "sha256": "e4f63c4748cd724db4bed553b9f416b8c1a345c9dcdaad2a453c7a999ef725d0",
+        "project_id": "{FF35C06D-D575-B24F-8C6D-6117B99B329F}",
+        "project_root": [],
+        "project_storage": "VBA",
+        "module_streams": [
+          "Module1"
+        ],
+        "library_parse": "pass"
+      },
+      "library_read": {
+        "package_open": "pass",
+        "sheet_catalog": [
+          "Sheet1"
+        ],
+        "worksheet_probe": "pass",
+        "worksheet_dimension": "A1:B5",
+        "marker_probe": "pass",
+        "vba_payload_parse": "pass"
+      },
+      "native_reopen_validation": {
+        "observed_by": "Root agent via Computer Use",
+        "application": "Microsoft Excel",
+        "reopen": "pass",
+        "repair_prompt": false,
+        "macro_security_action": "Disable Macros",
+        "visible_markers": true,
+        "B2_value": 42,
+        "B2_bold": true,
+        "macro_execution_observed": false
+      }
+    },
+    {
+      "path": "test-data/microsoft-office/excel/excel-recorded-macro.xlsb",
+      "format": "xlsb",
+      "bytes": 12177,
+      "sha256": "c6f978530b0aa96857497cb076a860de396042de3aa6a92311705068b45c72e3",
+      "file_description": "Microsoft Excel binary macro-enabled workbook",
+      "container": {
+        "kind": "OPC ZIP",
+        "zip_test": "pass",
+        "member_count": 13,
+        "members": [
+          "[Content_Types].xml",
+          "_rels/.rels",
+          "docProps/app.xml",
+          "docProps/core.xml",
+          "xl/_rels/workbook.bin.rels",
+          "xl/sharedStrings.bin",
+          "xl/styles.bin",
+          "xl/theme/theme1.xml",
+          "xl/vbaProject.bin",
+          "xl/workbook.bin",
+          "xl/worksheets/_rels/sheet1.bin.rels",
+          "xl/worksheets/binaryIndex1.bin",
+          "xl/worksheets/sheet1.bin"
+        ],
+        "main_workbook_part": "/xl/workbook.bin",
+        "main_workbook_content_type": "application/vnd.ms-excel.sheet.binary.macroEnabled.main",
+        "vba_project_content_type": "application/vnd.ms-office.vbaProject",
+        "vba_relationship": {
+          "source_part": "xl/workbook.bin",
+          "relationship_type": "http://schemas.microsoft.com/office/2006/relationships/vbaProject",
+          "target": "vbaProject.bin",
+          "target_exists": true
+        },
+        "binary_parts": [
+          "xl/workbook.bin",
+          "xl/worksheets/sheet1.bin",
+          "xl/styles.bin",
+          "xl/sharedStrings.bin",
+          "xl/worksheets/binaryIndex1.bin"
+        ]
+      },
+      "vba_container": {
+        "part": "xl/vbaProject.bin",
+        "bytes": 10752,
+        "sha256": "ce2ef3b47a7c28ce3cbf3287477685da2897004ec267dab8af28606220075839",
+        "project_id": "{86708EE3-4AFE-5D4F-B718-F9FAF26C517C}",
+        "project_root": [],
+        "project_storage": "VBA",
+        "module_streams": [
+          "Module1"
+        ],
+        "library_parse": "pass"
+      },
+      "library_read": {
+        "package_open": "pass",
+        "sheet_catalog": [
+          "Sheet1"
+        ],
+        "text_extraction": "pass",
+        "worksheet_dimension": "A1:B5",
+        "marker_probe": "pass",
+        "vba_payload_parse": "pass"
+      },
+      "native_reopen_validation": {
+        "observed_by": "Root agent via Computer Use",
+        "application": "Microsoft Excel",
+        "reopen": "pass",
+        "repair_prompt": false,
+        "macro_security_action": "Disable Macros",
+        "visible_markers": true,
+        "B2_value": 42,
+        "B2_bold": true,
+        "macro_execution_observed": false
+      }
+    },
+    {
+      "path": "test-data/microsoft-office/excel/excel-recorded-macro.xltm",
+      "format": "xltm",
+      "bytes": 12755,
+      "sha256": "3bf83e6fda698942bb8048aa75cb55d2b4791d78c0b6331a1fe8049569402433",
+      "file_description": "Microsoft Excel macro-enabled template",
+      "container": {
+        "kind": "OPC ZIP",
+        "zip_test": "pass",
+        "member_count": 11,
+        "members": [
+          "[Content_Types].xml",
+          "_rels/.rels",
+          "docProps/app.xml",
+          "docProps/core.xml",
+          "xl/_rels/workbook.xml.rels",
+          "xl/sharedStrings.xml",
+          "xl/styles.xml",
+          "xl/theme/theme1.xml",
+          "xl/vbaProject.bin",
+          "xl/workbook.xml",
+          "xl/worksheets/sheet1.xml"
+        ],
+        "main_workbook_part": "/xl/workbook.xml",
+        "main_workbook_content_type": "application/vnd.ms-excel.template.macroEnabled.main+xml",
+        "vba_project_content_type": "application/vnd.ms-office.vbaProject",
+        "vba_relationship": {
+          "source_part": "xl/workbook.xml",
+          "relationship_type": "http://schemas.microsoft.com/office/2006/relationships/vbaProject",
+          "target": "vbaProject.bin",
+          "target_exists": true
+        }
+      },
+      "vba_container": {
+        "part": "xl/vbaProject.bin",
+        "bytes": 10752,
+        "sha256": "71929a65639e462b9efbfcb8229aed2f4c5d6cb3b1ed45791e4bceaf5117c645",
+        "project_id": "{E4A7D37F-77C9-B940-91C4-111172E097F0}",
+        "project_root": [],
+        "project_storage": "VBA",
+        "module_streams": [
+          "Module1"
+        ],
+        "library_parse": "pass"
+      },
+      "library_read": {
+        "package_open": "pass",
+        "sheet_catalog": [
+          "Sheet1"
+        ],
+        "worksheet_probe": "pass",
+        "worksheet_dimension": "A1:B5",
+        "marker_probe": "pass",
+        "vba_payload_parse": "pass"
+      },
+      "native_reopen_validation": {
+        "observed_by": "Root agent via Computer Use",
+        "application": "Microsoft Excel",
+        "reopen": "pass",
+        "repair_prompt": false,
+        "macro_security_action": "Disable Macros",
+        "visible_markers": true,
+        "B2_value": 42,
+        "B2_bold": true,
+        "macro_execution_observed": false,
+        "template_semantics": "Container reopened without repair; template instantiation behavior was not separately certified."
+      }
+    },
+    {
+      "path": "test-data/microsoft-office/excel/excel-recorded-macro.xls",
+      "format": "xls",
+      "bytes": 28160,
+      "sha256": "6c377d5ec7e9493039b109404c72457497e76d250d3dda55733fb27dd55e31b9",
+      "file_description": "Microsoft Excel 97-2004 workbook with native VBA project",
+      "container": {
+        "kind": "Compound File Binary (CFB/OLE)",
+        "signature_hex": "d0cf11e0a1b11ae1",
+        "signature_valid": true,
+        "stream_count": 13,
+        "stream_inventory": [
+          {"path": "\u0001CompObj", "bytes": 102},
+          {"path": "Workbook", "bytes": 16189},
+          {"path": "_VBA_PROJECT_CUR/VBA/dir", "bytes": 587},
+          {"path": "_VBA_PROJECT_CUR/VBA/Module1", "bytes": 1684},
+          {"path": "_VBA_PROJECT_CUR/VBA/__SRP_0", "bytes": 1263},
+          {"path": "_VBA_PROJECT_CUR/VBA/__SRP_1", "bytes": 237},
+          {"path": "_VBA_PROJECT_CUR/VBA/__SRP_2", "bytes": 169},
+          {"path": "_VBA_PROJECT_CUR/VBA/__SRP_3", "bytes": 164},
+          {"path": "_VBA_PROJECT_CUR/VBA/_VBA_PROJECT", "bytes": 2717},
+          {"path": "_VBA_PROJECT_CUR/PROJECT", "bytes": 309},
+          {"path": "_VBA_PROJECT_CUR/PROJECTwm", "bytes": 26},
+          {"path": "\u0005SummaryInformation", "bytes": 228},
+          {"path": "\u0005DocumentSummaryInformation", "bytes": 244}
+        ]
+      },
+      "vba_container": {
+        "project_root": [
+          "_VBA_PROJECT_CUR"
+        ],
+        "vba_storage": "_VBA_PROJECT_CUR/VBA",
+        "required_streams": [
+          "_VBA_PROJECT_CUR/PROJECT",
+          "_VBA_PROJECT_CUR/VBA/_VBA_PROJECT",
+          "_VBA_PROJECT_CUR/VBA/dir"
+        ],
+        "module_streams": [
+          "_VBA_PROJECT_CUR/VBA/Module1"
+        ],
+        "project_id": "{E4A7D37F-77C9-B940-91C4-111172E097F0}",
+        "library_parse": "pass"
+      },
+      "library_read": {
+        "package_open": "pass",
+        "sheet_catalog": [
+          "Sheet1"
+        ],
+        "worksheet_probe": "pass",
+        "worksheet_dimension": "A1:B5",
+        "marker_probe": "pass",
+        "vba_storage_discovery": "pass",
+        "vba_payload_parse": "pass"
+      },
+      "native_reopen_validation": {
+        "observed_by": "Root agent via Computer Use",
+        "application": "Microsoft Excel",
+        "reopen": "pass",
+        "repair_prompt": false,
+        "macro_security_action": "Disable Macros",
+        "visible_markers": true,
+        "B2_value": 42,
+        "B2_bold": true,
+        "macro_execution_observed": false
+      }
+    },
+    {
+      "path": "test-data/microsoft-office/excel/excel-recorded-macro.xlt",
+      "format": "xlt",
+      "bytes": 28160,
+      "sha256": "ae94bd7d9a30e261d4d91a0d4df54006b51c1e50ace4a372ac091e4d68642c53",
+      "file_description": "Microsoft Excel 97-2004 template with native VBA project",
+      "container": {
+        "kind": "Compound File Binary (CFB/OLE)",
+        "signature_hex": "d0cf11e0a1b11ae1",
+        "signature_valid": true,
+        "stream_count": 13,
+        "stream_inventory": [
+          {"path": "\u0001CompObj", "bytes": 102},
+          {"path": "Workbook", "bytes": 16193},
+          {"path": "_VBA_PROJECT_CUR/VBA/dir", "bytes": 587},
+          {"path": "_VBA_PROJECT_CUR/VBA/Module1", "bytes": 1684},
+          {"path": "_VBA_PROJECT_CUR/VBA/__SRP_0", "bytes": 1263},
+          {"path": "_VBA_PROJECT_CUR/VBA/__SRP_1", "bytes": 237},
+          {"path": "_VBA_PROJECT_CUR/VBA/__SRP_2", "bytes": 169},
+          {"path": "_VBA_PROJECT_CUR/VBA/__SRP_3", "bytes": 164},
+          {"path": "_VBA_PROJECT_CUR/VBA/_VBA_PROJECT", "bytes": 2717},
+          {"path": "_VBA_PROJECT_CUR/PROJECT", "bytes": 305},
+          {"path": "_VBA_PROJECT_CUR/PROJECTwm", "bytes": 26},
+          {"path": "\u0005SummaryInformation", "bytes": 228},
+          {"path": "\u0005DocumentSummaryInformation", "bytes": 244}
+        ]
+      },
+      "vba_container": {
+        "project_root": [
+          "_VBA_PROJECT_CUR"
+        ],
+        "vba_storage": "_VBA_PROJECT_CUR/VBA",
+        "required_streams": [
+          "_VBA_PROJECT_CUR/PROJECT",
+          "_VBA_PROJECT_CUR/VBA/_VBA_PROJECT",
+          "_VBA_PROJECT_CUR/VBA/dir"
+        ],
+        "module_streams": [
+          "_VBA_PROJECT_CUR/VBA/Module1"
+        ],
+        "project_id": "{E4A7D37F-77C9-B940-91C4-111172E097F0}",
+        "library_parse": "pass"
+      },
+      "library_read": {
+        "package_open": "pass",
+        "sheet_catalog": [
+          "Sheet1"
+        ],
+        "worksheet_probe": "pass",
+        "worksheet_dimension": "A1:B5",
+        "marker_probe": "pass",
+        "vba_storage_discovery": "pass",
+        "vba_payload_parse": "pass"
+      },
+      "native_reopen_validation": {
+        "observed_by": "Root agent via Computer Use",
+        "application": "Microsoft Excel",
+        "reopen": "pass",
+        "repair_prompt": false,
+        "macro_security_action": "Disable Macros",
+        "visible_markers": true,
+        "B2_value": 42,
+        "B2_bold": true,
+        "macro_execution_observed": false,
+        "template_semantics": "Container reopened without repair; template instantiation behavior was not separately certified."
+      }
+    }
+  ],
+  "validation_methods": [
+    "SHA-256 computed from each closed fixture byte stream after all Excel windows and lock files were closed.",
+    "ZIP member inventories, content types, workbook relationships and XML worksheet/style marker evidence inspected read-only for XLSM, XLSB and XLTM.",
+    "CFB signature and stream inventories inspected read-only for XLS and XLT; both contain _VBA_PROJECT_CUR/VBA/dir, _VBA_PROJECT_CUR/VBA/_VBA_PROJECT and Module1 streams.",
+    "litchi-vba decompressed and decoded every dir/module payload without compiling, interpreting or executing source.",
+    "Native litchi-xlsx, unified XLSB and litchi-xls readers opened the closed files and exposed Sheet1 and the A1:B5 marker dataset.",
+    "Root agent reopened all five files in native Excel, selected Disable Macros, observed no repair prompt, and confirmed the marker dataset and bold B2 state."
+  ]
+}

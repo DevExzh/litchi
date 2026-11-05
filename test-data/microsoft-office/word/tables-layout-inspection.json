@@ -1,0 +1,333 @@
+{
+  "schema_version": 1,
+  "fixture_id": "word-tables-layout-002",
+  "generated_on": "2026-10-15",
+  "purpose": "Fixture-specific, read-only inspection of the native Microsoft Word table and section-layout derivatives.",
+  "provenance": {
+    "producer_app": "Microsoft Office Word",
+    "app_version": "16.110.2",
+    "app_build": "16.110.26062818",
+    "platform": "macOS",
+    "authoring_method": "Computer Use / native Microsoft Word UI",
+    "source": "Synthetic content entered in a native Word document; native Word Save As produced the DOC and RTF derivatives.",
+    "libreoffice_used": false,
+    "programmatic_office_generation_used": false,
+    "library_code_modified": false,
+    "all_documents_closed_before_hashing": true
+  },
+  "files": [
+    {
+      "path": "test-data/microsoft-office/word/word-tables-layout.docx",
+      "format": "docx",
+      "bytes": 20955,
+      "sha256": "94bdb1fc73e7d5097637b0095f7c3c136e74157631c2c9f475979f5f7b0e81d0"
+    },
+    {
+      "path": "test-data/microsoft-office/word/word-tables-layout.doc",
+      "format": "doc",
+      "bytes": 36352,
+      "sha256": "cde730cdfe835683c3e80f52cdb5c69742610155e2a34b9e09e21c2d57023f3a"
+    },
+    {
+      "path": "test-data/microsoft-office/word/word-tables-layout.rtf",
+      "format": "rtf",
+      "bytes": 79211,
+      "sha256": "34999eb1d97167904017ea056a9be222940ceb7c8fd827363958e74f4091910c"
+    }
+  ],
+  "docx": {
+    "container": {
+      "kind": "OPC ZIP",
+      "zip_test": "pass",
+      "xml_validation": "pass",
+      "member_count": 16,
+      "members": [
+        "[Content_Types].xml",
+        "_rels/.rels",
+        "docProps/app.xml",
+        "docProps/core.xml",
+        "word/_rels/document.xml.rels",
+        "word/document.xml",
+        "word/endnotes.xml",
+        "word/fontTable.xml",
+        "word/footer1.xml",
+        "word/footer2.xml",
+        "word/footnotes.xml",
+        "word/header1.xml",
+        "word/settings.xml",
+        "word/styles.xml",
+        "word/theme/theme1.xml",
+        "word/webSettings.xml"
+      ]
+    },
+    "main_document": {
+      "markers": [
+        "Native Word tables and layout",
+        "Fixture ID: word-tables-layout-002",
+        "TABLE_SECTION_START",
+        "TABLE_END",
+        "AFTER_TABLE_MARKER",
+        "Second section begins below.",
+        "LANDSCAPE_SECTION_START",
+        "Column one paragraph: alpha beta gamma delta.",
+        "Column two paragraph: one two three four.",
+        "SECTION_END_MARKER",
+        "ENDNOTE_ANCHOR_002"
+      ],
+      "xml_counts": {
+        "tbl": 2,
+        "tr": 7,
+        "tc": 21,
+        "tblHeader": 1,
+        "gridSpan": 1,
+        "vMerge_restart": 1,
+        "vMerge_continue": 1,
+        "sectPr": 2,
+        "headerReference": 1,
+        "footerReference": 2,
+        "endnoteReference": 1,
+        "fldChar": 0,
+        "instrText": 0,
+        "bookmarkStart": 0,
+        "bookmarkEnd": 0,
+        "ins": 0,
+        "del": 0,
+        "sdt": 0
+      },
+      "outer_table": {
+        "logical_grid_columns": 4,
+        "grid_columns_twips": [2340, 2340, 2340, 2340],
+        "row_count": 5,
+        "physical_cell_counts_by_row": [4, 4, 4, 4, 1],
+        "header_row_count": 1,
+        "header_row_text": ["Item", "Quantity", "Price", "Notes"],
+        "grid_span": {
+          "value": 4,
+          "cell_text": "Merged summary"
+        },
+        "style": "GridTable2-Accent1",
+        "width": {
+          "value": 5000,
+          "type": "pct"
+        }
+      },
+      "nested_table": {
+        "xml_table_count": 1,
+        "row_count": 2,
+        "logical_grid_columns": 2,
+        "grid_columns_twips": [1057, 1057],
+        "physical_cell_counts_by_row": [2, 2],
+        "first_column_vmerge": ["restart", "continue"],
+        "first_column_paragraph_text": [["N1", "10"], []],
+        "second_column_paragraph_text": [["N2"], ["20"]],
+        "style": "TableGrid"
+      },
+      "library_projection": {
+        "read_docx_table_count": 1,
+        "reason": "The public document table scan returns top-level body tables; the nested table remains inside the outer cell XML.",
+        "read_docx_text_bytes": 394,
+        "read_docx_text_contains": [
+          "TABLE_SECTION_START",
+          "Merged summary",
+          "N110",
+          "N220",
+          "LANDSCAPE_SECTION_START",
+          "ENDNOTE_ANCHOR_002"
+        ]
+      }
+    },
+    "sections": [
+      {
+        "index": 0,
+        "page_size_twips": {
+          "width": 12240,
+          "height": 15840,
+          "orientation": "portrait"
+        },
+        "margins_twips": {
+          "top": 1440,
+          "right": 1440,
+          "bottom": 1440,
+          "left": 1440,
+          "header": 720,
+          "footer": 720,
+          "gutter": 0
+        },
+        "columns": {
+          "num": 1,
+          "space_twips": 720,
+          "num_attribute_present": false
+        }
+      },
+      {
+        "index": 1,
+        "page_size_twips": {
+          "width": 15840,
+          "height": 12240,
+          "orientation": "landscape"
+        },
+        "margins_twips": {
+          "top": 1440,
+          "right": 1440,
+          "bottom": 1440,
+          "left": 1440,
+          "header": 720,
+          "footer": 720,
+          "gutter": 0
+        },
+        "columns": {
+          "num": 2,
+          "space_twips": 720,
+          "num_attribute_present": true
+        }
+      }
+    ],
+    "headers_footers": {
+      "parts": ["word/header1.xml", "word/footer1.xml", "word/footer2.xml"],
+      "first_section_references": {
+        "default_header": "rId6 -> header1.xml",
+        "even_footer": "rId7 -> footer1.xml",
+        "default_footer": "rId8 -> footer2.xml"
+      },
+      "second_section_reference_behavior": "No direct header/footer references; Word reuses the preceding section's definitions.",
+      "header_text": "HEADER_DEFAULT_002",
+      "page_fields": [
+        {
+          "part": "word/footer1.xml",
+          "instruction": "PAGE",
+          "cached_result": null
+        },
+        {
+          "part": "word/footer2.xml",
+          "instruction": "PAGE",
+          "cached_result": "2",
+          "marker": "FOOTER_PAGE_002:"
+        }
+      ]
+    },
+    "endnotes": {
+      "part": "word/endnotes.xml",
+      "reference_id": 1,
+      "anchor_marker": "ENDNOTE_ANCHOR_002",
+      "text": "ENDNOTE_TEXT_002: native endnote value 84."
+    },
+    "footnotes": {
+      "part": "word/footnotes.xml",
+      "user_reference_count": 0,
+      "note": "The part contains the native separator and continuation-separator records only."
+    },
+    "read_example": {
+      "command": "cargo run -q -p litchi-docx --example read_docx -- test-data/microsoft-office/word/word-tables-layout.docx",
+      "exit_code": 0,
+      "paragraph_count": 36,
+      "table_count": 1,
+      "text_bytes": 394
+    }
+  },
+  "doc": {
+    "container": {
+      "kind": "Compound File Binary (CFB/OLE)",
+      "file_identification": "Microsoft Word 97-2003 document",
+      "word_version_observed_by_reader": "Word 97",
+      "fib_version_hex": "0x00C1"
+    },
+    "read_example": {
+      "command": "cargo run -q -p litchi-doc --example read_doc -- test-data/microsoft-office/word/word-tables-layout.doc",
+      "exit_code": 0,
+      "paragraph_count": 62,
+      "table_count": 2,
+      "total_characters": 556,
+      "text_contains": [
+        "TABLE_SECTION_START",
+        "Merged summary",
+        "LANDSCAPE_SECTION_START",
+        "SECTION_END_MARKER",
+        "ENDNOTE_ANCHOR_002",
+        "ENDNOTE_TEXT_002: native endnote value 84."
+      ]
+    },
+    "textutil_read_only": {
+      "command": "textutil -convert txt -stdout test-data/microsoft-office/word/word-tables-layout.doc",
+      "exit_code": 0,
+      "observed": "The extracted text contains the outer and nested table values, the page/section break, both section markers, PAGE field projections, the footer marker, and the endnote text."
+    }
+  },
+  "rtf": {
+    "file_type": "Rich Text Format data, version 1, ANSI, code page 1252",
+    "read_example": {
+      "command": "cargo run -q -p litchi-rtf --example parse_rtf -- test-data/microsoft-office/word/word-tables-layout.rtf",
+      "exit_code": 1,
+      "error": "MalformedDocument(\"RTF stylesheet contains a duplicate typed style ID\")",
+      "semantic_counts_available": false
+    },
+    "textutil_read_only": {
+      "command": "textutil -convert txt -stdout test-data/microsoft-office/word/word-tables-layout.rtf",
+      "exit_code": 0,
+      "text_contains": [
+        "TABLE_SECTION_START",
+        "Merged summary",
+        "LANDSCAPE_SECTION_START",
+        "SECTION_END_MARKER",
+        "ENDNOTE_ANCHOR_002"
+      ]
+    },
+    "control_word_counts": {
+      "trowd": 13,
+      "cell": 59,
+      "row": 5,
+      "clvmgf": 1,
+      "clvmrg": 1,
+      "sectd": 8,
+      "cols": 1,
+      "header": 1,
+      "footer": 2,
+      "field": 2,
+      "fldinst": 2,
+      "fldrslt": 2,
+      "chftn": 6,
+      "footnote": 1,
+      "revised": 0,
+      "deleted": 0,
+      "bkmkstart": 0,
+      "bkmkend": 0,
+      "annotation": 0
+    }
+  },
+  "native_ui_validation": {
+    "observed_by": "Root agent via Computer Use",
+    "application": "Microsoft Office Word",
+    "reopen": "pass",
+    "repair_prompt": false,
+    "files": [
+      "word-tables-layout.docx",
+      "word-tables-layout.doc",
+      "word-tables-layout.rtf"
+    ],
+    "observations": [
+      "Outer table visibly contains five rows and four logical columns.",
+      "Nested table visibly contains two rows and two columns.",
+      "The nested first column uses a vertical merge.",
+      "Header text is visible in both sections; the footer page field and endnote are visible."
+    ]
+  },
+  "coverage": [
+    "DOCX and DOC table rows/cells, nested table payload, horizontal gridSpan, vertical merge, repeated header row, and cell text.",
+    "DOCX and DOC section page geometry, portrait-to-landscape transition, and two-column layout.",
+    "DOCX header/footer relationships and inert PAGE fields with cached result evidence.",
+    "DOCX/DOC endnote reference and endnote story text.",
+    "Native Word RTF table, section, header/footer, field, and endnote control-word presence."
+  ],
+  "known_limits": [
+    "The DOCX public read example reports one top-level table even though the package XML contains two w:tbl elements; the second is nested in an outer cell.",
+    "The DOCX read example does not expose section, header/footer, or endnote counts; those values are recorded from package parts and XML inspection.",
+    "The RTF file reopened in native Word, but litchi-rtf currently rejects it before semantic traversal because of a duplicate typed stylesheet ID. The RTF control-word and textutil observations are evidence of file contents, not a successful litchi-rtf parse.",
+    "The DOC binary stream was validated through the existing litchi-doc read example and textutil extraction; this inspection does not claim a complete binary table-property decode.",
+    "PAGE fields are inert cached instructions/results. No pagination, field refresh, rendering, or layout-engine behavior is claimed."
+  ],
+  "validation_scope": {
+    "read_only": true,
+    "gui_used_by_this_inspector": false,
+    "native_reopen_evidence_source": "Root agent Computer Use observations",
+    "library_code_or_tests_modified": false
+  }
+}

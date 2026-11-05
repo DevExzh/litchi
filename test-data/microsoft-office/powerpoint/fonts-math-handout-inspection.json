@@ -1,0 +1,240 @@
+{
+  "schema_version": 1,
+  "fixture_id": "powerpoint-fonts-math-handout-009",
+  "generated_on": "2026-10-15",
+  "purpose": "Read-only inspection of native Microsoft PowerPoint font embedding, OMML equation, handout-master and print-setting fixtures in PPTX and legacy PPT containers.",
+  "native_ui_observation_source": "Root agent Computer Use session; this inspection process did not operate Office UI.",
+  "provenance": {
+    "producer_app": "Microsoft Office PowerPoint",
+    "app_version": "16.110.2",
+    "app_build": "16.110.26062818",
+    "package_application": "Microsoft Macintosh PowerPoint",
+    "package_app_version": "16.0000",
+    "platform": "macOS",
+    "authoring_method": "Computer Use / native Microsoft PowerPoint UI",
+    "source_fixture": "test-data/microsoft-office/powerpoint/powerpoint-fonts-math-handout.pptx",
+    "source_fixture_sha256": "0871811bbf80ec3883dc6c3a205db7942c244ae60565f6bc1b6391ce8e62872f",
+    "legacy_derivative": "test-data/microsoft-office/powerpoint/powerpoint-fonts-math-handout.ppt",
+    "legacy_derivative_sha256": "1b03d9dd84d58e05d0daa7d0fd4a419ad53a66074a7becb37d2bb7b365461ad9",
+    "source_fixture_unchanged_at_inspection": true,
+    "libreoffice_used": false,
+    "programmatic_office_generation_used": false,
+    "library_code_modified": false,
+    "all_documents_closed_before_hashing": true,
+    "lock_files_present_at_inspection": false
+  },
+  "scope_and_limits": {
+    "variants": ["pptx", "ppt"],
+    "native_reopen_verified": true,
+    "native_reopen_repair_prompt": false,
+    "native_font_preference": "PowerPoint's Embed fonts in the file / embed all characters preference was enabled manually before the final PPTX save; the UI save preference was not automated by this inspection.",
+    "native_print_observation": "PowerPoint Print Layout was opened with Handouts: 6 Slides and Landscape selected; Escape canceled the print flow before a printer was chosen, followed by Cmd+S. Package inspection shows that this canceled operation did not persist print properties.",
+    "legacy_save_warning": "PowerPoint warned that the equation shapes/text on slides 2-4 cannot be edited in older PowerPoint versions; Save Anyway was accepted for the legacy derivative.",
+    "external_links_followed": false,
+    "macros_or_external_code_executed": false,
+    "known_reader_boundaries": [
+      "litchi-pptx::Package::fonts reads the presentation embeddedFontLst, validates the font relationship and application/x-fontdata content type, and returns the Cambria Math EOT payload; it does not interpret or rasterize the font program.",
+      "litchi-pptx::Slide text access exposes the equation placeholder's non-breaking-space fallback text, while the slide XML retains the native OMML tree under a14:m and the MCE fallback picture. Raw OMML is therefore the authoritative semantic fixture evidence for these equations.",
+      "litchi-pptx::presentation_properties::math parses presentation-level a14:m math properties in presProps.xml. This deck has slide-level OMML but no presentation-level math extension, so math_properties() returns None.",
+      "litchi-pptx::presentation_properties::metadata::handout::Master parses p:hf metadata and the handout background color. PowerPoint stored these native handout labels as direct hdr/ftr/sldNum placeholders instead of p:hf, so the typed parser reports default header/footer/date/page flags even though the raw handout master contains the markers and slide-number field.",
+      "litchi-ppt::Presentation::fonts reads the legacy FontCollection and PP10 embedding flags, but the legacy derivative has no embedded font data and reports has_embedded_fonts=false.",
+      "litchi-ppt::Presentation slide shape text reads the four legacy titles and slide-one body text; it does not expose the native equation semantics, handout placeholder text, or equation fallback pictures through the typed shape model.",
+      "The native print selection was canceled: PPTX presProps.xml has no p:prnPr and the legacy Document stream has no PrintOptionsAtom (record type 0x1770), so no persisted print-layout assertion is made."
+    ]
+  },
+  "expected_native_content": {
+    "slide_count": 4,
+    "slide_size_emu": [12192000, 6858000],
+    "slide_size": "16:9 landscape",
+    "ordered_slide_ids": [256, 257, 258, 259],
+    "slides": [
+      {
+        "slide": 1,
+        "marker": "PPT_FONTS_MATH_HANDOUT_009",
+        "subtitle": "Fixture ID: powerpoint-fonts-math-handout-009",
+        "text_markers": [
+          "ABCDEFGHIJKLMNOPQRSTUVWXYZ",
+          "abcdefghijklmnopqrstuvwxyz",
+          "0123456789",
+          "Symbols: € £ ¥ Ω π ± × ÷"
+        ],
+        "package_part": "/ppt/slides/slide1.xml"
+      },
+      {
+        "slide": 2,
+        "marker": "NATIVE_EQUATIONS_009",
+        "input_latex": "x=\\frac{-b\\pm\\sqrt{b^2-4ac}}{2a}",
+        "omml_namespace": "http://schemas.openxmlformats.org/officeDocument/2006/math",
+        "omml_constructs": ["m:oMath", "m:f", "m:rad", "m:sSup"],
+        "omml_text_content": "𝑥=−𝑏±𝑏²−4𝑎𝑐2𝑎",
+        "mce_choice_requires": "a14",
+        "fallback_picture_relationship": "rId2",
+        "fallback_picture_part": "/ppt/media/image1.png",
+        "package_part": "/ppt/slides/slide2.xml"
+      },
+      {
+        "slide": 3,
+        "marker": "NARY_EQUATION_009",
+        "input_latex": "\\sum_{k=1}^{4} k^2=30",
+        "omml_namespace": "http://schemas.openxmlformats.org/officeDocument/2006/math",
+        "omml_constructs": ["m:oMath", "m:nary", "m:sSup"],
+        "nary_properties": {"character": "∑", "limit_location": "undOvr", "subscript": "k=1", "superscript": "4"},
+        "omml_text_content": "𝑘=14𝑘²=30",
+        "mce_choice_requires": "a14",
+        "fallback_picture_relationship": "rId2",
+        "fallback_picture_part": "/ppt/media/image2.png",
+        "package_part": "/ppt/slides/slide3.xml"
+      },
+      {
+        "slide": 4,
+        "marker": "MATRIX_EQUATION_009",
+        "input_latex": "A=\\begin{matrix}1&2\\\\3&4\\end{matrix}",
+        "omml_namespace": "http://schemas.openxmlformats.org/officeDocument/2006/math",
+        "omml_constructs": ["m:oMath", "m:m", "m:mr", "m:e"],
+        "matrix": {"rows": 2, "columns": 2, "cells": [["1", "2"], ["3", "4"]], "column_justification": "center"},
+        "omml_text_content": "𝐴=1234",
+        "mce_choice_requires": "a14",
+        "fallback_picture_relationship": "rId2",
+        "fallback_picture_part": "/ppt/media/image3.png",
+        "package_part": "/ppt/slides/slide4.xml"
+      }
+    ]
+  },
+  "fonts": {
+    "native_setting": "Embed all characters",
+    "presentation_flags": {"embedTrueTypeFonts": "1", "saveSubsetFonts": "1"},
+    "embedded_font_list": [
+      {
+        "typeface": "Cambria Math",
+        "panose_hex": "02040503050406030204",
+        "pitch_family": 18,
+        "charset": 0,
+        "faces": [{"style": "regular", "relationship_id": "rId7", "target": "fonts/font1.fntdata"}]
+      }
+    ],
+    "package_part": "/ppt/fonts/font1.fntdata",
+    "content_type": "application/x-fontdata",
+    "payload": {
+      "format": "Embedded OpenType (EOT)",
+      "bytes": 129261,
+      "sha256": "4e9c7d3b3dc757b3f45eb6f7a902046ebabc9b5868c707aeaa4f1e6c42cccfc9",
+      "eot_declared_size": 129261,
+      "eot_font_data_size": 129053,
+      "eot_version_hex": "0x00020002",
+      "eot_flags_hex": "0x00000005",
+      "panose_hex": "02040503050406030204",
+      "charset": 0,
+      "italic": 0,
+      "weight": 400,
+      "fs_type_hex": "0x0008",
+      "magic_hex": "0x504c",
+      "family": "Cambria Math",
+      "style": "Regular",
+      "version": "Version 6.90i",
+      "full_name": "Cambria Math"
+    },
+    "reader_result": {
+      "litchi_pptx_fonts_count": 1,
+      "face_format": "PowerPoint",
+      "face_bytes": 129261,
+      "face_sha256_matches_payload": true,
+      "tolerance_report": {"defects": [], "unrecorded": 0},
+      "interpretation_limit": "The reader validates and returns bytes/metadata; glyph coverage or font rendering is not asserted by this fixture. The raw saveSubsetFonts=1 flag is recorded exactly even though the native UI preference was embed all characters."
+    }
+  },
+  "handout_master": {
+    "package_part": "/ppt/handoutMasters/handoutMaster1.xml",
+    "relationship_id": "rId6",
+    "background": {"kind": "solid", "srgb": "00B0F0", "native_ui_label": "Light Blue"},
+    "native_ui_layout": "Handouts: 6 Slides",
+    "native_ui_orientation": "Landscape",
+    "native_ui_header_footer": {"header": "HANDOUT_HEADER_009", "footer": "HANDOUT_FOOTER_009", "date": "off", "page_number": "on"},
+    "raw_placeholders": [
+      {"name": "Header Placeholder 1", "type": "hdr", "text": "HANDOUT_HEADER_009"},
+      {"name": "Footer Placeholder 3", "type": "ftr", "index": 2, "text": "HANDOUT_FOOTER_009"},
+      {"name": "Slide Number Placeholder 4", "type": "sldNum", "index": 3, "field_type": "slidenum", "field_text": "‹#›"}
+    ],
+    "raw_features": {"p_hf_element_present": false, "date_placeholder_present": false, "handout_relationship_target": "handoutMasters/handoutMaster1.xml"},
+    "typed_reader_result": {"layout": "OneSlide", "background_color": "00B0F0", "show_slide_images": true, "show_header": false, "header_text": null, "show_footer": false, "footer_text": null, "show_slide_number": false, "show_date_time": false, "date_time_text": null, "auto_date": false},
+    "reader_boundary": "Native placeholder text and the slidenum field are present in handoutMaster1.xml, but the typed handout codec only consumes p:hf and does not project direct handout placeholders or the six-slide handout layout."
+  },
+  "print_properties": {
+    "native_ui_action": "Print Layout > Handouts: 6 Slides > Landscape, then Escape to cancel before printer selection, then Cmd+S",
+    "pptx": {"presProps_part": "/ppt/presProps.xml", "prnPr_present": false, "math_extension_present": false, "typed_print_result": null},
+    "ppt": {"print_options_atom_record_type": "0x1770", "print_options_atom_present": false},
+    "persisted_print_selection": false,
+    "evidence_limit": "Because the print flow was canceled, this fixture records native UI coverage and the absence of persisted print settings rather than a saved print-layout preference."
+  },
+  "legacy_container": {
+    "format": "CFB / Composite Document File V2",
+    "header": "d0 cf 11 e0 a1 b1 1a e1",
+    "stream_count": 5,
+    "streams": [
+      {"name": "Pictures", "bytes": 86419, "sha256": "473865d23b25bd27c836b23bafaf01f6ca80411420dca756d90324ddbb1d381e"},
+      {"name": "Current User", "bytes": 4096, "sha256": "fbe348df6b3e3031e89ef44a18e58c4f11e1549cf20d51713f638fd9b86d2b82"},
+      {"name": "PowerPoint Document", "bytes": 144070, "sha256": "abdd832a213efeaeef62a92006f6f2a5d0acfdee386ad89d5215a233d60a1733"},
+      {"name": "\u0005SummaryInformation", "bytes": 8600, "sha256": "e74d5d98e2cf358b290ef01bd1c4093cb30b14cab008095b19544e19b709f157"},
+      {"name": "\u0005DocumentSummaryInformation", "bytes": 4096, "sha256": "7e17d69efc26653c994de42c0287a06fb44007481dde34f1b791a7e75890daa6"}
+    ],
+    "record_evidence": {
+      "document_handout_record": {"offset_hex": "0x8795", "type": "Handout", "payload_bytes": 10872, "nested_records": ["PPDrawing", "ProgTags"]},
+      "header_footer_records": [{"scope_instance": 3, "type": "HeadersFooters", "child": "HeadersFootersAtom"}, {"scope_instance": 4, "type": "HeadersFooters", "child": "HeadersFootersAtom"}],
+      "print_options_atom_type": "0x1770",
+      "print_options_atom_found": false
+    },
+    "font_reader_result": {
+      "base_font_count": 3,
+      "fonts": ["Aptos", "Arial", "Aptos Display"],
+      "international_font_collection": false,
+      "embedding_flags_raw": 1,
+      "embedding_subset": true,
+      "subset_option_confirmed": false,
+      "has_embedded_fonts": false,
+      "font_embedded_data_records": false
+    },
+    "legacy_read_result": {
+      "slide_count": 4,
+      "has_pictures": true,
+      "total_chars": 224,
+      "slide_shape_counts": [2, 2, 2, 2],
+      "slide_1_text_markers": ["PPT_FONTS_MATH_HANDOUT_009", "Fixture ID: powerpoint-fonts-math-handout-009", "ABCDEFGHIJKLMNOPQRSTUVWXYZ abcdefghijklmnopqrstuvwxyz 0123456789", "Symbols: € £ ¥ Ω π ± × ÷"],
+      "equation_slide_text": {"slide_2": "NATIVE_EQUATIONS_009", "slide_3": "NARY_EQUATION_009", "slide_4": "MATRIX_EQUATION_009"},
+      "equation_semantics_exposed": false,
+      "handout_header_footer_typed_values": null
+    }
+  },
+  "package_parts": {
+    "pptx_member_count": 50,
+    "presentation_xml": {"part": "/ppt/presentation.xml", "bytes": 3935, "sha256": "20acb562bcd0e32431395592e98b5c25ae33998a241a89dc2503cfaae3356b60"},
+    "presentation_relationships": {"part": "/ppt/_rels/presentation.xml.rels", "bytes": 1668, "sha256": "aa5a9e0ecfdb0ba4f1f1644509d909594c3c3b21225cfe4183bae1bf62de1c74"},
+    "pres_props": {"part": "/ppt/presProps.xml", "bytes": 818, "sha256": "cd12d22ac9a3825ff6772a707cd1e67f9ce26eb2aaf316023469a16b02852f85"},
+    "handout_master": {"part": "/ppt/handoutMasters/handoutMaster1.xml", "bytes": 3537, "sha256": "21a95b2d7a023a75219e8f99959fe70c8b758e328c81bd92cef2c6ad212f8052"},
+    "handout_master_relationships": {"part": "/ppt/handoutMasters/_rels/handoutMaster1.xml.rels", "bytes": 292, "sha256": "c900da93a4de8bad9a582295b1dbcb892e6cfec52985354da973ebb3fab497c1"},
+    "font": {"part": "/ppt/fonts/font1.fntdata", "bytes": 129261, "sha256": "4e9c7d3b3dc757b3f45eb6f7a902046ebabc9b5868c707aeaa4f1e6c42cccfc9"},
+    "equation_slides": [
+      {"part": "/ppt/slides/slide2.xml", "bytes": 5189, "sha256": "15c855d565885f2ac5314c941d55bafeda44dade93e956509b2a13f7bed07c5c", "relationships": {"part": "/ppt/slides/_rels/slide2.xml.rels", "bytes": 446, "sha256": "2556274e445456b553f6c7ebaa82748f98028b16bb948d01c68f3582386aceba"}},
+      {"part": "/ppt/slides/slide3.xml", "bytes": 4263, "sha256": "1221ff2dab79842374b985f303f8af09e6605fe67b8e22f9b228667300b9ddbe", "relationships": {"part": "/ppt/slides/_rels/slide3.xml.rels", "bytes": 446, "sha256": "e2f96f0e04ff90c361461ffbc57d3e6cd7ddaeeb48e58adbc2b43f663263ba6c"}},
+      {"part": "/ppt/slides/slide4.xml", "bytes": 4119, "sha256": "9d104b5c1f96d4688cd969236f8ca84d05e3df7605eabf5d3b64a53a11138fd8", "relationships": {"part": "/ppt/slides/_rels/slide4.xml.rels", "bytes": 446, "sha256": "d07bc731d986b7802815f98ac54303f4ac2d2f02b5396ffc68435636b379da8"}}
+    ],
+    "equation_fallback_pictures": [
+      {"part": "/ppt/media/image1.png", "bytes": 28024, "sha256": "270affc6d111869400fe5950c4b500d25f820c272d2ffe43b6952b9fd3b24f93", "dimensions": [1745, 716]},
+      {"part": "/ppt/media/image2.png", "bytes": 32226, "sha256": "295c0ac34e367b059c8cd29a2fb492e4b4c7db4a5c64b40237f310c3eee7b432", "dimensions": [1781, 833]},
+      {"part": "/ppt/media/image3.png", "bytes": 26094, "sha256": "78d106c7f714a37fcbb64c318a7aa4e29fe85e46faa8e44bcf94e8e962b2b9a5", "dimensions": [1745, 718]}
+    ]
+  },
+  "reader_checks": {
+    "pptx_example_read_pptx": {"slide_count": 4, "slide_size_emu": [12192000, 6858000], "equation_slide_text": ["NATIVE_EQUATIONS_009\\n ", "NARY_EQUATION_009\\n ", "MATRIX_EQUATION_009\\n "]},
+    "ppt_example_read_ppt": {"slide_count": 4, "total_chars": 224, "equation_slide_text": ["NATIVE_EQUATIONS_009", "NARY_EQUATION_009", "MATRIX_EQUATION_009"]},
+    "pptx_tolerance_report": {"defects": [], "unrecorded": 0},
+    "source_reader_paths": [
+      "crates/litchi-pptx/src/font/package.rs",
+      "crates/litchi-pptx/src/font/model.rs",
+      "crates/litchi-pptx/src/presentation_properties/math/codec.rs",
+      "crates/litchi-pptx/src/presentation_properties/metadata/handout/codec.rs",
+      "crates/litchi-pptx/src/shape/text.rs",
+      "crates/litchi-ppt/src/font/package.rs",
+      "crates/litchi-ppt/src/header_footer/codec.rs",
+      "crates/litchi-ppt/src/print_options.rs"
+    ]
+  }
+}

@@ -1,0 +1,769 @@
+{
+  "schema_version": 1,
+  "fixture_id": "excel-date1904-breaks-012",
+  "generated_on": "2026-10-15",
+  "purpose": "Fixture-specific, read-only inspection of native Microsoft Excel's 1904 date system, formula caches, manual row and column page breaks, print area, hidden rows and columns, and named custom views across transitional OOXML, BIFF12, and BIFF8.",
+  "provenance": {
+    "producer_app": "Microsoft Office Excel",
+    "app_version": "16.110.2",
+    "app_build": "16.110.26062818",
+    "package_application": "Microsoft Macintosh Excel",
+    "package_app_version": "16.0300",
+    "platform": "macOS",
+    "authoring_method": "Computer Use / native Microsoft Excel UI",
+    "authoring_scope": "A new native Excel workbook was authored through the UI. No LibreOffice or library writer generated any fixture bytes.",
+    "native_save_sequence": [
+      "Saved the new workbook as excel-date1904-breaks.xlsx with the workbook's Use 1904 date system preference enabled.",
+      "Saved a BIFF12 binary derivative as excel-date1904-breaks.xlsb.",
+      "Reopened the original XLSX and saved the legacy BIFF8 derivative as excel-date1904-breaks.xls without a Save As warning.",
+      "Closed and directly reopened all three final files in native Excel; no repair prompt was shown."
+    ],
+    "libreoffice_used": false,
+    "programmatic_office_generation_used": false,
+    "library_code_modified": false,
+    "all_documents_closed_before_hashing": true,
+    "lock_files_present_at_inspection": false
+  },
+  "scope_and_limits": {
+    "native_variants": [
+      "xlsx",
+      "xlsb",
+      "xls"
+    ],
+    "native_excel_reopen_verified": true,
+    "repair_or_conversion_prompt_observed": false,
+    "date_system_scope": "Excel's Use 1904 setting was enabled for the active workbook; the Excel help dialog observed during authoring explicitly described it as workbook-local.",
+    "legacy_negative_date_observation": "The native XLS reopen displayed the -1 serial cell as -1904-01-02 00:00:00. That exact presentation is recorded as an observation and is not normalized into a general negative-date rule.",
+    "semantic_parity_claimed": false,
+    "rendering_parity_claimed": false,
+    "calculation_limit": "Formula tokens and cached serials are recorded. This inspection does not claim that any library recalculates DATE or TIME formulas or applies date formatting.",
+    "reader_boundary": "The package and typed-reader observations below are exact probes of these closed files. A typed-reader error or empty public catalog is recorded as a library boundary; it is not evidence that native Excel failed to reopen the fixture."
+  },
+  "expected_native_content": {
+    "worksheet_order": [
+      "Sheet1"
+    ],
+    "active_worksheet": "Sheet1",
+    "date_system": {
+      "native_setting": "1904",
+      "marker_cells": {
+        "A1": "EXCEL_DATE1904_BREAKS_012",
+        "B1": "Fixture ID: excel-date1904-breaks-012",
+        "A2": "DATE_SYSTEM_012",
+        "B2": 1904
+      }
+    },
+    "date_cells": {
+      "column": "B",
+      "format_B3_B7": "yyyy-mm-dd hh:mm:ss",
+      "format_B8": "hh:mm:ss",
+      "cells": [
+        {
+          "address": "B3",
+          "label": "BASE_SERIAL_012",
+          "input": 0,
+          "storage": "numeric literal",
+          "cached_serial": 0
+        },
+        {
+          "address": "B4",
+          "label": "DAY_ONE_012",
+          "input": 1,
+          "storage": "numeric literal",
+          "cached_serial": 1
+        },
+        {
+          "address": "B5",
+          "label": "LEAP_DATE_012",
+          "formula": "DATE(2024,2,29)",
+          "cached_serial": 43889
+        },
+        {
+          "address": "B6",
+          "label": "TIMESTAMP_012",
+          "formula": "DATE(2026,10,15)+TIME(13,14,15)",
+          "cached_serial": 44848.5515625
+        },
+        {
+          "address": "B7",
+          "label": "NEGATIVE_SERIAL_012",
+          "input": -1,
+          "storage": "numeric literal",
+          "cached_serial": -1
+        },
+        {
+          "address": "B8",
+          "label": "TIME_ONLY_012",
+          "formula": "TIME(6,30,0)",
+          "cached_serial": 0.2708333333333333
+        }
+      ],
+      "native_xls_reopen_display": {
+        "B3": "1904-01-01",
+        "B4": "1904-01-02",
+        "B5": "2024-02-29",
+        "B6": "2026-10-15 13:14:15",
+        "B7": "-1904-01-02 00:00:00",
+        "B8": "06:30:00"
+      }
+    },
+    "pagination_grid": {
+      "range": "D1:L5",
+      "header": [
+        "NATIVE_PAGINATION_012",
+        "E",
+        "F",
+        "G",
+        "H",
+        "I",
+        "J",
+        "K",
+        "L"
+      ],
+      "rows": {
+        "R02": [
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9
+        ],
+        "R03": [
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10
+        ],
+        "R04": [
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11
+        ],
+        "R05": [
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11,
+          12
+        ]
+      },
+      "markers": {
+        "D20": "PAGE_TWO_MARKER_012",
+        "L40": "END_PAGINATION_012"
+      }
+    },
+    "worksheet_layout": {
+      "dimension": "A1:L40",
+      "column_widths": {
+        "A:B": 32.83203125,
+        "J": 0
+      },
+      "hidden_columns": [
+        "J"
+      ],
+      "hidden_rows": [
+        14,
+        15
+      ],
+      "active_cell": "B6",
+      "print_area": "A1:L40",
+      "manual_page_breaks": {
+        "row_break_before_row_20": {
+          "id": 19,
+          "minimum_column": 0,
+          "maximum_column": 16383,
+          "manual": true
+        },
+        "column_break_before_column_G": {
+          "id": 6,
+          "minimum_row": 0,
+          "maximum_row": 1048575,
+          "manual": true
+        }
+      }
+    },
+    "custom_views": [
+      {
+        "name": "BASE_PRINT_012",
+        "guid": "{EE5EFC54-D2C0-6547-A2C4-EF077924C75E}",
+        "show_page_breaks": true,
+        "print_area": "A1:L40",
+        "hidden_rows": false,
+        "hidden_columns": false,
+        "selection": null
+      },
+      {
+        "name": "HIDDEN_DETAIL_012",
+        "guid": "{1340DBFB-A9F5-8144-B06F-5F4F94C12B28}",
+        "show_page_breaks": true,
+        "print_area": "A1:L40",
+        "hidden_rows": true,
+        "hidden_columns": true,
+        "selection": "B6"
+      }
+    ],
+    "final_native_hidden_state": {
+      "hidden_column": "J",
+      "hidden_rows": [
+        14,
+        15
+      ],
+      "active_cell": "B6"
+    }
+  },
+  "format_observations": {
+    "xlsx": {
+      "container": "OPC ZIP",
+      "bytes": 10521,
+      "sha256": "6c8c3dcb769a54c5bd0847ef67a56cfc0fafca94f9e0718e01e2b3eb81a7d80b",
+      "zip_integrity": "pass",
+      "member_count": 11,
+      "main_workbook_content_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml",
+      "spreadsheetml_namespace": "http://schemas.openxmlformats.org/spreadsheetml/2006/main",
+      "critical_parts": [
+        "xl/workbook.xml",
+        "xl/worksheets/sheet1.xml",
+        "xl/styles.xml",
+        "xl/sharedStrings.xml",
+        "xl/calcChain.xml",
+        "xl/_rels/workbook.xml.rels"
+      ],
+      "native_reopen": "pass without repair; 1904 date cells, page breaks, hidden state, print area, and both custom views reopened"
+    },
+    "xlsb": {
+      "container": "OPC ZIP with BIFF12 binary parts",
+      "bytes": 9642,
+      "sha256": "c527368af57d0d1cfa7bc81eb0e5e124c390ee6eee909f31928ffd6f7f209866",
+      "zip_integrity": "pass",
+      "member_count": 13,
+      "main_workbook_content_type": "application/vnd.ms-excel.sheet.binary.main",
+      "critical_parts": [
+        "xl/workbook.bin",
+        "xl/worksheets/sheet1.bin",
+        "xl/styles.bin",
+        "xl/sharedStrings.bin",
+        "xl/calcChain.bin",
+        "xl/worksheets/binaryIndex1.bin",
+        "xl/worksheets/_rels/sheet1.bin.rels"
+      ],
+      "native_reopen": "pass without repair; 1904 date values, page-break record families, hidden state, print area, and both custom views reopened"
+    },
+    "xls": {
+      "container": "CFB/OLE2 BIFF8 workbook",
+      "bytes": 28160,
+      "sha256": "9654784b8c93edff5e4ca85ab29997d8154987b807dbe6476fe14cd737b67421",
+      "file_description": "Composite Document File V2 Document, Microsoft Macintosh Excel",
+      "workbook_stream_bytes": 18386,
+      "cfb_streams": {
+        "Workbook": 18386,
+        "\u0005SummaryInformation": 4096,
+        "\u0005DocumentSummaryInformation": 4096
+      },
+      "native_reopen": "pass without repair; both custom views listed in Excel and the 1904 date presentations reopened",
+      "native_save_warning": false
+    }
+  },
+  "binary_record_invariants": {
+    "xlsx_xml": {
+      "workbook_properties": {
+        "workbookPr_date1904": "1",
+        "sheet_names": [
+          "Sheet1"
+        ],
+        "defined_names": [
+          {
+            "name": "_xlnm.Print_Area",
+            "reference": "Sheet1!$A$1:$L$40",
+            "hidden": false
+          },
+          {
+            "name": "Z_1340DBFB_A9F5_8144_B06F_5F4F94C12B28_.wvu.Cols",
+            "reference": "Sheet1!$J:$J",
+            "hidden": true
+          },
+          {
+            "name": "Z_1340DBFB_A9F5_8144_B06F_5F4F94C12B28_.wvu.PrintArea",
+            "reference": "Sheet1!$A$1:$L$40",
+            "hidden": true
+          },
+          {
+            "name": "Z_1340DBFB_A9F5_8144_B06F_5F4F94C12B28_.wvu.Rows",
+            "reference": "Sheet1!$14:$15",
+            "hidden": true
+          },
+          {
+            "name": "Z_EE5EFC54_D2C0_6547_A2C4_EF077924C75E_.wvu.PrintArea",
+            "reference": "Sheet1!$A$1:$L$40",
+            "hidden": true
+          }
+        ],
+        "custom_workbook_views": [
+          {
+            "name": "HIDDEN_DETAIL_012",
+            "guid": "{1340DBFB-A9F5-8144-B06F-5F4F94C12B28}",
+            "activeSheetId": 1
+          },
+          {
+            "name": "BASE_PRINT_012",
+            "guid": "{EE5EFC54-D2C0-6547-A2C4-EF077924C75E}",
+            "activeSheetId": 1
+          }
+        ]
+      },
+      "worksheet_layout": {
+        "dimension": "A1:L40",
+        "hidden_column_record": {
+          "min": 10,
+          "max": 10,
+          "width": 0,
+          "hidden": true,
+          "customWidth": true
+        },
+        "hidden_row_records": [
+          14,
+          15
+        ],
+        "direct_row_break": {
+          "id": 19,
+          "max": 16383,
+          "manual": true
+        },
+        "direct_col_break": {
+          "id": 6,
+          "max": 1048575,
+          "manual": true
+        },
+        "custom_sheet_view_records": [
+          {
+            "guid": "{1340DBFB-A9F5-8144-B06F-5F4F94C12B28}",
+            "showPageBreaks": true,
+            "printArea": true,
+            "hiddenRows": true,
+            "hiddenColumns": true,
+            "activeCell": "B6",
+            "rowBreak": "id 19 / max 16383 / manual",
+            "colBreak": "id 6 / max 1048575 / manual"
+          },
+          {
+            "guid": "{EE5EFC54-D2C0-6547-A2C4-EF077924C75E}",
+            "showPageBreaks": true,
+            "printArea": true,
+            "hiddenRows": false,
+            "hiddenColumns": false,
+            "activeCell": null,
+            "rowBreak": "id 19 / max 16383 / manual",
+            "colBreak": "id 6 / max 1048575 / manual"
+          }
+        ]
+      },
+      "date_and_formula_cells": [
+        {
+          "address": "B3",
+          "style": 1,
+          "value": "0"
+        },
+        {
+          "address": "B4",
+          "style": 1,
+          "value": "1"
+        },
+        {
+          "address": "B5",
+          "style": 1,
+          "formula": "DATE(2024,2,29)",
+          "cached_value": "43889"
+        },
+        {
+          "address": "B6",
+          "style": 1,
+          "formula": "DATE(2026,10,15)+TIME(13,14,15)",
+          "cached_value": "44848.551562499997"
+        },
+        {
+          "address": "B7",
+          "style": 1,
+          "value": "-1"
+        },
+        {
+          "address": "B8",
+          "style": 2,
+          "formula": "TIME(6,30,0)",
+          "cached_value": "0.27083333333333331"
+        }
+      ],
+      "styles": {
+        "style_1_numFmtId_164": "yyyy\\-mm\\-dd\\ hh:mm:ss",
+        "style_2_numFmtId_165": "hh:mm:ss"
+      },
+      "calc_chain": [
+        "B5",
+        "B6",
+        "B8"
+      ],
+      "shared_string_count": 24
+    },
+    "xlsb_biff12": {
+      "package_member_record_counts": {
+        "xl/workbook.bin": 46,
+        "xl/worksheets/sheet1.bin": 169,
+        "xl/sharedStrings.bin": 26,
+        "xl/calcChain.bin": 5
+      },
+      "workbook_records": {
+        "BrtWbProp_0x0099": {
+          "payload_length": 12,
+          "payload_hex": "21 00 01 00 3c 16 03 00 00 00 00 00",
+          "date1904_flag": true,
+          "flag_rule": "The BIFF12 workbook property parser reads bit 0 of the first payload byte; 0x21 has that bit set."
+        },
+        "BrtName_count": 5,
+        "opaque_native_custom_view_metadata": {
+          "record_kind": "0x018D",
+          "count": 2,
+          "payload_lengths": [
+            84,
+            78
+          ],
+          "embedded_names": [
+            "HIDDEN_DETAIL_012",
+            "BASE_PRINT_012"
+          ]
+        },
+        "BrtCalcProp_count": 1,
+        "BrtBookView_count": 1
+      },
+      "shared_strings": {
+        "BrtBeginSst": 1,
+        "BrtSstItem": 24,
+        "BrtEndSst": 1,
+        "items_include": [
+          "EXCEL_DATE1904_BREAKS_012",
+          "Fixture ID: excel-date1904-breaks-012",
+          "DATE_SYSTEM_012",
+          "BASE_SERIAL_012",
+          "DAY_ONE_012",
+          "LEAP_DATE_012",
+          "TIMESTAMP_012",
+          "NEGATIVE_SERIAL_012",
+          "TIME_ONLY_012",
+          "NATIVE_PAGINATION_012",
+          "PAGE_TWO_MARKER_012",
+          "END_PAGINATION_012"
+        ]
+      },
+      "worksheet_records": {
+        "BrtRowHdr": 12,
+        "BrtCellIsst": 24,
+        "BrtCellRk": 36,
+        "BrtFmlaNum": 3,
+        "BrtBeginUserSViews_0x01A6": 1,
+        "BrtBeginUserSView_0x01A7": 2,
+        "BrtEndUserSView_0x01A8": 2,
+        "BrtEndUserSViews_0x01A9": 1,
+        "page_break_family": {
+          "begin_row_breaks_0x0188": 3,
+          "row_break_0x018C": 3,
+          "end_row_breaks_0x0189": 3,
+          "begin_column_breaks_0x018A": 3,
+          "column_break_0x018C": 3,
+          "end_column_breaks_0x018B": 3,
+          "row_break_payload": "13 00 00 00 00 00 00 00 ff 3f 00 00 01 00 00 00 00 00 00 00",
+          "column_break_payload": "06 00 00 00 00 00 00 00 ff ff 0f 00 01 00 00 00 00 00 00 00"
+        },
+        "page_setup_records": {
+          "BrtMargins_0x01DC": 3,
+          "BrtPrintOptions_0x01DD": 3,
+          "BrtPageSetup_0x01DE": 3
+        }
+      },
+      "date_and_formula_cells": [
+        {
+          "address": "B3",
+          "record": "BrtCellRk",
+          "raw_value": "0x00000000",
+          "cached_serial": 0
+        },
+        {
+          "address": "B4",
+          "record": "BrtCellRk",
+          "raw_value": "0x3FF00000",
+          "cached_serial": 1
+        },
+        {
+          "address": "B5",
+          "record": "BrtFmlaNum",
+          "cached_serial": 43889
+        },
+        {
+          "address": "B6",
+          "record": "BrtFmlaNum",
+          "cached_serial": 44848.5515625
+        },
+        {
+          "address": "B7",
+          "record": "BrtCellRk",
+          "raw_value": "0xBFF00000",
+          "cached_serial": -1
+        },
+        {
+          "address": "B8",
+          "record": "BrtFmlaNum",
+          "cached_serial": 0.2708333333333333
+        }
+      ],
+      "custom_view_and_break_scope": "The three page-break families are present once for the direct worksheet state and once inside each of the two 0x01A7 custom-view brackets; each bracket carries one row and one column break."
+    },
+    "xls_biff8": {
+      "workbook_stream_bytes": 18386,
+      "date1904_record": {
+        "record": "DATE1904 0x0022",
+        "count": 1,
+        "payload_hex": "01 00",
+        "date1904": true
+      },
+      "workbook_custom_views": [
+        {
+          "record": "UserBView 0x01A9",
+          "name": "BASE_PRINT_012",
+          "guid": "{EE5EFC54-D2C0-6547-A2C4-EF077924C75E}",
+          "payload_length": 67,
+          "display_flags": 3191
+        },
+        {
+          "record": "UserBView 0x01A9",
+          "name": "HIDDEN_DETAIL_012",
+          "guid": "{1340DBFB-A9F5-8144-B06F-5F4F94C12B28}",
+          "payload_length": 70,
+          "display_flags": 3191
+        }
+      ],
+      "worksheet_page_breaks": {
+        "direct_and_each_custom_view": true,
+        "horizontal_record_0x001B": {
+          "count": 3,
+          "payload_hex": "01 00 13 00 00 00 ff 00",
+          "break_position": 19,
+          "range_start": 0,
+          "range_end": 255
+        },
+        "vertical_record_0x001A": {
+          "count": 3,
+          "payload_hex": "01 00 06 00 00 00 ff ff",
+          "break_position": 6,
+          "range_start": 0,
+          "range_end": 65535
+        },
+        "custom_view_brackets": {
+          "UserSViewBegin_0x01AA": 2,
+          "UserSViewEnd_0x01AB": 2,
+          "begin_payload_lengths": [
+            64,
+            64
+          ],
+          "end_payload_hex": "01 00"
+        }
+      },
+      "date_and_formula_cells": [
+        {
+          "address": "B3",
+          "record": "RK 0x027E",
+          "cached_serial": 0
+        },
+        {
+          "address": "B4",
+          "record": "RK 0x027E",
+          "cached_serial": 1
+        },
+        {
+          "address": "B5",
+          "record": "FORMULA 0x0006",
+          "cached_serial": 43889,
+          "formula_token_bytes": 12
+        },
+        {
+          "address": "B6",
+          "record": "FORMULA 0x0006",
+          "cached_serial": 44848.5515625,
+          "formula_token_bytes": 25
+        },
+        {
+          "address": "B7",
+          "record": "RK 0x027E",
+          "cached_serial": -1
+        },
+        {
+          "address": "B8",
+          "record": "FORMULA 0x0006",
+          "cached_serial": 0.2708333333333333,
+          "formula_token_bytes": 12
+        }
+      ],
+      "defined_name_records": {
+        "print_area": "'Sheet1'!$A$1:$L$40",
+        "hidden_custom_view_names": [
+          "Z_1340DBFB_A9F5_8144_B06F_5F4F94C12B28_.wvu.Cols",
+          "Z_1340DBFB_A9F5_8144_B06F_5F4F94C12B28_.wvu.PrintArea",
+          "Z_1340DBFB_A9F5_8144_B06F_5F4F94C12B28_.wvu.Rows",
+          "Z_EE5EFC54_D2C0_6547_A2C4_EF077924C75E_.wvu.PrintArea"
+        ]
+      }
+    }
+  },
+  "reader_observations": {
+    "xlsx_read_xlsx_example": {
+      "command": "cargo run --quiet -p litchi-xlsx --example read_xlsx -- test-data/microsoft-office/excel/excel-date1904-breaks.xlsx",
+      "result": "pass",
+      "worksheet_names": [
+        "Sheet1"
+      ],
+      "active_sheet": "Sheet1",
+      "date_system": "Excel1904",
+      "dimensions": "A1:L40",
+      "sampled_values": {
+        "B2": 1904,
+        "B3": 0,
+        "B4": 1,
+        "B5": 43889,
+        "B6": 44848.5515625,
+        "B7": -1,
+        "B8": 0.2708333333333333,
+        "D20": "PAGE_TWO_MARKER_012",
+        "L40": "END_PAGINATION_012"
+      },
+      "boundary": "The generic cell reader exposes cached formula results as numeric serials; it does not itself render native date strings or apply the workbook's custom number formats."
+    },
+    "xlsx_typed_probes": {
+      "package_open": "pass",
+      "date_system_probe": "pass; Workbook::date_system() = Excel1904",
+      "page_break_probe": "pass; horizontal id 19 minimum 0 maximum 16383 manual=true; vertical id 6 minimum 0 maximum 1048575 manual=true",
+      "defined_names_probe": "pass; print area and four hidden custom-view helper names exposed",
+      "page_setup_probe": "error: Invalid(\"printer DPI 0 must be at least 1\")",
+      "named_sheet_views_probe": "pass with None; the worksheet named-sheet-view API does not expose the workbook customWorkbookViews in this fixture",
+      "formula_cache_probe": "pass through stored XML values; B5=43889, B6=44848.551562499997, B8=0.27083333333333331"
+    },
+    "xlsb_typed_reader": {
+      "package_open": "pass; litchi_xlsb::Workbook::new",
+      "is_1904_date_system": true,
+      "worksheet_names": [
+        "Sheet1"
+      ],
+      "defined_names": [
+        "Print_Area",
+        "Z_1340DBFB_A9F5_8144_B06F_5F4F94C12B28_.wvu.Cols",
+        "Z_1340DBFB_A9F5_8144_B06F_5F4F94C12B28_.wvu.PrintArea",
+        "Z_1340DBFB_A9F5_8144_B06F_5F4F94C12B28_.wvu.Rows",
+        "Z_EE5EFC54_D2C0_6547_A2C4_EF077924C75E_.wvu.PrintArea"
+      ],
+      "tolerance_report": "no defect output observed in the direct Workbook open",
+      "page_break_and_custom_view_api": "No public typed page-break or custom-view projection was used for this probe; BIFF12 record families and payloads are recorded above.",
+      "unified_xlsb_reader": {
+        "command": "cargo run --quiet -p litchi --example xlsb_reader --features ooxml --no-default-features -- test-data/microsoft-office/excel/excel-date1904-breaks.xlsb",
+        "result": "pass",
+        "extracted_date_cells": {
+          "B3": 0,
+          "B4": 1,
+          "B5": 43889,
+          "B6": 44848.5515625,
+          "B7": -1,
+          "B8": 0.2708333333333333
+        },
+        "boundary": "The unified text reader returns numeric cached serials and does not apply native date formatting, custom-view application, or page-layout rendering."
+      }
+    },
+    "xls_typed_reader": {
+      "package_open": "pass; litchi_xls::Workbook::new",
+      "is_1904_date_system": true,
+      "date_system": "Excel1904",
+      "custom_views": [
+        "BASE_PRINT_012",
+        "HIDDEN_DETAIL_012"
+      ],
+      "defined_names": [
+        "Print_Area",
+        "Z_1340DBFB_A9F5_8144_B06F_5F4F94C12B28_.wvu.Cols",
+        "Z_1340DBFB_A9F5_8144_B06F_5F4F94C12B28_.wvu.PrintArea",
+        "Z_1340DBFB_A9F5_8144_B06F_5F4F94C12B28_.wvu.Rows",
+        "Z_EE5EFC54_D2C0_6547_A2C4_EF077924C75E_.wvu.PrintArea"
+      ],
+      "worksheet_count": 0,
+      "worksheet_names": [],
+      "boundary": "The workbook-level BIFF8 metadata parser exposes Date1904, custom views, and defined names, but this native legacy derivative's public worksheet catalog is empty; the raw Workbook stream still contains the Sheet1 substream, date caches, and page-break/custom-view records listed above."
+    },
+    "public_api_surface_audit": {
+      "xlsx": [
+        "crates/litchi-xlsx/src/workbook/model.rs:855 Workbook::date_system",
+        "crates/litchi-xlsx/src/workbook/model.rs:1543 Worksheet::page_breaks",
+        "crates/litchi-xlsx/src/workbook/model.rs:1548 Worksheet::page_setup",
+        "crates/litchi-xlsx/src/workbook/model.rs:1559 Worksheet::print_options",
+        "No direct public projection for workbook customWorkbookViews was used"
+      ],
+      "xlsb": [
+        "crates/litchi-xlsb/src/workbook/source.rs:1022 SourceBackedWorkbook::is_1904_date_system",
+        "crates/litchi-xlsb/src/workbook/model.rs:369 WorkbookTrait::is_1904_date_system",
+        "No public typed worksheet page-break/custom-view projection was used"
+      ],
+      "xls": [
+        "crates/litchi-xls/src/workbook/source.rs:1479 SourceBackedWorkbook::date_system",
+        "crates/litchi-xls/src/workbook/model.rs:218 Workbook::custom_views",
+        "crates/litchi-xls/src/workbook/model.rs:517 Workbook::print_area",
+        "crates/litchi-xls/src/page_setup.rs:278 PageSetup::horizontal_page_breaks",
+        "crates/litchi-xls/src/page_setup.rs:282 PageSetup::vertical_page_breaks"
+      ]
+    }
+  },
+  "files": [
+    {
+      "path": "test-data/microsoft-office/excel/excel-date1904-breaks.xlsx",
+      "format": "xlsx",
+      "bytes": 10521,
+      "sha256": "6c8c3dcb769a54c5bd0847ef67a56cfc0fafca94f9e0718e01e2b3eb81a7d80b",
+      "container_kind": "OPC ZIP",
+      "member_count": 11,
+      "native_reopen_validation": "pass without repair"
+    },
+    {
+      "path": "test-data/microsoft-office/excel/excel-date1904-breaks.xlsb",
+      "format": "xlsb",
+      "bytes": 9642,
+      "sha256": "c527368af57d0d1cfa7bc81eb0e5e124c390ee6eee909f31928ffd6f7f209866",
+      "container_kind": "OPC ZIP with BIFF12 binary parts",
+      "member_count": 13,
+      "native_reopen_validation": "pass without repair"
+    },
+    {
+      "path": "test-data/microsoft-office/excel/excel-date1904-breaks.xls",
+      "format": "xls",
+      "bytes": 28160,
+      "sha256": "9654784b8c93edff5e4ca85ab29997d8154987b807dbe6476fe14cd737b67421",
+      "container_kind": "CFB/OLE2 BIFF8",
+      "workbook_stream_bytes": 18386,
+      "native_reopen_validation": "pass without repair"
+    }
+  ],
+  "validation_methods": [
+    "Computed SHA-256 and byte sizes from the closed final streams.",
+    "Checked ZIP central-directory member counts and integrity for XLSX and XLSB.",
+    "Inspected workbook, worksheet, styles, shared-string, calculation-chain, relationship, custom-view, hidden-state, print-area, and page-break XML read-only.",
+    "Inspected BIFF12 workbook and worksheet record framing, date-system flag, cached formula records, custom-view metadata, and page-break families with the repository dump tooling.",
+    "Inspected the BIFF8 Workbook stream with the repository dump_xls_records example and a read-only payload probe; no legacy bytes were regenerated.",
+    "Ran the existing litchi-xlsx read_xlsx example and typed date/page-break probes.",
+    "Ran the existing litchi-xlsb unified reader and typed Workbook probe; ran the existing litchi-xls reader and recorded its empty worksheet catalog boundary.",
+    "Native Excel close, reopen, custom-view list, warning choices, date displays, and hidden-state observations came from the root Computer Use session; this inspection process did not operate the Office UI."
+  ],
+  "native_ui_observation_source": "Root agent Computer Use session; native Microsoft Excel authored the three final files, enabled Use 1904 for the active workbook, inserted the row and column page breaks, set print area A1:L40, created BASE_PRINT_012 and HIDDEN_DETAIL_012, hid column J and rows 14:15 for the final state, reopened all three files without repair, and closed them before hashing."
+}

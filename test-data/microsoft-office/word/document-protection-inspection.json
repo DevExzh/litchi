@@ -1,0 +1,397 @@
+{
+  "schema_version": 1,
+  "fixture_id": "word-document-protection-008",
+  "generated_on": "2026-10-15",
+  "purpose": "Fixture-specific, read-only inspection of native Microsoft Word comments-only document protection, comment range metadata, and DOC/DOCX/RTF derivatives.",
+  "provenance": {
+    "producer_app": "Microsoft Office Word",
+    "app_version": "16.110.2",
+    "app_build": "16.110.26062818",
+    "platform": "macOS",
+    "authoring_method": "Computer Use / native Microsoft Word UI",
+    "source": "Synthetic content was entered in native Word, a comment was inserted on COMMENT_TARGET_008, and Tools > Protect Document was set to Comments with all password fields blank. Native Word Save As produced the DOC; the original DOCX was reopened and saved as RTF.",
+    "libreoffice_used": false,
+    "programmatic_office_generation_used": false,
+    "library_code_modified": false,
+    "all_documents_closed_before_hashing": true,
+    "fixture_files_are_closed_after_reopen": true
+  },
+  "files": [
+    {
+      "path": "test-data/microsoft-office/word/word-document-protection.docx",
+      "format": "docx",
+      "bytes": 17771,
+      "sha256": "45ebd2ff9164a9112e07b7c053818f8283a58e8e2d24d089bb207757df81a4d8"
+    },
+    {
+      "path": "test-data/microsoft-office/word/word-document-protection.doc",
+      "format": "doc",
+      "bytes": 25088,
+      "sha256": "79f4e1b7e29048d1c321affba757f70d60a8f083637af72e0e7dfa4d70b3d8f3"
+    },
+    {
+      "path": "test-data/microsoft-office/word/word-document-protection.rtf",
+      "format": "rtf",
+      "bytes": 48754,
+      "sha256": "31de5a6f8a38ac57fa9c1786b40c586a9eaf2d618ea14fad16a5e63d3ff28a5c"
+    }
+  ],
+  "coverage": {
+    "feature_groups": [
+      {
+        "feature": "comments-only document protection",
+        "status": "evidenced",
+        "evidence": "Native Word displayed Protect Document with Comments selected, and DOCX settings.xml stores w:documentProtection edit=comments enforcement=1."
+      },
+      {
+        "feature": "native comment and commented range",
+        "status": "evidenced",
+        "evidence": "COMMENT_TARGET_008 is wrapped by comment range id 0 and the comment body is PROTECTION_COMMENT_008."
+      },
+      {
+        "feature": "DOC protection metadata",
+        "status": "evidenced",
+        "evidence": "The typed DOC reader reports DOP comments_or_read_only=true, form_fields=false, tracked_revisions=false, and protection_key=0."
+      },
+      {
+        "feature": "RTF protection and annotation controls",
+        "status": "raw-evidence-only",
+        "evidence": "Native RTF contains annotprot, enforceprot1, protlevel1, and a starred annotation destination; the RTF semantic reader cannot parse this native file."
+      },
+      {
+        "feature": "enforcement, unlock, and password authentication",
+        "status": "not-tested",
+        "evidence": "No edit attempt, unlock attempt, or password credential was used."
+      }
+    ]
+  },
+  "docx": {
+    "container": {
+      "kind": "OPC ZIP",
+      "zip_test": "pass",
+      "xml_validation": "pass",
+      "member_count": 16,
+      "members": [
+        "[Content_Types].xml",
+        "_rels/.rels",
+        "word/document.xml",
+        "word/_rels/document.xml.rels",
+        "word/comments.xml",
+        "word/theme/theme1.xml",
+        "word/settings.xml",
+        "word/styles.xml",
+        "word/webSettings.xml",
+        "word/commentsExtended.xml",
+        "word/commentsIds.xml",
+        "word/commentsExtensible.xml",
+        "word/fontTable.xml",
+        "word/people.xml",
+        "docProps/core.xml",
+        "docProps/app.xml"
+      ],
+      "external_targets": [],
+      "relationships": {
+        "document": {
+          "rId1": "word/styles.xml",
+          "rId2": "word/settings.xml",
+          "rId3": "word/webSettings.xml",
+          "rId4": "word/comments.xml",
+          "rId5": "word/commentsExtended.xml",
+          "rId6": "word/commentsIds.xml",
+          "rId7": "word/commentsExtensible.xml",
+          "rId8": "word/fontTable.xml",
+          "rId9": "word/people.xml",
+          "rId10": "word/theme/theme1.xml"
+        },
+        "target_check": "pass"
+      },
+      "part_hashes": {
+        "word/document.xml": {
+          "bytes": 4034,
+          "sha256": "88a7a1dda57bbdb13dd3ef593181d359f4b831ee3914fe0ad96eaa90d3b24f43"
+        },
+        "word/settings.xml": {
+          "bytes": 3206,
+          "sha256": "364f1c5d524899ffc165ec3b20a440875b30d2f71e5efed97ce2ea0d149ca9bf"
+        },
+        "word/comments.xml": {
+          "bytes": 3068,
+          "sha256": "9b0dbf13ace0fd7aa71d53db84ddf199c310a8d6ab519c921af0262aeeb4d482"
+        },
+        "word/commentsExtended.xml": {
+          "bytes": 2694,
+          "sha256": "fbde235be916964d70e0709e865c00b5014e0f31e5aa5ddb0586a57e42c6e451"
+        },
+        "word/commentsIds.xml": {
+          "bytes": 2723,
+          "sha256": "00c45157cc724c1a1a8b22994e20269ab2d22eeac6f14900a2e895fb19ec8c12"
+        },
+        "word/commentsExtensible.xml": {
+          "bytes": 2832,
+          "sha256": "7cd8289492dbe2cfd5d72eb235f9dd712a07b28b4d414e01c2185fb47acdbcfc"
+        },
+        "word/people.xml": {
+          "bytes": 2747,
+          "sha256": "5d0c11ba6764cc28c5e0f9500d217cd0532486e8c886261be8b5dd662925f8ed"
+        }
+      }
+    },
+    "main_document": {
+      "markers": [
+        "WORD_PROTECTION_008",
+        "Fixture ID: word-document-protection-008",
+        "PROTECTED_BODY_008: this body is restricted to comments.",
+        "COMMENT_TARGET_008",
+        "COMMENT_TARGET_008: native comment remains available.",
+        "END_PROTECTION_008"
+      ],
+      "xml_counts": {
+        "w:p": 5,
+        "w:r": 7,
+        "w:t": 6,
+        "w:tbl": 0,
+        "w:sdt": 0,
+        "w:commentRangeStart": 1,
+        "w:commentRangeEnd": 1,
+        "w:commentReference": 1
+      },
+      "document_protection": {
+        "element": "w:documentProtection",
+        "edit": "comments",
+        "enforcement": "1",
+        "password_attributes": false,
+        "observed_settings_xml": "<w:documentProtection w:edit=\"comments\" w:enforcement=\"1\"/>"
+      },
+      "comment_range": {
+        "id": "0",
+        "range_text": "COMMENT_TARGET_008",
+        "reference_text": ": native comment remains available."
+      },
+      "core_properties": {
+        "creator": "Ryker Zhu",
+        "last_modified_by": "Ryker Zhu",
+        "revision": "1",
+        "created": "2026-10-15T08:06:00Z",
+        "modified": "2026-10-15T08:21:00Z"
+      },
+      "extended_properties": {
+        "template": "Normal.dotm",
+        "application": "Microsoft Office Word",
+        "doc_security": 8,
+        "pages": 1,
+        "words": 13,
+        "characters": 179,
+        "paragraphs": 8
+      },
+      "comments": {
+        "package_parts": [
+          "word/comments.xml",
+          "word/commentsExtended.xml",
+          "word/commentsIds.xml",
+          "word/commentsExtensible.xml",
+          "word/people.xml"
+        ],
+        "root_comment": {
+          "comment_id": "0",
+          "author": "Ryker Zhu",
+          "initials": "RZ",
+          "date": "2026-10-15T16:20:00Z",
+          "text": "PROTECTION_COMMENT_008: native comments-only restriction fixture.",
+          "comment_para_id": "73A0D512",
+          "durable_id": "19FBD274",
+          "done": "0",
+          "comments_extensible_date_utc": "2026-10-15T08:20:00Z"
+        },
+        "person": "Ryker Zhu"
+      },
+      "library_projection": {
+        "settings": {
+          "protected": true,
+          "protection_type": "Comments",
+          "track_revisions": false,
+          "zoom_percent": 100
+        },
+        "comments": {
+          "count": 1,
+          "id": 0,
+          "author": "Ryker Zhu",
+          "initials": "RZ",
+          "date": "2026-10-15T16:20:00Z",
+          "text": "PROTECTION_COMMENT_008: native comments-only restriction fixture."
+        },
+        "read_example": {
+          "command": "cargo run -q -p litchi-docx --example read_docx -- test-data/microsoft-office/word/word-document-protection.docx",
+          "exit_code": 0,
+          "paragraph_count": 5,
+          "table_count": 0,
+          "text_bytes": 186,
+          "text_contains": [
+            "WORD_PROTECTION_008",
+            "Fixture ID: word-document-protection-008",
+            "PROTECTED_BODY_008: this body is restricted to comments.",
+            "COMMENT_TARGET_008: native comment remains available.",
+            "END_PROTECTION_008"
+          ]
+        }
+      }
+    }
+  },
+  "doc": {
+    "container": {
+      "kind": "Compound File Binary (CFB/OLE)",
+      "file_identification": "Composite Document File V2 Document, Little Endian, MacOS, code page 10000",
+      "fib_version_hex": "0x00C1",
+      "word_version_observed_by_reader": "Word 97",
+      "streams": {
+        "1Table": 9567,
+        "WordDocument": 4096,
+        "\\u0001CompObj": 114,
+        "\\u0005SummaryInformation": 4096,
+        "\\u0005DocumentSummaryInformation": 4096
+      }
+    },
+    "file_metadata_observed": {
+      "author": "Ryker Zhu",
+      "template": "Normal.dotm",
+      "last_saved_by": "Ryker Zhu",
+      "revision": 2,
+      "application": "Microsoft Office Word",
+      "created": "2026-10-15 08:21:00 UTC",
+      "last_saved": "2026-10-15 08:21:00 UTC",
+      "pages": 1,
+      "words": 13,
+      "characters": 179,
+      "codepage": 10000
+    },
+    "document_properties": {
+      "version": "Word2013",
+      "base_protection": {
+        "comments_or_read_only": true,
+        "form_fields": false,
+        "tracked_revisions": false,
+        "track_revisions": false,
+        "vba_project_locked": false
+      },
+      "mail_merge_main_document": false,
+      "protection_key": 0,
+      "versioned_projection": "Word2013(chart_tracking_reference_based=true)"
+    },
+    "comments": {
+      "count": 1,
+      "reference_position": 136,
+      "author": "Ryker Zhu",
+      "initials": "RZ",
+      "bookmark_tag": 435933812,
+      "range_start": 118,
+      "range_end": 136,
+      "extended_metadata": {
+        "modified_at": "2026-10-15 16:20",
+        "depth": 0,
+        "parent_index": null,
+        "is_ink": false
+      },
+      "text": "PROTECTION_COMMENT_008: native comments-only restriction fixture."
+    },
+    "protected_ranges": null,
+    "read_example": {
+      "command": "cargo run -q -p litchi-doc --example read_doc -- test-data/microsoft-office/word/word-document-protection.doc",
+      "exit_code": 0,
+      "paragraph_count": 7,
+      "table_count": 0,
+      "total_characters": 261,
+      "text_contains": [
+        "WORD_PROTECTION_008",
+        "Fixture ID: word-document-protection-008",
+        "PROTECTED_BODY_008: this body is restricted to comments.",
+        "COMMENT_TARGET_008",
+        "END_PROTECTION_008",
+        "PROTECTION_COMMENT_008: native comments-only restriction fixture."
+      ]
+    },
+    "textutil_read_only": {
+      "command": "textutil -convert txt -stdout test-data/microsoft-office/word/word-document-protection.doc",
+      "exit_code": 0,
+      "text_contains": [
+        "WORD_PROTECTION_008",
+        "PROTECTED_BODY_008: this body is restricted to comments.",
+        "COMMENT_TARGET_008: native comment remains available.",
+        "END_PROTECTION_008",
+        "PROTECTION_COMMENT_008: native comments-only restriction fixture."
+      ]
+    }
+  },
+  "rtf": {
+    "file_type": "Rich Text Format data, version 1, ANSI, code page 1252, default middle east language ID 1025",
+    "raw_protection_controls": {
+      "annotprot": 1,
+      "enforceprot1": 1,
+      "protlevel1": 1,
+      "password_controls": 0,
+      "formprot": 0,
+      "protstart": 0,
+      "protend": 0
+    },
+    "raw_comment_controls": {
+      "starred_annotation_destination": 1,
+      "atnref": 1,
+      "atndate": 1,
+      "chatn": 1,
+      "comment_text": "PROTECTION_COMMENT_008: native comments-only restriction fixture."
+    },
+    "raw_markers": [
+      "WORD_PROTECTION_008",
+      "Fixture ID: word-document-protection-008",
+      "PROTECTED_BODY_008: this body is restricted to comments.",
+      "COMMENT_TARGET_008: native comment remains available.",
+      "END_PROTECTION_008",
+      "PROTECTION_COMMENT_008: native comments-only restriction fixture."
+    ],
+    "read_example": {
+      "command": "cargo run -q -p litchi-rtf --example parse_rtf -- test-data/microsoft-office/word/word-document-protection.rtf",
+      "exit_code": 1,
+      "error": "MalformedDocument(\"RTF data-store payload cannot be empty\")",
+      "semantic_counts_available": false
+    },
+    "textutil_read_only": {
+      "command": "textutil -convert txt -stdout test-data/microsoft-office/word/word-document-protection.rtf",
+      "exit_code": 0,
+      "text_contains": [
+        "WORD_PROTECTION_008",
+        "Fixture ID: word-document-protection-008",
+        "PROTECTED_BODY_008: this body is restricted to comments.",
+        "COMMENT_TARGET_008: native comment remains available.",
+        "END_PROTECTION_008"
+      ],
+      "comment_body_projected": false
+    }
+  },
+  "native_ui_validation": {
+    "protection_dialog": {
+      "command": "Tools > Protect Document",
+      "selected_restriction": "Comments",
+      "protection_checked": true,
+      "other_restrictions_checked": false,
+      "password_fields_blank": true,
+      "cancelled_without_changes": true
+    },
+    "comment_authoring": {
+      "comment_target": "COMMENT_TARGET_008",
+      "comment_text": "PROTECTION_COMMENT_008: native comments-only restriction fixture.",
+      "native_comment_remained_available": true
+    },
+    "reopen_status": {
+      "docx": "reopened in native Word without repair",
+      "doc": "reopened in native Word without repair",
+      "rtf": "reopened in native Word without repair"
+    },
+    "document_chain": "The DOC was produced by native Word Save As from the DOCX. The original DOCX was then reopened and saved as RTF.",
+    "enforcement_test": "not performed",
+    "password_test": "not performed"
+  },
+  "known_limits": [
+    "The fixture records native protection settings and comment metadata. It does not establish that litchi enforces the restriction during edits.",
+    "No password credential was entered; blank password fields mean that no password hash is evidenced in this fixture, not that password behavior is generally supported or unsupported.",
+    "The RTF parser failure is recorded as a native Word RTF reader boundary. Raw RTF control words and textutil output do not establish semantic parser parity.",
+    "DOCX modern comment extension parts are preserved and inspected as package metadata; comment-thread behavior was not tested beyond the single native comment."
+  ]
+}

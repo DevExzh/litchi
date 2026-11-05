@@ -1,0 +1,397 @@
+{
+  "schema_version": 1,
+  "fixture_id": "powerpoint-passive-macro-005",
+  "generated_on": "2026-10-15",
+  "purpose": "Fixture-specific, read-only inspection of four native Microsoft PowerPoint macro-enabled and legacy derivatives containing a harmless, manually callable VBA procedure.",
+  "provenance": {
+    "producer_app": "Microsoft Office PowerPoint",
+    "app_version": "16.110.2",
+    "app_build": "16.110.26062818",
+    "package_application": "Microsoft Macintosh PowerPoint",
+    "package_app_version": "16.0000",
+    "platform": "macOS",
+    "authoring_method": "Computer Use / native Microsoft PowerPoint UI and native VBE",
+    "source": "One title slide was authored in native PowerPoint. Standard Module1 contains the final passive FixtureNoOp procedure. The project was saved through native PowerPoint as PPTM, POTM, PPSM and legacy PPT.",
+    "macro_storage": "Standard Module1 in the current presentation/template/show; no Personal Macro Workbook, add-in, event module or automatic entry point was used.",
+    "recorded_vba_source": "Option Explicit, then Public Sub FixtureNoOp with a local String variable assigned the PPT_MACRO_005 marker; the procedure is never called by the fixture.",
+    "libreoffice_used": false,
+    "programmatic_office_generation_used": false,
+    "library_code_modified": false,
+    "macro_execution_during_authoring_or_inspection": false,
+    "deliberate_vba_compile_during_authoring_or_inspection": false,
+    "all_documents_closed_before_hashing": true,
+    "lock_files_present_at_inspection": false
+  },
+  "scope_and_limits": {
+    "native_variants": [
+      "pptm",
+      "potm",
+      "ppsm",
+      "ppt"
+    ],
+    "native_reopen_verified": true,
+    "native_reopen_repair_prompt": false,
+    "macro_security_action": "Disable Macros",
+    "macro_execution": false,
+    "deliberate_compile": false,
+    "template_instantiation_verified": false,
+    "slideshow_run_verified": false,
+    "external_links_followed": false,
+    "signature_present": false,
+    "automatic_entry_points_present": false,
+    "form_controls_present": false,
+    "activex_parts_present": false,
+    "semantic_limit": "The fixtures prove native container storage, marker preservation, and inert VBA source decoding. They do not execute VBA, certify template instantiation or slideshow-runtime behavior, or claim complete legacy PPT feature parity.",
+    "legacy_vba_reader_limit": "The strict litchi-ppt VBA reader exposes valid VBAInfo and persisted-storage metadata but rejects the native legacy outer payload with `PowerPoint(Corrupted(\"invalid ExOleObjStg zlib payload: incomplete deflate stream\"))`. A separate temporary read-only probe that appended an empty final raw-deflate block recovered the declared 8192-byte inner CFB and the same Module1 source; this permissive probe is evidence only and is not a library-reader pass."
+  },
+  "expected_native_content": {
+    "slide_count": 1,
+    "slide_size_emu": [
+      12192000,
+      6858000
+    ],
+    "shape_count": 2,
+    "title": "PPT_MACRO_005",
+    "subtitle_lines": [
+      "Fixture ID: powerpoint-passive-macro-005",
+      "Passive VBA payload; no automatic entry points"
+    ],
+    "slide_text_ooxml": "PPT_MACRO_005\nFixture ID: powerpoint-passive-macro-005\nPassive VBA payload; no automatic entry points",
+    "vba_marker": "PPT_MACRO_005",
+    "automatic_entry_point_scan": {
+      "patterns_checked": [
+        "Auto_Open",
+        "AutoClose",
+        "Auto_Show",
+        "PresentationOpen",
+        "PresentationClose",
+        "SlideShowBegin",
+        "SlideShowEnd",
+        "Main"
+      ],
+      "matches": [],
+      "present": false
+    }
+  },
+  "vba_source": {
+    "project_name": "VBAProject",
+    "page_id": 10000,
+    "module_count": 1,
+    "reference_count": 2,
+    "reference_names": [
+      "MSForms",
+      "Office"
+    ],
+    "references": {
+      "MSForms": "Original control reference",
+      "Office": "Registered reference"
+    },
+    "designer_frames": 0,
+    "project_text_records": 14,
+    "document_modules_present": false,
+    "automatic_event_handlers_present": false,
+    "module": {
+      "name": "Module1",
+      "stream_name": "Module1",
+      "kind": "Procedural",
+      "text_offset": 1180,
+      "read_only": false,
+      "private": false,
+      "source_text": "Attribute VB_Name = \"Module1\"\nOption Explicit\n\nPublic Sub FixtureNoOp()\n    Dim fixtureMarker As String\n    fixtureMarker = \"PPT_MACRO_005\"\n    \nEnd Sub\n"
+    },
+    "source_decoded_from": [
+      "pptm/ppt/vbaProject.bin",
+      "potm/ppt/vbaProject.bin",
+      "ppsm/ppt/vbaProject.bin",
+      "ppt/VbaProjectStg after bounded temporary raw-deflate recovery"
+    ],
+    "source_behavior": "FixtureNoOp only assigns the local fixtureMarker variable. It has no workbook/presentation mutation, no event procedure and no automatic entry point; it was not run or compiled deliberately."
+  },
+  "macro_security_validation": {
+    "alert_shown_on_native_reopen": true,
+    "user_action": "Disable Macros",
+    "macro_execution_allowed": false,
+    "macro_execution_observed": false,
+    "scope": "Root agent reopened each final file through native PowerPoint File Open with macros disabled. No Trust Center or security setting was changed."
+  },
+  "library_validation": {
+    "readers": [
+      "litchi-pptx::Package::open -> presentation",
+      "litchi-pptx::Presentation::vba -> litchi-vba::project::Project::read",
+      "litchi-ppt::Package::open -> presentation",
+      "litchi-ppt::Presentation::vba_project_storage / vba_info",
+      "litchi-ppt::Presentation::vba -> litchi-vba::project::Project::open",
+      "litchi-cfb::OleFile::open"
+    ],
+    "macro_execution": false,
+    "ooxml_package_open": "pass for pptm, potm and ppsm",
+    "ooxml_slide_reader": "pass for all three: one slide, two shapes, 12192000x6858000 EMU slide size and the expected three-line marker text",
+    "ooxml_vba_payload_parse": "pass for all three: rId7, /ppt/vbaProject.bin, 8192 payload bytes, VBAProject/page 10000, one Module1 module, two references and 14 project-text records",
+    "legacy_cfb_open": "pass: four top-level streams; PowerPoint Document stream is 39623 bytes",
+    "legacy_slide_reader": "pass: one slide, two shapes, no pictures, 101 text characters; native legacy line separation is returned as CR between the two subtitle lines",
+    "legacy_vba_metadata": "pass: VbaInfo persist_id_ref=3, has_macros=true, runtime_version=2; VbaProjectStorage compression=Zlib, declared_uncompressed_len=8192, stored_payload_len=3128",
+    "legacy_vba_payload_parse": "bounded strict reader result recorded as PowerPoint(Corrupted(\"invalid ExOleObjStg zlib payload: incomplete deflate stream\")); no source was executed",
+    "legacy_permissive_source_probe": "pass outside the repository: raw-deflate recovery produced an 8192-byte CFB beginning d0cf11e0a1b11ae1 and decoded the same VBAProject/Module1 source",
+    "commands": [
+      "unzip -t test-data/microsoft-office/powerpoint/powerpoint-passive-macro.pptm",
+      "unzip -t test-data/microsoft-office/powerpoint/powerpoint-passive-macro.potm",
+      "unzip -t test-data/microsoft-office/powerpoint/powerpoint-passive-macro.ppsm",
+      "cargo run -q -p litchi-pptx --features vba-inspection --example read_pptx -- test-data/microsoft-office/powerpoint/powerpoint-passive-macro.pptm",
+      "cargo run -q -p litchi-pptx --features vba-inspection --example read_pptx -- test-data/microsoft-office/powerpoint/powerpoint-passive-macro.potm",
+      "cargo run -q -p litchi-pptx --features vba-inspection --example read_pptx -- test-data/microsoft-office/powerpoint/powerpoint-passive-macro.ppsm",
+      "cargo run -q -p litchi-ppt --features vba-inspection --example read_ppt -- test-data/microsoft-office/powerpoint/powerpoint-passive-macro.ppt",
+      "cargo run -q -p litchi-ppt --features vba-inspection --example dump_ppt_structure -- test-data/microsoft-office/powerpoint/powerpoint-passive-macro.ppt",
+      "cargo test -p litchi-pptx --features vba-inspection --test pptx_vba_project"
+    ],
+    "reader_scope": "All readers and temporary probes were inert and read-only; no VBA compilation, interpretation or execution occurred."
+  },
+  "files": [
+    {
+      "path": "test-data/microsoft-office/powerpoint/powerpoint-passive-macro.pptm",
+      "format": "pptm",
+      "bytes": 38889,
+      "sha256": "44fc80d7ec1cbf635edb2325640726172207127f1716e4f53f8751145bbe7c52",
+      "file_description": "Microsoft PowerPoint 2007+ macro-enabled presentation",
+      "container": {
+        "kind": "OPC ZIP",
+        "zip_test": "pass",
+        "member_count": 38,
+        "main_presentation_part": "/ppt/presentation.xml",
+        "main_presentation_content_type": "application/vnd.ms-powerpoint.presentation.macroEnabled.main+xml",
+        "vba_project_content_type": "application/vnd.ms-office.vbaProject",
+        "vba_project_part": "/ppt/vbaProject.bin",
+        "vba_project_bytes": 8192,
+        "vba_project_sha256": "44e335f3ac81a2722397df0d6dc489d3de6d49ba0b83805fd94e3268d1d47ce2",
+        "vba_project_cfb_streams": {
+          "VBA/dir": 594,
+          "VBA/Module1": 1323,
+          "VBA/_VBA_PROJECT": 2849,
+          "PROJECT": 359,
+          "PROJECTwm": 26
+        },
+        "vba_relationship": {
+          "source_part": "ppt/presentation.xml",
+          "relationship_id": "rId7",
+          "relationship_type": "http://schemas.microsoft.com/office/2006/relationships/vbaProject",
+          "target": "vbaProject.bin",
+          "target_exists": true,
+          "target_mode": "internal"
+        },
+        "slide_part": "/ppt/slides/slide1.xml",
+        "slide_part_sha256": "6c4d65679550ece72061f31aa18e5cc6acdee11dbeca055c073a1321aefaf338",
+        "presentation_part_sha256": "5c70d04c37e8f54b408d3ba4223366d5548aedfa87d7935defe28a2d1301174c",
+        "signature_parts_present": false,
+        "external_vba_relationship": false
+      },
+      "library_read": {
+        "package_open": "pass",
+        "slide_count": 1,
+        "shape_count": 2,
+        "slide_text": "PPT_MACRO_005\nFixture ID: powerpoint-passive-macro-005\nPassive VBA payload; no automatic entry points",
+        "vba_relationship": "rId7 -> /ppt/vbaProject.bin",
+        "vba_payload_parse": "pass",
+        "vba_source": "pass; Module1 source matches vba_source.module.source_text"
+      },
+      "native_reopen_validation": {
+        "observed_by": "Root agent via Computer Use",
+        "reopen": "pass",
+        "repair_prompt": false,
+        "macro_security_action": "Disable Macros",
+        "one_slide_marker_visible": true,
+        "macro_execution_observed": false
+      }
+    },
+    {
+      "path": "test-data/microsoft-office/powerpoint/powerpoint-passive-macro.potm",
+      "format": "potm",
+      "bytes": 38925,
+      "sha256": "7c210298ee28f3bc3146a0cf422c2dbc3903a133085cb5176e7b292fa9fe702c",
+      "file_description": "Microsoft PowerPoint 2007+ macro-enabled template",
+      "container": {
+        "kind": "OPC ZIP",
+        "zip_test": "pass",
+        "member_count": 38,
+        "main_presentation_part": "/ppt/presentation.xml",
+        "main_presentation_content_type": "application/vnd.ms-powerpoint.template.macroEnabled.main+xml",
+        "vba_project_content_type": "application/vnd.ms-office.vbaProject",
+        "vba_project_part": "/ppt/vbaProject.bin",
+        "vba_project_bytes": 8192,
+        "vba_project_sha256": "12d30c0bc9bd41c473001f5a08420976e3a27cdee0217775abcb5bc8af57e420",
+        "vba_project_cfb_streams": {
+          "VBA/dir": 594,
+          "VBA/Module1": 1323,
+          "VBA/_VBA_PROJECT": 2849,
+          "PROJECT": 359,
+          "PROJECTwm": 26
+        },
+        "vba_relationship": {
+          "source_part": "ppt/presentation.xml",
+          "relationship_id": "rId7",
+          "relationship_type": "http://schemas.microsoft.com/office/2006/relationships/vbaProject",
+          "target": "vbaProject.bin",
+          "target_exists": true,
+          "target_mode": "internal"
+        },
+        "slide_part": "/ppt/slides/slide1.xml",
+        "slide_part_sha256": "6c4d65679550ece72061f31aa18e5cc6acdee11dbeca055c073a1321aefaf338",
+        "presentation_part_sha256": "5c70d04c37e8f54b408d3ba4223366d5548aedfa87d7935defe28a2d1301174c",
+        "signature_parts_present": false,
+        "external_vba_relationship": false
+      },
+      "library_read": {
+        "package_open": "pass",
+        "slide_count": 1,
+        "shape_count": 2,
+        "slide_text": "PPT_MACRO_005\nFixture ID: powerpoint-passive-macro-005\nPassive VBA payload; no automatic entry points",
+        "vba_relationship": "rId7 -> /ppt/vbaProject.bin",
+        "vba_payload_parse": "pass",
+        "vba_source": "pass; Module1 source matches vba_source.module.source_text"
+      },
+      "native_reopen_validation": {
+        "observed_by": "Root agent via Computer Use",
+        "reopen": "pass",
+        "repair_prompt": false,
+        "macro_security_action": "Disable Macros",
+        "one_slide_marker_visible": true,
+        "macro_execution_observed": false
+      }
+    },
+    {
+      "path": "test-data/microsoft-office/powerpoint/powerpoint-passive-macro.ppsm",
+      "format": "ppsm",
+      "bytes": 38929,
+      "sha256": "635fc588ef32aaade8f4793c3c7452b84b42614319517098ed08bb81f089f014",
+      "file_description": "Microsoft PowerPoint 2007+ macro-enabled slideshow",
+      "container": {
+        "kind": "OPC ZIP",
+        "zip_test": "pass",
+        "member_count": 38,
+        "main_presentation_part": "/ppt/presentation.xml",
+        "main_presentation_content_type": "application/vnd.ms-powerpoint.slideshow.macroEnabled.main+xml",
+        "vba_project_content_type": "application/vnd.ms-office.vbaProject",
+        "vba_project_part": "/ppt/vbaProject.bin",
+        "vba_project_bytes": 8192,
+        "vba_project_sha256": "2daf73e707470cdc42e154779c3f63372e90c5891c3f65f19e8d3d5312ff372c",
+        "vba_project_cfb_streams": {
+          "VBA/dir": 594,
+          "VBA/Module1": 1323,
+          "VBA/_VBA_PROJECT": 2849,
+          "PROJECT": 359,
+          "PROJECTwm": 26
+        },
+        "vba_relationship": {
+          "source_part": "ppt/presentation.xml",
+          "relationship_id": "rId7",
+          "relationship_type": "http://schemas.microsoft.com/office/2006/relationships/vbaProject",
+          "target": "vbaProject.bin",
+          "target_exists": true,
+          "target_mode": "internal"
+        },
+        "slide_part": "/ppt/slides/slide1.xml",
+        "slide_part_sha256": "6c4d65679550ece72061f31aa18e5cc6acdee11dbeca055c073a1321aefaf338",
+        "presentation_part_sha256": "5c70d04c37e8f54b408d3ba4223366d5548aedfa87d7935defe28a2d1301174c",
+        "signature_parts_present": false,
+        "external_vba_relationship": false
+      },
+      "library_read": {
+        "package_open": "pass",
+        "slide_count": 1,
+        "shape_count": 2,
+        "slide_text": "PPT_MACRO_005\nFixture ID: powerpoint-passive-macro-005\nPassive VBA payload; no automatic entry points",
+        "vba_relationship": "rId7 -> /ppt/vbaProject.bin",
+        "vba_payload_parse": "pass",
+        "vba_source": "pass; Module1 source matches vba_source.module.source_text"
+      },
+      "native_reopen_validation": {
+        "observed_by": "Root agent via Computer Use",
+        "reopen": "pass",
+        "repair_prompt": false,
+        "macro_security_action": "Disable Macros",
+        "one_slide_marker_visible": true,
+        "macro_execution_observed": false
+      }
+    },
+    {
+      "path": "test-data/microsoft-office/powerpoint/powerpoint-passive-macro.ppt",
+      "format": "ppt",
+      "bytes": 50176,
+      "sha256": "ea2ff3c6290bb5fc1a02ad88fea4afe88aac77d4b09f017c2757d91537185171",
+      "file_description": "Composite Document File V2 Document, Little Endian, MacOS PowerPoint 5.26 container produced by native PowerPoint Save As",
+      "container": {
+        "kind": "Compound File Binary (CFB/OLE)",
+        "cfb_signature": "d0cf11e0a1b11ae1",
+        "cfb_reader": "litchi-cfb::OleFile::open pass",
+        "stream_count": 4,
+        "streams": [
+          "Current User",
+          "\\u0005SummaryInformation",
+          "PowerPoint Document",
+          "\\u0005DocumentSummaryInformation"
+        ],
+        "stream_lengths": {
+          "Current User": 32,
+          "\\u0005SummaryInformation": 5312,
+          "PowerPoint Document": 39623,
+          "\\u0005DocumentSummaryInformation": 480
+        },
+        "powerpoint_document_sha256": "b60c38d1121ca9ef2be89a234549c1d6a70b2eb0309740e1c33d87a9fbf381a3",
+        "powerpoint_document_record_evidence": {
+          "vba_info_record": {
+            "record_type": "VBAInfo",
+            "offset": 843,
+            "length": 20,
+            "persist_id_ref": 3,
+            "has_macros": true,
+            "runtime_version": 2
+          },
+          "vba_storage_record": {
+            "record_type": "ExternalOleObjectStg / VbaProjectStg",
+            "offset": 36419,
+            "length": 3132,
+            "version": 0,
+            "instance": 1,
+            "compression": "Zlib as declared by the native record",
+            "declared_uncompressed_len": 8192,
+            "stored_payload_len": 3128
+          },
+          "persist_mapping": {
+            "persist_id": 3,
+            "storage_offset": 36419
+          }
+        },
+        "signature_present": false,
+        "top_level_vba_stream_present": false,
+        "legacy_vba_is_nested_in_powerpoint_document": true
+      },
+      "library_read": {
+        "package_open": "pass",
+        "slide_count": 1,
+        "shape_count": 2,
+        "has_pictures": false,
+        "slide_text": "PPT_MACRO_005\nFixture ID: powerpoint-passive-macro-005\rPassive VBA payload; no automatic entry points",
+        "vba_project_storage": "pass; VbaInfo persist_id_ref=3, has_macros=true, runtime_version=2, compression=Zlib, declared_uncompressed_len=8192, stored_payload_len=3128",
+        "vba_payload_parse": "bounded strict-reader error: PowerPoint(Corrupted(\"invalid ExOleObjStg zlib payload: incomplete deflate stream\"))",
+        "permissive_probe": "pass outside the repository after appending an empty final raw-deflate block; inner 8192-byte CFB and Module1 source match the OOXML variants"
+      },
+      "native_reopen_validation": {
+        "observed_by": "Root agent via Computer Use",
+        "reopen": "pass",
+        "repair_prompt": false,
+        "macro_security_action": "Disable Macros",
+        "one_slide_marker_visible": true,
+        "macro_execution_observed": false
+      }
+    }
+  ],
+  "validation_methods": [
+    "SHA-256 and byte size were computed from all four closed final fixture byte streams.",
+    "file identified pptm, potm and ppsm as Microsoft PowerPoint 2007+ and ppt as a CFB/OLE Microsoft Macintosh PowerPoint document.",
+    "unzip -t passed for all three OPC packages; each contained 38 members.",
+    "Python ZipFile/ElementTree inspection parsed package XML and relationships, confirmed the macro-enabled main content type for each extension, and confirmed the internal rId7 VBA relationship target.",
+    "The litchi-pptx reader opened all three OPC packages, exposed one slide with the expected text and decoded the embedded MS-OVBA project and Module1 source without execution.",
+    "The litchi-ppt reader and dump_ppt_structure opened the legacy CFB, recovered the slide marker and exposed VBAInfo/VbaProjectStg metadata. Its strict bounded VBA payload decoder recorded the incomplete-deflate result above.",
+    "A temporary probe outside the repository recovered the native legacy raw-deflate payload into an 8192-byte inner CFB and decoded the same inert Module1 source; this probe made no repository or library changes.",
+    "Root Computer Use observations record exact-file PowerPoint reopen with Disable Macros selected, no repair prompt, and the one-slide marker visible for all four final files."
+  ],
+  "native_ui_observation_source": "Root agent Computer Use session; this inspection process did not operate Office UI."
+}

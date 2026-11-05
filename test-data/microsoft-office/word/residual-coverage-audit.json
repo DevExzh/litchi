@@ -1,0 +1,1835 @@
+{
+  "schema_version": 1,
+  "generated_on": "2026-10-15",
+  "purpose": "Truthful row-level audit of every currently pending DOC/DOCX feature-matrix row against the finalized native Word corpus. This file supplements coverage.json and does not change fixture_status or common metadata.",
+  "scope": {
+    "formats": [
+      "doc",
+      "docx"
+    ],
+    "pending_rows_audited": 90,
+    "common_metadata_unchanged": true,
+    "classification_rule": "Each pending row receives exactly one bounded category; native_fixture_evidence_available means only the cited native subset was observed, never that the broad matrix row is complete.",
+    "categories": [
+      "native_fixture_evidence_available",
+      "operation_only_semantics",
+      "observed_native_ui_limitation",
+      "external_handoff",
+      "genuinely_missing_authorable_family"
+    ]
+  },
+  "source_matrices": {
+    "doc": "crates/litchi-doc/docs/FEATURE_MATRIX.md",
+    "docx": "crates/litchi-docx/docs/FEATURE_MATRIX.md"
+  },
+  "native_evidence_catalog": [
+    {
+      "ref": "word/text-structure",
+      "scope": "Native Word DOC and DOCX with paragraphs, styles, numbering, fields, bookmarks and hyperlinks."
+    },
+    {
+      "ref": "word/word-tables-layout",
+      "scope": "Native Word DOC, DOCX and RTF with tables, nested/merged cells, sections, page layout and note placement."
+    },
+    {
+      "ref": "word/word-review-controls",
+      "scope": "Native Word DOC, DOCX and RTF with revisions, comments, bookmarks, fields and review stories."
+    },
+    {
+      "ref": "word/word-math-navigation",
+      "scope": "Native Word DOC, DOCX, DOTX and RTF with OMML/legacy equation, TOC/navigation, fields, numbering and bibliography custom XML."
+    },
+    {
+      "ref": "word/word-visual-objects",
+      "scope": "Native Word DOC, DOCX and RTF with OfficeArt/VML/DrawingML pictures, shapes, charts and linked relationships."
+    },
+    {
+      "ref": "word/word-vector-diagram",
+      "scope": "Native Word DOC, DOCX and RTF with vector/SVG/SmartArt-like diagram content and AlternateContent."
+    },
+    {
+      "ref": "word/word-glossary",
+      "scope": "Native Word DOT, DOTX and converted DOCX glossary fixtures; exact AutoText/glossary inspection is in glossary-inspection.json."
+    },
+    {
+      "ref": "word/word-bidi-eastasia",
+      "scope": "Native Word DOC, DOCX and RTF multilingual fixture with Arabic bidi, Japanese East Asian text, language/font declarations and markers; not yet merged into common manifest metadata."
+    }
+  ],
+  "environment_notes": [
+    "Native Word provenance is Microsoft Office Word 16.110.2 build 16.110.26062818 on macOS for the finalized corpus where inspection metadata exists.",
+    "The corpus includes native Word DOC/DOCX/DOTX/DOT/RTF artifacts; bidi/east-Asia files are on disk but were intentionally not added to common metadata by this audit.",
+    "Current Word-for-Mac observations are bounded UI observations. They are not claims about Word on Windows, older Word releases, enterprise services, or every Office build.",
+    "Password, signature and trust rows remain external handoffs; no credentials, certificates or passwords are invented here."
+  ],
+  "summary": {
+    "counts_by_category": {
+      "observed_native_ui_limitation": 31,
+      "native_fixture_evidence_available": 37,
+      "external_handoff": 6,
+      "operation_only_semantics": 11,
+      "genuinely_missing_authorable_family": 5
+    },
+    "native_fixture_evidence_available_rows": [
+      "doc-011",
+      "doc-016",
+      "doc-017",
+      "doc-020",
+      "doc-021",
+      "doc-023",
+      "doc-025",
+      "doc-026",
+      "doc-033",
+      "doc-034",
+      "doc-035",
+      "doc-036",
+      "doc-037",
+      "doc-039",
+      "doc-040",
+      "doc-041",
+      "doc-042",
+      "doc-043",
+      "doc-048",
+      "doc-049",
+      "doc-054",
+      "doc-059",
+      "docx-071",
+      "docx-072",
+      "docx-090",
+      "docx-092",
+      "docx-093",
+      "docx-094",
+      "docx-095",
+      "docx-096",
+      "docx-097",
+      "docx-099",
+      "docx-101",
+      "docx-105",
+      "docx-110",
+      "docx-115",
+      "docx-119"
+    ],
+    "operation_only_semantics_rows": [
+      "doc-014",
+      "doc-068",
+      "docx-073",
+      "docx-074",
+      "docx-075",
+      "docx-076",
+      "docx-112",
+      "docx-120",
+      "docx-121",
+      "docx-122",
+      "docx-133"
+    ],
+    "observed_native_ui_limitation_rows": [
+      "doc-002",
+      "doc-003",
+      "doc-004",
+      "doc-005",
+      "doc-006",
+      "doc-007",
+      "doc-008",
+      "doc-009",
+      "doc-010",
+      "doc-015",
+      "doc-018",
+      "doc-024",
+      "doc-031",
+      "doc-032",
+      "doc-044",
+      "doc-046",
+      "doc-052",
+      "doc-062",
+      "doc-063",
+      "docx-070",
+      "docx-078",
+      "docx-086",
+      "docx-088",
+      "docx-098",
+      "docx-100",
+      "docx-102",
+      "docx-107",
+      "docx-108",
+      "docx-116",
+      "docx-128",
+      "docx-129"
+    ],
+    "external_handoff_rows": [
+      "doc-013",
+      "doc-027",
+      "doc-028",
+      "docx-084",
+      "docx-085",
+      "docx-132"
+    ],
+    "genuinely_missing_authorable_family_rows": [
+      "doc-045",
+      "doc-047",
+      "docx-103",
+      "docx-104",
+      "docx-106"
+    ],
+    "high_value_missing_native_families": [
+      {
+        "priority": "P1",
+        "rows": [
+          "doc-045"
+        ],
+        "family": "Caption and AutoCaption tables",
+        "bounded_plan": "Author a picture/table with Word Insert Caption and, if exposed, one AutoCaption rule; save DOC and DOCX, close/reopen natively, then inspect caption fields/sequence."
+      },
+      {
+        "priority": "P1",
+        "rows": [
+          "docx-103",
+          "docx-104"
+        ],
+        "family": "Footnote-area columns and saved collapsed outline heading",
+        "bounded_plan": "Probe each feature in a small native DOCX and require the exact sectPr footnoteColumns or pPr collapsed element before marking evidence."
+      },
+      {
+        "priority": "P2",
+        "rows": [
+          "doc-047"
+        ],
+        "family": "Master document/subdocument links",
+        "bounded_plan": "If Word exposes Master Document/Insert Subdocument, create one master plus one child and inspect link fields/relationships after reopen."
+      },
+      {
+        "priority": "P2",
+        "rows": [
+          "docx-106"
+        ],
+        "family": "symEx symbol extension",
+        "bounded_plan": "Use native Insert Symbol with a symbol likely to require the extension and inspect run XML; ordinary Unicode text is insufficient."
+      }
+    ],
+    "external_handoffs_to_keep_separate": [
+      "doc-013",
+      "doc-027",
+      "doc-028",
+      "docx-084",
+      "docx-085",
+      "docx-132"
+    ]
+  },
+  "rows": [
+    {
+      "id": "doc-002",
+      "format": "doc",
+      "owner": "litchi-doc",
+      "source_matrix": "crates/litchi-doc/docs/FEATURE_MATRIX.md",
+      "family": "Word binary",
+      "feature": "Word 2003 XML schema references (`Hplxsdr`, `XSDR`, `TIQ`)",
+      "scope": "Word 2003 XML schema references (`Hplxsdr`, `XSDR`, `TIQ`)",
+      "library_status": "partial",
+      "matrix_status": "🟡",
+      "fixture_status_before_audit": "pending",
+      "category": "observed_native_ui_limitation",
+      "rationale": "The corpus has no deterministic current Word-for-Mac authoring route for Word 2003 XML schema-reference streams; the limitation is a bounded UI/workflow observation, not proof that no Windows/legacy route exists.",
+      "evidence_refs": [
+        "root_ui_observation://Word-Mac/no-Word-2003-XML-schema-authoring"
+      ],
+      "next_action": "Leave pending unless a controlled Office build can author an XSDR/TIQ document."
+    },
+    {
+      "id": "doc-003",
+      "format": "doc",
+      "owner": "litchi-doc",
+      "source_matrix": "crates/litchi-doc/docs/FEATURE_MATRIX.md",
+      "family": "Word binary",
+      "feature": "Structured document tags (`SttbfBkmkSdt`, SDT bookmark PLCs, `SDTI`)",
+      "scope": "Structured document tags (`SttbfBkmkSdt`, SDT bookmark PLCs, `SDTI`)",
+      "library_status": "partial",
+      "matrix_status": "🟡",
+      "fixture_status_before_audit": "pending",
+      "category": "observed_native_ui_limitation",
+      "rationale": "Current Word-for-Mac Developer controls exposed legacy Text/Check/Combo form fields, not the legacy DOC SDT bookmark PLC authoring surface; absence is reported only for this observed UI route.",
+      "evidence_refs": [
+        "root_ui_observation://Word-Mac/Developer-only-legacy-form-controls"
+      ],
+      "next_action": "Probe a Windows/older Word route only if SDT bookmark fixtures are required."
+    },
+    {
+      "id": "doc-004",
+      "format": "doc",
+      "owner": "litchi-doc",
+      "source_matrix": "crates/litchi-doc/docs/FEATURE_MATRIX.md",
+      "family": "Word binary",
+      "feature": "Format consistency checker marks (`SttbfBkmkFcc`, `DPCID`)",
+      "scope": "Format consistency checker marks (`SttbfBkmkFcc`, `DPCID`)",
+      "library_status": "partial",
+      "matrix_status": "🟡",
+      "fixture_status_before_audit": "pending",
+      "category": "observed_native_ui_limitation",
+      "rationale": "Format-consistency checker marks are generated diagnostic state. No deterministic native Word authoring action was observed that records a stable fixture payload.",
+      "evidence_refs": [
+        "root_ui_observation://Word-Mac/no-stable-format-consistency-mark-authoring"
+      ]
+    },
+    {
+      "id": "doc-005",
+      "format": "doc",
+      "owner": "litchi-doc",
+      "source_matrix": "crates/litchi-doc/docs/FEATURE_MATRIX.md",
+      "family": "Word binary",
+      "feature": "Text Services Framework tables (`Plcfuim`, `PlfguidUim`, `UIM`)",
+      "scope": "Text Services Framework tables (`Plcfuim`, `PlfguidUim`, `UIM`)",
+      "library_status": "partial",
+      "matrix_status": "🟡",
+      "fixture_status_before_audit": "pending",
+      "category": "observed_native_ui_limitation",
+      "rationale": "Text Services Framework UIM tables are editor/platform integration state; no deterministic native Office document authoring route was observed on the current Mac environment.",
+      "evidence_refs": [
+        "root_ui_observation://Word-Mac/no-TSF-UIM-authoring"
+      ]
+    },
+    {
+      "id": "doc-006",
+      "format": "doc",
+      "owner": "litchi-doc",
+      "source_matrix": "crates/litchi-doc/docs/FEATURE_MATRIX.md",
+      "family": "Word binary",
+      "feature": "Grammar checker cookies (`Plcfcookie` and legacy cookies)",
+      "scope": "Grammar checker cookies (`Plcfcookie` and legacy cookies)",
+      "library_status": "partial",
+      "matrix_status": "🟡",
+      "fixture_status_before_audit": "pending",
+      "category": "observed_native_ui_limitation",
+      "rationale": "Grammar-checker cookies are proofing-engine state. The current native workflow does not expose a deterministic command to author a stable cookie fixture.",
+      "evidence_refs": [
+        "root_ui_observation://Word-Mac/proofing-cookies-not-authorable"
+      ]
+    },
+    {
+      "id": "doc-007",
+      "format": "doc",
+      "owner": "litchi-doc",
+      "source_matrix": "crates/litchi-doc/docs/FEATURE_MATRIX.md",
+      "family": "Word binary",
+      "feature": "Language auto-detection state (`Plcflad`, `LadSpls`)",
+      "scope": "Language auto-detection state (`Plcflad`, `LadSpls`)",
+      "library_status": "partial",
+      "matrix_status": "🟡",
+      "fixture_status_before_audit": "pending",
+      "category": "observed_native_ui_limitation",
+      "rationale": "Language auto-detection PLC state is proofing-engine metadata rather than a stable content feature; no deterministic native authoring route was observed.",
+      "evidence_refs": [
+        "root_ui_observation://Word-Mac/proofing-autodetection-not-authorable"
+      ]
+    },
+    {
+      "id": "doc-008",
+      "format": "doc",
+      "owner": "litchi-doc",
+      "source_matrix": "crates/litchi-doc/docs/FEATURE_MATRIX.md",
+      "family": "Word binary",
+      "feature": "Table character cache (`PlcfTch`)",
+      "scope": "Table character cache (`PlcfTch`)",
+      "library_status": "partial",
+      "matrix_status": "🟡",
+      "fixture_status_before_audit": "pending",
+      "category": "observed_native_ui_limitation",
+      "rationale": "Table-character cache records are derived caches. Current Word authoring creates tables but does not provide a controlled command for a chosen cache payload.",
+      "evidence_refs": [
+        "root_ui_observation://Word-Mac/no-table-character-cache-control"
+      ]
+    },
+    {
+      "id": "doc-009",
+      "format": "doc",
+      "owner": "litchi-doc",
+      "source_matrix": "crates/litchi-doc/docs/FEATURE_MATRIX.md",
+      "family": "Word binary",
+      "feature": "E-mail revision threading (`RmdThreading`)",
+      "scope": "E-mail revision threading (`RmdThreading`)",
+      "library_status": "partial",
+      "matrix_status": "🟡",
+      "fixture_status_before_audit": "pending",
+      "category": "observed_native_ui_limitation",
+      "rationale": "E-mail revision threading depends on mail integration and collaboration state; no deterministic local Word authoring route was observed.",
+      "evidence_refs": [
+        "root_ui_observation://Word-Mac/no-email-revision-threading-route"
+      ]
+    },
+    {
+      "id": "doc-010",
+      "format": "doc",
+      "owner": "litchi-doc",
+      "source_matrix": "crates/litchi-doc/docs/FEATURE_MATRIX.md",
+      "family": "Word binary",
+      "feature": "Repair bookmarks (`SttbfBkmkBPRepairs` and companion PLCs)",
+      "scope": "Repair bookmarks (`SttbfBkmkBPRepairs` and companion PLCs)",
+      "library_status": "partial",
+      "matrix_status": "🟡",
+      "fixture_status_before_audit": "pending",
+      "category": "observed_native_ui_limitation",
+      "rationale": "Repair bookmarks are emitted by repair/recovery paths. No deterministic clean Word authoring action can create a chosen repair record.",
+      "evidence_refs": [
+        "root_ui_observation://Word-Mac/no-repair-bookmark-authoring"
+      ]
+    },
+    {
+      "id": "doc-011",
+      "format": "doc",
+      "owner": "litchi-doc",
+      "source_matrix": "crates/litchi-doc/docs/FEATURE_MATRIX.md",
+      "family": "Word binary",
+      "feature": "Annotation bookmarks (`SttbfAtnBkmk`)",
+      "scope": "Annotation bookmarks (`SttbfAtnBkmk`)",
+      "library_status": "supported",
+      "matrix_status": "✅",
+      "fixture_status_before_audit": "pending",
+      "category": "native_fixture_evidence_available",
+      "rationale": "Native Word annotation/bookmark evidence is present in the review-controls DOC; this verifies the bounded annotation-story/bookmark shape only, not every legacy annotation bookmark table.",
+      "evidence_refs": [
+        "test-data/microsoft-office/word/word-review-controls.doc",
+        "test-data/microsoft-office/word/review-controls-inspection.json"
+      ]
+    },
+    {
+      "id": "doc-013",
+      "format": "doc",
+      "owner": "litchi-doc",
+      "source_matrix": "crates/litchi-doc/docs/FEATURE_MATRIX.md",
+      "family": "Word binary",
+      "feature": "VBA digital-signature storage (`DigitalSignature` PIDDSI and `StwUser` `Sign`/`SigAgile`/`SigV3`)",
+      "scope": "VBA digital-signature storage (`DigitalSignature` PIDDSI and `StwUser` `Sign`/`SigAgile`/`SigV3`)",
+      "library_status": "partial",
+      "matrix_status": "🟡",
+      "fixture_status_before_audit": "pending",
+      "category": "external_handoff",
+      "rationale": "VBA digital-signature storage needs a real certificate/signing identity. A macro-enabled Word fixture can be authored, but signing cannot be claimed without the external certificate handoff.",
+      "evidence_refs": [
+        "test-data/microsoft-office/word/recorded-macro-inspection.json"
+      ],
+      "next_action": "Obtain a user-approved signing certificate and record the exact certificate/trust context before authoring."
+    },
+    {
+      "id": "doc-014",
+      "format": "doc",
+      "owner": "litchi-doc",
+      "source_matrix": "crates/litchi-doc/docs/FEATURE_MATRIX.md",
+      "family": "Word binary",
+      "feature": "Saved selection (`Selsf`, `fcWss`)",
+      "scope": "Saved selection (`Selsf`, `fcWss`)",
+      "library_status": "partial",
+      "matrix_status": "🟡",
+      "fixture_status_before_audit": "pending",
+      "category": "operation_only_semantics",
+      "rationale": "Saved selection is transient application/transaction state rather than stable authored document content; a fixture cannot truthfully prove the library operation semantics.",
+      "evidence_refs": [],
+      "next_action": "Keep the matrix operation tests as the oracle; do not require a native fixture."
+    },
+    {
+      "id": "doc-015",
+      "format": "doc",
+      "owner": "litchi-doc",
+      "source_matrix": "crates/litchi-doc/docs/FEATURE_MATRIX.md",
+      "family": "Word binary",
+      "feature": "Paragraph-group properties (`PGPArray`, `PGPInfo`, `PGPOptions`)",
+      "scope": "Paragraph-group properties (`PGPArray`, `PGPInfo`, `PGPOptions`)",
+      "library_status": "partial",
+      "matrix_status": "🟡",
+      "fixture_status_before_audit": "pending",
+      "category": "observed_native_ui_limitation",
+      "rationale": "Paragraph-group properties are internal layout/optimization state; current Word authoring provides no deterministic control over a chosen PGPArray/PGPInfo payload.",
+      "evidence_refs": [
+        "root_ui_observation://Word-Mac/no-paragraph-group-property-control"
+      ]
+    },
+    {
+      "id": "doc-016",
+      "format": "doc",
+      "owner": "litchi-doc",
+      "source_matrix": "crates/litchi-doc/docs/FEATURE_MATRIX.md",
+      "family": "Word binary",
+      "feature": "Print metadata (`PrDrvr`, `PrEnvPort`, `PrEnvLand`)",
+      "scope": "Print metadata (`PrDrvr`, `PrEnvPort`, `PrEnvLand`)",
+      "library_status": "partial",
+      "matrix_status": "🟡",
+      "fixture_status_before_audit": "pending",
+      "category": "native_fixture_evidence_available",
+      "rationale": "Native Word section/page setup evidence is present in the tables-layout DOC; this covers the authored section, orientation, margins and page-layout subset, not printer-driver specific records.",
+      "evidence_refs": [
+        "test-data/microsoft-office/word/word-tables-layout.doc",
+        "test-data/microsoft-office/word/tables-layout-inspection.json"
+      ]
+    },
+    {
+      "id": "doc-017",
+      "format": "doc",
+      "owner": "litchi-doc",
+      "source_matrix": "crates/litchi-doc/docs/FEATURE_MATRIX.md",
+      "family": "Word binary",
+      "feature": "Frame/list records (`RgDofr`, `Dofr`)",
+      "scope": "Frame/list records (`RgDofr`, `Dofr`)",
+      "library_status": "partial",
+      "matrix_status": "🟡",
+      "fixture_status_before_audit": "pending",
+      "category": "native_fixture_evidence_available",
+      "rationale": "Native Word frame/list-shaped OfficeArt/VML content is present in the visual-objects and vector-diagram DOCs; this is bounded object/frame evidence and does not assert every Dofr variant.",
+      "evidence_refs": [
+        "test-data/microsoft-office/word/word-visual-objects.doc",
+        "test-data/microsoft-office/word/word-vector-diagram.doc",
+        "test-data/microsoft-office/word/visual-objects-inspection.json"
+      ]
+    },
+    {
+      "id": "doc-018",
+      "format": "doc",
+      "owner": "litchi-doc",
+      "source_matrix": "crates/litchi-doc/docs/FEATURE_MATRIX.md",
+      "family": "Word binary",
+      "feature": "`MsoEnvelopeCLSID` / `MsoEnvelope` metadata",
+      "scope": "`MsoEnvelopeCLSID` / `MsoEnvelope` metadata",
+      "library_status": "supported",
+      "matrix_status": "✅",
+      "fixture_status_before_audit": "pending",
+      "category": "observed_native_ui_limitation",
+      "rationale": "MsoEnvelope metadata belongs to legacy envelope/mail integration. No current local Word authoring route was observed; this does not rule out an older Windows workflow.",
+      "evidence_refs": [
+        "root_ui_observation://Word-Mac/no-MsoEnvelope-authoring"
+      ]
+    },
+    {
+      "id": "doc-020",
+      "format": "doc",
+      "owner": "litchi-doc",
+      "source_matrix": "crates/litchi-doc/docs/FEATURE_MATRIX.md",
+      "family": "Word binary",
+      "feature": "Word 97+ FIB and versioned FibRgFcLcb tables",
+      "scope": "Word 97+ FIB and versioned FibRgFcLcb tables",
+      "library_status": "supported",
+      "matrix_status": "✅",
+      "fixture_status_before_audit": "pending",
+      "category": "native_fixture_evidence_available",
+      "rationale": "The native Word97 DOC corpus contains real FIB and versioned FibRgFcLcb tables, including text, tables, review and glossary DOC artifacts; this verifies the bounded native package baseline.",
+      "evidence_refs": [
+        "test-data/microsoft-office/word/word-text-structure.doc",
+        "test-data/microsoft-office/word/word-glossary.dot",
+        "test-data/microsoft-office/word/word-tables-layout.doc"
+      ]
+    },
+    {
+      "id": "doc-021",
+      "format": "doc",
+      "owner": "litchi-doc",
+      "source_matrix": "crates/litchi-doc/docs/FEATURE_MATRIX.md",
+      "family": "Word binary",
+      "feature": "Versioned document properties (DopBase through Dop2013)",
+      "scope": "Versioned document properties (DopBase through Dop2013)",
+      "library_status": "supported",
+      "matrix_status": "✅",
+      "fixture_status_before_audit": "pending",
+      "category": "native_fixture_evidence_available",
+      "rationale": "Native DOC fixtures carry Word document/summary properties and versioned DOP-backed metadata; the evidence is bounded to properties observable in these files.",
+      "evidence_refs": [
+        "test-data/microsoft-office/word/word-text-structure.doc",
+        "test-data/microsoft-office/word/word-tables-layout.doc",
+        "test-data/microsoft-office/word/word-glossary.dot"
+      ]
+    },
+    {
+      "id": "doc-023",
+      "format": "doc",
+      "owner": "litchi-doc",
+      "source_matrix": "crates/litchi-doc/docs/FEATURE_MATRIX.md",
+      "family": "Word binary",
+      "feature": "WordDocument, table, Data, and story ranges",
+      "scope": "WordDocument, table, Data, and story ranges",
+      "library_status": "supported",
+      "matrix_status": "✅",
+      "fixture_status_before_audit": "pending",
+      "category": "native_fixture_evidence_available",
+      "rationale": "Native DOC fixtures exercise WordDocument/table/Data stories and story ranges through main text, notes, headers/footers, review and glossary content; no claim is made for every range combination.",
+      "evidence_refs": [
+        "test-data/microsoft-office/word/word-text-structure.doc",
+        "test-data/microsoft-office/word/word-tables-layout.doc",
+        "test-data/microsoft-office/word/word-review-controls.doc",
+        "test-data/microsoft-office/word/word-glossary.dot"
+      ]
+    },
+    {
+      "id": "doc-024",
+      "format": "doc",
+      "owner": "litchi-doc",
+      "source_matrix": "crates/litchi-doc/docs/FEATURE_MATRIX.md",
+      "family": "Word binary",
+      "feature": "Custom XML data storage",
+      "scope": "Custom XML data storage",
+      "library_status": "supported",
+      "matrix_status": "✅",
+      "fixture_status_before_audit": "pending",
+      "category": "observed_native_ui_limitation",
+      "rationale": "The finalized native Word binary DOC corpus does not contain a custom XML data-store artifact, and no deterministic current Word-for-Mac route for authoring one in a DOC was observed. The cited DOCX customXml bibliography part is a separate package-format boundary and must not be promoted to DOC evidence.",
+      "evidence_refs": [
+        "test-data/microsoft-office/word/word-math-navigation.docx",
+        "root_ui_observation://Word-Mac/no-Word-binary-Custom-XML-authoring"
+      ],
+      "next_action": "Only close with a native Word binary DOC that visibly and structurally preserves a custom XML store; keep DOCX customXml evidence separate."
+    },
+    {
+      "id": "doc-025",
+      "format": "doc",
+      "owner": "litchi-doc",
+      "source_matrix": "crates/litchi-doc/docs/FEATURE_MATRIX.md",
+      "family": "Word binary",
+      "feature": "Summary and document-summary property streams",
+      "scope": "Summary and document-summary property streams",
+      "library_status": "supported",
+      "matrix_status": "✅",
+      "fixture_status_before_audit": "pending",
+      "category": "native_fixture_evidence_available",
+      "rationale": "Native DOC summary/document-summary property streams are present in the authored DOC corpus; exact property values are fixture-specific and do not establish all versioned property fields.",
+      "evidence_refs": [
+        "test-data/microsoft-office/word/word-text-structure.doc",
+        "test-data/microsoft-office/word/word-glossary.dot"
+      ]
+    },
+    {
+      "id": "doc-026",
+      "format": "doc",
+      "owner": "litchi-doc",
+      "source_matrix": "crates/litchi-doc/docs/FEATURE_MATRIX.md",
+      "family": "Word binary",
+      "feature": "Reserved user-defined hyperlink metadata",
+      "scope": "Reserved user-defined hyperlink metadata",
+      "library_status": "supported",
+      "matrix_status": "✅",
+      "fixture_status_before_audit": "pending",
+      "category": "native_fixture_evidence_available",
+      "rationale": "Native text/review DOC and DOCX fixtures contain user-authored hyperlinks and relationship targets, which bounds the reserved user-link metadata surface; inert target resolution is not claimed.",
+      "evidence_refs": [
+        "test-data/microsoft-office/word/word-text-structure.doc",
+        "test-data/microsoft-office/word/word-review-controls.docx"
+      ]
+    },
+    {
+      "id": "doc-027",
+      "format": "doc",
+      "owner": "litchi-doc",
+      "source_matrix": "crates/litchi-doc/docs/FEATURE_MATRIX.md",
+      "family": "Word binary",
+      "feature": "Encryption stream and password-to-open profiles",
+      "scope": "Encryption stream and password-to-open profiles",
+      "library_status": "supported",
+      "matrix_status": "✅",
+      "fixture_status_before_audit": "pending",
+      "category": "external_handoff",
+      "rationale": "Password-to-open encryption requires a human-supplied password handoff. The current encrypted candidate remains plaintext until that handoff is completed.",
+      "evidence_refs": [
+        "test-data/microsoft-office/word/word-encrypted.docx"
+      ],
+      "next_action": "Complete the password handoff, then save/reopen native encrypted DOC and DOCX variants."
+    },
+    {
+      "id": "doc-028",
+      "format": "doc",
+      "owner": "litchi-doc",
+      "source_matrix": "crates/litchi-doc/docs/FEATURE_MATRIX.md",
+      "family": "Word binary",
+      "feature": "XML signatures storage and signatures stream",
+      "scope": "XML signatures storage and signatures stream",
+      "library_status": "supported",
+      "matrix_status": "✅",
+      "fixture_status_before_audit": "pending",
+      "category": "external_handoff",
+      "rationale": "XML signatures require a real certificate and signing identity; a local native fixture cannot establish signature validity without that external trust context.",
+      "evidence_refs": [],
+      "next_action": "Use a user-approved certificate handoff and preserve the signature/trust metadata separately."
+    },
+    {
+      "id": "doc-031",
+      "format": "doc",
+      "owner": "litchi-doc",
+      "source_matrix": "crates/litchi-doc/docs/FEATURE_MATRIX.md",
+      "family": "Word binary",
+      "feature": "Information Rights Management Data Space and protected content",
+      "scope": "Information Rights Management Data Space and protected content",
+      "library_status": "partial",
+      "matrix_status": "🟡",
+      "fixture_status_before_audit": "pending",
+      "category": "observed_native_ui_limitation",
+      "rationale": "IRM/protected-content authoring requires rights-management services and account policy that are unavailable in the current local workflow; do not infer universal product absence.",
+      "evidence_refs": [
+        "root_ui_observation://Word-Mac/no-local-IRM-route"
+      ]
+    },
+    {
+      "id": "doc-032",
+      "format": "doc",
+      "owner": "litchi-doc",
+      "source_matrix": "crates/litchi-doc/docs/FEATURE_MATRIX.md",
+      "family": "Word binary",
+      "feature": "Unknown streams and storages",
+      "scope": "Unknown streams and storages",
+      "library_status": "partial",
+      "matrix_status": "🟡",
+      "fixture_status_before_audit": "pending",
+      "category": "observed_native_ui_limitation",
+      "rationale": "Arbitrary unknown CFB streams/storages are not a user-authored Word feature with a deterministic native command; ordinary CFB preservation is covered elsewhere, not this exact generic boundary.",
+      "evidence_refs": [
+        "root_ui_observation://Word-Mac/no-arbitrary-unknown-storage-authoring"
+      ]
+    },
+    {
+      "id": "doc-033",
+      "format": "doc",
+      "owner": "litchi-doc",
+      "source_matrix": "crates/litchi-doc/docs/FEATURE_MATRIX.md",
+      "family": "Word binary",
+      "feature": "CP, PLC, STTB, SPRM/PRL, and property storage primitives",
+      "scope": "CP, PLC, STTB, SPRM/PRL, and property storage primitives",
+      "library_status": "supported",
+      "matrix_status": "✅",
+      "fixture_status_before_audit": "pending",
+      "category": "native_fixture_evidence_available",
+      "rationale": "Every native Word97 DOC artifact supplies real CP/PLC/STTB/SPRM/PRL property-storage structures through ordinary Word-authored stories; the fixture set does not enumerate every primitive variant.",
+      "evidence_refs": [
+        "test-data/microsoft-office/word/word-text-structure.doc",
+        "test-data/microsoft-office/word/word-review-controls.doc",
+        "test-data/microsoft-office/word/word-tables-layout.doc"
+      ]
+    },
+    {
+      "id": "doc-034",
+      "format": "doc",
+      "owner": "litchi-doc",
+      "source_matrix": "crates/litchi-doc/docs/FEATURE_MATRIX.md",
+      "family": "Word binary",
+      "feature": "Piece table, compressed/uncompressed Unicode text, FKPs, BTEs, and BinTable",
+      "scope": "Piece table, compressed/uncompressed Unicode text, FKPs, BTEs, and BinTable",
+      "library_status": "supported",
+      "matrix_status": "✅",
+      "fixture_status_before_audit": "pending",
+      "category": "native_fixture_evidence_available",
+      "rationale": "The native Word97 corpus contains piece-table Unicode/compressed text and FKP/BTE/BinTable structures; this is a bounded read-path baseline across ordinary authored DOCs.",
+      "evidence_refs": [
+        "test-data/microsoft-office/word/word-text-structure.doc",
+        "test-data/microsoft-office/word/word-tables-layout.doc",
+        "test-data/microsoft-office/word/word-review-controls.doc"
+      ]
+    },
+    {
+      "id": "doc-035",
+      "format": "doc",
+      "owner": "litchi-doc",
+      "source_matrix": "crates/litchi-doc/docs/FEATURE_MATRIX.md",
+      "family": "Word binary",
+      "feature": "Main, footnote, endnote, header, comment, textbox, and header-textbox parts",
+      "scope": "Main, footnote, endnote, header, comment, textbox, and header-textbox parts",
+      "library_status": "supported",
+      "matrix_status": "✅",
+      "fixture_status_before_audit": "pending",
+      "category": "native_fixture_evidence_available",
+      "rationale": "Native DOC fixtures visibly and structurally contain main, footnote/endnote, header/footer, comment and textbox stories across text, tables, review and visual-object documents; coverage is bounded to those authored stories.",
+      "evidence_refs": [
+        "test-data/microsoft-office/word/word-text-structure.doc",
+        "test-data/microsoft-office/word/word-tables-layout.doc",
+        "test-data/microsoft-office/word/word-review-controls.doc",
+        "test-data/microsoft-office/word/word-visual-objects.doc"
+      ]
+    },
+    {
+      "id": "doc-036",
+      "format": "doc",
+      "owner": "litchi-doc",
+      "source_matrix": "crates/litchi-doc/docs/FEATURE_MATRIX.md",
+      "family": "Word binary",
+      "feature": "Bookmark PLCs and names",
+      "scope": "Bookmark PLCs and names",
+      "library_status": "supported",
+      "matrix_status": "✅",
+      "fixture_status_before_audit": "pending",
+      "category": "native_fixture_evidence_available",
+      "rationale": "Native review and math-navigation DOC fixtures contain named bookmarks and bookmark ranges used by fields/navigation; this does not claim every bookmark PLC encoding.",
+      "evidence_refs": [
+        "test-data/microsoft-office/word/word-review-controls.doc",
+        "test-data/microsoft-office/word/word-math-navigation.doc"
+      ]
+    },
+    {
+      "id": "doc-037",
+      "format": "doc",
+      "owner": "litchi-doc",
+      "source_matrix": "crates/litchi-doc/docs/FEATURE_MATRIX.md",
+      "family": "Word binary",
+      "feature": "Field PLCs and non-Plcfld text-only fields",
+      "scope": "Field PLCs and non-Plcfld text-only fields",
+      "library_status": "supported",
+      "matrix_status": "✅",
+      "fixture_status_before_audit": "pending",
+      "category": "native_fixture_evidence_available",
+      "rationale": "Native review, math-navigation and mail-merge DOC fixtures contain fields and text-only field forms; the evidence is bounded to those field families and cached results.",
+      "evidence_refs": [
+        "test-data/microsoft-office/word/word-review-controls.doc",
+        "test-data/microsoft-office/word/word-math-navigation.doc",
+        "test-data/microsoft-office/word/word-mailmerge-fields.doc"
+      ]
+    },
+    {
+      "id": "doc-039",
+      "format": "doc",
+      "owner": "litchi-doc",
+      "source_matrix": "crates/litchi-doc/docs/FEATURE_MATRIX.md",
+      "family": "Word binary",
+      "feature": "Tables, nested tables, cell/row marks, merges, and TAP properties",
+      "scope": "Tables, nested tables, cell/row marks, merges, and TAP properties",
+      "library_status": "supported",
+      "matrix_status": "✅",
+      "fixture_status_before_audit": "pending",
+      "category": "native_fixture_evidence_available",
+      "rationale": "The native tables-layout DOC contains authored tables including nested/merged cells and row/cell properties; this is the exact bounded table cluster, not every TAP combination.",
+      "evidence_refs": [
+        "test-data/microsoft-office/word/word-tables-layout.doc",
+        "test-data/microsoft-office/word/tables-layout-inspection.json"
+      ]
+    },
+    {
+      "id": "doc-040",
+      "format": "doc",
+      "owner": "litchi-doc",
+      "source_matrix": "crates/litchi-doc/docs/FEATURE_MATRIX.md",
+      "family": "Word binary",
+      "feature": "Character, paragraph, table, section, and picture SPRM families",
+      "scope": "Character, paragraph, table, section, and picture SPRM families",
+      "library_status": "supported",
+      "matrix_status": "✅",
+      "fixture_status_before_audit": "pending",
+      "category": "native_fixture_evidence_available",
+      "rationale": "Native text, tables-layout and visual-object DOCs exercise character/paragraph/table/section/picture formatting properties; the matrix family remains broader than these examples.",
+      "evidence_refs": [
+        "test-data/microsoft-office/word/word-text-structure.doc",
+        "test-data/microsoft-office/word/word-tables-layout.doc",
+        "test-data/microsoft-office/word/word-visual-objects.doc"
+      ]
+    },
+    {
+      "id": "doc-041",
+      "format": "doc",
+      "owner": "litchi-doc",
+      "source_matrix": "crates/litchi-doc/docs/FEATURE_MATRIX.md",
+      "family": "Word binary",
+      "feature": "Stylesheet, list templates, list overrides, names, and numbering",
+      "scope": "Stylesheet, list templates, list overrides, names, and numbering",
+      "library_status": "supported",
+      "matrix_status": "✅",
+      "fixture_status_before_audit": "pending",
+      "category": "native_fixture_evidence_available",
+      "rationale": "Native text, tables-layout, math-navigation and glossary DOC/DOT fixtures contain styles, list templates/overrides and numbering; exact list/style combinations remain fixture-bounded.",
+      "evidence_refs": [
+        "test-data/microsoft-office/word/word-text-structure.doc",
+        "test-data/microsoft-office/word/word-tables-layout.doc",
+        "test-data/microsoft-office/word/word-math-navigation.doc",
+        "test-data/microsoft-office/word/word-glossary.dot"
+      ]
+    },
+    {
+      "id": "doc-042",
+      "format": "doc",
+      "owner": "litchi-doc",
+      "source_matrix": "crates/litchi-doc/docs/FEATURE_MATRIX.md",
+      "family": "Word binary",
+      "feature": "Section layout, columns, borders, page/line numbering, and note placement",
+      "scope": "Section layout, columns, borders, page/line numbering, and note placement",
+      "library_status": "supported",
+      "matrix_status": "✅",
+      "fixture_status_before_audit": "pending",
+      "category": "native_fixture_evidence_available",
+      "rationale": "Native tables-layout DOC sections exercise layout, columns/borders, page and note placement; line numbering and every legacy section SPRM are not asserted from this cluster.",
+      "evidence_refs": [
+        "test-data/microsoft-office/word/word-tables-layout.doc",
+        "test-data/microsoft-office/word/tables-layout-inspection.json"
+      ]
+    },
+    {
+      "id": "doc-043",
+      "format": "doc",
+      "owner": "litchi-doc",
+      "source_matrix": "crates/litchi-doc/docs/FEATURE_MATRIX.md",
+      "family": "Word binary",
+      "feature": "PLRSID, saved-by, associated strings, proofing, grammar, and spelling PLCs",
+      "scope": "PLRSID, saved-by, associated strings, proofing, grammar, and spelling PLCs",
+      "library_status": "supported",
+      "matrix_status": "✅",
+      "fixture_status_before_audit": "pending",
+      "category": "native_fixture_evidence_available",
+      "rationale": "Native DOC metadata/settings and Word-authored proofing state are present across the text, review and tables fixtures; this is bounded observable metadata and not a claim that every proofing PLC is populated.",
+      "evidence_refs": [
+        "test-data/microsoft-office/word/word-text-structure.doc",
+        "test-data/microsoft-office/word/word-review-controls.doc",
+        "test-data/microsoft-office/word/word-tables-layout.doc"
+      ]
+    },
+    {
+      "id": "doc-044",
+      "format": "doc",
+      "owner": "litchi-doc",
+      "source_matrix": "crates/litchi-doc/docs/FEATURE_MATRIX.md",
+      "family": "Word binary",
+      "feature": "Auto-summary (Asumyi and PlcfAsumy)",
+      "scope": "Auto-summary (Asumyi and PlcfAsumy)",
+      "library_status": "supported",
+      "matrix_status": "✅",
+      "fixture_status_before_audit": "pending",
+      "category": "observed_native_ui_limitation",
+      "rationale": "Auto-summary records are a deprecated/internal Word feature. No stable current Word-for-Mac authoring control was observed.",
+      "evidence_refs": [
+        "root_ui_observation://Word-Mac/no-AutoSummary-authoring"
+      ]
+    },
+    {
+      "id": "doc-045",
+      "format": "doc",
+      "owner": "litchi-doc",
+      "source_matrix": "crates/litchi-doc/docs/FEATURE_MATRIX.md",
+      "family": "Word binary",
+      "feature": "Captions and AutoCaption tables",
+      "scope": "Captions and AutoCaption tables",
+      "library_status": "supported",
+      "matrix_status": "✅",
+      "fixture_status_before_audit": "pending",
+      "category": "genuinely_missing_authorable_family",
+      "rationale": "No finalized Word corpus file contains an explicitly authored Caption/AutoCaption table. Word Insert Caption/AutoCaption is a concrete native authoring path worth a small picture/table-caption DOC and DOCX pair.",
+      "evidence_refs": [],
+      "next_action": "Author one picture/table with Insert Caption plus an AutoCaption rule if the current Word UI exposes it."
+    },
+    {
+      "id": "doc-046",
+      "format": "doc",
+      "owner": "litchi-doc",
+      "source_matrix": "crates/litchi-doc/docs/FEATURE_MATRIX.md",
+      "family": "Word binary",
+      "feature": "Smart tags and factoids (Plcffactoid, property bags, and related STTBs)",
+      "scope": "Smart tags and factoids (Plcffactoid, property bags, and related STTBs)",
+      "library_status": "supported",
+      "matrix_status": "✅",
+      "fixture_status_before_audit": "pending",
+      "category": "observed_native_ui_limitation",
+      "rationale": "Smart-tag/factoid property bags depend on retired recognition/integration features; no deterministic current Word authoring route was observed.",
+      "evidence_refs": [
+        "root_ui_observation://Word-Mac/no-smart-tag-authoring"
+      ]
+    },
+    {
+      "id": "doc-047",
+      "format": "doc",
+      "owner": "litchi-doc",
+      "source_matrix": "crates/litchi-doc/docs/FEATURE_MATRIX.md",
+      "family": "Word binary",
+      "feature": "Master-document subdocuments (PlcfWKB, WKB, FNPI, SttbFnm)",
+      "scope": "Master-document subdocuments (PlcfWKB, WKB, FNPI, SttbFnm)",
+      "library_status": "partial",
+      "matrix_status": "🟡",
+      "fixture_status_before_audit": "pending",
+      "category": "genuinely_missing_authorable_family",
+      "rationale": "No finalized fixture demonstrates a Word master document with a linked subdocument. This is a concrete Word document-management family, but it needs a bounded native probe before broad closure.",
+      "evidence_refs": [],
+      "next_action": "If the current UI exposes Master Document/Insert Subdocument, author one master and one child document and record link behavior."
+    },
+    {
+      "id": "doc-048",
+      "format": "doc",
+      "owner": "litchi-doc",
+      "source_matrix": "crates/litchi-doc/docs/FEATURE_MATRIX.md",
+      "family": "Word binary",
+      "feature": "Revision marks, author tables, and property revisions",
+      "scope": "Revision marks, author tables, and property revisions",
+      "library_status": "supported",
+      "matrix_status": "✅",
+      "fixture_status_before_audit": "pending",
+      "category": "native_fixture_evidence_available",
+      "rationale": "Native review-controls DOC contains tracked insert/delete revisions, authors and revision properties; accept/reject execution is classified separately as an operation.",
+      "evidence_refs": [
+        "test-data/microsoft-office/word/word-review-controls.doc",
+        "test-data/microsoft-office/word/review-controls-inspection.json"
+      ]
+    },
+    {
+      "id": "doc-049",
+      "format": "doc",
+      "owner": "litchi-doc",
+      "source_matrix": "crates/litchi-doc/docs/FEATURE_MATRIX.md",
+      "family": "Word binary",
+      "feature": "Document variables, attached-template and web-export metadata",
+      "scope": "Document variables, attached-template and web-export metadata",
+      "library_status": "partial",
+      "matrix_status": "🟡",
+      "fixture_status_before_audit": "pending",
+      "category": "native_fixture_evidence_available",
+      "rationale": "Native glossary DOT/DOTX and converted DOC fixtures provide attached-template/document-variable-adjacent template evidence and native building-block storage; web-export and every variable variant are not claimed.",
+      "evidence_refs": [
+        "test-data/microsoft-office/word/word-glossary.dot",
+        "test-data/microsoft-office/word/word-glossary.dotx",
+        "test-data/microsoft-office/word/glossary-inspection.json"
+      ]
+    },
+    {
+      "id": "doc-052",
+      "format": "doc",
+      "owner": "litchi-doc",
+      "source_matrix": "crates/litchi-doc/docs/FEATURE_MATRIX.md",
+      "family": "Word binary",
+      "feature": "ActiveX/OCX control semantics",
+      "scope": "ActiveX/OCX control semantics",
+      "library_status": "partial",
+      "matrix_status": "🟡",
+      "fixture_status_before_audit": "pending",
+      "category": "observed_native_ui_limitation",
+      "rationale": "ActiveX/OCX control semantics are Windows/COM integration features; current Word-for-Mac did not expose a controlled authoring route. This is a platform-boundary observation, not a universal format claim.",
+      "evidence_refs": [
+        "root_ui_observation://Word-Mac/no-ActiveX-authoring"
+      ]
+    },
+    {
+      "id": "doc-054",
+      "format": "doc",
+      "owner": "litchi-doc",
+      "source_matrix": "crates/litchi-doc/docs/FEATURE_MATRIX.md",
+      "family": "Word binary",
+      "feature": "Document statistics and DOP version metadata",
+      "scope": "Document statistics and DOP version metadata",
+      "library_status": "supported",
+      "matrix_status": "✅",
+      "fixture_status_before_audit": "pending",
+      "category": "native_fixture_evidence_available",
+      "rationale": "Native DOC files carry document statistics and DOP/version metadata observable through the Word97 package; exact statistic values are fixture-specific.",
+      "evidence_refs": [
+        "test-data/microsoft-office/word/word-text-structure.doc",
+        "test-data/microsoft-office/word/word-tables-layout.doc"
+      ]
+    },
+    {
+      "id": "doc-059",
+      "format": "doc",
+      "owner": "litchi-doc",
+      "source_matrix": "crates/litchi-doc/docs/FEATURE_MATRIX.md",
+      "family": "Word binary",
+      "feature": "MathType/MTEF Equation.3 objects",
+      "scope": "MathType/MTEF Equation.3 objects",
+      "library_status": "supported",
+      "matrix_status": "✅",
+      "fixture_status_before_audit": "pending",
+      "category": "native_fixture_evidence_available",
+      "rationale": "Native math-navigation DOC includes the authored legacy Equation.3/MathType-compatible object fallback alongside OMML; this bounds legacy object presence and does not claim full MTEF semantics.",
+      "evidence_refs": [
+        "test-data/microsoft-office/word/word-math-navigation.doc",
+        "test-data/microsoft-office/word/math-navigation-inspection.json"
+      ]
+    },
+    {
+      "id": "doc-062",
+      "format": "doc",
+      "owner": "litchi-doc",
+      "source_matrix": "crates/litchi-doc/docs/FEATURE_MATRIX.md",
+      "family": "Word binary",
+      "feature": "Command bars, keymaps, menus, toolbars, and UI customizations",
+      "scope": "Command bars, keymaps, menus, toolbars, and UI customizations",
+      "library_status": "partial",
+      "matrix_status": "🟡",
+      "fixture_status_before_audit": "pending",
+      "category": "observed_native_ui_limitation",
+      "rationale": "Command bars, keymaps, menus and toolbar customizations are application UI state rather than stable document content; no current Mac Word document-authoring route was observed.",
+      "evidence_refs": [
+        "root_ui_observation://Word-Mac/no-command-bar-storage-route"
+      ]
+    },
+    {
+      "id": "doc-063",
+      "format": "doc",
+      "owner": "litchi-doc",
+      "source_matrix": "crates/litchi-doc/docs/FEATURE_MATRIX.md",
+      "family": "Word binary",
+      "feature": "Routing slips and route-slip protection",
+      "scope": "Routing slips and route-slip protection",
+      "library_status": "partial",
+      "matrix_status": "🟡",
+      "fixture_status_before_audit": "pending",
+      "category": "observed_native_ui_limitation",
+      "rationale": "Routing slips and route-slip protection require legacy workflow/integration services; no deterministic current local Word route was observed.",
+      "evidence_refs": [
+        "root_ui_observation://Word-Mac/no-routing-slip-authoring"
+      ]
+    },
+    {
+      "id": "doc-068",
+      "format": "doc",
+      "owner": "litchi-doc",
+      "source_matrix": "crates/litchi-doc/docs/FEATURE_MATRIX.md",
+      "family": "Word binary",
+      "feature": "Complete later-version Word binary behavior",
+      "scope": "Complete later-version Word binary behavior",
+      "library_status": "partial",
+      "matrix_status": "🟡",
+      "fixture_status_before_audit": "pending",
+      "category": "operation_only_semantics",
+      "rationale": "“Complete later-version Word binary behavior” is a broad library compatibility claim. The native DOC corpus supplies bounded Word97 stories, but no finite fixture can prove completeness across all later-version binary records.",
+      "evidence_refs": [
+        "test-data/microsoft-office/word/word-text-structure.doc",
+        "test-data/microsoft-office/word/word-tables-layout.doc"
+      ],
+      "next_action": "Use targeted native fixtures for individual records rather than closing this umbrella row."
+    },
+    {
+      "id": "docx-070",
+      "format": "docx",
+      "owner": "litchi-docx",
+      "source_matrix": "crates/litchi-docx/docs/FEATURE_MATRIX.md",
+      "family": "WordprocessingML",
+      "feature": "Transitional and Strict package forms",
+      "scope": "Transitional and Strict package forms",
+      "library_status": "supported",
+      "matrix_status": "✅",
+      "fixture_status_before_audit": "pending",
+      "category": "observed_native_ui_limitation",
+      "rationale": "Native Transitional DOCX/DOTX is present, but a fresh Word-for-Mac UI probe did not expose a Strict Save As route. This is an observed local UI limitation; it does not claim Word on every platform cannot emit Strict.",
+      "evidence_refs": [
+        "test-data/microsoft-office/word/word-text-structure.docx",
+        "test-data/microsoft-office/word/word-glossary.dotx",
+        "root_ui_observation://Word-Mac/Strict-Save-As-not-exposed"
+      ],
+      "next_action": "Leave Strict pending unless a controlled Office build provides a native Strict save route."
+    },
+    {
+      "id": "docx-071",
+      "format": "docx",
+      "owner": "litchi-docx",
+      "source_matrix": "crates/litchi-docx/docs/FEATURE_MATRIX.md",
+      "family": "WordprocessingML",
+      "feature": "Markup Compatibility (mc:Ignorable, AlternateContent)",
+      "scope": "Markup Compatibility (mc:Ignorable, AlternateContent)",
+      "library_status": "partial",
+      "matrix_status": "🟡",
+      "fixture_status_before_audit": "pending",
+      "category": "native_fixture_evidence_available",
+      "rationale": "Native Word DOCX fixtures contain mc:Ignorable and AlternateContent, including vector/diagram content; this verifies the observed MCE package subset only.",
+      "evidence_refs": [
+        "test-data/microsoft-office/word/word-vector-diagram.docx",
+        "test-data/microsoft-office/word/vector-diagram-inspection.json"
+      ]
+    },
+    {
+      "id": "docx-072",
+      "format": "docx",
+      "owner": "litchi-docx",
+      "source_matrix": "crates/litchi-docx/docs/FEATURE_MATRIX.md",
+      "family": "WordprocessingML",
+      "feature": "Main document, settings, styles, numbering, theme, font table, comments, notes, headers, footers, glossary, and properties parts",
+      "scope": "Main document, settings, styles, numbering, theme, font table, comments, notes, headers, footers, glossary, and properties parts",
+      "library_status": "supported",
+      "matrix_status": "✅",
+      "fixture_status_before_audit": "pending",
+      "category": "native_fixture_evidence_available",
+      "rationale": "The native Word corpus covers main/settings/styles/numbering/theme/fontTable/comments/notes/headers/footers/properties across text, tables, review, math and visual fixtures; glossary-inspection.json proves a real DOTX glossary part, while converted word-glossary.docx explicitly loses that glossary part.",
+      "evidence_refs": [
+        "test-data/microsoft-office/word/word-text-structure.docx",
+        "test-data/microsoft-office/word/word-tables-layout.docx",
+        "test-data/microsoft-office/word/word-review-controls.docx",
+        "test-data/microsoft-office/word/word-math-navigation.dotx",
+        "test-data/microsoft-office/word/word-glossary.dotx",
+        "test-data/microsoft-office/word/word-glossary.docx",
+        "test-data/microsoft-office/word/glossary-inspection.json"
+      ]
+    },
+    {
+      "id": "docx-073",
+      "format": "docx",
+      "owner": "litchi-docx",
+      "source_matrix": "crates/litchi-docx/docs/FEATURE_MATRIX.md",
+      "family": "WordprocessingML",
+      "feature": "Main-document source-preserving transactions",
+      "scope": "Main-document source-preserving transactions",
+      "library_status": "partial",
+      "matrix_status": "🟡",
+      "fixture_status_before_audit": "pending",
+      "category": "operation_only_semantics",
+      "rationale": "Source-preserving transactions describe library mutation/round-trip behavior, not a stable native Word-authored feature; native fixtures can be inputs but cannot close this operation row.",
+      "evidence_refs": [],
+      "next_action": "Retain dedicated library transaction tests for this row."
+    },
+    {
+      "id": "docx-074",
+      "format": "docx",
+      "owner": "litchi-docx",
+      "source_matrix": "crates/litchi-docx/docs/FEATURE_MATRIX.md",
+      "family": "WordprocessingML",
+      "feature": "Cross-story hyperlink batches",
+      "scope": "Cross-story hyperlink batches",
+      "library_status": "supported",
+      "matrix_status": "✅",
+      "fixture_status_before_audit": "pending",
+      "category": "operation_only_semantics",
+      "rationale": "Cross-story hyperlink batching is a library operation over multiple stories; native files show individual links but cannot prove the batch transaction semantics.",
+      "evidence_refs": [
+        "test-data/microsoft-office/word/word-text-structure.docx",
+        "test-data/microsoft-office/word/word-review-controls.docx"
+      ],
+      "next_action": "Keep operation tests separate from fixture coverage."
+    },
+    {
+      "id": "docx-075",
+      "format": "docx",
+      "owner": "litchi-docx",
+      "source_matrix": "crates/litchi-docx/docs/FEATURE_MATRIX.md",
+      "family": "WordprocessingML",
+      "feature": "Source-backed secondary-story text",
+      "scope": "Source-backed secondary-story text",
+      "library_status": "partial",
+      "matrix_status": "🟡",
+      "fixture_status_before_audit": "pending",
+      "category": "operation_only_semantics",
+      "rationale": "Source-backed secondary-story text is an API projection/transaction concern. Native headers, footers, notes and comments provide inputs but do not prove the projection algorithm.",
+      "evidence_refs": [
+        "test-data/microsoft-office/word/word-tables-layout.docx",
+        "test-data/microsoft-office/word/word-review-controls.docx"
+      ],
+      "next_action": "Keep source-backed story tests as the oracle."
+    },
+    {
+      "id": "docx-076",
+      "format": "docx",
+      "owner": "litchi-docx",
+      "source_matrix": "crates/litchi-docx/docs/FEATURE_MATRIX.md",
+      "family": "WordprocessingML",
+      "feature": "Ordered paragraph and run content projection",
+      "scope": "Ordered paragraph and run content projection",
+      "library_status": "partial",
+      "matrix_status": "🟡",
+      "fixture_status_before_audit": "pending",
+      "category": "operation_only_semantics",
+      "rationale": "Ordered paragraph/run content projection is a library traversal contract. Native authored paragraphs/runs are useful inputs but cannot close the ordering operation row.",
+      "evidence_refs": [
+        "test-data/microsoft-office/word/word-text-structure.docx",
+        "test-data/microsoft-office/word/word-tables-layout.docx"
+      ],
+      "next_action": "Keep traversal tests independent of native fixture status."
+    },
+    {
+      "id": "docx-078",
+      "format": "docx",
+      "owner": "litchi-docx",
+      "source_matrix": "crates/litchi-docx/docs/FEATURE_MATRIX.md",
+      "family": "WordprocessingML",
+      "feature": "stylesWithEffects part",
+      "scope": "stylesWithEffects part",
+      "library_status": "partial",
+      "matrix_status": "🟡",
+      "fixture_status_before_audit": "pending",
+      "category": "observed_native_ui_limitation",
+      "rationale": "A deterministic corpus scan found no stylesWithEffects part, and the current Word-for-Mac UI exposed no controlled authoring route for that separate part. This does not prove the part is impossible on other Office builds.",
+      "evidence_refs": [
+        "root_scan://word-docx/no-stylesWithEffects-part",
+        "root_ui_observation://Word-Mac/no-stylesWithEffects-authoring"
+      ]
+    },
+    {
+      "id": "docx-084",
+      "format": "docx",
+      "owner": "litchi-docx",
+      "source_matrix": "crates/litchi-docx/docs/FEATURE_MATRIX.md",
+      "family": "WordprocessingML",
+      "feature": "Digital signatures",
+      "scope": "Digital signatures",
+      "library_status": "supported",
+      "matrix_status": "✅",
+      "fixture_status_before_audit": "pending",
+      "category": "external_handoff",
+      "rationale": "Digital signatures require a real certificate/signing identity and trust context; native Word fixture creation is blocked on that external handoff.",
+      "evidence_refs": [],
+      "next_action": "Obtain a user-approved certificate handoff before creating and reopening signed DOCX/DOCM variants."
+    },
+    {
+      "id": "docx-085",
+      "format": "docx",
+      "owner": "litchi-docx",
+      "source_matrix": "crates/litchi-docx/docs/FEATURE_MATRIX.md",
+      "family": "WordprocessingML",
+      "feature": "Password encryption",
+      "scope": "Password encryption",
+      "library_status": "supported",
+      "matrix_status": "✅",
+      "fixture_status_before_audit": "pending",
+      "category": "external_handoff",
+      "rationale": "Password encryption requires a human-supplied password handoff. The current word-encrypted.docx candidate is plaintext and therefore does not verify encryption.",
+      "evidence_refs": [
+        "test-data/microsoft-office/word/word-encrypted.docx"
+      ],
+      "next_action": "Complete password handoff, then save/reopen a native encrypted DOCX."
+    },
+    {
+      "id": "docx-086",
+      "format": "docx",
+      "owner": "litchi-docx",
+      "source_matrix": "crates/litchi-docx/docs/FEATURE_MATRIX.md",
+      "family": "WordprocessingML",
+      "feature": "Information Rights Management and protected content",
+      "scope": "Information Rights Management and protected content",
+      "library_status": "partial",
+      "matrix_status": "🟡",
+      "fixture_status_before_audit": "pending",
+      "category": "observed_native_ui_limitation",
+      "rationale": "IRM/protected-content authoring requires rights-management services/account policy absent from the current local workflow; this is a bounded environment limitation.",
+      "evidence_refs": [
+        "root_ui_observation://Word-Mac/no-local-IRM-route"
+      ]
+    },
+    {
+      "id": "docx-088",
+      "format": "docx",
+      "owner": "litchi-docx",
+      "source_matrix": "crates/litchi-docx/docs/FEATURE_MATRIX.md",
+      "family": "WordprocessingML",
+      "feature": "Web extensions and Office Add-ins",
+      "scope": "Web extensions and Office Add-ins",
+      "library_status": "partial",
+      "matrix_status": "🟡",
+      "fixture_status_before_audit": "pending",
+      "category": "observed_native_ui_limitation",
+      "rationale": "No local native Word UI route or authored add-in/web-extension package is available in the finalized corpus. Do not synthesize an Office Add-in fixture or infer universal absence.",
+      "evidence_refs": [
+        "root_ui_observation://Word-Mac/no-local-Office-Addin-authoring"
+      ]
+    },
+    {
+      "id": "docx-090",
+      "format": "docx",
+      "owner": "litchi-docx",
+      "source_matrix": "crates/litchi-docx/docs/FEATURE_MATRIX.md",
+      "family": "WordprocessingML",
+      "feature": "External relationships and linked content",
+      "scope": "External relationships and linked content",
+      "library_status": "partial",
+      "matrix_status": "🟡",
+      "fixture_status_before_audit": "pending",
+      "category": "native_fixture_evidence_available",
+      "rationale": "Native visual/text/review/mail-merge DOCX fixtures contain hyperlinks, media and external relationship records; the evidence is bounded to those targets and does not assert successful external retrieval.",
+      "evidence_refs": [
+        "test-data/microsoft-office/word/word-visual-objects.docx",
+        "test-data/microsoft-office/word/word-text-structure.docx",
+        "test-data/microsoft-office/word/word-mailmerge-fields.docx"
+      ]
+    },
+    {
+      "id": "docx-092",
+      "format": "docx",
+      "owner": "litchi-docx",
+      "source_matrix": "crates/litchi-docx/docs/FEATURE_MATRIX.md",
+      "family": "WordprocessingML",
+      "feature": "Modern comment reactions and extension lists",
+      "scope": "Modern comment reactions and extension lists",
+      "library_status": "supported",
+      "matrix_status": "✅",
+      "fixture_status_before_audit": "pending",
+      "category": "native_fixture_evidence_available",
+      "rationale": "Native review-controls DOCX contains comments, commentsExtended/commentsIds/commentsExtensible and people-related extension parts; no reaction payload is claimed beyond the observed extension lists.",
+      "evidence_refs": [
+        "test-data/microsoft-office/word/word-review-controls.docx",
+        "test-data/microsoft-office/word/review-controls-inspection.json"
+      ]
+    },
+    {
+      "id": "docx-093",
+      "format": "docx",
+      "owner": "litchi-docx",
+      "source_matrix": "crates/litchi-docx/docs/FEATURE_MATRIX.md",
+      "family": "WordprocessingML",
+      "feature": "rPr extension effects (glow, shadow, reflection, textOutline, textFill, scene3d, props3d)",
+      "scope": "rPr extension effects (glow, shadow, reflection, textOutline, textFill, scene3d, props3d)",
+      "library_status": "supported",
+      "matrix_status": "✅",
+      "fixture_status_before_audit": "pending",
+      "category": "native_fixture_evidence_available",
+      "rationale": "Native Word styles/settings contain observed w14 run-property extension content, including bounded effects metadata; the corpus does not prove every glow/shadow/reflection/3-D variant named by the matrix.",
+      "evidence_refs": [
+        "test-data/microsoft-office/word/word-text-structure.docx",
+        "test-data/microsoft-office/word/word-vector-diagram.docx"
+      ]
+    },
+    {
+      "id": "docx-094",
+      "format": "docx",
+      "owner": "litchi-docx",
+      "source_matrix": "crates/litchi-docx/docs/FEATURE_MATRIX.md",
+      "family": "WordprocessingML",
+      "feature": "rPr OpenType extensions (ligatures, numForm, numSpacing, stylisticSets, cntxtAlts)",
+      "scope": "rPr OpenType extensions (ligatures, numForm, numSpacing, stylisticSets, cntxtAlts)",
+      "library_status": "supported",
+      "matrix_status": "✅",
+      "fixture_status_before_audit": "pending",
+      "category": "native_fixture_evidence_available",
+      "rationale": "Native Word DOCX styles contain observed w14 OpenType extension metadata such as ligatures; full rendering/behavior for every OpenType option is outside the fixture evidence.",
+      "evidence_refs": [
+        "test-data/microsoft-office/word/word-text-structure.docx",
+        "test-data/microsoft-office/word/word-math-navigation.docx"
+      ]
+    },
+    {
+      "id": "docx-095",
+      "format": "docx",
+      "owner": "litchi-docx",
+      "source_matrix": "crates/litchi-docx/docs/FEATURE_MATRIX.md",
+      "family": "WordprocessingML",
+      "feature": "Settings extension elements (chartTrackingRefBased, docId, conflictMode, discardImageEditingData, defaultImageDpi)",
+      "scope": "Settings extension elements (chartTrackingRefBased, docId, conflictMode, discardImageEditingData, defaultImageDpi)",
+      "library_status": "supported",
+      "matrix_status": "✅",
+      "fixture_status_before_audit": "pending",
+      "category": "native_fixture_evidence_available",
+      "rationale": "Native settings.xml parts contain observed extension elements including document IDs and chart-tracking/default-image style metadata; this is a bounded package observation, not a complete extension inventory.",
+      "evidence_refs": [
+        "test-data/microsoft-office/word/word-text-structure.docx",
+        "test-data/microsoft-office/word/word-visual-objects.docx",
+        "test-data/microsoft-office/word/word-review-controls.docx"
+      ]
+    },
+    {
+      "id": "docx-096",
+      "format": "docx",
+      "owner": "litchi-docx",
+      "source_matrix": "crates/litchi-docx/docs/FEATURE_MATRIX.md",
+      "family": "WordprocessingML",
+      "feature": "Generic compatSetting records and compatibility mode",
+      "scope": "Generic compatSetting records and compatibility mode",
+      "library_status": "supported",
+      "matrix_status": "✅",
+      "fixture_status_before_audit": "pending",
+      "category": "native_fixture_evidence_available",
+      "rationale": "Native Word settings.xml parts carry compatSetting records and compatibility-mode metadata across the corpus; exact mode behavior remains fixture-bounded.",
+      "evidence_refs": [
+        "test-data/microsoft-office/word/word-text-structure.docx",
+        "test-data/microsoft-office/word/word-math-navigation.docx",
+        "test-data/microsoft-office/word/word-review-controls.docx"
+      ]
+    },
+    {
+      "id": "docx-097",
+      "format": "docx",
+      "owner": "litchi-docx",
+      "source_matrix": "crates/litchi-docx/docs/FEATURE_MATRIX.md",
+      "family": "WordprocessingML",
+      "feature": "SDT extension controls (entityPicker, checkbox, repeatingSection, repeatingSectionItem, appearance, color, dataBinding)",
+      "scope": "SDT extension controls (entityPicker, checkbox, repeatingSection, repeatingSectionItem, appearance, color, dataBinding)",
+      "library_status": "partial",
+      "matrix_status": "🟡",
+      "fixture_status_before_audit": "pending",
+      "category": "native_fixture_evidence_available",
+      "rationale": "Native math-navigation DOCX/DOTX contains one real core w:sdt/w:sdtPr/w:sdtContent TOC control. This verifies the bounded core SDT shape only; entityPicker, repeating-section, checkbox-extension and dataBinding variants are not claimed.",
+      "evidence_refs": [
+        "test-data/microsoft-office/word/word-math-navigation.docx",
+        "test-data/microsoft-office/word/word-math-navigation.dotx",
+        "test-data/microsoft-office/word/math-navigation-inspection.json"
+      ]
+    },
+    {
+      "id": "docx-098",
+      "format": "docx",
+      "owner": "litchi-docx",
+      "source_matrix": "crates/litchi-docx/docs/FEATURE_MATRIX.md",
+      "family": "WordprocessingML",
+      "feature": "SDT web-extension links (webExtensionsLinked, webExtensionCreated)",
+      "scope": "SDT web-extension links (webExtensionsLinked, webExtensionCreated)",
+      "library_status": "partial",
+      "matrix_status": "🟡",
+      "fixture_status_before_audit": "pending",
+      "category": "observed_native_ui_limitation",
+      "rationale": "No Word-for-Mac authoring route was observed for SDT web-extension links, and no authored web-extension package is in the corpus; this is a bounded UI observation.",
+      "evidence_refs": [
+        "root_ui_observation://Word-Mac/no-SDT-web-extension-route"
+      ]
+    },
+    {
+      "id": "docx-099",
+      "format": "docx",
+      "owner": "litchi-docx",
+      "source_matrix": "crates/litchi-docx/docs/FEATURE_MATRIX.md",
+      "family": "WordprocessingML",
+      "feature": "Paragraph and table-row extension identifiers (paraId, textId) and paragraph noSpellErr",
+      "scope": "Paragraph and table-row extension identifiers (paraId, textId) and paragraph noSpellErr",
+      "library_status": "supported",
+      "matrix_status": "✅",
+      "fixture_status_before_audit": "pending",
+      "category": "native_fixture_evidence_available",
+      "rationale": "Native Word DOCX paragraphs contain w14:paraId and w14:textId identifiers; the corpus provides bounded identifier evidence and does not assert every noSpellErr placement.",
+      "evidence_refs": [
+        "test-data/microsoft-office/word/word-text-structure.docx",
+        "test-data/microsoft-office/word/word-review-controls.docx",
+        "test-data/microsoft-office/word/word-vector-diagram.docx"
+      ]
+    },
+    {
+      "id": "docx-100",
+      "format": "docx",
+      "owner": "litchi-docx",
+      "source_matrix": "crates/litchi-docx/docs/FEATURE_MATRIX.md",
+      "family": "WordprocessingML",
+      "feature": "W14 conflict revision markup (conflictIns, conflictDel, and custom XML conflict ranges)",
+      "scope": "W14 conflict revision markup (conflictIns, conflictDel, and custom XML conflict ranges)",
+      "library_status": "partial",
+      "matrix_status": "🟡",
+      "fixture_status_before_audit": "pending",
+      "category": "observed_native_ui_limitation",
+      "rationale": "A deterministic scan found no w14 conflictIns/conflictDel content, and no native Word command for authoring conflict markup was observed. This does not claim that other Office conflict workflows cannot emit it.",
+      "evidence_refs": [
+        "root_scan://word-docx/no-conflictIns-conflictDel",
+        "root_ui_observation://Word-Mac/no-conflict-markup-authoring"
+      ]
+    },
+    {
+      "id": "docx-101",
+      "format": "docx",
+      "owner": "litchi-docx",
+      "source_matrix": "crates/litchi-docx/docs/FEATURE_MATRIX.md",
+      "family": "WordprocessingML",
+      "feature": "anchorId on object and pict",
+      "scope": "anchorId on object and pict",
+      "library_status": "supported",
+      "matrix_status": "✅",
+      "fixture_status_before_audit": "pending",
+      "category": "native_fixture_evidence_available",
+      "rationale": "Native visual-objects DOCX contains w14:anchorId on authored drawing objects; this is direct bounded anchor evidence.",
+      "evidence_refs": [
+        "test-data/microsoft-office/word/word-visual-objects.docx",
+        "test-data/microsoft-office/word/visual-objects-inspection.json"
+      ]
+    },
+    {
+      "id": "docx-102",
+      "format": "docx",
+      "owner": "litchi-docx",
+      "source_matrix": "crates/litchi-docx/docs/FEATURE_MATRIX.md",
+      "family": "WordprocessingML",
+      "feature": "Um Al-Qura umalqura calendar extension",
+      "scope": "Um Al-Qura umalqura calendar extension",
+      "library_status": "supported",
+      "matrix_status": "✅",
+      "fixture_status_before_audit": "pending",
+      "category": "observed_native_ui_limitation",
+      "rationale": "No w:calendar=umalqura element was found in the finalized corpus and no deterministic local Word UI route for selecting this specialized calendar extension was observed; do not infer universal product absence.",
+      "evidence_refs": [
+        "root_scan://word-docx/no-umalqura",
+        "root_ui_observation://Word-Mac/no-Um-Al-Qura-route"
+      ]
+    },
+    {
+      "id": "docx-103",
+      "format": "docx",
+      "owner": "litchi-docx",
+      "source_matrix": "crates/litchi-docx/docs/FEATURE_MATRIX.md",
+      "family": "WordprocessingML",
+      "feature": "sectPr footnoteColumns",
+      "scope": "sectPr footnoteColumns",
+      "library_status": "supported",
+      "matrix_status": "✅",
+      "fixture_status_before_audit": "pending",
+      "category": "genuinely_missing_authorable_family",
+      "rationale": "No finalized DOCX contains sectPr footnoteColumns. A focused native Word footnote-area columns probe is a concrete missing family if the current Word UI exposes it; do not claim the extension from ordinary footnotes alone.",
+      "evidence_refs": [],
+      "next_action": "Probe one document with multiple footnote columns and inspect sectPr/footnote parts; otherwise retain as unavailable."
+    },
+    {
+      "id": "docx-104",
+      "format": "docx",
+      "owner": "litchi-docx",
+      "source_matrix": "crates/litchi-docx/docs/FEATURE_MATRIX.md",
+      "family": "WordprocessingML",
+      "feature": "pPr collapsed",
+      "scope": "pPr collapsed",
+      "library_status": "supported",
+      "matrix_status": "✅",
+      "fixture_status_before_audit": "pending",
+      "category": "genuinely_missing_authorable_family",
+      "rationale": "No finalized DOCX contains pPr collapsed. A focused native outline-heading collapse fixture is a concrete missing family if Word exposes the saved collapsed state.",
+      "evidence_refs": [],
+      "next_action": "Author one collapsed outline heading and reopen natively before classifying."
+    },
+    {
+      "id": "docx-105",
+      "format": "docx",
+      "owner": "litchi-docx",
+      "source_matrix": "crates/litchi-docx/docs/FEATURE_MATRIX.md",
+      "family": "WordprocessingML",
+      "feature": "Numbering restartNumberingAfterBreak",
+      "scope": "Numbering restartNumberingAfterBreak",
+      "library_status": "supported",
+      "matrix_status": "✅",
+      "fixture_status_before_audit": "pending",
+      "category": "native_fixture_evidence_available",
+      "rationale": "Native math-navigation/text DOCX numbering parts contain w15:restartNumberingAfterBreak; this directly covers the observed extension element.",
+      "evidence_refs": [
+        "test-data/microsoft-office/word/word-math-navigation.docx",
+        "test-data/microsoft-office/word/word-text-structure.docx"
+      ]
+    },
+    {
+      "id": "docx-106",
+      "format": "docx",
+      "owner": "litchi-docx",
+      "source_matrix": "crates/litchi-docx/docs/FEATURE_MATRIX.md",
+      "family": "WordprocessingML",
+      "feature": "Run symEx symbol extension",
+      "scope": "Run symEx symbol extension",
+      "library_status": "supported",
+      "matrix_status": "✅",
+      "fixture_status_before_audit": "pending",
+      "category": "genuinely_missing_authorable_family",
+      "rationale": "No finalized DOCX contains the run symEx extension. A focused native Insert Symbol fixture can test whether current Word emits this extension; ordinary Unicode symbols do not close the row.",
+      "evidence_refs": [],
+      "next_action": "Probe a symbol requiring the Word symEx representation and inspect the run XML."
+    },
+    {
+      "id": "docx-107",
+      "format": "docx",
+      "owner": "litchi-docx",
+      "source_matrix": "crates/litchi-docx/docs/FEATURE_MATRIX.md",
+      "family": "WordprocessingML",
+      "feature": "Data-binding storeItemChecksum",
+      "scope": "Data-binding storeItemChecksum",
+      "library_status": "supported",
+      "matrix_status": "✅",
+      "fixture_status_before_audit": "pending",
+      "category": "observed_native_ui_limitation",
+      "rationale": "No custom XML data-binding/storeItemChecksum authoring route was observed in current Word-for-Mac; the math-navigation custom XML part is an unbound bibliography store, so it cannot close this row.",
+      "evidence_refs": [
+        "test-data/microsoft-office/word/word-math-navigation.docx",
+        "root_ui_observation://Word-Mac/no-customXml-binding-route"
+      ]
+    },
+    {
+      "id": "docx-108",
+      "format": "docx",
+      "owner": "litchi-docx",
+      "source_matrix": "crates/litchi-docx/docs/FEATURE_MATRIX.md",
+      "family": "WordprocessingML",
+      "feature": "Word 2024 formattingAllowed",
+      "scope": "Word 2024 formattingAllowed",
+      "library_status": "supported",
+      "matrix_status": "✅",
+      "fixture_status_before_audit": "pending",
+      "category": "observed_native_ui_limitation",
+      "rationale": "No w14 formattingAllowed element was found and the current Word-for-Mac UI exposed no controlled authoring path for this Word 2024 extension; this is a version/UI boundary observation.",
+      "evidence_refs": [
+        "root_scan://word-docx/no-formattingAllowed",
+        "root_ui_observation://Word-Mac/no-formattingAllowed-route"
+      ]
+    },
+    {
+      "id": "docx-110",
+      "format": "docx",
+      "owner": "litchi-docx",
+      "source_matrix": "crates/litchi-docx/docs/FEATURE_MATRIX.md",
+      "family": "WordprocessingML",
+      "feature": "Extended note/list number formats from [MS-DOCX] 2.4",
+      "scope": "Extended note/list number formats from [MS-DOCX] 2.4",
+      "library_status": "partial",
+      "matrix_status": "🟡",
+      "fixture_status_before_audit": "pending",
+      "category": "native_fixture_evidence_available",
+      "rationale": "Native tables/math/review DOCX fixtures contain authored footnote/endnote/list numbering and note placement; this is bounded note/list evidence, not every extended number-format token.",
+      "evidence_refs": [
+        "test-data/microsoft-office/word/word-tables-layout.docx",
+        "test-data/microsoft-office/word/word-math-navigation.docx",
+        "test-data/microsoft-office/word/word-review-controls.docx"
+      ]
+    },
+    {
+      "id": "docx-112",
+      "format": "docx",
+      "owner": "litchi-docx",
+      "source_matrix": "crates/litchi-docx/docs/FEATURE_MATRIX.md",
+      "family": "WordprocessingML",
+      "feature": "Revision application and accept/reject",
+      "scope": "Revision application and accept/reject",
+      "library_status": "partial",
+      "matrix_status": "🟡",
+      "fixture_status_before_audit": "pending",
+      "category": "operation_only_semantics",
+      "rationale": "The review-controls DOCX contains revisions, but accepting/rejecting revisions is an operation applied to a document state; no native fixture should be treated as proof that the library operation is correct.",
+      "evidence_refs": [
+        "test-data/microsoft-office/word/word-review-controls.docx",
+        "test-data/microsoft-office/word/review-controls-inspection.json"
+      ],
+      "next_action": "Use the review fixture as input and retain accept/reject operation tests."
+    },
+    {
+      "id": "docx-115",
+      "format": "docx",
+      "owner": "litchi-docx",
+      "source_matrix": "crates/litchi-docx/docs/FEATURE_MATRIX.md",
+      "family": "WordprocessingML",
+      "feature": "Bibliography source stores",
+      "scope": "Bibliography source stores",
+      "library_status": "partial",
+      "matrix_status": "🟡",
+      "fixture_status_before_audit": "pending",
+      "category": "native_fixture_evidence_available",
+      "rationale": "Native math-navigation DOCX/DOTX contains Word bibliography custom XML storage and relationships. The current fixture is an empty/default source store, so populated bibliography source records remain unverified.",
+      "evidence_refs": [
+        "test-data/microsoft-office/word/word-math-navigation.docx",
+        "test-data/microsoft-office/word/word-math-navigation.dotx",
+        "test-data/microsoft-office/word/math-navigation-inspection.json"
+      ]
+    },
+    {
+      "id": "docx-116",
+      "format": "docx",
+      "owner": "litchi-docx",
+      "source_matrix": "crates/litchi-docx/docs/FEATURE_MATRIX.md",
+      "family": "WordprocessingML",
+      "feature": "Smart tags",
+      "scope": "Smart tags",
+      "library_status": "partial",
+      "matrix_status": "🟡",
+      "fixture_status_before_audit": "pending",
+      "category": "observed_native_ui_limitation",
+      "rationale": "Smart tags are retired/integration-dependent; no deterministic current Word-for-Mac authoring route was observed and no smart-tag part is in the corpus.",
+      "evidence_refs": [
+        "root_ui_observation://Word-Mac/no-smart-tag-authoring"
+      ]
+    },
+    {
+      "id": "docx-119",
+      "format": "docx",
+      "owner": "litchi-docx",
+      "source_matrix": "crates/litchi-docx/docs/FEATURE_MATRIX.md",
+      "family": "WordprocessingML",
+      "feature": "Custom XML data stores and content-control bindings",
+      "scope": "Custom XML data stores and content-control bindings",
+      "library_status": "partial",
+      "matrix_status": "🟡",
+      "fixture_status_before_audit": "pending",
+      "category": "native_fixture_evidence_available",
+      "rationale": "Native math-navigation DOCX/DOTX contains customXml data-store parts and relationships, plus one core TOC SDT. No user payload binding/storeItemChecksum is claimed.",
+      "evidence_refs": [
+        "test-data/microsoft-office/word/word-math-navigation.docx",
+        "test-data/microsoft-office/word/word-math-navigation.dotx",
+        "test-data/microsoft-office/word/math-navigation-inspection.json"
+      ]
+    },
+    {
+      "id": "docx-120",
+      "format": "docx",
+      "owner": "litchi-docx",
+      "source_matrix": "crates/litchi-docx/docs/FEATURE_MATRIX.md",
+      "family": "WordprocessingML",
+      "feature": "Streaming document authoring",
+      "scope": "Streaming document authoring",
+      "library_status": "supported",
+      "matrix_status": "✅",
+      "fixture_status_before_audit": "pending",
+      "category": "operation_only_semantics",
+      "rationale": "Streaming document authoring is a library I/O/transaction behavior, not a persistent Word feature that native Office can author as a fixture.",
+      "evidence_refs": [],
+      "next_action": "Retain stream-oriented library tests."
+    },
+    {
+      "id": "docx-121",
+      "format": "docx",
+      "owner": "litchi-docx",
+      "source_matrix": "crates/litchi-docx/docs/FEATURE_MATRIX.md",
+      "family": "WordprocessingML",
+      "feature": "Validation and document statistics",
+      "scope": "Validation and document statistics",
+      "library_status": "partial",
+      "matrix_status": "🟡",
+      "fixture_status_before_audit": "pending",
+      "category": "operation_only_semantics",
+      "rationale": "Validation and document statistics are library inspection operations. Native properties/statistics are useful inputs but cannot verify the library’s validation algorithm.",
+      "evidence_refs": [
+        "test-data/microsoft-office/word/word-text-structure.docx",
+        "test-data/microsoft-office/word/word-tables-layout.docx"
+      ],
+      "next_action": "Keep validation/statistics tests independent of fixture classification."
+    },
+    {
+      "id": "docx-122",
+      "format": "docx",
+      "owner": "litchi-docx",
+      "source_matrix": "crates/litchi-docx/docs/FEATURE_MATRIX.md",
+      "family": "WordprocessingML",
+      "feature": "Source-bound sanitization and external-hyperlink redaction",
+      "scope": "Source-bound sanitization and external-hyperlink redaction",
+      "library_status": "partial",
+      "matrix_status": "🟡",
+      "fixture_status_before_audit": "pending",
+      "category": "operation_only_semantics",
+      "rationale": "Source-bound sanitization and external-hyperlink redaction are library transformations. Native hyperlink fixtures supply inputs, but no saved Word file can prove redaction semantics.",
+      "evidence_refs": [
+        "test-data/microsoft-office/word/word-text-structure.docx",
+        "test-data/microsoft-office/word/word-visual-objects.docx"
+      ],
+      "next_action": "Retain transformation tests as the oracle."
+    },
+    {
+      "id": "docx-128",
+      "format": "docx",
+      "owner": "litchi-docx",
+      "source_matrix": "crates/litchi-docx/docs/FEATURE_MATRIX.md",
+      "family": "WordprocessingML",
+      "feature": "Ink / inkML model",
+      "scope": "Ink / inkML model",
+      "library_status": "partial",
+      "matrix_status": "🟡",
+      "fixture_status_before_audit": "pending",
+      "category": "observed_native_ui_limitation",
+      "rationale": "No ink/inkML part is present and no deterministic local Word-for-Mac Ink authoring route was established. This is a bounded platform/workflow observation, not a universal absence claim.",
+      "evidence_refs": [
+        "root_scan://word-docx/no-inkML",
+        "root_ui_observation://Word-Mac/no-Ink-authoring"
+      ]
+    },
+    {
+      "id": "docx-129",
+      "format": "docx",
+      "owner": "litchi-docx",
+      "source_matrix": "crates/litchi-docx/docs/FEATURE_MATRIX.md",
+      "family": "WordprocessingML",
+      "feature": "MS-OWEXML custom-function payloads",
+      "scope": "MS-OWEXML custom-function payloads",
+      "library_status": "partial",
+      "matrix_status": "🟡",
+      "fixture_status_before_audit": "pending",
+      "category": "observed_native_ui_limitation",
+      "rationale": "MS-OWEXML custom-function payloads are specialized extension content; no current native Word authoring route was observed, so a synthetic fixture would be misleading.",
+      "evidence_refs": [
+        "root_ui_observation://Word-Mac/no-MS-OWEXML-custom-function-route"
+      ]
+    },
+    {
+      "id": "docx-132",
+      "format": "docx",
+      "owner": "litchi-docx",
+      "source_matrix": "crates/litchi-docx/docs/FEATURE_MATRIX.md",
+      "family": "WordprocessingML",
+      "feature": "Signature trust and certificate status",
+      "scope": "Signature trust and certificate status",
+      "library_status": "partial",
+      "matrix_status": "🟡",
+      "fixture_status_before_audit": "pending",
+      "category": "external_handoff",
+      "rationale": "Signature trust/certificate status requires an external certificate chain and trust context. It must remain separate from a future signed-package fixture.",
+      "evidence_refs": [],
+      "next_action": "Use the same user-approved certificate handoff as docx-084 and record trust status."
+    },
+    {
+      "id": "docx-133",
+      "format": "docx",
+      "owner": "litchi-docx",
+      "source_matrix": "crates/litchi-docx/docs/FEATURE_MATRIX.md",
+      "family": "WordprocessingML",
+      "feature": "Unsupported Word extension namespace content",
+      "scope": "Unsupported Word extension namespace content",
+      "library_status": "partial",
+      "matrix_status": "🟡",
+      "fixture_status_before_audit": "pending",
+      "category": "operation_only_semantics",
+      "rationale": "Generic unsupported-extension namespace content is a preservation/round-trip boundary, not one finite user-authored Word feature. Existing native extension parts are evidence inputs, not proof of arbitrary namespace behavior.",
+      "evidence_refs": [
+        "test-data/microsoft-office/word/word-vector-diagram.docx",
+        "test-data/microsoft-office/word/word-review-controls.docx"
+      ],
+      "next_action": "Use targeted package fixtures for each extension family rather than closing the generic row."
+    }
+  ]
+}

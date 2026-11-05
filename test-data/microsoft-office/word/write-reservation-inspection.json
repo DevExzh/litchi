@@ -1,0 +1,456 @@
+{
+  "schema_version": 1,
+  "fixture_id": "word-write-reservation-487",
+  "coverage_id": "rtf-487",
+  "generated_on": "2026-10-15",
+  "purpose": "Read-only audit of the native Word RTF write-reservation hash, its typed-reader boundary, and the corresponding native DOC and DOCX modify-password records.",
+  "provenance": {
+    "producer_app": "Microsoft Office Word",
+    "app_version": "16.110.2",
+    "app_build": "16.110.26062818",
+    "platform": "macOS",
+    "authoring_method": "Computer Use / native Microsoft Word UI",
+    "source_fixture": "test-data/microsoft-office/word/word-encrypted.doc",
+    "source_fixture_id": "word-encrypted-012",
+    "public_disposable_password": "Office42!",
+    "source_workflow": "Native Word opened word-encrypted.doc with the existing Office42! credential for opening and modification. Save As RTF produced word-write-reservation.rtf.",
+    "save_as_warning": {
+      "observed": true,
+      "description": "Native Word displayed an explicit protection-loss warning while saving the encrypted DOC as RTF.",
+      "exact_text": "This document is password protected. Saving this document in a format other than a Word Document will result in the loss of this protection. Do you want to continue?",
+      "human_action_time_approval": true,
+      "save_observed_after_approval": true,
+      "exact_warning_text_recorded": true,
+      "exact_confirmer_observed": false
+    },
+    "libreoffice_used": false,
+    "programmatic_office_generation_used": false,
+    "library_code_modified": false,
+    "existing_office_files_modified_after_native_save": false,
+    "analysis_method": "Read-only hash, raw-control, textutil, in-memory typed-reader, and temporary-copy isolation probes",
+    "all_documents_closed_before_hashing": true,
+    "auditor": "/root/rtf_boundary_audit"
+  },
+  "files": [
+    {
+      "fixture_id": "word-write-reservation-487",
+      "path": "test-data/microsoft-office/word/word-write-reservation.rtf",
+      "format": "rtf, ANSI/code page 1252",
+      "role": "native Word Save As RTF derivative after the protection-loss warning",
+      "bytes": 46510,
+      "sha256": "fcb5556b87fd29ed3723c3b9cc3752f2a9cb6a70fa4ea06855544c9ae5fba205"
+    },
+    {
+      "fixture_id": "word-encrypted-012",
+      "path": "test-data/microsoft-office/word/word-encrypted.doc",
+      "format": "encrypted Word 97-2003 CFB",
+      "role": "native encrypted source DOC with a typed SttbfAssoc write-reservation value",
+      "bytes": 25088,
+      "sha256": "4ff94c46646d95076e161844d8780f58cdfd895c15f8b264ae07c5aed609f24c"
+    },
+    {
+      "fixture_id": "word-encrypted-012",
+      "path": "test-data/microsoft-office/word/word-encrypted.docx",
+      "format": "encrypted OOXML CFB container",
+      "role": "native encrypted source DOCX with an OOXML w:writeProtection record",
+      "bytes": 19968,
+      "sha256": "724985af8f869ebd3daea454bac3057a646e6e41ac5b188fbf310cd43bd1bdc0"
+    }
+  ],
+  "content_markers": [
+    "WORD_ENCRYPTED_012",
+    "Fixture ID: word-encrypted-012",
+    "Native password-to-open specimen.",
+    "VALUE_012: 42",
+    "END_ENCRYPTED_012"
+  ],
+  "native_reopen": {
+    "path": "test-data/microsoft-office/word/word-write-reservation.rtf",
+    "open_status": "pass",
+    "password_to_open_prompt": false,
+    "modify_reservation_prompt": true,
+    "prompt_text_fragment": "reserved by Ryker Zhu Enter the password to modify ... or open read only",
+    "existing_credential_accepted": true,
+    "repair_prompt": false,
+    "markers_retained": true,
+    "closed_without_save_to_home": true,
+    "interpretation": "The RTF is plaintext and no longer has password-to-open encryption, while native Word still recognizes a modify reservation."
+  },
+  "rtf": {
+    "file_identification": {
+      "format": "Rich Text Format version 1",
+      "transport": "ANSI",
+      "code_page": 1252,
+      "default_middle_east_language_id": 1025
+    },
+    "raw_control_counts": {
+      "writereservhash": 1,
+      "writereservation": 0,
+      "passwordhash": 0,
+      "password": 0,
+      "datastore": 1,
+      "trackmoves0": 1,
+      "trackformatting1": 1,
+      "protection_controls": 0
+    },
+    "writereservhash": {
+      "source_line": 76,
+      "group_literal_prefix": "{\\*\\writereservhash ",
+      "control_byte_offset": 16541,
+      "payload_byte_offset": 16558,
+      "payload_end_exclusive": 16798,
+      "payload_hex_chars": 240,
+      "decoded_bytes": 120,
+      "payload_sha256": "4ae9142f45c0b136c67498e8c12403eee167b00e4eabfb8c0b9fbfd716195f57",
+      "payload_hex": "0200000078000000180000000e800000a086010040000000100000002800000068000000000000007ae1124d0b52d05b614f782b2b1784aa4dfd859cf68ff8527f73ad57c2faa3af1256a3ea6bcc42a93493c009f0371c9e21ee6962154aa063976bca26760f25460ab224a79073f5fe45a0f4104570576c",
+      "paired_legacy_writereservation_present": false,
+      "typed_model_storage": "litchi-rtf::WriteReservationHash.data as opaque bytes",
+      "typed_model_authenticates_or_decrypts": false,
+      "structural_passwordhash_compatibility_probe": {
+        "probe": "PasswordHash::from_bytes on the same decoded writereservhash bytes",
+        "result": "accepted",
+        "warning": "This is a byte-layout probe only. The writereservhash parser stores the record as opaque WriteReservationHash bytes and does not assert PasswordHash semantics or verify a credential.",
+        "version": 2,
+        "total_size": 120,
+        "flags": 24,
+        "flags_hex": "0x00000018",
+        "algorithm_id": 32782,
+        "algorithm_id_hex": "0x0000800e",
+        "spin_count": 100000,
+        "hash_size": 64,
+        "salt_size": 16,
+        "salt_hex": "2800000068000000000000007ae1124d",
+        "salt_sha256": "d96402d32beaa2e6e4177fe13a43ed077eeb597e833c1e9989905f3ec3b91d90",
+        "hash_hex": "0b52d05b614f782b2b1784aa4dfd859cf68ff8527f73ad57c2faa3af1256a3ea6bcc42a93493c009f0371c9e21ee6962154aa063976bca26760f25460ab224a7",
+        "hash_sha256": "ee5e0365ad5d1eae1057dbf5d0b32eeacd50cceb17285096dd28c8372676d63d",
+        "unknown_trailing_bytes": 12,
+        "trailing_hex": "9073f5fe45a0f4104570576c",
+        "trailing_sha256": "b7449384ea52e9fcc982b5d4c2952307832bebc47764ef5025a903ad62e1cea9"
+      }
+    },
+    "body": {
+      "source_lines": "81-85",
+      "paragraph_count_observed_by_textutil": 5,
+      "markers_present": true,
+      "textutil_command": "textutil -convert txt -stdout test-data/microsoft-office/word/word-write-reservation.rtf",
+      "textutil_exit_code": 0,
+      "textutil_contains": [
+        "WORD_ENCRYPTED_012",
+        "Fixture ID: word-encrypted-012",
+        "Native password-to-open specimen.",
+        "VALUE_012: 42",
+        "END_ENCRYPTED_012"
+      ]
+    },
+    "empty_datastore": {
+      "source_line": 231,
+      "literal": "{\\*\\datastore }}",
+      "count": 1,
+      "decoded_payload_bytes": 0
+    },
+    "reader_validation": {
+      "direct_public_reader": {
+        "command": "cargo run -q -p litchi-rtf --example parse_rtf -- test-data/microsoft-office/word/word-write-reservation.rtf",
+        "exit_code": 1,
+        "error": "MalformedDocument(\"RTF data-store payload cannot be empty\")",
+        "semantic_counts_available": false
+      },
+      "temporary_copy_without_empty_datastore": {
+        "operation": "A temporary copy outside the repository removed only the exact empty datastore group; the native fixture remained unchanged.",
+        "raw_model_api": "litchi_rtf::raw::Document::open",
+        "result": "pass",
+        "text_length": 116,
+        "paragraph_count": 5,
+        "revisions": 0,
+        "move_bookmarks": 0,
+        "write_reservations_empty": false,
+        "legacy_present": false,
+        "hash_present": true,
+        "hash_length": 120,
+        "hash_hex_matches_writereservhash_payload": true,
+        "tolerance_report": "not applicable to this raw-model probe"
+      },
+      "boundary_order": [
+        "writereservhash is recognized and decoded before the later root datastore group.",
+        "The direct original parse fails at the empty datastore before a complete Document is returned.",
+        "After only the datastore group is removed, the raw typed model retains the exact 120-byte hash."
+      ]
+    }
+  },
+  "comparison_with_encrypted_source_files": {
+    "doc": {
+      "outer_encryption": {
+        "fib_fEncrypted": true,
+        "nFib": "0x00C1",
+        "lKey": 198,
+        "cryptoapi_header_bytes": 198,
+        "profile": "Word 97 CryptoAPI RC4/SHA-1"
+      },
+      "write_reservation": {
+        "storage": "SttbfAssoc at FIB table index 32",
+        "table_stream": "1Table",
+        "offset": 9199,
+        "bytes": 96,
+        "typed_value": "Office42!",
+        "reader_api": "litchi-doc Package::document_with_options",
+        "reader_result": "pass; five-paragraph story and markers retained in memory",
+        "clear_derivative_written": false
+      },
+      "interpretation": "The encrypted DOC keeps a plaintext typed modify-password string in the decrypted associated-string table in addition to password-to-open encryption."
+    },
+    "docx": {
+      "outer_encryption": {
+        "container": "OLE2 Compound File Binary",
+        "profile": "AgileAes256Sha512",
+        "integrity": "Authenticated",
+        "clear_package_bytes": 13671,
+        "clear_package_written": false
+      },
+      "decrypted_settings_member": {
+        "member": "word/settings.xml",
+        "bytes": 3568,
+        "sha256": "18e25685d0d2fe9cc06f6b8f4ecb776f8b92a442dc48e8a827afefb059935f413",
+        "write_protection_element_count": 1,
+        "raw_element_attributes": {
+          "cryptProviderType": "rsaAES",
+          "cryptAlgorithmClass": "hash",
+          "cryptAlgorithmType": "typeAny",
+          "cryptAlgorithmSid": "14",
+          "cryptSpinCount": "100000",
+          "hash_decoded_bytes": 64,
+          "hash_sha256": "7d020f70647fd55a2d8f89b6a503ff3336248bc286e6056bdf4f3d7e9e8f7427",
+          "salt_decoded_bytes": 16,
+          "salt_sha256": "0cf9d523a5b3e8f65243a3767818ea119fa8417899d819b87f8d2216874da6e6"
+        }
+      },
+      "typed_reader_projection": {
+        "reader_api": "litchi-docx Package::open_with_password -> Document::settings",
+        "reader_result": "pass; five paragraphs and markers retained in memory",
+        "settings_is_write_protected": true,
+        "settings_is_document_protected": false,
+        "hash_and_salt_exposed_by_typed_settings_model": false,
+        "clear_derivative_written": false
+      },
+      "interpretation": "The encrypted DOCX stores a hashed modify-password record in word/settings.xml. litchi-docx exposes the write-protection boolean but not the raw hash and salt through its typed settings projection."
+    },
+    "rtf": {
+      "outer_encryption": "none observed; the RTF is plaintext and contains no passwordhash/password controls",
+      "write_reservation": "one native writereservhash record retained as 120 opaque bytes",
+      "typed_reader_projection": "raw litchi-rtf model retains the bytes only after the unrelated empty datastore group is isolated"
+    }
+  },
+  "source_references": [
+    {
+      "path": "test-data/microsoft-office/word/word-write-reservation.rtf",
+      "lines": "69-76",
+      "facts": [
+        "Native Word info and root header precede one starred writereservhash destination.",
+        "The writereservhash control begins at byte offset 16541 and its hexadecimal payload is 240 characters / 120 decoded bytes."
+      ]
+    },
+    {
+      "path": "test-data/microsoft-office/word/word-write-reservation.rtf",
+      "lines": "81-85",
+      "facts": [
+        "The five source content markers survive in the plaintext RTF body."
+      ]
+    },
+    {
+      "path": "test-data/microsoft-office/word/word-write-reservation.rtf",
+      "lines": "231",
+      "facts": [
+        "The root ends with one empty starred datastore group."
+      ]
+    },
+    {
+      "path": "test-data/microsoft-office/word/encryption-inspection.json",
+      "lines": "39-58,61-166,168-182",
+      "facts": [
+        "The DOC CryptoAPI and DOCX Agile profiles were decrypted only in memory.",
+        "The DOC SttbfAssoc write-reservation slot is typed as Office42!.",
+        "The encrypted source hashes, stream sizes, and five story markers are recorded."
+      ]
+    },
+    {
+      "path": "crates/litchi-rtf/src/codec/parser/codec/dispatch.rs",
+      "lines": "670-704",
+      "facts": [
+        "Root-level writereservhash is dispatched before visible text and duplicate destinations are rejected."
+      ]
+    },
+    {
+      "path": "crates/litchi-rtf/src/codec/parser/codec/styles.rs",
+      "lines": "764-830",
+      "facts": [
+        "The writereservhash destination accepts only an even hexadecimal text payload and converts it to opaque bytes."
+      ]
+    },
+    {
+      "path": "crates/litchi-rtf/src/metadata/write_reservation.rs",
+      "lines": "55-124",
+      "facts": [
+        "WriteReservationHash stores Cow<[u8]> and validates only non-empty and bounded data; it never authenticates or decrypts the value."
+      ]
+    },
+    {
+      "path": "crates/litchi-rtf/src/codec/parser/codec/document.rs",
+      "lines": "586-613",
+      "facts": [
+        "An empty starred datastore payload is a hard MalformedDocument error."
+      ]
+    },
+    {
+      "path": "crates/litchi-rtf/src/metadata/info.rs",
+      "lines": "64-128",
+      "facts": [
+        "PasswordHash has an independent fixed-header parser; accepting the RTF writereservhash bytes with it is recorded only as a structural compatibility probe."
+      ]
+    }
+  ],
+  "machine_checkable_expectations": [
+    {
+      "check": "sha256",
+      "command": "sha256sum test-data/microsoft-office/word/word-write-reservation.rtf test-data/microsoft-office/word/word-encrypted.doc test-data/microsoft-office/word/word-encrypted.docx",
+      "expected": {
+        "word-write-reservation.rtf": "fcb5556b87fd29ed3723c3b9cc3752f2a9cb6a70fa4ea06855544c9ae5fba205",
+        "word-encrypted.doc": "4ff94c46646d95076e161844d8780f58cdfd895c15f8b264ae07c5aed609f24c",
+        "word-encrypted.docx": "724985af8f869ebd3daea454bac3057a646e6e41ac5b188fbf310cd43bd1bdc0"
+      }
+    },
+    {
+      "check": "rtf_control_word_count",
+      "scope": "test-data/microsoft-office/word/word-write-reservation.rtf",
+      "expected": {
+        "writereservhash": 1,
+        "writereservation": 0,
+        "passwordhash": 0,
+        "password": 0,
+        "datastore": 1,
+        "trackmoves0": 1,
+        "trackformatting1": 1
+      }
+    },
+    {
+      "check": "writereservhash_payload",
+      "scope": "test-data/microsoft-office/word/word-write-reservation.rtf",
+      "expected": {
+        "control_byte_offset": 16541,
+        "payload_byte_offset": 16558,
+        "payload_hex_chars": 240,
+        "decoded_bytes": 120,
+        "payload_sha256": "4ae9142f45c0b136c67498e8c12403eee167b00e4eabfb8c0b9fbfd716195f57",
+        "payload_hex": "0200000078000000180000000e800000a086010040000000100000002800000068000000000000007ae1124d0b52d05b614f782b2b1784aa4dfd859cf68ff8527f73ad57c2faa3af1256a3ea6bcc42a93493c009f0371c9e21ee6962154aa063976bca26760f25460ab224a79073f5fe45a0f4104570576c"
+      }
+    },
+    {
+      "check": "native_textutil",
+      "command": "textutil -convert txt -stdout test-data/microsoft-office/word/word-write-reservation.rtf",
+      "expected": {
+        "exit_code": 0,
+        "contains_all_markers": true
+      }
+    },
+    {
+      "check": "direct_litchi_rtf_reader",
+      "command": "cargo run -q -p litchi-rtf --example parse_rtf -- test-data/microsoft-office/word/word-write-reservation.rtf",
+      "expected": {
+        "exit_code": 1,
+        "error": "MalformedDocument(\"RTF data-store payload cannot be empty\")",
+        "semantic_counts_available": false
+      }
+    },
+    {
+      "check": "isolated_raw_litchi_rtf_reader",
+      "operation": "Remove only the exact empty datastore group in a temporary file outside the repository, then open with litchi_rtf::raw::Document.",
+      "expected": {
+        "result": "pass",
+        "paragraph_count": 5,
+        "text_length": 116,
+        "write_reservations.hash.data_length": 120,
+        "write_reservations.legacy": null,
+        "write_reservations.hash.data_matches_payload": true
+      }
+    },
+    {
+      "check": "typed_source_write_reservation",
+      "scope": "word-encrypted.doc",
+      "expected": {
+        "litchi_doc_document_with_options": "pass",
+        "fib_fEncrypted": true,
+        "associated_string_slot": "WriteReservationPassword",
+        "associated_string_value": "Office42!",
+        "decrypted_in_memory": true
+      }
+    },
+    {
+      "check": "typed_docx_write_protection",
+      "scope": "word-encrypted.docx",
+      "expected": {
+        "litchi_crypto_mode": "AgileAes256Sha512",
+        "integrity": "Authenticated",
+        "settings_writeProtection_count": 1,
+        "litchi_docx_settings_is_write_protected": true,
+        "litchi_docx_settings_is_document_protected": false,
+        "decrypted_in_memory": true
+      }
+    }
+  ],
+  "native_ui_follow_ups": [
+    {
+      "candidate_id": "rtf_modify_only_without_open_encryption",
+      "ui_authoring": "Create a fresh native Word document, set a password to modify while leaving password to open blank in the native Save As password dialog, save as RTF, close, and reopen.",
+      "expected_difference": "Compare whether Word emits the same 120-byte writereservhash layout when no source open-encryption downgrade is involved.",
+      "purpose": "Separate the RTF modify-reservation producer from the encrypted-DOC-to-RTF downgrade path."
+    },
+    {
+      "candidate_id": "rtf_no_modify_reservation_control",
+      "ui_authoring": "Save an otherwise identical native Word document as RTF with both open and modify password fields blank.",
+      "expected_difference": "Use raw control counts and native modify-prompt behavior to establish the absence baseline for writereservhash.",
+      "purpose": "Confirm the single starred hash group is caused by the modify-password choice."
+    }
+  ],
+  "hypotheses": [
+    {
+      "label": "hypothesis",
+      "confidence": "high",
+      "statement": "The 120-byte native writereservhash payload uses the same fixed byte layout as the library's modern PasswordHash record: version 2, total size 120, flags 0x18, algorithm id 0x800e, spin count 100000, 16-byte salt, 64-byte logical hash, and 12 trailing bytes.",
+      "evidence": [
+        "The byte-level PasswordHash::from_bytes probe accepts the complete payload and reports those fields.",
+        "The payload's declared total size equals its decoded length.",
+        "The litchi-rtf writereservhash model intentionally retains the same bytes opaquely and does not make this semantic assertion."
+      ]
+    },
+    {
+      "label": "hypothesis",
+      "confidence": "medium",
+      "statement": "The native Save As RTF operation preserved modify-reservation metadata while dropping the source DOC/DOCX password-to-open envelope.",
+      "evidence": [
+        "The RTF is a plaintext ANSI file with no passwordhash/password controls.",
+        "Native Word reopened the RTF without a password-to-open prompt but displayed a modify-reservation prompt naming Ryker Zhu.",
+        "The source DOC and DOCX independently contain password-to-open encryption and modify-reservation records."
+      ]
+    }
+  ],
+  "negative_expectations": [
+    {
+      "expectation": "Do not report a successful direct litchi-rtf parse of the native RTF.",
+      "reason": "The unmodified fixture fails before semantic counts at the empty datastore destination."
+    },
+    {
+      "expectation": "Do not treat PasswordHash::from_bytes acceptance as password verification or as proof that writereservhash and passwordhash have identical authentication semantics.",
+      "reason": "The compatibility probe is structural; WriteReservationHash is documented and implemented as inert opaque bytes."
+    },
+    {
+      "expectation": "Do not infer that the DOCX typed settings boolean exposes or verifies the hash and salt.",
+      "reason": "The decrypted XML contains raw hash/salt attributes, while litchi-docx's typed settings projection reports only is_write_protected."
+    }
+  ],
+  "limitations": [
+    "The exact native protection-loss warning text is recorded, but the exact UI control or actor that confirmed it was not observed; the final RTF save itself was observed after human approval.",
+    "The semantic RTF values in this record come from a temporary copy with only the empty datastore group removed. The native fixture itself was never edited.",
+    "The structural passwordhash-compatible field split is a diagnostic interpretation, not a claim that the RTF writereservhash value can be used by litchi or any caller to authenticate Office42!.",
+    "The DOCX clear OPC package and the DOC decrypted streams were inspected in memory only; no clear derivative was written to disk.",
+    "This is coverage for the finalized native Word build and fixture identified by rtf-487; it does not generalize to other Word versions, RTF producers, or alternate reservation algorithms.",
+    "No library source, Office fixture, or common coverage manifest was modified by this inspection."
+  ]
+}

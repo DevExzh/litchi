@@ -1,0 +1,468 @@
+{
+  "schema_version": 1,
+  "fixture_id": "word-layout-extensions-016",
+  "generated_on": "2026-10-15",
+  "purpose": "Fixture-specific, read-only inspection of native Microsoft Word section extensions, collapsed-heading metadata, caption and AutoCaption field output, legacy symbols, Unicode scalar text, and footnotes across DOCX, DOTX, DOC, DOT, and RTF.",
+  "provenance": {
+    "producer_app": "Microsoft Office Word",
+    "app_version": "16.110.2",
+    "app_build": "16.110.26062818",
+    "platform": "macOS",
+    "authoring_method": "Computer Use / native Microsoft Word UI",
+    "source": "Synthetic markers were entered in a fresh native Word document. Word Format Paragraph authored the collapsed Heading 1 state, the native footnote layout dialog authored two footnote-area columns, Insert Caption authored the Figure field, and Word's AutoCaption rule for tables authored the Table field before the rule was restored to zero without a final resave. More Symbols authored a legacy Symbol-font infinity field; the emoji was entered as a Unicode scalar with Apple Color Emoji formatting. Word saved DOTX and then DOT, the DOTX was reopened and corrected to the final DOCX before the DOC derivative was saved, and the corrected DOCX was reopened before the RTF derivative was saved.",
+    "libreoffice_used": false,
+    "programmatic_office_generation_used": false,
+    "library_code_modified": false,
+    "office_files_modified_after_native_save": false,
+    "all_documents_closed_before_hashing": true,
+    "all_documents_reopened_without_repair": true,
+    "fixture_files_are_closed_after_reopen": true,
+    "auditor": "/root/word_remaining_audit"
+  },
+  "files": [
+    {
+      "path": "test-data/microsoft-office/word/word-layout-extensions.docx",
+      "format": "docx",
+      "role": "native OOXML source after the caption correction",
+      "bytes": 16505,
+      "sha256": "14dbe005b89b078823db8aee311a141b5a41e79a54c2cb3e55ab73708c847aaa",
+      "native_reopen": "pass"
+    },
+    {
+      "path": "test-data/microsoft-office/word/word-layout-extensions.dotx",
+      "format": "dotx",
+      "role": "native OOXML template derivative",
+      "bytes": 16434,
+      "sha256": "da93dd32de50b211c15b271bd67b8303f1b1bacbd914771f518dec6dee4273c8",
+      "native_reopen": "pass"
+    },
+    {
+      "path": "test-data/microsoft-office/word/word-layout-extensions.doc",
+      "format": "doc",
+      "role": "native Word 97-2003 derivative",
+      "bytes": 32768,
+      "sha256": "b589aeb5a31058ead69505398e1975b8f551ebd5898dabfcf9d23fbbe39af391",
+      "native_reopen": "pass"
+    },
+    {
+      "path": "test-data/microsoft-office/word/word-layout-extensions.dot",
+      "format": "dot",
+      "role": "native Word 97-2003 template derivative",
+      "bytes": 32768,
+      "sha256": "7701c62b10996044fc0ed5bf4253364321c1fb6a9f5ff6f2202650ac4b9d233f",
+      "native_reopen": "pass"
+    },
+    {
+      "path": "test-data/microsoft-office/word/word-layout-extensions.rtf",
+      "format": "rtf",
+      "role": "native Word RTF derivative from the corrected DOCX",
+      "bytes": 57955,
+      "sha256": "6b4b434ce131934e3287666efe8e995f54d09193330b89f4ab8c514a0b7ab95b",
+      "native_reopen": "pass"
+    }
+  ],
+  "content_markers": [
+    "WORD_LAYOUT_EXTENSIONS_016",
+    "Fixture ID: word-layout-extensions-016",
+    "COLLAPSED_HEADING_016",
+    "FOOTNOTE_ANCHOR_016",
+    "FOOTNOTE_COLUMN_016: native two-column footnote-area specimen.",
+    "CAPTION_NATIVE_016",
+    "SYMBOL_ANCHOR_016",
+    "EMOJI_SCALAR_016",
+    "END_LAYOUT_EXTENSIONS_016",
+    "AUTO_TABLE_016",
+    "Native AutoCaption",
+    "42"
+  ],
+  "coverage": [
+    {
+      "feature": "Word 2012 collapsed paragraph extension",
+      "status": "evidenced_raw_package",
+      "evidence": "DOCX and DOTX each contain one direct w15:collapsed element under the Heading 1 paragraph's w:pPr. Its namespace URI is http://schemas.microsoft.com/office/word/2012/wordml and it has no val attribute, which the library codec interprets as enabled. The native UI reopened the heading in the saved collapsed state. The public DOCX paragraph facade returned None for this source-backed paragraph, so the package XML is the authoritative fixture evidence and the projection gap is recorded below."
+    },
+    {
+      "feature": "Word 2012 footnote-area columns",
+      "status": "evidenced_raw_package",
+      "evidence": "DOCX and DOTX each contain one direct w15:footnoteColumns child of the final w:sectPr with w:val=2. The root mc:Ignorable list contains w15, and the body w:cols has no num attribute, so the two-column setting is specifically on the footnote area rather than the main body. word/footnotes.xml contains user footnote id=1 with FOOTNOTE_COLUMN_016. The public section facade returned no layout and its extracted sectPr omitted the unknown extension; raw package evidence is authoritative."
+    },
+    {
+      "feature": "Native caption and AutoCaption output",
+      "status": "evidenced_fields_only",
+      "evidence": "DOCX, DOTX, DOC, DOT, and RTF preserve the native Figure and Table SEQ fields with cached result 1. The table was created by the native AutoCaption rule and contains AUTO_TABLE_016, Amount, Native AutoCaption, and 42. No finalized DOC or DOT carries nonzero-length caption metadata tables: FIB pointer 52 and 53 are present with lcb=0, and typed caption_tables() reports labels=None and auto=None even for the template DOT. Therefore this fixture proves native SEQ/AutoCaption field output but does not claim SttbfCaption or SttbfAutoCaption table coverage."
+    },
+    {
+      "feature": "Legacy symbol and Unicode scalar controls",
+      "status": "evidenced_as_negative_symex_control",
+      "evidence": "DOCX and DOTX contain one legacy w:sym with w:font=Symbol and w:char=F0A5, plus a separate w:t containing U+1F600 with Apple Color Emoji run fonts. There are zero Word 2015 symEx elements. RTF preserves the legacy symbol as a SYMBOL 165 field and the emoji as paired RTF Unicode controls. The fixture must not be counted as Run symEx coverage."
+    }
+  ],
+  "docx": {
+    "container": {
+      "kind": "OPC ZIP",
+      "zip_test": "pass",
+      "xml_validation": "pass",
+      "member_count": 13,
+      "members": [
+        {"path": "[Content_Types].xml", "bytes": 1576, "sha256": "d88e3b0497f85dca5c239bbf9059ef844016c3260532dde8f5fa0f6f4ee75658"},
+        {"path": "_rels/.rels", "bytes": 590, "sha256": "e19238d7a71fa7a2490776252686f70e2de6238c87cd509b5e3a3cc07c2ea4df"},
+        {"path": "word/document.xml", "bytes": 6843, "sha256": "8cdd66456b33b81803f9a08d40324a8d9f8c8aa97b80ba514dde88d7ee4b326e"},
+        {"path": "word/_rels/document.xml.rels", "bytes": 1081, "sha256": "72b318b561797ad6c748023eeea9b06924c678abe0eef406998ae10d6fb9f154"},
+        {"path": "word/footnotes.xml", "bytes": 3694, "sha256": "ab36ac58ed2177568615703c7e39dc679cbf9fbdb421f8db45f465ac2c491aee"},
+        {"path": "word/endnotes.xml", "bytes": 3190, "sha256": "fe5018094ac2e25accd8eed21ad71711c8d7e245f1af401e7260363a261a223a"},
+        {"path": "word/theme/theme1.xml", "bytes": 8397, "sha256": "2760e6e84d4bf365af6570192dbe9cb57bb32653388d0ea041d116b25b1ca0a2"},
+        {"path": "word/settings.xml", "bytes": 3473, "sha256": "4f8aaa946ec4fec15cae99eb37860f9cf749152c41c40587df988fc0370f8f43"},
+        {"path": "word/styles.xml", "bytes": 44772, "sha256": "7d605ddc033235c8d19602ebd681b82abb53b78af9352b0bc46a7a72ecf281ec"},
+        {"path": "word/webSettings.xml", "bytes": 1069, "sha256": "9d21da07e99d87dfe36f6587ccc669539495e7130c513a0b63e3df49d2d71bd1"},
+        {"path": "word/fontTable.xml", "bytes": 2376, "sha256": "ac7f24fd0b09215af176dd800b238ff7b7ac0a94097304d5884e1236ebc3e33d"},
+        {"path": "docProps/core.xml", "bytes": 745, "sha256": "0f217b1f7eb125bab33f05b6e03a8bff7e3443bdae5a16c93445acbe93a0bfa8"},
+        {"path": "docProps/app.xml", "bytes": 732, "sha256": "0581a497379ab5ad13c50cd73536c104cc0aa822ed1574c8e154a303001fd493"}
+      ],
+      "document_relationship_count": 7,
+      "external_targets": [],
+      "content_type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"
+    },
+    "main_document": {
+      "source_member": "word/document.xml",
+      "xml_counts": {
+        "w:p": 14,
+        "w:r": 20,
+        "w:t": 18,
+        "w:tbl": 1,
+        "w:tr": 2,
+        "w:tc": 4,
+        "w:fldSimple": 2,
+        "w:footnoteReference": 1,
+        "w:sym": 1,
+        "w14:collapsed": 0,
+        "w12:collapsed_by_namespace": 1,
+        "w12:footnoteColumns_by_namespace": 1,
+        "w15sym:symEx_by_namespace": 0
+      },
+      "namespace_context": {
+        "word_2012_prefix_in_fixture": "w15",
+        "word_2012_namespace": "http://schemas.microsoft.com/office/word/2012/wordml",
+        "symex_prefix_declared_but_unused": "w16se",
+        "symex_namespace": "http://schemas.microsoft.com/office/word/2015/wordml/symex",
+        "mc_ignorable": "w14 w15 w16se w16cid w16 w16cex w16sdtdh w16sdtfl w16du wp14"
+      },
+      "markers_and_text": {
+        "paragraphs": [
+          "WORD_LAYOUT_EXTENSIONS_016",
+          "Fixture ID: word-layout-extensions-016",
+          "COLLAPSED_HEADING_016",
+          "Hidden-detail candidate paragraph for native collapsed-heading metadata.",
+          "FOOTNOTE_ANCHOR_016",
+          "Figure 1 CAPTION_NATIVE_016",
+          "SYMBOL_ANCHOR_016 EMOJI_SCALAR_016 😀",
+          "END_LAYOUT_EXTENSIONS_016",
+          "Table 1",
+          "AUTO_TABLE_016 | Amount",
+          "Native AutoCaption | 42"
+        ]
+      },
+      "collapsed_heading": {
+        "paragraph_marker": "COLLAPSED_HEADING_016",
+        "style": "Heading1",
+        "element_prefix": "w15",
+        "element_local_name": "collapsed",
+        "namespace": "http://schemas.microsoft.com/office/word/2012/wordml",
+        "attributes": {},
+        "semantic_value": "enabled because val is absent",
+        "following_detail_paragraph_present": true
+      },
+      "footnote_columns": {
+        "section_count": 1,
+        "element_prefix": "w15",
+        "element_namespace": "http://schemas.microsoft.com/office/word/2012/wordml",
+        "value_attribute": "w:val=2",
+        "mc_ignorable_contains_prefix": true,
+        "main_body_columns": {"element": "w:cols", "num_attribute": null, "space": "720"},
+        "footnote_anchor": "FOOTNOTE_ANCHOR_016",
+        "footnote_part": "word/footnotes.xml",
+        "user_footnote_id": "1"
+      },
+      "captions": {
+        "figure": {
+          "caption_marker": "CAPTION_NATIVE_016",
+          "style": "Caption",
+          "field_element": "w:fldSimple",
+          "instruction": "SEQ Figure \\* ARABIC",
+          "cached_result": "1",
+          "field_dirty_marker": false
+        },
+        "table_auto_caption": {
+          "table_caption_style": "Caption",
+          "field_element": "w:fldSimple",
+          "instruction": "SEQ Table \\* ARABIC",
+          "cached_result": "1",
+          "table_rows": 2,
+          "table_columns": 2,
+          "table_text": [
+            ["AUTO_TABLE_016", "Amount"],
+            ["Native AutoCaption", "42"]
+          ]
+        },
+        "caption_metadata_tables_in_this_docx": "not applicable",
+        "caption_metadata_tables_in_final_doc_and_dot": "absent; see binary.fib below"
+      },
+      "symbols": {
+        "legacy_w_sym": {"count": 1, "font": "Symbol", "char": "F0A5", "marker_before": "SYMBOL_ANCHOR_016"},
+        "unicode_scalar": {"marker": "EMOJI_SCALAR_016", "code_point": "U+1F600", "run_fonts": ["Apple Color Emoji"]},
+        "symEx_count": 0
+      },
+      "footnotes": {
+        "part": "word/footnotes.xml",
+        "record_count": 3,
+        "records": [
+          {"id": "-1", "type": "separator"},
+          {"id": "0", "type": "continuationSeparator"},
+          {"id": "1", "type": "user", "text_marker": "FOOTNOTE_COLUMN_016"}
+        ]
+      },
+      "endnotes": {"part": "word/endnotes.xml", "separator_records": 2, "user_endnote_records": 0}
+    },
+    "dotx_comparison": {
+      "content_type": "application/vnd.openxmlformats-officedocument.wordprocessingml.template.main+xml",
+      "document_xml_same_as_docx": true,
+      "styles_xml_same_as_docx": true,
+      "document_relationships_same_as_docx": true,
+      "content_types_differ_only_in_main_document_override": true,
+      "native_template_scope": "Template container storage is evidenced; template instantiation/execution is not claimed."
+    },
+    "library_projection": {
+      "read_example": {
+        "command": "cargo run -q -p litchi-docx --example read_docx -- test-data/microsoft-office/word/word-layout-extensions.docx",
+        "exit_code": 0,
+        "paragraph_count": 14,
+        "table_count": 1,
+        "text_bytes": 314,
+        "text_contains": [
+          "WORD_LAYOUT_EXTENSIONS_016",
+          "Fixture ID: word-layout-extensions-016",
+          "COLLAPSED_HEADING_016",
+          "FOOTNOTE_ANCHOR_016",
+          "CAPTION_NATIVE_016",
+          "SYMBOL_ANCHOR_016",
+          "EMOJI_SCALAR_016 😀",
+          "AUTO_TABLE_016",
+          "Native AutoCaption",
+          "42"
+        ]
+      },
+      "read_only_facade_probe": {
+        "docx_fields": 2,
+        "docx_sequence_fields": [
+          {"identifier": "Figure", "tail": "\\* ARABIC", "cached_result": "1", "dirty": false, "locked": false},
+          {"identifier": "Table", "tail": "\\* ARABIC", "cached_result": "1", "dirty": false, "locked": false}
+        ],
+        "docx_paragraph_collapsed_values": [],
+        "docx_direct_run_symex_values": [],
+        "docx_section_count": 1,
+        "docx_section_footnote_columns": null,
+        "boundary": "The package XML contains the w15 collapsed and footnoteColumns extensions, but the current source-backed paragraph and section projections did not expose them in this probe. This is a reader projection boundary, not evidence that the native extensions are absent."
+      }
+    }
+  },
+  "dotx": {
+    "container": {
+      "kind": "OPC ZIP",
+      "zip_test": "pass",
+      "xml_validation": "pass",
+      "member_count": 13,
+      "content_type": "application/vnd.openxmlformats-officedocument.wordprocessingml.template.main+xml",
+      "document_relationship_count": 7,
+      "external_targets": [],
+      "document_xml_same_as_docx": true,
+      "selected_member_hashes": {
+        "[Content_Types].xml": {"bytes": 1576, "sha256": "0451801fd1132e8b25780bcfb40a191b0a19196d95e0a47a0f9d7483ae405d56"},
+        "word/document.xml": {"bytes": 6843, "sha256": "8cdd66456b33b81803f9a08d40324a8d9f8c8aa97b80ba514dde88d7ee4b326e"},
+        "word/footnotes.xml": {"bytes": 3694, "sha256": "bcca632e4b47593b5b274142ac2bdfddf590955677945b0e8394c40449da0694"},
+        "word/endnotes.xml": {"bytes": 3190, "sha256": "1651215f2c7d4640d90b3b78c64fa8f659914b509ac812eded612f20796ea277"},
+        "word/settings.xml": {"bytes": 3308, "sha256": "5af32efc37a9ba73c950270ebac63e3b51d3f9f8679cbeaac249f0f1d6eeb427"},
+        "docProps/core.xml": {"bytes": 745, "sha256": "00d6e1b055da55db2ef67c4998827b695673064b05fa5ffa59256e394e670331"}
+      }
+    },
+    "main_document_scope": "The package document.xml contains the same collapsed heading, footnoteColumns, Figure/Table SEQ fields, legacy w:sym, emoji, table, and markers as the DOCX. The final DOTX has no DOC caption metadata tables because those live in binary Word template FIB tables, not OOXML."
+  },
+  "binary": {
+    "doc": {
+      "container": {
+        "kind": "Compound File Binary (CFB/OLE)",
+        "file_identification": "Composite Document File V2 Document, Little Endian, MacOS, code page 10000",
+        "template": "word-layout-extensions.docx",
+        "application": "Microsoft Office Word",
+        "pages": 1,
+        "words": 27,
+        "characters": 352,
+        "security": 0,
+        "fib_version_hex": "0x00C1",
+        "word_version": "Word 97",
+        "is_template": false
+      },
+      "fib_caption_pointers": {
+        "index_52_fc_lcb_SttbfCaption": {"fc": 8350, "lcb": 0},
+        "index_53_fc_lcb_SttbfAutoCaption": {"fc": 8350, "lcb": 0},
+        "interpretation": "Both ranges are absent because lcb is zero; no Caption or AutoCaption STTB is available."
+      },
+      "read_example": {
+        "command": "cargo run -q -p litchi-doc --example read_doc -- test-data/microsoft-office/word/word-layout-extensions.doc",
+        "exit_code": 0,
+        "paragraph_count": 27,
+        "table_count": 1,
+        "total_characters": 547,
+        "footnote_count": 1,
+        "section_count": 1,
+        "sequence_field_count": 2,
+        "symbol_field_count": 0,
+        "caption_tables": {"labels": null, "auto": null},
+        "text_contains": [
+          "WORD_LAYOUT_EXTENSIONS_016",
+          "Fixture ID: word-layout-extensions-016",
+          "COLLAPSED_HEADING_016",
+          "FOOTNOTE_ANCHOR_016",
+          "CAPTION_NATIVE_016",
+          "SYMBOL_ANCHOR_016",
+          "EMOJI_SCALAR_016 😀",
+          "END_LAYOUT_EXTENSIONS_016",
+          "AUTO_TABLE_016",
+          "Native AutoCaption",
+          "FOOTNOTE_COLUMN_016"
+        ]
+      },
+      "typed_sequence_fields": [
+        {"identifier": "Figure", "instruction": " SEQ Figure \\* ARABIC ", "cached_result": "1", "start_cp": 189, "separator_cp": 212, "end_cp": 214, "dirty": true, "results_edited": true, "locked": false},
+        {"identifier": "Table", "instruction": " SEQ Table \\* ARABIC ", "cached_result": "1", "start_cp": 306, "separator_cp": 328, "end_cp": 330, "dirty": true, "results_edited": true, "locked": false}
+      ],
+      "typed_footnote": {"count": 1, "number": 1, "text_marker": "FOOTNOTE_COLUMN_016"},
+      "legacy_symbol_projection": "symbol_fields() returned zero; the visible infinity is stored as a legacy object/control representation rather than a typed litchi-doc SymbolField.",
+      "conversion_boundary": "The DOC retains caption fields, table content, footnote story text, and the visible legacy symbol, but has no OOXML w12 extensions and no caption metadata tables. Heading collapse and footnote-area column semantics are therefore not claimed from this binary derivative."
+    },
+    "dot": {
+      "container": {
+        "kind": "Compound File Binary (CFB/OLE)",
+        "file_identification": "Composite Document File V2 Document, Little Endian, MacOS, code page 10000",
+        "template": "word-layout-extensions.dot",
+        "application": "Microsoft Office Word",
+        "pages": 1,
+        "words": 27,
+        "characters": 352,
+        "security": 0,
+        "fib_version_hex": "0x00C1",
+        "word_version": "Word 97",
+        "is_template": true
+      },
+      "fib_caption_pointers": {
+        "index_52_fc_lcb_SttbfCaption": {"fc": 8498, "lcb": 0},
+        "index_53_fc_lcb_SttbfAutoCaption": {"fc": 8498, "lcb": 0},
+        "interpretation": "The template bit is set, but both caption-table lengths are zero; no actual SttbfCaption or SttbfAutoCaption metadata was saved."
+      },
+      "read_only_typed_boundary": {
+        "paragraph_count": 27,
+        "table_count": 1,
+        "footnote_count": 1,
+        "sequence_field_count": 2,
+        "symbol_field_count": 0,
+        "caption_tables": {"labels": null, "auto": null}
+      },
+      "typed_sequence_fields": [
+        {"identifier": "Figure", "instruction": " SEQ Figure \\* ARABIC ", "cached_result": "1", "dirty": false, "results_edited": false, "locked": false},
+        {"identifier": "Table", "instruction": " SEQ Table \\* ARABIC ", "cached_result": "1", "dirty": true, "results_edited": false, "locked": false}
+      ],
+      "conversion_boundary": "DOT reopens as a native Word template and preserves the two SEQ fields and table, but the field-state flags differ from DOC and the caption metadata tables remain absent."
+    }
+  },
+  "rtf": {
+    "container": {
+      "kind": "Rich Text Format data, version 1, ANSI, code page 1252, default middle east language ID 1025",
+      "external_targets": []
+    },
+    "raw_controls": {
+      "field": 3,
+      "fldinst": 3,
+      "fldrslt": 3,
+      "chftn": 6,
+      "footnote_destination": 1,
+      "sectd": 6,
+      "cols": 0,
+      "trowd": 3,
+      "cell": 10,
+      "row": 2,
+      "mmath": 2,
+      "u": 6,
+      "sym_control": 0,
+      "collapsed_control": 0,
+      "symex_control": 0,
+      "formfield": 0,
+      "marker_counts": {
+        "WORD_LAYOUT_EXTENSIONS_016": 1,
+        "Fixture ID: word-layout-extensions-016": 1,
+        "COLLAPSED_HEADING_016": 1,
+        "FOOTNOTE_ANCHOR_016": 1,
+        "FOOTNOTE_COLUMN_016": 1,
+        "CAPTION_NATIVE_016": 1,
+        "SYMBOL_ANCHOR_016": 1,
+        "EMOJI_SCALAR_016": 1,
+        "END_LAYOUT_EXTENSIONS_016": 1,
+        "AUTO_TABLE_016": 1,
+        "Native AutoCaption": 1
+      },
+      "field_instructions": [
+        "SEQ Figure \\* ARABIC",
+        "SYMBOL 165 \\f \"Symbol\" \\s 12",
+        "SEQ Table \\* ARABIC"
+      ],
+      "unicode_controls": "The emoji is represented by paired RTF Unicode controls for U+1F600 with fallback bytes."
+    },
+    "read_example": {
+      "command": "cargo run -q -p litchi-rtf --example parse_rtf -- test-data/microsoft-office/word/word-layout-extensions.rtf",
+      "exit_code": 1,
+      "error": "MalformedDocument(\"RTF data-store payload cannot be empty\")",
+      "semantic_counts_available": false,
+      "reader_boundary": "Native Word RTF contains the expected raw field, table, footnote, legacy symbol, and Unicode controls, but litchi-rtf stops at the native empty starred data-store payload before semantic traversal."
+    },
+    "textutil_read_only": {
+      "command": "textutil -convert txt -stdout test-data/microsoft-office/word/word-layout-extensions.rtf",
+      "exit_code": 0,
+      "bytes": 328,
+      "markers_preserved": [
+        "WORD_LAYOUT_EXTENSIONS_016",
+        "Fixture ID: word-layout-extensions-016",
+        "COLLAPSED_HEADING_016",
+        "FOOTNOTE_ANCHOR_016",
+        "CAPTION_NATIVE_016",
+        "SYMBOL_ANCHOR_016",
+        "EMOJI_SCALAR_016 😀",
+        "END_LAYOUT_EXTENSIONS_016",
+        "AUTO_TABLE_016",
+        "Native AutoCaption",
+        "42"
+      ],
+      "note": "textutil projects field results and visible body text but omits the footnote story from this text extraction."
+    }
+  },
+  "native_ui_validation": {
+    "observed_by": "Root agent via Computer Use",
+    "application": "Microsoft Word",
+    "version": "16.110.2",
+    "build": "16.110.26062818",
+    "platform": "macOS",
+    "reopen": "pass for all five files",
+    "repair_prompt": false,
+    "observations": [
+      "DOCX and DOTX reopened with the collapsed Heading 1, one footnote, native Figure and Table caption fields, the table, legacy infinity symbol, and emoji visible.",
+      "DOC and DOT reopened as native Word binary files with the same markers, caption fields/table, footnote, and visible symbol content.",
+      "RTF reopened without repair and displayed the resolved caption fields, table, legacy symbol, emoji, and body markers.",
+      "The Word Table AutoCaption rule was temporarily enabled, confirmed after reopening DOT, then restored to zero and closed without resaving; no claim is made that the final DOT stores the AutoCaption preference tables."
+    ],
+    "semantic_scope": "Native UI observations establish save/close/reopen acceptance and visible content. They do not establish field refresh, pagination, layout rendering equivalence, or library support beyond the recorded raw-package and typed-reader probes."
+  },
+  "known_limits": [
+    "The DOCX/DOTX raw XML proves w15:collapsed and w15:footnoteColumns, but the current source-backed DOCX paragraph and section facades did not project those inherited namespace extensions in the read-only probe.",
+    "The final DOT has the template FIB bit but zero-length FIB 52/53 ranges. Native SEQ fields and a table created while AutoCaption was enabled are not equivalent to persisted SttbfCaption/SttbfAutoCaption metadata.",
+    "The DOC and DOT derivatives have no OOXML namespace extensions, so no binary conversion claim is made for collapsed-heading or footnoteColumns semantics.",
+    "The legacy w:sym/SYMBOL field and ordinary Unicode emoji are intentional negative controls for Word 2015 symEx; symEx coverage remains absent.",
+    "The RTF reopened in native Word but litchi-rtf rejects it before semantic traversal because of the native empty data-store payload. Raw control counts and textutil output are evidence of file contents, not a successful litchi-rtf parse.",
+    "No field refresh, AutoCaption preference resave, document protection, user editing, pagination, or visual-rendering equivalence was tested."
+  ]
+}

@@ -1,0 +1,657 @@
+{
+  "schema_version": 1,
+  "fixture_id": "excel-legacy-sheets-016",
+  "generated_on": "2026-10-15",
+  "purpose": "Fixture-specific, read-only inspection of native Excel legacy macro-sheet storage in XLSM, XLSB, and BIFF8 XLS derivatives, including raw sheet relationships, sheet kinds, BOF/index/cell records, and the ordinary-reader boundaries.",
+  "provenance": {
+    "producer_app": "Microsoft Office Excel",
+    "app_version": "16.110.2",
+    "app_build": "16.110.26062818",
+    "package_application": "Microsoft Macintosh Excel",
+    "package_app_version": "16.0300",
+    "platform": "macOS",
+    "authoring_method": "Computer Use / native Microsoft Excel UI",
+    "source": "A fresh native workbook was populated with inert marker text in Sheet1. Ctrl+F11 inserted a real MacroSheet, which was renamed Macro_016 and populated with three inert labels. The workbook was saved through native XLSM, XLSB, and legacy XLS derivatives.",
+    "native_save_chain": [
+      "fresh native workbook with Sheet1 marker content",
+      "Ctrl+F11 Insert MacroSheet; rename Macro1 to Macro_016; enter three labels",
+      "native XLSM save",
+      "native XLSB Save As and close",
+      "native XLSM reopen with macros disabled and Save As legacy XLS",
+      "direct native reopen of XLSB and XLS with no repair; close all files to Home"
+    ],
+    "libreoffice_used": false,
+    "programmatic_office_generation_used": false,
+    "library_code_modified": false,
+    "temporary_probe_harnesses_outside_checkout": true,
+    "macro_execution_during_authoring_or_inspection": false,
+    "all_documents_closed_before_hashing": true,
+    "lock_files_present_at_inspection": false
+  },
+  "scope_and_limits": {
+    "native_variants": [
+      "xlsm",
+      "xlsb",
+      "xls"
+    ],
+    "native_excel_reopen_verified": true,
+    "repair_or_conversion_prompt_observed": false,
+    "legacy_xls_warning": {
+      "shown": true,
+      "accepted": true,
+      "observed": "The native Save As XLS compatibility warning was accepted; the resulting XLS reopened without repair."
+    },
+    "macro_security_action": "Disable Macros was selected where Excel presented the macro-security route; no macro ran.",
+    "macro_sheet_authoring_route": "Ctrl+F11 Insert MacroSheet was observed to create a real MacroSheet. Insert Sheet context actions and Search for macro sheet did not expose another authoring route.",
+    "dialog_sheet_scope": "Search for dialog sheet returned only Protect Workbook, Financial Functions, Cell Styles, Calculate, and Print results. No bounded native dialog-sheet authoring route was found; this fixture does not claim dialog-sheet coverage.",
+    "open_panel_navigation_quirk": "The Open panel appeared disabled for XLSM and XLSB during the native session; Recent entries reopened them successfully. This is a UI navigation observation, not a package or reader result.",
+    "macro_execution": false,
+    "formula_execution": false,
+    "vba_project_present": false,
+    "revision_or_external_link_scope": "Not exercised by this fixture.",
+    "semantic_limit": "The fixture proves native legacy MacroSheet container storage, inert labels, and typed sheet-kind recognition. It does not provide macro-formula evaluation, dialog-sheet authoring, VBA storage, host automation, or macro execution."
+  },
+  "expected_native_content": {
+    "workbook_sheet_order": [
+      "Macro_016",
+      "Sheet1"
+    ],
+    "macro_sheet": {
+      "name": "Macro_016",
+      "visibility": "Visible",
+      "dimension": "A1:A3",
+      "cells": {
+        "A1": "MACROSHEET_MARKER_016",
+        "A2": "INERT_LABEL_ONLY_016",
+        "A3": "END_MACROSHEET_016"
+      },
+      "formula_count": 0,
+      "code_or_vba": false
+    },
+    "worksheet": {
+      "name": "Sheet1",
+      "visibility": "Visible",
+      "dimension": "A1:B2",
+      "cells": {
+        "A1": "EXCEL_LEGACY_SHEETS_016",
+        "B1": "Fixture ID: excel-legacy-sheets-016",
+        "A2": "INERT_CONTENT_016",
+        "B2": "No macro formulas or code are executed."
+      },
+      "formula_count": 0
+    }
+  },
+  "package_inspection": {
+    "xlsm": {
+      "container_kind": "OPC ZIP / macro-enabled SpreadsheetML",
+      "bytes": 9714,
+      "sha256": "9fcf8c04d6b0f28d7ff7fb6bb8d3ba967eb8df0ebe3740674cff564560b8a522",
+      "member_count": 11,
+      "zip_integrity": "pass",
+      "main_workbook": {
+        "path": "xl/workbook.xml",
+        "content_type": "application/vnd.ms-excel.sheet.macroEnabled.main+xml",
+        "sha256": "cdad6c98c82c330e98bd6868d30cbb9f879a2fe47a975e36e425ca1940a12e31",
+        "sheets": [
+          {
+            "name": "Macro_016",
+            "sheetId": "2",
+            "relationship_id": "rId1",
+            "target": "macrosheets/sheet1.xml",
+            "relationship_type": "http://schemas.microsoft.com/office/2006/relationships/xlMacrosheet"
+          },
+          {
+            "name": "Sheet1",
+            "sheetId": "1",
+            "relationship_id": "rId2",
+            "target": "worksheets/sheet1.xml",
+            "relationship_type": "http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet"
+          }
+        ]
+      },
+      "relationship_part": {
+        "path": "xl/_rels/workbook.xml.rels",
+        "bytes": 830,
+        "sha256": "70c797bfa974edd2fb686c2e0981e3c853c23266cd91689222053bf0db0d08f1"
+      },
+      "content_types_part": {
+        "path": "[Content_Types].xml",
+        "bytes": 1249,
+        "sha256": "f96c3ae322df658d724da149868be4c68f65bfd94515a3d92e289e5f1e0c1db5",
+        "macro_sheet_override": "application/vnd.ms-excel.macrosheet+xml",
+        "worksheet_override": "application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"
+      },
+      "macro_sheet_part": {
+        "path": "xl/macrosheets/sheet1.xml",
+        "content_type": "application/vnd.ms-excel.macrosheet+xml",
+        "bytes": 1407,
+        "sha256": "a913330c3e94155894d6db87cd5ee24db30f6bdc6ed742e7303972ec24258e6b",
+        "root": "macrosheet",
+        "dimension": "A1:A3",
+        "cells": [
+          {
+            "reference": "A1",
+            "type": "s",
+            "shared_string_index": 4,
+            "value": "MACROSHEET_MARKER_016",
+            "formula": null
+          },
+          {
+            "reference": "A2",
+            "type": "s",
+            "shared_string_index": 5,
+            "value": "INERT_LABEL_ONLY_016",
+            "formula": null
+          },
+          {
+            "reference": "A3",
+            "type": "s",
+            "shared_string_index": 6,
+            "value": "END_MACROSHEET_016",
+            "formula": null
+          }
+        ],
+        "formula_count": 0
+      },
+      "worksheet_part": {
+        "path": "xl/worksheets/sheet1.xml",
+        "content_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml",
+        "bytes": 1161,
+        "sha256": "960dbb4b1bf0c5c7065c535bd040c895f8c5a81602a7dbdd39380eedbae316bb",
+        "dimension": "A1:B2",
+        "formula_count": 0
+      },
+      "shared_strings_part": {
+        "path": "xl/sharedStrings.xml",
+        "bytes": 445,
+        "sha256": "51796d8dbda4c17da8ff35266f5526fbb1413146bc1ac0105f84fa5adce2eaf8",
+        "count": 7,
+        "unique_count": 7,
+        "values": [
+          "EXCEL_LEGACY_SHEETS_016",
+          "Fixture ID: excel-legacy-sheets-016",
+          "INERT_CONTENT_016",
+          "No macro formulas or code are executed.",
+          "MACROSHEET_MARKER_016",
+          "INERT_LABEL_ONLY_016",
+          "END_MACROSHEET_016"
+        ]
+      },
+      "vba_absence": {
+        "vba_project_part_present": false,
+        "vba_relationship_present": false,
+        "vba_content_type_override_present": false,
+        "macro_sheet_is_not_vba": true
+      }
+    },
+    "xlsb": {
+      "container_kind": "OPC ZIP / binary macro-enabled workbook",
+      "bytes": 9326,
+      "sha256": "39ac24811d4659ee485824db4adf2f25da95a9d9584a935ceaafcbbec43c0101",
+      "member_count": 15,
+      "zip_integrity": "pass",
+      "main_workbook": {
+        "path": "xl/workbook.bin",
+        "content_type": "application/vnd.ms-excel.sheet.binary.macroEnabled.main",
+        "bytes": 926,
+        "sha256": "782c787f46b44c789fc314f93010013aeac2419650134de0668c8460776171dd",
+        "record_count": 36,
+        "bundle_sheets": [
+          {
+            "offset": 420,
+            "record": "BrtBundleSh",
+            "state": 0,
+            "tab_id": 2,
+            "relationship_id": "rId1",
+            "name": "Macro_016",
+            "payload_length": 42
+          },
+          {
+            "offset": 465,
+            "record": "BrtBundleSh",
+            "state": 0,
+            "tab_id": 1,
+            "relationship_id": "rId2",
+            "name": "Sheet1",
+            "payload_length": 36
+          }
+        ],
+        "record_kind_counts": {
+          "0x0083": 1,
+          "0x0084": 1,
+          "0x008F": 1,
+          "0x0090": 1,
+          "0x009C": 2,
+          "0x0099": 1,
+          "0x009D": 1,
+          "0x009E": 1,
+          "0x0023": 2,
+          "0x0024": 2,
+          "0x0025": 3,
+          "0x0026": 3
+        }
+      },
+      "relationship_part": {
+        "path": "xl/_rels/workbook.bin.rels",
+        "bytes": 830,
+        "sha256": "9adc1802e26cc013f682741c42b18a9cd40bd225523b08df1383fc1ab8046939",
+        "macro_sheet_relationship": {
+          "relationship_id": "rId1",
+          "relationship_type": "http://schemas.microsoft.com/office/2006/relationships/xlMacrosheet",
+          "target": "macrosheets/sheet1.bin"
+        },
+        "worksheet_relationship": {
+          "relationship_id": "rId2",
+          "relationship_type": "http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet",
+          "target": "worksheets/sheet1.bin"
+        }
+      },
+      "content_types_part": {
+        "path": "[Content_Types].xml",
+        "bytes": 1327,
+        "sha256": "d5fa22e3cab48772d3978cd8f35e7ab0da8829677f0e71221112d14335d56c69",
+        "macro_sheet_override": "application/vnd.ms-excel.macrosheet",
+        "macro_index_override": "application/vnd.ms-excel.binIndexMs",
+        "worksheet_override": "application/vnd.ms-excel.worksheet",
+        "worksheet_index_override": "application/vnd.ms-excel.binIndexWs"
+      },
+      "macro_sheet_part": {
+        "path": "xl/macrosheets/sheet1.bin",
+        "content_type": "application/vnd.ms-excel.macrosheet",
+        "bytes": 490,
+        "sha256": "0b5c619c585d7a34f7c88604b7c1f4b32cf6169633a387d9e13f8473c08c8dea",
+        "record_count": 36,
+        "required_structure": [
+          "BrtBeginSheet",
+          "BrtWsProp",
+          "BrtWsDim",
+          "BrtBeginWsViews/BrtBeginWsView/BrtSel/BrtEndWsView/BrtEndWsViews",
+          "BrtBeginSheetData",
+          "BrtRowHdr + BrtCellIsst repeated for rows 0, 1, and 2",
+          "BrtEndSheetData",
+          "BrtEndSheet"
+        ],
+        "dimension_record": {
+          "offset": 29,
+          "record": "BrtWsDim",
+          "payload_fields": [0, 2, 0, 0]
+        },
+        "cell_records": [
+          {
+            "offset": 204,
+            "record": "BrtCellIsst",
+            "row_zero_based": 0,
+            "column_zero_based": 0,
+            "shared_string_index": 4,
+            "value": "MACROSHEET_MARKER_016"
+          },
+          {
+            "offset": 260,
+            "record": "BrtCellIsst",
+            "row_zero_based": 1,
+            "column_zero_based": 0,
+            "shared_string_index": 5,
+            "value": "INERT_LABEL_ONLY_016"
+          },
+          {
+            "offset": 316,
+            "record": "BrtCellIsst",
+            "row_zero_based": 2,
+            "column_zero_based": 0,
+            "shared_string_index": 6,
+            "value": "END_MACROSHEET_016"
+          }
+        ],
+        "formula_record_kinds": [],
+        "formula_record_count": 0,
+        "record_kind_counts": {
+          "0x0081": 1,
+          "0x0093": 1,
+          "0x0094": 1,
+          "0x0085": 1,
+          "0x0089": 1,
+          "0x0098": 1,
+          "0x008A": 1,
+          "0x0086": 1,
+          "0x0091": 1,
+          "0x0000": 3,
+          "0x0007": 3,
+          "0x0092": 1,
+          "0x0025": 5,
+          "0x0026": 5
+        }
+      },
+      "macro_index_part": {
+        "path": "xl/macrosheets/binaryIndex1.bin",
+        "content_type": "application/vnd.ms-excel.binIndexMs",
+        "bytes": 61,
+        "sha256": "1217929ac6f593077f93a1a5126c2fa9ddbacf651ed73b4a8f12da87c730dd23",
+        "record_sequence": [
+          {
+            "record": "BrtIndexBlock",
+            "kind": "0x002A",
+            "payload_length": 24
+          },
+          {
+            "record": "BrtIndexRowBlock",
+            "kind": "0x0028",
+            "payload_length": 30
+          },
+          {
+            "record": "BrtIndexPartEnd",
+            "kind": "0x0115",
+            "payload_length": 0
+          }
+        ],
+        "relationship_path": "xl/macrosheets/_rels/sheet1.bin.rels"
+      },
+      "worksheet_part": {
+        "path": "xl/worksheets/sheet1.bin",
+        "content_type": "application/vnd.ms-excel.worksheet",
+        "bytes": 462,
+        "sha256": "96c66742ff614abb20334842e1dae1275b532e5a5f6295224e18c9d54cee9c32",
+        "dimension_record_fields": [0, 1, 0, 1],
+        "formula_record_count": 0
+      },
+      "worksheet_index_part": {
+        "path": "xl/worksheets/binaryIndex1.bin",
+        "content_type": "application/vnd.ms-excel.binIndexWs",
+        "bytes": 55,
+        "sha256": "de8e4ce9a8836f4cbc678240c05b91c2c8d7f8cc25e3f80cfe09eedad267eb4b",
+        "record_sequence": [
+          "BrtIndexBlock",
+          "BrtIndexRowBlock",
+          "BrtIndexPartEnd"
+        ],
+        "relationship_path": "xl/worksheets/_rels/sheet1.bin.rels"
+      },
+      "shared_strings_part": {
+        "path": "xl/sharedStrings.bin",
+        "bytes": 409,
+        "sha256": "5aa2f6ffb92646d6d6e71c6a1e83429f4161ba6c88e503752fa4e5632493c1e9",
+        "count": 7,
+        "values": [
+          "EXCEL_LEGACY_SHEETS_016",
+          "Fixture ID: excel-legacy-sheets-016",
+          "INERT_CONTENT_016",
+          "No macro formulas or code are executed.",
+          "MACROSHEET_MARKER_016",
+          "INERT_LABEL_ONLY_016",
+          "END_MACROSHEET_016"
+        ]
+      },
+      "vba_absence": {
+        "vba_project_part_present": false,
+        "vba_relationship_present": false,
+        "vba_content_type_override_present": false,
+        "macro_sheet_is_not_vba": true
+      }
+    },
+    "xls": {
+      "container_kind": "CFB/OLE2 BIFF8 workbook",
+      "bytes": 26624,
+      "sha256": "1b92de8a6ee8fab102e10cf01661f91444822a6e29fbc03ec90feb40d6744a23",
+      "cfb_signature": "d0cf11e0a1b11ae1",
+      "directory_stream_count": 3,
+      "directory_streams": [
+        {
+          "path": "Workbook",
+          "bytes": 16478,
+          "sha256": "35899348ba2b17e44100489557ffcfcc2eddf518ed55166ad87d30ef94aee44c"
+        },
+        {
+          "path": "\u0005SummaryInformation",
+          "bytes": 4096,
+          "sha256": "539dda45e298bc83a64801cc954575c12e512facaa08a7a5896708675451e402"
+        },
+        {
+          "path": "\u0005DocumentSummaryInformation",
+          "bytes": 4096,
+          "sha256": "a77ec2e2449c455f59e3bf0961f2f747f4ac89428b7017138e567f61db4a63e2"
+        }
+      ],
+      "bound_sheet8": [
+        {
+          "workbook_tab_index": 0,
+          "record_offset": "0x2E17",
+          "substream_position": 15466,
+          "visibility": 0,
+          "sheet_type_code": "0x01",
+          "sheet_type": "MacroSheet",
+          "name": "Macro_016",
+          "payload_length": 17
+        },
+        {
+          "workbook_tab_index": 1,
+          "record_offset": "0x2E2C",
+          "substream_position": 15976,
+          "visibility": 0,
+          "sheet_type_code": "0x00",
+          "sheet_type": "Worksheet",
+          "name": "Sheet1",
+          "payload_length": 14
+        }
+      ],
+      "macro_sheet_substream": {
+        "start_offset": 15466,
+        "end_offset_exclusive": 15976,
+        "record_count": 38,
+        "bof": {
+          "offset": 15466,
+          "record": "BOF",
+          "payload_hex": "000640005a4fcd07c100020006080000",
+          "biff_version": "0x0600",
+          "substream_type": "0x0040",
+          "substream_kind": "MacroSheet"
+        },
+        "index": {
+          "offset": 15486,
+          "record": "INDEX",
+          "payload_length": 20,
+          "payload_hex": "0000000003000000803d0000fe3d0000"
+        },
+        "dimensions": {
+          "offset": 15750,
+          "record": "DIMENSIONS",
+          "payload_length": 14,
+          "payload_hex": "0000000003000000000001000000"
+        },
+        "labelsst_cells": [
+          {
+            "offset": 15828,
+            "row_zero_based": 0,
+            "column_zero_based": 0,
+            "shared_string_index": 4,
+            "value": "MACROSHEET_MARKER_016"
+          },
+          {
+            "offset": 15842,
+            "row_zero_based": 1,
+            "column_zero_based": 0,
+            "shared_string_index": 5,
+            "value": "INERT_LABEL_ONLY_016"
+          },
+          {
+            "offset": 15856,
+            "row_zero_based": 2,
+            "column_zero_based": 0,
+            "shared_string_index": 6,
+            "value": "END_MACROSHEET_016"
+          }
+        ],
+        "formula_record_kind": "0x0006",
+        "formula_record_count": 0,
+        "eof_offset": 15972
+      },
+      "worksheet_substream": {
+        "start_offset": 15976,
+        "end_offset_exclusive": 16478,
+        "bof_substream_type": "0x0010",
+        "substream_kind": "Worksheet",
+        "formula_record_count": 0,
+        "labelsst_cells": [
+          "A1 EXCEL_LEGACY_SHEETS_016",
+          "B1 Fixture ID: excel-legacy-sheets-016",
+          "A2 INERT_CONTENT_016",
+          "B2 No macro formulas or code are executed."
+        ]
+      },
+      "shared_strings": {
+        "unique_count": 7,
+        "values": [
+          "EXCEL_LEGACY_SHEETS_016",
+          "Fixture ID: excel-legacy-sheets-016",
+          "INERT_CONTENT_016",
+          "No macro formulas or code are executed.",
+          "MACROSHEET_MARKER_016",
+          "INERT_LABEL_ONLY_016",
+          "END_MACROSHEET_016"
+        ]
+      },
+      "vba_absence": {
+        "vba_storage_or_stream_present": false,
+        "vba_project_storage_present": false,
+        "module_streams_present": false
+      }
+    }
+  },
+  "library_validation": {
+    "scope": "Read-only reader probes; no library-generated fixture, source, or test edit was performed.",
+    "xlsx_reader": {
+      "command": "cargo run --quiet -p litchi-xlsx --example read_xlsx -- test-data/microsoft-office/excel/excel-legacy-sheets.xlsm",
+      "result": "pass",
+      "sheet_count": 2,
+      "sheet_names": [
+        "Macro_016",
+        "Sheet1"
+      ],
+      "active_sheet": "Macro_016",
+      "macro_sheet_kind": "WorksheetKind::Macro",
+      "worksheet_marker_values_match": true,
+      "typed_nonworksheet_result": "The example reports Macro_016 as non-worksheet. A temporary probe observed extents() and cells(\"A1:A3\") both returning NotWorksheet { sheet: \"Macro_016\" }; this is an explicit type gate, not an empty result."
+    },
+    "xlsb_source_backed_reader": {
+      "temporary_probe": "/tmp/litchi_legacy_probe",
+      "command": "cargo run --quiet --manifest-path /tmp/litchi_legacy_probe/Cargo.toml",
+      "open": "pass",
+      "sheet_count": 2,
+      "sheet_names": [
+        "Macro_016",
+        "Sheet1"
+      ],
+      "worksheet_count": 1,
+      "worksheet_names": [
+        "Sheet1"
+      ],
+      "active_catalog_position": 0,
+      "active_worksheet_index": null,
+      "macro_sheet_lookup": "sheet_by_name(\"Macro_016\") returns a checked sheet handle; worksheet_by_name(\"Macro_016\") returns Ok(None).",
+      "macro_materialize": "UnsupportedFeature(\"source-backed XLSB non-worksheet materialization is not supported\")",
+      "macro_indexed_values": "UnsupportedFeature(\"binary-index value lookup requires an XLSB worksheet\")",
+      "worksheet_readback": {
+        "name": "Sheet1",
+        "dimensions_zero_based": [
+          0,
+          0,
+          1,
+          1
+        ],
+        "materialize": "pass",
+        "indexed_values": "Ok(true)",
+        "marker_values_match": true
+      },
+      "boundary": "The raw macro-sheet binary index is present and structurally framed, but the typed indexed reader intentionally admits only SheetKind::Worksheet. The macro result is an explicit unsupported-feature error or ordinary-worksheet filtering, never a successful empty projection."
+    },
+    "xls_reader": {
+      "temporary_probe": "/tmp/litchi_legacy_probe",
+      "command": "cargo run --quiet --manifest-path /tmp/litchi_legacy_probe/Cargo.toml",
+      "open": "pass",
+      "worksheet_count": 1,
+      "worksheet_names": [
+        "Sheet1"
+      ],
+      "all_sheet_metadata": [
+        {
+          "workbook_index": 0,
+          "name": "Macro_016",
+          "kind": "SheetKind::MacroSheet",
+          "parsed_worksheet_index": null
+        },
+        {
+          "workbook_index": 1,
+          "name": "Sheet1",
+          "kind": "SheetKind::WorksheetOrDialog",
+          "parsed_worksheet_index": 0
+        }
+      ],
+      "macro_lookup": "WorkbookTrait::worksheet_by_name(\"Macro_016\") returns WorksheetNotFound(\"Macro_016\"); Workbook::sheets() retains the MacroSheet metadata.",
+      "worksheet_readback": {
+        "name": "Sheet1",
+        "dimensions_zero_based": [
+          0,
+          0,
+          1,
+          1
+        ],
+        "marker_values_match": true,
+        "tolerance_report": {
+          "defects": [],
+          "unrecorded": 0
+        }
+      },
+      "boundary": "BIFF8 BoundSheet8 and macro-sheet metadata are recognized, while the ordinary worksheet collection contains only Sheet1. No successful empty MacroSheet worksheet is reported."
+    },
+    "reader_source_paths": [
+      "crates/litchi-xlsx/src/workbook/model.rs:69-75 (WorksheetKind::Macro)",
+      "crates/litchi-xlsx/src/workbook/model.rs:1656-1661 and 1744-1747 (cell/extents access through worksheet store)",
+      "crates/litchi-xlsx/src/workbook/model.rs:1767-1772 (NotWorksheet gate)",
+      "crates/litchi-xlsb/src/workbook/source.rs:29-52 (macro/dialog content types and relationships)",
+      "crates/litchi-xlsb/src/workbook/source.rs:636-670 (SheetKind::Macro classification and worksheet-only index list)",
+      "crates/litchi-xlsb/src/workbook/source.rs:1141-1152 (indexed-value worksheet-only gate)",
+      "crates/litchi-xlsb/src/workbook/source.rs:1219-1226 (non-worksheet materialization gate)",
+      "crates/litchi-xls/src/records.rs:151-175 (BoundSheet8 sheet type codes)",
+      "crates/litchi-xls/src/sheet_metadata.rs:13-77 (SheetKind::MacroSheet metadata mapping)",
+      "crates/litchi-xls/src/workbook/source.rs:2284-2311 (macro tabs retained in all-sheet metadata but excluded from worksheet ordinal assignment)"
+    ]
+  },
+  "mismatches_and_boundaries": [
+    "Native Excel created and retained a real MacroSheet in all three formats, but no VBA project storage was created. MacroSheet storage and VBA storage are separate features.",
+    "XLSM and XLSB expose macro-sheet relationships and content types directly. XLS exposes BoundSheet8 type code 0x01 and a BOF substream type 0x0040; the macro substream has labels, INDEX, DIMENSIONS, and EOF but zero Formula records.",
+    "The XLSB macro binary-index part is present with BrtIndexBlock, BrtIndexRowBlock, and BrtIndexPartEnd. The source-backed indexed reader rejects it because the selected sheet kind is Macro, so the rejection is a typed capability boundary rather than evidence of missing index bytes.",
+    "The XLSB worksheet_by_name and XLS ordinary worksheet APIs filter macro tabs from ordinary worksheet selection. Direct all-sheet handles/metadata still retain Macro_016, and the explicit materialization/index errors distinguish suppression from successful empty output.",
+    "No dialog-sheet authoring route was found in the bounded native UI search. The dialog-sheet family is intentionally unclaimed by this fixture."
+  ],
+  "files": [
+    {
+      "path": "test-data/microsoft-office/excel/excel-legacy-sheets.xlsm",
+      "format": "xlsm",
+      "bytes": 9714,
+      "sha256": "9fcf8c04d6b0f28d7ff7fb6bb8d3ba967eb8df0ebe3740674cff564560b8a522",
+      "native_reopen_validation": "pass without repair; Macro_016 and Sheet1 visible; macros not executed"
+    },
+    {
+      "path": "test-data/microsoft-office/excel/excel-legacy-sheets.xlsb",
+      "format": "xlsb",
+      "bytes": 9326,
+      "sha256": "39ac24811d4659ee485824db4adf2f25da95a9d9584a935ceaafcbbec43c0101",
+      "native_reopen_validation": "pass without repair; Macro_016 and Sheet1 visible; macros disabled where prompted"
+    },
+    {
+      "path": "test-data/microsoft-office/excel/excel-legacy-sheets.xls",
+      "format": "xls",
+      "bytes": 26624,
+      "sha256": "1b92de8a6ee8fab102e10cf01661f91444822a6e29fbc03ec90feb40d6744a23",
+      "native_reopen_validation": "pass without repair; Macro_016 and Sheet1 visible; no VBA project present"
+    }
+  ],
+  "validation_methods": [
+    "Computed SHA-256 and byte sizes from all three closed fixture files; no lock files were present.",
+    "Checked ZIP central-directory integrity and read-only member hashes for XLSM and XLSB.",
+    "Inspected XLSM XML macrosheet root/cells, workbook relationships, content types, and shared strings without rewriting package bytes.",
+    "Inspected XLSB BIFF12 workbook, macrosheet, worksheet, binary-index, and shared-string streams with a bounded temporary record parser; the record framing and cell/index offsets are retained above.",
+    "Inspected the CFB directory and BIFF8 Workbook stream with a bounded temporary parser; BoundSheet8, macro BOF/INDEX/DIMENSIONS/LABELSST/EOF, and formula counts are retained above.",
+    "Ran the existing XLSX read_xlsx example and temporary source-backed XLSB/XLS reader probes; no reader source or test was edited.",
+    "Native Excel reopen, macro-security, visible-tab, no-repair, and navigation observations came from the root agent Computer Use session; this inspection process did not operate Office UI."
+  ],
+  "native_ui_observation_source": "Root agent Computer Use session; all three native files were closed, reopened, checked for repair, and closed before hashing."
+}

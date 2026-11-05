@@ -1,0 +1,432 @@
+{
+  "schema_version": 1,
+  "fixture_id": "word-glossary-014",
+  "generated_on": "2026-10-15",
+  "purpose": "Fixture-specific, read-only inspection of native Microsoft Word AutoText/building-block glossary storage in DOTX, its native DOC conversion, and the DOCX conversion boundary.",
+  "provenance": {
+    "producer_app": "Microsoft Office Word",
+    "app_version": "16.110.2",
+    "app_build": "16.110.26062818",
+    "platform": "macOS",
+    "authoring_method": "Computer Use / native Microsoft Word UI",
+    "source": "A fresh native Word template was given four marker paragraphs. The third paragraph, including its paragraph mark, was selected in Insert > AutoText > AutoText and added in the template glossary as LITCHI_AUTOTEXT_014. Native Word Save As produced the DOT and DOCX derivatives. Each file was closed and reopened in native Word before final closure.",
+    "libreoffice_used": false,
+    "programmatic_office_generation_used": false,
+    "library_code_modified": false,
+    "global_normal_template_modified": false,
+    "autocorrect_redefine_prompt": "Word displayed a redefine AutoCorrect prompt while closing the preferences dialog; no redefine action was chosen.",
+    "all_documents_closed_before_hashing": true,
+    "all_documents_reopened_without_repair": true,
+    "fixture_files_are_closed_after_reopen": true
+  },
+  "files": [
+    {
+      "path": "test-data/microsoft-office/word/word-glossary.dotx",
+      "format": "dotx",
+      "role": "native template with OPC glossary document part",
+      "bytes": 20155,
+      "sha256": "37b155e28b456aa9fb3cf51d659397e64d4f8c12b61ac569cf2c4a243beb95e1"
+    },
+    {
+      "path": "test-data/microsoft-office/word/word-glossary.dot",
+      "format": "dot",
+      "role": "native legacy template conversion",
+      "bytes": 34304,
+      "sha256": "62aad141f3e48545549eefe778e721cf2ae2a00251edccfeb7351fcd7e4ee1d8"
+    },
+    {
+      "path": "test-data/microsoft-office/word/word-glossary.docx",
+      "format": "docx",
+      "role": "native document conversion from the glossary template",
+      "bytes": 13372,
+      "sha256": "ace5056f719daebfad5b61f18a69e3cd7e16c5d51966cdeb7506b1199a20e347"
+    }
+  ],
+  "content_markers": {
+    "main_story": [
+      "WORD_GLOSSARY_014",
+      "Fixture ID: word-glossary-014",
+      "AUTOTEXT_BODY_014: reusable native Word building block.",
+      "END_GLOSSARY_014"
+    ],
+    "entry_name": "LITCHI_AUTOTEXT_014",
+    "entry_body": "AUTOTEXT_BODY_014: reusable native Word building block.",
+    "entry_guid": "{5A936865-E9C3-744B-B501-7EAE8EE436CD}",
+    "entry_style": "Normal",
+    "entry_category": "General",
+    "entry_gallery": "docParts",
+    "entry_behavior": "content",
+    "main_story_paragraph_count": 4,
+    "main_story_run_count": 4,
+    "main_story_text_node_count": 4
+  },
+  "coverage": {
+    "feature_groups": [
+      {
+        "feature": "OOXML AutoText/building-block glossary catalog",
+        "status": "evidenced",
+        "evidence": "The native DOTX has word/glossary/document.xml, a glossaryDocument relationship from word/document.xml, one docPart, and a typed litchi-docx Catalog entry named LITCHI_AUTOTEXT_014."
+      },
+      {
+        "feature": "Glossary entry body and semantic properties",
+        "status": "evidenced",
+        "evidence": "The DOTX docPartPr records the name, Normal style, General/docParts category, content insertion behavior, and GUID {5A936865-E9C3-744B-B501-7EAE8EE436CD}; docPartBody contains the native AUTOTEXT_BODY_014 text and an empty trailing paragraph."
+      },
+      {
+        "feature": "Native Word template AutoText UI lookup",
+        "status": "evidenced",
+        "evidence": "After reopening, Word's AutoText dialog with Look in set to the fixture DOTX listed LITCHI_AUTOTEXT_014. The converted DOT likewise listed the same name with Look in set to the fixture DOT."
+      },
+      {
+        "feature": "Legacy DOC AutoText tables and glossary story",
+        "status": "raw-evidence-only",
+        "evidence": "The DOC has a secondary glossary FIB and nonempty SttbfGlsy, PlcfGlsy, and SttbGlsyStyle pointers. The raw table payloads decode to the named AutoText entry, Normal style, and glossary story CPs; the strict typed attached-glossary projection rejects the producer's terminal/ignored CP boundary because ignored_cp equals ccpText."
+      },
+      {
+        "feature": "DOCX conversion of glossary metadata",
+        "status": "conversion-loss-evidenced",
+        "evidence": "The native DOCX keeps the four-paragraph main story byte-identical to the DOTX main document.xml but has no word/glossary directory, no glossary content-type override, and no glossaryDocument relationship. litchi-docx::Package::glossary and glossary_graph both return None."
+      },
+      {
+        "feature": "Digital signature/certificate authoring route",
+        "status": "producer-ui-unverified",
+        "evidence": "In a bounded Word 16.110.2 UI probe for this authoring session, File and Tools had no signature/certificate command and Insert had no Signature Line. This records menu availability only and does not claim that all Word signing routes or configurations are unsupported."
+      }
+    ]
+  },
+  "dotx": {
+    "container": {
+      "kind": "OPC ZIP",
+      "zip_test": "pass",
+      "xml_validation": "pass",
+      "member_count": 17,
+      "external_targets": [],
+      "content_type_overrides": {
+        "/word/document.xml": "application/vnd.openxmlformats-officedocument.wordprocessingml.template.main+xml",
+        "/word/styles.xml": "application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml",
+        "/word/settings.xml": "application/vnd.openxmlformats-officedocument.wordprocessingml.settings+xml",
+        "/word/webSettings.xml": "application/vnd.openxmlformats-officedocument.wordprocessingml.webSettings+xml",
+        "/word/fontTable.xml": "application/vnd.openxmlformats-officedocument.wordprocessingml.fontTable+xml",
+        "/word/glossary/document.xml": "application/vnd.openxmlformats-officedocument.wordprocessingml.document.glossary+xml",
+        "/word/glossary/styles.xml": "application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml",
+        "/word/glossary/settings.xml": "application/vnd.openxmlformats-officedocument.wordprocessingml.settings+xml",
+        "/word/glossary/webSettings.xml": "application/vnd.openxmlformats-officedocument.wordprocessingml.webSettings+xml",
+        "/word/glossary/fontTable.xml": "application/vnd.openxmlformats-officedocument.wordprocessingml.fontTable+xml",
+        "/word/theme/theme1.xml": "application/vnd.openxmlformats-officedocument.theme+xml",
+        "/docProps/core.xml": "application/vnd.openxmlformats-package.core-properties+xml",
+        "/docProps/app.xml": "application/vnd.openxmlformats-officedocument.extended-properties+xml"
+      },
+      "root_relationships": {
+        "rId1": "word/document.xml",
+        "rId2": "docProps/core.xml",
+        "rId3": "docProps/app.xml"
+      },
+      "document_relationships": {
+        "rId1": "styles.xml",
+        "rId2": "settings.xml",
+        "rId3": "webSettings.xml",
+        "rId4": "fontTable.xml",
+        "rId5": "glossary/document.xml",
+        "rId6": "theme/theme1.xml"
+      },
+      "glossary_relationships": {
+        "rId1": "styles.xml",
+        "rId2": "settings.xml",
+        "rId3": "webSettings.xml",
+        "rId4": "fontTable.xml"
+      },
+      "parts": [
+        {"path": "[Content_Types].xml", "bytes": 2025, "sha256": "f1e12ba27a26ae16fb586f1b177b00e519d6997fa8f5903db75cc543b0f042ba"},
+        {"path": "_rels/.rels", "bytes": 590, "sha256": "e19238d7a71fa7a2490776252686f70e2de6238c87cd509b5e3a3cc07c2ea4df"},
+        {"path": "word/document.xml", "bytes": 3570, "sha256": "ef64e314afc6359af8c7785fb75ec3e090855fd1f58c8e9a510811675e8f7507"},
+        {"path": "word/_rels/document.xml.rels", "bytes": 965, "sha256": "8faa2118c6db9ca48596a5f44866219b6b8d2b7ce1e9bf139752caa97e87744f"},
+        {"path": "word/theme/theme1.xml", "bytes": 8397, "sha256": "2760e6e84d4bf365af6570192dbe9cb57bb32653388d0ea041d116b25b1ca0a2"},
+        {"path": "word/settings.xml", "bytes": 3138, "sha256": "9d3de404ced13a95761f8828a22aa328466c8185ca9480e4598759412b4d4850"},
+        {"path": "word/glossary/document.xml", "bytes": 3213, "sha256": "0c3a06dee0d302495367e5b2248418c02fc1dcdbc63230eacb7aeede98936873"},
+        {"path": "word/glossary/settings.xml", "bytes": 2940, "sha256": "4675a770ee62aa8b632885626aa0824e43f79b928ff8c2a53844acab38c39053"},
+        {"path": "word/glossary/_rels/document.xml.rels", "bytes": 685, "sha256": "6a5cb307510ec859954146b9b86e3884fa5b108ee3701a21427d0efc883352b9"},
+        {"path": "word/styles.xml", "bytes": 42760, "sha256": "46bc5c019ef7c7ffff65fc06b2935d252464f798da434900d3606442f3f1240a"},
+        {"path": "word/webSettings.xml", "bytes": 1069, "sha256": "9d21da07e99d87dfe36f6587ccc669539495e7130c513a0b63e3df49d2d71bd1"},
+        {"path": "word/fontTable.xml", "bytes": 1831, "sha256": "88dd0cd28c13a48d979681218c86597fe170a188fc9e3f73ad934b150c47b237"},
+        {"path": "word/glossary/styles.xml", "bytes": 29840, "sha256": "e4ee2692ebc8b92fea381e10c01646ed2deeccd48b9443b891914162b957fd18"},
+        {"path": "word/glossary/webSettings.xml", "bytes": 1069, "sha256": "9d21da07e99d87dfe36f6587ccc669539495e7130c513a0b63e3df49d2d71bd1"},
+        {"path": "word/glossary/fontTable.xml", "bytes": 1831, "sha256": "88dd0cd28c13a48d979681218c86597fe170a188fc9e3f73ad934b150c47b237"},
+        {"path": "docProps/core.xml", "bytes": 745, "sha256": "2547e0c200d21e69be058c6775409589612583da9c13275cf793cb3ab3987ca1"},
+        {"path": "docProps/app.xml", "bytes": 720, "sha256": "9952be5d58e61c4a3f8c1023ddc83ef753476442cb1963b41e8926ad4eb0fab1"}
+      ]
+    },
+    "main_document": {
+      "document_xml_sha256": "ef64e314afc6359af8c7785fb75ec3e090855fd1f58c8e9a510811675e8f7507",
+      "body_paragraph_count": 4,
+      "run_count": 4,
+      "text_node_count": 4,
+      "paragraph_text": [
+        "WORD_GLOSSARY_014",
+        "Fixture ID: word-glossary-014",
+        "AUTOTEXT_BODY_014: reusable native Word building block.",
+        "END_GLOSSARY_014"
+      ],
+      "sect_pr_count": 1,
+      "main_body_has_glossary_content": false
+    },
+    "glossary": {
+      "root": "word/glossary/document.xml",
+      "conformance": "Transitional",
+      "glossary_document_count": 1,
+      "doc_parts_count": 1,
+      "doc_part_count": 1,
+      "doc_part_properties_count": 1,
+      "doc_part_body_count": 1,
+      "doc_part_body_paragraph_count": 2,
+      "doc_part_body_run_count": 1,
+      "doc_part_body_text_node_count": 1,
+      "doc_part_properties": {
+        "name": "LITCHI_AUTOTEXT_014",
+        "style": "Normal",
+        "category_name": "General",
+        "category_gallery": "docParts",
+        "behavior": "content",
+        "guid": "{5A936865-E9C3-744B-B501-7EAE8EE436CD}"
+      },
+      "doc_part_body_text": "AUTOTEXT_BODY_014: reusable native Word building block.",
+      "namespace_ignorable": "w14 w15 w16se w16cid w16 w16cex w16sdtdh w16sdtfl w16du wp14"
+    },
+    "library_projection": {
+      "read_example": {
+        "command": "cargo run -q -p litchi-docx --example read_docx -- test-data/microsoft-office/word/word-glossary.dotx",
+        "exit_code": 0,
+        "paragraph_count": 4,
+        "table_count": 0,
+        "text_bytes": 117,
+        "text": "WORD_GLOSSARY_014Fixture ID: word-glossary-014AUTOTEXT_BODY_014: reusable native Word building block.END_GLOSSARY_014"
+      },
+      "glossary_catalog": {
+        "conformance": "Transitional",
+        "entry_count": 1,
+        "entry_name": "LITCHI_AUTOTEXT_014",
+        "entry_body_bytes": 2711,
+        "entry_props": {
+          "style": "Normal",
+          "category_name": "General",
+          "gallery": "docParts",
+          "kinds": "empty",
+          "inserts": "CONTENT",
+          "description": null,
+          "id": "{5A936865-E9C3-744B-B501-7EAE8EE436CD}"
+        }
+      },
+      "glossary_graph": {
+        "root_name": "/word/glossary/document.xml",
+        "owner_main_part": "/word/document.xml",
+        "owner_relationship_id": "rId5",
+        "owner_target": "glossary/document.xml",
+        "conformance": "Transitional",
+        "root_relationship_count": 4,
+        "auxiliary_part_count": 4,
+        "root_xml_bytes": 3213,
+        "auxiliary_parts": [
+          {"name": "/word/glossary/fontTable.xml", "content_type": "application/vnd.openxmlformats-officedocument.wordprocessingml.fontTable+xml", "bytes": 1831, "sha256": "88dd0cd28c13a48d979681218c86597fe170a188fc9e3f73ad934b150c47b237"},
+          {"name": "/word/glossary/settings.xml", "content_type": "application/vnd.openxmlformats-officedocument.wordprocessingml.settings+xml", "bytes": 2940, "sha256": "4675a770ee62aa8b632885626aa0824e43f79b928ff8c2a53844acab38c39053"},
+          {"name": "/word/glossary/styles.xml", "content_type": "application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml", "bytes": 29840, "sha256": "e4ee2692ebc8b92fea381e10c01646ed2deeccd48b9443b891914162b957fd18"},
+          {"name": "/word/glossary/webSettings.xml", "content_type": "application/vnd.openxmlformats-officedocument.wordprocessingml.webSettings+xml", "bytes": 1069, "sha256": "9d21da07e99d87dfe36f6587ccc669539495e7130c513a0b63e3df49d2d71bd1"
+          }
+        ]
+      }
+    }
+  },
+  "docx": {
+    "container": {
+      "kind": "OPC ZIP",
+      "zip_test": "pass",
+      "xml_validation": "pass",
+      "member_count": 11,
+      "external_targets": [],
+      "content_type_overrides": {
+        "/word/document.xml": "application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml",
+        "/word/styles.xml": "application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml",
+        "/word/settings.xml": "application/vnd.openxmlformats-officedocument.wordprocessingml.settings+xml",
+        "/word/webSettings.xml": "application/vnd.openxmlformats-officedocument.wordprocessingml.webSettings+xml",
+        "/word/fontTable.xml": "application/vnd.openxmlformats-officedocument.wordprocessingml.fontTable+xml",
+        "/word/theme/theme1.xml": "application/vnd.openxmlformats-officedocument.theme+xml",
+        "/docProps/core.xml": "application/vnd.openxmlformats-package.core-properties+xml",
+        "/docProps/app.xml": "application/vnd.openxmlformats-officedocument.extended-properties+xml"
+      },
+      "root_relationships": {
+        "rId1": "word/document.xml",
+        "rId2": "docProps/core.xml",
+        "rId3": "docProps/app.xml"
+      },
+      "document_relationships": {
+        "rId1": "styles.xml",
+        "rId2": "settings.xml",
+        "rId3": "webSettings.xml",
+        "rId4": "fontTable.xml",
+        "rId5": "theme/theme1.xml"
+      },
+      "glossary_members_present": false,
+      "glossary_relationship_present": false,
+      "parts": [
+        {"path": "[Content_Types].xml", "bytes": 1312, "sha256": "dfa90f373b8fd8147ee3e4bfe1ee059e536cc1b068f7ec140c3fc0e6554f331a"},
+        {"path": "_rels/.rels", "bytes": 590, "sha256": "e19238d7a71fa7a2490776252686f70e2de6238c87cd509b5e3a3cc07c2ea4df"},
+        {"path": "word/document.xml", "bytes": 3570, "sha256": "ef64e314afc6359af8c7785fb75ec3e090855fd1f58c8e9a510811675e8f7507"},
+        {"path": "word/_rels/document.xml.rels", "bytes": 817, "sha256": "b725d5476e76f555fc24ecb908474fd29b671687336e5e1177a5c4c35cb5939f"},
+        {"path": "word/theme/theme1.xml", "bytes": 8397, "sha256": "2760e6e84d4bf365af6570192dbe9cb57bb32653388d0ea041d116b25b1ca0a2"},
+        {"path": "word/settings.xml", "bytes": 3225, "sha256": "b0c826cf793aa06051f8b2058c3dd341f83994a0db4e082ec5933561f25c9e5c"},
+        {"path": "word/styles.xml", "bytes": 42760, "sha256": "46bc5c019ef7c7ffff65fc06b2935d252464f798da434900d3606442f3f1240a"},
+        {"path": "word/webSettings.xml", "bytes": 1069, "sha256": "9d21da07e99d87dfe36f6587ccc669539495e7130c513a0b63e3df49d2d71bd1"},
+        {"path": "word/fontTable.xml", "bytes": 1831, "sha256": "88dd0cd28c13a48d979681218c86597fe170a188fc9e3f73ad934b150c47b237"},
+        {"path": "docProps/core.xml", "bytes": 745, "sha256": "915d82122f780d2ad3cd402df30f6bae42b48c5c58abd4b8dc502a38ab805d55"},
+        {"path": "docProps/app.xml", "bytes": 720, "sha256": "5bc60a6f2517e5680e3e70742c3e776da0a1645d3da65f68e66d0e6f6be98d7d"}
+      ]
+    },
+    "main_document": {
+      "document_xml_sha256": "ef64e314afc6359af8c7785fb75ec3e090855fd1f58c8e9a510811675e8f7507",
+      "byte_identical_to_dotx_main_document": true,
+      "body_paragraph_count": 4,
+      "run_count": 4,
+      "text_node_count": 4,
+      "paragraph_text": [
+        "WORD_GLOSSARY_014",
+        "Fixture ID: word-glossary-014",
+        "AUTOTEXT_BODY_014: reusable native Word building block.",
+        "END_GLOSSARY_014"
+      ]
+    },
+    "library_projection": {
+      "read_example": {
+        "command": "cargo run -q -p litchi-docx --example read_docx -- test-data/microsoft-office/word/word-glossary.docx",
+        "exit_code": 0,
+        "paragraph_count": 4,
+        "table_count": 0,
+        "text_bytes": 117,
+        "text": "WORD_GLOSSARY_014Fixture ID: word-glossary-014AUTOTEXT_BODY_014: reusable native Word building block.END_GLOSSARY_014"
+      },
+      "glossary_catalog": null,
+      "glossary_graph": null,
+      "interpretation": "The main story is readable and retains the marker body, but the native Save As DOCX conversion did not retain the AutoText catalog."
+    }
+  },
+  "doc": {
+    "container": {
+      "kind": "Compound Document File V2 / CFB",
+      "file_identification": "Microsoft Composite Document File V2, MacOS code page 10000, Microsoft Office Word",
+      "bytes": 34304,
+      "sha256": "62aad141f3e48545549eefe778e721cf2ae2a00251edccfeb7351fcd7e4ee1d8",
+      "stream_count": 5,
+      "streams": [
+        {"path": "1Table", "bytes": 15818, "sha256": "ee8fc9031f4aa1b49852f7531a2fd7d4a9e90d5da81244abb5adc715650fa282", "markers": {"LITCHI_AUTOTEXT_014": {"ascii": 0, "utf16le": 1}}},
+        {"path": "\\u0001CompObj", "bytes": 114, "sha256": "f70fe384c672865fff4bb8ab60d73098bc751e8f2aa915b8aff2e2085648b428"},
+        {"path": "WordDocument", "bytes": 6702, "sha256": "0a6826e1172abd1f956b25689fccd29c782682380519bc8155256197f9330ad3", "markers": {"AUTOTEXT_BODY_014": {"ascii": 2, "utf16le": 0}, "main_story_offsets": {"WORD_GLOSSARY_014": 2048, "Fixture ID: word-glossary-014": 2066, "AUTOTEXT_BODY_014": [2096, 6144], "END_GLOSSARY_014": 2152}, "attached_story_candidate": {"offset": 6144, "bytes": 58, "text": "AUTOTEXT_BODY_014: reusable native Word building block.\r\r\r"}}},
+        {"path": "\\u0005SummaryInformation", "bytes": 4096, "sha256": "145a2cfd8a1af36ad1733676d4b5704ac89037631cbd2b7370e8dd84bb328b88"},
+        {"path": "\\u0005DocumentSummaryInformation", "bytes": 4096, "sha256": "782a1e507e5067a4b30d40fd8dc8ada5882acd8255b5787367903cba33f6fd7c"}
+      ]
+    },
+    "main_story": {
+      "read_example": {
+        "command": "cargo run -q -p litchi-doc --example read_doc -- test-data/microsoft-office/word/word-glossary.dot",
+        "exit_code": 0,
+        "paragraph_count": 4,
+        "table_count": 0,
+        "total_characters": 121,
+        "text_with_cr": "WORD_GLOSSARY_014\rFixture ID: word-glossary-014\rAUTOTEXT_BODY_014: reusable native Word building block.\rEND_GLOSSARY_014\r",
+        "fib_version": "0x00C1",
+        "fib_version_name": "Word 97"
+      },
+      "body_markers_retained": true
+    },
+    "fib_and_glossary": {
+      "main_fib": {
+        "offset": 0,
+        "version": "0x00C1",
+        "version_name": "Word 97",
+        "is_template": true,
+        "is_glossary_document": false,
+        "next_fib_page": 8,
+        "cbMac": 6702,
+        "which_table_stream": "1Table",
+        "ccpText": 121,
+        "raw_data_bytes": 6702,
+        "raw_data_sha256": "0a6826e1172abd1f956b25689fccd29c782682380519bc8155256197f9330ad3",
+        "glossary_table_pointers": {
+          "SttbfGlsy_index_9": {"fc": 7698, "lcb": 0},
+          "PlcfGlsy_index_10": {"fc": 7698, "lcb": 0},
+          "SttbGlsyStyle_index_83": {"fc": 0, "lcb": 0}
+        }
+      },
+      "secondary_glossary_fib": {
+        "offset": 4096,
+        "version": "0x00C1",
+        "version_name": "Word 97",
+        "is_template": false,
+        "is_glossary_document": true,
+        "next_fib_page": 0,
+        "cbMac": 6702,
+        "which_table_stream": "1Table",
+        "ccpText": 58,
+        "raw_data_bytes": 2606,
+        "raw_data_sha256": "1d8750eeceaf886a6d1fd2abda028077e45dfa32fca4a17f092d2c8dbbceb1b6",
+        "glossary_table_pointers": {
+          "SttbfGlsy_index_9": {"fc": 14502, "lcb": 50, "payload_sha256": "df3104c171fe3b3cec51c28b73694db138367849ad898b9d20d994b29625e52c", "payload_hex": "ffff0100040013004c00490054004300480049005f004100550054004f00580054005f0030003100340000000000"},
+          "SttbGlsyStyle_index_83": {"fc": 14552, "lcb": 21, "payload_sha256": "3c70346da75a4d6385873ba825412aff332532d273a9460dfd58ad662df70155", "payload_hex": "ffff0100010006004e006f0072006d0061006c0001"},
+          "PlcfGlsy_index_10": {"fc": 14573, "lcb": 12, "payload_sha256": "7b202c7512206dfb18b79bfaa2b0757e1477293006aeabe72aadca2f6fb87c6d", "payload_hex": "00000000390000003a000000"}
+        },
+        "raw_table_decoding": {
+          "SttbfGlsy": {"count": 1, "entry_name": "LITCHI_AUTOTEXT_014", "kind_byte": "0x00 NamedAutoText", "style_index": 0},
+          "SttbGlsyStyle": {"count": 1, "style_name": "Normal", "use_count": 1},
+          "PlcfGlsy_cp_values": [0, 57, 58],
+          "terminal_cp": 57,
+          "ignored_cp": 58,
+          "ccpText": 58
+        }
+      },
+      "reader_projection": {
+        "document_glossary_metadata": null,
+        "attached_glossary": "error",
+        "attached_glossary_error": "Corrupted file: PlcfGlsy terminal CPs are not strictly increasing within ccpText",
+        "direct_secondary_metadata_parse_error": "Corrupted file: PlcfGlsy terminal CPs are not strictly increasing within ccpText",
+        "tolerance_report": "empty",
+        "interpretation": "The native DOC visibly retains the AutoText entry in Word and stores the expected raw glossary structures, but the current strict reader refuses the optional attached-glossary projection because ignored_cp (58) equals ccpText (58). This is recorded as a producer boundary, not repaired or normalized by the audit."
+      }
+    },
+    "native_conversion_observation": {
+      "word_reopen": "opened without repair and the fixture DOT's AutoText dialog listed LITCHI_AUTOTEXT_014",
+      "rendering_or_insertion_test": "not performed",
+      "global_template_effect": "none observed"
+    }
+  },
+  "conversion_comparison": {
+    "dotx_to_doc": {
+      "main_body_markers": "retained",
+      "native_glossary_lookup": "retained in Word UI",
+      "legacy_glossary_storage": "secondary FIB plus SttbfGlsy/PlcfGlsy/SttbGlsyStyle raw evidence",
+      "typed_reader": "main story succeeds; optional attached glossary rejects native CP boundary"
+    },
+    "dotx_to_docx": {
+      "main_document_xml_byte_equal": true,
+      "body_markers": "retained",
+      "glossary_document_part": "removed",
+      "glossary_relationship": "removed",
+      "typed_catalog": "None",
+      "semantic_claim": "The DOCX fixture verifies body preservation and native glossary graph loss on this Word conversion path; it does not claim that Word can no longer use any external or global AutoText source."
+    }
+  },
+  "native_ui_validation": {
+    "dotx": "reopened directly in Word without repair; AutoText dialog Look in fixture DOTX showed LITCHI_AUTOTEXT_014",
+    "dot": "reopened directly in Word without repair; AutoText dialog Look in fixture DOT showed LITCHI_AUTOTEXT_014",
+    "docx": "reopened directly in Word without repair; body markers intact; no fixture glossary lookup was claimed",
+    "documents_closed_after_validation": true,
+    "signature_probe": {
+      "scope": "bounded Word 16.110.2 File, Tools, and Insert menu probe during this fixture session",
+      "observed": ["File menu had no signature/certificate command", "Tools menu had no signature/certificate command", "Insert menu had no Signature Line command"],
+      "status": "producer-ui-unverified",
+      "claim_limit": "menu absence in this configuration is not a global unsupported-feature conclusion"
+    }
+  },
+  "known_limits": [
+    "No library source or fixture bytes were modified during inspection.",
+    "No AutoText insertion, rendering equivalence, or global Normal.dotm lookup test was performed.",
+    "The DOC secondary glossary story is raw-evidence-only because the native producer's terminal/ignored CP boundary is rejected by the current strict typed DOC reader.",
+    "DOCX absence of an in-package glossary graph is established from the saved package and typed reader; it does not characterize global AutoText sources.",
+    "The bounded signature menu probe does not establish support or absence across Word editions, add-ins, or alternate signing workflows."
+  ]
+}

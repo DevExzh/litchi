@@ -1,0 +1,374 @@
+{
+  "schema_version": 1,
+  "fixture_id": "word-math-navigation-005",
+  "generated_on": "2026-10-15",
+  "purpose": "Fixture-specific, read-only inspection of native Microsoft Word equations, automatic table of contents, multilevel numbering, bookmarks, and page-reference fields across DOCX, DOTX, DOC, and RTF derivatives.",
+  "provenance": {
+    "producer_app": "Microsoft Office Word",
+    "app_version": "16.110.2",
+    "app_build": "16.110.26062818",
+    "platform": "macOS",
+    "authoring_method": "Computer Use / native Microsoft Word UI",
+    "source": "Synthetic content entered and formatted in a native Word document; native Word Save As produced the DOTX, DOC, and RTF derivatives. The DOCX was saved under a native filename and then renamed after close without changing its bytes.",
+    "libreoffice_used": false,
+    "programmatic_office_generation_used": false,
+    "library_code_modified": false,
+    "all_documents_closed_before_hashing": true
+  },
+  "files": [
+    {
+      "path": "test-data/microsoft-office/word/word-math-navigation.docx",
+      "format": "docx",
+      "bytes": 17521,
+      "sha256": "1a92918478af7b47327974f72428422b65290001ee124bb73f7a7aaf226a34ee"
+    },
+    {
+      "path": "test-data/microsoft-office/word/word-math-navigation.dotx",
+      "format": "dotx",
+      "bytes": 17499,
+      "sha256": "c3107f4aa9a4c2663505cb627761f68e10b21810ea6a6f590b6b86803a0e915d"
+    },
+    {
+      "path": "test-data/microsoft-office/word/word-math-navigation.doc",
+      "format": "doc",
+      "bytes": 83456,
+      "sha256": "077d33455154e70c6b926eb69e74c8b2501cc9e6090ea217d77254ee4a6b0f2e"
+    },
+    {
+      "path": "test-data/microsoft-office/word/word-math-navigation.rtf",
+      "format": "rtf",
+      "bytes": 218344,
+      "sha256": "3e82fbc1a67118fed51e333f43970a4547f1d31b18f0c2cec2ccea381571ab27"
+    }
+  ],
+  "docx": {
+    "container": {
+      "kind": "OPC ZIP",
+      "zip_test": "pass",
+      "xml_validation": "pass",
+      "member_count": 15,
+      "members": [
+        "[Content_Types].xml",
+        "_rels/.rels",
+        "word/document.xml",
+        "word/_rels/document.xml.rels",
+        "word/theme/theme1.xml",
+        "word/settings.xml",
+        "customXml/item1.xml",
+        "customXml/itemProps1.xml",
+        "word/numbering.xml",
+        "word/styles.xml",
+        "word/webSettings.xml",
+        "word/fontTable.xml",
+        "docProps/core.xml",
+        "docProps/app.xml",
+        "customXml/_rels/item1.xml.rels"
+      ],
+      "content_type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"
+    },
+    "integrity": {
+      "xml_part_count": 15,
+      "relationship_count": 11,
+      "target_check": "pass",
+      "unresolved_internal_targets": [],
+      "external_targets": []
+    },
+    "main_document": {
+      "markers": [
+        "Native Word equations and navigation",
+        "Fixture ID: word-math-navigation-005",
+        "TOC_SECTION_START_005",
+        "TOC_SOURCE_H1_005 Equations",
+        "TOC_SOURCE_H2_005 Numbered cases",
+        "TOC_SECTION_END_005",
+        "OMML_INLINE_005",
+        "OMML_DISPLAY_005",
+        "EQUATION_SECTION_END_005",
+        "NUMBERED_FIRST_005",
+        "NUMBERED_NESTED_005",
+        "NUMBERED_SECOND_005",
+        "PAGEREF_TARGET_005",
+        "BOOKMARK_PAGE_005",
+        "MATH_NAVIGATION_END_005"
+      ],
+      "xml_counts": {
+        "p": 21,
+        "r": 41,
+        "t": 21,
+        "tbl": 0,
+        "sdt": 1,
+        "fldChar": 12,
+        "instrText": 4,
+        "bookmarkStart": 3,
+        "bookmarkEnd": 3,
+        "numPr": 3,
+        "hyperlink": 2,
+        "oMath": 2,
+        "oMathPara": 1
+      },
+      "equations": {
+        "inline": {
+          "marker": "OMML_INLINE_005",
+          "object_count": 1,
+          "structures": ["m:sSup", "m:f", "m:rad"],
+          "math_text": "x^2+1/2+sqrt9",
+          "observed_native_ui": "Inline equation visibly rendered as x^2 + 1/2 + square root of 9 after Word LaTeX input and Convert."
+        },
+        "display": {
+          "marker": "OMML_DISPLAY_005",
+          "object_count": 1,
+          "container": "m:oMathPara",
+          "structures": ["m:nary", "m:sub", "m:sup", "m:e"],
+          "operator": "∑",
+          "lower_limit": "k=1",
+          "upper_limit": "4",
+          "body": "k",
+          "trailing_text": "=10",
+          "observed_native_ui": "Separate display equation visibly rendered as sum k=1..4 k = 10."
+        }
+      },
+      "table_of_contents": {
+        "section_markers": ["TOC_SECTION_START_005", "TOC_SECTION_END_005"],
+        "content_control_count": 1,
+        "content_control_gallery": "Table of Contents",
+        "instruction": "TOC \\o \"1-3\" \\h \\z \\u",
+        "cached_entries": [
+          {
+            "text": "TOC_SOURCE_H1_005 Equations",
+            "style": "TOC1",
+            "cached_page": "1",
+            "bookmark": "_Toc242967666"
+          },
+          {
+            "text": "TOC_SOURCE_H2_005 Numbered cases",
+            "style": "TOC2",
+            "cached_page": "1",
+            "bookmark": "_Toc242967667"
+          }
+        ],
+        "observed_native_ui": "Automatic Classic table of contents remained visible after native close and reopen."
+      },
+      "navigation_fields": {
+        "toc_internal_page_fields": [
+          "PAGEREF _Toc242967666 \\h",
+          "PAGEREF _Toc242967667 \\h"
+        ],
+        "bookmark": {
+          "name": "LITCHI_PAGE_TARGET_005",
+          "range_text": "PAGEREF_TARGET_005"
+        },
+        "page_reference": {
+          "instruction": "PAGEREF LITCHI_PAGE_TARGET_005 \\h",
+          "cached_result": "1",
+          "marker": "BOOKMARK_PAGE_005"
+        },
+        "field_refresh_or_recalculation_performed": false
+      },
+      "numbering": {
+        "abstract_num_count": 1,
+        "num_count": 1,
+        "used_num_id": "1",
+        "used_levels": [
+          {"marker": "NUMBERED_FIRST_005", "ilvl": "0", "numId": "1", "native_label": "1."},
+          {"marker": "NUMBERED_NESTED_005", "ilvl": "1", "numId": "1", "native_label": "1.1."},
+          {"marker": "NUMBERED_SECOND_005", "ilvl": "0", "numId": "1", "native_label": "2."}
+        ],
+        "abstract_num": {
+          "id": "0",
+          "multi_level_type": "multilevel",
+          "restartNumberingAfterBreak": "0",
+          "level_count": 9,
+          "level_0": {"start": "1", "numFmt": "decimal", "lvlText": "%1."},
+          "level_1": {"start": "1", "numFmt": "decimal", "lvlText": "%1.%2."}
+        },
+        "observed_native_ui": "Cross-reference dialog and native Word reopen showed hierarchical labels 1, 1.1, and 2; AX body labels were stale and are not used as package evidence."
+      },
+      "custom_xml": {
+        "part": "customXml/item1.xml",
+        "schema": "http://schemas.openxmlformats.org/officeDocument/2006/bibliography",
+        "root": "b:Sources",
+        "source_record_count": 0,
+        "note": "Word emitted the default bibliography data store, but this fixture does not claim a citation source record or bibliography field."
+      }
+    },
+    "part_presence": {
+      "numbering": true,
+      "custom_xml": true,
+      "vba_project": false,
+      "drawings": false,
+      "charts": false,
+      "notes": false,
+      "headers": false,
+      "footers": false
+    },
+    "library_projection": {
+      "read_example": {
+        "command": "cargo run -q -p litchi-docx --example read_docx -- test-data/microsoft-office/word/word-math-navigation.docx",
+        "exit_code": 0,
+        "paragraph_count": 21,
+        "table_count": 0,
+        "text_bytes": 427,
+        "text_contains": [
+          "Native Word equations and navigation",
+          "Fixture ID: word-math-navigation-005",
+          "TOC_SOURCE_H1_005 Equations",
+          "TOC_SOURCE_H2_005 Numbered cases",
+          "OMML_INLINE_005",
+          "OMML_DISPLAY_005",
+          "NUMBERED_NESTED_005",
+          "BOOKMARK_PAGE_005: 1",
+          "MATH_NAVIGATION_END_005"
+        ]
+      }
+    }
+  },
+  "dotx": {
+    "container": {
+      "kind": "OPC ZIP",
+      "zip_test": "pass",
+      "xml_validation": "pass",
+      "member_count": 15,
+      "content_type": "application/vnd.openxmlformats-officedocument.wordprocessingml.template.main+xml",
+      "document_xml_same_as_docx": true,
+      "numbering_xml_same_as_docx": true,
+      "external_targets": []
+    },
+    "main_document": {
+      "xml_counts_same_as_docx": true,
+      "equation_and_navigation_scope_same_as_docx": true
+    },
+    "library_projection": {
+      "read_example": {
+        "command": "cargo run -q -p litchi-docx --example read_docx -- test-data/microsoft-office/word/word-math-navigation.dotx",
+        "exit_code": 0,
+        "paragraph_count": 21,
+        "table_count": 0,
+        "text_bytes": 427
+      }
+    },
+    "template_scope": "Native template container and package content type are evidenced; template instantiation or execution semantics are not claimed."
+  },
+  "doc": {
+    "container": {
+      "kind": "Compound File Binary (CFB/OLE)",
+      "file_identification": "Composite Document File V2 Document, Little Endian, MacOS, code page 10000",
+      "bytes": 83456,
+      "template": "word-math-navigation.dotx",
+      "application": "Microsoft Office Word",
+      "pages": 1,
+      "words": 46,
+      "characters": 607,
+      "security": 0,
+      "reader_word_version": "Word 97",
+      "reader_fib_version_hex": "0x00C1"
+    },
+    "read_example": {
+      "command": "cargo run -q -p litchi-doc --example read_doc -- test-data/microsoft-office/word/word-math-navigation.doc",
+      "exit_code": 0,
+      "paragraph_count": 21,
+      "table_count": 0,
+      "total_characters": 653,
+      "text_contains": [
+        "Native Word equations and navigation",
+        "Fixture ID: word-math-navigation-005",
+        "TOC_SECTION_START_005",
+        "TOC_SOURCE_H1_005 Equations",
+        "TOC_SOURCE_H2_005 Numbered cases",
+        "TOC_SECTION_END_005",
+        "OMML_INLINE_005: QUOTE",
+        "OMML_DISPLAY_005",
+        "EQUATION_SECTION_END_005",
+        "NUMBERED_FIRST_005",
+        "NUMBERED_NESTED_005",
+        "NUMBERED_SECOND_005",
+        "PAGEREF_TARGET_005",
+        "BOOKMARK_PAGE_005",
+        "MATH_NAVIGATION_END_005"
+      ],
+      "equation_projection": "The DOC reader exposes the converted inline equation as a QUOTE/object projection and does not expose the display equation's OMML semantics. Native Word visibly retained equation picture fallbacks: Picture2 inline and Picture1 for the summation."
+    },
+    "textutil_read_only": {
+      "command": "textutil -convert txt -stdout test-data/microsoft-office/word/word-math-navigation.doc",
+      "exit_code": 0,
+      "observed": "Extracted text retains the TOC field instructions/results, heading entries, numbered markers, PAGEREF instruction/result, and fixture markers; equation content is represented by legacy field/object controls rather than OMML text."
+    },
+    "conversion_scope": "The DOC is a native Word 97-2003 derivative. Its equation picture/object fallbacks are valid legacy evidence but are not semantic parity with the DOCX OMML trees."
+  },
+  "rtf": {
+    "container": {
+      "kind": "Rich Text Format data, version 1, ANSI, code page 1252",
+      "external_targets": []
+    },
+    "raw_control_counts": {
+      "mmath": 2,
+      "mmathPict": 2,
+      "moMath": 2,
+      "moMathPara": 1,
+      "msSup": 1,
+      "mnary": 1,
+      "field": 6,
+      "fldinst": 6,
+      "fldrslt": 6,
+      "bkmkstart": 3,
+      "bkmkend": 3,
+      "listtable": 1,
+      "listoverridetable": 1,
+      "listtext": 3,
+      "ls1": 4,
+      "ilvl1": 2,
+      "shppict": 2,
+      "pict": 4
+    },
+    "markers": [
+      "Native Word equations and navigation",
+      "Fixture ID: word-math-navigation-005",
+      "TOC_SECTION_START_005",
+      "TOC_SOURCE_H1_005 Equations",
+      "TOC_SOURCE_H2_005 Numbered cases",
+      "TOC_SECTION_END_005",
+      "OMML_INLINE_005",
+      "OMML_DISPLAY_005",
+      "EQUATION_SECTION_END_005",
+      "NUMBERED_FIRST_005",
+      "NUMBERED_NESTED_005",
+      "NUMBERED_SECOND_005",
+      "PAGEREF_TARGET_005",
+      "BOOKMARK_PAGE_005",
+      "MATH_NAVIGATION_END_005"
+    ],
+    "read_example": {
+      "command": "cargo run -q -p litchi-rtf --example parse_rtf -- test-data/microsoft-office/word/word-math-navigation.rtf",
+      "exit_code": 1,
+      "error": "MalformedDocument(\"RTF math zone contains an unsupported object destination\")"
+    },
+    "textutil_read_only": {
+      "command": "textutil -convert txt -stdout test-data/microsoft-office/word/word-math-navigation.rtf",
+      "exit_code": 0,
+      "observed": "Extracted text retains TOC entries and cached page 1, all numbered and navigation markers, and the equation boundary markers; the equation text itself is blank in the text projection."
+    },
+    "semantic_scope": "Raw native RTF math, field, bookmark, list, and picture controls are recorded, but no semantic litchi-rtf parse claim is made because the reader rejects the native math object destination."
+  },
+  "native_ui_validation": {
+    "observed_by": "root agent via Computer Use",
+    "application": "Microsoft Word",
+    "version": "16.110.2",
+    "build": "16.110.26062818",
+    "platform": "macOS",
+    "reopen": "pass for all four files",
+    "repair_prompt": false,
+    "observations": [
+      "DOCX and DOTX reopened with both native equation objects, the automatic Classic table of contents, cached TOC page references, hierarchical list labels 1, 1.1, and 2, and the bookmark/PAGEREF result visible.",
+      "DOC reopened without repair; Word displayed legacy equation picture fallbacks, including the inline equation and the summation, while retaining TOC and page-reference field content.",
+      "RTF reopened without repair; Word retained the equation objects, TOC, numbered list, bookmark, and page-reference content visible in the native UI."
+    ],
+    "semantic_scope": "Native UI observations establish save/close/reopen acceptance and visible content for the listed scopes; they do not establish field refresh, pagination, rendering equivalence, or library support beyond the recorded package and reader probes."
+  },
+  "known_limits": [
+    "The DOCX and DOTX field results are cached native results; no field refresh, TOC regeneration, PAGEREF evaluation, or navigation behavior was performed by the library.",
+    "The DOC equation objects are legacy picture/object fallbacks and must not be counted as OMML semantic parity with the DOCX/DOTX files.",
+    "The native RTF contains math object destinations that litchi-rtf currently rejects with MalformedDocument(\"RTF math zone contains an unsupported object destination\"); this is recorded as a reader boundary, not a corrupt-fixture diagnosis.",
+    "The default bibliography Custom XML store is present but empty; this fixture does not claim citation or bibliography-source coverage.",
+    "The numbering evidence covers one native multilevel decimal definition and three used paragraphs; it does not cover every numbering format or restart policy.",
+    "DOTX package/template storage is evidenced, but template instantiation and execution semantics are not verified."
+  ]
+}

@@ -1,0 +1,198 @@
+{
+  "schema_version": 1,
+  "fixture_id": "microsoft-office-import-assets-007",
+  "generated_on": "2026-10-15",
+  "purpose": "Deterministic, small, non-Office import sources for native Microsoft Office Computer Use fixtures: two English WebVTT cues, a blue/yellow SVG, and a self-contained colored-triangle glTF binary model.",
+  "provenance": {
+    "authoring_method": "Local deterministic synthetic asset generation from literal source values.",
+    "office_files_generated": false,
+    "office_fixture_authoring_method": "These files are import sources only; the consuming Office fixtures must be authored and saved through native Microsoft Office UI.",
+    "external_content_downloaded": false,
+    "libreoffice_used": false,
+    "programmatic_office_generation_used": false,
+    "library_code_modified": false,
+    "source_assets": "No source assets, network content, external URI, linked texture, or linked buffer was used."
+  },
+  "files": [
+    {
+      "path": "test-data/microsoft-office/assets/captions-007.vtt",
+      "format": "WebVTT",
+      "mime_type": "text/vtt",
+      "bytes": 94,
+      "sha256": "ef72ee0739e5bce54e8131e248a50d8ce65f825b9d20e64ca4d9db0fae591e9e",
+      "language": "en",
+      "validation": {
+        "header": "WEBVTT",
+        "cue_count": 2,
+        "cues": [
+          {
+            "start": "00:00.000",
+            "end": "00:01.000",
+            "text": "CAPTION_FIRST_007"
+          },
+          {
+            "start": "00:01.000",
+            "end": "00:02.000",
+            "text": "CAPTION_SECOND_007"
+          }
+        ],
+        "timing_order": "pass",
+        "cue_ranges_non_overlapping": true,
+        "external_references": false
+      }
+    },
+    {
+      "path": "test-data/microsoft-office/assets/svg-blue-yellow-007.svg",
+      "format": "SVG",
+      "mime_type": "image/svg+xml",
+      "bytes": 634,
+      "sha256": "7a9ddf774233cf05324a5f032d54003274d998e7cddda2185c899847e0ffead0",
+      "dimensions": {
+        "width": 320,
+        "height": 180,
+        "viewBox": "0 0 320 180"
+      },
+      "validation": {
+        "xml_parse": "pass",
+        "root_element": "svg",
+        "title_marker": "SVG_MARKER_007",
+        "visible_text_marker": "SVG_MARKER_007",
+        "description": "A synthetic blue field with a yellow rectangle.",
+        "shape_inventory": [
+          {
+            "element": "rect",
+            "fill": "#2879D8",
+            "geometry": "320x180 at (0,0)"
+          },
+          {
+            "element": "rect",
+            "fill": "#FFC12A",
+            "geometry": "192x108 at (64,36), rx=4"
+          },
+          {
+            "element": "text",
+            "fill": "#123B70",
+            "text": "SVG_MARKER_007"
+          }
+        ],
+        "external_references": false,
+        "embedded_raster_or_font": false
+      }
+    },
+    {
+      "path": "test-data/microsoft-office/assets/colored-triangle-007.glb",
+      "format": "glTF binary",
+      "mime_type": "model/gltf-binary",
+      "bytes": 1200,
+      "sha256": "0f2064d8a923c4cd8abda05f0cb9b2c13d300f14ae1df0446904202c280f6d17",
+      "validation": {
+        "file_identification": "glTF binary model, version 2",
+        "header": {
+          "magic": "glTF",
+          "version": 2,
+          "declared_total_length": 1200,
+          "actual_length": 1200
+        },
+        "chunks": [
+          {
+            "type": "JSON",
+            "bytes": 1080,
+            "sha256": "949faec8b96ca7ace6d68577b1254b4b9cce9a88b379cbdbe9bcdb24c420ac8f"
+          },
+          {
+            "type": "BIN",
+            "bytes": 92,
+            "sha256": "6325670a730fa07f76e4d4afb88028f91d0ac0adc8b4c85dfb5ab69602d57284"
+          }
+        ],
+        "json_parse": "pass",
+        "asset_version": "2.0",
+        "fixture_marker": "GLB_MARKER_007",
+        "scene_count": 1,
+        "node_count": 1,
+        "mesh_count": 1,
+        "primitive_count": 1,
+        "primitive_topology": "TRIANGLES (default mode)",
+        "vertex_count": 3,
+        "index_count": 3,
+        "attributes": [
+          "POSITION",
+          "COLOR_0"
+        ],
+        "material": "double-sided vertex-color PBR material",
+        "buffer_byte_length": 92,
+        "buffer_views": [
+          {
+            "byte_offset": 0,
+            "byte_length": 36,
+            "target": "ARRAY_BUFFER"
+          },
+          {
+            "byte_offset": 36,
+            "byte_length": 48,
+            "target": "ARRAY_BUFFER"
+          },
+          {
+            "byte_offset": 84,
+            "byte_length": 6,
+            "target": "ELEMENT_ARRAY_BUFFER"
+          }
+        ],
+        "external_references": false,
+        "embedded_texture_or_image": false
+      }
+    },
+    {
+      "path": "test-data/microsoft-office/assets/native-query-010.csv",
+      "format": "CSV",
+      "mime_type": "text/csv",
+      "bytes": 66,
+      "sha256": "fa8a8effa0eb4a04dd5fb4e2f88ac45f15f942fe0f24850862e0b192296c8ecb",
+      "purpose": "Small local source for native Excel text or Power Query import coverage; this is source data, not an Office workbook.",
+      "validation": {
+        "encoding": "UTF-8",
+        "line_ending": "LF",
+        "header": [
+          "ID",
+          "Category",
+          "Amount"
+        ],
+        "row_count": 3,
+        "rows": [
+          [
+            1,
+            "ALPHA_010",
+            12.5
+          ],
+          [
+            2,
+            "BETA_010",
+            20
+          ],
+          [
+            3,
+            "ALPHA_010",
+            7.5
+          ]
+        ],
+        "numeric_columns": [
+          "ID",
+          "Amount"
+        ],
+        "category_values": [
+          "ALPHA_010",
+          "BETA_010"
+        ],
+        "external_references": false
+      }
+    }
+  ],
+  "validation_methods": [
+    "SHA-256 and byte sizes were computed from the final closed asset files.",
+    "WebVTT header, cue count, exact cue texts, timestamps, ordering and non-overlap were checked with a bounded parser.",
+    "SVG XML was parsed with a namespace-aware XML parser; dimensions, markers, colors, shapes and absence of external references were checked.",
+    "GLB header, version, declared length, JSON and BIN chunk boundaries, JSON structure, accessor counts, buffer-view alignment, embedded marker and absence of external references were checked read-only.",
+    "The CSV was parsed as UTF-8 with LF line endings; the exact header, three rows, numeric columns, category values and absence of external references were checked.",
+    "file identified the GLB as a version-2 glTF binary model; no Office application was used to generate these import sources."
+  ]
+}

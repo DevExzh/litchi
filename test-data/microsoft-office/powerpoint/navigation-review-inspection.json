@@ -1,0 +1,536 @@
+{
+  "schema_version": 1,
+  "fixture_id": "powerpoint-navigation-review-003",
+  "generated_on": "2026-10-15",
+  "purpose": "Read-only inspection of native Microsoft PowerPoint navigation and review fixtures covering sections, custom shows, hidden-slide state, external and internal links, click and mouse-over actions, speaker notes, modern comments with a reply, slide masters/layouts/themes, and fixed footer/date fields.",
+  "native_ui_observation_source": "Root agent Computer Use session; this inspection process did not operate Office UI.",
+  "provenance": {
+    "producer_app": "Microsoft Office PowerPoint",
+    "app_version": "16.110.2",
+    "app_build": "16.110.26062818",
+    "package_application": "Microsoft Macintosh PowerPoint",
+    "package_app_version": "16.0000",
+    "platform": "macOS",
+    "authoring_method": "Computer Use / native Microsoft PowerPoint UI",
+    "source": "Synthetic slide markers, sections, custom shows, links/actions, notes, footer/date fields, and a modern comment thread were authored in native PowerPoint and saved as PPTX and legacy PPT.",
+    "libreoffice_used": false,
+    "programmatic_office_generation_used": false,
+    "library_code_modified": false,
+    "all_documents_closed_before_hashing": true,
+    "lock_files_present_at_inspection": false
+  },
+  "expected_native_content": {
+    "slide_count": 6,
+    "slide_titles_or_markers": [
+      "PPT_NAVIGATION_003",
+      "LINKS_ACTIONS_003",
+      "HIDDEN_DETAIL_003",
+      "REVIEW_NOTES_003",
+      "DESTINATION_003",
+      "PRESENTATION_END_003"
+    ],
+    "slides": [
+      {
+        "slide": 1,
+        "marker": "PPT_NAVIGATION_003",
+        "direct_text_markers": [
+          "Fixture ID: powerpoint-navigation-review-003",
+          "Native sections, custom shows, links and review"
+        ],
+        "footer": "PPT_FOOTER_003",
+        "date": "2026-01-15",
+        "slide_number": 1
+      },
+      {
+        "slide": 2,
+        "marker": "LINKS_ACTIONS_003",
+        "links_and_actions": [
+          {
+            "marker": "EXTERNAL_LINK_003",
+            "kind": "external_url",
+            "target": "https://example.com/litchi-ppt-fixture",
+            "tooltip": "EXTERNAL_TOOLTIP_003"
+          },
+          {
+            "marker": "INTERNAL_JUMP_003",
+            "kind": "internal_slide",
+            "target_slide": 5,
+            "target_part": "/ppt/slides/slide5.xml"
+          },
+          {
+            "marker": "MAILTO_LINK_003",
+            "kind": "email",
+            "target": "fixture@example.com",
+            "subject": "PPT_MAIL_SUBJECT_003"
+          },
+          {
+            "marker": "ACTION_NEXT_003",
+            "kind": "slide_show_jump",
+            "action": "ppaction://hlinkshowjump?jump=nextslide",
+            "trigger": "click"
+          }
+        ],
+        "footer": "PPT_FOOTER_003",
+        "date": "2026-01-15",
+        "slide_number": 2
+      },
+      {
+        "slide": 3,
+        "marker": "HIDDEN_DETAIL_003",
+        "hidden": true,
+        "hidden_marker": "HIDDEN_MARKER_003",
+        "direct_text": "This slide is intentionally hidden from the normal show.",
+        "footer": "PPT_FOOTER_003",
+        "date": "2026-01-15",
+        "slide_number": 3
+      },
+      {
+        "slide": 4,
+        "marker": "REVIEW_NOTES_003",
+        "comment_anchor_marker": "COMMENT_TARGET_003",
+        "notes_text": "PPT_NOTES_003: native navigation and review note.",
+        "modern_comment_root": "PPT_COMMENT_ROOT_003: verify the internal destination and hidden slide.",
+        "modern_comment_reply": "PPT_COMMENT_REPLY_003: confirmed section and custom-show membership.",
+        "footer": "PPT_FOOTER_003",
+        "date": "2026-01-15",
+        "slide_number": 4
+      },
+      {
+        "slide": 5,
+        "marker": "DESTINATION_003",
+        "direct_text_markers": [
+          "INTERNAL_DESTINATION_003",
+          "Section beta starts here."
+        ],
+        "footer": "PPT_FOOTER_003",
+        "date": "2026-01-15",
+        "slide_number": 5
+      },
+      {
+        "slide": 6,
+        "marker": "PRESENTATION_END_003",
+        "final_marker": "FINAL_MARKER_003",
+        "direct_text": "End of native navigation and review fixture.",
+        "mouse_over_action": "ppaction://hlinkshowjump?jump=firstslide",
+        "mouse_over_trigger": "hover",
+        "footer": "PPT_FOOTER_003",
+        "date": "2026-01-15",
+        "slide_number": 6
+      }
+    ],
+    "sections_pptx": [
+      {
+        "name": "SECTION_ALPHA_003",
+        "id": "{A6EF3FF9-2FC5-7E48-898D-FC1F42C6E0BB}",
+        "slides": [1, 2, 3, 4],
+        "slide_ids": [256, 257, 258, 259]
+      },
+      {
+        "name": "SECTION_BETA_003",
+        "id": "{21A303EB-537E-B048-B900-3B79F2FC6319}",
+        "slides": [5, 6],
+        "slide_ids": [260, 261]
+      }
+    ],
+    "custom_shows_pptx": [
+      {
+        "name": "SHOW_ALPHA_003",
+        "id": 0,
+        "slides": [1, 2, 5],
+        "slide_ids": [256, 257, 260]
+      },
+      {
+        "name": "SHOW_BETA_003",
+        "id": 1,
+        "slides": [6, 4, 1],
+        "slide_ids": [261, 259, 256]
+      }
+    ],
+    "modern_comments_pptx": {
+      "author_name": "Ryker Zhu",
+      "author_initials": "RZ",
+      "slide": 4,
+      "comment_part": "ppt/comments/modernComment_103_9D759682.xml",
+      "root_marker": "PPT_COMMENT_ROOT_003",
+      "reply_marker": "PPT_COMMENT_REPLY_003",
+      "root_reply_count": 1
+    },
+    "legacy_ppt_observations": {
+      "slide_count": 6,
+      "hidden_slide": 3,
+      "notes_slide": 4,
+      "named_show_names_observed": ["SHOW_ALPHA_003", "SHOW_BETA_003"],
+      "sections": "PowerPoint warned that sections would be lost when saving the legacy derivative; section semantic parity is not claimed.",
+      "comments": "No comment indication was observed after native reopen; absence of a semantic comment claim is intentional."
+    }
+  },
+  "typed_reader_boundaries": {
+    "pptx_high_value_apis": [
+      "litchi_pptx::Package::open",
+      "Package::presentation().slide_count / slide_references / slides",
+      "Presentation::hyperlinks",
+      "Slide::is_hidden / text / shapes / animations / comments / layout",
+      "Presentation::slide_masters / slide_layouts",
+      "Package::notes",
+      "presentation_properties::metadata::structure::load",
+      "actions::load_slide_action_settings",
+      "modern_comments::load_modern_comment_graph"
+    ],
+    "pptx_probe": {
+      "package_open": "pass",
+      "tolerance_defects": 0,
+      "slide_count": 6,
+      "slide_size_emu": [12192000, 6858000],
+      "semantic_shape_counts": [5, 5, 5, 5, 5, 5],
+      "slide_text_read": "pass for all six slides",
+      "animations": "all six slides returned an empty typed animation sequence; no p:timing part is present",
+      "legacy_comments_facade": "slide 4 returned None because this deck contains a modern comment part rather than a classic comments part",
+      "notes": {
+        "graph": "pass",
+        "slide_count": 1,
+        "typed_text": "PPT_NOTES_003: native navigation and review note.\\n4"
+      },
+      "modern_comments": {
+        "graph": "pass",
+        "author_count": 1,
+        "comment_part_count": 1,
+        "reply_count": 1,
+        "slide_part": "/ppt/slides/slide4.xml"
+      },
+      "structure_graph": {
+        "graph": "pass",
+        "slides": 6,
+        "sections": 2,
+        "custom_shows": 2,
+        "resolved_section_slide_ids": [
+          [256, 257, 258, 259],
+          [260, 261]
+        ],
+        "resolved_custom_show_slide_ids": [
+          [256, 257, 260],
+          [261, 259, 256]
+        ]
+      },
+      "actions_slide_2": [
+        {
+          "trigger": "click",
+          "kind": "Hyperlink",
+          "relationship_id": "rId2",
+          "tooltip": "EXTERNAL_TOOLTIP_003",
+          "target": "https://example.com/litchi-ppt-fixture"
+        },
+        {
+          "trigger": "click",
+          "kind": "SlideJump",
+          "action": "ppaction://hlinksldjump",
+          "relationship_id": "rId3",
+          "resolved_target": "/ppt/slides/slide5.xml"
+        },
+        {
+          "trigger": "click",
+          "kind": "Hyperlink",
+          "relationship_id": "rId4",
+          "target": "mailto:fixture@example.com?subject=PPT_MAIL_SUBJECT_003"
+        },
+        {
+          "trigger": "click",
+          "kind": "SlideShowJump(NextSlide)",
+          "action": "ppaction://hlinkshowjump?jump=nextslide",
+          "relationship_id": null
+        }
+      ],
+      "actions_slide_6": {
+        "raw_mouse_over_action": "present in a:hlinkMouseOver",
+        "typed_settings_count": 0,
+        "boundary": "load_slide_action_settings did not surface this text-run mouse-over action"
+      },
+      "hyperlinks_facade": {
+        "results": [
+          {
+            "slide_index": 1,
+            "kind": "External",
+            "target": "https://example.com/litchi-ppt-fixture",
+            "tooltip": null
+          },
+          {
+            "slide_index": 1,
+            "kind": "Email",
+            "target": "fixture@example.com",
+            "subject": "PPT_MAIL_SUBJECT_003",
+            "tooltip": null
+          },
+          {
+            "slide_index": 1,
+            "kind": "Slide",
+            "slide_number": 1,
+            "tooltip": null
+          },
+          {
+            "slide_index": 1,
+            "kind": "External",
+            "target": "ppaction://hlinkshowjump?jump=nextslide",
+            "tooltip": null
+          }
+        ],
+        "boundary": "The facade scans hyperlink relationships and inline values separately. The relationship-backed internal jump is resolved by the action-setting API to slide5.xml, while the inline ppaction://hlinksldjump without sldNum falls back to one-based slide_number 1; nextslide is retained as an unrecognized External value here."
+      },
+      "masters_and_layouts": {
+        "master_count": 1,
+        "layout_count": 11,
+        "master_name": "",
+        "master_shape_count": 5,
+        "master_theme": {
+          "name": "Office Theme",
+          "major_font": "Aptos Display",
+          "minor_font": "Aptos",
+          "color_count": 12
+        },
+        "layout_names": [
+          "Title Slide",
+          "Title and Content",
+          "Section Header",
+          "Two Content",
+          "Comparison",
+          "Title Only",
+          "Blank",
+          "Content with Caption",
+          "Picture with Caption",
+          "Title and Vertical Text",
+          "Vertical Title and Text"
+        ],
+        "layout_shape_counts": [5, 5, 5, 6, 8, 4, 3, 6, 6, 5, 5],
+        "root_boolean_boundaries": "Slide::is_hidden, SlideMaster::is_preserved, and SlideLayout::kind returned Invalid(\"PresentationML part lacks an element root\" or \"slide-layout part lacks an element root\") for this native XML; text, shapes, names, theme summary, and relationship graph still read successfully."
+      }
+    },
+    "legacy_ppt_reader": {
+      "reader": "litchi-cfb::OleFile::open -> litchi-ppt::Package::open -> presentation",
+      "cfb_open": "pass",
+      "stream_inventory": {
+        "Current User": 4096,
+        "PowerPoint Document": 102733,
+        "\\u0005SummaryInformation": "present",
+        "\\u0005DocumentSummaryInformation": "present"
+      },
+      "presentation_open": "pass",
+      "slide_count": 6,
+      "has_pictures": false,
+      "total_text_characters": 683,
+      "semantic_shape_counts": [5, 5, 5, 5, 5, 5],
+      "slide_text_read": "pass for all six slides; legacy line breaks use CR",
+      "document_stream_records": {
+        "slide_records": 6,
+        "notes_records": 2,
+        "named_shows_records": 1,
+        "hidden_slide_info_records": 1,
+        "external_hyperlink_records": 10,
+        "classic_comment_records_observed": false
+      },
+      "known_reader_limit": "The standard litchi-ppt reader exposes slide text and shape counts but does not provide a typed section/custom-show/hidden/action/comment facade for this fixture; the read-only record dump supplies the NamedShows, hidden SlideShowSlideInfoAtom, notes, and hyperlink evidence."
+    }
+  },
+  "scope_and_limits": {
+    "variants": ["pptx", "ppt"],
+    "native_reopen_verified": true,
+    "native_reopen_repair_prompt": false,
+    "external_links_followed": false,
+    "macros_or_external_code_executed": false,
+    "media_present": false,
+    "animations_present": false,
+    "transitions_present": false,
+    "classic_comments_present_in_pptx": false,
+    "modern_comments_present_in_pptx": true,
+    "legacy_comment_semantics_claimed": false,
+    "legacy_sections_semantics_claimed": false,
+    "footer_inheritance": "PPT_FOOTER_003 is present in the six slide text streams and also occurs in inherited layout/master placeholder XML; the fixture claims the direct slide marker and records inheritance separately.",
+    "legacy_warning_scope": "PowerPoint explicitly warned that sections would be lost when saving the legacy derivative. The legacy file was accepted and reopened without repair; six slides, hidden slide 3, notes slide 4, and named custom-show names remained observable.",
+    "reader_boundary_scope": "The raw package and typed structure/action/comment readers are recorded independently. A failed convenience accessor is not treated as evidence that the native feature is absent.",
+    "hash_scope": "Hashes were computed only after both final files were closed; no save occurred after the successful reopen check."
+  },
+  "recommended_next_native_ui_fixture": {
+    "status": "pending; no platform-unavailable claim",
+    "fixture_id": "powerpoint-motion-media-004",
+    "purpose": "Cover the remaining high-value native PowerPoint presentation families without changing this navigation fixture.",
+    "slides": [
+      {
+        "slide": 1,
+        "marker": "MASTER_THEME_004",
+        "native_ui_recipe": "Open View > Slide Master, add a visible master text marker, apply a distinct built-in theme, then close Master view.",
+        "expected_parts": ["ppt/slideMasters/slideMaster*.xml", "ppt/slideLayouts/slideLayout*.xml", "ppt/theme/theme*.xml"],
+        "expected_reader_apis": ["Presentation::slide_masters", "SlideMaster::theme", "Presentation::slide_layouts"]
+      },
+      {
+        "slide": 2,
+        "marker": "ANIMATION_TRANSITION_004",
+        "native_ui_recipe": "Apply one entrance animation to a marked shape and one visible slide transition with automatic advance.",
+        "expected_parts": ["ppt/slides/slide2.xml"],
+        "expected_xml": ["p:timing", "p:transition", "advance timing attributes"],
+        "expected_reader_apis": ["Slide::animations", "transition reader"]
+      },
+      {
+        "slide": 3,
+        "marker": "MEDIA_AUDIO_VIDEO_004",
+        "native_ui_recipe": "Insert test-data/iwork/keynote/media-replacement-assets/tone.wav and striped.mov through native Insert > Audio/Movie controls; retain visible poster or media markers.",
+        "expected_parts": ["ppt/media/*", "slide relationships with audio/video relationship types"],
+        "expected_reader_apis": ["slide media inventory", "media relationship reader"],
+        "validation_rule": "If PowerPoint refuses either local asset, record the exact native UI refusal and leave the feature pending rather than declaring it unavailable."
+      },
+      {
+        "slide": 4,
+        "marker": "MOTION_MEDIA_END_004",
+        "native_ui_recipe": "Add a final marker, save PPTX and legacy PPT, close, reopen both, and record any feature-loss warnings before hashing.",
+        "expected_structures": ["PPTX timing/media relationships retained or explicitly warned", "legacy warning scope recorded"]
+      }
+    ]
+  },
+  "validation_methods": [
+    "SHA-256 and byte counts computed from both closed final fixture byte streams.",
+    "ZIP central-directory and CRC check via Python ZipFile.testzip for PPTX; result was pass (testzip returned null).",
+    "XML well-formedness via Python ElementTree for every PPTX XML and .rels part; all 53 parsed parts succeeded.",
+    "OPC relationship targets resolved against package members; all 54 relationships were inspected, with no missing internal targets and no external targets fetched.",
+    "PPTX presentation.xml, slide XML, slide relationships, notes, sections, custom shows, modern authors, and modern comment parts inspected read-only.",
+    "Existing litchi-pptx read_pptx example invoked read-only; the typed package probe recorded structure, action, notes, modern-comment, hyperlink, master, layout, theme, animation, and convenience-accessor outcomes.",
+    "Existing litchi-ppt read_ppt example and dump_ppt_structure invoked read-only; CFB stream inventory and PowerPoint record evidence were recorded.",
+    "Root Computer Use observations record native PowerPoint close/reopen without repair prompts, the legacy sections warning, retained legacy visible features, and the modern comment root/reply."
+  ],
+  "files": [
+    {
+      "path": "test-data/microsoft-office/powerpoint/powerpoint-navigation-review.pptx",
+      "format": "pptx",
+      "bytes": 51319,
+      "sha256": "c38ffd02b373774a39b0c9760ae2e5474a9aa27828f027f74312f40b170d5877",
+      "file_description": "Microsoft PowerPoint 2007+",
+      "container": {
+        "kind": "OPC ZIP",
+        "zip_test": "pass",
+        "member_count": 54,
+        "xml_or_rels_part_count": 53,
+        "relationship_count": 54,
+        "xml_or_rels_parse": "pass",
+        "relationship_target_check": "pass",
+        "unresolved_internal_targets": [],
+        "external_targets": [
+          "https://example.com/litchi-ppt-fixture",
+          "mailto:fixture@example.com?subject=PPT_MAIL_SUBJECT_003"
+        ],
+        "key_members": [
+          "ppt/presentation.xml",
+          "ppt/_rels/presentation.xml.rels",
+          "ppt/slides/slide1.xml",
+          "ppt/slides/slide2.xml",
+          "ppt/slides/slide3.xml",
+          "ppt/slides/slide4.xml",
+          "ppt/slides/slide5.xml",
+          "ppt/slides/slide6.xml",
+          "ppt/slides/_rels/slide2.xml.rels",
+          "ppt/slides/_rels/slide4.xml.rels",
+          "ppt/notesSlides/notesSlide1.xml",
+          "ppt/notesSlides/_rels/notesSlide1.xml.rels",
+          "ppt/notesMasters/notesMaster1.xml",
+          "ppt/authors.xml",
+          "ppt/comments/modernComment_103_9D759682.xml",
+          "ppt/slideMasters/slideMaster1.xml",
+          "ppt/theme/theme1.xml"
+        ],
+        "parts_absent_by_design": [
+          "ppt/media/*",
+          "ppt/comments/comment*.xml",
+          "ppt/slideTimings/*",
+          "p:timing elements",
+          "p:transition elements"
+        ]
+      },
+      "library_read": {
+        "reader": "litchi-pptx::Package::open -> presentation",
+        "package_open": "pass",
+        "tolerance_report_defects": 0,
+        "slide_count": 6,
+        "slide_size_emu": [12192000, 6858000],
+        "semantic_shape_counts": [5, 5, 5, 5, 5, 5],
+        "animation_sequences_empty": true,
+        "structure_graph": "pass: 2 sections and 2 custom shows",
+        "action_settings": "pass: four click settings on slide 2, including external URL, internal slide5 target, mailto target, and next-slide jump",
+        "modern_comments": "pass: one author, one comment part, one root, one reply",
+        "notes": "pass: one notes slide; facade text includes the slide-number field as a trailing 4",
+        "hidden_slide_raw_state": "slide3.xml root has show=0",
+        "hidden_slide_facade": "error on all six slides: Invalid(\"PresentationML part lacks an element root\")",
+        "slide6_mouse_over_facade": "raw hlinkMouseOver is present; action-setting scan returned zero settings",
+        "masters": "pass: one master, five semantic shapes, Office Theme summary",
+        "layouts": "pass: eleven layout parts, names and shapes readable; kind and master-preserved root-boolean accessors error on this XML"
+      },
+      "native_ui_validation": {
+        "observed_by": "Root agent via Computer Use",
+        "application": "Microsoft PowerPoint",
+        "reopen": "pass",
+        "repair_prompt": false,
+        "observations": [
+          "Closed and reopened the exact PPTX without repair; six slides remained present.",
+          "Slide 3 remained hidden and slide 4 retained speaker notes.",
+          "Sections SECTION_ALPHA_003 and SECTION_BETA_003 and custom shows SHOW_ALPHA_003 and SHOW_BETA_003 remained in the PPTX package.",
+          "Slide 4 retained the modern comment root PPT_COMMENT_ROOT_003 and reply PPT_COMMENT_REPLY_003 after reopen.",
+          "Slide 2 link/action markers and slide 6 first-slide mouse-over action were retained in the package."
+        ],
+        "semantic_scope": "Native reopen and package evidence; no external URL, mail target, action, comment workflow, or media was activated."
+      }
+    },
+    {
+      "path": "test-data/microsoft-office/powerpoint/powerpoint-navigation-review.ppt",
+      "format": "ppt",
+      "bytes": 119808,
+      "sha256": "6f01f04cca465cdb57e399866f08a4e565ee9e23cad6810cd5a09e9caed1b430",
+      "file_description": "Composite Document File V2 Document, Little Endian, Os: MacOS, Version 5.26, Code page: 10000, Author: Ryker Zhu, Last Saved By: Ryker Zhu, Revision Number: 2, Name of Creating Application: Microsoft Macintosh PowerPoint",
+      "container": {
+        "kind": "Compound Document File V2 (CFB/OLE)",
+        "cfb_reader": "litchi-cfb::OleFile::open pass",
+        "file_size": 119808,
+        "stream_inventory": {
+          "Current User": 4096,
+          "PowerPoint Document": 102733,
+          "\\u0005SummaryInformation": "present",
+          "\\u0005DocumentSummaryInformation": "present"
+        },
+        "record_dump_evidence": {
+          "slide_records": 6,
+          "notes_records": 2,
+          "named_shows_records": 1,
+          "hidden_slide_info_records": 1,
+          "external_hyperlink_records": 10,
+          "classic_comment_records_observed": false
+        },
+        "parts_absent_by_design": ["PPTX modern authors/comments parts", "PPTX media parts", "PPTX timing and transition XML"]
+      },
+      "library_read": {
+        "readers": [
+          "litchi-cfb::OleFile::open",
+          "litchi-ppt::Package::open -> presentation"
+        ],
+        "cfb_open": "pass",
+        "presentation_open": "pass",
+        "slide_count": 6,
+        "has_pictures": false,
+        "total_text_characters": 683,
+        "semantic_shape_counts": [5, 5, 5, 5, 5, 5],
+        "slide_text_read": "pass for all six slides; legacy line breaks use CR",
+        "known_reader_limit": "The standard legacy reader does not expose typed sections, custom shows, hidden state, actions, or comment graph; the record dump supplies the format-level evidence."
+      },
+      "native_ui_validation": {
+        "observed_by": "Root agent via Computer Use",
+        "application": "Microsoft PowerPoint",
+        "reopen": "pass",
+        "repair_prompt": false,
+        "legacy_save_warning": {
+          "shown": true,
+          "accepted": true,
+          "message": "PowerPoint warned that sections would be lost when saving the legacy derivative.",
+          "semantic_parity_claimed": false
+        },
+        "observations": [
+          "Closed and reopened the exact legacy PPT without repair; six slides remained present.",
+          "Hidden slide 3, notes slide 4, and the two custom-show names remained observable in native PowerPoint.",
+          "No comment indication was observed after reopen; no semantic absence claim is made.",
+          "No save changes were made after the successful reopen check."
+        ],
+        "semantic_scope": "Visible native legacy reopen only; sections and modern comment parity are not claimed."
+      }
+    }
+  ]
+}

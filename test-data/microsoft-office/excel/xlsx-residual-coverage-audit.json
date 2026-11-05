@@ -1,0 +1,452 @@
+{
+  "schema_version": 1,
+  "generated_on": "2026-10-15",
+  "purpose": "Read-only audit of every pending XLSX feature-inventory row against the finalized native Microsoft Excel corpus. This file classifies the remaining work without changing coverage.json, source code, or shared corpus metadata.",
+  "scope": {
+    "source_inventory": "test-data/microsoft-office/coverage.json#/feature_inventory",
+    "source_matrix": "crates/litchi-xlsx/docs/FEATURE_MATRIX.md",
+    "pending_row_count": 30,
+    "coverage_source_sha256": "02502983bff74367104f8515bc6326a1b44e88a08a02c3d6f5c976f05a3eb5e1",
+    "matrix_source_sha256": "29860183239b6ebd9a0d5e14bee73bf6e281d16eca98d14467274614add91188",
+    "classification_rules": {
+      "operation_only": "The closed native corpus already records a bounded saved package/UI specimen for the row or a clearly named sub-scope; the remaining assertion is library CRUD, projection, validation, recalculation, refresh, runtime, or another operation beyond this file-only native audit.",
+      "observed_native_ui_limitation": "The residual audit or the inspected native session provides a bounded reason that the current native producer has no usable local authoring route. This never converts package absence into format-level unsupported status.",
+      "external_handoff": "Authoring requires a certificate/identity, password handoff, online provider/account, add-in manifest/service, or another external producer. A local native workbook alone is insufficient for an authoritative fixture.",
+      "genuinely_missing_authorable_family": "A distinct saved family is authorable in native Excel and has no exact finalized fixture. A concrete small target is listed; the target is not a duplicate of an existing operation or storage fixture."
+    },
+    "evidence_policy": "Native package facts are cited only at the scope recorded in the referenced inspection JSON. No rendering, recalculation, refresh, external execution, control execution, chart semantic parity, or broad XLSB/XLS parity is inferred. A missing part in one inspected package is recorded as fixture scope, never as proof that Excel cannot produce it."
+  },
+  "native_evidence_sources": [
+    {
+      "source_id": "inspection-fixture-0",
+      "path": "test-data/microsoft-office/excel/excel-values-formulas-chart.xlsx",
+      "sha256": "7b9b6602d687d3b0f65915611723c1cc60934e6ecca9c54bec44403904afbd57",
+      "inspection": "test-data/microsoft-office/inspection.json#/fixtures/0",
+      "bounded_facts": [
+        "Native Excel OPC ZIP with 22 members, 15 content-type overrides, 15 relationships, a chartsheet, two worksheets, sharedStrings.xml, styles.xml, theme1.xml, calcChain.xml, a table, and direct merged range A1:C1.",
+        "Shared-string catalog has count 48 and uniqueCount 44; the inspected entries have rich_text_run_count 0, so this is plain shared-string evidence rather than a rich-text-run fixture."
+      ]
+    },
+    {
+      "fixture_id": "excel-chart-families-013",
+      "path": "test-data/microsoft-office/excel/excel-chart-families.xlsx",
+      "sha256": "eae01ec29bec519fcdb2f474068eab3e2845ea63a14bdbad7ad662d209218fbd",
+      "inspection": "test-data/microsoft-office/excel/chart-families-inspection.json#/package_inspection/xlsx",
+      "bounded_facts": [
+        "Native Excel retained 18 worksheet/relationship/drawing parts and 17 chart parts, with chart style/color-style and chart-relationship parts and SVG plus raster fallback media.",
+        "All 17 chart XML payloads and five-point caches are present; rendering and full chart semantic round-trip remain outside scope."
+      ]
+    },
+    {
+      "fixture_id": "excel-conditional-drawings-005",
+      "path": "test-data/microsoft-office/excel/excel-conditional-drawings.xlsx",
+      "sha256": "dd3f5d866113dc6a102ae24a248f6321be6287dab522de7636fab86cd715d645",
+      "inspection": "test-data/microsoft-office/excel/conditional-drawings-inspection.json#/format_observations/xlsx",
+      "bounded_facts": [
+        "Native XLSX stores seven conditional-formatting containers/eight core rules, eleven DXFs, and native picture/rounded-rectangle drawing parts; stopIfTrue remained false."
+      ]
+    },
+    {
+      "fixture_id": "excel-form-controls-008",
+      "path": "test-data/microsoft-office/excel/excel-form-controls.xlsx",
+      "sha256": "5ecc8fe96f9bc071c4d2db4f4f483975645a2a3119a23e83b7731d3d1063a96b",
+      "inspection": "test-data/microsoft-office/excel/form-controls-inspection.json#/xlsx_ooxml_evidence",
+      "bounded_facts": [
+        "Native XLSX contains 11 ctrlProp parts/relationships, 11 DrawingML shapes, 11 VML mirrors, and zero ActiveX relationships; typed XLSX owner count is 11/11."
+      ]
+    },
+    {
+      "fixture_id": "excel-formula-owners-009",
+      "path": "test-data/microsoft-office/excel/excel-formula-owners.xlsx",
+      "sha256": "1514e27b0f7334a786eea5adba316b032844c8d5de81d9b1807298a3b1ed8b87",
+      "inspection": "test-data/microsoft-office/excel/formula-owners-inspection.json#/binary_record_invariants/xlsx_formula_xml",
+      "bounded_facts": [
+        "Native XLSX stores CSE/shared/data-table/scenario owners and dynamic-array owners with cached results.",
+        "Stored extension formulas are _xlfn.SEQUENCE, _xlfn._xlws.FILTER, and _xlfn.LET(_xlpm.x,...); calcChain.xml has 113 formula entries and workbook calcFeatures include LET_WF/LAMBDA_WF/ARRAYTEXT_WF."
+      ]
+    },
+    {
+      "fixture_id": "excel-connections-010",
+      "path": "test-data/microsoft-office/excel/excel-connections.xlsx",
+      "sha256": "c956cdc60d4149327d7d3f0c5c1952fcbeec3ae978c668c9d1bc5a6a19e258b8",
+      "inspection": "test-data/microsoft-office/excel/connections-inspection.json#/package_evidence/xlsx",
+      "bounded_facts": [
+        "Native XLSX stores one legacy Text connection, one Microsoft.Mashup.OleDb.1 Power Query connection, two queryTable parts, a structured query table, and customXml/item1.xml plus itemProps1.xml carrying the DataMashup payload.",
+        "The custom XML is a native DataMashup store; it is not evidence of an /xl/customData item/data pair, XML map, Data Model, web extension, or customUI part."
+      ]
+    },
+    {
+      "fixture_id": "excel-links-objects-006",
+      "path": "test-data/microsoft-office/excel/excel-links-objects.xlsx",
+      "sha256": "4bf5b315001334a876283187c6c7634373ab938f23c4e4b9a7788a12b88bcd42",
+      "inspection": "test-data/microsoft-office/excel/links-objects-inspection.json#/package_evidence/xlsx",
+      "bounded_facts": [
+        "Native XLSX stores one externalLink graph with cached values 49.75 and 14, one embedded Word package/OLE relationship, a B5 _localImage rich-value graph, and a classic B6 note.",
+        "No threaded-comment/persons parts or reply UI were created; no OLE activation or external-link refresh was performed."
+      ]
+    },
+    {
+      "fixture_id": "excel-pivot-controls-007",
+      "path": "test-data/microsoft-office/excel/excel-pivot-controls.xlsx",
+      "sha256": "24c9b605f4241d89913f8cdd1ae75047d550fd2a8ed9ad3c731a13cce6d3b2ef",
+      "inspection": "test-data/microsoft-office/excel/pivot-controls-inspection.json#/expected_native_content",
+      "bounded_facts": [
+        "Native XLSX stores Region and Product slicer caches/views, a Date February 2026 timeline, a filtered PivotTable total 9.5, and PivotChart007 on a chartsheet.",
+        "The pivot is a regular table-backed PivotTable; the audit found no pivotTableServerFormats or cachedUniqueNames specimen in this package."
+      ]
+    },
+    {
+      "fixture_id": "excel-date1904-breaks-012",
+      "path": "test-data/microsoft-office/excel/excel-date1904-breaks.xlsx",
+      "sha256": "6c8c3dcb769a54c5bd0847ef67a56cfc0fafca94f9e0718e01e2b3eb81a7d80b",
+      "inspection": "test-data/microsoft-office/excel/date1904-breaks-inspection.json#/binary_record_invariants/xlsx_xml",
+      "bounded_facts": [
+        "Native workbookPr date1904=1, DATE/TIME formula caches, calcChain entries B5/B6/B8, custom views BASE_PRINT_012 and HIDDEN_DETAIL_012, hidden J/rows 14:15, print area A1:L40, and manual row/column breaks are retained."
+      ]
+    }
+  ],
+  "classification_summary": {
+    "operation_only": 11,
+    "observed_native_ui_limitation": 7,
+    "external_handoff": 6,
+    "genuinely_missing_authorable_family": 6
+  },
+  "concrete_missing_authorable_targets": [
+    {
+      "row_ids": ["xlsx-203"],
+      "target": "Create one tiny XLSX with A1 containing two differently formatted text runs, for example bold RICH and italic TEXT, then inspect sharedStrings.xml for one si/r pair and its character properties.",
+      "reason": "The native core fixture proves shared strings but records rich_text_run_count 0 for every inspected entry; this target closes the distinct rich-text-run sub-scope without duplicating plain shared-string or formula fixtures."
+    },
+    {
+      "row_ids": ["xlsx-215"],
+      "target": "Create a small formula sheet with one deliberate error warning, mark the warning ignored, add a Watch Window entry for a formula cell, save, and inspect worksheet ignored-error/cell-watch owners.",
+      "reason": "No finalized native XLSX contains either owner. The library has separate ignored_errors and cell-watch owners, so a saved-state fixture would test distinct package records."
+    },
+    {
+      "row_ids": ["xlsx-217"],
+      "target": "With the installed East Asian/phonetic UI available, enter one Japanese or kana-labelled cell, apply native Phonetic Information/Format Cells phonetic settings, save, and inspect worksheet phoneticPr plus the stored text.",
+      "reason": "No finalized native XLSX contains phoneticPr. This is a small, distinct authoring target; if the current locale does not expose the command, retain the row as UI-limited rather than synthesizing the part."
+    },
+    {
+      "row_ids": ["xlsx-220"],
+      "target": "Create a new threaded comment on A1, add one reply, and, if a local signed-in identity is available, one mention; inspect threadedComments/persons relationships and reply/person IDs.",
+      "reason": "The links/objects fixture has only classic B6 notes and explicitly no threaded-comment/persons/reply UI. A root/reply fixture is a separate native family; mention identity may require an account and must be bounded if unavailable."
+    },
+    {
+      "row_ids": ["xlsx-228"],
+      "target": "Enter two 2x2 source blocks on separate sheets, use Data > Consolidate with Sum into a third sheet, and save a marker beside the result; inspect consolidation source references and cached result cells.",
+      "reason": "No finalized native XLSX contains consolidation metadata. The target exercises a native Excel operation absent from the table, pivot, or formula-owner fixtures; the audit must keep calculation semantics separate from stored metadata."
+    },
+    {
+      "row_ids": ["xlsx-234"],
+      "target": "On a fresh workbook, use the observed Tools > Track Changes > Highlight Changes route, enable the available legacy tracking mode, make two deterministic cell edits, save, and inspect revision users/headers/log relationships; attempt Accept or Reject only as a separate saved-state observation.",
+      "reason": "The current Excel session exposed both Track Changes commands, disabled until tracking is enabled. No finalized XLSX contains revision metadata, so this is a concrete native target rather than another ordinary cell-edit fixture."
+    }
+  ],
+  "rows": [
+    {
+      "id": "xlsx-197",
+      "feature": "OPC package, parts, relationships, and content types",
+      "classification": "operation_only",
+      "native_evidence": [
+        "test-data/microsoft-office/inspection.json#/fixtures/0: 22-member native OPC ZIP, 15 content-type overrides, 15 relationships, and all internal relationship targets resolved.",
+        "test-data/microsoft-office/excel/chart-families-inspection.json#/package_inspection/xlsx: 18 worksheet/relationship/drawing parts and 17 chart parts.",
+        "test-data/microsoft-office/excel/connections-inspection.json#/package_evidence/xlsx/relevant_parts: connections, query tables, table relationships, and custom XML are present."
+      ],
+      "bounded_result": "Package storage and graph presence are already natively evidenced. Remaining work is operation-level graph CRUD/opaque-part preservation beyond these exact parts; no duplicate basic package fixture is justified."
+    },
+    {
+      "id": "xlsx-198",
+      "feature": "Workbook and worksheet lifecycle",
+      "classification": "operation_only",
+      "native_evidence": [
+        "test-data/microsoft-office/inspection.json#/fixtures/0/features/workbook_sheets: native chart sheet Sales chart plus Sheet1 and Sheet2 in one workbook.",
+        "test-data/microsoft-office/excel/pivot-controls-inspection.json#/expected_native_content: PivotChart007 is retained on a non-worksheet chart sheet and the filtered PivotTable remains on its worksheet after native reopen."
+      ],
+      "bounded_result": "Native sheet ordering, ordinary worksheets, chart sheets, close/reopen, and native no-repair persistence are present. Insert/remove/reorder transaction semantics remain library operation coverage."
+    },
+    {
+      "id": "xlsx-199",
+      "feature": "Workbook properties and metadata",
+      "classification": "operation_only",
+      "native_evidence": [
+        "test-data/microsoft-office/inspection.json#/fixtures/0: docProps/core.xml and docProps/app.xml are native parts and Application is Microsoft Macintosh Excel.",
+        "test-data/microsoft-office/excel/date1904-breaks-inspection.json#/binary_record_invariants/xlsx_xml/workbook_properties: workbookPr date1904=1, print-area/hidden custom-view helper names, and two custom workbook views."
+      ],
+      "bounded_result": "Native workbook metadata, core/app properties, workbook settings, defined names, and custom-view metadata are present. The ordinary facade's custom-property operations and raw core/extended-property boundary remain operation-level; this is not a claim of complete metadata CRUD."
+    },
+    {
+      "id": "xlsx-200",
+      "feature": "Data Model descriptor and payload",
+      "classification": "observed_native_ui_limitation",
+      "native_evidence": [
+        "test-data/microsoft-office/coverage.json#/residual_matrix_pending_categories/categories/native_ui_unavailable: xlsx-200 is explicitly classified with the Excel XML Maps/Data Model/Power Pivot families because no usable native producer route was found; the category explicitly says this does not establish absence.",
+        "test-data/microsoft-office/excel/connections-inspection.json#/package_evidence/xlsx/custom_xml_data_mashup: the native DataMashup custom XML is a Power Query connection payload, not a proof of an XLDM Data Model descriptor or inner model."
+      ],
+      "bounded_result": "No local native Data Model/Power Pivot fixture is justified from the current corpus. Keep the row pending and do not reinterpret the Power Query DataMashup as Data Model evidence."
+    },
+    {
+      "id": "xlsx-201",
+      "feature": "Custom Data and Custom Data Properties",
+      "classification": "observed_native_ui_limitation",
+      "native_evidence": [
+        "test-data/microsoft-office/excel/connections-inspection.json#/package_evidence/xlsx/relevant_parts: customXml/item1.xml and itemProps1.xml are the native DataMashup store; a direct package scan of all finalized native XLSX files found no /xl/customData item/data pair.",
+        "crates/litchi-xlsx/docs/FEATURE_MATRIX.md:34: the matrix explicitly says native producer interoperability remains open for this owner."
+      ],
+      "bounded_result": "The native corpus has no direct Excel-produced Custom Data storage pair and no established local UI authoring route. This is a producer-route limitation, not a claim that the typed source-bound owner is unsupported."
+    },
+    {
+      "id": "xlsx-203",
+      "feature": "Shared strings and rich text runs",
+      "classification": "genuinely_missing_authorable_family",
+      "native_evidence": [
+        "test-data/microsoft-office/inspection.json#/fixtures/0/features/shared_strings: native shared strings count 48/unique 44, but every inspected entry has rich_text_run_count 0."
+      ],
+      "bounded_result": "Plain shared-string storage is already present; cell rich-text runs are the exact missing native sub-scope. See concrete_missing_authorable_targets[xlsx-203]."
+    },
+    {
+      "id": "xlsx-205",
+      "feature": "Extension function names (`_xlfn`)",
+      "classification": "operation_only",
+      "native_evidence": [
+        "test-data/microsoft-office/excel/formula-owners-inspection.json#/binary_record_invariants/xlsx_formula_xml/sheet2: stored _xlfn.SEQUENCE, _xlfn._xlws.FILTER, and _xlfn.LET(_xlpm.x,...) formulas with native cached values."
+      ],
+      "bounded_result": "Native inert extension-function syntax is exact. Remaining scope is formula mutation/catalog/evaluation behavior; no separate formula fixture is needed."
+    },
+    {
+      "id": "xlsx-207",
+      "feature": "Calculation properties",
+      "classification": "operation_only",
+      "native_evidence": [
+        "test-data/microsoft-office/excel/formula-owners-inspection.json#/binary_record_invariants/xlsx_formula_xml/workbook_calc_features: native calcFeatures include RD, Single, FV, CNMTM, LET_WF, LAMBDA_WF, and ARRAYTEXT_WF.",
+        "test-data/microsoft-office/excel/date1904-breaks-inspection.json#/binary_record_invariants/xlsb_biff12/workbook_records/BrtCalcProp_count: native BIFF12 derivative retains one calculation-property record."
+      ],
+      "bounded_result": "Authored calculation metadata is present; no recalculation or calculation-engine semantics are claimed. Remaining work is typed CRUD/invalidation operation coverage."
+    },
+    {
+      "id": "xlsx-208",
+      "feature": "Calculation chain and volatile dependencies",
+      "classification": "operation_only",
+      "native_evidence": [
+        "test-data/microsoft-office/excel/formula-owners-inspection.json#/binary_record_invariants/xlsx_formula_xml/calc_chain: calcChain.xml is present with 113 formula entries.",
+        "test-data/microsoft-office/excel/formula-owners-inspection.json#/binary_record_invariants/xlsb/calc_chain_records: BIFF12 BrtBeginCalcChain, 113 BrtCalcChainItem records, and BrtEndCalcChain are present."
+      ],
+      "bounded_result": "Native chain storage is directly covered. Dependency execution, volatility, recalculation, and operation-level edits remain outside the saved-state evidence."
+    },
+    {
+      "id": "xlsx-210",
+      "feature": "Styles and theme",
+      "classification": "operation_only",
+      "native_evidence": [
+        "test-data/microsoft-office/inspection.json#/fixtures/0/features/styles: native fonts, fills, borders, cellXfs, cellStyles, dxfs, tableStyles, and theme1.xml are present.",
+        "test-data/microsoft-office/excel/conditional-drawings-inspection.json#/format_observations/xlsx: styles.xml stores eleven DXFs used by native conditional-formatting families."
+      ],
+      "bounded_result": "Native style/theme and differential-style storage is present. Complete style CRUD or rendering parity is an operation/rendering boundary, not a missing ordinary fixture."
+    },
+    {
+      "id": "xlsx-213",
+      "feature": "Merged cells",
+      "classification": "operation_only",
+      "native_evidence": [
+        "test-data/microsoft-office/inspection.json#/fixtures/0/features/worksheets/1: Sheet1 has merged range A1:C1 and observed_counts.merged_cells=1."
+      ],
+      "bounded_result": "A native merged-cell specimen already exists; remaining work is library merge lookup/CRUD and conflict behavior."
+    },
+    {
+      "id": "xlsx-215",
+      "feature": "Ignored errors and cell watches",
+      "classification": "genuinely_missing_authorable_family",
+      "native_evidence": [
+        "The finalized native Excel inspection corpus contains no worksheet ignored-error or cell-watch owner; the existing core fixture only records ordinary error-valued/formula cells.",
+        "crates/litchi-xlsx/src/ignored_errors and the worksheet cell-watch owner are separate typed API surfaces in the source matrix."
+      ],
+      "bounded_result": "A native error-warning/watch fixture is feasible and distinct. See concrete_missing_authorable_targets[xlsx-215]; no calculation or watch-evaluation claim should be attached."
+    },
+    {
+      "id": "xlsx-216",
+      "feature": "Cell smart tags",
+      "classification": "observed_native_ui_limitation",
+      "native_evidence": [
+        "No native smart-tag/factoid package or marker appears in the finalized native Excel corpus.",
+        "crates/litchi-xlsx/docs/FEATURE_MATRIX.md:49: the typed owner is explicitly inert and action-provider/smart-tag execution is unsupported; no current native producer route was established in the Office session."
+      ],
+      "bounded_result": "Keep pending as a producer/UI-limited family. Do not synthesize a smart-tag part or infer that Excel cannot read one from the absence of a fixture."
+    },
+    {
+      "id": "xlsx-217",
+      "feature": "Phonetic properties",
+      "classification": "genuinely_missing_authorable_family",
+      "native_evidence": [
+        "No finalized native XLSX contains worksheet phoneticPr or a phonetic-text owner."
+      ],
+      "bounded_result": "A small East Asian/phonetic UI specimen is a distinct feasible target when the installed locale exposes the command. See concrete_missing_authorable_targets[xlsx-217]; if the command is unavailable, reclassify from direct UI evidence rather than fabricating XML."
+    },
+    {
+      "id": "xlsx-220",
+      "feature": "Threaded comments, persons, and mentions",
+      "classification": "genuinely_missing_authorable_family",
+      "native_evidence": [
+        "test-data/microsoft-office/excel/links-objects-inspection.json#/library_validation/xlsx/threaded_comments: package_parts_present=false, worksheet relationship absent, and native reply UI not present.",
+        "test-data/microsoft-office/excel/links-objects-inspection.json#/package_evidence/xlsx/classic_note_xml: B6 is a classic note only."
+      ],
+      "bounded_result": "Threaded comments are the missing native family; see the root/reply target in concrete_missing_authorable_targets[xlsx-220]. Mention/person identity may be account-dependent and must be recorded separately."
+    },
+    {
+      "id": "xlsx-226",
+      "feature": "Surveys attached to tables",
+      "classification": "external_handoff",
+      "native_evidence": [
+        "No native Survey package or table survey relationship appears in the finalized Excel corpus.",
+        "crates/litchi-xlsx/docs/FEATURE_MATRIX.md:64: Survey rendering/submission is inert and native producer edit evidence remains incomplete; docs/report/spec-gap-audit.md: the XLSX declared-gap section classifies Survey semantic authoring as write-unsupported."
+      ],
+      "bounded_result": "An authoritative fixture would require the legacy/online Survey or Forms producer and its account/service context. Do not duplicate a normal structured-table fixture or claim that a local native workbook can author submission semantics."
+    },
+    {
+      "id": "xlsx-228",
+      "feature": "Data consolidation",
+      "classification": "genuinely_missing_authorable_family",
+      "native_evidence": [
+        "No finalized native XLSX contains consolidation source-reference metadata or a native Data > Consolidate result owner.",
+        "crates/litchi-xlsx/src/data_consolidation and the source matrix expose a bounded metadata owner; calculation itself remains outside scope."
+      ],
+      "bounded_result": "A two-source-block native Consolidate specimen is feasible and unique; see concrete_missing_authorable_targets[xlsx-228]."
+    },
+    {
+      "id": "xlsx-234",
+      "feature": "Revisions and collaboration metadata",
+      "classification": "genuinely_missing_authorable_family",
+      "native_evidence": [
+        "No finalized native XLSX contains revision users/headers/log parts or a saved collaboration revision marker.",
+        "The current native Excel session exposed Tools > Track Changes > Highlight Changes… and Accept or Reject Changes…; both commands were disabled until tracking was enabled."
+      ],
+      "bounded_result": "This is a concrete authorable target rather than an ordinary edit duplicate; see concrete_missing_authorable_targets[xlsx-234]. Live coauthoring, conflict resolution, locking, and recalculation remain outside the fixture claim."
+    },
+    {
+      "id": "xlsx-244",
+      "feature": "PivotTable server formats (`pivotTableServerFormats`)",
+      "classification": "observed_native_ui_limitation",
+      "native_evidence": [
+        "test-data/microsoft-office/excel/pivot-controls-inspection.json#/expected_native_content/pivot_table: the finalized pivot is a regular Table1-backed PivotTable with slicers/timeline and no serverFormat record.",
+        "The source matrix identifies the admitted C510 owner but leaves native producer compatibility open; the available local pivot route did not expose an OLAP/server-format authoring path."
+      ],
+      "bounded_result": "Do not create another ordinary table-backed PivotTable. A meaningful target would require an OLAP/Data Model producer route, which is already classified as native-UI-limited in this session."
+    },
+    {
+      "id": "xlsx-246",
+      "feature": "Cached unique names (`cachedUniqueNames`)",
+      "classification": "observed_native_ui_limitation",
+      "native_evidence": [
+        "The finalized regular Table1-backed PivotTable/cache has no cachedUniqueNames owner in the inspected package.",
+        "The source matrix leaves native producer interoperability and cube access unclaimed; the native OLAP/Data Model route needed for meaningful unique-name caches was not available in the current session."
+      ],
+      "bounded_result": "No duplicate ordinary PivotTable fixture is justified. Keep pending until an OLAP/Data Model producer can author this cache field."
+    },
+    {
+      "id": "xlsx-251",
+      "feature": "DDE/OLE links and external data",
+      "classification": "operation_only",
+      "native_evidence": [
+        "test-data/microsoft-office/excel/links-objects-inspection.json#/package_evidence/xlsx: one embedded Word package/OLE graph, one external workbook link, cached values, and a rich-value image graph are retained.",
+        "test-data/microsoft-office/excel/connections-inspection.json#/package_evidence/xlsx/connections_xml: native Text and Microsoft.Mashup.OleDb.1 external-data connection metadata is present."
+      ],
+      "bounded_result": "Embedded OLE and external-data metadata are natively represented at the recorded scope. Direct DDE conversation, OLE activation, refresh, credentials, and external execution remain unclaimed; adding another embedded-object fixture would duplicate storage evidence."
+    },
+    {
+      "id": "xlsx-253",
+      "feature": "XML maps and XML data bindings",
+      "classification": "observed_native_ui_limitation",
+      "native_evidence": [
+        "test-data/microsoft-office/coverage.json#/residual_matrix_pending_categories/categories/native_ui_unavailable: xlsx-253 is explicitly grouped with the Excel XML Maps/Data Model/Power Pivot families because no usable native producer route was found; this does not establish absence.",
+        "A direct member scan of all finalized native XLSX packages found no xl/xmlMaps.xml or mapped binding part."
+      ],
+      "bounded_result": "Retain the typed XML-map API boundary as pending native producer evidence. Do not synthesize an XML map package or treat the absence in current fixtures as an Excel limitation beyond the recorded UI-route finding."
+    },
+    {
+      "id": "xlsx-254",
+      "feature": "Custom XML data stores",
+      "classification": "operation_only",
+      "native_evidence": [
+        "test-data/microsoft-office/excel/connections-inspection.json#/package_evidence/xlsx/relevant_parts: customXml/item1.xml, customXml/itemProps1.xml, and item1.xml.rels are native package members.",
+        "test-data/microsoft-office/excel/connections-inspection.json#/package_evidence/xlsx/custom_xml_data_mashup: DataMashup payload bytes, root, namespace, and typed Power Query model are recorded."
+      ],
+      "bounded_result": "A native custom XML store is already present through DataMashup. Remaining work is generic store CRUD, namespace/relationship preservation, and arbitrary application semantics; no second custom XML fixture is needed."
+    },
+    {
+      "id": "xlsx-255",
+      "feature": "Web extensions and Office add-ins",
+      "classification": "external_handoff",
+      "native_evidence": [
+        "No finalized native XLSX contains a webExtension, binding, add-in manifest, or provider task-pane part.",
+        "The source matrix covers inert web-extension metadata but explicitly excludes add-in activation/provider behavior; native authoring normally depends on an add-in manifest/store or service context."
+      ],
+      "bounded_result": "An authoritative native fixture needs an add-in manifest/provider or account/service handoff. A local workbook with an ordinary table or formula is not a substitute."
+    },
+    {
+      "id": "xlsx-259",
+      "feature": "OOXML digital signatures",
+      "classification": "external_handoff",
+      "native_evidence": [
+        "test-data/microsoft-office/coverage.json#/residual_matrix_pending_categories/categories/externally_blocked: xlsx-259 is explicitly blocked pending a certificate/real-identity signing handoff.",
+        "No finalized native Excel package contains a signature origin, signature XML, certificate chain, or trust result."
+      ],
+      "bounded_result": "A certificate and trusted identity are required for authoritative native evidence; no local unsigned fixture can close this row."
+    },
+    {
+      "id": "xlsx-260",
+      "feature": "OOXML package encryption",
+      "classification": "external_handoff",
+      "native_evidence": [
+        "test-data/microsoft-office/coverage.json#/residual_matrix_pending_categories/categories/externally_blocked: xlsx-260 is explicitly blocked pending the password/encryption handoff.",
+        "test-data/microsoft-office/manifest.json#/pending_candidates/0: excel-encrypted.xlsx remains an unfinalized plaintext baseline after the password dialog was canceled and is excluded from fixture counts."
+      ],
+      "bounded_result": "A native password/encryption handoff is required. The unfinalized baseline is not evidence of encryption and is not promoted here."
+    },
+    {
+      "id": "xlsx-261",
+      "feature": "Persisted Office Add-in task panes and web-extension parts",
+      "classification": "external_handoff",
+      "native_evidence": [
+        "No finalized native XLSX contains task-pane/web-extension parts or a persisted add-in relationship.",
+        "crates/litchi-xlsx/src/task_panes and the source matrix provide inert package CRUD, while add-in activation/provider behavior requires an external manifest/provider context."
+      ],
+      "bounded_result": "Use an external add-in manifest/provider handoff if this row must receive native evidence; do not duplicate the ordinary web-extension-free workbook corpus."
+    },
+    {
+      "id": "xlsx-262",
+      "feature": "Ribbon and custom UI XML",
+      "classification": "external_handoff",
+      "native_evidence": [
+        "No finalized native XLSX contains customUI/customUI14 parts or Ribbon relationships.",
+        "The matrix treats Ribbon/customUI as bounded/pass-through and leaves UI activation and arbitrary extension semantics outside the typed facade; producing the part requires external Custom UI XML/add-in tooling."
+      ],
+      "bounded_result": "An external customUI editor/add-in handoff is needed for an authoritative producer fixture. Do not infer a native Excel absence solely from the package scan."
+    },
+    {
+      "id": "xlsx-263",
+      "feature": "Unknown package parts and extension XML",
+      "classification": "operation_only",
+      "native_evidence": [
+        "Native chart-families, pivot-controls, links/objects, connections, formula-owners, conditional-drawings, and date1904 packages retain extension-bearing or opaque families including chart style/color parts, slicer/timeline graphs, richData, DataMashup custom XML, metadata, x14 conditional formats, and custom-view records."
+      ],
+      "bounded_result": "Unknown/extension storage is already materially represented. Remaining work is preservation through each typed mutation and explicit refusal of unowned graphs; a synthetic unknown-part fixture would not improve this native corpus."
+    },
+    {
+      "id": "xlsx-264",
+      "feature": "Data Model time groupings (`modelTimeGroupings`)",
+      "classification": "observed_native_ui_limitation",
+      "native_evidence": [
+        "test-data/microsoft-office/coverage.json#/residual_matrix_pending_categories/categories/native_ui_unavailable: xlsx-264 is explicitly grouped with Data Model/Power Pivot because no usable native producer route was found; the category does not establish absence.",
+        "The finalized date/timeline fixtures contain ordinary worksheet dates and a PivotTable timeline, but no XLDM modelTimeGroupings owner."
+      ],
+      "bounded_result": "A meaningful target requires the unavailable Data Model/Power Pivot producer path. The ordinary worksheet date1904 and PivotTable timeline fixtures do not substitute for model time-grouping metadata."
+    }
+  ],
+  "validation": {
+    "json_syntax": "validated with python3 -m json.tool",
+    "source_and_fixture_reads": "read-only shell/Python inspection only; no Office UI was operated in this audit",
+    "library_code_modified": false,
+    "shared_metadata_modified": false,
+    "fixture_files_modified": false,
+    "temporary_outputs": "none written inside the checkout"
+  }
+}

@@ -1,0 +1,184 @@
+{
+  "schema_version": 1,
+  "fixture_id": "word-encrypted-012",
+  "generated_on": "2026-10-15",
+  "purpose": "Read-only inspection of native Microsoft Word password-to-open DOCX Agile encryption, legacy DOC CryptoAPI encryption, and the DOC write-reservation string.",
+  "provenance": {
+    "producer_app": "Microsoft Office Word",
+    "app_version": "16.110.2",
+    "app_build": "16.110.26062818",
+    "platform": "macOS",
+    "authoring_method": "Computer Use / native Microsoft Word UI",
+    "source": "A fresh native Word document was given WORD_ENCRYPTED_012, its fixture ID, Native password-to-open specimen., VALUE_012: 42, and END_ENCRYPTED_012. Word initially rejected a longer password with the UI message Password too long; the public disposable password Office42! was then set for both opening and modification before the native DOCX save. Native Save As produced the DOC derivative.",
+    "public_disposable_password": "Office42!",
+    "wrong_password_probe": "wrong",
+    "initial_long_password_attempt": {"status": "rejected_by_native_Word", "ui_message": "Password too long", "candidate_retained": false},
+    "libreoffice_used": false,
+    "programmatic_office_generation_used": false,
+    "library_code_modified": false,
+    "office_files_modified_after_native_save": false,
+    "native_reopen_status": {
+      "word-encrypted.docx": "pass; native Word accepted the open and modify password and reopened without repair",
+      "word-encrypted.doc": "pass; native Word accepted the open and modify password, reopened without repair, and retained all markers"
+    },
+    "all_documents_closed_before_hashing": true,
+    "provisional_until_parent_final_reopen": false,
+    "auditor": "/root/word_remaining_audit"
+  },
+  "files": [
+    {"path": "test-data/microsoft-office/word/word-encrypted.docx", "format": "encrypted OOXML CFB container", "role": "native password-to-open DOCX", "bytes": 19968, "sha256": "724985af8f869ebd3daea454bac3057a646e6e41ac5b188fbf310cd43bd1bdc0"},
+    {"path": "test-data/microsoft-office/word/word-encrypted.doc", "format": "encrypted Word 97-2003 CFB", "role": "native password-to-open DOC derivative with write reservation", "bytes": 25088, "sha256": "4ff94c46646d95076e161844d8780f58cdfd895c15f8b264ae07c5aed609f24c"}
+  ],
+  "content_markers": [
+    "WORD_ENCRYPTED_012",
+    "Fixture ID: word-encrypted-012",
+    "Native password-to-open specimen.",
+    "VALUE_012: 42",
+    "END_ENCRYPTED_012"
+  ],
+  "coverage": [
+    {
+      "feature": "OOXML Agile password-to-open encryption",
+      "status": "evidenced_and_decrypted_in_memory",
+      "evidence": "The DOCX is a CFB container with the complete DataSpaces graph, EncryptionInfo, and EncryptedPackage streams. litchi-crypto::ooxml::inspect classifies it as AgileAes256Sha512; the correct password opens it with authenticated dataIntegrity and yields a 13,671-byte OPC package in memory. No decrypted package was written to disk."
+    },
+    {
+      "feature": "Legacy DOC CryptoAPI password-to-open encryption",
+      "status": "evidenced_and_read_in_memory",
+      "evidence": "The DOC FIB has fEncrypted set, nFib 0x00C1, lKey 198, and a 198-byte version 4.2 CryptoAPI RC4/SHA-1 header in 1Table. litchi-doc's correct-password path reads the five-paragraph story in memory; no decrypted DOC was written."
+    },
+    {
+      "feature": "DOC write reservation",
+      "status": "evidenced_typed",
+      "evidence": "After correct-password decryption, litchi-doc parses FIB table index 32 as SttbfAssoc at offset 9199, length 96, and its typed WriteReservationPassword slot is exactly Office42!. This is a modify-password metadata field in addition to the password-to-open encryption."
+    },
+    {
+      "feature": "Wrong and absent password contracts",
+      "status": "evidenced",
+      "evidence": "litchi-doc returns PasswordRequired without a password and InvalidPassword for wrong. litchi-docx maps both absent and wrong OOXML credentials to Encryption(Password), while the underlying litchi-crypto OOXML API returns Password. Correct credentials succeed in both paths."
+    }
+  ],
+  "docx": {
+    "container": {
+      "kind": "OLE2 Compound File Binary",
+      "file_size": 19968,
+      "directory_streams": 6,
+      "streams": [
+        {"path": "/\u0006DataSpaces/Version", "bytes": 76, "sha256": "e81d2d7f4d8b4aa96a9d1ac9aad489caa06f24c3de2b66471479daf34672ce3a"},
+        {"path": "/\u0006DataSpaces/DataSpaceMap", "bytes": 112, "sha256": "b520d7662070c97304b0bbff09af9f61baaa6872976663ed1a886abc7c29cb15"},
+        {"path": "/\u0006DataSpaces/DataSpaceInfo/StrongEncryptionDataSpace", "bytes": 64, "sha256": "167181108f6fd083cd67d569e9906a592ca923bc2d4c571ed1242caf92ed48f8"},
+        {"path": "/\u0006DataSpaces/TransformInfo/StrongEncryptionTransform/\u0006Primary", "bytes": 200, "sha256": "990349482cd707ba3093d6fff5bb72167a38f0831e58789a92c25cdeb01f7f93"},
+        {"path": "/EncryptionInfo", "bytes": 1289, "sha256": "f76f9630b14aff2ea04e80e60c7fe5fc040840a81f05ca540d04f6d0fef17893"},
+        {"path": "/EncryptedPackage", "bytes": 13688, "sha256": "a8f2e8560d457ae8a6f57421de3fd37a3968b7ef90ffe4df69eb44adfb8aaa88"}
+      ],
+      "dataspaces_graph": {
+        "version_stream": "Microsoft.Container.DataSpaces",
+        "data_space_map_entry": "EncryptedPackage2 -> StrongEncryptionDataSpace",
+        "data_space_transform": "StrongEncryptionTransform",
+        "primary_transform_stream": "\u0006Primary"
+      }
+    },
+    "encryption_info": {
+      "version": {"major": 4, "minor": 4},
+      "mode": "AgileAes256Sha512",
+      "key_data": {"salt_size": 16, "block_size": 16, "key_bits": 256, "hash_size": 64, "cipher_algorithm": "AES", "cipher_chaining": "ChainingModeCBC", "hash_algorithm": "SHA512"},
+      "password_key_encryptor": {"uri": "http://schemas.microsoft.com/office/2006/keyEncryptor/password", "spin_count": 100000, "salt_size": 16, "block_size": 16, "key_bits": 256, "hash_size": 64, "cipher_algorithm": "AES", "cipher_chaining": "ChainingModeCBC", "hash_algorithm": "SHA512"},
+      "data_integrity_elements": 2,
+      "data_integrity_verified": true,
+      "encryption_info_xml_sha256": "f76f9630b14aff2ea04e80e60c7fe5fc040840a81f05ca540d04f6d0fef17893"
+    },
+    "encrypted_package": {
+      "stream_bytes": 13688,
+      "declared_clear_package_bytes": 13671,
+      "decrypted_in_memory": true,
+      "clear_zip_member_count": 11,
+      "clear_zip_members": [
+        {"path": "[Content_Types].xml", "bytes": 1312, "sha256": "dfa90f373b8fd8147ee3e4bfe1ee059e536cc1b068f7ec140c3fc0e6554f331a"},
+        {"path": "_rels/.rels", "bytes": 590, "sha256": "e19238d7a71fa7a2490776252686f70e2de6238c87cd509b5e3a3cc07c2ea4df"},
+        {"path": "word/document.xml", "bytes": 3705, "sha256": "ac2ad2b1d0d940e0afc070f137ecce3325601c29e43fe9a24a8c78c615f1c44f"},
+        {"path": "word/_rels/document.xml.rels", "bytes": 817, "sha256": "b725d5476e76f555fc24ecb908474fd29b671687336e5e1177a5c4c35cb5939f"},
+        {"path": "word/theme/theme1.xml", "bytes": 8397, "sha256": "2760e6e84d4bf365af6570192dbe9cb57bb32653388d0ea041d116b25b1ca0a2"},
+        {"path": "word/settings.xml", "bytes": 3568, "sha256": "18e25685d1d2fe9ccf06b8f4ecb776f8b92a442dc48e8a827afefb059935f413"},
+        {"path": "word/styles.xml", "bytes": 42760, "sha256": "5404cc8025105a79816628b9b52c986863535e772999f4b39da71d6555c63248"},
+        {"path": "word/webSettings.xml", "bytes": 1069, "sha256": "9d21da07e99d87dfe36f6587ccc669539495e7130c513a0b63e3df49d2d71bd1"},
+        {"path": "word/fontTable.xml", "bytes": 1831, "sha256": "88dd0cd28c13a48d979681218c86597fe170a188fc9e3f73ad934b150c47b237"},
+        {"path": "docProps/core.xml", "bytes": 745, "sha256": "3278254d70846c95b05555cbdfade371b395b8bcdca3edac4a2b9367a3aec387"},
+        {"path": "docProps/app.xml", "bytes": 987, "sha256": "c6733e30b25e769a220a00c7bdf56b1b81dbb9035e26fb5675628ec20bd7b4c6"}
+      ]
+    },
+    "clear_main_document": {
+      "source_member": "word/document.xml",
+      "paragraph_count": 5,
+      "table_count": 0,
+      "markers": ["WORD_ENCRYPTED_012", "Fixture ID: word-encrypted-012", "Native password-to-open specimen.", "VALUE_012: 42", "END_ENCRYPTED_012"]
+    }
+  },
+  "doc": {
+    "container": {
+      "kind": "OLE2 Compound File Binary",
+      "file_size": 25088,
+      "stream_count": 5,
+      "streams": [
+        {"path": "/1Table", "bytes": 9295, "sha256": "f350a6cf0d6d64897ff38445bc8523d8677fcd35199b05493ef7ee575c34d082"},
+        {"path": "/\u0001CompObj", "bytes": 114, "sha256": "f70fe384c672865fff4bb8ab60d73098bc751e8f2aa915b8aff2e2085648b428"},
+        {"path": "/WordDocument", "bytes": 4096, "sha256": "956c12fe72d7e4b3f834c12dbe071122a36a720c0a048e7cf528eb2157fbbde0"},
+        {"path": "/\u0005SummaryInformation", "bytes": 4096, "sha256": "ce463659a48fb625d6e33ef530903fa0fbc6d4304dd03001ba3520c38713c80c"},
+        {"path": "/\u0005DocumentSummaryInformation", "bytes": 4096, "sha256": "4e7f20529b3ca01aa9be807295d543c3121a4ac12ed0415ac58515b1ba5fc143"}
+      ]
+    },
+    "fib": {
+      "nFib": "0x00C1",
+      "version_name": "Word 97",
+      "flags_raw": "0x1BF0",
+      "fEncrypted": true,
+      "fWhichTblStm": true,
+      "lKey": 198,
+      "table_stream": "1Table",
+      "table_stream_bytes": 9295,
+      "WordDocument_stream_bytes": 4096
+    },
+    "cryptoapi_header": {
+      "version_major": 4,
+      "version_minor": 2,
+      "outer_flags": "0x0000000C",
+      "inner_flags": "0x0000000C",
+      "header_size": 126,
+      "total_clear_header_bytes": 198,
+      "size_extra": 0,
+      "alg_id": "0x00006801",
+      "hash_id": "0x00008004",
+      "key_bits": 128,
+      "provider": "Microsoft Enhanced Cryptographic Provider v1.0",
+      "typed_rc4_header_parse": "pass"
+    },
+    "write_reservation": {
+      "fib_index": 32,
+      "sttbf_assoc_offset": 9199,
+      "sttbf_assoc_length": 96,
+      "typed_write_reservation_password": "Office42!",
+      "decrypted_in_memory": true
+    },
+    "main_story": {
+      "paragraph_count": 5,
+      "table_count": 0,
+      "text": "WORD_ENCRYPTED_012\rFixture ID: word-encrypted-012\rNative password-to-open specimen.\rVALUE_012: 42\rEND_ENCRYPTED_012\r",
+      "markers_present": true
+    }
+  },
+  "reader_validation": {
+    "litchi_crypto_ooxml_inspect": {"result": "Ok(Encrypted(AgileAes256Sha512))"},
+    "litchi_crypto_ooxml_open": {"password": "Office42!", "result": "pass", "integrity": "Authenticated", "clear_package_written": false},
+    "litchi_docx_correct_password": {"api": "Package::open_with_password", "password": "Office42!", "result": "pass", "paragraph_count": 5, "table_count": 0, "markers_present": true},
+    "litchi_docx_no_password": {"api": "Package::open_with_password", "password": "", "result": "Err(Encryption(Password))"},
+    "litchi_docx_wrong_password": {"api": "Package::open_with_password", "password": "wrong", "result": "Err(Encryption(Password))"},
+    "litchi_doc_no_password": {"api": "Package::document", "result": "Err(PasswordRequired)"},
+    "litchi_doc_wrong_password": {"api": "Package::document_with_options", "password": "wrong", "result": "Err(InvalidPassword)"},
+    "litchi_doc_correct_password": {"api": "Package::document_with_options", "password": "Office42!", "result": "pass", "paragraph_count": 5, "table_count": 0, "markers_present": true, "fib_encrypted": true}
+  },
+  "limitations": [
+    "Both encrypted files were directly reopened in native Word after saving; Word accepted Office42!, showed no repair prompt, retained the markers, and both documents were closed before hashing.",
+    "The public disposable password is recorded because this fixture explicitly tests password contracts; it must not be treated as a secret or reused for any other fixture.",
+    "Only in-memory decryption was used for inspection. No clear DOCX or DOC derivative was written.",
+    "This fixture covers password-to-open and the DOC SttbfAssoc write-reservation value; it does not claim coverage of certificate encryption, binary XOR obfuscation, or an alternate Agile cipher/hash profile."
+  ]
+}

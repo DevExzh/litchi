@@ -1,0 +1,1211 @@
+{
+  "schema_version": 1,
+  "fixture_id": "excel-form-controls-008",
+  "generated_on": "2026-10-15",
+  "purpose": "Fixture-specific, read-only inspection of eleven native Microsoft Excel worksheet Form Controls across OOXML XLSX, BIFF12 XLSB, and legacy BIFF8 XLS.",
+  "provenance": {
+    "producer_app": "Microsoft Office Excel",
+    "app_version": "16.110.2",
+    "app_build": "16.110.26062818",
+    "package_application": "Microsoft Macintosh Excel",
+    "package_app_version": "16.0300",
+    "platform": "macOS",
+    "authoring_method": "Computer Use / native Microsoft Excel Developer ribbon Form Controls UI",
+    "source": "One worksheet was authored in native Excel with eleven lower-ribbon Form Controls: Check Box, Combo Box, List Box, Spinner, Scroll Bar, Group Box, two Option Buttons, Label, Button, and a Mixed-state Check Box. The source XLSX was saved natively as XLSB and was closed/reopened before the original XLSX was reopened and saved as legacy XLS.",
+    "native_save_chain": [
+      "xlsx",
+      "xlsb",
+      "xls"
+    ],
+    "libreoffice_used": false,
+    "programmatic_office_generation_used": false,
+    "library_code_modified": false,
+    "temporary_probe_harnesses": [
+      "/tmp/litchi-form-probe",
+      "/tmp/probe_form_xml.py"
+    ],
+    "temporary_harnesses_outside_checkout": true,
+    "all_documents_closed_before_hashing": true,
+    "lock_files_present_at_inspection": false
+  },
+  "scope_and_limits": {
+    "native_variants": [
+      "xlsx",
+      "xlsb",
+      "xls"
+    ],
+    "native_excel_reopen_verified": true,
+    "repair_or_conversion_prompt_observed": false,
+    "activex_controls_present": false,
+    "vba_payload_present": false,
+    "macro_execution": false,
+    "external_links_followed": false,
+    "form_control_count_authored": 11,
+    "xls_compatibility_warning": {
+      "shown": true,
+      "accepted": true,
+      "effect": "native legacy conversion completed; typed BIFF8 form-control view exposed 8 of 11 OBJ controls"
+    },
+    "semantic_parity_claimed": false,
+    "reader_boundary": "The package and typed-reader observations below are exact probes of these files. BIFF8 and BIFF12 boundaries are recorded as library behavior; they are not evidence that native Excel failed to reopen the files."
+  },
+  "expected_native_content": {
+    "worksheet": {
+      "name": "Sheet1",
+      "dimension": "A1:D12",
+      "column_widths": {
+        "A:B": 32.83203125
+      },
+      "bold_range": "A1:B1",
+      "markers": {
+        "A1": "EXCEL_FORM_CONTROLS_008",
+        "B1": "Fixture ID: excel-form-controls-008",
+        "A2": "CHECK_LINK_008",
+        "B2": true,
+        "A3": "COMBO_LINK_008",
+        "B3": 2,
+        "A4": "LIST_LINK_008",
+        "B4": 3,
+        "A5": "SPIN_LINK_008",
+        "B5": 5,
+        "A6": "SCROLL_LINK_008",
+        "B6": 10,
+        "A7": "OPTION_LINK_008",
+        "B7": 2,
+        "A8": "END_FORM_CONTROLS_008",
+        "D9": "OPTION_A_008",
+        "D10": "OPTION_B_008",
+        "D11": "OPTION_C_008",
+        "A12": "MIXED_CHECK_008",
+        "B12": "#N/A"
+      },
+      "source_range": {
+        "D9:D11": [
+          "OPTION_A_008",
+          "OPTION_B_008",
+          "OPTION_C_008"
+        ]
+      }
+    },
+    "controls": [
+      {
+        "position": 0,
+        "name": "Check Box 1",
+        "shape_id": 1025,
+        "drawing_name": "Check Box 1",
+        "compat_spid": "_x0000_s1025",
+        "vml_id": "_x0000_s1025",
+        "object_type": "CheckBox",
+        "vml_object_type": "Checkbox",
+        "linked_cell": "$B$2",
+        "native_state": "checked",
+        "x14_properties": {
+          "objectType": "CheckBox",
+          "checked": "Checked",
+          "fmlaLink": "$B$2",
+          "lockText": "1"
+        },
+        "typed_xlsx_projection": {
+          "checked": "Checked",
+          "fmla_link": "$B$2",
+          "no_three_d": null,
+          "lock_text": true,
+          "item_list": []
+        },
+        "typed_xls_projection": {
+          "object_type": "CheckBox",
+          "object_id": 1,
+          "state": "Checked",
+          "flags": 2
+        },
+        "diagnostics": [
+          "VML mirror TextVAlign disagrees with effective x14 textVAlign"
+        ]
+      },
+      {
+        "position": 1,
+        "name": "Drop Down 2",
+        "shape_id": 1026,
+        "drawing_name": "Drop Down 2",
+        "compat_spid": "_x0000_s1026",
+        "vml_id": "_x0000_s1026",
+        "object_type": "Drop",
+        "vml_object_type": "Drop",
+        "linked_cell": "$B$3",
+        "source_range": "$D$9:$D$11",
+        "native_state": "selection index 2",
+        "x14_properties": {
+          "objectType": "Drop",
+          "dropStyle": "combo",
+          "dx": "15",
+          "fmlaLink": "$B$3",
+          "fmlaRange": "$D$9:$D$11",
+          "noThreeD": "1",
+          "sel": "2",
+          "val": "0"
+        },
+        "typed_xlsx_projection": {
+          "drop_style": "combo",
+          "dx": 15,
+          "fmla_link": "$B$3",
+          "fmla_range": "$D$9:$D$11",
+          "no_three_d": true,
+          "sel": 2,
+          "val": 0,
+          "item_list": [],
+          "seltype": null
+        },
+        "typed_xls_projection": null,
+        "diagnostics": [
+          "VML ClientData does not prove the typed form-control objectType mirror",
+          "VML mirror LockText disagrees with effective x14 lockText"
+        ]
+      },
+      {
+        "position": 2,
+        "name": "List Box 3",
+        "shape_id": 1027,
+        "drawing_name": "List Box 3",
+        "compat_spid": "_x0000_s1027",
+        "vml_id": "_x0000_s1027",
+        "object_type": "List",
+        "vml_object_type": "List",
+        "linked_cell": "$B$4",
+        "source_range": "$D$9:$D$11",
+        "native_state": "single selection index 3",
+        "x14_properties": {
+          "objectType": "List",
+          "dx": "15",
+          "fmlaLink": "$B$4",
+          "fmlaRange": "$D$9:$D$11",
+          "sel": "3",
+          "val": "0"
+        },
+        "typed_xlsx_projection": {
+          "dx": 15,
+          "fmla_link": "$B$4",
+          "fmla_range": "$D$9:$D$11",
+          "sel": 3,
+          "val": 0,
+          "no_three_d": null,
+          "item_list": [],
+          "seltype": null
+        },
+        "typed_xls_projection": null,
+        "diagnostics": [
+          "VML ClientData does not prove the typed form-control objectType mirror",
+          "VML mirror LockText disagrees with effective x14 lockText"
+        ]
+      },
+      {
+        "position": 3,
+        "name": "Spinner 4",
+        "shape_id": 1028,
+        "drawing_name": "Spinner 4",
+        "compat_spid": "_x0000_s1028",
+        "vml_id": "_x0000_s1028",
+        "object_type": "Spin",
+        "vml_object_type": "Spin",
+        "linked_cell": "$B$5",
+        "native_state": "current 5, min 1, max 20, increment 2",
+        "x14_properties": {
+          "objectType": "Spin",
+          "dx": "15",
+          "fmlaLink": "$B$5",
+          "inc": "2",
+          "max": "20",
+          "min": "1",
+          "page": "10",
+          "val": "5"
+        },
+        "typed_xlsx_projection": {
+          "dx": 15,
+          "fmla_link": "$B$5",
+          "inc": 2,
+          "max": 20,
+          "min": 1,
+          "page": 10,
+          "val": 5,
+          "horiz": null
+        },
+        "typed_xls_projection": {
+          "object_type": "SpinControl",
+          "object_id": 4,
+          "value": 5,
+          "minimum": 1,
+          "maximum": 20,
+          "increment": 2,
+          "page_increment": 10,
+          "horizontal": false,
+          "flags": 1
+        },
+        "diagnostics": [
+          "VML ClientData does not prove the typed form-control objectType mirror",
+          "VML mirror LockText disagrees with effective x14 lockText"
+        ]
+      },
+      {
+        "position": 4,
+        "name": "Scroll Bar 5",
+        "shape_id": 1029,
+        "drawing_name": "Scroll Bar 5",
+        "compat_spid": "_x0000_s1029",
+        "vml_id": "_x0000_s1029",
+        "object_type": "Scroll",
+        "vml_object_type": "Scroll",
+        "linked_cell": "$B$6",
+        "native_state": "horizontal, current 10, min 0, max 50, increment 2, page 5",
+        "x14_properties": {
+          "objectType": "Scroll",
+          "dx": "15",
+          "fmlaLink": "$B$6",
+          "horiz": "1",
+          "inc": "2",
+          "max": "50",
+          "page": "5",
+          "val": "10"
+        },
+        "typed_xlsx_projection": {
+          "dx": 15,
+          "fmla_link": "$B$6",
+          "horiz": true,
+          "inc": 2,
+          "max": 50,
+          "min": null,
+          "page": 5,
+          "val": 10
+        },
+        "typed_xls_projection": {
+          "object_type": "ScrollBar",
+          "object_id": 5,
+          "value": 10,
+          "minimum": 0,
+          "maximum": 50,
+          "increment": 2,
+          "page_increment": 5,
+          "horizontal": true,
+          "flags": 1
+        },
+        "diagnostics": [
+          "VML ClientData does not prove the typed form-control objectType mirror",
+          "VML mirror LockText disagrees with effective x14 lockText"
+        ]
+      },
+      {
+        "position": 5,
+        "name": "Group Box 6",
+        "shape_id": 1030,
+        "drawing_name": "Group Box 6",
+        "compat_spid": "_x0000_s1030",
+        "vml_id": "_x0000_s1030",
+        "object_type": "GBox",
+        "vml_object_type": "GBox",
+        "native_state": "height 1.6 in, width 2.5 in",
+        "x14_properties": {
+          "objectType": "GBox",
+          "noThreeD": "1"
+        },
+        "typed_xlsx_projection": {
+          "no_three_d": true,
+          "fmla_group": null
+        },
+        "typed_xls_projection": {
+          "object_type": "GroupBox",
+          "object_id": 6,
+          "flags": 1
+        },
+        "diagnostics": [
+          "VML ClientData does not prove the typed form-control objectType mirror",
+          "VML mirror LockText disagrees with effective x14 lockText"
+        ]
+      },
+      {
+        "position": 6,
+        "name": "Option Button 7",
+        "shape_id": 1031,
+        "drawing_name": "Option Button 7",
+        "compat_spid": "_x0000_s1031",
+        "vml_id": "_x0000_s1031",
+        "object_type": "Radio",
+        "vml_object_type": "Radio",
+        "linked_cell": "$B$7",
+        "native_state": "unchecked; first option in group",
+        "x14_properties": {
+          "objectType": "Radio",
+          "firstButton": "1",
+          "fmlaLink": "$B$7",
+          "lockText": "1",
+          "noThreeD": "1"
+        },
+        "typed_xlsx_projection": {
+          "first_button": true,
+          "fmla_link": "$B$7",
+          "checked": null,
+          "no_three_d": true,
+          "lock_text": true
+        },
+        "typed_xls_projection": {
+          "object_type": "RadioButton",
+          "object_id": 7,
+          "state": "Unchecked",
+          "next_radio_button_id": 12,
+          "first_in_group": true,
+          "flags": 3
+        },
+        "diagnostics": [
+          "VML mirror TextVAlign disagrees with effective x14 textVAlign"
+        ]
+      },
+      {
+        "position": 7,
+        "name": "Label 9",
+        "shape_id": 1033,
+        "drawing_name": "Label 9",
+        "compat_spid": "_x0000_s1033",
+        "vml_id": "_x0000_s1033",
+        "object_type": "Label",
+        "vml_object_type": "Label",
+        "linked_text": "Sheet1!$A$1",
+        "native_state": "visible linked marker",
+        "x14_properties": {
+          "objectType": "Label",
+          "fmlaTxbx": "Sheet1!$A$1",
+          "lockText": "1"
+        },
+        "typed_xlsx_projection": {
+          "fmla_txbx": "Sheet1!$A$1",
+          "lock_text": true
+        },
+        "typed_xls_projection": {
+          "object_type": "Label",
+          "object_id": 9
+        },
+        "diagnostics": [
+          "VML ClientData does not prove the typed form-control objectType mirror"
+        ]
+      },
+      {
+        "position": 8,
+        "name": "Button 10",
+        "shape_id": 1034,
+        "drawing_name": "Button 10",
+        "compat_spid": "_x0000_s1034",
+        "vml_id": "_x0000_s1034",
+        "object_type": "Button",
+        "vml_object_type": "Button",
+        "native_state": "Assign Macro dialog opened and canceled; no macro assignment or VBA payload",
+        "x14_properties": {
+          "objectType": "Button",
+          "lockText": "1"
+        },
+        "typed_xlsx_projection": {
+          "lock_text": true
+        },
+        "typed_xls_projection": null,
+        "diagnostics": [
+          "VML mirror TextHAlign disagrees with effective x14 textHAlign",
+          "VML mirror TextVAlign disagrees with effective x14 textVAlign"
+        ]
+      },
+      {
+        "position": 9,
+        "name": "Check Box 11",
+        "shape_id": 1035,
+        "drawing_name": "Check Box 11",
+        "compat_spid": "_x0000_s1035",
+        "vml_id": "_x0000_s1035",
+        "object_type": "CheckBox",
+        "vml_object_type": "Checkbox",
+        "linked_cell": "$B$12",
+        "native_state": "mixed state; linked cell #N/A",
+        "x14_properties": {
+          "objectType": "CheckBox",
+          "checked": "Mixed",
+          "fmlaLink": "$B$12",
+          "lockText": "1",
+          "noThreeD": "1"
+        },
+        "typed_xlsx_projection": {
+          "checked": "Mixed",
+          "fmla_link": "$B$12",
+          "no_three_d": true,
+          "lock_text": true
+        },
+        "typed_xls_projection": {
+          "object_type": "CheckBox",
+          "object_id": 11,
+          "state": "Mixed",
+          "flags": 3
+        },
+        "diagnostics": [
+          "VML mirror TextVAlign disagrees with effective x14 textVAlign"
+        ]
+      },
+      {
+        "position": 10,
+        "name": "Option Button 12",
+        "shape_id": 1036,
+        "drawing_name": "Option Button 12",
+        "compat_spid": "_x0000_s1036",
+        "vml_id": "_x0000_s1036",
+        "object_type": "Radio",
+        "vml_object_type": "Radio",
+        "native_state": "checked; second option in group, inherited linked-cell B7",
+        "x14_properties": {
+          "objectType": "Radio",
+          "checked": "Checked",
+          "lockText": "1",
+          "noThreeD": "1"
+        },
+        "typed_xlsx_projection": {
+          "checked": "Checked",
+          "fmla_link": null,
+          "first_button": null,
+          "no_three_d": true,
+          "lock_text": true
+        },
+        "typed_xls_projection": {
+          "object_type": "RadioButton",
+          "object_id": 12,
+          "state": "Checked",
+          "next_radio_button_id": 7,
+          "first_in_group": false,
+          "flags": 3
+        },
+        "diagnostics": [
+          "VML mirror TextVAlign disagrees with effective x14 textVAlign"
+        ]
+      }
+    ],
+    "native_ui_actions": {
+      "developer_ribbon": "Excel Developer preferences were explicitly enabled by the user; the lower Form Controls gallery was used.",
+      "option_group": "Option Button 7 was initially created outside the group and removed. Group Box 6 was enlarged, then Option Button 12 was created inside the group and inherited linked cell B7. Selecting Option Button 12 visibly cleared Option Button 7.",
+      "button": "Assign Macro dialog was opened and canceled. No macro was assigned and no VBA project was added.",
+      "default_captions": "Native default control captions were retained.",
+      "reopen": "All three final files were closed and reopened in native Excel with Disable Macros irrelevant because no VBA existed; no repair prompt appeared and cached marker/link values matched."
+    },
+    "native_format_observations": {
+      "xlsx": "Label 9 displayed the linked A1 marker as one bold OOXML/DrawingML line.",
+      "xlsb": "Drawing/VML control mirrors and linked values remained present in the native binary package.",
+      "xls": "Label 9 reopened as plain text and wrapped to two lines; this is a native legacy conversion presentation difference."
+    }
+  },
+  "xlsx_ooxml_evidence": {
+    "container": "OPC ZIP",
+    "bytes": 18143,
+    "sha256": "5ecc8fe96f9bc071c4d2db4f4f483975645a2a3119a23e83b7731d3d1063a96b",
+    "zip_integrity": "pass",
+    "member_count": 24,
+    "control_properties_namespace": "http://schemas.microsoft.com/office/spreadsheetml/2009/9/main",
+    "control_properties_content_type": "application/vnd.ms-excel.controlproperties+xml",
+    "control_properties_relationship_type": "http://schemas.openxmlformats.org/officeDocument/2006/relationships/ctrlProp",
+    "worksheet_control_elements": 11,
+    "ctrl_properties_parts": 11,
+    "ctrl_properties_relationships": 11,
+    "drawing_shape_count": 11,
+    "vml_client_data_control_count": 11,
+    "activex_relationships": 0,
+    "package_members": [
+      "[Content_Types].xml",
+      "_rels/.rels",
+      "docProps/app.xml",
+      "docProps/core.xml",
+      "xl/_rels/workbook.xml.rels",
+      "xl/workbook.xml",
+      "xl/sharedStrings.xml",
+      "xl/styles.xml",
+      "xl/theme/theme1.xml",
+      "xl/worksheets/sheet1.xml",
+      "xl/worksheets/_rels/sheet1.xml.rels",
+      "xl/drawings/drawing1.xml",
+      "xl/drawings/vmlDrawing1.vml",
+      "xl/ctrlProps/ctrlProp1.xml",
+      "xl/ctrlProps/ctrlProp2.xml",
+      "xl/ctrlProps/ctrlProp3.xml",
+      "xl/ctrlProps/ctrlProp4.xml",
+      "xl/ctrlProps/ctrlProp5.xml",
+      "xl/ctrlProps/ctrlProp6.xml",
+      "xl/ctrlProps/ctrlProp7.xml",
+      "xl/ctrlProps/ctrlProp8.xml",
+      "xl/ctrlProps/ctrlProp9.xml",
+      "xl/ctrlProps/ctrlProp10.xml",
+      "xl/ctrlProps/ctrlProp11.xml"
+    ],
+    "part_hashes": {
+      "[Content_Types].xml": {
+        "bytes": 2608,
+        "sha256": "99975f00f5dc723c6d84019550d066165b07a80d839349b4b1327f2076343f74"
+      },
+      "xl/workbook.xml": {
+        "bytes": 2278,
+        "sha256": "5e912e2400203e7dda050f34f0a0baea28814447e95c6bc02154039ec8c1aebb"
+      },
+      "xl/_rels/workbook.xml.rels": {
+        "bytes": 698,
+        "sha256": "353383fbe90f202be596bdf0a86439c704d7024f4f8c19ebc9d06b42a341dba1"
+      },
+      "xl/worksheets/sheet1.xml": {
+        "bytes": 8654,
+        "sha256": "90e2ccc9e59da0ea6e2e51d9f749f7962369e232f07fa6827b950b2bc087603e"
+      },
+      "xl/worksheets/_rels/sheet1.xml.rels": {
+        "bytes": 2048,
+        "sha256": "013bc8d07e1ce066d60e7e37d2bf1ceb9d39145f187c9d7177e7cf992111c17a"
+      },
+      "xl/drawings/drawing1.xml": {
+        "bytes": 19391,
+        "sha256": "7e56445416f58e8d60ae0aa319093db569b35c0c96e1264ec32504610ac4143b"
+      },
+      "xl/drawings/vmlDrawing1.vml": {
+        "bytes": 8893,
+        "sha256": "622a97e86fcb0abed36496f4ed67f46ca361194f50c032d12003f318a7032215"
+      },
+      "xl/styles.xml": {
+        "bytes": 1866,
+        "sha256": "b5036fd189601fa03ff741f8661cf90ca0a196bd87aaed2de450bf5873057b30"
+      }
+    },
+    "control_relationship_map": {
+      "rId3": "ctrlProp1.xml / Check Box 1",
+      "rId4": "ctrlProp2.xml / Drop Down 2",
+      "rId5": "ctrlProp3.xml / List Box 3",
+      "rId6": "ctrlProp4.xml / Spinner 4",
+      "rId7": "ctrlProp5.xml / Scroll Bar 5",
+      "rId8": "ctrlProp6.xml / Group Box 6",
+      "rId9": "ctrlProp7.xml / Option Button 7",
+      "rId10": "ctrlProp8.xml / Label 9",
+      "rId11": "ctrlProp9.xml / Button 10",
+      "rId12": "ctrlProp10.xml / Check Box 11",
+      "rId13": "ctrlProp11.xml / Option Button 12"
+    },
+    "drawingml_shapes": [
+      {
+        "shape_id": 1025,
+        "name": "Check Box 1",
+        "compat_spid": "_x0000_s1025"
+      },
+      {
+        "shape_id": 1026,
+        "name": "Drop Down 2",
+        "compat_spid": "_x0000_s1026"
+      },
+      {
+        "shape_id": 1027,
+        "name": "List Box 3",
+        "compat_spid": "_x0000_s1027"
+      },
+      {
+        "shape_id": 1028,
+        "name": "Spinner 4",
+        "compat_spid": "_x0000_s1028"
+      },
+      {
+        "shape_id": 1029,
+        "name": "Scroll Bar 5",
+        "compat_spid": "_x0000_s1029"
+      },
+      {
+        "shape_id": 1030,
+        "name": "Group Box 6",
+        "compat_spid": "_x0000_s1030"
+      },
+      {
+        "shape_id": 1031,
+        "name": "Option Button 7",
+        "compat_spid": "_x0000_s1031"
+      },
+      {
+        "shape_id": 1033,
+        "name": "Label 9",
+        "compat_spid": "_x0000_s1033"
+      },
+      {
+        "shape_id": 1034,
+        "name": "Button 10",
+        "compat_spid": "_x0000_s1034"
+      },
+      {
+        "shape_id": 1035,
+        "name": "Check Box 11",
+        "compat_spid": "_x0000_s1035"
+      },
+      {
+        "shape_id": 1036,
+        "name": "Option Button 12",
+        "compat_spid": "_x0000_s1036"
+      }
+    ],
+    "vml_client_data": [
+      {
+        "vml_id": "_x0000_s1025",
+        "object_type": "Checkbox",
+        "linked_cell": "$B$2",
+        "source_range": null
+      },
+      {
+        "vml_id": "_x0000_s1026",
+        "object_type": "Drop",
+        "linked_cell": "$B$3",
+        "source_range": "$D$9:$D$11"
+      },
+      {
+        "vml_id": "_x0000_s1027",
+        "object_type": "List",
+        "linked_cell": "$B$4",
+        "source_range": "$D$9:$D$11"
+      },
+      {
+        "vml_id": "_x0000_s1028",
+        "object_type": "Spin",
+        "linked_cell": "$B$5",
+        "source_range": null
+      },
+      {
+        "vml_id": "_x0000_s1029",
+        "object_type": "Scroll",
+        "linked_cell": "$B$6",
+        "source_range": null
+      },
+      {
+        "vml_id": "_x0000_s1030",
+        "object_type": "GBox",
+        "linked_cell": null,
+        "source_range": null
+      },
+      {
+        "vml_id": "_x0000_s1031",
+        "object_type": "Radio",
+        "linked_cell": "$B$7",
+        "source_range": null
+      },
+      {
+        "vml_id": "_x0000_s1033",
+        "object_type": "Label",
+        "linked_cell": null,
+        "source_range": null
+      },
+      {
+        "vml_id": "_x0000_s1034",
+        "object_type": "Button",
+        "linked_cell": null,
+        "source_range": null
+      },
+      {
+        "vml_id": "_x0000_s1035",
+        "object_type": "Checkbox",
+        "linked_cell": "$B$12",
+        "source_range": null
+      },
+      {
+        "vml_id": "_x0000_s1036",
+        "object_type": "Radio",
+        "linked_cell": null,
+        "source_range": null
+      }
+    ],
+    "ctrl_properties": [
+      {
+        "name": "Check Box 1",
+        "shape_id": 1025,
+        "object_type": "CheckBox",
+        "attributes": {
+          "objectType": "CheckBox",
+          "checked": "Checked",
+          "fmlaLink": "$B$2",
+          "lockText": "1"
+        }
+      },
+      {
+        "name": "Drop Down 2",
+        "shape_id": 1026,
+        "object_type": "Drop",
+        "attributes": {
+          "objectType": "Drop",
+          "dropStyle": "combo",
+          "dx": "15",
+          "fmlaLink": "$B$3",
+          "fmlaRange": "$D$9:$D$11",
+          "noThreeD": "1",
+          "sel": "2",
+          "val": "0"
+        }
+      },
+      {
+        "name": "List Box 3",
+        "shape_id": 1027,
+        "object_type": "List",
+        "attributes": {
+          "objectType": "List",
+          "dx": "15",
+          "fmlaLink": "$B$4",
+          "fmlaRange": "$D$9:$D$11",
+          "sel": "3",
+          "val": "0"
+        }
+      },
+      {
+        "name": "Spinner 4",
+        "shape_id": 1028,
+        "object_type": "Spin",
+        "attributes": {
+          "objectType": "Spin",
+          "dx": "15",
+          "fmlaLink": "$B$5",
+          "inc": "2",
+          "max": "20",
+          "min": "1",
+          "page": "10",
+          "val": "5"
+        }
+      },
+      {
+        "name": "Scroll Bar 5",
+        "shape_id": 1029,
+        "object_type": "Scroll",
+        "attributes": {
+          "objectType": "Scroll",
+          "dx": "15",
+          "fmlaLink": "$B$6",
+          "horiz": "1",
+          "inc": "2",
+          "max": "50",
+          "page": "5",
+          "val": "10"
+        }
+      },
+      {
+        "name": "Group Box 6",
+        "shape_id": 1030,
+        "object_type": "GBox",
+        "attributes": {
+          "objectType": "GBox",
+          "noThreeD": "1"
+        }
+      },
+      {
+        "name": "Option Button 7",
+        "shape_id": 1031,
+        "object_type": "Radio",
+        "attributes": {
+          "objectType": "Radio",
+          "firstButton": "1",
+          "fmlaLink": "$B$7",
+          "lockText": "1",
+          "noThreeD": "1"
+        }
+      },
+      {
+        "name": "Label 9",
+        "shape_id": 1033,
+        "object_type": "Label",
+        "attributes": {
+          "objectType": "Label",
+          "fmlaTxbx": "Sheet1!$A$1",
+          "lockText": "1"
+        }
+      },
+      {
+        "name": "Button 10",
+        "shape_id": 1034,
+        "object_type": "Button",
+        "attributes": {
+          "objectType": "Button",
+          "lockText": "1"
+        }
+      },
+      {
+        "name": "Check Box 11",
+        "shape_id": 1035,
+        "object_type": "CheckBox",
+        "attributes": {
+          "objectType": "CheckBox",
+          "checked": "Mixed",
+          "fmlaLink": "$B$12",
+          "lockText": "1",
+          "noThreeD": "1"
+        }
+      },
+      {
+        "name": "Option Button 12",
+        "shape_id": 1036,
+        "object_type": "Radio",
+        "attributes": {
+          "objectType": "Radio",
+          "checked": "Checked",
+          "lockText": "1",
+          "noThreeD": "1"
+        }
+      }
+    ],
+    "identity_closure": "Every admitted XLSX control has worksheet control shapeId, DrawingML cNvPr/compatSp spid, VML shape id, VML ClientData ObjectType, and ctrlProp relationship closure. The owner returned anchor_profile LoSmlAnchorV1 for all 11."
+  },
+  "xlsb_package_evidence": {
+    "container": "OPC ZIP with BIFF12 binary worksheet/workbook parts and native XML drawing/VML mirrors",
+    "bytes": 12295,
+    "sha256": "432d1eb8d8e90b684b64a14087911b0d096476ebb1d8bd6490811a986811bbab",
+    "zip_integrity": "pass",
+    "member_count": 14,
+    "package_members": [
+      "[Content_Types].xml",
+      "_rels/.rels",
+      "docProps/app.xml",
+      "docProps/core.xml",
+      "xl/_rels/workbook.bin.rels",
+      "xl/workbook.bin",
+      "xl/sharedStrings.bin",
+      "xl/styles.bin",
+      "xl/theme/theme1.xml",
+      "xl/worksheets/sheet1.bin",
+      "xl/worksheets/_rels/sheet1.bin.rels",
+      "xl/worksheets/binaryIndex1.bin",
+      "xl/drawings/drawing1.xml",
+      "xl/drawings/vmlDrawing1.vml"
+    ],
+    "part_hashes": {
+      "[Content_Types].xml": {
+        "bytes": 1340,
+        "sha256": "228939b72b020fc12bf9c73b00fb9a769d01b867bba96e494e836e575b80cd9c"
+      },
+      "xl/workbook.bin": {
+        "bytes": 909,
+        "sha256": "09c6f45742c246d877cd2a5aecd48c84fcbf359f672b05580fe030bbaf5def26"
+      },
+      "xl/_rels/workbook.bin.rels": {
+        "bytes": 698,
+        "sha256": "f9ed407985a792514f5d1a26a3e419b65ef2fbd7318f92c53e6dd0d6d367b82d"
+      },
+      "xl/worksheets/sheet1.bin": {
+        "bytes": 1156,
+        "sha256": "f0cb32f56105aab0c27777546b315521bcac6b35484a7a08305b57ea787b8b27"
+      },
+      "xl/worksheets/_rels/sheet1.bin.rels": {
+        "bytes": 574,
+        "sha256": "d63b7767544fcb8b807b9ec45b06b6d9dac442abba1876c5222c642f845c49ae"
+      },
+      "xl/drawings/drawing1.xml": {
+        "bytes": 14123,
+        "sha256": "031fc3826b614f6df90b7b20f665ae974589c163f832af370bb6ad233a22d49c"
+      },
+      "xl/drawings/vmlDrawing1.vml": {
+        "bytes": 8893,
+        "sha256": "622a97e86fcb0abed36496f4ed67f46ca361194f50c032d12003f318a7032215"
+      },
+      "xl/sharedStrings.bin": {
+        "bytes": 533,
+        "sha256": "ef26f4ae9283f22f42b3e559fbf90741cf33ee0e783ff6b66f38367ed67704a7"
+      },
+      "xl/styles.bin": {
+        "bytes": 764,
+        "sha256": "46baf2ccc815ca7fc55b1cb38c50a5eb9acfb56716ebfbfd48faef2b85421bff"
+      },
+      "xl/worksheets/binaryIndex1.bin": {
+        "bytes": 115,
+        "sha256": "af1cddd9d91d5b5ff9c9703179114afa07940cf05af89eb9f8c04afc5d9afdf7"
+      }
+    },
+    "ctrl_properties_parts": 0,
+    "ctrl_properties_relationships": 0,
+    "worksheet_control_elements": "not represented as SpreadsheetML controls in sheet1.bin",
+    "drawing_shape_count": 11,
+    "vml_client_data_control_count": 11,
+    "activex_relationships": 0,
+    "sheet_relationships": {
+      "rId1": "binaryIndex1.bin",
+      "rId2": "drawing1.xml",
+      "rId3": "vmlDrawing1.vml"
+    },
+    "raw_sheet1_record_inventory": {
+      "record_count": 94,
+      "kind_counts": {
+        "0x0000": 13,
+        "0x0001": 3,
+        "0x0002": 5,
+        "0x0003": 2,
+        "0x0004": 1,
+        "0x0007": 13,
+        "0x0008": 1,
+        "0x0025": 14,
+        "0x0026": 14,
+        "0x0081": 1,
+        "0x0082": 1,
+        "0x0085": 1,
+        "0x0086": 1,
+        "0x0089": 1,
+        "0x0091": 1,
+        "0x0092": 1,
+        "0x0093": 1,
+        "0x0094": 1,
+        "0x0098": 1,
+        "0x0186": 1,
+        "0x0187": 1,
+        "0x0217": 1,
+        "0x0226": 1,
+        "0x0227": 1,
+        "0x0400": 12,
+        "0x0415": 1
+      }
+    },
+    "typed_control_api": "unavailable in litchi-xlsb; controls remain inert package/drawing/VML data"
+  },
+  "xls_biff8_evidence": {
+    "container": "CFB/OLE2 BIFF8 workbook",
+    "bytes": 29696,
+    "sha256": "6a5e3f76f4b76fc5008ffeb048dbc757840b5215f04eef62f8723508ba55fbac",
+    "cfb_signature": "D0 CF 11 E0 A1 B1 1A E1",
+    "streams": [
+      [
+        "Workbook"
+      ],
+      [
+        "\u0005SummaryInformation"
+      ],
+      [
+        "\u0005DocumentSummaryInformation"
+      ]
+    ],
+    "workbook_stream_bytes": 19503,
+    "worksheet_count": 1,
+    "raw_obj_record_count": 11,
+    "raw_obj_records": [
+      {
+        "offset": "0x4271",
+        "object_id": 1,
+        "object_type_code": "0x000B",
+        "object_type": "CheckBox",
+        "typed_form_control": true
+      },
+      {
+        "offset": "0x435F",
+        "object_id": 2,
+        "object_type_code": "0x0014",
+        "object_type": "DropDown",
+        "typed_form_control": false,
+        "parser_boundary": "truncated Obj subrecord"
+      },
+      {
+        "offset": "0x4427",
+        "object_id": 3,
+        "object_type_code": "0x0012",
+        "object_type": "List",
+        "typed_form_control": false,
+        "parser_boundary": "truncated Obj subrecord"
+      },
+      {
+        "offset": "0x44DF",
+        "object_id": 4,
+        "object_type_code": "0x0010",
+        "object_type": "SpinControl",
+        "typed_form_control": true
+      },
+      {
+        "offset": "0x457D",
+        "object_id": 5,
+        "object_type_code": "0x0011",
+        "object_type": "ScrollBar",
+        "typed_form_control": true
+      },
+      {
+        "offset": "0x4639",
+        "object_id": 6,
+        "object_type_code": "0x0013",
+        "object_type": "GroupBox",
+        "typed_form_control": true
+      },
+      {
+        "offset": "0x4729",
+        "object_id": 7,
+        "object_type_code": "0x000C",
+        "object_type": "RadioButton",
+        "typed_form_control": true
+      },
+      {
+        "offset": "0x484B",
+        "object_id": 9,
+        "object_type_code": "0x000E",
+        "object_type": "Label",
+        "typed_form_control": true
+      },
+      {
+        "offset": "0x4945",
+        "object_id": 10,
+        "object_type_code": "0x0007",
+        "object_type": "Button",
+        "typed_form_control": false,
+        "parser_boundary": "ObjectType::Button is excluded from FormControl::is_form_control; OleObject parser requires type 8"
+      },
+      {
+        "offset": "0x4A29",
+        "object_id": 11,
+        "object_type_code": "0x000B",
+        "object_type": "CheckBox",
+        "typed_form_control": true
+      },
+      {
+        "offset": "0x4B3C",
+        "object_id": 12,
+        "object_type_code": "0x000C",
+        "object_type": "RadioButton",
+        "typed_form_control": true
+      }
+    ],
+    "typed_form_control_count": 8,
+    "typed_form_control_ids": [
+      1,
+      4,
+      5,
+      6,
+      7,
+      9,
+      11,
+      12
+    ],
+    "ole_object_count": 0
+  },
+  "reader_observations": {
+    "xlsx_generic_reader": {
+      "command": "cargo run --quiet -p litchi-xlsx --example read_xlsx -- test-data/microsoft-office/excel/excel-form-controls.xlsx",
+      "result": "pass",
+      "worksheet_names": [
+        "Sheet1"
+      ],
+      "worksheet_dimension": "A1:D12",
+      "marker_values_match": true,
+      "B12": "#N/A"
+    },
+    "xlsx_typed_form_control_owner": {
+      "temporary_probe": "/tmp/litchi-form-probe",
+      "eager_open": "pass",
+      "source_backed_open": "pass",
+      "eager_control_count": 11,
+      "source_backed_control_count": 11,
+      "eager_source_views_match": true,
+      "collection_diagnostics": [],
+      "anchor_profiles": {
+        "all": "LoSmlAnchorV1"
+      },
+      "typed_object_types": [
+        "CheckBox",
+        "Drop",
+        "List",
+        "Spin",
+        "Scroll",
+        "GBox",
+        "Radio",
+        "Label",
+        "Button",
+        "CheckBox",
+        "Radio"
+      ],
+      "item_list_observation": "Combo and List use fmlaRange=$D$9:$D$11; no x14 itemLst was authored, so item_list is empty for both.",
+      "control_diagnostics": {
+        "UnprovenMirror": {
+          "VML ClientData does not prove the typed form-control objectType mirror": [
+            "Drop Down 2",
+            "List Box 3",
+            "Spinner 4",
+            "Scroll Bar 5",
+            "Group Box 6",
+            "Label 9"
+          ],
+          "VML mirror LockText disagrees with effective x14 lockText": [
+            "Drop Down 2",
+            "List Box 3",
+            "Spinner 4",
+            "Scroll Bar 5",
+            "Group Box 6"
+          ],
+          "VML mirror TextVAlign disagrees with effective x14 textVAlign": [
+            "Check Box 1",
+            "Option Button 7",
+            "Button 10",
+            "Check Box 11",
+            "Option Button 12"
+          ],
+          "VML mirror TextHAlign disagrees with effective x14 textHAlign": [
+            "Button 10"
+          ]
+        }
+      }
+    },
+    "xlsb_generic_reader": {
+      "command": "cargo run --quiet -p litchi --example xlsb_reader --features ooxml --no-default-features -- test-data/microsoft-office/excel/excel-form-controls.xlsb",
+      "result": "pass",
+      "text_and_cached_values_match": true,
+      "typed_form_control_api": "not available",
+      "raw_package_open": "pass; Workbook::new and OpcPackage iteration exposed drawing1.xml, vmlDrawing1.vml, sheet1.bin and three worksheet relationships",
+      "semantic_limit": "litchi-xlsb does not instantiate or semantically decode Form Controls; the 11 native controls are preserved as inert drawing/VML/package data."
+    },
+    "xls_biff8_reader": {
+      "generic_command": "cargo run --quiet -p litchi-xls --example read_xls -- test-data/microsoft-office/excel/excel-form-controls.xls",
+      "generic_result": "pass; Sheet1 and A1:D12 marker values exposed",
+      "typed_probe": "litchi_xls::ole_object::Snapshot::open(bytes, litchi_xls::ole_object::Limits::default())",
+      "typed_result": "pass; 8 typed FormControl values, 0 typed OleObject values",
+      "typed_ids": [
+        1,
+        4,
+        5,
+        6,
+        7,
+        9,
+        11,
+        12
+      ],
+      "raw_obj_result": "11 Obj records remain in Workbook stream; DropDown and List records hit truncated-subrecord parser boundary and Button is outside the typed form-control admission set."
+    },
+    "form_control_regression_tests": {
+      "commands": [
+        "cargo test --quiet -p litchi-xlsx --test form_control_owner_read",
+        "cargo test --quiet -p litchi-xlsx --test form_control_properties",
+        "cargo test --quiet -p litchi-xlsx --test form_control_scalar_lifecycle"
+      ],
+      "results": [
+        "39 passed",
+        "18 passed",
+        "32 passed"
+      ],
+      "scope": "Existing repository regression suites; the native fixture was probed through a temporary harness and no test source was modified."
+    }
+  },
+  "mismatches_and_boundaries": [
+    "XLSX x14 owner admits all 11 controls, but VML mirror diagnostics are present for native Excel defaults/legacy mirrors. These diagnostics are expected observations, not package-open failures.",
+    "Combo Box and List Box expose fmlaRange and linked cells but no x14 itemLst; the typed item list is therefore empty by design for this native source.",
+    "The XLSB package has no ctrlProps parts or typed form-control owner. Its drawing/VML mirrors contain all 11 controls, while litchi-xlsb only exposes inert package/drawing data.",
+    "The XLS Workbook stream contains all 11 native Obj records, but the typed litchi-xls FormControl view exposes only 8. DropDown object id 2 and List object id 3 hit the current truncated Obj subrecord boundary; Button object id 10 is intentionally excluded because ObjectType::Button is not in FormControl::is_form_control.",
+    "The Scroll Bar x14 property omits min, so the XLSX typed projection reports authored min=None with effective minimum 0; BIFF8 FtSbs stores minimum=0.",
+    "Native XLS Label 9 reopened as plain text wrapping to two lines, while the OOXML version remained bold/single-line; this is a native legacy presentation difference."
+  ],
+  "files": [
+    {
+      "path": "test-data/microsoft-office/excel/excel-form-controls.xlsx",
+      "format": "xlsx",
+      "bytes": 18143,
+      "sha256": "5ecc8fe96f9bc071c4d2db4f4f483975645a2a3119a23e83b7731d3d1063a96b",
+      "native_reopen_validation": "pass without repair; 11 controls and linked marker values visible"
+    },
+    {
+      "path": "test-data/microsoft-office/excel/excel-form-controls.xlsb",
+      "format": "xlsb",
+      "bytes": 12295,
+      "sha256": "432d1eb8d8e90b684b64a14087911b0d096476ebb1d8bd6490811a986811bbab",
+      "native_reopen_validation": "pass without repair; 11 drawing/VML control mirrors and linked marker values visible"
+    },
+    {
+      "path": "test-data/microsoft-office/excel/excel-form-controls.xls",
+      "format": "xls",
+      "bytes": 29696,
+      "sha256": "6a5e3f76f4b76fc5008ffeb048dbc757840b5215f04eef62f8723508ba55fbac",
+      "native_reopen_validation": "pass without repair; marker values visible and legacy Label wrapping observed"
+    }
+  ],
+  "validation_methods": [
+    "Computed SHA-256 and byte sizes from closed final streams; no lock files were present.",
+    "Checked ZIP central-directory integrity for XLSX and XLSB.",
+    "Inspected SpreadsheetML control elements, sheet relationships, ctrlProp XML, DrawingML compatibility spids, and VML ClientData/object types read-only.",
+    "Inspected BIFF12 package members and decompressed xl/worksheets/sheet1.bin with the repository dump_records example; no binary package was rewritten.",
+    "Inspected the BIFF8 Workbook stream with dump_xls_records and a temporary raw Obj inventory; all 11 native Obj records were retained in the audit result.",
+    "Ran typed XLSX eager/source-backed probes, the generic XLSX/XLSB/XLS readers, and the public XLS OLE/FormControl snapshot API without executing controls or macros.",
+    "Ran existing XLSX form-control owner/property/scalar regression suites; all tests passed.",
+    "Native Excel close/reopen, control state, linked-cell values, compatibility warning, and label presentation observations came from the root Computer Use session; this inspection process did not operate Office UI."
+  ],
+  "native_ui_observation_source": "Root agent Computer Use session; all three native files were closed, reopened, checked for repair, and closed before hashing."
+}

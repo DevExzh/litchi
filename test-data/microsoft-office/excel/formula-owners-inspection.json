@@ -1,0 +1,755 @@
+{
+  "schema_version": 1,
+  "fixture_id": "excel-formula-owners-009",
+  "generated_on": "2026-10-15",
+  "purpose": "Fixture-specific, read-only inspection of native Microsoft Excel formula-owner storage: legacy CSE and shared formulas, one-variable and two-variable what-if data tables, Scenario Manager, modern dynamic arrays, and cached LET results across OOXML, BIFF12, and BIFF8.",
+  "provenance": {
+    "producer_app": "Microsoft Office Excel",
+    "app_version": "16.110.2",
+    "app_build": "16.110.26062818",
+    "package_application": "Microsoft Macintosh Excel",
+    "package_app_version": "16.0300",
+    "platform": "macOS",
+    "authoring_method": "Computer Use / native Microsoft Excel UI",
+    "authoring_scope": "A new native Excel workbook was authored through the UI. No LibreOffice or library writer generated any fixture bytes.",
+    "native_save_sequence": [
+      "Saved the new workbook as excel-formula-owners.xlsx.",
+      "Saved a BIFF12 derivative as excel-formula-owners.xlsb.",
+      "Reopened the original XLSX, then saved the legacy BIFF8 derivative as excel-formula-owners.xls.",
+      "Reopened all three final files in native Excel without a repair prompt and closed them before inspection."
+    ],
+    "libreoffice_used": false,
+    "programmatic_office_generation_used": false,
+    "library_code_modified": false,
+    "all_documents_closed_before_hashing": true,
+    "lock_files_present_at_inspection": false
+  },
+  "scope_and_limits": {
+    "native_variants": [
+      "xlsx",
+      "xlsb",
+      "xls"
+    ],
+    "native_excel_reopen_verified": true,
+    "repair_or_conversion_prompt_observed": false,
+    "xlsx_and_xlsb_dynamic_array_observation": "Native Excel retained the SEQUENCE and FILTER spill formulas and cached spill values after XLSX and XLSB reopen.",
+    "xls_dynamic_array_observation": "The legacy XLS reopen retained the cached values, but native Excel showed the dynamic-array cells as formula-owned cells without modern spill behavior.",
+    "xls_formula_warning": {
+      "older_formula_unsupported_recalculate_prompt": "shown",
+      "user_action": "No; retain cached results",
+      "generic_feature_loss_warning": "shown and accepted"
+    },
+    "scenario_observation_limit": "Scenario Edit Values was opened for ALTERNATE_009 and its 25/4 values were verified, then canceled without saving or changing the final baseline workbook.",
+    "calculation_limit": "This inspection records stored formula tokens, owner ranges, cached values, and native UI observations. It does not claim that the library recalculates formulas, applies scenarios, recomputes data tables, or implements dynamic-array spill semantics.",
+    "semantic_parity_claimed": false,
+    "rendering_parity_claimed": false
+  },
+  "expected_native_content": {
+    "worksheet_order": [
+      "Sheet1",
+      "Sheet2"
+    ],
+    "active_worksheet": "Sheet2",
+    "sheet1_formula_owners": {
+      "markers": {
+        "A1": "EXCEL_FORMULA_OWNERS_009",
+        "B1": "Fixture ID: excel-formula-owners-009"
+      },
+      "header_row": {
+        "A3": "Quantity",
+        "B3": "Price",
+        "C3": "CSE_PRODUCT_009",
+        "D3": "COPIED_FORMULA_009",
+        "G3": "INPUT_MODEL_009",
+        "H3": "Value"
+      },
+      "quantity_price": {
+        "range": "A4:B7",
+        "rows": [
+          [
+            2,
+            10
+          ],
+          [
+            3,
+            20
+          ],
+          [
+            4,
+            30
+          ],
+          [
+            5,
+            40
+          ]
+        ]
+      },
+      "cse_array_formula": {
+        "range": "C4:C7",
+        "native_formula_bar": "{=A4:A7*B4:B7}",
+        "stored_formula": "A4:A7*B4:B7",
+        "native_ctrl_shift_return_verified": true,
+        "cached_values": [
+          20,
+          60,
+          120,
+          200
+        ]
+      },
+      "copied_formula": {
+        "range": "D4:D103",
+        "formula": "ROW()*2",
+        "formula_count": 100,
+        "cached_first": {
+          "D4": 8
+        },
+        "cached_last": {
+          "D103": 206
+        },
+        "cached_sequence": "8, 10, 12, ... , 206",
+        "stored_shared_formula_ranges": [
+          "D5:D68",
+          "D69:D103"
+        ],
+        "native_fill_command_used": true
+      },
+      "input_model": {
+        "labels": {
+          "G3": "INPUT_MODEL_009",
+          "H3": "Value",
+          "G4": "Input_X",
+          "G5": "Input_Y",
+          "G6": "Model_Result"
+        },
+        "inputs": {
+          "H4": 10,
+          "H5": 2
+        },
+        "formula": {
+          "H6": "=H4*H5+5",
+          "cached_value": 25
+        }
+      },
+      "one_variable_data_table": {
+        "label": "ONE_VARIABLE_009",
+        "formula_cell": "J3",
+        "formula": "=H6",
+        "input_values": {
+          "I4:I7": [
+            1,
+            2,
+            3,
+            4
+          ]
+        },
+        "table_range": "I3:J7",
+        "orientation": "column input",
+        "column_input_cell": "$H$4",
+        "row_input_blank": true,
+        "cached_outputs": {
+          "J4:J7": [
+            7,
+            9,
+            11,
+            13
+          ]
+        }
+      },
+      "two_variable_data_table": {
+        "label": "TWO_VARIABLE_009",
+        "formula_cell": "L3",
+        "formula": "=H6",
+        "column_headers": {
+          "M3:P3": [
+            1,
+            2,
+            3,
+            4
+          ]
+        },
+        "row_headers": {
+          "L4:L7": [
+            10,
+            20,
+            30,
+            40
+          ]
+        },
+        "table_range": "L3:P7",
+        "row_input_cell": "$H$5",
+        "column_input_cell": "$H$4",
+        "cached_outputs": {
+          "M4:P7": [
+            [
+              15,
+              25,
+              35,
+              45
+            ],
+            [
+              25,
+              45,
+              65,
+              85
+            ],
+            [
+              35,
+              65,
+              95,
+              125
+            ],
+            [
+              45,
+              85,
+              125,
+              165
+            ]
+          ]
+        }
+      },
+      "scenario_manager": {
+        "native_ui_state": {
+          "prevent_changes": true,
+          "hide": false,
+          "default_scenario_shown_or_applied": false,
+          "current_scenario": "BASELINE_009"
+        },
+        "scenarios": [
+          {
+            "name": "BASELINE_009",
+            "input_cells": {
+              "H4": 10,
+              "H5": 2
+            },
+            "comment": "Native scenario: X=10, Y=2.",
+            "locked": true,
+            "hidden": false
+          },
+          {
+            "name": "ALTERNATE_009",
+            "input_cells": {
+              "H4": 25,
+              "H5": 4
+            },
+            "comment": "Native scenario: X=25, Y=4.",
+            "locked": true,
+            "hidden": false
+          }
+        ],
+        "native_alternate_verification": "Edit Values showed H4=25 and H5=4 for ALTERNATE_009; the dialog was canceled and the workbook closed without a save prompt."
+      },
+      "formatting": {
+        "styled_range": "A1:P1",
+        "bold": true,
+        "column_widths": {
+          "A:P": 18
+        },
+        "stored_native_width": 18.83203125
+      }
+    },
+    "sheet2_dynamic_formulas": {
+      "markers": {
+        "A1": "DYNAMIC_FORMULAS_009",
+        "B1": "Native stored spill values",
+        "A3": "SEQUENCE_009",
+        "D3": "FILTER_009",
+        "F3": "LET_009"
+      },
+      "sequence": {
+        "anchor": "A4",
+        "spill_range": "A4:B6",
+        "native_formula": "=SEQUENCE(3,2,10,2)",
+        "stored_formula": "_xlfn.SEQUENCE(3,2,10,2)",
+        "cached_values": [
+          [
+            10,
+            12
+          ],
+          [
+            14,
+            16
+          ],
+          [
+            18,
+            20
+          ]
+        ]
+      },
+      "filter": {
+        "anchor": "D4",
+        "spill_range": "D4:E5",
+        "native_formula": "=FILTER(Sheet1!A4:B7,Sheet1!A4:A7>=4)",
+        "stored_formula": "_xlfn._xlws.FILTER(Sheet1!A4:B7,Sheet1!A4:A7>=4)",
+        "cached_values": [
+          [
+            4,
+            30
+          ],
+          [
+            5,
+            40
+          ]
+        ]
+      },
+      "let": {
+        "anchor": "F4",
+        "native_formula": "=LET(x,7,x*x+1)",
+        "stored_formula": "_xlfn.LET(_xlpm.x,7,_xlpm.x*_xlpm.x+1)",
+        "cached_value": 50
+      },
+      "dynamic_array_owner_count": 2,
+      "native_reopen_spills_retained": true
+    }
+  },
+  "format_observations": {
+    "xlsx": {
+      "container": "OPC ZIP",
+      "bytes": 12812,
+      "sha256": "1514e27b0f7334a786eea5adba316b032844c8d5de81d9b1807298a3b1ed8b87",
+      "zip_integrity": "pass",
+      "member_count": 13,
+      "main_workbook_content_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml",
+      "spreadsheetml_namespace": "http://schemas.openxmlformats.org/spreadsheetml/2006/main",
+      "critical_parts": [
+        "xl/workbook.xml",
+        "xl/_rels/workbook.xml.rels",
+        "xl/worksheets/sheet1.xml",
+        "xl/worksheets/sheet2.xml",
+        "xl/sharedStrings.xml",
+        "xl/metadata.xml",
+        "xl/calcChain.xml",
+        "xl/styles.xml"
+      ],
+      "native_reopen": "pass without repair; formula caches and native formula owners reopened"
+    },
+    "xlsb": {
+      "container": "OPC ZIP with BIFF12 binary parts",
+      "bytes": 12035,
+      "sha256": "6626274eb76cf5bea84b061435188d613f90185d7d34583b60f377013af874ac",
+      "zip_integrity": "pass",
+      "member_count": 17,
+      "main_workbook_content_type": "application/vnd.ms-excel.sheet.binary.macroEnabled.main",
+      "critical_parts": [
+        "xl/workbook.bin",
+        "xl/worksheets/sheet1.bin",
+        "xl/worksheets/sheet2.bin",
+        "xl/worksheets/binaryIndex1.bin",
+        "xl/worksheets/binaryIndex2.bin",
+        "xl/metadata.bin",
+        "xl/calcChain.bin"
+      ],
+      "native_reopen": "pass without repair; native XLSB retained dynamic formula spills and stored caches"
+    },
+    "xls": {
+      "container": "CFB/OLE2 BIFF8 workbook",
+      "bytes": 34304,
+      "sha256": "12f87df75c876e833aaa4497bee9bfc26857cd353241f4e70b87fba97d104d4a",
+      "file_description": "Composite Document File V2 Document, Microsoft Macintosh Excel",
+      "workbook_stream_bytes": 24359,
+      "boundsheet8_count": 2,
+      "native_sheet_order": [
+        "Sheet1",
+        "Sheet2"
+      ],
+      "native_reopen": "pass without repair; older-formula warning was answered No and generic feature-loss warning was accepted",
+      "native_cached_values_retained": true,
+      "native_cse_retained": true,
+      "native_scenario_manager_retained": true,
+      "native_dynamic_spill_semantics_retained": false
+    }
+  },
+  "binary_record_invariants": {
+    "xlsx_formula_xml": {
+      "sheet1": {
+        "array_formula": {
+          "cell": "C4",
+          "ref": "C4:C7",
+          "formula": "A4:A7*B4:B7"
+        },
+        "shared_formula_owners": [
+          {
+            "cell": "D5",
+            "ref": "D5:D68",
+            "si": 0,
+            "formula": "ROW()*2"
+          },
+          {
+            "cell": "D69",
+            "ref": "D69:D103",
+            "si": 1,
+            "formula": "ROW()*2"
+          }
+        ],
+        "data_table_anchors": [
+          {
+            "cell": "J4",
+            "ref": "J4:J7",
+            "dt2D": 0,
+            "dtr": 0,
+            "r1": "H4",
+            "row_input": null,
+            "column_input": "H4",
+            "ca": 1
+          },
+          {
+            "cell": "M4",
+            "ref": "M4:P7",
+            "dt2D": 1,
+            "dtr": 1,
+            "r1": "H5",
+            "r2": "H4",
+            "row_input": "H5",
+            "column_input": "H4"
+          }
+        ],
+        "scalar_formulas": {
+          "J3": {
+            "formula": "H6",
+            "cached": 25
+          },
+          "L3": {
+            "formula": "H6",
+            "cached": 25
+          },
+          "H6": {
+            "formula": "H4*H5+5",
+            "cached": 25
+          }
+        },
+        "formula_count_range": "D4:D103 contains 100 formula cells",
+        "scenario_xml": {
+          "element": "scenarios",
+          "current": 0,
+          "scenario_count": 2,
+          "scenarios": [
+            "BASELINE_009",
+            "ALTERNATE_009"
+          ],
+          "input_cells": [
+            "H4",
+            "H5"
+          ],
+          "locked": true,
+          "hidden": false
+        }
+      },
+      "sheet2": {
+        "array_formula_owners": [
+          {
+            "cell": "A4",
+            "ref": "A4:B6",
+            "formula": "_xlfn.SEQUENCE(3,2,10,2)"
+          },
+          {
+            "cell": "D4",
+            "ref": "D4:E5",
+            "formula": "_xlfn._xlws.FILTER(Sheet1!A4:B7,Sheet1!A4:A7>=4)"
+          }
+        ],
+        "scalar_formula": {
+          "cell": "F4",
+          "formula": "_xlfn.LET(_xlpm.x,7,_xlpm.x*_xlpm.x+1)",
+          "cached": 50
+        }
+      },
+      "metadata_xml": {
+        "part": "xl/metadata.xml",
+        "future_metadata_name": "XLDAPR",
+        "dynamic_array_properties": {
+          "fDynamic": 1,
+          "fCollapsed": 0
+        }
+      },
+      "calc_chain": {
+        "part": "xl/calcChain.xml",
+        "formula_entry_count": 113,
+        "sheet_id_counts": {
+          "1": 108,
+          "2": 5
+        },
+        "attribute_shape_counts": {
+          "r,i": 104,
+          "r,i,s": 4,
+          "a,i,r": 3,
+          "i,l,r": 2
+        }
+      },
+      "workbook_calc_features": [
+        "microsoft.com:RD",
+        "microsoft.com:Single",
+        "microsoft.com:FV",
+        "microsoft.com:CNMTM",
+        "microsoft.com:LET_WF",
+        "microsoft.com:LAMBDA_WF",
+        "microsoft.com:ARRAYTEXT_WF"
+      ]
+    },
+    "xlsb": {
+      "part_sizes_and_record_counts": {
+        "xl/worksheets/sheet1.bin": {
+          "bytes": 10201,
+          "records": 627
+        },
+        "xl/worksheets/sheet2.bin": {
+          "bytes": 1164,
+          "records": 61
+        },
+        "xl/workbook.bin": {
+          "bytes": 1224,
+          "records": 44
+        },
+        "xl/calcChain.bin": {
+          "bytes": 1701,
+          "records": 115
+        }
+      },
+      "sheet1_formula_and_what_if_records": {
+        "0x0005_BrtCellReal": 20,
+        "0x0009_BrtFmlaNum": 107,
+        "0x01AA_BrtArrFmla": 1,
+        "0x01AB_BrtShrFmla": 2,
+        "0x01AC_BrtTable": 2,
+        "0x01F4_BrtBeginScenMan": 1,
+        "0x01F5_BrtEndScenMan": 1,
+        "0x01F6_BrtBeginSct": 2,
+        "0x01F7_BrtEndSct": 2,
+        "0x01F8_BrtSlc": 4
+      },
+      "sheet2_formula_records": {
+        "0x0009_BrtFmlaNum": 11,
+        "0x01AA_BrtArrFmla": 2
+      },
+      "calc_chain_records": {
+        "0x0210_BrtBeginCalcChain": 1,
+        "0x003F_BrtCalcChainItem": 113,
+        "0x0211_BrtEndCalcChain": 1
+      },
+      "dynamic_formula_storage": "The two native spill ranges are represented as two BrtArrFmla owners and eleven cached numeric formula cells on sheet2.bin."
+    },
+    "xls_biff8": {
+      "workbook_stream_bytes": 24359,
+      "workbook_globals": {
+        "0x0085_BOUNDSHEET8": 2,
+        "0x00FC_SST": 1,
+        "0x0896": 1,
+        "0x089B": 1
+      },
+      "sheet0_sheet1": {
+        "0x0006_FORMULA": 127,
+        "0x0221_ARRAY": 1,
+        "0x0236_TABLE": 2,
+        "0x04BC_SHARED_FORMULA": 2,
+        "0x00AE_SCENMAN": 1,
+        "0x00AF_SCENARIO": 2
+      },
+      "sheet1_sheet2": {
+        "0x0006_FORMULA": 11,
+        "0x0221_ARRAY": 2,
+        "0x0236_TABLE": 0,
+        "0x04BC_SHARED_FORMULA": 0,
+        "0x00AE_SCENMAN": 0,
+        "0x00AF_SCENARIO": 0
+      },
+      "legacy_owner_mapping": {
+        "sheet1_array": "C4:C7",
+        "sheet1_tables": [
+          "J4:J7",
+          "M4:P7"
+        ],
+        "sheet2_arrays": [
+          "A4:B6",
+          "D4:E5"
+        ]
+      }
+    }
+  },
+  "reader_observations": {
+    "xlsx_reader": {
+      "command": "cargo run --quiet -p litchi-xlsx --example read_xlsx -- test-data/microsoft-office/excel/excel-formula-owners.xlsx",
+      "result": "pass",
+      "worksheet_names": [
+        "Sheet1",
+        "Sheet2"
+      ],
+      "active_sheet": "Sheet2",
+      "sheet1_formula_readback": {
+        "J3": {
+          "formula": "H6",
+          "cached": 25
+        },
+        "L3": {
+          "formula": "H6",
+          "cached": 25
+        },
+        "H6": {
+          "formula": "H4*H5+5",
+          "cached": 25
+        }
+      },
+      "sheet2_formula_readback": {
+        "A4": {
+          "kind": "Array",
+          "range": "A4:B6",
+          "cached": 10,
+          "formula": "_xlfn.SEQUENCE(3,2,10,2)"
+        },
+        "D4": {
+          "kind": "Array",
+          "range": "D4:E5",
+          "cached": 4,
+          "formula": "_xlfn._xlws.FILTER(Sheet1!A4:B7,Sheet1!A4:A7>=4)"
+        },
+        "F4": {
+          "kind": "Scalar",
+          "cached": 50,
+          "formula": "_xlfn.LET(_xlpm.x,7,_xlpm.x*_xlpm.x+1)"
+        }
+      },
+      "boundary": "The generic XLSX reader preserves stored formula kind, owner range, and cached value. It does not recalculate the formulas or apply the Scenario Manager/data-table inputs."
+    },
+    "xlsb_reader": {
+      "unified_command": "cargo run --quiet -p litchi --example xlsb_reader --features ooxml --no-default-features -- test-data/microsoft-office/excel/excel-formula-owners.xlsb",
+      "result": "error while opening workbook",
+      "error": "Invalid formula: BrtName has invalid macro shortcut key 0x00",
+      "indexed_probe_result": "The existing binary_index_profile probe reached the same BrtName invalid macro shortcut key 0x00 error for both worksheet indices.",
+      "raw_record_probe": "The read-only dump_records probe parsed sheet1.bin, sheet2.bin, workbook.bin, and calcChain.bin completely; raw formula-owner records are recorded above.",
+      "boundary": "This fixture records native BIFF12 storage even though the current unified/package reader rejects a workbook NAME record before materialization."
+    },
+    "xls_reader": {
+      "command": "cargo run --quiet -p litchi-xls --example read_xls -- test-data/microsoft-office/excel/excel-formula-owners.xls",
+      "result": "pass",
+      "worksheet_names": [
+        "Sheet1",
+        "Sheet2"
+      ],
+      "sheet1": {
+        "dimensions_zero_based": [
+          0,
+          0,
+          102,
+          15
+        ],
+        "formula_cell_count": 127,
+        "array_owner_count": 1,
+        "array_owner_ranges": [
+          "C4:C7"
+        ],
+        "data_table_count": 2,
+        "data_table_ranges": [
+          "J4:J7",
+          "M4:P7"
+        ],
+        "scenario_manager_present": true,
+        "scenario_manager_current": 0,
+        "scenario_manager_shown": null,
+        "scenario_names": [
+          "BASELINE_009",
+          "ALTERNATE_009"
+        ],
+        "scenario_cells": {
+          "BASELINE_009": {
+            "H4": "10",
+            "H5": "2"
+          },
+          "ALTERNATE_009": {
+            "H4": "25",
+            "H5": "4"
+          }
+        },
+        "cse_formula_readback": {
+          "C4:C7": "=(A4:A7*B4:B7)",
+          "cached_values": [
+            20,
+            60,
+            120,
+            200
+          ]
+        },
+        "shared_formula_flags": {
+          "range": "D5:D103",
+          "shared_formula_metadata": true,
+          "raw_owner_record_count": 2
+        }
+      },
+      "sheet2": {
+        "dimensions_zero_based": [
+          0,
+          0,
+          5,
+          5
+        ],
+        "formula_cell_count": 11,
+        "array_owner_count": 2,
+        "array_owner_ranges": [
+          "A4:B6",
+          "D4:E5"
+        ],
+        "cached_spill_values_retained": true,
+        "let_formula_rendering": {
+          "cell": "F4",
+          "rendered_formula": "=#VALUE!",
+          "stored_cache": 50
+        }
+      },
+      "boundary": "BIFF8 typed APIs expose CSE, shared-formula flags, data-table metadata, and Scenario Manager snapshots. The legacy formula renderer cannot render native LET tokens and reports =#VALUE! while retaining the stored cache 50; this is not a recalculation result."
+    },
+    "public_api_surface_audit": {
+      "xlsx": [
+        "crates/litchi-xlsx/src/formula",
+        "crates/litchi-xlsx/src/workbook/model.rs formula and cell readers"
+      ],
+      "xlsb": [
+        "crates/litchi-xlsb/src/formula/model.rs",
+        "crates/litchi-xlsb/src/host/scenarios",
+        "crates/litchi-xlsb/src/cell_values/worksheet.rs"
+      ],
+      "xls": [
+        "crates/litchi-xls/src/worksheet/mod.rs:325 array_formulas",
+        "crates/litchi-xls/src/worksheet/mod.rs:456 data_tables",
+        "crates/litchi-xls/src/worksheet/mod.rs:754 scenario_manager",
+        "crates/litchi-xls/src/cell.rs:235 formula_metadata"
+      ]
+    }
+  },
+  "files": [
+    {
+      "path": "test-data/microsoft-office/excel/excel-formula-owners.xlsx",
+      "format": "xlsx",
+      "bytes": 12812,
+      "sha256": "1514e27b0f7334a786eea5adba316b032844c8d5de81d9b1807298a3b1ed8b87",
+      "container_kind": "OPC ZIP",
+      "member_count": 13,
+      "native_reopen_validation": "pass without repair; formula owners and caches retained"
+    },
+    {
+      "path": "test-data/microsoft-office/excel/excel-formula-owners.xlsb",
+      "format": "xlsb",
+      "bytes": 12035,
+      "sha256": "6626274eb76cf5bea84b061435188d613f90185d7d34583b60f377013af874ac",
+      "container_kind": "OPC ZIP with BIFF12 binary parts",
+      "member_count": 17,
+      "native_reopen_validation": "pass without repair; dynamic formula spills and caches retained"
+    },
+    {
+      "path": "test-data/microsoft-office/excel/excel-formula-owners.xls",
+      "format": "xls",
+      "bytes": 34304,
+      "sha256": "12f87df75c876e833aaa4497bee9bfc26857cd353241f4e70b87fba97d104d4a",
+      "container_kind": "CFB/OLE2 BIFF8",
+      "workbook_stream_bytes": 24359,
+      "boundsheet8_count": 2,
+      "native_reopen_validation": "pass without repair; caches, CSE, data tables, and scenarios retained; dynamic spill behavior lost"
+    }
+  ],
+  "validation_methods": [
+    "Computed SHA-256 and byte sizes from the closed final fixture streams.",
+    "Checked ZIP central-directory member counts and CRC integrity for XLSX and XLSB.",
+    "Inspected OOXML formula, metadata, calc-chain, scenario, and shared-string parts read-only.",
+    "Decompressed the BIFF12 parts and ran the repository dump_records example; no binary part was regenerated.",
+    "Inspected the BIFF8 Workbook stream with dump_xls_records; no legacy bytes were regenerated.",
+    "Ran existing litchi-xlsx, litchi-xlsb, and litchi-xls reader probes read-only; parser boundaries are recorded verbatim above.",
+    "Used a temporary harness outside the checkout only to enumerate typed BIFF8 formula owners, data tables, and scenarios; it did not write fixture or repository files.",
+    "Native Excel close, reopen, warning choices, cached values, CSE verification, dynamic-spill observations, and scenario Edit Values verification came from the root Computer Use session; this inspection process did not operate the Office UI."
+  ],
+  "native_ui_observation_source": "Root agent Computer Use session; native Microsoft Excel authored the three final files, reopened each without repair, verified cached formula outputs and CSE/Scenario Manager behavior, accepted the legacy feature-loss warning after choosing No to recalculate unsupported formulas, and closed all files before hashing."
+}

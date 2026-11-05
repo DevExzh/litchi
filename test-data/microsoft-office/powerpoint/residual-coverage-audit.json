@@ -1,0 +1,655 @@
+{
+  "schema_version": 1,
+  "generated_on": "2026-10-15",
+  "purpose": "Read-only residual audit of every pending PPT/PPTX feature row against the finalized native Microsoft PowerPoint corpus. This file records bounded evidence or the reason a row remains operation-only, UI-limited, externally handed off, genuinely missing as an authorable family, or explicitly excluded.",
+  "scope": {
+    "source": "test-data/microsoft-office/coverage.json#/feature_inventory",
+    "pending_row_count": 62,
+    "formats": [
+      "ppt",
+      "pptx"
+    ],
+    "office_write_performed_by_this_audit": false,
+    "source_or_fixture_binary_modified_by_this_audit": false,
+    "native_ui_session_state": "No additional UI operation was attempted. Root reported that PowerPoint binding remains unavailable after the Preferences Save-pane and Finder Open With recovery attempts; existing inspection records are treated as authoritative."
+  },
+  "classification_definitions": {
+    "native_bounded_evidence": "A finalized native fixture contains the named marker, record, package part, native reopen observation, or bounded reader result; the row remains limited to the stated fields.",
+    "operation_only": "The row describes a library transaction or runtime behavior for which this corpus has no row-specific native authoring/reopen evidence.",
+    "observed_ui_limitation": "Native PowerPoint or the accepted format conversion produced the named warning/fallback/visibility boundary; absence beyond that boundary is not inferred.",
+    "external_handoff": "Completion depends on a certificate, mail/browser/network, add-in/service, or other host outside the local package workflow.",
+    "genuinely_missing_authorable_family": "The current bounded writer has no authoring path for the requested semantic family; this is a library/authoring boundary, not a claim that the host cannot display it.",
+    "excluded_baseline": "Explicitly excluded by the parent task for this audit; no coverage claim is made."
+  },
+  "fixtures_consulted": [
+    "test-data/microsoft-office/powerpoint/powerpoint-text-table.pptx",
+    "test-data/microsoft-office/powerpoint/powerpoint-text-table.ppt",
+    "test-data/microsoft-office/powerpoint/powerpoint-visual-objects.pptx",
+    "test-data/microsoft-office/powerpoint/powerpoint-visual-objects.ppt",
+    "test-data/microsoft-office/powerpoint/powerpoint-navigation-review.pptx",
+    "test-data/microsoft-office/powerpoint/powerpoint-navigation-review.ppt",
+    "test-data/microsoft-office/powerpoint/powerpoint-media-objects.pptx",
+    "test-data/microsoft-office/powerpoint/powerpoint-media-objects.ppt",
+    "test-data/microsoft-office/powerpoint/powerpoint-master-motion.pptx",
+    "test-data/microsoft-office/powerpoint/powerpoint-master-motion.ppt",
+    "test-data/microsoft-office/powerpoint/powerpoint-modern-media.pptx",
+    "test-data/microsoft-office/powerpoint/powerpoint-modern-media.ppt"
+  ],
+  "inspection_records": [
+    "test-data/microsoft-office/powerpoint/visual-objects-inspection.json",
+    "test-data/microsoft-office/powerpoint/navigation-review-inspection.json",
+    "test-data/microsoft-office/powerpoint/media-objects-inspection.json",
+    "test-data/microsoft-office/powerpoint/master-motion-inspection.json",
+    "test-data/microsoft-office/powerpoint/modern-media-inspection.json",
+    "test-data/microsoft-office/powerpoint/format-variants-inspection.json",
+    "test-data/microsoft-office/powerpoint/passive-macro-inspection.json"
+  ],
+  "rows": [
+    {
+      "id": "ppt-340",
+      "format": "ppt",
+      "feature": "Photo album settings (`PhotoAlbumInfo10Atom`)",
+      "classification": "genuinely_missing_authorable_family",
+      "source_matrix": "crates/litchi-ppt/docs/FEATURE_MATRIX.md",
+      "basis": "The finalized native corpus has ordinary inserted pictures but no PhotoAlbumInfo10Atom operation. The matrix has no semantic photo-album writer; no native album authoring was run."
+    },
+    {
+      "id": "ppt-341",
+      "format": "ppt",
+      "feature": "Presentation Advisor (`PP9DocBinaryTagExtension` preferences)",
+      "classification": "operation_only",
+      "source_matrix": "crates/litchi-ppt/docs/FEATURE_MATRIX.md",
+      "basis": "No PP9DocBinaryTagExtension value or Presentation Advisor package transaction was exercised; the library row is bounded parser/to_record support."
+    },
+    {
+      "id": "ppt-342",
+      "format": "ppt",
+      "feature": "Document sound collection (`SoundCollection`, `Sound`, `SoundData`)",
+      "classification": "native_bounded_evidence",
+      "source_matrix": "crates/litchi-ppt/docs/FEATURE_MATRIX.md",
+      "bounded_native_evidence": "The legacy derivative contains SoundCollection=1 and ExternalWavAudioEmbedded=1; the typed reader recovers one 2000 ms EmbeddedWav with sound_id=1, loop and rewind.",
+      "boundary": "No claim is made for playback or every SoundData interaction field."
+    },
+    {
+      "id": "ppt-343",
+      "format": "ppt",
+      "feature": "WMF recoloring (`RecolorInfo`)",
+      "classification": "operation_only",
+      "source_matrix": "crates/litchi-ppt/docs/FEATURE_MATRIX.md",
+      "basis": "No WMF/RecolorInfo payload or native recolor operation is in the finalized corpus."
+    },
+    {
+      "id": "ppt-344",
+      "format": "ppt",
+      "feature": "Custom table-style record (`RoundTripCustomTableStyles12Atom`)",
+      "classification": "native_bounded_evidence",
+      "source_matrix": "crates/litchi-ppt/docs/FEATURE_MATRIX.md",
+      "bounded_native_evidence": "The legacy modern-media derivative contains RoundTripCustomTableStyles12Atom=1 in the PowerPoint Document record inventory.",
+      "boundary": "Presence and record placement are evidenced; no effective custom table-style resolver or rendered style claim is made."
+    },
+    {
+      "id": "ppt-345",
+      "format": "ppt",
+      "feature": "Open, create, and save",
+      "classification": "native_bounded_evidence",
+      "source_matrix": "crates/litchi-ppt/docs/FEATURE_MATRIX.md",
+      "bounded_native_evidence": "Native PowerPoint reopened the finalized text/table, navigation, visual, media, master-motion and modern-media .ppt files without repair; the exact saved artifacts are available for open/save boundary checks.",
+      "boundary": "This proves native reopen of saved files, not unrestricted writer/rendering parity."
+    },
+    {
+      "id": "ppt-346",
+      "format": "ppt",
+      "feature": "CFB streams, storages, and property sets",
+      "classification": "native_bounded_evidence",
+      "source_matrix": "crates/litchi-ppt/docs/FEATURE_MATRIX.md",
+      "bounded_native_evidence": "navigation-review-inspection.json and master-motion-inspection.json record CFB/OLE signatures, Current User, PowerPoint Document, SummaryInformation and DocumentSummaryInformation streams for native .ppt files."
+    },
+    {
+      "id": "ppt-347",
+      "format": "ppt",
+      "feature": "PowerPoint document stream and persist mapping",
+      "classification": "native_bounded_evidence",
+      "source_matrix": "crates/litchi-ppt/docs/FEATURE_MATRIX.md",
+      "bounded_native_evidence": "The same inspections record PowerPoint Document stream bytes, top-level Slide/MainMaster/Notes/PersistPtrHolder/UserEdit records and the native six/seven-slide reopen.",
+      "boundary": "Persist mapping is bounded to inspected files and record inventories."
+    },
+    {
+      "id": "ppt-351",
+      "format": "ppt",
+      "feature": "Presentation metadata and summary information",
+      "classification": "native_bounded_evidence",
+      "source_matrix": "crates/litchi-ppt/docs/FEATURE_MATRIX.md",
+      "bounded_native_evidence": "Legacy inspection records contain both SummaryInformation and DocumentSummaryInformation property streams, with native marker text retained after reopen.",
+      "boundary": "Only the recorded property-set presence/stream scope is claimed; no complete property-value matrix was authored."
+    },
+    {
+      "id": "ppt-352",
+      "format": "ppt",
+      "feature": "View state, guides, and print settings",
+      "classification": "operation_only",
+      "source_matrix": "crates/litchi-ppt/docs/FEATURE_MATRIX.md",
+      "basis": "No native operation specifically changed view state, guides, or print settings in the finalized legacy corpus."
+    },
+    {
+      "id": "ppt-353",
+      "format": "ppt",
+      "feature": "Text boxes, paragraphs, runs, and formatting",
+      "classification": "native_bounded_evidence",
+      "source_matrix": "crates/litchi-ppt/docs/FEATURE_MATRIX.md",
+      "bounded_native_evidence": "Native .ppt reopen retained slide text and markers across navigation-review (6 slides), master-motion (7 slides), visual-objects (5 slides) and media/modern-media files; litchi-ppt text/shape probes passed at the recorded scope."
+    },
+    {
+      "id": "ppt-354",
+      "format": "ppt",
+      "feature": "Text extensions and outline metadata",
+      "classification": "operation_only",
+      "source_matrix": "crates/litchi-ppt/docs/FEATURE_MATRIX.md",
+      "basis": "No fixture has a dedicated outline/text-extension marker or a native operation targeting those metadata fields."
+    },
+    {
+      "id": "ppt-355",
+      "format": "ppt",
+      "feature": "Picture bullets",
+      "classification": "operation_only",
+      "source_matrix": "crates/litchi-ppt/docs/FEATURE_MATRIX.md",
+      "basis": "No picture-bullet resource or text-run picture-bullet operation was authored in native PowerPoint."
+    },
+    {
+      "id": "ppt-357",
+      "format": "ppt",
+      "feature": "Shape-scoped OfficeArtClientData",
+      "classification": "operation_only",
+      "source_matrix": "crates/litchi-ppt/docs/FEATURE_MATRIX.md",
+      "basis": "No shape-scoped OfficeArtClientData child was isolated and edited in the native corpus."
+    },
+    {
+      "id": "ppt-360",
+      "format": "ppt",
+      "feature": "Tables",
+      "classification": "native_bounded_evidence",
+      "source_matrix": "crates/litchi-ppt/docs/FEATURE_MATRIX.md",
+      "bounded_native_evidence": "powerpoint-text-table.ppt contains the native 4x3 table value sequence and reopened with the table visible; litchi-ppt recovered the table value sequence.",
+      "boundary": "Table style/rendering parity beyond the recorded values is not claimed."
+    },
+    {
+      "id": "ppt-364",
+      "format": "ppt",
+      "feature": "Diagram build records",
+      "classification": "operation_only",
+      "source_matrix": "crates/litchi-ppt/docs/FEATURE_MATRIX.md",
+      "basis": "The SmartArt fixture proves a native visual diagram, but no DiagramBuildContainer/DiagramBuildAtom operation or build metadata was isolated."
+    },
+    {
+      "id": "ppt-368",
+      "format": "ppt",
+      "feature": "Classic comments",
+      "classification": "observed_ui_limitation",
+      "source_matrix": "crates/litchi-ppt/docs/FEATURE_MATRIX.md",
+      "basis": "The legacy navigation-review derivative reopened without repair after conversion from a modern-comment source, but no comment indicator appeared; the inspection explicitly avoids claiming semantic classic-comment absence.",
+      "boundary": "This is a conversion/UI boundary, not proof that every legacy comment record is unsupported."
+    },
+    {
+      "id": "ppt-372",
+      "format": "ppt",
+      "feature": "Named/custom slide shows",
+      "classification": "native_bounded_evidence",
+      "source_matrix": "crates/litchi-ppt/docs/FEATURE_MATRIX.md",
+      "bounded_native_evidence": "navigation-review.ppt and master-motion.ppt retain SHOW_ALPHA_003/SHOW_BETA_003 in native UI; the legacy record dump finds a NamedShows record.",
+      "boundary": "litchi-ppt custom_shows returned an empty typed list for master-motion despite the native names; typed CRUD parity is not claimed."
+    },
+    {
+      "id": "ppt-373",
+      "format": "ppt",
+      "feature": "Headers and footers",
+      "classification": "native_bounded_evidence",
+      "source_matrix": "crates/litchi-ppt/docs/FEATURE_MATRIX.md",
+      "bounded_native_evidence": "navigation-review slides retain PPT_FOOTER_003, date 2026-01-15 and slide numbers; master-motion legacy record inventory contains HeadersFooters=2.",
+      "boundary": "Direct footer/date markers and record presence are bounded; no complete inherited override matrix is claimed."
+    },
+    {
+      "id": "ppt-377",
+      "format": "ppt",
+      "feature": "Custom XML data storage",
+      "classification": "operation_only",
+      "source_matrix": "crates/litchi-ppt/docs/FEATURE_MATRIX.md",
+      "basis": "No MsoDataStore/custom-XML item, schema reference or custom XML relationship was authored in the finalized native PowerPoint corpus."
+    },
+    {
+      "id": "ppt-378",
+      "format": "ppt",
+      "feature": "Embedded font records and payload metadata",
+      "classification": "excluded_baseline",
+      "source_matrix": "crates/litchi-ppt/docs/FEATURE_MATRIX.md",
+      "basis": "Embedded-font baseline is explicitly excluded from this audit per the parent task."
+    },
+    {
+      "id": "ppt-379",
+      "format": "ppt",
+      "feature": "Smart tags",
+      "classification": "operation_only",
+      "source_matrix": "crates/litchi-ppt/docs/FEATURE_MATRIX.md",
+      "basis": "No SmartTag store, recognizer, property bag or shape-run mapping was authored or observed in the finalized files."
+    },
+    {
+      "id": "ppt-380",
+      "format": "ppt",
+      "feature": "Programmable tags",
+      "classification": "native_bounded_evidence",
+      "source_matrix": "crates/litchi-ppt/docs/FEATURE_MATRIX.md",
+      "bounded_native_evidence": "master-motion legacy record inventory contains ProgTags=9, ProgBinaryTag=15 and BinaryTagData=15; native reopen retained the associated deck markers.",
+      "boundary": "Tag payload values and execution are not claimed from record counts alone."
+    },
+    {
+      "id": "ppt-381",
+      "format": "ppt",
+      "feature": "Slide-library synchronization and round-trip records",
+      "classification": "external_handoff",
+      "source_matrix": "crates/litchi-ppt/docs/FEATURE_MATRIX.md",
+      "basis": "Slide-library synchronization requires a server/library URL and no server is contacted by the library or native fixture workflow; no local native package-only operation closes this row."
+    },
+    {
+      "id": "ppt-382",
+      "format": "ppt",
+      "feature": "Broadcast, HTML-publish, routing-slip, envelope, and privacy metadata",
+      "classification": "external_handoff",
+      "source_matrix": "crates/litchi-ppt/docs/FEATURE_MATRIX.md",
+      "basis": "Broadcast, HTML publishing, routing-slip and envelope workflows require browser, mail or network services; no such external workflow was invoked."
+    },
+    {
+      "id": "ppt-383",
+      "format": "ppt",
+      "feature": "Document comparison and review diff metadata",
+      "classification": "operation_only",
+      "source_matrix": "crates/litchi-ppt/docs/FEATURE_MATRIX.md",
+      "basis": "No native compare/review-diff generation or accept/reject workflow was run; the review fixture contains a comment thread, not a comparison result."
+    },
+    {
+      "id": "ppt-384",
+      "format": "ppt",
+      "feature": "Modify-password and protection metadata",
+      "classification": "operation_only",
+      "source_matrix": "crates/litchi-ppt/docs/FEATURE_MATRIX.md",
+      "basis": "No modify-password/protection metadata operation was authored in the finalized legacy files."
+    },
+    {
+      "id": "ppt-385",
+      "format": "ppt",
+      "feature": "Password encryption",
+      "classification": "excluded_baseline",
+      "source_matrix": "crates/litchi-ppt/docs/FEATURE_MATRIX.md",
+      "basis": "Password-encryption coverage is explicitly excluded here; the current baseline is plaintext and closed as instructed."
+    },
+    {
+      "id": "ppt-387",
+      "format": "ppt",
+      "feature": "Digital signatures",
+      "classification": "external_handoff",
+      "source_matrix": "crates/litchi-ppt/docs/FEATURE_MATRIX.md",
+      "basis": "Digital-signature authoring needs an external certificate/private-key identity; no certificate or signing workflow was available in this native fixture run."
+    },
+    {
+      "id": "ppt-389",
+      "format": "ppt",
+      "feature": "Complete native chart authoring",
+      "classification": "observed_ui_limitation",
+      "source_matrix": "crates/litchi-ppt/docs/FEATURE_MATRIX.md",
+      "basis": "Native legacy chart content reopened visibly, but visual-objects.ppt exposed the chart through AX Object -> image Content Placeholder and editability was not claimed; modern-media ChartEx slides were converted to pictures in the legacy save.",
+      "boundary": "The bounded native evidence does not establish complete editable legacy chart authoring."
+    },
+    {
+      "id": "ppt-391",
+      "format": "ppt",
+      "feature": "Full OfficeArt record and vendor-extension semantics",
+      "classification": "observed_ui_limitation",
+      "source_matrix": "crates/litchi-ppt/docs/FEATURE_MATRIX.md",
+      "basis": "The legacy visual-object strict shape probe stops at slide 5 with OfficeArt(MalformedShape: container header invalid), while the modern-media aggregate picture inventory reports a BLIP UID mismatch; native legacy conversion also warns about non-editable shapes.",
+      "boundary": "These are exact reader/conversion boundaries, not a claim that every OfficeArt record is absent."
+    },
+    {
+      "id": "pptx-394",
+      "format": "pptx",
+      "feature": "Open, create, and save",
+      "classification": "native_bounded_evidence",
+      "source_matrix": "crates/litchi-pptx/docs/FEATURE_MATRIX.md",
+      "bounded_native_evidence": "Native PowerPoint reopened the finalized PPTX text/table, visual, navigation, media, master-motion and modern-media files without repair; package readers opened each at the recorded scope.",
+      "boundary": "Native reopen and package open are bounded operation evidence, not full semantic conformance."
+    },
+    {
+      "id": "pptx-395",
+      "format": "pptx",
+      "feature": "OPC parts, relationships, and content types",
+      "classification": "native_bounded_evidence",
+      "source_matrix": "crates/litchi-pptx/docs/FEATURE_MATRIX.md",
+      "bounded_native_evidence": "The finalized PPTX inspections validate ZIP/OPC members, XML/.rels parsing and relationship-target closure: navigation-review has 54 members/54 relationships; modern-media records all native extension/media/chart parts."
+    },
+    {
+      "id": "pptx-397",
+      "format": "pptx",
+      "feature": "Opened-presentation atomic composition",
+      "classification": "operation_only",
+      "source_matrix": "crates/litchi-pptx/docs/FEATURE_MATRIX.md",
+      "basis": "No native Office operation can demonstrate the library's opened-presentation atomic transaction; the corpus only proves ordinary native reopen."
+    },
+    {
+      "id": "pptx-398",
+      "format": "pptx",
+      "feature": "Source-backed cross-slide image/chart leaf copy",
+      "classification": "operation_only",
+      "source_matrix": "crates/litchi-pptx/docs/FEATURE_MATRIX.md",
+      "basis": "No native cross-slide image/chart leaf-copy operation was exercised; visual objects and charts are present, but not copied through the source-backed editor path."
+    },
+    {
+      "id": "pptx-399",
+      "format": "pptx",
+      "feature": "Presentation size, root properties, and view settings",
+      "classification": "native_bounded_evidence",
+      "source_matrix": "crates/litchi-pptx/docs/FEATURE_MATRIX.md",
+      "bounded_native_evidence": "modern-media records slide size [12192000, 6858000], one master, eleven layouts, slide-number field and native presentation root properties; the exact PPTX reopened without repair.",
+      "boundary": "View metadata is bounded to recorded root properties; no rendering/layout calculation is claimed."
+    },
+    {
+      "id": "pptx-403",
+      "format": "pptx",
+      "feature": "Handout master",
+      "classification": "excluded_baseline",
+      "source_matrix": "crates/litchi-pptx/docs/FEATURE_MATRIX.md",
+      "basis": "Handout-master coverage is explicitly excluded from this baseline per the parent task."
+    },
+    {
+      "id": "pptx-406",
+      "format": "pptx",
+      "feature": "Presentation property structure and extended guides",
+      "classification": "native_bounded_evidence",
+      "source_matrix": "crates/litchi-pptx/docs/FEATURE_MATRIX.md",
+      "bounded_native_evidence": "master-motion.pptx contains p14:sectionLst and an empty p15:sldGuideLst in ppt/presentation.xml; visual format variants also preserve the p15:sldGuideLst extension.",
+      "boundary": "The evidence is presence/retention of the extension; no non-empty guide authoring claim is made."
+    },
+    {
+      "id": "pptx-407",
+      "format": "pptx",
+      "feature": "PowerPoint 2017/10 read-only recommendation",
+      "classification": "operation_only",
+      "source_matrix": "crates/litchi-pptx/docs/FEATURE_MATRIX.md",
+      "basis": "No p1710 readonlyRecommended operation was authored or observed in the finalized native corpus."
+    },
+    {
+      "id": "pptx-409",
+      "format": "pptx",
+      "feature": "Text boxes, paragraphs, runs, and bullets",
+      "classification": "native_bounded_evidence",
+      "source_matrix": "crates/litchi-pptx/docs/FEATURE_MATRIX.md",
+      "bounded_native_evidence": "Native PPTX slide text, paragraphs and markers reopen across text-table, navigation-review, visual-objects, master-motion and modern-media; package XML and typed text probes pass at the recorded scope."
+    },
+    {
+      "id": "pptx-410",
+      "format": "pptx",
+      "feature": "Text styles and Kinsoku settings",
+      "classification": "operation_only",
+      "source_matrix": "crates/litchi-pptx/docs/FEATURE_MATRIX.md",
+      "basis": "No dedicated Kinsoku or text-style extension marker was authored and inspected as a row-specific native operation."
+    },
+    {
+      "id": "pptx-415",
+      "format": "pptx",
+      "feature": "Tables and table styles",
+      "classification": "native_bounded_evidence",
+      "source_matrix": "crates/litchi-pptx/docs/FEATURE_MATRIX.md",
+      "bounded_native_evidence": "powerpoint-text-table.pptx contains the native 4x3 table, table-style flags and reopened table values without repair.",
+      "boundary": "Effective style rendering beyond the recorded table/style flags is not claimed."
+    },
+    {
+      "id": "pptx-427",
+      "format": "pptx",
+      "feature": "Slide-show laser traces",
+      "classification": "operation_only",
+      "source_matrix": "crates/litchi-pptx/docs/FEATURE_MATRIX.md",
+      "basis": "No slide-show laser trace was recorded; PowerPoint slideshow/runtime was not used for this fixture set."
+    },
+    {
+      "id": "pptx-428",
+      "format": "pptx",
+      "feature": "Slide-show event records",
+      "classification": "operation_only",
+      "source_matrix": "crates/litchi-pptx/docs/FEATURE_MATRIX.md",
+      "basis": "No slide-show event-record operation was run; persisted package state was inspected without event replay."
+    },
+    {
+      "id": "pptx-429",
+      "format": "pptx",
+      "feature": "Classic comments",
+      "classification": "observed_ui_limitation",
+      "source_matrix": "crates/litchi-pptx/docs/FEATURE_MATRIX.md",
+      "basis": "navigation-review.pptx contains a modern comment root/reply, while the classic comments facade returns None and no classic comments part is present; the native workflow therefore only established the modern route.",
+      "boundary": "No semantic classic-comment absence is inferred beyond this bounded fixture."
+    },
+    {
+      "id": "pptx-432",
+      "format": "pptx",
+      "feature": "ActiveX/control payloads",
+      "classification": "operation_only",
+      "source_matrix": "crates/litchi-pptx/docs/FEATURE_MATRIX.md",
+      "basis": "The native OLE fixture contains an embedded Excel.Sheet.12 object, not an ActiveX/control payload; no control binary or native control operation was authored."
+    },
+    {
+      "id": "pptx-433",
+      "format": "pptx",
+      "feature": "Embedded fonts",
+      "classification": "excluded_baseline",
+      "source_matrix": "crates/litchi-pptx/docs/FEATURE_MATRIX.md",
+      "basis": "Embedded-font coverage is explicitly excluded from this audit per the parent task."
+    },
+    {
+      "id": "pptx-434",
+      "format": "pptx",
+      "feature": "Tags and customer data",
+      "classification": "operation_only",
+      "source_matrix": "crates/litchi-pptx/docs/FEATURE_MATRIX.md",
+      "basis": "No tag/customer-data relationship, custom XML schema or shape-owned tag was authored in the finalized native PPTX corpus."
+    },
+    {
+      "id": "pptx-435",
+      "format": "pptx",
+      "feature": "Revision and change information",
+      "classification": "operation_only",
+      "source_matrix": "crates/litchi-pptx/docs/FEATURE_MATRIX.md",
+      "basis": "No revision/change metadata or collaborative change-history operation was authored; the modern comment thread is a separate feature."
+    },
+    {
+      "id": "pptx-436",
+      "format": "pptx",
+      "feature": "Web extensions and Office Add-ins",
+      "classification": "external_handoff",
+      "source_matrix": "crates/litchi-pptx/docs/FEATURE_MATRIX.md",
+      "basis": "Web extensions and Office Add-ins require an add-in/task-pane host and loading context; no external add-in service or execution was invoked."
+    },
+    {
+      "id": "pptx-437",
+      "format": "pptx",
+      "feature": "Ink annotations",
+      "classification": "operation_only",
+      "source_matrix": "crates/litchi-pptx/docs/FEATURE_MATRIX.md",
+      "basis": "No native Draw/Ink stroke was authored in the finalized corpus; a package content-part fixture would require a separate native drawing operation."
+    },
+    {
+      "id": "pptx-438",
+      "format": "pptx",
+      "feature": "PowerPoint 2014 InkAction owners",
+      "classification": "genuinely_missing_authorable_family",
+      "source_matrix": "crates/litchi-pptx/docs/FEATURE_MATRIX.md",
+      "basis": "The matrix supports reading/editing existing InkAction owners but does not create or remove owners/parts; no native fixture can establish authoring through the current bounded writer."
+    },
+    {
+      "id": "pptx-439",
+      "format": "pptx",
+      "feature": "Password encryption",
+      "classification": "excluded_baseline",
+      "source_matrix": "crates/litchi-pptx/docs/FEATURE_MATRIX.md",
+      "basis": "Password-encryption coverage is explicitly excluded here; the current baseline is plaintext and closed as instructed."
+    },
+    {
+      "id": "pptx-440",
+      "format": "pptx",
+      "feature": "Digital signatures",
+      "classification": "external_handoff",
+      "source_matrix": "crates/litchi-pptx/docs/FEATURE_MATRIX.md",
+      "basis": "Digital-signature authoring needs an external certificate/private-key identity and signing host; no such native workflow was available."
+    },
+    {
+      "id": "pptx-442",
+      "format": "pptx",
+      "feature": "Selected 2010/2012 extension metadata",
+      "classification": "native_bounded_evidence",
+      "source_matrix": "crates/litchi-pptx/docs/FEATURE_MATRIX.md",
+      "bounded_native_evidence": "master-motion and modern-media PPTX slides retain p14 extension markup plus creationId/modId values; master-motion also retains p14:sectionLst and p15:sldGuideLst in the presentation root.",
+      "boundary": "This is selected extension evidence only; it does not certify every 2010/2012 extension family."
+    },
+    {
+      "id": "pptx-443",
+      "format": "pptx",
+      "feature": "PowerPoint math extension (a14:m)",
+      "classification": "excluded_baseline",
+      "source_matrix": "crates/litchi-pptx/docs/FEATURE_MATRIX.md",
+      "basis": "PowerPoint math/equation coverage is explicitly excluded from this audit per the parent task."
+    },
+    {
+      "id": "pptx-446",
+      "format": "pptx",
+      "feature": "Designer/design-element/designer-property/designer-tag metadata",
+      "classification": "external_handoff",
+      "source_matrix": "crates/litchi-pptx/docs/FEATURE_MATRIX.md",
+      "basis": "Designer/design-element metadata is tied to the Designer service/design environment; no service fetch or designer authoring context was invoked."
+    },
+    {
+      "id": "pptx-447",
+      "format": "pptx",
+      "feature": "Classification metadata",
+      "classification": "external_handoff",
+      "source_matrix": "crates/litchi-pptx/docs/FEATURE_MATRIX.md",
+      "basis": "Classification metadata depends on host sensitivity/classification services; no host classification workflow was available or invoked."
+    },
+    {
+      "id": "pptx-448",
+      "format": "pptx",
+      "feature": "Modern comment task, reaction, and V2 change-command families",
+      "classification": "native_bounded_evidence",
+      "source_matrix": "crates/litchi-pptx/docs/FEATURE_MATRIX.md",
+      "bounded_native_evidence": "navigation-review.pptx and master-motion.pptx retain one modern comment root and one reply with native reopen confirmation.",
+      "boundary": "Task, reaction and V2 change-command families were not present; only root/reply coverage is bounded."
+    },
+    {
+      "id": "pptx-449",
+      "format": "pptx",
+      "feature": "Non-Ink content parts",
+      "classification": "operation_only",
+      "source_matrix": "crates/litchi-pptx/docs/FEATURE_MATRIX.md",
+      "basis": "No non-Ink content-part payload or p:contentPart owner was authored in the finalized native PPTX corpus."
+    },
+    {
+      "id": "pptx-450",
+      "format": "pptx",
+      "feature": "Full media TracksInfo/player semantics",
+      "classification": "native_bounded_evidence",
+      "source_matrix": "crates/litchi-pptx/docs/FEATURE_MATRIX.md",
+      "bounded_native_evidence": "modern-media.pptx retains a p173 track with label English Fixture 007, lang en-us, /ppt/media/track1.vtt and two deterministic cues; native reopen shows English Fixture007-EnglishUS.",
+      "boundary": "The media reader rejects the containing p14:media extLst before exposing the track, and full player/runtime semantics remain unclaimed."
+    },
+    {
+      "id": "pptx-451",
+      "format": "pptx",
+      "feature": "Full extension-schema conformance",
+      "classification": "operation_only",
+      "source_matrix": "crates/litchi-pptx/docs/FEATURE_MATRIX.md",
+      "basis": "The corpus exercises selected p14/p15/p159/p173/3D/ChartEx branches, but no finite native fixture establishes full extension-schema conformance; the recorded typed-reader boundaries remain."
+    }
+  ],
+  "next_native_fixture_candidates": [
+    {
+      "rows": [
+        "ppt-340"
+      ],
+      "family": "Photo AlbumInfo10Atom",
+      "priority": "high if PowerPoint UI binding recovers",
+      "native_recipe": "Insert > Photo Album with two deterministic local images, set one layout/frame option, save both PPTX/PPT, reopen, and inspect the legacy PhotoAlbumInfo10Atom plus visible album markers.",
+      "expected_boundary": "Current litchi-ppt matrix has no semantic photo-album writer; this would be native-read evidence only."
+    },
+    {
+      "rows": [
+        "pptx-437"
+      ],
+      "family": "Ink annotations",
+      "priority": "medium",
+      "native_recipe": "Use PowerPoint Draw/pen on one slide with a deterministic marker, save/reopen PPTX, and inspect p:contentPart/customXml InkML relationships and native reopen.",
+      "expected_boundary": "No ink stroke was authored in the finalized corpus; replay, recognition and rendering remain out of scope."
+    },
+    {
+      "rows": [
+        "pptx-432",
+        "pptx-429"
+      ],
+      "family": "ActiveX/classic-comment compatibility",
+      "priority": "requires another native host or imported legacy source",
+      "native_recipe": "Use a Windows PowerPoint or an existing legacy classic-comment/ActiveX source only if an authorized native host is available; preserve the source unchanged and record exact reopen warnings.",
+      "expected_boundary": "Do not infer Mac unavailability from this audit; the current Mac session did not author these families."
+    }
+  ],
+  "summary": {
+    "row_count": 62,
+    "classification_counts": {
+      "excluded_baseline": 6,
+      "external_handoff": 7,
+      "genuinely_missing_authorable_family": 2,
+      "native_bounded_evidence": 20,
+      "observed_ui_limitation": 4,
+      "operation_only": 23
+    },
+    "native_evidence_rows": [
+      "ppt-342",
+      "ppt-344",
+      "ppt-345",
+      "ppt-346",
+      "ppt-347",
+      "ppt-351",
+      "ppt-353",
+      "ppt-360",
+      "ppt-372",
+      "ppt-373",
+      "ppt-380",
+      "pptx-394",
+      "pptx-395",
+      "pptx-399",
+      "pptx-406",
+      "pptx-409",
+      "pptx-415",
+      "pptx-442",
+      "pptx-448",
+      "pptx-450"
+    ],
+    "ui_limited_rows": [
+      "ppt-368",
+      "ppt-389",
+      "ppt-391",
+      "pptx-429"
+    ],
+    "external_handoff_rows": [
+      "ppt-381",
+      "ppt-382",
+      "ppt-387",
+      "pptx-436",
+      "pptx-440",
+      "pptx-446",
+      "pptx-447"
+    ],
+    "genuinely_missing_authorable_rows": [
+      "ppt-340",
+      "pptx-438"
+    ],
+    "excluded_rows": [
+      "ppt-378",
+      "ppt-385",
+      "pptx-403",
+      "pptx-433",
+      "pptx-439",
+      "pptx-443"
+    ]
+  }
+}

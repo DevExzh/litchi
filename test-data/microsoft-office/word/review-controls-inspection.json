@@ -1,0 +1,360 @@
+{
+  "schema_version": 1,
+  "fixture_id": "word-review-controls-003",
+  "generated_on": "2026-10-15",
+  "purpose": "Fixture-specific, read-only inspection of native Microsoft Word revision, bookmark, field, comment, and property derivatives.",
+  "provenance": {
+    "producer_app": "Microsoft Office Word",
+    "app_version": "16.110.2",
+    "app_build": "16.110.26062818",
+    "platform": "macOS",
+    "authoring_method": "Computer Use / native Microsoft Word UI",
+    "source": "Synthetic content entered in a native Word document; native Word Save As produced the DOC and RTF derivatives.",
+    "libreoffice_used": false,
+    "programmatic_office_generation_used": false,
+    "library_code_modified": false,
+    "all_documents_closed_before_hashing": true
+  },
+  "files": [
+    {
+      "path": "test-data/microsoft-office/word/word-review-controls.docx",
+      "format": "docx",
+      "bytes": 19090,
+      "sha256": "b85582dfe2d04d0157252e1697bf67e64c1e50a1c3a7023fd1afc37238e49f9c"
+    },
+    {
+      "path": "test-data/microsoft-office/word/word-review-controls.doc",
+      "format": "doc",
+      "bytes": 25600,
+      "sha256": "c8d0a57bf6b77c7999870b6d59e0d2f217c52b55c2344118c880715645b51736"
+    },
+    {
+      "path": "test-data/microsoft-office/word/word-review-controls.rtf",
+      "format": "rtf",
+      "bytes": 51895,
+      "sha256": "d8c0845af1d7aaa55607299477d27683573b3f87d486c0e35aabce1b04e389fd"
+    }
+  ],
+  "docx": {
+    "container": {
+      "kind": "OPC ZIP",
+      "zip_test": "pass",
+      "xml_validation": "pass",
+      "member_count": 17,
+      "members": [
+        "[Content_Types].xml",
+        "_rels/.rels",
+        "docProps/app.xml",
+        "docProps/core.xml",
+        "docProps/custom.xml",
+        "word/_rels/document.xml.rels",
+        "word/comments.xml",
+        "word/commentsExtended.xml",
+        "word/commentsExtensible.xml",
+        "word/commentsIds.xml",
+        "word/document.xml",
+        "word/fontTable.xml",
+        "word/people.xml",
+        "word/settings.xml",
+        "word/styles.xml",
+        "word/theme/theme1.xml",
+        "word/webSettings.xml"
+      ]
+    },
+    "main_document": {
+      "markers": [
+        "Native Word review and references",
+        "Fixture ID: word-review-controls-003",
+        "REVIEW_ORIGINAL_003",
+        "REVIEW_INSERT_003",
+        "BOOKMARK_VALUE_003",
+        "COMMENT_ANCHOR_003",
+        "REFERENCE_FIELD_FOLLOWS",
+        "BOOKMARK_VALUE_003",
+        "REVIEW_CONTROLS_END"
+      ],
+      "xml_counts": {
+        "p": 9,
+        "r": 12,
+        "t": 9,
+        "delText": 1,
+        "ins": 1,
+        "del": 1,
+        "rPrChange": 2,
+        "bookmarkStart": 1,
+        "bookmarkEnd": 1,
+        "fldSimple": 1,
+        "sdt": 0,
+        "commentRangeStart": 2,
+        "commentRangeEnd": 2,
+        "commentReference": 2,
+        "tbl": 0,
+        "drawing": 0,
+        "oMath": 0
+      },
+      "revisions": {
+        "insertion": {
+          "id": "2",
+          "author": "Ryker Zhu",
+          "date": "2026-10-15T13:49:00Z",
+          "dateUtc": "2026-10-15T05:49:00Z",
+          "text": "REVIEW_INSERT_003"
+        },
+        "deletion": {
+          "id": "3",
+          "author": "Ryker Zhu",
+          "date": "2026-10-15T13:49:00Z",
+          "dateUtc": "2026-10-15T05:49:00Z",
+          "text": "REVIEW_DELETE_003"
+        },
+        "bold_rPrChange": {
+          "count": 2,
+          "scopes": ["paragraph_properties", "run_properties"],
+          "ids": ["0", "1"],
+          "author": "Ryker Zhu",
+          "date": "2026-10-15T13:49:00Z",
+          "dateUtc": "2026-10-15T05:49:00Z",
+          "current_bold_property_count": 2,
+          "text": "REVIEW_ORIGINAL_003"
+        }
+      },
+      "bookmark": {
+        "name": "LITCHI_BOOKMARK_003",
+        "id": "4",
+        "range_text": "BOOKMARK_VALUE_003"
+      },
+      "field": {
+        "kind": "native simple REF field",
+        "element": "w:fldSimple",
+        "instruction": " REF LITCHI_BOOKMARK_003 ",
+        "referenced_bookmark": "LITCHI_BOOKMARK_003",
+        "cached_result": "BOOKMARK_VALUE_003",
+        "refresh_or_recalculation_performed": false
+      },
+      "comments": {
+        "package_parts": [
+          "word/comments.xml",
+          "word/commentsExtended.xml",
+          "word/commentsIds.xml",
+          "word/commentsExtensible.xml",
+          "word/people.xml"
+        ],
+        "root_comment": {
+          "comment_id": "5",
+          "para_id": "44BDD156",
+          "author": "Ryker Zhu",
+          "date": "2026-10-15T13:50:00Z",
+          "text": "MODERN_COMMENT_003: review fixture comment.",
+          "anchor_text": "COMMENT_ANCHOR_003",
+          "durable_id": "472EDEAE"
+        },
+        "reply": {
+          "comment_id": "6",
+          "para_id": "3FD135F2",
+          "author": "Ryker Zhu",
+          "date": "2026-10-15T13:51:00Z",
+          "text": "MODERN_REPLY_003: native reply retained.",
+          "para_id_parent": "44BDD156",
+          "durable_id": "7A8903A0"
+        },
+        "comments_extended_parent_link_validated": true,
+        "package_reply_validated": true,
+        "ui_reply_visible_on_reopen": "not_claimed"
+      },
+      "relationships": {
+        "comments": "rId4 -> comments.xml",
+        "commentsExtended": "rId5 -> commentsExtended.xml",
+        "commentsIds": "rId6 -> commentsIds.xml",
+        "commentsExtensible": "rId7 -> commentsExtensible.xml",
+        "people": "rId9 -> people.xml"
+      }
+    },
+    "custom_properties": {
+      "FixtureId": {
+        "type": "vt:lpwstr",
+        "value": "word-review-controls-003"
+      },
+      "ExpectedCount": {
+        "type": "vt:i4",
+        "value": 42
+      },
+      "IsNative": {
+        "type": "vt:bool",
+        "value": true
+      }
+    },
+    "core_properties": {
+      "title": "Native Word review fixture",
+      "subject": "Tracked revisions, bookmarks, fields, comments",
+      "creator": "Litchi Fixture Author",
+      "keywords": "native;word;review;003",
+      "description": "Synthetic local Microsoft Word fixture created through Computer Use.",
+      "last_modified_by": "Ryker Zhu",
+      "revision": "3",
+      "category": "Regression fixture",
+      "created": "2026-10-15T05:48:00Z",
+      "modified": "2026-10-15T05:53:00Z"
+    },
+    "read_example": {
+      "command": "cargo run -q -p litchi-docx --example read_docx -- test-data/microsoft-office/word/word-review-controls.docx",
+      "exit_code": 0,
+      "paragraph_count": 9,
+      "table_count": 0,
+      "text_bytes": 201,
+      "text_contains": [
+        "Native Word review and references",
+        "REVIEW_ORIGINAL_003",
+        "REVIEW_INSERT_003",
+        "BOOKMARK_VALUE_003",
+        "COMMENT_ANCHOR_003",
+        "BOOKMARK_VALUE_003",
+        "REVIEW_CONTROLS_END"
+      ],
+      "custom_properties": {
+        "ExpectedCount": "I32(42)",
+        "FixtureId": "Text(\"word-review-controls-003\")",
+        "IsNative": "Bool(true)"
+      }
+    }
+  },
+  "doc": {
+    "container": {
+      "kind": "Compound File Binary (CFB/OLE)",
+      "file_identification": "Microsoft Word 97-2003 document",
+      "word_version_observed_by_reader": "Word 97",
+      "fib_version_hex": "0x00C1"
+    },
+    "read_example": {
+      "command": "cargo run -q -p litchi-doc --example read_doc -- test-data/microsoft-office/word/word-review-controls.doc",
+      "exit_code": 0,
+      "paragraph_count": 12,
+      "table_count": 0,
+      "total_characters": 346,
+      "text_contains": [
+        "Native Word review and references",
+        "REVIEW_ORIGINAL_003",
+        "REVIEW_INSERT_003",
+        "REVIEW_DELETE_003",
+        "BOOKMARK_VALUE_003",
+        "REFERENCE_FIELD_FOLLOWS",
+        "REF LITCHI_BOOKMARK_003",
+        "MODERN_COMMENT_003: review fixture comment.",
+        "MODERN_REPLY_003: native reply retained."
+      ]
+    },
+    "file_metadata_observed": {
+      "title": "Native Word review fixture",
+      "subject": "Tracked revisions, bookmarks, fields, comments",
+      "author": "Litchi Fixture Author",
+      "application": "Microsoft Office Word",
+      "template": "Normal.dotm",
+      "last_saved_by": "Ryker Zhu",
+      "pages": 1,
+      "words": 18,
+      "characters": 239,
+      "security": 0
+    },
+    "textutil_read_only": {
+      "command": "textutil -convert txt -stdout test-data/microsoft-office/word/word-review-controls.doc",
+      "exit_code": 0,
+      "observed": "Extracted text contains the insertion, bookmark value, REF instruction/result projection, and both comment texts; the deletion marker is present in the litchi-doc paragraph projection and textutil output as native DOC text.",
+      "text_contains": [
+        "REVIEW_INSERT_003",
+        "REVIEW_DELETE_003",
+        "BOOKMARK_VALUE_003",
+        "REF LITCHI_BOOKMARK_003",
+        "MODERN_COMMENT_003: review fixture comment.",
+        "MODERN_REPLY_003: native reply retained."
+      ]
+    }
+  },
+  "rtf": {
+    "file_type": "Rich Text Format data, version 1, ANSI, code page 1252",
+    "read_example": {
+      "command": "cargo run -q -p litchi-rtf --example parse_rtf -- test-data/microsoft-office/word/word-review-controls.rtf",
+      "exit_code": 1,
+      "error": "MalformedDocument(\"RTF data-store payload cannot be empty\")",
+      "semantic_counts_available": false
+    },
+    "textutil_read_only": {
+      "command": "textutil -convert txt -stdout test-data/microsoft-office/word/word-review-controls.rtf",
+      "exit_code": 0,
+      "text_contains": [
+        "Native Word review and references",
+        "REVIEW_INSERT_003REVIEW_DELETE_003",
+        "BOOKMARK_VALUE_003",
+        "REFERENCE_FIELD_FOLLOWS",
+        "REVIEW_CONTROLS_END"
+      ],
+      "comments_text_projected": false
+    },
+    "control_word_counts": {
+      "revised": 1,
+      "deleted": 1,
+      "bkmkstart": 1,
+      "bkmkend": 1,
+      "field": 1,
+      "fldinst": 1,
+      "fldrslt": 1,
+      "annotation": 2,
+      "atrfstart": 2,
+      "atrfend": 2,
+      "chftn": 0,
+      "footnote": 0,
+      "insrsid": 18,
+      "delrsid": 1,
+      "revauth": 1,
+      "revdttm": 1
+    },
+    "raw_markers": {
+      "REVIEW_INSERT_003": true,
+      "REVIEW_DELETE_003": true,
+      "LITCHI_BOOKMARK_003": true,
+      "BOOKMARK_VALUE_003": true,
+      "MODERN_COMMENT_003": true,
+      "MODERN_REPLY_003": true
+    }
+  },
+  "native_ui_validation": {
+    "observed_by": "Root agent via Computer Use",
+    "application": "Microsoft Office Word",
+    "reopen": "pass",
+    "repair_prompt": false,
+    "files": [
+      "word-review-controls.docx",
+      "word-review-controls.doc",
+      "word-review-controls.rtf"
+    ],
+    "observations": [
+      "All three native Word files reopened without a repair prompt.",
+      "The tracked insertion REVIEW_INSERT_003, deletion REVIEW_DELETE_003, and bold rPrChange were authored and retained.",
+      "Bookmark LITCHI_BOOKMARK_003 and the native REF field with cached BOOKMARK_VALUE_003 were authored and retained.",
+      "Root comment MODERN_COMMENT_003 and reply MODERN_REPLY_003 are present in the saved modern comment package with commentsExtended paraIdParent linkage."
+    ],
+    "ui_reply_visible_on_reopen": "not_claimed"
+  },
+  "coverage": [
+    "DOCX, DOC, and RTF tracked insertion and deletion markers.",
+    "DOCX bold run/paragraph rPrChange metadata and revision authorship/date metadata.",
+    "DOCX bookmark range and native simple REF field with cached result.",
+    "DOCX modern root comment, reply package record, commentsExtended parent linkage, durable IDs, and people part.",
+    "DOCX custom properties with string, integer, and boolean value types.",
+    "DOCX core properties and native DOC metadata projection."
+  ],
+  "known_limits": [
+    "No structured document tag (SDT) is present: document.xml contains zero w:sdt elements. This fixture does not claim SDT coverage.",
+    "The modern reply is validated from the saved comments.xml/commentsExtended.xml package; no UI-visible reply state on reopen is claimed.",
+    "The REF field has a cached result and was not refreshed or recalculated by this inspection; no field-update behavior is claimed.",
+    "The DOCX public read example reports revision and comment text in its text projection but does not expose structured revision, bookmark, field, comment, or property nodes.",
+    "The DOC binary was validated through the existing litchi-doc reader and textutil extraction; this inspection does not claim a complete binary revision/comment/property decode.",
+    "The RTF file reopened in native Word and contains the expected raw control words, but litchi-rtf rejects it before semantic traversal because the RTF data-store payload is empty.",
+    "No accept/reject revisions, comment editing, field refresh, rendering, pagination, or layout-engine behavior is claimed."
+  ],
+  "validation_scope": {
+    "read_only": true,
+    "gui_used_by_this_inspector": false,
+    "native_reopen_evidence_source": "Root agent Computer Use observations",
+    "library_code_or_tests_modified": false,
+    "shared_metadata_modified": false
+  }
+}

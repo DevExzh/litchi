@@ -1,0 +1,591 @@
+{
+  "schema_version": 1,
+  "fixture_id": "powerpoint-master-motion-006",
+  "generated_on": "2026-10-15",
+  "purpose": "Read-only inspection of native Microsoft PowerPoint master, layout, animation, transition and Zoom fixtures in PPTX and legacy PPT containers.",
+  "native_ui_observation_source": "Root agent Computer Use session; this inspection process did not operate Office UI.",
+  "provenance": {
+    "producer_app": "Microsoft Office PowerPoint",
+    "app_version": "16.110.2",
+    "app_build": "16.110.26062818",
+    "package_application": "Microsoft Macintosh PowerPoint",
+    "package_app_version": "16.0000",
+    "platform": "macOS",
+    "authoring_method": "Computer Use / native Microsoft PowerPoint UI",
+    "source_fixture": "test-data/microsoft-office/powerpoint/powerpoint-navigation-review.pptx",
+    "source_fixture_sha256": "c38ffd02b373774a39b0c9760ae2e5474a9aa27828f027f74312f40b170d5877",
+    "derivation_chain": [
+      "powerpoint-navigation-review.pptx",
+      "powerpoint-master-motion.pptx",
+      "powerpoint-master-motion.ppt"
+    ],
+    "derivation_method": "Native PowerPoint UI changed the source deck's master and first title layout, applied slide animation and transitions, and inserted native Summary, Slide and Section Zoom objects; the legacy derivative was saved through PowerPoint's compatibility flow.",
+    "source_deck_unchanged": true,
+    "libreoffice_used": false,
+    "programmatic_office_generation_used": false,
+    "library_code_modified": false,
+    "all_documents_closed_before_hashing": true,
+    "lock_files_present_at_inspection": false
+  },
+  "expected_native_content": {
+    "slide_count": 7,
+    "slide_order": [
+      "SUMMARY_ZOOM_006",
+      "PPT_MASTER_MOTION_006",
+      "LINKS_ACTIONS_003",
+      "HIDDEN_DETAIL_003",
+      "REVIEW_NOTES_003",
+      "DESTINATION_003",
+      "PRESENTATION_END_003"
+    ],
+    "slides": [
+      {
+        "slide": 1,
+        "marker": "SUMMARY_ZOOM_006",
+        "native_feature": "Summary Zoom",
+        "summary_section": "Summary Section",
+        "children": [
+          {"section": "SECTION_ALPHA_003", "slide_range": [2, 3, 4, 5]},
+          {"section": "SECTION_BETA_003", "slide_range": [6, 7]}
+        ],
+        "package_part": "/ppt/slides/slide1.xml"
+      },
+      {
+        "slide": 2,
+        "marker": "PPT_MASTER_MOTION_006",
+        "direct_text_markers": [
+          "Fixture ID: powerpoint-master-motion-006",
+          "Native master, layout, animation and Zoom"
+        ],
+        "master_marker": "MASTER_INHERITED_006",
+        "layout_marker": "TITLE_LAYOUT_INHERITED_006",
+        "animation": {
+          "kind": "Fly In",
+          "direction": "From Left",
+          "start": "After Previous",
+          "duration_seconds": 1.25,
+          "target_shape_id": 2,
+          "raw_preset_id": 2,
+          "raw_preset_class": "entr",
+          "raw_preset_subtype": 8
+        },
+        "transition": {
+          "kind": "Push",
+          "direction": "From Top",
+          "speed": "Medium",
+          "duration_seconds": 0.75,
+          "advance_on_click": true,
+          "advance_after_seconds": 3.0,
+          "raw": "<p:transition spd=\"med\" advTm=\"3000\"><p:push dir=\"u\"/></p:transition>"
+        },
+        "slide_zoom": {
+          "target_slide": 6,
+          "target_slide_id": 260,
+          "return_to_zoom": true,
+          "transition_seconds": 0.7,
+          "active_requires": "pslz",
+          "fallback_action": "ppaction://hlinksldjump"
+        },
+        "package_part": "/ppt/slides/slide2.xml"
+      },
+      {
+        "slide": 3,
+        "marker": "LINKS_ACTIONS_003",
+        "links_and_actions": [
+          {
+            "marker": "EXTERNAL_LINK_003",
+            "kind": "external_url",
+            "target": "https://example.com/litchi-ppt-fixture",
+            "tooltip": "EXTERNAL_TOOLTIP_003",
+            "trigger": "click"
+          },
+          {
+            "marker": "INTERNAL_JUMP_003",
+            "kind": "internal_slide",
+            "target_slide": 6,
+            "target_part": "/ppt/slides/slide6.xml",
+            "trigger": "click"
+          },
+          {
+            "marker": "MAILTO_LINK_003",
+            "kind": "email",
+            "target": "fixture@example.com",
+            "subject": "PPT_MAIL_SUBJECT_003",
+            "trigger": "click"
+          },
+          {
+            "marker": "ACTION_NEXT_003",
+            "kind": "slide_show_jump",
+            "action": "ppaction://hlinkshowjump?jump=nextslide",
+            "trigger": "click"
+          }
+        ],
+        "section_zoom": {
+          "target_section": "SECTION_BETA_003",
+          "target_section_id": "{21A303EB-537E-B048-B900-3B79F2FC6319}",
+          "transition_seconds": 1.0,
+          "active_requires": "psez",
+          "fallback_action": "ppaction://hlinksldjump"
+        },
+        "morph_transition": {
+          "duration_seconds": 1.5,
+          "option": "byObject",
+          "active_requires": "p159",
+          "fallback": "fade"
+        },
+        "package_part": "/ppt/slides/slide3.xml"
+      },
+      {
+        "slide": 4,
+        "marker": "HIDDEN_DETAIL_003",
+        "hidden": true,
+        "hidden_marker": "HIDDEN_MARKER_003",
+        "direct_text": "This slide is intentionally hidden from the normal show.",
+        "package_part": "/ppt/slides/slide4.xml"
+      },
+      {
+        "slide": 5,
+        "marker": "REVIEW_NOTES_003",
+        "comment_anchor_marker": "COMMENT_TARGET_003",
+        "notes_text": "PPT_NOTES_003: native navigation and review note.",
+        "modern_comment_root": "PPT_COMMENT_ROOT_003: verify the internal destination and hidden slide.",
+        "modern_comment_reply": "PPT_COMMENT_REPLY_003: confirmed section and custom-show membership.",
+        "package_part": "/ppt/slides/slide5.xml"
+      },
+      {
+        "slide": 6,
+        "marker": "DESTINATION_003",
+        "direct_text_markers": ["INTERNAL_DESTINATION_003", "Section beta starts here."],
+        "package_part": "/ppt/slides/slide6.xml"
+      },
+      {
+        "slide": 7,
+        "marker": "PRESENTATION_END_003",
+        "final_marker": "FINAL_MARKER_003",
+        "direct_text": "End of native navigation and review fixture.",
+        "mouse_over_action": "ppaction://hlinkshowjump?jump=firstslide",
+        "mouse_over_trigger": "hover",
+        "package_part": "/ppt/slides/slide7.xml"
+      }
+    ],
+    "fixed_fields": {
+      "date": "2026-01-15",
+      "footer": "PPT_FOOTER_003",
+      "slide_numbers": [1, 2, 3, 4, 5, 6, 7]
+    },
+    "sections_pptx": [
+      {
+        "name": "Summary Section",
+        "id": "{B4BB6E3D-8F5E-F543-838B-5EBD9B4A9F1E}",
+        "slides": [1],
+        "slide_ids": [262]
+      },
+      {
+        "name": "SECTION_ALPHA_003",
+        "id": "{A6EF3FF9-2FC5-7E48-898D-FC1F42C6E0BB}",
+        "slides": [2, 3, 4, 5],
+        "slide_ids": [256, 257, 258, 259]
+      },
+      {
+        "name": "SECTION_BETA_003",
+        "id": "{21A303EB-537E-B048-B900-3B79F2FC6319}",
+        "slides": [6, 7],
+        "slide_ids": [260, 261]
+      }
+    ],
+    "custom_shows_pptx": [
+      {"name": "SHOW_ALPHA_003", "id": 0, "slides": [2, 3, 6], "slide_ids": [256, 257, 260]},
+      {"name": "SHOW_BETA_003", "id": 1, "slides": [7, 5, 2], "slide_ids": [261, 259, 256]}
+    ],
+    "modern_comments_pptx": {
+      "author_name": "Ryker Zhu",
+      "author_initials": "RZ",
+      "slide": 5,
+      "slide_part": "/ppt/slides/slide5.xml",
+      "comment_part": "ppt/comments/modernComment_103_9D759682.xml",
+      "root_marker": "PPT_COMMENT_ROOT_003",
+      "reply_marker": "PPT_COMMENT_REPLY_003",
+      "root_reply_count": 1
+    },
+    "master_layout_theme": {
+      "master_part": "ppt/slideMasters/slideMaster1.xml",
+      "master_shape": {
+        "name": "TextBox 12",
+        "shape_id": 13,
+        "marker": "MASTER_INHERITED_006",
+        "x_inches": 0.6,
+        "y_inches": 6.95,
+        "cx_emu": 6099858,
+        "cy_emu": 369332
+      },
+      "layout_part": "ppt/slideLayouts/slideLayout1.xml",
+      "layout_name": "Fixture Title Layout 006",
+      "layout_shape": {
+        "name": "TextBox 8",
+        "shape_id": 9,
+        "marker": "TITLE_LAYOUT_INHERITED_006",
+        "x_inches": 0.6,
+        "y_inches": 6.5,
+        "cx_emu": 6099858,
+        "cy_emu": 369332
+      },
+      "active_theme_part": "ppt/theme/theme1.xml",
+      "active_theme_name": "Ion",
+      "major_font": "Century Gothic",
+      "minor_font": "Century Gothic",
+      "color_count": 12,
+      "notes_theme_part": "ppt/theme/theme2.xml",
+      "notes_theme_name": "Office Theme"
+    }
+  },
+  "typed_reader_boundaries": {
+    "pptx_package_probe": {
+      "reader": "litchi-pptx::Package::open",
+      "package_open": "pass",
+      "tolerance_defects": 0,
+      "slide_count": 7,
+      "slide_size_emu": [12192000, 6858000],
+      "semantic_shape_counts": [7, 6, 6, 5, 5, 5, 5],
+      "slide_text_read": "pass for all seven slides",
+      "hidden_facade": "Slide::is_hidden returned Invalid(\"PresentationML part lacks an element root\") on slides 4-7; raw slide4.xml has show=0 and text/shapes still read.",
+      "animations": {
+        "slide1": "empty",
+        "slide2": "error: Invalid(\"animation has multiple shape targets\")",
+        "slide3": "empty",
+        "slides4_to_7": "empty"
+      },
+      "actions": {
+        "slide1": "two fallback click slide jumps for the Summary Zoom children",
+        "slide2": "one fallback click slide jump for Slide Zoom 7",
+        "slide3": "five settings: external URL, internal slide jump, mailto, next-slide action, and Section Zoom fallback jump",
+        "slide7_mouse_over": "raw hlinkMouseOver retained but no typed action setting was surfaced"
+      },
+      "hyperlinks_facade": "External URL and mailto targets are decoded; the internal relationship-backed targets and fallback Zoom jumps are decoded as Slide results. The mouse-over first-slide action is not surfaced by load_slide_action_settings.",
+      "notes": {
+        "graph": "pass",
+        "slide_count": 1,
+        "typed_text": "PPT_NOTES_003: native navigation and review note.\\n5"
+      },
+      "modern_comments": {
+        "graph": "pass",
+        "author_count": 1,
+        "comment_part_count": 1,
+        "root_count": 1,
+        "reply_count": 1,
+        "slide_part": "/ppt/slides/slide5.xml"
+      },
+      "structure_graph": {
+        "graph": "pass",
+        "slides": 7,
+        "sections": 3,
+        "custom_shows": 2,
+        "resolved_section_slide_ids": [[262], [256, 257, 258, 259], [260, 261]],
+        "resolved_custom_show_slide_ids": [[256, 257, 260], [261, 259, 256]]
+      },
+      "masters_and_layouts": {
+        "master_count": 1,
+        "layout_count": 17,
+        "master_shape_count": 12,
+        "master_theme": {"name": "Ion", "major_font": "Century Gothic", "minor_font": "Century Gothic", "color_count": 12},
+        "first_layout_name": "Fixture Title Layout 006",
+        "first_layout_shape_count": 6,
+        "layout_shape_counts": [6, 5, 5, 6, 8, 4, 3, 6, 6, 6, 5, 8, 5, 12, 15, 5, 5],
+        "root_boolean_boundaries": "SlideMaster::is_preserved returned Invalid(\"PresentationML part lacks an element root\"); SlideLayout::kind returned Invalid(\"slide-layout part lacks an element root\") for all 17 layouts. Names, shapes, theme summary and relationship graph still read successfully."
+      },
+      "zoom_reader": {
+        "slides_1_to_3": "Slide::zooms returned Invalid(\"zoom XML prefix 'p' is unbound\") because the native MCE Zoom owner has a fallback branch with a p prefix that is locally unbound when the zoom codec parses the owner.",
+        "slides_4_to_7": "Slide::zooms returned an empty owner; xml byte lengths were 3546, 3697, 3511 and 3648.",
+        "normal_scene_reader": "The ordinary semantic shape reader still exposes the native MCE fallback pictures/groups: Summary Zoom slide1 has Group Summary Zoom 7 and two pictures; slide2 has Picture Slide Zoom 7; slide3 has Picture Section Zoom 7.",
+        "source_picture_inventory": "SourceSlide::images refuses slides 1-3 with UnsafeEdit because picture ownership inside the MCE branch is ambiguous; slides4-7 return zero pictures."
+      },
+      "source_backed_transition_boundary": {
+        "source_open": "pass; slide_count=7; tolerance defects=0",
+        "slides_1_to_3": "SourceBackedPresentationEditor::slide_snapshot returned UnsafeEdit { operation: 'slide_snapshot', reason: 'source-backed transition edits refuse markup-compatibility outside the direct transition owner' }.",
+        "slides_4_to_7": "slide_snapshot succeeded and SourceBackedSlideSnapshot::transition returned None.",
+        "scope": "The direct source transition reader cannot capture these slides because unrelated native Zoom MCE markup is outside the transition owner; this is a reader boundary, not evidence that the native transitions or Zooms are absent."
+      }
+    },
+    "pptx_raw_parts": {
+      "presentation_xml": {
+        "part": "ppt/presentation.xml",
+        "bytes": 4643,
+        "sha256": "ab74ded2d0b92e209e3b1447ee107bcbb2216f11faf5650bcb9e9a9d490ac96b",
+        "slide_ids_in_order": [262, 256, 257, 258, 259, 260, 261],
+        "custom_show_relationships": {
+          "SHOW_ALPHA_003": ["rId3", "rId4", "rId7"],
+          "SHOW_BETA_003": ["rId8", "rId6", "rId3"]
+        },
+        "section_extension": "p14:sectionLst with Summary Section, SECTION_ALPHA_003 and SECTION_BETA_003"
+      },
+      "key_parts": [
+        {"part": "ppt/_rels/presentation.xml.rels", "bytes": 2049, "sha256": "b5c2ccc8c4e9071bad11fae81dadee51a99f6e7c4a86463416363a62dcc4af06"},
+        {"part": "ppt/slideMasters/slideMaster1.xml", "bytes": 19563, "sha256": "12326c4936f51a1a7ac5d8def305892a56d4bc636429a0d6b5e0c87428d57913"},
+        {"part": "ppt/slideLayouts/slideLayout1.xml", "bytes": 5053, "sha256": "c91d27be98322304f332491ab038495569ccbaf30622f5eed16ae697a23a3f64"},
+        {"part": "ppt/theme/theme1.xml", "bytes": 7010, "sha256": "7be9ced965f7ce8f26f6d9776e719e8df09e4bdf0a874f2a256da54e778a3750"},
+        {"part": "ppt/theme/theme2.xml", "bytes": 8723, "sha256": "b3d77e0bc8b68d1b8aa69c2f44fc1708555190efc68544ab94834647ab4ca584"},
+        {"part": "ppt/slides/slide1.xml", "bytes": 7200, "sha256": "1d17b33e339f892f83f65f70477f130bd032a6aefe79633abae86ccc2f6a4767"},
+        {"part": "ppt/slides/slide2.xml", "bytes": 8225, "sha256": "ab5973fcb6c61f28c8124ef52ea7692913658ed31591d823be56fd34d7363689"},
+        {"part": "ppt/slides/slide3.xml", "bytes": 7096, "sha256": "6f7e6e5a52c17f4923032a5940c6ffc3c7d9f12104fd928fd2933e5e8ad9e0e8"},
+        {"part": "ppt/slides/slide4.xml", "bytes": 3546, "sha256": "28db01eebffa94474f1e65659eccdc2549927eb7e0b00c36632bb70cd1a0abe8"},
+        {"part": "ppt/slides/slide5.xml", "bytes": 3697, "sha256": "629ab5e6cd281446723aa6b3e35f1d4d762960791b071e5a8f05a07759a70242"},
+        {"part": "ppt/slides/slide6.xml", "bytes": 3511, "sha256": "e644f8dfa69615c232ac859b5ab56c1b25cc4421350fff1327869f1cb621d09"},
+        {"part": "ppt/slides/slide7.xml", "bytes": 3648, "sha256": "f150ae2cd5d16a4bc31496691c8aa73a14aa6fe685266e83a66b216f153ce2c7"},
+        {"part": "ppt/notesSlides/notesSlide1.xml", "bytes": 1703, "sha256": "c0eab6e2a520738358437f35829f492cc0e7d485b2dd9659d6fb5094086387bc"},
+        {"part": "ppt/authors.xml", "bytes": 430, "sha256": "826dbe9f1796ac8d35bef6ca202930139fc90b29ac379e3304e03b744fdbb57b"},
+        {"part": "ppt/comments/modernComment_103_9D759682.xml", "bytes": 1454, "sha256": "3993eee9200a5b8026a32ac29fee9bcf8c44bfb7a2de021d80b2ccd96697f631"}
+      ],
+      "zoom_mce": {
+        "slide1": "Choice Requires=psuz, summaryZm with two summaryZmObj section IDs; fallback p:grpSp with two hyperlink pictures.",
+        "slide2": "Choice Requires=pslz, sldZmObj sldId=260 cId=2013120336 transitionDur=700; fallback p:pic with rId3 slide jump.",
+        "slide3": "Choice Requires=psez, sectionZmObj sectionId={21A303EB-537E-B048-B900-3B79F2FC6319} transitionDur=1000; fallback p:pic with rId3 slide jump."
+      },
+      "animation_xml": {
+        "part": "ppt/slides/slide2.xml",
+        "timing_present": true,
+        "target_shape_id": 2,
+        "timing_node_ids": [1, 2, 3, 4, 5, 6, 7, 8],
+        "property_animations": ["ppt_x", "ppt_y"],
+        "property_duration_ms": 1250,
+        "build_entry": {"spid": "2", "grpId": "0"}
+      },
+      "morph_xml": {
+        "part": "ppt/slides/slide3.xml",
+        "active_choice": "p159",
+        "active_effect": "p159:morph option=byObject",
+        "active_duration_ms": 1500,
+        "fallback_effect": "p:fade",
+        "fallback_duration": "spd=slow"
+      }
+    },
+    "legacy_ppt_reader": {
+      "reader": "litchi-cfb::OleFile::open -> litchi-ppt::Package::open -> presentation",
+      "cfb_open": "pass",
+      "presentation_open": "pass",
+      "slide_count": 7,
+      "has_pictures": false,
+      "slide_shape_counts": [5, 6, 6, 5, 5, 5, 5],
+      "slide_text_read": "pass for all seven slides; legacy line breaks use CR",
+      "slide_transitions_and_timing": {
+        "slide1": {"transition": "none", "timing": "none", "animations": 0},
+        "slide2": {"transition": "Push / Medium / Both / 3000ms / FromTop", "timing": "advance_on_click=true, auto_advance=true, hidden=false", "animations": 1, "animation_extension": "InvalidFormat(\"ExtTimeNode children are not in canonical order\")"},
+        "slide3": {"transition": "AlphaFade / Slow / OnClick", "timing": "advance_on_click=true, auto_advance=false, hidden=false", "animations": 0},
+        "slide4": {"transition": "Undefined / Slow / OnClick", "timing": "advance_on_click=true, auto_advance=false, hidden=true", "animations": 0},
+        "slide5": {"transition": "none", "timing": "none", "animations": 0, "notes": "PPT_NOTES_003: native navigation and review note."},
+        "slide6": {"transition": "none", "timing": "none", "animations": 0},
+        "slide7": {"transition": "none", "timing": "none", "animations": 0}
+      },
+      "custom_shows_facade": "Presentation::custom_shows returned [] even though the binary stream contains one NamedShows record; the Record parser retains NamedShows as an opaque container with zero parsed children. Native UI still showed SHOW_ALPHA_003 and SHOW_BETA_003 before and after legacy reopen.",
+      "master_metadata": {"powerpoint12_main_master_metadata_count": 5, "main_master_programmable_tag_count": 5, "document_programmable_tags_present": true},
+      "comments_facade": "All seven legacy slides returned an empty classic-comments list; the modern PPTX comment graph has no equivalent legacy semantic claim."
+    },
+    "legacy_binary_records": {
+      "powerpoint_document_stream": {
+        "bytes": 3030293,
+        "sha256": "08a08f1d6e525572ca18a097ee1fb4c4f1ac8471e76fa607a726791650d7e725",
+        "top_level_record_count": 17,
+        "top_level_records": [
+          {"type": "Document", "offset": 0, "payload_bytes": 5552},
+          {"type": "MainMaster", "offset": 5560, "payload_bytes": 603000},
+          {"type": "MainMaster", "offset": 608568, "payload_bytes": 582483},
+          {"type": "MainMaster", "offset": 1191059, "payload_bytes": 586856},
+          {"type": "MainMaster", "offset": 1777923, "payload_bytes": 586199},
+          {"type": "MainMaster", "offset": 2364130, "payload_bytes": 587191},
+          {"type": "Notes", "offset": 2951329, "payload_bytes": 20202},
+          {"type": "Slide", "offset": 2971539, "payload_bytes": 7226},
+          {"type": "Slide", "offset": 2978773, "payload_bytes": 12327},
+          {"type": "Slide", "offset": 2991108, "payload_bytes": 7828},
+          {"type": "Slide", "offset": 2998944, "payload_bytes": 7527},
+          {"type": "Slide", "offset": 3006479, "payload_bytes": 7482},
+          {"type": "Slide", "offset": 3013969, "payload_bytes": 7479},
+          {"type": "Slide", "offset": 3021456, "payload_bytes": 7541},
+          {"type": "Notes", "offset": 3029005, "payload_bytes": 1172},
+          {"type": "PersistPtrHolder", "offset": 3030185, "payload_bytes": 64},
+          {"type": "UserEditAtom", "offset": 3030257, "payload_bytes": 28}
+        ]
+      },
+      "record_counts": {
+        "Slide": 7,
+        "MainMaster": 5,
+        "Notes": 2,
+        "NamedShows": 1,
+        "SlidePersistAtom": 13,
+        "SSSlideInfoAtom": 3,
+        "ExternalHyperlink": 10,
+        "ExternalHyperlinkAtom": 10,
+        "PPDrawing": 14,
+        "ProgTags": 9,
+        "ProgBinaryTag": 15,
+        "BinaryTagData": 15,
+        "RoundTripTheme12Atom": 6,
+        "RoundTripContentMasterInfo12Atom": 17,
+        "RoundTripColorMapping12Atom": 6,
+        "RoundTripCompositeMasterId12Atom": 5,
+        "RoundTripOArtTextStyles12Atom": 5,
+        "HeadersFooters": 2,
+        "Unknown": 19
+      },
+      "stream_inventory": {
+        "Pictures": {"bytes": 1108458, "sha256": "78ac57e71af208ad859333086cae9fb039bf691f6b87b22fe9a37c573bf31701"},
+        "Current User": {"bytes": 4096, "sha256": "c1853b3aae1314f5dbe8e3b89a99d049ff374075f4bb733d6fb42a8a3bd0ec33"},
+        "PowerPoint Document": {"bytes": 3030293, "sha256": "08a08f1d6e525572ca18a097ee1fb4c4f1ac8471e76fa607a726791650d7e725"},
+        "\\u0005SummaryInformation": {"bytes": 7396, "sha256": "a38baeaca14b0395e4ed7084d358036e75d3302bdaf8de90e1bd5e3ce77211cd"},
+        "\\u0005DocumentSummaryInformation": {"bytes": 4096, "sha256": "5f6a6d4c6e40f58da0fcc2110c7490f4d1931654c71cf5e7a193ff0ea8cfc358"}
+      }
+    }
+  },
+  "native_ui_validation": {
+    "observed_by": "Root agent via Computer Use",
+    "application": "Microsoft PowerPoint",
+    "pptx_reopen": {
+      "path": "test-data/microsoft-office/powerpoint/powerpoint-master-motion.pptx",
+      "opened_exact_file_with_powerpoint_open": true,
+      "repair_prompt": false,
+      "slide_count": 7,
+      "hidden_slide": 4,
+      "notes_slide": 5,
+      "sections_and_custom_shows_retained": true,
+      "modern_comment_and_reply_retained": true
+    },
+    "ppt_reopen": {
+      "path": "test-data/microsoft-office/powerpoint/powerpoint-master-motion.ppt",
+      "opened_exact_file_with_powerpoint_open": true,
+      "repair_prompt": false,
+      "slide_count": 7,
+      "hidden_slide": 4,
+      "notes_slide": 5,
+      "legacy_named_show_names_observed": ["SHOW_ALPHA_003", "SHOW_BETA_003"],
+      "legacy_zoom_fallback_images_visible": ["Summary Zoom", "Slide Zoom", "Section Zoom"],
+      "inherited_markers_visible": ["MASTER_INHERITED_006", "TITLE_LAYOUT_INHERITED_006"]
+    },
+    "legacy_save_warning": {
+      "shown": true,
+      "accepted": true,
+      "messages_observed": [
+        "14 shapes across slides 1-7 will not be editable in older PowerPoint.",
+        "Sections will be lost when saving the legacy presentation.",
+        "One transition cannot be viewed in the legacy presentation.",
+        "Summary Zoom, Slide Zoom and Section Zoom objects will be converted to pictures."
+      ],
+      "affected_features": ["sections", "one transition", "three Zoom objects", "14 shapes"]
+    },
+    "activation_scope": {
+      "slideshow_run_verified": false,
+      "zoom_activation_verified": false,
+      "external_links_followed": false,
+      "mailto_activation_verified": false,
+      "mouse_over_activation_verified": false,
+      "scope_note": "The fixture records persisted package/UI state only; no slide show or Zoom activation claim is made."
+    }
+  },
+  "scope_and_limits": {
+    "variants": ["pptx", "ppt"],
+    "native_reopen_verified": true,
+    "native_reopen_repair_prompt": false,
+    "external_links_followed": false,
+    "macros_or_external_code_executed": false,
+    "native_zoom_semantics_claimed": true,
+    "zoom_activation_claimed": false,
+    "legacy_sections_semantics_claimed": false,
+    "legacy_zoom_semantics_claimed": false,
+    "legacy_comment_semantics_claimed": false,
+    "animation_typed_parity_claimed": false,
+    "morph_typed_parity_claimed": false,
+    "footer_and_date": "PPT_FOOTER_003 and 2026-01-15 are direct slide fields and are also represented by inherited master/layout placeholders.",
+    "reader_boundary_scope": "Raw OOXML and CFB record evidence are recorded separately from typed-reader outcomes. A convenience accessor failure is not treated as evidence that the native feature is absent.",
+    "hash_scope": "Hashes were computed only after both final files were closed; no save occurred after the successful reopen checks."
+  },
+  "validation_methods": [
+    "SHA-256 and byte counts computed from both closed final fixture byte streams.",
+    "ZIP central-directory and CRC check via Python ZipFile.testzip for PPTX; result was pass (testzip returned null).",
+    "XML well-formedness via Python ElementTree for all 38 XML and 30 .rels parts; all 68 parsed successfully.",
+    "OPC relationship targets resolved against package members; all 80 relationships were inspected, with no missing internal targets and two external hyperlink targets left inert.",
+    "PPTX presentation, slide, master, layout, theme, notes, modern-author/comment, transition, timing and Zoom parts inspected read-only.",
+    "Existing litchi-pptx typed probes recorded package, structure, actions, notes, comments, hyperlinks, master/layout/theme, animation, Zoom, source-backed transition and source-picture inventory outcomes.",
+    "Existing litchi-ppt typed probes recorded legacy text, shape, transition, timing, animation, notes, comments and custom-show outcomes.",
+    "Legacy PowerPoint Document stream was parsed with the repository's Record parser; 17 top-level records consumed all 3030293 stream bytes and record counts are recorded above.",
+    "Root Computer Use observations record native PowerPoint close/reopen without repair prompts, legacy compatibility warnings, retained legacy visible fallbacks and inherited markers."
+  ],
+  "files": [
+    {
+      "path": "test-data/microsoft-office/powerpoint/powerpoint-master-motion.pptx",
+      "format": "pptx",
+      "bytes": 895283,
+      "sha256": "c23717ee6a2b8b6d96b128bf1f1bd0037ed57da359556ff8ff253e7c6a9e9dac",
+      "file_description": "Microsoft PowerPoint 2007+",
+      "container": {
+        "kind": "OPC ZIP",
+        "zip_test": "pass",
+        "member_count": 77,
+        "xml_part_count": 38,
+        "relationship_part_count": 30,
+        "xml_or_rels_parse": "pass",
+        "relationship_count": 80,
+        "relationship_target_check": "pass",
+        "unresolved_internal_targets": [],
+        "external_targets": [
+          "https://example.com/litchi-ppt-fixture",
+          "mailto:fixture@example.com?subject=PPT_MAIL_SUBJECT_003"
+        ],
+        "key_members": [
+          "ppt/presentation.xml",
+          "ppt/_rels/presentation.xml.rels",
+          "ppt/slides/slide1.xml",
+          "ppt/slides/slide2.xml",
+          "ppt/slides/slide3.xml",
+          "ppt/slides/slide4.xml",
+          "ppt/slides/slide5.xml",
+          "ppt/slides/slide6.xml",
+          "ppt/slides/slide7.xml",
+          "ppt/slideMasters/slideMaster1.xml",
+          "ppt/slideLayouts/slideLayout1.xml",
+          "ppt/theme/theme1.xml",
+          "ppt/theme/theme2.xml",
+          "ppt/notesSlides/notesSlide1.xml",
+          "ppt/authors.xml",
+          "ppt/comments/modernComment_103_9D759682.xml"
+        ],
+        "media_parts": 9,
+        "zoom_media": {
+          "ppt/media/image6.png": {"bytes": 69649, "sha256": "fae0ed1fb069d91492cc1283bd973b0fd88ec85c2579d33fa326f6b90300ff32"},
+          "ppt/media/image7.png": {"bytes": 62780, "sha256": "222d4b3e1fdf2990dad40678982fa652fdea8151753e4e6b710645b39bbbb926"},
+          "ppt/media/image8.png": {"bytes": 36707, "sha256": "966644fc932aac1b86e527adcec794ac6949cddaca85c698b6c880c08f08ca7b"}
+        }
+      }
+    },
+    {
+      "path": "test-data/microsoft-office/powerpoint/powerpoint-master-motion.ppt",
+      "format": "ppt",
+      "bytes": 4189184,
+      "sha256": "c4ea2315e305980ccc0a362097352cff66025f7cde408aa375737a40394e4084",
+      "file_description": "Composite Document File V2 Document, Little Endian, Os: MacOS, Version 5.26, Code page: 10000, Author: Ryker Zhu, Last Saved By: Ryker Zhu, Revision Number: 2, Name of Creating Application: Microsoft Macintosh PowerPoint",
+      "container": {
+        "kind": "Compound Document File V2 (CFB/OLE)",
+        "cfb_reader": "litchi-cfb::OleFile::open pass",
+        "file_size": 4189184,
+        "stream_inventory": {
+          "Current User": 4096,
+          "PowerPoint Document": 3030293,
+          "\\u0005SummaryInformation": 7396,
+          "\\u0005DocumentSummaryInformation": 4096,
+          "Pictures": 1108458
+        },
+        "record_dump_evidence": {
+          "top_level_records": 17,
+          "slide_records": 7,
+          "main_master_records": 5,
+          "notes_records": 2,
+          "named_shows_records": 1,
+          "hidden_slide_info_records": 1,
+          "external_hyperlink_records": 10,
+          "classic_comment_records_observed": false
+        },
+        "parts_absent_or_converted_by_design": [
+          "PPTX modern authors/comments parts",
+          "PPTX active Zoom graphicFrame semantics",
+          "PPTX section graph semantics",
+          "PPTX p:timing and Morph extension markup"
+        ]
+      }
+    }
+  ]
+}

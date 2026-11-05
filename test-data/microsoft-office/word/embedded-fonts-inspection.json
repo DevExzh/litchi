@@ -1,0 +1,516 @@
+{
+  "schema_version": 1,
+  "fixture_id": "word-embedded-fonts-011",
+  "generated_on": "2026-10-15",
+  "purpose": "Fixture-specific, read-only inspection of native Microsoft Word embedded fonts, whole versus subset-save settings, legacy DOC font streams, and the RTF conversion boundary.",
+  "provenance": {
+    "producer_app": "Microsoft Office Word",
+    "app_version": "16.110.2",
+    "app_build": "16.110.26062818",
+    "platform": "macOS",
+    "authoring_method": "Computer Use / native Microsoft Word UI",
+    "source": "A five-paragraph specimen was entered in native Word, all body text was set to Aptos, document font embedding was enabled, and a full-embedding DOCX and a save-subset DOCX were saved. Native Word Save As produced the DOC from the full DOCX; the original full DOCX was reopened and saved as RTF.",
+    "libreoffice_used": false,
+    "programmatic_office_generation_used": false,
+    "library_code_modified": false,
+    "all_documents_closed_before_hashing": true,
+    "all_documents_reopened_without_repair": true
+  },
+  "files": [
+    {
+      "path": "test-data/microsoft-office/word/word-embedded-fonts.docx",
+      "format": "docx",
+      "role": "full embedded-font save",
+      "bytes": 2185903,
+      "sha256": "4a3a50878dc3f49d5e7eb1866805839267fd3fa548cf857cd01351fca66b9851"
+    },
+    {
+      "path": "test-data/microsoft-office/word/word-embedded-fonts-subset.docx",
+      "format": "docx",
+      "role": "save-subset-fonts variant",
+      "bytes": 240501,
+      "sha256": "fa66049d598e03515336008450b7917a0470e7665faf8e3785b941881cc8b3bf"
+    },
+    {
+      "path": "test-data/microsoft-office/word/word-embedded-fonts.doc",
+      "format": "doc",
+      "role": "DOC derivative of the full DOCX",
+      "bytes": 691200,
+      "sha256": "62fbd2ea54f667d9d8a32021178e2a9b7eb23b875200611c001701754de55e20"
+    },
+    {
+      "path": "test-data/microsoft-office/word/word-embedded-fonts.rtf",
+      "format": "rtf",
+      "role": "RTF derivative of the reopened full DOCX",
+      "bytes": 47382,
+      "sha256": "f7484f24b8c0efd60f48c142d616a16efa36dc520054048dcdbfb00b8cdf462e"
+    }
+  ],
+  "content_markers": [
+    "WORD_EMBEDDED_FONTS_011",
+    "Fixture ID: word-embedded-fonts-011",
+    "Native embedded font specimen: ABCDEFGHIJKLMNOPQRSTUVWXYZ abcdefghijklmnopqrstuvwxyz 0123456789.",
+    "Symbols: € £ ¥ © ® Ω π ± × ÷.",
+    "END_FONT_011"
+  ],
+  "coverage": {
+    "feature_groups": [
+      {
+        "feature": "OOXML full font embedding",
+        "status": "evidenced",
+        "evidence": "The full DOCX settings part contains w:embedTrueTypeFonts, fontTable.xml has six embed relationships, and the six stored payloads deobfuscate with their fontKey values to valid sfnt headers."
+      },
+      {
+        "feature": "OOXML save-subset-fonts setting",
+        "status": "evidenced",
+        "evidence": "The subset DOCX settings part contains both w:embedTrueTypeFonts and w:saveSubsetFonts; only the two Aptos faces used by the specimen remain embedded."
+      },
+      {
+        "feature": "regular, italic, and bold embedded faces",
+        "status": "evidenced",
+        "evidence": "The full font table records Aptos regular/italic, Times New Roman regular/bold/italic, and Aptos Display regular, with exact resource hashes and clear OpenType name records below."
+      },
+      {
+        "feature": "legacy DOC SttbTtmbd embedded-font metadata",
+        "status": "evidenced",
+        "evidence": "The DOC reader reports two embedded-font entries, and the raw SttbTtmbd table points to the Cambria Math and Aptos font-data blocks in WordDocument."
+      },
+      {
+        "feature": "RTF embedded-font declarations",
+        "status": "raw-evidence-only",
+        "evidence": "Native RTF contains ten empty fontemb/ftruetype declaration groups and no fontfile or inline payload. The typed RTF reader stops at the native empty datastore group before exposing its font table."
+      },
+      {
+        "feature": "font licensing or fsType policy interpretation",
+        "status": "raw-opaque",
+        "evidence": "OS/2 fsType is recorded as the raw value 0x0008 for each deobfuscated OOXML font. This inspection does not interpret that value as a legal, installability, or redistribution decision."
+      },
+      {
+        "feature": "font installation, substitution, and rendering equivalence",
+        "status": "not-tested",
+        "evidence": "The fixtures were reopened in native Word without repair, but no font installation, missing-font substitution, printer download, or cross-platform rendering test was performed."
+      }
+    ]
+  },
+  "docx": {
+    "shared_content": {
+      "document_xml_bytes": 4994,
+      "document_xml_sha256": "82a0b12f70661619ae6e14e5e6b4cd1c078c74412ee633403a89265bb8d1d932",
+      "paragraph_count": 5,
+      "run_count": 7,
+      "markers": [
+        "WORD_EMBEDDED_FONTS_011",
+        "Fixture ID: word-embedded-fonts-011",
+        "Native embedded font specimen: ABCDEFGHIJKLMNOPQRSTUVWXYZ abcdefghijklmnopqrstuvwxyz 0123456789.",
+        "Symbols: € £ ¥ © ® Ω π ± × ÷.",
+        "END_FONT_011"
+      ],
+      "font_run_format": "Aptos"
+    },
+    "variants": {
+      "full": {
+        "member_count": 18,
+        "settings": {
+          "embedTrueTypeFonts": true,
+          "saveSubsetFonts": false,
+          "settings_xml_bytes": 3222,
+          "settings_xml_sha256": "0c85f07c9a1ca6ba1526cee4b8c438a808f19eb2a9a38960de228d5085714742"
+        },
+        "font_table_xml": {
+          "bytes": 2306,
+          "sha256": "81ab8831ad354ede84d27a58c55a85fe0bd4e672df0fda20f00431b6321a4087",
+          "font_count": 3,
+          "relationship_part_bytes": 949,
+          "relationship_part_sha256": "4e4399326777a2e78262168dbfd7fab2e75d5353cb441282608b6e39b4576ec0"
+        },
+        "embedded_faces": [
+          {
+            "font_table_name": "Aptos",
+            "embed_style": "Regular",
+            "target": "word/fonts/font1.odttf",
+            "font_key": "{97061037-BF4F-EC4D-85B7-17BE7EB31062}",
+            "stored_bytes": 220792,
+            "stored_sha256": "5199e5ba0241e28e059805f4272ce8eb52c6a49444290de5069e10996c39d869",
+            "deobfuscation": "litchi_docx::font::deobfuscate succeeded",
+            "clear_bytes": 220792,
+            "clear_sha256": "95980114fcfd42f2f9c446dae429b70582bf2f03097d68433ea9e7d85a49da0b",
+            "sfnt_signature_hex": "00010000",
+            "sfnt_table_count": 20,
+            "name_table_primary": {
+              "family": "Aptos",
+              "subfamily": "Regular",
+              "full_name": "Aptos",
+              "postscript": "Aptos",
+              "version": "Version 2.01;O365"
+            },
+            "os2_fsType_raw_hex": "0008",
+            "os2_fsType_u16": 8
+          },
+          {
+            "font_table_name": "Aptos",
+            "embed_style": "Italic",
+            "target": "word/fonts/font2.odttf",
+            "font_key": "{F80D6FAC-2739-9642-828A-7F5C21D9753E}",
+            "stored_bytes": 227828,
+            "stored_sha256": "96b70766d52e04e59dacd426490e5771e247361a3a75af62a572ec7f5769b127",
+            "deobfuscation": "litchi_docx::font::deobfuscate succeeded",
+            "clear_bytes": 227828,
+            "clear_sha256": "888909eceb9acd84157078cc097c11f8a94a34ff3bd3fe08194ce7866f5998d1",
+            "sfnt_signature_hex": "00010000",
+            "sfnt_table_count": 20,
+            "name_table_primary": {
+              "family": "Aptos",
+              "subfamily": "Italic",
+              "full_name": "Aptos Italic",
+              "postscript": "Aptos-Italic",
+              "version": "Version 2.01;O365"
+            },
+            "os2_fsType_raw_hex": "0008",
+            "os2_fsType_u16": 8
+          },
+          {
+            "font_table_name": "Times New Roman",
+            "embed_style": "Regular",
+            "target": "word/fonts/font3.odttf",
+            "font_key": "{B343B19C-7430-FF4E-9CF2-6B3300742D6D}",
+            "stored_bytes": 1188156,
+            "stored_sha256": "d638474b83a3e75342478731fa04c0f78d9bab1572ab747af826ace26414f81d",
+            "deobfuscation": "litchi_docx::font::deobfuscate succeeded",
+            "clear_bytes": 1188156,
+            "clear_sha256": "e77f429f5cde743c30216c2d5917706d09ddd938990f4f5ae98bfd4b5c7d0495",
+            "sfnt_signature_hex": "00010000",
+            "sfnt_table_count": 24,
+            "name_table_primary": {
+              "family": "Times New Roman",
+              "subfamily": "Regular",
+              "full_name": "Times New Roman",
+              "postscript": "TimesNewRomanPSMT",
+              "version": "Version 7.00;O365"
+            },
+            "os2_fsType_raw_hex": "0008",
+            "os2_fsType_u16": 8
+          },
+          {
+            "font_table_name": "Times New Roman",
+            "embed_style": "Bold",
+            "target": "word/fonts/font4.odttf",
+            "font_key": "{2A2F009B-A295-8945-ABC3-AB071A544A33}",
+            "stored_bytes": 1168472,
+            "stored_sha256": "be3e0ce880580fa0dbf3aa45f955f8cf8e02b805bd57a10cba0deaa1a5faf8c6",
+            "deobfuscation": "litchi_docx::font::deobfuscate succeeded",
+            "clear_bytes": 1168472,
+            "clear_sha256": "3750f5d563d062ed8c4e2a0516da3374b8fbcdedee0608e107efd97ded80bcae",
+            "sfnt_signature_hex": "00010000",
+            "sfnt_table_count": 24,
+            "name_table_primary": {
+              "family": "Times New Roman",
+              "subfamily": "Bold",
+              "full_name": "Times New Roman Bold",
+              "postscript": "TimesNewRomanPS-BoldMT",
+              "version": "Version 7.00;O365"
+            },
+            "os2_fsType_raw_hex": "0008",
+            "os2_fsType_u16": 8
+          },
+          {
+            "font_table_name": "Times New Roman",
+            "embed_style": "Italic",
+            "target": "word/fonts/font5.odttf",
+            "font_key": "{038F4E0A-9EE6-FC49-A0A4-8E9051563447}",
+            "stored_bytes": 932820,
+            "stored_sha256": "774a395e3f547c92260ae5de4c91a6535508a67049a665945b456aaa4363b563",
+            "deobfuscation": "litchi_docx::font::deobfuscate succeeded",
+            "clear_bytes": 932820,
+            "clear_sha256": "f957cbaf4af5b52260462b486dd10a01507184dc39cdbbb3364e428b800b37e6",
+            "sfnt_signature_hex": "00010000",
+            "sfnt_table_count": 23,
+            "name_table_primary": {
+              "family": "Times New Roman",
+              "subfamily": "Italic",
+              "full_name": "Times New Roman Italic",
+              "postscript": "TimesNewRomanPS-ItalicMT",
+              "version": "Version 7.00;O365"
+            },
+            "os2_fsType_raw_hex": "0008",
+            "os2_fsType_u16": 8
+          },
+          {
+            "font_table_name": "Aptos Display",
+            "embed_style": "Regular",
+            "target": "word/fonts/font6.odttf",
+            "font_key": "{52F08950-E6D2-894E-A22A-D29F742ADE50}",
+            "stored_bytes": 221112,
+            "stored_sha256": "bcce8c6dc0d3da59c96a686ce694e0a2583cef8b4ef37b9deed2da98d96633d8",
+            "deobfuscation": "litchi_docx::font::deobfuscate succeeded",
+            "clear_bytes": 221112,
+            "clear_sha256": "af7a83e6f1d18b62535a8ee97939ab8653d5ac1fe1861cdb8fce829d3878d901",
+            "sfnt_signature_hex": "00010000",
+            "sfnt_table_count": 20,
+            "name_table_primary": {
+              "family": "Aptos Display",
+              "subfamily": "Regular",
+              "full_name": "Aptos Display",
+              "postscript": "AptosDisplay",
+              "version": "Version 2.01;O365"
+            },
+            "os2_fsType_raw_hex": "0008",
+            "os2_fsType_u16": 8
+          }
+        ],
+        "typed_reader": {
+          "open": "pass",
+          "font_table_count": 3,
+          "font_table_names": ["Aptos", "Times New Roman", "Aptos Display"],
+          "embedded_face_counts": {
+            "Aptos": 2,
+            "Times New Roman": 3,
+            "Aptos Display": 1
+          },
+          "resource_bytes_are_obfuscated": true,
+          "resource_deobfuscation_verified": true,
+          "embed_subsetted_attribute": "null for every parsed face; the library exposes the global w:saveSubsetFonts setting only as raw package settings, not as a face-level attribute"
+        },
+        "selected_part_hashes": {
+          "word/document.xml": [4994, "82a0b12f70661619ae6e14e5e6b4cd1c078c74412ee633403a89265bb8d1d932"],
+          "word/_rels/document.xml.rels": [817, "b725d5476e76f555fc24ecb908474fd29b671687336e5e1177a5c4c35cb5939f"],
+          "word/fontTable.xml": [2306, "81ab8831ad354ede84d27a58c55a85fe0bd4e672df0fda20f00431b6321a4087"],
+          "word/_rels/fontTable.xml.rels": [949, "4e4399326777a2e78262168dbfd7fab2e75d5353cb441282608b6e39b4576ec0"],
+          "word/settings.xml": [3222, "0c85f07c9a1ca6ba1526cee4b8c438a808f19eb2a9a38960de228d5085714742"],
+          "word/styles.xml": [42760, "f9d51d39374c993dda82d78db819d8cbc8ce95199a8ed8fb106812135c5b2a90"],
+          "word/theme/theme1.xml": [8397, "2760e6e84d4bf365af6570192dbe9cb57bb32653388d0ea041d116b25b1ca0a2"]
+        }
+      },
+      "subset": {
+        "member_count": 14,
+        "settings": {
+          "embedTrueTypeFonts": true,
+          "saveSubsetFonts": true,
+          "settings_xml_bytes": 3294,
+          "settings_xml_sha256": "81e84d284db68994c1cc5ce39c3c6016fee1975ceca1148469a4ef64597ab063"
+        },
+        "font_table_xml": {
+          "bytes": 1990,
+          "sha256": "374caf3be788ecdea65e1025be405a364f4bab5d2ab474050e10858040b82ce1",
+          "font_count": 3,
+          "relationship_part_bytes": 421,
+          "relationship_part_sha256": "d101dbc0ea9e260647185130ac01b63844f01c8a05d2432ce0e3f53f2f967774"
+        },
+        "embedded_faces": [
+          {
+            "font_table_name": "Aptos",
+            "embed_style": "Regular",
+            "target": "word/fonts/font1.odttf",
+            "font_key": "{B26F5D13-96A7-214E-AECA-DF7423233E66}",
+            "stored_bytes": 220792,
+            "stored_sha256": "363827cbc85176a20b67871666b84639e40da2edce3e8b3a11c799ea08643f46",
+            "clear_bytes": 220792,
+            "clear_sha256": "95980114fcfd42f2f9c446dae429b70582bf2f03097d68433ea9e7d85a49da0b",
+            "sfnt_signature_hex": "00010000",
+            "sfnt_table_count": 20,
+            "name_table_primary": {"family": "Aptos", "subfamily": "Regular", "full_name": "Aptos", "postscript": "Aptos", "version": "Version 2.01;O365"},
+            "os2_fsType_raw_hex": "0008",
+            "os2_fsType_u16": 8
+          },
+          {
+            "font_table_name": "Aptos",
+            "embed_style": "Italic",
+            "target": "word/fonts/font2.odttf",
+            "font_key": "{FBB347AA-B0EA-9045-8E40-6550D1276269}",
+            "stored_bytes": 227828,
+            "stored_sha256": "69905247a209b9fd01d1dc6e1f2f6e9c770bfce2fbae1aafdaff850be3c059de",
+            "clear_bytes": 227828,
+            "clear_sha256": "888909eceb9acd84157078cc097c11f8a94a34ff3bd3fe08194ce7866f5998d1",
+            "sfnt_signature_hex": "00010000",
+            "sfnt_table_count": 20,
+            "name_table_primary": {"family": "Aptos", "subfamily": "Italic", "full_name": "Aptos Italic", "postscript": "Aptos-Italic", "version": "Version 2.01;O365"},
+            "os2_fsType_raw_hex": "0008",
+            "os2_fsType_u16": 8
+          }
+        ],
+        "typed_reader": {
+          "open": "pass",
+          "font_table_count": 3,
+          "font_table_names": ["Aptos", "Times New Roman", "Aptos Display"],
+          "embedded_face_counts": {"Aptos": 2, "Times New Roman": 0, "Aptos Display": 0},
+          "resource_deobfuscation_verified": true,
+          "embed_subsetted_attribute": "null for both parsed faces"
+        },
+        "selected_part_hashes": {
+          "word/document.xml": [4994, "82a0b12f70661619ae6e14e5e6b4cd1c078c74412ee633403a89265bb8d1d932"],
+          "word/_rels/document.xml.rels": [817, "b725d5476e76f555fc24ecb908474fd29b671687336e5e1177a5c4c35cb5939f"],
+          "word/fontTable.xml": [1990, "374caf3be788ecdea65e1025be405a364f4bab5d2ab474050e10858040b82ce1"],
+          "word/_rels/fontTable.xml.rels": [421, "d101dbc0ea9e260647185130ac01b63844f01c8a05d2432ce0e3f53f2f967774"],
+          "word/settings.xml": [3294, "81e84d284db68994c1cc5ce39c3c6016fee1975ceca1148469a4ef64597ab063"],
+          "word/styles.xml": [42760, "f9d51d39374c993dda82d78db819d8cbc8ce95199a8ed8fb106812135c5b2a90"],
+          "word/theme/theme1.xml": [8397, "2760e6e84d4bf365af6570192dbe9cb57bb32653388d0ea041d116b25b1ca0a2"]
+        }
+      }
+    },
+    "conversion_comparison": {
+      "full_vs_subset": "document.xml, document.xml.rels, styles.xml, theme1.xml, and Content_Types.xml are byte-identical. The subset variant adds w:saveSubsetFonts, removes the four unused Times New Roman/Aptos Display face relationships and payloads, and assigns new obfuscation keys to the retained Aptos payloads; after deobfuscation the retained Aptos regular and italic clear hashes are byte-identical.",
+      "full_font_payloads": "Six .odttf members, 3,959,180 stored bytes in total.",
+      "subset_font_payloads": "Two .odttf members, 448,620 stored bytes in total.",
+      "library_boundary": "The typed DOCX reader exposes the font table, style, key, resource bytes, and raw resource hashes. Its Embed::subsetted value is absent for these native files even though the package settings distinguish the variants."
+    }
+  },
+  "doc": {
+    "container": {
+      "kind": "Compound Document File V2 / CFB-OLE",
+      "file_identification": "Composite Document File V2 Document, Little Endian, Os: MacOS, Version 5.26, Code page: 10000",
+      "cfb_signature_hex": "D0CF11E0A1B11AE1",
+      "stream_count": 5,
+      "streams": [
+        {"name": "1Table", "bytes": 9117, "sha256": "6a899bd6e321ed4d7407404314615d50e444675b44f1eb9422f9c6cedb3b40ef"},
+        {"name": "WordDocument", "bytes": 673042, "sha256": "67bc45613f4c7d39d55268af718c1643f6eff20bbb48d6cefb730311e07aed70"},
+        {"name": "\\u0001CompObj", "bytes": 114, "sha256": "f70fe384c672865fff4bb8ab60d73098bc751e8f2aa915b8aff2e2085648b428"},
+        {"name": "\\u0005SummaryInformation", "bytes": 420, "sha256": "cd9adffd4cc6d474441461f8ac02664d6961560c142cc071801e4a5d1a3d6660"},
+        {"name": "\\u0005DocumentSummaryInformation", "bytes": 280, "sha256": "31d107fbff31531b8a2eb4a8f7f3d6f4157f73f86945d9da26ac995af5002a30"}
+      ],
+      "data_stream_present": false,
+      "file_metadata": {
+        "author": "Ryker Zhu",
+        "template": "Normal.dotm",
+        "last_saved_by": "Ryker Zhu",
+        "revision": 2,
+        "application": "Microsoft Office Word",
+        "created_utc": "2026-10-15T09:48:00Z",
+        "last_saved_utc": "2026-10-15T09:48:00Z",
+        "pages": 1,
+        "words": 14,
+        "characters": 186,
+        "security": 0,
+        "codepage": 10000
+      }
+    },
+    "font_table": {
+      "fib_pointer_index": 15,
+      "stream": "1Table",
+      "offset": 7977,
+      "bytes": 368,
+      "sha256": "3408939d62dc2326cc6ddd8636504177bea3217f88e2a8927dad001fb09c83ca",
+      "format": "SttbfFfn",
+      "font_count": 6,
+      "font_names_by_index": ["Times New Roman", "Symbol", "Arial", "Aptos", "Aptos Display", "Cambria Math"]
+    },
+    "embedded_font_table": {
+      "fib_pointer_index": 61,
+      "stream": "1Table",
+      "offset": 7943,
+      "bytes": 34,
+      "sha256": "f11f58a797f7f7e4da0228a3f9adac24c4f14102bc54ef525ad912ef7f537be979",
+      "format": "SttbTtmbd",
+      "raw_header": {"ibstMac": 2, "ibstMax": 64, "brgbst": 10},
+      "entries": [
+        {"font_data_offset": 3630, "font_table_index": 5, "font_name": "Cambria Math", "bold": false, "italic": false, "subset_order": null},
+        {"font_data_offset": 573197, "font_table_index": 3, "font_name": "Aptos", "bold": false, "italic": false, "subset_order": null}
+      ]
+    },
+    "word_document_font_blocks": [
+      {
+        "font_name_from_sttbf_ffn": "Cambria Math",
+        "font_table_index": 5,
+        "offset": 3630,
+        "bytes": 569567,
+        "end_offset_exclusive": 573197,
+        "sha256": "53e5b643b6f6382a558b814c3880067b2908ab5c4a4643beb627a1b3141de23c",
+        "leading_header_dwords_le": [569567, 569359, 131074, 4],
+        "leading_bytes_hex": "dfb008000fb00800020002000400000002040503050406030204000090010000",
+        "payload_interpretation": "opaque legacy Word embedded-font binary; no sfnt signature was assumed or synthesized"
+      },
+      {
+        "font_name_from_sttbf_ffn": "Aptos",
+        "font_table_index": 3,
+        "offset": 573197,
+        "bytes": 99845,
+        "end_offset_exclusive": 673042,
+        "sha256": "a2bb161962578ec61efc3bd7d887bb9fe3883bf2306c50610b8c5df1ab035191",
+        "leading_header_dwords_le": [99845, 99657, 131074, 4],
+        "leading_bytes_hex": "05860100498501000200020004000000020b0004020202020204000090010000",
+        "payload_interpretation": "opaque legacy Word embedded-font binary; no sfnt signature was assumed or synthesized"
+      }
+    ],
+    "typed_reader": {
+      "open": "pass",
+      "word_version": "Word 97",
+      "tolerance_report_defects": [],
+      "paragraph_count": 5,
+      "table_count": 0,
+      "text": "WORD_EMBEDDED_FONTS_011\rFixture ID: word-embedded-fonts-011\rNative embedded font specimen: ABCDEFGHIJKLMNOPQRSTUVWXYZ abcdefghijklmnopqrstuvwxyz 0123456789.\rSymbols: € £ ¥ © ® Ω π ± × ÷.\rEND_FONT_011\r",
+      "document_properties_version": "Word2013",
+      "document_properties_bytes": 694,
+      "embed_true_type_fonts": true,
+      "embedded_font_count": 2,
+      "reader_projection": "Document::embedded_fonts exposes offsets, font-table indices, bold/italic flags, and subset order. It deliberately does not load, install, decode, or execute the legacy font blocks."
+    }
+  },
+  "rtf": {
+    "file_description": "Rich Text Format data, version 1, ANSI, code page 1252, default middle east language ID 1025",
+    "raw_file_bytes": 47382,
+    "raw_file_sha256": "f7484f24b8c0efd60f48c142d616a16efa36dc520054048dcdbfb00b8cdf462e",
+    "raw_font_controls": {
+      "fonttbl": 1,
+      "fontemb": 10,
+      "ftruetype": 10,
+      "fontfile": 0,
+      "fontfname": 0,
+      "bin": 0,
+      "panose": 11,
+      "fontemb_declarations_by_name": {
+        "Times New Roman": 7,
+        "Aptos": 2,
+        "Aptos Display": 1
+      },
+      "cambria_math_base_definition_without_fontemb": 1,
+      "empty_fontemb_group": {
+        "literal": "{\\*\\fontemb\\ftruetype }",
+        "bytes": 23,
+        "sha256": "03fc0421ccecd62786f4a7f86a8df6ea1ac2f4abb1ea8c84440b089b793e7198",
+        "payload_bytes_after_control_group": 0
+      },
+      "inline_font_payload": false,
+      "external_fontfile_reference": false
+    },
+    "raw_data_store": {
+      "datastore": 1,
+      "literal": "{\\*\\datastore }",
+      "sha256": "9ef91565ee19341ed7dcb9ac274f078092d6fbc086301b65a066d51b708979b9",
+      "payload_bytes": 0
+    },
+    "typed_reader": {
+      "command": "cargo run -q -p litchi-rtf --example parse_rtf -- test-data/microsoft-office/word/word-embedded-fonts.rtf",
+      "exit_code": 1,
+      "error": "MalformedDocument(\"RTF data-store payload cannot be empty\")",
+      "semantic_font_table_available": false,
+      "reader_boundary": "The native empty datastore group stops the typed RTF reader before it exposes the font table or the empty fontemb declarations."
+    },
+    "textutil_read_only": {
+      "command": "textutil -convert txt -stdout test-data/microsoft-office/word/word-embedded-fonts.rtf",
+      "exit_code": 0,
+      "bytes": 211,
+      "sha256": "ba429f52aad63c08a685088905687188451ad680e704195faae929709f8b3822",
+      "text": "WORD_EMBEDDED_FONTS_011\nFixture ID: word-embedded-fonts-011\nNative embedded font specimen: ABCDEFGHIJKLMNOPQRSTUVWXYZ abcdefghijklmnopqrstuvwxyz 0123456789.\nSymbols: € £ ¥ © ® Ω π ± × ÷.\nEND_FONT_011\n"
+    }
+  },
+  "native_ui_validation": {
+    "preferences": {
+      "full_docx": {"embed_fonts": true, "subset_fonts": false, "observed": "Word Preferences > Save showed Embed fonts in the file checked and Subset fonts when embedding checked off."},
+      "subset_docx": {"embed_fonts": true, "subset_fonts": true, "observed": "Word Preferences > Save showed both embedding and Subset fonts when embedding checked."}
+    },
+    "reopen_status": {
+      "word-embedded-fonts.docx": "reopened in native Word without repair",
+      "word-embedded-fonts-subset.docx": "reopened in native Word without repair",
+      "word-embedded-fonts.doc": "reopened in native Word without repair",
+      "word-embedded-fonts.rtf": "reopened in native Word without repair"
+    },
+    "document_chain": "The DOC was produced by native Word Save As from the full DOCX. The RTF was produced by reopening the original full DOCX and using Save As; it was not produced from the DOC chain.",
+    "open_picker_boundary": "After DOC Save As, the Word Open picker displayed a valid full-DOCX preview but left Open disabled; double-click and Return had no effect. The picker was cancelled, and Finder Open With Microsoft Word opened the full DOCX immediately without repair. Finder explicit Word opening was also used for the subset DOCX, DOC, and RTF.",
+    "save_warning": "No conversion warning was observed for the DOC or RTF Save As operations."
+  },
+  "known_limits": [
+    "The OS/2 fsType value is recorded as raw font-program metadata only. This fixture makes no legal, licensing, installability, redistribution, or permission claim from it.",
+    "The DOC WordDocument font blocks use legacy embedded-font storage and are recorded as opaque bounded byte ranges. They were not treated as OOXML-obfuscated sfnt files.",
+    "The save-subset fixture demonstrates the native Word setting and the resulting reduction from six to two embedded faces. It does not establish a general subset algorithm because the retained Aptos payloads are byte-identical after deobfuscation and no second specimen was authored.",
+    "The typed RTF reader cannot expose the font table for this native file because it rejects the empty datastore payload first; RTF font controls and textutil output are raw/read-only evidence only.",
+    "No font was installed, activated, printed, or compared against a missing-font environment. Native reopen without repair does not establish cross-platform rendering or substitution parity."
+  ]
+}

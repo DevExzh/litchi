@@ -1,0 +1,591 @@
+{
+  "schema_version": 1,
+  "fixture_id": "word-legacy-form-010",
+  "generated_on": "2026-10-15",
+  "purpose": "Fixture-specific, read-only inspection of native Microsoft Word legacy FORMTEXT, FORMCHECKBOX, and FORMDROPDOWN fields, their FFData metadata, bookmarks, and forms protection across DOCX, DOC, and RTF.",
+  "provenance": {
+    "producer_app": "Microsoft Office Word",
+    "app_version": "16.110.2",
+    "app_build": "16.110.26062818",
+    "platform": "macOS",
+    "authoring_method": "Computer Use / native Microsoft Word UI",
+    "source": "The unprotected DOCX was authored first in native Word with three legacy form fields. The protected DOCX was produced after selecting Protect Form. Native Word Save As produced the DOC from the protected DOCX; the original protected DOCX was reopened and saved as RTF.",
+    "libreoffice_used": false,
+    "programmatic_office_generation_used": false,
+    "library_code_modified": false,
+    "all_documents_closed_before_hashing": true,
+    "all_documents_reopened_without_repair": true
+  },
+  "files": [
+    {
+      "path": "test-data/microsoft-office/word/word-legacy-form-unprotected.docx",
+      "format": "docx",
+      "role": "unprotected baseline",
+      "bytes": 13759,
+      "sha256": "a4b37e93f7cf0c93213e419cb42796e361785f4354d50a585dcd5b60ed910778"
+    },
+    {
+      "path": "test-data/microsoft-office/word/word-legacy-form.docx",
+      "format": "docx",
+      "role": "forms-protected source",
+      "bytes": 13788,
+      "sha256": "ef1672164fc05011927dd6f9f498cd0d90b6c7e99aaaf6ca2f5c5fe77c21f948"
+    },
+    {
+      "path": "test-data/microsoft-office/word/word-legacy-form.doc",
+      "format": "doc",
+      "role": "DOC derivative of the protected DOCX",
+      "bytes": 29184,
+      "sha256": "f4b3e30d5d939bcb97d651f0cf920e1b56f2c0e782d154ce43b896f2cfb1ed79"
+    },
+    {
+      "path": "test-data/microsoft-office/word/word-legacy-form.rtf",
+      "format": "rtf",
+      "role": "RTF derivative of the reopened protected DOCX",
+      "bytes": 48852,
+      "sha256": "35681f5af147dc4d80fdd28696c74d608345329fb6f7e86e9ab7c77ecca68879"
+    }
+  ],
+  "content_markers": {
+    "body": [
+      "WORD_LEGACY_FORM_010",
+      "Fixture ID: word-legacy-form-010",
+      "TEXT_FIELD_010",
+      "CHECKBOX_FIELD_010",
+      "DROPDOWN_FIELD_010",
+      "END_FORM_010"
+    ],
+    "field_names": [
+      "FixtureText010",
+      "FixtureCheck010",
+      "FixtureDropdown010"
+    ],
+    "text_field": {
+      "default_value": "FORM_VALUE_010",
+      "max_length": 24,
+      "bookmark": "FixtureText010",
+      "calculate_on_exit": true,
+      "enabled": true,
+      "native_ui_status_bar_help": "STATUS_TEXT_010",
+      "native_ui_f1_help": "HELP_TEXT_010",
+      "entry_macro": "",
+      "exit_macro": ""
+    },
+    "checkbox_field": {
+      "bookmark": "FixtureCheck010",
+      "default_checked": true,
+      "size_points": 14,
+      "size_half_points": 28,
+      "calculate_on_exit": false,
+      "enabled": true
+    },
+    "dropdown_field": {
+      "bookmark": "FixtureDropdown010",
+      "entries": ["OPTION_A_010", "OPTION_B_010"],
+      "native_ui_selection": "OPTION_A_010",
+      "calculate_on_exit": false,
+      "enabled": true
+    }
+  },
+  "coverage": {
+    "feature_groups": [
+      {
+        "feature": "legacy text form field",
+        "status": "evidenced",
+        "evidence": "Native Word emitted FORMTEXT with FixtureText010, default FORM_VALUE_010, max length 24, enabled and calculate-on-exit metadata in DOCX w:ffData; DOC FFData and RTF formfield metadata retain the same values."
+      },
+      {
+        "feature": "legacy checkbox form field",
+        "status": "evidenced",
+        "evidence": "Native Word emitted FORMCHECKBOX with FixtureCheck010, default checked state, and 28 half-points (14 points) in DOCX, DOC FFData, and raw RTF controls."
+      },
+      {
+        "feature": "legacy dropdown form field",
+        "status": "evidenced",
+        "evidence": "Native Word emitted FORMDROPDOWN with FixtureDropdown010 and OPTION_A_010 / OPTION_B_010 in DOCX, DOC FFData, and raw RTF controls; the stored default index is zero."
+      },
+      {
+        "feature": "form-field bookmarks",
+        "status": "evidenced",
+        "evidence": "All three fields have paired bookmark starts and ends with the expected names in DOCX; the DOC reader reports the same bookmark names and ranges."
+      },
+      {
+        "feature": "forms-only document protection",
+        "status": "evidenced",
+        "evidence": "Native Word Protect Document showed Forms selected with the other restriction modes clear and password fields blank; DOCX settings.xml has edit=forms and enforcement=1, DOC DOP form_fields=true, and raw RTF has formprot, enforceprot1, and protlevel2."
+      },
+      {
+        "feature": "help text and macro slots",
+        "status": "partially-persisted",
+        "evidence": "HELP_TEXT_010 is persisted as DOCX w:helpText, DOC FFData help_text, and RTF ffhelptext. The native UI value STATUS_TEXT_010 is absent from all three saved payloads, and no entry or exit macro is stored."
+      },
+      {
+        "feature": "forms protection enforcement, editing, and unlock",
+        "status": "not-tested",
+        "evidence": "No edit attempt, checkbox click, dropdown change, unlock attempt, or password credential was used."
+      }
+    ]
+  },
+  "native_ui_validation": {
+    "reopen": {
+      "unprotected_baseline": "reopened in native Word without repair",
+      "protected_docx": "reopened in native Word without repair",
+      "protected_doc": "reopened in native Word without repair",
+      "protected_rtf": "reopened in native Word without repair"
+    },
+    "protection_dialog": {
+      "unprotected_baseline": {
+        "protection_checked": false,
+        "forms": false,
+        "comments": false,
+        "tracked_revisions": false,
+        "read_only": false,
+        "all_restrictions": false
+      },
+      "protected_docx": {
+        "protection_checked": true,
+        "forms": true,
+        "comments": false,
+        "tracked_revisions": false,
+        "read_only": false,
+        "all_restrictions": false,
+        "password_fields_blank": true
+      },
+      "protected_doc": {
+        "protection_checked": true,
+        "forms": true,
+        "comments": false,
+        "tracked_revisions": false,
+        "read_only": false,
+        "all_restrictions": false,
+        "password_fields_blank": true
+      },
+      "protected_rtf": {
+        "protection_checked": true,
+        "forms": true,
+        "comments": false,
+        "tracked_revisions": false,
+        "read_only": false,
+        "all_restrictions": false,
+        "password_fields_blank": true
+      },
+      "settings_cancelled_without_changes": true
+    },
+    "field_dialog_values": {
+      "text": "Word UI displayed default FORM_VALUE_010, maximum length 24, enabled, calculate-on-exit enabled, Status Bar help STATUS_TEXT_010, F1 help HELP_TEXT_010, and empty entry/exit macro slots.",
+      "checkbox": "Word UI displayed default checked, 14-point size, enabled, calculate-on-exit disabled, and bookmark FixtureCheck010.",
+      "dropdown": "Word UI displayed entries OPTION_A_010 and OPTION_B_010 with OPTION_A_010 selected, enabled, calculate-on-exit disabled, and bookmark FixtureDropdown010."
+    },
+    "ui_to_wire_boundary": "The native UI value STATUS_TEXT_010 was not persisted by Word in these saved payloads. Package evidence records the persisted HELP_TEXT_010 and the absence of any status-text control separately from the UI observation."
+  },
+  "docx": {
+    "container": {
+      "kind": "OPC ZIP",
+      "zip_test": "pass",
+      "xml_validation": "pass",
+      "member_count": 11,
+      "members": [
+        "[Content_Types].xml",
+        "_rels/.rels",
+        "word/document.xml",
+        "word/_rels/document.xml.rels",
+        "word/theme/theme1.xml",
+        "word/settings.xml",
+        "word/styles.xml",
+        "word/webSettings.xml",
+        "word/fontTable.xml",
+        "docProps/core.xml",
+        "docProps/app.xml"
+      ],
+      "relationship_target_check": "pass",
+      "external_targets": []
+    },
+    "common_document_xml": {
+      "bytes": 5429,
+      "sha256": "e73cf050ecb57fff4e11a47b78cb2404857871b2e2badf0b36709c0b4dd1beb5",
+      "xml_counts": {
+        "p": 6,
+        "r": 19,
+        "t": 7,
+        "fldChar": 9,
+        "ffData": 3,
+        "bookmarkStart": 3,
+        "bookmarkEnd": 3,
+        "instrText": 3,
+        "sdt": 0,
+        "tbl": 0
+      },
+      "field_instructions": ["FORMTEXT", "FORMCHECKBOX", "FORMDROPDOWN"],
+      "field_markers": {
+        "begin": 3,
+        "separate": 3,
+        "end": 3
+      },
+      "bookmarks": [
+        {"id": "0", "name": "FixtureText010"},
+        {"id": "1", "name": "FixtureCheck010"},
+        {"id": "2", "name": "FixtureDropdown010"}
+      ],
+      "ffData": [
+        {
+          "kind": "text",
+          "name": "FixtureText010",
+          "enabled": true,
+          "calcOnExit": true,
+          "helpText": {"type": "text", "value": "HELP_TEXT_010"},
+          "textInput": {"default": "FORM_VALUE_010", "maxLength": 24},
+          "statusText_present": false,
+          "entryMacro_present": false,
+          "exitMacro_present": false
+        },
+        {
+          "kind": "checkbox",
+          "name": "FixtureCheck010",
+          "enabled": true,
+          "calcOnExit": false,
+          "checkBox": {"size_half_points": 28, "default": 1},
+          "cached_result_text_present": false
+        },
+        {
+          "kind": "dropdown",
+          "name": "FixtureDropdown010",
+          "enabled": true,
+          "calcOnExit": false,
+          "ddList": ["OPTION_A_010", "OPTION_B_010"],
+          "explicit_result_present": false
+        }
+      ],
+      "document_text_projection": "WORD_LEGACY_FORM_010Fixture ID: word-legacy-form-010TEXT_FIELD_010: FORM_VALUE_010CHECKBOX_FIELD_010: DROPDOWN_FIELD_010: END_FORM_010"
+    },
+    "part_hashes": {
+      "common_to_baseline_and_protected": [
+        {"path": "[Content_Types].xml", "bytes": 1312, "sha256": "dfa90f373b8fd8147ee3e4bfe1ee059e536cc1b068f7ec140c3fc0e6554f331a"},
+        {"path": "_rels/.rels", "bytes": 590, "sha256": "e19238d7a71fa7a2490776252686f70e2de6238c87cd509b5e3a3cc07c2ea4df"},
+        {"path": "word/document.xml", "bytes": 5429, "sha256": "e73cf050ecb57fff4e11a47b78cb2404857871b2e2badf0b36709c0b4dd1beb5"},
+        {"path": "word/_rels/document.xml.rels", "bytes": 817, "sha256": "b725d5476e76f555fc24ecb908474fd29b671687336e5e1177a5c4c35cb5939f"},
+        {"path": "word/theme/theme1.xml", "bytes": 8397, "sha256": "2760e6e84d4bf365af6570192dbe9cb57bb32653388d0ea041d116b25b1ca0a2"},
+        {"path": "word/styles.xml", "bytes": 42760, "sha256": "02259292ec74ca1781e9a98cbad99e532b9c135721880c8c8f548b447f3a92bb"},
+        {"path": "word/webSettings.xml", "bytes": 1069, "sha256": "9d21da07e99d87dfe36f6587ccc669539495e7130c513a0b63e3df49d2d71bd1"},
+        {"path": "word/fontTable.xml", "bytes": 1831, "sha256": "88dd0cd28c13a48d979681218c86597fe170a188fc9e3f73ad934b150c47b237"}
+      ],
+      "variants": {
+        "unprotected": [
+          {"path": "word/settings.xml", "bytes": 3173, "sha256": "1496fbf053c0b9c65249163faf80ac1d0d245e40915712ed020fc76ea1724bb7"},
+          {"path": "docProps/core.xml", "bytes": 745, "sha256": "b9e04bef5edc8ea27b3d7b33e92bc6cace0a44cd174f2d98068b1bbcb9196ca6"},
+          {"path": "docProps/app.xml", "bytes": 714, "sha256": "e068d7659fb25917315af6c5b5431964c61dd0893842837497a8bfa8faa91b44"}
+        ],
+        "protected": [
+          {"path": "word/settings.xml", "bytes": 3255, "sha256": "c2bb4f96351c17074cd479c887fbd8aaf4f0d120004b0eabd8064096a777f4a7"},
+          {"path": "docProps/core.xml", "bytes": 745, "sha256": "c26e69321880de9b24a0c886ae15e868eef2d2f13b3db2c97980155bf2622ea2"},
+          {"path": "docProps/app.xml", "bytes": 714, "sha256": "5ca39a59328d6a2ef4909b8d076299328004ec6b332a6bfe3399e9476486368b"}
+        ]
+      }
+    },
+    "settings": {
+      "unprotected": {
+        "documentProtection_present": false,
+        "zoom_percent": 100
+      },
+      "protected": {
+        "documentProtection": {"edit": "forms", "enforcement": "1", "password_attributes_present": false},
+        "zoom_percent": 100
+      }
+    },
+    "extended_properties": {
+      "application": "Microsoft Office Word",
+      "template": "Normal.dotm",
+      "docSecurity": 0,
+      "pages": 1,
+      "words": 13,
+      "characters": 177,
+      "paragraphs": 8
+    },
+    "library_projection": {
+      "read_example": {
+        "command": "cargo run -q -p litchi-docx --example read_docx -- test-data/microsoft-office/word/word-legacy-form.docx",
+        "exit_code": 0,
+        "paragraph_count": 6,
+        "table_count": 0,
+        "text_bytes": 134,
+        "text_contains": [
+          "WORD_LEGACY_FORM_010",
+          "Fixture ID: word-legacy-form-010",
+          "TEXT_FIELD_010: FORM_VALUE_010",
+          "CHECKBOX_FIELD_010",
+          "DROPDOWN_FIELD_010",
+          "END_FORM_010"
+        ]
+      },
+      "typed_legacy_form_fields": {
+        "unprotected_count": 3,
+        "protected_count": 3,
+        "fields": [
+          {"instruction": "FORMTEXT", "kind": "Text", "cached_result": "FORM_VALUE_010", "dirty": false, "locked": false},
+          {"instruction": "FORMCHECKBOX", "kind": "CheckBox", "cached_result": null, "dirty": false, "locked": false},
+          {"instruction": "FORMDROPDOWN", "kind": "DropDown", "cached_result": null, "dirty": false, "locked": false}
+        ],
+        "reader_boundary": "The DOCX typed LegacyForm view intentionally exposes field-code kind, opaque instructions, cached result, and state only; associated w:ffData properties are recorded from raw document.xml above."
+      }
+    }
+  },
+  "doc": {
+    "container": {
+      "kind": "OLE2 Compound File",
+      "file_description": "Composite Document File V2 Document, Little Endian, MacOS, code page 10000",
+      "cfb_signature": "D0 CF 11 E0 A1 B1 1A E1",
+      "file_bytes": 29184,
+      "stream_count": 6,
+      "streams": [
+        {"name": "Data", "bytes": 4096, "sha256": "fca85ab7751b947f18e6c125efa94dfd50fdab8d79953f46769a740a0a081125", "nonzero_range": "0..519"},
+        {"name": "1Table", "bytes": 9263, "sha256": "d38b98d8bf82ce76bda74b7bc729c2d2ceff6303ce039365976e32b0f1076557", "nonzero_range": "0..9242"},
+        {"name": "WordDocument", "bytes": 4096, "sha256": "33a62f97f78ad2a29f800f07f326bbe09eb4fb11e6fdb208980a8ce9828b630a", "nonzero_range": "0..3630"},
+        {"name": "\\u0001CompObj", "bytes": 114, "sha256": "f70fe384c672865fff4bb8ab60d73098bc751e8f2aa915b8aff2e2085648b428", "nonzero_range": "0..102"},
+        {"name": "\\u0005SummaryInformation", "bytes": 4096, "sha256": "1592ddd52ce8727b610593bd7e8c35ef6116ef3433616c4a11d2d82f488278cf", "nonzero_range": "0..413"},
+        {"name": "\\u0005DocumentSummaryInformation", "bytes": 4096, "sha256": "1084f8ab42f897a3a6541040412d6ab414abfabb16ef3efee706d111fa0ac3c2", "nonzero_range": "0..276"}
+      ],
+      "metadata": {
+        "author": "Ryker Zhu",
+        "template": "Normal.dotm",
+        "last_saved_by": "Ryker Zhu",
+        "revision": 2,
+        "application": "Microsoft Office Word",
+        "created_utc": "2026-10-15T08:29:00Z",
+        "last_saved_utc": "2026-10-15T08:29:00Z",
+        "pages": 1,
+        "words": 13,
+        "characters": 177,
+        "codepage": 10000
+      }
+    },
+    "data_stream_form_payloads": [
+      {"field": "FixtureText010", "nil_picf_offset": 0, "nil_picf_length": 188, "ffdata_offset": 68, "ffdata_kind": "Text"},
+      {"field": "FixtureCheck010", "nil_picf_offset": 192, "nil_picf_length": 134, "ffdata_offset": 260, "ffdata_kind": "CheckBox"},
+      {"field": "FixtureDropdown010", "nil_picf_offset": 392, "nil_picf_length": 128, "ffdata_offset": 460, "ffdata_kind": "DropDown"}
+    ],
+    "typed_reader": {
+      "read_example": {
+        "command": "cargo run -q -p litchi-doc --example read_doc -- test-data/microsoft-office/word/word-legacy-form.doc",
+        "exit_code": 0,
+        "paragraph_count": 6,
+        "table_count": 0,
+        "total_characters": 190,
+        "fib_version": "Word 97",
+        "text_projection": "WORD_LEGACY_FORM_010\\rFixture ID: word-legacy-form-010\\rTEXT_FIELD_010: \\u0013 FORMTEXT \\u0001\\u0014FORM_VALUE_010\\u0015\\rCHECKBOX_FIELD_010: \\u0013 FORMCHECKBOX \\u0001\\u0014\\u0015\\rDROPDOWN_FIELD_010: \\u0013 FORMDROPDOWN \\u0001\\u0014\\u0015\\rEND_FORM_010\\r"
+      },
+      "document_properties": {
+        "version": "Word2013",
+        "bytes": 694,
+        "sha256": "4d53eea8fec10519884b10aa2cbabe5a8f60a8d7e15f14916398cd7031499abf",
+        "base_protection": {
+          "comments_or_read_only": false,
+          "form_fields": true,
+          "tracked_revisions": false,
+          "track_revisions": false,
+          "vba_project_locked": false
+        },
+        "protection_key": 0,
+        "versioned": "Word2013(Dop2013 { chart_tracking_reference_based: true })",
+        "extension_bytes": 610
+      },
+      "bookmarks": [
+        {"name": "FixtureText010", "start": 71, "end": 98, "is_native": false},
+        {"name": "FixtureCheck010", "start": 120, "end": 137, "is_native": false},
+        {"name": "FixtureDropdown010", "start": 159, "end": 176, "is_native": false}
+      ],
+      "legacy_form_fields": [
+        {
+          "kind": "Text",
+          "field_type": "FormText",
+          "start_cp": 70,
+          "separator_cp": 82,
+          "end_cp": 97,
+          "instruction": " FORMTEXT \\u0001",
+          "opaque_instructions": "\\u0001",
+          "cached_result": "FORM_VALUE_010",
+          "dirty": false,
+          "locked": false,
+          "end_flags": {"private_result": false, "has_separator": true},
+          "form_data": {
+            "kind": "Text",
+            "state": 0,
+            "text_kind": "Regular",
+            "own_help": true,
+            "own_status": true,
+            "protected": false,
+            "auto_size": false,
+            "recalculate": true,
+            "has_list_box": false,
+            "max_length": 24,
+            "size_half_points": 0,
+            "name": "FixtureText010",
+            "default_text": "FORM_VALUE_010",
+            "default_state": null,
+            "text_format": "",
+            "help_text": "HELP_TEXT_010",
+            "status_text": "",
+            "entry_macro": "",
+            "exit_macro": "",
+            "items": null
+          }
+        },
+        {
+          "kind": "CheckBox",
+          "field_type": "FormCheckbox",
+          "start_cp": 119,
+          "separator_cp": 135,
+          "end_cp": 136,
+          "instruction": " FORMCHECKBOX \\u0001",
+          "opaque_instructions": "\\u0001",
+          "cached_result": "",
+          "dirty": false,
+          "locked": false,
+          "end_flags": {"private_result": true, "has_separator": true},
+          "form_data": {
+            "kind": "CheckBox",
+            "state": 25,
+            "default_state": 1,
+            "checkbox_state": "undefined",
+            "auto_size": true,
+            "size_half_points": 28,
+            "protected": false,
+            "recalculate": false,
+            "name": "FixtureCheck010",
+            "help_text": "",
+            "status_text": "",
+            "entry_macro": "",
+            "exit_macro": ""
+          }
+        },
+        {
+          "kind": "DropDown",
+          "field_type": "FormDropdown",
+          "start_cp": 158,
+          "separator_cp": 174,
+          "end_cp": 175,
+          "instruction": " FORMDROPDOWN \\u0001",
+          "opaque_instructions": "\\u0001",
+          "cached_result": "",
+          "dirty": false,
+          "locked": false,
+          "end_flags": {"private_result": true, "has_separator": true},
+          "form_data": {
+            "kind": "DropDown",
+            "state": 25,
+            "default_state": 0,
+            "selected_item_index": null,
+            "has_list_box": true,
+            "items": ["OPTION_A_010", "OPTION_B_010"],
+            "protected": false,
+            "recalculate": false,
+            "name": "FixtureDropdown010",
+            "help_text": "",
+            "status_text": "",
+            "entry_macro": "",
+            "exit_macro": ""
+          }
+        }
+      ],
+      "reader_boundary": "The typed DOC reader exposes FFData and reports the checkbox and dropdown result states as undefined (25) while retaining default_state 1 and 0. This is stored state metadata; it is not a simulated click or selection."
+    },
+    "textutil": {
+      "exit_code": 0,
+      "bytes": 178,
+      "sha256": "ffcb0d0645f7c6dc3ebdba696333588a05067379b603ffcfd745a08e35019145",
+      "text": "WORD_LEGACY_FORM_010\\nFixture ID: word-legacy-form-010\\nTEXT_FIELD_010:  FORMTEXT FORM_VALUE_010\\nCHECKBOX_FIELD_010:  FORMCHECKBOX \\nDROPDOWN_FIELD_010:  FORMDROPDOWN \\nEND_FORM_010\\n"
+    }
+  },
+  "rtf": {
+    "file_description": "Rich Text Format data, version 1, ANSI, code page 1252, default middle east language ID 1025",
+    "raw_controls": {
+      "field_and_metadata_counts": {
+        "field": 3,
+        "fldinst": 3,
+        "fldrslt": 3,
+        "datafield": 3,
+        "formfield": 3,
+        "fldpriv": 2,
+        "bkmkstart": 3,
+        "bkmkend": 3,
+        "formprot": 1,
+        "formshade": 1,
+        "enforceprot1": 1,
+        "protlevel2": 1,
+        "password": 0,
+        "passwordhash": 0
+      },
+      "form_field_control_counts": {
+        "fftype0": 1,
+        "fftype1": 1,
+        "fftype2": 1,
+        "ffdeftext": 1,
+        "ffdefres0": 1,
+        "ffdefres1": 1,
+        "ffhelptext": 1,
+        "ffstattext": 0,
+        "ffownhelp": 1,
+        "ffownstat": 0,
+        "ffrecalc": 1,
+        "ffmaxlen24": 1,
+        "ffhps20": 2,
+        "ffhps28": 1,
+        "ffsize1": 1,
+        "ffhaslistbox": 1,
+        "ffres25": 2,
+        "ffl": 2
+      },
+      "marker_counts": {
+        "WORD_LEGACY_FORM_010": 1,
+        "Fixture ID: word-legacy-form-010": 1,
+        "TEXT_FIELD_010": 1,
+        "FORM_VALUE_010": 2,
+        "CHECKBOX_FIELD_010": 1,
+        "DROPDOWN_FIELD_010": 1,
+        "END_FORM_010": 1,
+        "FixtureText010": 3,
+        "FixtureCheck010": 3,
+        "FixtureDropdown010": 3,
+        "HELP_TEXT_010": 1,
+        "STATUS_TEXT_010": 0,
+        "OPTION_A_010": 1,
+        "OPTION_B_010": 1
+      },
+      "formfield_groups": [
+        "{\\*\\formfield{\\fftype0\\ffownhelp\\fftypetxt0\\ffrecalc\\ffmaxlen24\\ffhps20{\\*\\ffname FixtureText010}{\\*\\ffdeftext FORM_VALUE_010}\\r\\n{\\*\\ffhelptext HELP_TEXT_010}}}",
+        "{\\*\\formfield{\\fftype1\\ffres25\\ffsize1\\fftypetxt0\\ffhps28{\\*\\ffname FixtureCheck010}\\ffdefres1}}",
+        "{\\*\\formfield{\\fftype2\\ffres25\\fftypetxt0\\ffhaslistbox\\ffhps20{\\*\\ffname FixtureDropdown010}\\r\\n\\ffdefres0{\\*\\ffl OPTION_A_010}{\\*\\ffl OPTION_B_010}}}"
+      ],
+      "protection_header_snippets": {
+        "form_protection": "\\formprot\\formshade",
+        "enforcement": "\\enforceprot1\\protlevel2"
+      }
+    },
+    "typed_reader": {
+      "command": "cargo run -q -p litchi-rtf --example parse_rtf -- test-data/microsoft-office/word/word-legacy-form.rtf",
+      "exit_code": 1,
+      "error": "MalformedDocument(\"RTF data-store payload cannot be empty\")",
+      "field_count_available": false,
+      "protection_metadata_available": false,
+      "reader_boundary": "The native RTF contains the expected legacy field and protection controls, but the library semantic parser stops at the native data-store payload before exposing typed fields or protection. Raw control counts above are the authoritative RTF evidence for this fixture."
+    },
+    "textutil": {
+      "exit_code": 0,
+      "bytes": 140,
+      "sha256": "1f5d583314d9ea8f73ff62dcc11fb57705ee00770d105253e2da6aafcd6117b0",
+      "text": "WORD_LEGACY_FORM_010\\nFixture ID: word-legacy-form-010\\nTEXT_FIELD_010: FORM_VALUE_010\\nCHECKBOX_FIELD_010: \\nDROPDOWN_FIELD_010: \\nEND_FORM_010\\n",
+      "comment": "macOS textutil projects the cached text value and body labels but does not expose checkbox or dropdown selections."
+    }
+  },
+  "conversion_comparison": {
+    "docx_baseline_vs_protected": "word/document.xml is byte-identical; the protected variant adds only settings protection and Word metadata changes in this package comparison.",
+    "protected_docx_to_doc": "The DOC retains three typed legacy fields, all three bookmarks, complete FFData defaults and list entries, and forms-only DOP protection. Its text projection includes legacy field control markers.",
+    "protected_docx_to_rtf": "The RTF retains three raw field groups, bookmarks, FFData-style controls, and forms protection controls. The RTF semantic reader cannot open this native file because of its data-store payload.",
+    "status_help": "The native UI status-bar value STATUS_TEXT_010 is absent from DOCX w:statusText, DOC FFData status_text, and RTF ffstattext. HELP_TEXT_010 persists as the F1/help destination."
+  },
+  "known_limits": [
+    "No enforcement or edit-denial test was performed.",
+    "No password was entered, stored, or tested; raw DOCX and RTF password attributes/controls are absent and the DOC protection_key is zero.",
+    "No form field was filled, recalculated, clicked, or changed during inspection.",
+    "The DOCX typed form-field API is intentionally inert and does not expose associated w:ffData properties; raw XML evidence is recorded separately.",
+    "The RTF typed parser failed before semantic form/protection discovery, so RTF claims are raw-evidence-only."
+  ]
+}

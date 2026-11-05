@@ -1,0 +1,1203 @@
+{
+  "schema_version": 1,
+  "audit_id": "excel-binary-residual-coverage-audit",
+  "generated_on": "2026-10-15",
+  "purpose": "Read-only reconciliation of every pending XLS/XLSB coverage row against the finalized native Excel corpus and bounded Computer Use observations.",
+  "provenance": {
+    "source_inventory": "test-data/microsoft-office/coverage.json#/feature_inventory",
+    "selection": "All rows with format xls or xlsb and fixture_status=pending at audit time",
+    "pending_row_count": 65,
+    "xls_pending_count": 35,
+    "xlsb_pending_count": 30,
+    "office_ui_controller": "Root agent; this audit did not operate Office UI.",
+    "fixture_bytes_modified_by_audit": false,
+    "library_source_modified_by_audit": false,
+    "common_metadata_modified_by_audit": false
+  },
+  "classification_semantics": {
+    "operation_only": "The row describes a library CRUD/codec/transaction/refresh/publish/runtime behavior that a native saved file cannot certify. A native target may provide source bytes, but it does not close the operation claim.",
+    "observed_native_ui_limitation": "The tested native Excel UI exposed no usable route or a disabled control for the exact family. This is session-scoped route evidence and never a global feature-absence claim.",
+    "external_handoff": "The row requires an external password, certificate identity, provider/server, add-in, or custom authoring tool before a bounded native probe can be authoritative.",
+    "genuinely_missing_authorable_family": "No exact saved-state family is present in the finalized corpus and no stronger blocker classification is justified. A candidate native target is listed when a feasible route is known; absence is not inferred from unfamiliarity."
+  },
+  "closed_native_families": [
+    {
+      "family": "chart_families",
+      "row_ids": [
+        "xls-181",
+        "xls-182",
+        "xlsb-309",
+        "xlsb-310"
+      ],
+      "fixtures": [
+        {
+          "path": "test-data/microsoft-office/excel/excel-chart-families.xlsx",
+          "sha256": "eae01ec29bec519fcdb2f474068eab3e2845ea63a14bdbad7ad662d209218fbd",
+          "inspection_reference": "test-data/microsoft-office/excel/chart-families-inspection.json#/files/0"
+        },
+        {
+          "path": "test-data/microsoft-office/excel/excel-chart-families.xlsb",
+          "sha256": "d2f7a10375577f7014443eaf49a4215ff33d6bb48f15dc8bce77ca25c88b4da7",
+          "inspection_reference": "test-data/microsoft-office/excel/chart-families-inspection.json#/files/1"
+        },
+        {
+          "path": "test-data/microsoft-office/excel/excel-chart-families.xls",
+          "sha256": "94aed9811a45661ee033e79738b46f0b98d8c89a76b7f2f5913ea01cd6ff5097",
+          "inspection_reference": "test-data/microsoft-office/excel/chart-families-inspection.json#/files/2"
+        }
+      ],
+      "bounded_evidence": "The native specimen contains 17 embedded chart families, chart caches/axes/error-bars/trendlines, 18 worksheet/drawing resources, SVG plus raster fallback, BIFF12 chart resources, and 17 BIFF8 chart substreams. XLS retains the chart substreams and rasterizes the SVG. This closes the listed stored-family scope only; rendering, complete chart authoring, recalculation, and runtime remain boundaries."
+    },
+    {
+      "family": "connections_and_query_tables",
+      "row_ids": [
+        "xls-166",
+        "xlsb-322",
+        "xlsb-323"
+      ],
+      "fixtures": [
+        {
+          "path": "test-data/microsoft-office/excel/excel-connections.xlsx",
+          "sha256": "c956cdc60d4149327d7d3f0c5c1952fcbeec3ae978c668c9d1bc5a6a19e258b8",
+          "inspection_reference": "test-data/microsoft-office/inspection.json#/fixtures/84"
+        },
+        {
+          "path": "test-data/microsoft-office/excel/excel-connections.xlsb",
+          "sha256": "f24be09b3f7c7e0091a28c5b4b2f5457658cc3aba2ea67a4ec41b10c6d929e2d",
+          "inspection_reference": "test-data/microsoft-office/inspection.json#/fixtures/85"
+        },
+        {
+          "path": "test-data/microsoft-office/excel/excel-connections.xls",
+          "sha256": "5b273db0f35f6ba4f3de8bc63c40535bd14ac14ceb0677dc3ea0a6df3958cbb4",
+          "inspection_reference": "test-data/microsoft-office/inspection.json#/fixtures/86"
+        }
+      ],
+      "bounded_evidence": "The three native derivatives retain the legacy Text connection, Microsoft.Mashup.OleDb.1 query connection, query-table metadata, loaded rows, and DataMashup payload. XLSX Connections::parse and XLSB Workbook::connections pass; XLSB text wizard detail remains raw and XLS direct worksheet publication is suppressed. No connection CRUD, refresh, or external execution claim follows."
+    },
+    {
+      "family": "date1904_and_pagination",
+      "row_ids": [
+        "xlsb-280",
+        "xlsb-304"
+      ],
+      "fixtures": [
+        {
+          "path": "test-data/microsoft-office/excel/excel-date1904-breaks.xlsx",
+          "sha256": "6c8c3dcb769a54c5bd0847ef67a56cfc0fafca94f9e0718e01e2b3eb81a7d80b",
+          "inspection_reference": "test-data/microsoft-office/inspection.json#/fixtures/91"
+        },
+        {
+          "path": "test-data/microsoft-office/excel/excel-date1904-breaks.xlsb",
+          "sha256": "c527368af57d0d1cfa7bc81eb0e5e124c390ee6eee909f31928ffd6f7f209866",
+          "inspection_reference": "test-data/microsoft-office/inspection.json#/fixtures/92"
+        },
+        {
+          "path": "test-data/microsoft-office/excel/excel-date1904-breaks.xls",
+          "sha256": "9654784b8c93edff5e4ca85ab29997d8154987b807dbe6476fe14cd737b67421",
+          "inspection_reference": "test-data/microsoft-office/inspection.json#/fixtures/93"
+        }
+      ],
+      "bounded_evidence": "Native Excel reopened with workbook-local 1904 mode, cached date/formula serials, manual page-break families, print area, hidden state, and two custom views. XLSB exposes the 1904 flag and numeric values while page breaks/custom views remain raw; XLS workbook metadata exposes the date system/custom views but its worksheet catalog is empty. Native date rendering and print/custom-view application remain untested."
+    },
+    {
+      "family": "form_controls",
+      "row_ids": [
+        "xls-184",
+        "xlsb-313"
+      ],
+      "fixtures": [
+        {
+          "path": "test-data/microsoft-office/excel/excel-form-controls.xlsx",
+          "sha256": "5ecc8fe96f9bc071c4d2db4f4f483975645a2a3119a23e83b7731d3d1063a96b",
+          "inspection_reference": "test-data/microsoft-office/inspection.json#/fixtures/74"
+        },
+        {
+          "path": "test-data/microsoft-office/excel/excel-form-controls.xlsb",
+          "sha256": "432d1eb8d8e90b684b64a14087911b0d096476ebb1d8bd6490811a986811bbab",
+          "inspection_reference": "test-data/microsoft-office/inspection.json#/fixtures/75"
+        },
+        {
+          "path": "test-data/microsoft-office/excel/excel-form-controls.xls",
+          "sha256": "6a5e3f76f4b76fc5008ffeb048dbc757840b5215f04eef62f8723508ba55fbac",
+          "inspection_reference": "test-data/microsoft-office/inspection.json#/fixtures/76"
+        }
+      ],
+      "bounded_evidence": "The native files retain 11 lower-ribbon Form Controls with linked values and option-group state. XLSB exposes inert DrawingML/VML/package records without a typed control API; XLS raw BIFF8 has all 11 Obj records while the typed reader projects 8 and records DropDown/List/Button boundaries. ActiveX, VBA, macro assignment, and interaction runtime are not claimed."
+    },
+    {
+      "family": "formula_owners_and_caches",
+      "row_ids": [
+        "xls-141",
+        "xls-142",
+        "xlsb-282",
+        "xlsb-283"
+      ],
+      "fixtures": [
+        {
+          "path": "test-data/microsoft-office/excel/excel-formula-owners.xlsx",
+          "sha256": "1514e27b0f7334a786eea5adba316b032844c8d5de81d9b1807298a3b1ed8b87",
+          "inspection_reference": "test-data/microsoft-office/inspection.json#/fixtures/81"
+        },
+        {
+          "path": "test-data/microsoft-office/excel/excel-formula-owners.xlsb",
+          "sha256": "6626274eb76cf5bea84b061435188d613f90185d7d34583b60f377013af874ac",
+          "inspection_reference": "test-data/microsoft-office/inspection.json#/fixtures/82"
+        },
+        {
+          "path": "test-data/microsoft-office/excel/excel-formula-owners.xls",
+          "sha256": "12f87df75c876e833aaa4497bee9bfc26857cd353241f4e70b87fba97d104d4a",
+          "inspection_reference": "test-data/microsoft-office/inspection.json#/fixtures/83"
+        }
+      ],
+      "bounded_evidence": "Native files retain CSE/array, shared, one-variable/two-variable data-table, Scenario Manager, dynamic-array owners and cached values. Raw XLSB records parse but the unified reader stops at BrtName shortcut key 0x00; XLS retains caches/owners but renders native LET as =#VALUE! while cache 50 remains. No recalculation or scenario/data-table runtime claim follows."
+    }
+  ],
+  "native_ui_observations": [
+    {
+      "probe": "Excel Developer/Tools menus",
+      "row_ids": [
+        "xls-192",
+        "xlsb-286",
+        "xlsb-287",
+        "xlsb-324"
+      ],
+      "observation": "The bounded native UI probe exposed VB/macros/Form Controls but no XML Maps, Data Model, or Power Pivot control. This is a route-availability observation for the tested Excel session, not a global absence claim."
+    },
+    {
+      "probe": "Excel Tools menu revision controls",
+      "row_ids": [
+        "xls-175",
+        "xls-176",
+        "xlsb-308"
+      ],
+      "observation": "Tools exposes Track Changes > Highlight Changes… and Accept or Reject Changes…; Merge Workbooks is visible but disabled. A fresh small revision-history workbook remains a feasible next native probe, subject to whether Track Changes activation is accepted and persists in the selected XLS/XLSB save."
+    },
+    {
+      "probe": "Excel File/Tools signing controls",
+      "row_ids": [
+        "xls-150",
+        "xlsb-328"
+      ],
+      "observation": "No document-signing command was exposed in the bounded File/Tools probe. A signing fixture still requires a certificate/private-key identity and trust workflow outside this audit."
+    }
+  ],
+  "evidence_catalog": {
+    "xls_native_core_state": {
+      "kind": "bounded native raw/package evidence plus reader boundaries",
+      "fixtures": [
+        {
+          "path": "test-data/microsoft-office/excel/excel-interaction-print.xls",
+          "sha256": "b9a980ff14f8ef73d54c80d3151671d27cb1603aa624c25d75530d315c5e65ec",
+          "inspection_reference": "test-data/microsoft-office/inspection.json#/fixtures/19"
+        },
+        {
+          "path": "test-data/microsoft-office/excel/excel-date1904-breaks.xls",
+          "sha256": "9654784b8c93edff5e4ca85ab29997d8154987b807dbe6476fe14cd737b67421",
+          "inspection_reference": "test-data/microsoft-office/inspection.json#/fixtures/93"
+        },
+        {
+          "path": "test-data/microsoft-office/excel/excel-formula-owners.xls",
+          "sha256": "12f87df75c876e833aaa4497bee9bfc26857cd353241f4e70b87fba97d104d4a",
+          "inspection_reference": "test-data/microsoft-office/inspection.json#/fixtures/83"
+        },
+        {
+          "path": "test-data/microsoft-office/excel/excel-form-controls.xls",
+          "sha256": "6a5e3f76f4b76fc5008ffeb048dbc757840b5215f04eef62f8723508ba55fbac",
+          "inspection_reference": "test-data/microsoft-office/inspection.json#/fixtures/76"
+        },
+        {
+          "path": "test-data/microsoft-office/excel/excel-chart-families.xls",
+          "sha256": "94aed9811a45661ee033e79738b46f0b98d8c89a76b7f2f5913ea01cd6ff5097",
+          "inspection_reference": "test-data/microsoft-office/excel/chart-families-inspection.json#/files/2"
+        },
+        {
+          "path": "test-data/microsoft-office/excel/excel-connections.xls",
+          "sha256": "5b273db0f35f6ba4f3de8bc63c40535bd14ac14ceb0677dc3ea0a6df3958cbb4",
+          "inspection_reference": "test-data/microsoft-office/inspection.json#/fixtures/86"
+        }
+      ],
+      "evidence": "The finalized XLS corpus contains valid CFB containers and native Workbook streams with ordinary cells, formulas/caches, dates, names, styles, protection, validation, notes, controls, charts, connections and custom XML. Those saved bytes support format-specific observations, but do not by themselves certify the library read/write/transaction surface for the pending generic rows. XLS worksheet publication is suppressed for several derivatives, so public facade emptiness is not treated as native absence."
+    },
+    "xlsb_native_core_state": {
+      "kind": "bounded native raw/package evidence plus reader boundaries",
+      "fixtures": [
+        {
+          "path": "test-data/microsoft-office/excel/excel-interaction-print.xlsb",
+          "sha256": "11d9221b268f52749ad4a736937c55353080a183f7cd8345c64b02b797929fc8",
+          "inspection_reference": "test-data/microsoft-office/inspection.json#/fixtures/18"
+        },
+        {
+          "path": "test-data/microsoft-office/excel/excel-date1904-breaks.xlsb",
+          "sha256": "c527368af57d0d1cfa7bc81eb0e5e124c390ee6eee909f31928ffd6f7f209866",
+          "inspection_reference": "test-data/microsoft-office/inspection.json#/fixtures/92"
+        },
+        {
+          "path": "test-data/microsoft-office/excel/excel-formula-owners.xlsb",
+          "sha256": "6626274eb76cf5bea84b061435188d613f90185d7d34583b60f377013af874ac",
+          "inspection_reference": "test-data/microsoft-office/inspection.json#/fixtures/82"
+        },
+        {
+          "path": "test-data/microsoft-office/excel/excel-form-controls.xlsb",
+          "sha256": "432d1eb8d8e90b684b64a14087911b0d096476ebb1d8bd6490811a986811bbab",
+          "inspection_reference": "test-data/microsoft-office/inspection.json#/fixtures/75"
+        },
+        {
+          "path": "test-data/microsoft-office/excel/excel-chart-families.xlsb",
+          "sha256": "d2f7a10375577f7014443eaf49a4215ff33d6bb48f15dc8bce77ca25c88b4da7",
+          "inspection_reference": "test-data/microsoft-office/excel/chart-families-inspection.json#/files/1"
+        },
+        {
+          "path": "test-data/microsoft-office/excel/excel-connections.xlsb",
+          "sha256": "f24be09b3f7c7e0091a28c5b4b2f5457658cc3aba2ea67a4ec41b10c6d929e2d",
+          "inspection_reference": "test-data/microsoft-office/inspection.json#/fixtures/85"
+        }
+      ],
+      "evidence": "The finalized XLSB corpus contains workbook/worksheet/index/style/shared-string/drawing/chart/control/connection parts and native caches. Typed readers pass or stop at recorded native record families such as AC_BEGIN in BrtBeginDVals and the formula-owner BrtName shortcut; raw package evidence remains valid. Generic package/codec/CRUD rows require operation evidence beyond a native saved file."
+    },
+    "xls_future_records": {
+      "kind": "no intentional native authoring target",
+      "evidence": "Unknown/future BIFF records cannot be selected as a deterministic native Excel UI feature. Existing native files contain known record families and opaque/extension records, but no fixture can claim an intentionally authored future record."
+    },
+    "xls_password_handoff": {
+      "kind": "external handoff",
+      "evidence": "No finalized native password-to-open XLS fixture is present. Creating and verifying one requires a user-supplied password and a reopen/decryption handoff; workbook protection in interaction-print.xls is not package encryption."
+    },
+    "legacy_signing_handoff": {
+      "kind": "external handoff",
+      "evidence": "No finalized native signed XLS/XLSB fixture is present. The bounded File/Tools probe exposed no signing command, and certificate/private-key identity and trust are external prerequisites."
+    },
+    "xls_custom_xml": {
+      "kind": "bounded subtype only",
+      "evidence": "excel-connections.xls contains one MsoDataStore storage with a 11,106-byte DataMashup Item and 314-byte Properties stream; Workbook::custom_xml_data_store reports one DataMashup item. This is native custom-XML storage evidence for the Power Query subtype, not arbitrary XML-map/custom XML authoring."
+    },
+    "xls_macro_dialog": {
+      "kind": "missing native authoring target",
+      "evidence": "No finalized XLS fixture contains a deliberately authored macro sheet or dialog sheet. The matrix only promises metadata recognition; formula execution, dialog controls, and host automation are outside the saved-state fixture scope."
+    },
+    "xls_crud_operation": {
+      "kind": "operation-only",
+      "evidence": "Cell/worksheet CRUD is a library transaction surface. Native files show ordinary saved cells and sheet directories, but no Office reopen can certify litchi-xls insertion, removal, rename, or atomic publication behavior."
+    },
+    "xls_picture": {
+      "kind": "missing native authoring target",
+      "evidence": "The conditional-drawings and visual fixtures contain worksheet pictures/shapes, but no finalized XLS fixture isolates a BIFF8 background or header/footer picture record. A dedicated saved-state specimen is therefore still absent."
+    },
+    "xls_watch": {
+      "kind": "missing native authoring target",
+      "evidence": "No finalized XLS fixture records a native Watch Window entry or formula-error checking state. The matrix exposes inert CellWatch/error metadata and does not implement the watch-window/diagnostic runtime."
+    },
+    "xls_phonetic": {
+      "kind": "missing native authoring target",
+      "evidence": "No finalized XLS fixture isolates BIFF8 phonetic string/range metadata. Authoring requires an East Asian language/phonetic UI context; no such context was established by this audit."
+    },
+    "xls_consolidation": {
+      "kind": "operation-only candidate",
+      "evidence": "No finalized XLS fixture contains a dedicated consolidation directory/source set. Native Data > Consolidate could produce a saved state, but the library matrix explicitly treats consolidation as inert metadata and does not execute it."
+    },
+    "xls_web_publish": {
+      "kind": "operation-only",
+      "evidence": "No finalized XLS fixture certifies publishing. The matrix models publication destinations/ranges/page metadata but explicitly excludes publishing and network I/O; a Save As Web Page operation would be separate evidence."
+    },
+    "xls_rtd": {
+      "kind": "external handoff",
+      "evidence": "No finalized XLS fixture contains an RTD server/ProgID/topic setup. A native RTD result requires an external server/provider; the library retains topics and cached values inertly and does not refresh or execute them."
+    },
+    "revision_history": {
+      "kind": "operation-only with a feasible native route",
+      "evidence": "No finalized XLS/XLSB fixture contains a saved revision log/user-name collaboration state. The current native Tools menu exposes Track Changes > Highlight Changes… and Accept or Reject Changes…; Merge Workbooks is disabled. Menu presence is not saved-state evidence, so a fresh small workbook probe is still needed."
+    },
+    "xls_toolbar": {
+      "kind": "missing native authoring target",
+      "evidence": "No finalized XLS fixture contains an intentionally authored XCB Office Toolbars stream. The matrix supports inert typed toolbar metadata, but this audit did not establish a native Excel route for creating a deterministic legacy toolbar customization."
+    },
+    "dde_external": {
+      "kind": "external handoff",
+      "evidence": "No finalized XLS/XLSB fixture performs DDE/OLE conversation, COM activation, refresh, or external launch. The matrix retains link topics/program IDs/items as inert metadata; an external program/provider would be required for runtime evidence."
+    },
+    "mdx_external": {
+      "kind": "external handoff",
+      "evidence": "No finalized XLS/XLSB fixture uses a cube connection or MDX provider. The matrix exposes bounded MDX/cell/value metadata but explicitly does not execute cube connections or MDX expressions."
+    },
+    "xml_maps_ui": {
+      "kind": "observed native UI limitation",
+      "evidence": "The bounded Developer/Tools probe exposed no XML Maps command for the tested Excel session. Existing evidence must not be promoted to a global absence claim; an alternate Excel edition/add-in or an external XML mapping authoring route would be needed to test it."
+    },
+    "xlsb_volatile": {
+      "kind": "missing native authoring target",
+      "evidence": "No finalized XLSB fixture contains an optional Volatile Dependencies part. The matrix owns bounded part/record transactions, but no stable native Excel UI action was identified that deterministically authors this family."
+    },
+    "xlsb_crud_operation": {
+      "kind": "operation-only",
+      "evidence": "Worksheet cell CRUD and generic OPC part editing are library transactions. Native XLSB package saves and binary indexes prove source structure only; they do not certify litchi-xlsb edit/commit/patch behavior."
+    },
+    "threaded_comments": {
+      "kind": "missing native authoring target",
+      "evidence": "The finalized Excel corpus contains classic notes but no XLSB threaded-comment/persons parts or reply evidence. A native Review > New Comment/reply specimen is a concrete candidate; no such operation was performed in this audit."
+    },
+    "xlsb_watch_phonetic": {
+      "kind": "missing native authoring target",
+      "evidence": "No finalized XLSB fixture contains cell-watch or phonetic metadata. A Watch Window specimen is a feasible candidate; phonetic metadata additionally needs the appropriate language/IME context. Rendering and watch monitoring remain outside the matrix."
+    },
+    "data_model_ui": {
+      "kind": "observed native UI limitation",
+      "evidence": "The bounded Developer/Tools probe exposed no Data Model or Power Pivot control for the tested Excel session. This records route availability only; it does not establish that all Excel editions lack the feature."
+    },
+    "xlsb_ribbon_external": {
+      "kind": "external handoff",
+      "evidence": "No finalized XLSB package contains custom Ribbon UI. Native Excel menu probing did not establish a custom UI authoring route; a bounded Custom UI package/editor handoff would be required before native behavior can be assessed."
+    },
+    "xlsb_taskpane_external": {
+      "kind": "external handoff",
+      "evidence": "No finalized XLSB package contains a task-pane/web-extension binding. The matrix supports bounded graph metadata but excludes add-in activation/provider behavior; an add-in/web-provider handoff is required for runtime evidence."
+    }
+  },
+  "feasible_ui_targets": {
+    "xls_legacy_core_bundle": {
+      "row_ids": [
+        "xls-134",
+        "xls-135",
+        "xls-136",
+        "xls-138",
+        "xls-139",
+        "xls-140",
+        "xls-143",
+        "xls-144",
+        "xls-145",
+        "xls-146",
+        "xls-147",
+        "xls-148",
+        "xls-154",
+        "xls-156",
+        "xls-157",
+        "xls-158",
+        "xls-160",
+        "xls-161"
+      ],
+      "route": "Create one small ordinary workbook in native Excel, add values/formulas, merged cells, styles, names, hyperlink, validation, view/protection/property markers, then Save As Excel 97-2004 Workbook (.xls) and close/reopen.",
+      "limit": "This would add native saved-state evidence only. It cannot close library transaction/CRUD claims by itself; all CFB/BIFF records and typed reader results must remain separately bounded."
+    },
+    "xls_legacy_macro_dialog": {
+      "row_ids": [
+        "xls-153"
+      ],
+      "route": "If the tested Excel edition exposes Insert Macro Sheet or Insert Dialog Sheet, create one marker-bearing legacy sheet and save as .xls.",
+      "limit": "The route is a candidate and was not observed; macro formulas/dialog controls must remain inert and unexecuted."
+    },
+    "xls_background_header_picture": {
+      "row_ids": [
+        "xls-169"
+      ],
+      "route": "Use Page Layout > Background and Insert Header & Footer > Picture in a small workbook, save as .xls, close/reopen, and inspect BIFF8 background/header picture records.",
+      "limit": "Background and header/footer pictures are separate authoring paths; a worksheet drawing picture does not substitute for either one."
+    },
+    "xls_watch_window": {
+      "row_ids": [
+        "xls-170"
+      ],
+      "route": "Create a formula marker, use Formulas > Watch Window to add it and the native error-checking controls if available, then save/reopen the legacy derivative.",
+      "limit": "The native watch display/runtime is not a library claim; only persisted metadata should be recorded."
+    },
+    "xls_phonetic_language": {
+      "row_ids": [
+        "xls-171"
+      ],
+      "route": "With an East Asian editing language/IME available, author phonetic/ruby text and save as .xls; inspect the BIFF8 phonetic records.",
+      "limit": "No language/IME route was established in this audit, so this remains a candidate rather than an observed native limitation."
+    },
+    "xls_data_consolidate": {
+      "row_ids": [
+        "xls-172"
+      ],
+      "route": "Use Data > Consolidate over two local ranges, save as .xls, and inspect the saved consolidation directory/source metadata.",
+      "limit": "Do not treat the native result as evidence of library execution; the matrix keeps consolidation inert."
+    },
+    "xls_save_as_web": {
+      "row_ids": [
+        "xls-173"
+      ],
+      "route": "Use Save As Web Page with a local destination and record the publication settings/output as an operation-specific artifact.",
+      "limit": "Publishing/network behavior is outside this fixture-only audit and would need a separate operation receipt."
+    },
+    "revision_history_small": {
+      "row_ids": [
+        "xls-175",
+        "xls-176",
+        "xlsb-308"
+      ],
+      "route": "Create a small marker workbook; use Tools > Track Changes > Highlight Changes… to enable tracking, edit one marker, save as XLS and XLSB, close/reopen, and inspect revision-log/user-name records. Test Accept or Reject separately. Merge Workbooks is currently disabled.",
+      "limit": "The menu route is observed, but activation/persistence and the legacy shared-workbook prerequisites remain unverified."
+    },
+    "xls_toolbar_customization": {
+      "row_ids": [
+        "xls-178"
+      ],
+      "route": "If native Excel exposes a legacy Customize Toolbar route, add one deterministic toolbar marker and save as .xls for XCB inspection.",
+      "limit": "No such route was observed in the current bounded probe; do not infer global absence."
+    },
+    "xlsb_threaded_comments": {
+      "row_ids": [
+        "xlsb-298"
+      ],
+      "route": "Use Review > New Comment, add a reply/mention if the native session exposes threaded comments, save as XLSB, close/reopen, and inspect comments/persons relationships.",
+      "limit": "The existing classic-note fixture does not substitute for a threaded comment; no threaded operation was performed."
+    },
+    "xlsb_watch_phonetic": {
+      "row_ids": [
+        "xlsb-307"
+      ],
+      "route": "Use Formula > Watch Window for a marker formula and, with an East Asian language/IME available, author phonetic text; save as XLSB and inspect the BIFF12 metadata.",
+      "limit": "The two subfamilies need separate saved-state observations; no watch monitoring or phonetic rendering claim follows."
+    }
+  },
+  "pending_rows": [
+    {
+      "row_id": "xls-134",
+      "format": "xls",
+      "feature": "OLE Compound File container",
+      "library_status": "supported",
+      "matrix_status": "✅",
+      "fixture_status": "pending",
+      "classification": "operation_only",
+      "evidence_ref": "xls_native_core_state",
+      "next_target_ref": "xls_legacy_core_bundle"
+    },
+    {
+      "row_id": "xls-135",
+      "format": "xls",
+      "feature": "BIFF8 workbook and worksheet record streams",
+      "library_status": "supported",
+      "matrix_status": "✅",
+      "fixture_status": "pending",
+      "classification": "operation_only",
+      "evidence_ref": "xls_native_core_state",
+      "next_target_ref": "xls_legacy_core_bundle"
+    },
+    {
+      "row_id": "xls-136",
+      "format": "xls",
+      "feature": "Generic BIFF record access",
+      "library_status": "supported",
+      "matrix_status": "✅",
+      "fixture_status": "pending",
+      "classification": "operation_only",
+      "evidence_ref": "xls_native_core_state",
+      "next_target_ref": "xls_legacy_core_bundle"
+    },
+    {
+      "row_id": "xls-137",
+      "format": "xls",
+      "feature": "Unknown and future BIFF records",
+      "library_status": "partial",
+      "matrix_status": "🟡",
+      "fixture_status": "pending",
+      "classification": "genuinely_missing_authorable_family",
+      "evidence_ref": "xls_future_records",
+      "next_target_ref": null
+    },
+    {
+      "row_id": "xls-138",
+      "format": "xls",
+      "feature": "Workbook and sheet directory",
+      "library_status": "supported",
+      "matrix_status": "✅",
+      "fixture_status": "pending",
+      "classification": "operation_only",
+      "evidence_ref": "xls_native_core_state",
+      "next_target_ref": "xls_legacy_core_bundle"
+    },
+    {
+      "row_id": "xls-139",
+      "format": "xls",
+      "feature": "Cell values and cached results",
+      "library_status": "supported",
+      "matrix_status": "✅",
+      "fixture_status": "pending",
+      "classification": "operation_only",
+      "evidence_ref": "xls_native_core_state",
+      "next_target_ref": "xls_legacy_core_bundle"
+    },
+    {
+      "row_id": "xls-140",
+      "format": "xls",
+      "feature": "Shared strings and rich-string properties",
+      "library_status": "supported",
+      "matrix_status": "✅",
+      "fixture_status": "pending",
+      "classification": "operation_only",
+      "evidence_ref": "xls_native_core_state",
+      "next_target_ref": "xls_legacy_core_bundle"
+    },
+    {
+      "row_id": "xls-143",
+      "format": "xls",
+      "feature": "Defined names and built-in names",
+      "library_status": "supported",
+      "matrix_status": "✅",
+      "fixture_status": "pending",
+      "classification": "operation_only",
+      "evidence_ref": "xls_native_core_state",
+      "next_target_ref": "xls_legacy_core_bundle"
+    },
+    {
+      "row_id": "xls-144",
+      "format": "xls",
+      "feature": "Workbook calculation properties",
+      "library_status": "supported",
+      "matrix_status": "✅",
+      "fixture_status": "pending",
+      "classification": "operation_only",
+      "evidence_ref": "xls_native_core_state",
+      "next_target_ref": "xls_legacy_core_bundle"
+    },
+    {
+      "row_id": "xls-145",
+      "format": "xls",
+      "feature": "Workbook views and window state",
+      "library_status": "supported",
+      "matrix_status": "✅",
+      "fixture_status": "pending",
+      "classification": "operation_only",
+      "evidence_ref": "xls_native_core_state",
+      "next_target_ref": "xls_legacy_core_bundle"
+    },
+    {
+      "row_id": "xls-146",
+      "format": "xls",
+      "feature": "Core, summary, and custom properties",
+      "library_status": "supported",
+      "matrix_status": "✅",
+      "fixture_status": "pending",
+      "classification": "operation_only",
+      "evidence_ref": "xls_native_core_state",
+      "next_target_ref": "xls_legacy_core_bundle"
+    },
+    {
+      "row_id": "xls-147",
+      "format": "xls",
+      "feature": "Theme, fonts, palette, number formats, and XF styles",
+      "library_status": "supported",
+      "matrix_status": "✅",
+      "fixture_status": "pending",
+      "classification": "operation_only",
+      "evidence_ref": "xls_native_core_state",
+      "next_target_ref": "xls_legacy_core_bundle"
+    },
+    {
+      "row_id": "xls-148",
+      "format": "xls",
+      "feature": "Workbook protection",
+      "library_status": "supported",
+      "matrix_status": "✅",
+      "fixture_status": "pending",
+      "classification": "operation_only",
+      "evidence_ref": "xls_native_core_state",
+      "next_target_ref": "xls_legacy_core_bundle"
+    },
+    {
+      "row_id": "xls-149",
+      "format": "xls",
+      "feature": "BIFF password encryption",
+      "library_status": "supported",
+      "matrix_status": "✅",
+      "fixture_status": "pending",
+      "classification": "external_handoff",
+      "evidence_ref": "xls_password_handoff",
+      "next_target_ref": null
+    },
+    {
+      "row_id": "xls-150",
+      "format": "xls",
+      "feature": "Legacy digital signatures",
+      "library_status": "supported",
+      "matrix_status": "✅",
+      "fixture_status": "pending",
+      "classification": "external_handoff",
+      "evidence_ref": "legacy_signing_handoff",
+      "next_target_ref": null
+    },
+    {
+      "row_id": "xls-152",
+      "format": "xls",
+      "feature": "Custom XML data store",
+      "library_status": "partial",
+      "matrix_status": "🟡",
+      "fixture_status": "pending",
+      "classification": "genuinely_missing_authorable_family",
+      "evidence_ref": "xls_custom_xml",
+      "next_target_ref": null
+    },
+    {
+      "row_id": "xls-153",
+      "format": "xls",
+      "feature": "Legacy macrosheet and dialog-sheet behavior",
+      "library_status": "partial",
+      "matrix_status": "🟡",
+      "fixture_status": "pending",
+      "classification": "genuinely_missing_authorable_family",
+      "evidence_ref": "xls_macro_dialog",
+      "next_target_ref": "xls_legacy_macro_dialog"
+    },
+    {
+      "row_id": "xls-154",
+      "format": "xls",
+      "feature": "Cell and worksheet CRUD",
+      "library_status": "supported",
+      "matrix_status": "✅",
+      "fixture_status": "pending",
+      "classification": "operation_only",
+      "evidence_ref": "xls_crud_operation",
+      "next_target_ref": "xls_legacy_core_bundle"
+    },
+    {
+      "row_id": "xls-156",
+      "format": "xls",
+      "feature": "Cell formatting lookup",
+      "library_status": "supported",
+      "matrix_status": "✅",
+      "fixture_status": "pending",
+      "classification": "operation_only",
+      "evidence_ref": "xls_native_core_state",
+      "next_target_ref": "xls_legacy_core_bundle"
+    },
+    {
+      "row_id": "xls-157",
+      "format": "xls",
+      "feature": "Merged cells",
+      "library_status": "supported",
+      "matrix_status": "✅",
+      "fixture_status": "pending",
+      "classification": "operation_only",
+      "evidence_ref": "xls_native_core_state",
+      "next_target_ref": "xls_legacy_core_bundle"
+    },
+    {
+      "row_id": "xls-158",
+      "format": "xls",
+      "feature": "Hyperlinks",
+      "library_status": "supported",
+      "matrix_status": "✅",
+      "fixture_status": "pending",
+      "classification": "operation_only",
+      "evidence_ref": "xls_native_core_state",
+      "next_target_ref": "xls_legacy_core_bundle"
+    },
+    {
+      "row_id": "xls-160",
+      "format": "xls",
+      "feature": "Worksheet protection",
+      "library_status": "supported",
+      "matrix_status": "✅",
+      "fixture_status": "pending",
+      "classification": "operation_only",
+      "evidence_ref": "xls_native_core_state",
+      "next_target_ref": "xls_legacy_core_bundle"
+    },
+    {
+      "row_id": "xls-161",
+      "format": "xls",
+      "feature": "Data validation",
+      "library_status": "supported",
+      "matrix_status": "✅",
+      "fixture_status": "pending",
+      "classification": "operation_only",
+      "evidence_ref": "xls_native_core_state",
+      "next_target_ref": "xls_legacy_core_bundle"
+    },
+    {
+      "row_id": "xls-169",
+      "format": "xls",
+      "feature": "Background and header/footer pictures",
+      "library_status": "partial",
+      "matrix_status": "🟡",
+      "fixture_status": "pending",
+      "classification": "genuinely_missing_authorable_family",
+      "evidence_ref": "xls_picture",
+      "next_target_ref": "xls_background_header_picture"
+    },
+    {
+      "row_id": "xls-170",
+      "format": "xls",
+      "feature": "Cell watches and formula-error features",
+      "library_status": "partial",
+      "matrix_status": "🟡",
+      "fixture_status": "pending",
+      "classification": "genuinely_missing_authorable_family",
+      "evidence_ref": "xls_watch",
+      "next_target_ref": "xls_watch_window"
+    },
+    {
+      "row_id": "xls-171",
+      "format": "xls",
+      "feature": "Phonetic information",
+      "library_status": "partial",
+      "matrix_status": "🟡",
+      "fixture_status": "pending",
+      "classification": "genuinely_missing_authorable_family",
+      "evidence_ref": "xls_phonetic",
+      "next_target_ref": "xls_phonetic_language"
+    },
+    {
+      "row_id": "xls-172",
+      "format": "xls",
+      "feature": "Data consolidation",
+      "library_status": "partial",
+      "matrix_status": "🟡",
+      "fixture_status": "pending",
+      "classification": "operation_only",
+      "evidence_ref": "xls_consolidation",
+      "next_target_ref": "xls_data_consolidate"
+    },
+    {
+      "row_id": "xls-173",
+      "format": "xls",
+      "feature": "Web publishing",
+      "library_status": "partial",
+      "matrix_status": "🟡",
+      "fixture_status": "pending",
+      "classification": "operation_only",
+      "evidence_ref": "xls_web_publish",
+      "next_target_ref": "xls_save_as_web"
+    },
+    {
+      "row_id": "xls-174",
+      "format": "xls",
+      "feature": "Real-time data and RTD topics",
+      "library_status": "partial",
+      "matrix_status": "🟡",
+      "fixture_status": "pending",
+      "classification": "external_handoff",
+      "evidence_ref": "xls_rtd",
+      "next_target_ref": null
+    },
+    {
+      "row_id": "xls-175",
+      "format": "xls",
+      "feature": "Revision log and shared-workbook collaboration",
+      "library_status": "partial",
+      "matrix_status": "🟡",
+      "fixture_status": "pending",
+      "classification": "operation_only",
+      "evidence_ref": "revision_history",
+      "next_target_ref": "revision_history_small"
+    },
+    {
+      "row_id": "xls-176",
+      "format": "xls",
+      "feature": "User Names stream and shared-workbook user log",
+      "library_status": "partial",
+      "matrix_status": "🟡",
+      "fixture_status": "pending",
+      "classification": "operation_only",
+      "evidence_ref": "revision_history",
+      "next_target_ref": "revision_history_small"
+    },
+    {
+      "row_id": "xls-178",
+      "format": "xls",
+      "feature": "Office Toolbars stream (`XCB`)",
+      "library_status": "partial",
+      "matrix_status": "🟡",
+      "fixture_status": "pending",
+      "classification": "genuinely_missing_authorable_family",
+      "evidence_ref": "xls_toolbar",
+      "next_target_ref": "xls_toolbar_customization"
+    },
+    {
+      "row_id": "xls-187",
+      "format": "xls",
+      "feature": "DDE and OLE link behavior",
+      "library_status": "partial",
+      "matrix_status": "🟡",
+      "fixture_status": "pending",
+      "classification": "external_handoff",
+      "evidence_ref": "dde_external",
+      "next_target_ref": null
+    },
+    {
+      "row_id": "xls-188",
+      "format": "xls",
+      "feature": "MDX and cell/value metadata",
+      "library_status": "partial",
+      "matrix_status": "🟡",
+      "fixture_status": "pending",
+      "classification": "external_handoff",
+      "evidence_ref": "mdx_external",
+      "next_target_ref": null
+    },
+    {
+      "row_id": "xls-192",
+      "format": "xls",
+      "feature": "XML maps and mapped XML import/export",
+      "library_status": "partial",
+      "matrix_status": "🟡",
+      "fixture_status": "pending",
+      "classification": "observed_native_ui_limitation",
+      "evidence_ref": "xml_maps_ui",
+      "next_target_ref": null
+    },
+    {
+      "row_id": "xlsb-274",
+      "format": "xlsb",
+      "feature": "OPC package and BIFF12 part graph",
+      "library_status": "supported",
+      "matrix_status": "✅",
+      "fixture_status": "pending",
+      "classification": "operation_only",
+      "evidence_ref": "xlsb_native_core_state",
+      "next_target_ref": "xlsb_core_bundle"
+    },
+    {
+      "row_id": "xlsb-275",
+      "format": "xlsb",
+      "feature": "Workbook Theme part",
+      "library_status": "partial",
+      "matrix_status": "🟡",
+      "fixture_status": "pending",
+      "classification": "operation_only",
+      "evidence_ref": "xlsb_native_core_state",
+      "next_target_ref": "xlsb_core_bundle"
+    },
+    {
+      "row_id": "xlsb-276",
+      "format": "xlsb",
+      "feature": "BIFF12 raw record codec",
+      "library_status": "supported",
+      "matrix_status": "✅",
+      "fixture_status": "pending",
+      "classification": "operation_only",
+      "evidence_ref": "xlsb_native_core_state",
+      "next_target_ref": "xlsb_core_bundle"
+    },
+    {
+      "row_id": "xlsb-277",
+      "format": "xlsb",
+      "feature": "Worksheet binary index",
+      "library_status": "partial",
+      "matrix_status": "🟡",
+      "fixture_status": "pending",
+      "classification": "operation_only",
+      "evidence_ref": "xlsb_native_core_state",
+      "next_target_ref": "xlsb_core_bundle"
+    },
+    {
+      "row_id": "xlsb-278",
+      "format": "xlsb",
+      "feature": "Workbook and worksheet binary streams",
+      "library_status": "supported",
+      "matrix_status": "✅",
+      "fixture_status": "pending",
+      "classification": "operation_only",
+      "evidence_ref": "xlsb_native_core_state",
+      "next_target_ref": "xlsb_core_bundle"
+    },
+    {
+      "row_id": "xlsb-279",
+      "format": "xlsb",
+      "feature": "Workbook and sheet directory",
+      "library_status": "supported",
+      "matrix_status": "✅",
+      "fixture_status": "pending",
+      "classification": "operation_only",
+      "evidence_ref": "xlsb_native_core_state",
+      "next_target_ref": "xlsb_core_bundle"
+    },
+    {
+      "row_id": "xlsb-281",
+      "format": "xlsb",
+      "feature": "Shared strings",
+      "library_status": "supported",
+      "matrix_status": "✅",
+      "fixture_status": "pending",
+      "classification": "operation_only",
+      "evidence_ref": "xlsb_native_core_state",
+      "next_target_ref": "xlsb_core_bundle"
+    },
+    {
+      "row_id": "xlsb-284",
+      "format": "xlsb",
+      "feature": "Defined names and named ranges",
+      "library_status": "supported",
+      "matrix_status": "✅",
+      "fixture_status": "pending",
+      "classification": "operation_only",
+      "evidence_ref": "xlsb_native_core_state",
+      "next_target_ref": "xlsb_core_bundle"
+    },
+    {
+      "row_id": "xlsb-285",
+      "format": "xlsb",
+      "feature": "Calculation properties",
+      "library_status": "supported",
+      "matrix_status": "✅",
+      "fixture_status": "pending",
+      "classification": "operation_only",
+      "evidence_ref": "xlsb_native_core_state",
+      "next_target_ref": "xlsb_core_bundle"
+    },
+    {
+      "row_id": "xlsb-286",
+      "format": "xlsb",
+      "feature": "Spreadsheet Data Model records and model part",
+      "library_status": "partial",
+      "matrix_status": "🟡",
+      "fixture_status": "pending",
+      "classification": "observed_native_ui_limitation",
+      "evidence_ref": "data_model_ui",
+      "next_target_ref": null
+    },
+    {
+      "row_id": "xlsb-287",
+      "format": "xlsb",
+      "feature": "XLDM 140 table names and time groupings",
+      "library_status": "partial",
+      "matrix_status": "🟡",
+      "fixture_status": "pending",
+      "classification": "observed_native_ui_limitation",
+      "evidence_ref": "data_model_ui",
+      "next_target_ref": null
+    },
+    {
+      "row_id": "xlsb-288",
+      "format": "xlsb",
+      "feature": "Calculation Chain",
+      "library_status": "partial",
+      "matrix_status": "🟡",
+      "fixture_status": "pending",
+      "classification": "operation_only",
+      "evidence_ref": "xlsb_native_core_state",
+      "next_target_ref": "xlsb_core_bundle"
+    },
+    {
+      "row_id": "xlsb-289",
+      "format": "xlsb",
+      "feature": "Volatile Dependencies",
+      "library_status": "partial",
+      "matrix_status": "🟡",
+      "fixture_status": "pending",
+      "classification": "genuinely_missing_authorable_family",
+      "evidence_ref": "xlsb_volatile",
+      "next_target_ref": null
+    },
+    {
+      "row_id": "xlsb-290",
+      "format": "xlsb",
+      "feature": "Styles, fonts, fills, borders, alignment, and number formats",
+      "library_status": "supported",
+      "matrix_status": "✅",
+      "fixture_status": "pending",
+      "classification": "operation_only",
+      "evidence_ref": "xlsb_native_core_state",
+      "next_target_ref": "xlsb_core_bundle"
+    },
+    {
+      "row_id": "xlsb-292",
+      "format": "xlsb",
+      "feature": "Merged cells",
+      "library_status": "supported",
+      "matrix_status": "✅",
+      "fixture_status": "pending",
+      "classification": "operation_only",
+      "evidence_ref": "xlsb_native_core_state",
+      "next_target_ref": "xlsb_core_bundle"
+    },
+    {
+      "row_id": "xlsb-294",
+      "format": "xlsb",
+      "feature": "Core/package properties",
+      "library_status": "partial",
+      "matrix_status": "🟡",
+      "fixture_status": "pending",
+      "classification": "operation_only",
+      "evidence_ref": "xlsb_native_core_state",
+      "next_target_ref": "xlsb_core_bundle"
+    },
+    {
+      "row_id": "xlsb-295",
+      "format": "xlsb",
+      "feature": "Worksheet cell CRUD",
+      "library_status": "supported",
+      "matrix_status": "✅",
+      "fixture_status": "pending",
+      "classification": "operation_only",
+      "evidence_ref": "xlsb_crud_operation",
+      "next_target_ref": "xlsb_core_bundle"
+    },
+    {
+      "row_id": "xlsb-296",
+      "format": "xlsb",
+      "feature": "Hyperlinks",
+      "library_status": "supported",
+      "matrix_status": "✅",
+      "fixture_status": "pending",
+      "classification": "operation_only",
+      "evidence_ref": "xlsb_native_core_state",
+      "next_target_ref": "xlsb_core_bundle"
+    },
+    {
+      "row_id": "xlsb-298",
+      "format": "xlsb",
+      "feature": "Threaded comments and persons",
+      "library_status": "supported",
+      "matrix_status": "✅",
+      "fixture_status": "pending",
+      "classification": "genuinely_missing_authorable_family",
+      "evidence_ref": "threaded_comments",
+      "next_target_ref": "xlsb_threaded_comments"
+    },
+    {
+      "row_id": "xlsb-299",
+      "format": "xlsb",
+      "feature": "Data validation",
+      "library_status": "supported",
+      "matrix_status": "✅",
+      "fixture_status": "pending",
+      "classification": "operation_only",
+      "evidence_ref": "xlsb_native_core_state",
+      "next_target_ref": "xlsb_core_bundle"
+    },
+    {
+      "row_id": "xlsb-305",
+      "format": "xlsb",
+      "feature": "Sheet protection",
+      "library_status": "partial",
+      "matrix_status": "🟡",
+      "fixture_status": "pending",
+      "classification": "operation_only",
+      "evidence_ref": "xlsb_native_core_state",
+      "next_target_ref": "xlsb_core_bundle"
+    },
+    {
+      "row_id": "xlsb-307",
+      "format": "xlsb",
+      "feature": "Cell watches and phonetic metadata",
+      "library_status": "supported",
+      "matrix_status": "✅",
+      "fixture_status": "pending",
+      "classification": "genuinely_missing_authorable_family",
+      "evidence_ref": "xlsb_watch_phonetic",
+      "next_target_ref": "xlsb_watch_phonetic"
+    },
+    {
+      "row_id": "xlsb-308",
+      "format": "xlsb",
+      "feature": "Shared-workbook revision records",
+      "library_status": "partial",
+      "matrix_status": "🟡",
+      "fixture_status": "pending",
+      "classification": "operation_only",
+      "evidence_ref": "revision_history",
+      "next_target_ref": "revision_history_small"
+    },
+    {
+      "row_id": "xlsb-321",
+      "format": "xlsb",
+      "feature": "DDE and OLE links",
+      "library_status": "partial",
+      "matrix_status": "🟡",
+      "fixture_status": "pending",
+      "classification": "external_handoff",
+      "evidence_ref": "dde_external",
+      "next_target_ref": null
+    },
+    {
+      "row_id": "xlsb-324",
+      "format": "xlsb",
+      "feature": "Custom XML Maps catalogs and BIFF12 bindings",
+      "library_status": "partial",
+      "matrix_status": "🟡",
+      "fixture_status": "pending",
+      "classification": "observed_native_ui_limitation",
+      "evidence_ref": "xml_maps_ui",
+      "next_target_ref": null
+    },
+    {
+      "row_id": "xlsb-325",
+      "format": "xlsb",
+      "feature": "Ribbon and custom UI parts",
+      "library_status": "partial",
+      "matrix_status": "🟡",
+      "fixture_status": "pending",
+      "classification": "external_handoff",
+      "evidence_ref": "xlsb_ribbon_external",
+      "next_target_ref": null
+    },
+    {
+      "row_id": "xlsb-326",
+      "format": "xlsb",
+      "feature": "Task panes and web-extension bindings",
+      "library_status": "partial",
+      "matrix_status": "🟡",
+      "fixture_status": "pending",
+      "classification": "external_handoff",
+      "evidence_ref": "xlsb_taskpane_external",
+      "next_target_ref": null
+    },
+    {
+      "row_id": "xlsb-328",
+      "format": "xlsb",
+      "feature": "OPC digital signatures",
+      "library_status": "supported",
+      "matrix_status": "✅",
+      "fixture_status": "pending",
+      "classification": "external_handoff",
+      "evidence_ref": "legacy_signing_handoff",
+      "next_target_ref": null
+    },
+    {
+      "row_id": "xlsb-330",
+      "format": "xlsb",
+      "feature": "Generic package part editing",
+      "library_status": "supported",
+      "matrix_status": "✅",
+      "fixture_status": "pending",
+      "classification": "operation_only",
+      "evidence_ref": "xlsb_crud_operation",
+      "next_target_ref": "xlsb_core_bundle"
+    },
+    {
+      "row_id": "xlsb-333",
+      "format": "xlsb",
+      "feature": "MDX/cell/value metadata semantics",
+      "library_status": "partial",
+      "matrix_status": "🟡",
+      "fixture_status": "pending",
+      "classification": "external_handoff",
+      "evidence_ref": "mdx_external",
+      "next_target_ref": null
+    }
+  ],
+  "residual_counts": {
+    "by_classification": {
+      "operation_only": 41,
+      "observed_native_ui_limitation": 4,
+      "external_handoff": 10,
+      "genuinely_missing_authorable_family": 10
+    },
+    "by_format": {
+      "xls": {
+        "operation_only": 22,
+        "observed_native_ui_limitation": 1,
+        "external_handoff": 5,
+        "genuinely_missing_authorable_family": 7
+      },
+      "xlsb": {
+        "operation_only": 19,
+        "observed_native_ui_limitation": 3,
+        "external_handoff": 5,
+        "genuinely_missing_authorable_family": 3
+      }
+    }
+  },
+  "source_references": {
+    "xls_feature_matrix": "crates/litchi-xls/docs/FEATURE_MATRIX.md:29-48,54-61,69-78,92-93,99,103,105",
+    "xlsb_feature_matrix": "crates/litchi-xlsb/docs/FEATURE_MATRIX.md:32-35,37-48,50-52,58-71,78-81,92-103,110-116",
+    "native_corpus_inventory": "test-data/microsoft-office/coverage.json#/current_native_fixtures and #/native_fixture_evidence",
+    "chart_audit": "test-data/microsoft-office/excel/chart-families-inspection.json",
+    "connections_audit": "test-data/microsoft-office/excel/connections-inspection.json",
+    "date1904_audit": "test-data/microsoft-office/excel/date1904-breaks-inspection.json",
+    "form_controls_audit": "test-data/microsoft-office/excel/form-controls-inspection.json",
+    "formula_owners_audit": "test-data/microsoft-office/excel/formula-owners-inspection.json",
+    "interaction_print_audit": "test-data/microsoft-office/excel/interaction-print-inspection.json",
+    "prior_binary_boundary_audit": "test-data/microsoft-office/binary-reader-boundary-analysis.json"
+  }
+}

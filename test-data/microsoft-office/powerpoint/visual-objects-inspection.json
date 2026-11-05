@@ -1,0 +1,590 @@
+{
+  "schema_version": 1,
+  "fixture_id": "powerpoint-visual-objects-002",
+  "generated_on": "2026-10-15",
+  "purpose": "Read-only inspection of native PowerPoint visual-object fixtures covering an embedded picture, SmartArt BasicProcess, an embedded clustered column chart with an edited Excel data sheet, and grouped drawing shapes with an elbow connector.",
+  "provenance": {
+    "producer_app": "Microsoft Office PowerPoint",
+    "app_version": "16.110.2",
+    "app_build": "16.110.26062818",
+    "package_application": "Microsoft Macintosh PowerPoint",
+    "package_app_version": "16.0000",
+    "platform": "macOS",
+    "authoring_method": "Computer Use / native Microsoft PowerPoint UI",
+    "source": "Synthetic slide titles and markers entered in native PowerPoint; picture inserted from test-data/images/jpg/abstract1.jpg; SmartArt, chart, and grouped drawings authored or edited in native PowerPoint.",
+    "libreoffice_used": false,
+    "programmatic_office_generation_used": false,
+    "library_code_modified": false,
+    "all_documents_closed_before_hashing": true,
+    "lock_files_present_at_inspection": false
+  },
+  "scope_and_limits": {
+    "variants": [
+      "pptx",
+      "ppt"
+    ],
+    "native_reopen_verified": true,
+    "external_links_followed": false,
+    "macros_or_external_code_executed": false,
+    "legacy_chart_semantics_fully_decoded": false,
+    "connector_endpoint_binding_claimed": false,
+    "named_picture_style_claimed": false,
+    "style_limit": "The PPTX picture carries a rectangle geometry and a:DML outerShdw effect, but no named DropShadowRectangle token or p:style element; the named style is therefore not claimed.",
+    "legacy_limit": "The legacy derivative was saved after accepting PowerPoint potential-feature-loss warnings. Native reopen confirms the visible deck, but legacy editability/semantic parity for SmartArt and chart OLE data is not claimed."
+  },
+  "expected_native_content": {
+    "slide_count": 5,
+    "slide_titles": [
+      "Native PowerPoint visual objects",
+      "EMBEDDED_PICTURE_002",
+      "SMARTART_PROCESS_002",
+      "EMBEDDED_CHART_002",
+      "DRAWINGS_CONNECTOR_002"
+    ],
+    "markers": [
+      "Fixture ID: powerpoint-visual-objects-002",
+      "PICTURE_ALT_002",
+      "Acquire",
+      "Transform",
+      "Verify",
+      "REGIONAL_TOTALS_002",
+      "SOURCE_002",
+      "TARGET_002"
+    ],
+    "picture": {
+      "slide": 2,
+      "marker": "EMBEDDED_PICTURE_002",
+      "source": "test-data/images/jpg/abstract1.jpg",
+      "alt_text": "PICTURE_ALT_002: existing abstract JPEG embedded through Microsoft PowerPoint."
+    },
+    "smartart": {
+      "slide": 3,
+      "layout": "BasicProcess",
+      "layout_unique_id": "urn:microsoft.com/office/officeart/2005/8/layout/process1",
+      "nodes": [
+        "Acquire",
+        "Transform",
+        "Verify"
+      ],
+      "connectors": 2
+    },
+    "chart": {
+      "slide": 4,
+      "title": "REGIONAL_TOTALS_002",
+      "type": "clustered column",
+      "bar_dir": "col",
+      "series": [
+        "North",
+        "South",
+        "West"
+      ],
+      "categories": [
+        "Q1",
+        "Q2",
+        "Q3",
+        "Q4"
+      ],
+      "values": {
+        "North": [
+          10,
+          20,
+          30,
+          40
+        ],
+        "South": [
+          15,
+          18,
+          21,
+          24
+        ],
+        "West": [
+          8,
+          12,
+          16,
+          20
+        ]
+      },
+      "embedded_sheet_range": "A1:D5",
+      "embedded_sheet_rows": [
+        [
+          "Quarter",
+          "North",
+          "South",
+          "West"
+        ],
+        [
+          "Q1",
+          10,
+          15,
+          8
+        ],
+        [
+          "Q2",
+          20,
+          18,
+          12
+        ],
+        [
+          "Q3",
+          30,
+          21,
+          16
+        ],
+        [
+          "Q4",
+          40,
+          24,
+          20
+        ]
+      ]
+    },
+    "grouped_drawings": {
+      "slide": 5,
+      "group_name": "Group 6",
+      "members": [
+        "SOURCE_002",
+        "TARGET_002",
+        "Elbow Connector 5"
+      ],
+      "source": {
+        "shape": "roundRect",
+        "label": "SOURCE_002",
+        "x_emu": 1371600,
+        "y_emu": 2743200,
+        "cx_emu": 2743200,
+        "cy_emu": 914400
+      },
+      "target": {
+        "shape": "ellipse",
+        "label": "TARGET_002",
+        "x_emu": 7772400,
+        "y_emu": 4114800,
+        "cx_emu": 2743200,
+        "cy_emu": 914400
+      },
+      "connector": {
+        "shape": "bentConnector3",
+        "tail_end": "triangle",
+        "x_emu": 4114800,
+        "y_emu": 3200400,
+        "cx_emu": 3657600,
+        "cy_emu": 1371600,
+        "start_connection_element_present": false,
+        "end_connection_element_present": false
+      }
+    }
+  },
+  "files": [
+    {
+      "path": "test-data/microsoft-office/powerpoint/powerpoint-visual-objects.pptx",
+      "format": "pptx",
+      "bytes": 146815,
+      "sha256": "ece3be475a78f0599166a54d9b923a7fc05b3e34f59aa502594f197ceced6d3e",
+      "file_description": "Microsoft PowerPoint 2007+",
+      "container": {
+        "kind": "OPC ZIP",
+        "zip_test": "pass",
+        "member_count": 56,
+        "members": [
+          "[Content_Types].xml",
+          "_rels/.rels",
+          "docProps/app.xml",
+          "docProps/core.xml",
+          "docProps/thumbnail.jpeg",
+          "ppt/_rels/presentation.xml.rels",
+          "ppt/charts/_rels/chart1.xml.rels",
+          "ppt/charts/chart1.xml",
+          "ppt/charts/colors1.xml",
+          "ppt/charts/style1.xml",
+          "ppt/diagrams/colors1.xml",
+          "ppt/diagrams/data1.xml",
+          "ppt/diagrams/drawing1.xml",
+          "ppt/diagrams/layout1.xml",
+          "ppt/diagrams/quickStyle1.xml",
+          "ppt/embeddings/Microsoft_Excel_Worksheet.xlsx",
+          "ppt/media/image1.jpg",
+          "ppt/presProps.xml",
+          "ppt/presentation.xml",
+          "ppt/slideLayouts/_rels/slideLayout1.xml.rels",
+          "ppt/slideLayouts/_rels/slideLayout10.xml.rels",
+          "ppt/slideLayouts/_rels/slideLayout11.xml.rels",
+          "ppt/slideLayouts/_rels/slideLayout2.xml.rels",
+          "ppt/slideLayouts/_rels/slideLayout3.xml.rels",
+          "ppt/slideLayouts/_rels/slideLayout4.xml.rels",
+          "ppt/slideLayouts/_rels/slideLayout5.xml.rels",
+          "ppt/slideLayouts/_rels/slideLayout6.xml.rels",
+          "ppt/slideLayouts/_rels/slideLayout7.xml.rels",
+          "ppt/slideLayouts/_rels/slideLayout8.xml.rels",
+          "ppt/slideLayouts/_rels/slideLayout9.xml.rels",
+          "ppt/slideLayouts/slideLayout1.xml",
+          "ppt/slideLayouts/slideLayout10.xml",
+          "ppt/slideLayouts/slideLayout11.xml",
+          "ppt/slideLayouts/slideLayout2.xml",
+          "ppt/slideLayouts/slideLayout3.xml",
+          "ppt/slideLayouts/slideLayout4.xml",
+          "ppt/slideLayouts/slideLayout5.xml",
+          "ppt/slideLayouts/slideLayout6.xml",
+          "ppt/slideLayouts/slideLayout7.xml",
+          "ppt/slideLayouts/slideLayout8.xml",
+          "ppt/slideLayouts/slideLayout9.xml",
+          "ppt/slideMasters/_rels/slideMaster1.xml.rels",
+          "ppt/slideMasters/slideMaster1.xml",
+          "ppt/slides/_rels/slide1.xml.rels",
+          "ppt/slides/_rels/slide2.xml.rels",
+          "ppt/slides/_rels/slide3.xml.rels",
+          "ppt/slides/_rels/slide4.xml.rels",
+          "ppt/slides/_rels/slide5.xml.rels",
+          "ppt/slides/slide1.xml",
+          "ppt/slides/slide2.xml",
+          "ppt/slides/slide3.xml",
+          "ppt/slides/slide4.xml",
+          "ppt/slides/slide5.xml",
+          "ppt/tableStyles.xml",
+          "ppt/theme/theme1.xml",
+          "ppt/viewProps.xml"
+        ],
+        "xml_or_rels_parse": "pass",
+        "xml_or_rels_part_count": 53,
+        "relationship_count": 52,
+        "relationship_target_check": "pass",
+        "unresolved_internal_targets": [],
+        "external_targets": [],
+        "key_part_hashes": {
+          "ppt/media/image1.jpg": {
+            "bytes": 83204,
+            "sha256": "b6f8d168d41e0fc296eb1e0e3855d9669584b7528c2ef4966817443d9bc9b929"
+          },
+          "ppt/embeddings/Microsoft_Excel_Worksheet.xlsx": {
+            "bytes": 10002,
+            "sha256": "af2f15cd6d57f6e182e9d245a70cdddc5402fc8f0494f29b1b0707772abd99ff"
+          },
+          "ppt/charts/chart1.xml": {
+            "bytes": 8994,
+            "sha256": "a83b56bb84fdcff902557dd1abaef388d4973a14c2b7de8b2f299bb5192470e4"
+          },
+          "ppt/diagrams/data1.xml": {
+            "bytes": 9831,
+            "sha256": "90bb45eb7d2734c5de9ca4eea5ada20070192cecf69cbfa65ec7114e5f8ecda3"
+          }
+        }
+      },
+      "application_properties": {
+        "Application": "Microsoft Macintosh PowerPoint",
+        "PresentationFormat": "Widescreen",
+        "Slides": "5",
+        "Notes": "0",
+        "AppVersion": "16.0000",
+        "DocSecurity": null
+      },
+      "native_parts": {
+        "presentation": {
+          "slide_count": 5,
+          "slide_size_emu": {
+            "cx": 12192000,
+            "cy": 6858000
+          },
+          "slide_titles": [
+            "Native PowerPoint visual objects",
+            "EMBEDDED_PICTURE_002",
+            "SMARTART_PROCESS_002",
+            "EMBEDDED_CHART_002",
+            "DRAWINGS_CONNECTOR_002"
+          ]
+        },
+        "slide1": {
+          "text": [
+            "Native PowerPoint visual objects",
+            "Fixture ID: powerpoint-visual-objects-002",
+            "Pictures, drawings, charts and SmartArt"
+          ]
+        },
+        "slide2": {
+          "text": [
+            "EMBEDDED_PICTURE_002"
+          ],
+          "picture_relationship": "rId2 -> ../media/image1.jpg",
+          "alt_text": "PICTURE_ALT_002: existing abstract JPEG embedded through Microsoft PowerPoint.",
+          "geometry": "rect",
+          "outer_shadow": {
+            "present": true,
+            "blurRad": 292100,
+            "dist": 139700,
+            "dir": 2700000,
+            "color": "333333",
+            "alpha": 65000
+          },
+          "named_style_element_present": false
+        },
+        "slide3": {
+          "text": [
+            "SMARTART_PROCESS_002"
+          ],
+          "diagram_relationships": {
+            "data": "../diagrams/data1.xml",
+            "layout": "../diagrams/layout1.xml",
+            "drawing": "../diagrams/drawing1.xml",
+            "colors": "../diagrams/colors1.xml",
+            "quick_style": "../diagrams/quickStyle1.xml"
+          },
+          "layout_unique_id": "urn:microsoft.com/office/officeart/2005/8/layout/process1",
+          "layout_category": "process",
+          "diagram_nodes": [
+            "Acquire",
+            "Transform",
+            "Verify"
+          ],
+          "diagram_connectors": 2
+        },
+        "slide4": {
+          "text": [
+            "EMBEDDED_CHART_002"
+          ],
+          "chart_relationship": "rId2 -> ../charts/chart1.xml",
+          "chart_title": "REGIONAL_TOTALS_002",
+          "chart_type": "clustered column",
+          "series": [
+            "North",
+            "South",
+            "West"
+          ],
+          "categories": [
+            "Q1",
+            "Q2",
+            "Q3",
+            "Q4"
+          ],
+          "cached_values": {
+            "North": [
+              10,
+              20,
+              30,
+              40
+            ],
+            "South": [
+              15,
+              18,
+              21,
+              24
+            ],
+            "West": [
+              8,
+              12,
+              16,
+              20
+            ]
+          },
+          "embedded_workbook": "ppt/embeddings/Microsoft_Excel_Worksheet.xlsx",
+          "embedded_sheet_range": "A1:D5",
+          "embedded_sheet_values": [
+            [
+              "Quarter",
+              "North",
+              "South",
+              "West"
+            ],
+            [
+              "Q1",
+              10,
+              15,
+              8
+            ],
+            [
+              "Q2",
+              20,
+              18,
+              12
+            ],
+            [
+              "Q3",
+              30,
+              21,
+              16
+            ],
+            [
+              "Q4",
+              40,
+              24,
+              20
+            ]
+          ]
+        },
+        "slide5": {
+          "text": [
+            "DRAWINGS_CONNECTOR_002",
+            "SOURCE_002",
+            "TARGET_002"
+          ],
+          "group": {
+            "id": "7",
+            "name": "Group 6",
+            "member_shape_names": [
+              "Rounded Rectangle 3",
+              "Oval 4",
+              "Elbow Connector 5"
+            ],
+            "member_labels": [
+              "SOURCE_002",
+              "TARGET_002"
+            ],
+            "connector_geometry": "bentConnector3",
+            "connector_tail_end": "triangle",
+            "stCxn_present": false,
+            "endCxn_present": false,
+            "endpoint_binding_claimed": false
+          },
+          "source_geometry": "roundRect",
+          "target_geometry": "ellipse"
+        }
+      },
+      "library_read": {
+        "reader": "litchi-pptx::Package::open -> presentation",
+        "package_open": "pass",
+        "tolerance_report": {
+          "defects": [],
+          "unrecorded": 0
+        },
+        "slide_count": 5,
+        "slide_size_emu": [
+          12192000,
+          6858000
+        ],
+        "slide_text": [
+          "Native PowerPoint visual objects\nFixture ID: powerpoint-visual-objects-002\nPictures, drawings, charts and SmartArt",
+          "EMBEDDED_PICTURE_002",
+          "SMARTART_PROCESS_002",
+          "EMBEDDED_CHART_002",
+          "DRAWINGS_CONNECTOR_002\nSOURCE_002\nTARGET_002"
+        ],
+        "semantic_shape_counts": [
+          2,
+          2,
+          2,
+          2,
+          5
+        ],
+        "animation_sequences_empty": true,
+        "note": "The typed text/shape probe opens all slides; package-level XML inspection supplies picture, diagram, chart and connector details."
+      },
+      "native_ui_validation": {
+        "observed_by": "Root agent via Computer Use",
+        "application": "Microsoft PowerPoint",
+        "reopen": "pass",
+        "repair_prompt": false,
+        "observations": [
+          "Closed and reopened without repair prompt; five slides remained present.",
+          "Slide 2 retained embedded picture and alt text PICTURE_ALT_002.",
+          "Slide 3 retained BasicProcess SmartArt with Acquire, Transform and Verify.",
+          "Slide 4 retained REGIONAL_TOTALS_002 and the North/South/West Q1-Q4 data values.",
+          "Slide 5 retained the grouped SOURCE_002/TARGET_002 shapes and elbow connector."
+        ],
+        "semantic_scope": "Visible native PowerPoint reopen and package-backed object observations; connector attachment is not claimed without stCxn/endCxn."
+      }
+    },
+    {
+      "path": "test-data/microsoft-office/powerpoint/powerpoint-visual-objects.ppt",
+      "format": "ppt",
+      "bytes": 352768,
+      "sha256": "b7f8150a0b717cd386e588b5af5bd6e0de1dd726c483383d1538479c051af48d",
+      "file_description": "Composite Document File V2 Document, Little Endian, Os: MacOS, Version 5.26, Code page: 10000, Author: Ryker Zhu, Last Saved By: Ryker Zhu, Revision Number: 1, Name of Creating Application: Microsoft Macintosh PowerPoint, Number of Words: 49",
+      "container": {
+        "kind": "Compound File Binary (CFB/OLE)",
+        "cfb_reader": "litchi-cfb::OleFile::open pass",
+        "file_size": 352768,
+        "sector_size": 512,
+        "directory_entry_count": 8,
+        "tolerance_report": {
+          "defects": [],
+          "unrecorded": 0
+        },
+        "stream_inventory": {
+          "Pictures": 181910,
+          "Current User": 4096,
+          "\\u0005SummaryInformation": 6184,
+          "PowerPoint Document": 150646,
+          "\\u0005DocumentSummaryInformation": 4096
+        },
+        "powerpoint_document_record_evidence": {
+          "record": "ExternalOleObjectStg",
+          "record_type_raw": "0x1011",
+          "offset_hex": "0x00022656",
+          "payload_bytes": 9672
+        },
+        "top_level_embedded_workbook_stream_present": false
+      },
+      "native_parts": {
+        "slide_count": 5,
+        "slide_titles": [
+          "Native PowerPoint visual objects",
+          "EMBEDDED_PICTURE_002",
+          "SMARTART_PROCESS_002",
+          "EMBEDDED_CHART_002",
+          "DRAWINGS_CONNECTOR_002"
+        ],
+        "legacy_binary_scope": "PowerPoint Document and Pictures streams are retained; the typed legacy reader does not expose complete SmartArt or chart OLE semantics.",
+        "chart_observation": "The legacy save warning was accepted. Native current PowerPoint displayed REGIONAL_TOTALS_002 with Q1-Q4 and North/South/West values through the legacy object/image preview; this is visible UI evidence and is not asserted as a decoded legacy chart model."
+      },
+      "library_read": {
+        "readers": [
+          "litchi-cfb::OleFile::open",
+          "litchi-ppt::Package::open -> presentation"
+        ],
+        "cfb_open": "pass",
+        "cfb_tolerance_defects": 0,
+        "stream_inventory": "pass",
+        "presentation_open": "pass",
+        "slide_count": 5,
+        "has_pictures": true,
+        "total_text_characters": 224,
+        "slide_text": [
+          "Native PowerPoint visual objects\nFixture ID: powerpoint-visual-objects-002\nPictures, drawings, charts and SmartArt",
+          "EMBEDDED_PICTURE_002",
+          "SMARTART_PROCESS_002",
+          "EMBEDDED_CHART_002",
+          "DRAWINGS_CONNECTOR_002\nSOURCE_002\nTARGET_002"
+        ],
+        "semantic_shape_counts": [
+          2,
+          2,
+          2,
+          2,
+          0
+        ],
+        "known_reader_limit": "The legacy per-slide shape probe reports zero shapes for slide 5 even though native PowerPoint visibly retained the grouped drawings; no library shape parity claim is made."
+      },
+      "native_ui_validation": {
+        "observed_by": "Root agent via Computer Use",
+        "application": "Microsoft PowerPoint",
+        "reopen": "pass",
+        "repair_prompt": false,
+        "legacy_save_warning": {
+          "shown": true,
+          "accepted": true,
+          "messages": [
+            "Chart data rows/columns may exceed legacy XLS limits (65536 rows/256 columns).",
+            "SmartArt will not be editable in pre-2007 PowerPoint."
+          ],
+          "semantic_parity_claimed": false
+        },
+        "observations": [
+          "Closed and reopened without repair prompt; five slide titles remained present.",
+          "Native current PowerPoint retained the SmartArt visual and grouped shapes/image alt text.",
+          "Slide 4 displayed REGIONAL_TOTALS_002 with Q1-Q4 and North/South/West values; AX exposed it as Object -> image Content Placeholder 3, so legacy chart semantics are not claimed."
+        ],
+        "semantic_scope": "Visible native legacy reopen only; warning acceptance and display do not certify editable BIFF/OLE chart or SmartArt semantics."
+      }
+    }
+  ],
+  "validation_methods": [
+    "SHA-256 computed from both closed final fixture byte streams.",
+    "ZIP central-directory and CRC check via Python ZipFile.testzip for PPTX.",
+    "XML well-formedness via Python ElementTree for every PPTX XML and .rels part; all 53 parsed parts succeeded.",
+    "OPC relationship targets resolved against package members; no external targets were fetched.",
+    "Embedded image bytes compared with test-data/images/jpg/abstract1.jpg; bytes and SHA-256 matched.",
+    "Embedded chart workbook ZIP parsed read-only; Sheet1 A1:D5 values and chart cache series compared with the expected matrix.",
+    "SmartArt data, layout and drawing parts parsed read-only; process1 layout and Acquire/Transform/Verify nodes confirmed.",
+    "CFB/OLE opened with litchi-cfb; tolerance report clean and stream inventory recorded for legacy PPT.",
+    "Existing litchi-pptx and litchi-ppt readers invoked read-only; slide text, counts and reader boundaries recorded.",
+    "Root Computer Use observations record native PowerPoint close/reopen without repair prompt; legacy save warning acceptance and visible chart object scope are recorded explicitly."
+  ],
+  "native_ui_observation_source": "Root agent Computer Use session; this read-only inspection process did not operate Office UI."
+}

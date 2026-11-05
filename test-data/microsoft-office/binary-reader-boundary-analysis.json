@@ -1,0 +1,344 @@
+{
+  "schema_version": 1,
+  "generated_on": "2026-10-15",
+  "purpose": "Read-only evidence for native Microsoft Office binary-reader boundaries. This file records the bytes and direct probe observations without changing library code or claiming that an error-masked value is a successful empty result.",
+  "scope": {
+    "authoring_source": "Native Microsoft Office fixtures produced through Computer Use and reopened in the native applications.",
+    "libreoffice_used": false,
+    "library_code_modified": false,
+    "fixture_bytes_modified": false,
+    "reader_invocation_mode": "Existing litchi readers and structure-dump examples were run read-only against closed fixture bytes.",
+    "empty_result_interpretation": "A zero or empty catalog is marked as a successful empty result only when the reader returned successfully. Values produced by unwrap_or fallbacks or after swallowed worksheet errors remain observations of error suppression."
+  },
+  "boundaries": [
+    {
+      "fixture_id": "excel-interaction-print-xlsb",
+      "path": "test-data/microsoft-office/excel/excel-interaction-print.xlsb",
+      "format": "xlsb",
+      "file": {
+        "bytes": 11418,
+        "sha256": "11d9221b268f52749ad4a736937c55353080a183f7cd8345c64b02b797929fc8"
+      },
+      "native_stream_evidence": {
+        "container": "OPC ZIP",
+        "package_member": "xl/worksheets/sheet1.bin",
+        "package_member_bytes": 3283,
+        "record_dump_command": "target/debug/examples/dump_xlsb_structure test-data/microsoft-office/excel/excel-interaction-print.xlsb",
+        "record_sequence": [
+          {
+            "offset_hex": "0x00000622",
+            "kind_hex": "0x023D",
+            "known_name": "BrtBeginDVals",
+            "payload_bytes": 18
+          },
+          {
+            "offset_hex": "0x00000637",
+            "kind_hex": "0x0025",
+            "known_name": "AC_BEGIN",
+            "payload_bytes": 6
+          },
+          {
+            "offset_hex": "0x0000063F",
+            "kind_hex": "0x0C00",
+            "known_name": null,
+            "payload_bytes": 16
+          },
+          {
+            "offset_hex": "0x00000652",
+            "kind_hex": "0x0026",
+            "known_name": "AC_END",
+            "payload_bytes": 0
+          },
+          {
+            "offset_hex": "0x00000654",
+            "kind_hex": "0x0040",
+            "known_name": "D_VAL",
+            "payload_bytes": 204
+          },
+          {
+            "offset_hex": "0x00000723",
+            "kind_hex": "0x0025",
+            "known_name": "AC_BEGIN",
+            "payload_bytes": 6
+          },
+          {
+            "offset_hex": "0x0000072B",
+            "kind_hex": "0x0C00",
+            "known_name": null,
+            "payload_bytes": 16
+          },
+          {
+            "offset_hex": "0x0000073E",
+            "kind_hex": "0x0026",
+            "known_name": "AC_END",
+            "payload_bytes": 0
+          },
+          {
+            "offset_hex": "0x00000740",
+            "kind_hex": "0x0040",
+            "known_name": "D_VAL",
+            "payload_bytes": 91
+          },
+          {
+            "offset_hex": "0x00000985",
+            "kind_hex": "0x023E",
+            "known_name": "BrtEndDVals",
+            "payload_bytes": 0
+          }
+        ],
+        "repeated_ac_wrappers": true,
+        "native_binary_interpretation": "Native Excel placed AC_BEGIN/AC_END wrappers and a 0x0C00 record inside the BrtBeginDVals collection before BrtDVal records. The worksheet stream is structurally present; no native-corruption conclusion is made."
+      },
+      "library_observation": {
+        "reader": "litchi-xlsb::Workbook::new",
+        "workbook_open": "pass",
+        "worksheet_catalog": {
+          "count": 1,
+          "names": [
+            "Sheet1"
+          ]
+        },
+        "worksheet_materialization": "error",
+        "direct_error": "Unrecognized { typ: \"BrtBeginDVals collection\", val: \"unexpected record 0x0025\" }",
+        "probe_value": null,
+        "successful_empty_result": false,
+        "error_suppression": {
+          "present": false,
+        "details": "The data-validation consumer returns the error directly when the first AC_BEGIN record is encountered."
+        }
+      },
+      "classification": {
+        "kind": "native_record_coverage_gap",
+        "summary": "This is a real BIFF12 data-validation collection reader boundary, not an empty worksheet and not an API probe misinterpretation.",
+        "unresolved_detail": "The semantic name of record 0x0C00 is not defined by the current raw-kind table; the observed trigger is the preceding AC_BEGIN record 0x0025."
+      },
+      "source_evidence": [
+        {
+          "path": "crates/litchi-xlsb/src/raw/kind.rs",
+          "lines": "47-48",
+          "symbols": [
+            "AC_BEGIN",
+            "AC_END"
+          ]
+        },
+        {
+          "path": "crates/litchi-xlsb/src/raw/kind.rs",
+          "lines": "350-356",
+          "symbols": [
+            "BEGIN_D_VALS",
+            "END_D_VALS",
+            "D_VAL",
+            "D_VAL_LIST"
+          ]
+        },
+        {
+          "path": "crates/litchi-xlsb/src/host/cells_reader/validation.rs",
+          "lines": "358-417",
+          "symbol": "consume_classic_data_validations",
+          "evidence": "Only D_VAL_LIST, D_VAL and END_D_VALS are accepted; every other record returns Unrecognized with typ BrtBeginDVals collection and the record kind."
+        },
+        {
+          "path": "crates/litchi-xlsb/src/host/cells_reader/codec.rs",
+          "lines": "636-645",
+          "evidence": "BEGIN_D_VALS dispatches to consume_classic_data_validations."
+        }
+      ]
+    },
+    {
+      "fixture_id": "excel-interaction-print-xls",
+      "path": "test-data/microsoft-office/excel/excel-interaction-print.xls",
+      "format": "xls",
+      "file": {
+        "bytes": 30208,
+        "sha256": "b9a980ff14f8ef73d54c80d3151671d27cb1603aa624c25d75530d315c5e65ec"
+      },
+      "native_stream_evidence": {
+        "container": "Compound File Binary (CFB/OLE)",
+        "stream": "Workbook",
+        "stream_bytes": 19975,
+        "record_dump_command": "target/debug/examples/dump_xls_records test-data/microsoft-office/excel/excel-interaction-print.xls",
+        "records": [
+          {
+            "offset_hex": "0x0030B9",
+            "record": "BOUNDSHEET8",
+            "payload_bytes": 14
+          },
+          {
+            "offset_hex": "0x0040E7",
+            "record": "BOF(Sheet#0)",
+            "version": "Biff8",
+            "substream_type_hex": "0x0010",
+            "payload_bytes": 16
+          },
+          {
+            "offset_hex": "0x0040FB",
+            "record": "INDEX",
+            "record_type_hex": "0x020B",
+            "payload_bytes": 20
+          },
+          {
+            "offset_hex": "0x0043D7",
+            "record": "DIMENSIONS",
+            "record_type_hex": "0x0200",
+            "payload_bytes": 14
+          },
+          {
+            "offset_hex": "0x004E03",
+            "record": "EOF",
+            "payload_bytes": 0
+          }
+        ],
+        "native_binary_interpretation": "The CFB Workbook stream contains one BIFF8 worksheet substream with normal worksheet records. Native Excel reopen was valid; the file does not lack a worksheet directory entry or worksheet bytes."
+      },
+      "library_observation": {
+        "reader": "litchi-xls::Workbook::new",
+        "workbook_open": "pass",
+        "published_worksheet_catalog": {
+          "count": 0,
+          "names": []
+        },
+        "probe_command": "target/debug/examples/read_xls test-data/microsoft-office/excel/excel-interaction-print.xls",
+        "probe_output": "Worksheet count : 0",
+        "worksheet_materialization": "error",
+        "direct_api_error": "WorksheetNotFound(\"Sheet index 0\")",
+        "successful_empty_result": false,
+        "error_suppression": {
+          "present": true,
+          "source_behavior": "parse_workbook ignores every non-pivot worksheet parse Err(_) and continues with no published Worksheet value.",
+          "original_worksheet_parse_error_known": false,
+          "original_error_reason": "The top-level package parser discards the original error at the Err(_) match arm, so this audit cannot identify the precise triggering BIFF8 record from the public API."
+        }
+      },
+      "classification": {
+        "kind": "swallowed_worksheet_parse_error",
+        "summary": "WorksheetNotFound is a secondary API symptom of an empty published worksheet vector; it is not evidence that the native XLS contains no worksheet.",
+        "precise_trigger": "unknown_by_current_probe"
+      },
+      "source_evidence": [
+        {
+          "path": "crates/litchi-xls/src/workbook/package.rs",
+          "lines": "201-227",
+          "symbol": "parse_workbook",
+          "evidence": "Successful worksheet parses are pushed into self.worksheets, while the general Err(_) arm is empty."
+        },
+        {
+          "path": "crates/litchi-xls/src/workbook/model.rs",
+          "lines": "318-322",
+          "symbol": "xls_worksheet",
+          "evidence": "An index outside the published worksheet vector returns WorksheetNotFound(\"Sheet index {index}\")."
+        },
+        {
+          "path": "crates/litchi-xls/src/workbook/model.rs",
+          "lines": "600-602",
+          "symbol": "worksheet_count",
+          "evidence": "The count reports self.worksheets.len(), so swallowed parse failures appear as count zero."
+        }
+      ]
+    },
+    {
+      "fixture_id": "powerpoint-visual-objects-ppt-slide-5",
+      "path": "test-data/microsoft-office/powerpoint/powerpoint-visual-objects.ppt",
+      "format": "ppt",
+      "slide": 5,
+      "file": {
+        "bytes": 352768,
+        "sha256": "b7f8150a0b717cd386e588b5af5bd6e0de1dd726c483383d1538479c051af48d"
+      },
+      "native_stream_evidence": {
+        "container": "Compound File Binary (CFB/OLE)",
+        "stream": "PowerPoint Document",
+        "stream_bytes": 150646,
+        "cfb_streams": {
+          "Pictures": 181910,
+          "Current User": 4096,
+          "\\u0005SummaryInformation": 6184,
+          "PowerPoint Document": 150646,
+          "\\u0005DocumentSummaryInformation": 4096
+        },
+        "slide_record": {
+          "offset_hex": "0x00020B91",
+          "record": "Slide",
+          "payload_bytes": 6845
+        },
+        "drawing_record": {
+          "record": "PPDrawing",
+          "payload_bytes": 6685,
+          "escher_container": "DgContainer",
+          "escher_type_hex": "0xF002",
+          "escher_payload_bytes": 6677,
+          "shape_count_field": 6,
+          "shape_id_current": 6149
+        },
+        "embedded_ole_record": {
+          "record": "ExternalOleObjectStg",
+          "record_type_hex": "0x1011",
+          "offset_hex": "0x00022656",
+          "payload_bytes": 9672
+        },
+        "native_binary_interpretation": "The legacy slide contains a non-empty grouped drawing. Native PowerPoint retained the group, SOURCE_002, TARGET_002 and Elbow Connector 5 on reopen."
+      },
+      "library_observation": {
+        "reader": "litchi-ppt::Package::open -> presentation",
+        "presentation_open": "pass",
+        "slide_count": 5,
+        "per_slide_probe": {
+          "command": "target/debug/examples/read_ppt test-data/microsoft-office/powerpoint/powerpoint-visual-objects.ppt",
+          "observed_output": "--- Slide 5 (0 shapes) ---",
+          "observed_shape_count": 0,
+          "successful_empty_result": false,
+          "error_suppression": {
+            "present": true,
+            "source": "crates/litchi-ppt/examples/read_ppt.rs:38",
+            "expression": "slide.shape_count().unwrap_or(0)",
+            "meaning": "The zero is an error fallback, not a successful empty shape slice."
+          }
+        },
+        "direct_shape_probe": {
+          "command": "target/debug/examples/read_shapes_all_formats test-data/microsoft-office/powerpoint/powerpoint-visual-objects.ppt",
+          "source": "crates/litchi/examples/read_shapes_all_formats.rs:106",
+          "error": "OfficeArt(MalformedShape { reason: \"OfficeArt container header is invalid\" })",
+          "successful_empty_result": false,
+          "error_suppression": {
+            "present": false,
+            "meaning": "The direct shape example propagates the shape parser error."
+          }
+        }
+      },
+      "classification": {
+        "kind": "native_officeart_parser_gap_masked_by_probe_fallback",
+        "summary": "The native grouped drawing is present and the direct litchi-ppt shape reader fails while parsing it. The existing zero count is caused by probe error suppression.",
+        "shape_parity_claimed": false
+      },
+      "source_evidence": [
+        {
+          "path": "crates/litchi-ppt/examples/read_ppt.rs",
+          "lines": "36-40",
+          "evidence": "The example converts any shape_count error to zero with unwrap_or(0)."
+        },
+        {
+          "path": "crates/litchi-ppt/src/slide/types/semantic.rs",
+          "lines": "100-106",
+          "symbol": "shape_count",
+          "evidence": "shape_count calls shapes()?.len(), so parser errors propagate from the API."
+        },
+        {
+          "path": "crates/litchi-ppt/src/slide/types/codec.rs",
+          "lines": "54-83",
+          "symbol": "parse_shapes / parse_shape_enums",
+          "evidence": "The slide parser passes PPDrawing data to litchi-odraw::parse and propagates its result."
+        },
+        {
+          "path": "crates/litchi-odraw/src/shape/codec.rs",
+          "lines": "96-108",
+          "symbol": "parse_with",
+          "evidence": "MalformedShape is returned when a nested OfficeArt record is structurally invalid."
+        }
+      ]
+    }
+  ],
+  "metadata_corrections_for_common_and_per_group_reports": {
+    "powerpoint_visual_objects": "Keep semantic_shape_counts[slide 5] = 0 as the observed output of the existing fallback probe, but classify it as error_suppressed and record the direct OfficeArt(MalformedShape { reason: \"OfficeArt container header is invalid\" }) error. Do not describe it as a successful empty result.",
+    "excel_interaction_print_xls": "Keep worksheet catalog count 0 and WorksheetNotFound(\"Sheet index 0\") as observed outputs, but classify them as the result of a swallowed worksheet parse error. The original parse error and precise BIFF8 trigger are unknown because parse_workbook discards the general Err(_) value.",
+    "preserved_observations": "The probe outputs remain recorded verbatim alongside the classification; they are not rewritten as success values."
+  }
+}

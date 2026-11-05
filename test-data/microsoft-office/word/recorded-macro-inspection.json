@@ -1,0 +1,1687 @@
+{
+  "schema_version": 1,
+  "fixture_id": "word-recorded-macro-004",
+  "generated_on": "2026-10-15",
+  "purpose": "Fixture-specific, read-only inspection of four native Microsoft Word macro-enabled and legacy derivatives created with the real Word macro recorder.",
+  "provenance": {
+    "producer_app": "Microsoft Office Word",
+    "app_version": "16.110.2",
+    "app_build": "16.110.26062818",
+    "platform": "macOS",
+    "authoring_method": "Computer Use / native Microsoft Word UI with Record Macro",
+    "source": "Synthetic content entered in native Word; one recording action, Cmd+B, saved explicitly in each document/template and exported through native Word Save As for DOCM, DOTM, DOC and DOT.",
+    "macro_storage": "The recorded macro was stored in the current document/template rather than Normal.dotm.",
+    "libreoffice_used": false,
+    "programmatic_office_generation_used": false,
+    "library_code_modified": false,
+    "macro_execution_during_authoring_or_inspection": false,
+    "all_documents_closed_before_hashing": true
+  },
+  "expected_markers": [
+    "Native Word recorded macro fixture",
+    "Fixture ID: word-recorded-macro-004",
+    "MACRO_FORMAT_TARGET",
+    "The stored macro only applies bold formatting to the current selection.",
+    "MACRO_FIXTURE_END"
+  ],
+  "macro_security_validation": {
+    "alert_shown_on_native_reopen": true,
+    "user_action": "Disable Macros",
+    "macro_execution_allowed": false,
+    "macro_execution_observed": false,
+    "scope": "Native Word reopen validation only; the VBA source was inspected inertly by library readers."
+  },
+  "recorded_action": {
+    "action": "Cmd+B",
+    "recording_scope": "Current document/template",
+    "automatic_execution": false,
+    "source_behavior": "Selection.Font.Bold = wdToggle toggles the current selection bold state when invoked."
+  },
+  "library_validation": {
+    "readers": [
+      "litchi-vba::project::Project::read for OOXML vbaProject.bin",
+      "litchi-docx::Package::open/vba/VbaProject::project for DOCM/DOTM",
+      "litchi-doc::Package::open/vba for DOC/DOT"
+    ],
+    "macro_execution": false,
+    "all_four_payloads_parsed": true,
+    "errors": [],
+    "note": "The readers decode metadata and inert source only; they do not compile, interpret, or execute VBA."
+  },
+  "files": [
+    {
+      "path": "test-data/microsoft-office/word/word-recorded-macro.docm",
+      "format": "docm",
+      "bytes": 19304,
+      "sha256": "47c8419628481a99234a1454616411e69036a0693444eb06caa678994856468c",
+      "file_description": "Microsoft Word 2007+",
+      "container": {
+        "kind": "OPC ZIP",
+        "zip_test": "pass",
+        "member_count": 14,
+        "members": [
+          "[Content_Types].xml",
+          "_rels/.rels",
+          "docProps/app.xml",
+          "docProps/core.xml",
+          "word/_rels/document.xml.rels",
+          "word/_rels/vbaProject.bin.rels",
+          "word/document.xml",
+          "word/fontTable.xml",
+          "word/settings.xml",
+          "word/styles.xml",
+          "word/theme/theme1.xml",
+          "word/vbaData.xml",
+          "word/vbaProject.bin",
+          "word/webSettings.xml"
+        ]
+      },
+      "content_types": {
+        "main_document_content_type": "application/vnd.ms-word.document.macroEnabled.main+xml",
+        "vba_project_default_present": true,
+        "vba_data_content_type": "application/vnd.ms-word.vbaData+xml",
+        "override_part_check": "pass",
+        "override_count": 9
+      },
+      "xml_validation": {
+        "status": "pass",
+        "xml_part_count": 13,
+        "errors": [],
+        "relationship_target_check": "pass",
+        "unresolved_internal_targets": [],
+        "external_targets": []
+      },
+      "application_properties": {
+        "Application": "Microsoft Office Word",
+        "AppVersion": "16.0000",
+        "Template": "Normal.dotm",
+        "Pages": "1",
+        "Words": "12",
+        "Characters": "169",
+        "Paragraphs": "8",
+        "Lines": "8",
+        "DocSecurity": "0"
+      },
+      "relationships": {
+        "relationship_count": 10,
+        "target_check": "pass",
+        "unresolved_internal_targets": [],
+        "external_targets": [],
+        "relationships": [
+          {
+            "rels_part": "_rels/.rels",
+            "source_part": "/",
+            "id": "rId3",
+            "type": "http://schemas.openxmlformats.org/officeDocument/2006/relationships/extended-properties",
+            "target": "docProps/app.xml",
+            "target_mode": "Internal",
+            "resolved_target": "/docProps/app.xml",
+            "target_exists": true
+          },
+          {
+            "rels_part": "_rels/.rels",
+            "source_part": "/",
+            "id": "rId2",
+            "type": "http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties",
+            "target": "docProps/core.xml",
+            "target_mode": "Internal",
+            "resolved_target": "/docProps/core.xml",
+            "target_exists": true
+          },
+          {
+            "rels_part": "_rels/.rels",
+            "source_part": "/",
+            "id": "rId1",
+            "type": "http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument",
+            "target": "word/document.xml",
+            "target_mode": "Internal",
+            "resolved_target": "/word/document.xml",
+            "target_exists": true
+          },
+          {
+            "rels_part": "word/_rels/document.xml.rels",
+            "source_part": "word/document.xml",
+            "id": "rId3",
+            "type": "http://schemas.openxmlformats.org/officeDocument/2006/relationships/settings",
+            "target": "settings.xml",
+            "target_mode": "Internal",
+            "resolved_target": "/word/settings.xml",
+            "target_exists": true
+          },
+          {
+            "rels_part": "word/_rels/document.xml.rels",
+            "source_part": "word/document.xml",
+            "id": "rId2",
+            "type": "http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles",
+            "target": "styles.xml",
+            "target_mode": "Internal",
+            "resolved_target": "/word/styles.xml",
+            "target_exists": true
+          },
+          {
+            "rels_part": "word/_rels/document.xml.rels",
+            "source_part": "word/document.xml",
+            "id": "rId1",
+            "type": "http://schemas.microsoft.com/office/2006/relationships/vbaProject",
+            "target": "vbaProject.bin",
+            "target_mode": "Internal",
+            "resolved_target": "/word/vbaProject.bin",
+            "target_exists": true
+          },
+          {
+            "rels_part": "word/_rels/document.xml.rels",
+            "source_part": "word/document.xml",
+            "id": "rId6",
+            "type": "http://schemas.openxmlformats.org/officeDocument/2006/relationships/theme",
+            "target": "theme/theme1.xml",
+            "target_mode": "Internal",
+            "resolved_target": "/word/theme/theme1.xml",
+            "target_exists": true
+          },
+          {
+            "rels_part": "word/_rels/document.xml.rels",
+            "source_part": "word/document.xml",
+            "id": "rId5",
+            "type": "http://schemas.openxmlformats.org/officeDocument/2006/relationships/fontTable",
+            "target": "fontTable.xml",
+            "target_mode": "Internal",
+            "resolved_target": "/word/fontTable.xml",
+            "target_exists": true
+          },
+          {
+            "rels_part": "word/_rels/document.xml.rels",
+            "source_part": "word/document.xml",
+            "id": "rId4",
+            "type": "http://schemas.openxmlformats.org/officeDocument/2006/relationships/webSettings",
+            "target": "webSettings.xml",
+            "target_mode": "Internal",
+            "resolved_target": "/word/webSettings.xml",
+            "target_exists": true
+          },
+          {
+            "rels_part": "word/_rels/vbaProject.bin.rels",
+            "source_part": "word/vbaProject.bin",
+            "id": "rId1",
+            "type": "http://schemas.microsoft.com/office/2006/relationships/wordVbaData",
+            "target": "vbaData.xml",
+            "target_mode": "Internal",
+            "resolved_target": "/word/vbaData.xml",
+            "target_exists": true
+          }
+        ]
+      },
+      "main_document": {
+        "method": "ElementTree read of word/document.xml",
+        "text": "Native Word recorded macro fixture\nFixture ID: word-recorded-macro-004\nMACRO_FORMAT_TARGET\nThe stored macro only applies bold formatting to the current selection.\nMACRO_FIXTURE_END",
+        "paragraphs": [
+          "Native Word recorded macro fixture",
+          "Fixture ID: word-recorded-macro-004",
+          "MACRO_FORMAT_TARGET",
+          "The stored macro only applies bold formatting to the current selection.",
+          "MACRO_FIXTURE_END"
+        ],
+        "expected_markers_present": {
+          "Native Word recorded macro fixture": true,
+          "Fixture ID: word-recorded-macro-004": true,
+          "MACRO_FORMAT_TARGET": true,
+          "The stored macro only applies bold formatting to the current selection.": true,
+          "MACRO_FIXTURE_END": true
+        },
+        "xml_counts": {
+          "p": 5,
+          "r": 5,
+          "t": 5,
+          "tbl": 0,
+          "drawing": 0,
+          "fldSimple": 0,
+          "instrText": 0,
+          "bookmarkStart": 0,
+          "bookmarkEnd": 0,
+          "ins": 0,
+          "del": 0,
+          "sdt": 0
+        },
+        "marker_order": [
+          "Native Word recorded macro fixture",
+          "Fixture ID: word-recorded-macro-004",
+          "MACRO_FORMAT_TARGET",
+          "The stored macro only applies bold formatting to the current selection.",
+          "MACRO_FIXTURE_END"
+        ]
+      },
+      "vba_container": {
+        "part": "word/vbaProject.bin",
+        "bytes": 12800,
+        "sha256": "3cc296e042be194b7d1ddf30777731de852780c623e383b71e8f04dbef59f89f",
+        "supplemental_part": "word/vbaData.xml",
+        "supplemental_bytes": 2812,
+        "macro_descriptors": [
+          {
+            "{http://schemas.microsoft.com/office/word/2006/wordml}macroName": "PROJECT.NEWMACROS.FIXTUREBOLDSELECTION",
+            "{http://schemas.microsoft.com/office/word/2006/wordml}name": "Project.NewMacros.FixtureBoldSelection",
+            "{http://schemas.microsoft.com/office/word/2006/wordml}bEncrypt": "00",
+            "{http://schemas.microsoft.com/office/word/2006/wordml}cmg": "56"
+          }
+        ],
+        "project_relationship": "word/_rels/vbaProject.bin.rels rId1 -> vbaData.xml",
+        "library_read": {
+          "package_open": "pass",
+          "vba_graph": "pass",
+          "payload_parse": "pass",
+          "project_root": "/word/document.xml",
+          "project_part": "/word/vbaProject.bin",
+          "supplemental_part": "/word/vbaData.xml",
+          "project_relationship_id": "rId1",
+          "supplemental_relationship_id": "rId1",
+          "project_name": "Project",
+          "module_count": 2,
+          "reference_count": 3,
+          "errors": []
+        },
+        "project": {
+          "project_name": "Project",
+          "page_id": 10000,
+          "module_count": 2,
+          "reference_count": 3,
+          "reference_names": [
+            "MSForms",
+            "Normal",
+            "Office"
+          ],
+          "module_names": [
+            "ThisDocument",
+            "NewMacros"
+          ],
+          "modules": [
+            {
+              "name": "ThisDocument",
+              "stream_name": "ThisDocument",
+              "kind": "DocumentClassOrDesigner",
+              "text_offset": 931,
+              "read_only": false,
+              "private": false,
+              "source_text": "Attribute VB_Name = \"ThisDocument\"\nAttribute VB_Base = \"1Normal.ThisDocument\"\nAttribute VB_GlobalNameSpace = False\nAttribute VB_Creatable = False\nAttribute VB_PredeclaredId = True\nAttribute VB_Exposed = True\nAttribute VB_TemplateDerived = True\nAttribute VB_Customizable = True\n"
+            },
+            {
+              "name": "NewMacros",
+              "stream_name": "NewMacros",
+              "kind": "Procedural",
+              "text_offset": 1420,
+              "read_only": false,
+              "private": false,
+              "source_text": "Attribute VB_Name = \"NewMacros\"\nSub FixtureBoldSelection()\nAttribute FixtureBoldSelection.VB_Description = \"Synthetic fixture macro: applies bold to the selected text. No automatic execution.\"\nAttribute FixtureBoldSelection.VB_ProcData.VB_Invoke_Func = \"Project.NewMacros.FixtureBoldSelection\"\n'\n' FixtureBoldSelection Macro\n' Synthetic fixture macro: applies bold to the selected text. No automatic execution.\n'\n    Selection.Font.Bold = wdToggle\nEnd Sub\n"
+            }
+          ],
+          "source_line_endings": "litchi-vba decoded source as LF-delimited text",
+          "macro_behavior": {
+            "procedure": "FixtureBoldSelection",
+            "qualified_name": "Project.NewMacros.FixtureBoldSelection",
+            "description": "Synthetic fixture macro: applies bold to the selected text. No automatic execution.",
+            "recorded_action": "Cmd+B only",
+            "source_statement": "Selection.Font.Bold = wdToggle",
+            "expected_behavior": "When explicitly invoked with a current selection, toggles the selection bold state. It is not an unconditional bold-on operation.",
+            "automatic_execution": false,
+            "event_handlers_present": false,
+            "execution_performed_during_inspection": false
+          },
+          "automatic_execution": false,
+          "reader_scope": "Metadata, compressed module source and project relationships only; no compilation, interpretation or execution."
+        }
+      },
+      "native_reopen_validation": {
+        "observed_by": "Root agent via Computer Use",
+        "application": "Microsoft Word",
+        "reopen": "pass",
+        "repair_prompt": false,
+        "macro_security": {
+          "alert_shown_on_native_reopen": true,
+          "user_action": "Disable Macros",
+          "macro_execution_allowed": false,
+          "macro_execution_observed": false,
+          "scope": "Native Word reopen validation only; the VBA source was inspected inertly by library readers."
+        },
+        "visible_markers": [
+          "Native Word recorded macro fixture",
+          "Fixture ID: word-recorded-macro-004",
+          "MACRO_FORMAT_TARGET",
+          "The stored macro only applies bold formatting to the current selection.",
+          "MACRO_FIXTURE_END"
+        ],
+        "visible_title": "Native Word recorded macro fixture",
+        "visible_fixture_id": "word-recorded-macro-004",
+        "recording_action": "Cmd+B only",
+        "macro_storage": "Stored explicitly in this document/template; not Normal.dotm.",
+        "semantic_limit": "Visible native reopen confirms markers and no repair prompt; it does not execute or semantically test the macro."
+      }
+    },
+    {
+      "path": "test-data/microsoft-office/word/word-recorded-macro.dotm",
+      "format": "dotm",
+      "bytes": 19241,
+      "sha256": "af1d15a6e9ca38ebf2904118067b0dfaaa511332c5e9da8e601f3e45cad8ee0f",
+      "file_description": "Microsoft Word 2007+",
+      "container": {
+        "kind": "OPC ZIP",
+        "zip_test": "pass",
+        "member_count": 14,
+        "members": [
+          "[Content_Types].xml",
+          "_rels/.rels",
+          "docProps/app.xml",
+          "docProps/core.xml",
+          "word/_rels/document.xml.rels",
+          "word/_rels/vbaProject.bin.rels",
+          "word/document.xml",
+          "word/fontTable.xml",
+          "word/settings.xml",
+          "word/styles.xml",
+          "word/theme/theme1.xml",
+          "word/vbaData.xml",
+          "word/vbaProject.bin",
+          "word/webSettings.xml"
+        ]
+      },
+      "content_types": {
+        "main_document_content_type": "application/vnd.ms-word.template.macroEnabledTemplate.main+xml",
+        "vba_project_default_present": true,
+        "vba_data_content_type": "application/vnd.ms-word.vbaData+xml",
+        "override_part_check": "pass",
+        "override_count": 9
+      },
+      "xml_validation": {
+        "status": "pass",
+        "xml_part_count": 13,
+        "errors": [],
+        "relationship_target_check": "pass",
+        "unresolved_internal_targets": [],
+        "external_targets": []
+      },
+      "application_properties": {
+        "Application": "Microsoft Office Word",
+        "AppVersion": "16.0000",
+        "Template": "word-recorded-macro.dotm",
+        "Pages": "1",
+        "Words": "12",
+        "Characters": "169",
+        "Paragraphs": "8",
+        "Lines": "8",
+        "DocSecurity": "0"
+      },
+      "relationships": {
+        "relationship_count": 10,
+        "target_check": "pass",
+        "unresolved_internal_targets": [],
+        "external_targets": [],
+        "relationships": [
+          {
+            "rels_part": "_rels/.rels",
+            "source_part": "/",
+            "id": "rId3",
+            "type": "http://schemas.openxmlformats.org/officeDocument/2006/relationships/extended-properties",
+            "target": "docProps/app.xml",
+            "target_mode": "Internal",
+            "resolved_target": "/docProps/app.xml",
+            "target_exists": true
+          },
+          {
+            "rels_part": "_rels/.rels",
+            "source_part": "/",
+            "id": "rId2",
+            "type": "http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties",
+            "target": "docProps/core.xml",
+            "target_mode": "Internal",
+            "resolved_target": "/docProps/core.xml",
+            "target_exists": true
+          },
+          {
+            "rels_part": "_rels/.rels",
+            "source_part": "/",
+            "id": "rId1",
+            "type": "http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument",
+            "target": "word/document.xml",
+            "target_mode": "Internal",
+            "resolved_target": "/word/document.xml",
+            "target_exists": true
+          },
+          {
+            "rels_part": "word/_rels/document.xml.rels",
+            "source_part": "word/document.xml",
+            "id": "rId3",
+            "type": "http://schemas.openxmlformats.org/officeDocument/2006/relationships/settings",
+            "target": "settings.xml",
+            "target_mode": "Internal",
+            "resolved_target": "/word/settings.xml",
+            "target_exists": true
+          },
+          {
+            "rels_part": "word/_rels/document.xml.rels",
+            "source_part": "word/document.xml",
+            "id": "rId2",
+            "type": "http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles",
+            "target": "styles.xml",
+            "target_mode": "Internal",
+            "resolved_target": "/word/styles.xml",
+            "target_exists": true
+          },
+          {
+            "rels_part": "word/_rels/document.xml.rels",
+            "source_part": "word/document.xml",
+            "id": "rId1",
+            "type": "http://schemas.microsoft.com/office/2006/relationships/vbaProject",
+            "target": "vbaProject.bin",
+            "target_mode": "Internal",
+            "resolved_target": "/word/vbaProject.bin",
+            "target_exists": true
+          },
+          {
+            "rels_part": "word/_rels/document.xml.rels",
+            "source_part": "word/document.xml",
+            "id": "rId6",
+            "type": "http://schemas.openxmlformats.org/officeDocument/2006/relationships/theme",
+            "target": "theme/theme1.xml",
+            "target_mode": "Internal",
+            "resolved_target": "/word/theme/theme1.xml",
+            "target_exists": true
+          },
+          {
+            "rels_part": "word/_rels/document.xml.rels",
+            "source_part": "word/document.xml",
+            "id": "rId5",
+            "type": "http://schemas.openxmlformats.org/officeDocument/2006/relationships/fontTable",
+            "target": "fontTable.xml",
+            "target_mode": "Internal",
+            "resolved_target": "/word/fontTable.xml",
+            "target_exists": true
+          },
+          {
+            "rels_part": "word/_rels/document.xml.rels",
+            "source_part": "word/document.xml",
+            "id": "rId4",
+            "type": "http://schemas.openxmlformats.org/officeDocument/2006/relationships/webSettings",
+            "target": "webSettings.xml",
+            "target_mode": "Internal",
+            "resolved_target": "/word/webSettings.xml",
+            "target_exists": true
+          },
+          {
+            "rels_part": "word/_rels/vbaProject.bin.rels",
+            "source_part": "word/vbaProject.bin",
+            "id": "rId1",
+            "type": "http://schemas.microsoft.com/office/2006/relationships/wordVbaData",
+            "target": "vbaData.xml",
+            "target_mode": "Internal",
+            "resolved_target": "/word/vbaData.xml",
+            "target_exists": true
+          }
+        ]
+      },
+      "main_document": {
+        "method": "ElementTree read of word/document.xml",
+        "text": "Native Word recorded macro fixture\nFixture ID: word-recorded-macro-004\nMACRO_FORMAT_TARGET\nThe stored macro only applies bold formatting to the current selection.\nMACRO_FIXTURE_END",
+        "paragraphs": [
+          "Native Word recorded macro fixture",
+          "Fixture ID: word-recorded-macro-004",
+          "MACRO_FORMAT_TARGET",
+          "The stored macro only applies bold formatting to the current selection.",
+          "MACRO_FIXTURE_END"
+        ],
+        "expected_markers_present": {
+          "Native Word recorded macro fixture": true,
+          "Fixture ID: word-recorded-macro-004": true,
+          "MACRO_FORMAT_TARGET": true,
+          "The stored macro only applies bold formatting to the current selection.": true,
+          "MACRO_FIXTURE_END": true
+        },
+        "xml_counts": {
+          "p": 5,
+          "r": 5,
+          "t": 5,
+          "tbl": 0,
+          "drawing": 0,
+          "fldSimple": 0,
+          "instrText": 0,
+          "bookmarkStart": 0,
+          "bookmarkEnd": 0,
+          "ins": 0,
+          "del": 0,
+          "sdt": 0
+        },
+        "marker_order": [
+          "Native Word recorded macro fixture",
+          "Fixture ID: word-recorded-macro-004",
+          "MACRO_FORMAT_TARGET",
+          "The stored macro only applies bold formatting to the current selection.",
+          "MACRO_FIXTURE_END"
+        ]
+      },
+      "vba_container": {
+        "part": "word/vbaProject.bin",
+        "bytes": 12800,
+        "sha256": "9320243694e82e3f1206dbf7c5bbef7ba8e3510718bb325b566e2f43e34a42aa",
+        "supplemental_part": "word/vbaData.xml",
+        "supplemental_bytes": 2812,
+        "macro_descriptors": [
+          {
+            "{http://schemas.microsoft.com/office/word/2006/wordml}macroName": "PROJECT.NEWMACROS.FIXTUREBOLDSELECTION",
+            "{http://schemas.microsoft.com/office/word/2006/wordml}name": "Project.NewMacros.FixtureBoldSelection",
+            "{http://schemas.microsoft.com/office/word/2006/wordml}bEncrypt": "00",
+            "{http://schemas.microsoft.com/office/word/2006/wordml}cmg": "56"
+          }
+        ],
+        "project_relationship": "word/_rels/vbaProject.bin.rels rId1 -> vbaData.xml",
+        "library_read": {
+          "package_open": "pass",
+          "vba_graph": "pass",
+          "payload_parse": "pass",
+          "project_root": "/word/document.xml",
+          "project_part": "/word/vbaProject.bin",
+          "supplemental_part": "/word/vbaData.xml",
+          "project_relationship_id": "rId1",
+          "supplemental_relationship_id": "rId1",
+          "project_name": "Project",
+          "module_count": 2,
+          "reference_count": 3,
+          "errors": []
+        },
+        "project": {
+          "project_name": "Project",
+          "page_id": 10000,
+          "module_count": 2,
+          "reference_count": 3,
+          "reference_names": [
+            "MSForms",
+            "Normal",
+            "Office"
+          ],
+          "module_names": [
+            "ThisDocument",
+            "NewMacros"
+          ],
+          "modules": [
+            {
+              "name": "ThisDocument",
+              "stream_name": "ThisDocument",
+              "kind": "DocumentClassOrDesigner",
+              "text_offset": 931,
+              "read_only": false,
+              "private": false,
+              "source_text": "Attribute VB_Name = \"ThisDocument\"\nAttribute VB_Base = \"1Normal.ThisDocument\"\nAttribute VB_GlobalNameSpace = False\nAttribute VB_Creatable = False\nAttribute VB_PredeclaredId = True\nAttribute VB_Exposed = True\nAttribute VB_TemplateDerived = True\nAttribute VB_Customizable = True\n"
+            },
+            {
+              "name": "NewMacros",
+              "stream_name": "NewMacros",
+              "kind": "Procedural",
+              "text_offset": 1420,
+              "read_only": false,
+              "private": false,
+              "source_text": "Attribute VB_Name = \"NewMacros\"\nSub FixtureBoldSelection()\nAttribute FixtureBoldSelection.VB_Description = \"Synthetic fixture macro: applies bold to the selected text. No automatic execution.\"\nAttribute FixtureBoldSelection.VB_ProcData.VB_Invoke_Func = \"Project.NewMacros.FixtureBoldSelection\"\n'\n' FixtureBoldSelection Macro\n' Synthetic fixture macro: applies bold to the selected text. No automatic execution.\n'\n    Selection.Font.Bold = wdToggle\nEnd Sub\n"
+            }
+          ],
+          "source_line_endings": "litchi-vba decoded source as LF-delimited text",
+          "macro_behavior": {
+            "procedure": "FixtureBoldSelection",
+            "qualified_name": "Project.NewMacros.FixtureBoldSelection",
+            "description": "Synthetic fixture macro: applies bold to the selected text. No automatic execution.",
+            "recorded_action": "Cmd+B only",
+            "source_statement": "Selection.Font.Bold = wdToggle",
+            "expected_behavior": "When explicitly invoked with a current selection, toggles the selection bold state. It is not an unconditional bold-on operation.",
+            "automatic_execution": false,
+            "event_handlers_present": false,
+            "execution_performed_during_inspection": false
+          },
+          "automatic_execution": false,
+          "reader_scope": "Metadata, compressed module source and project relationships only; no compilation, interpretation or execution."
+        }
+      },
+      "native_reopen_validation": {
+        "observed_by": "Root agent via Computer Use",
+        "application": "Microsoft Word",
+        "reopen": "pass",
+        "repair_prompt": false,
+        "macro_security": {
+          "alert_shown_on_native_reopen": true,
+          "user_action": "Disable Macros",
+          "macro_execution_allowed": false,
+          "macro_execution_observed": false,
+          "scope": "Native Word reopen validation only; the VBA source was inspected inertly by library readers."
+        },
+        "visible_markers": [
+          "Native Word recorded macro fixture",
+          "Fixture ID: word-recorded-macro-004",
+          "MACRO_FORMAT_TARGET",
+          "The stored macro only applies bold formatting to the current selection.",
+          "MACRO_FIXTURE_END"
+        ],
+        "visible_title": "Native Word recorded macro fixture",
+        "visible_fixture_id": "word-recorded-macro-004",
+        "recording_action": "Cmd+B only",
+        "macro_storage": "Stored explicitly in this document/template; not Normal.dotm.",
+        "semantic_limit": "Visible native reopen confirms markers and no repair prompt; it does not execute or semantically test the macro."
+      }
+    },
+    {
+      "path": "test-data/microsoft-office/word/word-recorded-macro.doc",
+      "format": "doc",
+      "bytes": 36352,
+      "sha256": "feb510658540c2a51282a8d458739041238a2dde2d3c6ce6c3adaf6488ef6d06",
+      "file_description": "Composite Document File V2 Document, Little Endian, Os: MacOS, Version 5.26, Code page: 10000, Author: Ryker Zhu, Template: word-recorded-macro.dotm, Last Saved By: Ryker Zhu, Revision Number: 2, Name of Creating Application: Microsoft Office Word, Create Time/Date: Thu Oct 15 06:00:00 2026, Last Saved Time/Date: Thu Oct 15 06:00:00 2026, Number of Pages: 1, Number of Words: 12, Number of Characters: 169, Security: 0",
+      "container": {
+        "kind": "Compound File Binary (CFB/OLE)",
+        "cfb": {
+          "signature_hex": "d0cf11e0a1b11ae1",
+          "file_size": 36352,
+          "signature_valid": true,
+          "header": {
+            "major_version": 3,
+            "minor_version": 62,
+            "byte_order_hex": "feff",
+            "sector_size": 512,
+            "mini_sector_size": 64,
+            "num_fat_sectors": 1,
+            "first_directory_sector": 44,
+            "mini_stream_cutoff": 4096,
+            "first_mini_fat_sector": 46,
+            "num_mini_fat_sectors": 2,
+            "num_difat_sectors": 0
+          },
+          "directory_streams": [
+            {
+              "directory_index": 0,
+              "name": "Root Entry",
+              "object_type": "root",
+              "start_sector": 47,
+              "size_bytes": 9280
+            },
+            {
+              "directory_index": 1,
+              "name": "1Table",
+              "object_type": "stream",
+              "start_sector": 8,
+              "size_bytes": 9354
+            },
+            {
+              "directory_index": 2,
+              "name": "WordDocument",
+              "object_type": "stream",
+              "start_sector": 0,
+              "size_bytes": 4096
+            },
+            {
+              "directory_index": 3,
+              "name": "\u0005SummaryInformation",
+              "object_type": "stream",
+              "start_sector": 27,
+              "size_bytes": 4096
+            },
+            {
+              "directory_index": 4,
+              "name": "\u0005DocumentSummaryInformation",
+              "object_type": "stream",
+              "start_sector": 35,
+              "size_bytes": 4096
+            },
+            {
+              "directory_index": 5,
+              "name": "Macros",
+              "object_type": "storage",
+              "start_sector": 0,
+              "size_bytes": 0
+            },
+            {
+              "directory_index": 6,
+              "name": "VBA",
+              "object_type": "storage",
+              "start_sector": 0,
+              "size_bytes": 0
+            },
+            {
+              "directory_index": 7,
+              "name": "dir",
+              "object_type": "stream",
+              "start_sector": 0,
+              "size_bytes": 689
+            },
+            {
+              "directory_index": 8,
+              "name": "__SRP_0",
+              "object_type": "stream",
+              "start_sector": 11,
+              "size_bytes": 1366
+            },
+            {
+              "directory_index": 9,
+              "name": "__SRP_1",
+              "object_type": "stream",
+              "start_sector": 33,
+              "size_bytes": 275
+            },
+            {
+              "directory_index": 10,
+              "name": "__SRP_2",
+              "object_type": "stream",
+              "start_sector": 38,
+              "size_bytes": 169
+            },
+            {
+              "directory_index": 11,
+              "name": "__SRP_3",
+              "object_type": "stream",
+              "start_sector": 41,
+              "size_bytes": 164
+            },
+            {
+              "directory_index": 12,
+              "name": "NewMacros",
+              "object_type": "stream",
+              "start_sector": 44,
+              "size_bytes": 1678
+            },
+            {
+              "directory_index": 13,
+              "name": "ThisDocument",
+              "object_type": "stream",
+              "start_sector": 71,
+              "size_bytes": 1087
+            },
+            {
+              "directory_index": 14,
+              "name": "_VBA_PROJECT",
+              "object_type": "stream",
+              "start_sector": 88,
+              "size_bytes": 2999
+            },
+            {
+              "directory_index": 15,
+              "name": "PROJECT",
+              "object_type": "stream",
+              "start_sector": 135,
+              "size_bytes": 340
+            },
+            {
+              "directory_index": 16,
+              "name": "PROJECTwm",
+              "object_type": "stream",
+              "start_sector": 141,
+              "size_bytes": 71
+            },
+            {
+              "directory_index": 17,
+              "name": "\u0001CompObj",
+              "object_type": "stream",
+              "start_sector": 143,
+              "size_bytes": 114
+            }
+          ],
+          "integrity": {
+            "sector_count": 70,
+            "fat_sector_chain": [
+              43
+            ],
+            "directory_chain": [
+              44,
+              45,
+              49,
+              54,
+              68
+            ],
+            "directory_entry_count": 18,
+            "check": "pass",
+            "errors": []
+          }
+        },
+        "stream_inventory": [
+          {
+            "path": [
+              "1Table"
+            ],
+            "bytes": 9354
+          },
+          {
+            "path": [
+              "Macros",
+              "VBA",
+              "dir"
+            ],
+            "bytes": 689
+          },
+          {
+            "path": [
+              "Macros",
+              "VBA",
+              "__SRP_0"
+            ],
+            "bytes": 1366
+          },
+          {
+            "path": [
+              "Macros",
+              "VBA",
+              "__SRP_1"
+            ],
+            "bytes": 275
+          },
+          {
+            "path": [
+              "Macros",
+              "VBA",
+              "__SRP_2"
+            ],
+            "bytes": 169
+          },
+          {
+            "path": [
+              "Macros",
+              "VBA",
+              "__SRP_3"
+            ],
+            "bytes": 164
+          },
+          {
+            "path": [
+              "Macros",
+              "VBA",
+              "NewMacros"
+            ],
+            "bytes": 1678
+          },
+          {
+            "path": [
+              "Macros",
+              "VBA",
+              "ThisDocument"
+            ],
+            "bytes": 1087
+          },
+          {
+            "path": [
+              "Macros",
+              "VBA",
+              "_VBA_PROJECT"
+            ],
+            "bytes": 2999
+          },
+          {
+            "path": [
+              "Macros",
+              "PROJECT"
+            ],
+            "bytes": 340
+          },
+          {
+            "path": [
+              "Macros",
+              "PROJECTwm"
+            ],
+            "bytes": 71
+          },
+          {
+            "path": [
+              "\u0001CompObj"
+            ],
+            "bytes": 114
+          },
+          {
+            "path": [
+              "WordDocument"
+            ],
+            "bytes": 4096
+          },
+          {
+            "path": [
+              "\u0005SummaryInformation"
+            ],
+            "bytes": 4096
+          },
+          {
+            "path": [
+              "\u0005DocumentSummaryInformation"
+            ],
+            "bytes": 4096
+          }
+        ]
+      },
+      "native_streams": {
+        "stream_paths": [
+          [
+            "1Table"
+          ],
+          [
+            "Macros",
+            "VBA",
+            "dir"
+          ],
+          [
+            "Macros",
+            "VBA",
+            "__SRP_0"
+          ],
+          [
+            "Macros",
+            "VBA",
+            "__SRP_1"
+          ],
+          [
+            "Macros",
+            "VBA",
+            "__SRP_2"
+          ],
+          [
+            "Macros",
+            "VBA",
+            "__SRP_3"
+          ],
+          [
+            "Macros",
+            "VBA",
+            "NewMacros"
+          ],
+          [
+            "Macros",
+            "VBA",
+            "ThisDocument"
+          ],
+          [
+            "Macros",
+            "VBA",
+            "_VBA_PROJECT"
+          ],
+          [
+            "Macros",
+            "PROJECT"
+          ],
+          [
+            "Macros",
+            "PROJECTwm"
+          ],
+          [
+            "\u0001CompObj"
+          ],
+          [
+            "WordDocument"
+          ],
+          [
+            "\u0005SummaryInformation"
+          ],
+          [
+            "\u0005DocumentSummaryInformation"
+          ]
+        ],
+        "project_root": [
+          "Macros"
+        ],
+        "vba_storage": [
+          "Macros",
+          "VBA"
+        ],
+        "required_streams_present": [
+          "Macros/PROJECT",
+          "Macros/VBA/_VBA_PROJECT",
+          "Macros/VBA/dir"
+        ],
+        "module_streams": [
+          "Macros/VBA/NewMacros",
+          "Macros/VBA/ThisDocument"
+        ],
+        "ignored_srp_streams": [
+          "Macros/VBA/__SRP_0",
+          "Macros/VBA/__SRP_1",
+          "Macros/VBA/__SRP_2",
+          "Macros/VBA/__SRP_3"
+        ]
+      },
+      "xml_validation": {
+        "status": "not_applicable",
+        "reason": "Legacy CFB/DOC has no OPC XML package parts."
+      },
+      "main_document": {
+        "method": "textutil -convert txt -stdout read-only extraction",
+        "exit_code": 0,
+        "stderr": "",
+        "text": "Native Word recorded macro fixture\nFixture ID: word-recorded-macro-004\nMACRO_FORMAT_TARGET\nThe stored macro only applies bold formatting to the current selection.\nMACRO_FIXTURE_END\n",
+        "expected_markers_present": {
+          "Native Word recorded macro fixture": true,
+          "Fixture ID: word-recorded-macro-004": true,
+          "MACRO_FORMAT_TARGET": true,
+          "The stored macro only applies bold formatting to the current selection.": true,
+          "MACRO_FIXTURE_END": true
+        },
+        "marker_order": [
+          "Native Word recorded macro fixture",
+          "Fixture ID: word-recorded-macro-004",
+          "MACRO_FORMAT_TARGET",
+          "The stored macro only applies bold formatting to the current selection.",
+          "MACRO_FIXTURE_END"
+        ]
+      },
+      "vba_container": {
+        "storage_discovery": {
+          "package_open": "pass",
+          "storage_count": 1,
+          "project_root": [
+            "Macros"
+          ],
+          "vba_storage": [
+            "Macros",
+            "VBA"
+          ],
+          "structurally_complete": true,
+          "may_contain_macro_code": true,
+          "project_stream": true,
+          "project_wm_stream": true,
+          "project_lk_stream": false,
+          "vba_project_stream": true,
+          "dir_stream": true,
+          "candidate_module_streams": [
+            "NewMacros",
+            "ThisDocument"
+          ],
+          "srp_streams": [
+            "__SRP_0",
+            "__SRP_1",
+            "__SRP_2",
+            "__SRP_3"
+          ]
+        },
+        "library_read": {
+          "package_open": "pass",
+          "vba_storage_discovery": "pass",
+          "payload_parse": "pass",
+          "project_name": "Project",
+          "module_count": 2,
+          "reference_count": 3,
+          "errors": []
+        },
+        "project": {
+          "project_name": "Project",
+          "page_id": 10000,
+          "module_count": 2,
+          "reference_count": 3,
+          "reference_names": [
+            "MSForms",
+            "Normal",
+            "Office"
+          ],
+          "module_names": [
+            "ThisDocument",
+            "NewMacros"
+          ],
+          "modules": [
+            {
+              "name": "ThisDocument",
+              "stream_name": "ThisDocument",
+              "kind": "DocumentClassOrDesigner",
+              "text_offset": 931,
+              "read_only": false,
+              "private": false,
+              "source_text": "Attribute VB_Name = \"ThisDocument\"\nAttribute VB_Base = \"1Normal.ThisDocument\"\nAttribute VB_GlobalNameSpace = False\nAttribute VB_Creatable = False\nAttribute VB_PredeclaredId = True\nAttribute VB_Exposed = True\nAttribute VB_TemplateDerived = True\nAttribute VB_Customizable = True\n"
+            },
+            {
+              "name": "NewMacros",
+              "stream_name": "NewMacros",
+              "kind": "Procedural",
+              "text_offset": 1420,
+              "read_only": false,
+              "private": false,
+              "source_text": "Attribute VB_Name = \"NewMacros\"\nSub FixtureBoldSelection()\nAttribute FixtureBoldSelection.VB_Description = \"Synthetic fixture macro: applies bold to the selected text. No automatic execution.\"\nAttribute FixtureBoldSelection.VB_ProcData.VB_Invoke_Func = \"Project.NewMacros.FixtureBoldSelection\"\n'\n' FixtureBoldSelection Macro\n' Synthetic fixture macro: applies bold to the selected text. No automatic execution.\n'\n    Selection.Font.Bold = wdToggle\nEnd Sub\n"
+            }
+          ],
+          "source_line_endings": "litchi-vba decoded source as LF-delimited text",
+          "macro_behavior": {
+            "procedure": "FixtureBoldSelection",
+            "qualified_name": "Project.NewMacros.FixtureBoldSelection",
+            "description": "Synthetic fixture macro: applies bold to the selected text. No automatic execution.",
+            "recorded_action": "Cmd+B only",
+            "source_statement": "Selection.Font.Bold = wdToggle",
+            "expected_behavior": "When explicitly invoked with a current selection, toggles the selection bold state. It is not an unconditional bold-on operation.",
+            "automatic_execution": false,
+            "event_handlers_present": false,
+            "execution_performed_during_inspection": false
+          },
+          "automatic_execution": false,
+          "reader_scope": "Metadata, compressed module source and project relationships only; no compilation, interpretation or execution."
+        }
+      },
+      "native_reopen_validation": {
+        "observed_by": "Root agent via Computer Use",
+        "application": "Microsoft Word",
+        "reopen": "pass",
+        "repair_prompt": false,
+        "macro_security": {
+          "alert_shown_on_native_reopen": true,
+          "user_action": "Disable Macros",
+          "macro_execution_allowed": false,
+          "macro_execution_observed": false,
+          "scope": "Native Word reopen validation only; the VBA source was inspected inertly by library readers."
+        },
+        "visible_markers": [
+          "Native Word recorded macro fixture",
+          "Fixture ID: word-recorded-macro-004",
+          "MACRO_FORMAT_TARGET",
+          "The stored macro only applies bold formatting to the current selection.",
+          "MACRO_FIXTURE_END"
+        ],
+        "visible_title": "Native Word recorded macro fixture",
+        "visible_fixture_id": "word-recorded-macro-004",
+        "recording_action": "Cmd+B only",
+        "macro_storage": "Stored explicitly in this document/template; not Normal.dotm.",
+        "semantic_limit": "Visible native reopen confirms markers and no repair prompt; it does not execute or semantically test the macro."
+      }
+    },
+    {
+      "path": "test-data/microsoft-office/word/word-recorded-macro.dot",
+      "format": "dot",
+      "bytes": 36352,
+      "sha256": "b69b1caeb749a0c7c56f505dd5a2fb3135acc1f74c21ff5319df6b7ebab82f6d",
+      "file_description": "Composite Document File V2 Document, Little Endian, Os: MacOS, Version 5.26, Code page: 10000, Author: Ryker Zhu, Template: Normal.dotm, Last Saved By: Ryker Zhu, Revision Number: 2, Name of Creating Application: Microsoft Office Word, Total Editing Time: 01:00, Create Time/Date: Thu Oct 15 06:01:00 2026, Last Saved Time/Date: Thu Oct 15 06:01:00 2026, Number of Pages: 1, Number of Words: 12, Number of Characters: 169, Security: 0",
+      "container": {
+        "kind": "Compound File Binary (CFB/OLE)",
+        "cfb": {
+          "signature_hex": "d0cf11e0a1b11ae1",
+          "file_size": 36352,
+          "signature_valid": true,
+          "header": {
+            "major_version": 3,
+            "minor_version": 62,
+            "byte_order_hex": "feff",
+            "sector_size": 512,
+            "mini_sector_size": 64,
+            "num_fat_sectors": 1,
+            "first_directory_sector": 44,
+            "mini_stream_cutoff": 4096,
+            "first_mini_fat_sector": 46,
+            "num_mini_fat_sectors": 2,
+            "num_difat_sectors": 0
+          },
+          "directory_streams": [
+            {
+              "directory_index": 0,
+              "name": "Root Entry",
+              "object_type": "root",
+              "start_sector": 47,
+              "size_bytes": 9280
+            },
+            {
+              "directory_index": 1,
+              "name": "1Table",
+              "object_type": "stream",
+              "start_sector": 8,
+              "size_bytes": 9358
+            },
+            {
+              "directory_index": 2,
+              "name": "WordDocument",
+              "object_type": "stream",
+              "start_sector": 0,
+              "size_bytes": 4096
+            },
+            {
+              "directory_index": 3,
+              "name": "\u0005SummaryInformation",
+              "object_type": "stream",
+              "start_sector": 27,
+              "size_bytes": 4096
+            },
+            {
+              "directory_index": 4,
+              "name": "\u0005DocumentSummaryInformation",
+              "object_type": "stream",
+              "start_sector": 35,
+              "size_bytes": 4096
+            },
+            {
+              "directory_index": 5,
+              "name": "Macros",
+              "object_type": "storage",
+              "start_sector": 0,
+              "size_bytes": 0
+            },
+            {
+              "directory_index": 6,
+              "name": "VBA",
+              "object_type": "storage",
+              "start_sector": 0,
+              "size_bytes": 0
+            },
+            {
+              "directory_index": 7,
+              "name": "dir",
+              "object_type": "stream",
+              "start_sector": 0,
+              "size_bytes": 689
+            },
+            {
+              "directory_index": 8,
+              "name": "__SRP_0",
+              "object_type": "stream",
+              "start_sector": 11,
+              "size_bytes": 1366
+            },
+            {
+              "directory_index": 9,
+              "name": "__SRP_1",
+              "object_type": "stream",
+              "start_sector": 33,
+              "size_bytes": 275
+            },
+            {
+              "directory_index": 10,
+              "name": "__SRP_2",
+              "object_type": "stream",
+              "start_sector": 38,
+              "size_bytes": 169
+            },
+            {
+              "directory_index": 11,
+              "name": "__SRP_3",
+              "object_type": "stream",
+              "start_sector": 41,
+              "size_bytes": 164
+            },
+            {
+              "directory_index": 12,
+              "name": "NewMacros",
+              "object_type": "stream",
+              "start_sector": 44,
+              "size_bytes": 1678
+            },
+            {
+              "directory_index": 13,
+              "name": "ThisDocument",
+              "object_type": "stream",
+              "start_sector": 71,
+              "size_bytes": 1087
+            },
+            {
+              "directory_index": 14,
+              "name": "_VBA_PROJECT",
+              "object_type": "stream",
+              "start_sector": 88,
+              "size_bytes": 2999
+            },
+            {
+              "directory_index": 15,
+              "name": "PROJECT",
+              "object_type": "stream",
+              "start_sector": 135,
+              "size_bytes": 340
+            },
+            {
+              "directory_index": 16,
+              "name": "PROJECTwm",
+              "object_type": "stream",
+              "start_sector": 141,
+              "size_bytes": 71
+            },
+            {
+              "directory_index": 17,
+              "name": "\u0001CompObj",
+              "object_type": "stream",
+              "start_sector": 143,
+              "size_bytes": 114
+            }
+          ],
+          "integrity": {
+            "sector_count": 70,
+            "fat_sector_chain": [
+              43
+            ],
+            "directory_chain": [
+              44,
+              45,
+              49,
+              54,
+              68
+            ],
+            "directory_entry_count": 18,
+            "check": "pass",
+            "errors": []
+          }
+        },
+        "stream_inventory": [
+          {
+            "path": [
+              "1Table"
+            ],
+            "bytes": 9358
+          },
+          {
+            "path": [
+              "Macros",
+              "VBA",
+              "dir"
+            ],
+            "bytes": 689
+          },
+          {
+            "path": [
+              "Macros",
+              "VBA",
+              "__SRP_0"
+            ],
+            "bytes": 1366
+          },
+          {
+            "path": [
+              "Macros",
+              "VBA",
+              "__SRP_1"
+            ],
+            "bytes": 275
+          },
+          {
+            "path": [
+              "Macros",
+              "VBA",
+              "__SRP_2"
+            ],
+            "bytes": 169
+          },
+          {
+            "path": [
+              "Macros",
+              "VBA",
+              "__SRP_3"
+            ],
+            "bytes": 164
+          },
+          {
+            "path": [
+              "Macros",
+              "VBA",
+              "NewMacros"
+            ],
+            "bytes": 1678
+          },
+          {
+            "path": [
+              "Macros",
+              "VBA",
+              "ThisDocument"
+            ],
+            "bytes": 1087
+          },
+          {
+            "path": [
+              "Macros",
+              "VBA",
+              "_VBA_PROJECT"
+            ],
+            "bytes": 2999
+          },
+          {
+            "path": [
+              "Macros",
+              "PROJECT"
+            ],
+            "bytes": 340
+          },
+          {
+            "path": [
+              "Macros",
+              "PROJECTwm"
+            ],
+            "bytes": 71
+          },
+          {
+            "path": [
+              "\u0001CompObj"
+            ],
+            "bytes": 114
+          },
+          {
+            "path": [
+              "WordDocument"
+            ],
+            "bytes": 4096
+          },
+          {
+            "path": [
+              "\u0005SummaryInformation"
+            ],
+            "bytes": 4096
+          },
+          {
+            "path": [
+              "\u0005DocumentSummaryInformation"
+            ],
+            "bytes": 4096
+          }
+        ]
+      },
+      "native_streams": {
+        "stream_paths": [
+          [
+            "1Table"
+          ],
+          [
+            "Macros",
+            "VBA",
+            "dir"
+          ],
+          [
+            "Macros",
+            "VBA",
+            "__SRP_0"
+          ],
+          [
+            "Macros",
+            "VBA",
+            "__SRP_1"
+          ],
+          [
+            "Macros",
+            "VBA",
+            "__SRP_2"
+          ],
+          [
+            "Macros",
+            "VBA",
+            "__SRP_3"
+          ],
+          [
+            "Macros",
+            "VBA",
+            "NewMacros"
+          ],
+          [
+            "Macros",
+            "VBA",
+            "ThisDocument"
+          ],
+          [
+            "Macros",
+            "VBA",
+            "_VBA_PROJECT"
+          ],
+          [
+            "Macros",
+            "PROJECT"
+          ],
+          [
+            "Macros",
+            "PROJECTwm"
+          ],
+          [
+            "\u0001CompObj"
+          ],
+          [
+            "WordDocument"
+          ],
+          [
+            "\u0005SummaryInformation"
+          ],
+          [
+            "\u0005DocumentSummaryInformation"
+          ]
+        ],
+        "project_root": [
+          "Macros"
+        ],
+        "vba_storage": [
+          "Macros",
+          "VBA"
+        ],
+        "required_streams_present": [
+          "Macros/PROJECT",
+          "Macros/VBA/_VBA_PROJECT",
+          "Macros/VBA/dir"
+        ],
+        "module_streams": [
+          "Macros/VBA/NewMacros",
+          "Macros/VBA/ThisDocument"
+        ],
+        "ignored_srp_streams": [
+          "Macros/VBA/__SRP_0",
+          "Macros/VBA/__SRP_1",
+          "Macros/VBA/__SRP_2",
+          "Macros/VBA/__SRP_3"
+        ]
+      },
+      "xml_validation": {
+        "status": "not_applicable",
+        "reason": "Legacy CFB/DOC has no OPC XML package parts."
+      },
+      "main_document": {
+        "method": "textutil -convert txt -stdout read-only extraction",
+        "exit_code": 0,
+        "stderr": "",
+        "text": "Native Word recorded macro fixture\nFixture ID: word-recorded-macro-004\nMACRO_FORMAT_TARGET\nThe stored macro only applies bold formatting to the current selection.\nMACRO_FIXTURE_END\n",
+        "expected_markers_present": {
+          "Native Word recorded macro fixture": true,
+          "Fixture ID: word-recorded-macro-004": true,
+          "MACRO_FORMAT_TARGET": true,
+          "The stored macro only applies bold formatting to the current selection.": true,
+          "MACRO_FIXTURE_END": true
+        },
+        "marker_order": [
+          "Native Word recorded macro fixture",
+          "Fixture ID: word-recorded-macro-004",
+          "MACRO_FORMAT_TARGET",
+          "The stored macro only applies bold formatting to the current selection.",
+          "MACRO_FIXTURE_END"
+        ]
+      },
+      "vba_container": {
+        "storage_discovery": {
+          "package_open": "pass",
+          "storage_count": 1,
+          "project_root": [
+            "Macros"
+          ],
+          "vba_storage": [
+            "Macros",
+            "VBA"
+          ],
+          "structurally_complete": true,
+          "may_contain_macro_code": true,
+          "project_stream": true,
+          "project_wm_stream": true,
+          "project_lk_stream": false,
+          "vba_project_stream": true,
+          "dir_stream": true,
+          "candidate_module_streams": [
+            "NewMacros",
+            "ThisDocument"
+          ],
+          "srp_streams": [
+            "__SRP_0",
+            "__SRP_1",
+            "__SRP_2",
+            "__SRP_3"
+          ]
+        },
+        "library_read": {
+          "package_open": "pass",
+          "vba_storage_discovery": "pass",
+          "payload_parse": "pass",
+          "project_name": "Project",
+          "module_count": 2,
+          "reference_count": 3,
+          "errors": []
+        },
+        "project": {
+          "project_name": "Project",
+          "page_id": 10000,
+          "module_count": 2,
+          "reference_count": 3,
+          "reference_names": [
+            "MSForms",
+            "Normal",
+            "Office"
+          ],
+          "module_names": [
+            "ThisDocument",
+            "NewMacros"
+          ],
+          "modules": [
+            {
+              "name": "ThisDocument",
+              "stream_name": "ThisDocument",
+              "kind": "DocumentClassOrDesigner",
+              "text_offset": 931,
+              "read_only": false,
+              "private": false,
+              "source_text": "Attribute VB_Name = \"ThisDocument\"\nAttribute VB_Base = \"1Normal.ThisDocument\"\nAttribute VB_GlobalNameSpace = False\nAttribute VB_Creatable = False\nAttribute VB_PredeclaredId = True\nAttribute VB_Exposed = True\nAttribute VB_TemplateDerived = True\nAttribute VB_Customizable = True\n"
+            },
+            {
+              "name": "NewMacros",
+              "stream_name": "NewMacros",
+              "kind": "Procedural",
+              "text_offset": 1420,
+              "read_only": false,
+              "private": false,
+              "source_text": "Attribute VB_Name = \"NewMacros\"\nSub FixtureBoldSelection()\nAttribute FixtureBoldSelection.VB_Description = \"Synthetic fixture macro: applies bold to the selected text. No automatic execution.\"\nAttribute FixtureBoldSelection.VB_ProcData.VB_Invoke_Func = \"Project.NewMacros.FixtureBoldSelection\"\n'\n' FixtureBoldSelection Macro\n' Synthetic fixture macro: applies bold to the selected text. No automatic execution.\n'\n    Selection.Font.Bold = wdToggle\nEnd Sub\n"
+            }
+          ],
+          "source_line_endings": "litchi-vba decoded source as LF-delimited text",
+          "macro_behavior": {
+            "procedure": "FixtureBoldSelection",
+            "qualified_name": "Project.NewMacros.FixtureBoldSelection",
+            "description": "Synthetic fixture macro: applies bold to the selected text. No automatic execution.",
+            "recorded_action": "Cmd+B only",
+            "source_statement": "Selection.Font.Bold = wdToggle",
+            "expected_behavior": "When explicitly invoked with a current selection, toggles the selection bold state. It is not an unconditional bold-on operation.",
+            "automatic_execution": false,
+            "event_handlers_present": false,
+            "execution_performed_during_inspection": false
+          },
+          "automatic_execution": false,
+          "reader_scope": "Metadata, compressed module source and project relationships only; no compilation, interpretation or execution."
+        }
+      },
+      "native_reopen_validation": {
+        "observed_by": "Root agent via Computer Use",
+        "application": "Microsoft Word",
+        "reopen": "pass",
+        "repair_prompt": false,
+        "macro_security": {
+          "alert_shown_on_native_reopen": true,
+          "user_action": "Disable Macros",
+          "macro_execution_allowed": false,
+          "macro_execution_observed": false,
+          "scope": "Native Word reopen validation only; the VBA source was inspected inertly by library readers."
+        },
+        "visible_markers": [
+          "Native Word recorded macro fixture",
+          "Fixture ID: word-recorded-macro-004",
+          "MACRO_FORMAT_TARGET",
+          "The stored macro only applies bold formatting to the current selection.",
+          "MACRO_FIXTURE_END"
+        ],
+        "visible_title": "Native Word recorded macro fixture",
+        "visible_fixture_id": "word-recorded-macro-004",
+        "recording_action": "Cmd+B only",
+        "macro_storage": "Stored explicitly in this document/template; not Normal.dotm.",
+        "semantic_limit": "Visible native reopen confirms markers and no repair prompt; it does not execute or semantically test the macro."
+      }
+    }
+  ],
+  "validation_methods": [
+    "SHA-256 computed from each closed fixture byte stream.",
+    "OPC Zip CRC check and XML well-formedness for DOCM/DOTM; internal relationship targets resolved and macro content types checked.",
+    "CFB/OLE signature, FAT/directory chain and stream inventory inspected for DOC/DOT; litchi-doc package and VBA storage readers opened both files.",
+    "litchi-vba decompressed and decoded the dir/module streams read-only; module source and project metadata were compared across all four variants.",
+    "textutil -convert txt -stdout used only for read-only legacy Word marker extraction.",
+    "Root native Word reopen observations record no repair prompt and Disable Macros selection; no macro execution was performed."
+  ]
+}

@@ -1,0 +1,1227 @@
+{
+  "schema_version": 1,
+  "fixture_id": "powerpoint-modern-media-007",
+  "generated_on": "2026-10-15",
+  "purpose": "Read-only inspection of native Microsoft PowerPoint fixtures covering embedded media captions, native SVG import, a native 3D model with camera metadata, and native ChartEx waterfall and sunburst charts in PPTX and legacy PPT containers.",
+  "native_ui_observation_source": "Root agent Computer Use session; this inspection process did not operate Office UI.",
+  "provenance": {
+    "producer_app": "Microsoft Office PowerPoint",
+    "app_version": "16.110.2",
+    "app_build": "16.110.26062818",
+    "package_application": "Microsoft Macintosh PowerPoint",
+    "package_app_version": "16.0000",
+    "platform": "macOS",
+    "authoring_method": "Computer Use / native Microsoft PowerPoint UI",
+    "source_fixture": "test-data/microsoft-office/powerpoint/powerpoint-media-objects.pptx",
+    "source_fixture_sha256": "35bf326a3d9374faee9f6a8837a3a5f9c3235de1b38013be0e9dc4cb76e4262f",
+    "source_fixture_unchanged_at_inspection": true,
+    "import_assets": [
+      "test-data/microsoft-office/assets/captions-007.vtt",
+      "test-data/microsoft-office/assets/svg-blue-yellow-007.svg",
+      "test-data/microsoft-office/assets/colored-triangle-007.glb"
+    ],
+    "libreoffice_used": false,
+    "programmatic_office_generation_used": false,
+    "library_code_modified": false,
+    "all_documents_closed_before_hashing": true,
+    "lock_files_present_at_inspection": false
+  },
+  "scope_and_limits": {
+    "variants": [
+      "pptx",
+      "ppt"
+    ],
+    "native_reopen_verified": true,
+    "native_reopen_repair_prompt": false,
+    "external_links_followed": false,
+    "macros_or_external_code_executed": false,
+    "media_or_model_execution_claimed": false,
+    "chart_animation_or_slideshow_execution_claimed": false,
+    "legacy_modern_feature_semantic_parity_claimed": false,
+    "legacy_save_warning": "PowerPoint warned that slide 2 video, slide 5 SVG, slide 6 3D model, and slides 7-8 charts would be saved as pictures in the legacy derivative; the warning was accepted.",
+    "known_reader_boundaries": [
+      "litchi-pptx::media_parts::load_slide_media rejects slide 2 with Invalid(unsupported p14:media child 'extLst') before it can expose the native caption track; the media relationship rId2 and track relationship rId4 are present and valid in the package.",
+      "litchi-pptx::Slide::model3ds rejects slide 6 because PowerPoint declares the GLB content type as model/gltf.binary while the reader currently requires model/gltf-binary.",
+      "litchi-pptx::Slide::chart_extensions parses slide 8's ChartEx sunburst but rejects slide 7's native waterfall subtotal syntax with Invalid(\"invalid  subtotal index\"); PowerPoint uses <cx:subtotals><cx:idx val=\"0\"/>...</cx:subtotals>.",
+      "litchi-pptx::presentation::SourceBackedPresentation::images refuses slides 4, 6, 7 and 8 because the picture fallback is inside an MCE AlternateContent branch whose ownership is ambiguous; slide 5 instead refuses because a:blip has no direct r:embed or r:link and the SVG relationship is carried by asvg:svgBlip.",
+      "litchi-ppt::Presentation::images fails with OfficeArt(MalformedImage { reason: resolved BLIP UID does not match the FBSE UID }) for this legacy derivative; typed external_media and ole_objects records remain readable.",
+      "The source GLB is transformed by PowerPoint's native importer before being stored as model3d1.glb, and the source SVG is minified and rewritten as image4.svg; both package payloads retain their deterministic visible markers but are not byte-identical to their import assets."
+    ]
+  },
+  "expected_native_content": {
+    "slide_count": 8,
+    "slide_titles_or_markers": [
+      "PPT_MODERN_MEDIA_007",
+      "VIDEO_EMBED_004",
+      "AUDIO_EMBED_004",
+      "OLE_WORKBOOK_004",
+      "SVG_VECTOR_007",
+      "MODEL_3D_007",
+      "CHARTEX_WATERFALL_007",
+      "CHARTEX_SUNBURST_007"
+    ],
+    "slide_1_text": [
+      "PPT_MODERN_MEDIA_007",
+      "Fixture ID: powerpoint-modern-media-007",
+      "Native captions, vector, 3D and extended charts"
+    ],
+    "presentation_graph": {
+      "slide_size_emu": [
+        12192000,
+        6858000
+      ],
+      "ordered_slide_ids": [
+        256,
+        257,
+        258,
+        259,
+        260,
+        261,
+        262,
+        263
+      ],
+      "hidden_slides": [],
+      "slide_masters": 1,
+      "slide_layouts": 11,
+      "native_master_date_text": "10/15/26",
+      "slide_number_field_present": true
+    },
+    "video_with_captions": {
+      "slide": 2,
+      "marker": "VIDEO_EMBED_004",
+      "inherited_video_source": "test-data/iwork/keynote/media-replacement-assets/striped.mov",
+      "inherited_video_duration_seconds": 2.0,
+      "caption_source": "test-data/microsoft-office/assets/captions-007.vtt",
+      "caption_source_bytes": 94,
+      "caption_source_sha256": "ef72ee0739e5bce54e8131e248a50d8ce65f825b9d20e64ca4d9db0fae591e9e",
+      "caption_source_cues": [
+        {
+          "start": "00:00.000",
+          "end": "00:01.000",
+          "text": "CAPTION_FIRST_007"
+        },
+        {
+          "start": "00:01.000",
+          "end": "00:02.000",
+          "text": "CAPTION_SECOND_007"
+        }
+      ],
+      "native_reopen_caption_list": "English Fixture007-EnglishUS",
+      "slide_xml_track": {
+        "namespace": "http://schemas.microsoft.com/office/powerpoint/2017/3/main",
+        "track_id": "{22E87EF0-5BD7-B344-840B-341EC7730D78}",
+        "label": "English Fixture 007",
+        "lang": "en-us",
+        "relationship_id": "rId4"
+      },
+      "package_track_part": "/ppt/media/track1.vtt",
+      "package_track_bytes": 107,
+      "package_track_sha256": "4c750786fc13356efe4c5421dbf6cb4d6bd5efc7df87abd5f40551562452aa29",
+      "package_track_text": "WEBVTT\\n\\n00:00:00.000 --> 00:00:01.000\\nCAPTION_FIRST_007\\n\\n00:00:01.000 --> 00:00:02.000\\nCAPTION_SECOND_007\\n",
+      "slide_xml_media": {
+        "media_relationship_id": "rId2",
+        "video_relationship_id": "rId1",
+        "video_relationship_target": "NULL",
+        "video_relationship_target_mode": "External",
+        "trim_start_hundredths": 50,
+        "trim_end_hundredths": 50,
+        "fade_in_hundredths": 250,
+        "fade_out_hundredths": 500,
+        "poster_relationship_id": "rId5"
+      },
+      "alt_text": "VIDEO_ALT_004: synthetic colored stripes movie with a custom PNG poster.",
+      "alt_text_persisted": true
+    },
+    "audio": {
+      "slide": 3,
+      "marker": "AUDIO_EMBED_004",
+      "source": "test-data/iwork/keynote/media-replacement-assets/tone.wav",
+      "duration_seconds": 2.0,
+      "play_in_background": true,
+      "start": "automatically",
+      "play_across_slides": true,
+      "loop": true,
+      "hide_during_show": true,
+      "rewind_after_playing": true,
+      "reopened_playback_controls_confirmed": true
+    },
+    "ole_workbook": {
+      "slide": 4,
+      "marker": "OLE_WORKBOOK_004",
+      "source": "test-data/microsoft-office/excel/excel-values-formulas-chart.xlsx",
+      "display_as_icon": false,
+      "prog_id": "Excel.Sheet.12",
+      "object_name": "Worksheet",
+      "preview_part": "/ppt/media/image3.emf",
+      "embedded_package_part": "/ppt/embeddings/Microsoft_Excel_Worksheet.xlsx",
+      "embedded_workbook_sha256": "07fbdf1bd05d9f080356bbc10bc9cc897ffd794a166b2c141f45bad707051bbc",
+      "native_values_observed": [
+        49.75,
+        14
+      ]
+    },
+    "svg": {
+      "slide": 5,
+      "marker": "SVG_VECTOR_007",
+      "source": "test-data/microsoft-office/assets/svg-blue-yellow-007.svg",
+      "source_bytes": 634,
+      "source_sha256": "7a9ddf774233cf05324a5f032d54003274d998e7cddda2185c899847e0ffead0",
+      "source_dimensions": {
+        "width": 320,
+        "height": 180,
+        "view_box": "0 0 320 180"
+      },
+      "native_insert_width_inches": 6.0,
+      "native_aspect_ratio_locked": true,
+      "alt_text": "SVG_ALT_007: blue and yellow vector blocks with the SVG_MARKER_007 label.",
+      "slide_relationship_id": "rId2",
+      "slide_xml_svg_relationship": "asvg:svgBlip r:embed=\"rId2\"",
+      "package_part": "/ppt/media/image4.svg",
+      "package_bytes": 418,
+      "package_sha256": "91bdc6ffe9ddcd4ddda5c1e4872f0003b6b0864a0523c19945a4917da6858a95",
+      "package_marker_retained": true,
+      "package_has_raster_fallback": false,
+      "package_svg_note": "PowerPoint rewrote the source SVG into a compact image4.svg and kept the SVG relationship in an a:blip extension; the ordinary a:blip has no r:embed or r:link."
+    },
+    "model3d": {
+      "slide": 6,
+      "marker": "MODEL_3D_007",
+      "source": "test-data/microsoft-office/assets/colored-triangle-007.glb",
+      "source_bytes": 1200,
+      "source_sha256": "0f2064d8a923c4cd8abda05f0cb9b2c13d300f14ae1df0446904202c280f6d17",
+      "source_header": {
+        "magic": "glTF",
+        "version": 2,
+        "declared_total_length": 1200
+      },
+      "slide_relationship_id": "rId2",
+      "slide_relationship_type": "http://schemas.microsoft.com/office/2017/06/relationships/model3d",
+      "package_part": "/ppt/media/model3d1.glb",
+      "package_content_type": "model/gltf.binary",
+      "package_bytes": 1112,
+      "package_sha256": "c38cdec1804bd5c2aef0b8ae55186d9dabbb7831b83d074583d3af2f292ecddb",
+      "package_glb": {
+        "magic": "glTF",
+        "version": 2,
+        "declared_total_length": 1112,
+        "json_chunk_bytes": 1024,
+        "json_chunk_sha256": "ae1eca4583207e5e0e1538edb13eb746b699235ecb628dd4cefe547f155c413b",
+        "bin_chunk_bytes": 60,
+        "bin_chunk_sha256": "554847dc36c4c501dce608d1a9b8dbe33f6b5dfd1de1fc77be63dde1f9c462a4",
+        "fixture_marker_retained": "GLB_MARKER_007"
+      },
+      "camera": {
+        "position": {
+          "x": 0,
+          "y": 0,
+          "z": 62500298
+        },
+        "up": {
+          "dx": 0,
+          "dy": 36000000,
+          "dz": 0
+        },
+        "look_at": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        },
+        "perspective_fov": 2700000
+      },
+      "transform": {
+        "meter_per_model_unit": {
+          "numerator": 624999,
+          "denominator": 1000000
+        },
+        "pre_translation": {
+          "dx": 0,
+          "dy": -2250000,
+          "dz": 0
+        },
+        "scale": {
+          "sx": 1000000,
+          "sy": 1000000,
+          "sz": 1000000
+        },
+        "rotation": {
+          "ax": 1200000,
+          "ay": -1800000,
+          "az": -600000
+        },
+        "post_translation": {
+          "dx": 0,
+          "dy": 0,
+          "dz": 0
+        }
+      },
+      "raster_preview": {
+        "renderer": "Office3DRenderer",
+        "version": "16.0.8326",
+        "relationship_id": "rId3",
+        "part": "/ppt/media/image5.png",
+        "bytes": 54931,
+        "sha256": "fd6b8bff032f6006be7aa80e5eb3149ccfc6c999a06591132e52809b3693c91e",
+        "dimensions": [
+          466,
+          518
+        ]
+      },
+      "alt_text": "MODEL_ALT_007: synthetic colored triangle shown from above, front and right.",
+      "native_views_selected": [
+        "Above",
+        "Front",
+        "Right"
+      ],
+      "native_reopen_visible_gradient_triangle": true
+    },
+    "chartex_waterfall": {
+      "slide": 7,
+      "marker": "CHARTEX_WATERFALL_007",
+      "chart_type": "waterfall",
+      "workbook_range": "Sheet1!$A$2:$B$9",
+      "series_formula": "Sheet1!$B$1",
+      "series_value": "FLOW_007",
+      "rows": [
+        ["Start_007", 100],
+        ["Gain_A_007", 25],
+        ["Loss_A_007", -10],
+        ["Gain_B_007", 5],
+        ["Subtotal_007", 120],
+        ["Loss_B_007", -20],
+        ["Gain_C_007", 30],
+        ["End_007", 130]
+      ],
+      "native_subtotal_indices": [
+        0,
+        4,
+        7
+      ],
+      "fallback_part": "/ppt/media/image6.png",
+      "fallback_dimensions": [
+        1473,
+        612
+      ],
+      "native_reopen_axis_totals_verified": true
+    },
+    "chartex_sunburst": {
+      "slide": 8,
+      "marker": "CHARTEX_SUNBURST_007",
+      "chart_type": "sunburst",
+      "workbook_range": "Sheet1!$A$2:$C$17",
+      "numeric_range": "Sheet1!$D$2:$D$17",
+      "series_formula": "Sheet1!$D$1",
+      "series_value": "HIERARCHY_007",
+      "levels": 3,
+      "leaves": 16,
+      "leaf_values": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16
+      ],
+      "leaf_value_total": 136,
+      "regions": [
+        "NORTH_007",
+        "SOUTH_007"
+      ],
+      "groups": [
+        "GROUP_1_007",
+        "GROUP_2_007",
+        "GROUP_3_007",
+        "GROUP_4_007"
+      ],
+      "fallback_part": "/ppt/media/image7.png",
+      "fallback_dimensions": [
+        1473,
+        612
+      ],
+      "native_reopen_axis_totals_verified": true
+    }
+  },
+  "files": [
+    {
+      "path": "test-data/microsoft-office/powerpoint/powerpoint-modern-media.pptx",
+      "format": "pptx",
+      "bytes": 394407,
+      "sha256": "4aca2a5222721bd1670934460b97f966625f7334b275a81c412e716ff3e6b849",
+      "file_description": "Microsoft PowerPoint 2007+",
+      "container": {
+        "kind": "OPC ZIP",
+        "zip_test": "pass",
+        "member_count": 73,
+        "xml_parts_parsed": 58,
+        "relationship_part_count": 24,
+        "relationship_count": 70,
+        "internal_relationship_target_misses": 0,
+        "external_relationships": [
+          {
+            "part": "ppt/slides/_rels/slide2.xml.rels",
+            "id": "rId1",
+            "type": "video",
+            "target": "NULL",
+            "target_mode": "External"
+          }
+        ],
+        "content_type_defaults": {
+          "emf": "image/x-emf",
+          "glb": "model/gltf.binary",
+          "jpeg": "image/jpeg",
+          "mov": "video/quicktime",
+          "png": "image/png",
+          "rels": "application/vnd.openxmlformats-package.relationships+xml",
+          "svg": "image/svg+xml",
+          "vtt": "text/vtt",
+          "wav": "audio/x-wav",
+          "xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          "xml": "application/xml"
+        },
+        "members": [
+          "[Content_Types].xml",
+          "_rels/.rels",
+          "docProps/app.xml",
+          "docProps/core.xml",
+          "docProps/thumbnail.jpeg",
+          "ppt/_rels/presentation.xml.rels",
+          "ppt/charts/_rels/chartEx1.xml.rels",
+          "ppt/charts/_rels/chartEx2.xml.rels",
+          "ppt/charts/chartEx1.xml",
+          "ppt/charts/chartEx2.xml",
+          "ppt/charts/colors1.xml",
+          "ppt/charts/colors2.xml",
+          "ppt/charts/style1.xml",
+          "ppt/charts/style2.xml",
+          "ppt/embeddings/Microsoft_Excel_Worksheet.xlsx",
+          "ppt/embeddings/Microsoft_Excel_Worksheet1.xlsx",
+          "ppt/embeddings/Microsoft_Excel_Worksheet2.xlsx",
+          "ppt/media/image1.png",
+          "ppt/media/image2.png",
+          "ppt/media/image3.emf",
+          "ppt/media/image4.svg",
+          "ppt/media/image5.png",
+          "ppt/media/image6.png",
+          "ppt/media/image7.png",
+          "ppt/media/media1.mov",
+          "ppt/media/media2.wav",
+          "ppt/media/model3d1.glb",
+          "ppt/media/track1.vtt",
+          "ppt/presProps.xml",
+          "ppt/presentation.xml",
+          "ppt/slideLayouts/_rels/slideLayout1.xml.rels",
+          "ppt/slideLayouts/_rels/slideLayout10.xml.rels",
+          "ppt/slideLayouts/_rels/slideLayout11.xml.rels",
+          "ppt/slideLayouts/_rels/slideLayout2.xml.rels",
+          "ppt/slideLayouts/_rels/slideLayout3.xml.rels",
+          "ppt/slideLayouts/_rels/slideLayout4.xml.rels",
+          "ppt/slideLayouts/_rels/slideLayout5.xml.rels",
+          "ppt/slideLayouts/_rels/slideLayout6.xml.rels",
+          "ppt/slideLayouts/_rels/slideLayout7.xml.rels",
+          "ppt/slideLayouts/_rels/slideLayout8.xml.rels",
+          "ppt/slideLayouts/_rels/slideLayout9.xml.rels",
+          "ppt/slideLayouts/slideLayout1.xml",
+          "ppt/slideLayouts/slideLayout10.xml",
+          "ppt/slideLayouts/slideLayout11.xml",
+          "ppt/slideLayouts/slideLayout2.xml",
+          "ppt/slideLayouts/slideLayout3.xml",
+          "ppt/slideLayouts/slideLayout4.xml",
+          "ppt/slideLayouts/slideLayout5.xml",
+          "ppt/slideLayouts/slideLayout6.xml",
+          "ppt/slideLayouts/slideLayout7.xml",
+          "ppt/slideLayouts/slideLayout8.xml",
+          "ppt/slideLayouts/slideLayout9.xml",
+          "ppt/slideMasters/_rels/slideMaster1.xml.rels",
+          "ppt/slideMasters/slideMaster1.xml",
+          "ppt/slides/_rels/slide1.xml.rels",
+          "ppt/slides/_rels/slide2.xml.rels",
+          "ppt/slides/_rels/slide3.xml.rels",
+          "ppt/slides/_rels/slide4.xml.rels",
+          "ppt/slides/_rels/slide5.xml.rels",
+          "ppt/slides/_rels/slide6.xml.rels",
+          "ppt/slides/_rels/slide7.xml.rels",
+          "ppt/slides/_rels/slide8.xml.rels",
+          "ppt/slides/slide1.xml",
+          "ppt/slides/slide2.xml",
+          "ppt/slides/slide3.xml",
+          "ppt/slides/slide4.xml",
+          "ppt/slides/slide5.xml",
+          "ppt/slides/slide6.xml",
+          "ppt/slides/slide7.xml",
+          "ppt/slides/slide8.xml",
+          "ppt/tableStyles.xml",
+          "ppt/theme/theme1.xml",
+          "ppt/viewProps.xml"
+        ],
+        "key_relationships": {
+          "slide2": [
+            {
+              "id": "rId2",
+              "type": "media",
+              "target": "/ppt/media/media1.mov"
+            },
+            {
+              "id": "rId1",
+              "type": "video",
+              "target": "NULL",
+              "target_mode": "External"
+            },
+            {
+              "id": "rId4",
+              "type": "track",
+              "target": "/ppt/media/track1.vtt"
+            },
+            {
+              "id": "rId5",
+              "type": "image",
+              "target": "/ppt/media/image1.png"
+            }
+          ],
+          "slide3": [
+            {
+              "id": "rId2",
+              "type": "audio",
+              "target": "/ppt/media/media2.wav"
+            },
+            {
+              "id": "rId1",
+              "type": "media",
+              "target": "/ppt/media/media2.wav"
+            },
+            {
+              "id": "rId4",
+              "type": "image",
+              "target": "/ppt/media/image2.png"
+            }
+          ],
+          "slide4": [
+            {
+              "id": "rId2",
+              "type": "package",
+              "target": "/ppt/embeddings/Microsoft_Excel_Worksheet.xlsx"
+            },
+            {
+              "id": "rId3",
+              "type": "image",
+              "target": "/ppt/media/image3.emf"
+            }
+          ],
+          "slide5": [
+            {
+              "id": "rId2",
+              "type": "image",
+              "target": "/ppt/media/image4.svg"
+            }
+          ],
+          "slide6": [
+            {
+              "id": "rId2",
+              "type": "model3d",
+              "target": "/ppt/media/model3d1.glb"
+            },
+            {
+              "id": "rId3",
+              "type": "image",
+              "target": "/ppt/media/image5.png"
+            }
+          ],
+          "slide7": [
+            {
+              "id": "rId2",
+              "type": "chartEx",
+              "target": "/ppt/charts/chartEx1.xml"
+            },
+            {
+              "id": "rId3",
+              "type": "image",
+              "target": "/ppt/media/image6.png"
+            }
+          ],
+          "slide8": [
+            {
+              "id": "rId2",
+              "type": "chartEx",
+              "target": "/ppt/charts/chartEx2.xml"
+            },
+            {
+              "id": "rId3",
+              "type": "image",
+              "target": "/ppt/media/image7.png"
+            }
+          ],
+          "chartEx1": [
+            {
+              "id": "rId1",
+              "type": "package",
+              "target": "/ppt/embeddings/Microsoft_Excel_Worksheet1.xlsx"
+            },
+            {
+              "id": "rId2",
+              "type": "chartStyle",
+              "target": "/ppt/charts/style1.xml"
+            },
+            {
+              "id": "rId3",
+              "type": "chartColorStyle",
+              "target": "/ppt/charts/colors1.xml"
+            }
+          ],
+          "chartEx2": [
+            {
+              "id": "rId1",
+              "type": "package",
+              "target": "/ppt/embeddings/Microsoft_Excel_Worksheet2.xlsx"
+            },
+            {
+              "id": "rId2",
+              "type": "chartStyle",
+              "target": "/ppt/charts/style2.xml"
+            },
+            {
+              "id": "rId3",
+              "type": "chartColorStyle",
+              "target": "/ppt/charts/colors2.xml"
+            }
+          ]
+        },
+        "media_parts": [
+          {
+            "part": "ppt/media/media1.mov",
+            "content_type": "video/quicktime",
+            "bytes": 87997,
+            "sha256": "e4b92ec504d372e2330b37d4dcd0441d2990096f41f880343795c45508a0c997",
+            "source": "test-data/iwork/keynote/media-replacement-assets/striped.mov",
+            "matches_source_bytes": true
+          },
+          {
+            "part": "ppt/media/media2.wav",
+            "content_type": "audio/x-wav",
+            "bytes": 192044,
+            "sha256": "27f1b6add1bd884455da7a36244d92fc26b81b622ce1671d5cb77bebffeb135a",
+            "source": "test-data/iwork/keynote/media-replacement-assets/tone.wav",
+            "matches_source_bytes": true
+          },
+          {
+            "part": "ppt/media/image1.png",
+            "content_type": "image/png",
+            "bytes": 1698,
+            "sha256": "d594d8f832d3ab38d03e0d06316d2fa5e401217e50e21e01814e593d752da3e8",
+            "role": "inherited video poster",
+            "dimensions": [
+              320,
+              180
+            ]
+          },
+          {
+            "part": "ppt/media/image2.png",
+            "content_type": "image/png",
+            "bytes": 4717,
+            "sha256": "b0151c2c2e3cf64bc37a7bb9d8b8b98d4c4fccf7b6af4c08c4f847a79f9db0da",
+            "role": "inherited audio icon/poster",
+            "dimensions": [
+              128,
+              128
+            ]
+          },
+          {
+            "part": "ppt/media/image3.emf",
+            "content_type": "image/x-emf",
+            "bytes": 81992,
+            "sha256": "d2a459ae9eec497ac562a4b96569b9dabe2e161f9d961c74192979ab95a7597b",
+            "role": "inherited OLE preview"
+          },
+          {
+            "part": "ppt/media/image4.svg",
+            "content_type": "image/svg+xml",
+            "bytes": 418,
+            "sha256": "91bdc6ffe9ddcd4ddda5c1e4872f0003b6b0864a0523c19945a4917da6858a95",
+            "role": "native SVG payload",
+            "source": "test-data/microsoft-office/assets/svg-blue-yellow-007.svg",
+            "matches_source_bytes": false,
+            "marker_retained": true
+          },
+          {
+            "part": "ppt/media/image5.png",
+            "content_type": "image/png",
+            "bytes": 54931,
+            "sha256": "fd6b8bff032f6006be7aa80e5eb3149ccfc6c999a06591132e52809b3693c91e",
+            "role": "native 3D raster preview",
+            "dimensions": [
+              466,
+              518
+            ]
+          },
+          {
+            "part": "ppt/media/image6.png",
+            "content_type": "image/png",
+            "bytes": 31634,
+            "sha256": "11cef8bc98465b9511c30f3af53b56399e08edcaa35a3790c37c800fb34bdec4",
+            "role": "ChartEx waterfall fallback",
+            "dimensions": [
+              1473,
+              612
+            ]
+          },
+          {
+            "part": "ppt/media/image7.png",
+            "content_type": "image/png",
+            "bytes": 89745,
+            "sha256": "525888fc069b73f95e32509fe59a7d82e862f31ed440faa6d634eaae48f4f0b2",
+            "role": "ChartEx sunburst fallback",
+            "dimensions": [
+              1473,
+              612
+            ]
+          },
+          {
+            "part": "ppt/media/model3d1.glb",
+            "content_type": "model/gltf.binary",
+            "bytes": 1112,
+            "sha256": "c38cdec1804bd5c2aef0b8ae55186d9dabbb7831b83d074583d3af2f292ecddb",
+            "role": "native 3D model payload"
+          },
+          {
+            "part": "ppt/media/track1.vtt",
+            "content_type": "text/vtt",
+            "bytes": 107,
+            "sha256": "4c750786fc13356efe4c5421dbf6cb4d6bd5efc7df87abd5f40551562452aa29",
+            "role": "native video caption track"
+          }
+        ],
+        "chart_ex_parts": [
+          {
+            "part": "ppt/charts/chartEx1.xml",
+            "slide": 7,
+            "bytes": 1814,
+            "sha256": "5904e5eaf7f2907531cf06ac4c2a2bdeb7d57be541982f37402f847cf5bbf1b1",
+            "content_type": "application/vnd.ms-office.chartex+xml",
+            "layout_id": "waterfall",
+            "external_data_relationship": "rId1",
+            "external_data_auto_update": false,
+            "fallback_image_relationship": "rId3",
+            "series_formula": "Sheet1!$B$1",
+            "series_value": "FLOW_007",
+            "category_formula": "Sheet1!$A$2:$A$9",
+            "value_formula": "Sheet1!$B$2:$B$9",
+            "values": [
+              100,
+              25,
+              -10,
+              5,
+              120,
+              -20,
+              30,
+              130
+            ],
+            "subtotals_wire": "<cx:subtotals><cx:idx val=\"0\"/><cx:idx val=\"4\"/><cx:idx val=\"7\"/></cx:subtotals>"
+          },
+          {
+            "part": "ppt/charts/chartEx2.xml",
+            "slide": 8,
+            "bytes": 3118,
+            "sha256": "af4bb632a88584f8dea45fb657ecfefcdc0bcc9b08c5896264b0dbbdfb89640c",
+            "content_type": "application/vnd.ms-office.chartex+xml",
+            "layout_id": "sunburst",
+            "external_data_relationship": "rId1",
+            "external_data_auto_update": false,
+            "fallback_image_relationship": "rId3",
+            "series_formula": "Sheet1!$D$1",
+            "series_value": "HIERARCHY_007",
+            "category_formula": "Sheet1!$A$2:$C$17",
+            "value_formula": "Sheet1!$D$2:$D$17",
+            "string_dimension_levels": 3,
+            "string_point_count_per_level": 16,
+            "numeric_values": [
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              7,
+              8,
+              9,
+              10,
+              11,
+              12,
+              13,
+              14,
+              15,
+              16
+            ]
+          }
+        ],
+        "embedded_workbooks": [
+          {
+            "part": "/ppt/embeddings/Microsoft_Excel_Worksheet.xlsx",
+            "bytes": 18372,
+            "sha256": "07fbdf1bd05d9f080356bbc10bc9cc897ffd794a166b2c141f45bad707051bbc",
+            "zip_test": "pass",
+            "member_count": 21,
+            "role": "inherited OLE workbook",
+            "sheet_names": [
+              "Sales chart",
+              "Sheet1",
+              "Sheet2"
+            ],
+            "formula_cells": {
+              "Sheet1!B6": {
+                "formula": "SUM(B2:B5)",
+                "cached_value": 14
+              },
+              "Sheet1!D6": {
+                "formula": "SUM(D2:D5)",
+                "cached_value": 49.75
+              },
+              "Sheet2!B3": {
+                "formula": "Sheet1!D6",
+                "cached_value": 49.75
+              },
+              "Sheet2!B4": {
+                "formula": "SUM(Table1[Quantity])",
+                "cached_value": 14
+              }
+            }
+          },
+          {
+            "part": "/ppt/embeddings/Microsoft_Excel_Worksheet1.xlsx",
+            "bytes": 8882,
+            "sha256": "d6c5efd8025acf975a6658b7e02191155a34cb6f1f5a70fbd5d6c8049b8b91d5",
+            "zip_test": "pass",
+            "member_count": 10,
+            "role": "native Excel editor workbook for waterfall",
+            "sheet_names": [
+              "Sheet1"
+            ],
+            "values": {
+              "A1": "Stage",
+              "B1": "FLOW_007",
+              "A2:B9": "Start_007/100, Gain_A_007/25, Loss_A_007/-10, Gain_B_007/5, Subtotal_007/120, Loss_B_007/-20, Gain_C_007/30, End_007/130"
+            }
+          },
+          {
+            "part": "/ppt/embeddings/Microsoft_Excel_Worksheet2.xlsx",
+            "bytes": 9210,
+            "sha256": "eed8b6545959d4c2b681e7e9066d165394ae4b5581a439aa8a0f7daa8b24d204",
+            "zip_test": "pass",
+            "member_count": 10,
+            "role": "native Excel editor workbook for sunburst",
+            "sheet_names": [
+              "Sheet1"
+            ],
+            "values": {
+              "A1:D1": "Region/Group/Item/HIERARCHY_007",
+              "A2:D17": "Rows 1-8 NORTH_007, rows 9-16 SOUTH_007; GROUP_{ceil(i/4)}_007; ITEM_{i2digit}_007; value i"
+            }
+          }
+        ],
+        "key_part_hashes": {
+          "[Content_Types].xml": "56e3fa10ef18d03a054e9c3145b8b77cb0fba7ac70688ae1cd5f58b75f3d5ce2",
+          "ppt/presentation.xml": "26781b7e5e447b6d11679c9a7a92c84395075015c9fd3aa399d1cb8e997c6746",
+          "ppt/presProps.xml": "cd12d22ac9a3825ff6772a707cd1e67f9ce26eb2aaf316023469a16b02852f85",
+          "ppt/slideMasters/slideMaster1.xml": "7f81037457c09123fc27b541fc1259e4bb311baed21f18c9b4e0bb3996095182",
+          "ppt/theme/theme1.xml": "b3d77e0bc8b68d1b8aa69c2f44fc1708555190efc68544ab94834647ab4ca584",
+          "ppt/slides/slide5.xml": "f05fc5ae0e2db5ba7c7261caeb7916af47196a1fd242f88147798d5c74135e1f",
+          "ppt/slides/slide6.xml": "6771865f5b3227e951cab1a0f4781e3bd2a7ed175750ed6ac07e634aa36dd46f",
+          "ppt/slides/slide7.xml": "f8c0034857b5a5c30c79f332e349819b3abff08009d061885eadf30c51433303",
+          "ppt/slides/slide8.xml": "f5759424141d7124d27908ffa64d7120c47390f35fbb7b9c785a3da2def37066",
+          "ppt/slides/_rels/slide5.xml.rels": "9290a956559db4fdf40475846bdfb994f93d315d0f3cdf0aff5da3f24649de73",
+          "ppt/slides/_rels/slide6.xml.rels": "191be6ee213dc3a5c27d67fcf8f0a21c909038ed6d7f57340b36504d3ea6d9de",
+          "ppt/slides/_rels/slide7.xml.rels": "8634fce0b1c237f9b221fd183adcf44a4cfe0f408a555905c06216ff058df8c1",
+          "ppt/slides/_rels/slide8.xml.rels": "73ab9777c8108ac635e6e133067933e1a110583dc32c7c2cd8cd62bd6191eedc",
+          "ppt/charts/chartEx1.xml": "5904e5eaf7f2907531cf06ac4c2a2bdeb7d57be541982f37402f847cf5bbf1b1",
+          "ppt/charts/chartEx2.xml": "af4bb632a88584f8dea45fb657ecfefcdc0bcc9b08c5896264b0dbbdfb89640c",
+          "ppt/charts/_rels/chartEx1.xml.rels": "662e952e1e469a7e0811591034f731faa11e730cc1672e4b5f0c49d6d86469a3",
+          "ppt/charts/_rels/chartEx2.xml.rels": "eda5f62e449ec56f08643e05347364dea765f96a67ae4b8eed08dff8d55ed61c",
+          "ppt/media/image4.svg": "91bdc6ffe9ddcd4ddda5c1e4872f0003b6b0864a0523c19945a4917da6858a95",
+          "ppt/media/model3d1.glb": "c38cdec1804bd5c2aef0b8ae55186d9dabbb7831b83d074583d3af2f292ecddb",
+          "ppt/media/track1.vtt": "4c750786fc13356efe4c5421dbf6cb4d6bd5efc7df87abd5f40551562452aa29",
+          "ppt/embeddings/Microsoft_Excel_Worksheet1.xlsx": "d6c5efd8025acf975a6658b7e02191155a34cb6f1f5a70fbd5d6c8049b8b91d5",
+          "ppt/embeddings/Microsoft_Excel_Worksheet2.xlsx": "eed8b6545959d4c2b681e7e9066d165394ae4b5581a439aa8a0f7daa8b24d204"
+        }
+      },
+      "library_read": {
+        "reader": "litchi-pptx::Package::open -> presentation",
+        "package_open": "pass",
+        "tolerance_defects": 0,
+        "slide_count": 8,
+        "slide_size_emu": [
+          12192000,
+          6858000
+        ],
+        "slide_text": [
+          "PPT_MODERN_MEDIA_007\\nFixture ID: powerpoint-modern-media-007\\nNative captions, vector, 3D and extended charts",
+          "VIDEO_EMBED_004",
+          "AUDIO_EMBED_004",
+          "OLE_WORKBOOK_004",
+          "SVG_VECTOR_007",
+          "MODEL_3D_007",
+          "CHARTEX_WATERFALL_007",
+          "CHARTEX_SUNBURST_007"
+        ],
+        "semantic_shape_counts": [
+          2,
+          2,
+          2,
+          2,
+          2,
+          2,
+          2,
+          2
+        ],
+        "semantic_shape_kinds_and_names": [
+          [
+            "Auto:Title 1",
+            "Auto:Subtitle 2"
+          ],
+          [
+            "Auto:Title 1",
+            "Picture:striped.mov"
+          ],
+          [
+            "Auto:Title 1",
+            "Picture:tone.wav"
+          ],
+          [
+            "Auto:Title 1",
+            "Ole:Content Placeholder 3"
+          ],
+          [
+            "Auto:Title 1",
+            "Picture:Content Placeholder 4"
+          ],
+          [
+            "Auto:Title 1",
+            "Picture:Content Placeholder 3"
+          ],
+          [
+            "Auto:Title 1",
+            "Picture:Content Placeholder 3"
+          ],
+          [
+            "Auto:Title 1",
+            "Picture:Content Placeholder 3"
+          ]
+        ],
+        "media_parts_reader": {
+          "slide_2": {
+            "result": "error",
+            "error": "Invalid(unsupported p14:media child 'extLst')"
+          },
+          "slide_3": {
+            "result": "pass",
+            "picture_count": 1,
+            "kind": "Audio",
+            "name": "tone.wav",
+            "relationship_id": "rId2",
+            "resource_part": "/ppt/media/media2.wav",
+            "resource_content_type": "audio/x-wav",
+            "office_extension_embed_relationship_id": "rId1"
+          }
+        },
+        "chart_extensions_reader": {
+          "slide_7": {
+            "result": "error",
+            "error": "Invalid(\"invalid  subtotal index\")"
+          },
+          "slide_8": {
+            "result": "pass",
+            "document_info": {
+              "version": "0.0",
+              "features": [],
+              "fallback_image_relationship_id": null,
+              "data_sets": 1,
+              "series_layouts": [
+                "Sunburst"
+              ],
+              "axes": 0,
+              "external_data": {
+                "relationship_id": "rId1",
+                "auto_update": false
+              },
+              "title": true,
+              "legend": false,
+              "external_data_target": "EmbeddedPackage /ppt/embeddings/Microsoft_Excel_Worksheet2.xlsx",
+              "fallback_image_part": null,
+              "chart_style_loaded": false,
+              "chart_color_style_loaded": false
+            }
+          }
+        },
+        "model3d_reader": {
+          "slide_6": {
+            "result": "error",
+            "error": "ContentType { expected: \"model/gltf-binary\", actual: \"model/gltf.binary\" }"
+          }
+        },
+        "source_backed_presentation": {
+          "open": "pass",
+          "tolerance_defects": 0,
+          "slide_count": 8,
+          "images": {
+            "slide_1": {
+              "result": "pass",
+              "count": 0
+            },
+            "slide_2": {
+              "result": "pass",
+              "count": 1,
+              "name": "striped.mov",
+              "relationship_id": "rId5",
+              "target": "/ppt/media/image1.png",
+              "content_type": "image/png",
+              "read_bytes": 1698
+            },
+            "slide_3": {
+              "result": "pass",
+              "count": 1,
+              "name": "tone.wav",
+              "relationship_id": "rId4",
+              "target": "/ppt/media/image2.png",
+              "content_type": "image/png",
+              "read_bytes": 4717
+            },
+            "slide_4": {
+              "result": "error",
+              "error": "UnsafeEdit { operation: source-backed picture inventory, reason: picture ownership inside an MCE branch is ambiguous }"
+            },
+            "slide_5": {
+              "result": "error",
+              "error": "Relationship(\"picture a:blip is missing r:embed or r:link\")"
+            },
+            "slide_6": {
+              "result": "error",
+              "error": "UnsafeEdit { operation: source-backed picture inventory, reason: picture ownership inside an MCE branch is ambiguous }"
+            },
+            "slide_7": {
+              "result": "error",
+              "error": "UnsafeEdit { operation: source-backed picture inventory, reason: picture ownership inside an MCE branch is ambiguous }"
+            },
+            "slide_8": {
+              "result": "error",
+              "error": "UnsafeEdit { operation: source-backed picture inventory, reason: picture ownership inside an MCE branch is ambiguous }"
+            }
+          }
+        }
+      },
+      "native_ui_validation": {
+        "reopen": "pass",
+        "repair_prompt": false,
+        "opened_exact_file_with_powerpoint_open": true,
+        "slide_count": 8,
+        "caption_track_reopened": "English Fixture007-EnglishUS",
+        "svg_reopened_as_native_picture": true,
+        "model3d_reopened_with_alt_text": true,
+        "chart_ex_waterfall_reopened": true,
+        "chart_ex_waterfall_totals_verified": true,
+        "chart_ex_sunburst_reopened": true,
+        "chart_ex_sunburst_leaf_total_verified": 136,
+        "native_media_or_3d_execution": false
+      }
+    },
+    {
+      "path": "test-data/microsoft-office/powerpoint/powerpoint-modern-media.ppt",
+      "format": "ppt",
+      "bytes": 518144,
+      "sha256": "6d09f45e7195ef5f36e8fa5622fc2749d237768ed48d15bc58fb14cc2fd3f62f",
+      "file_description": "Composite Document File V2 Document, Little Endian, Os: MacOS, Version 5.26, Code page: 10000, Author: Ryker Zhu, Last Saved By: Ryker Zhu, Revision Number: 2, Name of Creating Application: Microsoft Macintosh PowerPoint, Total Editing Time: 13:34, Create Time/Date: Thu Oct 15 07:27:33 2026, Last Saved Time/Date: Thu Oct 15 09:31:45 2026, Number of Words: 59",
+      "container": {
+        "kind": "Compound File Binary (CFB/OLE)",
+        "cfb_reader": "litchi-cfb::OleFile::open pass",
+        "stream_count": 5,
+        "streams": [
+          "Pictures",
+          "Current User",
+          "\\u0005SummaryInformation",
+          "PowerPoint Document",
+          "\\u0005DocumentSummaryInformation"
+        ],
+        "stream_lengths": {
+          "Pictures": 225956,
+          "Current User": 4096,
+          "\\u0005SummaryInformation": 5988,
+          "PowerPoint Document": 271813,
+          "\\u0005DocumentSummaryInformation": 4096
+        },
+        "stream_sha256": {
+          "Pictures": "0817e74ddb105cebdb6c09bbc8c40a295d4516d77a64c2db8a4bbcd32c015c52",
+          "Current User": "d6423a804c186c936043a10a1f627f798bb389bb25ae881fcba0bce9feceda67",
+          "\\u0005SummaryInformation": "f412dea38fadd9c11d15058f109fbfee702d6d2e835ab0987cf5f958ee0196d9",
+          "PowerPoint Document": "7aa15437e679dd1a39ae914d1f6d419683deef7a033ab5b031408af4d1eca738",
+          "\\u0005DocumentSummaryInformation": "f669d0a7c1b4218e2c7900dbf318cb10d43ea858f0ee45a6159616b4109bc0e4"
+        },
+        "powerpoint_document_record_evidence": {
+          "top_level_record_count": 13,
+          "document_record_payload_bytes": 195936,
+          "main_master_record_payload_bytes": 32653,
+          "slide_record_count": 8,
+          "slide_record_payload_bytes": [
+            935,
+            2065,
+            2833,
+            696,
+            16903,
+            804,
+            1593,
+            1594
+          ],
+          "external_ole_object_storage_bytes": 15621,
+          "persist_ptr_holder_bytes": 48,
+          "user_edit_atom_bytes": 28,
+          "record_counts": {
+            "Document": 1,
+            "MainMaster": 1,
+            "Slide": 8,
+            "SlideAtom": 9,
+            "PPDrawing": 9,
+            "SoundCollection": 1,
+            "ExObjList": 1,
+            "ExternalWavAudioEmbedded": 1,
+            "ExternalOleEmbed": 1,
+            "RoundTripTheme12Atom": 1,
+            "RoundTripColorMapping12Atom": 1,
+            "RoundTripContentMasterInfo12Atom": 11,
+            "RoundTripContentMasterId12Atom": 8,
+            "RoundTripCustomTableStyles12Atom": 1,
+            "ProgTags": 3,
+            "BinaryTagData": 4,
+            "Unknown": 10
+          }
+        }
+      },
+      "library_read": {
+        "reader": "litchi-ppt::Package::open -> presentation",
+        "package_open": "pass",
+        "slide_count": 8,
+        "has_pictures": true,
+        "slide_text": [
+          "PPT_MODERN_MEDIA_007\\nFixture ID: powerpoint-modern-media-007\\rNative captions, vector, 3D and extended charts",
+          "VIDEO_EMBED_004",
+          "AUDIO_EMBED_004",
+          "OLE_WORKBOOK_004",
+          "SVG_VECTOR_007",
+          "MODEL_3D_007",
+          "CHARTEX_WATERFALL_007",
+          "CHARTEX_SUNBURST_007"
+        ],
+        "fallback_shape_counts": [
+          2,
+          2,
+          2,
+          2,
+          2,
+          2,
+          2,
+          2
+        ],
+        "fallback_shape_kinds": "All legacy slide shape inventories returned Placeholder values except the native picture frames retained for slides 7 and 8; media, SVG, 3D and ChartEx semantics are not exposed as typed legacy shapes.",
+        "slide_animation_counts": [
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "external_media": {
+          "result": "pass",
+          "object_count": 1,
+          "object": {
+            "kind": "EmbeddedWav",
+            "media_id": 4,
+            "sound_id": 1,
+            "duration_ms": 2000,
+            "loop_playback": true,
+            "rewind_after_playing": true,
+            "narration": false
+          },
+          "unknown_record": "ExternalOleEmbed at object_index 1"
+        },
+        "ole_objects": {
+          "result": "pass",
+          "object_count": 1,
+          "object": {
+            "object_id": 5,
+            "subtype": "Excel",
+            "persist_id": 2,
+            "menu_name": "Worksheet",
+            "program_id": "Excel.Sheet.12",
+            "clipboard_name": "Worksheet"
+          },
+          "unknown_record": "ExternalWavAudioEmbedded at object_index 0"
+        },
+        "images": {
+          "result": "error",
+          "error": "OfficeArt(MalformedImage { reason: resolved BLIP UID does not match the FBSE UID })"
+        },
+        "legacy_feature_fallbacks": {
+          "slide_2_video": "picture",
+          "slide_5_svg": "PNG picture",
+          "slide_6_model3d": "image",
+          "slide_7_chartex_waterfall": "picture",
+          "slide_8_chartex_sunburst": "picture",
+          "native_ui_reopen_observed": "The final three feature slides reopened as images with the model alt text retained; the typed image reader still fails on the aggregate Pictures stream."
+        },
+        "legacy_media_semantics": "The legacy typed records preserve the WAV and Excel metadata, but modern captions, SVG, 3D and ChartEx objects are downgraded by PowerPoint's legacy save path and no full semantic parity claim is made."
+      },
+      "native_ui_validation": {
+        "reopen": "pass",
+        "repair_prompt": false,
+        "opened_exact_file_with_powerpoint_open": true,
+        "slide_count": 8,
+        "legacy_save_warning_shown_and_accepted": true,
+        "warning_scope": "PowerPoint warned that media, SVG, 3D and ChartEx content would be saved as pictures.",
+        "all_eight_markers_matched": true,
+        "caption_or_3d_execution": false
+      }
+    }
+  ],
+  "typed_reader_boundaries": {
+    "pptx_high_value_apis": [
+      "litchi_pptx::Package::open",
+      "Package::presentation().slide_count / slide_size / slides",
+      "Slide::text / shapes",
+      "litchi_pptx::media_parts::load_slide_media",
+      "Slide::model3ds",
+      "Slide::chart_extensions",
+      "litchi_pptx::presentation::SourceBackedPresentation::open",
+      "SourceSlide::images / read_image"
+    ],
+    "pptx_chart_ex_boundary": "The native ChartEx XML and embedded workbooks are package-readable. The typed ChartEx reader accepts the sunburst data graph and embedded workbook, but its current subtotal codec does not accept PowerPoint's attribute-form subtotal indices in the waterfall part.",
+    "pptx_model3d_boundary": "The native slide graph includes am3d:model3d with camera, transform, lighting and raster preview metadata plus a related GLB. The typed model3d reader reaches relationship validation and rejects the Office content-type spelling model/gltf.binary before returning the model.",
+    "pptx_svg_boundary": "The native SVG is stored as image/svg+xml and referenced by asvg:svgBlip under a DrawingML extension. The semantic slide shape remains a Picture, but SourceSlide::images currently requires a direct a:blip r:embed or r:link and returns a missing-reference error.",
+    "pptx_caption_boundary": "The caption track is retained as a text/vtt part and p173:track metadata with language and label, but media_parts currently rejects the containing p14:media extLst child before exposing the track.",
+    "legacy_high_value_apis": [
+      "litchi_cfb::OleFile::open / list_streams / open_stream",
+      "litchi_ppt::Package::open -> presentation",
+      "Presentation::external_media",
+      "Presentation::ole_objects",
+      "Presentation::images",
+      "Slide::text / shape_count / animations"
+    ],
+    "legacy_media_boundary": "The typed legacy ExternalWavAudioEmbedded and ExternalOleEmbed records are recoverable. PowerPoint's legacy fallback pictures are visible in native UI but Presentation::images fails before a complete picture inventory can be returned."
+  },
+  "validation_methods": [
+    "SHA-256 and byte sizes were computed from both closed final fixture byte streams and from the unchanged import assets.",
+    "file identified the OOXML fixture as Microsoft PowerPoint 2007+ and the legacy fixture as a MacOS CFB/OLE Microsoft PowerPoint document.",
+    "Python ZipFile.testzip passed for the PPTX; all 58 XML and relationship members parsed with the standard library XML parser.",
+    "The PPTX relationship graph contained 70 relationships, zero missing internal targets, and one intentional external video target NULL.",
+    "PPTX slide XML and relationship parts were inspected for caption track language and label, SVG extension relationships, model3d camera and raster preview, ChartEx choices and fallback pictures.",
+    "The SVG and GLB package payloads were compared with their deterministic import assets; Office rewrite differences, marker retention, GLB chunk sizes and source/package hashes were recorded.",
+    "Both ChartEx XML parts and all three embedded workbooks were extracted, tested as ZIP/XML, hashed, and checked for deterministic formulas, ranges, values, labels and subtotal indices.",
+    "litchi-pptx package and source-backed readers were run against the PPTX; slide text, semantic shape counts, media loading, model3d, ChartEx and source-backed picture outcomes were recorded.",
+    "litchi-cfb and litchi-ppt readers were run against the legacy PPT; stream inventory, stream hashes, record counts, slide text, audio, OLE metadata, animation counts and the existing picture-reader error were recorded.",
+    "Root Computer Use observations record native PowerPoint reopen without repair for both formats, the caption language list, SVG and 3D import behavior, native chart totals, legacy save warning and fallback images."
+  ]
+}

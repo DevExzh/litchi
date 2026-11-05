@@ -1,0 +1,550 @@
+{
+  "schema_version": 1,
+  "generated_on": "2026-10-15",
+  "purpose": "Read-only closure review of the eleven pending litchi-rtf matrix rows against the finalized native Microsoft Word RTF corpus. This file records bounded evidence and the smallest useful native follow-ups; it does not change fixture_status.",
+  "provenance": {
+    "producer_app": "Microsoft Office Word",
+    "app_version": "16.110.2",
+    "app_build": "16.110.26062818",
+    "platform": "macOS",
+    "authoring_method": "Computer Use / native Microsoft Word UI for the existing fixtures",
+    "analysis_method": "Read-only coverage-row, source-matrix, raw-RTF, inspection-metadata, hash, and existing reader-result comparison",
+    "libreoffice_used": false,
+    "programmatic_office_generation_used": false,
+    "library_code_modified": false,
+    "existing_rtf_modified": false,
+    "common_metadata_modified": false,
+    "native_reopen_claim": "The cited native Word fixtures were closed and reopened without a repair prompt where their inspection files record native_reopen=pass.",
+    "auditor": "/root/rtf_boundary_audit"
+  },
+  "scope": {
+    "row_ids": [
+      "rtf-454",
+      "rtf-461",
+      "rtf-463",
+      "rtf-464",
+      "rtf-469",
+      "rtf-482",
+      "rtf-485",
+      "rtf-487",
+      "rtf-488",
+      "rtf-489",
+      "rtf-490"
+    ],
+    "coverage_source": "test-data/microsoft-office/coverage.json",
+    "coverage_object_paths": {
+      "rtf-454": "/feature_inventory/453",
+      "rtf-461": "/feature_inventory/460",
+      "rtf-463": "/feature_inventory/462",
+      "rtf-464": "/feature_inventory/463",
+      "rtf-469": "/feature_inventory/468",
+      "rtf-482": "/feature_inventory/481",
+      "rtf-485": "/feature_inventory/484",
+      "rtf-487": "/feature_inventory/486",
+      "rtf-488": "/feature_inventory/487",
+      "rtf-489": "/feature_inventory/488",
+      "rtf-490": "/feature_inventory/489"
+    },
+    "source_matrix": "crates/litchi-rtf/docs/FEATURE_MATRIX.md",
+    "source_matrix_lines": {
+      "rtf-454": 31,
+      "rtf-461": 38,
+      "rtf-463": 40,
+      "rtf-464": 46,
+      "rtf-469": 51,
+      "rtf-482": 64,
+      "rtf-485": 67,
+      "rtf-487": 69,
+      "rtf-488": 75,
+      "rtf-489": 76,
+      "rtf-490": 77
+    },
+    "classification_rule": {
+      "fixture_bounded": "A native Word RTF contains raw controls directly related to the row, but the fixture covers only a bounded sub-scope or the litchi-rtf reader stops before typed traversal. This category never means that the broad matrix row is complete.",
+      "operation_only": "The remaining assertion is transport, CRUD, refresh, execution, or another operation that a native saved RTF cannot certify as a file-only fixture.",
+      "producer_unavailable": "The exact RTF construct is absent from this native Word 16.110.2/macOS corpus and no deterministic current native Word authoring route was observed. This is a producer/workflow boundary, not a claim that no historical or other producer can emit it.",
+      "concrete_missing_authorable_recipe": "No finalized fixture exists, but a small native Word UI operation can be tried and accepted only after the expected RTF controls are observed after close and reopen. No RTF bytes are synthesized by this audit."
+    }
+  },
+  "summary": {
+    "classification_counts": {
+      "fixture_bounded": 7,
+      "operation_only": 1,
+      "producer_unavailable": 1,
+      "concrete_missing_authorable_recipe": 2
+    },
+    "row_ids_by_classification": {
+      "fixture_bounded": ["rtf-454", "rtf-461", "rtf-464", "rtf-469", "rtf-482", "rtf-485", "rtf-488"],
+      "operation_only": ["rtf-463"],
+      "producer_unavailable": ["rtf-489"],
+      "concrete_missing_authorable_recipe": ["rtf-487", "rtf-490"]
+    },
+    "native_rtf_reader_policy": "No native Word RTF fixture is promoted to a semantic litchi-rtf pass. Every known native RTF file in this corpus contains one empty starred datastore group, but four files stop earlier at a different parser boundary; the datastore is therefore a common raw construct and not a universal first-error claim.",
+    "reader_error_counts_over_known_native_rtf_corpus": {
+      "empty_datastore_payload": 9,
+      "duplicate_typed_style_id": 1,
+      "invalid_file_table_entry_count": 1,
+      "unsupported_math_object_destination": 1,
+      "unstarred_shape_group_shprslt": 1
+    },
+    "reader_error_scope_note": "The nine empty-datastore results are word-bidi-eastasia, word-document-protection, word-embedded-fonts, word-layout-extensions, word-legacy-form, word-review-controls, word-rtf-minimal, word-rtf-table-grid, and word-visual-objects. word-tables-layout stops at duplicate typed style ID; word-mailmerge-fields stops at invalid file-table entry count; word-math-navigation stops at an unsupported math object destination; word-vector-diagram stops at an unstarred shape-group shprslt destination.",
+    "common_raw_absence_scan": {
+      "scope": "test-data/microsoft-office/word/*.rtf",
+      "file_count": 13,
+      "expected_count_each_file": {
+        "\\rtlpar": 0,
+        "\\kinsoku": 0,
+        "\\writereservation": 0,
+        "\\writereservhash": 0,
+        "\\passwordhash": 0,
+        "\\xmlopen": 0,
+        "\\xmlclose": 0,
+        "\\xmlattr": 0,
+        "\\factoidname": 0,
+        "\\mvfmf": 0,
+        "\\mvfml": 0,
+        "\\mvtof": 0,
+        "\\mvtol": 0
+      },
+      "interpretation": "These are measured absences in the current native corpus. They do not establish that Word or another producer can never emit the controls."
+    }
+  },
+  "native_rtf_corpus": [
+    {
+      "fixture_id": "word-bidi-eastasia-015",
+      "path": "test-data/microsoft-office/word/word-bidi-eastasia.rtf",
+      "bytes": 55704,
+      "sha256": "4c1faec1d945a3bfca15b3513a18d32786846229751a29502ebebb2a88a0df4a",
+      "native_reopen": "pass",
+      "inspection": "test-data/microsoft-office/word/bidi-eastasia-inspection.json",
+      "reader_error": "MalformedDocument(\"RTF data-store payload cannot be empty\")",
+      "reader_error_stage": "root-header empty datastore at RTF source line 273"
+    },
+    {
+      "fixture_id": "word-document-protection-008",
+      "path": "test-data/microsoft-office/word/word-document-protection.rtf",
+      "bytes": 48754,
+      "sha256": "31de5a6f8a38ac57fa9c1786b40c586a9eaf2d618ea14fad16a5e63d3ff28a5c",
+      "native_reopen": "pass",
+      "inspection": "test-data/microsoft-office/word/document-protection-inspection.json",
+      "reader_error": "MalformedDocument(\"RTF data-store payload cannot be empty\")"
+    },
+    {
+      "fixture_id": "word-embedded-fonts-011",
+      "path": "test-data/microsoft-office/word/word-embedded-fonts.rtf",
+      "bytes": 47382,
+      "sha256": "f7484f24b8c0efd60f48c142d616a16efa36dc520054048dcdbfb00b8cdf462e",
+      "native_reopen": "pass",
+      "inspection": "test-data/microsoft-office/word/embedded-fonts-inspection.json",
+      "reader_error": "MalformedDocument(\"RTF data-store payload cannot be empty\")"
+    },
+    {
+      "fixture_id": "word-layout-extensions-016",
+      "path": "test-data/microsoft-office/word/word-layout-extensions.rtf",
+      "bytes": 57955,
+      "sha256": "6b4b434ce131934e3287666efe8e995f54d09193330b89f4ab8c514a0b7ab95b",
+      "native_reopen": "pass",
+      "inspection": "test-data/microsoft-office/word/layout-extensions-inspection.json",
+      "reader_error": "MalformedDocument(\"RTF data-store payload cannot be empty\")"
+    },
+    {
+      "fixture_id": "word-legacy-form-010",
+      "path": "test-data/microsoft-office/word/word-legacy-form.rtf",
+      "bytes": 48852,
+      "sha256": "35681f5af147dc4d80fdd28696c74d608345329fb6f7e86e9ab7c77ecca68879",
+      "native_reopen": "pass",
+      "inspection": "test-data/microsoft-office/word/legacy-form-inspection.json",
+      "reader_error": "MalformedDocument(\"RTF data-store payload cannot be empty\")"
+    },
+    {
+      "fixture_id": "word-mailmerge-fields-009",
+      "path": "test-data/microsoft-office/word/word-mailmerge-fields.rtf",
+      "bytes": 49788,
+      "sha256": "3400508a4557ed2bf76fe2472d344c9a4992b7bad5a79e9b578d596ae153d083",
+      "native_reopen": "pass",
+      "inspection": "test-data/microsoft-office/word/mailmerge-inspection.json",
+      "reader_error": "MalformedDocument(\"RTF file table has an invalid entry count\")"
+    },
+    {
+      "fixture_id": "word-math-navigation-005",
+      "path": "test-data/microsoft-office/word/word-math-navigation.rtf",
+      "bytes": 218344,
+      "sha256": "3e82fbc1a67118fed51e333f43970a4547f1d31b18f0c2cec2ccea381571ab27",
+      "native_reopen": "pass",
+      "inspection": "test-data/microsoft-office/word/math-navigation-inspection.json",
+      "reader_error": "MalformedDocument(\"RTF math zone contains an unsupported object destination\")"
+    },
+    {
+      "fixture_id": "word-review-controls-003",
+      "path": "test-data/microsoft-office/word/word-review-controls.rtf",
+      "bytes": 51895,
+      "sha256": "d8c0845af1d7aaa55607299477d27683573b3f87d486c0e35aabce1b04e389fd",
+      "native_reopen": "pass",
+      "inspection": "test-data/microsoft-office/word/review-controls-inspection.json",
+      "reader_error": "MalformedDocument(\"RTF data-store payload cannot be empty\")"
+    },
+    {
+      "fixture_id": "word-rtf-minimal-006",
+      "path": "test-data/microsoft-office/word/word-rtf-minimal.rtf",
+      "bytes": 46744,
+      "sha256": "9d4d939a0228701679d49da35db613e3a6bc827b2b38509c0f332142d217f76c",
+      "native_reopen": "pass",
+      "inspection": "test-data/microsoft-office/word/rtf-minimal-inspection.json#/fixtures/0",
+      "reader_error": "MalformedDocument(\"RTF data-store payload cannot be empty\")"
+    },
+    {
+      "fixture_id": "word-rtf-table-grid-006",
+      "path": "test-data/microsoft-office/word/word-rtf-table-grid.rtf",
+      "bytes": 48528,
+      "sha256": "a51aa77ff69eb6102b16231cb732f5aa19bb3e2dc2f5598d964dfb44e8622a69",
+      "native_reopen": "pass",
+      "inspection": "test-data/microsoft-office/word/rtf-minimal-inspection.json#/fixtures/1",
+      "reader_error": "MalformedDocument(\"RTF data-store payload cannot be empty\")"
+    },
+    {
+      "fixture_id": "word-tables-layout-002",
+      "path": "test-data/microsoft-office/word/word-tables-layout.rtf",
+      "bytes": 79211,
+      "sha256": "34999eb1d97167904017ea056a9be222940ceb7c8fd827363958e74f4091910c",
+      "native_reopen": "pass",
+      "inspection": "test-data/microsoft-office/word/tables-layout-inspection.json",
+      "reader_error": "MalformedDocument(\"RTF stylesheet contains a duplicate typed style ID\")"
+    },
+    {
+      "fixture_id": "word-vector-diagram-013",
+      "path": "test-data/microsoft-office/word/word-vector-diagram.rtf",
+      "bytes": 225434,
+      "sha256": "c63056f55b095edd424a67aaf90625dbddb61995818d3af81f6eade884872a02",
+      "native_reopen": "pass",
+      "inspection": "test-data/microsoft-office/word/vector-diagram-inspection.json",
+      "reader_error": "MalformedDocument(\"RTF shape-group shprslt destination must be starred\")"
+    },
+    {
+      "fixture_id": "word-visual-objects-007",
+      "path": "test-data/microsoft-office/word/word-visual-objects.rtf",
+      "bytes": 1005978,
+      "sha256": "25a188525ac0c8c83b61ce1f38a4a894f356029f815406bd01e0db8e87daf909",
+      "native_reopen": "pass",
+      "inspection": "test-data/microsoft-office/word/visual-objects-inspection.json",
+      "reader_error": "MalformedDocument(\"RTF data-store payload cannot be empty\")"
+    }
+  ],
+  "rows": [
+    {
+      "id": "rtf-454",
+      "feature": "Unicode and legacy code pages",
+      "library_status": "partial",
+      "matrix_status": "🟡",
+      "fixture_status_before_review": "pending",
+      "classification": "fixture_bounded",
+      "bounded_evidence": [
+        "word-bidi-eastasia.rtf has ANSI/CP1252 header controls, Unicode \\u fallbacks, \\uc values 1 and 2, language groups for Arabic, Hebrew, Japanese, and Chinese, and selected legacy font charsets.",
+        "The same fixture records 146 font definitions/\\fcharset controls, 220 hex fallbacks, and body language groups on source lines 103-127 in its inspection metadata."
+      ],
+      "machine_checkable_expectations": [
+        {"check": "metadata_value", "path": "test-data/microsoft-office/word/bidi-eastasia-inspection.json#/rtf.default_document_settings.ansicpg", "expected": 1252},
+        {"check": "metadata_value", "path": "test-data/microsoft-office/word/bidi-eastasia-inspection.json#/rtf.language_and_unicode_controls.uc_values_seen", "expected": [1, 2]},
+        {"check": "metadata_value", "path": "test-data/microsoft-office/word/bidi-eastasia-inspection.json#/rtf.language_and_unicode_controls.u_control_count", "expected": 48},
+        {"check": "metadata_value", "path": "test-data/microsoft-office/word/bidi-eastasia-inspection.json#/rtf.language_and_unicode_controls.hex_fallback_count", "expected": 220},
+        {"check": "metadata_value", "path": "test-data/microsoft-office/word/bidi-eastasia-inspection.json#/rtf.font_and_associated_controls.fcharset_count", "expected": 146}
+      ],
+      "reader_observation": "The native reader invocation exits 1 at the empty datastore group; no typed Unicode/code-page traversal is claimed.",
+      "native_ui_follow_up": "No new broad fixture is required for the current bounded evidence. If an isolated code-page specimen is useful, create one plain paragraph, select one Japanese/Chinese font, add one non-ASCII character and one explicit Unicode character, save as RTF, close, reopen, and require the expected \\fcharset/\\u/\\uc controls before recording it."
+    },
+    {
+      "id": "rtf-461",
+      "feature": "Unknown control words and starred destinations",
+      "library_status": "partial",
+      "matrix_status": "🟡",
+      "fixture_status_before_review": "pending",
+      "classification": "fixture_bounded",
+      "bounded_evidence": [
+        "All thirteen native Word RTF files contain a starred empty \\datastore destination and a starred \\themedata destination; their headers also contain the XML namespace table destination.",
+        "These are producer-emitted starred destinations, but the corpus does not isolate an intentionally unknown control word. The exact unknown-control sub-scope therefore remains unproven."
+      ],
+      "machine_checkable_expectations": [
+        {"check": "regex_count_each_file", "glob": "test-data/microsoft-office/word/*.rtf", "regex": "\\{\\s*\\\\\\*\\s*\\\\datastore\\s*\\}", "expected": 1},
+        {"check": "control_word_count", "path": "test-data/microsoft-office/word/word-rtf-minimal.rtf", "control_word": "themedata", "expected": 1},
+        {"check": "control_word_count", "path": "test-data/microsoft-office/word/word-rtf-minimal.rtf", "control_word": "xmlnstbl", "expected": 1},
+        {"check": "control_word_count", "path": "test-data/microsoft-office/word/word-rtf-minimal.rtf", "control_word": "datastore", "expected": 1},
+        {"check": "reader_result", "path": "test-data/microsoft-office/word/word-rtf-minimal.rtf", "expected_exit_code": 1, "expected_error": "MalformedDocument(\"RTF data-store payload cannot be empty\")"}
+      ],
+      "reader_observation": "The empty datastore is the first failure in the minimal, review, bidi, layout, font, protection, form, and visual-object derivatives; earlier boundaries occur in the other four rich files listed in native_rtf_corpus.",
+      "native_ui_follow_up": "Save a blank Word document as RTF and compare its starred destinations with the minimal fixture. Word UI cannot request an arbitrary unknown control word; an exact unknown-control isolation would require a legacy or other producer, so no synthetic RTF is proposed."
+    },
+    {
+      "id": "rtf-463",
+      "feature": "Compressed RTF transport, [MS-OXRTFCP]",
+      "library_status": "supported",
+      "matrix_status": "✅",
+      "fixture_status_before_review": "pending",
+      "classification": "operation_only",
+      "bounded_evidence": [
+        "Every native Word RTF in this corpus is ordinary RTF beginning with the plain RTF header; no file is an LZFu or MELA transport frame.",
+        "The library's transport contract is already exercised by exact LZFu vectors and compress/decompress round trips in transport_and_producer_contracts.rs lines 13-64."
+      ],
+      "machine_checkable_expectations": [
+        {"check": "plain_rtf_header_each_file", "glob": "test-data/microsoft-office/word/*.rtf", "expected_prefix": "{\\rtf"},
+        {"check": "native_transport_fixture_count", "glob": "test-data/microsoft-office/word/*.rtf", "expected_compressed_frame_count": 0},
+        {"check": "existing_codec_vector", "path": "crates/litchi-rtf/tests/transport_and_producer_contracts.rs", "lines": "44-64", "expected": "LZFu detection, decompress, exact recompress, no-op write, and changed-write refusal"}
+      ],
+      "reader_observation": "This row does not require a native Word RTF semantic parse; the native corpus cannot certify compressed transport behavior.",
+      "native_ui_follow_up": "None for Word. A compressed fixture belongs to an Outlook/MS-OXRTFCP transport producer or the existing codec vector suite; Save As RTF in Word is not a useful authoring route for this frame."
+    },
+    {
+      "id": "rtf-464",
+      "feature": "Character formatting and paragraph properties",
+      "library_status": "partial",
+      "matrix_status": "🟡",
+      "fixture_status_before_review": "pending",
+      "classification": "fixture_bounded",
+      "bounded_evidence": [
+        "Native RTF body and header controls cover Unicode, fonts, colors, paragraph alignment, spacing, indentation, breaks, fields, notes, tables, revisions, and shape/text stories across the layout, review, bidi, and visual-object derivatives.",
+        "The raw controls are useful file evidence but the reader does not reach typed traversal for these native files."
+      ],
+      "machine_checkable_expectations": [
+        {"check": "metadata_value", "path": "test-data/microsoft-office/word/tables-layout-inspection.json#/rtf.control_word_counts", "expected_subset": {"trowd": 13, "cell": 59, "row": 5, "sectd": 8, "field": 2, "chftn": 6}},
+        {"check": "metadata_value", "path": "test-data/microsoft-office/word/review-controls-inspection.json#/rtf.control_word_counts", "expected_subset": {"revised": 1, "deleted": 1, "annotation": 2, "field": 1}},
+        {"check": "metadata_value", "path": "test-data/microsoft-office/word/bidi-eastasia-inspection.json#/rtf.paragraph_and_asian_controls.par_count", "expected": 7}
+      ],
+      "reader_observation": "word-tables-layout stops at duplicate typed style ID; review and bidi stop at empty datastore. These failures prevent a broad typed-format pass claim.",
+      "native_ui_follow_up": "For a single-control isolation, author one short paragraph with bold, italic, underline, strike, color, a tab, first-line indent, spacing, and a page break; save as RTF, close, reopen, and record only controls actually present. The existing corpus already supplies higher-value combined raw coverage."
+    },
+    {
+      "id": "rtf-469",
+      "feature": "Latent styles and style/format restrictions",
+      "library_status": "partial",
+      "matrix_status": "🟡",
+      "fixture_status_before_review": "pending",
+      "classification": "fixture_bounded",
+      "bounded_evidence": [
+        "Every native Word RTF derivative contains a \\latentstyles destination and the surrounding \\lsd* style visibility/priority/lock controls. The bidi inspection records the stylesheet/default source region as lines 53-92 and the raw RTF has one latentstyles control.",
+        "The current files do not isolate a before/after style restriction change, and the typed reader stops before semantic projection."
+      ],
+      "machine_checkable_expectations": [
+        {"check": "control_word_count_each_file", "glob": "test-data/microsoft-office/word/*.rtf", "control_word": "latentstyles", "expected": 1},
+        {"check": "control_word_presence", "path": "test-data/microsoft-office/word/word-bidi-eastasia.rtf", "control_words": ["lsdlocked", "lsdpriority", "lsdsemihidden", "lsdunhideused"], "expected": "all present"}
+      ],
+      "reader_observation": "Raw stylesheet evidence is available; no native RTF semantic count is available because the known reader errors occur before traversal.",
+      "native_ui_follow_up": "On a blank Word document, open the Styles pane's Manage Styles/Recommend or Hide controls if exposed, change one built-in style visibility/priority, save as RTF, close, reopen, and compare the lsd* controls. If the UI does not expose a saved restriction change, keep this row fixture-bounded."
+    },
+    {
+      "id": "rtf-482",
+      "feature": "Document information and producer metadata",
+      "library_status": "partial",
+      "matrix_status": "🟡",
+      "fixture_status_before_review": "pending",
+      "classification": "fixture_bounded",
+      "bounded_evidence": [
+        "Every native Word RTF has an \\info destination with author, creation/revision time, version and document-count metadata, plus \\themedata, \\xmlnstbl and \\datastore destinations.",
+        "The datastore is present as an empty payload in every file; no populated native custom-XML store is available in this corpus."
+      ],
+      "machine_checkable_expectations": [
+        {"check": "control_word_count_each_file", "glob": "test-data/microsoft-office/word/*.rtf", "control_words": {"info": 1, "author": 1, "creatim": 1, "revtim": 1, "vern": 1, "version": 1, "themedata": 1, "xmlnstbl": 1, "datastore": 1}},
+        {"check": "empty_datastore_payload_each_file", "glob": "test-data/microsoft-office/word/*.rtf", "regex": "\\{\\s*\\\\\\*\\s*\\\\datastore\\s*\\}", "expected": 1},
+        {"check": "inspection_reference", "path": "test-data/microsoft-office/word/embedded-fonts-inspection.json", "lines": "473-484", "expected": "empty datastore payload_bytes=0 and reader rejection"}
+      ],
+      "reader_observation": "Document metadata is raw evidence only for the native corpus; the empty datastore prevents the semantic reader from exposing the typed info/data-store model in the affected files.",
+      "native_ui_follow_up": "Create a blank document, set one visible File > Properties value and one custom document property/variable if the installed Word UI exposes it, save as RTF, close, reopen, and require a nonempty corresponding destination. Do not call the attempt successful unless the raw RTF controls are present."
+    },
+    {
+      "id": "rtf-485",
+      "feature": "Bidirectional, associated-font, and East Asian formatting",
+      "library_status": "partial",
+      "matrix_status": "🟡",
+      "fixture_status_before_review": "pending",
+      "classification": "fixture_bounded",
+      "bounded_evidence": [
+        "word-bidi-eastasia.rtf directly records Arabic/Hebrew/Japanese/Chinese body language groups, \\u/\\uc fallbacks, \\fcharset, \\fcs0/\\fcs1, \\rtlch/\\ltrch, associated fonts, and East Asian charset/font selections.",
+        "The same native audit records rtlpar_count=0, rtlsect_count=0, and kinsoku_count=0. The DOCX source likewise has no w:bidi, w:rtl, or w:kinsoku elements; explicit paragraph direction and custom Kinsoku remain outside this fixture."
+      ],
+      "machine_checkable_expectations": [
+        {"check": "metadata_value", "path": "test-data/microsoft-office/word/bidi-eastasia-inspection.json#/rtf.font_and_associated_controls", "expected_subset": {"fbidi_count": 146, "fcharset_count": 146, "associated_font_controls_af_count": 161, "fcs0_count": 69, "fcs1_count": 69, "rtlch_count": 69, "ltrch_count": 69}},
+        {"check": "metadata_value", "path": "test-data/microsoft-office/word/bidi-eastasia-inspection.json#/rtf.language_and_unicode_controls.body_language_groups", "expected_keys": ["arabic", "hebrew", "japanese", "chinese"]},
+        {"check": "metadata_value", "path": "test-data/microsoft-office/word/bidi-eastasia-inspection.json#/rtf.paragraph_and_asian_controls", "expected_subset": {"rtlpar_count": 0, "rtlsect_count": 0, "kinsoku_count": 0, "asianbrkrule_count": 1}}
+      ],
+      "reader_observation": "The native RTF reader stops at the empty datastore group on source line 273; no typed direction/associated-font/Kinsoku pass is claimed.",
+      "residual_subscope_classifications": {
+        "unicode_and_associated_font_controls": "fixture_bounded",
+        "explicit_paragraph_direction_and_custom_kinsoku": "producer_unavailable"
+      },
+      "native_ui_follow_up": "If Word exposes Home > Paragraph right-to-left and an East Asian line-breaking/Kinsoku setting, author one Arabic/Hebrew paragraph and one punctuation-heavy CJK paragraph, save as RTF, close, reopen, and require \\rtlpar or \\rtlsect and \\kinsoku. The current Computer Use probe did not expose those controls, so absence must remain a producer/workflow observation rather than invented syntax."
+    },
+    {
+      "id": "rtf-487",
+      "feature": "Write-reservation metadata",
+      "library_status": "partial",
+      "matrix_status": "🟡",
+      "fixture_status_before_review": "pending",
+      "classification": "concrete_missing_authorable_recipe",
+      "bounded_evidence": [
+        "No current native Word RTF contains \\writereservation or \\writereservhash. The existing document-protection fixture is a different protection family and must not be treated as write-reservation evidence.",
+        "The matrix specifies the exact destinations and the writer emits them as starred root-header groups; the parser/writer tests use opaque, passive values only."
+      ],
+      "machine_checkable_expectations": [
+        {"check": "control_word_count_each_file", "glob": "test-data/microsoft-office/word/*.rtf", "control_words": {"writereservation": 0, "writereservhash": 0}},
+        {"check": "source_contract", "path": "crates/litchi-rtf/src/codec/writer/codec/output/header.rs", "lines": "898-922", "expected": "starred writereservhash and writereservation destinations"},
+        {"check": "existing_synthetic_contract", "path": "crates/litchi-rtf/tests/write_reservations.rs", "lines": "24-64", "expected": "passive parse and retained write-back of both destinations"}
+      ],
+      "reader_observation": "No native file reaches this row's typed model because the required controls are absent; existing unit vectors are not native Office fixtures.",
+      "native_ui_follow_up": "Create a plain document, use Word Save As RTF and its Options/Security path to set a password to modify or write reservation if the installed UI exposes that setting, save, close, reopen, and scan for one or both starred \\writereservhash/\\writereservation destinations. Record the exact native result; do not infer that a password-to-modify dialog emits these specific RTF controls."
+    },
+    {
+      "id": "rtf-488",
+      "feature": "Positioned paragraph objects and frames",
+      "library_status": "partial",
+      "matrix_status": "🟡",
+      "fixture_status_before_review": "pending",
+      "classification": "fixture_bounded",
+      "bounded_evidence": [
+        "word-tables-layout.rtf contains two footer paragraph groups with \\pvpara, \\phmrg, \\posxr, \\posy0 and \\overlay controls.",
+        "word-visual-objects.rtf contains a positioned picture paragraph with \\phmrg, \\posxr, \\posyc, \\dxfrtext180, \\dfrmtxtx180 and \\dfrmtxty0. These are raw positioned-layout evidence, while drawing text boxes and floating pictures remain separate matrix scopes."
+      ],
+      "machine_checkable_expectations": [
+        {"check": "control_word_count", "path": "test-data/microsoft-office/word/word-tables-layout.rtf", "control_words": {"pvpara": 2, "phmrg": 2, "posx": 2, "posy": 2, "overlay": 2}},
+        {"check": "control_word_count", "path": "test-data/microsoft-office/word/word-visual-objects.rtf", "control_words": {"phmrg": 1, "posx": 1, "posy": 1, "posyc": 1, "dxfrtext": 1, "dfrmtxtx": 1, "dfrmtxty": 1}},
+        {"check": "inspection_reference", "path": "test-data/microsoft-office/word/visual-objects-inspection.json", "lines": "544-618", "expected": "raw positioned object and picture evidence; reader stops before semantic projection"}
+      ],
+      "reader_observation": "The table fixture stops at duplicate typed style ID and the visual-object fixture stops at empty datastore; no typed ParagraphFrame traversal is claimed.",
+      "native_ui_follow_up": "If Word exposes the legacy paragraph Frame command, create one paragraph-only frame with no picture or drawing shape, save as RTF, close, reopen, and require \\pvpara/\\ph* or equivalent frame controls without \\shp* payloads. If the UI only exposes text boxes or floating pictures, retain the current fixture-bounded classification."
+    },
+    {
+      "id": "rtf-489",
+      "feature": "SmartTag/factoid data",
+      "library_status": "partial",
+      "matrix_status": "🟡",
+      "fixture_status_before_review": "pending",
+      "classification": "producer_unavailable",
+      "bounded_evidence": [
+        "The current corpus has \\xmlnstbl and \\xmlns namespace-table controls, but no \\xmlopen, \\xmlclose, \\xmlattr, \\xmlattrns, or \\factoidname groups.",
+        "Modern Word for Mac provided no deterministic SmartTag/factoid authoring route during this corpus work. The library's native vocabulary is documented separately from the current producer files."
+      ],
+      "machine_checkable_expectations": [
+        {"check": "control_word_count_each_file", "glob": "test-data/microsoft-office/word/*.rtf", "control_words": {"xmlopen": 0, "xmlclose": 0, "xmlattr": 0, "xmlattrns": 0, "factoidname": 0}},
+        {"check": "control_word_count", "path": "test-data/microsoft-office/word/word-rtf-minimal.rtf", "control_words": {"xmlnstbl": 1, "xmlns": 2}},
+        {"check": "source_vocabulary", "path": "crates/litchi-rtf/src/metadata/smart_tag.rs", "lines": "1-11", "expected": "starred xmlopen/xmlclose, xmlnsN, factoidname, xmlattr, xmlattrnsN vocabulary"}
+      ],
+      "reader_observation": "There is no native fixture containing this vocabulary, so no reader result is attached to this row.",
+      "native_ui_follow_up": "Use a Word version or legacy Smart Tags capable producer that exposes a saved SmartTag/factoid, then save as RTF and require paired starred \\xmlopen/\\xmlclose, \\xmlnsN, \\factoidname and an optional \\xmlattr group. Do not synthesize these destinations in a Word fixture."
+    },
+    {
+      "id": "rtf-490",
+      "feature": "Move bookmarks",
+      "library_status": "partial",
+      "matrix_status": "🟡",
+      "fixture_status_before_review": "pending",
+      "classification": "concrete_missing_authorable_recipe",
+      "bounded_evidence": [
+        "All thirteen native RTF headers carry \\trackmoves0, but none contains the paired move-range destinations \\mvfmf/\\mvfml and \\mvtof/\\mvtol.",
+        "The existing review-controls fixture records ordinary \\revised and \\deleted controls only; ordinary tracked insertion/deletion is not move-bookmark evidence."
+      ],
+      "machine_checkable_expectations": [
+        {"check": "control_word_count_each_file", "glob": "test-data/microsoft-office/word/*.rtf", "control_words": {"trackmoves": 1, "mvfmf": 0, "mvfml": 0, "mvtof": 0, "mvtol": 0}},
+        {"check": "source_vocabulary", "path": "crates/litchi-rtf/src/review/move_bookmark.rs", "lines": "1-8", "expected": "four move start/end controls and inert pairing semantics"},
+        {"check": "existing_synthetic_contract", "path": "crates/litchi-rtf/tests/smart_tags_move_bookmarks.rs", "lines": "6-29", "expected": "paired source/destination move markers with six-byte payloads"}
+      ],
+      "reader_observation": "No native move-marker fixture exists; the existing unit test is a synthetic RTF vector and is not promoted to Office evidence.",
+      "native_ui_follow_up": "Enable Review > Track Changes > Track Moves if the installed Word UI exposes it, move one marked token from one paragraph to another, save as RTF, close, reopen, and require matched \\mvfmf/\\mvfml and \\mvtof/\\mvtol tags with the expected author/DTTM payload. If Track Moves is unavailable on this Word build, reclassify this candidate as producer_unavailable rather than fabricating controls."
+    }
+  ],
+  "high_value_rtf_coverage_gaps": [
+    {
+      "gap": "Populated starred datastore/custom-XML payload",
+      "classification": "producer_unavailable",
+      "evidence": "All thirteen native RTF files have exactly one empty {\\*\\datastore } group; no file has payload bytes after the destination control.",
+      "minimal_follow_up": "Use Word Developer/XML Mapping or another visible custom-XML route only if the installed UI exposes one; save and require nonempty datastore hex after native reopen."
+    },
+    {
+      "gap": "Native Grid Table 2 Accent 1 conditional table-style serialization",
+      "classification": "fixture_bounded",
+      "evidence": "word-tables-layout.rtf has seven \\ts36 groups for one logical style and stops at duplicate typed style ID; word-rtf-table-grid.rtf has one \\ts35 group and reaches the empty datastore error instead.",
+      "minimal_follow_up": "The existing pair is already the smallest useful native comparison; any new fixture should only be made if a separate conditional-style variant is needed."
+    },
+    {
+      "gap": "Nonempty embedded-font payload",
+      "classification": "producer_unavailable",
+      "evidence": "word-embedded-fonts.rtf has ten \\fontemb groups but the recorded empty fontemb group has zero payload bytes; its typed reader stops at datastore.",
+      "minimal_follow_up": "A native font-embedding setting can be probed, but acceptance requires a nonempty RTF \\fontemb payload and must not infer it from DOCX embedded fonts."
+    },
+    {
+      "gap": "Word 6J-era East Asian controls",
+      "classification": "producer_unavailable",
+      "evidence": "The matrix explicitly lists \\jsksu, \\jsku, \\horzvert, \\gcw, \\twoinone, \\nosectexpand, \\sectexpand and \\jclisttab as untyped; none occurs in the native corpus.",
+      "minimal_follow_up": "No current native Word UI route was identified; preserve the explicit matrix exclusion rather than adding synthetic RTF."
+    },
+    {
+      "gap": "Rich native object and equation RTF semantic traversal",
+      "classification": "fixture_bounded",
+      "evidence": "Native math, vector, visual-object, mail-merge and table RTF files preserve raw controls and reopen in Word, but each stops at a distinct litchi-rtf parser boundary before semantic counts.",
+      "minimal_follow_up": "Keep raw controls, hashes, and exact first errors as the fixture contract until a reader-boundary change is intentionally made."
+    }
+  ],
+  "source_references": [
+    {
+      "path": "crates/litchi-rtf/docs/FEATURE_MATRIX.md",
+      "lines": "31, 38, 40, 46, 51, 64, 67, 69, 75-77",
+      "fact": "Authoritative feature wording and the bounded scope for all eleven rows."
+    },
+    {
+      "path": "test-data/microsoft-office/word/bidi-eastasia-inspection.json",
+      "lines": "350-442",
+      "fact": "Native Unicode, code-page, associated-font, East Asian, source-line and empty-datastore observations."
+    },
+    {
+      "path": "test-data/microsoft-office/word/rtf-minimal-inspection.json",
+      "lines": "25-90, 215-246",
+      "fact": "Minimal plain/Table Grid comparison and exact empty-datastore versus duplicate-style boundary."
+    },
+    {
+      "path": "test-data/microsoft-office/word/tables-layout-inspection.json",
+      "lines": "255-325",
+      "fact": "Native table/layout raw controls, hashes/reopen result, and duplicate typed style reader error."
+    },
+    {
+      "path": "test-data/microsoft-office/word/review-controls-inspection.json",
+      "lines": "271-318",
+      "fact": "Native review/bookmark/annotation raw controls and empty-datastore reader boundary."
+    },
+    {
+      "path": "test-data/microsoft-office/word/embedded-fonts-inspection.json",
+      "lines": "446-514",
+      "fact": "Native RTF fontemb and empty payload evidence plus reader boundary."
+    },
+    {
+      "path": "test-data/microsoft-office/word/visual-objects-inspection.json",
+      "lines": "544-618",
+      "fact": "Native positioned picture, OLE object, shape fallback and empty-datastore observations."
+    },
+    {
+      "path": "test-data/microsoft-office/word/vector-diagram-inspection.json",
+      "lines": "333-442",
+      "fact": "Native shape-group/shprslt raw evidence and earlier shape-group reader error."
+    },
+    {
+      "path": "crates/litchi-rtf/tests/transport_and_producer_contracts.rs",
+      "lines": "13-64",
+      "fact": "Existing exact LZFu transport vector and changed-write boundary."
+    },
+    {
+      "path": "crates/litchi-rtf/src/metadata/smart_tag.rs",
+      "lines": "1-11",
+      "fact": "SmartTag/factoid control vocabulary and inert scope."
+    },
+    {
+      "path": "crates/litchi-rtf/src/review/move_bookmark.rs",
+      "lines": "1-8",
+      "fact": "Move bookmark control vocabulary and pairing boundary."
+    },
+    {
+      "path": "crates/litchi-rtf/tests/write_reservations.rs",
+      "lines": "24-64",
+      "fact": "Existing synthetic write-reservation coverage; no native Office claim."
+    }
+  ],
+  "scope_limits": [
+    "This review does not modify RTF files, library source, tests, coverage.json, manifest.json, or common metadata.",
+    "Raw RTF control presence, textutil output, native Word reopen, and hashes are file evidence; they are not semantic litchi-rtf parse success.",
+    "Hypotheses and candidate Word UI recipes are clearly separated from observed facts and require exact control checks after a future native save/reopen.",
+    "No claims are made about Word for Windows, older Word versions, Outlook transport production, SmartTag-capable legacy producers, rendering, pagination, recalculation, protection authentication, move execution, or external refresh."
+  ]
+}

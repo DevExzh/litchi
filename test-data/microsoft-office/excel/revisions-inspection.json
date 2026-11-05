@@ -1,0 +1,1275 @@
+{
+  "schema_version": 1,
+  "fixture_id": "excel-revisions-014",
+  "generated_on": "2026-10-15",
+  "purpose": "Fixture-specific, read-only inspection of three native Microsoft Excel derivatives containing legacy Track Changes collaboration metadata, six deterministic cell or sheet revisions, revision headers, user identity records, and the final workbook values and formula cache.",
+  "provenance": {
+    "producer_app": "Microsoft Office Excel",
+    "app_version": "16.110.2",
+    "app_build": "16.110.26062818",
+    "package_application": "Microsoft Macintosh Excel",
+    "package_app_version": "16.0300",
+    "platform": "macOS",
+    "authoring_method": "Computer Use / native Microsoft Excel UI",
+    "source": "A fresh native workbook was populated with deterministic markers, enabled Tools > Track Changes > Highlight Changes with Track while editing, changed three Sheet1 cells, inserted and populated Review_014, then saved through native XLSX, XLSB, and legacy XLS paths.",
+    "native_save_chain": [
+      "native XLSX with tracking enabled and initial tracked edits",
+      "native XLSX final save after Highlight Changes was turned off",
+      "native XLSB Save As",
+      "original XLSX reopen",
+      "native XLS Save As with the legacy compatibility warning accepted"
+    ],
+    "libreoffice_used": false,
+    "programmatic_office_generation_used": false,
+    "library_code_modified": false,
+    "temporary_probe_harnesses_outside_checkout": true,
+    "all_documents_closed_before_hashing": true,
+    "lock_files_present_at_inspection": false,
+    "final_transient_history_discarded_without_saving": true,
+    "final_close_state": "All Excel windows were closed to Home; generated History sheets were discarded with Don't Save, so no transient History view was added to the fixture content."
+  },
+  "scope_and_limits": {
+    "native_variants": [
+      "xlsx",
+      "xlsb",
+      "xls"
+    ],
+    "native_excel_reopen_verified": true,
+    "repair_or_conversion_prompt_observed": false,
+    "legacy_xls_warning": {
+      "shown": true,
+      "accepted": true,
+      "feature_loss_warning_accepted": true,
+      "observed": "Native Save As XLS required the legacy shared-format warning to be accepted; the resulting XLS reopened without repair and retained the final cells plus revision streams."
+    },
+    "tracking_route": "Tools > Track Changes > Highlight Changes; Track while editing was checked during authoring. For the read-only History view, When, Who, and Where were unchecked and List changes on new sheet was selected.",
+    "transient_history_view": "Native Excel generated a History sheet in A1:K9 with six revision rows plus header/footer. Saving removed that transient History sheet while retaining Sheet1 and Review_014 in all final files.",
+    "revision_semantic_parity_claimed": false,
+    "live_coauthoring": false,
+    "accept_or_reject_changes_exercised": false,
+    "merge_workbooks_exercised": false,
+    "macro_execution": false,
+    "external_links_followed": false,
+    "reader_boundary": "The typed XLSX, XLSB, and XLS readers expose the final workbook cells and cached formula result. They do not expose Excel revision headers, revision log entries, User Names records, or the transient History worksheet through the tested reader examples; those are established by raw OPC/BIFF inspection.",
+    "coverage_rows": {
+      "xlsx-234": "Direct native SpreadsheetML revisionHeaders.xml, revisionLog1/2/3.xml, userNames.xml, six revision entries, and final native reopen evidence.",
+      "xls-175": "Direct native BIFF8 Revision Log stream with revision header, cell-change/sheet-insert records, six marker changes, and final native reopen evidence.",
+      "xls-176": "Direct native BIFF8 User Names stream presence and empty collaboration-table framing after final close; the final stream has no user-name record, while Ryker Zhu remains in Revision Log identity records and CFB summary metadata.",
+      "xlsb-308": "Direct native BIFF12 revisionHeaders.bin, revisionLog1/2/3.bin, userNames.bin and six revision groups."
+    },
+    "transient_history_close_observation": "Reopening each XLSB/XLS to regenerate History made unsaved window changes. The final close chose Don't Save for those transient views; only the temporary History view and associated final-close identity payload were discarded."
+  },
+  "expected_native_content": {
+    "workbook_name": "Fresh native workbook; no custom workbook title was stored in package metadata.",
+    "worksheet_order": [
+      "Sheet1",
+      "Review_014"
+    ],
+    "tracking_state_during_authoring": {
+      "track_while_editing": true,
+      "when_filter": "unchecked",
+      "who_filter": "unchecked",
+      "where_filter": "unchecked",
+      "list_changes_on_new_sheet": true
+    },
+    "initial_cells_before_tracked_changes": {
+      "Sheet1!A1": "EXCEL_REVISIONS_014",
+      "Sheet1!B1": "Fixture ID: excel-revisions-014",
+      "Sheet1!A2": "Value_014",
+      "Sheet1!B2": 10,
+      "Sheet1!A3": "Formula_014",
+      "Sheet1!B3": {
+        "formula": "B2*2",
+        "cached_value": 20
+      },
+      "Sheet1!A4": "Status_014",
+      "Sheet1!B4": "BASELINE_014",
+      "Sheet1!A5": "END_REVISIONS_014"
+    },
+    "final_cells": {
+      "Sheet1!A1": "EXCEL_REVISIONS_014",
+      "Sheet1!B1": "Fixture ID: excel-revisions-014",
+      "Sheet1!A2": "Value_014",
+      "Sheet1!B2": 25,
+      "Sheet1!A3": "Formula_014",
+      "Sheet1!B3": {
+        "formula": "B2*3",
+        "cached_value": 75
+      },
+      "Sheet1!A4": "Status_014",
+      "Sheet1!B4": "UPDATED_014",
+      "Sheet1!A5": "END_REVISIONS_014",
+      "Review_014!A1": "NEW_SHEET_014",
+      "Review_014!B1": "REVISION_CREATED_014"
+    },
+    "final_dimensions": {
+      "Sheet1": "A1:B5",
+      "Review_014": "A1:B1"
+    },
+    "revision_entries": [
+      {
+        "revision_id": "1",
+        "kind": "cell_change",
+        "sheet": "Sheet1",
+        "cell": "B2",
+        "old_value": 10,
+        "new_value": 25
+      },
+      {
+        "revision_id": "2",
+        "kind": "cell_change",
+        "sheet": "Sheet1",
+        "cell": "B3",
+        "old_formula": "B2*2",
+        "new_formula": "B2*3",
+        "old_cached_value": 20,
+        "new_cached_value": 75
+      },
+      {
+        "revision_id": "3",
+        "kind": "cell_change",
+        "sheet": "Sheet1",
+        "cell": "B4",
+        "old_value": "BASELINE_014",
+        "new_value": "UPDATED_014"
+      },
+      {
+        "revision_id": "4",
+        "kind": "sheet_insert",
+        "sheet": "Review_014",
+        "sheet_position_zero_based": 1
+      },
+      {
+        "revision_id": "5",
+        "kind": "cell_insert",
+        "sheet": "Review_014",
+        "cell": "A1",
+        "new_value": "NEW_SHEET_014"
+      },
+      {
+        "revision_id": "6",
+        "kind": "cell_insert",
+        "sheet": "Review_014",
+        "cell": "B1",
+        "new_value": "REVISION_CREATED_014"
+      }
+    ],
+    "transient_history_sheet": {
+      "name": "History",
+      "range": "A1:K9",
+      "revision_row_count": 6,
+      "header_and_footer_present": true,
+      "persisted_in_final_files": false
+    },
+    "markers": {
+      "Sheet1!A1": "EXCEL_REVISIONS_014",
+      "Sheet1!B1": "Fixture ID: excel-revisions-014",
+      "Sheet1!A5": "END_REVISIONS_014",
+      "Review_014!A1": "NEW_SHEET_014",
+      "Review_014!B1": "REVISION_CREATED_014"
+    }
+  },
+  "package_inspection": {
+    "xlsx": {
+      "container_kind": "OPC ZIP / transitional SpreadsheetML",
+      "member_count": 18,
+      "zip_integrity": "pass",
+      "revision_parts": [
+        {
+          "path": "xl/revisions/revisionHeaders.xml",
+          "bytes": 1120,
+          "sha256": "97e9736963725f886d7a92bc7e1034d439d779bf45784ee8e171d446d89ff822",
+          "content_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.revisionHeaders+xml"
+        },
+        {
+          "path": "xl/revisions/revisionLog1.xml",
+          "bytes": 379,
+          "sha256": "1498627a4b0bbc319ec531ce5d7efc895372011cc9a80634c13631c71dad8ec6",
+          "content_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.revisionLog+xml"
+        },
+        {
+          "path": "xl/revisions/revisionLog2.xml",
+          "bytes": 1043,
+          "sha256": "b52620e06da5cecb2b2b038fd697f7ab3bcfb48354e5cb702a0a087af6f03ba1",
+          "content_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.revisionLog+xml"
+        },
+        {
+          "path": "xl/revisions/revisionLog3.xml",
+          "bytes": 523,
+          "sha256": "e1ec8f2352ed86c32f31ec4cb77c39a2ce12b81cee6afbbdfad7c53ac4e8cb75",
+          "content_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.revisionLog+xml"
+        },
+        {
+          "path": "xl/revisions/userNames.xml",
+          "bytes": 385,
+          "sha256": "cd6952598c95d3a6f9b328eaf974571bcb7660f458c0199032f91bd1cb4de739",
+          "content_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.userNames+xml"
+        }
+      ],
+      "revision_relationship_part": {
+        "path": "xl/revisions/_rels/revisionHeaders.xml.rels",
+        "bytes": 571,
+        "sha256": "e7be9653b7c0a98f43a6bbdb2fd1fe949f1148c53d0fda48d898b1eef047b6d0",
+        "relationships": [
+          {
+            "id": "rId1",
+            "type": "revisionLog",
+            "target": "revisionLog1.xml"
+          },
+          {
+            "id": "rId2",
+            "type": "revisionLog",
+            "target": "revisionLog2.xml"
+          },
+          {
+            "id": "rId3",
+            "type": "revisionLog",
+            "target": "revisionLog3.xml"
+          }
+        ]
+      },
+      "workbook_relationships_to_revision_parts": [
+        {
+          "id": "rId7",
+          "type": "revisionHeaders",
+          "target": "revisions/revisionHeaders.xml"
+        },
+        {
+          "id": "rId8",
+          "type": "userNames",
+          "target": "revisions/userNames.xml"
+        }
+      ],
+      "revision_headers_xml": {
+        "path": "xl/revisions/revisionHeaders.xml",
+        "sha256": "97e9736963725f886d7a92bc7e1034d439d779bf45784ee8e171d446d89ff822",
+        "root_attributes": {
+          "guid": "{AAFE9182-DA3A-A24C-ACB5-15D001B28196}",
+          "diskRevisions": "1",
+          "revisionId": "6",
+          "version": "3"
+        },
+        "headers": [
+          {
+            "guid": "{4AE59389-965A-2C47-B819-CC750216FEF0}",
+            "dateTime": "2026-10-15T18:54:12",
+            "maxSheetId": "2",
+            "userName": "Ryker Zhu",
+            "relationship_id": "rId1",
+            "minRId": null,
+            "maxRId": null,
+            "sheet_ids": [
+              "1"
+            ]
+          },
+          {
+            "guid": "{E255CB4B-8B2C-0342-9355-18ED86D66A4A}",
+            "dateTime": "2026-10-15T18:54:52",
+            "maxSheetId": "3",
+            "userName": "Ryker Zhu",
+            "relationship_id": "rId2",
+            "minRId": "1",
+            "maxRId": "6",
+            "sheet_ids": [
+              "1",
+              "2"
+            ]
+          },
+          {
+            "guid": "{AAFE9182-DA3A-A24C-ACB5-15D001B28196}",
+            "dateTime": "2026-10-15T18:55:15",
+            "maxSheetId": "3",
+            "userName": "Ryker Zhu",
+            "relationship_id": "rId3",
+            "minRId": null,
+            "maxRId": null,
+            "sheet_ids": [
+              "1",
+              "2"
+            ]
+          }
+        ]
+      },
+      "revision_logs_xml": [
+        {
+          "path": "xl/revisions/revisionLog1.xml",
+          "relationship_id": "rId1",
+          "sha256": "1498627a4b0bbc319ec531ce5d7efc895372011cc9a80634c13631c71dad8ec6",
+          "entry_count": 0,
+          "entries": []
+        },
+        {
+          "path": "xl/revisions/revisionLog2.xml",
+          "relationship_id": "rId2",
+          "sha256": "b52620e06da5cecb2b2b038fd697f7ab3bcfb48354e5cb702a0a087af6f03ba1",
+          "entry_count": 6,
+          "entries": [
+            {
+              "tag": "rcc",
+              "attributes": {
+                "rId": "1",
+                "sId": "1",
+                "xfDxf": "1",
+                "dxf": "1"
+              },
+              "old_cell": {
+                "value": "10",
+                "type": null
+              },
+              "new_cell": {
+                "value": "25",
+                "type": null
+              }
+            },
+            {
+              "tag": "rcc",
+              "attributes": {
+                "rId": "2",
+                "sId": "1",
+                "xfDxf": "1",
+                "dxf": "1"
+              },
+              "old_cell": {
+                "formula": "B2*2"
+              },
+              "new_cell": {
+                "formula": "B2*3"
+              }
+            },
+            {
+              "tag": "rcc",
+              "attributes": {
+                "rId": "3",
+                "sId": "1",
+                "xfDxf": "1",
+                "dxf": "1"
+              },
+              "old_cell": {
+                "value": "BASELINE_014",
+                "type": "inlineStr"
+              },
+              "new_cell": {
+                "value": "UPDATED_014",
+                "type": "inlineStr"
+              }
+            },
+            {
+              "tag": "ris",
+              "attributes": {
+                "rId": "4",
+                "sheetId": "2",
+                "name": "[excel-revisions.xlsx]Review_014",
+                "sheetPosition": "1"
+              }
+            },
+            {
+              "tag": "rcc",
+              "attributes": {
+                "rId": "5",
+                "sId": "2",
+                "xfDxf": "1",
+                "dxf": "1"
+              },
+              "old_cell": null,
+              "new_cell": {
+                "value": "NEW_SHEET_014",
+                "type": "inlineStr"
+              }
+            },
+            {
+              "tag": "rcc",
+              "attributes": {
+                "rId": "6",
+                "sId": "2",
+                "xfDxf": "1",
+                "dxf": "1"
+              },
+              "old_cell": null,
+              "new_cell": {
+                "value": "REVISION_CREATED_014",
+                "type": "inlineStr"
+              }
+            }
+          ]
+        },
+        {
+          "path": "xl/revisions/revisionLog3.xml",
+          "relationship_id": "rId3",
+          "sha256": "e1ec8f2352ed86c32f31ec4cb77c39a2ce12b81cee6afbbdfad7c53ac4e8cb75",
+          "entry_count": 2,
+          "entries": [
+            {
+              "tag": "rcv",
+              "attributes": {
+                "guid": "{DFC82956-C1E8-CD4D-A754-0ADAD5CAF49A}",
+                "action": "delete"
+              }
+            },
+            {
+              "tag": "rcv",
+              "attributes": {
+                "guid": "{DFC82956-C1E8-CD4D-A754-0ADAD5CAF49A}",
+                "action": "add"
+              }
+            }
+          ],
+          "purpose": "Native custom-workbook-view delete/add bookkeeping; not one of the six cell or sheet revisions."
+        }
+      ],
+      "user_names_xml": {
+        "path": "xl/revisions/userNames.xml",
+        "sha256": "cd6952598c95d3a6f9b328eaf974571bcb7660f458c0199032f91bd1cb4de739",
+        "root_attributes": {
+          "count": "0"
+        },
+        "user_count": 0,
+        "note": "The final XLSX userNames part is present but has count=0; the revisionHeaders header records carry userName=\"Ryker Zhu\"."
+      }
+    },
+    "xlsb": {
+      "container_kind": "OPC ZIP with BIFF12 binary workbook/worksheet/index streams and native BIFF12 revision parts",
+      "member_count": 22,
+      "zip_integrity": "pass",
+      "revision_parts": [
+        {
+          "path": "xl/revisions/revisionHeaders.bin",
+          "bytes": 341,
+          "sha256": "456bff5d864621cc6bb2169b0e06bd76425c80b02ebcfd99ea4bd7307b5246d0",
+          "content_type": "application/vnd.ms-excel.revisionHeaders"
+        },
+        {
+          "path": "xl/revisions/revisionLog1.bin",
+          "bytes": 3,
+          "sha256": "9f93b991357755385febc052c2ee1154979c5018c9c50d0de1146bc705535574",
+          "content_type": "application/vnd.ms-excel.revisionLog"
+        },
+        {
+          "path": "xl/revisions/revisionLog2.bin",
+          "bytes": 568,
+          "sha256": "98f39d6c6d6c51315c3cbdd7dd5cbef7f60384ec967c841e7662ae3ef764f799",
+          "content_type": "application/vnd.ms-excel.revisionLog"
+        },
+        {
+          "path": "xl/revisions/revisionLog3.bin",
+          "bytes": 69,
+          "sha256": "fc949e862d31372ad12dff9151e53cec0965e20358df55d44d95b1aa9e728545",
+          "content_type": "application/vnd.ms-excel.revisionLog"
+        },
+        {
+          "path": "xl/revisions/userNames.bin",
+          "bytes": 11,
+          "sha256": "f32f9177ecdf77429c9aa29b3f7f977e0753f071abdb0941e3566e10eb313916",
+          "content_type": "application/vnd.ms-excel.userNames"
+        }
+      ],
+      "revision_relationship_part": {
+        "path": "xl/revisions/_rels/revisionHeaders.bin.rels",
+        "bytes": 571,
+        "sha256": "a3449911603f168287024b32dd73cd62464143635d0f836c32a3291bb0f65eb5",
+        "relationships": [
+          {
+            "id": "rId1",
+            "type": "revisionLog",
+            "target": "revisionLog1.bin"
+          },
+          {
+            "id": "rId2",
+            "type": "revisionLog",
+            "target": "revisionLog2.bin"
+          },
+          {
+            "id": "rId3",
+            "type": "revisionLog",
+            "target": "revisionLog3.bin"
+          }
+        ]
+      },
+      "workbook_relationships_to_revision_parts": [
+        {
+          "id": "rId7",
+          "type": "revisionHeaders",
+          "target": "revisions/revisionHeaders.bin"
+        },
+        {
+          "id": "rId8",
+          "type": "userNames",
+          "target": "revisions/userNames.bin"
+        }
+      ],
+      "biff12_record_encoding": "Variable-length little-endian record-id and record-length varints; record bodies are retained below as raw hexadecimal.",
+      "revision_records": {
+        "xl/revisions/revisionHeaders.bin": {
+          "bytes": 341,
+          "sha256": "456bff5d864621cc6bb2169b0e06bd76425c80b02ebcfd99ea4bd7307b5246d0",
+          "raw_hex": "8e032e0f008291feaa3ada4ca2acb515d001b281968291feaa3ada4ca2acb515d001b28196060000000100000000001e009b035cffffffff0000000020000000ffff8993e54a5a96472cb819cc750216fef0ea070a0f12360c040200000000000000000009000000520079006b006500720020005a0068007500040000007200490064003100010000000100000000009b035effffffff0000000020000000ffff4bcb55e22c8b4203935518ed86d66a4aea070a0f123634040300010000000600000009000000520079006b006500720020005a00680075000400000072004900640032000200000001000200000000009b035effffffff0000000020000000ffff8291feaa3ada4ca2acb515d001b28196ea070a0f12370f040300000000000000000009000000520079006b006500720020005a0068007500040000007200490064003300020000000100020000000000930300",
+          "biff12_record_inventory": [
+            {
+              "offset": 0,
+              "record_id": "0x018E",
+              "length": 46,
+              "body_hex": "0f008291feaa3ada4ca2acb515d001b281968291feaa3ada4ca2acb515d001b28196060000000100000000001e00"
+            },
+            {
+              "offset": 49,
+              "record_id": "0x019B",
+              "length": 92,
+              "body_hex": "ffffffff0000000020000000ffff8993e54a5a96472cb819cc750216fef0ea070a0f12360c040200000000000000000009000000520079006b006500720020005a006800750004000000720049006400310001000000010000000000"
+            },
+            {
+              "offset": 144,
+              "record_id": "0x019B",
+              "length": 94,
+              "body_hex": "ffffffff0000000020000000ffff4bcb55e22c8b4203935518ed86d66a4aea070a0f123634040300010000000600000009000000520079006b006500720020005a0068007500040000007200490064003200020000000100020000000000"
+            },
+            {
+              "offset": 241,
+              "record_id": "0x019B",
+              "length": 94,
+              "body_hex": "ffffffff0000000020000000ffff8291feaa3ada4ca2acb515d001b28196ea070a0f12370f040300000000000000000009000000520079006b006500720020005a0068007500040000007200490064003300020000000100020000000000"
+            },
+            {
+              "offset": 338,
+              "record_id": "0x0193",
+              "length": 0,
+              "body_hex": ""
+            }
+          ]
+        },
+        "xl/revisions/revisionLog1.bin": {
+          "bytes": 3,
+          "sha256": "9f93b991357755385febc052c2ee1154979c5018c9c50d0de1146bc705535574",
+          "raw_hex": "930300",
+          "biff12_record_inventory": [
+            {
+              "offset": 0,
+              "record_id": "0x0193",
+              "length": 0,
+              "body_hex": ""
+            }
+          ]
+        },
+        "xl/revisions/revisionLog2.bin": {
+          "bytes": 568,
+          "sha256": "98f39d6c6d6c51315c3cbdd7dd5cbef7f60384ec967c841e7662ae3ef764f799",
+          "raw_hex": "99032200000000010000000800000001000100000001000000093400080000000000000000020c010000000000000000002440020c0100000000000000000039409a0300990322000000000200000008000000010002000000010000002d340008000000000000000009250100000000000000000039400000000000000b000000440100000001c01e0200050000000009250100000000000000000039400000000000000b000000440100000001c01e030005000000009a0300990322000000000300000008000000010003000000010000001b34000800000000000000003e250100000000000000000c00000042004100530045004c0049004e0045005f003000310034003e230100000000000000000b00000055005000440041005400450044005f003000310034009a03009e035400000000040000000500000002000100200000005b0065007800630065006c002d007200650076006900730069006f006e0073002e0078006c00730078005d005200650076006900650077005f00300031003400990322000000000500000008000000020000000000000000000334000000000000000000003e270000000000000000000d0000004e00450057005f00530048004500450054005f003000310034009a0300990322000000000600000008000000020000000000010000000334000000000000000000003e35010000000000000000140000005200450056004900530049004f004e005f0043005200450041005400450044005f003000310034009a0300930300",
+          "biff12_record_inventory": [
+            {
+              "offset": 0,
+              "record_id": "0x0199",
+              "length": 34,
+              "body_hex": "00000000010000000800000001000100000001000000093400080000000000000000"
+            },
+            {
+              "offset": 37,
+              "record_id": "0x0002",
+              "length": 12,
+              "body_hex": "010000000000000000002440"
+            },
+            {
+              "offset": 51,
+              "record_id": "0x0002",
+              "length": 12,
+              "body_hex": "010000000000000000003940"
+            },
+            {
+              "offset": 65,
+              "record_id": "0x019A",
+              "length": 0,
+              "body_hex": ""
+            },
+            {
+              "offset": 68,
+              "record_id": "0x0199",
+              "length": 34,
+              "body_hex": "000000000200000008000000010002000000010000002d3400080000000000000000"
+            },
+            {
+              "offset": 105,
+              "record_id": "0x0009",
+              "length": 37,
+              "body_hex": "0100000000000000000039400000000000000b000000440100000001c01e02000500000000"
+            },
+            {
+              "offset": 144,
+              "record_id": "0x0009",
+              "length": 37,
+              "body_hex": "0100000000000000000039400000000000000b000000440100000001c01e03000500000000"
+            },
+            {
+              "offset": 183,
+              "record_id": "0x019A",
+              "length": 0,
+              "body_hex": ""
+            },
+            {
+              "offset": 186,
+              "record_id": "0x0199",
+              "length": 34,
+              "body_hex": "000000000300000008000000010003000000010000001b3400080000000000000000"
+            },
+            {
+              "offset": 223,
+              "record_id": "0x003E",
+              "length": 37,
+              "body_hex": "0100000000000000000c00000042004100530045004c0049004e0045005f00300031003400"
+            },
+            {
+              "offset": 262,
+              "record_id": "0x003E",
+              "length": 35,
+              "body_hex": "0100000000000000000b00000055005000440041005400450044005f00300031003400"
+            },
+            {
+              "offset": 299,
+              "record_id": "0x019A",
+              "length": 0,
+              "body_hex": ""
+            },
+            {
+              "offset": 302,
+              "record_id": "0x019E",
+              "length": 84,
+              "body_hex": "00000000040000000500000002000100200000005b0065007800630065006c002d007200650076006900730069006f006e0073002e0078006c00730078005d005200650076006900650077005f00300031003400"
+            },
+            {
+              "offset": 389,
+              "record_id": "0x0199",
+              "length": 34,
+              "body_hex": "00000000050000000800000002000000000000000000033400000000000000000000"
+            },
+            {
+              "offset": 426,
+              "record_id": "0x003E",
+              "length": 39,
+              "body_hex": "0000000000000000000d0000004e00450057005f00530048004500450054005f00300031003400"
+            },
+            {
+              "offset": 467,
+              "record_id": "0x019A",
+              "length": 0,
+              "body_hex": ""
+            },
+            {
+              "offset": 470,
+              "record_id": "0x0199",
+              "length": 34,
+              "body_hex": "00000000060000000800000002000000000001000000033400000000000000000000"
+            },
+            {
+              "offset": 507,
+              "record_id": "0x003E",
+              "length": 53,
+              "body_hex": "010000000000000000140000005200450056004900530049004f004e005f0043005200450041005400450044005f00300031003400"
+            },
+            {
+              "offset": 562,
+              "record_id": "0x019A",
+              "length": 0,
+              "body_hex": ""
+            },
+            {
+              "offset": 565,
+              "record_id": "0x0193",
+              "length": 0,
+              "body_hex": ""
+            }
+          ]
+        },
+        "xl/revisions/revisionLog3.bin": {
+          "bytes": 69,
+          "sha256": "fc949e862d31372ad12dff9151e53cec0965e20358df55d44d95b1aa9e728545",
+          "raw_hex": "9c031e00000000000000002c000000ffff5629c8dfe8c14dcda7540adad5caf49a9c031e00000000000000002b000000ffff5629c8dfe8c14dcda7540adad5caf49a930300",
+          "biff12_record_inventory": [
+            {
+              "offset": 0,
+              "record_id": "0x019C",
+              "length": 30,
+              "body_hex": "00000000000000002c000000ffff5629c8dfe8c14dcda7540adad5caf49a"
+            },
+            {
+              "offset": 33,
+              "record_id": "0x019C",
+              "length": 30,
+              "body_hex": "00000000000000002b000000ffff5629c8dfe8c14dcda7540adad5caf49a"
+            },
+            {
+              "offset": 66,
+              "record_id": "0x0193",
+              "length": 0,
+              "body_hex": ""
+            }
+          ]
+        },
+        "xl/revisions/userNames.bin": {
+          "bytes": 11,
+          "sha256": "f32f9177ecdf77429c9aa29b3f7f977e0753f071abdb0941e3566e10eb313916",
+          "raw_hex": "8f03020000910300930300",
+          "biff12_record_inventory": [
+            {
+              "offset": 0,
+              "record_id": "0x018F",
+              "length": 2,
+              "body_hex": "0000"
+            },
+            {
+              "offset": 5,
+              "record_id": "0x0191",
+              "length": 0,
+              "body_hex": ""
+            },
+            {
+              "offset": 8,
+              "record_id": "0x0193",
+              "length": 0,
+              "body_hex": ""
+            }
+          ]
+        }
+      },
+      "revision_record_semantics": {
+        "revisionHeaders.bin": {
+          "header_record": "0x018E",
+          "header_records": [
+            "0x019B",
+            "0x019B",
+            "0x019B"
+          ],
+          "relationship_ids": [
+            "rId1",
+            "rId2",
+            "rId3"
+          ],
+          "user_name": "Ryker Zhu",
+          "header_count": 3
+        },
+        "userNames.bin": {
+          "user_record": null,
+          "user_name": null,
+          "note": "The final closed XLSB UserNames.bin contains only empty framing records (0x018F, 0x0191, 0x0193); the temporary Ryker Zhu identity payload was discarded with the unsaved History view."
+        },
+        "revisionLog1.bin": {
+          "entry_count": 0,
+          "sentinel_record": "0x0193"
+        },
+        "revisionLog2.bin": {
+          "entry_count": 6,
+          "revision_groups": [
+            {
+              "revision_id": 1,
+              "header_record": "0x0199",
+              "nested_records": [
+                "0x0002",
+                "0x0002"
+              ],
+              "markers": [
+                "10",
+                "25"
+              ]
+            },
+            {
+              "revision_id": 2,
+              "header_record": "0x0199",
+              "nested_records": [
+                "0x0009",
+                "0x0009"
+              ],
+              "markers": [
+                "B2*2",
+                "B2*3"
+              ]
+            },
+            {
+              "revision_id": 3,
+              "header_record": "0x0199",
+              "nested_records": [
+                "0x003E",
+                "0x003E"
+              ],
+              "markers": [
+                "BASELINE_014",
+                "UPDATED_014"
+              ]
+            },
+            {
+              "revision_id": 4,
+              "header_record": "0x019E",
+              "nested_records": [],
+              "markers": [
+                "Review_014"
+              ]
+            },
+            {
+              "revision_id": 5,
+              "header_record": "0x0199",
+              "nested_records": [
+                "0x003E"
+              ],
+              "markers": [
+                "NEW_SHEET_014"
+              ]
+            },
+            {
+              "revision_id": 6,
+              "header_record": "0x0199",
+              "nested_records": [
+                "0x003E"
+              ],
+              "markers": [
+                "REVISION_CREATED_014"
+              ]
+            }
+          ]
+        },
+        "revisionLog3.bin": {
+          "entry_count": 2,
+          "record": "0x019C",
+          "actions": [
+            "delete",
+            "add"
+          ],
+          "purpose": "Native custom-workbook-view bookkeeping."
+        }
+      }
+    },
+    "xls": {
+      "container_kind": "CFB/OLE2 BIFF8",
+      "file_size_bytes": 28160,
+      "cfb_signature": "D0 CF 11 E0 A1 B1 1A E1",
+      "cfb_directory_streams": [
+        {
+          "path": "/\u0001CompObj",
+          "bytes": 102
+        },
+        {
+          "path": "/Workbook",
+          "bytes": 17124,
+          "sha256": "e8a79b36341c569368bde02744ce03116a592239b437824d234868ed16ad869e"
+        },
+        {
+          "path": "/User Names",
+          "bytes": 536,
+          "sha256": "e6c25514eab29a9319bf9c7eda300095728987bada6d1dbefafb78b548d9c9bc"
+        },
+        {
+          "path": "/Revision Log",
+          "bytes": 1922,
+          "sha256": "9c125c5042a4c15727e70e99af4a4e94c8fee72c877a987221acb1be9a413b5c"
+        },
+        {
+          "path": "/\u0005SummaryInformation",
+          "bytes": 228
+        },
+        {
+          "path": "/\u0005DocumentSummaryInformation",
+          "bytes": 260
+        }
+      ],
+      "revision_streams": {
+        "User Names": {
+          "bytes": 536,
+          "sha256": "e6c25514eab29a9319bf9c7eda300095728987bada6d1dbefafb78b548d9c9bc",
+          "raw_hex": "9101020000009801040006000000920100022900000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000970102000000",
+          "biff8_record_inventory": [
+            {
+              "offset": 0,
+              "record_id": "0x0191",
+              "length": 2,
+              "body_hex": "0000"
+            },
+            {
+              "offset": 6,
+              "record_id": "0x0198",
+              "length": 4,
+              "body_hex": "06000000"
+            },
+            {
+              "offset": 14,
+              "record_id": "0x0192",
+              "length": 512,
+              "body_hex": "2900000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
+            },
+            {
+              "offset": 530,
+              "record_id": "0x0197",
+              "length": 2,
+              "body_hex": "0000"
+            }
+          ]
+        },
+        "Revision Log": {
+          "bytes": 1922,
+          "sha256": "9c125c5042a4c15727e70e99af4a4e94c8fee72c877a987221acb1be9a413b5c",
+          "raw_hex": "96013200060000000f00c4e32e9c28b74450b7286fd2d46d14a1c4e32e9c28b74450b7286fd2d46d14a1060000000200000000001e009501a2000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000009401a20000000000ea070a0f12381b0409000052796b6572205a687500000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000038019e00ffffffff0000000020000000ffff8291feaa3ada4ca2acb515d001b28196b00409000052796b6572205a68750000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000ea070a0f12381b0403003d0104000100020038019e00ffffffff0000000020000000ffff8993e54a5a96472cb819cc750216fef0b00409000052796b6572205a68750000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000ea070a0f12360c0402003d010200ffff38019e00ffffffff0000000020000000ffff4bcb55e22c8b4203935518ed86d66a4ab00409000052796b6572205a68750000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000ea070a0f1236340403003d010400000000003b012c0042000000010000000800000001001234000001000100080000000000000000000000244000000000000039403b01340052000000020000000800000001002d34000002000100180000000000090044010001c01e02000500090044010001c01e030005003b01390056000000030000000800000001001b340000030001001e00000000000c0000424153454c494e455f3031340b0000555044415445445f3031344d0114011c02000004000000050001000200010000002000005b657863656c2d7265766973696f6e732e786c73785d5265766965775f3031345f30313400000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000ea070a0f123634040300000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000003b012c005a0000000500000008000000020003340000000000000000000000000d00004e45575f53484545545f3031343b013300680000000600000008000000020003340000000001000000000000001400005245564953494f4e5f435245415445445f30313438019e00ffffffff0000000020000000ffff8291feaa3ada4ca2acb515d001b28196b00409000052796b6572205a68755445445f30313431345f30313400000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000ea070a0f12370f0403003d01040000000000ac011e0026000000000000002c000000ffff5629c8dfe8c14dcda7540adad5caf49aac011e0026000000000000002b000000ffff5629c8dfe8c14dcda7540adad5caf49a38019e00ffffffff0000000020000000ffffc4e32e9c28b74450b7286fd2d46d14a1b00409000052796b6572205a68755445445f30313431345f30313400000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000ea070a0f12381b0403003d01040001000200ac011e0026000000000000002c000000ffff5629c8dfe8c14dcda7540adad5caf49aac011e0026000000000000002b000000ffff5629c8dfe8c14dcda7540adad5caf49a0a000000",
+          "biff8_record_inventory": [
+            {
+              "offset": 0,
+              "record_id": "0x0196",
+              "length": 50,
+              "body_hex": "060000000f00c4e32e9c28b74450b7286fd2d46d14a1c4e32e9c28b74450b7286fd2d46d14a1060000000200000000001e00"
+            },
+            {
+              "offset": 54,
+              "record_id": "0x0195",
+              "length": 162,
+              "body_hex": "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
+            },
+            {
+              "offset": 220,
+              "record_id": "0x0194",
+              "length": 162,
+              "body_hex": "00000000ea070a0f12381b0409000052796b6572205a6875000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
+            },
+            {
+              "offset": 386,
+              "record_id": "0x0138",
+              "length": 158,
+              "body_hex": "ffffffff0000000020000000ffff8291feaa3ada4ca2acb515d001b28196b00409000052796b6572205a68750000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000ea070a0f12381b040300"
+            },
+            {
+              "offset": 548,
+              "record_id": "0x013D",
+              "length": 4,
+              "body_hex": "01000200"
+            },
+            {
+              "offset": 556,
+              "record_id": "0x0138",
+              "length": 158,
+              "body_hex": "ffffffff0000000020000000ffff8993e54a5a96472cb819cc750216fef0b00409000052796b6572205a68750000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000ea070a0f12360c040200"
+            },
+            {
+              "offset": 718,
+              "record_id": "0x013D",
+              "length": 2,
+              "body_hex": "ffff"
+            },
+            {
+              "offset": 724,
+              "record_id": "0x0138",
+              "length": 158,
+              "body_hex": "ffffffff0000000020000000ffff4bcb55e22c8b4203935518ed86d66a4ab00409000052796b6572205a68750000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000ea070a0f123634040300"
+            },
+            {
+              "offset": 886,
+              "record_id": "0x013D",
+              "length": 4,
+              "body_hex": "00000000"
+            },
+            {
+              "offset": 894,
+              "record_id": "0x013B",
+              "length": 44,
+              "body_hex": "4200000001000000080000000100123400000100010008000000000000000000000024400000000000003940"
+            },
+            {
+              "offset": 942,
+              "record_id": "0x013B",
+              "length": 52,
+              "body_hex": "52000000020000000800000001002d34000002000100180000000000090044010001c01e02000500090044010001c01e03000500"
+            },
+            {
+              "offset": 998,
+              "record_id": "0x013B",
+              "length": 57,
+              "body_hex": "56000000030000000800000001001b340000030001001e00000000000c0000424153454c494e455f3031340b0000555044415445445f303134"
+            },
+            {
+              "offset": 1059,
+              "record_id": "0x014D",
+              "length": 276,
+              "body_hex": "1c02000004000000050001000200010000002000005b657863656c2d7265766973696f6e732e786c73785d5265766965775f3031345f30313400000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000ea070a0f12363404030000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
+            },
+            {
+              "offset": 1339,
+              "record_id": "0x013B",
+              "length": 44,
+              "body_hex": "5a0000000500000008000000020003340000000000000000000000000d00004e45575f53484545545f303134"
+            },
+            {
+              "offset": 1387,
+              "record_id": "0x013B",
+              "length": 51,
+              "body_hex": "680000000600000008000000020003340000000001000000000000001400005245564953494f4e5f435245415445445f303134"
+            },
+            {
+              "offset": 1442,
+              "record_id": "0x0138",
+              "length": 158,
+              "body_hex": "ffffffff0000000020000000ffff8291feaa3ada4ca2acb515d001b28196b00409000052796b6572205a68755445445f30313431345f30313400000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000ea070a0f12370f040300"
+            },
+            {
+              "offset": 1604,
+              "record_id": "0x013D",
+              "length": 4,
+              "body_hex": "00000000"
+            },
+            {
+              "offset": 1612,
+              "record_id": "0x01AC",
+              "length": 30,
+              "body_hex": "26000000000000002c000000ffff5629c8dfe8c14dcda7540adad5caf49a"
+            },
+            {
+              "offset": 1646,
+              "record_id": "0x01AC",
+              "length": 30,
+              "body_hex": "26000000000000002b000000ffff5629c8dfe8c14dcda7540adad5caf49a"
+            },
+            {
+              "offset": 1680,
+              "record_id": "0x0138",
+              "length": 158,
+              "body_hex": "ffffffff0000000020000000ffffc4e32e9c28b74450b7286fd2d46d14a1b00409000052796b6572205a68755445445f30313431345f30313400000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000ea070a0f12381b040300"
+            },
+            {
+              "offset": 1842,
+              "record_id": "0x013D",
+              "length": 4,
+              "body_hex": "01000200"
+            },
+            {
+              "offset": 1850,
+              "record_id": "0x01AC",
+              "length": 30,
+              "body_hex": "26000000000000002c000000ffff5629c8dfe8c14dcda7540adad5caf49a"
+            },
+            {
+              "offset": 1884,
+              "record_id": "0x01AC",
+              "length": 30,
+              "body_hex": "26000000000000002b000000ffff5629c8dfe8c14dcda7540adad5caf49a"
+            },
+            {
+              "offset": 1918,
+              "record_id": "0x000A",
+              "length": 0,
+              "body_hex": ""
+            }
+          ]
+        }
+      },
+      "biff8_revision_semantics": {
+        "user_names_stream": {
+          "stream_name": "User Names",
+          "top_level_record_count": 4,
+          "record_ids": [
+            "0x0191",
+            "0x0198",
+            "0x0192",
+            "0x0197"
+          ],
+          "user_name": null,
+          "note": "The final closed XLS User Names stream retains the empty collaboration table framing but no user-name record; Ryker Zhu remains present in the Revision Log identity records and CFB summary properties."
+        },
+        "revision_log_stream": {
+          "stream_name": "Revision Log",
+          "top_level_record_count": 24,
+          "record_ids": [
+            "0x0196",
+            "0x0195",
+            "0x0194",
+            "0x0138",
+            "0x013D",
+            "0x0138",
+            "0x013D",
+            "0x0138",
+            "0x013D",
+            "0x013B",
+            "0x013B",
+            "0x013B",
+            "0x014D",
+            "0x013B",
+            "0x013B",
+            "0x0138",
+            "0x013D",
+            "0x01AC",
+            "0x01AC",
+            "0x0138",
+            "0x013D",
+            "0x01AC",
+            "0x01AC",
+            "0x000A"
+          ],
+          "revision_header_record": "0x0196",
+          "cell_or_sheet_revision_record_families": [
+            "0x0138",
+            "0x013B",
+            "0x014D",
+            "0x01AC"
+          ],
+          "six_change_markers": [
+            "B2: 10 -> 25",
+            "B3: B2*2 -> B2*3",
+            "B4: BASELINE_014 -> UPDATED_014",
+            "insert Review_014",
+            "Review_014!A1: NEW_SHEET_014",
+            "Review_014!B1: REVISION_CREATED_014"
+          ],
+          "visible_strings": [
+            "BASELINE_014",
+            "UPDATED_014",
+            "[excel-revisions.xlsx]Review_014",
+            "NEW_SHEET_014",
+            "REVISION_CREATED_014",
+            "Ryker Zhu"
+          ]
+        }
+      }
+    }
+  },
+  "library_validation": {
+    "scope": "Read-only inspection; no library-generated fixture or source edit was performed.",
+    "xlsx_reader": {
+      "command": "cargo run --quiet -p litchi-xlsx --example read_xlsx -- test-data/microsoft-office/excel/excel-revisions.xlsx",
+      "result": "pass",
+      "worksheet_count": 2,
+      "worksheet_names": [
+        "Sheet1",
+        "Review_014"
+      ],
+      "active_sheet": "Sheet1",
+      "final_marker_values": {
+        "Sheet1!A1": "EXCEL_REVISIONS_014",
+        "Sheet1!B1": "Fixture ID: excel-revisions-014",
+        "Sheet1!B2": 25,
+        "Sheet1!B3": {
+          "formula": "B2*3",
+          "cached_value": 75
+        },
+        "Sheet1!B4": "UPDATED_014",
+        "Review_014!A1": "NEW_SHEET_014",
+        "Review_014!B1": "REVISION_CREATED_014"
+      },
+      "boundary": "Final cell values and cached formula were read; revision headers, revision logs, user names, and transient History sheet were not surfaced by this typed reader example."
+    },
+    "xlsb_reader": {
+      "command": "cargo run --quiet -p litchi --example xlsb_reader --features ooxml --no-default-features -- test-data/microsoft-office/excel/excel-revisions.xlsb",
+      "result": "pass",
+      "worksheet_text_extraction": "Sheet1 and Review_014 marker text plus final numeric values were emitted; no open or extraction error.",
+      "final_marker_values": {
+        "B2": 25,
+        "B3": 75,
+        "B4": "UPDATED_014",
+        "Review_014!A1": "NEW_SHEET_014",
+        "Review_014!B1": "REVISION_CREATED_014"
+      },
+      "boundary": "Confirms BIFF12 workbook and worksheets but does not traverse the revision parts as typed revision objects."
+    },
+    "xlsb_indexed_reader": {
+      "command": "cargo run --quiet -p litchi-xlsb --example binary_index_profile -- --fixture test-data/microsoft-office/excel/excel-revisions.xlsb --case indexed_cold --warmup 1 --samples 1",
+      "result": "pass",
+      "sheet_index": 0,
+      "cell_count": 9,
+      "dimensions_zero_based": [
+        0,
+        0,
+        4,
+        1
+      ],
+      "semantic_ok": true,
+      "digest_stable": true,
+      "boundary": "Indexed values cover the final Sheet1 cell projection; revision streams are outside this typed worksheet index API."
+    },
+    "xlsb_binary_structure": {
+      "command": "cargo run --quiet -p litchi --example dump_xlsb_structure --features ooxml --no-default-features -- test-data/microsoft-office/excel/excel-revisions.xlsb",
+      "result": "pass",
+      "observed": "BIFF12 workbook.bin, worksheet .bin streams, binary index streams, styles.bin, and all revision package members were listed; workbook/worksheet binary iteration completed without truncation."
+    },
+    "xls_reader": {
+      "command": "cargo run --quiet -p litchi-xls --example read_xls -- test-data/microsoft-office/excel/excel-revisions.xls",
+      "result": "pass",
+      "worksheet_count": 2,
+      "worksheet_names": [
+        "Sheet1",
+        "Review_014"
+      ],
+      "date_system_1904": false,
+      "final_marker_values": {
+        "B2": 25,
+        "B3": 75,
+        "B4": "UPDATED_014",
+        "Review_014!A1": "NEW_SHEET_014",
+        "Review_014!B1": "REVISION_CREATED_014"
+      },
+      "boundary": "Final BIFF8 cell values were read, but formula text and Revision Log/User Names semantics were not exposed by this typed reader example."
+    },
+    "xls_cfb_reader": {
+      "command": "cargo run --quiet -p litchi-ole-common --example inspect_ole -- test-data/microsoft-office/excel/excel-revisions.xls",
+      "result": "pass",
+      "signature": "D0 CF 11 E0 A1 B1 1A E1",
+      "stream_count": 6,
+      "revision_streams_seen": {
+        "/User Names": 536,
+        "/Revision Log": 1922
+      },
+      "metadata": {
+        "author": "Ryker Zhu",
+        "last_saved_by": "Ryker Zhu",
+        "application": "Microsoft Macintosh Excel",
+        "codepage": 10000
+      },
+      "final_close_note": "Final close discarded the transient History view; inspect_ole still sees both collaboration streams and the final workbook reopens without repair."
+    },
+    "xls_record_reader": {
+      "command": "cargo run --quiet -p litchi-xls --example dump_xls_records -- test-data/microsoft-office/excel/excel-revisions.xls",
+      "result": "pass",
+      "workbook_stream_bytes": 17124,
+      "record_count": 393,
+      "boundsheet8_count": 2,
+      "worksheet_bof_count": 2,
+      "worksheet_eof_count": 2,
+      "truncation_or_parse_error": false,
+      "boundary": "BIFF8 Workbook stream framing and final worksheet records were iterated; collaboration streams are separate CFB streams and are covered by inspect_ole plus the raw stream inventory above."
+    }
+  },
+  "files": [
+    {
+      "path": "test-data/microsoft-office/excel/excel-revisions.xlsx",
+      "format": "xlsx",
+      "bytes": 15052,
+      "sha256": "34d494b4ca8f2b8485be94b16841e0f26ac8f2be783534803877c026a878206d",
+      "file_description": "Microsoft Excel 2007+ transitional OOXML with revision parts",
+      "container_kind": "OPC ZIP",
+      "native_reopen_validation": "pass",
+      "zip_member_count": 18,
+      "zip_integrity": "pass"
+    },
+    {
+      "path": "test-data/microsoft-office/excel/excel-revisions.xlsb",
+      "format": "xlsb",
+      "bytes": 13369,
+      "sha256": "fe9ef9ff4170878c764db53f8bce9574c76f487f9ef264228de27e78c8160206",
+      "file_description": "Microsoft Excel Binary Workbook with BIFF12 revision parts",
+      "container_kind": "OPC ZIP with BIFF12 binary workbook/worksheet and revision streams",
+      "native_reopen_validation": "pass",
+      "zip_member_count": 22,
+      "zip_integrity": "pass"
+    },
+    {
+      "path": "test-data/microsoft-office/excel/excel-revisions.xls",
+      "format": "xls",
+      "bytes": 28160,
+      "sha256": "3909544d1b48ff4f165c9d02b7cf2206d28fbaa69524e78be5a20b1f4f48acf9",
+      "file_description": "Composite Document File V2 Document, Microsoft Macintosh Excel, BIFF8 plus collaboration streams",
+      "container_kind": "CFB/OLE2 BIFF8",
+      "native_reopen_validation": "pass",
+      "workbook_stream_bytes": 17124,
+      "revision_stream_bytes": {
+        "User Names": 536,
+        "Revision Log": 1922
+      },
+      "cfb_directory_stream_count": 6
+    }
+  ],
+  "validation_methods": [
+    "After the final native close, all three disk files were rehashed and their revision package/CFB streams were re-read; XLSB UserNames.bin and XLS User Names shrank because the unsaved transient History view was discarded, while revision logs and workbook content remained unchanged.",
+    "SHA-256 and byte sizes were computed from closed final fixture files and raw revision streams.",
+    "ZIP central-directory and CRC checks passed for XLSX and XLSB; revision content types and relationships were inspected read-only.",
+    "SpreadsheetML revisionHeaders.xml, revisionLog1/2/3.xml, userNames.xml, final worksheet XML, and formula cache were parsed without rewriting package bytes.",
+    "BIFF12 revisionHeaders.bin, revisionLog1/2/3.bin, userNames.bin were iterated with variable-length record framing; raw record bodies and marker strings were retained above.",
+    "CFB directory, User Names, Revision Log, Workbook stream, BIFF8 records, marker strings, and stream hashes were inspected without changing the XLS.",
+    "Existing litchi-xlsx, litchi-xlsb, litchi-xls, litchi-cfb, BIFF12 structure, and binary index reader examples were invoked read-only; typed-reader boundaries are recorded above.",
+    "Native Excel Track Changes, transient History A1:K9 behavior, save-chain warnings, close/reopen behavior, marker values, and no-repair observations are from the root Computer Use session; this inspection did not operate Office UI."
+  ],
+  "native_ui_observation_source": "Root agent Computer Use session; all three final fixtures were closed to Home after a final read-only History check. Generated History views were discarded with Don't Save, and the final disk files were rehashed without another Office save."
+}

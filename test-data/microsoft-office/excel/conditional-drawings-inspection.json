@@ -1,0 +1,808 @@
+{
+  "schema_version": 1,
+  "fixture_id": "excel-conditional-drawings-005",
+  "generated_on": "2026-10-15",
+  "purpose": "Fixture-specific, read-only inspection of three native Microsoft Excel derivatives exercising data bars, two- and three-color scales, icon sets, formula and duplicate-value rules, priority and DXF storage, a worksheet picture, and a rounded-rectangle DrawingML/OfficeArt shape across OOXML, BIFF12, and BIFF8.",
+  "provenance": {
+    "producer_app": "Microsoft Office Excel",
+    "package_application": "Microsoft Macintosh Excel",
+    "platform": "macOS",
+    "authoring_method": "Computer Use / native Microsoft Excel UI",
+    "source": "One deterministic worksheet was entered in native Excel. The sheet contains six source rows, four total formulas, four conditional-formatting visualization families, formula and duplicate-value rules, a picture using the existing poster.png asset, and a rounded rectangle containing CF_SHAPE_005. The native save chain was XLSX to XLSB to XLS.",
+    "native_save_chain": [
+      "xlsx",
+      "xlsb",
+      "xls"
+    ],
+    "image_source": "test-data/iwork/keynote/media-replacement-assets/poster.png",
+    "libreoffice_used": false,
+    "programmatic_office_generation_used": false,
+    "library_code_modified": false,
+    "all_documents_closed_before_hashing": true,
+    "lock_files_present_at_inspection": false
+  },
+  "scope_and_limits": {
+    "native_variants": [
+      "xlsx",
+      "xlsb",
+      "xls"
+    ],
+    "native_excel_reopen_verified": true,
+    "repair_or_conversion_prompt_observed": false,
+    "generic_loss_warning": {
+      "shown_for": "xls",
+      "accepted": true,
+      "feature_loss_warning_accepted": true
+    },
+    "stop_if_true": {
+      "native_ui_attempt": "Clicking Stop If True did not toggle the control.",
+      "saved_observation": "No stopIfTrue attribute/flag was saved; typed BIFF8 extension and BIFF12 rule reads report false.",
+      "expected_value": false
+    },
+    "xls_visual_difference": "The native XLS reopen screenshot showed the data bar normalized from the XLSX/XLSB solid negative-axis presentation (-17%, 0%, 8%, 33%, 63%, 83%) to a 0%, 17%, 25%, 50%, 79%, 100% gradient without a negative axis. This is recorded as a format-specific native observation and is not a rendering or semantic parity claim.",
+    "semantic_limit": "This fixture records native Excel storage and reopen observations for the listed conditional-formatting and drawing scopes. It does not certify conditional-formatting evaluation, rendering equivalence, arbitrary producer parity, complete x14/MCE support, complete OfficeArt semantics, or unsupported reader paths."
+  },
+  "expected_native_content": {
+    "worksheet_order": [
+      "Sheet1"
+    ],
+    "worksheet": {
+      "name": "Sheet1",
+      "dimension": "A1:I9",
+      "column_range": "A:I",
+      "column_width": 18.83203125,
+      "header_row_bold": "A2:I2",
+      "markers": {
+        "A1": "EXCEL_FORMATTING_005",
+        "B1": "Fixture ID: excel-conditional-drawings-005",
+        "F9": "END_CF_005"
+      },
+      "source_rows": [
+        {
+          "row": 3,
+          "label": "Alpha",
+          "data_bar": -20,
+          "color_scale": -20,
+          "icon_set": 0,
+          "formula_rule": 10,
+          "duplicate": "Alpha",
+          "two_color": -20,
+          "priority": 10
+        },
+        {
+          "row": 4,
+          "label": "Beta",
+          "data_bar": 0,
+          "color_scale": 0,
+          "icon_set": 20,
+          "formula_rule": 25,
+          "duplicate": "Beta",
+          "two_color": 0,
+          "priority": 25
+        },
+        {
+          "row": 5,
+          "label": "Gamma",
+          "data_bar": 10,
+          "color_scale": 10,
+          "icon_set": 40,
+          "formula_rule": 50,
+          "duplicate": "Alpha",
+          "two_color": 10,
+          "priority": 50
+        },
+        {
+          "row": 6,
+          "label": "Delta",
+          "data_bar": 40,
+          "color_scale": 40,
+          "icon_set": 60,
+          "formula_rule": 75,
+          "duplicate": "Gamma",
+          "two_color": 40,
+          "priority": 75
+        },
+        {
+          "row": 7,
+          "label": "Epsilon",
+          "data_bar": 75,
+          "color_scale": 75,
+          "icon_set": 80,
+          "formula_rule": 100,
+          "duplicate": "Beta",
+          "two_color": 75,
+          "priority": 100
+        },
+        {
+          "row": 8,
+          "label": "Zeta",
+          "data_bar": 100,
+          "color_scale": 100,
+          "icon_set": 100,
+          "formula_rule": 125,
+          "duplicate": "Delta",
+          "two_color": 100,
+          "priority": 125
+        }
+      ],
+      "totals": {
+        "B9": {
+          "formula": "SUM(B3:B8)",
+          "cached_value": 205
+        },
+        "C9": {
+          "formula": "AVERAGE(C3:C8)",
+          "cached_value": 34.166666666666664,
+          "native_display": "34.1666667"
+        },
+        "D9": {
+          "formula": "MAX(D3:D8)",
+          "cached_value": 100
+        },
+        "E9": {
+          "formula": "SUM(E3:E8)",
+          "cached_value": 385
+        }
+      },
+      "conditional_formatting": {
+        "container_count": 7,
+        "core_rule_count": 8,
+        "stop_if_true": false,
+        "rules": [
+          {
+            "range": "B3:B8",
+            "type": "dataBar",
+            "priority": 8,
+            "dxf_id": null,
+            "stop_if_true": false,
+            "core": {
+              "thresholds": [
+                {
+                  "type": "min"
+                },
+                {
+                  "type": "max"
+                }
+              ],
+              "color": "FF638EC6",
+              "presentation": "solid blue bar; native UI showed automatic red negative fill"
+            },
+            "x14_extension": {
+              "id": "{ECB0A437-79F1-4B45-BC65-239A77CC427B}",
+              "min_length": 0,
+              "max_length": 100,
+              "gradient": false,
+              "thresholds": [
+                {
+                  "type": "autoMin"
+                },
+                {
+                  "type": "autoMax"
+                }
+              ],
+              "negative_fill_color": "FFFF0000",
+              "axis_color": "FF000000"
+            }
+          },
+          {
+            "range": "C3:C8",
+            "type": "colorScale",
+            "priority": 7,
+            "dxf_id": null,
+            "stop_if_true": false,
+            "thresholds": [
+              {
+                "type": "min"
+              },
+              {
+                "type": "percentile",
+                "value": 50
+              },
+              {
+                "type": "max"
+              }
+            ],
+            "colors": [
+              "FFF8696B",
+              "FFFFEB84",
+              "FF63BE7B"
+            ],
+            "presentation": "red-yellow-green three-color scale"
+          },
+          {
+            "range": "D3:D8",
+            "type": "iconSet",
+            "priority": 6,
+            "dxf_id": null,
+            "stop_if_true": false,
+            "icon_set": "3Arrows",
+            "thresholds": [
+              {
+                "type": "percent",
+                "value": 0
+              },
+              {
+                "type": "percent",
+                "value": 33
+              },
+              {
+                "type": "percent",
+                "value": 67
+              }
+            ],
+            "show_value_attribute": "absent; native default",
+            "reverse_attribute": "absent; native default"
+          },
+          {
+            "range": "E3:E8",
+            "type": "expression",
+            "priority": 5,
+            "dxf_id": 7,
+            "stop_if_true": false,
+            "formula": "AND($E3>=50,$E3<100)",
+            "dxf": {
+              "font_color": "FF9C0006",
+              "fill_color": "FFFFC7CE",
+              "presentation": "light red fill with dark red text"
+            }
+          },
+          {
+            "range": "F3:F8",
+            "type": "duplicateValues",
+            "priority": 4,
+            "dxf_id": 6,
+            "stop_if_true": false,
+            "dxf": {
+              "font_color": "FF9C0006",
+              "fill_color": "FFFFC7CE",
+              "presentation": "red duplicate-value rule"
+            }
+          },
+          {
+            "range": "H3:H8",
+            "type": "colorScale",
+            "priority": 3,
+            "dxf_id": null,
+            "stop_if_true": false,
+            "thresholds": [
+              {
+                "type": "min"
+              },
+              {
+                "type": "max"
+              }
+            ],
+            "colors": [
+              "FF63BE7B",
+              "FFFCFCFF"
+            ],
+            "presentation": "native UI white-green two-color scale; package min is green and max is white"
+          },
+          {
+            "range": "I3:I8",
+            "type": "expression",
+            "rules_in_source_order": [
+              {
+                "priority": 2,
+                "dxf_id": 5,
+                "formula": "$I3>=50",
+                "stop_if_true": false,
+                "dxf": {
+                  "font_color": "FF9C5700",
+                  "fill_color": "FFFFEB9C",
+                  "presentation": "yellow fill with dark orange text"
+                }
+              },
+              {
+                "priority": 1,
+                "dxf_id": 4,
+                "formula": "$I3>=75",
+                "stop_if_true": false,
+                "dxf": {
+                  "font_color": "FF006100",
+                  "fill_color": "FFC6EFCE",
+                  "presentation": "green fill with dark green text"
+                }
+              }
+            ],
+            "priority_semantics": "lower priority number is higher precedence; the native source stores priority 2 before priority 1 in this container"
+          }
+        ],
+        "styles_dxf_count": 11,
+        "styles_dxf_summary": {
+          "0": {
+            "font_color": "FF006100",
+            "fill_color": "FFC6EFCE"
+          },
+          "1": {
+            "font_color": "FF9C5700",
+            "fill_color": "FFFFEB9C"
+          },
+          "2": {
+            "font_color": "FF9C0006",
+            "fill_color": "FFFFC7CE"
+          },
+          "3": {
+            "font_color": "FF9C0006",
+            "fill_color": "FFFFC7CE"
+          },
+          "4": {
+            "font_color": "FF006100",
+            "fill_color": "FFC6EFCE"
+          },
+          "5": {
+            "font_color": "FF9C5700",
+            "fill_color": "FFFFEB9C"
+          },
+          "6": {
+            "font_color": "FF9C0006",
+            "fill_color": "FFFFC7CE"
+          },
+          "7": {
+            "font_color": "FF9C0006",
+            "fill_color": "FFFFC7CE"
+          },
+          "8": {
+            "font_color": "FF9C5700",
+            "fill_color": "FFFFEB9C"
+          },
+          "9": {
+            "font_color": "FF9C0006",
+            "fill_color": "FFFFC7CE"
+          },
+          "10": {
+            "font_color": "FF9C0006",
+            "fill_color": "FFFFC7CE"
+          }
+        }
+      }
+    },
+    "drawing": {
+      "worksheet": "Sheet1",
+      "anchor_count": 2,
+      "picture": {
+        "id": 3,
+        "name": "Picture 2",
+        "description": "CF_PICTURE_005: synthetic blue and yellow stripes anchored over worksheet cells.",
+        "relationship_id": "rId1",
+        "media_part": "xl/media/image1.png",
+        "content_type": "image/png",
+        "bytes": 1698,
+        "sha256": "d594d8f832d3ab38d03e0d06316d2fa5e401217e50e21e01814e593d752da3e8",
+        "anchor": {
+          "type": "twoCell",
+          "edit_as": "oneCell",
+          "from": {
+            "column": 0,
+            "column_offset_emu": 0,
+            "row": 11,
+            "row_offset_emu": 0
+          },
+          "to": {
+            "column": 1,
+            "column_offset_emu": 596900,
+            "row": 16,
+            "row_offset_emu": 127000
+          },
+          "geometry_emu": {
+            "offset_x": 0,
+            "offset_y": 2235200,
+            "width": 2032000,
+            "height": 1143000
+          }
+        },
+        "native_cell_area": "A12:B17"
+      },
+      "shape": {
+        "id": 4,
+        "name": "Rounded Rectangle 3",
+        "kind": "rounded rectangle",
+        "preset_geometry": "roundRect",
+        "text": "CF_SHAPE_005",
+        "anchor": {
+          "type": "twoCell",
+          "edit_as": "twoCell",
+          "from": {
+            "column": 5,
+            "column_offset_emu": 1123950,
+            "row": 15,
+            "row_offset_emu": 82550
+          },
+          "to": {
+            "column": 7,
+            "column_offset_emu": 1179830,
+            "row": 19,
+            "row_offset_emu": 184150
+          },
+          "geometry_emu": {
+            "offset_x": 8299450,
+            "offset_y": 3130550,
+            "width": 2926080,
+            "height": 914400
+          }
+        },
+        "native_cell_area": "F16:H20"
+      }
+    }
+  },
+  "format_observations": {
+    "xlsx": {
+      "container": "OPC ZIP",
+      "zip_integrity": "pass",
+      "member_count": 15,
+      "main_workbook_content_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml",
+      "spreadsheetml_namespace": "http://schemas.openxmlformats.org/spreadsheetml/2006/main",
+      "strict_conformance": false,
+      "critical_parts": [
+        "xl/workbook.xml",
+        "xl/worksheets/sheet1.xml",
+        "xl/styles.xml",
+        "xl/sharedStrings.xml",
+        "xl/drawings/drawing1.xml",
+        "xl/drawings/_rels/drawing1.xml.rels",
+        "xl/media/image1.png",
+        "xl/calcChain.xml"
+      ],
+      "conditional_storage": "Seven conditionalFormatting containers and eight core cfRule elements are present in sheet1.xml. The data-bar rule has an x14 id reference and sheet-level x14 conditionalFormattings extension. styles.xml contains dxfs count=11.",
+      "drawing_storage": "drawing1.xml contains one xdr:pic and one rounded-rectangle xdr:sp; drawing1.xml.rels maps rId1 to image1.png.",
+      "native_reopen": "pass"
+    },
+    "xlsb": {
+      "container": "OPC ZIP with BIFF12 binary parts",
+      "zip_integrity": "pass",
+      "member_count": 16,
+      "main_workbook_content_type": "application/vnd.ms-excel.sheet.binary.main",
+      "critical_parts": [
+        "xl/workbook.bin",
+        "xl/worksheets/sheet1.bin",
+        "xl/styles.bin",
+        "xl/sharedStrings.bin",
+        "xl/drawings/drawing1.xml",
+        "xl/drawings/_rels/drawing1.xml.rels",
+        "xl/media/image1.png",
+        "xl/calcChain.bin",
+        "xl/worksheets/binaryIndex1.bin"
+      ],
+      "conditional_storage": "sheet1.bin contains seven classic conditional-formatting collections and eight BrtBeginCFRule records, plus the native Office 2013 data-bar extension family. styles.bin contains BrtBeginDXFs count=11, eleven BrtDXF records, and BrtEndDXFs.",
+      "drawing_storage": "The standard SpreadsheetDrawing XML and image relationship are retained unchanged alongside BIFF12 sheet records.",
+      "native_reopen": "pass"
+    },
+    "xls": {
+      "container": "CFB/OLE2 BIFF8 workbook",
+      "workbook_stream_bytes": 24253,
+      "boundsheet8_count": 1,
+      "native_sheet_order": [
+        "Sheet1"
+      ],
+      "conditional_storage": "The sheet contains three legacy CONDFMT/CF groups for the formula and duplicate rules, four BIFF12-style CONDFMT12/CF12 groups for the data bar, color scales, and icon set, and four CFEX extensions linking the formula/duplicate rules to priorities and differential formats.",
+      "drawing_storage": "The Workbook stream contains one MSODRAWINGGROUP record, three MSODRAWING records, two OBJ records, one TXO record, and the embedded PNG payload. The typed OfficeArt projection finds a picture and a rounded rectangle.",
+      "native_reopen": "pass",
+      "feature_loss_warning_accepted": true
+    }
+  },
+  "binary_record_invariants": {
+    "xlsb": {
+      "sheet1_bin_conditional_record_counts": {
+        "0x01CD_BrtBeginCondFormatting": 7,
+        "0x01CE_BrtEndCondFormatting": 7,
+        "0x01CF_BrtBeginCFRule": 8,
+        "0x01D0_BrtEndCFRule": 8,
+        "0x01D1_BrtBeginIconSet": 1,
+        "0x01D2_BrtEndIconSet": 1,
+        "0x01D3_BrtBeginDataBar": 1,
+        "0x01D4_BrtEndDataBar": 1,
+        "0x01D5_BrtBeginColorScale": 2,
+        "0x01D6_BrtEndColorScale": 2,
+        "0x01D7_BrtCFVO": 10,
+        "0x0234_BrtColor": 6,
+        "0x047A_BrtCFRuleExt": 1,
+        "0x0416_BrtBeginCondFormatting14": 1,
+        "0x0418_BrtBeginCFRule14": 1,
+        "0x0419_BrtEndCFRule14": 1,
+        "0x041A_BrtCFVO14": 2,
+        "0x041B_BrtBeginDataBar14": 1,
+        "0x041F_BrtColor14": 2,
+        "0x0484_BrtEndDataBar14": 1
+      },
+      "classic_rule_headers": [
+        {
+          "rule_type": 4,
+          "template": 3,
+          "dxf_id": null,
+          "priority": 8,
+          "payload_bytes": 46
+        },
+        {
+          "rule_type": 3,
+          "template": 2,
+          "dxf_id": null,
+          "priority": 7,
+          "payload_bytes": 46
+        },
+        {
+          "rule_type": 6,
+          "template": 4,
+          "dxf_id": null,
+          "priority": 6,
+          "payload_bytes": 46
+        },
+        {
+          "rule_type": 2,
+          "template": 1,
+          "dxf_id": 7,
+          "priority": 5,
+          "payload_bytes": 80
+        },
+        {
+          "rule_type": 2,
+          "template": 27,
+          "dxf_id": 6,
+          "priority": 4,
+          "payload_bytes": 46
+        },
+        {
+          "rule_type": 3,
+          "template": 2,
+          "dxf_id": null,
+          "priority": 3,
+          "payload_bytes": 46
+        },
+        {
+          "rule_type": 2,
+          "template": 1,
+          "dxf_id": 5,
+          "priority": 2,
+          "payload_bytes": 65
+        },
+        {
+          "rule_type": 2,
+          "template": 1,
+          "dxf_id": 4,
+          "priority": 1,
+          "payload_bytes": 65
+        }
+      ],
+      "styles_bin_dxf_records": {
+        "0x01F9_BrtBeginDXFs_count": 11,
+        "0x01FB_BrtDXF": 11,
+        "0x01FA_BrtEndDXFs": 1
+      }
+    },
+    "xls": {
+      "conditional_format_record_counts": {
+        "0x01B0_CONDFMT": 3,
+        "0x01B1_CF": 4,
+        "0x0879_CONDFMT12": 4,
+        "0x087A_CF12": 4,
+        "0x087B_CFEX": 4
+      },
+      "typed_cf12_payloads": [
+        {
+          "id": 1,
+          "range": "B3:B8",
+          "kind": "DataBar",
+          "priority": 8,
+          "stop_if_true": false,
+          "template": 3,
+          "payload_bytes": 28
+        },
+        {
+          "id": 2,
+          "range": "C3:C8",
+          "kind": "ColorScale",
+          "priority": 7,
+          "stop_if_true": false,
+          "template": 2,
+          "payload_bytes": 119
+        },
+        {
+          "id": 3,
+          "range": "D3:D8",
+          "kind": "IconSet",
+          "priority": 6,
+          "stop_if_true": false,
+          "template": 4,
+          "payload_bytes": 54
+        },
+        {
+          "id": 6,
+          "range": "H3:H8",
+          "kind": "ColorScale",
+          "priority": 3,
+          "stop_if_true": false,
+          "template": 2,
+          "payload_bytes": 76
+        }
+      ],
+      "legacy_formula_groups": [
+        {
+          "id": 4,
+          "range": "E3:E8",
+          "rule_count": 1,
+          "rule_kind": "Formula"
+        },
+        {
+          "id": 5,
+          "range": "F3:F8",
+          "rule_count": 1,
+          "rule_kind": "Formula; BIFF8 legacy projection of duplicateValues"
+        },
+        {
+          "id": 7,
+          "range": "I3:I8",
+          "rule_count": 2,
+          "rule_kind": "Formula"
+        }
+      ],
+      "cfex_extensions": [
+        {
+          "identifier": 4,
+          "legacy_rule_index": 0,
+          "priority": 5,
+          "active": true,
+          "stop_if_true": false,
+          "template": 1,
+          "differential_format_bytes": 180
+        },
+        {
+          "identifier": 5,
+          "legacy_rule_index": 0,
+          "priority": 4,
+          "active": true,
+          "stop_if_true": false,
+          "template": 27,
+          "differential_format_bytes": 180
+        },
+        {
+          "identifier": 7,
+          "legacy_rule_index": 0,
+          "priority": 1,
+          "active": true,
+          "stop_if_true": false,
+          "template": 1,
+          "differential_format_bytes": 180
+        },
+        {
+          "identifier": 7,
+          "legacy_rule_index": 1,
+          "priority": 2,
+          "active": true,
+          "stop_if_true": false,
+          "template": 1,
+          "differential_format_bytes": 180
+        }
+      ],
+      "drawing_record_counts": {
+        "0x00EB_MSODRAWINGGROUP_workbook_globals": 1,
+        "0x00EC_MSODRAWING_sheet": 3,
+        "0x005D_OBJ_sheet": 2,
+        "0x01B6_TXO_sheet": 1,
+        "0x003C_CONTINUE_sheet": 2
+      },
+      "embedded_png": {
+        "workbook_stream_offset": 12451,
+        "bytes": 1698,
+        "sha256": "d594d8f832d3ab38d03e0d06316d2fa5e401217e50e21e01814e593d752da3e8"
+      }
+    }
+  },
+  "library_validation": {
+    "scope": "Read-only inspection; no library-generated fixture, source edit, or publication was performed.",
+    "xlsx_reader": {
+      "general_command": "cargo run --quiet -p litchi-xlsx --example read_xlsx -- test-data/microsoft-office/excel/excel-conditional-drawings.xlsx",
+      "general_result": "pass; Workbook::open exposed Sheet1, dimensions A1:I9, shared-string labels, numeric source values, and cached formula cells.",
+      "conditional_formatting_probe": {
+        "api": "Worksheet::conditional_formattings() -> Result<Vec<Formatting>>",
+        "result": "Workbook open succeeded, but the typed conditional-formatting read failed with: invalid XLSX structure: core cfRule is missing priority.",
+        "source_api": "crates/litchi-xlsx/src/workbook/model.rs:1485 and crates/litchi-xlsx/src/conditional_formatting/mod.rs:20 expose the worksheet facade and parse_conditional_formattings/parse_differential_formats.",
+        "interpretation": "The package XML contains explicit priority attributes on every core cfRule; this record is the observed reader boundary for the native x14-linked data-bar layout, not a claim that the source XML lacks priorities."
+      },
+      "drawing_probe": {
+        "apis": [
+          "Worksheet::drawing(0)",
+          "Worksheet::picture(PictureSelector)",
+          "drawing::SourceDrawing::scan",
+          "shapes::load_sheet_shapes"
+        ],
+        "typed_drawing_result": "Worksheet::drawing(0) and SourceDrawing::scan failed with: invalid XLSX structure: source-backed XLSX drawing: drawing anchor children are out of order.",
+        "shape_package_result": "shapes::load_sheet_shapes passed and returned one rounded-rectangle Shape object with text CF_SHAPE_005 and the expected F16:H20 anchor. The shape inventory intentionally does not replace the separate picture owner.",
+        "image_payload_result": "The OPC media part was inspected read-only and matched the source PNG hash; no picture mutation was attempted."
+      }
+    },
+    "xlsb_reader": {
+      "typed_workbook_probe": {
+        "api": "Workbook::new followed by Workbook::worksheet(0)",
+        "open_result": "pass; worksheet catalog exposed Sheet1.",
+        "worksheet_result": "failed with: Unrecognized BrtBeginCFRule collection: unexpected record 0x0023.",
+        "interpretation": "The BIFF12 stream contains the native conditional-formatting records listed above; the failure is the current worksheet materialization boundary for this saved extension layout."
+      },
+      "conditional_formatting_api": "Worksheet::conditional_formattings() -> &[Formatting] in crates/litchi-xlsb/src/sheet.rs:346; the model supports classic and Office 2013 Scale, Bar, IconSet, and extension14 payloads, but this fixture did not reach that facade because worksheet parsing rejected the source record sequence.",
+      "drawing_probe": {
+        "api": "Workbook::sheet_drawing(0)",
+        "result": "pass; two drawing anchors, one PNG image, one shape, and zero charts.",
+        "image": {
+          "name": "Picture 2",
+          "description": "CF_PICTURE_005: synthetic blue and yellow stripes anchored over worksheet cells.",
+          "relationship_id": "rId1",
+          "format": "Png",
+          "bytes": 1698,
+          "sha256": "d594d8f832d3ab38d03e0d06316d2fa5e401217e50e21e01814e593d752da3e8"
+        },
+        "shape": {
+          "name": "Rounded Rectangle 3",
+          "geometry": "RoundRect",
+          "text": "CF_SHAPE_005",
+          "anchor": "F16:H20"
+        },
+        "source_api": "crates/litchi-xlsb/src/workbook/model.rs:257 and crates/litchi-xlsb/src/host/drawing.rs expose the typed SheetDrawing, image, shape, and anchor inventory."
+      }
+    },
+    "xls_reader": {
+      "general_command": "cargo run --quiet -p litchi-xls --example read_xls -- test-data/microsoft-office/excel/excel-conditional-drawings.xls",
+      "general_result": "pass; Workbook::new exposed Sheet1, dimensions A1:I9, and native cell labels/values.",
+      "conditional_formatting_probe": {
+        "apis": [
+          "Worksheet::conditional_formattings()",
+          "Worksheet::conditional_formattings12()",
+          "Worksheet::conditional_format_extensions()"
+        ],
+        "result": "pass; 3 legacy groups, 4 CF12 groups, and 4 CFEX extensions were exposed with the ranges, rule kinds, priorities, payload lengths, DXF linkage, and stop=false values recorded above.",
+        "source_api": "crates/litchi-xls/src/worksheet/mod.rs:775-795"
+      },
+      "drawing_probe": {
+        "apis": [
+          "extract_shapes_from_workbook",
+          "count_shapes_in_workbook",
+          "extract_shape_text_from_workbook"
+        ],
+        "result": "pass; two shapes were projected from the Workbook stream: picture shape id 1025 and AutoShape id 1026 with text CF_SHAPE_005.",
+        "picture_anchor": "Picture id 1025 projected as Size behavior from A12 through B17.",
+        "rounded_rectangle_anchor": "AutoShape id 1026 projected as Fixed behavior from F16 through H20.",
+        "source_api": "crates/litchi-xls/src/shapes.rs"
+      }
+    },
+    "temporary_probe_location": "/tmp/litchi-cf-probe (outside the checkout; not a repository artifact)"
+  },
+  "files": [
+    {
+      "path": "test-data/microsoft-office/excel/excel-conditional-drawings.xlsx",
+      "format": "xlsx",
+      "bytes": 14263,
+      "sha256": "dd3f5d866113dc6a102ae24a248f6321be6287dab522de7636fab86cd715d645",
+      "file_description": "Microsoft Excel 2007+",
+      "container_kind": "OPC ZIP",
+      "member_count": 15,
+      "native_reopen_validation": "pass"
+    },
+    {
+      "path": "test-data/microsoft-office/excel/excel-conditional-drawings.xlsb",
+      "format": "xlsb",
+      "bytes": 12985,
+      "sha256": "9f8df8e4c5cfe5845e0a529f10fb9f9d15f45bf8939ec965b74c6d54b11f7f56",
+      "file_description": "Microsoft Excel 2007+",
+      "container_kind": "OPC ZIP with BIFF12 binary parts",
+      "member_count": 16,
+      "native_reopen_validation": "pass"
+    },
+    {
+      "path": "test-data/microsoft-office/excel/excel-conditional-drawings.xls",
+      "format": "xls",
+      "bytes": 34304,
+      "sha256": "d89e2115aa9e8fc47b464328417cf85ceb1240edba6ca35064b1fbf71042ac5e",
+      "file_description": "Composite Document File V2 Document, Microsoft Macintosh Excel",
+      "container_kind": "CFB/OLE2 BIFF8",
+      "workbook_stream_bytes": 24253,
+      "native_reopen_validation": "pass"
+    }
+  ],
+  "validation_methods": [
+    "SHA-256 and byte sizes were computed from the closed fixture streams.",
+    "ZIP central-directory and CRC checks passed for XLSX and XLSB.",
+    "Worksheet XML, styles, shared strings, DrawingML, relationships, and the PNG media payload were inspected read-only.",
+    "BIFF12 sheet, styles, workbook, and binary-index records were inspected with the repository dump_records example after extracting parts in memory.",
+    "BIFF8 Workbook stream records were inspected with the repository dump_xls_records example; the embedded PNG was located and hashed without rewriting the CFB stream.",
+    "Existing litchi-xlsx and litchi-xls reader examples and temporary typed-reader probes were invoked read-only; specialized parser failures and drawing boundaries are recorded above.",
+    "Native Excel save, close, reopen, warning choices, feature retention, screenshot differences, and marker values are recorded from the root Computer Use session; this inspection process did not operate the Office UI."
+  ],
+  "native_ui_observation_source": "Root agent Computer Use session; all three final fixtures were saved through native Microsoft Excel, closed, reopened, inspected, and closed again without a repair prompt."
+}
