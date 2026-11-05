@@ -1,8 +1,8 @@
 # 0429 — W3: delete the `litchi-iwa` host
 
-- Status: merge-ready on branch `uo2/iwa-w3`, trunk `feat/unified-ops-api` at
-  `4d8a3e161f` merged in. The merge waits only on the coordinator's gate. Not
-  pushed.
+- Status: merged to `feat/unified-ops-api` at `3001da641b` and to
+  `feat/office-format-completeness` at `967e6ccce8`, on the owner's instruction,
+  before the 53-row gate finished; see PROGRESS for its result. Not pushed.
 - Date: 2026-11-05 (first prepared 2026-11-03).
 - Plan: record [0363](0363-iwa-monolith-exit-plan.md), wave W3, and its
   deletion gate (§6, now §10); ADR [0028](../adr/0028-iwa-monolith-exit.md).

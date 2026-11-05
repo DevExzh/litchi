@@ -10,6 +10,10 @@ rust-version.workspace = true
 autoexamples = false
 
 [[example]]
+name = "keynote_mac_queue_caption_routes"
+path = "examples/mac_queue_caption_routes.rs"
+
+[[example]]
 name = "keynote_edit_chart_arrangement"
 path = "examples/edit_chart_arrangement.rs"
 
@@ -115,7 +119,6 @@ path = "examples/set_slide_skipped.rs"
 
 [features]
 default = []
-internal-iwork-source = ["litchi-iwa-archive/internal-iwork-source"]
 
 [dependencies]
 litchi-core       = { workspace = true }

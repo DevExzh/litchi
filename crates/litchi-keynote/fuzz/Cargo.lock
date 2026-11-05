@@ -600,7 +600,6 @@ dependencies = [
 name = "litchi-iwa-style"
 version = "0.0.1"
 dependencies = [
- "litchi-iwa-archive",
  "litchi-iwa-common",
  "litchi-iwa-core",
  "litchi-iwa-protos",

@@ -25,8 +25,8 @@ default = []
 # object-tree adapter (`format::iwork`), whose internal umbrella is
 # `iwork-adapter`. Detection classifies iWork packages itself, as the last
 # ZIP candidate, through `litchi-iwa-detect`; the leaves' prepared-source
-# ingress (`internal-iwork-source`) adopts the detection's parsed container
-# without a second ZIP pass.
+# ingress (`Package::from_prepared_source`) adopts the detection's parsed
+# container without a second ZIP pass.
 # `encryption` (step S6) adds `Locked::unlock`: OOXML package decryption
 # through `litchi-crypto`, the OOXML leaves' decrypted-package constructors,
 # and legacy PowerPoint decryption. It also lets an OOXML-only build parse the
@@ -76,9 +76,9 @@ odi         = ["odf-objects", "dep:litchi-odi"]
 odb         = ["odf-objects", "dep:litchi-odb"]
 odf-formula = ["odf-objects", "dep:litchi-odf-formula"]
 odf-objects = ["dep:litchi-odf-common", "dep:soapberry-zip"]
-pages   = ["iwork-adapter", "dep:litchi-pages", "litchi-pages/internal-iwork-source"]
-keynote = ["iwork-adapter", "dep:base64", "dep:litchi-keynote", "litchi-keynote/internal-iwork-source"]
-numbers = ["iwork-adapter", "dep:litchi-numbers", "litchi-numbers/internal-iwork-source"]
+pages   = ["iwork-adapter", "dep:litchi-pages"]
+keynote = ["iwork-adapter", "dep:base64", "dep:litchi-keynote"]
+numbers = ["iwork-adapter", "dep:litchi-numbers"]
 iwork-adapter = ["dep:litchi-iwa-archive", "dep:litchi-iwa-detect", "dep:soapberry-zip"]
 
 encryption = [

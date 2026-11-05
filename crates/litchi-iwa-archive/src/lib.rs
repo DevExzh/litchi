@@ -29,9 +29,8 @@ mod zip;
 
 /// Transitional type-routing surface for the physical IWA substrate.
 ///
-/// The migration host and focused format crates can import neutral archive
-/// values through this archive-owned path while the last direct dependency on
-/// `litchi-iwa-core` is retired. Every item is an exact re-export: this module
+/// Focused format crates can import neutral archive values through this
+/// archive-owned path. Every item is an exact re-export: this module
 /// introduces no wrapper, conversion, or second ownership boundary. It is
 /// hidden from generated API documentation because callers should generally
 /// use a concrete format package's semantic API instead.
@@ -46,9 +45,6 @@ pub mod iwa {
     };
 }
 
-#[cfg(feature = "internal-iwork-source")]
-#[doc(hidden)]
-pub use catalog::OwnedSourceCatalog;
 pub use catalog::{Component, ComponentCatalog, SourceCatalog};
 pub use directory::{
     DirectoryMarkers, DirectoryMetadataSidecars, DirectoryProvenance, FrozenDirectoryBundle,
@@ -67,8 +63,7 @@ pub use semantic::{SemanticMetadataSidecars, SemanticProfile, SemanticProjection
 /// Explicitly unstable neutral physical candidate ingress.
 ///
 /// This module is intended for the root coordinator and focused format
-/// owners while the migration host is retired. It exposes storage facts and
-/// admission callbacks only; it does not publish generated messages, native
+/// owners. It exposes storage facts and admission callbacks only; it does not publish generated messages, native
 /// object identifiers, or format semantic values through a supported facade.
 #[doc(hidden)]
 pub mod unstable {

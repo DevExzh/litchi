@@ -201,20 +201,6 @@ fn native_multiroot_comments_preserve_independent_metadata_and_values()
             Storage::Stored(Value::Text(value)) => assert_eq!(value, sentinel),
             other => panic!("native sentinel mismatch: {other:?}"),
         }
-        #[cfg(feature = "internal-iwork-source")]
-        {
-            let compatible = Package::__table_cell_comment_from_bytes_for_compatibility(
-                BYTES, "Sheet 1", "Table 1", position,
-            )?
-            .ok_or("compatibility root missing")?;
-            assert_eq!(compatible, root);
-            assert!(
-                Package::__table_cell_comment_replies_from_bytes_for_compatibility(
-                    BYTES, "Sheet 1", "Table 1", position,
-                )?
-                .is_empty()
-            );
-        }
     }
     let mut unchanged = Vec::new();
     package.write_to(&mut unchanged)?;

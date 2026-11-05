@@ -334,7 +334,7 @@ impl Package {
         let catalog = super::table_headers::rewrite::physical_source(self).map_err(|_| {
             Error::Refused(crate::package::table_cell_pop_up_menu::Refusal::UnsupportedSource)
         })?;
-        let owner = catalog.__source_owner();
+        let owner = catalog.source_owner();
         if !patch.artifacts.authorizes_owner(&owner) {
             return Err(Error::PatchConflict);
         }
@@ -429,7 +429,7 @@ fn no_op_commit(
     let catalog = super::table_headers::rewrite::physical_source(source).map_err(|_| {
         Error::Refused(crate::package::table_cell_pop_up_menu::Refusal::UnsupportedSource)
     })?;
-    let owner = catalog.__source_owner();
+    let owner = catalog.source_owner();
     Ok(Commit {
         package: source.snapshot(),
         patch: Patch {
@@ -460,7 +460,7 @@ fn rewrite(
         .map_err(|_| {
             Error::Refused(crate::package::table_cell_pop_up_menu::Refusal::UnsupportedSource)
         })?
-        .__source_owner();
+        .source_owner();
     let target = popup::resolve_cell(
         source,
         SheetSelector::index(sheet),
@@ -512,7 +512,7 @@ fn rewrite(
             let diagnostics = package_diff_diagnostics(source, &package)?;
             let target_owner = super::table_headers::rewrite::physical_source(&package)
                 .map_err(|_| Error::Verification)?
-                .__source_owner();
+                .source_owner();
             return Ok(Commit {
                 package,
                 patch: Patch {
@@ -550,7 +550,7 @@ fn rewrite(
         }
         let target_owner = super::table_headers::rewrite::physical_source(&package)
             .map_err(|_| Error::Verification)?
-            .__source_owner();
+            .source_owner();
         return Ok(Commit {
             package,
             patch: Patch {
@@ -700,7 +700,7 @@ fn rewrite(
     )?;
     let target_owner = super::table_headers::rewrite::physical_source(&candidate)
         .map_err(|_| Error::Verification)?
-        .__source_owner();
+        .source_owner();
     let touched_components = changed_component_count(source, &candidate)?;
     Ok(Commit {
         package: candidate,

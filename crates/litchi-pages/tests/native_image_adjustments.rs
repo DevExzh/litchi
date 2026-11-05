@@ -1,5 +1,3 @@
-#![cfg(feature = "internal-iwork-source")]
-
 //! Native Pages integration coverage for image-inspector adjustments.
 //!
 //! The fixtures are authored, saved, closed, and reopened by Pages 14.4.

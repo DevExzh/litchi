@@ -413,11 +413,11 @@ pub(super) fn create_root_comment(
     if actual != expected {
         return Err(Error::Verification);
     }
-    let target_owner = physical_source(&package)?.__source_owner();
+    let target_owner = physical_source(&package)?.source_owner();
     Ok(Commit {
         package,
         patch: Patch {
-            artifacts: OwnedExactArtifacts::new(physical.__source_owner(), target_owner),
+            artifacts: OwnedExactArtifacts::new(physical.source_owner(), target_owner),
             path,
             before: None,
             after: Some(actual),

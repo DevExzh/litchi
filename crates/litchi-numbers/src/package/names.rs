@@ -807,7 +807,7 @@ fn commit_edit(source: &Package, mut operations: Vec<Operation>) -> Result<Commi
         .filter(|operation| operation.before != operation.after)
         .count();
     let source_catalog = physical_source(source)?;
-    let source_bytes = source_catalog.__source_owner();
+    let source_bytes = source_catalog.source_owner();
     let source_fingerprint = fingerprint(&source_bytes);
     if changed == 0 {
         let patch = Patch {
@@ -847,7 +847,7 @@ fn commit_edit(source: &Package, mut operations: Vec<Operation>) -> Result<Commi
         preview_names.len(),
         true,
     )?;
-    let target = physical_source(&package)?.__source_owner();
+    let target = physical_source(&package)?.source_owner();
     let target_fingerprint = fingerprint(&target);
     let patch = Patch {
         source: source_bytes,

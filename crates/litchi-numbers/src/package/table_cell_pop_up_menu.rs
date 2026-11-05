@@ -542,7 +542,7 @@ impl Package {
     pub fn apply_table_cell_pop_up_menu_format(&self, patch: &Patch) -> Result<Commit, Error> {
         let catalog = super::table_headers::rewrite::physical_source(self)
             .map_err(|_| Error::Refused(Refusal::UnsupportedSource))?;
-        let source = catalog.__source_owner();
+        let source = catalog.source_owner();
         if !patch.artifacts.authorizes_owner(&source) {
             return Err(Error::PatchConflict);
         }
@@ -623,7 +623,7 @@ fn no_op_commit(
 ) -> Result<Commit, Error> {
     let catalog = super::table_headers::rewrite::physical_source(source)
         .map_err(|_| Error::Refused(Refusal::UnsupportedSource))?;
-    let owner = catalog.__source_owner();
+    let owner = catalog.source_owner();
     Ok(Commit {
         package: source.snapshot(),
         patch: Patch {
@@ -666,7 +666,7 @@ fn rewrite_transaction(
     }
     let source_owner = super::table_headers::rewrite::physical_source(source)
         .map_err(|_| Error::Refused(Refusal::UnsupportedSource))?
-        .__source_owner();
+        .source_owner();
     let published = table::pop_up_publish::publish(
         source,
         target,
@@ -692,7 +692,7 @@ fn rewrite_transaction(
     let candidate = published.package;
     let target_owner = super::table_headers::rewrite::physical_source(&candidate)
         .map_err(|_| Error::Verification)?
-        .__source_owner();
+        .source_owner();
     Ok(Commit {
         package: candidate,
         patch: Patch {

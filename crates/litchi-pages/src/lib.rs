@@ -97,26 +97,6 @@ pub use litchi_iwa_common::chart::metadata::ChartMetadata;
 pub use litchi_iwa_detect::MAX_PROPERTIES_BYTES as MAX_DOCUMENT_PROPERTIES_BYTES;
 pub use litchi_iwa_text::{TextPosition, TextSpan};
 pub use package::MergeReader;
-#[cfg(feature = "internal-iwork-source")]
-#[doc(hidden)]
-pub use package::{
-    __CatalogBodyTableAppearanceSource, __catalog_body_table_appearance,
-    __catalog_body_table_style_edges,
-};
-#[cfg(feature = "internal-iwork-source")]
-#[doc(hidden)]
-pub use package::{__decode_image_adjustments_payload, ImageAdjustmentsError};
-#[cfg(feature = "internal-iwork-source")]
-#[doc(hidden)]
-pub use package::{
-    __decode_movie_playback_payload, __rewrite_movie_playback_payload, MoviePlaybackError,
-};
-#[cfg(feature = "internal-iwork-source")]
-#[doc(hidden)]
-pub use package::{
-    __is_valid_pages_text_storage, __pages_body_storage_discovery,
-    __semantic_document_from_prepared_source, BodyStorageDiscovery,
-};
 pub use package::{
     MAX_OBJECTS, Package, PackageError, PackageResult, SaveError, Stats, WriteError,
 };

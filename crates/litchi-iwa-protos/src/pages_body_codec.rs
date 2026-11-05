@@ -134,8 +134,7 @@ impl DocumentBodySnapshot {
     }
 }
 
-/// Borrowed focused projection of the Pages document-root facts used by the
-/// migration host.
+/// Borrowed focused projection of the Pages document-root facts.
 //
 // The root payload itself is retained as a borrow so callers can keep the
 // native bytes authoritative. Singular references and the page-layout scalar
@@ -529,7 +528,7 @@ pub fn decode_document_body(
     Ok(strict)
 }
 
-/// Decode the focused Pages document-root facts needed by the migration host.
+/// Decode the focused Pages document-root facts.
 //
 // A complete strict source pass runs before the private Buffa lazy view is
 // constructed. The view is used only for the already-selected scalar

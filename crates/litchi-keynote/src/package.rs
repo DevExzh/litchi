@@ -6,8 +6,6 @@
 
 mod blank_layout;
 pub(crate) use blank_layout::{FreshError, FreshSettings};
-#[cfg(feature = "internal-iwork-source")]
-mod catalog_table_appearance;
 mod chart_axis_support;
 pub(crate) mod edit;
 mod identity;
@@ -103,7 +101,7 @@ use litchi_iwa_common::{
 };
 use litchi_iwa_core::{ArchiveObject, RawMessage};
 use litchi_iwa_detect::{Format, PreparedSource};
-#[cfg(any(test, feature = "internal-iwork-source"))]
+#[cfg(test)]
 use litchi_iwa_protos::keynote_slide_drawables_codec;
 use litchi_iwa_protos::{
     keynote_document_codec, keynote_media_codec, keynote_placeholder_text_codec,
@@ -127,17 +125,6 @@ use crate::{
     slide::media::{Point as MediaPoint, Size as MediaSize},
     transition::Effect,
 };
-
-#[cfg(feature = "internal-iwork-source")]
-pub use catalog_table_appearance::{
-    __CatalogTableAppearanceSource, __catalog_table_appearance, __catalog_table_style_edges,
-};
-#[cfg(feature = "internal-iwork-source")]
-#[doc(hidden)]
-pub use image_adjustments::{__decode_image_adjustments_payload, ImageAdjustmentsError};
-#[cfg(feature = "internal-iwork-source")]
-#[doc(hidden)]
-pub use slide_preview::{__invalidate_slide_preview, SlidePreviewInvalidationError};
 
 use crate::presentation::{Presentation, Stats as PresentationStats};
 pub(crate) use edit::Edit;
@@ -219,7 +206,6 @@ pub(crate) const fn unexpected_format(format: Format) -> ReadError {
 }
 
 const DOCUMENT_MESSAGE_TYPE: u32 = 1;
-const LITCHI_SOURCE_BUILT_TEMPLATE: &str = "Application/Litchi/Blank/Wide";
 const SHOW_MESSAGE_TYPE: u32 = 2;
 const SLIDE_NODE_MESSAGE_TYPE: u32 = 4;
 const SLIDE_MESSAGE_TYPE: u32 = 5;
@@ -543,7 +529,7 @@ struct State {
     semantic: OnceCell<Presentation>,
     #[cfg(test)]
     semantic_decode_attempts: AtomicUsize,
-    #[cfg(all(test, feature = "internal-iwork-source"))]
+    #[cfg(test)]
     source_classification_attempts: usize,
 }
 
@@ -770,9 +756,7 @@ impl Package {
     /// allocation. This is an unstable host migration seam; callers must
     /// provide immutable bytes that have already crossed the owning package
     /// boundary and must not use it as a raw-source public API.
-    #[cfg(feature = "internal-iwork-source")]
-    #[doc(hidden)]
-    pub fn __from_shared_source_with_options(
+    pub fn from_shared_bytes_with_options(
         source: Arc<[u8]>,
         options: OpenOptions,
     ) -> ReadResult<Self> {
@@ -802,9 +786,7 @@ impl Package {
     ///
     /// Returns [`ReadError`] when the source belongs to another application or
     /// the Keynote root/index cannot be validated.
-    #[cfg(feature = "internal-iwork-source")]
-    #[doc(hidden)]
-    pub fn __from_prepared_source(
+    pub fn from_prepared_source(
         source: PreparedSource,
         semantic: SemanticLimits,
     ) -> ReadResult<Self> {
@@ -858,7 +840,7 @@ impl Package {
                 semantic: OnceCell::new(),
                 #[cfg(test)]
                 semantic_decode_attempts: AtomicUsize::new(0),
-                #[cfg(all(test, feature = "internal-iwork-source"))]
+                #[cfg(test)]
                 source_classification_attempts,
             }),
         };
@@ -882,7 +864,7 @@ impl Package {
                 semantic: OnceCell::new(),
                 #[cfg(test)]
                 semantic_decode_attempts: AtomicUsize::new(0),
-                #[cfg(all(test, feature = "internal-iwork-source"))]
+                #[cfg(test)]
                 source_classification_attempts: 0,
             }),
         };
@@ -922,7 +904,7 @@ impl Package {
                 semantic: OnceCell::new(),
                 #[cfg(test)]
                 semantic_decode_attempts: AtomicUsize::new(0),
-                #[cfg(all(test, feature = "internal-iwork-source"))]
+                #[cfg(test)]
                 source_classification_attempts: 0,
             }),
         };
@@ -1171,25 +1153,6 @@ impl Package {
         self.root_show_identifier()?;
         self.semantic_document()?;
         Ok(())
-    }
-
-    /// Classify the private source-builder compatibility marker.
-    ///
-    /// This is an internal migration seam for the legacy facade. It borrows a
-    /// strict Buffa-era projection of the native root and does not expose the
-    /// marker or any raw archive identity to normal focused-package callers.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error when the root document or its required envelopes are
-    /// missing, ambiguous, malformed, or outside the configured wire limits.
-    #[doc(hidden)]
-    pub fn __is_litchi_source_built_compatibility(&self) -> ReadResult<bool> {
-        let marker = decode_root_template_identifier(
-            self.root_document_payload()?,
-            self.semantic_wire_limits()?,
-        )?;
-        Ok(marker == Some(LITCHI_SOURCE_BUILT_TEMPLATE))
     }
 
     /// Return package measurements after resolving the semantic slide tree.
@@ -1799,26 +1762,6 @@ fn slide_placeholder_role(
     }
 }
 
-/// Consume a prepared Keynote source into an archive-free semantic document.
-///
-/// This unstable coordinator handoff releases exact package bytes and logical
-/// sidecars before the lazy Keynote graph is projected. It supports both ZIP
-/// inputs and app-authored package directories because only the retained IWA
-/// component snapshot crosses this boundary.
-///
-/// # Errors
-///
-/// Returns [`ReadError`] when the source belongs to another application or
-/// its Keynote graph is malformed or exceeds the supplied semantic limits.
-#[cfg(feature = "internal-iwork-source")]
-#[doc(hidden)]
-pub fn __presentation_from_prepared_source(
-    source: PreparedSource,
-    semantic: SemanticLimits,
-) -> ReadResult<Presentation> {
-    presentation_from_prepared_source(source, semantic)
-}
-
 pub(crate) fn presentation_from_prepared_source(
     source: PreparedSource,
     semantic: SemanticLimits,
@@ -2139,42 +2082,6 @@ fn decode_root_show_identifier(payload: &[u8], wire_limits: WireLimits) -> ReadR
         } else {
             ReadError::InvalidFormat(format!(
                 "Keynote root document projection is malformed: {error}"
-            ))
-        }
-    })
-}
-
-fn decode_root_template_identifier(
-    payload: &[u8],
-    wire_limits: WireLimits,
-) -> ReadResult<Option<&str>> {
-    let recursion_limit = u32::try_from(wire_limits.max_nesting()).map_err(|_error| {
-        ReadError::InvalidFormat("Keynote root nesting limit does not fit u32".to_owned())
-    })?;
-    keynote_document_codec::decode_template_identifier(
-        payload,
-        keynote_document_codec::DecodeOptions::new(payload.len(), recursion_limit)
-            .with_max_fields(wire_limits.max_fields())
-            .with_max_work_bytes(wire_limits.max_rewrite_work()),
-    )
-    .map_err(|error| {
-        if let Some((observed, maximum)) = error.field_limit_values() {
-            ReadError::PayloadLimit {
-                kind: PayloadLimitKind::Fields,
-                observed,
-                maximum,
-                path: SemanticPath::Package,
-            }
-        } else if let Some((observed, maximum)) = error.work_limit_values() {
-            ReadError::PayloadLimit {
-                kind: PayloadLimitKind::Work,
-                observed,
-                maximum,
-                path: SemanticPath::Package,
-            }
-        } else {
-            ReadError::InvalidFormat(format!(
-                "Keynote root template projection is malformed: {error}"
             ))
         }
     })
@@ -3359,7 +3266,7 @@ fn decode_slide_node_projection(
 /// The format adapter supplies package-derived limits to the focused Buffa
 /// codec. The codec performs strict canonical preflight before forcing its
 /// borrowed lazy repeated references, and returns only compact scalar lists.
-#[cfg(any(test, feature = "internal-iwork-source"))]
+#[cfg(test)]
 fn decode_slide_drawable_projection(
     payload: &[u8],
     wire_limits: WireLimits,
@@ -3379,7 +3286,7 @@ fn decode_slide_drawable_projection(
         .map_err(|error| map_slide_drawables_projection_error(error, path))
 }
 
-#[cfg(any(test, feature = "internal-iwork-source"))]
+#[cfg(test)]
 fn map_slide_drawables_projection_error(
     error: keynote_slide_drawables_codec::DecodeError,
     path: SemanticPath,
@@ -3421,51 +3328,6 @@ fn map_slide_drawables_projection_error(
             "Keynote slide drawable projection is malformed: {error}"
         )),
     }
-}
-
-/// Decode the strict drawable projection for the migration host.
-///
-/// This hidden seam retains only the two repeated identifier lists required by
-/// read-only table graph discovery. It deliberately does not expose a
-/// generated slide archive or payload lifetime to the host crate.
-#[cfg(feature = "internal-iwork-source")]
-#[doc(hidden)]
-pub fn __decode_slide_drawable_projection(
-    payload: &[u8],
-    wire_limits: WireLimits,
-    slide_index: usize,
-) -> ReadResult<(Vec<u64>, Vec<u64>)> {
-    decode_slide_drawable_projection(
-        payload,
-        wire_limits,
-        SemanticPath::Slide { index: slide_index },
-    )
-}
-
-/// Decode the strict slide-node projection for the migration host.
-///
-/// This hidden seam keeps the selected slide identifier and skip state as
-/// owned scalars while the focused package remains the owner of the required
-/// native envelope and reference validation. The caller retains no generated
-/// `KN.SlideNodeArchive` value or payload borrow.
-///
-/// # Errors
-///
-/// Returns [`ReadError`] when the selected node is malformed, lacks one of its
-/// required envelope fields, exceeds `wire_limits`, or contains an invalid
-/// slide reference.
-#[cfg(feature = "internal-iwork-source")]
-#[doc(hidden)]
-pub fn __decode_slide_node_projection(
-    payload: &[u8],
-    wire_limits: WireLimits,
-    slide_index: usize,
-) -> ReadResult<(u64, bool)> {
-    decode_slide_node_projection(
-        payload,
-        wire_limits,
-        SemanticPath::Slide { index: slide_index },
-    )
 }
 
 fn decode_slide_owner<'source>(
@@ -5232,7 +5094,6 @@ mod tests {
         Ok(())
     }
 
-    #[cfg(feature = "internal-iwork-source")]
     #[test]
     fn prepared_source_skips_redundant_keynote_classification()
     -> Result<(), Box<dyn std::error::Error>> {
@@ -5245,8 +5106,7 @@ mod tests {
             panic!("the native fixture must be recognized as Keynote");
         };
 
-        let prepared_package =
-            Package::__from_prepared_source(prepared, SemanticLimits::default())?;
+        let prepared_package = Package::from_prepared_source(prepared, SemanticLimits::default())?;
         assert_eq!(prepared_package.state.source_classification_attempts, 0);
 
         let direct_package = Package::from_bytes(&source)?;
@@ -5254,14 +5114,11 @@ mod tests {
         Ok(())
     }
 
-    #[cfg(feature = "internal-iwork-source")]
     #[test]
     fn shared_source_ingress_reuses_exact_allocation() -> Result<(), Box<dyn std::error::Error>> {
         let source: Arc<[u8]> = std::fs::read(native_fixture_path())?.into();
-        let package = Package::__from_shared_source_with_options(
-            Arc::clone(&source),
-            OpenOptions::default(),
-        )?;
+        let package =
+            Package::from_shared_bytes_with_options(Arc::clone(&source), OpenOptions::default())?;
         assert!(Arc::ptr_eq(&source, &package.state.source.shared_source()));
         Ok(())
     }

@@ -300,8 +300,9 @@ impl Edit<'_> {
             caption::Layout::Inline
         };
         let source = self.source;
+        let label = self.target.label;
         let written = caption::write(&mut working, self.target, text, layout, |_| {
-            theme(source).map_err(|_| {
+            theme(source, label).map_err(|_| {
                 caption::Error::Graph(litchi_iwa_style::graph::Error::Invalid(
                     "a document without a caption theme",
                 ))
@@ -336,10 +337,12 @@ fn workspace(
     Ok((components, limits))
 }
 
-/// The document stylesheet, the theme's first caption paragraph-style
-/// preset and the document language (the host's
-/// `sheet_shape_caption_theme`).
-fn theme(package: &Package) -> Result<(u64, u64, Option<String>), structure::Fault> {
+/// The document stylesheet, the paragraph style of a new `label` and the
+/// document language (`caption::theme_label_paragraph_style`, record 0435).
+fn theme(
+    package: &Package,
+    label: caption::Label,
+) -> Result<(u64, u64, Option<String>), structure::Fault> {
     use structure::Fault;
     let reference = |payload: &[u8], path: &[u32]| -> Result<u64, Fault> {
         let records = references::records(payload, path)?;
@@ -363,7 +366,9 @@ fn theme(package: &Package) -> Result<(u64, u64, Option<String>), structure::Fau
     let [base] = base.as_slice() else {
         return Err(Fault::Invalid);
     };
-    let paragraph_style = caption::theme_paragraph_style(base).ok_or(Fault::Invalid)?;
+    let paragraph_style =
+        caption::theme_label_paragraph_style(base, label, |id| graph::object(package, id).ok())
+            .ok_or(Fault::Invalid)?;
     graph::object(package, stylesheet)?;
     graph::object(package, paragraph_style)?;
     Ok((stylesheet, paragraph_style, language))

@@ -71,7 +71,6 @@ path = "examples/generate_footnote_fixture.rs"
 
 [features]
 default = []
-internal-iwork-source = ["litchi-iwa-archive/internal-iwork-source"]
 
 [dependencies]
 litchi-core       = { workspace = true }

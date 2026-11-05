@@ -362,38 +362,6 @@ fn with_parent_mismatch(source: &[u8]) -> TestResult<Vec<u8>> {
     })
 }
 
-#[cfg(feature = "internal-iwork-source")]
-fn with_missing_parent(source: &[u8]) -> TestResult<Vec<u8>> {
-    rewrite_component(source, TABLES_MEMBER, |archive| {
-        let table_info = archive
-            .object_mut(BETA_INFO_ID)
-            .ok_or_else(|| io::Error::other("selected table-info is missing"))?;
-        let message = table_info
-            .messages
-            .first()
-            .cloned()
-            .ok_or_else(|| io::Error::other("selected table-info payload is missing"))?;
-        let mut decoded = tst::TableInfoArchive::decode(message.data.as_slice())?;
-        decoded.super_.parent = None;
-        table_info.replace_message(
-            0,
-            RawMessage {
-                type_: message.type_,
-                data: decoded.encode_to_vec(),
-            },
-            Default::default(),
-        )?;
-        let info = table_info
-            .archive_info
-            .message_infos
-            .first_mut()
-            .ok_or_else(|| io::Error::other("table-info metadata is missing"))?;
-        info.object_references = vec![BETA_MODEL_ID];
-        info.field_infos.clear();
-        Ok(())
-    })
-}
-
 fn with_malformed_table_info(source: &[u8]) -> TestResult<Vec<u8>> {
     rewrite_component(source, TABLES_MEMBER, |archive| {
         let table_info = archive
@@ -412,36 +380,6 @@ fn with_malformed_table_info(source: &[u8]) -> TestResult<Vec<u8>> {
                 // archive framing remains valid so ingress, rather than the
                 // fixture builder, gets to reject the malformed graph.
                 data: vec![0x0a, 0x80],
-            },
-            Default::default(),
-        )?;
-        Ok(())
-    })
-}
-
-#[cfg(feature = "internal-iwork-source")]
-fn with_projection_unsupported_model(source: &[u8]) -> TestResult<Vec<u8>> {
-    rewrite_component(source, TABLES_MEMBER, |archive| {
-        let model = archive
-            .object_mut(BETA_MODEL_ID)
-            .ok_or_else(|| io::Error::other("selected table model is missing"))?;
-        let message = model
-            .messages
-            .first()
-            .cloned()
-            .ok_or_else(|| io::Error::other("selected table model payload is missing"))?;
-        let mut decoded = tst::TableModelArchive::decode(message.data.as_slice())?;
-        // The physical relocation owner only needs the model's identity and
-        // message framing.  An oversized row count deliberately makes the
-        // semantic cell projection refuse the source before relocation, so
-        // this test exercises the focused physical-admission compatibility
-        // path rather than accidentally taking the ordinary Package route.
-        decoded.number_of_rows = 1_048_577;
-        model.replace_message(
-            0,
-            RawMessage {
-                type_: message.type_,
-                data: decoded.encode_to_vec(),
             },
             Default::default(),
         )?;
@@ -541,22 +479,6 @@ fn table_parent(source: &[u8], table_identifier: u64) -> TestResult<u64> {
     .parent
     .map(|parent| parent.identifier)
     .ok_or_else(|| io::Error::other("table-info parent reference is missing").into())
-}
-
-#[cfg(feature = "internal-iwork-source")]
-fn optional_table_parent(source: &[u8], table_identifier: u64) -> TestResult<Option<u64>> {
-    Ok(tst::TableInfoArchive::decode(
-        object_message(
-            source,
-            TABLES_MEMBER,
-            table_identifier,
-            TABLE_INFO_MESSAGE_TYPE,
-        )?
-        .as_slice(),
-    )?
-    .super_
-    .parent
-    .map(|parent| parent.identifier))
 }
 
 fn assert_locality(source: &[u8], target: &[u8]) -> TestResult {
@@ -886,79 +808,6 @@ fn malformed_or_ambiguous_ownership_is_refused_without_partial_mutation() -> Tes
         &with_wrong_parent_reference_path(&bytes)?,
         "wrong table parent reference path",
     )?;
-    Ok(())
-}
-
-#[cfg(feature = "internal-iwork-source")]
-#[test]
-fn physical_compatibility_relocates_projection_unsupported_model() -> TestResult {
-    let source = with_projection_unsupported_model(&fixture()?)?;
-    assert!(
-        Package::from_bytes(&source).is_err(),
-        "the oversized model must stay outside the semantic projection"
-    );
-
-    let target = Package::__move_table_from_bytes_for_compatibility(
-        &source,
-        SOURCE_SHEET_NAME,
-        BETA_TABLE_NAME,
-        DESTINATION_SHEET_NAME,
-    )?;
-    assert_eq!(
-        sheet_drawable_ids(&target, SOURCE_SHEET_ID)?,
-        vec![ALPHA_INFO_ID]
-    );
-    assert_eq!(
-        sheet_drawable_ids(&target, DESTINATION_SHEET_ID)?,
-        vec![GAMMA_INFO_ID, BETA_INFO_ID]
-    );
-    assert_eq!(table_parent(&target, BETA_INFO_ID)?, DESTINATION_SHEET_ID);
-    assert_locality(&source, &target)?;
-    assert!(
-        Package::from_bytes(&target).is_err(),
-        "compatibility relocation must not silently promote an unsupported model"
-    );
-    Ok(())
-}
-
-#[cfg(feature = "internal-iwork-source")]
-#[test]
-fn physical_compatibility_preserves_missing_parent_and_round_trips() -> TestResult {
-    let source = with_missing_parent(&fixture()?)?;
-    let target = Package::__move_table_from_bytes_for_compatibility(
-        &source,
-        SOURCE_SHEET_NAME,
-        BETA_TABLE_NAME,
-        DESTINATION_SHEET_NAME,
-    )?;
-    assert_eq!(
-        sheet_drawable_ids(&target, SOURCE_SHEET_ID)?,
-        vec![ALPHA_INFO_ID]
-    );
-    assert_eq!(
-        sheet_drawable_ids(&target, DESTINATION_SHEET_ID)?,
-        vec![GAMMA_INFO_ID, BETA_INFO_ID]
-    );
-    assert_eq!(optional_table_parent(&target, BETA_INFO_ID)?, None);
-    let source_catalog = Catalog::from_bytes(&source, Default::default())?;
-    let target_catalog = Catalog::from_bytes(&target, Default::default())?;
-    let source_tables = source_catalog
-        .iter()
-        .find(|entry| entry.name() == TABLES_MEMBER)
-        .ok_or_else(|| io::Error::other("source table component is missing"))?;
-    let target_tables = target_catalog
-        .iter()
-        .find(|entry| entry.name() == TABLES_MEMBER)
-        .ok_or_else(|| io::Error::other("target table component is missing"))?;
-    assert_eq!(source_tables.data(), target_tables.data());
-
-    let restored = Package::__move_table_from_bytes_for_compatibility(
-        &target,
-        DESTINATION_SHEET_NAME,
-        BETA_TABLE_NAME,
-        SOURCE_SHEET_NAME,
-    )?;
-    assert_eq!(restored, source);
     Ok(())
 }
 

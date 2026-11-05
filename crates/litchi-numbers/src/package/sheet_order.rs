@@ -297,7 +297,7 @@ impl Edit<'_> {
             .operation
             .ok_or(Error::Refused(Refusal::NoStagedOperation))?;
         let source_catalog = physical_source(self.source)?;
-        let source_bytes = source_catalog.__source_owner();
+        let source_bytes = source_catalog.source_owner();
         if operation.source_position == operation.destination_position {
             return Ok(Commit {
                 package: self.source.snapshot(),
@@ -347,7 +347,7 @@ impl Edit<'_> {
             &previews,
             0,
         )?;
-        let target_bytes = physical_source(&rewritten.package)?.__source_owner();
+        let target_bytes = physical_source(&rewritten.package)?.source_owner();
         budget.charge_transaction_work(
             source_bytes
                 .len()
@@ -630,7 +630,7 @@ impl Package {
     /// artifact and performs one linear locality verification.
     pub fn apply_sheet_order(&self, patch: &Patch) -> Result<Commit, Error> {
         let source_catalog = physical_source(self)?;
-        let source = source_catalog.__source_owner();
+        let source = source_catalog.source_owner();
         if !patch.artifacts.authorizes_owner(&source) {
             return Err(Error::PatchConflict);
         }

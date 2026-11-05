@@ -1832,7 +1832,6 @@ impl Catalog {
     ///
     /// Returns an error when the ZIP envelope or a configured physical limit
     /// is invalid.
-    #[cfg(any(test, feature = "internal-iwork-source"))]
     pub(crate) fn from_owned_bytes_with_limits(source: Vec<u8>, limits: Limits) -> Result<Self> {
         let checked_limits = limits.validate()?;
         Self::from_source_with_checked_limits(
@@ -1848,7 +1847,6 @@ impl Catalog {
     ///
     /// Returns an error when the ZIP envelope or a configured physical limit
     /// is invalid.
-    #[cfg(feature = "internal-iwork-source")]
     pub(crate) fn from_source_owner_with_limits(
         source: SharedBytes,
         limits: Limits,
@@ -2023,7 +2021,6 @@ impl Catalog {
 
     /// Clone the exact immutable source owner without copying package bytes.
     #[must_use]
-    #[cfg(any(test, feature = "internal-iwork-source"))]
     pub(crate) fn source_owner(&self) -> SharedBytes {
         self.source.clone()
     }

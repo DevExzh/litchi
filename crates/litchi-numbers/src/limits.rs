@@ -231,15 +231,6 @@ impl SourceLimits {
         )
     }
 
-    /// Derive the profile of an archive catalog a coordinator already
-    /// parsed (unstable migration-host seam).
-    #[cfg(feature = "internal-iwork-source")]
-    #[doc(hidden)]
-    #[must_use]
-    pub fn __from_archive(limits: litchi_iwa_archive::Limits) -> Self {
-        Self::from_archive(limits)
-    }
-
     /// Derive the profile of an already-validated archive catalog. Values are
     /// clamped to the hard ceilings, never rejected.
     pub(crate) fn from_archive(limits: litchi_iwa_archive::Limits) -> Self {

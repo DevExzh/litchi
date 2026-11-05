@@ -72,7 +72,7 @@ impl Package {
     /// target artifact and verifies its semantic state and physical locality.
     pub fn apply_table_headers(&self, patch: &Patch) -> Result<Commit, Error> {
         let source_catalog = physical_source(self)?;
-        let source = source_catalog.__source_owner();
+        let source = source_catalog.source_owner();
         if !patch.artifacts.authorizes_owner(&source) {
             return Err(Error::PatchConflict);
         }

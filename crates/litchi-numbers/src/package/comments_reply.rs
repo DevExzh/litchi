@@ -853,7 +853,7 @@ fn no_op_commit(
     after: &[CommentReply],
 ) -> Result<Commit, Error> {
     let catalog = physical_source(source).map_err(|error| map_root_error(error, path))?;
-    let owner = catalog.__source_owner();
+    let owner = catalog.source_owner();
     let before = before.to_vec().into_boxed_slice();
     let after = after.to_vec().into_boxed_slice();
     Ok(Commit {
@@ -996,10 +996,10 @@ fn commit_edit(edit: Edit<'_>) -> Result<Commit, Error> {
     let source_previews = super::root_preview_deletions(catalog)
         .map_err(|error| map_root_error(error, path))?
         .len();
-    let source_owner = catalog.__source_owner();
+    let source_owner = catalog.source_owner();
     let target_owner = physical_source(&candidate)
         .map_err(|_| Error::Verification)?
-        .__source_owner();
+        .source_owner();
     Ok(Commit {
         package: candidate,
         patch: Patch {
@@ -1161,7 +1161,7 @@ impl Package {
     /// Apply a reversible exact-source direct-reply patch.
     pub fn apply_table_cell_comment_reply(&self, patch: &Patch) -> Result<Commit, Error> {
         let catalog = physical_source(self).map_err(|error| map_root_error(error, patch.path))?;
-        let owner = catalog.__source_owner();
+        let owner = catalog.source_owner();
         if !patch.artifacts.authorizes_owner(&owner) {
             return Err(Error::PatchConflict);
         }

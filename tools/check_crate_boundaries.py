@@ -1527,9 +1527,8 @@ IWA_KEYNOTE_MEDIA_READER_TYPES = frozenset(
     {"KeynoteSlideMovieInfo", "KeynoteSlideAudioInfo"}
 )
 
-# Keynote no longer provides the raw borrowed-payload compatibility ingress.
-# Pages and Numbers retain their existing hidden seams; the shared playback
-# ratchet below treats this Keynote seam as a forbidden symbol instead.
+# Keynote no longer provides the raw borrowed-payload compatibility ingress;
+# the shared playback ratchet below treats this name as a forbidden symbol.
 IWA_KEYNOTE_MOVIE_PLAYBACK_RETIRED_SEAM = "__decode_movie_playback_payload"
 IWA_KEYNOTE_MOVIE_PLAYBACK_RETIRED_SEAM_REFERENCE = re.compile(
     rf"(?<![A-Za-z0-9_#]){re.escape(IWA_KEYNOTE_MOVIE_PLAYBACK_RETIRED_SEAM)}"
@@ -1542,53 +1541,16 @@ IWA_SHARED_MEDIA_PLAYBACK_ROOT_MODULE = re.compile(
 IWA_MEDIA_PLAYBACK_OWNER_SOURCES = {
     "Keynote": Path("crates/litchi-keynote/src/package/slide_movie_playback.rs"),
     "Pages": Path("crates/litchi-pages/src/package/movie_playback.rs"),
-    "Numbers": Path("crates/litchi-numbers/src/package/movie_playback.rs"),
 }
 IWA_MEDIA_PLAYBACK_OWNER_PACKAGE_SOURCES = {
     "Keynote": Path("crates/litchi-keynote/src/package.rs"),
     "Pages": Path("crates/litchi-pages/src/package.rs"),
-    "Numbers": Path("crates/litchi-numbers/src/package.rs"),
-}
-IWA_MEDIA_PLAYBACK_OWNER_EXPORT_SOURCES = {
-    "Keynote": Path("crates/litchi-keynote/src/lib.rs"),
-    "Pages": Path("crates/litchi-pages/src/lib.rs"),
-    "Numbers": Path("crates/litchi-numbers/src/lib.rs"),
 }
 IWA_MEDIA_PLAYBACK_OWNER_MODULES = {
     "Keynote": re.compile(
         r"(?m)^[ \t]*(?:pub\(crate\)[ \t]+)?mod[ \t]+(?:r#)?slide_movie_playback\s*;"
     ),
-    "Pages": re.compile(
-        r"(?ms)^[ \t]*#\s*\[\s*cfg\s*\(\s*feature\s*=\s*"
-        r'"internal-iwork-source"\s*\)\s*\][ \t]*\n'
-        r"^[ \t]*mod[ \t]+(?:r#)?movie_playback\s*;"
-    ),
-    "Numbers": re.compile(
-        r"(?ms)^[ \t]*#\s*\[\s*cfg\s*\(\s*feature\s*=\s*"
-        r'"internal-iwork-source"\s*\)\s*\][ \t]*\n'
-        r"^[ \t]*mod[ \t]+(?:r#)?movie_playback\s*;"
-    ),
-}
-IWA_MEDIA_PLAYBACK_OWNER_SEAMS = {
-    # Keynote's former compatibility reader is retired with the host raw
-    # projections.  Pages and Numbers still expose their feature-gated seams
-    # to the narrow legacy adapters below.
-    "Keynote": (None, None),
-    "Pages": (
-        "__decode_movie_playback_payload",
-        "__rewrite_movie_playback_payload",
-    ),
-    "Numbers": ("__movie_playback_settings", "__rewrite_movie_playback_settings"),
-}
-IWA_MEDIA_PLAYBACK_HOST_CALLS = {
-    "Pages": re.compile(
-        r"\blitchi_pages\s*::\s*__decode_movie_playback_payload\s*\("
-        r"|\blitchi_pages\s*::\s*__rewrite_movie_playback_payload\s*\("
-    ),
-    "Numbers": re.compile(
-        r"\blitchi_numbers\s*::\s*__movie_playback_settings\s*\("
-        r"|\blitchi_numbers\s*::\s*__rewrite_movie_playback_settings\s*\("
-    ),
+    "Pages": re.compile(r"(?m)^[ \t]*mod[ \t]+(?:r#)?movie_playback\s*;"),
 }
 IWA_MEDIA_PLAYBACK_CODEC_SOURCE = Path(
     "crates/litchi-iwa-protos/src/movie_playback_codec.rs"
@@ -1629,9 +1591,6 @@ IWA_IMAGE_ADJUSTMENTS_OWNER_EXPORT_SOURCES = {
 }
 IWA_IMAGE_ADJUSTMENTS_OWNER_MODULES = {
     # All three packages expose selector-first semantic image APIs by default.
-    # Only the raw host bridge below is feature-gated; keeping the module
-    # itself behind that feature would make the supported API disappear from
-    # a normal format-crate build.
     ecosystem: re.compile(r"(?m)^\s*mod\s+(?:r#)?image_adjustments\s*;")
     for ecosystem in ("Numbers",)
 } | {
@@ -1647,28 +1606,11 @@ IWA_IMAGE_ADJUSTMENTS_OWNER_MODULES = {
 # ADR 0034 W1 transaction module (checked by the shared Pages family helper)
 # rather than through the crate root.
 IWA_IMAGE_ADJUSTMENTS_TRANSACTION_FAMILY_OWNERS = {"Pages": "image_adjustments"}
-IWA_IMAGE_ADJUSTMENTS_FEATURE_GATED_MODULE = re.compile(
-    r"(?ms)^\s*#\s*\[\s*cfg\s*\(\s*feature\s*=\s*"
-    r'"internal-iwork-source"\s*\)\s*\]\s*\n'
-    r"\s*(?:pub\s*\([^()]*\)\s*)?mod\s+(?:r#)?image_adjustments\s*;"
-)
-IWA_IMAGE_ADJUSTMENTS_OWNER_SEAMS = (
-    "__decode_image_adjustments_payload",
-    "__rewrite_image_adjustments_payload",
-)
-IWA_IMAGE_ADJUSTMENTS_OWNER_SEAMS_BY_ECOSYSTEM = {
-    # The compatibility hosts use this edge for bounded graph reads only.
-    # Focused package tests exercise the neutral codec directly, so no format
-    # retains a hidden package rewrite bridge here.
-    "Keynote": ("__decode_image_adjustments_payload",),
-    "Pages": ("__decode_image_adjustments_payload",),
-    "Numbers": ("__decode_image_adjustments_payload",),
-}
 IWA_IMAGE_ADJUSTMENTS_RETIRED_WRITE_SEAM = (
     "__rewrite_image_adjustments_payload"
 )
 IWA_IMAGE_ADJUSTMENTS_RETIRED_WRITE_ECOSYSTEMS = frozenset(
-    IWA_IMAGE_ADJUSTMENTS_OWNER_SEAMS_BY_ECOSYSTEM
+    IWA_IMAGE_ADJUSTMENTS_OWNER_SOURCES
 )
 IWA_IMAGE_ADJUSTMENTS_SEMANTIC_METHODS = {
     "Keynote": (
@@ -1717,34 +1659,9 @@ IWA_IMAGE_ADJUSTMENTS_SEMANTIC_TYPES = {
         "Diagnostics",
     ),
 }
-IWA_IMAGE_ADJUSTMENTS_HIDDEN_ERROR = "ImageAdjustmentsError"
-IWA_INTERNAL_SOURCE_CFG_ATTRIBUTE = re.compile(
-    r"#\s*\[\s*cfg\s*\(\s*feature\s*=\s*"
-    r'"internal-iwork-source"\s*\)\s*\]'
-)
 IWA_DOC_HIDDEN_ATTRIBUTE = re.compile(
     r"#\s*\[\s*doc\s*\(\s*hidden\s*\)\s*\]"
 )
-IWA_IMAGE_ADJUSTMENTS_HIDDEN_ERROR_DECLARATION = re.compile(
-    r"(?ms)(?P<attributes>(?:\s*#\s*\[[^\]]+\]\s*\n)+)"
-    r"\s*(?:pub\s+)?enum\s+ImageAdjustmentsError\b"
-)
-IWA_IMAGE_ADJUSTMENTS_BRIDGE_MODULE = re.compile(
-    r"(?ms)^(?P<attributes>(?:\s*#\s*\[[^\]]+\]\s*\n)+)"
-    r"\s*(?:pub(?:\([^()]*\))?\s+)?mod\s+"
-    r"(?:r#)?image_adjustments_bridge\s*\{"
-)
-IWA_IMAGE_ADJUSTMENTS_HOST_CALLS = {
-    "Keynote": re.compile(
-        r"\blitchi_keynote\s*::\s*__decode_image_adjustments_payload\s*\("
-    ),
-    "Pages": re.compile(
-        r"\blitchi_pages\s*::\s*__decode_image_adjustments_payload\s*\("
-    ),
-    "Numbers": re.compile(
-        r"\blitchi_numbers\s*::\s*__decode_image_adjustments_payload\s*\("
-    ),
-}
 IWA_IMAGE_ADJUSTMENTS_RETIRED_WRITE_CALLS = {
     ecosystem: re.compile(
         rf"\blitchi_{ecosystem.lower()}\s*::\s*"
@@ -1767,9 +1684,6 @@ IWA_IMAGE_ADJUSTMENTS_CODEC_LAZY_MARKERS = (
 )
 IWA_IMAGE_ADJUSTMENTS_CODEC_DECODE_CALL = re.compile(
     r"\bdecode_image_adjustments(?:_with_report)?\s*\("
-)
-IWA_IMAGE_ADJUSTMENTS_CODEC_REWRITE_CALL = re.compile(
-    r"\brewrite_image_adjustments\s*\("
 )
 IWA_IMAGE_ADJUSTMENTS_CODEC_GENERATED_LEAK = re.compile(
     r"\b(?:[A-Za-z_][A-Za-z0-9_]*::)?ImageAdjustmentsArchive\s*::\s*decode\s*\("
@@ -5672,9 +5586,6 @@ KEYNOTE_SLIDE_TRANSITION_IMPLEMENTATION_SOURCES = (
     KEYNOTE_SOURCE_ROOT / "transition.rs",
     KEYNOTE_SOURCE_ROOT / "package" / "slide_transition.rs",
 )
-KEYNOTE_SLIDE_TRANSITION_HIDDEN_SOURCE_SEAM = (
-    "__transition_settings_from_source"
-)
 KEYNOTE_SLIDE_TRANSITION_EXPORT_SOURCES = (
     KEYNOTE_SOURCE_ROOT / "lib.rs",
     KEYNOTE_SOURCE_ROOT / "package.rs",
@@ -6520,19 +6431,6 @@ NUMBERS_TABLE_APPEARANCE_OWNER_SOURCE = Path(
 # only raw-ID/borrowed-payload exception is the explicitly hidden seam below;
 # keeping its declaration exact prevents a second public/native appearance API
 # from being smuggled into the focused crate.
-NUMBERS_TABLE_APPEARANCE_HIDDEN_SOURCE_SEAM = (
-    "__table_appearance_from_source_built"
-)
-NUMBERS_TABLE_APPEARANCE_HIDDEN_SOURCE_SEAM_DECLARATION = re.compile(
-    r"(?ms)^[ \t]*#[ \t]*\[[ \t]*cfg\s*\(\s*feature\s*=\s*"
-    r"\"internal-iwork-source\"\s*\)[ \t]*\][ \t]*\n"
-    r"^[ \t]*#[ \t]*\[[ \t]*doc\s*\(\s*hidden\s*\)[ \t]*\][ \t]*\n"
-    rf"^[ \t]*pub\s+fn\s+{re.escape(NUMBERS_TABLE_APPEARANCE_HIDDEN_SOURCE_SEAM)}\b"
-)
-NUMBERS_TABLE_APPEARANCE_HIDDEN_SOURCE_SEAM_SIGNATURE = re.compile(
-    rf"\bpub\s+fn\s+{re.escape(NUMBERS_TABLE_APPEARANCE_HIDDEN_SOURCE_SEAM)}"
-    r"\s*(?:<|\()"
-)
 NUMBERS_TABLE_APPEARANCE_OWNER_HELPER_ROOT = Path(
     "crates/litchi-numbers/src/package/table_appearance"
 )
@@ -8143,7 +8041,7 @@ NUMBERS_TABLE_CELL_DURATION_FORMAT_OWNER_REQUIRED_MARKERS = {
         r"(?<![A-Za-z0-9_])source_is_exact(?![A-Za-z0-9_])"
     ),
     "source-owner identity": re.compile(
-        r"(?<![A-Za-z0-9_])__source_owner(?![A-Za-z0-9_])"
+        r"(?<![A-Za-z0-9_])source_owner(?![A-Za-z0-9_])"
     ),
     "exact-artifact patch capability": re.compile(
         r"(?<![A-Za-z0-9_])OwnedExactArtifacts(?![A-Za-z0-9_])"
@@ -11665,15 +11563,11 @@ NUMBERS_TABLE_SORT_RAW_PARAMETER = re.compile(
 NUMBERS_TABLE_MOVE_OWNER_SOURCE = (
     NUMBERS_SOURCE_ROOT / "package" / "table_relocation.rs"
 )
-NUMBERS_TABLE_MOVE_COMPAT_SOURCE = (
-    NUMBERS_SOURCE_ROOT / "package" / "table_relocation_compat.rs"
-)
 NUMBERS_TABLE_MOVE_EXPORT_SOURCES = (
     NUMBERS_SOURCE_ROOT / "lib.rs",
     NUMBERS_SOURCE_ROOT / "package.rs",
 )
 NUMBERS_TABLE_MOVE_PACKAGE_METHOD = "move_table"
-NUMBERS_TABLE_MOVE_COMPAT_METHOD = "__move_table_from_bytes_for_compatibility"
 NUMBERS_TABLE_MOVE_SELECTOR_TYPES = ("SheetSelector", "TableSelector")
 NUMBERS_PACKAGE_TABLE_MOVE_MODULE = re.compile(
     r"^[ \t]*(?:pub(?:\([^()]*\))?[ \t\r\n]+)?"
@@ -11684,21 +11578,6 @@ PUBLIC_NUMBERS_PACKAGE_TABLE_MOVE_MODULE = re.compile(
     r"^[ \t]*pub[ \t\r\n]+mod[ \t\r\n]+(?:r#)?table_relocation\b"
     r"[ \t\r\n]*(?:;|\{)",
     re.MULTILINE,
-)
-NUMBERS_TABLE_MOVE_COMPAT_MODULE = re.compile(
-    r"(?m)^[ \t]*(?P<visibility>pub(?:\([^()]*\))?[ \t]+)?"
-    r"[ \t]*mod[ \t\r\n]+(?:r#)?table_relocation_compat\b"
-    r"[ \t\r\n]*;"
-)
-NUMBERS_TABLE_MOVE_COMPAT_PUBLIC_MODULE = re.compile(
-    r"(?m)^[ \t]*pub(?:\([^()]*\))?[ \t]+mod[ \t\r\n]+"
-    r"(?:r#)?table_relocation_compat\b[ \t\r\n]*;"
-)
-NUMBERS_TABLE_MOVE_COMPAT_METHOD_DECLARATION = re.compile(
-    r"(?m)^[ \t]*pub[ \t\r\n]+fn[ \t\r\n]+"
-    rf"(?:r#)?{re.escape(NUMBERS_TABLE_MOVE_COMPAT_METHOD)}\b"
-    r"(?:[ \t\r\n]*<[^{}]*>)?"
-    r"[ \t\r\n]*\("
 )
 NUMBERS_TABLE_MOVE_RAW_PARAMETER = re.compile(
     r"\b(?:[A-Za-z_]+_)?(?:sheet|table|sheet_id|table_id|table_object_id|"
@@ -11753,69 +11632,6 @@ NUMBERS_TABLE_LOCK_ALLOWED_COMMON_REEXPORT = (
     "State",
 )
 
-# A compatibility reader is only useful once it is wired and exercised.  Tie
-# activation to the private seam, its source-built test corpus, and the
-# already checked-in wire/native parity suites.  This prevents a half-created
-# module from making the still-live host reader fail while migration is in
-# progress, and makes the eventual deletion gate evidence based.
-IWA_NUMBERS_CELL_COMMENT_READER_COMPAT_SOURCE = Path(
-    "crates/litchi-numbers/src/package/comments_compat.rs"
-)
-IWA_NUMBERS_CELL_COMMENT_READER_COMPAT_MODULE_SOURCE = Path(
-    "crates/litchi-numbers/src/package/comments.rs"
-)
-IWA_NUMBERS_CELL_COMMENT_READER_COMPAT_MODULE = re.compile(
-    r"(?m)^[ \t]*(?:pub(?:\([^()]*\))?[ \t]+)?mod[ \t\r\n]+"
-    r"(?:r#)?comments_compat\b[ \t\r\n]*;"
-)
-IWA_NUMBERS_CELL_COMMENT_READER_COMPAT_METHODS = (
-    "__table_cell_comment_from_bytes_for_compatibility",
-    "__table_cell_comment_replies_from_bytes_for_compatibility",
-)
-# These four hidden methods are the only compatibility exception to the
-# mutation facade's raw-byte vocabulary rule.  Keep the overloads explicit:
-# a new public method in the same file must still be rejected until it has a
-# semantic API of its own.
-IWA_NUMBERS_CELL_COMMENT_READER_COMPAT_PUBLIC_METHODS = (
-    "__table_cell_comment_from_bytes_for_compatibility",
-    "__table_cell_comment_from_bytes_for_compatibility_with_options",
-    "__table_cell_comment_replies_from_bytes_for_compatibility",
-    "__table_cell_comment_replies_from_bytes_for_compatibility_with_options",
-)
-IWA_NUMBERS_CELL_COMMENT_READER_COMPAT_PUBLIC_METHOD_SET = frozenset(
-    IWA_NUMBERS_CELL_COMMENT_READER_COMPAT_PUBLIC_METHODS
-)
-IWA_NUMBERS_CELL_COMMENT_READER_COMPAT_PUBLIC_SIGNATURES = {
-    "__table_cell_comment_from_bytes_for_compatibility": (
-        "pub fn __table_cell_comment_from_bytes_for_compatibility<'sheet, 'table>("
-        " bytes: &[u8], sheet: impl Into<SheetSelector<'sheet>>, "
-        "table: impl Into<TableSelector<'table>>, position: At, ) "
-        "-> Result<Option<Comment>>"
-    ),
-    "__table_cell_comment_from_bytes_for_compatibility_with_options": (
-        "pub fn __table_cell_comment_from_bytes_for_compatibility_with_options<"
-        "'sheet, 'table>( bytes: &[u8], options: OpenOptions, "
-        "sheet: impl Into<SheetSelector<'sheet>>, "
-        "table: impl Into<TableSelector<'table>>, position: At, ) "
-        "-> Result<Option<Comment>>"
-    ),
-    "__table_cell_comment_replies_from_bytes_for_compatibility": (
-        "pub fn __table_cell_comment_replies_from_bytes_for_compatibility<'sheet, "
-        "'table>( bytes: &[u8], sheet: impl Into<SheetSelector<'sheet>>, "
-        "table: impl Into<TableSelector<'table>>, position: At, ) "
-        "-> Result<Box<[CommentReply]>>"
-    ),
-    "__table_cell_comment_replies_from_bytes_for_compatibility_with_options": (
-        "pub fn __table_cell_comment_replies_from_bytes_for_compatibility_with_options<"
-        " 'sheet, 'table, >( bytes: &[u8], options: OpenOptions, "
-        "sheet: impl Into<SheetSelector<'sheet>>, "
-        "table: impl Into<TableSelector<'table>>, position: At, ) "
-        "-> Result<Box<[CommentReply]>>"
-    ),
-}
-IWA_NUMBERS_CELL_COMMENT_READER_COMPAT_PATH_ATTRIBUTE = re.compile(
-    r"#\s*\[\s*path\s*=\s*[\"']comments_compat\.rs[\"']\s*\]"
-)
 IWA_NUMBERS_CELL_COMMENT_CLEAR_LEGACY_HELPER = "clear_cell_comment_in_package"
 RETIRED_IWA_NUMBERS_DOCUMENT_TYPES = (
     "NumbersDocument",
@@ -18469,82 +18285,6 @@ def _rust_root_canonical_exports(
     return frozenset(exported)
 
 
-def _iwa_numbers_cell_comment_reader_compat_module_is_private_hidden(
-    root: Path,
-) -> bool:
-    """Recognize the one private module allowed to expose source bytes.
-
-    The compatibility implementation is included from ``comments.rs`` under
-    the internal source feature.  Require the complete hidden/path-gated
-    declaration here so a similarly named module, a public module, or a
-    copied file cannot widen the mutation-facade exception.
-    """
-
-    module_path = root / IWA_NUMBERS_CELL_COMMENT_READER_COMPAT_MODULE_SOURCE
-    if not module_path.is_file():
-        return False
-    raw_source = _mask_rust_cfg_test_items(
-        module_path.read_text(encoding="utf-8")
-    )
-    source = _mask_rust_non_code(raw_source)
-    for match in IWA_NUMBERS_CELL_COMMENT_READER_COMPAT_MODULE.finditer(source):
-        statement = match.group(0)
-        if re.search(r"\bpub\b", statement) is not None:
-            continue
-        attributes = _rust_attribute_block_before(raw_source, match.start())
-        if (
-            IWA_INTERNAL_SOURCE_CFG_ATTRIBUTE.search(attributes) is None
-            or IWA_DOC_HIDDEN_ATTRIBUTE.search(attributes) is None
-            or IWA_NUMBERS_CELL_COMMENT_READER_COMPAT_PATH_ATTRIBUTE.search(
-                attributes
-            )
-            is None
-        ):
-            continue
-        return True
-    return False
-
-
-def _iwa_numbers_cell_comment_reader_compat_public_method_allowed(
-    root: Path,
-    path: Path,
-    source: str,
-    name: str,
-    declaration: str,
-    line_number: int,
-) -> bool:
-    """Allow only the four hidden methods in the private compatibility seam."""
-
-    if path != root / IWA_NUMBERS_CELL_COMMENT_READER_COMPAT_SOURCE:
-        return False
-    if name not in IWA_NUMBERS_CELL_COMMENT_READER_COMPAT_PUBLIC_METHOD_SET:
-        return False
-    expected = IWA_NUMBERS_CELL_COMMENT_READER_COMPAT_PUBLIC_SIGNATURES.get(name)
-    if expected is None or re.sub(r"\s+", " ", declaration).strip() != expected:
-        return False
-    if not _iwa_numbers_cell_comment_reader_compat_module_is_private_hidden(root):
-        return False
-
-    source_code = _mask_rust_non_code(source)
-    method_pattern = re.compile(
-        rf"(?<![A-Za-z0-9_#])pub(?![ \t\r\n]*\()[ \t\r\n]+"
-        rf"(?:(?:unsafe|async|const)[ \t\r\n]+)*fn[ \t\r\n]+"
-        rf"(?:r#)?{re.escape(name)}\b"
-    )
-    method_match = next(
-        (
-            match
-            for match in method_pattern.finditer(source_code)
-            if source_code.count("\n", 0, match.start()) + 1 == line_number
-        ),
-        None,
-    )
-    if method_match is None:
-        return False
-    attributes = _rust_attribute_block_before(source, method_match.start())
-    return IWA_DOC_HIDDEN_ATTRIBUTE.search(attributes) is not None
-
-
 def audit_keynote_show_settings_facade_source_topology(
     root: Path = ROOT,
 ) -> list[str]:
@@ -19123,20 +18863,6 @@ def audit_keynote_slide_transition_facade_source_topology(
         ) in declarations:
             if not _is_keynote_slide_transition_public_declaration(
                 declaration, dedicated_source=complete_source_scope
-            ):
-                continue
-            # This feature-gated hidden method is a narrow internal seam.
-            # Its bounded wire input is intentionally private to that
-            # edge; the public semantic API
-            # below still rejects the same vocabulary everywhere else.
-            declaration_identifiers = {
-                match.group(1) for match in RUST_IDENTIFIER.finditer(declaration)
-            }
-            if (
-                path
-                == root / KEYNOTE_SLIDE_TRANSITION_IMPLEMENTATION_SOURCES[1]
-                and KEYNOTE_SLIDE_TRANSITION_HIDDEN_SOURCE_SEAM
-                in declaration_identifiers
             ):
                 continue
             owner_declaration = _keynote_slide_transition_owner_declaration(
@@ -20514,72 +20240,12 @@ def audit_numbers_table_move_facade_source_topology(
     package_code = _mask_rust_non_code(package_source)
     violations: list[str] = []
 
-    for match in NUMBERS_TABLE_MOVE_COMPAT_PUBLIC_MODULE.finditer(package_code):
-        line_number = package_code.count("\n", 0, match.start()) + 1
-        violations.append(
-            "focused litchi-numbers table-move compatibility module must remain "
-            "private: "
-            f"{NUMBERS_TABLE_MOVE_EXPORT_SOURCES[1]}:{line_number}"
-        )
     for match in PUBLIC_NUMBERS_PACKAGE_TABLE_MOVE_MODULE.finditer(package_code):
         line_number = package_code.count("\n", 0, match.start()) + 1
         violations.append(
             "focused litchi-numbers table-move package module must remain private: "
             f"{NUMBERS_TABLE_MOVE_EXPORT_SOURCES[1]}:{line_number}"
         )
-
-    compat_path = root / NUMBERS_TABLE_MOVE_COMPAT_SOURCE
-    if not compat_path.is_file():
-        violations.append(
-            "focused litchi-numbers table-move compatibility source is missing: "
-            f"{NUMBERS_TABLE_MOVE_COMPAT_SOURCE}"
-        )
-    else:
-        compat_source = _mask_rust_cfg_test_items(
-            compat_path.read_text(encoding="utf-8")
-        )
-        compat_declarations = _mask_rust_comments(compat_source)
-        module_match = NUMBERS_TABLE_MOVE_COMPAT_MODULE.search(package_source)
-        if module_match is None:
-            violations.append(
-                "focused litchi-numbers table-move compatibility module must be "
-                "private and feature-gated: "
-                f"{NUMBERS_TABLE_MOVE_EXPORT_SOURCES[1]}"
-            )
-        else:
-            module_attributes = _rust_attribute_block_before(
-                package_source, module_match.start()
-            )
-            if IWA_INTERNAL_SOURCE_CFG_ATTRIBUTE.search(module_attributes) is None:
-                violations.append(
-                    "focused litchi-numbers table-move compatibility module must "
-                    "use the internal-iwork-source feature gate: "
-                    f"{NUMBERS_TABLE_MOVE_EXPORT_SOURCES[1]}"
-                )
-        method_match = NUMBERS_TABLE_MOVE_COMPAT_METHOD_DECLARATION.search(
-            compat_declarations
-        )
-        if method_match is None:
-            violations.append(
-                "focused litchi-numbers table-move compatibility seam is missing: "
-                f"{NUMBERS_TABLE_MOVE_COMPAT_SOURCE}"
-            )
-        else:
-            method_attributes = _rust_attribute_block_before(
-                compat_declarations, method_match.start()
-            )
-            if IWA_INTERNAL_SOURCE_CFG_ATTRIBUTE.search(method_attributes) is None:
-                violations.append(
-                    "focused litchi-numbers table-move compatibility seam must be "
-                    "feature-gated: "
-                    f"{NUMBERS_TABLE_MOVE_COMPAT_SOURCE}"
-                )
-            if IWA_DOC_HIDDEN_ATTRIBUTE.search(method_attributes) is None:
-                violations.append(
-                    "focused litchi-numbers table-move compatibility seam must be "
-                    "doc(hidden): "
-                    f"{NUMBERS_TABLE_MOVE_COMPAT_SOURCE}"
-                )
 
     methods = {
         name: (declaration, line_number)
@@ -21225,29 +20891,9 @@ def audit_numbers_table_appearance_facade_source_topology(
         production_source = _mask_rust_cfg_test_items(
             path.read_text(encoding="utf-8")
         )
-        has_hidden_source_seam = (
-            path == owner_path
-            and NUMBERS_TABLE_APPEARANCE_HIDDEN_SOURCE_SEAM_DECLARATION.search(
-                owner_source
-            )
-            is not None
-        )
         for declaration, line_number in _rust_public_declarations(production_source):
             if not _is_numbers_table_appearance_public_declaration(
                 declaration, dedicated_source=dedicated_source
-            ):
-                continue
-            # This is the sole intentional raw-ID/borrowed-byte exception.  It
-            # is only accepted in the canonical private owner and only when
-            # the surrounding source proves both cfg(feature) and doc(hidden).
-            # A similarly named public helper elsewhere remains subject to all
-            # normal facade leak checks.
-            if (
-                has_hidden_source_seam
-                and NUMBERS_TABLE_APPEARANCE_HIDDEN_SOURCE_SEAM_SIGNATURE.search(
-                    declaration
-                )
-                is not None
             ):
                 continue
             identifiers = [
@@ -32823,6 +32469,69 @@ def audit_iwa_common_formula_render_ownership(
     return sorted(set(violations))
 
 
+# The migration host's feature and hidden seams, removed by record 0436. A leaf
+# that needs one of these again gets a `pub(crate)` item or a glossary-checked
+# public API instead.
+IWA_RETIRED_HOST_FEATURE = "internal-iwork-source"
+IWA_RETIRED_HOST_SEAMS = re.compile(
+    r"(?<![A-Za-z0-9_])(?:"
+    r"__CatalogBodyTableAppearanceSource|__CatalogTableAppearanceSource|"
+    r"__catalog_body_table_appearance|__catalog_body_table_style_edges|"
+    r"__catalog_table_appearance|__catalog_table_style_edges|"
+    r"__clear_table_sort_order_from_bytes_for_compatibility|"
+    r"__compatibility_tables_from_prepared_source|"
+    r"__decode_image_adjustments_payload|__decode_movie_playback_payload|"
+    r"__decode_slide_drawable_projection|__decode_slide_node_projection|"
+    r"__from_archive|__from_prepared_source|"
+    r"__from_prepared_source_with_semantic_limits|__from_shared_archives|"
+    r"__from_shared_catalog|__from_shared_source_with_options|"
+    r"__invalidate_slide_preview|__is_litchi_source_built_compatibility|"
+    r"__is_valid_pages_text_storage|__move_table_from_bytes_for_compatibility|"
+    r"__movie_playback_settings|__pages_body_storage_discovery|"
+    r"__presentation_from_prepared_source|__rewrite_movie_playback_payload|"
+    r"__rewrite_movie_playback_settings|"
+    r"__semantic_document_from_prepared_source|"
+    r"__set_table_sort_order_from_bytes_for_compatibility|"
+    r"__slide_table_appearances|__source_owner|"
+    r"__table_appearance_from_source_built|"
+    r"__table_cell_comment_from_bytes_for_compatibility(?:_with_options)?|"
+    r"__table_cell_comment_replies_from_bytes_for_compatibility(?:_with_options)?|"
+    r"__table_sort_order_from_bytes_for_compatibility|"
+    r"__transition_settings_from_source|"
+    r"OwnedSourceCatalog|SourceBuiltAppearancePayload"
+    r")(?![A-Za-z0-9_])"
+)
+
+
+def audit_iwa_retired_host_seams(root: Path = ROOT) -> list[str]:
+    """Keep the deleted migration host's feature and hidden seams out of crates."""
+
+    crates = root / "crates"
+    if not crates.is_dir():
+        return []
+    violations: list[str] = []
+    for manifest in sorted(crates.glob("*/Cargo.toml")):
+        if IWA_RETIRED_HOST_FEATURE in manifest.read_text(encoding="utf-8"):
+            violations.append(
+                f"retired iWork host feature {IWA_RETIRED_HOST_FEATURE}: "
+                f"{manifest.relative_to(root)}"
+            )
+    for source_path in sorted(crates.glob("*/**/*.rs")):
+        source = source_path.read_text(encoding="utf-8", errors="replace")
+        if IWA_RETIRED_HOST_FEATURE in source:
+            violations.append(
+                f"retired iWork host feature {IWA_RETIRED_HOST_FEATURE}: "
+                f"{source_path.relative_to(root)}"
+            )
+        for match in IWA_RETIRED_HOST_SEAMS.finditer(source):
+            line_number = source.count("\n", 0, match.start()) + 1
+            violations.append(
+                f"retired iWork host seam {match.group(0)}: "
+                f"{source_path.relative_to(root)}:{line_number}"
+            )
+    return violations
+
+
 def audit_iwa_shared_media_playback_source_topology(
     root: Path = ROOT,
 ) -> list[str]:
@@ -32844,10 +32553,6 @@ def audit_iwa_shared_media_playback_source_topology(
         ecosystem: root / path
         for ecosystem, path in IWA_MEDIA_PLAYBACK_OWNER_PACKAGE_SOURCES.items()
     }
-    export_paths = {
-        ecosystem: root / path
-        for ecosystem, path in IWA_MEDIA_PLAYBACK_OWNER_EXPORT_SOURCES.items()
-    }
     codec_path = root / IWA_MEDIA_PLAYBACK_CODEC_SOURCE
     if not codec_path.is_file() or not all(path.is_file() for path in owner_paths.values()):
         return []
@@ -32863,45 +32568,14 @@ def audit_iwa_shared_media_playback_source_topology(
         owner_codes[ecosystem] = _mask_rust_non_code(source)
         owner_raw_codes[ecosystem] = _mask_rust_non_code(raw_source)
 
-    def function_declaration(
-        name: str,
-        *,
-        rewrite: bool = False,
-    ) -> re.Pattern[str]:
-        arguments = (
-            r"(?=[^)]*\bsource\s*:\s*&\s*\[\s*u8\s*\])"
-            r"(?=[^)]*\bWireLimits\b)"
-        )
-        if rewrite:
-            arguments += r"(?=[^)]*\bMediaPlaybackSettings\b)"
-        arguments += r"[^)]*"
-        return re.compile(
-            r"(?ms)#\s*\[\s*doc\s*\(\s*hidden\s*\)\s*\][^\n]*\n"
-            r"(?:\s*#\s*\[[^\]]+\]\s*\n)*"
-            rf"\s*pub\s+fn\s+{re.escape(name)}\s*\({arguments}\s*\)"
-        )
-
     for ecosystem, owner_path in owner_paths.items():
         owner_code = owner_codes[ecosystem]
-        decode_name, rewrite_name = IWA_MEDIA_PLAYBACK_OWNER_SEAMS[ecosystem]
-        for name, rewrite in ((decode_name, False), (rewrite_name, True)):
-            if name is None:
-                continue
-            if function_declaration(name, rewrite=rewrite).search(owner_code) is None:
-                violations.append(
-                    f"focused litchi-{ecosystem.lower()} movie-playback owner is missing "
-                    f"hidden source seam {name}: {owner_paths[ecosystem]}"
-                )
 
         package_source = (
             _mask_rust_cfg_test_items(package_paths[ecosystem].read_text(encoding="utf-8"))
             if package_paths[ecosystem].is_file()
             else ""
         )
-        # Keep feature strings intact while hiding comments.  The module is
-        # intentionally gated by the literal `internal-iwork-source` feature,
-        # so the general non-code mask would erase the declaration we need to
-        # enforce here.
         package_code = _mask_rust_comments(package_source)
         if IWA_MEDIA_PLAYBACK_OWNER_MODULES[ecosystem].search(package_code) is None:
             violations.append(
@@ -32922,15 +32596,6 @@ def audit_iwa_shared_media_playback_source_topology(
                         package_paths[ecosystem],
                     )
                 )
-            if export_paths[ecosystem].is_file():
-                seam_sources.append(
-                    (
-                        _mask_rust_non_code(
-                            export_paths[ecosystem].read_text(encoding="utf-8")
-                        ),
-                        export_paths[ecosystem],
-                    )
-                )
             for seam_source, seam_path in seam_sources:
                 for match in IWA_KEYNOTE_MOVIE_PLAYBACK_RETIRED_SEAM_REFERENCE.finditer(
                     seam_source
@@ -32941,31 +32606,6 @@ def audit_iwa_shared_media_playback_source_topology(
                         f"{IWA_KEYNOTE_MOVIE_PLAYBACK_RETIRED_SEAM}: "
                         f"{seam_path.relative_to(root)}:{line_number}"
                     )
-
-        export_sources = [package_source]
-        export_path = export_paths[ecosystem]
-        if export_path.is_file():
-            export_sources.append(
-                _mask_rust_comments(
-                    _mask_rust_cfg_test_items(export_path.read_text(encoding="utf-8"))
-                )
-            )
-        export_sources[0] = _mask_rust_comments(export_sources[0])
-        for name in (decode_name, rewrite_name):
-            if name is None:
-                continue
-            hidden_export = re.compile(
-                r"(?ms)^\s*#\s*\[\s*cfg\s*\(\s*feature\s*=\s*"
-                r'"internal-iwork-source"\s*\)\s*\]\s*\n'
-                r"\s*#\s*\[\s*doc\s*\(\s*hidden\s*\)\s*\]\s*\n"
-                rf"\s*pub\s+use[^;]*\b{re.escape(name)}\b[^;]*;"
-            )
-            if not any(hidden_export.search(source) for source in export_sources):
-                violations.append(
-                    f"focused litchi-{ecosystem.lower()} movie-playback seam {name} "
-                    "must use the hidden internal-iwork-source export: "
-                    f"{IWA_MEDIA_PLAYBACK_OWNER_EXPORT_SOURCES[ecosystem]}"
-                )
 
         if "movie_playback_codec" not in owner_code:
             violations.append(
@@ -33019,89 +32659,9 @@ def audit_iwa_shared_image_adjustments_source_topology(
     def code_for(path: Path) -> str:
         return _mask_rust_non_code(source_for(path))
 
-    def hidden_seam(
-        name: str,
-        *,
-        rewrite: bool,
-        feature_gated: bool,
-    ) -> re.Pattern[str]:
-        arguments = (
-            r"(?=[^)]*\bsource\s*:\s*&\s*\[\s*u8\s*\])"
-            r"(?=[^)]*\bWireLimits\b)"
-        )
-        if rewrite:
-            arguments += r"(?=[^)]*\bImageAdjustments\b)"
-        attributes = r"(?P<attributes>(?:\s*#\s*\[[^\]]+\]\s*\n)+)"
-        return re.compile(
-            rf"(?ms)^{attributes}"
-            rf"\s*pub\s+fn\s+{re.escape(name)}\s*\({arguments}[^)]*\)"
-        )
-
     for ecosystem, owner_path in owner_paths.items():
         owner_source = source_for(owner_path)
         owner_code = _mask_rust_non_code(owner_source)
-        owner_declaration_source = _mask_rust_comments(owner_source)
-        bridge_module = IWA_IMAGE_ADJUSTMENTS_BRIDGE_MODULE.search(
-            owner_declaration_source
-        )
-        bridge_module_span: tuple[int, int] | None = None
-        bridge_module_feature_gated = False
-        if bridge_module is not None:
-            bridge_code = _mask_rust_non_code(owner_declaration_source)
-            bridge_opening = bridge_code.rfind("{", bridge_module.start(), bridge_module.end())
-            bridge_end = _rust_balanced_delimited_end(bridge_code, bridge_opening)
-            if bridge_end is not None:
-                bridge_module_span = (bridge_opening, bridge_end)
-                bridge_module_feature_gated = (
-                    IWA_INTERNAL_SOURCE_CFG_ATTRIBUTE.search(
-                        bridge_module.group("attributes")
-                    )
-                    is not None
-                )
-
-        def in_feature_gated_bridge(match: re.Match[str]) -> bool:
-            return bridge_module_feature_gated and bridge_module_span is not None and (
-                bridge_module_span[0] < match.start() < bridge_module_span[1]
-            )
-        owner_seams = IWA_IMAGE_ADJUSTMENTS_OWNER_SEAMS_BY_ECOSYSTEM[ecosystem]
-        for seam in owner_seams:
-            seam_match = hidden_seam(
-                seam,
-                rewrite=seam == IWA_IMAGE_ADJUSTMENTS_RETIRED_WRITE_SEAM,
-                feature_gated=True,
-            ).search(owner_declaration_source)
-            if seam_match is None or not (
-                IWA_DOC_HIDDEN_ATTRIBUTE.search(seam_match.group("attributes"))
-                and (
-                    IWA_INTERNAL_SOURCE_CFG_ATTRIBUTE.search(
-                        seam_match.group("attributes")
-                    )
-                    or in_feature_gated_bridge(seam_match)
-                )
-            ):
-                violations.append(
-                    f"focused litchi-{ecosystem.lower()} image-adjustments owner is missing "
-                    f"hidden source seam {seam}: {IWA_IMAGE_ADJUSTMENTS_OWNER_SOURCES[ecosystem]}"
-                )
-
-        hidden_error_match = IWA_IMAGE_ADJUSTMENTS_HIDDEN_ERROR_DECLARATION.search(
-            owner_declaration_source
-        )
-        if hidden_error_match is None or not (
-            IWA_DOC_HIDDEN_ATTRIBUTE.search(hidden_error_match.group("attributes"))
-            and (
-                IWA_INTERNAL_SOURCE_CFG_ATTRIBUTE.search(
-                    hidden_error_match.group("attributes")
-                )
-                or in_feature_gated_bridge(hidden_error_match)
-            )
-        ):
-            violations.append(
-                f"focused litchi-{ecosystem.lower()} image-adjustments hidden error "
-                "must remain behind the internal-iwork-source/doc(hidden) bridge: "
-                f"{IWA_IMAGE_ADJUSTMENTS_OWNER_SOURCES[ecosystem]}"
-            )
-
         owner_methods = {
             name: declaration
             for name, declaration, _line_number in _rust_public_methods_in_impl(
@@ -33144,14 +32704,9 @@ def audit_iwa_shared_image_adjustments_source_topology(
                 f"{IWA_IMAGE_ADJUSTMENTS_OWNER_SOURCES[ecosystem]}"
             )
 
-        # The raw source bridge is the sole public declaration allowed to
-        # mention bytes or the hidden bridge error.  Keep generated archive
-        # vocabulary out of the default selector-first API as well.
+        # Keep raw bytes and generated archive vocabulary out of the
+        # selector-first API.
         for declaration, line_number in _rust_public_declarations(owner_source):
-            if any(seam in declaration for seam in owner_seams):
-                continue
-            if IWA_IMAGE_ADJUSTMENTS_HIDDEN_ERROR in declaration:
-                continue
             if RUST_BYTE_SLICE.search(declaration) is not None:
                 violations.append(
                     f"focused litchi-{ecosystem.lower()} image-adjustments public API "
@@ -33181,10 +32736,6 @@ def audit_iwa_shared_image_adjustments_source_topology(
         required_codec_calls = [
             ("decode_image_adjustments", IWA_IMAGE_ADJUSTMENTS_CODEC_DECODE_CALL)
         ]
-        if IWA_IMAGE_ADJUSTMENTS_RETIRED_WRITE_SEAM in owner_seams:
-            required_codec_calls.append(
-                ("rewrite_image_adjustments", IWA_IMAGE_ADJUSTMENTS_CODEC_REWRITE_CALL)
-            )
         for marker, pattern in required_codec_calls:
             if pattern.search(owner_code) is None:
                 violations.append(
@@ -33214,12 +32765,6 @@ def audit_iwa_shared_image_adjustments_source_topology(
                 "missing its default semantic declaration: "
                 f"{IWA_IMAGE_ADJUSTMENTS_OWNER_PACKAGE_SOURCES[ecosystem]}"
             )
-        elif IWA_IMAGE_ADJUSTMENTS_FEATURE_GATED_MODULE.search(package_code) is not None:
-            violations.append(
-                f"focused litchi-{ecosystem.lower()} image-adjustments semantic module "
-                "must remain available in the default build: "
-                f"{IWA_IMAGE_ADJUSTMENTS_OWNER_PACKAGE_SOURCES[ecosystem]}"
-            )
 
         export_sources = [package_source]
         export_path = root / IWA_IMAGE_ADJUSTMENTS_OWNER_EXPORT_SOURCES[ecosystem]
@@ -33246,20 +32791,6 @@ def audit_iwa_shared_image_adjustments_source_topology(
                 "is missing its semantic error export: "
                 f"{IWA_IMAGE_ADJUSTMENTS_OWNER_EXPORT_SOURCES[ecosystem]}"
             )
-        for seam in (*owner_seams, IWA_IMAGE_ADJUSTMENTS_HIDDEN_ERROR):
-            hidden_export = re.compile(
-                r"(?ms)^\s*#\s*\[\s*cfg\s*\(\s*feature\s*=\s*"
-                r'"internal-iwork-source"\s*\)\s*\]\s*\n'
-                r"\s*#\s*\[\s*doc\s*\(\s*hidden\s*\)\s*\]\s*\n"
-                rf"\s*pub\s+use[^;]*\b{re.escape(seam)}\b[^;]*;"
-            )
-            if not any(hidden_export.search(source) for source in export_sources):
-                violations.append(
-                    f"focused litchi-{ecosystem.lower()} image-adjustments seam {seam} "
-                    "must use the hidden internal-iwork-source export: "
-                    f"{IWA_IMAGE_ADJUSTMENTS_OWNER_EXPORT_SOURCES[ecosystem]}"
-                )
-
         if ecosystem in IWA_IMAGE_ADJUSTMENTS_RETIRED_WRITE_ECOSYSTEMS:
             retired_write = IWA_IMAGE_ADJUSTMENTS_RETIRED_WRITE_SEAM
             for name, line_number in _rust_function_declarations(owner_source):
@@ -34888,10 +34419,6 @@ def audit_numbers_table_cell_comment_reply_mutation_facade_source_topology(
 
     for path, source in owner_sources.items():
         for name, declaration, line_number in _rust_public_methods_in_impl(source, "Package"):
-            if _iwa_numbers_cell_comment_reader_compat_public_method_allowed(
-                root, path, source, name, declaration, line_number
-            ):
-                continue
             scan_surface(declaration, path, declaration, line_number)
         for name, declaration, line_number in _rust_public_methods_in_impl(
             source, "CommentReplyIndex"
@@ -50479,7 +50006,6 @@ NUMBERS_TABLE_MERGE_READER_ALLOWED_METHODS = frozenset(
         "from_shared_bytes",
         "from_shared_bytes_with_options",
         "table_merges",
-        "__from_shared_catalog",
     }
 )
 NUMBERS_TABLE_MERGE_READER_FUNCTION_NAME = re.compile(
@@ -50537,7 +50063,6 @@ FOCUSED_TABLE_MERGE_READER_ALLOWED_METHODS = frozenset(
         "slide_table_merges",
         "read_options",
         "options",
-        "__from_shared_catalog",
     }
 )
 FOCUSED_TABLE_MERGE_READER_FORBIDDEN_TYPES = re.compile(
@@ -50552,9 +50077,6 @@ FOCUSED_TABLE_MERGE_READER_FORBIDDEN_TYPES = re.compile(
 )
 FOCUSED_TABLE_MERGE_READER_ARC_BYTES = re.compile(
     r"\bArc[ \t]*<[ \t]*\[[ \t]*u8[ \t]*\][ \t]*>"
-)
-FOCUSED_TABLE_MERGE_READER_COMPONENT_CATALOG = re.compile(
-    r"\bArc[ \t]*<[ \t]*ComponentCatalog[ \t]*>"
 )
 FOCUSED_TABLE_MERGE_READER_PUBLIC_PHYSICAL_TYPES = re.compile(
     r"(?<![A-Za-z0-9_])(?:"
@@ -52724,12 +52246,6 @@ def _audit_focused_table_merge_reader_source_topology(
     methods = _rust_public_methods_in_impl(production_source, "MergeReader")
     method_lines = {line for _name, _declaration, line in methods}
     method_names = {name for name, _declaration, _line in methods}
-    expected_internal = "__from_shared_catalog"
-    if expected_internal not in method_names:
-        violations.append(
-            f"{format_name} table-merge reader is missing its shared-catalog "
-            f"ingress: {relative_reader}"
-        )
     if "open" not in method_names:
         violations.append(
             f"{format_name} table-merge reader is missing path ingress: "
@@ -52784,16 +52300,15 @@ def _audit_focused_table_merge_reader_source_topology(
                 f"{raw_id.group(0).strip()}: {relative_reader}:{line_number}"
             )
 
-        if name != expected_internal:
-            physical_type = FOCUSED_TABLE_MERGE_READER_PUBLIC_PHYSICAL_TYPES.search(
-                declaration
+        physical_type = FOCUSED_TABLE_MERGE_READER_PUBLIC_PHYSICAL_TYPES.search(
+            declaration
+        )
+        if physical_type is not None:
+            violations.append(
+                f"{format_name} table-merge reader exposes a physical or "
+                f"semantic type {physical_type.group(0)} from public method "
+                f"{name}: {relative_reader}:{line_number}"
             )
-            if physical_type is not None:
-                violations.append(
-                    f"{format_name} table-merge reader exposes a physical or "
-                    f"semantic type {physical_type.group(0)} from public method "
-                    f"{name}: {relative_reader}:{line_number}"
-                )
 
         if name not in FOCUSED_TABLE_MERGE_READER_ALLOWED_METHODS:
             violations.append(
@@ -52843,35 +52358,6 @@ def _audit_focused_table_merge_reader_source_topology(
                     f"{format_name} table-merge reader shared ingress must accept "
                     f"Arc<[u8]> ({name}): {relative_reader}:{line_number}"
                 )
-        elif name == expected_internal:
-            if FOCUSED_TABLE_MERGE_READER_COMPONENT_CATALOG.search(declaration) is None:
-                violations.append(
-                    f"{format_name} table-merge reader shared-catalog ingress must "
-                    f"accept Arc<ComponentCatalog>: {relative_reader}:{line_number}"
-                )
-            if re.search(rf"\b{re.escape(limits_type)}\b", declaration) is None:
-                violations.append(
-                    f"{format_name} table-merge reader shared-catalog ingress must "
-                    f"retain {limits_type}: {relative_reader}:{line_number}"
-                )
-            method_match = re.search(
-                r"\bpub[ \t]+fn[ \t]+__from_shared_catalog\b",
-                production_source,
-            )
-            if method_match is not None:
-                attributes = _rust_attribute_block_before(
-                    production_source, method_match.start()
-                )
-                if IWA_INTERNAL_SOURCE_CFG_ATTRIBUTE.search(attributes) is None:
-                    violations.append(
-                        f"{format_name} table-merge reader shared-catalog ingress "
-                        f"must be feature-gated: {relative_reader}:{line_number}"
-                    )
-                if IWA_DOC_HIDDEN_ATTRIBUTE.search(attributes) is None:
-                    violations.append(
-                        f"{format_name} table-merge reader shared-catalog ingress "
-                        f"must be doc(hidden): {relative_reader}:{line_number}"
-                    )
         elif name == query_method:
             missing_selectors = sorted(
                 selector
@@ -53094,31 +52580,6 @@ def audit_numbers_table_merge_reader_source_topology(
                     "Numbers table-merge reader shared ingress must accept "
                     f"Arc<[u8]> ({name}): {relative_reader}:{line_number}"
                 )
-        elif name == "__from_shared_catalog":
-            if re.search(r"\bArc[ \t]*<[ \t]*ComponentCatalog[ \t]*>", declaration) is None:
-                violations.append(
-                    "Numbers table-merge reader internal ingress must accept "
-                    f"Arc<ComponentCatalog>: {relative_reader}:{line_number}"
-                )
-            if re.search(r"\bOpenOptions\b", declaration) is None:
-                violations.append(
-                    "Numbers table-merge reader internal ingress must retain "
-                    f"OpenOptions: {relative_reader}:{line_number}"
-                )
-            for method in re.finditer(r"\bpub\s+fn\s+__from_shared_catalog\b", code):
-                if code.count("\n", 0, method.start()) + 1 != line_number:
-                    continue
-                attributes = _rust_attribute_block_before(production_source, method.start())
-                if IWA_INTERNAL_SOURCE_CFG_ATTRIBUTE.search(attributes) is None:
-                    violations.append(
-                        "Numbers table-merge reader internal ingress must be "
-                        f"feature-gated: {relative_reader}:{line_number}"
-                    )
-                if IWA_DOC_HIDDEN_ATTRIBUTE.search(attributes) is None:
-                    violations.append(
-                        "Numbers table-merge reader internal ingress must be "
-                        f"doc(hidden): {relative_reader}:{line_number}"
-                    )
         elif name == "table_merges":
             if not re.search(r"\bSheetSelector\b", declaration):
                 violations.append(
@@ -57202,6 +56663,7 @@ def main(argv: list[str] | None = None) -> int:
         + audit_iwa_common_table_read_source_topology()
         + audit_iwa_shared_media_playback_source_topology()
         + audit_iwa_shared_image_adjustments_source_topology()
+        + audit_iwa_retired_host_seams()
         + audit_numbers_extractor_no_eager_table_data_list_source_topology()
         + audit_numbers_comment_clear_metadata_prerequisite_source_topology()
         + audit_numbers_table_cell_comment_reply_facade_source_topology()

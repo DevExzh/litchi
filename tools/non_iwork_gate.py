@@ -1053,7 +1053,7 @@ def _feature_references(
                     original_dependency_name(value.removeprefix("dep:"))
                 )
                 continue
-            # A value such as litchi-pages/internal-iwork-source is a
+            # A value such as litchi-pages/some-feature is a
             # feature forwarded to an optional dependency.  Its package name
             # is the part before the slash.
             dependency_alias, _, _ = value.partition("/")

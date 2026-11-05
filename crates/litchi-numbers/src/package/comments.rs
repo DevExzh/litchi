@@ -44,10 +44,6 @@ use crate::{SheetSelector, TableSelector, table::At};
 
 use super::Package;
 
-#[cfg(feature = "internal-iwork-source")]
-#[doc(hidden)]
-#[path = "comments_compat.rs"]
-mod comments_compat;
 #[path = "comments_create.rs"]
 mod comments_create;
 #[path = "comments_read.rs"]
@@ -1123,28 +1119,9 @@ impl Package {
 
     /// Read source-ordered semantic replies from a resolved comment target.
     ///
-    /// The physical compatibility reader uses the same bounded projection
-    /// after selector admission, while the normal package reader reaches it
-    /// through the fully projected semantic document above.
+    /// The package reader reaches it through the fully projected semantic
+    /// document above.
     fn read_comment_replies(&self, located: Located) -> Result<Box<[CommentReply]>, Error> {
-        self.read_comment_replies_with_mode(located, false)
-    }
-
-    /// Read replies through the compatibility model envelope without
-    /// changing the strict public package or mutation paths.
-    #[cfg(feature = "internal-iwork-source")]
-    fn read_comment_replies_compatibility(
-        &self,
-        located: Located,
-    ) -> Result<Box<[CommentReply]>, Error> {
-        self.read_comment_replies_with_mode(located, true)
-    }
-
-    fn read_comment_replies_with_mode(
-        &self,
-        located: Located,
-        compatibility_defaults: bool,
-    ) -> Result<Box<[CommentReply]>, Error> {
         let path = located.target.path;
         if located.comment.is_none() {
             return Err(Error::Refused(Refusal::CommentNotFound { path }));
@@ -1156,13 +1133,9 @@ impl Package {
         // readable comment list.  Likewise, a reply may live in another
         // current component or be shared by more than one root.  Keep those
         // facts out of the mutation census below.
-        let census = if compatibility_defaults {
-            census_comment_read_with_model_mode(self, path, true)?
-        } else {
-            census_comment_read(self, path)?
-        };
+        let census = census_comment_read(self, path)?;
         validate_comment_authors(self, &census, path)?;
-        validate_reply_package_metadata_with_mode(self, path, compatibility_defaults)?;
+        validate_reply_package_metadata(self, path)?;
         let entry = located
             .entry
             .as_ref()
@@ -1412,7 +1385,7 @@ impl Package {
     /// Apply a reversible exact-source comment patch.
     pub fn apply_table_cell_comment(&self, patch: &Patch) -> Result<Commit, Error> {
         let source_catalog = physical_source(self)?;
-        let source = source_catalog.__source_owner();
+        let source = source_catalog.source_owner();
         if !patch.artifacts.authorizes_owner(&source) {
             return Err(Error::PatchConflict);
         }
@@ -1490,20 +1463,9 @@ impl Package {
     }
 }
 
-fn validate_reply_package_metadata_with_mode(
-    source: &Package,
-    path: Path,
-    compatibility_defaults: bool,
-) -> Result<(), Error> {
-    // Legacy editor fixtures (and some older native documents) have no
-    // PackageMetadata sidecar at all.  A semantic compatibility read can
-    // still prove the selected comment graph from its source-owned archives,
-    // but must validate a sidecar whenever one is present. In particular,
-    // do not turn a malformed or misplaced metadata message into an absent
-    // sidecar by checking only the canonical member name.
+fn validate_reply_package_metadata(source: &Package, path: Path) -> Result<(), Error> {
     let metadata = match super::comments_metadata::strict_source(source) {
         Ok(metadata) => metadata,
-        Err(_) if compatibility_defaults && !package_metadata_is_present(source) => return Ok(()),
         Err(_) => return Err(Error::InvalidSource { path }),
     };
     let payload_len = metadata.payload().len();
@@ -1544,22 +1506,6 @@ fn validate_reply_package_metadata_with_mode(
     super::comments_metadata::inspect_cross_component_read(source, options)
         .map_err(|_| Error::InvalidSource { path })?;
     Ok(())
-}
-
-fn package_metadata_is_present(source: &Package) -> bool {
-    source
-        .state
-        .components
-        .iter_archives()
-        .any(|(name, archive)| {
-            name == super::metadata::ENTRY_NAME
-                || archive.objects.iter().any(|object| {
-                    object
-                        .messages
-                        .iter()
-                        .any(|message| message.type_ == super::metadata::MESSAGE_TYPE)
-                })
-        })
 }
 
 fn validate_comment_authors(
@@ -1771,14 +1717,12 @@ struct DecodedTableStorage<'source> {
 enum CommentTableModelMode {
     Strict,
     DenseNative,
-    Compatibility,
 }
 
 fn decode_comment_table_model<'source>(
     payload: &'source [u8],
     message_type: u32,
     options: numbers_table_cell_storage_codec::DecodeOptions,
-    compatibility_defaults: bool,
     path: Path,
 ) -> Result<
     Option<(
@@ -1822,15 +1766,7 @@ fn decode_comment_table_model<'source>(
                             Err(_) => {},
                         }
                     }
-                    if !compatibility_defaults {
-                        return Err(map_table_codec_error(dense_error, path));
-                    }
-                    let (model, _report) =
-                        numbers_table_cell_storage_codec::decode_table_model_compatibility_with_report(
-                            payload, options,
-                        )
-                        .map_err(|error| map_table_codec_error(error, path))?;
-                    (model, CommentTableModelMode::Compatibility)
+                    return Err(map_table_codec_error(dense_error, path));
                 },
             }
         },
@@ -1893,21 +1829,6 @@ fn decode_table_storage<'source>(
     source: &'source Package,
     target: &Target,
 ) -> Result<DecodedTableStorage<'source>, Error> {
-    decode_table_storage_with_mode(source, target, false)
-}
-
-fn decode_table_storage_compatibility<'source>(
-    source: &'source Package,
-    target: &Target,
-) -> Result<DecodedTableStorage<'source>, Error> {
-    decode_table_storage_with_mode(source, target, true)
-}
-
-fn decode_table_storage_with_mode<'source>(
-    source: &'source Package,
-    target: &Target,
-    compatibility_defaults: bool,
-) -> Result<DecodedTableStorage<'source>, Error> {
     let model_route = MessageRoute {
         component_index: target.native.component_index,
         object_index: target.native.object_index,
@@ -1924,7 +1845,6 @@ fn decode_table_storage_with_mode<'source>(
         model_message.data.as_slice(),
         model_message.type_,
         model_options,
-        compatibility_defaults,
         target.path,
     )?
     else {
@@ -1939,8 +1859,7 @@ fn decode_table_storage_with_mode<'source>(
         model.base_data_store(),
         data_store_options,
         model_mode,
-        compatibility_defaults,
-        compatibility_defaults,
+        false,
         target.path,
     )?;
     let (tile_storage, _report) =
@@ -1959,7 +1878,6 @@ fn decode_comment_data_store<'source>(
     payload: &'source [u8],
     options: numbers_table_cell_storage_codec::DecodeOptions,
     model_mode: CommentTableModelMode,
-    compatibility_defaults: bool,
     allow_strict_fallback: bool,
     path: Path,
 ) -> Result<numbers_table_cell_storage_codec::DataStoreSnapshot<'source>, Error> {
@@ -1973,32 +1891,18 @@ fn decode_comment_data_store<'source>(
     match model_mode {
         CommentTableModelMode::Strict => match strict {
             Ok((store, _report)) => Ok(store),
-            Err(strict_error) if !compatibility_defaults && !allow_strict_fallback => {
+            Err(strict_error) if !allow_strict_fallback => {
                 Err(map_table_codec_error(strict_error, path))
             },
-            Err(_strict_error) if !compatibility_defaults => {
+            Err(_strict_error) => {
                 numbers_table_cell_storage_codec::decode_data_store_compatibility_with_report(
                     payload, options,
                 )
                 .map(|(store, _report)| store)
                 .map_err(|fallback| map_table_codec_error(fallback, path))
             },
-            Err(_strict_error) => {
-                decode_dense_then_legacy_data_store(payload, options, compatibility_defaults, path)
-            },
         },
         CommentTableModelMode::DenseNative => {
-            if compatibility_defaults {
-                decode_dense_then_legacy_data_store(payload, options, compatibility_defaults, path)
-            } else {
-                numbers_table_cell_storage_codec::decode_data_store_compatibility_with_report(
-                    payload, options,
-                )
-                .map(|(store, _report)| store)
-                .map_err(|error| map_table_codec_error(error, path))
-            }
-        },
-        CommentTableModelMode::Compatibility => {
             numbers_table_cell_storage_codec::decode_data_store_compatibility_with_report(
                 payload, options,
             )
@@ -2094,57 +1998,8 @@ fn map_comment_table_info_error(error: table_info_codec::DecodeError, path: Path
     }
 }
 
-fn decode_dense_then_legacy_data_store<'source>(
-    payload: &'source [u8],
-    options: numbers_table_cell_storage_codec::DecodeOptions,
-    compatibility_defaults: bool,
-    path: Path,
-) -> Result<numbers_table_cell_storage_codec::DataStoreSnapshot<'source>, Error> {
-    let dense = numbers_table_cell_storage_codec::decode_data_store_dense_native_with_report(
-        payload, options,
-    );
-    match dense {
-        Ok((store, _report)) => Ok(store),
-        Err(error) if error.resource_limit().is_some() => Err(map_table_codec_error(error, path)),
-        Err(dense_error) if compatibility_defaults => {
-            numbers_table_cell_storage_codec::decode_data_store_compatibility_with_report(
-                payload, options,
-            )
-            .map(|(store, _report)| store)
-            .map_err(|fallback| {
-                if fallback.resource_limit().is_some() {
-                    map_table_codec_error(fallback, path)
-                } else {
-                    map_table_codec_error(dense_error, path)
-                }
-            })
-        },
-        Err(error) => Err(map_table_codec_error(error, path)),
-    }
-}
-
-fn resolve_comment_native(source: &Package, target: Target) -> Result<Located, Error> {
-    resolve_comment_native_with_mode(source, target, false)
-}
-
-#[cfg(feature = "internal-iwork-source")]
-fn resolve_comment_native_compatibility(
-    source: &Package,
-    target: Target,
-) -> Result<Located, Error> {
-    resolve_comment_native_with_mode(source, target, true)
-}
-
-fn resolve_comment_native_with_mode(
-    source: &Package,
-    mut target: Target,
-    compatibility_defaults: bool,
-) -> Result<Located, Error> {
-    let decoded = if compatibility_defaults {
-        decode_table_storage_compatibility(source, &target)?
-    } else {
-        decode_table_storage(source, &target)?
-    };
+fn resolve_comment_native(source: &Package, mut target: Target) -> Result<Located, Error> {
+    let decoded = decode_table_storage(source, &target)?;
     let data_store = decoded.data_store;
     let tile_storage = decoded.tile_storage;
     let data_store_comment_table_id = data_store
@@ -2889,8 +2744,8 @@ fn commit_shared_root(edit: Edit<'_>, located: Located) -> Result<Commit, Error>
         .ok_or(Error::InvalidSource { path })?;
     let source_catalog = physical_source(edit.source)?;
     let source_previews = root_preview_deletions(source_catalog)?.len();
-    let source_owner = source_catalog.__source_owner();
-    let target_owner = physical_source(&package)?.__source_owner();
+    let source_owner = source_catalog.source_owner();
+    let target_owner = physical_source(&package)?.source_owner();
     Ok(Commit {
         package,
         patch: Patch {
@@ -3014,7 +2869,7 @@ fn map_native_fault(fault: litchi_iwa_table::comments_native::Fault, path: Path)
 
 fn commit_edit(edit: Edit<'_>) -> Result<Commit, Error> {
     let source_catalog = physical_source(edit.source)?;
-    let source_owner = source_catalog.__source_owner();
+    let source_owner = source_catalog.source_owner();
     if edit.before == edit.after {
         return Ok(Commit {
             package: edit.source.snapshot(),
@@ -3101,7 +2956,7 @@ fn commit_edit(edit: Edit<'_>) -> Result<Commit, Error> {
         {
             return Err(Error::Verification);
         }
-        let target_owner = physical_source(&package)?.__source_owner();
+        let target_owner = physical_source(&package)?.source_owner();
         let target_cell = Arc::from(prepared.cell.into_boxed_slice());
         return Ok(Commit {
             package,
@@ -3179,7 +3034,7 @@ fn commit_edit(edit: Edit<'_>) -> Result<Commit, Error> {
     {
         return Err(Error::Verification);
     }
-    let target_owner = physical_source(&package)?.__source_owner();
+    let target_owner = physical_source(&package)?.source_owner();
     Ok(Commit {
         package,
         patch: Patch {
@@ -4882,31 +4737,17 @@ fn prove_archive_reference_ownership(
 }
 
 fn census_comment_ownership(source: &Package, path: Path) -> Result<CommentOwnershipCensus, Error> {
-    census_comment_ownership_with_model_mode(source, path, CommentCensusMode::Mutation, false)
+    census_comment_ownership_with_mode(source, path, CommentCensusMode::Mutation)
 }
 
 fn census_comment_read(source: &Package, path: Path) -> Result<CommentOwnershipCensus, Error> {
-    census_comment_read_with_model_mode(source, path, false)
+    census_comment_ownership_with_mode(source, path, CommentCensusMode::Read)
 }
 
-fn census_comment_read_with_model_mode(
-    source: &Package,
-    path: Path,
-    compatibility_defaults: bool,
-) -> Result<CommentOwnershipCensus, Error> {
-    census_comment_ownership_with_model_mode(
-        source,
-        path,
-        CommentCensusMode::Read,
-        compatibility_defaults,
-    )
-}
-
-fn census_comment_ownership_with_model_mode(
+fn census_comment_ownership_with_mode(
     source: &Package,
     path: Path,
     mode: CommentCensusMode,
-    compatibility_defaults: bool,
 ) -> Result<CommentOwnershipCensus, Error> {
     let mut census = CommentOwnershipCensus::default();
     let mut budget = CensusBudget::new(source.state.options.semantic().max_references());
@@ -5205,7 +5046,6 @@ fn census_comment_ownership_with_model_mode(
         &mut census,
         &mut budget,
         mode.requires_field_infos(),
-        compatibility_defaults,
         path,
     )?;
     census_alias_checks(
@@ -5652,7 +5492,6 @@ fn census_models_and_cells(
     census: &mut CommentOwnershipCensus,
     budget: &mut CensusBudget,
     require_field_infos: bool,
-    compatibility_defaults: bool,
     path: Path,
 ) -> Result<(), Error> {
     let mut scan_work = 0;
@@ -5686,7 +5525,6 @@ fn census_models_and_cells(
                     message.data.as_slice(),
                     message.type_,
                     options,
-                    compatibility_defaults,
                     path,
                 )?
                 else {
@@ -5715,7 +5553,6 @@ fn census_models_and_cells(
                     model.base_data_store(),
                     data_options,
                     model_mode,
-                    compatibility_defaults,
                     true,
                     path,
                 )?;

@@ -161,27 +161,6 @@ impl MergeReader {
         Self::from_components_with_limits(source.into_components(), limits)
     }
 
-    /// Build a reader from an already parsed shared component catalog.
-    ///
-    /// This migration-only ingress is used by an iWork coordinator that has
-    /// already validated and cached the physical component archives. It does
-    /// not reopen ZIP bytes or clone any archive payload. The originating
-    /// catalog owns physical ingress validation; `limits` governs this Pages
-    /// reader's object graph and merge query work.
-    ///
-    /// # Errors
-    ///
-    /// Returns a typed error when the component inventory or Pages root graph
-    /// is invalid under the selected limits.
-    #[cfg(feature = "internal-iwork-source")]
-    #[doc(hidden)]
-    pub fn __from_shared_catalog(
-        components: Arc<ComponentCatalog>,
-        limits: Limits,
-    ) -> Result<Self, Error> {
-        Self::from_shared_components_with_limits(components, limits)
-    }
-
     fn from_components_with_limits(
         components: ComponentCatalog,
         limits: Limits,
@@ -257,4 +236,74 @@ impl MergeReader {
 /// The archive profile `options` selects for physical merge-reader ingress.
 fn archive_limits(options: OpenOptions) -> Result<Limits, Error> {
     options.archive().map_err(map_package_error)
+}
+
+#[cfg(test)]
+mod tests {
+    use litchi_iwa_archive::SourceCatalog;
+
+    use super::*;
+
+    const NATIVE: &[u8] =
+        include_bytes!("../../../../../test-data/iwork/pages/body-table-merges-native.pages");
+
+    /// The extent of `component`'s parsed archive stream.
+    fn stream_extent(component: &litchi_iwa_archive::Component) -> u64 {
+        component.archive().objects.last().map_or(0, |object| {
+            object
+                .data_offset
+                .checked_add(object.data_length)
+                .expect("native archive stream extent fits u64")
+        })
+    }
+
+    fn component_payload_limits(components: &ComponentCatalog, total: u64) -> Limits {
+        let largest = components
+            .iter()
+            .map(stream_extent)
+            .max()
+            .expect("native Pages package has components");
+        assert!(largest > 0);
+        Limits::new(
+            Limits::MAX_INPUT_BYTES,
+            Limits::MAX_ENTRIES,
+            Limits::MAX_ENTRY_BYTES,
+            total,
+            usize::try_from(largest).expect("native archive stream extent fits usize"),
+        )
+        .expect("native payload budget is within the physical hard ceilings")
+    }
+
+    fn native_components() -> Arc<ComponentCatalog> {
+        let source = SourceCatalog::from_bytes(NATIVE, Limits::default()).expect("native source");
+        Arc::new(source.into_components())
+    }
+
+    #[test]
+    fn reader_accepts_the_exact_component_payload_budget() {
+        let components = native_components();
+        let total = components.iter().map(stream_extent).sum();
+        let limits = component_payload_limits(&components, total);
+        let reader = MergeReader::from_shared_components_with_limits(components, limits)
+            .expect("the exact budget admits the reader");
+        assert!(!reader.body_table_merges(0usize).expect("merges").is_empty());
+    }
+
+    #[test]
+    fn reader_rejects_one_below_component_payload_budget() {
+        let components = native_components();
+        let total: u64 = components.iter().map(stream_extent).sum();
+        assert!(total > 0);
+        let limits = component_payload_limits(&components, total - 1);
+        let reader = MergeReader::from_shared_components_with_limits(components, limits)
+            .expect("the root graph stays within the reduced budget");
+        assert!(matches!(
+            reader.body_table_merges(0usize),
+            Err(Error::Limit {
+                kind: crate::table::merge::transaction::LimitKind::TotalPayloadBytes,
+                observed,
+                maximum,
+            }) if observed == total && maximum == total - 1
+        ));
+    }
 }

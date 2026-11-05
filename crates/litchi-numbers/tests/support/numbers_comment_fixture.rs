@@ -1101,7 +1101,6 @@ pub(crate) fn fixture(mode: FixtureMode, corruption: Option<Corruption>) -> Test
 /// and malformed-graph variants remain shared with the focused reader tests,
 /// then change only the table discovery envelope and cell/list key that make
 /// this a faithful legacy source-built snapshot.
-#[allow(dead_code, reason = "used by the migration-host compatibility suite")]
 pub(crate) fn source_built_comment_fixture(shared: bool) -> TestResult<Vec<u8>> {
     let mode = if shared {
         FixtureMode::SharedRoot
@@ -1263,98 +1262,6 @@ pub(crate) fn source_built_comment_fixture_with_table_style(shared: bool) -> Tes
         SnappyStream::compress(&document.to_bytes(Default::default())?, Default::default())?;
     Ok(catalog.reassemble_to_bytes(
         &[EntryEdit::new(DOCUMENT_MEMBER, compressed.as_slice())],
-        Limits::default(),
-    )?)
-}
-
-/// Wrap the source-built sheet in the form-based Numbers envelope.  The
-/// nested `SheetArchive` has the same drawable ownership and name as the
-/// standard fixture; only the physical sheet message variant changes.
-#[allow(dead_code, reason = "used by the migration-host compatibility suite")]
-pub(crate) fn form_based_source_built_comment_fixture(shared: bool) -> TestResult<Vec<u8>> {
-    let source = source_built_comment_fixture(shared)?;
-    let catalog = Catalog::from_bytes(&source, Default::default())?;
-    let document_entry = catalog
-        .iter()
-        .find(|entry| entry.name() == DOCUMENT_MEMBER)
-        .ok_or_else(|| io::Error::other("comment fixture document member is missing"))?;
-    let stream = SnappyStream::decompress(document_entry.data(), Default::default())?;
-    let mut document = Archive::parse(stream.as_bytes(), Default::default())?;
-    let sheet = document
-        .object_mut(SHEET_ID)
-        .ok_or_else(|| io::Error::other("comment fixture sheet is missing"))?;
-    let message_index = sheet
-        .messages
-        .iter()
-        .position(|message| message.type_ == SHEET_TYPE)
-        .ok_or_else(|| io::Error::other("comment fixture standard sheet is missing"))?;
-    let nested = tn::SheetArchive::decode(sheet.messages[message_index].data.as_slice())?;
-    sheet.replace_message_preserving_header(
-        message_index,
-        RawMessage {
-            type_: 3,
-            data: tn::FormBasedSheetArchive {
-                super_: nested,
-                ..Default::default()
-            }
-            .encode_to_vec(),
-        },
-        Default::default(),
-    )?;
-    let compressed =
-        SnappyStream::compress(&document.to_bytes(Default::default())?, Default::default())?;
-    Ok(catalog.reassemble_to_bytes(
-        &[EntryEdit::new(DOCUMENT_MEMBER, compressed.as_slice())],
-        Limits::default(),
-    )?)
-}
-
-/// Remove the metadata member from a source-built comment package while
-/// leaving every selected document component byte-for-byte unchanged.
-#[allow(dead_code, reason = "used by the migration-host compatibility suite")]
-pub(crate) fn source_built_comment_fixture_without_metadata(shared: bool) -> TestResult<Vec<u8>> {
-    let source = source_built_comment_fixture(shared)?;
-    let catalog = Catalog::from_bytes(&source, Default::default())?;
-    let entries = catalog
-        .iter()
-        .filter(|entry| entry.name() != METADATA_MEMBER)
-        .map(|entry| (entry.name(), entry.data()))
-        .collect::<Vec<_>>();
-    Ok(litchi_iwa_archive::package::to_bytes(
-        entries,
-        Limits::default(),
-    )?)
-}
-
-/// Replace the present metadata payload with a caller-selected wire value.
-/// This distinguishes a genuinely absent metadata member from a malformed or
-/// schema-incomplete metadata archive in the compatibility reader contract.
-#[allow(dead_code, reason = "used by the migration-host compatibility suite")]
-pub(crate) fn source_built_comment_fixture_with_metadata_payload(
-    payload: &[u8],
-) -> TestResult<Vec<u8>> {
-    let source = source_built_comment_fixture(false)?;
-    let catalog = Catalog::from_bytes(&source, Default::default())?;
-    let metadata_entry = catalog
-        .iter()
-        .find(|entry| entry.name() == METADATA_MEMBER)
-        .ok_or_else(|| io::Error::other("comment fixture metadata member is missing"))?;
-    let stream = SnappyStream::decompress(metadata_entry.data(), Default::default())?;
-    let mut metadata_archive = Archive::parse(stream.as_bytes(), Default::default())?;
-    let metadata = metadata_archive
-        .object_mut(METADATA_OBJECT_ID)
-        .ok_or_else(|| io::Error::other("comment fixture metadata object is missing"))?;
-    let message = metadata
-        .messages
-        .first_mut()
-        .ok_or_else(|| io::Error::other("comment fixture metadata payload is missing"))?;
-    message.data = payload.to_vec();
-    let compressed = SnappyStream::compress(
-        &metadata_archive.to_bytes(Default::default())?,
-        Default::default(),
-    )?;
-    Ok(catalog.reassemble_to_bytes(
-        &[EntryEdit::new(METADATA_MEMBER, compressed.as_slice())],
         Limits::default(),
     )?)
 }

@@ -14,8 +14,8 @@
 //!
 //! Two layers: payload- and object-level rules ([`Label`], [`GraphIds`],
 //! [`graph_objects`], [`standin`], [`info_graph`], [`repoint`],
-//! [`replace_reference`], [`drawable_width`], [`theme_paragraph_style`])
-//! for owners that publish through their own cores (Keynote, Pages); and
+//! [`replace_reference`], [`drawable_width`], [`theme_paragraph_style`],
+//! [`theme_label_paragraph_style`]) for owners that publish through their own cores (Keynote, Pages); and
 //! [`read()`] and [`write()`] over a [`Workspace`] for owners that publish a
 //! workspace's changes (Numbers).
 
@@ -60,6 +60,18 @@ const GEOMETRY_SIZE_FIELD: u32 = 2;
 const SIZE_WIDTH_FIELD: u32 = 1;
 const THEME_PRESETS_FIELD: u32 = 210;
 const PRESETS_CAPTION_STYLES_FIELD: u32 = 1;
+/// `TSWP.ParagraphStyleArchive`.
+const PARAGRAPH_STYLE_MESSAGE_TYPE: u32 = 2_022;
+/// `TSWP.ParagraphStyleArchive.super` (`TSS.StyleArchive`).
+const PARAGRAPH_STYLE_SUPER_FIELD: u32 = 1;
+/// `TSS.StyleArchive.style_identifier`.
+const STYLE_IDENTIFIER_FIELD: u32 = 2;
+/// The `style_identifier` of the paragraph style Numbers and Keynote give a
+/// caption they author (record 0435). Every template we hold, Pages' too,
+/// lists it in the theme's caption styles after the title's
+/// `captions-0-paragraphstyle-Caption Title`, except a document built by Litchi
+/// (one style, listed twice) and some built for Pages (the title's alone).
+const CAPTION_PARAGRAPH_STYLE_IDENTIFIER: &[u8] = b"captions-0-paragraphstyle-Caption Text";
 
 /// A malformed drawable payload or label reference.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -193,7 +205,9 @@ impl GraphIds {
 pub struct Theme<'a> {
     /// The document stylesheet.
     pub stylesheet: u64,
-    /// The theme's first caption paragraph-style preset.
+    /// The label's paragraph style: [`theme_label_paragraph_style`] where a
+    /// native caption shows the style, [`theme_paragraph_style`] where none
+    /// does (record 0435).
     pub paragraph_style: u64,
     /// The document language.
     pub language: Option<&'a str>,
@@ -553,8 +567,10 @@ pub fn archive_width(drawable: &[u8]) -> Result<Option<f32>, Malformed> {
 }
 
 /// The first caption paragraph-style preset of a `TSS.ThemeArchive`
-/// payload (`application_presets.caption_styles[0]`, the host's
-/// `image_caption_theme`).
+/// payload (`application_presets.caption_styles[0]`): every template we hold
+/// names the title's style here, `captions-0-paragraphstyle-Caption Title`.
+/// A new title uses it; so does a new Pages caption, which has no native
+/// evidence (record 0435).
 #[must_use]
 pub fn theme_paragraph_style(theme: &[u8]) -> Option<u64> {
     let limits = WireLimits::DEFAULT;
@@ -564,13 +580,62 @@ pub fn theme_paragraph_style(theme: &[u8]) -> Option<u64> {
     let first = presets
         .fields()
         .find(|field| field.number() == PRESETS_CAPTION_STYLES_FIELD)?;
-    if first.wire_type() != 2 {
+    reference_identifier(first.wire_type(), first.payload())
+}
+
+/// The paragraph style of a new `label` from a `TSS.ThemeArchive` payload,
+/// `object` resolving the presets (record 0435). A title takes the first
+/// preset. A caption takes the preset that is the paragraph style native
+/// captions use; a template that lists none falls back to the first preset, as
+/// every caption did before: documents Litchi built list one style for both.
+#[must_use]
+pub fn theme_label_paragraph_style<'a>(
+    theme: &[u8],
+    label: Label,
+    mut object: impl FnMut(u64) -> Option<&'a ArchiveObject>,
+) -> Option<u64> {
+    let limits = WireLimits::DEFAULT;
+    let first = theme_paragraph_style(theme)?;
+    if label == Label::Title {
+        return Some(first);
+    }
+    let view = WireView::parse(theme, limits).ok()?;
+    let presets = unique(&view, THEME_PRESETS_FIELD).ok()??;
+    let presets = WireView::parse(presets, limits).ok()?;
+    let caption = presets
+        .fields()
+        .filter(|field| field.number() == PRESETS_CAPTION_STYLES_FIELD)
+        .filter_map(|field| reference_identifier(field.wire_type(), field.payload()))
+        .find(|identifier| object(*identifier).is_some_and(is_caption_paragraph_style));
+    Some(caption.unwrap_or(first))
+}
+
+/// The identifier of a `TSP.Reference` field, when it names an object.
+fn reference_identifier(wire_type: u8, payload: &[u8]) -> Option<u64> {
+    if wire_type != 2 {
         return None;
     }
-    let reference = WireView::parse(first.payload(), limits).ok()?;
+    let reference = WireView::parse(payload, WireLimits::DEFAULT).ok()?;
     let field = reference.fields().find(|field| field.number() == 1)?;
     let (value, _) = litchi_iwa_common::decode_varint_from_bytes(field.payload()).ok()?;
     (value != 0).then_some(value)
+}
+
+fn is_caption_paragraph_style(object: &ArchiveObject) -> bool {
+    let limits = WireLimits::DEFAULT;
+    object
+        .messages
+        .iter()
+        .filter(|message| message.type_ == PARAGRAPH_STYLE_MESSAGE_TYPE)
+        .any(|message| {
+            let identifier = || {
+                let style = WireView::parse(&message.data, limits).ok()?;
+                let base = unique(&style, PARAGRAPH_STYLE_SUPER_FIELD).ok()??;
+                let base = WireView::parse(base, limits).ok()?;
+                unique(&base, STYLE_IDENTIFIER_FIELD).ok()?
+            };
+            identifier() == Some(CAPTION_PARAGRAPH_STYLE_IDENTIFIER)
+        })
 }
 
 /// One label of a drawable in a [`Workspace`].
@@ -898,7 +963,7 @@ fn insert_componentized_style(
 /// Store `text` as `target`'s label (`None`: clear it), as the host's
 /// `set_*_caption`/`remove_*_caption` do: a present label's storage text
 /// is replaced; an absent one gets a new graph in `layout` (`theme` names
-/// its stylesheet, paragraph style and language); clearing points the
+/// its stylesheet, the label's paragraph style and language); clearing points the
 /// drawable at a fresh stand-in and keeps the old graph. New objects take
 /// identifiers from the package watermark, get UUIDs in the drawable's
 /// component (a componentized style: in the stylesheet's) and raise the
@@ -1124,6 +1189,97 @@ mod tests {
         assert!(info.field_infos.iter().all(|field| {
             field.unknown_field_rule == Some(litchi_iwa_core::UnknownFieldRule::IgnoreAndPreserve)
         }));
+    }
+
+    fn theme_with_presets(presets: &[u64]) -> Vec<u8> {
+        let limits = WireLimits::DEFAULT;
+        let mut list = Vec::new();
+        for preset in presets {
+            litchi_iwa_common::wire::append_length_delimited_field(
+                &mut list,
+                PRESETS_CAPTION_STYLES_FIELD,
+                &reference_payload(*preset),
+                limits,
+            )
+            .expect("preset");
+        }
+        let mut theme = Vec::new();
+        litchi_iwa_common::wire::append_length_delimited_field(
+            &mut theme,
+            THEME_PRESETS_FIELD,
+            &list,
+            limits,
+        )
+        .expect("theme");
+        theme
+    }
+
+    fn style_object(identifier: u64, message_type: u32, style_identifier: &[u8]) -> ArchiveObject {
+        let limits = WireLimits::DEFAULT;
+        let mut base = Vec::new();
+        litchi_iwa_common::wire::append_length_delimited_field(
+            &mut base,
+            STYLE_IDENTIFIER_FIELD,
+            style_identifier,
+            limits,
+        )
+        .expect("base");
+        let mut style = Vec::new();
+        litchi_iwa_common::wire::append_length_delimited_field(
+            &mut style,
+            PARAGRAPH_STYLE_SUPER_FIELD,
+            &base,
+            limits,
+        )
+        .expect("style");
+        ArchiveObject::new(
+            identifier,
+            vec![RawMessage {
+                type_: message_type,
+                data: style,
+            }],
+            litchi_iwa_core::Limits::default(),
+        )
+        .expect("object")
+    }
+
+    #[test]
+    fn a_caption_takes_the_native_style_and_a_title_the_first_preset() {
+        let title = style_object(
+            7,
+            PARAGRAPH_STYLE_MESSAGE_TYPE,
+            b"captions-0-paragraphstyle-Caption Title",
+        );
+        let caption = style_object(
+            9,
+            PARAGRAPH_STYLE_MESSAGE_TYPE,
+            CAPTION_PARAGRAPH_STYLE_IDENTIFIER,
+        );
+        let mistyped = style_object(11, 2_025, CAPTION_PARAGRAPH_STYLE_IDENTIFIER);
+        let object = |identifier: u64| match identifier {
+            7 => Some(&title),
+            9 => Some(&caption),
+            11 => Some(&mistyped),
+            _ => None,
+        };
+        let style = |presets: &[u64], label| {
+            theme_label_paragraph_style(&theme_with_presets(presets), label, object)
+        };
+        assert_eq!(theme_paragraph_style(&theme_with_presets(&[7, 9])), Some(7));
+        assert_eq!(style(&[7, 9], Label::Caption), Some(9));
+        assert_eq!(style(&[7, 9], Label::Title), Some(7));
+        // The order does not decide: the style's own identifier does.
+        assert_eq!(style(&[9, 7], Label::Caption), Some(9));
+        assert_eq!(style(&[9, 7], Label::Title), Some(9));
+        // No such style: the first preset, as a document Litchi built has.
+        for lacking in [&[7, 7][..], &[7], &[7, 11], &[7, 404]] {
+            assert_eq!(style(lacking, Label::Caption), Some(7));
+        }
+        assert_eq!(style(&[], Label::Caption), None);
+        assert_eq!(
+            theme_label_paragraph_style(&[], Label::Caption, object),
+            None
+        );
     }
 
     #[test]

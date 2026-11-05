@@ -308,7 +308,7 @@ impl Iwork {
                 let leaf = options.pages_options.unwrap_or_default();
                 if leaf.source_limits_value() == litchi_pages::SourceLimits::default() {
                     drop(shared);
-                    litchi_pages::Package::__from_prepared_source_with_semantic_limits(
+                    litchi_pages::Package::from_prepared_source(
                         prepared,
                         leaf.semantic_limits_value(),
                     )
@@ -324,13 +324,13 @@ impl Iwork {
                 let leaf = options.keynote_options.unwrap_or_default();
                 if leaf.source_limits_value() == litchi_keynote::SourceLimits::default() {
                     drop(shared);
-                    litchi_keynote::Package::__from_prepared_source(
+                    litchi_keynote::Package::from_prepared_source(
                         prepared,
                         leaf.semantic_limits_value(),
                     )
                 } else {
                     drop(prepared);
-                    litchi_keynote::Package::__from_shared_source_with_options(shared, leaf)
+                    litchi_keynote::Package::from_shared_bytes_with_options(shared, leaf)
                 }
                 .map(Owner::Keynote)
                 .map_err(|error| leaf_error(LeafError::Keynote(error), FileFormat::Keynote))?
@@ -340,7 +340,7 @@ impl Iwork {
                 let leaf = options.numbers_options.unwrap_or_default();
                 if leaf.source_limits_value() == litchi_numbers::SourceLimits::default() {
                     drop(shared);
-                    litchi_numbers::Package::__from_prepared_source(
+                    litchi_numbers::Package::from_prepared_source(
                         prepared,
                         leaf.semantic_limits_value(),
                     )

@@ -1207,31 +1207,6 @@ fn map_transition_codec_error(
 }
 
 impl Package {
-    /// Project one borrowed slide payload into focused semantic transition
-    /// settings for the internal iWork adapter.
-    ///
-    /// This intentionally accepts only the selected `KN.SlideArchive` payload
-    /// and a caller-owned wire budget. It performs the focused codec's strict
-    /// borrowed projection without constructing any generated archive object
-    /// or retaining the source. Structural preflight remains on the package
-    /// mutation path, where it protects wire edits; applying that aggregate
-    /// scanner here would charge nested selected messages twice against the
-    /// caller's input-byte ceiling.
-    ///
-    /// # Errors
-    ///
-    /// Returns the focused transition error when the payload is malformed,
-    /// exceeds `limits`, or contains invalid semantic or opaque values.
-    #[cfg(feature = "internal-iwork-source")]
-    #[doc(hidden)]
-    pub fn __transition_settings_from_source(
-        payload: &[u8],
-        limits: WireLimits,
-    ) -> Result<Option<Settings>, Error> {
-        let projection = decode_transition_projection(payload, limits)?;
-        optional_settings_from_projection(&projection.settings, limits)
-    }
-
     /// Read one slide's focused transition settings without exposing IWA IDs.
     ///
     /// # Errors
@@ -1810,7 +1785,7 @@ fn settings_from_projection(
     Ok(settings)
 }
 
-#[cfg(any(test, feature = "internal-iwork-source"))]
+#[cfg(test)]
 fn optional_settings_from_projection(
     snapshot: &TransitionSettingsSnapshot<'_>,
     limits: WireLimits,
@@ -2607,10 +2582,6 @@ mod tests {
             .expect("source-sized field limit is valid")
             .with_rewrite_work(source.len().saturating_mul(8))
             .expect("source-sized work limit is valid");
-        #[cfg(feature = "internal-iwork-source")]
-        let reduced_result =
-            super::Package::__transition_settings_from_source(&source, reduced_byte_limit);
-        #[cfg(not(feature = "internal-iwork-source"))]
         let reduced_result = decode_transition_projection(&source, reduced_byte_limit);
         assert!(matches!(
             reduced_result,
@@ -2620,18 +2591,5 @@ mod tests {
                 maximum,
             }) if observed == source.len() as u64 && maximum == source.len().saturating_sub(1) as u64
         ));
-
-        #[cfg(feature = "internal-iwork-source")]
-        {
-            let settings = super::Package::__transition_settings_from_source(&source, limits)
-                .expect("hidden host seam should use the focused decoder");
-            assert_eq!(
-                settings
-                    .expect("modern transition should be present")
-                    .effect()
-                    .map(Effect::identifier),
-                Some("none")
-            );
-        }
     }
 }
