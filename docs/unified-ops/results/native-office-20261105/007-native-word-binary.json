@@ -1,0 +1,230 @@
+{
+  "schema_version": 1,
+  "date": "2026-11-05",
+  "source_commit": "9a3289e867ca323fb3dc400c5a4db5973d561f47",
+  "base_commit": "01f76426d8cd8befcee965a031d56dbe9cd1634f",
+  "problem": "Native binary Word fixtures exposed attached-glossary end-sentinel and stylesheet-origin assumptions, lost revision toggles in editor enumeration, and stale shared glossary FIB pointers after otherwise valid main-story edits.",
+  "changes": [
+    "Accept the ignored final PlcfGlsy sentinel at ccpText, as emitted by native Word. Real item endpoints remain strictly inside the text, ordered and UTF-16-boundary checked; duplicate/reversed/out-of-range sentinels remain errors.",
+    "Check LPStd alignment relative to the STSH record. The native attached stylesheet begins at Table-stream offset 9031 and has correctly aligned local records. A physically odd offset does not rescue malformed local alignment.",
+    "Revision enumeration now uses the semantic reader\u2019s resolved ordered flag state, including 0x80/0x81 and later overrides, instead of searching for any literal 1. Valid revision ToggleOperands no longer generate Bool8 repair defects; actual Bool8 handling keeps its recorded fallback.",
+    "Synchronize both FIBs\u2019 shared CHPX/PAPX pointers and cbMac after main-body publication, including deferred character-format publication. Validate the previously published template/glossary header coupling before writing; malformed input coupling is not silently repaired.",
+    "Add twelve DOC owner regressions and a public operations regression for native templates, macros, child files, encryption, comments, forms, moves, plain-body CRUD and exact inverse preservation. Correct the older subdocument test\u2019s obsolete statement that the repository has no positive specimen."
+  ],
+  "verification_scope": {
+    "catalog": "20 unencrypted DOC/DOT/extensionless-child variants plus one native encrypted DOC. Paragraph counts include all stories and table marks; table counts describe top-level tables.",
+    "source_edits": "13 title edits retain every unrelated CFB stream payload, source bytes, paragraph/table counts and exact inverse bytes. Native plain Unicode body creation/movement/removal, move accept/reject, and glossary-preserving deferred bold publication are separately exercised.",
+    "attached_glossary": "Native LITCHI_AUTOTEXT_014 metadata and text, CP range [0,57), terminal/ignored/story-length tuple (57,58,58), Normal style, and selected paragraph/run formatting remain readable across body edits.",
+    "revisions": "Native source/destination ranges [58,132) and [193,267), author Ryker Zhu, local 2026-10-15 20:07 DTTM and shared RSID 0x00EC3828. Accept and reject produce exact six-paragraph bodies and invert to the original source.",
+    "comments": "Two native legacy comments retain their trailing carriage return, author, root/reply depth and parent index, local DTTM timestamps and absent ink flag.",
+    "forms": "Stored FFData text/default/cache/help/length, checkbox default true versus undefined result, and dropdown item/default versus undefined selection. No UI state, macro or field execution.",
+    "encryption": "Absent/wrong/correct credentials, exact five paragraphs, write-reservation Office42! metadata and ciphertext retention. Ordinary edits return the typed Encrypted refusal; encrypted body editing and rekeying are not claimed.",
+    "operations": "Auto/Eager configured routes query the native template\u2019s four paragraph paths and atomically edit two body paragraphs; a format-owner reopen confirms the attached AutoText content and identity, and the patch inverse restores the entire CFB.",
+    "negative_cases": "Malformed in-memory derivatives of the native DOT exercise stale shared CHPX pointers and mismatched cbMac. The original fixture on disk is immutable."
+  },
+  "results": {
+    "rust_passed_across_selected_suites": 2039,
+    "python_passed": 71,
+    "native_doc_owner_tests": 12,
+    "native_doc_ops_tests": 1,
+    "indexed_coverage": {
+      "fixtures": 139,
+      "fixtures_with_tests": 119,
+      "feature_rows": 494,
+      "feature_rows_with_partial_tests": 107,
+      "indexed_tests": 100,
+      "native_fixture_statuses": {
+        "verified_native_fixture": 197,
+        "pending": 252,
+        "library_boundary": 44,
+        "not_applicable": 1
+      }
+    },
+    "source_fixtures_modified": false,
+    "fresh_native_application_validation": false
+  },
+  "validation": [
+    {
+      "command": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi-doc --features formula --lib --tests --no-fail-fast",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "doc-owner-final.log",
+        "path": "/tmp/litchi-native-office.GMvwp4/doc-owner-final.log",
+        "bytes": 148915,
+        "sha256": "87a7636dd31a6b3e98b1d90f7c42b0488b6c6ba9b39b811838d8608ca22f770a"
+      },
+      "regenerate": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi-doc --features formula --lib --tests --no-fail-fast > /tmp/litchi-native-office.GMvwp4/doc-owner-final.log 2>&1",
+      "suites": 51,
+      "passed": 1485,
+      "failed": 0,
+      "ignored": 2,
+      "existing_ignored_tests": [
+        "test package::tests::test_invalid_file ... ignored, requires an external DOC fixture",
+        "test package::tests::test_open_package ... ignored, requires an external DOC fixture"
+      ]
+    },
+    {
+      "command": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi-ops --no-default-features --features doc,formula --lib --test 'doc_*' --test microsoft_office_native --no-fail-fast",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "doc-ops-first.log",
+        "path": "/tmp/litchi-native-office.GMvwp4/doc-ops-first.log",
+        "bytes": 50941,
+        "sha256": "521f5b1d5fdbf5927b3f35fbc424b9852cecfe9c7054cc44222720f178710259"
+      },
+      "regenerate": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi-ops --no-default-features --features doc,formula --lib --test 'doc_*' --test microsoft_office_native --no-fail-fast > /tmp/litchi-native-office.GMvwp4/doc-ops-first.log 2>&1",
+      "suites": 5,
+      "passed": 445,
+      "failed": 0,
+      "ignored": 1,
+      "existing_ignored_tests": [
+        "test libreoffice_probe_files ... ignored, writes LibreOffice probe files to DOC_WRITE_DIR"
+      ]
+    },
+    {
+      "command": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi --no-default-features --features doc,docx,encryption,formula,markdown,ppt,pptx,rtf,xls,xlsb,xlsx --lib --tests --no-fail-fast -- --test-threads=1",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "doc-facade-final.log",
+        "path": "/tmp/litchi-native-office.GMvwp4/doc-facade-final.log",
+        "bytes": 32799,
+        "sha256": "1bff3b01070d77274aad68296bf57832084291f866a981cf958796b5d12c7c22"
+      },
+      "regenerate": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi --no-default-features --features doc,docx,encryption,formula,markdown,ppt,pptx,rtf,xls,xlsb,xlsx --lib --tests --no-fail-fast -- --test-threads=1 > /tmp/litchi-native-office.GMvwp4/doc-facade-final.log 2>&1",
+      "suites": 30,
+      "passed": 109,
+      "failed": 0,
+      "ignored": 0,
+      "existing_ignored_tests": []
+    },
+    {
+      "command": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo clippy --locked --offline -p litchi-doc -p litchi-ops --no-default-features --features litchi-doc/formula,litchi-ops/doc,litchi-ops/formula --lib --tests --no-deps -- -D warnings",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "doc-clippy-first.log",
+        "path": "/tmp/litchi-native-office.GMvwp4/doc-clippy-first.log",
+        "bytes": 18207,
+        "sha256": "f6cd19a3247c37610be8f5f80b8583fa260247e8f2c4063ef360365d7bd53150"
+      },
+      "regenerate": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo clippy --locked --offline -p litchi-doc -p litchi-ops --no-default-features --features litchi-doc/formula,litchi-ops/doc,litchi-ops/formula --lib --tests --no-deps -- -D warnings > /tmp/litchi-native-office.GMvwp4/doc-clippy-first.log 2>&1"
+    },
+    {
+      "command": "python3 -m unittest tools.test_native_office_corpus tools.test_non_iwork_gate tools.test_no_3rdparty_references",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "doc-python-final.log",
+        "path": "/tmp/litchi-native-office.GMvwp4/doc-python-final.log",
+        "bytes": 663,
+        "sha256": "21c958dae92e24bf97da13e9b75dbcdec39e370033aa55fa1789fe048ce1fa2c"
+      },
+      "regenerate": "python3 -m unittest tools.test_native_office_corpus tools.test_non_iwork_gate tools.test_no_3rdparty_references > /tmp/litchi-native-office.GMvwp4/doc-python-final.log 2>&1"
+    },
+    {
+      "command": "python3 tools/non_iwork_gate.py verify",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "doc-gate-final.log",
+        "path": "/tmp/litchi-native-office.GMvwp4/doc-gate-final.log",
+        "bytes": 1947,
+        "sha256": "093891c870e429ea255a96e2b70c0ab385611633fd15daebaafeccfe5f74a514"
+      },
+      "regenerate": "python3 tools/non_iwork_gate.py verify > /tmp/litchi-native-office.GMvwp4/doc-gate-final.log 2>&1"
+    },
+    {
+      "command": "python3 tools/native_office_coverage.py",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "doc-coverage-final.json",
+        "path": "/tmp/litchi-native-office.GMvwp4/doc-coverage-final.json",
+        "bytes": 334279,
+        "sha256": "d7e3522ec2df66e806daf902518e4aeb9aebec51dc52ed26f0e9d5600511706b"
+      },
+      "regenerate": "python3 tools/native_office_coverage.py > /tmp/litchi-native-office.GMvwp4/doc-coverage-final.json 2>&1"
+    }
+  ],
+  "additional_checks": [
+    {
+      "command": "git diff-tree --no-commit-id --name-only -r 9a3289e867ca323fb3dc400c5a4db5973d561f47 -- '*.rs' | xargs rustfmt --check --edition 2024",
+      "result": "pass; ten Rust files"
+    },
+    {
+      "command": "git diff --cached --check",
+      "result": "pass"
+    },
+    {
+      "command": "AGENTS.md staged evidence-size and binaries-path guards",
+      "result": "both print nothing before each commit"
+    }
+  ],
+  "specification_references": [
+    "https://learn.microsoft.com/en-us/openspecs/office_file_formats/ms-doc/2eb727c3-8703-4057-8858-35fe676ac899",
+    "https://learn.microsoft.com/en-us/openspecs/office_file_formats/ms-doc/8ff6f5f0-ee65-48e3-ab1e-f15deeb24355",
+    "https://learn.microsoft.com/en-us/openspecs/office_file_formats/ms-doc/c8ee0f39-02c3-4caa-b27a-6a97600130fe",
+    "https://learn.microsoft.com/en-us/openspecs/office_file_formats/ms-doc/7022285b-9621-42e9-ad4d-4e02c115ef18",
+    "https://learn.microsoft.com/en-us/openspecs/office_file_formats/ms-doc/bc4ca98b-68ca-49dc-a091-1460e42d781e"
+  ],
+  "reproduction_artifacts": [
+    {
+      "artifact": {
+        "file_name": "doc-baseline.jsonl",
+        "path": "/tmp/litchi-native-office.GMvwp4/doc-baseline.jsonl",
+        "bytes": 25981,
+        "sha256": "4977d3400781d1387eb1859660dd6c3bc690d4a0a0b3de581761fa2cc274f2f0"
+      },
+      "scope": "Read-only baseline of all 21 native binary Word variants: glossary failure and zero enumerated move revisions reproduced."
+    },
+    {
+      "artifact": {
+        "file_name": "doc-native-before.log",
+        "path": "/tmp/litchi-native-office.GMvwp4/doc-native-before.log",
+        "bytes": 18493,
+        "sha256": "e3249a3627fbf50819193f8bfb07e0ea5a358bab885a9f3254de63d1c7efd215"
+      },
+      "scope": "The two permanent native regressions fail before fixes: attached glossary refused and expected two move records absent."
+    },
+    {
+      "artifact": {
+        "file_name": "doc-native-after.log",
+        "path": "/tmp/litchi-native-office.GMvwp4/doc-native-after.log",
+        "bytes": 18134,
+        "sha256": "98d3db64dd661d97ef4852d7a4a3f7d3e8e93c35530159ecbb33b708edf463db"
+      },
+      "scope": "After correcting the sentinel bound, native attached STSH exposes the incorrect absolute-alignment rejection."
+    },
+    {
+      "artifact": {
+        "file_name": "doc-native-expanded.log",
+        "path": "/tmp/litchi-native-office.GMvwp4/doc-native-expanded.log",
+        "bytes": 18383,
+        "sha256": "f96ea50194ff48de75969b409fda0388d7c0eedeea3f1dbfd434ad37d725828e"
+      },
+      "scope": "Title replacement publishes stale shared CHPX pointers for the attached glossary before synchronization fix."
+    }
+  ],
+  "binaries": [
+    {
+      "file_name": "microsoft_office_native-f1e0aa08d6f4c523",
+      "path": "/tmp/litchi-native-office.GMvwp4/target/debug/deps/microsoft_office_native-f1e0aa08d6f4c523",
+      "bytes": 13975288,
+      "sha256": "cadbd9d1dce79c417c9c93386963c0a38e6a713ca84a2993d886617d0f3377e9",
+      "source_commit": "9a3289e867ca323fb3dc400c5a4db5973d561f47",
+      "build_command": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi-doc --features formula --lib --tests --no-fail-fast"
+    },
+    {
+      "file_name": "microsoft_office_native-cd1e3c02c068d8af",
+      "path": "/tmp/litchi-native-office.GMvwp4/target/debug/deps/microsoft_office_native-cd1e3c02c068d8af",
+      "bytes": 17594952,
+      "sha256": "55d4dc4fc20cf532f63ac765ea88922070ed00502657d9248bbc5f8a20bd5653",
+      "source_commit": "9a3289e867ca323fb3dc400c5a4db5973d561f47",
+      "build_command": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi-ops --no-default-features --features doc,formula --lib --test 'doc_*' --test microsoft_office_native --no-fail-fast"
+    }
+  ],
+  "remaining_scope": [
+    "The goal remains active. Twenty Excel fixture files remain unindexed: SpreadsheetML/template/macro variants and encrypted XLSX/XLSB/XLS.",
+    "107 of 494 feature rows have partial indexed assertions, not whole-feature completion. All 252 historical pending fixture statuses remain unchanged.",
+    "Additional typed Word qualification remains for nested table/layout details, drawings/images/objects, macros/fonts, field/navigation and mail-merge semantics, and further metadata families where the fixtures carry evidence.",
+    "Glossary support here is passive read plus preservation during main-body edits, not arbitrary editing of attached glossary content.",
+    "Revision flags use the existing semantic reader\u2019s ordered toggle resolution. This batch does not expand the general style-cascade contract.",
+    "No Microsoft Word reopen, external-target refresh, macro/control execution, font rendering, pagination or layout validation was performed."
+  ]
+}
