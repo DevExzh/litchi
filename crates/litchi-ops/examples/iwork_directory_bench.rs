@@ -100,7 +100,7 @@ fn leaf_bytes_open(kind: &str, bytes: Arc<[u8]>) {
         },
         "keynote" => {
             black_box(
-                litchi_keynote::Package::__from_shared_source_with_options(
+                litchi_keynote::Package::from_shared_bytes_with_options(
                     bytes,
                     litchi_keynote::OpenOptions::new(),
                 )

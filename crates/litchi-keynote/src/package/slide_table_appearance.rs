@@ -902,18 +902,12 @@ struct SlideSelectionContext {
     slide_position: Position,
     slide_identifier: u64,
     slide_message_index: usize,
-    #[cfg(feature = "internal-iwork-source")]
-    table_count: usize,
 }
 
 enum TableScanMode<'a> {
     Select {
         table_position: usize,
         selected: &'a mut Option<TableSelectionCandidate>,
-    },
-    #[cfg(feature = "internal-iwork-source")]
-    Batch {
-        appearances: &'a mut Vec<Appearance>,
     },
 }
 
@@ -1101,34 +1095,6 @@ impl Package {
         let catalog = physical_source(self)?;
         budget.source_catalog(self, catalog)?;
         Ok(select_table_with_budget(self, slide.into(), table.into(), &mut budget)?.before)
-    }
-
-    /// Resolve every native table appearance on one slide in z-order.
-    ///
-    /// This migration seam shares the exact selector validation and semantic
-    /// scan used by the single-table reader, while retaining only compact
-    /// appearance values. It is hidden because the supported facade remains
-    /// selector-first; the host uses it to avoid rescanning one package for
-    /// every table in a listing.
-    #[cfg(feature = "internal-iwork-source")]
-    #[doc(hidden)]
-    pub fn __slide_table_appearances(&self, slide_index: usize) -> Result<Vec<Appearance>, Error> {
-        let mut budget = AppearanceBudget::new(self)?;
-        let catalog = physical_source(self)?;
-        budget.source_catalog(self, catalog)?;
-        let mut appearances = Vec::new();
-        let context = scan_tables_with_budget(
-            self,
-            SlideSelector::index(slide_index),
-            &mut budget,
-            &mut TableScanMode::Batch {
-                appearances: &mut appearances,
-            },
-        )?;
-        if context.table_count != 0 {
-            find_metadata_component(self, &mut budget)?;
-        }
-        Ok(appearances)
     }
 
     /// Start a selector-first immutable appearance edit.
@@ -3202,21 +3168,6 @@ fn scan_tables_with_budget(
                     .ok_or(Error::InvalidSource)?,
             )?;
         },
-        #[cfg(feature = "internal-iwork-source")]
-        TableScanMode::Batch { appearances } => {
-            budget.allocations(1)?;
-            budget.scratch(
-                z_order
-                    .len()
-                    .checked_mul(size_of::<Appearance>())
-                    .ok_or(Error::InvalidSource)?,
-            )?;
-            appearances
-                .try_reserve_exact(z_order.len())
-                .map_err(|_| Error::Allocation {
-                    amount: z_order.len(),
-                })?;
-        },
     }
     let mut table_count = 0usize;
     for table_info_identifier in z_order.iter().copied() {
@@ -3349,8 +3300,6 @@ fn scan_tables_with_budget(
                     });
                 }
             },
-            #[cfg(feature = "internal-iwork-source")]
-            TableScanMode::Batch { appearances } => appearances.push(resolved.appearance),
         }
         table_count = table_count.checked_add(1).ok_or(Error::InvalidSource)?;
     }
@@ -3358,8 +3307,6 @@ fn scan_tables_with_budget(
         slide_position,
         slide_identifier: record.slide_identifier,
         slide_message_index,
-        #[cfg(feature = "internal-iwork-source")]
-        table_count,
     })
 }
 
