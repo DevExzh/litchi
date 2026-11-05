@@ -51,23 +51,14 @@ pub(crate) mod body_table_title;
 pub(crate) mod body_table_topology;
 pub(crate) mod body_table_values;
 pub(crate) mod builder_table;
-#[cfg(feature = "internal-iwork-source")]
-mod catalog_body_table_appearance;
 mod directory;
 pub(crate) mod document_settings;
 pub(crate) mod drawable_order;
 pub(crate) mod footnote_text;
 pub(crate) mod header_footer_text;
 pub(crate) mod image_adjustments;
-pub(crate) mod metadata_edit;
-#[cfg(feature = "internal-iwork-source")]
-mod movie_playback;
-// The drawable-properties family reads and rewrites movie playback through
-// the same owner module, so it is compiled without the host seam feature as
-// well; only the hidden `__*` re-exports stay behind the feature.
 mod locale;
-#[cfg(not(feature = "internal-iwork-source"))]
-#[path = "package/movie_playback.rs"]
+pub(crate) mod metadata_edit;
 mod movie_playback;
 pub(crate) mod page_layout;
 mod save;
@@ -95,8 +86,6 @@ pub(crate) mod text_box_list;
 pub(crate) mod text_box_named_style;
 mod text_box_structure;
 pub(crate) mod text_box_text;
-#[cfg(feature = "internal-iwork-source")]
-mod text_storage;
 
 use std::borrow::Cow;
 use std::fmt;
@@ -113,7 +102,6 @@ use litchi_iwa_common::{
     wire::{WireFieldView, WireView},
 };
 use litchi_iwa_detect::Format;
-#[cfg(feature = "internal-iwork-source")]
 use litchi_iwa_detect::PreparedSource;
 use litchi_iwa_protos::pages_body_codec::{self, DecodeOptions as PagesBodyDecodeOptions};
 use litchi_iwa_protos::{pages_footnote_codec, pages_footnote_marker_codec};
@@ -129,17 +117,6 @@ use crate::{
 };
 
 pub use body_table_merges::MergeReader;
-#[cfg(feature = "internal-iwork-source")]
-pub use catalog_body_table_appearance::{
-    __CatalogBodyTableAppearanceSource, __catalog_body_table_appearance,
-    __catalog_body_table_style_edges,
-};
-#[cfg(feature = "internal-iwork-source")]
-pub use image_adjustments::{__decode_image_adjustments_payload, ImageAdjustmentsError};
-#[cfg(feature = "internal-iwork-source")]
-pub use movie_playback::{
-    __decode_movie_playback_payload, __rewrite_movie_playback_payload, MoviePlaybackError,
-};
 pub use save::SaveError;
 const SECTION_MESSAGE_TYPE: u32 = 10_011;
 const FOOTNOTE_REFERENCE_MESSAGE_TYPE: u32 = 2_008;
@@ -206,29 +183,6 @@ impl FootnoteSemanticBudget {
         self.retained_bytes = observed;
         Ok(())
     }
-}
-
-/// Validate one native Pages text-storage payload through the focused,
-/// source-borrowing adapter.
-///
-/// This is intentionally hidden from the supported semantic API. The legacy
-/// migration host uses it while its editor remains in place; the focused
-/// adapter owns the finite profile and the text-wire qualification itself.
-#[cfg(feature = "internal-iwork-source")]
-#[doc(hidden)]
-pub fn __is_valid_pages_text_storage(source: &[u8]) -> bool {
-    text_storage::is_valid(source)
-}
-
-#[cfg(feature = "internal-iwork-source")]
-#[doc(hidden)]
-pub use text_storage::BodyStorageDiscovery;
-
-/// Project the compact body fields needed by the legacy migration host.
-#[cfg(feature = "internal-iwork-source")]
-#[doc(hidden)]
-pub fn __pages_body_storage_discovery(source: &[u8]) -> PackageResult<BodyStorageDiscovery> {
-    text_storage::body_discovery(source)
 }
 
 /// Bounded physical ingress limits for a Pages package.
@@ -785,32 +739,19 @@ impl Package {
         Self::from_ingress(source, options.semantic_limits_value())
     }
 
-    /// Consume a source prepared by the focused iWork coordinator.
+    /// Consume a package source prepared by a format coordinator, under
+    /// explicit semantic limits.
     ///
-    /// This cross-crate ingress is intentionally unstable and exists only so
-    /// the root iWork coordinator can dispatch one already parsed immutable
-    /// package without repeating ZIP, Snappy, or IWA work.
+    /// This adopts the coordinator's parsed container without repeating ZIP,
+    /// Snappy or IWA work. The source's physical profile stays authoritative
+    /// (record 0306).
     ///
     /// # Errors
     ///
     /// Returns [`PackageError`] when the prepared source belongs to another
-    /// application or its Pages semantic projection is invalid.
-    #[cfg(feature = "internal-iwork-source")]
-    #[doc(hidden)]
-    pub fn __from_prepared_source(source: PreparedSource) -> PackageResult<Self> {
-        Self::__from_prepared_source_with_semantic_limits(source, crate::SemanticLimits::DEFAULT)
-    }
-
-    /// [`Self::__from_prepared_source`] under explicit semantic limits; the
-    /// prepared source's physical profile stays authoritative (record 0306).
-    ///
-    /// # Errors
-    ///
-    /// The errors of [`Self::__from_prepared_source`], with semantic limit
-    /// failures measured against `semantic`.
-    #[cfg(feature = "internal-iwork-source")]
-    #[doc(hidden)]
-    pub fn __from_prepared_source_with_semantic_limits(
+    /// application or its Pages semantic projection is invalid, with semantic
+    /// limit failures measured against `semantic`.
+    pub fn from_prepared_source(
         source: PreparedSource,
         semantic: crate::SemanticLimits,
     ) -> PackageResult<Self> {
@@ -1175,23 +1116,6 @@ impl Metadata {
         Ok(metadata)
     }
 
-    #[cfg(feature = "internal-iwork-source")]
-    fn from_prepared_sidecars(
-        sidecars: &litchi_iwa_detect::PreparedMetadataSidecars,
-    ) -> PackageResult<Self> {
-        let mut metadata = Self::default();
-        if let Some(data) = sidecars.properties_plist() {
-            metadata.apply_properties(data)?;
-        }
-        if let Some(data) = sidecars.build_version_history_plist() {
-            metadata.build_version = parse_build_version(data)?;
-        }
-        if let Some(data) = sidecars.document_identifier() {
-            metadata.apply_document_identifier(data)?;
-        }
-        Ok(metadata)
-    }
-
     fn apply_document_identifier(&mut self, data: &[u8]) -> PackageResult<()> {
         let identifier_text = std::str::from_utf8(data).map_err(|error| {
             PackageError::InvalidFormat(format!(
@@ -1307,59 +1231,6 @@ impl StorageAccumulator {
     }
 }
 
-/// Consume a prepared Pages source into an archive-free semantic document.
-///
-/// This unstable coordinator handoff deliberately discards the physical
-/// package catalog before semantic decoding begins. The caller-selected
-/// section and text limits can tighten, but never relax, Pages' hard semantic
-/// caps or the physical IWA-stream limit retained by the prepared source.
-///
-/// # Errors
-///
-/// Returns [`PackageError`] when the prepared source belongs to another iWork
-/// application, its Pages graph is malformed, or projection exceeds an
-/// effective admission bound.
-#[cfg(feature = "internal-iwork-source")]
-#[doc(hidden)]
-pub fn __semantic_document_from_prepared_source(
-    source: PreparedSource,
-    max_sections: usize,
-    max_text_bytes: usize,
-) -> PackageResult<Document> {
-    let semantic = crate::SemanticLimits::builder()
-        .max_sections(max_sections)?
-        .max_text_bytes(max_text_bytes)?
-        .build()?;
-    semantic_document_from_prepared_source(source, semantic)
-}
-
-#[cfg(feature = "internal-iwork-source")]
-pub(crate) fn semantic_document_from_prepared_source(
-    source: PreparedSource,
-    semantic: crate::SemanticLimits,
-) -> PackageResult<Document> {
-    validate_prepared_format(&source)?;
-    let (components, limits, sidecars) = source.__into_pages_semantic_source()?.__into_parts();
-    // Parse every present canonical diagnostic before publishing any source
-    // metadata. Failure therefore yields no partially populated Document.
-    let metadata = Metadata::from_prepared_sidecars(&sidecars)?.to_core();
-    let object_count = validate_components(&components)?;
-    let root_references = root_references_with_limits(&components, limits)?;
-    let document = decode_document(
-        &components,
-        root_references,
-        semantic.max_sections(),
-        semantic.max_text_bytes().min(effective_text_limit(limits)),
-        limits,
-    )?;
-    let stats = Stats {
-        total_objects: object_count,
-        section_count: document.section_count(),
-    };
-    Ok(Document::from_source(document, metadata, stats))
-}
-
-#[cfg(feature = "internal-iwork-source")]
 fn validate_prepared_format(source: &PreparedSource) -> PackageResult<()> {
     if source.format() != Format::Pages {
         return Err(PackageError::UnexpectedFormat {
@@ -4663,7 +4534,18 @@ mod tests {
         Ok(())
     }
 
-    #[cfg(feature = "internal-iwork-source")]
+    fn text_limit(max_text_bytes: usize) -> PackageResult<crate::SemanticLimits> {
+        crate::SemanticLimits::builder()
+            .max_text_bytes(max_text_bytes)?
+            .build()
+    }
+
+    fn section_limit(max_sections: usize) -> PackageResult<crate::SemanticLimits> {
+        crate::SemanticLimits::builder()
+            .max_sections(max_sections)?
+            .build()
+    }
+
     #[test]
     fn prepared_source_handoff_matches_direct_ingress() -> PackageResult<()> {
         let bytes = package_bytes(Some("Prepared Pages body"), true, true)?;
@@ -4674,7 +4556,7 @@ mod tests {
                 PackageError::InvalidFormat("Pages fixture was not detected".to_owned())
             })?;
 
-        let handed_off = Package::__from_prepared_source(prepared)?;
+        let handed_off = Package::from_prepared_source(prepared, crate::SemanticLimits::DEFAULT)?;
 
         assert_eq!(handed_off.text()?, direct.text()?);
         assert_eq!(handed_off.sections().len(), direct.sections().len());
@@ -4686,7 +4568,6 @@ mod tests {
         Ok(())
     }
 
-    #[cfg(feature = "internal-iwork-source")]
     #[test]
     fn semantic_prepared_source_handoff_matches_package_projection() -> PackageResult<()> {
         let bytes = sectioned_package_bytes(
@@ -4705,15 +4586,11 @@ mod tests {
                 PackageError::InvalidFormat("Pages fixture was not detected".to_owned())
             })?;
 
-        let document = __semantic_document_from_prepared_source(
-            prepared,
-            MAX_SECTIONS,
-            DEFAULT_MAX_TEXT_BYTES,
-        )?;
+        let package = Package::from_prepared_source(prepared, crate::SemanticLimits::DEFAULT)?;
 
-        assert_eq!(document.plain_text(), direct.text()?);
-        assert_eq!(document.sections().len(), direct.sections().len());
-        for (semantic, packaged) in document.sections().iter().zip(direct.sections()) {
+        assert_eq!(package.text()?, direct.text()?);
+        assert_eq!(package.sections().len(), direct.sections().len());
+        for (semantic, packaged) in package.sections().iter().zip(direct.sections()) {
             assert_eq!(semantic.index(), packaged.index());
             assert_eq!(semantic.name(), packaged.name());
             assert_eq!(semantic.plain_text(), packaged.plain_text());
@@ -4721,32 +4598,6 @@ mod tests {
         Ok(())
     }
 
-    #[cfg(feature = "internal-iwork-source")]
-    #[test]
-    fn semantic_prepared_source_releases_physical_source() -> PackageResult<()> {
-        let source: Arc<[u8]> = package_bytes(Some("Detached"), true, true)?.into();
-        let weak_source = Arc::downgrade(&source);
-        let prepared = PreparedSource::from_shared_bytes(
-            Arc::clone(&source),
-            litchi_iwa_detect::Limits::default(),
-        )
-        .map_err(|error| PackageError::InvalidFormat(error.to_string()))?
-        .ok_or_else(|| PackageError::InvalidFormat("Pages fixture was not detected".to_owned()))?;
-        drop(source);
-        assert!(weak_source.upgrade().is_some());
-
-        let document = __semantic_document_from_prepared_source(
-            prepared,
-            MAX_SECTIONS,
-            DEFAULT_MAX_TEXT_BYTES,
-        )?;
-
-        assert!(weak_source.upgrade().is_none());
-        assert_eq!(document.plain_text(), "Detached");
-        Ok(())
-    }
-
-    #[cfg(feature = "internal-iwork-source")]
     #[test]
     fn semantic_prepared_source_rejects_malformed_pages_graph() -> PackageResult<()> {
         let root = tp::DocumentArchive {
@@ -4776,13 +4627,9 @@ mod tests {
                 PackageError::InvalidFormat("Pages fixture was not detected".to_owned())
             })?;
 
-        let error = __semantic_document_from_prepared_source(
-            prepared,
-            MAX_SECTIONS,
-            DEFAULT_MAX_TEXT_BYTES,
-        )
-        .err()
-        .unwrap_or_else(|| panic!("missing Pages body should fail"));
+        let error = Package::from_prepared_source(prepared, crate::SemanticLimits::DEFAULT)
+            .err()
+            .unwrap_or_else(|| panic!("missing Pages body should fail"));
 
         assert!(
             error
@@ -4792,7 +4639,6 @@ mod tests {
         Ok(())
     }
 
-    #[cfg(feature = "internal-iwork-source")]
     #[test]
     fn semantic_prepared_source_enforces_exact_and_one_over_text_limits() -> PackageResult<()> {
         let bytes = package_bytes(Some("12345"), true, false)?;
@@ -4801,15 +4647,15 @@ mod tests {
             .ok_or_else(|| {
                 PackageError::InvalidFormat("Pages fixture was not detected".to_owned())
             })?;
-        let document = __semantic_document_from_prepared_source(exact, MAX_SECTIONS, 5)?;
-        assert_eq!(document.plain_text(), "12345");
+        let package = Package::from_prepared_source(exact, text_limit(5)?)?;
+        assert_eq!(package.text()?, "12345");
 
         let one_over = PreparedSource::from_bytes(&bytes, litchi_iwa_detect::Limits::default())
             .map_err(|error| PackageError::InvalidFormat(error.to_string()))?
             .ok_or_else(|| {
                 PackageError::InvalidFormat("Pages fixture was not detected".to_owned())
             })?;
-        let error = __semantic_document_from_prepared_source(one_over, MAX_SECTIONS, 4)
+        let error = Package::from_prepared_source(one_over, text_limit(4)?)
             .err()
             .unwrap_or_else(|| panic!("one-over text should fail during wire preflight"));
         assert!(matches!(
@@ -4822,7 +4668,6 @@ mod tests {
         Ok(())
     }
 
-    #[cfg(feature = "internal-iwork-source")]
     #[test]
     fn semantic_prepared_source_charges_section_name_bytes_not_scratch_slots() -> PackageResult<()>
     {
@@ -4838,14 +4683,13 @@ mod tests {
                 PackageError::InvalidFormat("Pages fixture was not detected".to_owned())
             })?;
 
-        let document = __semantic_document_from_prepared_source(exact, MAX_SECTIONS, "X".len())?;
-        assert_eq!(document.sections().len(), 1);
-        assert_eq!(document.sections()[0].name(), Some("X"));
-        assert_eq!(document.text_len(), 0);
+        let package = Package::from_prepared_source(exact, text_limit("X".len())?)?;
+        assert_eq!(package.sections().len(), 1);
+        assert_eq!(package.sections()[0].name(), Some("X"));
+        assert!(package.text()?.is_empty());
         Ok(())
     }
 
-    #[cfg(feature = "internal-iwork-source")]
     #[test]
     fn semantic_prepared_source_enforces_exact_and_one_over_section_limits() -> PackageResult<()> {
         let bytes = sectioned_package_bytes(
@@ -4862,15 +4706,15 @@ mod tests {
             .ok_or_else(|| {
                 PackageError::InvalidFormat("Pages fixture was not detected".to_owned())
             })?;
-        let document = __semantic_document_from_prepared_source(exact, 2, DEFAULT_MAX_TEXT_BYTES)?;
-        assert_eq!(document.sections().len(), 2);
+        let package = Package::from_prepared_source(exact, section_limit(2)?)?;
+        assert_eq!(package.sections().len(), 2);
 
         let one_over = PreparedSource::from_bytes(&bytes, litchi_iwa_detect::Limits::default())
             .map_err(|error| PackageError::InvalidFormat(error.to_string()))?
             .ok_or_else(|| {
                 PackageError::InvalidFormat("Pages fixture was not detected".to_owned())
             })?;
-        let error = __semantic_document_from_prepared_source(one_over, 1, DEFAULT_MAX_TEXT_BYTES)
+        let error = Package::from_prepared_source(one_over, section_limit(1)?)
             .err()
             .unwrap_or_else(|| panic!("one-over section should fail during wire preflight"));
         assert!(matches!(

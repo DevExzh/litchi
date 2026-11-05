@@ -1,15 +1,12 @@
 //! Focused Pages merge-reader coverage.
 //!
 //! The reader must resolve semantic selectors and decode only the selected
-//! merge metadata while sharing immutable parsed archives across clones and
-//! the migration-only component-catalog ingress.
+//! merge metadata while sharing immutable parsed archives across clones.
 
 use std::error::Error as StdError;
 use std::sync::Arc;
 
 use litchi_iwa_archive::Limits;
-#[cfg(feature = "internal-iwork-source")]
-use litchi_iwa_archive::SourceCatalog;
 use litchi_iwa_archive::package::{Catalog, EntryEdit};
 use litchi_iwa_common::table::merge::Region;
 use litchi_iwa_core::{Archive, RawMessage, SnappyStream};
@@ -200,119 +197,5 @@ fn shared_byte_reader_clones_survive_input_source_drop() -> TestResult {
     drop(reader);
     assert_eq!(clone.body_table_merges("Table 1")?, expected());
     drop(clone);
-    Ok(())
-}
-
-#[cfg(feature = "internal-iwork-source")]
-#[test]
-fn shared_catalog_ingress_retains_the_original_archive_records() -> TestResult {
-    let source = SourceCatalog::from_bytes(NATIVE, Limits::default())?;
-    let components = Arc::new(source.into_components());
-    let components_lifetime = Arc::downgrade(&components);
-    let reader = MergeReader::__from_shared_catalog(Arc::clone(&components), Limits::default())?;
-    let clone = reader.clone();
-
-    assert_eq!(Arc::strong_count(&components), 2);
-    assert_eq!(
-        reader.body_table_merges(BodyTableSelector::index(0))?,
-        expected()
-    );
-
-    drop(components);
-    drop(reader);
-    assert!(components_lifetime.upgrade().is_some());
-    assert_eq!(
-        clone.body_table_merges(BodyTableSelector::index(0))?,
-        expected()
-    );
-    drop(clone);
-    assert!(components_lifetime.upgrade().is_none());
-    Ok(())
-}
-
-#[cfg(feature = "internal-iwork-source")]
-fn component_payload_limits(
-    components: &litchi_iwa_archive::ComponentCatalog,
-    total: u64,
-) -> Limits {
-    let largest = components
-        .iter()
-        .map(|component| {
-            component
-                .archive()
-                .objects
-                .last()
-                .map(|object| {
-                    object
-                        .data_offset
-                        .checked_add(object.data_length)
-                        .expect("native archive stream extent fits u64")
-                })
-                .unwrap_or(0)
-        })
-        .max()
-        .expect("native Pages package has components");
-    assert!(largest > 0);
-    Limits::new(
-        Limits::MAX_INPUT_BYTES,
-        Limits::MAX_ENTRIES,
-        Limits::MAX_ENTRY_BYTES,
-        total,
-        usize::try_from(largest).expect("native archive stream extent fits usize"),
-    )
-    .expect("native payload budget is within the physical hard ceilings")
-}
-
-#[cfg(feature = "internal-iwork-source")]
-fn total_component_payload_bytes(components: &litchi_iwa_archive::ComponentCatalog) -> u64 {
-    components
-        .iter()
-        .map(|component| {
-            component
-                .archive()
-                .objects
-                .last()
-                .map(|object| {
-                    object
-                        .data_offset
-                        .checked_add(object.data_length)
-                        .expect("native archive stream extent fits u64")
-                })
-                .unwrap_or(0)
-        })
-        .sum()
-}
-
-#[cfg(feature = "internal-iwork-source")]
-#[test]
-fn shared_catalog_reader_accepts_the_exact_component_payload_budget() -> TestResult {
-    let source = SourceCatalog::from_bytes(NATIVE, Limits::default())?;
-    let components = Arc::new(source.into_components());
-    let total = total_component_payload_bytes(&components);
-    let limits = component_payload_limits(&components, total);
-    let reader = MergeReader::__from_shared_catalog(Arc::clone(&components), limits)?;
-
-    assert_eq!(reader.body_table_merges(0usize)?, expected());
-    Ok(())
-}
-
-#[cfg(feature = "internal-iwork-source")]
-#[test]
-fn shared_catalog_reader_rejects_one_below_component_payload_budget() -> TestResult {
-    let source = SourceCatalog::from_bytes(NATIVE, Limits::default())?;
-    let components = Arc::new(source.into_components());
-    let total = total_component_payload_bytes(&components);
-    assert!(total > 0);
-    let limits = component_payload_limits(&components, total - 1);
-    let reader = MergeReader::__from_shared_catalog(Arc::clone(&components), limits)?;
-
-    assert!(matches!(
-        reader.body_table_merges(0usize),
-        Err(BodyTableMergesError::Limit {
-            kind: litchi_pages::table::merge::transaction::LimitKind::TotalPayloadBytes,
-            observed,
-            maximum,
-        }) if observed == total && maximum == total - 1
-    ));
     Ok(())
 }

@@ -1,21 +1,6 @@
-//! Bounded Pages movie-playback projection and source-preserving rewrite.
-//!
-//! This module was an internal bridge for the retired migration host
-//! (deleted by record 0429; last present at commit `4d8a3e161f`), which
-//! borrowed one MovieArchive payload from its parsed-archive cache and
-//! delegated scalar semantics to the focused Pages package.  No generated
-//! MovieArchive or package-wide source is retained by this seam.
-//!
-//! The body-media properties family uses the same projection and rewrite,
-//! so the module is compiled without the host seam feature as well.
-
-#![cfg_attr(
-    not(feature = "internal-iwork-source"),
-    allow(
-        unreachable_pub,
-        reason = "The items are re-exported only for the host seam feature."
-    )
-)]
+//! Bounded Pages movie-playback projection and source-preserving rewrite,
+//! used by the body-media properties family. No generated MovieArchive or
+//! package-wide source is retained here.
 
 use std::time::Duration;
 
@@ -28,10 +13,9 @@ use litchi_iwa_protos::movie_playback_codec::{
 };
 use thiserror::Error;
 
-/// Typed failures at the hidden Pages MovieArchive playback seam.
-#[doc(hidden)]
+/// Typed failures of the Pages MovieArchive playback projection.
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
-pub enum MoviePlaybackError {
+pub(super) enum MoviePlaybackError {
     /// The bounded Buffa/wire projection rejected the source or candidate.
     #[error("movie playback codec rejected the payload: {0}")]
     Codec(#[from] codec::DecodeError),
@@ -59,12 +43,7 @@ fn codec_options(source: &[u8], limits: WireLimits) -> codec::DecodeOptions {
 
 /// Decode one borrowed Pages MovieArchive payload into archive-free playback
 /// settings.
-///
-/// This function is hidden because its payload argument is a native wire
-/// boundary used only by the umbrella Pages editor.  The supported editor
-/// facade exposes playback through semantic movie and audio handles.
-#[doc(hidden)]
-pub fn __decode_movie_playback_payload(
+pub(super) fn decode_movie_playback_payload(
     source: &[u8],
     limits: WireLimits,
 ) -> Result<MediaPlaybackSettings, MoviePlaybackError> {
@@ -74,8 +53,7 @@ pub fn __decode_movie_playback_payload(
 
 /// Rewrite one borrowed Pages MovieArchive payload while preserving unknown
 /// fields and their source order.
-#[doc(hidden)]
-pub fn __rewrite_movie_playback_payload(
+pub(super) fn rewrite_movie_playback_payload(
     source: &[u8],
     settings: MediaPlaybackSettings,
     limits: WireLimits,
@@ -155,7 +133,7 @@ mod tests {
     use litchi_iwa_common::WireLimits;
     use litchi_iwa_common::media::playback::{MediaLoopMode, MediaPlaybackSettings, MediaVolume};
 
-    use super::{__decode_movie_playback_payload, __rewrite_movie_playback_payload};
+    use super::{decode_movie_playback_payload, rewrite_movie_playback_payload};
 
     fn source() -> Vec<u8> {
         let mut bytes = Vec::new();
@@ -174,10 +152,10 @@ mod tests {
         original.extend_from_slice(&[
             0x98, 0x06, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x00,
         ]);
-        let baseline = __decode_movie_playback_payload(&original, WireLimits::default()).unwrap();
+        let baseline = decode_movie_playback_payload(&original, WireLimits::default()).unwrap();
         assert_eq!(baseline.end_time, Duration::from_secs_f32(1.5));
         assert_eq!(
-            __rewrite_movie_playback_payload(&original, baseline, WireLimits::default()).unwrap(),
+            rewrite_movie_playback_payload(&original, baseline, WireLimits::default()).unwrap(),
             original
         );
         let replacement = MediaPlaybackSettings {
@@ -188,28 +166,26 @@ mod tests {
             volume: Some(MediaVolume::new(0.75).unwrap()),
         };
         let changed =
-            __rewrite_movie_playback_payload(&original, replacement, WireLimits::default())
-                .unwrap();
+            rewrite_movie_playback_payload(&original, replacement, WireLimits::default()).unwrap();
         assert_eq!(
-            __decode_movie_playback_payload(&changed, WireLimits::default()).unwrap(),
+            decode_movie_playback_payload(&changed, WireLimits::default()).unwrap(),
             replacement.canonicalize().unwrap()
         );
         assert!(changed.ends_with(&[
             0x98, 0x06, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x00
         ]));
         let restored =
-            __rewrite_movie_playback_payload(&changed, baseline, WireLimits::default()).unwrap();
+            rewrite_movie_playback_payload(&changed, baseline, WireLimits::default()).unwrap();
         assert_eq!(restored, original);
     }
 
     #[test]
     fn focused_rewrite_keeps_legacy_only_loop_shape() {
         let mut bytes = vec![0x0a, 0x00, 0x25, 0, 0, 0xc0, 0x3f, 0x30, 0x01];
-        let baseline = __decode_movie_playback_payload(&bytes, WireLimits::default()).unwrap();
+        let baseline = decode_movie_playback_payload(&bytes, WireLimits::default()).unwrap();
         assert_eq!(baseline.loop_mode, Some(MediaLoopMode::Repeat));
         let replacement = baseline.with_loop_mode(Some(MediaLoopMode::BackAndForth));
-        bytes =
-            __rewrite_movie_playback_payload(&bytes, replacement, WireLimits::default()).unwrap();
+        bytes = rewrite_movie_playback_payload(&bytes, replacement, WireLimits::default()).unwrap();
         assert_eq!(bytes, [0x0a, 0x00, 0x25, 0, 0, 0xc0, 0x3f, 0x30, 0x02]);
         assert!(!bytes.windows(2).any(|window| window == [0xc0, 0x01]));
     }
@@ -217,17 +193,16 @@ mod tests {
     #[test]
     fn omitted_optionals_and_modern_loop_presence_are_preserved() {
         let mut bytes = vec![0x0a, 0x00, 0x25, 0, 0, 0xc0, 0x3f];
-        let baseline = __decode_movie_playback_payload(&bytes, WireLimits::default()).unwrap();
+        let baseline = decode_movie_playback_payload(&bytes, WireLimits::default()).unwrap();
         assert_eq!(
             baseline,
             MediaPlaybackSettings::new(Duration::from_millis(1_500))
         );
         let replacement = baseline.with_loop_mode(Some(MediaLoopMode::Repeat));
-        bytes =
-            __rewrite_movie_playback_payload(&bytes, replacement, WireLimits::default()).unwrap();
+        bytes = rewrite_movie_playback_payload(&bytes, replacement, WireLimits::default()).unwrap();
         assert!(bytes.windows(2).any(|window| window == [0xc0, 0x01]));
         assert_eq!(
-            __decode_movie_playback_payload(&bytes, WireLimits::default()).unwrap(),
+            decode_movie_playback_payload(&bytes, WireLimits::default()).unwrap(),
             replacement
         );
     }
@@ -236,6 +211,6 @@ mod tests {
     fn focused_codec_applies_caller_limits() {
         let bytes = source();
         let limits = WireLimits::default().with_input_bytes(1).unwrap();
-        assert!(__decode_movie_playback_payload(&bytes, limits).is_err());
+        assert!(decode_movie_playback_payload(&bytes, limits).is_err());
     }
 }

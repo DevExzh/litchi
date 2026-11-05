@@ -1676,17 +1676,6 @@ fn rewrite_adjustments(
         .map_err(map_codec_error)
 }
 
-#[cfg(feature = "internal-iwork-source")]
-fn codec_options(source: &[u8], limits: WireLimits) -> image_adjustments_codec::DecodeOptions {
-    image_adjustments_codec::DecodeOptions::new(
-        limits.max_input_bytes().min(source.len().max(1)),
-        limits.max_fields(),
-        limits.max_rewrite_work(),
-        u32::try_from(limits.max_nesting()).unwrap_or(u32::MAX),
-    )
-    .with_max_output_bytes(limits.max_output_bytes())
-}
-
 fn image_adjustments_write(
     adjustments: ImageAdjustments,
 ) -> image_adjustments_codec::ImageAdjustmentsWrite {
@@ -2415,39 +2404,6 @@ fn map_core_error(error: litchi_iwa_core::Error) -> Error {
             Error::Allocation { amount: requested }
         },
         _ => Error::InvalidSource,
-    }
-}
-
-#[cfg(feature = "internal-iwork-source")]
-#[doc(hidden)]
-pub use image_adjustments_bridge::{__decode_image_adjustments_payload, ImageAdjustmentsError};
-
-#[cfg(feature = "internal-iwork-source")]
-mod image_adjustments_bridge {
-    use super::*;
-
-    /// Typed failures at the hidden Pages ImageArchive adjustment seam.
-    #[doc(hidden)]
-    #[derive(Debug, Clone, PartialEq, Eq, ThisError)]
-    pub enum ImageAdjustmentsError {
-        /// The bounded neutral codec rejected the source or candidate.
-        #[error("image adjustments codec rejected the payload: {0}")]
-        Codec(#[from] image_adjustments_codec::DecodeError),
-        /// The projected value failed the common semantic boundary.
-        #[error("invalid image adjustment value: {0}")]
-        Semantic(#[from] litchi_iwa_common::shape::image::Error),
-    }
-
-    #[doc(hidden)]
-    pub fn __decode_image_adjustments_payload(
-        source: &[u8],
-        limits: WireLimits,
-    ) -> Result<ImageAdjustments, ImageAdjustmentsError> {
-        let snapshot = image_adjustments_codec::decode_image_adjustments(
-            source,
-            codec_options(source, limits),
-        )?;
-        Ok(adjustments_from_snapshot(snapshot)?)
     }
 }
 
