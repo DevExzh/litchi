@@ -63,7 +63,7 @@ unchanged, so the manifest still matches:
 | Row | Line | Note |
 |---|---:|---|
 | `q-e54e71bd4570` W1-F first rule | 262 | the rule fired, bytes and by hand |
-| `q-9bb7c4ec065a` W1-B Pages identity | 304 | **OPEN**: hand edit and save never performed |
+| `q-9bb7c4ec065a` W1-B Pages identity | 304 | hand edit and save done in run 2, no conflict (correction below) |
 | `q-c8ea770c712d` W4-H `pivot_categories` | 756 | **OPEN**: tree stored only by reference |
 | `q-3080a227051a` W4-K formulas | 773 | 32.5 recalculated; **OPEN**: tree stored only by reference |
 | `q-f9a5aaa1c1fa` W4-K cell edits | 774 | Refresh 80 to 125 |
@@ -255,7 +255,7 @@ does to it. `P0858` holds both, in run 1.
 |---|---|---|---|
 | `q-3080a227051a` W4-K `set_formula`, `set_formula_cached` with `pivot_category`, line 773 | Four native-workbook packages: open, save, reopen, formula kept, recalculated | **A category on a tree stored only by reference.** Only Linux proofs against the host (`numbers_pivot_formula_author_referenced_tree_parity`) | See below |
 | `q-c8ea770c712d` W4-H `pivot_categories`, line 756 | Native workbook read; 169 categories | **The read of a tree stored only by reference**, by the same reasoning | See below |
-| `q-9bb7c4ec065a` W1-B Pages `Identity::from_parts`, line 304 | Run 3: both open, save, reopen. Re-saved `versionUUID`, `documentUUID` and `privateUUID` differ between the two, and `stableDocumentUUID` keeps each input's. 0432 §5: the owner saw no prompt with both open, on earlier bytes | **The row's "edit and save" by hand was never performed**; the runner's save has no edit, and the prompt check has not been repeated on these bytes | D1's wording, open, save, close and reopen, is met. The row asks more |
+| `q-9bb7c4ec065a` W1-B Pages `Identity::from_parts`, line 304 | Run 3: both open, save, reopen. Re-saved `versionUUID`, `documentUUID` and `privateUUID` differ between the two, and `stableDocumentUUID` keeps each input's. 0432 §5: the owner saw no prompt with both open, on earlier bytes | **Coordinator correction:** the hand edit and save was done. Run 2's `RUN.md` §4a asked for it on `I-P0512` and `I-P0513`, the same route's run-1 packages, and the owner reported "No conflict". The check was not repeated on run 3's bytes | Closed: D1's wording and the row's hand step are both met |
 
 **The by-reference part.** What the Mac shows:
 
@@ -270,7 +270,6 @@ My reading: D1 asks a route to pass native open, save, close and reopen, and tho
 - Refresh or regrouping over an unlisted category formula, §5. Hand step on `P1150`'s re-save: press Refresh, save, return. That is two minutes. It does not change any route's open, save and reopen.
 - `6001 -> 600x`, §7. Run 4 could send those 12 packages to get re-saves. It would explain them; it is not needed for their pass.
 
-The hand step that would close the Pages row: open `P0517` and `P0518` together, edit and save each, report any prompt.
 
 ## 11. Gaps found here
 
