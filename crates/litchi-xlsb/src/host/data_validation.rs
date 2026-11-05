@@ -39,10 +39,6 @@ pub(crate) fn parse_collection_settings(
     owner::parse_collection_settings(data, extension14, limits).map_err(Into::into)
 }
 
-pub(crate) fn parse_dval_list(data: &[u8], limits: crate::raw::Limits) -> Result<String> {
-    owner::parse_dval_list(data, limits).map_err(Into::into)
-}
-
 pub(crate) fn validate_dval_list_formula(value: &str) -> Result<()> {
     owner::validate_dval_list_formula(value).map_err(Into::into)
 }

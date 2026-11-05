@@ -145,7 +145,9 @@ impl Worksheet {
         }
 
         if let Some(block) = sparkline_block {
+            writer.write_record(kind::FRT_BEGIN, &[2, 14, 0, 0])?;
             writer.get_mut().write_all(block)?;
+            writer.write_record(kind::FRT_END, &[])?;
         }
 
         // Write BrtEndSheet

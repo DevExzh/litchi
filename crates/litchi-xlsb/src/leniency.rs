@@ -228,8 +228,8 @@ impl ReservedFieldDefect {
 ///
 /// This enumeration is closed by design: it is the exhaustive contract of the
 /// layout repairs a read applies under every [`Leniency`] variant (audit
-/// finding F3.11). Record framing itself is never repaired: a record whose
-/// payload is *shorter* than its layout requires stays a hard error.
+/// finding F3.11). Record framing and truncated required fields stay hard
+/// errors. `ConditionalNullText` permits only a wholly omitted unused suffix.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub enum LayoutDefect {
@@ -265,6 +265,25 @@ pub enum LayoutDefect {
     /// The format code is kept verbatim. The recorded observed value is its
     /// length in UTF-16 code units (saturated to `u32::MAX`).
     NumberFormatCodeLength,
+    /// A classic conditional rule's redundant formula byte count disagreed
+    /// with the self-delimiting CFParsedFormula. Native Excel emits this form.
+    /// Keep the fully validated formula's cce/rgce and ancillary bytes; record
+    /// the redundant count at the rule's priority. Framing and truncation are
+    /// still errors, and a zero count still means the formula is absent.
+    ConditionalFormulaLength,
+    /// Native Excel omitted the unused nullable text suffix of a non-text
+    /// BrtBeginCFRule14. Interpret the absent suffix as NULL. A partial suffix
+    /// or a missing required contains-text value is never repaired. Observed
+    /// is zero; location is the rule priority (zero for an extension rule).
+    ConditionalNullText,
+    /// Native Excel set both pane freeze flags. The paired native XLSX view
+    /// identifies the pane as frozen without splitting; let fFrozenNoSplit
+    /// take precedence. Observed is the two set bits, location the view index.
+    PaneFreezeFlags,
+    /// Native Excel stores LET parameter names with procedure flags and a
+    /// zero shortcut byte. Retain the inert definition without a shortcut;
+    /// nonzero control-character shortcuts remain invalid. Observed is zero.
+    NameWithoutShortcut,
 }
 
 impl LayoutDefect {
@@ -283,6 +302,16 @@ impl LayoutDefect {
             Self::NumberFormatCodeLength => {
                 "kept a number format code whose length is outside 1..=255"
             },
+            Self::ConditionalFormulaLength => {
+                "used the validated formula length instead of a conflicting redundant rule count"
+            },
+            Self::ConditionalNullText => {
+                "read an omitted unused conditional-rule text suffix as NULL"
+            },
+            Self::PaneFreezeFlags => {
+                "gave frozen-without-split precedence over conflicting freeze flags"
+            },
+            Self::NameWithoutShortcut => "kept an inert procedure-shaped name without a shortcut",
         }
     }
 }
@@ -1264,6 +1293,10 @@ mod tests {
             Defect::from(LayoutDefect::BorderStyle),
             Defect::from(LayoutDefect::NumberFormatId),
             Defect::from(LayoutDefect::NumberFormatCodeLength),
+            Defect::from(LayoutDefect::ConditionalFormulaLength),
+            Defect::from(LayoutDefect::ConditionalNullText),
+            Defect::from(LayoutDefect::PaneFreezeFlags),
+            Defect::from(LayoutDefect::NameWithoutShortcut),
             Defect::from(CachedNumberDefect::NonFinite),
             Defect::from(CachedNumberDefect::Denormalized),
             Defect::from(ValueEncodingDefect::BooleanByte),

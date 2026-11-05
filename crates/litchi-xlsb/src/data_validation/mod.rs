@@ -11,6 +11,7 @@ use thiserror::Error as ThisError;
 mod codec;
 pub mod edit;
 mod model;
+pub(crate) mod prelude;
 
 #[cfg(test)]
 mod tests;

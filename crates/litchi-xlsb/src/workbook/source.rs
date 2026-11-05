@@ -2113,9 +2113,12 @@ impl SourceInner {
                 let data = part.data()?;
                 postflight_package(&self.package)?;
                 let _ = preflight_package(&self.package)?;
+                // Table XTI references use the complete sheet catalog,
+                // including chart tabs, rather than worksheet ordinals.
                 let table = Workbook::parse_table_definition(
                     data.as_bytes(),
-                    table_part.worksheet_position,
+                    self.sheets[self.worksheet_positions[table_part.worksheet_position]]
+                        .workbook_position,
                     &mut Tolerance::recording(&mut report),
                     self.raw_limits,
                 );

@@ -104,9 +104,7 @@ fn write_classic_collection<W: Write>(
 
     for &dv in validations {
         if let Some(list_formula) = &dv.list_formula {
-            let mut payload = Vec::new();
-            write_xl_wide_string(&mut payload, list_formula, limits)?;
-            writer.write_record(kind::D_VAL_LIST, &payload)?;
+            write_list_override(writer, list_formula, limits)?;
         }
         let payload = serialize_data_validation(dv, limits)?;
         writer.write_record(kind::D_VAL, &payload)?;
@@ -154,12 +152,25 @@ pub(crate) fn encode_classic_records(
     let mut out = Vec::new();
     let mut writer = Encoder::new(&mut out, limits);
     if let Some(list_formula) = &dv.list_formula {
-        let mut payload = Vec::new();
-        write_xl_wide_string(&mut payload, list_formula, limits)?;
-        writer.write_record(kind::D_VAL_LIST, &payload)?;
+        write_list_override(&mut writer, list_formula, limits)?;
     }
     writer.write_record(kind::D_VAL, &serialize_data_validation(dv, limits)?)?;
     Ok(out)
+}
+
+fn write_list_override<W: Write>(
+    writer: &mut Encoder<W>,
+    formula: &str,
+    limits: crate::raw::Limits,
+) -> Result<()> {
+    let mut payload = Vec::new();
+    write_xl_wide_string(&mut payload, formula, limits)?;
+    // MS-XLSB ACDVALLIST and ACProductVersion: one Excel (product 0)
+    // version 0x0E02 entry, with fileExtension set for later versions.
+    writer.write_record(kind::AC_BEGIN, &[1, 0, 2, 14, 0, 128])?;
+    writer.write_record(kind::D_VAL_LIST, &payload)?;
+    writer.write_record(kind::AC_END, &[])?;
+    Ok(())
 }
 
 /// Serialize a single [`Validation`] into the `BrtDVal` binary payload.
@@ -921,14 +932,12 @@ mod tests {
         )
         .unwrap();
         assert_eq!(
-            crate::package::data_validation::parse_dval_list(&payload, crate::raw::Limits::DEFAULT)
-                .unwrap(),
+            crate::data_validation::parse_dval_list(&payload, crate::raw::Limits::DEFAULT).unwrap(),
             "One,\"Two,Three\",Four"
         );
         payload.extend_from_slice(&[0, 0]);
         assert!(
-            crate::package::data_validation::parse_dval_list(&payload, crate::raw::Limits::DEFAULT)
-                .is_err()
+            crate::data_validation::parse_dval_list(&payload, crate::raw::Limits::DEFAULT).is_err()
         );
     }
 

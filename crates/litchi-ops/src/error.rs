@@ -2398,7 +2398,9 @@ impl Classify for litchi_rtf::Error {
             Self::Limit { .. } | Self::LimitExceeded { .. } => Class::of(Code::LimitExceeded),
             Self::InvalidLimit { .. } => Class::of(Code::InvalidArgument),
             Self::AllocationFailed { .. } => Class::of(Code::InternalError),
-            Self::UnsupportedCodePage(_) => Class::of(Code::UnsupportedCapability),
+            Self::UnsupportedCodePage(_) | Self::UnsupportedContent(_) => {
+                Class::of(Code::UnsupportedCapability)
+            },
             _ => Class::of(Code::CorruptFile),
         }
     }

@@ -18,6 +18,7 @@ pub struct Snapshot {
     source: Vec<u8>,
     groups: Option<Groups>,
     block: Option<Range<usize>>,
+    envelope: Option<Range<usize>>,
     insertion_anchor: Option<usize>,
     limits: Limits,
 }
@@ -68,6 +69,7 @@ impl Snapshot {
             source: self.source,
             groups: self.groups,
             block: self.block,
+            envelope: self.envelope,
             insertion_anchor: self.insertion_anchor,
             limits: self.limits,
         }
@@ -82,6 +84,7 @@ impl Snapshot {
             source: self.source,
             groups: self.groups,
             block: self.block,
+            envelope: self.envelope,
             insertion_anchor: self.insertion_anchor,
             limits,
         }
@@ -102,6 +105,7 @@ pub(crate) struct Edit {
     source: Vec<u8>,
     groups: Option<Groups>,
     block: Option<Range<usize>>,
+    envelope: Option<Range<usize>>,
     insertion_anchor: Option<usize>,
     limits: Limits,
 }
@@ -129,7 +133,11 @@ impl Edit {
             .transpose()?;
         let after = render(
             &self.source,
-            self.block.as_ref(),
+            if encoded.is_none() {
+                self.envelope.as_ref().or(self.block.as_ref())
+            } else {
+                self.block.as_ref()
+            },
             self.insertion_anchor,
             encoded.as_deref(),
             self.limits,
@@ -287,6 +295,9 @@ fn scan(source: Vec<u8>, limits: Limits) -> Result<Snapshot> {
     let mut tail_depth = 0usize;
     let mut boundary_top_level_proven = true;
     let mut after_sheet_data = false;
+    let mut previous = None;
+    let mut envelope_start = None;
+    let mut envelope = None;
 
     while let Some(record) = records.next() {
         let record = record?;
@@ -294,7 +305,47 @@ fn scan(source: Vec<u8>, limits: Limits) -> Result<Snapshot> {
         let start = record.offset();
         let end = records.offset();
 
-        if tail_boundary.is_some() && is_sparkline_family(record_kind) {
+        let wrapper = if record_kind == kind::BEGIN_SPARKLINE_GROUPS && tail_depth == 1 {
+            match previous {
+                Some((kind::FRT_BEGIN, begin, finish, 4)) if finish == start => {
+                    if crate::part_edit::SheetLayout::is_top_level_boundary(
+                        &source,
+                        crate::raw::Limits::new(limits.record_bytes(), 1),
+                        begin,
+                    )
+                    .map_err(|_| {
+                        invalid(
+                            "sparkline FRT wrapper",
+                            "invalid worksheet collection nesting",
+                        )
+                    })? {
+                        Some(begin)
+                    } else {
+                        None
+                    }
+                },
+                _ => None,
+            }
+        } else {
+            None
+        };
+        if envelope_start.is_some()
+            && envelope.is_none()
+            && block.is_some()
+            && family.is_empty()
+            && (record_kind != kind::FRT_END || tail_depth != 1)
+        {
+            return Err(invalid(
+                "sparkline FRT wrapper",
+                "collection is not immediately followed by its FRT end",
+            ));
+        }
+
+        if tail_boundary.is_some()
+            && is_sparkline_family(record_kind)
+            && envelope_start.is_none()
+            && wrapper.is_none()
+        {
             return Err(invalid(
                 "sparkline record family",
                 "record occurs after the worksheet FRT tail boundary",
@@ -315,12 +366,13 @@ fn scan(source: Vec<u8>, limits: Limits) -> Result<Snapshot> {
                         "collection is outside the post-cell-table worksheet region",
                     ));
                 }
-                if !boundary_top_level_proven {
+                if !boundary_top_level_proven && wrapper.is_none() {
                     return Err(invalid(
                         "BrtBeginSparklineGroups",
                         "collection placement is not provably top-level",
                     ));
                 }
+                envelope_start = wrapper;
                 outer_start = Some(start);
                 family.push(kind::END_SPARKLINE_GROUPS);
             },
@@ -372,6 +424,11 @@ fn scan(source: Vec<u8>, limits: Limits) -> Result<Snapshot> {
                 tail_depth = tail_depth.checked_sub(1).ok_or_else(|| {
                     invalid("worksheet FRT tail", "BrtFRTEnd has no matching begin")
                 })?;
+                if tail_depth == 0 && envelope.is_none() && block.is_some() {
+                    if let Some(begin) = envelope_start {
+                        envelope = Some(begin..end);
+                    }
+                }
             },
             kind::FRT_END if after_sheet_data => {
                 return Err(invalid(
@@ -403,6 +460,7 @@ fn scan(source: Vec<u8>, limits: Limits) -> Result<Snapshot> {
             },
             _ => {},
         }
+        previous = Some((record_kind, start, end, record.payload().len()));
     }
 
     if !family.is_empty() || outer_start.is_some() {
@@ -443,6 +501,7 @@ fn scan(source: Vec<u8>, limits: Limits) -> Result<Snapshot> {
         source,
         groups,
         block,
+        envelope,
         insertion_anchor,
         limits,
     })
@@ -483,6 +542,21 @@ fn render(
     encoded: Option<&[u8]>,
     limits: Limits,
 ) -> Result<Option<Vec<u8>>> {
+    let wrapped;
+    let encoded = if block.is_none() && encoded.is_some() {
+        let mut bytes = Vec::new();
+        let mut writer = crate::raw::Encoder::new(
+            &mut bytes,
+            crate::raw::Limits::new(limits.record_bytes(), 1),
+        );
+        writer.write_record(kind::FRT_BEGIN, &[2, 14, 0, 0])?;
+        writer.write_encoded_records(encoded.unwrap_or_default())?;
+        writer.write_record(kind::FRT_END, &[])?;
+        wrapped = bytes;
+        Some(wrapped.as_slice())
+    } else {
+        encoded
+    };
     let replacement = encoded.unwrap_or_default();
     let (start, end) = if let Some(span) = block {
         (span.start, span.end)

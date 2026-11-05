@@ -85,7 +85,7 @@ pub(super) fn validate_closure(
     for part in package_value.iter_parts().filter(|part| {
         part.rels()
             .iter()
-            .any(|relationship| relationship.reltype() == super::codec::VIEWS_RELATIONSHIP_TYPE)
+            .any(|relationship| super::codec::is_views_relationship(relationship.reltype()))
     }) {
         let views = package::load_views(package_value, part.partname(), xml_limits)?
             .map_or_else(Views::new, |attached| attached.views);

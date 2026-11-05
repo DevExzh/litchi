@@ -474,6 +474,306 @@
         "xlsb",
         "xlsx"
       ]
+    },
+    {
+      "crate": "litchi-rtf",
+      "target": "microsoft_office_native",
+      "name": "native_word_math_retains_inline_and_display_equation_trees",
+      "fixtures": [
+        "word/word-math-navigation.rtf"
+      ],
+      "feature_rows": [
+        "rtf-479"
+      ],
+      "assertions": [
+        "Two typed inline/display equations, exact run text, superscript/fraction/sum structures and properties; exact source publication and isolated typed-equation writer/reopen."
+      ],
+      "scope_limit": "No equation evaluation or layout; character formatting and fallback images remain source-owned; multiple equations in a display paragraph have a typed unsupported boundary."
+    },
+    {
+      "crate": "litchi",
+      "target": "microsoft_office_native",
+      "name": "native_rtf_math_opens_through_the_facade_and_unmodeled_grouping_is_typed",
+      "fixtures": [
+        "word/word-math-navigation.rtf"
+      ],
+      "feature_rows": [
+        "rtf-479"
+      ],
+      "assertions": [
+        "Native body marker and exact facade publication; derived unsupported multiple-equation grouping returns UnsupportedCapability with Rtf format and source reason."
+      ],
+      "scope_limit": "The native document has one equation per display paragraph; the unsupported grouping case is synthetic.",
+      "required_features": [
+        "doc",
+        "docx",
+        "ppt",
+        "pptx",
+        "rtf",
+        "xls",
+        "xlsb",
+        "xlsx"
+      ]
+    },
+    {
+      "crate": "litchi-xlsb",
+      "target": "microsoft_office_native",
+      "name": "native_excel_validation_collection_exposes_all_seven_rules_and_cached_totals",
+      "fixtures": [
+        "excel/excel-interaction-print.xlsb"
+      ],
+      "feature_rows": [
+        "xlsb-299",
+        "xlsb-280"
+      ],
+      "assertions": [
+        "Seven exact rule kinds/ranges, integer bounds and prompt title; cached totals14 and95."
+      ],
+      "scope_limit": "Classic validation read only; no validation evaluation or extension14 prelude claim."
+    },
+    {
+      "crate": "litchi-xlsb",
+      "target": "microsoft_office_native",
+      "name": "native_excel_validation_edit_retains_alternate_metadata_and_other_members",
+      "fixtures": [
+        "excel/excel-interaction-print.xlsb"
+      ],
+      "feature_rows": [
+        "xlsb-299"
+      ],
+      "assertions": [
+        "Error-title edit retains other rules, AC identity bytes and every unrelated package member; inverse restores exact source."
+      ],
+      "scope_limit": "One classic rule metadata change; source-bound package publication only."
+    },
+    {
+      "crate": "litchi-xlsb",
+      "target": "microsoft_office_native",
+      "name": "native_excel_validation_add_and_remove_preserve_existing_rules",
+      "fixtures": [
+        "excel/excel-interaction-print.xlsb"
+      ],
+      "feature_rows": [
+        "xlsb-299"
+      ],
+      "assertions": [
+        "Appending then removing B10 validation preserves seven native rules and restores all package members."
+      ],
+      "scope_limit": "Classic rule add/remove; no native-app reopen."
+    },
+    {
+      "crate": "litchi-xlsb",
+      "target": "microsoft_office_native",
+      "name": "native_validation_stream_refuses_broken_alternate_framing_and_counts",
+      "fixtures": [
+        "excel/excel-interaction-print.xlsb"
+      ],
+      "feature_rows": [
+        "xlsb-299"
+      ],
+      "assertions": [
+        "Six in-memory mutations verify missing/nonempty AC ends, malformed begin, orphan/excess prefixes and mismatched counts fail in reader and editor."
+      ],
+      "scope_limit": "Derived malformed inputs; original native fixture remains unchanged."
+    },
+    {
+      "crate": "litchi-xlsb",
+      "target": "microsoft_office_native",
+      "name": "validation_list_alternate_is_retained_or_replaced_without_losing_opaque_prefixes",
+      "fixtures": [
+        "excel/excel-interaction-print.xlsb"
+      ],
+      "feature_rows": [
+        "xlsb-299"
+      ],
+      "assertions": [
+        "Derived ACDVALLIST survives metadata edit; list replacement updates formula and retains every native opaque prefix."
+      ],
+      "scope_limit": "List-prefix variant is constructed in memory; native fixture supplies the other rule and identity records."
+    },
+    {
+      "crate": "litchi-xlsb",
+      "target": "microsoft_office_native",
+      "name": "native_excel_conditional_formatting_links_the_wrapped_data_bar_extension",
+      "fixtures": [
+        "excel/excel-conditional-drawings.xlsb"
+      ],
+      "feature_rows": [
+        "xlsb-300"
+      ],
+      "assertions": [
+        "Eight classic priorities and one extension; exact data-bar GUID link, three redundant-length and one absent-NULL-suffix report entries."
+      ],
+      "scope_limit": "Read/link and repair accounting only; no full conditional-format writer or rendering claim."
+    },
+    {
+      "crate": "litchi-xlsb",
+      "target": "microsoft_office_native",
+      "name": "native_conditional_repairs_do_not_accept_truncated_formulas_or_broken_wrappers",
+      "fixtures": [
+        "excel/excel-conditional-drawings.xlsb"
+      ],
+      "feature_rows": [
+        "xlsb-300"
+      ],
+      "assertions": [
+        "Strict low-level record parser refuses repair; true formula truncation, missing FRT end and partial NULL suffix remain errors."
+      ],
+      "scope_limit": "Derived corruptions distinguish bounded repair from accepting malformed data."
+    },
+    {
+      "crate": "litchi-xlsb",
+      "target": "microsoft_office_native",
+      "name": "native_excel_frozen_pane_matches_its_paired_xlsx_view",
+      "fixtures": [
+        "excel/excel-values-formulas-chart.xlsb"
+      ],
+      "feature_rows": [
+        "xlsb-291"
+      ],
+      "assertions": [
+        "Frozen bottom-right pane at B2 with one-row/one-column splits; exact freeze-flag repair count."
+      ],
+      "scope_limit": "Paired native XLSX state provides independent expected semantics; other view state is not covered."
+    },
+    {
+      "crate": "litchi-xlsb",
+      "target": "microsoft_office_native",
+      "name": "native_excel_workbooks_materialize_every_declared_worksheet",
+      "fixtures": [
+        "excel/excel-values-formulas-chart.xlsb",
+        "excel/excel-interaction-print.xlsb",
+        "excel/excel-recorded-macro.xlsb",
+        "excel/excel-visual-analytics.xlsb",
+        "excel/excel-conditional-drawings.xlsb",
+        "excel/excel-links-objects.xlsb",
+        "excel/excel-pivot-controls.xlsb",
+        "excel/excel-form-controls.xlsb",
+        "excel/excel-formula-owners.xlsb",
+        "excel/excel-connections.xlsb",
+        "excel/excel-date1904-breaks.xlsb",
+        "excel/excel-chart-families.xlsb",
+        "excel/excel-revisions.xlsb",
+        "excel/excel-metadata.xlsb",
+        "excel/excel-legacy-sheets.xlsb"
+      ],
+      "feature_rows": [
+        "xlsb-278",
+        "xlsb-279"
+      ],
+      "assertions": [
+        "All15 unencrypted native XLSB files open and materialize every worksheet with independently specified counts."
+      ],
+      "scope_limit": "Catalog/materialization coverage is not semantic coverage of each feature; encryption is excluded."
+    },
+    {
+      "crate": "litchi-xlsb",
+      "target": "microsoft_office_native",
+      "name": "native_excel_sparklines_retain_locations_identity_blocks_and_patch_inverse",
+      "fixtures": [
+        "excel/excel-visual-analytics.xlsb"
+      ],
+      "feature_rows": [
+        "xlsb-301"
+      ],
+      "assertions": [
+        "Two column/line groups with four exact locations; line-weight edit retains other group, AC identities and unrelated parts; exact inverse and full-envelope removal."
+      ],
+      "scope_limit": "Formulas are retained, not evaluated; no render or native-app reopen claim."
+    },
+    {
+      "crate": "litchi-xlsb",
+      "target": "microsoft_office_native",
+      "name": "native_excel_slicer_views_keep_names_captions_and_alternate_identities",
+      "fixtures": [
+        "excel/excel-pivot-controls.xlsb"
+      ],
+      "feature_rows": [
+        "xlsb-317"
+      ],
+      "assertions": [
+        "Region/Product names, captions and cache names; typed write/reopen and reordered caption edit preserve AC identities; duplicate identity and missing collection end rejected."
+      ],
+      "scope_limit": "View-part codec only; cache CRUD and filter execution are not covered."
+    },
+    {
+      "crate": "litchi-xlsb",
+      "target": "microsoft_office_native",
+      "name": "native_excel_timeline_resolves_native_relationships_and_retains_february_selection",
+      "fixtures": [
+        "excel/excel-pivot-controls.xlsb"
+      ],
+      "feature_rows": [
+        "xlsb-318"
+      ],
+      "assertions": [
+        "Native cache relationship resolution, February2026 selection and Date month-level view/UID; typed XML roundtrip; spoofed MCE namespace rejected."
+      ],
+      "scope_limit": "Read and isolated codec write; native-source transactional edits, refresh and filtering remain uncovered."
+    },
+    {
+      "crate": "litchi-xlsb",
+      "target": "microsoft_office_native",
+      "name": "native_excel_let_parameter_name_and_cached_result_remain_inert",
+      "fixtures": [
+        "excel/excel-formula-owners.xlsb"
+      ],
+      "feature_rows": [
+        "xlsb-284",
+        "xlsb-280",
+        "xlsb-282"
+      ],
+      "assertions": [
+        "Exact LET/parameter/FILTER/SEQUENCE names, one missing-shortcut report, F4 formula status, original name tokens and cached50."
+      ],
+      "scope_limit": "Context-dependent UDF slot0x00FF intentionally remains opaque; this is formula retention evidence, not expression rendering or evaluation."
+    },
+    {
+      "crate": "litchi-xlsb",
+      "target": "microsoft_office_native",
+      "name": "native_excel_external_link_uses_referenced_relative_path_and_cached_values",
+      "fixtures": [
+        "excel/excel-links-objects.xlsb"
+      ],
+      "feature_rows": [
+        "xlsb-319",
+        "xlsb-320"
+      ],
+      "assertions": [
+        "Referenced relative path selected despite absolute alternate; three exact source sheet names, external caches49.75/14 and total63.75; untouched package members."
+      ],
+      "scope_limit": "No target fetch, link refresh, OLE activation or external-link edit claim."
+    },
+    {
+      "crate": "litchi-xlsb",
+      "target": "microsoft_office_native",
+      "name": "native_excel_streaming_structured_formula_uses_complete_sheet_catalog_positions",
+      "fixtures": [
+        "excel/excel-values-formulas-chart.xlsb"
+      ],
+      "feature_rows": [
+        "xlsb-303",
+        "xlsb-282"
+      ],
+      "assertions": [
+        "Source-backed Table1 has complete catalog position 1 after a chart sheet; streaming Sheet2!B4 resolves exactly SUM(Table1[Quantity]) with cached value 14."
+      ],
+      "scope_limit": "One structured table reference and cursor traversal, not general formula execution."
+    },
+    {
+      "crate": "litchi-xlsb",
+      "target": "microsoft_office_native",
+      "name": "native_sparkline_alternate_content_accepts_both_positions_but_rejects_broken_envelopes",
+      "fixtures": [
+        "excel/excel-visual-analytics.xlsb"
+      ],
+      "feature_rows": [
+        "xlsb-301"
+      ],
+      "assertions": [
+        "Derived inside-group AC prefix reads; missing/nonempty AC ends and missing FRT end fail."
+      ],
+      "scope_limit": "In-memory framing variants only; original native prefix is before the group."
     }
   ]
 }

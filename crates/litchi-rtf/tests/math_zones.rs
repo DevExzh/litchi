@@ -160,6 +160,114 @@ fn skips_mmath_pict_fallback_and_accepts_momath_aliases() {
 }
 
 #[test]
+fn native_envelopes_keep_math_order_and_scoped_unicode_fallback() {
+    let document = Tree::parse(
+        concat!(
+            r"{\rtf1\uc1 A{\mmath{\*\moMathPara{\moMathParaPr{\mjc center}}",
+            r"{\*\moMath{\rtlch\fcs1\af1\ltrch\fcs0\f2{\uc0{\mr \u945}}{\mr \u946?}}}",
+            r"}{\mmathPict{\pict\pngblip 00}}}B}"
+        ),
+        litchi_rtf::read::OpenOptions::default(),
+    )
+    .unwrap();
+    assert_eq!(document.text(), "AB");
+    let zones = document.math_zones();
+    assert_eq!(zones.len(), 1);
+    assert_eq!(zones[0].kind, MathZoneKind::Display);
+    assert_eq!(zones[0].position, 1);
+    assert_eq!(zones[0].content.len(), 2);
+    assert_eq!(
+        zones[0].paragraph_properties.as_ref().unwrap().properties[0].value,
+        "center"
+    );
+    for (object, expected) in zones[0].content.iter().zip(["α", "β"]) {
+        let MathObject::Run(run) = object else {
+            panic!("expected run")
+        };
+        assert_eq!(run.text, expected);
+    }
+    let reopened =
+        Tree::parse_bytes(&write(&document), litchi_rtf::read::OpenOptions::default()).unwrap();
+    assert_eq!(reopened.math_zones(), zones);
+}
+
+#[test]
+fn native_math_wrappers_reject_non_formatting_content_and_bound_recursion() {
+    for source in [
+        r"{\rtf1{\mmath{\*\moMath{\f1{\field{\fldinst X}{\fldrslt Y}}}}}}",
+        r"{\rtf1{\mmath{\*\moMath{\f1\object bad}}}}",
+        r"{\rtf1{\mmath{\*\moMath{\f1\bin1 x}}}}",
+        r"{\rtf1{\mmath{\*\moMath{\f1 ungrouped text}}}}",
+        r"{\rtf1{\mmath{\*\unknown{\mr x}}}}",
+        r"{\rtf1{\mmath{\*\moMath{\mr x}}{\*\moMath{\mr y}}}}",
+        r"{\rtf1{\mmath{\mr x}{\*\moMath{\mr y}}}}",
+        r"{\rtf1{\mmath{\*\moMath{\mr x}}{\mr y}}}",
+        r"{\rtf1{\mmath{\mf{\mfPr{\mctrlPr\field}}{\mnum{\mr 1}}{\mden{\mr 2}}}}}",
+    ] {
+        assert!(
+            Tree::parse(source, litchi_rtf::read::OpenOptions::default()).is_err(),
+            "{source}"
+        );
+    }
+    for wrapper in [r"{\*\moMath", r"{\f1"] {
+        let small = format!(
+            r"{{\rtf1{{\mmath{}{{\mr x}}{}}}}}",
+            wrapper.repeat(4),
+            "}".repeat(4)
+        );
+        Tree::parse(&small, litchi_rtf::read::OpenOptions::default()).unwrap();
+        let source = format!(
+            r"{{\rtf1{{\mmath{}{{\mr x}}{}}}}}",
+            wrapper.repeat(100),
+            "}".repeat(100)
+        );
+        let error = Tree::parse(&source, litchi_rtf::read::OpenOptions::default())
+            .err()
+            .unwrap();
+        assert!(error.to_string().contains("depth exceeds"), "{error}");
+    }
+}
+
+#[test]
+fn native_post_script_orders_round_trip_without_weakening_role_validation() {
+    for structure in [
+        r"{\msSup{\me{\mr x}}{\msup{\mr 2}}}",
+        r"{\msSub{\me{\mr x}}{\msub{\mr i}}}",
+        r"{\msSubSup{\me{\mr x}}{\msub{\mr i}}{\msup{\mr 2}}}",
+    ] {
+        let source = format!(r"{{\rtf1{{\mmath{structure}}}}}");
+        let parsed = Tree::parse(&source, litchi_rtf::read::OpenOptions::default()).unwrap();
+        let reparsed =
+            Tree::parse_bytes(&write(&parsed), litchi_rtf::read::OpenOptions::default()).unwrap();
+        assert_eq!(reparsed.math_zones(), parsed.math_zones());
+    }
+    for structure in [
+        r"{\msSup{\me{\mr x}}}",
+        r"{\msSup{\me{\mr x}}{\me{\mr y}}}",
+        r"{\msSubSup{\me{\mr x}}{\msup{\mr 2}}{\msub{\mr i}}}",
+        r"{\msPre{\me{\mr x}}{\msub{\mr i}}{\msup{\mr 2}}}",
+    ] {
+        let source = format!(r"{{\rtf1{{\mmath{structure}}}}}");
+        assert!(
+            Tree::parse(&source, litchi_rtf::read::OpenOptions::default()).is_err(),
+            "{structure}"
+        );
+    }
+}
+
+#[test]
+fn math_paragraph_equation_boundaries_are_not_silently_flattened() {
+    let source = r"{\rtf1{\mmath{\*\moMathPara{\*\moMath\f34{\mr x}}{\*\moMath\f34{\mr y}}}}}";
+    let error = Tree::parse(source, litchi_rtf::read::OpenOptions::default())
+        .err()
+        .unwrap();
+    assert!(matches!(
+        error,
+        litchi_rtf::Error::UnsupportedContent("multiple equations in one math paragraph")
+    ));
+}
+
+#[test]
 fn coexists_with_body_markup_positions() {
     let document = Tree::parse(
         r"{\rtf1 ab{\mmath{\mr 1}}cd{\*\bkmkstart bm}ef{\*\bkmkend bm}}",

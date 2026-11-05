@@ -52,6 +52,7 @@ where
         // Walk the worksheet preamble up to BrtWsDim (worksheet dimensions),
         // capturing the sheet-view collection while skipping everything else.
         let mut views = Vec::new();
+        let mut tolerance = ToleranceReport::default();
         loop {
             let typ = iter.read_type()?;
             let _ = iter.fill_buffer(&mut buf)?;
@@ -59,7 +60,12 @@ where
                 break;
             }
             if typ == kind::BEGIN_WS_VIEWS {
-                views = crate::package::sheet_view::read_views(&mut iter, &mut buf, raw_limits)?;
+                views = crate::package::sheet_view::read_views(
+                    &mut iter,
+                    &mut buf,
+                    raw_limits,
+                    &mut Tolerance::recording(&mut tolerance),
+                )?;
             }
         }
         if buf.len() != 16 {
@@ -75,7 +81,6 @@ where
         // future records. Producers disagree on whether the WSVIEWS block
         // precedes or follows BrtWsDim, so both phases capture it.
         let mut column_infos = Vec::new();
-        let mut tolerance = ToleranceReport::default();
         loop {
             let typ = iter.read_type()?;
             let _ = iter.fill_buffer(&mut buf)?;
@@ -89,7 +94,12 @@ where
                     Tolerance::recording(&mut tolerance),
                 )?);
             } else if typ == kind::BEGIN_WS_VIEWS {
-                views = crate::package::sheet_view::read_views(&mut iter, &mut buf, raw_limits)?;
+                views = crate::package::sheet_view::read_views(
+                    &mut iter,
+                    &mut buf,
+                    raw_limits,
+                    &mut Tolerance::recording(&mut tolerance),
+                )?;
             }
         }
 

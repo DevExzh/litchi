@@ -995,6 +995,11 @@ fn row_unsupported_operations_are_unsupported_capability() {
         litchi_rtf::Error::UnsupportedCodePage(10001),
         Code::UnsupportedCapability,
     );
+    #[cfg(feature = "rtf")]
+    assert_code(
+        litchi_rtf::Error::UnsupportedContent("multiple equations in one math paragraph"),
+        Code::UnsupportedCapability,
+    );
 }
 
 // Row: `Locked` read/edit, `Signed` edit, `ProtectionDenied` ->

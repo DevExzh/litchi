@@ -445,3 +445,90 @@ fn native_word_tracked_move_markers_coexist_with_insert_delete_revisions() {
     assert_eq!(reopened.raw().move_bookmarks(), moves);
     assert_eq!(reopened.raw().revisions(), revisions);
 }
+
+#[test]
+fn native_word_math_retains_inline_and_display_equation_trees() {
+    use litchi_rtf::{MathObject, MathStructureChild, MathStructureKind, MathZoneKind};
+    fn math_text(objects: &[MathObject<'_>]) -> String {
+        let mut text = String::new();
+        for object in objects {
+            match object {
+                MathObject::Run(run) => text.push_str(&run.text),
+                MathObject::Structure(structure) => {
+                    for child in &structure.children {
+                        match child {
+                            MathStructureChild::Element(element) => {
+                                text.push_str(&math_text(&element.content))
+                            },
+                            MathStructureChild::MatrixRow(row) => {
+                                for cell in &row.cells {
+                                    text.push_str(&math_text(&cell.content));
+                                }
+                            },
+                        }
+                    }
+                },
+            }
+        }
+        text
+    }
+
+    let source = native("word-math-navigation.rtf");
+    let zones = source.raw().math_zones();
+    assert_eq!(zones.len(), 2);
+    assert_eq!(zones[0].kind, MathZoneKind::Inline);
+    assert_eq!(zones[1].kind, MathZoneKind::Display);
+    assert_eq!(math_text(&zones[0].content), "x2+12+9");
+    assert_eq!(math_text(&zones[1].content), "k=14k=10");
+    assert_eq!(zones[0].content.len(), 5);
+    assert!(
+        matches!(&zones[0].content[0], MathObject::Structure(s) if s.kind == MathStructureKind::ScriptSup)
+    );
+    assert!(
+        matches!(&zones[0].content[2], MathObject::Structure(s) if s.kind == MathStructureKind::Fraction)
+    );
+    let MathObject::Structure(sum) = &zones[1].content[0] else {
+        panic!("expected summation");
+    };
+    assert_eq!(sum.kind, MathStructureKind::Nary);
+    let properties = &sum.properties.as_ref().unwrap().properties;
+    assert!(properties.iter().any(
+        |property| property.name == litchi_rtf::MathPropertyName::Char && property.value == "∑"
+    ));
+    assert!(properties.iter().any(|property| property.name
+        == litchi_rtf::MathPropertyName::LimitLocation
+        && property.value == "undOvr"));
+    for marker in [
+        "OMML_INLINE_005",
+        "OMML_DISPLAY_005",
+        "MATH_NAVIGATION_END_005",
+    ] {
+        assert!(source.text().contains(marker), "missing {marker}");
+    }
+    let bytes = source.to_bytes().unwrap();
+    assert_eq!(
+        bytes.as_slice(),
+        include_bytes!("../../../test-data/microsoft-office/word/word-math-navigation.rtf")
+    );
+    assert_eq!(
+        Package::from_bytes(&bytes).unwrap().raw().math_zones(),
+        zones
+    );
+
+    // Write just the typed equations, independently of source-byte replay.
+    // Cosmetic character formatting and picture fallbacks are outside this
+    // model's existing contract; the original package keeps their exact bytes.
+    let mut expected = zones.to_vec();
+    let mut bytes = Vec::new();
+    let mut writer = litchi_rtf::write::Writer::new(&mut bytes);
+    writer.write_document_header().unwrap();
+    for zone in &mut expected {
+        zone.position = 0;
+        writer.write_math_zone(zone).unwrap();
+    }
+    writer.write_str("}").unwrap();
+    assert_eq!(
+        Package::from_bytes(&bytes).unwrap().raw().math_zones(),
+        expected
+    );
+}

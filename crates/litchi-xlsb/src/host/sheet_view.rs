@@ -224,13 +224,22 @@ pub fn write_view_payload(view: Option<&View>, limits: crate::raw::Limits) -> Re
 
 /// Parse a `BrtPane` payload.
 pub fn parse_pane(data: &[u8], limits: crate::raw::Limits) -> Result<Pane> {
+    parse_pane_with_tolerance(data, limits, &mut crate::leniency::Tolerance::refusing(), 0)
+}
+
+fn parse_pane_with_tolerance(
+    data: &[u8],
+    limits: crate::raw::Limits,
+    tolerance: &mut crate::leniency::Tolerance<'_>,
+    location: u32,
+) -> Result<Pane> {
     let context = "BrtPane";
     let mut cursor = Cursor::new(data, context, limits.admit(data.len())?);
     let horizontal = cursor.read_f64()?;
     let vertical = cursor.read_f64()?;
     let top_left = cell(cursor.read_u32()?, cursor.read_u32()?, context)?;
     let position = position_from_u32(cursor.read_u32()?, context)?;
-    let flags = cursor.read_u8()?;
+    let mut flags = cursor.read_u8()?;
     cursor.finish()?;
     debug_assert_eq!(data.len(), PANE_LEN);
 
@@ -238,10 +247,14 @@ pub fn parse_pane(data: &[u8], limits: crate::raw::Limits) -> Result<Pane> {
         return Err(malformed(context, "reserved pane flags are set"));
     }
     if flags & PANE_FLAG_MASK == PANE_FLAG_MASK {
-        return Err(malformed(
-            context,
-            "fFrozen and fFrozenNoSplit are both set",
-        ));
+        tolerance.tolerate(
+            crate::leniency::LayoutDefect::PaneFreezeFlags,
+            kind::PANE,
+            location,
+            u32::from(flags),
+            || malformed(context, "fFrozen and fFrozenNoSplit are both set"),
+        )?;
+        flags &= !PANE_FLAG_FROZEN;
     }
 
     let state = if flags & PANE_FLAG_FROZEN != 0 {
@@ -390,6 +403,7 @@ pub(crate) fn read_views<RS: std::io::Read + std::io::Seek>(
     iter: &mut crate::package::records::Stream<RS>,
     buf: &mut Vec<u8>,
     limits: crate::raw::Limits,
+    tolerance: &mut crate::leniency::Tolerance<'_>,
 ) -> Result<Vec<View>> {
     let context = "BrtBeginWsViews collection";
     let mut views = Vec::new();
@@ -421,7 +435,12 @@ pub(crate) fn read_views<RS: std::io::Read + std::io::Seek>(
                 if view.pane.is_some() {
                     return Err(malformed(context, "duplicate BrtPane"));
                 }
-                view.pane = Some(parse_pane(buf, limits)?);
+                view.pane = Some(parse_pane_with_tolerance(
+                    buf,
+                    limits,
+                    tolerance,
+                    u32::try_from(index).unwrap_or(u32::MAX),
+                )?);
             },
             kind::SEL => {
                 let index =

@@ -961,6 +961,8 @@ impl Sparkline {
 /// One XLSB sparkline group.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Group {
+    pub(super) alternate_before: Vec<u8>,
+    pub(super) alternate_inside: Vec<u8>,
     kind: SparklineType,
     empty_cells: EmptyCells,
     options: Options,
@@ -983,6 +985,8 @@ impl Group {
         limits: Limits,
     ) -> Result<Self> {
         let value = Self {
+            alternate_before: Vec::new(),
+            alternate_inside: Vec::new(),
             kind,
             empty_cells: EmptyCells::Zero,
             options: Options::empty(),
@@ -1125,6 +1129,8 @@ impl Group {
         limits: Limits,
     ) -> Result<Self> {
         let value = Self {
+            alternate_before: Vec::new(),
+            alternate_inside: Vec::new(),
             kind,
             empty_cells,
             options,
@@ -1142,7 +1148,12 @@ impl Group {
 
     /// Return all heap allocations owned by this group.
     pub(crate) fn retained_bytes(&self) -> usize {
-        let mut total = self.items.capacity().saturating_mul(size_of::<Sparkline>());
+        let mut total = self
+            .items
+            .capacity()
+            .saturating_mul(size_of::<Sparkline>())
+            .saturating_add(self.alternate_before.capacity())
+            .saturating_add(self.alternate_inside.capacity());
         if let Some(formula) = &self.date_formula {
             total = total.saturating_add(formula.retained_bytes());
         }
@@ -1222,7 +1233,27 @@ impl Groups {
         check_limit("total sparklines", expected_total, limits.total)?;
 
         let mut total = 0usize;
+        let mut prefixes = std::collections::HashSet::new();
         for group in &self.groups {
+            if !group.alternate_before.is_empty() && !group.alternate_inside.is_empty() {
+                return Err(Error::Value {
+                    record: "sparkline group",
+                    reason: "duplicate alternate identity prefixes",
+                });
+            }
+            for prefix in [&group.alternate_before, &group.alternate_inside] {
+                check_limit(
+                    "alternate content bytes",
+                    prefix.len(),
+                    limits.block_bytes(),
+                )?;
+                if !prefix.is_empty() && !prefixes.insert(prefix) {
+                    return Err(Error::Value {
+                        record: "sparkline groups",
+                        reason: "duplicate alternate identity prefix",
+                    });
+                }
+            }
             validate_group(group, limits)?;
             total = total.checked_add(group.items.len()).ok_or(Error::Limit {
                 resource: "total sparklines",

@@ -414,6 +414,10 @@ pub(crate) struct CfCursor<'a> {
 }
 
 impl<'a> CfCursor<'a> {
+    pub(super) fn remaining(&self) -> usize {
+        self.data.len().saturating_sub(self.offset)
+    }
+
     /// Admit one record payload under the caller's raw profile.
     pub(crate) fn new(
         data: &'a [u8],

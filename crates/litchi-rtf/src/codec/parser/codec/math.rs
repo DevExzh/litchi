@@ -270,7 +270,7 @@ impl<'a> Parser<'a> {
     /// Expects `self.pos` at the zone control word and consumes tokens through
     /// the group's closing brace. Math run text is stored in the typed zone
     /// tree only and never enters the body story (like field results).
-    pub(super) fn parse_math_zone_destination(&mut self, display: bool) -> crate::Result<()> {
+    pub(super) fn parse_math_zone_destination(&mut self, mut display: bool) -> crate::Result<()> {
         if self.math_zones.len() >= crate::math::MAX_MATH_ZONES {
             return Err(crate::Error::MalformedDocument(
                 "RTF math zone count exceeds the safety limit".to_string(),
@@ -279,57 +279,7 @@ impl<'a> Parser<'a> {
         self.pos += 1; // zone control
         let mut paragraph_properties = None;
         let mut content = Vec::new();
-        loop {
-            match self.tokens.get(self.pos) {
-                Some(Token::CloseBrace) => {
-                    self.pos += 1;
-                    break;
-                },
-                Some(Token::OpenBrace) => match self.tokens.get(self.pos + 1) {
-                    Some(Token::Control(ControlWord::MathZoneParagraphProperties)) => {
-                        if !display || paragraph_properties.is_some() || !content.is_empty() {
-                            return Err(crate::Error::MalformedDocument(
-                                "RTF math paragraph properties are misplaced".to_string(),
-                            ));
-                        }
-                        paragraph_properties = Some(self.parse_math_properties_group(
-                            crate::MathPropertiesKind::Paragraph,
-                            1,
-                        )?);
-                    },
-                    Some(Token::Control(ControlWord::IgnorableDestination))
-                        if matches!(
-                            self.tokens.get(self.pos + 2),
-                            Some(Token::Control(ControlWord::MathZonePictureFallback))
-                        ) =>
-                    {
-                        // Fallback renderings are never modeled; skip them.
-                        self.skip_group()?;
-                    },
-                    Some(Token::Control(_)) => {
-                        content.push(self.parse_math_object(1)?);
-                        if content.len() > crate::math::MAX_MATH_OBJECTS_PER_CONTAINER {
-                            return Err(crate::Error::MalformedDocument(
-                                "RTF math object count exceeds the safety limit".to_string(),
-                            ));
-                        }
-                    },
-                    _ => {
-                        return Err(crate::Error::MalformedDocument(
-                            "RTF math zone contains unsupported grouped content".to_string(),
-                        ));
-                    },
-                },
-                Some(Token::Text(text)) if text.trim().is_empty() => {
-                    self.pos += 1;
-                },
-                _ => {
-                    return Err(crate::Error::MalformedDocument(
-                        "RTF math zone contains ungrouped, binary, or active data".to_string(),
-                    ));
-                },
-            }
-        }
+        self.parse_math_zone_contents(&mut display, &mut paragraph_properties, &mut content, 0)?;
         let kind = if display {
             crate::MathZoneKind::Display
         } else {
@@ -342,6 +292,187 @@ impl<'a> Parser<'a> {
             crate::BodyStoryEvent::MathZone(index),
         ));
         Ok(())
+    }
+
+    /// Word nests moMath/moMathPara inside an mmath envelope. Keep one zone
+    /// for that envelope and derive its display kind from the inner container.
+    fn parse_math_zone_contents(
+        &mut self,
+        display: &mut bool,
+        paragraph: &mut Option<crate::MathProperties<'a>>,
+        content: &mut Vec<crate::MathObject<'a>>,
+        depth: usize,
+    ) -> crate::Result<()> {
+        if depth > crate::math::MAX_MATH_DEPTH {
+            return Err(crate::Error::MalformedDocument(
+                "RTF math nesting depth exceeds the safety limit".to_string(),
+            ));
+        }
+        let mut saw_container = false;
+        let paragraph_container = matches!(
+            self.tokens.get(self.pos.saturating_sub(1)),
+            Some(Token::Control(ControlWord::MathZoneDisplay))
+        );
+        loop {
+            match self.tokens.get(self.pos) {
+                Some(Token::CloseBrace) => {
+                    self.pos += 1;
+                    return Ok(());
+                },
+                Some(Token::OpenBrace) => {
+                    let starred = matches!(
+                        self.tokens.get(self.pos + 1),
+                        Some(Token::Control(ControlWord::IgnorableDestination))
+                    );
+                    match self.nested_control_word() {
+                        Some(ControlWord::MathZoneInline | ControlWord::MathZoneDisplay) => {
+                            if paragraph_container
+                                && saw_container
+                                && self.nested_control_word() == Some(ControlWord::MathZoneInline)
+                            {
+                                return Err(crate::Error::UnsupportedContent(
+                                    "multiple equations in one math paragraph",
+                                ));
+                            }
+                            if saw_container || !content.is_empty() {
+                                return Err(crate::Error::MalformedDocument(
+                                    "RTF math envelope contains multiple or mixed containers"
+                                        .to_string(),
+                                ));
+                            }
+                            saw_container = true;
+                            *display |=
+                                self.nested_control_word() == Some(ControlWord::MathZoneDisplay);
+                            self.pos += if starred { 3 } else { 2 };
+                            self.parse_math_zone_contents(display, paragraph, content, depth + 1)?;
+                        },
+                        Some(ControlWord::MathZoneParagraphProperties) if !starred => {
+                            if !*display
+                                || paragraph.is_some()
+                                || !content.is_empty()
+                                || saw_container
+                            {
+                                return Err(crate::Error::MalformedDocument(
+                                    "RTF math paragraph properties are misplaced".to_string(),
+                                ));
+                            }
+                            *paragraph = Some(self.parse_math_properties_group(
+                                crate::MathPropertiesKind::Paragraph,
+                                depth + 1,
+                            )?);
+                        },
+                        Some(ControlWord::MathZonePictureFallback) => {
+                            // Rendered fallbacks stay in the source package;
+                            // they are outside the typed mathematics model.
+                            self.skip_group()?;
+                        },
+                        _ if !saw_container => {
+                            self.append_math_content_group(content, depth + 1)?
+                        },
+                        _ => {
+                            return Err(crate::Error::MalformedDocument(
+                                "RTF math envelope contains content outside its container"
+                                    .to_string(),
+                            ));
+                        },
+                    }
+                },
+                Some(Token::Text(text)) if text.trim().is_empty() => self.pos += 1,
+                Some(Token::Control(ControlWord::FontNumber(_)))
+                    if !saw_container && content.is_empty() =>
+                {
+                    // The oMath grammar allows a leading math-font selector.
+                    self.pos += 1;
+                },
+                None => return Err(crate::Error::UnexpectedEof),
+                _ => {
+                    return Err(crate::Error::MalformedDocument(
+                        "RTF math zone contains ungrouped, binary, or active data".to_string(),
+                    ));
+                },
+            }
+        }
+    }
+
+    /// Native Word groups character formatting around mr and structure
+    /// destinations. Like formatting inside mr, it is not modeled. Decode
+    /// children in order, retain the group's Unicode fallback scope, and
+    /// reject controls that would change the destination or document state.
+    fn append_math_content_group(
+        &mut self,
+        content: &mut Vec<crate::MathObject<'a>>,
+        depth: usize,
+    ) -> crate::Result<()> {
+        if depth > crate::math::MAX_MATH_DEPTH {
+            return Err(crate::Error::MalformedDocument(
+                "RTF math nesting depth exceeds the safety limit".to_string(),
+            ));
+        }
+        if matches!(self.tokens.get(self.pos + 1), Some(Token::Control(control))
+            if *control == ControlWord::MathRun || Self::math_structure_kind(control).is_some())
+        {
+            if content.len() >= crate::math::MAX_MATH_OBJECTS_PER_CONTAINER {
+                return Err(crate::Error::MalformedDocument(
+                    "RTF math object count exceeds the safety limit".to_string(),
+                ));
+            }
+            content.push(self.parse_math_object(depth)?);
+            return Ok(());
+        }
+        self.expect_token(&Token::OpenBrace)?;
+        let state = self.current_state()?.clone();
+        self.states.push(state);
+        loop {
+            match self.tokens.get(self.pos) {
+                Some(Token::CloseBrace) => {
+                    self.pos += 1;
+                    self.states.pop();
+                    return Ok(());
+                },
+                Some(Token::OpenBrace) => self.append_math_content_group(content, depth + 1)?,
+                Some(Token::Control(control)) if Self::math_character_control(control) => {
+                    if let ControlWord::UnicodeSkip(skip) = *control {
+                        self.current_state_mut()?.unicode_skip = skip;
+                    }
+                    self.pos += 1;
+                },
+                Some(Token::Text(text)) if text.trim().is_empty() => self.pos += 1,
+                None => return Err(crate::Error::UnexpectedEof),
+                _ => {
+                    return Err(crate::Error::MalformedDocument(
+                        "RTF math formatting group contains non-formatting content".to_string(),
+                    ));
+                },
+            }
+        }
+    }
+
+    fn math_character_control(control: &ControlWord<'_>) -> bool {
+        matches!(
+            control,
+            ControlWord::LeftToRightCharacter
+                | ControlWord::RightToLeftCharacter
+                | ControlWord::FontComplexScript(_)
+                | ControlWord::AssociatedFontNumber(_)
+                | ControlWord::AssociatedFontSize(_)
+                | ControlWord::AssociatedLanguage(_)
+                | ControlWord::AssociatedBold(_)
+                | ControlWord::AssociatedItalic(_)
+                | ControlWord::FontNumber(_)
+                | ControlWord::FontSize(_)
+                | ControlWord::Bold(_)
+                | ControlWord::Italic(_)
+                | ControlWord::Plain
+                | ControlWord::ColorForeground(_)
+                | ControlWord::Underline(_)
+                | ControlWord::UnderlineNone
+                | ControlWord::Strike(_)
+                | ControlWord::Language(_)
+                | ControlWord::LanguageEastAsian(_)
+                | ControlWord::InsertRsid(_)
+                | ControlWord::CharStyleRsid(_)
+                | ControlWord::UnicodeSkip(_)
+        )
     }
 
     /// Parse one math object group; `self.pos` is at its opening brace.
@@ -474,13 +605,8 @@ impl<'a> Parser<'a> {
                             depth,
                         )?);
                     },
-                    Some(Token::Control(_)) => {
-                        content.push(self.parse_math_object(depth + 1)?);
-                    },
                     _ => {
-                        return Err(crate::Error::MalformedDocument(
-                            "RTF math argument contains unsupported grouped content".to_string(),
-                        ));
+                        self.append_math_content_group(&mut content, depth + 1)?;
                     },
                 },
                 Some(Token::Text(text)) if text.trim().is_empty() => {
@@ -691,6 +817,13 @@ impl<'a> Parser<'a> {
                                 .to_string(),
                         ));
                     },
+                },
+                Some(Token::Control(control))
+                    if kind == crate::MathPropertiesKind::Control
+                        && Self::math_character_control(control) =>
+                {
+                    // The model has no character-format projection for mctrlPr.
+                    self.pos += 1;
                 },
                 Some(Token::Text(text)) if text.trim().is_empty() => {
                     self.pos += 1;

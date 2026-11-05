@@ -19,6 +19,16 @@ pub struct Encoder<W: Write> {
 }
 
 impl<W: Write> Encoder<W> {
+    /// Replay a complete, framing-validated record sequence verbatim.
+    pub(crate) fn write_encoded_records(&mut self, bytes: &[u8]) -> Result<()> {
+        self.limits.validate()?;
+        for record in super::Records::new(bytes, self.limits) {
+            let _ = record?;
+        }
+        self.writer.write_all(bytes)?;
+        Ok(())
+    }
+
     /// Write with explicit finite limits.
     #[must_use]
     pub const fn new(writer: W, limits: Limits) -> Self {

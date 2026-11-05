@@ -81,6 +81,8 @@ pub enum Error {
     /// such as the Mac Japanese (10001) and Mac Cyrillic (10007) pages.
     /// The document is well formed; its text cannot be decoded exactly.
     UnsupportedCodePage(u32),
+    /// Well-formed content that the retained model cannot represent faithfully.
+    UnsupportedContent(&'static str),
     /// A source-limit value was invalid at profile construction.
     InvalidLimit {
         /// Stable physical ingress dimension.
@@ -130,6 +132,7 @@ impl fmt::Display for Error {
             Error::UnsupportedCodePage(page) => {
                 write!(f, "unsupported RTF ANSI code page {page}")
             },
+            Error::UnsupportedContent(content) => write!(f, "unsupported RTF content: {content}"),
             Error::InvalidLimit {
                 kind,
                 value,

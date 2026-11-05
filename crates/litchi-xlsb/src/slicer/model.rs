@@ -254,6 +254,9 @@ impl Cache {
 /// One worksheet slicer view.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct View {
+    /// Opaque alternate-content prefix belonging to this view. Retained
+    /// through edits and moves; empty for a newly authored view.
+    pub alternate_content: Vec<u8>,
     /// Unique workbook-scoped view name.
     pub name: String,
     /// Referenced cache name.
@@ -281,6 +284,7 @@ impl View {
     #[must_use]
     pub fn new(name: impl Into<String>, cache_name: impl Into<String>) -> Self {
         Self {
+            alternate_content: Vec::new(),
             name: name.into(),
             cache_name: cache_name.into(),
             start_item: 0,
@@ -383,7 +387,14 @@ pub(crate) fn validate_views(value: &Views) -> Result<()> {
         });
     }
     let mut names = std::collections::HashSet::with_capacity(value.items.len());
+    let mut prefixes = std::collections::HashSet::new();
     for view in &value.items {
+        if !view.alternate_content.is_empty() && !prefixes.insert(&view.alternate_content) {
+            return Err(Error::Unrecognized {
+                typ: "slicer view collection",
+                val: "duplicate alternate identity prefix",
+            });
+        }
         validate_name(&view.name, "slicer view name", MAX_NAME_UNITS)?;
         validate_name(&view.cache_name, "slicer view cache name", MAX_NAME_UNITS)?;
         if view.column_count == 0 || view.column_count > 20_000 {

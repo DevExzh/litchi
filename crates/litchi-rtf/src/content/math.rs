@@ -546,7 +546,7 @@ impl MathStructureKind {
 
     /// Expected argument sequence as `(role, optional)` pairs, or `None` for
     /// kinds with variadic children (delimiter, equation array, matrix).
-    fn expected_children(self) -> Option<&'static [(MathElementRole, bool)]> {
+    fn expected_children(self, base_first: bool) -> Option<&'static [(MathElementRole, bool)]> {
         const ELEMENT: &[(MathElementRole, bool)] = &[(MathElementRole::Element, false)];
         match self {
             Self::Accent
@@ -575,6 +575,22 @@ impl MathStructureKind {
                 (MathElementRole::Subscript, true),
                 (MathElementRole::Superscript, true),
                 (MathElementRole::Element, false),
+            ]),
+            // The published RTF grammar puts the base last; current Word
+            // also writes the OOXML-style base-first order for post-scripts.
+            // Keep both producer orders and retain every child's explicit role.
+            Self::ScriptSubSup if base_first => Some(&[
+                (MathElementRole::Element, false),
+                (MathElementRole::Subscript, false),
+                (MathElementRole::Superscript, false),
+            ]),
+            Self::ScriptSub if base_first => Some(&[
+                (MathElementRole::Element, false),
+                (MathElementRole::Subscript, false),
+            ]),
+            Self::ScriptSup if base_first => Some(&[
+                (MathElementRole::Element, false),
+                (MathElementRole::Superscript, false),
             ]),
             Self::ScriptPre | Self::ScriptSubSup => Some(&[
                 (MathElementRole::Subscript, false),
@@ -662,7 +678,9 @@ impl<'a> MathStructure<'a> {
             }
             properties.validate()?;
         }
-        match self.kind.expected_children() {
+        let base_first = matches!(self.children.first(), Some(MathStructureChild::Element(element))
+            if element.role == MathElementRole::Element);
+        match self.kind.expected_children(base_first) {
             Some(expected) => {
                 let mut index = 0usize;
                 for &(role, optional) in expected {

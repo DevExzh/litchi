@@ -666,7 +666,7 @@ fn writer_stages_all_sparkline_groups_at_the_canonical_sheet_tail() {
     let kinds = Records::new(&buffer, crate::raw::Limits::DEFAULT)
         .map(|record| record.unwrap().kind())
         .collect::<Vec<_>>();
-    let mut expected_tail = vec![kind::BEGIN_SPARKLINE_GROUPS];
+    let mut expected_tail = vec![kind::FRT_BEGIN, kind::BEGIN_SPARKLINE_GROUPS];
     for _ in 0..3 {
         expected_tail.extend_from_slice(&[
             kind::BEGIN_SPARKLINE_GROUP,
@@ -676,7 +676,7 @@ fn writer_stages_all_sparkline_groups_at_the_canonical_sheet_tail() {
             kind::END_SPARKLINE_GROUP,
         ]);
     }
-    expected_tail.extend_from_slice(&[kind::END_SPARKLINE_GROUPS, kind::END_SHEET]);
+    expected_tail.extend_from_slice(&[kind::END_SPARKLINE_GROUPS, kind::FRT_END, kind::END_SHEET]);
     assert!(kinds.ends_with(&expected_tail));
 
     let reparsed =

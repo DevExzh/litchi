@@ -63,7 +63,9 @@ fn write_single_cond_formatting<W: Write>(
         )?;
         write_rule_visualization(writer, rule)?;
         if let Some(guid) = rule.classic_extension_guid {
+            writer.write_record(kind::FRT_BEGIN, &[2, 14, 0, 0])?;
             writer.write_record(kind::CF_RULE_EXT, &serialize_rule_extension_guid(guid))?;
+            writer.write_record(kind::FRT_END, &[])?;
         }
         writer.write_record(kind::END_CF_RULE, &[])?;
     }

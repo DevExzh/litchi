@@ -323,7 +323,9 @@ pub fn load_caches(
             .rels()
             .get(relationship_id)
             .ok_or_else(|| invalid("timeline cache references", "missing relationship"))?;
-        if relationship.is_external() || relationship.reltype() != CACHE_RELATIONSHIP_TYPE {
+        if relationship.is_external()
+            || !super::codec::is_cache_relationship(relationship.reltype())
+        {
             return Err(invalid(
                 "timeline cache relationship",
                 "wrong type or external target",
@@ -331,7 +333,7 @@ pub fn load_caches(
         }
         let target = relationship.target_partname()?;
         let part = package.get_part(&target)?;
-        if part.content_type() != CACHE_CONTENT_TYPE || !part.rels().is_empty() {
+        if !super::codec::is_cache_content(part.content_type()) || !part.rels().is_empty() {
             return Err(invalid(
                 "timeline cache part",
                 "wrong content type or outbound relationships",
@@ -345,7 +347,7 @@ pub fn load_caches(
     }
     let referenced: HashSet<_> = output.iter().map(|part| part.part_name.as_str()).collect();
     for part in package.iter_parts() {
-        if part.content_type() == CACHE_CONTENT_TYPE
+        if super::codec::is_cache_content(part.content_type())
             && !referenced.contains(part.partname().as_str())
         {
             return Err(invalid("timeline cache package graph", "orphan cache part"));
@@ -367,7 +369,9 @@ fn remove_caches(package: &mut OpcPackage, workbook: &PackURI) -> Result<()> {
                 .rels()
                 .get(relationship_id)
                 .ok_or_else(|| invalid("timeline cache references", "missing relationship"))?;
-            if relationship.is_external() || relationship.reltype() != CACHE_RELATIONSHIP_TYPE {
+            if relationship.is_external()
+                || !super::codec::is_cache_relationship(relationship.reltype())
+            {
                 return Err(invalid(
                     "timeline cache relationship",
                     "wrong type or external target",
@@ -469,7 +473,7 @@ pub fn load_views(
     let relationships: Vec<_> = worksheet_part
         .rels()
         .iter()
-        .filter(|relationship| relationship.reltype() == VIEWS_RELATIONSHIP_TYPE)
+        .filter(|relationship| super::codec::is_views_relationship(relationship.reltype()))
         .collect();
     if relationships.len() > 1 {
         return Err(invalid(
@@ -494,7 +498,7 @@ pub fn load_views(
     }
     let target = relationship.target_partname()?;
     let part = package.get_part(&target)?;
-    if part.content_type() != VIEWS_CONTENT_TYPE || !part.rels().is_empty() {
+    if !super::codec::is_views_content(part.content_type()) || !part.rels().is_empty() {
         return Err(invalid(
             "timeline views",
             "wrong content type or outbound relationships",

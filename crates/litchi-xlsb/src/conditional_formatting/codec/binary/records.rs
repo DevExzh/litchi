@@ -514,6 +514,22 @@ impl Rule {
         context: &impl Resolution,
         limits: crate::raw::Limits,
     ) -> Result<Self> {
+        Self::parse_with_tolerance(
+            data,
+            base,
+            context,
+            limits,
+            &mut crate::leniency::Tolerance::refusing(),
+        )
+    }
+
+    pub(crate) fn parse_with_tolerance(
+        data: &[u8],
+        base: (u32, u32),
+        context: &impl Resolution,
+        limits: crate::raw::Limits,
+        tolerance: &mut crate::leniency::Tolerance<'_>,
+    ) -> Result<Self> {
         let mut cursor = CfCursor::new(data, "BrtBeginCFRule", limits)?;
         let rule_type_raw = cursor.read_u32()?;
         let rule_type = RuleType::from_u32(rule_type_raw)
@@ -593,10 +609,13 @@ impl Rule {
             }
             let formula = cursor.read_formula()?;
             if formula.rgce.len() != size as usize {
-                return Err(invalid(
-                    "BrtBeginCFRule",
-                    "formula declared token bytes, found",
-                ));
+                tolerance.tolerate(
+                    crate::leniency::LayoutDefect::ConditionalFormulaLength,
+                    crate::raw::kind::BEGIN_CF_RULE,
+                    priority,
+                    size,
+                    || invalid("BrtBeginCFRule", "formula declared token bytes, found"),
+                )?;
             }
             formula_slots[index] = Some(formula);
         }
@@ -659,6 +678,22 @@ impl Rule {
         context: &impl Resolution,
         limits: crate::raw::Limits,
     ) -> Result<Self> {
+        Self::parse_extension14_with_tolerance(
+            data,
+            base,
+            context,
+            limits,
+            &mut crate::leniency::Tolerance::refusing(),
+        )
+    }
+
+    pub(crate) fn parse_extension14_with_tolerance(
+        data: &[u8],
+        base: (u32, u32),
+        context: &impl Resolution,
+        limits: crate::raw::Limits,
+        tolerance: &mut crate::leniency::Tolerance<'_>,
+    ) -> Result<Self> {
         let (formulas, header_size) = parse_formula_header(data, "BrtBeginCFRule14", 2, limits)?;
         let mut cursor = CfCursor::new(&data[header_size..], "BrtBeginCFRule14", limits)?;
         let rule_type_raw = cursor.read_u32()?;
@@ -718,7 +753,18 @@ impl Rule {
         let unused = cursor.read_u32()?;
         let guid = cursor.read_array::<16>()?;
         let guid_present = cursor.read_bool32()?;
-        let text = cursor.read_nullable_string()?;
+        let text = if template != 8 && cursor.remaining() == 0 {
+            tolerance.tolerate(
+                crate::leniency::LayoutDefect::ConditionalNullText,
+                crate::raw::kind::BEGIN_CF_RULE14,
+                u32::try_from(signed_priority).unwrap_or(0),
+                0,
+                || invalid("BrtBeginCFRule14", "missing unused NULL text suffix"),
+            )?;
+            None
+        } else {
+            cursor.read_nullable_string()?
+        };
         cursor.finish()?;
 
         if template == 8 {

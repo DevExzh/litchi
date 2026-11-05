@@ -391,6 +391,7 @@ fn parse_view(payload: &[u8], limits: crate::raw::Limits) -> Result<View> {
         return Err(invalid("BrtBeginSlicer unused flags", "unexpected value"));
     }
     let view = View {
+        alternate_content: Vec::new(),
         start_item: cursor.read_u32()?,
         column_count: cursor.read_u32()?,
         level: cursor.read_u32()?,
@@ -422,19 +423,32 @@ pub fn parse_views(data: &[u8], limits: crate::raw::Limits) -> Result<Views> {
     empty(&records[0], "BrtBeginSlicers")?;
     let mut views = Views::new();
     let mut index = 1;
+    let mut ended = false;
     while index < records.len() {
         if records[index].kind() == kind::END_SLICERS {
             empty(&records[index], "BrtEndSlicers")?;
             index += 1;
+            ended = true;
             break;
         }
-        if records[index].kind() != kind::BEGIN_SLICER {
+        let mut prefix = Vec::new();
+        if records[index].kind() == kind::AC_BEGIN {
+            let start = records[index].offset();
+            index = alternate_end(&records, index)?;
+            let stop = records.get(index).map_or(data.len(), Record::offset);
+            prefix.extend_from_slice(&data[start..stop]);
+        }
+        if records
+            .get(index)
+            .is_none_or(|record| record.kind() != kind::BEGIN_SLICER)
+        {
             return Err(invalid(
                 "slicer views",
                 "unexpected record in view collection",
             ));
         }
-        let view = parse_view(records[index].payload(), limits)?;
+        let mut view = parse_view(records[index].payload(), limits)?;
+        view.alternate_content = prefix;
         index += 1;
         let end = records
             .get(index)
@@ -445,6 +459,9 @@ pub fn parse_views(data: &[u8], limits: crate::raw::Limits) -> Result<Views> {
         empty(end, "BrtEndSlicer")?;
         views.items.push(view);
         index += 1;
+    }
+    if !ended {
+        return Err(Error::UnexpectedEndOfStream("BrtEndSlicers"));
     }
     if index != records.len() {
         return Err(invalid(
@@ -459,10 +476,33 @@ pub fn parse_views(data: &[u8], limits: crate::raw::Limits) -> Result<Views> {
 /// Encode one worksheet slicer views part.
 pub fn write_views(views: &Views, limits: crate::raw::Limits) -> Result<Vec<u8>> {
     validate_views(views)?;
+    let prefix_bytes = views
+        .items
+        .iter()
+        .try_fold(0usize, |total, view| {
+            total.checked_add(view.alternate_content.len())
+        })
+        .ok_or_else(|| invalid("slicer views", "alternate prefix size overflow"))?;
+    if prefix_bytes > MAX_PART_BYTES {
+        return Err(invalid(
+            "slicer views",
+            "alternate prefixes exceed part limit",
+        ));
+    }
     let mut output = Vec::new();
     let mut writer = Encoder::new(&mut output, limits);
     writer.write_record(kind::BEGIN_SLICERS, &[])?;
     for view in &views.items {
+        if !view.alternate_content.is_empty() {
+            let records = parse_all(&view.alternate_content, limits)?;
+            if alternate_end(&records, 0)? != records.len() {
+                return Err(invalid(
+                    "slicer alternate prefix",
+                    "records follow the alternate block",
+                ));
+            }
+            writer.write_encoded_records(&view.alternate_content)?;
+        }
         let mut payload = Vec::new();
         let mut flags = u8::from(view.caption_visible) | (u8::from(view.caption.is_some()) << 1);
         flags |= u8::from(view.style.is_some()) << 2;
@@ -485,5 +525,53 @@ pub fn write_views(views: &Views, limits: crate::raw::Limits) -> Result<Vec<u8>>
         writer.write_record(kind::END_SLICER, &[])?;
     }
     writer.write_record(kind::END_SLICERS, &[])?;
+    if output.len() > MAX_PART_BYTES {
+        return Err(invalid("slicer views", "part exceeds byte limit"));
+    }
     Ok(output)
+}
+
+fn alternate_end(records: &[Record<'_>], start: usize) -> Result<usize> {
+    let begin = records
+        .get(start)
+        .ok_or(Error::UnexpectedEndOfStream("slicer alternate prefix"))?;
+    if begin.kind() != kind::AC_BEGIN || begin.payload().len() < 2 {
+        return Err(invalid("slicer alternate prefix", "invalid begin record"));
+    }
+    let count = usize::from(u16::from_le_bytes([begin.payload()[0], begin.payload()[1]]));
+    if count == 0 || begin.payload().len() != 2 + count * 4 {
+        return Err(invalid(
+            "slicer alternate prefix",
+            "invalid product version array",
+        ));
+    }
+    let mut index = start + 1;
+    loop {
+        let record = records
+            .get(index)
+            .ok_or(Error::UnexpectedEndOfStream("slicer alternate prefix"))?;
+        if record.kind() == kind::AC_END {
+            empty(record, "BrtACEnd")?;
+            if index == start + 1 {
+                return Err(invalid("slicer alternate prefix", "empty alternate block"));
+            }
+            return Ok(index + 1);
+        }
+        if matches!(
+            record.kind(),
+            kind::AC_BEGIN
+                | kind::FRT_BEGIN
+                | kind::FRT_END
+                | kind::BEGIN_SLICER
+                | kind::END_SLICER
+                | kind::BEGIN_SLICERS
+                | kind::END_SLICERS
+        ) {
+            return Err(invalid(
+                "slicer alternate prefix",
+                "unterminated or nested block",
+            ));
+        }
+        index += 1;
+    }
 }

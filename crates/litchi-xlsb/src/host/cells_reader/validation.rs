@@ -13,9 +13,10 @@ use crate::conditional_formatting::{
     AxisPosition14, Bar, Bar14, Color, Formatting, Icon, IconSet, IconSet14, RecordKind, Rule,
     RuleType, Scale, Value, icon_count14, parse_rule_extension_guid,
 };
+use crate::data_validation::prelude::{Prelude, Step};
 use crate::leniency::{ReservedFieldDefect, Tolerance};
 use crate::package::cell::CellHeader;
-use crate::package::data_validation::{Validation, parse_dval_list};
+use crate::package::data_validation::Validation;
 use crate::package::error::{Error, Result};
 use crate::raw::{Kind, kind};
 use crate::sheet::{AutoFilter, ColumnInfo, RowInfo, SheetProtection, StrongProtection};
@@ -357,26 +358,20 @@ where
 
     pub(super) fn consume_classic_data_validations(&mut self, expected_count: u32) -> Result<()> {
         let start = self.data_validations.len();
-        let mut pending_list = None;
+        let mut prelude = Prelude::default();
         loop {
             self.buf.clear();
             let typ = self.iter.read_type()?;
             let _ = self.iter.fill_buffer(&mut self.buf)?;
+            if prelude.feed(typ, &self.buf, self.raw_limits)? != Step::Other {
+                continue;
+            }
             match typ {
-                kind::D_VAL_LIST => {
-                    if pending_list.is_some() {
-                        return Err(Error::Unrecognized {
-                            typ: "BrtDValList",
-                            val: "consecutive list overrides",
-                        });
-                    }
-                    pending_list = Some(parse_dval_list(&self.buf, self.raw_limits)?);
-                },
                 kind::D_VAL => {
                     let location = u32::try_from(self.data_validations.len()).unwrap_or(u32::MAX);
                     let rule = Validation::parse_classic_with(
                         &self.buf,
-                        pending_list.take(),
+                        prelude.take_list()?,
                         self.formula_context,
                         self.raw_limits,
                         &mut Tolerance::recording(&mut self.tolerance),
@@ -391,12 +386,7 @@ where
                             found: self.buf.len(),
                         });
                     }
-                    if pending_list.is_some() {
-                        return Err(Error::Unrecognized {
-                            typ: "BrtDValList",
-                            val: "not followed by BrtDVal",
-                        });
-                    }
+                    prelude.finish()?;
                     break;
                 },
                 _ => {
@@ -474,11 +464,12 @@ where
             let _ = self.iter.fill_buffer(&mut self.buf)?;
             match typ {
                 kind::BEGIN_CF_RULE => {
-                    let mut rule = Rule::parse_with_context(
+                    let mut rule = Rule::parse_with_tolerance(
                         &self.buf,
                         base,
                         self.formula_context,
                         self.raw_limits,
+                        &mut Tolerance::recording(&mut self.tolerance),
                     )?;
                     if formatting
                         .rules
@@ -532,11 +523,12 @@ where
             let _ = self.iter.fill_buffer(&mut self.buf)?;
             match typ {
                 kind::BEGIN_CF_RULE14 => {
-                    let mut rule = Rule::parse_extension14_with_context(
+                    let mut rule = Rule::parse_extension14_with_tolerance(
                         &self.buf,
                         base,
                         self.formula_context,
                         self.raw_limits,
+                        &mut Tolerance::recording(&mut self.tolerance),
                     )?;
                     let signed_priority = rule
                         .extension14
@@ -686,6 +678,7 @@ where
             let typ = self.iter.read_type()?;
             let _ = self.iter.fill_buffer(&mut self.buf)?;
             match typ {
+                kind::FRT_BEGIN => self.consume_conditional_rule_future(rule)?,
                 kind::BEGIN_COLOR_SCALE => {
                     if rule.color_scale.is_some() || !self.buf.is_empty() {
                         return Err(Error::Unrecognized {
@@ -761,6 +754,74 @@ where
             });
         }
         Ok(())
+    }
+
+    fn consume_conditional_rule_future(&mut self, rule: &mut Rule) -> Result<()> {
+        if self.buf.len() != 4 {
+            return Err(Error::InvalidLength {
+                expected: 4,
+                found: self.buf.len(),
+            });
+        }
+        let mut ends = vec![kind::FRT_END];
+        loop {
+            self.buf.clear();
+            let typ = self.iter.read_type()?;
+            let _ = self.iter.fill_buffer(&mut self.buf)?;
+            match typ {
+                kind::FRT_BEGIN | kind::AC_BEGIN => {
+                    if ends.len() >= 64 {
+                        return Err(Error::Unrecognized {
+                            typ: "conditional-rule future block",
+                            val: "nesting exceeds 64",
+                        });
+                    }
+                    if typ == kind::FRT_BEGIN && self.buf.len() != 4 {
+                        return Err(Error::InvalidLength {
+                            expected: 4,
+                            found: self.buf.len(),
+                        });
+                    }
+                    ends.push(if typ == kind::FRT_BEGIN {
+                        kind::FRT_END
+                    } else {
+                        kind::AC_END
+                    });
+                },
+                kind::FRT_END | kind::AC_END => {
+                    if ends.pop() != Some(typ) || !self.buf.is_empty() {
+                        return Err(Error::Unrecognized {
+                            typ: "conditional-rule future block",
+                            val: "mismatched or nonempty end",
+                        });
+                    }
+                    if ends.is_empty() {
+                        return Ok(());
+                    }
+                },
+                kind::CF_RULE_EXT if ends.len() == 1 => {
+                    if rule.classic_extension_guid.is_some() {
+                        return Err(Error::Unrecognized {
+                            typ: "BrtCFRuleExt",
+                            val: "duplicate record",
+                        });
+                    }
+                    rule.classic_extension_guid =
+                        Some(parse_rule_extension_guid(&self.buf, self.raw_limits)?);
+                },
+                kind::END_CF_RULE
+                | kind::BEGIN_CF_RULE
+                | kind::BEGIN_COND_FORMATTING
+                | kind::END_COND_FORMATTING
+                | kind::END_SHEET => {
+                    return Err(Error::Unrecognized {
+                        typ: "conditional-rule future block",
+                        val: "unterminated before outer record",
+                    });
+                },
+                _ => {},
+            }
+        }
     }
 
     pub(super) fn consume_color_scale(&mut self, base: (u32, u32)) -> Result<Scale> {

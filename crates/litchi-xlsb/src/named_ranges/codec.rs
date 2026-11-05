@@ -103,9 +103,18 @@ pub(crate) fn parse_with(
         ));
     }
     if f_proc && !f_func && ch_key < 0x20 {
-        return Err(Error::InvalidFormula(
-            "BrtName has invalid macro shortcut key",
-        ));
+        if ch_key != 0 {
+            return Err(Error::InvalidFormula(
+                "BrtName has invalid macro shortcut key",
+            ));
+        }
+        tolerance.tolerate(
+            crate::leniency::LayoutDefect::NameWithoutShortcut,
+            kind::NAME,
+            ordinal,
+            0,
+            || Error::InvalidFormula("BrtName has invalid macro shortcut key"),
+        )?;
     }
 
     let sheet_id_raw = cursor.read_u32()? as i32;

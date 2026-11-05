@@ -31,6 +31,7 @@
 
 use std::ops::Range;
 
+use super::prelude::{Prelude, Step};
 use super::{RecordKind, Validation};
 use crate::package::Package;
 use crate::package::error::Result;
@@ -95,8 +96,14 @@ impl Package {
 struct Collection {
     unit: Range<usize>,
     header_payload: Vec<u8>,
-    items: Vec<Range<usize>>,
+    items: Vec<Item>,
     end: Range<usize>,
+}
+
+struct Item {
+    span: Range<usize>,
+    prefix: Range<usize>,
+    opaque: Vec<Range<usize>>,
 }
 
 fn collection(
@@ -122,16 +129,49 @@ fn collection(
     let header_payload = header.payload().to_vec();
     let mut items = Vec::new();
     let mut pending: Option<usize> = None;
+    let mut alternate_start = None;
+    let mut opaque = Vec::new();
+    let mut prelude = Prelude::default();
     let mut end = None;
     while let Some(item) = records.next() {
         let item = item?;
         let start = base + item.offset();
         let stop = base + records.offset();
-        if item.kind() == kind::D_VAL_LIST {
-            pending.get_or_insert(start);
-        } else if item.kind() == kind::D_VAL {
-            items.push(pending.take().unwrap_or(start)..stop);
+        match prelude.feed(item.kind(), item.payload(), raw_limits)? {
+            Step::Begin => {
+                pending.get_or_insert(start);
+                alternate_start = Some(start);
+                continue;
+            },
+            Step::Content => continue,
+            Step::End { list } => {
+                let begin = alternate_start
+                    .take()
+                    .ok_or_else(|| invalid("unmatched alternate end"))?;
+                if !list {
+                    opaque.push(begin..stop);
+                }
+                continue;
+            },
+            Step::BareList => {
+                pending.get_or_insert(start);
+                continue;
+            },
+            Step::Other => {},
+        }
+        if item.kind() == kind::D_VAL {
+            let _ = prelude.take_list()?;
+            if items.len() >= MAX_VALIDATIONS {
+                return Err(invalid("too many validations"));
+            }
+            let begin = pending.take().unwrap_or(start);
+            items.push(Item {
+                span: begin..stop,
+                prefix: begin..start,
+                opaque: std::mem::take(&mut opaque),
+            });
         } else if item.kind() == kind::END_D_VALS {
+            prelude.finish()?;
             end = Some(start..stop);
         } else {
             return Err(invalid(
@@ -142,6 +182,10 @@ fn collection(
     let end = end.ok_or_else(|| invalid("a validation collection has no end"))?;
     if header_payload.len() != 18 {
         return Err(invalid("a validation collection header is not 18 bytes"));
+    }
+    let declared = u32::from_le_bytes(header_payload[14..18].try_into().unwrap());
+    if usize::try_from(declared).ok() != Some(items.len()) {
+        return Err(invalid("validation count does not match its records"));
     }
     Ok(Some(Collection {
         unit: unit.span.clone(),
@@ -185,7 +229,7 @@ impl Edit {
                 collection
                     .items
                     .iter()
-                    .map(|span| bytes[span.clone()].to_vec())
+                    .map(|item| bytes[item.span.clone()].to_vec())
                     .collect()
             })
             .unwrap_or_default();
@@ -196,14 +240,36 @@ impl Edit {
                 }
                 items.push(encoded);
             },
-            Change::Set(index, encoded) => {
+            Change::Set(index, encoded, keep_list) => {
+                let source = current
+                    .as_ref()
+                    .and_then(|collection| collection.items.get(index))
+                    .ok_or_else(|| invalid("the validation is missing"))?;
+                let mut replacement = Vec::new();
+                if keep_list {
+                    replacement.extend_from_slice(&bytes[source.prefix.clone()]);
+                    let start = Records::new(&encoded, raw_limits)
+                        .find_map(|record| match record {
+                            Ok(record) if record.kind() == kind::D_VAL => Some(Ok(record.offset())),
+                            Ok(_) => None,
+                            Err(error) => Some(Err(error)),
+                        })
+                        .transpose()?
+                        .ok_or_else(|| invalid("encoded validation is missing"))?;
+                    replacement.extend_from_slice(&encoded[start..]);
+                } else {
+                    for span in &source.opaque {
+                        replacement.extend_from_slice(&bytes[span.clone()]);
+                    }
+                    replacement.extend_from_slice(&encoded);
+                }
                 let slot = items
                     .get_mut(index)
                     .ok_or_else(|| invalid("the validation is missing"))?;
-                if *slot == encoded {
+                if *slot == replacement {
                     return Ok(false);
                 }
-                *slot = encoded;
+                *slot = replacement;
             },
             Change::Remove(index) => {
                 if index >= items.len() {
@@ -275,8 +341,16 @@ impl Edit {
     ///
     /// The errors of [`Self::add`], and an error for a missing position.
     pub fn set(&mut self, sheet: usize, index: usize, validation: Validation) -> Result<bool> {
+        let existing = self.validations(sheet)?;
+        let previous = existing
+            .get(index)
+            .ok_or_else(|| invalid("the validation is missing"))?;
+        if previous == &validation {
+            return Ok(false);
+        }
+        let keep_list = previous.list_formula == validation.list_formula;
         let encoded = encode(&validation, self.staged.raw_limits())?;
-        self.publish(sheet, Change::Set(index, encoded))
+        self.publish(sheet, Change::Set(index, encoded, keep_list))
     }
 
     /// Remove the classic validation at `index`.
@@ -303,7 +377,7 @@ impl Edit {
 
 enum Change {
     Add(Vec<u8>),
-    Set(usize, Vec<u8>),
+    Set(usize, Vec<u8>, bool),
     Remove(usize),
 }
 

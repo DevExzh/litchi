@@ -191,3 +191,25 @@ fn native_rtf_edit_reopen_and_inverse_keep_the_original_word_source() {
         "Native Word edited through File"
     );
 }
+
+#[test]
+fn native_rtf_math_opens_through_the_facade_and_unmodeled_grouping_is_typed() {
+    let file = native("word/word-math-navigation.rtf", FileFormat::Rtf);
+    assert!(file.text().unwrap().contains("MATH_NAVIGATION_END_005"));
+    assert_eq!(
+        file.to_bytes().unwrap().as_slice(),
+        include_bytes!("../../../test-data/microsoft-office/word/word-math-navigation.rtf")
+    );
+    let error = litchi::open_bytes(
+        br"{\rtf1{\mmath{\*\moMathPara{\*\moMath{\mr x}}{\*\moMath{\mr y}}}}}".to_vec(),
+    )
+    .unwrap_err();
+    assert_eq!(error.code(), litchi::Code::UnsupportedCapability);
+    assert_eq!(error.format(), Some(FileFormat::Rtf));
+    assert!(
+        std::error::Error::source(&error)
+            .unwrap()
+            .to_string()
+            .contains("multiple equations in one math paragraph")
+    );
+}

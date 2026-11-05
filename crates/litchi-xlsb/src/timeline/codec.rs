@@ -19,12 +19,40 @@ use std::collections::BTreeMap;
 
 pub(crate) const X15: &str = "http://schemas.microsoft.com/office/spreadsheetml/2010/11/main";
 pub(crate) const XR10: &str = "http://schemas.microsoft.com/office/spreadsheetml/2016/revision10";
-pub(crate) const CACHE_CONTENT_TYPE: &str = "application/vnd.ms-excel.TimelineCache+xml";
+pub(crate) const CACHE_CONTENT_TYPE: &str = "application/vnd.ms-excel.timelineCache+xml";
 pub(crate) const CACHE_RELATIONSHIP_TYPE: &str =
-    "http://schemas.microsoft.com/office/2010/relationships/TimelineCache";
-pub(crate) const VIEWS_CONTENT_TYPE: &str = "application/vnd.ms-excel.Timeline+xml";
+    "http://schemas.microsoft.com/office/2011/relationships/timelineCache";
+pub(crate) const VIEWS_CONTENT_TYPE: &str = "application/vnd.ms-excel.timeline+xml";
 pub(crate) const VIEWS_RELATIONSHIP_TYPE: &str =
-    "http://schemas.microsoft.com/office/2010/relationships/Timeline";
+    "http://schemas.microsoft.com/office/2011/relationships/timeline";
+
+// Accept the historical Litchi spellings while authoring Office's canonical
+// content and relationship types.
+pub(crate) fn is_cache_relationship(value: &str) -> bool {
+    matches!(
+        value,
+        CACHE_RELATIONSHIP_TYPE
+            | "http://schemas.microsoft.com/office/2010/relationships/TimelineCache"
+    )
+}
+pub(crate) fn is_views_relationship(value: &str) -> bool {
+    matches!(
+        value,
+        VIEWS_RELATIONSHIP_TYPE | "http://schemas.microsoft.com/office/2010/relationships/Timeline"
+    )
+}
+pub(crate) fn is_cache_content(value: &str) -> bool {
+    matches!(
+        value,
+        CACHE_CONTENT_TYPE | "application/vnd.ms-excel.TimelineCache+xml"
+    )
+}
+pub(crate) fn is_views_content(value: &str) -> bool {
+    matches!(
+        value,
+        VIEWS_CONTENT_TYPE | "application/vnd.ms-excel.Timeline+xml"
+    )
+}
 
 const MAX_XML_BYTES: usize = 16 * 1024 * 1024;
 const MAX_NODES: usize = 250_000;
@@ -83,6 +111,15 @@ fn attributes(
             .decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
             .map_err(|_error| invalid("invalid XML attribute value"))?
             .into_owned();
+        if attribute.key.local_name().as_ref() == b"Ignorable"
+            && matches!(reader.resolver().resolve_attribute(attribute.key).0,
+                ResolveResult::Bound(Namespace(namespace))
+                    if namespace == b"http://schemas.openxmlformats.org/markup-compatibility/2006")
+        {
+            // The typed codec still rejects unknown elements/attributes;
+            // this directive itself adds no timeline semantic value.
+            continue;
+        }
         if result.insert(key.clone(), value).is_some() {
             return Err(invalid("duplicate XML attribute"));
         }
@@ -536,7 +573,7 @@ pub fn write_views(value: &Views, xml_limits: litchi_core::Limits) -> Result<Vec
     output.push_str(X15);
     output.push_str("\" xmlns:xr10=\"");
     output.push_str(XR10);
-    output.push_str("\">");
+    output.push_str("\" xmlns:mc=\"http://schemas.openxmlformats.org/markup-compatibility/2006\" mc:Ignorable=\"xr10\">");
     for view in &value.items {
         output.push_str("<x15:timeline");
         attr_write(&mut output, "name", &view.name);

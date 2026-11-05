@@ -62,7 +62,7 @@ fn absent_insert_uses_future_record_anchor_and_preserves_outside_bytes() {
     let mut block_end = None;
     let mut records = Records::new(after, crate::raw::Limits::DEFAULT);
     while let Some(record) = records.next() {
-        if record.unwrap().kind() == kind::END_SPARKLINE_GROUPS {
+        if record.unwrap().kind() == kind::FRT_END {
             block_end = Some(records.offset());
             break;
         }
@@ -73,7 +73,7 @@ fn absent_insert_uses_future_record_anchor_and_preserves_outside_bytes() {
 }
 
 #[test]
-fn rejects_sparkline_family_inside_or_after_the_frt_tail() {
+fn accepts_an_owned_frt_envelope_but_rejects_a_bare_block_after_the_tail() {
     let block = super::encode_block(&groups(), Limits::DEFAULT).unwrap();
     let prefix = stream(&[
         (kind::BEGIN_SHEET, &[]),
@@ -84,7 +84,11 @@ fn rejects_sparkline_family_inside_or_after_the_frt_tail() {
     let close = stream(&[(kind::FRT_END, &[]), (kind::END_SHEET, &[])]);
 
     let inside = [&prefix[..], &block, &close].concat();
-    assert!(read(&inside, Limits::DEFAULT).is_err());
+    let parsed = read(&inside, Limits::DEFAULT).unwrap();
+    assert_eq!(parsed.groups(), Some(&groups()));
+    let mut edit = parsed.edit();
+    assert!(edit.remove());
+    assert_eq!(edit.commit().unwrap().patch().after(), empty_sheet());
 
     let closed_tail = stream(&[
         (kind::BEGIN_SHEET, &[]),
@@ -124,7 +128,8 @@ fn validates_nested_frt_tail_balance_and_preserves_balanced_tail() {
             *end = record.offset();
             Some((record.kind(), record.offset()))
         })
-        .find_map(|(record, start)| (record == kind::FRT_BEGIN).then_some(start))
+        .filter_map(|(record, start)| (record == kind::FRT_BEGIN).then_some(start))
+        .nth(1)
         .unwrap();
     assert_eq!(
         block_end,
@@ -132,6 +137,7 @@ fn validates_nested_frt_tail_balance_and_preserves_balanced_tail() {
             + super::encode_block(&groups(), Limits::DEFAULT)
                 .unwrap()
                 .len()
+            + 8 // Newly authored BrtFRTBegin (6 bytes) and BrtFRTEnd (2).
     );
     assert_eq!(&commit.patch().after()[block_end..], &nested[anchor..]);
 
@@ -273,7 +279,7 @@ fn worksheet_source_and_candidate_byte_limits_are_exact_and_atomic() {
     ));
 
     let encoded = super::encode_block(&groups(), Limits::DEFAULT).unwrap();
-    let candidate_len = source.len() + encoded.len();
+    let candidate_len = source.len() + encoded.len() + 8; // Future-record envelope.
     let exact = Limits::DEFAULT
         .with_block_bytes(encoded.len())
         .unwrap()

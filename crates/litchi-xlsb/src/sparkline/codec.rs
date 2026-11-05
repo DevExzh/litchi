@@ -39,7 +39,7 @@ pub(crate) fn parse_block(input: &[u8], limits: Limits) -> Result<(Groups, usize
     let mut groups = Vec::new();
     let mut total_items = 0usize;
     loop {
-        let record = next(
+        let mut record = next(
             &mut records,
             "BrtBeginSparklineGroup or BrtEndSparklineGroups",
         )?;
@@ -47,6 +47,10 @@ pub(crate) fn parse_block(input: &[u8], limits: Limits) -> Result<(Groups, usize
         if record.kind() == kind::END_SPARKLINE_GROUPS {
             empty(record, "BrtEndSparklineGroups")?;
             break;
+        }
+        let mut prefix = Vec::new();
+        if record.kind() == kind::AC_BEGIN {
+            (prefix, record) = alternate_prefix(record, &mut records, input, limits)?;
         }
         expect_kind(
             record,
@@ -57,7 +61,8 @@ pub(crate) fn parse_block(input: &[u8], limits: Limits) -> Result<(Groups, usize
         groups
             .try_reserve(1)
             .map_err(|_| allocation("group collection"))?;
-        let group = parse_group(record.payload(), &mut records, limits, total_items)?;
+        let mut group = parse_group(record.payload(), &mut records, input, limits, total_items)?;
+        group.alternate_before = prefix;
         total_items = total_items
             .checked_add(group.sparklines().len())
             .ok_or(Error::Limit {
@@ -86,8 +91,10 @@ pub(crate) fn encode_block(value: &Groups, limits: Limits) -> Result<Vec<u8>> {
     let mut writer = Encoder::new(output, raw::Limits::new(limits.record_bytes(), 1));
     writer.write_record(kind::BEGIN_SPARKLINE_GROUPS, &[])?;
     for group in value.as_slice() {
+        writer.write_encoded_records(&group.alternate_before)?;
         let payload = encode_group_payload(group, limits)?;
         writer.write_record(kind::BEGIN_SPARKLINE_GROUP, &payload)?;
+        writer.write_encoded_records(&group.alternate_inside)?;
         writer.write_record(kind::BEGIN_SPARKLINES, &[])?;
         for sparkline in group.sparklines() {
             let payload = encode_sparkline_payload(sparkline, limits)?;
@@ -105,6 +112,7 @@ pub(crate) fn encode_block(value: &Groups, limits: Limits) -> Result<Vec<u8>> {
 fn parse_group(
     payload: &[u8],
     records: &mut Records<'_>,
+    input: &[u8],
     limits: Limits,
     prior_items: usize,
 ) -> Result<Group> {
@@ -188,7 +196,11 @@ fn parse_group(
     let maximum = Axis::new(axis_kind(individual_max, group_max), manual_max)?;
     let minimum = Axis::new(axis_kind(individual_min, group_min), manual_min)?;
 
-    let begin = next(records, "BrtBeginSparklines")?;
+    let mut begin = next(records, "BrtBeginSparklines")?;
+    let mut prefix = Vec::new();
+    if begin.kind() == kind::AC_BEGIN {
+        (prefix, begin) = alternate_prefix(begin, records, input, limits)?;
+    }
     enforce_block_bytes(records.offset(), limits)?;
     expect_kind(begin, kind::BEGIN_SPARKLINES, "BrtBeginSparklines")?;
     empty(begin, "BrtBeginSparklines")?;
@@ -225,7 +237,7 @@ fn parse_group(
     expect_kind(end, kind::END_SPARKLINE_GROUP, "BrtEndSparklineGroup")?;
     empty(end, "BrtEndSparklineGroup")?;
 
-    Group::from_wire(
+    let mut group = Group::from_wire(
         kind,
         empty_cells,
         options,
@@ -237,7 +249,9 @@ fn parse_group(
         date_formula,
         items,
         limits,
-    )
+    )?;
+    group.alternate_inside = prefix;
+    Ok(group)
 }
 
 fn parse_sparkline(payload: &[u8], limits: Limits) -> Result<Sparkline> {
@@ -474,6 +488,8 @@ fn write_formula(output: &mut Vec<u8>, formula: &Formula) -> Result<()> {
 fn encoded_block_len(groups: &Groups) -> Result<usize> {
     let mut total = record_len(0)?;
     for group in groups.as_slice() {
+        total = checked_add(total, group.alternate_before.len())?;
+        total = checked_add(total, group.alternate_inside.len())?;
         let formula = group
             .date_formula()
             .map(encoded_formula_len)
@@ -603,4 +619,67 @@ const fn axis_flags(kind: AxisType, individual: u16, group: u16) -> u16 {
         AxisType::Group => group,
         AxisType::Custom => 0,
     }
+}
+
+fn alternate_prefix<'a>(
+    first: Record<'a>,
+    records: &mut Records<'a>,
+    input: &[u8],
+    limits: Limits,
+) -> Result<(Vec<u8>, Record<'a>)> {
+    let payload = first.payload();
+    if payload.len() < 2 {
+        return Err(value(
+            "sparkline alternate prefix",
+            "short product version array",
+        ));
+    }
+    let count = usize::from(u16::from_le_bytes([payload[0], payload[1]]));
+    if count == 0 || payload.len() != 2 + count * 4 {
+        return Err(value(
+            "sparkline alternate prefix",
+            "invalid product version count",
+        ));
+    }
+    let mut content = false;
+    loop {
+        let record = next(records, "BrtACEnd")?;
+        enforce_block_bytes(records.offset(), limits)?;
+        match record.kind() {
+            kind::AC_END => {
+                empty(record, "BrtACEnd")?;
+                if !content {
+                    return Err(value("sparkline alternate prefix", "empty block"));
+                }
+                break;
+            },
+            kind::AC_BEGIN
+            | kind::FRT_BEGIN
+            | kind::FRT_END
+            | kind::BEGIN_SPARKLINE_GROUPS
+            | kind::END_SPARKLINE_GROUPS
+            | kind::BEGIN_SPARKLINE_GROUP
+            | kind::END_SPARKLINE_GROUP
+            | kind::BEGIN_SPARKLINES
+            | kind::END_SPARKLINES
+            | kind::SPARKLINE => {
+                return Err(value(
+                    "sparkline alternate prefix",
+                    "unterminated or nested block",
+                ));
+            },
+            _ => content = true,
+        }
+    }
+    let raw = input
+        .get(first.offset()..records.offset())
+        .ok_or_else(|| value("sparkline alternate prefix", "invalid source range"))?;
+    let mut prefix = Vec::new();
+    prefix
+        .try_reserve_exact(raw.len())
+        .map_err(|_| allocation("alternate prefix"))?;
+    prefix.extend_from_slice(raw);
+    let record = next(records, "record after alternate prefix")?;
+    enforce_block_bytes(records.offset(), limits)?;
+    Ok((prefix, record))
 }

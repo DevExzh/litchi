@@ -435,11 +435,11 @@ mod tests {
     }
 
     /// The cursor's cells, each read from the grid it names.
-    fn streamed(sheet: &super::SourceBackedWorksheet) -> Option<Listed> {
+    fn streamed(sheet: &super::SourceBackedWorksheet, path: &Path) -> Option<Listed> {
         let mut cursor = sheet.cell_cursor().ok()?;
         let mut out = Vec::new();
         while let Some(at) = cursor.next() {
-            let at = at.unwrap();
+            let at = at.unwrap_or_else(|error| panic!("{}: {error:?}", path.display()));
             let cell = cursor.grid().unwrap().cell_at(at).unwrap().unwrap();
             out.push((at, cell.value().clone()));
         }
@@ -464,7 +464,7 @@ mod tests {
                 continue;
             };
             for sheet in worksheets {
-                let streamed = streamed(&sheet);
+                let streamed = streamed(&sheet, &path);
                 let complete = complete(&sheet);
                 match streamed {
                     // A cursor refused before its first cell: so is the grid.
@@ -512,7 +512,10 @@ mod tests {
         assert_eq!(stages, [false, true]);
         let fresh = generated(5_000, 0..5_000);
         let sheet = fresh.worksheet_by_index(0).unwrap().unwrap();
-        assert_eq!(streamed(&sheet), complete(&sheet));
+        assert_eq!(
+            streamed(&sheet, Path::new("generated workbook")),
+            complete(&sheet)
+        );
         // Once the grid is resident, the cursor reads it.
         let mut cursor = sheet.cell_cursor().unwrap();
         cursor.next().unwrap().unwrap();

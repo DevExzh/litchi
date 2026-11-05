@@ -1740,6 +1740,50 @@ pub(crate) struct SheetLayout {
 }
 
 impl SheetLayout {
+    /// Prove one post-cell-table boundary without allocating a complete unit
+    /// index. Unknown unwrapped records keep the result conservative.
+    pub(crate) fn is_top_level_boundary(
+        data: &[u8],
+        limits: crate::raw::Limits,
+        wanted: usize,
+    ) -> Result<bool> {
+        let mut after_cells = false;
+        let mut known = true;
+        let mut stack = [kind::END_SHEET; 64];
+        let mut depth = 0usize;
+        for record in Records::new(data, limits) {
+            let record = record?;
+            if record.offset() == wanted {
+                return Ok(after_cells && known && depth == 0);
+            }
+            if record.offset() > wanted {
+                return Ok(false);
+            }
+            let current = record.kind();
+            if !after_cells {
+                after_cells = current == kind::END_SHEET_DATA;
+                continue;
+            }
+            if depth > 0 && stack[depth - 1] == current {
+                depth -= 1;
+            } else if let Some((_, end, _)) = BLOCKS.iter().find(|(begin, _, _)| *begin == current)
+            {
+                if depth == stack.len() {
+                    return Err(invalid("worksheet collection nesting exceeds 64"));
+                }
+                stack[depth] = *end;
+                depth += 1;
+            } else if BLOCKS.iter().any(|(_, end, _)| *end == current) {
+                return Err(invalid(
+                    "worksheet record closes a collection it did not open",
+                ));
+            } else if depth == 0 && !SINGLES.iter().any(|(single, _)| *single == current) {
+                known = false;
+            }
+        }
+        Ok(false)
+    }
+
     /// Scan a worksheet stream under the owning workbook's raw policy.
     pub(crate) fn scan_with_limits(data: &[u8], limits: crate::raw::Limits) -> Result<Self> {
         let mut records = Records::new(data, limits);

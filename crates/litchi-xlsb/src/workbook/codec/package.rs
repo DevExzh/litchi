@@ -468,12 +468,6 @@ impl Workbook {
                 })
             },
             Kind::Workbook | Kind::Ole => {
-                if relationships.len() != 1 {
-                    return Err(crate::package::error::Error::InvalidFormula(
-                        "external workbook/OLE link must have exactly one data-source relationship",
-                    ));
-                }
-
                 let relationship_id = parsed.relationship_id().ok_or({
                     crate::package::error::Error::InvalidFormula(
                         "external workbook/OLE link has no data-source relationship ID",
@@ -502,6 +496,16 @@ impl Workbook {
                 if !allowed_relationship_types.contains(&relationship.reltype()) {
                     return Err(crate::package::error::Error::InvalidFormula(
                         "relationship has invalid type",
+                    ));
+                }
+                // Native Excel can store both relative and absolute data
+                // source paths. The BrtBeginSupBook ID selects the target;
+                // retain alternate external paths without opening any of them.
+                if relationships.iter().any(|rel| {
+                    !rel.is_external() || !allowed_relationship_types.contains(&rel.reltype())
+                }) {
+                    return Err(crate::package::error::Error::InvalidFormula(
+                        "external link has an invalid alternate data-source relationship",
                     ));
                 }
 
