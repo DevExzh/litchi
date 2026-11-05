@@ -1,4 +1,4 @@
-# Parity-test names of crates/litchi-iwa/tests/parity at 4dbfe29241 (the harness was deleted by record 0429).
+# Parity-test names of crates/litchi-iwa/tests/parity at 4d8a3e161f (the harness was deleted by record 0429).
 test	file
 builder_body_table_cost_abba	crates/litchi-iwa/tests/parity/pages_builder_cases.rs
 builder_language_locale_cost_abba	crates/litchi-iwa/tests/parity/pages_builder_cases.rs
@@ -556,7 +556,8 @@ numbers_media_assets_read_parity	crates/litchi-iwa/tests/parity/numbers_media_ca
 numbers_media_catalog_parity	crates/litchi-iwa/tests/parity/media_cases.rs
 numbers_media_extraction_parity	crates/litchi-iwa/tests/parity/media_cases.rs
 numbers_media_replace_parity	crates/litchi-iwa/tests/parity/numbers_media_cases.rs
-numbers_native_conditional_highlight_volatile_is_refused	crates/litchi-iwa/tests/parity/numbers_volatile_highlight_cases.rs
+numbers_native_conditional_highlight_volatile_host_fails_leaf_registers	crates/litchi-iwa/tests/parity/numbers_volatile_highlight_cases.rs
+numbers_native_pivot_formula_host_and_leaf_both_write	crates/litchi-iwa/tests/parity/numbers_pivot_formula_cases.rs
 numbers_owned_table_cell_cost_abba	crates/litchi-iwa/tests/parity/numbers_pivot_owner_cell_cases.rs
 numbers_owned_table_value_write_is_admitted	crates/litchi-iwa/tests/parity/numbers_pivot_owner_cell_cases.rs
 numbers_package_lifecycle_parity	crates/litchi-iwa/tests/parity/owner_io_cases.rs
@@ -564,6 +565,7 @@ numbers_physical_access_parity	crates/litchi-iwa/tests/parity/physical_cases.rs
 numbers_pivot_categories_cost_abba	crates/litchi-iwa/tests/parity/numbers_pivot_cases.rs
 numbers_pivot_categories_read_parity	crates/litchi-iwa/tests/parity/numbers_pivot_cases.rs
 numbers_pivot_formula_author_cost_abba	crates/litchi-iwa/tests/parity/numbers_pivot_formula_cases.rs
+numbers_pivot_formula_author_inline_only_parity	crates/litchi-iwa/tests/parity/numbers_pivot_formula_cases.rs
 numbers_pivot_formula_author_parity	crates/litchi-iwa/tests/parity/numbers_pivot_formula_cases.rs
 numbers_pivot_formula_author_referenced_tree_parity	crates/litchi-iwa/tests/parity/numbers_pivot_formula_cases.rs
 numbers_pivot_formula_author_without_cache_parity	crates/litchi-iwa/tests/parity/numbers_pivot_formula_cases.rs

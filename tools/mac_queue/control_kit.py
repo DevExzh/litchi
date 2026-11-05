@@ -462,7 +462,7 @@ GROUP_C = [
     ("P1143", "numbers_pivot_formula_author_without_cache_parity"),
     ("P1144", "numbers_pivot_formula_author_parity"),
 ]
-# Objects of the synthetic pivot fixture (crates/litchi-iwa/tests/parity/numbers_pivot_cases.rs).
+# Objects of the synthetic pivot fixture (crates/litchi-numbers/tests/pivot_synthetic_group_bys.rs).
 CYCLE = {9_100_020, 9_100_021, 9_100_022, 9_100_023}
 OTHERS = {9_100_002, 9_100_003, 9_100_030, 9_100_031, 9_100_040}
 INLINE = {9_100_010}

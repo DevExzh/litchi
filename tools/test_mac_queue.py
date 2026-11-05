@@ -130,11 +130,15 @@ class RealQueueTests(unittest.TestCase):
                 if source.kind == "example":
                     self.assertIn(source.name, mac_queue.example_stems(), f"line {row.line}")
 
-    def test_parity_tests_come_from_the_snapshot_without_the_harness(self) -> None:
-        self.assertFalse((mac_queue.ROOT / mac_queue.PARITY_DIR).exists())
+    def test_parity_tests_come_from_the_snapshot(self) -> None:
         tests = mac_queue.parity_tests()
-        self.assertEqual(len(tests), 1400)
-        self.assertTrue(all(path.startswith(str(mac_queue.PARITY_DIR)) for path in tests.values()))
+        self.assertEqual(len(tests), 1402)
+        self.assertIn("numbers_pivot_formula_author_inline_only_parity", tests)
+        self.assertTrue(all(path.endswith(".rs") for path in tests.values()))
+
+    def test_generation_refuses_to_rebuild_the_dumps(self) -> None:
+        with self.assertRaisesRegex(SystemExit, "cannot be rebuilt"):
+            generate.main(["--out", str(Path(tempfile.gettempdir()) / "unused")])
 
     def test_explicit_cases_exist(self) -> None:
         tests = mac_queue.parity_tests()
@@ -156,9 +160,9 @@ class FakeRepository:
         self.out = base / "out"
         (self.root / "docs/unified-ops").mkdir(parents=True)
         (self.root / "docs/unified-ops/0375b-chart-text.md").write_text("record\n")
-        parity = self.root / "crates/litchi-iwa/tests/parity"
-        parity.mkdir(parents=True)
-        parity.joinpath("x.rs").write_text("".join(f"#[test]\nfn {name}() {{}}\n" for name in TESTS))
+        snapshot = self.root / mac_queue.PARITY_SNAPSHOT
+        snapshot.parent.mkdir(parents=True)
+        snapshot.write_text("# frozen\ntest\tfile\n" + "".join(f"{name}\tx.rs\n" for name in TESTS))
         (self.root / "test-data/iwork/pages").mkdir(parents=True)
         self.fixture = b"tracked pages fixture"
         (self.root / "test-data/iwork/pages/basic.pages").write_bytes(self.fixture)
