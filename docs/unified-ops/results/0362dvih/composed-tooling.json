@@ -13,7 +13,7 @@
   "exit_code": 0,
   "tests": 41,
   "elapsed_seconds": 7.98,
-  "log": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/drawingml-raw-owner-composed/tooling.log",
+  "log": "(deleted-coord-artifact)/tooling.log",
   "log_bytes": 374,
   "log_sha256": "ce600d9722c9be704b394003766b0ba9cdc393e6615dfd710e6daee44e59687c",
   "resolution": "Only adapter-pin table conflicted; all entries rehashed from composed files, preserving1adCargo/lib andowner/rawchanges."

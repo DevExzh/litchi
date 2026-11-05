@@ -26,7 +26,7 @@
     "fixture": "IWA_MESSAGE_COUNT in {1,8,32,128}; setup and archive encoding outside timed loop",
     "iterations": "per operation = (Ir at 12000 - Ir at 2000) / 10000",
     "noncanonical_route": "retained_validate (64 unknown fields and noncanonical unknown varint in retained header)",
-    "raw_artifacts": "/home/zhuhe/code/litchi-worktrees/.coord/constructor-0361f-coordinator/count-callgrind-v3",
+    "raw_artifacts": "(deleted-coord-artifact)",
     "tool": "valgrind --tool=callgrind"
   },
   "results": {
@@ -314,13 +314,13 @@
   "schema": "litchi.iwa-constructor-repair.v2",
   "source": {
     "base_binary": {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/constructor-0361f-coordinator/count-target-base/release/iwa-constructor-probe",
+      "path": "(deleted-coord-artifact)/iwa-constructor-probe",
       "sha256": "cce613ebdc209e4b272e87396a6947cfb1d4ffcc53b5898bfec64cb00993109b",
       "size": 630816
     },
     "base_commit": "ddf2ac8ae2117cd78829ef94bcb610d6cbdfa0e2",
     "candidate_binary": {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/constructor-0361f-coordinator/count-target-candidate/release/iwa-constructor-probe",
+      "path": "(deleted-coord-artifact)/iwa-constructor-probe",
       "sha256": "5d0000fa6977b5bbdd6d8d7367e083ab50ad1c2648ff45ef1606115c8bc18c3b",
       "size": 647600
     },

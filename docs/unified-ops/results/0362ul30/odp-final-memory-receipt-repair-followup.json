@@ -9,7 +9,7 @@
     "prior_commit": "2a20b44488"
   },
   "preserved_build_packet": {
-    "root": "/home/zhuhe/code/litchi-worktrees/.coord/odp-final-build-prep-472b670547-repair-11858e697f",
+    "root": "(deleted-coord-artifact)",
     "input_sha256": "92babe0b6243cdf903830b9b2a6d796604cade3a0c3b2c9724caa796391ee76d",
     "plan_sha256": "0e96988db9add9de7d0f91f792ef8379d995a6083dac559b70d032a1a67a589e",
     "build_handoff_sha256": "be60e8b150675818451a1962aea9d1dc32e3e51e74b51956ec910d0632088f2e",
@@ -24,17 +24,17 @@
   },
   "frozen_final": {
     "memory_protocol": {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/odp-final-memory-qualification-2a20b44488-final/memory-protocol.json",
+      "path": "(deleted-coord-artifact)/memory-protocol.json",
       "bytes": 28914,
       "sha256": "868313fa19b0fd3652bf84644899406721d8f811641cf327f417eb4f9895b3ec"
     },
     "handoff": {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/odp-final-build-prep-472b670547-final-2a20b44488/final-handoff.json",
+      "path": "(deleted-coord-artifact)/final-handoff.json",
       "bytes": 3664,
       "sha256": "44617c1befa3fa8ade24b17046221e50dca2697af91c754d3d7fac4d385d999b"
     },
     "negative_partial_metrics": {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/odp-final-memory-qualification-2a20b44488-final/negative-partial-metrics-tests.log",
+      "path": "(deleted-coord-artifact)/negative-partial-metrics-tests.log",
       "bytes": 47,
       "sha256": "ca7e7743983a6fc3d6b5f59bff03b8e42ec358e675623c0f36c7d01f5447563d",
       "returncode": 0,

@@ -15,7 +15,7 @@
     "validator_receipt_sha256": "e22ada00b65934f4de5b561767175d4a12537da635e4a051c2b4bf9688f89f0d"
   },
   "receipt": {
-    "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-w2c-series-typed-errors-perf-babab049dfd5094f9bcc555e4d2beae7799a9fac/final-capture-receipt-v2.txt",
+    "path": "(deleted-coord-artifact)/final-capture-receipt-v2.txt",
     "sha256": "7f1d3772d6b0c75b9b7ac8ba8eac7d5ed87df5b298fb6bd4c53bffba7d8de0e5"
   },
   "routes": [

@@ -15,14 +15,14 @@
     }
   },
   "root": "/home/zhuhe/code/litchi-worktrees/uo2-budget-validation",
-  "target": "/home/zhuhe/code/litchi-worktrees/.coord/isolated-wsdoc/target",
+  "target": "(deleted-coord-artifact)",
   "policy": {
     "runner_files": {
-      "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/gate-safe-next-20261024/run_safe_gate.py": "0d8111c04bc9666566dab7c4f281a9f3fd7bb41efd64bd92703450abeee0bf14",
-      "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/gate-safe-next-20261024/safe_chunked_tests.py": "70fdb56c96e4ed9e1d1e0d2b1e9c7f1db148a2115fb25246d13464569290cc35",
-      "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/gate-safe-next-20261024/bin/cargo": "495e24c6f60b238378386d86ac4158cba904992ce8870a9494f2c4a0eedd256d"
+      "(deleted-coord-artifact)/run_safe_gate.py": "0d8111c04bc9666566dab7c4f281a9f3fd7bb41efd64bd92703450abeee0bf14",
+      "(deleted-coord-artifact)/safe_chunked_tests.py": "70fdb56c96e4ed9e1d1e0d2b1e9c7f1db148a2115fb25246d13464569290cc35",
+      "(deleted-coord-artifact)/cargo": "495e24c6f60b238378386d86ac4158cba904992ce8870a9494f2c4a0eedd256d"
     },
-    "cargo_wrapper": "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/gate-safe-next-20261024/bin/cargo",
+    "cargo_wrapper": "(deleted-coord-artifact)",
     "offline": true,
     "locked": true,
     "memory_max": "20G",
@@ -44,12 +44,12 @@
     "partial": true
   },
   "state": {
-    "path": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/wsdoc-49c25ef67f/state.json",
+    "path": "(deleted-coord-artifact)/state.json",
     "bytes": 6906,
     "sha256": "99ef0db900a02e54b9a9b1d5971fd41c0076e2b61850553ba9fab6e8aa7d6df3"
   },
   "plan": {
-    "path": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/wsdoc-49c25ef67f/plan.json",
+    "path": "(deleted-coord-artifact)/plan.json",
     "bytes": 21952,
     "sha256": "463d3c06a25612f2591936d88f6bbeaa88d16859b3e6e51f44852c59ff3dcb03"
   },
@@ -67,7 +67,7 @@
       "--all-features"
     ],
     "environment": {
-      "CARGO_TARGET_DIR": "/home/zhuhe/code/litchi-worktrees/.coord/isolated-wsdoc/target",
+      "CARGO_TARGET_DIR": "(deleted-coord-artifact)",
       "CARGO_NET_OFFLINE": "true",
       "LITCHI_MEM_MAX": "20G",
       "CARGO_BUILD_JOBS": "1",
@@ -78,7 +78,7 @@
     },
     "exit": 0,
     "seconds": 1057.4715530872345,
-    "log": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/wsdoc-49c25ef67f/34-wsdoc-attempt-1792827392719701687-1607544.log",
+    "log": "(deleted-coord-artifact)/34-wsdoc-attempt-1792827392719701687-1607544.log",
     "log_bytes": 0,
     "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "target_bytes_after": 4504969096,
@@ -138,15 +138,15 @@
       {
         "pid": "1607855",
         "cargo_command": "doc",
-        "target": "/home/zhuhe/code/litchi-worktrees/.coord/isolated-wsdoc/target"
+        "target": "(deleted-coord-artifact)"
       }
     ],
     "cargo_target_sizes": {
-      "/home/zhuhe/code/litchi-worktrees/.coord/isolated-wsdoc/target": {
+      "(deleted-coord-artifact)": {
         "bytes": 4504969096
       }
     },
-    "cargo_target_trace_file": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/wsdoc-49c25ef67f/34-wsdoc-attempt-1792827392719701687-1607544-cargo-targets.tsv",
+    "cargo_target_trace_file": "(deleted-coord-artifact)/34-wsdoc-attempt-1792827392719701687-1607544-cargo-targets.tsv",
     "cargo_target_trace_bytes": 75,
     "cargo_target_trace_sha256": "5386e56ea133eab8c9af40d42835f2080ae21cffac0f7c2be17557428564c5c5",
     "preflight": {
@@ -160,12 +160,12 @@
     "status": "passed"
   },
   "regenerator": {
-    "path": "/home/zhuhe/code/litchi-worktrees/.coord/record-wsdoc-20261024.py",
+    "path": "(deleted-coord-artifact)/record-wsdoc-20261024.py",
     "bytes": 1773,
     "sha256": "a6bec0ab899ab8d24414215a2928ee69eb854793859dc6e7d53d9dcd73fc33ec"
   },
   "regeneration_command": [
     "python3",
-    "/home/zhuhe/code/litchi-worktrees/.coord/record-wsdoc-20261024.py"
+    "(deleted-coord-artifact)"
   ]
 }

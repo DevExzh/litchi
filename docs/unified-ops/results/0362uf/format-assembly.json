@@ -10,7 +10,7 @@
       ],
       "exit": 1,
       "seconds": 27.92652893400009,
-      "log": "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/fmt-assembly-v1/check.log",
+      "log": "(deleted-coord-artifact)/check.log",
       "bytes": 92119,
       "sha256": "705894c817242c1c0795725e39c9280ec1d23be88b192232a88f8278cf9e55de",
       "files": [
@@ -49,7 +49,7 @@
       ],
       "exit": 0,
       "seconds": 29.254170318999968,
-      "log": "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/fmt-assembly-v2/check.log",
+      "log": "(deleted-coord-artifact)/check.log",
       "bytes": 0,
       "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
     }
@@ -79,7 +79,7 @@
     "docs/unified-ops/results/0362ye/route_after.rs"
   ],
   "patch": {
-    "path": "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/fmt-assembly-v2/applied.patch",
+    "path": "(deleted-coord-artifact)/applied.patch",
     "bytes": 85461,
     "sha256": "b9983c88ecf30bdd2e0d113979625841c50e620ba65903c411970ebc27603faf"
   },

@@ -1,10 +1,10 @@
 {
   "build": {
     "argv": [
-      "/home/zhuhe/code/litchi-worktrees/.coord/bin/cargo",
+      "(deleted-coord-artifact)",
       "build",
       "--manifest-path",
-      "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/drawingml-native-5c67/driver/Cargo.toml",
+      "(deleted-coord-artifact)",
       "--release",
       "--locked",
       "--offline",
@@ -15,7 +15,7 @@
     ],
     "binary": {
       "bytes": 5112712,
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/drawingml-native-5c67/target/release/drawingml-raw-native",
+      "path": "(deleted-coord-artifact)/drawingml-raw-native",
       "sha256": "8167cc94e15ba6966edff9fd7e716851f69b229fac9f3a28b71090120f9fb934"
     },
     "cwd": "/home/zhuhe/code/litchi-worktrees/uo2-drawingml-native-raw-repair",
@@ -23,9 +23,9 @@
       "CARGO_BUILD_JOBS": "1",
       "CARGO_INCREMENTAL": "0",
       "CARGO_PROFILE_RELEASE_DEBUG": "0",
-      "CARGO_TARGET_DIR": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/drawingml-native-5c67/target",
+      "CARGO_TARGET_DIR": "(deleted-coord-artifact)",
       "LITCHI_MEM_MAX": "20G",
-      "PATH_prepend": "/home/zhuhe/code/litchi-worktrees/.coord/bin"
+      "PATH_prepend": "(deleted-coord-artifact)"
     },
     "exit": 0,
     "shell_limits": {
@@ -44,7 +44,7 @@
   },
   "candidate": {
     "revision": "5c67e58938c30d76bf281f722c849a7060b506e9",
-    "root": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/drawingml-native-5c67/source",
+    "root": "(deleted-coord-artifact)",
     "status": "",
     "tree": "23ddddbf4a0cdfa2dfe1dfe51a07cf1a44cf02b8"
   },
@@ -52,12 +52,12 @@
   "inputs": {
     "driver_lock": {
       "bytes": 29747,
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/drawingml-native-5c67/driver/Cargo.lock",
+      "path": "(deleted-coord-artifact)/Cargo.lock",
       "sha256": "93878f7a5925cb0484a770bdfb7132cb124dd43c7d37a31ad08fe19b0d8dd741"
     },
     "driver_manifest": {
       "bytes": 943,
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/drawingml-native-5c67/driver/Cargo.toml",
+      "path": "(deleted-coord-artifact)/Cargo.toml",
       "sha256": "52651d83e94b58e264ae83f569cf8c24ff53de1f5e6c75ffbbd94b57eac022b8"
     },
     "fixture_descriptor": {
@@ -67,12 +67,12 @@
     },
     "probe": {
       "bytes": 186531,
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/drawingml-native-5c67/driver/src/drawingml_raw_probe.rs",
+      "path": "(deleted-coord-artifact)/drawingml_raw_probe.rs",
       "sha256": "cfdb50ff37ccdf8d4e6ebef08bbdb634579b3da266b4dd165cc41fe6bbfe18a6"
     },
     "source_cargo_toml": {
       "bytes": 10672,
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/drawingml-native-5c67/source/Cargo.toml",
+      "path": "(deleted-coord-artifact)/Cargo.toml",
       "sha256": "f5ec007892023b38f1deaef1ce20714db58b58448a3bea088be3b847b84570de"
     }
   },
@@ -83,7 +83,7 @@
   "preflights": [
     {
       "argv": [
-        "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/drawingml-native-5c67/target/release/drawingml-raw-native",
+        "(deleted-coord-artifact)",
         "--lane",
         "drawingml-chart-raw",
         "--endpoint",
@@ -110,19 +110,19 @@
         "150",
         "--preflight",
         "--json",
-        "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/drawingml-native-5c67/preflight/drawingml-chart-raw.json"
+        "(deleted-coord-artifact)"
       ],
       "cwd": "/home/zhuhe/code/litchi-worktrees/uo2-drawingml-native-raw-repair",
       "environment": {
         "LITCHI_MEM_MAX": "20G",
-        "PATH_prepend": "/home/zhuhe/code/litchi-worktrees/.coord/bin",
+        "PATH_prepend": "(deleted-coord-artifact)",
         "RUST_TEST_THREADS": "1"
       },
       "exit": 0,
       "id": "drawingml-chart-raw",
       "output": {
         "bytes": 1085,
-        "path": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/drawingml-native-5c67/preflight/drawingml-chart-raw.json",
+        "path": "(deleted-coord-artifact)/drawingml-chart-raw.json",
         "sha256": "f55d6b308139293c87be79e048f07aef32faf10bb08b940ba4e1e957ba153711"
       },
       "shell_limits": {
@@ -131,18 +131,18 @@
       },
       "stderr": {
         "bytes": 0,
-        "path": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/drawingml-native-5c67/preflight/drawingml-chart-raw.json.stderr",
+        "path": "(deleted-coord-artifact)/drawingml-chart-raw.json.stderr",
         "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
       },
       "stdout": {
         "bytes": 0,
-        "path": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/drawingml-native-5c67/preflight/drawingml-chart-raw.json.stdout",
+        "path": "(deleted-coord-artifact)/drawingml-chart-raw.json.stdout",
         "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
       }
     },
     {
       "argv": [
-        "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/drawingml-native-5c67/target/release/drawingml-raw-native",
+        "(deleted-coord-artifact)",
         "--lane",
         "drawingml-diagram-raw",
         "--endpoint",
@@ -169,19 +169,19 @@
         "150",
         "--preflight",
         "--json",
-        "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/drawingml-native-5c67/preflight/drawingml-diagram-raw.json"
+        "(deleted-coord-artifact)"
       ],
       "cwd": "/home/zhuhe/code/litchi-worktrees/uo2-drawingml-native-raw-repair",
       "environment": {
         "LITCHI_MEM_MAX": "20G",
-        "PATH_prepend": "/home/zhuhe/code/litchi-worktrees/.coord/bin",
+        "PATH_prepend": "(deleted-coord-artifact)",
         "RUST_TEST_THREADS": "1"
       },
       "exit": 0,
       "id": "drawingml-diagram-raw",
       "output": {
         "bytes": 1100,
-        "path": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/drawingml-native-5c67/preflight/drawingml-diagram-raw.json",
+        "path": "(deleted-coord-artifact)/drawingml-diagram-raw.json",
         "sha256": "e0ef246744496ab3ac4390b737136148086e81b4689196dc432cb37ba472331e"
       },
       "shell_limits": {
@@ -190,18 +190,18 @@
       },
       "stderr": {
         "bytes": 0,
-        "path": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/drawingml-native-5c67/preflight/drawingml-diagram-raw.json.stderr",
+        "path": "(deleted-coord-artifact)/drawingml-diagram-raw.json.stderr",
         "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
       },
       "stdout": {
         "bytes": 0,
-        "path": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/drawingml-native-5c67/preflight/drawingml-diagram-raw.json.stdout",
+        "path": "(deleted-coord-artifact)/drawingml-diagram-raw.json.stdout",
         "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
       }
     },
     {
       "argv": [
-        "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/drawingml-native-5c67/target/release/drawingml-raw-native",
+        "(deleted-coord-artifact)",
         "--lane",
         "drawingml-text-media-raw",
         "--endpoint",
@@ -228,19 +228,19 @@
         "150",
         "--preflight",
         "--json",
-        "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/drawingml-native-5c67/preflight/drawingml-text-media-raw.json"
+        "(deleted-coord-artifact)"
       ],
       "cwd": "/home/zhuhe/code/litchi-worktrees/uo2-drawingml-native-raw-repair",
       "environment": {
         "LITCHI_MEM_MAX": "20G",
-        "PATH_prepend": "/home/zhuhe/code/litchi-worktrees/.coord/bin",
+        "PATH_prepend": "(deleted-coord-artifact)",
         "RUST_TEST_THREADS": "1"
       },
       "exit": 0,
       "id": "drawingml-text-media-raw",
       "output": {
         "bytes": 2299,
-        "path": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/drawingml-native-5c67/preflight/drawingml-text-media-raw.json",
+        "path": "(deleted-coord-artifact)/drawingml-text-media-raw.json",
         "sha256": "b651bdccfdfd4857e49199ce49f11bdb0878c1e39d74e48813d006f35fe586fe"
       },
       "shell_limits": {
@@ -249,18 +249,18 @@
       },
       "stderr": {
         "bytes": 0,
-        "path": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/drawingml-native-5c67/preflight/drawingml-text-media-raw.json.stderr",
+        "path": "(deleted-coord-artifact)/drawingml-text-media-raw.json.stderr",
         "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
       },
       "stdout": {
         "bytes": 0,
-        "path": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/drawingml-native-5c67/preflight/drawingml-text-media-raw.json.stdout",
+        "path": "(deleted-coord-artifact)/drawingml-text-media-raw.json.stdout",
         "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
       }
     },
     {
       "argv": [
-        "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/drawingml-native-5c67/target/release/drawingml-raw-native",
+        "(deleted-coord-artifact)",
         "--lane",
         "drawingml-theme-ink",
         "--endpoint",
@@ -289,19 +289,19 @@
         "150",
         "--preflight",
         "--json",
-        "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/drawingml-native-5c67/preflight/drawingml-theme-ink-bulk.json"
+        "(deleted-coord-artifact)"
       ],
       "cwd": "/home/zhuhe/code/litchi-worktrees/uo2-drawingml-native-raw-repair",
       "environment": {
         "LITCHI_MEM_MAX": "20G",
-        "PATH_prepend": "/home/zhuhe/code/litchi-worktrees/.coord/bin",
+        "PATH_prepend": "(deleted-coord-artifact)",
         "RUST_TEST_THREADS": "1"
       },
       "exit": 0,
       "id": "drawingml-theme-ink-bulk",
       "output": {
         "bytes": 1492,
-        "path": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/drawingml-native-5c67/preflight/drawingml-theme-ink-bulk.json",
+        "path": "(deleted-coord-artifact)/drawingml-theme-ink-bulk.json",
         "sha256": "d152ef9c309a632f64944492deb02ed7ddf1f9c81af226b74982fec2082f6273"
       },
       "shell_limits": {
@@ -310,18 +310,18 @@
       },
       "stderr": {
         "bytes": 0,
-        "path": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/drawingml-native-5c67/preflight/drawingml-theme-ink-bulk.json.stderr",
+        "path": "(deleted-coord-artifact)/drawingml-theme-ink-bulk.json.stderr",
         "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
       },
       "stdout": {
         "bytes": 0,
-        "path": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/drawingml-native-5c67/preflight/drawingml-theme-ink-bulk.json.stdout",
+        "path": "(deleted-coord-artifact)/drawingml-theme-ink-bulk.json.stdout",
         "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
       }
     },
     {
       "argv": [
-        "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/drawingml-native-5c67/target/release/drawingml-raw-native",
+        "(deleted-coord-artifact)",
         "--lane",
         "drawingml-geometry-color-formatcode2-transform",
         "--endpoint",
@@ -348,19 +348,19 @@
         "150",
         "--preflight",
         "--json",
-        "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/drawingml-native-5c67/preflight/drawingml-geometry-color-formatcode2-transform.json"
+        "(deleted-coord-artifact)"
       ],
       "cwd": "/home/zhuhe/code/litchi-worktrees/uo2-drawingml-native-raw-repair",
       "environment": {
         "LITCHI_MEM_MAX": "20G",
-        "PATH_prepend": "/home/zhuhe/code/litchi-worktrees/.coord/bin",
+        "PATH_prepend": "(deleted-coord-artifact)",
         "RUST_TEST_THREADS": "1"
       },
       "exit": 0,
       "id": "drawingml-geometry-color-formatcode2-transform",
       "output": {
         "bytes": 2316,
-        "path": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/drawingml-native-5c67/preflight/drawingml-geometry-color-formatcode2-transform.json",
+        "path": "(deleted-coord-artifact)/drawingml-geometry-color-formatcode2-transform.json",
         "sha256": "8228d2a9dfa2f08e17e2f5ce2cdc5373e4829f9b665a50ed1e240c27a6cfab7e"
       },
       "shell_limits": {
@@ -369,18 +369,18 @@
       },
       "stderr": {
         "bytes": 0,
-        "path": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/drawingml-native-5c67/preflight/drawingml-geometry-color-formatcode2-transform.json.stderr",
+        "path": "(deleted-coord-artifact)/drawingml-geometry-color-formatcode2-transform.json.stderr",
         "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
       },
       "stdout": {
         "bytes": 0,
-        "path": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/drawingml-native-5c67/preflight/drawingml-geometry-color-formatcode2-transform.json.stdout",
+        "path": "(deleted-coord-artifact)/drawingml-geometry-color-formatcode2-transform.json.stdout",
         "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
       }
     },
     {
       "argv": [
-        "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/drawingml-native-5c67/target/release/drawingml-raw-native",
+        "(deleted-coord-artifact)",
         "--lane",
         "drawingml-theme-ink",
         "--endpoint",
@@ -409,19 +409,19 @@
         "150",
         "--preflight",
         "--json",
-        "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/drawingml-native-5c67/preflight/drawingml-theme-family-raw.json"
+        "(deleted-coord-artifact)"
       ],
       "cwd": "/home/zhuhe/code/litchi-worktrees/uo2-drawingml-native-raw-repair",
       "environment": {
         "LITCHI_MEM_MAX": "20G",
-        "PATH_prepend": "/home/zhuhe/code/litchi-worktrees/.coord/bin",
+        "PATH_prepend": "(deleted-coord-artifact)",
         "RUST_TEST_THREADS": "1"
       },
       "exit": 0,
       "id": "drawingml-theme-family-raw",
       "output": {
         "bytes": 1099,
-        "path": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/drawingml-native-5c67/preflight/drawingml-theme-family-raw.json",
+        "path": "(deleted-coord-artifact)/drawingml-theme-family-raw.json",
         "sha256": "39f29c14a629344b0df87c5bf6fd0705a8c738dc564df1c19c8c808ed8fb969f"
       },
       "shell_limits": {
@@ -430,18 +430,18 @@
       },
       "stderr": {
         "bytes": 0,
-        "path": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/drawingml-native-5c67/preflight/drawingml-theme-family-raw.json.stderr",
+        "path": "(deleted-coord-artifact)/drawingml-theme-family-raw.json.stderr",
         "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
       },
       "stdout": {
         "bytes": 0,
-        "path": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/drawingml-native-5c67/preflight/drawingml-theme-family-raw.json.stdout",
+        "path": "(deleted-coord-artifact)/drawingml-theme-family-raw.json.stdout",
         "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
       }
     },
     {
       "argv": [
-        "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/drawingml-native-5c67/target/release/drawingml-raw-native",
+        "(deleted-coord-artifact)",
         "--lane",
         "drawingml-chart-raw",
         "--endpoint",
@@ -470,19 +470,19 @@
         "150",
         "--preflight",
         "--json",
-        "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/drawingml-native-5c67/preflight/drawingml-chart-owner.json"
+        "(deleted-coord-artifact)"
       ],
       "cwd": "/home/zhuhe/code/litchi-worktrees/uo2-drawingml-native-raw-repair",
       "environment": {
         "LITCHI_MEM_MAX": "20G",
-        "PATH_prepend": "/home/zhuhe/code/litchi-worktrees/.coord/bin",
+        "PATH_prepend": "(deleted-coord-artifact)",
         "RUST_TEST_THREADS": "1"
       },
       "exit": 0,
       "id": "drawingml-chart-owner",
       "output": {
         "bytes": 1100,
-        "path": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/drawingml-native-5c67/preflight/drawingml-chart-owner.json",
+        "path": "(deleted-coord-artifact)/drawingml-chart-owner.json",
         "sha256": "81838eae5808fd86dbbe2005e5cf31f51ab25abda734a0daf31c210f08ab0c54"
       },
       "shell_limits": {
@@ -491,18 +491,18 @@
       },
       "stderr": {
         "bytes": 0,
-        "path": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/drawingml-native-5c67/preflight/drawingml-chart-owner.json.stderr",
+        "path": "(deleted-coord-artifact)/drawingml-chart-owner.json.stderr",
         "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
       },
       "stdout": {
         "bytes": 0,
-        "path": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/drawingml-native-5c67/preflight/drawingml-chart-owner.json.stdout",
+        "path": "(deleted-coord-artifact)/drawingml-chart-owner.json.stdout",
         "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
       }
     },
     {
       "argv": [
-        "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/drawingml-native-5c67/target/release/drawingml-raw-native",
+        "(deleted-coord-artifact)",
         "--lane",
         "drawingml-theme-ink",
         "--endpoint",
@@ -531,19 +531,19 @@
         "150",
         "--preflight",
         "--json",
-        "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/drawingml-native-5c67/preflight/drawingml-theme-family-owner.json"
+        "(deleted-coord-artifact)"
       ],
       "cwd": "/home/zhuhe/code/litchi-worktrees/uo2-drawingml-native-raw-repair",
       "environment": {
         "LITCHI_MEM_MAX": "20G",
-        "PATH_prepend": "/home/zhuhe/code/litchi-worktrees/.coord/bin",
+        "PATH_prepend": "(deleted-coord-artifact)",
         "RUST_TEST_THREADS": "1"
       },
       "exit": 0,
       "id": "drawingml-theme-family-owner",
       "output": {
         "bytes": 2329,
-        "path": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/drawingml-native-5c67/preflight/drawingml-theme-family-owner.json",
+        "path": "(deleted-coord-artifact)/drawingml-theme-family-owner.json",
         "sha256": "f408aaf0aa3848b43138fa429778591a79a3189d060bb2eeaee4db9ec0d17dde"
       },
       "shell_limits": {
@@ -552,18 +552,18 @@
       },
       "stderr": {
         "bytes": 0,
-        "path": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/drawingml-native-5c67/preflight/drawingml-theme-family-owner.json.stderr",
+        "path": "(deleted-coord-artifact)/drawingml-theme-family-owner.json.stderr",
         "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
       },
       "stdout": {
         "bytes": 0,
-        "path": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/drawingml-native-5c67/preflight/drawingml-theme-family-owner.json.stdout",
+        "path": "(deleted-coord-artifact)/drawingml-theme-family-owner.json.stdout",
         "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
       }
     },
     {
       "argv": [
-        "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/drawingml-native-5c67/target/release/drawingml-raw-native",
+        "(deleted-coord-artifact)",
         "--lane",
         "drawingml-theme-ink",
         "--endpoint",
@@ -592,19 +592,19 @@
         "150",
         "--preflight",
         "--json",
-        "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/drawingml-native-5c67/preflight/drawingml-ink-actions-owner.json"
+        "(deleted-coord-artifact)"
       ],
       "cwd": "/home/zhuhe/code/litchi-worktrees/uo2-drawingml-native-raw-repair",
       "environment": {
         "LITCHI_MEM_MAX": "20G",
-        "PATH_prepend": "/home/zhuhe/code/litchi-worktrees/.coord/bin",
+        "PATH_prepend": "(deleted-coord-artifact)",
         "RUST_TEST_THREADS": "1"
       },
       "exit": 0,
       "id": "drawingml-ink-actions-owner",
       "output": {
         "bytes": 2328,
-        "path": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/drawingml-native-5c67/preflight/drawingml-ink-actions-owner.json",
+        "path": "(deleted-coord-artifact)/drawingml-ink-actions-owner.json",
         "sha256": "ec1d6a1cba2afe26535a25cb8839467a3fefc24524b6bed9f5092061be1c4d3b"
       },
       "shell_limits": {
@@ -613,18 +613,18 @@
       },
       "stderr": {
         "bytes": 0,
-        "path": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/drawingml-native-5c67/preflight/drawingml-ink-actions-owner.json.stderr",
+        "path": "(deleted-coord-artifact)/drawingml-ink-actions-owner.json.stderr",
         "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
       },
       "stdout": {
         "bytes": 0,
-        "path": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/drawingml-native-5c67/preflight/drawingml-ink-actions-owner.json.stdout",
+        "path": "(deleted-coord-artifact)/drawingml-ink-actions-owner.json.stdout",
         "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
       }
     },
     {
       "argv": [
-        "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/drawingml-native-5c67/target/release/drawingml-raw-native",
+        "(deleted-coord-artifact)",
         "--lane",
         "drawingml-geometry-color-formatcode2-transform",
         "--endpoint",
@@ -653,19 +653,19 @@
         "150",
         "--preflight",
         "--json",
-        "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/drawingml-native-5c67/preflight/drawingml-transform-owner.json"
+        "(deleted-coord-artifact)"
       ],
       "cwd": "/home/zhuhe/code/litchi-worktrees/uo2-drawingml-native-raw-repair",
       "environment": {
         "LITCHI_MEM_MAX": "20G",
-        "PATH_prepend": "/home/zhuhe/code/litchi-worktrees/.coord/bin",
+        "PATH_prepend": "(deleted-coord-artifact)",
         "RUST_TEST_THREADS": "1"
       },
       "exit": 0,
       "id": "drawingml-transform-owner",
       "output": {
         "bytes": 2335,
-        "path": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/drawingml-native-5c67/preflight/drawingml-transform-owner.json",
+        "path": "(deleted-coord-artifact)/drawingml-transform-owner.json",
         "sha256": "04d930db5c0d56d603ab81706b09cd47474c00ae66c85a70805adc3bd374d8a9"
       },
       "shell_limits": {
@@ -674,12 +674,12 @@
       },
       "stderr": {
         "bytes": 0,
-        "path": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/drawingml-native-5c67/preflight/drawingml-transform-owner.json.stderr",
+        "path": "(deleted-coord-artifact)/drawingml-transform-owner.json.stderr",
         "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
       },
       "stdout": {
         "bytes": 0,
-        "path": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/drawingml-native-5c67/preflight/drawingml-transform-owner.json.stdout",
+        "path": "(deleted-coord-artifact)/drawingml-transform-owner.json.stdout",
         "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
       }
     }

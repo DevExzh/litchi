@@ -21,7 +21,7 @@
     "reported_leak_bytes": 544,
     "configuration": "Same shared owner, before releasing CFB reader caches and temporary Workbook buffer before writer output allocation."
   },
-  "external_directory": "/home/zhuhe/code/litchi-worktrees/.coord/exact-limits/graph-owner-probe",
+  "external_directory": "(deleted-coord-artifact)",
   "artifacts": {
     "heap-final-before.zst": {
       "bytes": 36897,

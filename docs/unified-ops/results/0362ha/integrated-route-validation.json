@@ -5,27 +5,27 @@
   "route_count": 109,
   "artifacts": {
     "source": {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/w8-part-a-integration/integrated-d39d179353-v1/source.tar",
+      "path": "(deleted-coord-artifact)/source.tar",
       "bytes": 6619760640,
       "sha256": "eff01d2513be05072d8d2ecc674a706b87411e4933f9a2aee60a050a187ff039"
     },
     "probe": {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/w8-part-a-integration/integrated-d39d179353-v1/file_w8_qualified_probe.rs",
+      "path": "(deleted-coord-artifact)/file_w8_qualified_probe.rs",
       "bytes": 74747,
       "sha256": "3a01dd2cbb971b4eba54e2eccffa99e1b3c4557db14af03e61869f99f0a0cc27"
     },
     "binary": {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/w8-part-a-integration/integrated-d39d179353-v1/file_w8_qualified_probe",
+      "path": "(deleted-coord-artifact)/file_w8_qualified_probe",
       "bytes": 244621440,
       "sha256": "6093fdb544b55bbea49d808648624e3d705d0e6d3a25e6fad458dfa5b5ad57ad"
     },
     "lock": {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/w8-part-a-integration/integrated-d39d179353-v1/Cargo.lock",
+      "path": "(deleted-coord-artifact)/Cargo.lock",
       "bytes": 139505,
       "sha256": "d85b4300c58dbdf0dcc3cb8243ad4ea00cd9c29c9d1d4a77c38e51fe12f708aa"
     },
     "routes": {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/w8-part-a-integration/integrated-d39d179353-v1/matrix/routes.jsonl",
+      "path": "(deleted-coord-artifact)/routes.jsonl",
       "bytes": 238193,
       "sha256": "877802466f1a0b4338b57e58a2cc9ad614427869ad4eef69e1bf7f6b78f71761"
     }
@@ -1345,14 +1345,14 @@
       "python3",
       "-B",
       "docs/unified-ops/results/0362h/validate.py",
-      "/home/zhuhe/code/litchi-worktrees/.coord/w8-part-a-integration/integrated-d39d179353-v1/file_w8_qualified_probe",
-      "/home/zhuhe/code/litchi-worktrees/.coord/w8-part-a-integration/integrated-d39d179353-v1/matrix",
+      "(deleted-coord-artifact)",
+      "(deleted-coord-artifact)",
       "--source",
-      "/home/zhuhe/code/litchi-worktrees/.coord/w8-part-a-integration/integrated-d39d179353-v1/source.tar",
+      "(deleted-coord-artifact)",
       "--probe",
-      "/home/zhuhe/code/litchi-worktrees/.coord/w8-part-a-integration/integrated-d39d179353-v1/file_w8_qualified_probe.rs",
+      "(deleted-coord-artifact)",
       "--lock",
-      "/home/zhuhe/code/litchi-worktrees/.coord/w8-part-a-integration/integrated-d39d179353-v1/Cargo.lock",
+      "(deleted-coord-artifact)",
       "--source-commit",
       "d39d179353b5fd1ce82ca479b16cee2fc4dc8ffb",
       "--build-command",
@@ -1360,7 +1360,7 @@
     ],
     "exit": 0,
     "seconds": 151.28904929594137,
-    "log": "/home/zhuhe/code/litchi-worktrees/.coord/w8-part-a-integration/integrated-d39d179353-v1/validation.log",
+    "log": "(deleted-coord-artifact)/validation.log",
     "bytes": 268,
     "sha256": "e89e6249a3f60c6ccd105d21056552d3d0aeaee98f9944b24acf6a21e238dcf2"
   },

@@ -5,7 +5,7 @@
     "head": "a06fd62966b6a8ec76e8073381ee95ca4bf8513d",
     "clean": true,
     "cargo_lock_sha256": "f1fcd168699797144b68e94ae186854c0974f7ce03f003baa4e33540d506907e",
-    "binary": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-w2b-pages-symbols-build-0555-a06fd62966/parity-0555-a06fd62966-release-debug1",
+    "binary": "(deleted-coord-artifact)/parity-0555-a06fd62966-release-debug1",
     "binary_sha256": "991b304b3b258da6e76d9aa0205dda63929a36d14800ddd68020d6472f03614d"
   },
   "capture": {
@@ -16,9 +16,9 @@
     "threshold": 100,
     "validator": "validate_call_audit.py",
     "validator_sha256": "c0637e4304f5fdbfae6fca6b0e9a9c17f7d10cb9a56c7df6846951fa4bdf6b8e",
-    "validator_receipt": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-w2b-pages-symbols-final-0555-a06fd62966-cpu5/c063-derived-receipt.json",
+    "validator_receipt": "(deleted-coord-artifact)/c063-derived-receipt.json",
     "validator_receipt_sha256": "159decf0ece7bbbc68c7e3c1a90e561b856422caa5442fe97edaa7894d5b77f5",
-    "capture_correction": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-w2b-pages-symbols-build-0555-a06fd62966/capture-correction-v2.json",
+    "capture_correction": "(deleted-coord-artifact)/capture-correction-v2.json",
     "capture_correction_sha256": "14f62c8d418b5216c384507422695f1ad0b832b64753fca506a89cacf9a19c02",
     "route_count": 4,
     "capture_count": 8

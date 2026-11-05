@@ -7,17 +7,17 @@
       "wave": "wave43",
       "artifacts": {
         "manifest.json": {
-          "path": "/home/zhuhe/code/litchi-worktrees/.coord/worktree-cleanup-2026-10-23/quarantine/wave43/manifest.json",
+          "path": "(deleted-coord-artifact)/manifest.json",
           "bytes": 69054,
           "sha256": "b5231b358abf904ae448476c3b50bdf5a9e10c5541c045e3dd1a5c830dc8fbd6"
         },
         "receipt.json": {
-          "path": "/home/zhuhe/code/litchi-worktrees/.coord/worktree-cleanup-2026-10-23/quarantine/wave43/receipt.json",
+          "path": "(deleted-coord-artifact)/receipt.json",
           "bytes": 132766,
           "sha256": "349b69c0500cbc36e1a0c659f224b89be28a48b27f9cd5882e752312a8b71166"
         },
         "restore-check.json": {
-          "path": "/home/zhuhe/code/litchi-worktrees/.coord/worktree-cleanup-2026-10-23/quarantine/wave43/restore-check.json",
+          "path": "(deleted-coord-artifact)/restore-check.json",
           "bytes": 1788,
           "sha256": "7b17ee970c479355a774d9d7ea251071409b3e60fc2752261b2d234b6f4c0822"
         }
@@ -38,17 +38,17 @@
       "wave": "wave43-diagram",
       "artifacts": {
         "manifest.json": {
-          "path": "/home/zhuhe/code/litchi-worktrees/.coord/worktree-cleanup-2026-10-23/quarantine/wave43-diagram/manifest.json",
+          "path": "(deleted-coord-artifact)/manifest.json",
           "bytes": 69374,
           "sha256": "1c57460e5c412f6ebb39d29e2e2aabba6c4b3945663e60bec71805ccbdbaa059"
         },
         "receipt.json": {
-          "path": "/home/zhuhe/code/litchi-worktrees/.coord/worktree-cleanup-2026-10-23/quarantine/wave43-diagram/receipt.json",
+          "path": "(deleted-coord-artifact)/receipt.json",
           "bytes": 133418,
           "sha256": "27201fb03e1df274c43ad833a42667fcc6246f860451d63843a2753afba9fcac"
         },
         "restore-check.json": {
-          "path": "/home/zhuhe/code/litchi-worktrees/.coord/worktree-cleanup-2026-10-23/quarantine/wave43-diagram/restore-check.json",
+          "path": "(deleted-coord-artifact)/restore-check.json",
           "bytes": 1784,
           "sha256": "bd591d4f99e142d8a72bdf44ddf1e50dc15ab0e1804c1c9d48a648e9fee4e972"
         }
@@ -69,17 +69,17 @@
       "wave": "wave44",
       "artifacts": {
         "manifest.json": {
-          "path": "/home/zhuhe/code/litchi-worktrees/.coord/worktree-cleanup-2026-10-23/quarantine/wave44/manifest.json",
+          "path": "(deleted-coord-artifact)/manifest.json",
           "bytes": 71934,
           "sha256": "55868ae4e760154b6878a6c28d53d69bf49df8a0ca07f577645077e3966eb10b"
         },
         "receipt.json": {
-          "path": "/home/zhuhe/code/litchi-worktrees/.coord/worktree-cleanup-2026-10-23/quarantine/wave44/receipt.json",
+          "path": "(deleted-coord-artifact)/receipt.json",
           "bytes": 134223,
           "sha256": "b78044763327a886eb30c6b3c235fff96ab0869319070ce5c0eba18fffca8ad5"
         },
         "restore-check.json": {
-          "path": "/home/zhuhe/code/litchi-worktrees/.coord/worktree-cleanup-2026-10-23/quarantine/wave44/restore-check.json",
+          "path": "(deleted-coord-artifact)/restore-check.json",
           "bytes": 2351,
           "sha256": "f2127206856f72b94f3a5c189949726e40a4a90f3a40779d43bbe38e4034a423"
         }

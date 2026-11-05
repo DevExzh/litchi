@@ -4,9 +4,9 @@
   "cwd": "/home/zhuhe/code/litchi-worktrees/uo2-coordinator-metadata-integration",
   "command": [
     "python3",
-    "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/run-semantic-checks-disk-guarded.py",
-    "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/api-assembly-consumers-commands-v6.json",
-    "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/api-assembly-consumers-v21"
+    "(deleted-coord-artifact)",
+    "(deleted-coord-artifact)",
+    "(deleted-coord-artifact)"
   ],
   "started_unix_seconds": 1792765732.8227477,
   "checks": [
@@ -25,7 +25,7 @@
       ],
       "exit": 0,
       "seconds": 82.22261126900048,
-      "log": "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/api-assembly-consumers-v21/check-0.log",
+      "log": "(deleted-coord-artifact)/check-0.log",
       "bytes": 347388,
       "sha256": "943b8a1e6bf21016769bd25adac22d2b8f492e46280c740ebc28c1124bc2db90",
       "target_bytes_before": 18619750556,
@@ -53,7 +53,7 @@
       ],
       "exit": 0,
       "seconds": 13.73075887900086,
-      "log": "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/api-assembly-consumers-v21/check-1.log",
+      "log": "(deleted-coord-artifact)/check-1.log",
       "bytes": 183,
       "sha256": "c9b7cd49827b50d87c194fbe9b73cd159ed34fcf144d4a55d752742c28d59cfa",
       "target_bytes_before": 18619724051,
@@ -72,7 +72,7 @@
       ],
       "exit": 101,
       "seconds": 489.0304346590001,
-      "log": "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/api-assembly-consumers-v21/check-2.log",
+      "log": "(deleted-coord-artifact)/check-2.log",
       "bytes": 31714,
       "sha256": "ee36281ed190b9baaca75f958742cae429ec53b5096e43a7fae740933fc9ca1e",
       "target_bytes_before": 18619724051,

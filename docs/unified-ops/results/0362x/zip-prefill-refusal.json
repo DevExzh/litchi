@@ -20,7 +20,7 @@
       "targets": 8,
       "tests": 104,
       "log": {
-        "path": "/home/zhuhe/code/litchi-worktrees/.coord/zip-gate-repair/zip-suite.log",
+        "path": "(deleted-coord-artifact)/zip-suite.log",
         "bytes": 92378,
         "sha256": "be06937340df7a6342ed0fc1a14d5b137ae5bfd09816d2afdb74c4f64016099d"
       }
@@ -29,7 +29,7 @@
       "result": "pass",
       "command": "cargo clippy --offline --locked -p soapberry-zip --all-targets --all-features -- -D warnings",
       "log": {
-        "path": "/home/zhuhe/code/litchi-worktrees/.coord/zip-gate-repair/zip-clippy.log",
+        "path": "(deleted-coord-artifact)/zip-clippy.log",
         "bytes": 223,
         "sha256": "0d3aecd8b1776627590b71af471c3891df2c07c1317c558330eb96256960ab7e"
       }

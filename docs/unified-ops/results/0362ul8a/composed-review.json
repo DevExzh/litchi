@@ -38,7 +38,7 @@
   "cargo_or_native_executed": false,
   "prior_aborted_composition": {
     "index_tree_before_draft": "100ef2521f4f5c66d22b13710f16edfcd1c9146b",
-    "patch_path": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/legacy-composition-return/resolved-before-execution-returns.patch",
+    "patch_path": "(deleted-coord-artifact)/resolved-before-execution-returns.patch",
     "patch_bytes": 150269,
     "patch_sha256": "8759ae84c441b128720e195e640c2629662cb3768971d7246fe88c7c3096093a"
   },

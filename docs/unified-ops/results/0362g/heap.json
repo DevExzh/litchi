@@ -32,8 +32,8 @@
         "heaptrack",
         "--record-only",
         "-o",
-        "/home/zhuhe/code/litchi-worktrees/.coord/ppt-e3aa-heap-20261021/original",
-        "/home/zhuhe/code/litchi-worktrees/.coord/ppt-instrumented-baselines-20261021/original-e673d4addb-scoped_patch_probe",
+        "(deleted-coord-artifact)",
+        "(deleted-coord-artifact)",
         "/home/zhuhe/code/litchi-worktrees/unified-ops-api/test-data/unified-ops/0294/video.ppt",
         "100",
         "10",
@@ -42,15 +42,15 @@
       "analysis_command": [
         "heaptrack_print",
         "-f",
-        "/home/zhuhe/code/litchi-worktrees/.coord/ppt-e3aa-heap-20261021/original.zst",
+        "(deleted-coord-artifact)",
         "--print-peaks=0",
         "--print-allocators=0",
         "--print-temporary=0",
         "--print-massif",
-        "/home/zhuhe/code/litchi-worktrees/.coord/ppt-e3aa-heap-20261021/original.massif"
+        "(deleted-coord-artifact)"
       ],
       "binary": {
-        "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-instrumented-baselines-20261021/original-e673d4addb-scoped_patch_probe",
+        "path": "(deleted-coord-artifact)/original-e673d4addb-scoped_patch_probe",
         "bytes": 1716976,
         "sha256": "9f23a1a9119cfb541361e7661c3384a1b2c63c59ae9d95f4842f4a9c1d5a5b28"
       },
@@ -64,22 +64,22 @@
       "exit_code": 0,
       "artifacts": [
         {
-          "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-e3aa-heap-20261021/original.zst",
+          "path": "(deleted-coord-artifact)/original.zst",
           "bytes": 115250,
           "sha256": "315397d5fd884ad08c579973d7b9d31642975753802051eab2a5f279e728127f"
         },
         {
-          "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-e3aa-heap-20261021/original.log",
+          "path": "(deleted-coord-artifact)/original.log",
           "bytes": 1203,
           "sha256": "0d2c6f83e6d36da44b59899126552596056e276fc2d1447c4e6088f1360aa8ab"
         },
         {
-          "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-e3aa-heap-20261021/original.analysis",
+          "path": "(deleted-coord-artifact)/original.analysis",
           "bytes": 650,
           "sha256": "a32975e215c28f77a8140e5857905b923e2925792cd1d2ddd9cbb8f74eb8f925"
         },
         {
-          "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-e3aa-heap-20261021/original.massif",
+          "path": "(deleted-coord-artifact)/original.massif",
           "bytes": 2689,
           "sha256": "c66ac9ee903a9bc8cbf41938d5962c8c0013b9ff510f0f089e7703dc973de96c"
         }
@@ -91,15 +91,15 @@
         "heaptrack",
         "--record-only",
         "-o",
-        "/home/zhuhe/code/litchi-worktrees/.coord/ppt-e3aa-heap-20261021/sip",
-        "/home/zhuhe/code/litchi-worktrees/.coord/ppt-sip-common-lock-20261021/sip-common-lock-scoped_patch_probe",
+        "(deleted-coord-artifact)",
+        "(deleted-coord-artifact)",
         "/home/zhuhe/code/litchi-worktrees/unified-ops-api/test-data/unified-ops/0294/video.ppt",
         "100",
         "10",
         "100"
       ],
       "binary": {
-        "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-sip-common-lock-20261021/sip-common-lock-scoped_patch_probe",
+        "path": "(deleted-coord-artifact)/sip-common-lock-scoped_patch_probe",
         "bytes": 1770160,
         "sha256": "61272a3cc329c27b8ad0dfa1c20934e4c95c6e7b0d57a0de8331bae868b01139"
       },
@@ -113,31 +113,31 @@
       "analysis_command": [
         "heaptrack_print",
         "-f",
-        "/home/zhuhe/code/litchi-worktrees/.coord/ppt-e3aa-heap-20261021/sip.zst",
+        "(deleted-coord-artifact)",
         "--print-peaks=0",
         "--print-allocators=0",
         "--print-temporary=0",
         "--print-massif",
-        "/home/zhuhe/code/litchi-worktrees/.coord/ppt-e3aa-heap-20261021/sip.massif"
+        "(deleted-coord-artifact)"
       ],
       "artifacts": [
         {
-          "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-e3aa-heap-20261021/sip.zst",
+          "path": "(deleted-coord-artifact)/sip.zst",
           "bytes": 110770,
           "sha256": "99399c38591e13305302fcaf00c8933a3bca17cc2d6db64f574a6e763e01983b"
         },
         {
-          "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-e3aa-heap-20261021/sip.log",
+          "path": "(deleted-coord-artifact)/sip.log",
           "bytes": 1198,
           "sha256": "885ae991e7db41be526d05e431ba261d3cf338e14bfbf2623cb7354aed1fa8a8"
         },
         {
-          "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-e3aa-heap-20261021/sip.analysis",
+          "path": "(deleted-coord-artifact)/sip.analysis",
           "bytes": 632,
           "sha256": "06eb9bcc770280997a888916efe20fe3696a30ee35b329c4c8c8a5f0a9b2f915"
         },
         {
-          "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-e3aa-heap-20261021/sip.massif",
+          "path": "(deleted-coord-artifact)/sip.massif",
           "bytes": 2552,
           "sha256": "e2b33df5834855b4fdeef5ab8c110db93faa9d98328e71f101635d0fdcb72839"
         }
@@ -149,15 +149,15 @@
         "heaptrack",
         "--record-only",
         "-o",
-        "/home/zhuhe/code/litchi-worktrees/.coord/ppt-e3aa-heap-20261021/e3aa",
-        "/home/zhuhe/code/litchi-worktrees/.coord/ppt-e3aa-release-source-20261021/protected/scoped_patch_probe-e3aa14d255",
+        "(deleted-coord-artifact)",
+        "(deleted-coord-artifact)",
         "/home/zhuhe/code/litchi-worktrees/unified-ops-api/test-data/unified-ops/0294/video.ppt",
         "100",
         "10",
         "100"
       ],
       "binary": {
-        "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-e3aa-release-source-20261021/protected/scoped_patch_probe-e3aa14d255",
+        "path": "(deleted-coord-artifact)/scoped_patch_probe-e3aa14d255",
         "bytes": 1770856,
         "sha256": "3fae0cb2b27ec4ef8b21263d12824906108a616ce6a56d0b98496bb12409b8bb"
       },
@@ -171,31 +171,31 @@
       "analysis_command": [
         "heaptrack_print",
         "-f",
-        "/home/zhuhe/code/litchi-worktrees/.coord/ppt-e3aa-heap-20261021/e3aa.zst",
+        "(deleted-coord-artifact)",
         "--print-peaks=0",
         "--print-allocators=0",
         "--print-temporary=0",
         "--print-massif",
-        "/home/zhuhe/code/litchi-worktrees/.coord/ppt-e3aa-heap-20261021/e3aa.massif"
+        "(deleted-coord-artifact)"
       ],
       "artifacts": [
         {
-          "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-e3aa-heap-20261021/e3aa.zst",
+          "path": "(deleted-coord-artifact)/e3aa.zst",
           "bytes": 102517,
           "sha256": "3cfe86e487524ef79fcc491e5c5aeff23f68f7f8c26baf93f2f0cfa369de7c12"
         },
         {
-          "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-e3aa-heap-20261021/e3aa.log",
+          "path": "(deleted-coord-artifact)/e3aa.log",
           "bytes": 1200,
           "sha256": "57b65304c6caaa14594698d909f9e4a6218e8727850032c49f4f1bb2f0bde3a8"
         },
         {
-          "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-e3aa-heap-20261021/e3aa.analysis",
+          "path": "(deleted-coord-artifact)/e3aa.analysis",
           "bytes": 642,
           "sha256": "88015be53f7b4d8a5395c6c2dbe9b1e7254fa1aba23584adfb85ad261c150cd6"
         },
         {
-          "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-e3aa-heap-20261021/e3aa.massif",
+          "path": "(deleted-coord-artifact)/e3aa.massif",
           "bytes": 2560,
           "sha256": "63fb6362605f75fa95b446415528af3d977502dd7be5ada805742f03cca8b59c"
         }
@@ -204,142 +204,142 @@
   ],
   "artifacts": [
     {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-e3aa-heap-20261021/e3aa-concurrent-host-after.txt",
+      "path": "(deleted-coord-artifact)/e3aa-concurrent-host-after.txt",
       "bytes": 60003,
       "sha256": "983ce0c4622f8d55a4a3387628058ea3e34f56ef14eb161eaa2b74cf2d14a8ef"
     },
     {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-e3aa-heap-20261021/e3aa-concurrent-host-before.txt",
+      "path": "(deleted-coord-artifact)/e3aa-concurrent-host-before.txt",
       "bytes": 60634,
       "sha256": "5f806613099f97a0eac1ab99efe2a961939cb2d565246b13a06151722a7bed01"
     },
     {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-e3aa-heap-20261021/e3aa.analysis",
+      "path": "(deleted-coord-artifact)/e3aa.analysis",
       "bytes": 642,
       "sha256": "88015be53f7b4d8a5395c6c2dbe9b1e7254fa1aba23584adfb85ad261c150cd6"
     },
     {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-e3aa-heap-20261021/e3aa.log",
+      "path": "(deleted-coord-artifact)/e3aa.log",
       "bytes": 1200,
       "sha256": "57b65304c6caaa14594698d909f9e4a6218e8727850032c49f4f1bb2f0bde3a8"
     },
     {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-e3aa-heap-20261021/e3aa.massif",
+      "path": "(deleted-coord-artifact)/e3aa.massif",
       "bytes": 2560,
       "sha256": "63fb6362605f75fa95b446415528af3d977502dd7be5ada805742f03cca8b59c"
     },
     {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-e3aa-heap-20261021/e3aa.zst",
+      "path": "(deleted-coord-artifact)/e3aa.zst",
       "bytes": 102517,
       "sha256": "3cfe86e487524ef79fcc491e5c5aeff23f68f7f8c26baf93f2f0cfa369de7c12"
     },
     {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-e3aa-heap-20261021/original-after.host.json",
+      "path": "(deleted-coord-artifact)/original-after.host.json",
       "bytes": 50106,
       "sha256": "3398416f1d17cbb043fa1c32d478b87e81a1d446e4ada2f94a16b5d9595ae33d"
     },
     {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-e3aa-heap-20261021/original-before.host.json",
+      "path": "(deleted-coord-artifact)/original-before.host.json",
       "bytes": 50112,
       "sha256": "31642b7460c6d16ba15419a5563ca814e00b131822e7dce6c4c897232da5c080"
     },
     {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-e3aa-heap-20261021/original-during-1.host.json",
+      "path": "(deleted-coord-artifact)/original-during-1.host.json",
       "bytes": 50891,
       "sha256": "e3f6ecfcca6939d708506f35046a8e7a6da456ec37f4e223f3a68b8661cc52e4"
     },
     {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-e3aa-heap-20261021/original.analysis",
+      "path": "(deleted-coord-artifact)/original.analysis",
       "bytes": 650,
       "sha256": "a32975e215c28f77a8140e5857905b923e2925792cd1d2ddd9cbb8f74eb8f925"
     },
     {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-e3aa-heap-20261021/original.log",
+      "path": "(deleted-coord-artifact)/original.log",
       "bytes": 1203,
       "sha256": "0d2c6f83e6d36da44b59899126552596056e276fc2d1447c4e6088f1360aa8ab"
     },
     {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-e3aa-heap-20261021/original.massif",
+      "path": "(deleted-coord-artifact)/original.massif",
       "bytes": 2689,
       "sha256": "c66ac9ee903a9bc8cbf41938d5962c8c0013b9ff510f0f089e7703dc973de96c"
     },
     {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-e3aa-heap-20261021/original.zst",
+      "path": "(deleted-coord-artifact)/original.zst",
       "bytes": 115250,
       "sha256": "315397d5fd884ad08c579973d7b9d31642975753802051eab2a5f279e728127f"
     },
     {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-e3aa-heap-20261021/receipts-before-v3.json",
+      "path": "(deleted-coord-artifact)/receipts-before-v3.json",
       "bytes": 2318,
       "sha256": "d205c02bad9236b20f980f97b276a714e5dae449584dce6299aedaf456ed50f5"
     },
     {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-e3aa-heap-20261021/receipts.json",
+      "path": "(deleted-coord-artifact)/receipts.json",
       "bytes": 6930,
       "sha256": "45a3678b84f711116e762cf85a3769ce1d6b91a71ff4a71efee13af449615cc9"
     },
     {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-e3aa-heap-20261021/sip-before.host.json",
+      "path": "(deleted-coord-artifact)/sip-before.host.json",
       "bytes": 55990,
       "sha256": "692e861899ae163faf161c549a8fd6f08447e5b81840274a341c446c67432d29"
     },
     {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-e3aa-heap-20261021/sip-concurrent-host-after.txt",
+      "path": "(deleted-coord-artifact)/sip-concurrent-host-after.txt",
       "bytes": 60665,
       "sha256": "6b2a9ec52b70e1fa4a6ff34056a845376fb2dc9af48f28e6a4d9096bbf06be1f"
     },
     {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-e3aa-heap-20261021/sip-concurrent-host-before.txt",
+      "path": "(deleted-coord-artifact)/sip-concurrent-host-before.txt",
       "bytes": 60521,
       "sha256": "03fcfc5856b48106ca305056706a50756becfd54be99812ac845d6fed64121e8"
     },
     {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-e3aa-heap-20261021/sip.analysis",
+      "path": "(deleted-coord-artifact)/sip.analysis",
       "bytes": 632,
       "sha256": "06eb9bcc770280997a888916efe20fe3696a30ee35b329c4c8c8a5f0a9b2f915"
     },
     {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-e3aa-heap-20261021/sip.log",
+      "path": "(deleted-coord-artifact)/sip.log",
       "bytes": 1198,
       "sha256": "885ae991e7db41be526d05e431ba261d3cf338e14bfbf2623cb7354aed1fa8a8"
     },
     {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-e3aa-heap-20261021/sip.massif",
+      "path": "(deleted-coord-artifact)/sip.massif",
       "bytes": 2552,
       "sha256": "e2b33df5834855b4fdeef5ab8c110db93faa9d98328e71f101635d0fdcb72839"
     },
     {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-e3aa-heap-20261021/sip.zst",
+      "path": "(deleted-coord-artifact)/sip.zst",
       "bytes": 110770,
       "sha256": "99399c38591e13305302fcaf00c8933a3bca17cc2d6db64f574a6e763e01983b"
     },
     {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-review-0362g/heap.py",
+      "path": "(deleted-coord-artifact)/heap.py",
       "bytes": 2037,
       "sha256": "ef0c7ee55a78c6add1f333622f797b28f1e0d94dcb04ffa464b3906008f000e0"
     },
     {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-review-0362g/heap_v2.py",
+      "path": "(deleted-coord-artifact)/heap_v2.py",
       "bytes": 2247,
       "sha256": "b3c7a110d9f8db6c357e2103e9f8aca8a6bca71652d39f07ca565fec3c48923b"
     },
     {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-review-0362g/heap_v3.py",
+      "path": "(deleted-coord-artifact)/heap_v3.py",
       "bytes": 2234,
       "sha256": "a5fd84b64f186d372934525187bc49edebbbed87ede55503e46fec3969688113"
     },
     {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-e3aa-heap.driver.log",
+      "path": "(deleted-coord-artifact)/ppt-e3aa-heap.driver.log",
       "bytes": 294,
       "sha256": "42043a89b5c97138439c4e1e5146d28a1d7d76cb325d3ee8715b67f9a133f0d5"
     },
     {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-e3aa-heap-v2.driver.log",
+      "path": "(deleted-coord-artifact)/ppt-e3aa-heap-v2.driver.log",
       "bytes": 3006,
       "sha256": "d14c7ed260fb1bfde86e7f71c66715d1353d45e21a74ebb3db265b79ae5f17c5"
     },
     {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-e3aa-heap-v3.driver.log",
+      "path": "(deleted-coord-artifact)/ppt-e3aa-heap-v3.driver.log",
       "bytes": 1285,
       "sha256": "8e5ea6bb7cb733cac2b65ce4299f752b483b66b12a10965e07186fc4a27010fe"
     }

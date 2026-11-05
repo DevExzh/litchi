@@ -18,7 +18,7 @@
   ],
   "exit": 0,
   "seconds": 24.226530220999848,
-  "log": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/ole-owner-protocol-merge/combined-tests.log",
+  "log": "(deleted-coord-artifact)/combined-tests.log",
   "log_bytes": 423,
   "log_sha256": "9b887f70dd0a9dc5b55b54adf84aa09d6987dc8eb934751ceca8f4beaeb438f3",
   "scope": "Composed Python protocol validation only; no Cargo/native measurement"

@@ -11,33 +11,33 @@
     "annotation": "callgrind_annotate --auto=no --inclusive=yes --threshold=100 --show-percs=yes"
   },
   "binary": {
-    "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-w2a-symbols-facade-ff06bcf61b/bin/parity-8ccb274458659a4c",
+    "path": "(deleted-coord-artifact)/parity-8ccb274458659a4c",
     "mode": "0555",
     "bytes": 217652104,
     "sha256": "9545d118a7d9aace70f122981be65ee820fc2622db7817f43ddf4a5e2f1c27a1"
   },
   "plan": {
-    "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-w2a-symbols-facade-ff06bcf61b/callgrind-plan-v4.json",
+    "path": "(deleted-coord-artifact)/callgrind-plan-v4.json",
     "sha256": "6ebff8a5cf2c12975ec7d5473de62407d2ff93a0a84aa21fa26f148d73109d1b"
   },
   "validator": {
-    "path": "/home/zhuhe/code/litchi-worktrees/.coord/resume-20261028/perf/iwork-probe-isolation-final/validate_call_audit.py",
+    "path": "(deleted-coord-artifact)/validate_call_audit.py",
     "sha256": "c0637e4304f5fdbfae6fca6b0e9a9c17f7d10cb9a56c7df6846951fa4bdf6b8e"
   },
   "receipt": {
-    "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-w2a-symbols-facade-ff06bcf61b/capture-v4/c063-validator-receipt-v4.json",
+    "path": "(deleted-coord-artifact)/c063-validator-receipt-v4.json",
     "sha256": "c94eaf2ca4f2346f39c99b7bb539ac0f6453baa4c6f6f2bef0c5a901e479e751"
   },
   "capture_note": {
-    "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-w2a-symbols-facade-ff06bcf61b/capture-v4-output-policy-note.json",
+    "path": "(deleted-coord-artifact)/capture-v4-output-policy-note.json",
     "sha256": "5e0ca70f23ba817307cd3152a34b377380d41204b70efb4e93d7fe6dd2bf8f9f",
     "kind": "descriptive-output-policy-only"
   },
   "build": {
-    "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-w2a-symbols-facade-ff06bcf61b/build-receipt.json",
+    "path": "(deleted-coord-artifact)/build-receipt.json",
     "sha256": "30abf04245c4fc7f2e8bcf732ef9aae4886c596357e31ce4ffb15cd61264a6a6"
   },
-  "artifact_root": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-w2a-symbols-facade-ff06bcf61b/capture-v4",
+  "artifact_root": "(deleted-coord-artifact)",
   "routes": [
     {
       "id": "numbers_symbols_all_read",

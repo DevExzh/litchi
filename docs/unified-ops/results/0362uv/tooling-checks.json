@@ -18,7 +18,7 @@
       ],
       "tests_passed": 63,
       "exit": 0,
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/final-tooling-0362uv/native-tooling.log",
+      "path": "(deleted-coord-artifact)/native-tooling.log",
       "bytes": 750,
       "sha256": "d0697b7a434b8c6bb1674bbcb59e8dfcbe26867718015b8f64c9fed002511c3c"
     },
@@ -35,7 +35,7 @@
       ],
       "tests_passed": 20,
       "exit": 0,
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/final-tooling-0362uv/iwa-tooling.log",
+      "path": "(deleted-coord-artifact)/iwa-tooling.log",
       "bytes": 119,
       "sha256": "5ad39553da26ed0bc1640deba507feb05586b200903854aeafd97dd1fe7c59f9"
     }

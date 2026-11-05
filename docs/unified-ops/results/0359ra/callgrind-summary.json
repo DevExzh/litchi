@@ -15,12 +15,12 @@
   },
   "binaries": {
     "before": {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/rtf-refusals/binaries/before",
+      "path": "(deleted-coord-artifact)/before",
       "size_bytes": 4124032,
       "sha256": "4693bd12232d92a61ef2f437de2d623e345a106288d5d0a5c5638cf27677420a"
     },
     "after": {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/rtf-refusals/binaries/after",
+      "path": "(deleted-coord-artifact)/after",
       "size_bytes": 4137976,
       "sha256": "0ca9e98098c9e687737c9f446019cf5108f17c3b024cf0f565890d26ff61ec96"
     }
@@ -70,19 +70,19 @@
   },
   "external_profile_artifacts": [
     {
-      "file": "/home/zhuhe/code/litchi-worktrees/.coord/rtf-refusals/callgrind-20261022/before.callgrind",
+      "file": "(deleted-coord-artifact)/before.callgrind",
       "size_bytes": 512449,
       "sha256": "f9b8459e0983b6e5e9dcdb45a3f76c8ee5e308733f1b0e025cbd6f227242bc6b"
     },
     {
-      "file": "/home/zhuhe/code/litchi-worktrees/.coord/rtf-refusals/callgrind-20261022/after.callgrind",
+      "file": "(deleted-coord-artifact)/after.callgrind",
       "size_bytes": 512765,
       "sha256": "fd867758cbaf471f3561a8a4a0dfc488fc39b35084468e0ead6a9e7d0e719334"
     }
   ],
   "native_qualification": {
     "status": "open-for-any-future-candidate",
-    "driver": "/home/zhuhe/code/litchi-worktrees/.coord/rtf-refusals/run-abba.py",
+    "driver": "(deleted-coord-artifact)",
     "required_artifacts": ["release binaries and hashes", "all A-B-B-A JSONL outputs", "summary and process monitor", "paired heaptrack captures and summaries", "test, fidelity and glossary logs"],
     "native_timing_waived": false
   }

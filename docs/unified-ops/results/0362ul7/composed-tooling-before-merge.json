@@ -12,7 +12,7 @@
   ],
   "exit_code": 0,
   "wall_seconds": 1.3632665049954085,
-  "log": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/composed-inventory-tooling-76c21c49cf.log",
+  "log": "(deleted-coord-artifact)/composed-inventory-tooling-76c21c49cf.log",
   "log_bytes": 186,
   "log_sha256": "4f41c03b743ac6444e5a6b6e453c0a8964d68a3ad35a2cfcc186fcb535e1fdc3"
 }

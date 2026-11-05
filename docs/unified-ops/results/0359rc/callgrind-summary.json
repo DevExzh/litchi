@@ -56,7 +56,7 @@
     {"edge": "malloc -> __memcpy_avx_unaligned_erms", "calls_current": 299, "calls_candidate": 311, "current": 10221, "candidate": 18905}
   ],
   "same_path_identity_control": {
-    "fixed_executable_path": "/home/zhuhe/code/litchi-worktrees/.coord/rtf-refusals/same-path-20261022/underline_route_probe",
+    "fixed_executable_path": "(deleted-coord-artifact)/underline_route_probe",
     "current_binary_sha256": "7e39b866316d370d1051d9052784df360f4a2676a2c5d610e182eff979b1dbb0",
     "candidate_binary_sha256": "672f38ba61e0c6422beaa79810acb07d2c0caaff5651299a502835645df4e4ae",
     "argv0_environment_cpu_matched": true,

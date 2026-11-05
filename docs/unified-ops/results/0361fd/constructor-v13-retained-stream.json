@@ -15,22 +15,22 @@
     "fixture": "64 unknown fields and a noncanonical unknown varint in the retained header; setup outside timed loop",
     "binaries": {
       "base": {
-        "path": "/home/zhuhe/code/litchi-worktrees/.coord/constructor-0361f-coordinator/count-target-base/release/iwa-constructor-probe",
+        "path": "(deleted-coord-artifact)/iwa-constructor-probe",
         "sha256": "cce613ebdc209e4b272e87396a6947cfb1d4ffcc53b5898bfec64cb00993109b"
       },
       "candidate": {
-        "path": "/home/zhuhe/code/litchi-worktrees/.coord/constructor-0361f-coordinator/count-target-candidate/release/iwa-constructor-probe",
+        "path": "(deleted-coord-artifact)/iwa-constructor-probe",
         "sha256": "f4073989e903927ce4c0af31587044d8619a4af0f4323fdd2d68ffda949befb0",
         "source_state": "worktree based on bf1109b5b9 before the final push_new-only simplification; retained validation source is identical."
       }
     },
     "captures": {
       "base": {
-        "path": "/home/zhuhe/code/litchi-worktrees/.coord/constructor-0361f-coordinator/count-callgrind-v3/retained_validate-base-8-12000-v13.out",
+        "path": "(deleted-coord-artifact)/retained_validate-base-8-12000-v13.out",
         "sha256": "6e30eedbea715a1e49fffcd36fcdb0c63732ae90c79286c9769e6d5506209360"
       },
       "candidate": {
-        "path": "/home/zhuhe/code/litchi-worktrees/.coord/constructor-0361f-coordinator/count-callgrind-v3/retained_validate-candidate-8-12000-v13.out",
+        "path": "(deleted-coord-artifact)/retained_validate-candidate-8-12000-v13.out",
         "sha256": "47b8346943f03a51064d9faba2c1655161667d0f45fec828104b9e10b6b035bb"
       }
     },

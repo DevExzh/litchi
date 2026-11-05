@@ -18,7 +18,7 @@
     }
   },
   "candidate": {
-    "candidate_worktree": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/odg-final-prep-472b670547/candidate",
+    "candidate_worktree": "(deleted-coord-artifact)",
     "commit": "472b6705475b073e7fe08f6e11ee17fb1e29f838",
     "root_lock": {
       "bytes": 139606,
@@ -29,7 +29,7 @@
       "entries": 460717,
       "sha256": "682a4b02744a7ab110c3ea5f061749215832cf2221c5c689632e9b7773b860bb"
     },
-    "source_root": "/home/zhuhe/code/litchi-worktrees/.coord/final-api-capture-472b670547/source",
+    "source_root": "(deleted-coord-artifact)",
     "tree": "ebc1cee05f124c0c63977aff07a23288c19e7d00"
   },
   "claim_scope": "source identities, preparation receipts, plans and executable commands only; no build, native timing, qualification or acceptance claim",
@@ -47,13 +47,13 @@
     "odf": [
       {
         "bytes": 4625,
-        "path": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/odf-final-prep-472b670547/input/odf-shared-triad.json",
+        "path": "(deleted-coord-artifact)/odf-shared-triad.json",
         "role": "manifest",
         "sha256": "59e16a3bec360e71d24e6d19781554d58fc2160c32bfe31ef302894d6d4cf6de"
       },
       {
         "bytes": 3023,
-        "path": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/odf-final-prep-472b670547/preparation.json",
+        "path": "(deleted-coord-artifact)/preparation.json",
         "role": "source-preparation-receipt",
         "sha256": "18fcdba1653487cfcbf958b3d5e430ca106ab6e19bb5a0f89ebc804ed6d57bb8"
       }
@@ -61,25 +61,25 @@
     "odg": [
       {
         "bytes": 8163,
-        "path": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/odg-final-prep-472b670547/manifest.json",
+        "path": "(deleted-coord-artifact)/manifest.json",
         "role": "manifest",
         "sha256": "e678936335af1ac32097d30300a6c473868b69ca738c2526d4ce33f5a43cb60b"
       },
       {
         "bytes": 1006,
-        "path": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/odg-final-prep-472b670547/plan/plan.json",
+        "path": "(deleted-coord-artifact)/plan.json",
         "role": "plan",
         "sha256": "f3849edb5ec65759e1c686f2027ffdca841a6a2303ca4f746a581a429ca8d852"
       },
       {
         "bytes": 48198,
-        "path": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/odg-final-prep-472b670547/prepare.json",
+        "path": "(deleted-coord-artifact)/prepare.json",
         "role": "source-preparation-receipt",
         "sha256": "5d559b6125e5212c6defbad0c2d64b8908f0017b76599833a3b0a9aca7af253f"
       },
       {
         "bytes": 7838,
-        "path": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/odg-final-prep-472b670547/execution-commands.json",
+        "path": "(deleted-coord-artifact)/execution-commands.json",
         "role": "execution-commands",
         "sha256": "e2d7b3f64aa287eac455f7bb5086c25f915b5218a3bd2ae099afc5dec360fb6c"
       }
@@ -87,13 +87,13 @@
     "odp": [
       {
         "bytes": 1686,
-        "path": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/odp-final-prep-472b670547/input.json",
+        "path": "(deleted-coord-artifact)/input.json",
         "role": "input-manifest",
         "sha256": "65197807c41a2de1200af623911275adeb2aafedbb40477dfa7ec6f47a7eb168"
       },
       {
         "bytes": 2034,
-        "path": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/odp-final-prep-472b670547/plan/plan.json",
+        "path": "(deleted-coord-artifact)/plan.json",
         "role": "plan",
         "sha256": "e47db2ae6d707be66d35ba4a30de28b8511d6ab43ca08ec0e2d0ddf6cbbe1d23"
       }
@@ -104,19 +104,19 @@
     "odg": [
       {
         "bytes": 8263,
-        "path": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/odg-final-prep-c796d0acc2/manifest.json",
+        "path": "(deleted-coord-artifact)/manifest.json",
         "role": "manifest",
         "sha256": "70df88e089559e25bd7ff0d9f63d15ce282d0d6dd78e4cd589787a642ed9f79b"
       },
       {
         "bytes": 1006,
-        "path": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/odg-final-prep-c796d0acc2/plan/plan.json",
+        "path": "(deleted-coord-artifact)/plan.json",
         "role": "plan",
         "sha256": "885d83739221fbbfdd31136d841cdc5639f58cdfeef32f282e7bc22bde62b635"
       },
       {
         "bytes": 48458,
-        "path": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/odg-final-prep-c796d0acc2/prepare.json",
+        "path": "(deleted-coord-artifact)/prepare.json",
         "role": "source-preparation-receipt",
         "sha256": "b63499a1b8080662dbc5db622438bb6aa168091a9144454dd22d99bb428643cb"
       }

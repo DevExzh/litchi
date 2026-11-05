@@ -39,7 +39,7 @@
       ],
       "exit_code": 0,
       "seconds": 1.331648724997649,
-      "log": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/iwa-wire-alias-removal/tooling.log",
+      "log": "(deleted-coord-artifact)/tooling.log",
       "log_bytes": 167,
       "log_sha256": "f1ae9791cd71b7b2b6f886156cfa980bb82bce19071296bf07f86aae198f242c",
       "target_pre_bytes": 6083810704,
@@ -59,7 +59,7 @@
       ],
       "exit_code": 0,
       "seconds": 52.818272336997325,
-      "log": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/iwa-wire-alias-removal/codec-tests.log",
+      "log": "(deleted-coord-artifact)/codec-tests.log",
       "log_bytes": 8727,
       "log_sha256": "f0db3be8a7f5bc487abfe09fcdc79eb9d4f2d3eb7172c128050b9d6ff04d8956",
       "target_pre_bytes": 6083810704,
@@ -80,7 +80,7 @@
       ],
       "exit_code": 0,
       "seconds": 51.19814022000355,
-      "log": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/iwa-wire-alias-removal/consumers.log",
+      "log": "(deleted-coord-artifact)/consumers.log",
       "log_bytes": 2226,
       "log_sha256": "384cd3b606ff40861979f571928ec48fa6f7b8e9ec6256374cd47d5499117858",
       "target_pre_bytes": 6298379134,
@@ -105,7 +105,7 @@
       ],
       "exit_code": 0,
       "seconds": 21.98234867300198,
-      "log": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/iwa-wire-alias-removal/rustdoc.log",
+      "log": "(deleted-coord-artifact)/rustdoc.log",
       "log_bytes": 569,
       "log_sha256": "a08dfa82cf91e8870c993518398dd6b59ef06412f47eaaf66ded78558fd4a2a8",
       "target_pre_bytes": 6467782349,
@@ -119,11 +119,11 @@
         "--profile",
         "iwa-protos-wire-codecs",
         "--json",
-        "/home/zhuhe/code/litchi-worktrees/.coord/drawingml-chart-raw-target/doc/litchi_iwa_protos.json"
+        "(deleted-coord-artifact)"
       ],
       "exit_code": 0,
       "seconds": 2.3097055920079583,
-      "log": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/iwa-wire-alias-removal/new-glossary.log",
+      "log": "(deleted-coord-artifact)/new-glossary.log",
       "log_bytes": 152,
       "log_sha256": "bff41c2b3eede6b424ea03f2a85c62e8abaa487380569a65ca6436cd74397da2",
       "target_pre_bytes": 6595576309,
@@ -132,7 +132,7 @@
   ],
   "old_capture_negative_control": {
     "artifact": {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/final-api-capture-082fbeafe8/output/inventory/litchi_iwa_protos.json",
+      "path": "(deleted-coord-artifact)/litchi_iwa_protos.json",
       "bytes": 67363729,
       "sha256": "ef7aec8961906f5c72df5cde00545421b73596365bf690cb6317c29eb7a16f21"
     },
@@ -149,7 +149,7 @@
     "note": "Eight findings cover six banned declarations and two references in return types."
   },
   "new_rustdoc": {
-    "path": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/iwa-wire-alias-removal/litchi_iwa_protos.json",
+    "path": "(deleted-coord-artifact)/litchi_iwa_protos.json",
     "bytes": 66976246,
     "sha256": "640532ba18f65714f9f7a117a9b81fdd306f9bc44ec7db8fa9bedf6805dc8e55"
   },

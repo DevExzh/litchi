@@ -4,12 +4,12 @@
   "cwd": "/home/zhuhe/code/litchi-worktrees/uo2-budget-validation",
   "command": [
     "python3",
-    "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/run-semantic-checks-disk-guarded.py",
-    "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/facade-xlsb-runtime-v17-commands.json",
-    "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/facade-xlsb-runtime-v17"
+    "(deleted-coord-artifact)",
+    "(deleted-coord-artifact)",
+    "(deleted-coord-artifact)"
   ],
   "started_unix_seconds": 1792785428.2387836,
-  "target": "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/target",
+  "target": "(deleted-coord-artifact)",
   "lock_sha256": "52ed0cacac15b5e440349bfc0f4aca2665bcf50d59d4321624e596bb410783c6",
   "checks": [
     {
@@ -28,13 +28,13 @@
       ],
       "exit": 0,
       "seconds": 202.67397641199932,
-      "log": "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/facade-xlsb-runtime-v17/check-0.log",
+      "log": "(deleted-coord-artifact)/check-0.log",
       "bytes": 413719,
       "sha256": "dcd6e41b29339fcfa9be3bf632b6d86698f02b089b5deb549b3b2265dec145d6",
       "target_bytes_before": 3634723996,
       "completed_test_executables_pruned": [
         {
-          "path": "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/target/debug/deps/litchi_ops-1281d387699cc94f",
+          "path": "(deleted-coord-artifact)/litchi_ops-1281d387699cc94f",
           "bytes": 280020008,
           "sha256": "25e07243be041e67fc0c921c946f2dfcb9bc1d60ae9fcec3629c275028801e1e"
         }
@@ -56,13 +56,13 @@
       ],
       "exit": 101,
       "seconds": 33.506861363006465,
-      "log": "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/facade-xlsb-runtime-v17/check-1.log",
+      "log": "(deleted-coord-artifact)/check-1.log",
       "bytes": 226520,
       "sha256": "1a799697febf9a817fe4936858ea863a24416a48ae4b7c766fb481d2ba9a22f6",
       "target_bytes_before": 3635306026,
       "completed_test_executables_pruned": [
         {
-          "path": "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/target/debug/deps/litchi_xlsb-a78e52581af29829",
+          "path": "(deleted-coord-artifact)/litchi_xlsb-a78e52581af29829",
           "bytes": 47843936,
           "sha256": "667d6f15a2621837709d8d4e28c4f38aa36475b0678f6cdc3eed2907448815e1"
         }

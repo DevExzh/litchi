@@ -54,7 +54,7 @@
       "bench_matrix": "passed"
     }
   },
-  "raw_log_directory": "/home/zhuhe/code/litchi-worktrees/.coord/odraw-limits",
+  "raw_log_directory": "(deleted-coord-artifact)",
   "logs": {
     "consumer-tests.log": {
       "bytes": 448642,

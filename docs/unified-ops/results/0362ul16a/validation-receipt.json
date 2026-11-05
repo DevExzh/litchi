@@ -18,15 +18,15 @@
     "sha256": "4100b1fbb272dd24842f33a2d6f353a3f3a97dfa7e435c4649a0e1a029bfaea1"
   },
   "environment": {
-    "cargo": "/home/zhuhe/code/litchi-worktrees/.coord/bin/cargo",
+    "cargo": "(deleted-coord-artifact)",
     "offline": true,
     "locked": true,
     "cargo_build_jobs": 1,
     "rust_test_threads": 1,
     "memory_cap": "20G",
-    "cargo_target": "/home/zhuhe/code/litchi-worktrees/.coord/cfb-sequential-error-layout/target",
+    "cargo_target": "(deleted-coord-artifact)",
     "cargo_target_du_sb_bytes_after": 1025039867,
-    "glossary_target": "/home/zhuhe/code/litchi-worktrees/.coord/cfb-sequential-error-layout/glossary-target-final",
+    "glossary_target": "(deleted-coord-artifact)",
     "glossary_target_du_sb_bytes_after": 162537392
   },
   "successful_commands": [
@@ -34,14 +34,14 @@
       "name": "fmt",
       "argv": ["cargo", "fmt", "--all", "--check"],
       "exit_code": 0,
-      "log": {"path": "/home/zhuhe/code/litchi-worktrees/.coord/cfb-sequential-error-layout/validation-16a/fmt-fixed.log", "bytes": 0, "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"}
+      "log": {"path": "(deleted-coord-artifact)/fmt-fixed.log", "bytes": 0, "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"}
     },
     {
       "name": "glossary_unit_tests",
       "argv": ["python3", "-m", "unittest", "-q", "tools.test_check_api_glossary"],
       "exit_code": 0,
       "tests": 54,
-      "log": {"path": "/home/zhuhe/code/litchi-worktrees/.coord/cfb-sequential-error-layout/validation-16a/glossary-tests.log", "bytes": 98, "sha256": "611e4111d3a747400fb597f81b277ef0ccf1a133ed8ad74b82e72a53342e5dea"}
+      "log": {"path": "(deleted-coord-artifact)/glossary-tests.log", "bytes": 98, "sha256": "611e4111d3a747400fb597f81b277ef0ccf1a133ed8ad74b82e72a53342e5dea"}
     },
     {
       "name": "cfb_tests",
@@ -49,38 +49,38 @@
       "exit_code": 0,
       "test_counts": [496, 2, 7, 6, 11, 16, 5, 6, 6],
       "total_tests": 555,
-      "log": {"path": "/home/zhuhe/code/litchi-worktrees/.coord/cfb-sequential-error-layout/validation-16a/cfb-tests-final.log", "bytes": 48340, "sha256": "becd506929e5dc553e08b5a15549053dd7335d2a9b941f3e5f04f8e89e8c475f"}
+      "log": {"path": "(deleted-coord-artifact)/cfb-tests-final.log", "bytes": 48340, "sha256": "becd506929e5dc553e08b5a15549053dd7335d2a9b941f3e5f04f8e89e8c475f"}
     },
     {
       "name": "cfb_clippy",
       "argv": ["cargo", "clippy", "--offline", "--locked", "-p", "litchi-cfb", "--all-targets", "--all-features", "--", "-D", "warnings"],
       "exit_code": 0,
-      "log": {"path": "/home/zhuhe/code/litchi-worktrees/.coord/cfb-sequential-error-layout/validation-16a/cfb-clippy-final.log", "bytes": 72, "sha256": "5604fc8f0c276397a55db4bd7008236712075c0ad37d3b3a0f1fe362b1b85a36"}
+      "log": {"path": "(deleted-coord-artifact)/cfb-clippy-final.log", "bytes": 72, "sha256": "5604fc8f0c276397a55db4bd7008236712075c0ad37d3b3a0f1fe362b1b85a36"}
     },
     {
       "name": "cfb_glossary_rustdoc",
-      "argv": ["python3", "tools/check_api_glossary.py", "--profile", "cfb", "--target-dir", "/home/zhuhe/code/litchi-worktrees/.coord/cfb-sequential-error-layout/glossary-target-final"],
+      "argv": ["python3", "tools/check_api_glossary.py", "--profile", "cfb", "--target-dir", "(deleted-coord-artifact)"],
       "exit_code": 0,
-      "log": {"path": "/home/zhuhe/code/litchi-worktrees/.coord/cfb-sequential-error-layout/validation-16a/glossary-cfb-final.log", "bytes": 1842, "sha256": "aa0e4a29df8f523f5de1882be2467d8c1bac57c222a050ecccbb6080ee07ba4d"}
+      "log": {"path": "(deleted-coord-artifact)/glossary-cfb-final.log", "bytes": 1842, "sha256": "aa0e4a29df8f523f5de1882be2467d8c1bac57c222a050ecccbb6080ee07ba4d"}
     },
     {
       "name": "legacy_consumers_check",
       "argv": ["cargo", "check", "--offline", "--locked", "-p", "litchi-doc", "-p", "litchi-xls", "-p", "litchi-ppt", "--all-targets", "--all-features"],
       "exit_code": 0,
-      "log": {"path": "/home/zhuhe/code/litchi-worktrees/.coord/cfb-sequential-error-layout/validation-16a/legacy-check-fixed2.log", "bytes": 307, "sha256": "b6a99c0dd9df9073fc81f0eb3931b1301816055aa08c192838ee9895e0ec0fcb"}
+      "log": {"path": "(deleted-coord-artifact)/legacy-check-fixed2.log", "bytes": 307, "sha256": "b6a99c0dd9df9073fc81f0eb3931b1301816055aa08c192838ee9895e0ec0fcb"}
     }
   ],
   "rejected_attempts": [
     {
       "name": "legacy_consumers_check_before_closure",
       "exit_code": 101,
-      "log": {"path": "/home/zhuhe/code/litchi-worktrees/.coord/cfb-sequential-error-layout/validation-16a/legacy-check.log", "bytes": 1637, "sha256": "dfe3fb83550237d1bccca36e1209d31711d74633acfa7ca49e45128a773c11e2"},
+      "log": {"path": "(deleted-coord-artifact)/legacy-check.log", "bytes": 1637, "sha256": "dfe3fb83550237d1bccca36e1209d31711d74633acfa7ca49e45128a773c11e2"},
       "reason": "The first compile exposed litchi-ppt/src/text_edit.rs:6018; the follow-up migrated it. A second compile exposed the two litchi-xls cell-value test consumers; legacy-check-fixed2 is the corrected result."
     },
     {
       "name": "legacy_consumers_check_after_first_closure",
       "exit_code": 101,
-      "log": {"path": "/home/zhuhe/code/litchi-worktrees/.coord/cfb-sequential-error-layout/validation-16a/legacy-check-fixed.log", "bytes": 1718, "sha256": "76c6ffb7dcf86361e78373964f111c18ee9b8971ab175e407dcd967c15802068"},
+      "log": {"path": "(deleted-coord-artifact)/legacy-check-fixed.log", "bytes": 1718, "sha256": "76c6ffb7dcf86361e78373964f111c18ee9b8971ab175e407dcd967c15802068"},
       "reason": "The second compile exposed litchi-xls/src/cell_values/tests.rs:1469 and :1505; both were then migrated."
     }
   ],

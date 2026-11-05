@@ -40,7 +40,7 @@
       ],
       "exit": 101,
       "reason": "input ceiling reported unsupported format",
-      "log": "/home/zhuhe/code/litchi-worktrees/.coord/w8-part-a-integration/odf-owner-v1/regression.log",
+      "log": "(deleted-coord-artifact)/regression.log",
       "bytes": 1103,
       "sha256": "3d7163b07e5e76829e0321721cef7f5e9b1600b066bdc60a4386c248cba8a7ea"
     },
@@ -59,7 +59,7 @@
       ],
       "exit": 101,
       "reason": "error code fixed but common-core payload not converted to typed ODF limit",
-      "log": "/home/zhuhe/code/litchi-worktrees/.coord/w8-part-a-integration/odf-owner-v2/regression.log",
+      "log": "(deleted-coord-artifact)/regression.log",
       "bytes": 1022,
       "sha256": "131ea4fb15980d5d2496e402884eb33c0cbd1bf429873690b84f5215607af43f"
     },
@@ -78,7 +78,7 @@
       ],
       "exit": 101,
       "reason": "new member-boundary test passed u64 to usize builder",
-      "log": "/home/zhuhe/code/litchi-worktrees/.coord/w8-part-a-integration/odf-owner-v3/regression.log",
+      "log": "(deleted-coord-artifact)/regression.log",
       "bytes": 1321,
       "sha256": "3f4828af9d7163fe64a97b8376f2aebc83e3c73b46cab853a2517aa76bd86984"
     }
@@ -100,7 +100,7 @@
           ],
           "exit": 0,
           "seconds": 48.684039877029136,
-          "log": "/home/zhuhe/code/litchi-worktrees/.coord/w8-part-a-integration/odf-owner-v4/check-0.log",
+          "log": "(deleted-coord-artifact)/check-0.log",
           "bytes": 76711,
           "sha256": "3e6a7f0776ef71e16829c5a28d7d2b55d322ad96719865620debff9af066a396"
         },
@@ -117,7 +117,7 @@
           ],
           "exit": 0,
           "seconds": 38.86498833796941,
-          "log": "/home/zhuhe/code/litchi-worktrees/.coord/w8-part-a-integration/odf-owner-v4/check-1.log",
+          "log": "(deleted-coord-artifact)/check-1.log",
           "bytes": 19058,
           "sha256": "f9a2ffe5d4cd4d143a00624a832ea2778ea7babb61c4cc99010eba0a77a791b6"
         },
@@ -137,7 +137,7 @@
           ],
           "exit": 0,
           "seconds": 85.95044106303249,
-          "log": "/home/zhuhe/code/litchi-worktrees/.coord/w8-part-a-integration/odf-owner-v4/check-2.log",
+          "log": "(deleted-coord-artifact)/check-2.log",
           "bytes": 172,
           "sha256": "bfb1c4d7ad30e0c4cbf2112f413b9e19d2876debf003c2ea89bedc3f6d7c2dd3"
         },
@@ -159,7 +159,7 @@
           ],
           "exit": 101,
           "seconds": 3.639611147926189,
-          "log": "/home/zhuhe/code/litchi-worktrees/.coord/w8-part-a-integration/odf-owner-v4/check-3.log",
+          "log": "(deleted-coord-artifact)/check-3.log",
           "bytes": 657,
           "sha256": "ffaf6152589e0e6517c433ed08c2db25a31185ff377a2db0ea95642e988a4ec2"
         }
@@ -179,7 +179,7 @@
           ],
           "exit": 0,
           "seconds": 2.4238741329172626,
-          "log": "/home/zhuhe/code/litchi-worktrees/.coord/w8-part-a-integration/odf-owner-v5/check-0.log",
+          "log": "(deleted-coord-artifact)/check-0.log",
           "bytes": 0,
           "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
         },
@@ -201,7 +201,7 @@
           ],
           "exit": 0,
           "seconds": 14.201667714980431,
-          "log": "/home/zhuhe/code/litchi-worktrees/.coord/w8-part-a-integration/odf-owner-v5/check-1.log",
+          "log": "(deleted-coord-artifact)/check-1.log",
           "bytes": 172,
           "sha256": "ed4fc54e122313a90ee267111cf3df323791df19911270b1962823f3e6a9d10d"
         },
@@ -218,7 +218,7 @@
           ],
           "exit": 0,
           "seconds": 0.5197090019937605,
-          "log": "/home/zhuhe/code/litchi-worktrees/.coord/w8-part-a-integration/odf-owner-v5/check-2.log",
+          "log": "(deleted-coord-artifact)/check-2.log",
           "bytes": 171,
           "sha256": "eb39e5ef3d254474aa59e8295aad3c0953e12cd8bcff94b945c37a19f7c75416"
         }
@@ -241,7 +241,7 @@
           ],
           "exit": 0,
           "seconds": 43.02428483602125,
-          "log": "/home/zhuhe/code/litchi-worktrees/.coord/w8-part-a-integration/odf-owner-v6/check-0.log",
+          "log": "(deleted-coord-artifact)/check-0.log",
           "bytes": 493,
           "sha256": "3e16c79c68be6addad6428f6abb24e95b403ce02f4b90d713941e999506ea292"
         },
@@ -256,7 +256,7 @@
           ],
           "exit": 0,
           "seconds": 2.737045398913324,
-          "log": "/home/zhuhe/code/litchi-worktrees/.coord/w8-part-a-integration/odf-owner-v6/check-1.log",
+          "log": "(deleted-coord-artifact)/check-1.log",
           "bytes": 0,
           "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
         }

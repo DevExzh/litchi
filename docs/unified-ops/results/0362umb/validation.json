@@ -23,12 +23,12 @@
     "lock_source": "/home/zhuhe/code/litchi-worktrees/uo2-budget-validation/Cargo.lock",
     "cargo_shim_sha256": "1b22a69fd625d57565041bf6c634d8ebd1a82be8b3d0006390472c86324230d8",
     "cargo_config_sha256": "50b044c83828f2c448ee59c362afaa79de2dd47fbd390f0cd2888391f1d1119d",
-    "target": "/home/zhuhe/code/litchi-worktrees/.coord/final-odp-doctests/target",
+    "target": "(deleted-coord-artifact)",
     "target_bytes_after": 410690676
   },
   "checks": [
     {
-      "command": "cargo test --offline --locked --target-dir /home/zhuhe/code/litchi-worktrees/.coord/final-odp-doctests/target -p litchi-odp --all-features --doc",
+      "command": "cargo test --offline --locked --target-dir (deleted-coord-artifact) -p litchi-odp --all-features --doc",
       "result": "pass",
       "tests_passed": 19,
       "tests_failed": 0,
@@ -40,7 +40,7 @@
       "result": "pass"
     },
     {
-      "command": "cargo check --offline --locked --target-dir /home/zhuhe/code/litchi-worktrees/.coord/final-odp-doctests/target -p litchi-odp --all-features --all-targets",
+      "command": "cargo check --offline --locked --target-dir (deleted-coord-artifact) -p litchi-odp --all-features --all-targets",
       "result": "pass",
       "elapsed_seconds": 27.45,
       "max_rss_kb": 501524
@@ -50,5 +50,5 @@
       "result": "pass"
     }
   ],
-  "receipts": "/home/zhuhe/code/litchi-worktrees/.coord/final-odp-doctests/receipts/receipt-manifest.log"
+  "receipts": "(deleted-coord-artifact)"
 }

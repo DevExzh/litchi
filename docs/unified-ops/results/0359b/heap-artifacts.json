@@ -1,18 +1,18 @@
 [
   {
-    "file": "/home/zhuhe/code/litchi-worktrees/.coord/rtf-refusals/heap-before.zst",
+    "file": "(deleted-coord-artifact)/heap-before.zst",
     "size_bytes": 18622,
     "sha256": "9bff2cc46969da34629b37a92fff1380994be1cb32b21e16b41558aa8264a397",
     "binary_sha256": "4693bd12232d92a61ef2f437de2d623e345a106288d5d0a5c5638cf27677420a",
-    "regenerate": "heaptrack -o /home/zhuhe/code/litchi-worktrees/.coord/rtf-refusals/heap-before /home/zhuhe/code/litchi-worktrees/.coord/rtf-refusals/binaries/before",
-    "summarize": "heaptrack_print -f /home/zhuhe/code/litchi-worktrees/.coord/rtf-refusals/heap-before.zst -p 0 -a 0 -T 0"
+    "regenerate": "heaptrack -o (deleted-coord-artifact) (deleted-coord-artifact)",
+    "summarize": "heaptrack_print -f (deleted-coord-artifact) -p 0 -a 0 -T 0"
   },
   {
-    "file": "/home/zhuhe/code/litchi-worktrees/.coord/rtf-refusals/heap-after.zst",
+    "file": "(deleted-coord-artifact)/heap-after.zst",
     "size_bytes": 18658,
     "sha256": "a73b7a5648008201836558109a44129584998388c4da2ae6cdcf7ee1be0fed0d",
     "binary_sha256": "0ca9e98098c9e687737c9f446019cf5108f17c3b024cf0f565890d26ff61ec96",
-    "regenerate": "heaptrack -o /home/zhuhe/code/litchi-worktrees/.coord/rtf-refusals/heap-after /home/zhuhe/code/litchi-worktrees/.coord/rtf-refusals/binaries/after",
-    "summarize": "heaptrack_print -f /home/zhuhe/code/litchi-worktrees/.coord/rtf-refusals/heap-after.zst -p 0 -a 0 -T 0"
+    "regenerate": "heaptrack -o (deleted-coord-artifact) (deleted-coord-artifact)",
+    "summarize": "heaptrack_print -f (deleted-coord-artifact) -p 0 -a 0 -T 0"
   }
 ]

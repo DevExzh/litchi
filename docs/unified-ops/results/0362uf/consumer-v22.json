@@ -4,9 +4,9 @@
   "cwd": "/home/zhuhe/code/litchi-worktrees/uo2-coordinator-metadata-integration",
   "command": [
     "python3",
-    "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/run-semantic-checks-disk-guarded.py",
-    "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/api-assembly-consumers-commands-v7.json",
-    "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/api-assembly-consumers-v22"
+    "(deleted-coord-artifact)",
+    "(deleted-coord-artifact)",
+    "(deleted-coord-artifact)"
   ],
   "started_unix_seconds": 1792766601.940684,
   "checks": [
@@ -23,7 +23,7 @@
       ],
       "exit": 101,
       "seconds": 180.8435288109995,
-      "log": "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/api-assembly-consumers-v22/check-0.log",
+      "log": "(deleted-coord-artifact)/check-0.log",
       "bytes": 2515,
       "sha256": "0ec89765c6440c43f6538eb457ca9e65196889edfa99feb6597be012f970f532",
       "target_bytes_before": 18620128880,

@@ -32,7 +32,7 @@
       ],
       "exit": 0,
       "seconds": 2.696465337066911,
-      "log": "/home/zhuhe/code/litchi-worktrees/.coord/w8-part-a-integration/harness-v1/check-0.log",
+      "log": "(deleted-coord-artifact)/check-0.log",
       "bytes": 0,
       "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
     },
@@ -50,7 +50,7 @@
       ],
       "exit": 0,
       "seconds": 317.2282706340775,
-      "log": "/home/zhuhe/code/litchi-worktrees/.coord/w8-part-a-integration/harness-v1/check-1.log",
+      "log": "(deleted-coord-artifact)/check-1.log",
       "bytes": 8089,
       "sha256": "67afa43b0d6d94836a8075ae3ebe58913e7e6f66af681da731696db7e1b94681"
     },
@@ -71,7 +71,7 @@
       ],
       "exit": 0,
       "seconds": 229.61452200694475,
-      "log": "/home/zhuhe/code/litchi-worktrees/.coord/w8-part-a-integration/harness-v1/check-2.log",
+      "log": "(deleted-coord-artifact)/check-2.log",
       "bytes": 7332,
       "sha256": "0f1c0faf1e81f58840b9ba3063dda4dd98e8a4d174d3ee720c689e64110b7c1a"
     }

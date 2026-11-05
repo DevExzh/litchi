@@ -1,4 +1,4 @@
-# External 0362yd evidence; files stay under .coord/odp-0362yd-evidence.
+# External 0362yd evidence; files stayed outside the repository.
 # Generated from the selected binary, allocator JSON, and Callgrind files by the 0362yd receipt script; verify each listed path with sha256sum.
 # columns: bytes sha256 relative-path
 3048448 6af07f71a4257195fb2b66eb6e34159a5b0d1159250ae3ef431a5748265e225f odp_0362yd_baseline_e4a0614f5d

@@ -49,7 +49,7 @@
       "environment": {},
       "exit_code": 0,
       "seconds": 27.046,
-      "log": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-raw-limits/fmt-final-apply.log",
+      "log": "(deleted-coord-artifact)/fmt-final-apply.log",
       "bytes": 0,
       "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
     },
@@ -68,7 +68,7 @@
       "environment": {},
       "exit_code": 0,
       "seconds": 45.093,
-      "log": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-raw-limits/core-final-tests.log",
+      "log": "(deleted-coord-artifact)/core-final-tests.log",
       "bytes": 24457,
       "sha256": "59fd96bc263e56949c803ae250aecba6f7214d49ed7c6194b22e9fd04c807afe"
     },
@@ -76,14 +76,14 @@
       "name": "probe-build-v2",
       "command": [
         "python3",
-        "/home/zhuhe/code/litchi-worktrees/.coord/iwa-raw-limits/snappy-probe.py",
+        "(deleted-coord-artifact)",
         "build",
-        "/home/zhuhe/code/litchi-worktrees/.coord/iwa-raw-limits/probe-v2"
+        "(deleted-coord-artifact)"
       ],
       "environment": {},
       "exit_code": 0,
       "seconds": 233.082,
-      "log": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-raw-limits/probe-build-v2.log",
+      "log": "(deleted-coord-artifact)/probe-build-v2.log",
       "bytes": 0,
       "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
     },
@@ -91,7 +91,7 @@
       "name": "tests-final",
       "command": [
         "python3",
-        "/home/zhuhe/code/litchi-worktrees/.coord/scripts/chunked-cargo-tests.py",
+        "(deleted-coord-artifact)",
         "-p",
         "litchi-iwa-core",
         "-p",
@@ -113,7 +113,7 @@
       "environment": {},
       "exit_code": 0,
       "seconds": 438.707,
-      "log": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-raw-limits/tests-final.log",
+      "log": "(deleted-coord-artifact)/tests-final.log",
       "bytes": 563849,
       "sha256": "2cb1cd59701c4dfb4ed4edc719ec7daa23510d819279f7e3d403ffc0056b01ba"
     },
@@ -129,7 +129,7 @@
       "environment": {},
       "exit_code": 0,
       "seconds": 174.03,
-      "log": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-raw-limits/check-final.log",
+      "log": "(deleted-coord-artifact)/check-final.log",
       "bytes": 18557,
       "sha256": "262e0ecb398f9af76ccae8bae632878c0f8087b6732877fc79f49dfbcec9dba4"
     },
@@ -161,7 +161,7 @@
       "environment": {},
       "exit_code": 0,
       "seconds": 77.635,
-      "log": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-raw-limits/clippy-final.log",
+      "log": "(deleted-coord-artifact)/clippy-final.log",
       "bytes": 2266,
       "sha256": "7feb8cc0d6c6ba58f2e04ab18958d2659c589016ba3e18a33b54caba4b5e8963"
     },
@@ -176,7 +176,7 @@
       "environment": {},
       "exit_code": 0,
       "seconds": 26.613,
-      "log": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-raw-limits/fmt-final-check.log",
+      "log": "(deleted-coord-artifact)/fmt-final-check.log",
       "bytes": 0,
       "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
     },
@@ -202,7 +202,7 @@
       },
       "exit_code": 0,
       "seconds": 38.542,
-      "log": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-raw-limits/doc-final-litchi-iwa-core.log",
+      "log": "(deleted-coord-artifact)/doc-final-litchi-iwa-core.log",
       "bytes": 875,
       "sha256": "908dd82ed848d13d805bca144a11c0be31940274fbea01c6dde7805af931a37a"
     },
@@ -228,7 +228,7 @@
       },
       "exit_code": 0,
       "seconds": 26.19,
-      "log": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-raw-limits/doc-final-litchi-iwa-archive.log",
+      "log": "(deleted-coord-artifact)/doc-final-litchi-iwa-archive.log",
       "bytes": 880,
       "sha256": "97ff32f0ba907cc52f57b5a9ab8646231d4fc714dc2377bda8da46049431f41f"
     },
@@ -254,7 +254,7 @@
       },
       "exit_code": 0,
       "seconds": 22.339,
-      "log": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-raw-limits/doc-final-litchi-iwa.log",
+      "log": "(deleted-coord-artifact)/doc-final-litchi-iwa.log",
       "bytes": 1254,
       "sha256": "cc10d8e385e009ab0524349b2b414031a7ae2e1538446e3f99601b12a9b5b489"
     },
@@ -269,7 +269,7 @@
       "environment": {},
       "exit_code": 0,
       "seconds": 0.023,
-      "log": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-raw-limits/fmt-preflight-repair.log",
+      "log": "(deleted-coord-artifact)/fmt-preflight-repair.log",
       "bytes": 0,
       "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
     },
@@ -287,7 +287,7 @@
       "environment": {},
       "exit_code": 0,
       "seconds": 40.839,
-      "log": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-raw-limits/tests-preflight-repair.log",
+      "log": "(deleted-coord-artifact)/tests-preflight-repair.log",
       "bytes": 29862,
       "sha256": "c17a32bc12e00de1b90629d6ed2daf19470806bc20a885e1dca1bcd2d2c024c0"
     },
@@ -309,7 +309,7 @@
       "environment": {},
       "exit_code": 0,
       "seconds": 41.535,
-      "log": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-raw-limits/clippy-preflight-repair.log",
+      "log": "(deleted-coord-artifact)/clippy-preflight-repair.log",
       "bytes": 879,
       "sha256": "e4c57cd1320b5128d48054eb1ccdb17827491b9a5de2f014c4e432bbd5e39119"
     },
@@ -317,14 +317,14 @@
       "name": "probe-build-v3",
       "command": [
         "python3",
-        "/home/zhuhe/code/litchi-worktrees/.coord/iwa-raw-limits/snappy-probe.py",
+        "(deleted-coord-artifact)",
         "build",
-        "/home/zhuhe/code/litchi-worktrees/.coord/iwa-raw-limits/probe-v3"
+        "(deleted-coord-artifact)"
       ],
       "environment": {},
       "exit_code": 0,
       "seconds": 225.868,
-      "log": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-raw-limits/probe-build-v3.log",
+      "log": "(deleted-coord-artifact)/probe-build-v3.log",
       "bytes": 0,
       "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
     },
@@ -341,7 +341,7 @@
       "environment": {},
       "exit_code": 0,
       "seconds": 0.06,
-      "log": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-raw-limits/fmt-encoder-repair.log",
+      "log": "(deleted-coord-artifact)/fmt-encoder-repair.log",
       "bytes": 0,
       "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
     },
@@ -359,7 +359,7 @@
       "environment": {},
       "exit_code": 101,
       "seconds": 1.09,
-      "log": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-raw-limits/tests-encoder-repair.log",
+      "log": "(deleted-coord-artifact)/tests-encoder-repair.log",
       "bytes": 1246,
       "sha256": "ec5aa5bfcf86184b1bdfff1ac70c323648e998475346f3f802e7063e64847e77"
     },
@@ -376,7 +376,7 @@
       "environment": {},
       "exit_code": 0,
       "seconds": 0.058,
-      "log": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-raw-limits/fmt-encoder-repair2.log",
+      "log": "(deleted-coord-artifact)/fmt-encoder-repair2.log",
       "bytes": 0,
       "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
     },
@@ -394,7 +394,7 @@
       "environment": {},
       "exit_code": 0,
       "seconds": 2.855,
-      "log": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-raw-limits/tests-encoder-repair2.log",
+      "log": "(deleted-coord-artifact)/tests-encoder-repair2.log",
       "bytes": 28902,
       "sha256": "d4cb43bd47e5b2a96aec1c71860bf9fe5ebc5c233b578dded842c8066d0aaa7f"
     },
@@ -416,7 +416,7 @@
       "environment": {},
       "exit_code": 0,
       "seconds": 2.493,
-      "log": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-raw-limits/clippy-encoder-repair.log",
+      "log": "(deleted-coord-artifact)/clippy-encoder-repair.log",
       "bytes": 288,
       "sha256": "64f3db944485e74a7b90539492dbc4bad764f838a601fa8b90b79a8b513ab9b9"
     },
@@ -424,391 +424,391 @@
       "name": "probe-build-v4",
       "command": [
         "python3",
-        "/home/zhuhe/code/litchi-worktrees/.coord/iwa-raw-limits/snappy-probe.py",
+        "(deleted-coord-artifact)",
         "build",
-        "/home/zhuhe/code/litchi-worktrees/.coord/iwa-raw-limits/probe-v4"
+        "(deleted-coord-artifact)"
       ],
       "environment": {},
       "exit_code": 0,
       "seconds": 225.105,
-      "log": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-raw-limits/probe-build-v4.log",
+      "log": "(deleted-coord-artifact)/probe-build-v4.log",
       "bytes": 0,
       "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
     }
   ],
   "artifacts": [
     {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-raw-limits/boundaries.log",
+      "path": "(deleted-coord-artifact)/boundaries.log",
       "bytes": 565,
       "sha256": "e302003e0f20687b6aac64aff19a826e6fd062e168a7ed12a3a2ecf1ddd75334"
     },
     {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-raw-limits/check-1.jsonl",
+      "path": "(deleted-coord-artifact)/check-1.jsonl",
       "bytes": 479614,
       "sha256": "4b68977873efba2d8b2b39632ea949deab551305397c35bf4e513e5a7843bb5f"
     },
     {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-raw-limits/check-1.stderr",
+      "path": "(deleted-coord-artifact)/check-1.stderr",
       "bytes": 7938,
       "sha256": "787d603e412e5ea058dda732ccb396ede46f95452ee394fb7299ff3e481f9b2f"
     },
     {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-raw-limits/check-10.jsonl",
+      "path": "(deleted-coord-artifact)/check-10.jsonl",
       "bytes": 1528516,
       "sha256": "0c42ee7d0b492d4c6c426f49ea319ea3981bc0643a38bdf407995c9c0d61ea2c"
     },
     {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-raw-limits/check-10.stderr",
+      "path": "(deleted-coord-artifact)/check-10.stderr",
       "bytes": 335,
       "sha256": "8a96df59003074b591fed860dfae6d57d910e82da3ecc1f082d0feefca75ed6b"
     },
     {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-raw-limits/check-11.jsonl",
+      "path": "(deleted-coord-artifact)/check-11.jsonl",
       "bytes": 2752768,
       "sha256": "9a8f5a2e45769661291db9a25866f5f4456e77cd15c8df84816e51f3cb12a43e"
     },
     {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-raw-limits/check-11.stderr",
+      "path": "(deleted-coord-artifact)/check-11.stderr",
       "bytes": 2286,
       "sha256": "b119ee883f076320f24506b5cc9d2b3cceb297d6b4daed23a8831d9db8c9ddb7"
     },
     {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-raw-limits/check-12.jsonl",
+      "path": "(deleted-coord-artifact)/check-12.jsonl",
       "bytes": 2331895,
       "sha256": "55cd3085daa2068a2f2c0ae2cf599e7a335ec34d306726c8b678c6ff4be5c855"
     },
     {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-raw-limits/check-12.stderr",
+      "path": "(deleted-coord-artifact)/check-12.stderr",
       "bytes": 1236,
       "sha256": "b78f3961c2a60c2a01b34a8565b777324eaf4f0009ba763712f124d91e7cd5a9"
     },
     {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-raw-limits/check-2.jsonl",
+      "path": "(deleted-coord-artifact)/check-2.jsonl",
       "bytes": 1078398,
       "sha256": "bc870e9b38b55aa8c78c99a0a55f44ca8c703327880ecc0492808ca89185b940"
     },
     {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-raw-limits/check-2.stderr",
+      "path": "(deleted-coord-artifact)/check-2.stderr",
       "bytes": 3969,
       "sha256": "f1c37f925e51212b6e824c27cc0869e7a54b7c81c5d3a2a3a31ce6e001f62bb9"
     },
     {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-raw-limits/check-3.jsonl",
+      "path": "(deleted-coord-artifact)/check-3.jsonl",
       "bytes": 1220307,
       "sha256": "06766631c75e2d5e4844e2fc81c719c9cf44be71ead281fce2635741f73330dd"
     },
     {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-raw-limits/check-3.stderr",
+      "path": "(deleted-coord-artifact)/check-3.stderr",
       "bytes": 1065,
       "sha256": "f5f5e38b2fc1490bd3eba714d1c5d51d2b92b2381cd8f221063f48d86db30128"
     },
     {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-raw-limits/check-4.jsonl",
+      "path": "(deleted-coord-artifact)/check-4.jsonl",
       "bytes": 5621495,
       "sha256": "f1e1288cb3642e3f767683328a445b9a8f71462a38c94ab7fda3e0779787e84c"
     },
     {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-raw-limits/check-4.stderr",
+      "path": "(deleted-coord-artifact)/check-4.stderr",
       "bytes": 703,
       "sha256": "65147dea394a0b4ae18978110d89729bb1c4d7d3998a279223589182d776cc6d"
     },
     {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-raw-limits/check-5.jsonl",
+      "path": "(deleted-coord-artifact)/check-5.jsonl",
       "bytes": 1299876,
       "sha256": "f89cb91b9dc1506c7cc8ae8ccbfa7a46d76fca0b6698495ca94766072eec17f5"
     },
     {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-raw-limits/check-5.stderr",
+      "path": "(deleted-coord-artifact)/check-5.stderr",
       "bytes": 1911,
       "sha256": "89f8b41ebe5c9dc2b3506b9da16fd5f43a36fd99032ba685e5d86e84046d19f5"
     },
     {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-raw-limits/check-6.jsonl",
+      "path": "(deleted-coord-artifact)/check-6.jsonl",
       "bytes": 1242661,
       "sha256": "badebabd8c59cd49c8e046878da60e8b03729afc2f6d7cc8f681df6ec18a749a"
     },
     {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-raw-limits/check-6.stderr",
+      "path": "(deleted-coord-artifact)/check-6.stderr",
       "bytes": 823,
       "sha256": "fa5d95df094d8b69ebeaf6a6cb9348fcdee48f7adf9a6d70114dd56a2fe598ac"
     },
     {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-raw-limits/check-7.jsonl",
+      "path": "(deleted-coord-artifact)/check-7.jsonl",
       "bytes": 561083,
       "sha256": "21a85190cc58f0f4e20f36be9ec80a7af016de59410eaa2db869ac6ab359933c"
     },
     {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-raw-limits/check-7.stderr",
+      "path": "(deleted-coord-artifact)/check-7.stderr",
       "bytes": 404,
       "sha256": "53e8d1bb16f0c66c4016176ddb08ace761c56c6720e8ad22137e7d4f25f6975c"
     },
     {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-raw-limits/check-8.jsonl",
+      "path": "(deleted-coord-artifact)/check-8.jsonl",
       "bytes": 9705060,
       "sha256": "260bd85238fbdf6b091a80734d46c29df75ca497a11933b94e745164bc4cf1da"
     },
     {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-raw-limits/check-8.stderr",
+      "path": "(deleted-coord-artifact)/check-8.stderr",
       "bytes": 20258,
       "sha256": "ec9a8776361094309ea470405d892c10256166df2bceaff00752aafd416274a5"
     },
     {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-raw-limits/check-9.jsonl",
+      "path": "(deleted-coord-artifact)/check-9.jsonl",
       "bytes": 2349076,
       "sha256": "d5adbaf711de88410f6d61f8c5b7254d8edf95e37a41619cc58c59e2258b866b"
     },
     {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-raw-limits/check-9.stderr",
+      "path": "(deleted-coord-artifact)/check-9.stderr",
       "bytes": 2541,
       "sha256": "a7ac27000e27b8ddcc1aa3c9386bd8a508169599ea02d2a442bc8151f6eacb2e"
     },
     {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-raw-limits/check-final.log",
+      "path": "(deleted-coord-artifact)/check-final.log",
       "bytes": 18557,
       "sha256": "262e0ecb398f9af76ccae8bae632878c0f8087b6732877fc79f49dfbcec9dba4"
     },
     {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-raw-limits/check-policy-1.log",
+      "path": "(deleted-coord-artifact)/check-policy-1.log",
       "bytes": 3955,
       "sha256": "34d6443c38359407c3ec70a48f05c1893dacc02f5b9acf147dade5c8c5cc83d5"
     },
     {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-raw-limits/clippy-1.log",
+      "path": "(deleted-coord-artifact)/clippy-1.log",
       "bytes": 2151,
       "sha256": "a686970b585d88857822a8a4b72702e6df4ebcd0b720508213bad09e4a697708"
     },
     {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-raw-limits/clippy-encoder-repair.log",
+      "path": "(deleted-coord-artifact)/clippy-encoder-repair.log",
       "bytes": 288,
       "sha256": "64f3db944485e74a7b90539492dbc4bad764f838a601fa8b90b79a8b513ab9b9"
     },
     {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-raw-limits/clippy-final.log",
+      "path": "(deleted-coord-artifact)/clippy-final.log",
       "bytes": 2266,
       "sha256": "7feb8cc0d6c6ba58f2e04ab18958d2659c589016ba3e18a33b54caba4b5e8963"
     },
     {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-raw-limits/clippy-preflight-repair.log",
+      "path": "(deleted-coord-artifact)/clippy-preflight-repair.log",
       "bytes": 879,
       "sha256": "e4c57cd1320b5128d48054eb1ccdb17827491b9a5de2f014c4e432bbd5e39119"
     },
     {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-raw-limits/core-final-tests.log",
+      "path": "(deleted-coord-artifact)/core-final-tests.log",
       "bytes": 24457,
       "sha256": "59fd96bc263e56949c803ae250aecba6f7214d49ed7c6194b22e9fd04c807afe"
     },
     {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-raw-limits/doc-archive.log",
+      "path": "(deleted-coord-artifact)/doc-archive.log",
       "bytes": 913,
       "sha256": "46d2ed0787cb2d51e8cd70c5cb635ac97cd754349bf33c7e400a9c18f0276596"
     },
     {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-raw-limits/doc-core.log",
+      "path": "(deleted-coord-artifact)/doc-core.log",
       "bytes": 995,
       "sha256": "781527041d80c3a0190f0ec7d7fbf84c142f34a2fdda852b2ceca9f4370b394a"
     },
     {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-raw-limits/doc-final-litchi-iwa-archive.log",
+      "path": "(deleted-coord-artifact)/doc-final-litchi-iwa-archive.log",
       "bytes": 880,
       "sha256": "97ff32f0ba907cc52f57b5a9ab8646231d4fc714dc2377bda8da46049431f41f"
     },
     {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-raw-limits/doc-final-litchi-iwa-core.log",
+      "path": "(deleted-coord-artifact)/doc-final-litchi-iwa-core.log",
       "bytes": 875,
       "sha256": "908dd82ed848d13d805bca144a11c0be31940274fbea01c6dde7805af931a37a"
     },
     {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-raw-limits/doc-final-litchi-iwa.log",
+      "path": "(deleted-coord-artifact)/doc-final-litchi-iwa.log",
       "bytes": 1254,
       "sha256": "cc10d8e385e009ab0524349b2b414031a7ae2e1538446e3f99601b12a9b5b489"
     },
     {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-raw-limits/doc-iwa.log",
+      "path": "(deleted-coord-artifact)/doc-iwa.log",
       "bytes": 1679,
       "sha256": "f75da48c7ac3a1f5810e9f43654ec09812ef9d539ec319dae6c8d22fa5f594e5"
     },
     {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-raw-limits/final-checks.py",
+      "path": "(deleted-coord-artifact)/final-checks.py",
       "bytes": 4020,
       "sha256": "8b7504b8f401ea7d5f53729d400bd49e3538881f7dd1137ba2fe3d41f530ab31"
     },
     {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-raw-limits/final-receipts.jsonl",
+      "path": "(deleted-coord-artifact)/final-receipts.jsonl",
       "bytes": 8510,
       "sha256": "107ff949351bd163a34903b5163485a8644cf77ed0352f5fe573c6dd2e81d556"
     },
     {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-raw-limits/fmt-apply.log",
+      "path": "(deleted-coord-artifact)/fmt-apply.log",
       "bytes": 0,
       "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
     },
     {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-raw-limits/fmt-encoder-repair.log",
+      "path": "(deleted-coord-artifact)/fmt-encoder-repair.log",
       "bytes": 0,
       "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
     },
     {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-raw-limits/fmt-encoder-repair2.log",
+      "path": "(deleted-coord-artifact)/fmt-encoder-repair2.log",
       "bytes": 0,
       "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
     },
     {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-raw-limits/fmt-final-apply.log",
+      "path": "(deleted-coord-artifact)/fmt-final-apply.log",
       "bytes": 0,
       "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
     },
     {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-raw-limits/fmt-final-check.log",
+      "path": "(deleted-coord-artifact)/fmt-final-check.log",
       "bytes": 0,
       "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
     },
     {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-raw-limits/fmt-preflight-repair.log",
+      "path": "(deleted-coord-artifact)/fmt-preflight-repair.log",
       "bytes": 0,
       "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
     },
     {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-raw-limits/fuzz-check-1.log",
+      "path": "(deleted-coord-artifact)/fuzz-check-1.log",
       "bytes": 10802,
       "sha256": "a2b9e4e993a27768acc6914a82819a839ba075bb643b701da1c8019fc1ec5a2d"
     },
     {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-raw-limits/fuzz-check-2.jsonl",
+      "path": "(deleted-coord-artifact)/fuzz-check-2.jsonl",
       "bytes": 362775,
       "sha256": "44b46f13670c6cd877a48b666a85fe5c543af0c7fa0a36e34105bdde7bcdd5dc"
     },
     {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-raw-limits/fuzz-check-2.stderr",
+      "path": "(deleted-coord-artifact)/fuzz-check-2.stderr",
       "bytes": 1477,
       "sha256": "c2bd611b3955a7b96fb24d6d1bb4719881f3522a8e59aa4d1e8015ac55ca56f9"
     },
     {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-raw-limits/fuzz-check-3.jsonl",
+      "path": "(deleted-coord-artifact)/fuzz-check-3.jsonl",
       "bytes": 208320,
       "sha256": "8c980fb5264de3a2d21dbed1c4902d475d7a879af95dda175359cd14051f5961"
     },
     {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-raw-limits/fuzz-check-3.stderr",
+      "path": "(deleted-coord-artifact)/fuzz-check-3.stderr",
       "bytes": 913,
       "sha256": "172a88a54017f714e31b36c0693d7469bc28dd2479d30f7a72702cd69d513557"
     },
     {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-raw-limits/glossary-archive.log",
+      "path": "(deleted-coord-artifact)/glossary-archive.log",
       "bytes": 123,
       "sha256": "75ce6f506e975b4bd7f39f1d0d42a44655762da60326af5fca9eb9bbbe6fa789"
     },
     {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-raw-limits/glossary-core.log",
+      "path": "(deleted-coord-artifact)/glossary-core.log",
       "bytes": 123,
       "sha256": "551523dd0adfa5c8f8d4ef4b4cfb7d730e3bdcb12c8ceee5e230fa79b88f8c77"
     },
     {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-raw-limits/glossary-final-archive.log",
+      "path": "(deleted-coord-artifact)/glossary-final-archive.log",
       "bytes": 123,
       "sha256": "75ce6f506e975b4bd7f39f1d0d42a44655762da60326af5fca9eb9bbbe6fa789"
     },
     {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-raw-limits/glossary-final-core.log",
+      "path": "(deleted-coord-artifact)/glossary-final-core.log",
       "bytes": 123,
       "sha256": "551523dd0adfa5c8f8d4ef4b4cfb7d730e3bdcb12c8ceee5e230fa79b88f8c77"
     },
     {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-raw-limits/glossary-final-iwa.log",
+      "path": "(deleted-coord-artifact)/glossary-final-iwa.log",
       "bytes": 125,
       "sha256": "c22cf8bec4603bc72b8d902bb33adcb849f91f42dcc82827c72176f704f59d13"
     },
     {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-raw-limits/native-tool-check-1.jsonl",
+      "path": "(deleted-coord-artifact)/native-tool-check-1.jsonl",
       "bytes": 55146,
       "sha256": "dae421b3013c47e5e489e42d41090974ac33c85b97abe80b3eee6bc65556cab2"
     },
     {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-raw-limits/native-tool-check-1.stderr",
+      "path": "(deleted-coord-artifact)/native-tool-check-1.stderr",
       "bytes": 827,
       "sha256": "0eb212c9e7a05ebb485fc04d5b8eec87f99e01d002237a08bc4448dd3f628d9b"
     },
     {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-raw-limits/native-v1.log",
+      "path": "(deleted-coord-artifact)/native-v1.log",
       "bytes": 1425,
       "sha256": "0e2d395d8a8df6e60613ab7d805f0742e0b607110b0489bf10ce581ed3c5df9e"
     },
     {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-raw-limits/native-v2.log",
+      "path": "(deleted-coord-artifact)/native-v2.log",
       "bytes": 1433,
       "sha256": "cfc735314295e74abe8e428c04b83b6640c82e87c93c0230d030a786072b3d41"
     },
     {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-raw-limits/native-v3-followup.log",
+      "path": "(deleted-coord-artifact)/native-v3-followup.log",
       "bytes": 595,
       "sha256": "55eec3c90a10ce126eea9a603232d022c4714d9d0dc7df03b9b83fc04240d174"
     },
     {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-raw-limits/native-v3.log",
+      "path": "(deleted-coord-artifact)/native-v3.log",
       "bytes": 1425,
       "sha256": "89bd05f651bd645de93ff8b509e0dd140ba461c6dde9f245fc3ba993181675e7"
     },
     {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-raw-limits/native-v4-copy-followup.log",
+      "path": "(deleted-coord-artifact)/native-v4-copy-followup.log",
       "bytes": 196,
       "sha256": "09c267aa6e47b88bc04cf3f2c0bee9cdd61c4aa4055f41f673b84617f6da8cf1"
     },
     {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-raw-limits/native-v4.log",
+      "path": "(deleted-coord-artifact)/native-v4.log",
       "bytes": 1430,
       "sha256": "7bfc1cd1a7b42f874b31b1455039b0e35684c29c7d51bcbeada8365c3b48a9cc"
     },
     {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-raw-limits/perf-tool-check-1.jsonl",
+      "path": "(deleted-coord-artifact)/perf-tool-check-1.jsonl",
       "bytes": 228847,
       "sha256": "59994b966d34901de3f038dbf1aab02ec6c515eacd6094f80399f6e1535f57c0"
     },
     {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-raw-limits/perf-tool-check-1.stderr",
+      "path": "(deleted-coord-artifact)/perf-tool-check-1.stderr",
       "bytes": 8570,
       "sha256": "1b4a79f95297661cf6cce563794daf564928ecde1d05b638b9f00a9aa09dfaa5"
     },
     {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-raw-limits/probe-build-v2.log",
+      "path": "(deleted-coord-artifact)/probe-build-v2.log",
       "bytes": 0,
       "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
     },
     {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-raw-limits/probe-build-v3.log",
+      "path": "(deleted-coord-artifact)/probe-build-v3.log",
       "bytes": 0,
       "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
     },
     {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-raw-limits/probe-build-v4.log",
+      "path": "(deleted-coord-artifact)/probe-build-v4.log",
       "bytes": 0,
       "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
     },
     {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-raw-limits/tests-1.log",
+      "path": "(deleted-coord-artifact)/tests-1.log",
       "bytes": 570689,
       "sha256": "56804149e2965d31581822557bcf4d56e945e03e05d00a7aedd7ce8e16ae4a3b"
     },
     {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-raw-limits/tests-encoder-repair.log",
+      "path": "(deleted-coord-artifact)/tests-encoder-repair.log",
       "bytes": 1246,
       "sha256": "ec5aa5bfcf86184b1bdfff1ac70c323648e998475346f3f802e7063e64847e77"
     },
     {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-raw-limits/tests-encoder-repair2.log",
+      "path": "(deleted-coord-artifact)/tests-encoder-repair2.log",
       "bytes": 28902,
       "sha256": "d4cb43bd47e5b2a96aec1c71860bf9fe5ebc5c233b578dded842c8066d0aaa7f"
     },
     {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-raw-limits/tests-final.log",
+      "path": "(deleted-coord-artifact)/tests-final.log",
       "bytes": 563849,
       "sha256": "2cb1cd59701c4dfb4ed4edc719ec7daa23510d819279f7e3d403ffc0056b01ba"
     },
     {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-raw-limits/tests-preflight-repair.log",
+      "path": "(deleted-coord-artifact)/tests-preflight-repair.log",
       "bytes": 29862,
       "sha256": "c17a32bc12e00de1b90629d6ed2daf19470806bc20a885e1dca1bcd2d2c024c0"
     },
     {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-raw-limits/tool-tests.log",
+      "path": "(deleted-coord-artifact)/tool-tests.log",
       "bytes": 1272,
       "sha256": "cce621a58010c06ba489fcb90b2ac733054d5485857cafa9e180df97884f364e"
     }

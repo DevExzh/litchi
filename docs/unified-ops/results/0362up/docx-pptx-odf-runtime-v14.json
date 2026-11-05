@@ -4,12 +4,12 @@
   "cwd": "/home/zhuhe/code/litchi-worktrees/uo2-budget-validation",
   "command": [
     "python3",
-    "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/run-semantic-checks-disk-guarded.py",
-    "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/docx-pptx-odf-runtime-v14-commands.json",
-    "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/docx-pptx-odf-runtime-v14"
+    "(deleted-coord-artifact)",
+    "(deleted-coord-artifact)",
+    "(deleted-coord-artifact)"
   ],
   "started_unix_seconds": 1792784153.9803646,
-  "target": "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/target",
+  "target": "(deleted-coord-artifact)",
   "lock_sha256": "52ed0cacac15b5e440349bfc0f4aca2665bcf50d59d4321624e596bb410783c6",
   "checks": [
     {
@@ -33,13 +33,13 @@
       ],
       "exit": 0,
       "seconds": 91.63910487400426,
-      "log": "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/docx-pptx-odf-runtime-v14/check-0.log",
+      "log": "(deleted-coord-artifact)/check-0.log",
       "bytes": 342809,
       "sha256": "3937ab643fbbdba414dda3e8e9eee48159cec964679f24242371eed8d94c6fba",
       "target_bytes_before": 3393484537,
       "completed_test_executables_pruned": [
         {
-          "path": "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/target/debug/deps/litchi_ops-1281d387699cc94f",
+          "path": "(deleted-coord-artifact)/litchi_ops-1281d387699cc94f",
           "bytes": 279773528,
           "sha256": "83fef55d39b0ccbf298d3c9ffdfeb7ec49b2942e7bf99a839dddd848e2aa695c"
         }

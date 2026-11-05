@@ -167,55 +167,55 @@
   "raw_logs": [
     {
       "name": "fmt",
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-error-contract-validation/fmt.log",
+      "path": "(deleted-coord-artifact)/fmt.log",
       "bytes": 0,
       "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
     },
     {
       "name": "clippy",
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-error-contract-validation/clippy.log",
+      "path": "(deleted-coord-artifact)/clippy.log",
       "bytes": 2668,
       "sha256": "5c4594cafce5a19fa452c9a4ffa1d979b183e66272610d1ac360ce4fc359848d"
     },
     {
       "name": "tests",
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-error-contract-validation/tests.log",
+      "path": "(deleted-coord-artifact)/tests.log",
       "bytes": 37254,
       "sha256": "c23ef4fac6bfde8b17c8c0d09f545271503233cf9965c8eb2c035f28cb9e7d59"
     },
     {
       "name": "rustdoc",
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-error-contract-validation/rustdoc.log",
+      "path": "(deleted-coord-artifact)/rustdoc.log",
       "bytes": 268,
       "sha256": "692dfd7357f25f85e40874ce6dc7d7f5f4df44dbceded7e3bf82d6dde2899105"
     },
     {
       "name": "glossary",
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-error-contract-validation/glossary.log",
+      "path": "(deleted-coord-artifact)/glossary.log",
       "bytes": 123,
       "sha256": "b94f276d44565d7ff2b4dec030f3e43233174495c862e9b40525072555aa861c"
     },
     {
       "name": "inventory",
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-error-contract-validation/inventory.log",
+      "path": "(deleted-coord-artifact)/inventory.log",
       "bytes": 140,
       "sha256": "12f547b62f50f072fa9343e289f8fa2e990eac0dcf98c5c199e331cf29a41f4e"
     },
     {
       "name": "workspace-check",
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-error-contract-check-6.log",
+      "path": "(deleted-coord-artifact)/iwa-error-contract-check-6.log",
       "bytes": 6499,
       "sha256": "c673e60c853daa2b5d907272310dd7c3e4344f1cf151862416b84cdf6010f5b3"
     },
     {
       "name": "harness",
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-error-contract-validation/harness.log",
+      "path": "(deleted-coord-artifact)/harness.log",
       "bytes": 776,
       "sha256": "5d6ff298ef43d6d5345eaeee8394a2cd1f0b98ff2437ed86a918554aea096a4e"
     },
     {
       "name": "resave",
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-error-contract-validation/resave.log",
+      "path": "(deleted-coord-artifact)/resave.log",
       "bytes": 1455,
       "sha256": "93a5633aa6315d1d1fe85c5f9515bc406006ca76479d67aef57ad1c02515b468"
     }

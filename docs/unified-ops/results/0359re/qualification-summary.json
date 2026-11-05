@@ -10,7 +10,7 @@
     "incremental": false,
     "debug": 0,
     "memory_max": "20G",
-    "target_dir": "/home/zhuhe/code/litchi-worktrees/.coord/rtf-refusals/target-replay-arc",
+    "target_dir": "(deleted-coord-artifact)",
     "target_size": "671M",
     "binary_sha256": "6d47549df0be90cee8f5830685fc18d108824b1c68d0db8d84f800697b01bb52"
   },

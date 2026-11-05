@@ -14,7 +14,7 @@
       "finished_ns": 1792619135118844972,
       "exit_code": 0,
       "log": {
-        "path": "/home/zhuhe/code/litchi-worktrees/.coord/odraw-limit-kinds-0362i/fmt.log",
+        "path": "(deleted-coord-artifact)/fmt.log",
         "bytes": 0,
         "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
       },
@@ -33,7 +33,7 @@
       "finished_ns": 1792619143890009046,
       "exit_code": 0,
       "log": {
-        "path": "/home/zhuhe/code/litchi-worktrees/.coord/odraw-limit-kinds-0362i/tests.log",
+        "path": "(deleted-coord-artifact)/tests.log",
         "bytes": 8256,
         "sha256": "562bfcc08377257894987461fabc61d34fe87fbe6f893a44161aa8ac429b5a0a"
       },
@@ -59,7 +59,7 @@
       "finished_ns": 1792619146958469214,
       "exit_code": 0,
       "log": {
-        "path": "/home/zhuhe/code/litchi-worktrees/.coord/odraw-limit-kinds-0362i/clippy.log",
+        "path": "(deleted-coord-artifact)/clippy.log",
         "bytes": 355,
         "sha256": "ac245d1a0381511dea94a32af56b3c7e5617a7c32b7c71575e117a8a013dd0db"
       },
@@ -79,7 +79,7 @@
       "finished_ns": 1792619153967891686,
       "exit_code": 0,
       "log": {
-        "path": "/home/zhuhe/code/litchi-worktrees/.coord/odraw-limit-kinds-0362i/glossary.log",
+        "path": "(deleted-coord-artifact)/glossary.log",
         "bytes": 699,
         "sha256": "ef6f25c35f28cf4bfe2449923517a198cdf7a7ed41af2a86bb056a4928b445b8"
       },
@@ -107,7 +107,7 @@
       "finished_ns": 1792619406049116800,
       "exit_code": 0,
       "log": {
-        "path": "/home/zhuhe/code/litchi-worktrees/.coord/odraw-limit-kinds-0362i/consumer-check.log",
+        "path": "(deleted-coord-artifact)/consumer-check.log",
         "bytes": 8911,
         "sha256": "27f1804d734a075021841dc3243ff602400c0dd46863b3ff796157459c4e8113"
       },
@@ -125,7 +125,7 @@
       "finished_ns": 1792619406547160692,
       "exit_code": 0,
       "log": {
-        "path": "/home/zhuhe/code/litchi-worktrees/.coord/odraw-limit-kinds-0362i/glossary-tests.log",
+        "path": "(deleted-coord-artifact)/glossary-tests.log",
         "bytes": 130,
         "sha256": "d2e64369f016580bd42b31aa430622d6cdfc8a6761cf090d7a59d584c387ffee"
       },
@@ -143,7 +143,7 @@
       "finished_ns": 1792619433707996471,
       "exit_code": 0,
       "log": {
-        "path": "/home/zhuhe/code/litchi-worktrees/.coord/odraw-limit-kinds-0362i/fmt-check.log",
+        "path": "(deleted-coord-artifact)/fmt-check.log",
         "bytes": 0,
         "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
       },

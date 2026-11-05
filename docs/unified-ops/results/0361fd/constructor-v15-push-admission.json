@@ -32,19 +32,19 @@
     },
     "captures": {
       "base_push_new": {
-        "path": "/home/zhuhe/code/litchi-worktrees/.coord/constructor-0361f-coordinator/count-callgrind-v15f/archive_info_e2e-base-8-12000.out",
+        "path": "(deleted-coord-artifact)/archive_info_e2e-base-8-12000.out",
         "sha256": "5d88a4a5e51c664297fdc0a3a0ae4f864321b24daa3f0666aa148976842fa445"
       },
       "candidate_push_new": {
-        "path": "/home/zhuhe/code/litchi-worktrees/.coord/constructor-0361f-coordinator/count-callgrind-v15f/archive_info_e2e-candidate-8-12000.out",
+        "path": "(deleted-coord-artifact)/archive_info_e2e-candidate-8-12000.out",
         "sha256": "7fdb449783f1db9da1da3883975ba701cf746c86e15d51360757bb2d863ac7"
       },
       "base_generic": {
-        "path": "/home/zhuhe/code/litchi-worktrees/.coord/constructor-0361f-coordinator/count-callgrind-v15f/archive_info_generic_e2e-base-8-12000.out",
+        "path": "(deleted-coord-artifact)/archive_info_generic_e2e-base-8-12000.out",
         "sha256": "ba40aa619299a3117fc69ca1f91c1a009dd7a192809d91904bae2923381d89b1"
       },
       "candidate_generic": {
-        "path": "/home/zhuhe/code/litchi-worktrees/.coord/constructor-0361f-coordinator/count-callgrind-v15f/archive_info_generic_e2e-candidate-8-12000.out",
+        "path": "(deleted-coord-artifact)/archive_info_generic_e2e-candidate-8-12000.out",
         "sha256": "3c939c2c71c2f5c6dd742e631acd2972bee7b778b3dd91ea3544b6cb1ae0ba03"
       }
     }

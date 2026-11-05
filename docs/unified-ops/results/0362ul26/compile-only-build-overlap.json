@@ -59,7 +59,7 @@
     {
       "command": "python3 -m py_compile tools/native_qualification_runner.py tools/test_native_qualification_runner.py",
       "exit_code": 0,
-      "log": "/home/zhuhe/code/litchi-worktrees/.coord/cfb-compile-overlap-protocol-20261024-final/pycompile.log",
+      "log": "(deleted-coord-artifact)/pycompile.log",
       "log_bytes": 0,
       "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
     },
@@ -67,7 +67,7 @@
       "command": "python3 -m unittest tools.test_native_qualification_runner -v",
       "exit_code": 0,
       "tests_passed": 38,
-      "log": "/home/zhuhe/code/litchi-worktrees/.coord/cfb-compile-overlap-protocol-20261024-rereview/native-runner-tests.log",
+      "log": "(deleted-coord-artifact)/native-runner-tests.log",
       "log_bytes": 7663,
       "log_sha256": "e6acb516b9eefeadacdf7ac90054cceb27a08f4c991e44a34c9b81bd4cad5906"
     },
@@ -75,7 +75,7 @@
       "command": "python3 -m unittest tools.test_drawingml_raw_qualification tools.test_legacy_native_qualification -v",
       "exit_code": 0,
       "tests_passed": 31,
-      "log": "/home/zhuhe/code/litchi-worktrees/.coord/cfb-compile-overlap-protocol-20261024-rereview/paired-legacy-tests.log",
+      "log": "(deleted-coord-artifact)/paired-legacy-tests.log",
       "log_bytes": 5941,
       "log_sha256": "c0e3c58176d3dd1e23218ca30eafa81358b1715a5afd7d78b9caa1151c57c3c9"
     }

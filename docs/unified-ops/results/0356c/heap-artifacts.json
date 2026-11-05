@@ -1,18 +1,18 @@
 [
   {
-    "file": "/home/zhuhe/code/litchi-worktrees/.coord/pptx-manifest/compact-heap-before.zst",
+    "file": "(deleted-coord-artifact)/compact-heap-before.zst",
     "size_bytes": 921525,
     "sha256": "d7b39c96d2cae79bbdd6ee4fceebf004dcab99668b2e0effb2a8e2a4a98689cd",
     "binary_sha256": "301f01f72d204520302122fe9b054345604f868b18b3f588bfc992f82a112458",
-    "regenerate": "heaptrack -o /home/zhuhe/code/litchi-worktrees/.coord/pptx-manifest/compact-heap-before /home/zhuhe/code/litchi-worktrees/.coord/pptx-manifest/binaries/compact-before",
-    "summarize": "heaptrack_print -f /home/zhuhe/code/litchi-worktrees/.coord/pptx-manifest/compact-heap-before.zst -p 0 -a 0 -T 0"
+    "regenerate": "heaptrack -o (deleted-coord-artifact) (deleted-coord-artifact)",
+    "summarize": "heaptrack_print -f (deleted-coord-artifact) -p 0 -a 0 -T 0"
   },
   {
-    "file": "/home/zhuhe/code/litchi-worktrees/.coord/pptx-manifest/final-heap-after.zst",
+    "file": "(deleted-coord-artifact)/final-heap-after.zst",
     "size_bytes": 620500,
     "sha256": "2ac959f9a41b5ca9fd9592ba937e7b8f1e19ab45ca683aae0b46099371bc8d9d",
     "binary_sha256": "f28d184a01a5ef91fea9cd861226db0b3c044ede683945781677078854f2df4f",
-    "regenerate": "heaptrack -o /home/zhuhe/code/litchi-worktrees/.coord/pptx-manifest/final-heap-after /home/zhuhe/code/litchi-worktrees/.coord/pptx-manifest/binaries/compact-after",
-    "summarize": "heaptrack_print -f /home/zhuhe/code/litchi-worktrees/.coord/pptx-manifest/final-heap-after.zst -p 0 -a 0 -T 0"
+    "regenerate": "heaptrack -o (deleted-coord-artifact) (deleted-coord-artifact)",
+    "summarize": "heaptrack_print -f (deleted-coord-artifact) -p 0 -a 0 -T 0"
   }
 ]

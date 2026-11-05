@@ -46,7 +46,7 @@
         "bytes": 31748
       },
       "manual_two_edge_attempt": {
-        "path": "/home/zhuhe/code/litchi-worktrees/.coord/drawingml-limits/unified-chart-lock-manual.patch.lock",
+        "path": "(deleted-coord-artifact)/unified-chart-lock-manual.patch.lock",
         "sha256": "b1d25ab8d54c6e779f928c93363035b263e4c78c58d7b97997640ac66dc0f72e",
         "bytes": 31780
       },
@@ -59,24 +59,24 @@
     }
   },
   "environment": {
-    "path_prefix": "/home/zhuhe/code/litchi-worktrees/.coord/bin",
+    "path_prefix": "(deleted-coord-artifact)",
     "litchi_mem_max": "20G",
     "cargo_build_jobs": 1,
     "cargo_incremental": 0,
     "dev_test_release_bench_debug": 0,
     "offline": true,
     "locked": true,
-    "tmpdir": "/home/zhuhe/code/litchi-worktrees/.coord/drawingml-consumer/tmp",
-    "target_dir": "/home/zhuhe/code/litchi-worktrees/.coord/drawingml-consumer/consumer-target",
+    "tmpdir": "(deleted-coord-artifact)",
+    "target_dir": "(deleted-coord-artifact)",
     "target_bytes_after_final": 2590004731
   },
-  "focused_command": "set -o pipefail; env -u LITCHI_CAPPED -u LITCHI_BLESS PATH=/home/zhuhe/code/litchi-worktrees/.coord/bin:$PATH LITCHI_MEM_MAX=20G CARGO_BUILD_JOBS=1 CARGO_INCREMENTAL=0 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_PROFILE_RELEASE_DEBUG=0 CARGO_PROFILE_BENCH_DEBUG=0 TMPDIR=/home/zhuhe/code/litchi-worktrees/.coord/drawingml-consumer/tmp cargo test -p litchi-ops --all-features --offline --locked --lib drawingml --no-fail-fast --target-dir /home/zhuhe/code/litchi-worktrees/.coord/drawingml-consumer/consumer-target 2>&1 | tee /home/zhuhe/code/litchi-worktrees/.coord/drawingml-consumer/consumer-focused-rerun3.log",
+  "focused_command": "set -o pipefail; env -u LITCHI_CAPPED -u LITCHI_BLESS PATH=(deleted-coord-artifact):$PATH LITCHI_MEM_MAX=20G CARGO_BUILD_JOBS=1 CARGO_INCREMENTAL=0 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_PROFILE_RELEASE_DEBUG=0 CARGO_PROFILE_BENCH_DEBUG=0 TMPDIR=(deleted-coord-artifact) cargo test -p litchi-ops --all-features --offline --locked --lib drawingml --no-fail-fast --target-dir (deleted-coord-artifact) 2>&1 | tee (deleted-coord-artifact)",
   "focused_attempts": [
     {
       "label": "initial classifier compile failure",
       "session": "2968",
       "log": {
-        "path": "/home/zhuhe/code/litchi-worktrees/.coord/drawingml-consumer/consumer-focused.log",
+        "path": "(deleted-coord-artifact)/consumer-focused.log",
         "bytes": 15956,
         "sha256": "f66d15358a581bc35e65e0f44828ba783ffc442028ddc7105721cd730c403369"
       },
@@ -88,7 +88,7 @@
       "session": "21325",
       "exit_code": 0,
       "log": {
-        "path": "/home/zhuhe/code/litchi-worktrees/.coord/drawingml-consumer/consumer-focused-rerun.log",
+        "path": "(deleted-coord-artifact)/consumer-focused-rerun.log",
         "bytes": 1290,
         "sha256": "d731ab9c699b599ad98d0c35c3020a586f529cb2a1435a20e74cf5e9007ff9bd"
       },
@@ -103,7 +103,7 @@
       "session": "2692",
       "exit_code": 0,
       "log": {
-        "path": "/home/zhuhe/code/litchi-worktrees/.coord/drawingml-consumer/consumer-focused-rerun2.log",
+        "path": "(deleted-coord-artifact)/consumer-focused-rerun2.log",
         "bytes": 602,
         "sha256": "b470721317fb8cc73f0dbfc57eb393484059ff7dac2392d7778cdd7e1920fbac"
       },
@@ -118,7 +118,7 @@
       "session": "66810",
       "exit_code": 0,
       "log": {
-        "path": "/home/zhuhe/code/litchi-worktrees/.coord/drawingml-consumer/consumer-focused-rerun3.log",
+        "path": "(deleted-coord-artifact)/consumer-focused-rerun3.log",
         "bytes": 602,
         "sha256": "aa82bb559c44f212dead0a3175b5ac877c371bfde3d0f655994ef7367ea5f7a7"
       },
@@ -136,30 +136,30 @@
   "standalone_checks": [
     {
       "label": "locked-before-local-lock-repair",
-      "command": "env -u LITCHI_CAPPED -u LITCHI_BLESS PATH=/home/zhuhe/code/litchi-worktrees/.coord/bin:$PATH LITCHI_MEM_MAX=20G CARGO_BUILD_JOBS=1 CARGO_INCREMENTAL=0 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_PROFILE_RELEASE_DEBUG=0 CARGO_PROFILE_BENCH_DEBUG=0 TMPDIR=/home/zhuhe/code/litchi-worktrees/.coord/drawingml-limits/tmp cargo check --manifest-path tools/perf-baseline/unified-chart-add/Cargo.toml --offline --locked --target-dir /home/zhuhe/code/litchi-worktrees/.coord/drawingml-limits/unified-chart-target",
+      "command": "env -u LITCHI_CAPPED -u LITCHI_BLESS PATH=(deleted-coord-artifact):$PATH LITCHI_MEM_MAX=20G CARGO_BUILD_JOBS=1 CARGO_INCREMENTAL=0 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_PROFILE_RELEASE_DEBUG=0 CARGO_PROFILE_BENCH_DEBUG=0 TMPDIR=(deleted-coord-artifact) cargo check --manifest-path tools/perf-baseline/unified-chart-add/Cargo.toml --offline --locked --target-dir (deleted-coord-artifact)",
       "exit_code": 101,
       "log": {
-        "path": "/home/zhuhe/code/litchi-worktrees/.coord/drawingml-limits/unified-chart-check.log",
+        "path": "(deleted-coord-artifact)/unified-chart-check.log",
         "bytes": 298,
         "sha256": "408841b16b557ec63fabc2b00f3c191ca9af807b53abcfb63f326adcc7ef4d5a"
       }
     },
     {
       "label": "offline-local-lock-resolution",
-      "command": "env -u LITCHI_CAPPED -u LITCHI_BLESS PATH=/home/zhuhe/code/litchi-worktrees/.coord/bin:$PATH LITCHI_MEM_MAX=20G CARGO_BUILD_JOBS=1 CARGO_INCREMENTAL=0 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_PROFILE_RELEASE_DEBUG=0 CARGO_PROFILE_BENCH_DEBUG=0 TMPDIR=/home/zhuhe/code/litchi-worktrees/.coord/drawingml-limits/tmp cargo check --manifest-path tools/perf-baseline/unified-chart-add/Cargo.toml --offline --target-dir /home/zhuhe/code/litchi-worktrees/.coord/drawingml-limits/unified-chart-target",
+      "command": "env -u LITCHI_CAPPED -u LITCHI_BLESS PATH=(deleted-coord-artifact):$PATH LITCHI_MEM_MAX=20G CARGO_BUILD_JOBS=1 CARGO_INCREMENTAL=0 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_PROFILE_RELEASE_DEBUG=0 CARGO_PROFILE_BENCH_DEBUG=0 TMPDIR=(deleted-coord-artifact) cargo check --manifest-path tools/perf-baseline/unified-chart-add/Cargo.toml --offline --target-dir (deleted-coord-artifact)",
       "exit_code": 0,
       "log": {
-        "path": "/home/zhuhe/code/litchi-worktrees/.coord/drawingml-limits/unified-chart-unlocked-resolution.log",
+        "path": "(deleted-coord-artifact)/unified-chart-unlocked-resolution.log",
         "bytes": 5560,
         "sha256": "fa33065a9258be4500d5d142c7636f52080d566daf9b0a05f73fb67a2aeb5723"
       }
     },
     {
       "label": "locked-final",
-      "command": "env -u LITCHI_CAPPED -u LITCHI_BLESS PATH=/home/zhuhe/code/litchi-worktrees/.coord/bin:$PATH LITCHI_MEM_MAX=20G CARGO_BUILD_JOBS=1 CARGO_INCREMENTAL=0 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_PROFILE_RELEASE_DEBUG=0 CARGO_PROFILE_BENCH_DEBUG=0 TMPDIR=/home/zhuhe/code/litchi-worktrees/.coord/drawingml-limits/tmp cargo check --manifest-path tools/perf-baseline/unified-chart-add/Cargo.toml --offline --locked --target-dir /home/zhuhe/code/litchi-worktrees/.coord/drawingml-limits/unified-chart-target",
+      "command": "env -u LITCHI_CAPPED -u LITCHI_BLESS PATH=(deleted-coord-artifact):$PATH LITCHI_MEM_MAX=20G CARGO_BUILD_JOBS=1 CARGO_INCREMENTAL=0 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_PROFILE_RELEASE_DEBUG=0 CARGO_PROFILE_BENCH_DEBUG=0 TMPDIR=(deleted-coord-artifact) cargo check --manifest-path tools/perf-baseline/unified-chart-add/Cargo.toml --offline --locked --target-dir (deleted-coord-artifact)",
       "exit_code": 0,
       "log": {
-        "path": "/home/zhuhe/code/litchi-worktrees/.coord/drawingml-limits/unified-chart-check-locked.log",
+        "path": "(deleted-coord-artifact)/unified-chart-check-locked.log",
         "bytes": 590,
         "sha256": "a0d88f49ca29aed02c60152559c08380cbd6247aafbaf89699781e59f814856d"
       }

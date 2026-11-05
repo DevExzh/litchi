@@ -53,7 +53,7 @@
       "candidate_sha256": "b8bfda6dcaefd32b23de789d7e823781a9e35792ff6e8d5347cdba2cc6d6fd94"
     },
     "captures": {
-      "directory": "/home/zhuhe/code/litchi-worktrees/.coord/constructor-0361f-coordinator/count-callgrind-v17-ledger",
+      "directory": "(deleted-coord-artifact)",
       "manifest_sha256": "e97b087cd9c0ad86ded97883ec60e6540b909ae97aa7969b7e7f3a499c2fcd34",
       "files": 48,
       "bytes": 5201998
@@ -811,7 +811,7 @@
       "candidate_sha256": "32345cdd8a17ba0fb98697bcc72db6cb15f87bbeb952da4e586f5d901a2ec6e0"
     },
     "captures": {
-      "directory": "/home/zhuhe/code/litchi-worktrees/.coord/constructor-0361f-coordinator/count-callgrind-v18-raw",
+      "directory": "(deleted-coord-artifact)",
       "manifest_sha256": "789b3f55b095e0283498962bacbd20261b2636eb442ff205757501abcf3aa812",
       "files": 32,
       "bytes": 3449352

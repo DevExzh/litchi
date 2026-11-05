@@ -2,10 +2,10 @@
   "schema": "litchi.ppt.lazy-native.qualification-receipt.v1",
   "status": "correctness_allocation_preflight_passed",
   "claim_scope": "correctness and allocator-instrumentation preflight only; no calibration, timing, ABBA, or performance acceptance claim",
-  "artifact_root": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-lazy-native-compile-20261024",
+  "artifact_root": "(deleted-coord-artifact)",
   "external_receipt": {"path": "qualification-receipt-472b670547-corrected.json", "bytes": 7646, "sha256": "fbe59be89acb3a588b659c217f05ddf3c6ac49cdbeee2dce03c821e469714db8"},
   "candidate": {
-    "root": "/home/zhuhe/code/litchi-worktrees/.coord/final-api-capture-472b670547/source",
+    "root": "(deleted-coord-artifact)",
     "head": "472b6705475b073e7fe08f6e11ee17fb1e29f838",
     "tree": "ebc1cee05f124c0c63977aff07a23288c19e7d00",
     "status": "clean",
@@ -27,8 +27,8 @@
     ]
   },
   "preparation": {
-    "baseline_root": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-lazy-native-compile-20261024/baseline-8779-sparse-final-472b",
-    "candidate_root": "/home/zhuhe/code/litchi-worktrees/.coord/final-api-capture-472b670547/source",
+    "baseline_root": "(deleted-coord-artifact)",
+    "candidate_root": "(deleted-coord-artifact)",
     "receipt": {"path": "preparation-472b670547.json", "bytes": 12243, "sha256": "3d146ac64ad708ba65d0bb3d2bdc70f95c86463c6000ec0c07841b01c9a627cf"},
     "log": {"path": "logs/preparation-472b670547.log", "bytes": 0, "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "exit": 0},
     "baseline_ref": "8779d059add6c90c74552801372c44f770db9f0f",
@@ -37,11 +37,11 @@
     "baseline_reuse_basis": "472b preparation has the same baseline sparse ref/tree, lock, registration-before/after, fixture and probe hashes as the reviewed c796 preparation; only external source-root paths and candidate ref differ"
   },
   "build": {
-    "command_normal": "source /home/zhuhe/code/litchi-worktrees/.coord/ppt-lazy-entry/env.sh; export CARGO_TARGET_DIR=/home/zhuhe/code/litchi-worktrees/.coord/ppt-lazy-native-compile-20261024/candidate-472b-normal-target; export TMPDIR=/home/zhuhe/code/litchi-worktrees/.coord/ppt-lazy-native-compile-20261024/candidate-472b-normal-tmp; export CARGO_BUILD_JOBS=1; cargo build --release --offline --locked --manifest-path /home/zhuhe/code/litchi-worktrees/.coord/final-api-capture-472b670547/source/tools/perf-baseline/Cargo.toml --target-dir /home/zhuhe/code/litchi-worktrees/.coord/ppt-lazy-native-compile-20261024/candidate-472b-normal-target --bin ppt_lazy_native",
-    "command_allocator": "source /home/zhuhe/code/litchi-worktrees/.coord/ppt-lazy-entry/env.sh; export CARGO_TARGET_DIR=/home/zhuhe/code/litchi-worktrees/.coord/ppt-lazy-native-compile-20261024/candidate-472b-allocator-target; export TMPDIR=/home/zhuhe/code/litchi-worktrees/.coord/ppt-lazy-native-compile-20261024/candidate-472b-allocator-tmp; export CARGO_BUILD_JOBS=1; cargo build --release --offline --locked --manifest-path /home/zhuhe/code/litchi-worktrees/.coord/final-api-capture-472b670547/source/tools/perf-baseline/Cargo.toml --target-dir /home/zhuhe/code/litchi-worktrees/.coord/ppt-lazy-native-compile-20261024/candidate-472b-allocator-target --bin ppt_lazy_native_alloc",
+    "command_normal": "source (deleted-coord-artifact); export CARGO_TARGET_DIR=(deleted-coord-artifact); export TMPDIR=(deleted-coord-artifact); export CARGO_BUILD_JOBS=1; cargo build --release --offline --locked --manifest-path (deleted-coord-artifact) --target-dir (deleted-coord-artifact) --bin ppt_lazy_native",
+    "command_allocator": "source (deleted-coord-artifact); export CARGO_TARGET_DIR=(deleted-coord-artifact); export TMPDIR=(deleted-coord-artifact); export CARGO_BUILD_JOBS=1; cargo build --release --offline --locked --manifest-path (deleted-coord-artifact) --target-dir (deleted-coord-artifact) --bin ppt_lazy_native_alloc",
     "environment": {"memory_cap": "LITCHI_MEM_MAX=20G", "cargo_build_jobs": "1", "cargo_incremental": "0", "cargo_net_offline": "true", "cargo_profile_release_debug": "0", "cpu_pin": "none", "toolchain": "rustc 1.95.0 (59807616e 2026-04-14), LLVM 22.1.2"},
     "baseline_reuse": {
-      "root": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-lazy-native-compile-20261024",
+      "root": "(deleted-coord-artifact)",
       "basis": "fresh 472b preparation equals the reviewed c796 baseline preparation for the baseline ref/tree, lock, registration bytes, fixture/probe hashes, toolchain and build environment; the reused binaries were built and verified in the reviewed c796 packet",
       "normal": {"exit": 0, "binary": {"path": "baseline-082-normal-target/release/ppt_lazy_native", "bytes": 12131056, "sha256": "ffcf3aebd0adca8ec26047f732e58026506829562cf51480056315a0a598416a"}, "target_bytes": 1314991296},
       "allocator": {"exit": 0, "binary": {"path": "baseline-082-allocator-target/release/ppt_lazy_native_alloc", "bytes": 12138552, "sha256": "0d045e2c6a36e83d4d36fb9525b814849ec39b3d06a0e4fe02fcc9ed94cb85d7"}, "target_bytes": 1315001381}

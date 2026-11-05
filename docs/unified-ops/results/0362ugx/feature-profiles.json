@@ -4,19 +4,19 @@
   "runtime_change": false,
   "source_fix": "e1576fa6dcd9f856ddea0b0ec6b038cb6b076265",
   "runner": {
-    "path": "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/gate-safe/run_safe_gate.py",
+    "path": "(deleted-coord-artifact)/run_safe_gate.py",
     "bytes": 32791,
     "sha256": "0691c5cb469d9f59caf67c63b748e4d2c80ea5b58e9b99cbde0e171fa5e8a372"
   },
   "attempts": [
     {
       "state": {
-        "path": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/full-gate-b6732d02b2/state.json",
+        "path": "(deleted-coord-artifact)/state.json",
         "bytes": 331995,
         "sha256": "11ea9128d69d3eddac082e7cc39b47637b367e3a89379a044c287309ea7f8427"
       },
       "plan": {
-        "path": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/full-gate-b6732d02b2/plan.json",
+        "path": "(deleted-coord-artifact)/plan.json",
         "bytes": 22286,
         "sha256": "da3260d7263a2110538ff39790831318ef58acb6ffdae25b9bf61540bf904617"
       },
@@ -112,7 +112,7 @@
           "target_bytes_after": 4706734564,
           "log_bytes": 0,
           "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-          "log": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/full-gate-b6732d02b2/00-fmt-attempt-1792817356783307791-4164126.log",
+          "log": "(deleted-coord-artifact)/00-fmt-attempt-1792817356783307791-4164126.log",
           "post_exit": {
             "target_bytes": 4706734564,
             "samples": [
@@ -165,7 +165,7 @@
           "target_bytes_after": 4706734564,
           "log_bytes": 0,
           "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-          "log": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/full-gate-b6732d02b2/01-clippy-all-features-attempt-1792817428729290812-4164126.log",
+          "log": "(deleted-coord-artifact)/01-clippy-all-features-attempt-1792817428729290812-4164126.log",
           "post_exit": {
             "target_bytes": 4706734564,
             "samples": [
@@ -213,7 +213,7 @@
           "target_bytes_after": 5024514848,
           "log_bytes": 0,
           "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-          "log": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/full-gate-b6732d02b2/02-clippy-ops-no-encryption-attempt-1792817447620319004-4164126.log",
+          "log": "(deleted-coord-artifact)/02-clippy-ops-no-encryption-attempt-1792817447620319004-4164126.log",
           "post_exit": {
             "target_bytes": 5024514848,
             "samples": [
@@ -260,7 +260,7 @@
           "target_bytes_after": 5031621579,
           "log_bytes": 0,
           "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-          "log": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/full-gate-b6732d02b2/03-clippy-ops--attempt-1792817818486314403-4164126.log",
+          "log": "(deleted-coord-artifact)/03-clippy-ops--attempt-1792817818486314403-4164126.log",
           "post_exit": {
             "target_bytes": 5031621579,
             "samples": [
@@ -309,7 +309,7 @@
           "target_bytes_after": 5119378908,
           "log_bytes": 0,
           "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-          "log": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/full-gate-b6732d02b2/04-clippy-ops-xlsx-attempt-1792817839485244037-4164126.log",
+          "log": "(deleted-coord-artifact)/04-clippy-ops-xlsx-attempt-1792817839485244037-4164126.log",
           "post_exit": {
             "target_bytes": 5119378908,
             "samples": [
@@ -358,7 +358,7 @@
           "target_bytes_after": 5157457172,
           "log_bytes": 0,
           "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-          "log": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/full-gate-b6732d02b2/05-clippy-ops-pptx-attempt-1792817911429533439-4164126.log",
+          "log": "(deleted-coord-artifact)/05-clippy-ops-pptx-attempt-1792817911429533439-4164126.log",
           "post_exit": {
             "target_bytes": 5157457172,
             "samples": [
@@ -407,7 +407,7 @@
           "target_bytes_after": 5183724615,
           "log_bytes": 0,
           "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-          "log": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/full-gate-b6732d02b2/06-clippy-ops-docx-attempt-1792817965030956829-4164126.log",
+          "log": "(deleted-coord-artifact)/06-clippy-ops-docx-attempt-1792817965030956829-4164126.log",
           "post_exit": {
             "target_bytes": 5183724615,
             "samples": [
@@ -456,7 +456,7 @@
           "target_bytes_after": 5222936832,
           "log_bytes": 0,
           "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-          "log": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/full-gate-b6732d02b2/07-clippy-ops-xls-attempt-1792818012076338260-4164126.log",
+          "log": "(deleted-coord-artifact)/07-clippy-ops-xls-attempt-1792818012076338260-4164126.log",
           "post_exit": {
             "target_bytes": 5222936832,
             "samples": [
@@ -505,7 +505,7 @@
           "target_bytes_after": 5239387499,
           "log_bytes": 0,
           "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-          "log": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/full-gate-b6732d02b2/08-clippy-ops-xlsb-attempt-1792818056445197119-4164126.log",
+          "log": "(deleted-coord-artifact)/08-clippy-ops-xlsb-attempt-1792818056445197119-4164126.log",
           "post_exit": {
             "target_bytes": 5239387499,
             "samples": [
@@ -554,7 +554,7 @@
           "target_bytes_after": 5256938874,
           "log_bytes": 0,
           "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-          "log": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/full-gate-b6732d02b2/09-clippy-ops-doc-attempt-1792818089146447197-4164126.log",
+          "log": "(deleted-coord-artifact)/09-clippy-ops-doc-attempt-1792818089146447197-4164126.log",
           "post_exit": {
             "target_bytes": 5256938874,
             "samples": [
@@ -603,7 +603,7 @@
           "target_bytes_after": 5288731684,
           "log_bytes": 0,
           "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-          "log": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/full-gate-b6732d02b2/10-clippy-ops-ppt-attempt-1792818120287634217-4164126.log",
+          "log": "(deleted-coord-artifact)/10-clippy-ops-ppt-attempt-1792818120287634217-4164126.log",
           "post_exit": {
             "target_bytes": 5288731684,
             "samples": [
@@ -652,7 +652,7 @@
           "target_bytes_after": 5329367905,
           "log_bytes": 0,
           "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-          "log": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/full-gate-b6732d02b2/11-clippy-ops-rtf-attempt-1792818161616137373-4164126.log",
+          "log": "(deleted-coord-artifact)/11-clippy-ops-rtf-attempt-1792818161616137373-4164126.log",
           "post_exit": {
             "target_bytes": 5329367905,
             "samples": [
@@ -701,7 +701,7 @@
           "target_bytes_after": 5355621762,
           "log_bytes": 0,
           "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-          "log": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/full-gate-b6732d02b2/12-clippy-ops-odt-attempt-1792818193969604347-4164126.log",
+          "log": "(deleted-coord-artifact)/12-clippy-ops-odt-attempt-1792818193969604347-4164126.log",
           "post_exit": {
             "target_bytes": 5355621762,
             "samples": [
@@ -750,7 +750,7 @@
           "target_bytes_after": 5373330526,
           "log_bytes": 0,
           "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-          "log": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/full-gate-b6732d02b2/13-clippy-ops-ods-attempt-1792818248849248558-4164126.log",
+          "log": "(deleted-coord-artifact)/13-clippy-ops-ods-attempt-1792818248849248558-4164126.log",
           "post_exit": {
             "target_bytes": 5373330526,
             "samples": [
@@ -799,7 +799,7 @@
           "target_bytes_after": 5382432923,
           "log_bytes": 0,
           "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-          "log": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/full-gate-b6732d02b2/14-clippy-ops-odp-attempt-1792818291198021467-4164126.log",
+          "log": "(deleted-coord-artifact)/14-clippy-ops-odp-attempt-1792818291198021467-4164126.log",
           "post_exit": {
             "target_bytes": 5382432923,
             "samples": [
@@ -848,7 +848,7 @@
           "target_bytes_after": 5389515825,
           "log_bytes": 0,
           "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-          "log": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/full-gate-b6732d02b2/15-clippy-ops-oth-attempt-1792818328142264820-4164126.log",
+          "log": "(deleted-coord-artifact)/15-clippy-ops-oth-attempt-1792818328142264820-4164126.log",
           "post_exit": {
             "target_bytes": 5389515825,
             "samples": [
@@ -897,7 +897,7 @@
           "target_bytes_after": 5395955617,
           "log_bytes": 0,
           "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-          "log": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/full-gate-b6732d02b2/16-clippy-ops-odm-attempt-1792818359662313713-4164126.log",
+          "log": "(deleted-coord-artifact)/16-clippy-ops-odm-attempt-1792818359662313713-4164126.log",
           "post_exit": {
             "target_bytes": 5395955617,
             "samples": [
@@ -946,7 +946,7 @@
           "target_bytes_after": 5397529489,
           "log_bytes": 464,
           "log_sha256": "625cc18ad5689b85742bde97a751be19980c0c313c48da60f1d2308269935953",
-          "log": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/full-gate-b6732d02b2/17-clippy-ops-odg-attempt-1792818386978218472-4164126.log",
+          "log": "(deleted-coord-artifact)/17-clippy-ops-odg-attempt-1792818386978218472-4164126.log",
           "post_exit": {
             "target_bytes": 5397529489,
             "samples": [
@@ -975,12 +975,12 @@
     },
     {
       "state": {
-        "path": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/odg-odb-cfg-cbbad7a7c0/state.json",
+        "path": "(deleted-coord-artifact)/state.json",
         "bytes": 41769,
         "sha256": "52decffeaccab30582c767195a8cade6a1a8befc8d438a3800847fda1f6884be"
       },
       "plan": {
-        "path": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/odg-odb-cfg-cbbad7a7c0/plan.json",
+        "path": "(deleted-coord-artifact)/plan.json",
         "bytes": 21849,
         "sha256": "10e8e5e3da2bef420f341366df4a44c0a861a8f95ccf02f8a4d9f80960e61abb"
       },
@@ -1036,7 +1036,7 @@
           "target_bytes_after": 5402275136,
           "log_bytes": 469,
           "log_sha256": "0b7587642c186f97ccd41af31093ab19ef16159a686f7ca9270e21fd765db773",
-          "log": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/odg-odb-cfg-cbbad7a7c0/17-clippy-ops-odg-attempt-1792818872383015800-345201.log",
+          "log": "(deleted-coord-artifact)/17-clippy-ops-odg-attempt-1792818872383015800-345201.log",
           "post_exit": {
             "target_bytes": 5402275136,
             "samples": [
@@ -1065,12 +1065,12 @@
     },
     {
       "state": {
-        "path": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/remaining-profiles-e1576fa6dc/state.json",
+        "path": "(deleted-coord-artifact)/state.json",
         "bytes": 250279,
         "sha256": "e0cca1faf33e225c24b74765483b6ece89f24f4f9c2377aca2e6c889298cf004"
       },
       "plan": {
-        "path": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/remaining-profiles-e1576fa6dc/plan.json",
+        "path": "(deleted-coord-artifact)/plan.json",
         "bytes": 22120,
         "sha256": "ee7dbb5183901a88fc2bd842075ca459d21191a4e1a6c81951652a9986b23406"
       },
@@ -1138,7 +1138,7 @@
           "target_bytes_after": 5402278628,
           "log_bytes": 0,
           "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-          "log": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/remaining-profiles-e1576fa6dc/17-clippy-ops-odg-attempt-1792819613279197751-502953.log",
+          "log": "(deleted-coord-artifact)/17-clippy-ops-odg-attempt-1792819613279197751-502953.log",
           "post_exit": {
             "target_bytes": 5402278628,
             "samples": [
@@ -1187,7 +1187,7 @@
           "target_bytes_after": 5408134900,
           "log_bytes": 0,
           "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-          "log": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/remaining-profiles-e1576fa6dc/18-clippy-ops-odc-attempt-1792819628962184660-502953.log",
+          "log": "(deleted-coord-artifact)/18-clippy-ops-odc-attempt-1792819628962184660-502953.log",
           "post_exit": {
             "target_bytes": 5408134900,
             "samples": [
@@ -1236,7 +1236,7 @@
           "target_bytes_after": 5414161816,
           "log_bytes": 0,
           "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-          "log": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/remaining-profiles-e1576fa6dc/19-clippy-ops-odi-attempt-1792819650566785454-502953.log",
+          "log": "(deleted-coord-artifact)/19-clippy-ops-odi-attempt-1792819650566785454-502953.log",
           "post_exit": {
             "target_bytes": 5414161816,
             "samples": [
@@ -1285,7 +1285,7 @@
           "target_bytes_after": 5420571813,
           "log_bytes": 0,
           "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-          "log": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/remaining-profiles-e1576fa6dc/20-clippy-ops-odb-attempt-1792819679858176589-502953.log",
+          "log": "(deleted-coord-artifact)/20-clippy-ops-odb-attempt-1792819679858176589-502953.log",
           "post_exit": {
             "target_bytes": 5420571813,
             "samples": [
@@ -1334,7 +1334,7 @@
           "target_bytes_after": 5426282273,
           "log_bytes": 0,
           "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-          "log": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/remaining-profiles-e1576fa6dc/21-clippy-ops-odf-formula-attempt-1792819703627574931-502953.log",
+          "log": "(deleted-coord-artifact)/21-clippy-ops-odf-formula-attempt-1792819703627574931-502953.log",
           "post_exit": {
             "target_bytes": 5426282273,
             "samples": [
@@ -1383,7 +1383,7 @@
           "target_bytes_after": 5572752639,
           "log_bytes": 0,
           "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-          "log": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/remaining-profiles-e1576fa6dc/22-clippy-ops-pages-attempt-1792819729086803576-502953.log",
+          "log": "(deleted-coord-artifact)/22-clippy-ops-pages-attempt-1792819729086803576-502953.log",
           "post_exit": {
             "target_bytes": 5572752639,
             "samples": [
@@ -1432,7 +1432,7 @@
           "target_bytes_after": 5594083858,
           "log_bytes": 0,
           "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-          "log": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/remaining-profiles-e1576fa6dc/23-clippy-ops-keynote-attempt-1792819825341587191-502953.log",
+          "log": "(deleted-coord-artifact)/23-clippy-ops-keynote-attempt-1792819825341587191-502953.log",
           "post_exit": {
             "target_bytes": 5594083858,
             "samples": [
@@ -1481,7 +1481,7 @@
           "target_bytes_after": 5613723699,
           "log_bytes": 0,
           "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-          "log": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/remaining-profiles-e1576fa6dc/24-clippy-ops-numbers-attempt-1792819870577166370-502953.log",
+          "log": "(deleted-coord-artifact)/24-clippy-ops-numbers-attempt-1792819870577166370-502953.log",
           "post_exit": {
             "target_bytes": 5613723699,
             "samples": [
@@ -1512,7 +1512,7 @@
   "operational_rejection": {
     "note": "An IWA fixture generator used the gate checkout during the first e157 ODG attempt. The guard refused the overlap; after all owner jobs exited, the same frozen selection was resumed without policy changes.",
     "correction": {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-native-qualification-b673-20261024-owner-validation-provenance-rejection.json",
+      "path": "(deleted-coord-artifact)/iwa-native-qualification-b673-20261024-owner-validation-provenance-rejection.json",
       "bytes": 4910,
       "sha256": "dd6b718eb604f8f8c47b2050e9b38d54270b221d34dc7ba0cf1f4513fb85d186"
     }

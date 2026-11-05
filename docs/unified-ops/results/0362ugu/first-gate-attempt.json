@@ -87,7 +87,7 @@
         "--check"
       ],
       "environment": {
-        "CARGO_TARGET_DIR": "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/target",
+        "CARGO_TARGET_DIR": "(deleted-coord-artifact)",
         "CARGO_NET_OFFLINE": "true",
         "LITCHI_MEM_MAX": "20G",
         "CARGO_BUILD_JOBS": "1",
@@ -97,7 +97,7 @@
       },
       "exit": 1,
       "seconds": 81.77977728843689,
-      "log": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/full-gate-2dfc4f134d/00-fmt-attempt-1792815904599553077-3713346.log",
+      "log": "(deleted-coord-artifact)/00-fmt-attempt-1792815904599553077-3713346.log",
       "log_bytes": 10644,
       "log_sha256": "929e9bf021a568ce3217a2f9b7185cb9c2c9a95dfe910a4583938dbd3a5c088f",
       "target_bytes_after": 4706726230,
@@ -157,15 +157,15 @@
         {
           "pid": "3714205",
           "cargo_command": "fmt",
-          "target": "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/target"
+          "target": "(deleted-coord-artifact)"
         }
       ],
       "cargo_target_sizes": {
-        "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/target": {
+        "(deleted-coord-artifact)": {
           "bytes": 4706726230
         }
       },
-      "cargo_target_trace_file": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/full-gate-2dfc4f134d/00-fmt-attempt-1792815904599553077-3713346-cargo-targets.tsv",
+      "cargo_target_trace_file": "(deleted-coord-artifact)/00-fmt-attempt-1792815904599553077-3713346-cargo-targets.tsv",
       "cargo_target_trace_bytes": 78,
       "cargo_target_trace_sha256": "0e26396910bc53c4772375e5a5c4c8de7aa838bd9a36cf7eb58f60a6eba7b725",
       "preflight": {
@@ -252,6 +252,6 @@
       "status": "failed"
     }
   ],
-  "external_state": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/full-gate-2dfc4f134d/state.json",
+  "external_state": "(deleted-coord-artifact)/state.json",
   "external_state_sha256": "293eec04f0251bb0c082457cdd89e287eed7dc592a3d8e7c7d93d411fd479753"
 }

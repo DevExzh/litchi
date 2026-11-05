@@ -41,13 +41,13 @@
     }
   },
   "environment": {
-    "cargo": "/home/zhuhe/code/litchi-worktrees/.coord/bin/cargo",
+    "cargo": "(deleted-coord-artifact)",
     "offline": true,
     "locked": true,
     "cargo_build_jobs": 1,
     "rust_test_threads": 1,
     "memory_cap": "20G",
-    "target": "/home/zhuhe/code/litchi-worktrees/.coord/cfb-sequential-error-layout/perf-16b-target",
+    "target": "(deleted-coord-artifact)",
     "target_du_sb_bytes_after": 2862146958
   },
   "successful_commands": [
@@ -56,7 +56,7 @@
       "argv": ["cargo", "check", "--manifest-path", "tools/perf-baseline/Cargo.toml", "--offline", "--locked", "--all-targets"],
       "exit_code": 0,
       "log": {
-        "path": "/home/zhuhe/code/litchi-worktrees/.coord/cfb-sequential-error-layout/validation-16b/ordinary-check-fixed-manifest.log",
+        "path": "(deleted-coord-artifact)/ordinary-check-fixed-manifest.log",
         "bytes": 39914,
         "sha256": "1c4178777c0f11075515750580a9a94d36141281acce6b38e620ae24a745cd10"
       },
@@ -67,7 +67,7 @@
       "argv": ["cargo", "fmt", "--all", "--check"],
       "exit_code": 0,
       "log": {
-        "path": "/home/zhuhe/code/litchi-worktrees/.coord/cfb-sequential-error-layout/validation-16b/root-fmt-final.log",
+        "path": "(deleted-coord-artifact)/root-fmt-final.log",
         "bytes": 0,
         "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
       }
@@ -78,7 +78,7 @@
       "exit_code": 0,
       "tests": 23,
       "log": {
-        "path": "/home/zhuhe/code/litchi-worktrees/.coord/cfb-sequential-error-layout/validation-16b/protocol-tests.log",
+        "path": "(deleted-coord-artifact)/protocol-tests.log",
         "bytes": 98,
         "sha256": "4e4793c3224b7c923b76ad78b35ba1d537b3ffeae9dcff667b79f90bcc6da93e"
       }
@@ -90,7 +90,7 @@
       "argv": ["cargo", "check", "--offline", "--locked", "-p", "litchi-perf-baseline", "--all-targets"],
       "exit_code": 101,
       "log": {
-        "path": "/home/zhuhe/code/litchi-worktrees/.coord/cfb-sequential-error-layout/validation-16b/ordinary-check.log",
+        "path": "(deleted-coord-artifact)/ordinary-check.log",
         "bytes": 82,
         "sha256": "1de91218d83fe2c6abb4500bdcfbed5346109729dc72eb88bd3f61094d06cb8e"
       },
@@ -101,7 +101,7 @@
       "argv": ["cargo", "fmt", "--all", "--check"],
       "exit_code": 1,
       "log": {
-        "path": "/home/zhuhe/code/litchi-worktrees/.coord/cfb-sequential-error-layout/validation-16b/root-fmt.log",
+        "path": "(deleted-coord-artifact)/root-fmt.log",
         "bytes": 540,
         "sha256": "bd1437032bc7c022981cc77456fdff399bb2aa2e4c6b7e39e3c633dcf3d7e949"
       },
@@ -112,7 +112,7 @@
       "argv": ["cargo", "fmt", "--manifest-path", "tools/perf-baseline/Cargo.toml", "--all", "--", "--check"],
       "exit_code": 1,
       "log": {
-        "path": "/home/zhuhe/code/litchi-worktrees/.coord/cfb-sequential-error-layout/validation-16b/perf-fmt.log",
+        "path": "(deleted-coord-artifact)/perf-fmt.log",
         "bytes": 1881,
         "sha256": "ac7a14fda5ef3b26fd588a4ca40fe09a230d238982ec4d60edb12fe7ffe6a6e4"
       },

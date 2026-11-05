@@ -30,7 +30,7 @@
     "warnings"
   ],
   "environment": {
-    "CARGO_TARGET_DIR": "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/target",
+    "CARGO_TARGET_DIR": "(deleted-coord-artifact)",
     "CARGO_NET_OFFLINE": "true",
     "LITCHI_MEM_MAX": "20G",
     "CARGO_BUILD_JOBS": "1",
@@ -65,27 +65,27 @@
     ]
   },
   "log": {
-    "log": "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/composed-lazy-consumers-0f007c4d74/01-clippy-all-features-attempt-1792811805415836969-2404993.log",
+    "log": "(deleted-coord-artifact)/01-clippy-all-features-attempt-1792811805415836969-2404993.log",
     "log_bytes": 0,
     "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
   },
   "state": {
-    "path": "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/composed-lazy-consumers-0f007c4d74/state.json",
+    "path": "(deleted-coord-artifact)/state.json",
     "bytes": 22906,
     "sha256": "1e278df8992929d81255e243720933edb2a966bc48a6981f0a31f780e65d85d0"
   },
   "plan": {
-    "path": "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/composed-lazy-consumers-0f007c4d74/plan.json",
+    "path": "(deleted-coord-artifact)/plan.json",
     "bytes": 21328,
     "sha256": "eb98c167fa222424d831d3f79b3d8ae2093c6f1efe6f566bc1e648f515831c8d"
   },
   "policy": {
     "runner_files": {
-      "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/gate-safe/run_safe_gate.py": "0691c5cb469d9f59caf67c63b748e4d2c80ea5b58e9b99cbde0e171fa5e8a372",
-      "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/gate-safe/safe_chunked_tests.py": "70fdb56c96e4ed9e1d1e0d2b1e9c7f1db148a2115fb25246d13464569290cc35",
-      "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/gate-safe/bin/cargo": "495e24c6f60b238378386d86ac4158cba904992ce8870a9494f2c4a0eedd256d"
+      "(deleted-coord-artifact)/run_safe_gate.py": "0691c5cb469d9f59caf67c63b748e4d2c80ea5b58e9b99cbde0e171fa5e8a372",
+      "(deleted-coord-artifact)/safe_chunked_tests.py": "70fdb56c96e4ed9e1d1e0d2b1e9c7f1db148a2115fb25246d13464569290cc35",
+      "(deleted-coord-artifact)/cargo": "495e24c6f60b238378386d86ac4158cba904992ce8870a9494f2c4a0eedd256d"
     },
-    "cargo_wrapper": "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/gate-safe/bin/cargo",
+    "cargo_wrapper": "(deleted-coord-artifact)",
     "offline": true,
     "locked": true,
     "memory_max": "20G",
@@ -106,7 +106,7 @@
     "full_step_count": 53,
     "partial": true
   },
-  "cargo_target_trace_file": "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/composed-lazy-consumers-0f007c4d74/01-clippy-all-features-attempt-1792811805415836969-2404993-cargo-targets.tsv",
+  "cargo_target_trace_file": "(deleted-coord-artifact)/01-clippy-all-features-attempt-1792811805415836969-2404993-cargo-targets.tsv",
   "cargo_target_trace_bytes": 81,
   "cargo_target_trace_sha256": "3131db2d6abd107d923f879bb401780979cdc4391f0327282b88514a944c1eaa"
 }

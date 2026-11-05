@@ -7,8 +7,8 @@
     "command": "cargo build --offline --locked --release -p litchi-rtf --example refusal_contract_bench",
     "jobs": 1,
     "targets": {
-      "current": "/home/zhuhe/code/litchi-worktrees/.coord/rtf-refusal-current-base-target",
-      "fast": "/home/zhuhe/code/litchi-worktrees/.coord/rtf-refusal-fast-target"
+      "current": "(deleted-coord-artifact)",
+      "fast": "(deleted-coord-artifact)"
     }
   },
   "probe": {

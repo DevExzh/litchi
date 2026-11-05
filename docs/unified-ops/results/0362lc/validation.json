@@ -33,7 +33,7 @@
     "sha256": "d85b4300c58dbdf0dcc3cb8243ad4ea00cd9c29c9d1d4a77c38e51fe12f708aa"
   },
   "receipt": {
-    "path": "/home/zhuhe/code/litchi-worktrees/.coord/durable-ink-0362l/v7/checks.json",
+    "path": "(deleted-coord-artifact)/checks.json",
     "bytes": 2067,
     "sha256": "24f31df2ff3be4b7125fe2096caf464dcb3a09e59c19f604b869b4676b1aa05b"
   },
@@ -52,7 +52,7 @@
       ],
       "exit": 0,
       "seconds": 63.638288003974594,
-      "log": "/home/zhuhe/code/litchi-worktrees/.coord/durable-ink-0362l/v7/check-0.log",
+      "log": "(deleted-coord-artifact)/check-0.log",
       "bytes": 8534,
       "sha256": "08029181b6de632d18110179d8850b7b8c1b661fa8041882311d8286b4fb1692"
     },
@@ -69,7 +69,7 @@
       ],
       "exit": 0,
       "seconds": 73.83648987696506,
-      "log": "/home/zhuhe/code/litchi-worktrees/.coord/durable-ink-0362l/v7/check-1.log",
+      "log": "(deleted-coord-artifact)/check-1.log",
       "bytes": 133339,
       "sha256": "ac61c6ebd80575a6140b035bcf9e3d6841a445cca20d80ac36b2f97c455b4d22"
     },
@@ -86,7 +86,7 @@
       ],
       "exit": 0,
       "seconds": 4.384842152940109,
-      "log": "/home/zhuhe/code/litchi-worktrees/.coord/durable-ink-0362l/v7/check-2.log",
+      "log": "(deleted-coord-artifact)/check-2.log",
       "bytes": 23296,
       "sha256": "a2e179d69f8509a26ce3f71f3f7ba9546d2174b261f5c597c90fef565cb8a13e"
     },
@@ -106,7 +106,7 @@
       ],
       "exit": 0,
       "seconds": 67.12032154900953,
-      "log": "/home/zhuhe/code/litchi-worktrees/.coord/durable-ink-0362l/v7/check-3.log",
+      "log": "(deleted-coord-artifact)/check-3.log",
       "bytes": 2498,
       "sha256": "0df98169df6d73ab8f76b805d65595a10676aa1ada8e81db909a84c19f179352"
     },
@@ -121,7 +121,7 @@
       ],
       "exit": 0,
       "seconds": 1.840277063078247,
-      "log": "/home/zhuhe/code/litchi-worktrees/.coord/durable-ink-0362l/v7/check-4.log",
+      "log": "(deleted-coord-artifact)/check-4.log",
       "bytes": 0,
       "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
     }

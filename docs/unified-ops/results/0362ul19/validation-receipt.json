@@ -54,15 +54,15 @@
     }
   },
   "environment": {
-    "cargo": "/home/zhuhe/code/litchi-worktrees/.coord/bin/cargo",
+    "cargo": "(deleted-coord-artifact)",
     "offline": true,
     "locked": true,
     "cargo_build_jobs": 1,
     "rust_test_threads": 1,
     "memory_cap": "20G",
-    "target": "/home/zhuhe/code/litchi-worktrees/.coord/docx-artifact-stream-report-validation/target",
+    "target": "(deleted-coord-artifact)",
     "target_bytes_after": 1629962979,
-    "rustdoc_target": "/home/zhuhe/code/litchi-worktrees/.coord/docx-artifact-stream-report-validation/rustdoc-target",
+    "rustdoc_target": "(deleted-coord-artifact)",
     "rustdoc_target_bytes_after": 745221476
   },
   "successful_commands": [
@@ -72,7 +72,7 @@
       "exit_code": 0,
       "tests": "9 passed",
       "log": {
-        "path": "/home/zhuhe/code/litchi-worktrees/.coord/docx-artifact-stream-report-validation/logs/opc-stream-tests.log",
+        "path": "(deleted-coord-artifact)/opc-stream-tests.log",
         "bytes": 5313,
         "sha256": "3d3f8502a8f57722353b5886683d55a6339ce4761a464c8e13033672d5a4d99f"
       }
@@ -83,7 +83,7 @@
       "exit_code": 0,
       "tests": "1 passed",
       "log": {
-        "path": "/home/zhuhe/code/litchi-worktrees/.coord/docx-artifact-stream-report-validation/logs/docx-stream-test.log",
+        "path": "(deleted-coord-artifact)/docx-stream-test.log",
         "bytes": 3822,
         "sha256": "f9ecba04c7a933ae3ba628f1bf6600bca409240b2c18faedfc33f083e0eea0b7"
       }
@@ -93,7 +93,7 @@
       "argv": ["cargo", "check", "--offline", "--locked", "-p", "litchi-opc", "-p", "litchi-docx", "--all-targets", "--all-features"],
       "exit_code": 0,
       "log": {
-        "path": "/home/zhuhe/code/litchi-worktrees/.coord/docx-artifact-stream-report-validation/logs/opc-docx-all-targets-all-features.log",
+        "path": "(deleted-coord-artifact)/opc-docx-all-targets-all-features.log",
         "bytes": 8492,
         "sha256": "29b3bf7344ef60fd183b160cbdac98b6ae89ce8485a90f38157bb943e1ce4ac8"
       }
@@ -105,8 +105,8 @@
       "glossary_profile": "opc-minimal",
       "glossary_result": "pass",
       "log": {
-        "rustdoc": {"path": "/home/zhuhe/code/litchi-worktrees/.coord/docx-artifact-stream-report-validation/logs/rustdoc-opc-minimal.log", "bytes": 3620, "sha256": "51ebcc6067cf8a697c5efa27b92008b8627a2d47f30938fee8f287fc307a038e"},
-        "glossary": {"path": "/home/zhuhe/code/litchi-worktrees/.coord/docx-artifact-stream-report-validation/logs/glossary-opc-minimal.log", "bytes": 153, "sha256": "96b744382bb550218367e83ca4b12c15811e30bb53b1d86e35186acbe70103ef"}
+        "rustdoc": {"path": "(deleted-coord-artifact)/rustdoc-opc-minimal.log", "bytes": 3620, "sha256": "51ebcc6067cf8a697c5efa27b92008b8627a2d47f30938fee8f287fc307a038e"},
+        "glossary": {"path": "(deleted-coord-artifact)/glossary-opc-minimal.log", "bytes": 153, "sha256": "96b744382bb550218367e83ca4b12c15811e30bb53b1d86e35186acbe70103ef"}
       }
     },
     {
@@ -116,8 +116,8 @@
       "glossary_profile": "opc-full",
       "glossary_result": "pass",
       "log": {
-        "rustdoc": {"path": "/home/zhuhe/code/litchi-worktrees/.coord/docx-artifact-stream-report-validation/logs/rustdoc-opc-full.log", "bytes": 3437, "sha256": "47ff6a5c71e609143a3a0aed8ddc5b902ea69125c20e127e955ddaa308a93f73"},
-        "glossary": {"path": "/home/zhuhe/code/litchi-worktrees/.coord/docx-artifact-stream-report-validation/logs/glossary-opc-full.log", "bytes": 153, "sha256": "96b744382bb550218367e83ca4b12c15811e30bb53b1d86e35186acbe70103ef"}
+        "rustdoc": {"path": "(deleted-coord-artifact)/rustdoc-opc-full.log", "bytes": 3437, "sha256": "47ff6a5c71e609143a3a0aed8ddc5b902ea69125c20e127e955ddaa308a93f73"},
+        "glossary": {"path": "(deleted-coord-artifact)/glossary-opc-full.log", "bytes": 153, "sha256": "96b744382bb550218367e83ca4b12c15811e30bb53b1d86e35186acbe70103ef"}
       }
     },
     {
@@ -127,8 +127,8 @@
       "glossary_profile": "docx-minimal",
       "glossary_result": "pass",
       "log": {
-        "rustdoc": {"path": "/home/zhuhe/code/litchi-worktrees/.coord/docx-artifact-stream-report-validation/logs/rustdoc-docx-minimal.log", "bytes": 3283, "sha256": "c2c1bd7d51cac7e1d8640ec3c91bd0e2277eed05a86c1b4ee4be6e205c046c4c"},
-        "glossary": {"path": "/home/zhuhe/code/litchi-worktrees/.coord/docx-artifact-stream-report-validation/logs/glossary-docx-minimal.log", "bytes": 155, "sha256": "4ecfcc59908545887631e4a92941e59aaa6d37d681ac336654162c775ba5e9eb"}
+        "rustdoc": {"path": "(deleted-coord-artifact)/rustdoc-docx-minimal.log", "bytes": 3283, "sha256": "c2c1bd7d51cac7e1d8640ec3c91bd0e2277eed05a86c1b4ee4be6e205c046c4c"},
+        "glossary": {"path": "(deleted-coord-artifact)/glossary-docx-minimal.log", "bytes": 155, "sha256": "4ecfcc59908545887631e4a92941e59aaa6d37d681ac336654162c775ba5e9eb"}
       }
     },
     {
@@ -138,8 +138,8 @@
       "glossary_profile": "docx-full",
       "glossary_result": "pass",
       "log": {
-        "rustdoc": {"path": "/home/zhuhe/code/litchi-worktrees/.coord/docx-artifact-stream-report-validation/logs/rustdoc-docx-full.log", "bytes": 6329, "sha256": "4397151afd507421e483b1804ebdf4ec24f6256713fecf8fdde9849504ca8434"},
-        "glossary": {"path": "/home/zhuhe/code/litchi-worktrees/.coord/docx-artifact-stream-report-validation/logs/glossary-docx-full.log", "bytes": 155, "sha256": "8bcb4f67b3bb9c2cee69c0220fbfa73a253a9abd768ade275fa6fad95dee11e4"}
+        "rustdoc": {"path": "(deleted-coord-artifact)/rustdoc-docx-full.log", "bytes": 6329, "sha256": "4397151afd507421e483b1804ebdf4ec24f6256713fecf8fdde9849504ca8434"},
+        "glossary": {"path": "(deleted-coord-artifact)/glossary-docx-full.log", "bytes": 155, "sha256": "8bcb4f67b3bb9c2cee69c0220fbfa73a253a9abd768ade275fa6fad95dee11e4"}
       }
     },
     {
@@ -149,8 +149,8 @@
       "glossary_profile": "soapberry-zip",
       "glossary_result": "pass; 6 corrected office scopes resolved",
       "log": {
-        "rustdoc": {"path": "/home/zhuhe/code/litchi-worktrees/.coord/docx-artifact-stream-report-validation/logs/rustdoc-soapberry.log", "bytes": 1375, "sha256": "4e91b4356a2cdfae133f78048424d0b31e93afaeeff722be25eb7e905c064633"},
-        "glossary": {"path": "/home/zhuhe/code/litchi-worktrees/.coord/docx-artifact-stream-report-validation/logs/glossary-soapberry.log", "bytes": 152, "sha256": "917beb818de828b8301f64db2c6a0ecd3637a2048edca996f08153eeb3dd39e0"}
+        "rustdoc": {"path": "(deleted-coord-artifact)/rustdoc-soapberry.log", "bytes": 1375, "sha256": "4e91b4356a2cdfae133f78048424d0b31e93afaeeff722be25eb7e905c064633"},
+        "glossary": {"path": "(deleted-coord-artifact)/glossary-soapberry.log", "bytes": 152, "sha256": "917beb818de828b8301f64db2c6a0ecd3637a2048edca996f08153eeb3dd39e0"}
       }
     }
   ],

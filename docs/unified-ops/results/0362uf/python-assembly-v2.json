@@ -17,7 +17,7 @@
       ],
       "exit": 0,
       "seconds": 34.9139240580007,
-      "log": "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/python-assembly-v2/check-0.log",
+      "log": "(deleted-coord-artifact)/check-0.log",
       "bytes": 633568,
       "sha256": "43b44b0888dbbc8a4f2bcb66183d40574b2615fcd7a67b816ad6891272eb93fd"
     }

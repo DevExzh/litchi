@@ -11,19 +11,19 @@
     "changed": 2212
   },
   "input_lock": {
-    "path": "/home/zhuhe/code/litchi-worktrees/.coord/constructor-0361f-coordinator/matched-v5/source-base/Cargo.lock",
+    "path": "(deleted-coord-artifact)/Cargo.lock",
     "bytes": 139505,
     "sha256": "d85b4300c58dbdf0dcc3cb8243ad4ea00cd9c29c9d1d4a77c38e51fe12f708aa",
     "lockfile_version": 3
   },
   "build_manifest": {
-    "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-0361f-constructor-0ba-build-20261023/build.json",
+    "path": "(deleted-coord-artifact)/build.json",
     "bytes": 902357,
     "sha256": "4c9377c5de821776f116c10d62e916610339d03cbe2b358160fb3229b6a37e0f"
   },
   "generated_endpoint_locks": {
     "base": {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-0361f-constructor-0ba-build-20261023/project-base/Cargo.lock",
+      "path": "(deleted-coord-artifact)/Cargo.lock",
       "bytes": 22087,
       "sha256": "97ee8dd9248535f20c62e682698650ddfd61f6e4d322747a9c1cdcb04a6f735c",
       "lockfile_version": 4,
@@ -31,7 +31,7 @@
       "registry_packages": 91
     },
     "candidate": {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-lockdiag.Blar6B/Cargo.lock",
+      "path": "(deleted-coord-artifact)/Cargo.lock",
       "bytes": 22293,
       "sha256": "da8da00dee6227c537feaccd85537196d70c1fb590b50860384ffad5d9a14705",
       "lockfile_version": 4,
@@ -91,12 +91,12 @@
     ],
     "exit_code": 101,
     "receipt": {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-0361f-constructor-0ba-build-20261023/build-candidate/native.receipt.json",
+      "path": "(deleted-coord-artifact)/native.receipt.json",
       "bytes": 885,
       "sha256": "d8788cd3df800a64dd74a38d4412c549a9818bfc593bb7ab6ba9f029b3274831"
     },
     "stderr": {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-0361f-constructor-0ba-build-20261023/build-candidate/native.stderr",
+      "path": "(deleted-coord-artifact)/native.stderr",
       "bytes": 305,
       "sha256": "c881ec279218a35e003da6559982be348f6d0796aa9f777e0ee416289f322b09"
     },
@@ -107,7 +107,7 @@
     "command": ["cargo", "metadata", "--offline", "--locked", "--format-version=1"],
     "exit_code": 101,
     "stderr": {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-lockdiag-base-candidate-lock/metadata.stderr",
+      "path": "(deleted-coord-artifact)/metadata.stderr",
       "bytes": 279,
       "sha256": "4a94d9a13d9086f1df0e8692db1eedc382c35212f1b3c78de05ed060b3ebe663"
     },

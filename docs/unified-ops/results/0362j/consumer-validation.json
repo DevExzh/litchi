@@ -24,7 +24,7 @@
       "exit_code": 0,
       "elapsed_seconds": 122.35549521446228,
       "log": {
-        "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-0362j-consumer-fix/ops-check.log",
+        "path": "(deleted-coord-artifact)/ops-check.log",
         "bytes": 8293,
         "sha256": "45b425c88002605e0aed964167033902b0499f62fa7c25b40f48704a2a278b69"
       }
@@ -44,7 +44,7 @@
       "exit_code": 0,
       "elapsed_seconds": 190.9776647090912,
       "log": {
-        "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-0362j-consumer-fix/ops-lib.log",
+        "path": "(deleted-coord-artifact)/ops-lib.log",
         "bytes": 85505,
         "sha256": "c1414d378b590ce298f89dff470f5eede4c23e25cb7f41d5a6a2322fc8ac45c0"
       }

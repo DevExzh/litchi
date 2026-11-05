@@ -7,17 +7,17 @@
   ],
   "locks": {
     "original": {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-base-prep-20261021/Cargo.lock",
+      "path": "(deleted-coord-artifact)/Cargo.lock",
       "bytes": 139425,
       "sha256": "950690b5cad8b3e62c06553660a6310d28197bd305c4333b4d6fd3e96fffcb22"
     },
     "sip_historical": {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-sip-e4bd-prep-20261021/Cargo.lock",
+      "path": "(deleted-coord-artifact)/Cargo.lock",
       "bytes": 139487,
       "sha256": "7ffc6778f9dc85acbeee601d436dfa08135c0a6e318511c65dabaa271547163e"
     },
     "sip_matched": {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-sip-common-lock-20261021/Cargo.lock",
+      "path": "(deleted-coord-artifact)/Cargo.lock",
       "bytes": 139487,
       "sha256": "1d0c16ee87fc2daf98da8722ec07d38b8f8341c4a0163d7307640d29802797dc"
     },
@@ -27,7 +27,7 @@
       "sha256": "1d0c16ee87fc2daf98da8722ec07d38b8f8341c4a0163d7307640d29802797dc"
     },
     "final_candidate": {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-final-admission-20261021/Cargo.lock",
+      "path": "(deleted-coord-artifact)/Cargo.lock",
       "bytes": 139505,
       "sha256": "40dcbcff741065997d9bc583140a22d921ebe2b4f321570af2587d1cf22d3b5c"
     }

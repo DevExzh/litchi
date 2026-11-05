@@ -31,12 +31,12 @@
   ],
   "fresh_rustdoc": [
     {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/replay-return-contract/docx-minimal.json",
+      "path": "(deleted-coord-artifact)/docx-minimal.json",
       "bytes": 77218594,
       "sha256": "732aec310c8e88430440683a00cd48166371ef9e6446008757792d029956a48f"
     },
     {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/replay-return-contract/docx-full.json",
+      "path": "(deleted-coord-artifact)/docx-full.json",
       "bytes": 79021739,
       "sha256": "0318526d0e504fda4fe017663164c47d22308a93357e807ef47487b931106aa8"
     }
@@ -45,7 +45,7 @@
     {
       "attempt": "v1",
       "receipt": {
-        "path": "/home/zhuhe/code/litchi-worktrees/.coord/replay-return-contract/validation-v1/checks.json",
+        "path": "(deleted-coord-artifact)/checks.json",
         "bytes": 2683,
         "sha256": "5e172ac8ed2a53e4174ba79944810f1e9a257eb7a3701739d939f8ac27d3cac1"
       },
@@ -59,7 +59,7 @@
           ],
           "exit": 0,
           "seconds": 0.6242067519342527,
-          "log": "/home/zhuhe/code/litchi-worktrees/.coord/replay-return-contract/validation-v1/check-0.log",
+          "log": "(deleted-coord-artifact)/check-0.log",
           "bytes": 133,
           "sha256": "bc345bcabb7df91d145e5ddcd14d52d7d9a231b919557bab843dbc2fa4d17804"
         },
@@ -74,7 +74,7 @@
           ],
           "exit": 0,
           "seconds": 25.48575021594297,
-          "log": "/home/zhuhe/code/litchi-worktrees/.coord/replay-return-contract/validation-v1/check-1.log",
+          "log": "(deleted-coord-artifact)/check-1.log",
           "bytes": 2064,
           "sha256": "353107116e6b617167ffe620f4bbee088310ab98cfe87e4007462f626e4feec1"
         },
@@ -82,11 +82,11 @@
           "command": [
             "python3",
             "-c",
-            "import pathlib,shutil,hashlib,json; p=pathlib.Path('/home/zhuhe/code/litchi-worktrees/unified-ops-api/target/doc/litchi_docx.json'); q=pathlib.Path('/home/zhuhe/code/litchi-worktrees/.coord/replay-return-contract/docx-minimal.json'); shutil.copyfile(p,q); print(json.dumps(dict(path=str(q),bytes=q.stat().st_size,sha256=hashlib.sha256(q.read_bytes()).hexdigest())))"
+            "import pathlib,shutil,hashlib,json; p=pathlib.Path('/home/zhuhe/code/litchi-worktrees/unified-ops-api/target/doc/litchi_docx.json'); q=pathlib.Path('(deleted-coord-artifact)'); shutil.copyfile(p,q); print(json.dumps(dict(path=str(q),bytes=q.stat().st_size,sha256=hashlib.sha256(q.read_bytes()).hexdigest())))"
           ],
           "exit": 0,
           "seconds": 0.09588901395909488,
-          "log": "/home/zhuhe/code/litchi-worktrees/.coord/replay-return-contract/validation-v1/check-2.log",
+          "log": "(deleted-coord-artifact)/check-2.log",
           "bytes": 191,
           "sha256": "b460ba4ee15fbeaacda9d3146263178f515b3706c13844bbcca21365b4f7c1aa"
         },
@@ -101,7 +101,7 @@
           ],
           "exit": 0,
           "seconds": 33.80901453597471,
-          "log": "/home/zhuhe/code/litchi-worktrees/.coord/replay-return-contract/validation-v1/check-3.log",
+          "log": "(deleted-coord-artifact)/check-3.log",
           "bytes": 3587,
           "sha256": "a11e00ea7ef931ec325830d78a6e45ffc73c833d9619b7e9f580d138f01e8f85"
         },
@@ -109,11 +109,11 @@
           "command": [
             "python3",
             "-c",
-            "import pathlib,shutil,hashlib,json; p=pathlib.Path('/home/zhuhe/code/litchi-worktrees/unified-ops-api/target/doc/litchi_docx.json'); q=pathlib.Path('/home/zhuhe/code/litchi-worktrees/.coord/replay-return-contract/docx-full.json'); shutil.copyfile(p,q); print(json.dumps(dict(path=str(q),bytes=q.stat().st_size,sha256=hashlib.sha256(q.read_bytes()).hexdigest())))"
+            "import pathlib,shutil,hashlib,json; p=pathlib.Path('/home/zhuhe/code/litchi-worktrees/unified-ops-api/target/doc/litchi_docx.json'); q=pathlib.Path('(deleted-coord-artifact)'); shutil.copyfile(p,q); print(json.dumps(dict(path=str(q),bytes=q.stat().st_size,sha256=hashlib.sha256(q.read_bytes()).hexdigest())))"
           ],
           "exit": 0,
           "seconds": 0.0942188169574365,
-          "log": "/home/zhuhe/code/litchi-worktrees/.coord/replay-return-contract/validation-v1/check-4.log",
+          "log": "(deleted-coord-artifact)/check-4.log",
           "bytes": 188,
           "sha256": "e8541e97b407aeebdc71e8b6e63554fc51b184fa8b6da323f4014f69f3ac3be4"
         }
@@ -122,7 +122,7 @@
     {
       "attempt": "v2",
       "receipt": {
-        "path": "/home/zhuhe/code/litchi-worktrees/.coord/replay-return-contract/validation-v2/checks.json",
+        "path": "(deleted-coord-artifact)/checks.json",
         "bytes": 2064,
         "sha256": "535812ce54d22ca4dd7127cedf76607f4946cb4a17279b92d3513a91ce949851"
       },
@@ -143,7 +143,7 @@
           ],
           "exit": 0,
           "seconds": 34.2444596629357,
-          "log": "/home/zhuhe/code/litchi-worktrees/.coord/replay-return-contract/validation-v2/check-0.log",
+          "log": "(deleted-coord-artifact)/check-0.log",
           "bytes": 633483,
           "sha256": "ad6a0a5f12fdee2d669eae7a948f4b03c14c12598069fd3ee884b81ab1ad3d07"
         },
@@ -154,11 +154,11 @@
             "--profile",
             "docx-minimal",
             "--json",
-            "/home/zhuhe/code/litchi-worktrees/.coord/replay-return-contract/docx-minimal.json"
+            "(deleted-coord-artifact)"
           ],
           "exit": 0,
           "seconds": 2.7806924919132143,
-          "log": "/home/zhuhe/code/litchi-worktrees/.coord/replay-return-contract/validation-v2/check-1.log",
+          "log": "(deleted-coord-artifact)/check-1.log",
           "bytes": 125,
           "sha256": "9e60fc093b9d6e7f2cb17e8dfa8d0c017224e792c403dc038d6c6d80018be3dd"
         },
@@ -169,11 +169,11 @@
             "--profile",
             "docx-full",
             "--json",
-            "/home/zhuhe/code/litchi-worktrees/.coord/replay-return-contract/docx-full.json"
+            "(deleted-coord-artifact)"
           ],
           "exit": 0,
           "seconds": 2.760060520027764,
-          "log": "/home/zhuhe/code/litchi-worktrees/.coord/replay-return-contract/validation-v2/check-2.log",
+          "log": "(deleted-coord-artifact)/check-2.log",
           "bytes": 125,
           "sha256": "2c166a7eee79cb0b00ce9040118241b9c22286f1f8ceac295084d2bb40df48e7"
         },
@@ -181,11 +181,11 @@
           "command": [
             "python3",
             "tools/api_debt_inventory.py",
-            "/home/zhuhe/code/litchi-worktrees/.coord/replay-return-contract/docx-full.json"
+            "(deleted-coord-artifact)"
           ],
           "exit": 1,
           "seconds": 2.9685518199112266,
-          "log": "/home/zhuhe/code/litchi-worktrees/.coord/replay-return-contract/validation-v2/check-3.log",
+          "log": "(deleted-coord-artifact)/check-3.log",
           "bytes": 1048,
           "sha256": "b28baed3e1eefbd86035cfc74e95b0029682e82a26df6c1d3cebe26d6d780ded"
         }
@@ -194,7 +194,7 @@
     {
       "attempt": "v3",
       "receipt": {
-        "path": "/home/zhuhe/code/litchi-worktrees/.coord/replay-return-contract/validation-v3/checks.json",
+        "path": "(deleted-coord-artifact)/checks.json",
         "bytes": 2065,
         "sha256": "97dce01f997c3113bff2360e844fde0e3a9772630c12b16c980d448187785ed2"
       },
@@ -215,7 +215,7 @@
           ],
           "exit": 0,
           "seconds": 32.36514258792158,
-          "log": "/home/zhuhe/code/litchi-worktrees/.coord/replay-return-contract/validation-v3/check-0.log",
+          "log": "(deleted-coord-artifact)/check-0.log",
           "bytes": 633484,
           "sha256": "aa28897939ef9cf68b4743e213f2de747a45aaf18013351862af70ebdd426852"
         },
@@ -226,11 +226,11 @@
             "--profile",
             "docx-minimal",
             "--json",
-            "/home/zhuhe/code/litchi-worktrees/.coord/replay-return-contract/docx-minimal.json"
+            "(deleted-coord-artifact)"
           ],
           "exit": 0,
           "seconds": 2.8811037060804665,
-          "log": "/home/zhuhe/code/litchi-worktrees/.coord/replay-return-contract/validation-v3/check-1.log",
+          "log": "(deleted-coord-artifact)/check-1.log",
           "bytes": 155,
           "sha256": "da4458936686a45736d6034f4f62afd03f5108134c177cd6c98011ec9f47403a"
         },
@@ -241,11 +241,11 @@
             "--profile",
             "docx-full",
             "--json",
-            "/home/zhuhe/code/litchi-worktrees/.coord/replay-return-contract/docx-full.json"
+            "(deleted-coord-artifact)"
           ],
           "exit": 0,
           "seconds": 2.8010417399927974,
-          "log": "/home/zhuhe/code/litchi-worktrees/.coord/replay-return-contract/validation-v3/check-2.log",
+          "log": "(deleted-coord-artifact)/check-2.log",
           "bytes": 155,
           "sha256": "5a9f20c8206911ac29f27b8849a07562fa14c1fb0c936d36c173b952ef0f17e8"
         },
@@ -253,11 +253,11 @@
           "command": [
             "python3",
             "tools/api_debt_inventory.py",
-            "/home/zhuhe/code/litchi-worktrees/.coord/replay-return-contract/docx-full.json"
+            "(deleted-coord-artifact)"
           ],
           "exit": 0,
           "seconds": 2.538204842945561,
-          "log": "/home/zhuhe/code/litchi-worktrees/.coord/replay-return-contract/validation-v3/check-3.log",
+          "log": "(deleted-coord-artifact)/check-3.log",
           "bytes": 4251,
           "sha256": "4f53bf083e9e9ce59fbe8384d9e8839919bd07d80dc8ecdc171a1926f0bddc42"
         }
@@ -266,7 +266,7 @@
     {
       "attempt": "v4",
       "receipt": {
-        "path": "/home/zhuhe/code/litchi-worktrees/.coord/replay-return-contract/validation-v4/checks.json",
+        "path": "(deleted-coord-artifact)/checks.json",
         "bytes": 2065,
         "sha256": "3fd0f27bee134db64375466cf44c8eb7ed1fa4bc8fbf2fd98c9a8addd842fade"
       },
@@ -287,7 +287,7 @@
           ],
           "exit": 0,
           "seconds": 32.76462684303988,
-          "log": "/home/zhuhe/code/litchi-worktrees/.coord/replay-return-contract/validation-v4/check-0.log",
+          "log": "(deleted-coord-artifact)/check-0.log",
           "bytes": 633485,
           "sha256": "9ccc9c029225d4002a727c96d099ecebcd05476805f7396124cdf0d8e94d471c"
         },
@@ -298,11 +298,11 @@
             "--profile",
             "docx-minimal",
             "--json",
-            "/home/zhuhe/code/litchi-worktrees/.coord/replay-return-contract/docx-minimal.json"
+            "(deleted-coord-artifact)"
           ],
           "exit": 0,
           "seconds": 2.6837936990195885,
-          "log": "/home/zhuhe/code/litchi-worktrees/.coord/replay-return-contract/validation-v4/check-1.log",
+          "log": "(deleted-coord-artifact)/check-1.log",
           "bytes": 155,
           "sha256": "da4458936686a45736d6034f4f62afd03f5108134c177cd6c98011ec9f47403a"
         },
@@ -313,11 +313,11 @@
             "--profile",
             "docx-full",
             "--json",
-            "/home/zhuhe/code/litchi-worktrees/.coord/replay-return-contract/docx-full.json"
+            "(deleted-coord-artifact)"
           ],
           "exit": 0,
           "seconds": 2.8875902299769223,
-          "log": "/home/zhuhe/code/litchi-worktrees/.coord/replay-return-contract/validation-v4/check-2.log",
+          "log": "(deleted-coord-artifact)/check-2.log",
           "bytes": 155,
           "sha256": "5a9f20c8206911ac29f27b8849a07562fa14c1fb0c936d36c173b952ef0f17e8"
         },
@@ -325,11 +325,11 @@
           "command": [
             "python3",
             "tools/api_debt_inventory.py",
-            "/home/zhuhe/code/litchi-worktrees/.coord/replay-return-contract/docx-full.json"
+            "(deleted-coord-artifact)"
           ],
           "exit": 0,
           "seconds": 2.463899409980513,
-          "log": "/home/zhuhe/code/litchi-worktrees/.coord/replay-return-contract/validation-v4/check-3.log",
+          "log": "(deleted-coord-artifact)/check-3.log",
           "bytes": 4483,
           "sha256": "c9f20d012fc961656721df0564f5edc5f8969fc3922fd4dfce1dda85d41385f8"
         }

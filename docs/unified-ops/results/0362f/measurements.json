@@ -167,12 +167,12 @@
     {
       "name": "ppt-phase-original-8f-v1",
       "raw_measurements": {
-        "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-8f-v1/measurements.json",
+        "path": "(deleted-coord-artifact)/measurements.json",
         "bytes": 2605,
         "sha256": "1cc5f81dadbdb889d0268e09d1e72d38b13785be47ea6cc0e8ecbf9437a991c9"
       },
       "artifact_inventory": {
-        "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-review-0362f/ppt-phase-original-8f-v1-artifacts.json",
+        "path": "(deleted-coord-artifact)/ppt-phase-original-8f-v1-artifacts.json",
         "bytes": 638,
         "sha256": "8e7e2fb95991d6db454eed39c80f354de7da589a4d79b234d1b47f0b00d1888a"
       },
@@ -191,18 +191,18 @@
       "after_commit": "8f84379e3191f8228d5dc14e64d75a16cb1c8426",
       "binaries": {
         "before": {
-          "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-instrumented-baselines-20261021/original-e673d4addb-scoped_patch_probe",
+          "path": "(deleted-coord-artifact)/original-e673d4addb-scoped_patch_probe",
           "bytes": 1716976,
           "sha256": "9f23a1a9119cfb541361e7661c3384a1b2c63c59ae9d95f4842f4a9c1d5a5b28"
         },
         "after": {
-          "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-instrumented-baselines-20261021/candidate-8f84379e31-scoped_patch_probe",
+          "path": "(deleted-coord-artifact)/candidate-8f84379e31-scoped_patch_probe",
           "bytes": 1772376,
           "sha256": "d7234c318349f1ff27d5897f7f61a0c70a06d71f516148cd93593b50660a8b09"
         }
       },
       "runner": {
-        "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-abba.py",
+        "path": "(deleted-coord-artifact)/ppt-phase-abba.py",
         "bytes": 10834,
         "sha256": "fb73a6fd39f8c5adb36feefcae6e424a72c0146f7132674dcd1d910b01a440c1"
       },
@@ -218,15 +218,15 @@
       },
       "command": [
         "python3",
-        "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-abba.py",
+        "(deleted-coord-artifact)",
         "--before",
-        "../.coord/ppt-instrumented-baselines-20261021/original-e673d4addb-scoped_patch_probe",
+        "(deleted-coord-artifact)",
         "--after",
-        "../.coord/ppt-instrumented-baselines-20261021/candidate-8f84379e31-scoped_patch_probe",
+        "(deleted-coord-artifact)",
         "--fixture",
         "test-data/unified-ops/0294/video.ppt",
         "--out",
-        "../.coord/ppt-phase-original-8f-v1",
+        "(deleted-coord-artifact)",
         "--before-commit",
         "e673d4addbf4b4224f377e419702a33b3d6958fe",
         "--after-commit",
@@ -248,12 +248,12 @@
     {
       "name": "ppt-phase-original-8f-v2",
       "raw_measurements": {
-        "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-8f-v2/measurements.json",
+        "path": "(deleted-coord-artifact)/measurements.json",
         "bytes": 2605,
         "sha256": "f06ffe5c60309bb76bb85b0524c5abce0967c1503c23ff09a3dcef705826a592"
       },
       "artifact_inventory": {
-        "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-review-0362f/ppt-phase-original-8f-v2-artifacts.json",
+        "path": "(deleted-coord-artifact)/ppt-phase-original-8f-v2-artifacts.json",
         "bytes": 638,
         "sha256": "0b23f761bf3e3831ed8cae1bdeb6a1efa0cf50753ac6092f320dd91abb433068"
       },
@@ -261,25 +261,25 @@
       "disposition": {
         "status": "rejected before calibration; no native samples collected",
         "reason": "startup host guard found unrelated peculiar-adblock-compiler Cargo PID 3373337 and rustc 3373349",
-        "log": "../.coord/ppt-phase-original-8f-v2.log",
+        "log": "(deleted-coord-artifact)",
         "recorded_ns": 1792614370618360446
       },
       "before_commit": "e673d4addbf4b4224f377e419702a33b3d6958fe",
       "after_commit": "8f84379e3191f8228d5dc14e64d75a16cb1c8426",
       "binaries": {
         "before": {
-          "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-instrumented-baselines-20261021/original-e673d4addb-scoped_patch_probe",
+          "path": "(deleted-coord-artifact)/original-e673d4addb-scoped_patch_probe",
           "bytes": 1716976,
           "sha256": "9f23a1a9119cfb541361e7661c3384a1b2c63c59ae9d95f4842f4a9c1d5a5b28"
         },
         "after": {
-          "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-instrumented-baselines-20261021/candidate-8f84379e31-scoped_patch_probe",
+          "path": "(deleted-coord-artifact)/candidate-8f84379e31-scoped_patch_probe",
           "bytes": 1772376,
           "sha256": "d7234c318349f1ff27d5897f7f61a0c70a06d71f516148cd93593b50660a8b09"
         }
       },
       "runner": {
-        "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-abba.py",
+        "path": "(deleted-coord-artifact)/ppt-phase-abba.py",
         "bytes": 10834,
         "sha256": "fb73a6fd39f8c5adb36feefcae6e424a72c0146f7132674dcd1d910b01a440c1"
       },
@@ -295,15 +295,15 @@
       },
       "command": [
         "python3",
-        "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-abba.py",
+        "(deleted-coord-artifact)",
         "--before",
-        "../.coord/ppt-instrumented-baselines-20261021/original-e673d4addb-scoped_patch_probe",
+        "(deleted-coord-artifact)",
         "--after",
-        "../.coord/ppt-instrumented-baselines-20261021/candidate-8f84379e31-scoped_patch_probe",
+        "(deleted-coord-artifact)",
         "--fixture",
         "test-data/unified-ops/0294/video.ppt",
         "--out",
-        "../.coord/ppt-phase-original-8f-v2",
+        "(deleted-coord-artifact)",
         "--before-commit",
         "e673d4addbf4b4224f377e419702a33b3d6958fe",
         "--after-commit",
@@ -325,12 +325,12 @@
     {
       "name": "ppt-phase-original-8f-v3",
       "raw_measurements": {
-        "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-8f-v3/measurements.json",
+        "path": "(deleted-coord-artifact)/measurements.json",
         "bytes": 22042,
         "sha256": "63c6bbcb482b89d5f40947a569f9a7359879d94a99c36db0879e9f4ee4701c08"
       },
       "artifact_inventory": {
-        "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-review-0362f/ppt-phase-original-8f-v3-artifacts.json",
+        "path": "(deleted-coord-artifact)/ppt-phase-original-8f-v3-artifacts.json",
         "bytes": 99576,
         "sha256": "7111bdda06db4e96bef3e9e08d2699f6b5187e47010b3c0a2eb0aa9a54314de1"
       },
@@ -346,18 +346,18 @@
       "after_commit": "8f84379e3191f8228d5dc14e64d75a16cb1c8426",
       "binaries": {
         "before": {
-          "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-instrumented-baselines-20261021/original-e673d4addb-scoped_patch_probe",
+          "path": "(deleted-coord-artifact)/original-e673d4addb-scoped_patch_probe",
           "bytes": 1716976,
           "sha256": "9f23a1a9119cfb541361e7661c3384a1b2c63c59ae9d95f4842f4a9c1d5a5b28"
         },
         "after": {
-          "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-instrumented-baselines-20261021/candidate-8f84379e31-scoped_patch_probe",
+          "path": "(deleted-coord-artifact)/candidate-8f84379e31-scoped_patch_probe",
           "bytes": 1772376,
           "sha256": "d7234c318349f1ff27d5897f7f61a0c70a06d71f516148cd93593b50660a8b09"
         }
       },
       "runner": {
-        "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-abba.py",
+        "path": "(deleted-coord-artifact)/ppt-phase-abba.py",
         "bytes": 10834,
         "sha256": "fb73a6fd39f8c5adb36feefcae6e424a72c0146f7132674dcd1d910b01a440c1"
       },
@@ -373,15 +373,15 @@
       },
       "command": [
         "python3",
-        "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-abba.py",
+        "(deleted-coord-artifact)",
         "--before",
-        "../.coord/ppt-instrumented-baselines-20261021/original-e673d4addb-scoped_patch_probe",
+        "(deleted-coord-artifact)",
         "--after",
-        "../.coord/ppt-instrumented-baselines-20261021/candidate-8f84379e31-scoped_patch_probe",
+        "(deleted-coord-artifact)",
         "--fixture",
         "test-data/unified-ops/0294/video.ppt",
         "--out",
-        "../.coord/ppt-phase-original-8f-v3",
+        "(deleted-coord-artifact)",
         "--before-commit",
         "e673d4addbf4b4224f377e419702a33b3d6958fe",
         "--after-commit",
@@ -444,7 +444,7 @@
             "retained_bytes_per_patch": 98304.0
           },
           "receipt": {
-            "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-8f-v3/calibration-before.receipt.json",
+            "path": "(deleted-coord-artifact)/calibration-before.receipt.json",
             "bytes": 1253,
             "sha256": "74c526c7bdeba20ff6f0d799ea07b918ab8140d86821488dc732b16188a5f397"
           }
@@ -496,7 +496,7 @@
             "retained_bytes_per_patch": 15384.0
           },
           "receipt": {
-            "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-8f-v3/calibration-after.receipt.json",
+            "path": "(deleted-coord-artifact)/calibration-after.receipt.json",
             "bytes": 1250,
             "sha256": "7561f470e1c523f7b8e0e3181fb46ea63d9cad667c7f3c3038ce4049add36a3b"
           }
@@ -567,7 +567,7 @@
                 "retained_bytes_per_patch": 98304.0
               },
               "receipt": {
-                "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-8f-v3/block-00-0-before.receipt.json",
+                "path": "(deleted-coord-artifact)/block-00-0-before.receipt.json",
                 "bytes": 1249,
                 "sha256": "21763ce2cf02101cce96c4ba26f34aa174557255d163039c00412de743528499"
               }
@@ -619,7 +619,7 @@
                 "retained_bytes_per_patch": 15384.0
               },
               "receipt": {
-                "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-8f-v3/block-00-1-after.receipt.json",
+                "path": "(deleted-coord-artifact)/block-00-1-after.receipt.json",
                 "bytes": 1246,
                 "sha256": "c7d58c6b07375db721ad19b1865f8ede914b2d10b13ee876cd9dde4cbff0e0b7"
               }
@@ -671,7 +671,7 @@
                 "retained_bytes_per_patch": 15384.0
               },
               "receipt": {
-                "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-8f-v3/block-00-2-after.receipt.json",
+                "path": "(deleted-coord-artifact)/block-00-2-after.receipt.json",
                 "bytes": 1246,
                 "sha256": "da640ef78a2b020d315597f1099dd72f6a041459b07ad759b055f5ed2542aad4"
               }
@@ -723,7 +723,7 @@
                 "retained_bytes_per_patch": 98304.0
               },
               "receipt": {
-                "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-8f-v3/block-00-3-before.receipt.json",
+                "path": "(deleted-coord-artifact)/block-00-3-before.receipt.json",
                 "bytes": 1249,
                 "sha256": "6ca3598424e86e6f677e1286570edb8ee2d18bef43b31486ce140c16dda57ced"
               }
@@ -789,7 +789,7 @@
                 "retained_bytes_per_patch": 98304.0
               },
               "receipt": {
-                "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-8f-v3/block-01-0-before.receipt.json",
+                "path": "(deleted-coord-artifact)/block-01-0-before.receipt.json",
                 "bytes": 1249,
                 "sha256": "30b1a419f0bf66b654484858a3be46f93d298ec04dc023b306a4b012e8afbcda"
               }
@@ -841,7 +841,7 @@
                 "retained_bytes_per_patch": 15384.0
               },
               "receipt": {
-                "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-8f-v3/block-01-1-after.receipt.json",
+                "path": "(deleted-coord-artifact)/block-01-1-after.receipt.json",
                 "bytes": 1246,
                 "sha256": "b920ca362cdf9f1d00d3f593c9b63c23a0fa8277ac7d5c582ed67222d9d15cb8"
               }
@@ -893,7 +893,7 @@
                 "retained_bytes_per_patch": 15384.0
               },
               "receipt": {
-                "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-8f-v3/block-01-2-after.receipt.json",
+                "path": "(deleted-coord-artifact)/block-01-2-after.receipt.json",
                 "bytes": 1246,
                 "sha256": "0af783beb01cd5d16243d6ca60683b0d1e7219be96925c54bb13661922974634"
               }
@@ -945,7 +945,7 @@
                 "retained_bytes_per_patch": 98304.0
               },
               "receipt": {
-                "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-8f-v3/block-01-3-before.receipt.json",
+                "path": "(deleted-coord-artifact)/block-01-3-before.receipt.json",
                 "bytes": 1249,
                 "sha256": "f59f81bbf72b61d546a274e4ece08a2abb3111485e773fbc32465849eb570a0f"
               }
@@ -957,12 +957,12 @@
     {
       "name": "ppt-phase-original-8f-v4",
       "raw_measurements": {
-        "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-8f-v4/measurements.json",
+        "path": "(deleted-coord-artifact)/measurements.json",
         "bytes": 5971,
         "sha256": "8e966cb9322ada325b7c2d0702fd083b5d49a01de73ccd77d6e42c080e046ae2"
       },
       "artifact_inventory": {
-        "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-review-0362f/ppt-phase-original-8f-v4-artifacts.json",
+        "path": "(deleted-coord-artifact)/ppt-phase-original-8f-v4-artifacts.json",
         "bytes": 45108,
         "sha256": "d98c3c5ca524d0a63b3e97f2ebc37d6bf1f8a6f75a57bc3cd82561132aecaacd"
       },
@@ -978,18 +978,18 @@
       "after_commit": "8f84379e3191f8228d5dc14e64d75a16cb1c8426",
       "binaries": {
         "before": {
-          "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-instrumented-baselines-20261021/original-e673d4addb-scoped_patch_probe",
+          "path": "(deleted-coord-artifact)/original-e673d4addb-scoped_patch_probe",
           "bytes": 1716976,
           "sha256": "9f23a1a9119cfb541361e7661c3384a1b2c63c59ae9d95f4842f4a9c1d5a5b28"
         },
         "after": {
-          "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-instrumented-baselines-20261021/candidate-8f84379e31-scoped_patch_probe",
+          "path": "(deleted-coord-artifact)/candidate-8f84379e31-scoped_patch_probe",
           "bytes": 1772376,
           "sha256": "d7234c318349f1ff27d5897f7f61a0c70a06d71f516148cd93593b50660a8b09"
         }
       },
       "runner": {
-        "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-abba.py",
+        "path": "(deleted-coord-artifact)/ppt-phase-abba.py",
         "bytes": 10861,
         "sha256": "d85b578b6d46bf9e26b1ef73ff5bd5e26c36197c1d059532d7c45a43e653337f"
       },
@@ -1005,15 +1005,15 @@
       },
       "command": [
         "python3",
-        "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-abba.py",
+        "(deleted-coord-artifact)",
         "--before",
-        "../.coord/ppt-instrumented-baselines-20261021/original-e673d4addb-scoped_patch_probe",
+        "(deleted-coord-artifact)",
         "--after",
-        "../.coord/ppt-instrumented-baselines-20261021/candidate-8f84379e31-scoped_patch_probe",
+        "(deleted-coord-artifact)",
         "--fixture",
         "test-data/unified-ops/0294/video.ppt",
         "--out",
-        "../.coord/ppt-phase-original-8f-v4",
+        "(deleted-coord-artifact)",
         "--before-commit",
         "e673d4addbf4b4224f377e419702a33b3d6958fe",
         "--after-commit",
@@ -1076,7 +1076,7 @@
             "retained_bytes_per_patch": 98304.0
           },
           "receipt": {
-            "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-8f-v4/calibration-before.receipt.json",
+            "path": "(deleted-coord-artifact)/calibration-before.receipt.json",
             "bytes": 1253,
             "sha256": "46f7e5799d6b544f6ccdf40874b79a031bbc1c3a64deea6d6966b8d2e081c67e"
           }
@@ -1128,7 +1128,7 @@
             "retained_bytes_per_patch": 15384.0
           },
           "receipt": {
-            "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-8f-v4/calibration-after.receipt.json",
+            "path": "(deleted-coord-artifact)/calibration-after.receipt.json",
             "bytes": 1250,
             "sha256": "97b2a79af8a6646eec21991e55c43f096006016fcf4659918c9348108737bcba"
           }
@@ -1144,12 +1144,12 @@
     {
       "name": "ppt-phase-original-final-v1",
       "raw_measurements": {
-        "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/measurements.json",
+        "path": "(deleted-coord-artifact)/measurements.json",
         "bytes": 30172,
         "sha256": "94c1f3d352c450beae5c39e6fc8f990a2f506653199214084b59f0420602d589"
       },
       "artifact_inventory": {
-        "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-review-0362f/ppt-phase-original-final-v1-artifacts.json",
+        "path": "(deleted-coord-artifact)/ppt-phase-original-final-v1-artifacts.json",
         "bytes": 124341,
         "sha256": "b5dc13c3783a2ce352af694eab03a5944cc38970a6f99b6bc272c92ef92baa6d"
       },
@@ -1165,18 +1165,18 @@
       "after_commit": "00673b9006+patch-sha256:3d725e367f95ffa732be299a9c4f27590e1594bad71eeb81904cca4226e0b7b6",
       "binaries": {
         "before": {
-          "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-instrumented-baselines-20261021/original-e673d4addb-scoped_patch_probe",
+          "path": "(deleted-coord-artifact)/original-e673d4addb-scoped_patch_probe",
           "bytes": 1716976,
           "sha256": "9f23a1a9119cfb541361e7661c3384a1b2c63c59ae9d95f4842f4a9c1d5a5b28"
         },
         "after": {
-          "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-final-admission-20261021/candidate-scoped_patch_probe",
+          "path": "(deleted-coord-artifact)/candidate-scoped_patch_probe",
           "bytes": 1764192,
           "sha256": "ca2721c456769f99056a7541dc2abe02fe14153e35876fa010a22a7ea69123fe"
         }
       },
       "runner": {
-        "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-abba.py",
+        "path": "(deleted-coord-artifact)/ppt-phase-abba.py",
         "bytes": 10861,
         "sha256": "d85b578b6d46bf9e26b1ef73ff5bd5e26c36197c1d059532d7c45a43e653337f"
       },
@@ -1192,15 +1192,15 @@
       },
       "command": [
         "python3",
-        "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-abba.py",
+        "(deleted-coord-artifact)/ppt-phase-abba.py",
         "--before",
-        "../.coord/ppt-instrumented-baselines-20261021/original-e673d4addb-scoped_patch_probe",
+        "(deleted-coord-artifact)",
         "--after",
-        "../.coord/ppt-final-admission-20261021/candidate-scoped_patch_probe",
+        "(deleted-coord-artifact)",
         "--fixture",
         "test-data/unified-ops/0294/video.ppt",
         "--out",
-        "../.coord/ppt-phase-original-final-v1",
+        "(deleted-coord-artifact)",
         "--before-commit",
         "e673d4addbf4b4224f377e419702a33b3d6958fe",
         "--after-commit",
@@ -1263,7 +1263,7 @@
             "retained_bytes_per_patch": 98304.0
           },
           "receipt": {
-            "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/calibration-before.receipt.json",
+            "path": "(deleted-coord-artifact)/calibration-before.receipt.json",
             "bytes": 1265,
             "sha256": "9796d72e36f6c3cdc8e936c43322e3b88d515c019c73c3516a8c7af6e5124766"
           }
@@ -1315,7 +1315,7 @@
             "retained_bytes_per_patch": 15384.0
           },
           "receipt": {
-            "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/calibration-after.receipt.json",
+            "path": "(deleted-coord-artifact)/calibration-after.receipt.json",
             "bytes": 1244,
             "sha256": "aa5e34bfc9b630f4f3049333301c81d281d3f717c53e9b8ae6c22eeb7d992b04"
           }
@@ -1386,7 +1386,7 @@
                 "retained_bytes_per_patch": 98304.0
               },
               "receipt": {
-                "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-00-0-before.receipt.json",
+                "path": "(deleted-coord-artifact)/block-00-0-before.receipt.json",
                 "bytes": 1261,
                 "sha256": "79bfd409349d76f4175279d0a607c935f6657021e1b7a479d2467c5076799a7a"
               }
@@ -1438,7 +1438,7 @@
                 "retained_bytes_per_patch": 15384.0
               },
               "receipt": {
-                "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-00-1-after.receipt.json",
+                "path": "(deleted-coord-artifact)/block-00-1-after.receipt.json",
                 "bytes": 1240,
                 "sha256": "5e68101bfff4507dff3c3f4d4b27e428f74b94a62f33c6140376e04fd5f407cd"
               }
@@ -1490,7 +1490,7 @@
                 "retained_bytes_per_patch": 15384.0
               },
               "receipt": {
-                "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-00-2-after.receipt.json",
+                "path": "(deleted-coord-artifact)/block-00-2-after.receipt.json",
                 "bytes": 1240,
                 "sha256": "adb8b226bde842039ea4977ec529053399539e77ba15f2cbcf981383aff9fb7c"
               }
@@ -1542,7 +1542,7 @@
                 "retained_bytes_per_patch": 98304.0
               },
               "receipt": {
-                "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-00-3-before.receipt.json",
+                "path": "(deleted-coord-artifact)/block-00-3-before.receipt.json",
                 "bytes": 1261,
                 "sha256": "ad5e90816548eee69ad418308c7c3f3f76e1032061015e233ad0662a7d311493"
               }
@@ -1608,7 +1608,7 @@
                 "retained_bytes_per_patch": 98304.0
               },
               "receipt": {
-                "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-01-0-before.receipt.json",
+                "path": "(deleted-coord-artifact)/block-01-0-before.receipt.json",
                 "bytes": 1261,
                 "sha256": "7c689498983bea0d77df0e55d07b74667c28d566c6072d5949ef3675a4f1087d"
               }
@@ -1660,7 +1660,7 @@
                 "retained_bytes_per_patch": 15384.0
               },
               "receipt": {
-                "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-01-1-after.receipt.json",
+                "path": "(deleted-coord-artifact)/block-01-1-after.receipt.json",
                 "bytes": 1240,
                 "sha256": "19f281cd1f984f29c4f579318aa84d59d8096a06b2e20339758de841a2aba251"
               }
@@ -1712,7 +1712,7 @@
                 "retained_bytes_per_patch": 15384.0
               },
               "receipt": {
-                "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-01-2-after.receipt.json",
+                "path": "(deleted-coord-artifact)/block-01-2-after.receipt.json",
                 "bytes": 1240,
                 "sha256": "679a79942a6341b796222e3e3884d7ba9fbda385e272a9d6e8909ca6cdd6dde1"
               }
@@ -1764,7 +1764,7 @@
                 "retained_bytes_per_patch": 98304.0
               },
               "receipt": {
-                "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-01-3-before.receipt.json",
+                "path": "(deleted-coord-artifact)/block-01-3-before.receipt.json",
                 "bytes": 1261,
                 "sha256": "28d7fd0e7ac1944f424ee8c20e90468703e48ca804e92e6c40cb68a5d7138674"
               }
@@ -1830,7 +1830,7 @@
                 "retained_bytes_per_patch": 98304.0
               },
               "receipt": {
-                "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-02-0-before.receipt.json",
+                "path": "(deleted-coord-artifact)/block-02-0-before.receipt.json",
                 "bytes": 1261,
                 "sha256": "b7c8e75aaf8632c586fe934f26a1096db4edb9e8c75ad516f49503323ed3e4b4"
               }
@@ -1882,7 +1882,7 @@
                 "retained_bytes_per_patch": 15384.0
               },
               "receipt": {
-                "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-02-1-after.receipt.json",
+                "path": "(deleted-coord-artifact)/block-02-1-after.receipt.json",
                 "bytes": 1240,
                 "sha256": "3d591507e17c699172c1d8f098f18f87237ef88e263d1c936325b06d349bd7b1"
               }
@@ -1934,7 +1934,7 @@
                 "retained_bytes_per_patch": 15384.0
               },
               "receipt": {
-                "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-02-2-after.receipt.json",
+                "path": "(deleted-coord-artifact)/block-02-2-after.receipt.json",
                 "bytes": 1240,
                 "sha256": "785557289ef9daff95c47d53657964fd96ff07fd929024927ebd0c47615900e4"
               }
@@ -1986,7 +1986,7 @@
                 "retained_bytes_per_patch": 98304.0
               },
               "receipt": {
-                "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-02-3-before.receipt.json",
+                "path": "(deleted-coord-artifact)/block-02-3-before.receipt.json",
                 "bytes": 1261,
                 "sha256": "0dad213bff1631512633999ad8be7d2b518837d6f3b0a9ee8311124f4a6aafa0"
               }
@@ -1998,12 +1998,12 @@
     {
       "name": "ppt-phase-original-final-v2",
       "raw_measurements": {
-        "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v2/measurements.json",
+        "path": "(deleted-coord-artifact)/measurements.json",
         "bytes": 22471,
         "sha256": "787f5474adec5f5f09401ae1202c7666e9bc47a8a5ed30b1689b0c83c905ee48"
       },
       "artifact_inventory": {
-        "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-review-0362f/ppt-phase-original-final-v2-artifacts.json",
+        "path": "(deleted-coord-artifact)/ppt-phase-original-final-v2-artifacts.json",
         "bytes": 77137,
         "sha256": "3735bfc58543b3867be990458e780e20c722f6ec92d6704fb73fd2dfce54fabb"
       },
@@ -2013,18 +2013,18 @@
       "after_commit": "00673b9006+patch-sha256:3d725e367f95ffa732be299a9c4f27590e1594bad71eeb81904cca4226e0b7b6",
       "binaries": {
         "before": {
-          "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-instrumented-baselines-20261021/original-e673d4addb-scoped_patch_probe",
+          "path": "(deleted-coord-artifact)/original-e673d4addb-scoped_patch_probe",
           "bytes": 1716976,
           "sha256": "9f23a1a9119cfb541361e7661c3384a1b2c63c59ae9d95f4842f4a9c1d5a5b28"
         },
         "after": {
-          "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-final-admission-20261021/candidate-scoped_patch_probe",
+          "path": "(deleted-coord-artifact)/candidate-scoped_patch_probe",
           "bytes": 1764192,
           "sha256": "ca2721c456769f99056a7541dc2abe02fe14153e35876fa010a22a7ea69123fe"
         }
       },
       "runner": {
-        "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-abba.py",
+        "path": "(deleted-coord-artifact)/ppt-phase-abba.py",
         "bytes": 11689,
         "sha256": "42e49141d7b8b8a3940fad8861aa259b763c6468a7684b8906bb29a4955b41a8"
       },
@@ -2040,15 +2040,15 @@
       },
       "command": [
         "python3",
-        "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-abba.py",
+        "(deleted-coord-artifact)/ppt-phase-abba.py",
         "--before",
-        "../.coord/ppt-instrumented-baselines-20261021/original-e673d4addb-scoped_patch_probe",
+        "(deleted-coord-artifact)",
         "--after",
-        "../.coord/ppt-final-admission-20261021/candidate-scoped_patch_probe",
+        "(deleted-coord-artifact)",
         "--fixture",
         "test-data/unified-ops/0294/video.ppt",
         "--out",
-        "../.coord/ppt-phase-original-final-v2",
+        "(deleted-coord-artifact)",
         "--before-commit",
         "e673d4addbf4b4224f377e419702a33b3d6958fe",
         "--after-commit",
@@ -2111,7 +2111,7 @@
             "retained_bytes_per_patch": 98304.0
           },
           "receipt": {
-            "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v2/calibration-before.receipt.json",
+            "path": "(deleted-coord-artifact)/calibration-before.receipt.json",
             "bytes": 1265,
             "sha256": "19becd3235f11fe17d019122e13b1ebc76fb56c5b892f45c3171cba3fa58b257"
           }
@@ -2163,7 +2163,7 @@
             "retained_bytes_per_patch": 15384.0
           },
           "receipt": {
-            "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v2/calibration-after.receipt.json",
+            "path": "(deleted-coord-artifact)/calibration-after.receipt.json",
             "bytes": 1244,
             "sha256": "b2cb10687125968fd7e838738dbbf56c1418081f393088fdbababe7cb6cd2d07"
           }
@@ -2234,7 +2234,7 @@
                 "retained_bytes_per_patch": 98304.0
               },
               "receipt": {
-                "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v2/block-00-0-before.receipt.json",
+                "path": "(deleted-coord-artifact)/block-00-0-before.receipt.json",
                 "bytes": 1261,
                 "sha256": "bec7e873a3c4237dd8ae89ca56479c06e60567f25ca615f500b06a5cda874378"
               }
@@ -2286,7 +2286,7 @@
                 "retained_bytes_per_patch": 15384.0
               },
               "receipt": {
-                "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v2/block-00-1-after.receipt.json",
+                "path": "(deleted-coord-artifact)/block-00-1-after.receipt.json",
                 "bytes": 1240,
                 "sha256": "8314112185b4dbce476706ec0acb7e3bd183756bf1971657de492fea2a1e51b6"
               }
@@ -2338,7 +2338,7 @@
                 "retained_bytes_per_patch": 15384.0
               },
               "receipt": {
-                "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v2/block-00-2-after.receipt.json",
+                "path": "(deleted-coord-artifact)/block-00-2-after.receipt.json",
                 "bytes": 1240,
                 "sha256": "729ff4bcd37632a194dd882038aad52d57aa6a0a4a1ceb27b9259429c0438ca5"
               }
@@ -2390,7 +2390,7 @@
                 "retained_bytes_per_patch": 98304.0
               },
               "receipt": {
-                "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v2/block-00-3-before.receipt.json",
+                "path": "(deleted-coord-artifact)/block-00-3-before.receipt.json",
                 "bytes": 1261,
                 "sha256": "bafac35ea410038761311932319f54b6432649b2e86924d765b17215d49f8d07"
               }
@@ -2456,7 +2456,7 @@
                 "retained_bytes_per_patch": 98304.0
               },
               "receipt": {
-                "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v2/block-01-0-before.receipt.json",
+                "path": "(deleted-coord-artifact)/block-01-0-before.receipt.json",
                 "bytes": 1261,
                 "sha256": "648ff83642adf1021f931e45a4509d7df378cdb2230b5d9910c4fce5b02e55b4"
               }
@@ -2508,7 +2508,7 @@
                 "retained_bytes_per_patch": 15384.0
               },
               "receipt": {
-                "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v2/block-01-1-after.receipt.json",
+                "path": "(deleted-coord-artifact)/block-01-1-after.receipt.json",
                 "bytes": 1240,
                 "sha256": "ca5a7c3c857e2384c44c1ce82d3720c7c6474fcb113bb6ee9d42f9f7447e498f"
               }
@@ -2560,7 +2560,7 @@
                 "retained_bytes_per_patch": 15384.0
               },
               "receipt": {
-                "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v2/block-01-2-after.receipt.json",
+                "path": "(deleted-coord-artifact)/block-01-2-after.receipt.json",
                 "bytes": 1240,
                 "sha256": "7fe55240bd5a41ea47cf626a07e6d51f23af1ba4b2b8f49657d97d0e68bb541f"
               }
@@ -2612,7 +2612,7 @@
                 "retained_bytes_per_patch": 98304.0
               },
               "receipt": {
-                "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v2/block-01-3-before.receipt.json",
+                "path": "(deleted-coord-artifact)/block-01-3-before.receipt.json",
                 "bytes": 1261,
                 "sha256": "f127bc35ae08b9bf8d636c3e48cdaafde1b8b291922708cb9ecf67ef4598d214"
               }
@@ -2624,12 +2624,12 @@
     {
       "name": "ppt-phase-sip-final-v1",
       "raw_measurements": {
-        "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-sip-final-v1/measurements.json",
+        "path": "(deleted-coord-artifact)/measurements.json",
         "bytes": 46412,
         "sha256": "bb3bc09e599e295c168c906213ae490dab7e686ee94b9ddfa63b08cb58a9a132"
       },
       "artifact_inventory": {
-        "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-review-0362f/ppt-phase-sip-final-v1-artifacts.json",
+        "path": "(deleted-coord-artifact)/ppt-phase-sip-final-v1-artifacts.json",
         "bytes": 178385,
         "sha256": "7ac5dec3b4f121376fff536ad836eba8be8dcc89a4e90f637a221ad65ae2fdc0"
       },
@@ -2639,18 +2639,18 @@
       "after_commit": "00673b9006+patch-sha256:3d725e367f95ffa732be299a9c4f27590e1594bad71eeb81904cca4226e0b7b6",
       "binaries": {
         "before": {
-          "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-sip-common-lock-20261021/sip-common-lock-scoped_patch_probe",
+          "path": "(deleted-coord-artifact)/sip-common-lock-scoped_patch_probe",
           "bytes": 1770160,
           "sha256": "61272a3cc329c27b8ad0dfa1c20934e4c95c6e7b0d57a0de8331bae868b01139"
         },
         "after": {
-          "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-final-admission-20261021/candidate-scoped_patch_probe",
+          "path": "(deleted-coord-artifact)/candidate-scoped_patch_probe",
           "bytes": 1764192,
           "sha256": "ca2721c456769f99056a7541dc2abe02fe14153e35876fa010a22a7ea69123fe"
         }
       },
       "runner": {
-        "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-abba.py",
+        "path": "(deleted-coord-artifact)/ppt-phase-abba.py",
         "bytes": 11689,
         "sha256": "42e49141d7b8b8a3940fad8861aa259b763c6468a7684b8906bb29a4955b41a8"
       },
@@ -2666,15 +2666,15 @@
       },
       "command": [
         "python3",
-        "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-abba.py",
+        "(deleted-coord-artifact)/ppt-phase-abba.py",
         "--before",
-        "../.coord/ppt-sip-common-lock-20261021/sip-common-lock-scoped_patch_probe",
+        "(deleted-coord-artifact)",
         "--after",
-        "../.coord/ppt-final-admission-20261021/candidate-scoped_patch_probe",
+        "(deleted-coord-artifact)",
         "--fixture",
         "test-data/unified-ops/0294/video.ppt",
         "--out",
-        "../.coord/ppt-phase-sip-final-v1",
+        "(deleted-coord-artifact)",
         "--before-commit",
         "e4bdab60667470124c4da202477ba6bb1734f256",
         "--after-commit",
@@ -2737,7 +2737,7 @@
             "retained_bytes_per_patch": 15384.0
           },
           "receipt": {
-            "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-sip-final-v1/calibration-before.receipt.json",
+            "path": "(deleted-coord-artifact)/calibration-before.receipt.json",
             "bytes": 1234,
             "sha256": "7fc2ceb1d9809892a11a77328a6dbc4f2e1107d6a08aff026bb7027adcb206bb"
           }
@@ -2789,7 +2789,7 @@
             "retained_bytes_per_patch": 15384.0
           },
           "receipt": {
-            "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-sip-final-v1/calibration-after.receipt.json",
+            "path": "(deleted-coord-artifact)/calibration-after.receipt.json",
             "bytes": 1224,
             "sha256": "7292073a68dfe3d8ad5060371e0775c62d43557ce5dad3bd9f26b4827d79d6e1"
           }
@@ -2860,7 +2860,7 @@
                 "retained_bytes_per_patch": 15384.0
               },
               "receipt": {
-                "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-sip-final-v1/block-00-0-before.receipt.json",
+                "path": "(deleted-coord-artifact)/block-00-0-before.receipt.json",
                 "bytes": 1230,
                 "sha256": "21aeae54c25a3406d3cc655a400eba9a55c615fc9e31b5c0fd32a6998d186830"
               }
@@ -2912,7 +2912,7 @@
                 "retained_bytes_per_patch": 15384.0
               },
               "receipt": {
-                "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-sip-final-v1/block-00-1-after.receipt.json",
+                "path": "(deleted-coord-artifact)/block-00-1-after.receipt.json",
                 "bytes": 1220,
                 "sha256": "d69d55a59d583b9a46dfa60f6d502c86549b98daa3c3e0e972a5f4af517ff45b"
               }
@@ -2964,7 +2964,7 @@
                 "retained_bytes_per_patch": 15384.0
               },
               "receipt": {
-                "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-sip-final-v1/block-00-2-after.receipt.json",
+                "path": "(deleted-coord-artifact)/block-00-2-after.receipt.json",
                 "bytes": 1220,
                 "sha256": "7f39b0a1c957532c512d1f20d3e41d70cffd7a25c8fee779f259aef01100dbce"
               }
@@ -3016,7 +3016,7 @@
                 "retained_bytes_per_patch": 15384.0
               },
               "receipt": {
-                "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-sip-final-v1/block-00-3-before.receipt.json",
+                "path": "(deleted-coord-artifact)/block-00-3-before.receipt.json",
                 "bytes": 1230,
                 "sha256": "af5d9309a5eea25cb78dda58b8499f283ab4e8659ca1140bdde35bc3860f217c"
               }
@@ -3082,7 +3082,7 @@
                 "retained_bytes_per_patch": 15384.0
               },
               "receipt": {
-                "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-sip-final-v1/block-01-0-before.receipt.json",
+                "path": "(deleted-coord-artifact)/block-01-0-before.receipt.json",
                 "bytes": 1230,
                 "sha256": "d5672c17fb6e21335370c60460f455ef370de78ab8ae4203f412d2ab9335d1c5"
               }
@@ -3134,7 +3134,7 @@
                 "retained_bytes_per_patch": 15384.0
               },
               "receipt": {
-                "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-sip-final-v1/block-01-1-after.receipt.json",
+                "path": "(deleted-coord-artifact)/block-01-1-after.receipt.json",
                 "bytes": 1220,
                 "sha256": "24de26af3ca5ac6ea2ea6a6bb1cae509eedb6a94f08a67f344e78809d82a5ff9"
               }
@@ -3186,7 +3186,7 @@
                 "retained_bytes_per_patch": 15384.0
               },
               "receipt": {
-                "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-sip-final-v1/block-01-2-after.receipt.json",
+                "path": "(deleted-coord-artifact)/block-01-2-after.receipt.json",
                 "bytes": 1220,
                 "sha256": "f3189c4aadf9818dad32a2fd776d7868dee08a246a0dd9f1ccac4c82f46b323b"
               }
@@ -3238,7 +3238,7 @@
                 "retained_bytes_per_patch": 15384.0
               },
               "receipt": {
-                "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-sip-final-v1/block-01-3-before.receipt.json",
+                "path": "(deleted-coord-artifact)/block-01-3-before.receipt.json",
                 "bytes": 1230,
                 "sha256": "8b1529b4c410816ade39985b74b953911839982ac6c9e809c848400f0817b763"
               }
@@ -3304,7 +3304,7 @@
                 "retained_bytes_per_patch": 15384.0
               },
               "receipt": {
-                "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-sip-final-v1/block-02-0-before.receipt.json",
+                "path": "(deleted-coord-artifact)/block-02-0-before.receipt.json",
                 "bytes": 1230,
                 "sha256": "8bf4b196f84780f78592b13647eceee631cfaa358b4b29b4c7e7968c21b5c759"
               }
@@ -3356,7 +3356,7 @@
                 "retained_bytes_per_patch": 15384.0
               },
               "receipt": {
-                "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-sip-final-v1/block-02-1-after.receipt.json",
+                "path": "(deleted-coord-artifact)/block-02-1-after.receipt.json",
                 "bytes": 1220,
                 "sha256": "b3681bcab1d7868ff4e5bf57c2469c65656339666e0130be7ee28888b0aea7d8"
               }
@@ -3408,7 +3408,7 @@
                 "retained_bytes_per_patch": 15384.0
               },
               "receipt": {
-                "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-sip-final-v1/block-02-2-after.receipt.json",
+                "path": "(deleted-coord-artifact)/block-02-2-after.receipt.json",
                 "bytes": 1220,
                 "sha256": "2450111779485550c5d06a31d8449288a04349b81e142cb9efa8e767afc8e90e"
               }
@@ -3460,7 +3460,7 @@
                 "retained_bytes_per_patch": 15384.0
               },
               "receipt": {
-                "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-sip-final-v1/block-02-3-before.receipt.json",
+                "path": "(deleted-coord-artifact)/block-02-3-before.receipt.json",
                 "bytes": 1230,
                 "sha256": "1fdddaf9cf91cb3038570767d4e3cb0f50c25635d1052fae17a342dd46e3f2fe"
               }
@@ -3526,7 +3526,7 @@
                 "retained_bytes_per_patch": 15384.0
               },
               "receipt": {
-                "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-sip-final-v1/block-03-0-before.receipt.json",
+                "path": "(deleted-coord-artifact)/block-03-0-before.receipt.json",
                 "bytes": 1230,
                 "sha256": "27c72be9d991271b43b48164d6b201f3520150f7ba15e0e69a1172f5f2c05088"
               }
@@ -3578,7 +3578,7 @@
                 "retained_bytes_per_patch": 15384.0
               },
               "receipt": {
-                "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-sip-final-v1/block-03-1-after.receipt.json",
+                "path": "(deleted-coord-artifact)/block-03-1-after.receipt.json",
                 "bytes": 1220,
                 "sha256": "b7dbf50e2d8b1d5e498ef1ec0ee45a8b21fa2dd38b87f4e18070e6c4d14e5574"
               }
@@ -3630,7 +3630,7 @@
                 "retained_bytes_per_patch": 15384.0
               },
               "receipt": {
-                "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-sip-final-v1/block-03-2-after.receipt.json",
+                "path": "(deleted-coord-artifact)/block-03-2-after.receipt.json",
                 "bytes": 1220,
                 "sha256": "f30e42df74ce5fbbcb5dd96d44890fbefeaef5c26dd1fda445f410c3915a56c2"
               }
@@ -3682,7 +3682,7 @@
                 "retained_bytes_per_patch": 15384.0
               },
               "receipt": {
-                "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-sip-final-v1/block-03-3-before.receipt.json",
+                "path": "(deleted-coord-artifact)/block-03-3-before.receipt.json",
                 "bytes": 1230,
                 "sha256": "eac4980a9279bbf529f41eb3a136ef3f48e67512bec660d13b79099c698302e7"
               }
@@ -3748,7 +3748,7 @@
                 "retained_bytes_per_patch": 15384.0
               },
               "receipt": {
-                "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-sip-final-v1/block-04-0-before.receipt.json",
+                "path": "(deleted-coord-artifact)/block-04-0-before.receipt.json",
                 "bytes": 1230,
                 "sha256": "3b3acdb62da4db5dace350121cdcb8fc0f607119bcdec224006c86a5a80c3582"
               }
@@ -3800,7 +3800,7 @@
                 "retained_bytes_per_patch": 15384.0
               },
               "receipt": {
-                "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-sip-final-v1/block-04-1-after.receipt.json",
+                "path": "(deleted-coord-artifact)/block-04-1-after.receipt.json",
                 "bytes": 1220,
                 "sha256": "0d0a75dbdac92c40cc41ec7d074b9c406728e0af6f217bd334c31c56bf28d0af"
               }
@@ -3852,7 +3852,7 @@
                 "retained_bytes_per_patch": 15384.0
               },
               "receipt": {
-                "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-sip-final-v1/block-04-2-after.receipt.json",
+                "path": "(deleted-coord-artifact)/block-04-2-after.receipt.json",
                 "bytes": 1220,
                 "sha256": "824c417c89fd1573af0fefbfd8b8b02aef49f86a40964b3e8340dde6352efd65"
               }
@@ -3904,7 +3904,7 @@
                 "retained_bytes_per_patch": 15384.0
               },
               "receipt": {
-                "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-sip-final-v1/block-04-3-before.receipt.json",
+                "path": "(deleted-coord-artifact)/block-04-3-before.receipt.json",
                 "bytes": 1230,
                 "sha256": "b3e4da5da2927a27addfe7791aa8924ef5d1590ca2c466978e6837b4ae1d7df9"
               }
@@ -3928,17 +3928,17 @@
       "registry_parity": "matches protected original and matched Sip references"
     },
     "source_manifest": {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-final-admission-20261021/source-digests.json",
+      "path": "(deleted-coord-artifact)/source-digests.json",
       "bytes": 1363443,
       "sha256": "e2904c09c7d4ed9b36e29291c32275e132600341d10a13beca48592d0cffbab3"
     },
     "integration_patch": {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-final-admission-20261021/integration.patch",
+      "path": "(deleted-coord-artifact)/integration.patch",
       "bytes": 66660,
       "sha256": "3d725e367f95ffa732be299a9c4f27590e1594bad71eeb81904cca4226e0b7b6"
     },
     "binary": {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-final-admission-20261021/candidate-scoped_patch_probe",
+      "path": "(deleted-coord-artifact)/candidate-scoped_patch_probe",
       "bytes": 1764192,
       "sha256": "ca2721c456769f99056a7541dc2abe02fe14153e35876fa010a22a7ea69123fe"
     },
@@ -3956,11 +3956,11 @@
     "build_environment": {
       "CARGO_BUILD_JOBS": 2,
       "CARGO_INCREMENTAL": 0,
-      "cargo_shim": "/home/zhuhe/code/litchi-worktrees/.coord/bin/cargo"
+      "cargo_shim": "(deleted-coord-artifact)"
     },
     "build_exit": 0,
     "build_log": {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-final-admission-20261021/build.log",
+      "path": "(deleted-coord-artifact)/build.log",
       "bytes": 4693,
       "sha256": "c3044daa6148719ea50effc1861ad26262f72e60ebd8aca68b20b348a27dc2d9"
     },
@@ -3968,7 +3968,7 @@
     "preflights": [
       {
         "command": [
-          "/home/zhuhe/code/litchi-worktrees/.coord/ppt-final-admission-20261021/candidate-scoped_patch_probe",
+          "(deleted-coord-artifact)",
           "/home/zhuhe/code/litchi-worktrees/unified-ops-api/test-data/unified-ops/0294/video.ppt",
           "2",
           "1",
@@ -3976,12 +3976,12 @@
         ],
         "exit": 0,
         "stdout": {
-          "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-final-admission-20261021/smoke.stdout",
+          "path": "(deleted-coord-artifact)/smoke.stdout",
           "bytes": 555,
           "sha256": "d2f0e1fb02f604ff9e9f953be9ca721ea09e27b55f5f5c7e1431dc294e2c43b4"
         },
         "stderr": {
-          "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-final-admission-20261021/smoke.stderr",
+          "path": "(deleted-coord-artifact)/smoke.stderr",
           "bytes": 0,
           "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
         },
@@ -3989,7 +3989,7 @@
       },
       {
         "command": [
-          "/home/zhuhe/code/litchi-worktrees/.coord/ppt-final-admission-20261021/candidate-scoped_patch_probe",
+          "(deleted-coord-artifact)",
           "/home/zhuhe/code/litchi-worktrees/unified-ops-api/test-data/unified-ops/0294/video.ppt",
           "0",
           "0",
@@ -3997,12 +3997,12 @@
         ],
         "exit": 0,
         "stdout": {
-          "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-final-admission-20261021/empty.stdout",
+          "path": "(deleted-coord-artifact)/empty.stdout",
           "bytes": 516,
           "sha256": "ebe2b52d91a559dc9b34ccd29f9e73e3a04d166e9af43b3136211defa475bb96"
         },
         "stderr": {
-          "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-final-admission-20261021/empty.stderr",
+          "path": "(deleted-coord-artifact)/empty.stderr",
           "bytes": 0,
           "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
         },
@@ -4012,7 +4012,7 @@
   },
   "matched_sip_build": {
     "source_commit": "e4bdab60667470124c4da202477ba6bb1734f256",
-    "source_directory": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-sip-e4bd-prep-20261021",
+    "source_directory": "(deleted-coord-artifact)",
     "harness_sha256": "0bd4d9c1bcad6319968024ff603ae77195810174e496d5394fbae1838021e549",
     "lock_source": "uo2-w8-file/Cargo.lock",
     "lock_sha256": "1d0c16ee87fc2daf98da8722ec07d38b8f8341c4a0163d7307640d29802797dc",
@@ -4029,23 +4029,23 @@
       "scoped_patch_probe"
     ],
     "build_environment": {
-      "CARGO_TARGET_DIR": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-sip-common-lock-20261021/target",
+      "CARGO_TARGET_DIR": "(deleted-coord-artifact)",
       "CARGO_BUILD_JOBS": "2",
-      "cargo_shim": "/home/zhuhe/code/litchi-worktrees/.coord/bin/cargo"
+      "cargo_shim": "(deleted-coord-artifact)"
     },
     "build_exit": 0,
     "binary": {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-sip-common-lock-20261021/sip-common-lock-scoped_patch_probe",
+      "path": "(deleted-coord-artifact)/sip-common-lock-scoped_patch_probe",
       "bytes": 1770160,
       "sha256": "61272a3cc329c27b8ad0dfa1c20934e4c95c6e7b0d57a0de8331bae868b01139"
     },
     "build_log": {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-sip-common-lock-20261021/build.log",
+      "path": "(deleted-coord-artifact)/build.log",
       "bytes": 4693,
       "sha256": "264be2a5684aa8f0e4384f7fe3d2e9690dea45e8ce77e53697c0ce4a0df72680"
     },
     "source_digests": {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-sip-common-lock-20261021/source-digests.json",
+      "path": "(deleted-coord-artifact)/source-digests.json",
       "bytes": 1362627,
       "sha256": "9534541b5b49341bae11a521295a052245590862a695fe46293ea7eeb8cdb09f"
     },

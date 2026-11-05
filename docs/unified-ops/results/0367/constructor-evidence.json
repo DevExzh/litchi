@@ -3,13 +3,13 @@
  "record": "docs/unified-ops/0367-iwa-w0a-substrate-and-constructor-return.md",
  "baseline": {
   "commit": "ddf2ac8ae2117cd78829ef94bcb610d6cbdfa0e2",
-  "source": "/home/zhuhe/code/litchi-worktrees/.coord/constructor-0361f-coordinator/matched-v10/source-base (litchi-iwa-core identical to git archive ddf2ac8ae2)",
+  "source": "(deleted-coord-artifact) (litchi-iwa-core identical to git archive ddf2ac8ae2)",
   "build": "cargo build --release --features before --manifest-path probe-base/Cargo.toml",
   "lock_sha256": "551fd8812350c2b13b5d1791fb8773ba4a50c71801728c3a18f6c1dca3f7f89a"
  },
  "candidate": {
   "commit": "f2e5e7898520fd6d0096ad27f99aaee9060a8d66",
-  "snapshot": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-w0a/ctor/src-final-f2e5e78985",
+  "snapshot": "(deleted-coord-artifact)",
   "build": "cargo build --release --manifest-path probe-cand/Cargo.toml (allocations: --features allocations)",
   "lock_sha256": "7f3995948b308f5ccc22c4f9bb462da0ceb4eacbd370ccc3f73ff85ac7e020ec"
  },
@@ -20,32 +20,32 @@
  },
  "binaries": {
   "base": {
-   "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-w0a/ctor/bin/base",
+   "path": "(deleted-coord-artifact)/base",
    "sha256": "e82c777b72209ba75a82f6b5dd99a236d9511174f590f2f6713472551c882042",
    "bytes": 648688
   },
   "final": {
-   "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-w0a/ctor/bin/final",
+   "path": "(deleted-coord-artifact)/final",
    "sha256": "cce3f2f507072296a7d6b10ef27ba7ff536465eafeafd6e0d925eff4e8129d98",
    "bytes": 699672
   },
   "base-alloc": {
-   "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-w0a/ctor/bin/base-alloc",
+   "path": "(deleted-coord-artifact)/base-alloc",
    "sha256": "9ce12cc5abfa6d8aaa4d9b7ca736d0bfdc990414cbdb47d045ed89469e5dc458",
    "bytes": 668136
   },
   "final-alloc": {
-   "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-w0a/ctor/bin/final-alloc",
+   "path": "(deleted-coord-artifact)/final-alloc",
    "sha256": "0eaf3d969c3766dc1111c959ba59d95dc4d3b557cec59b8ce337ec758e9d756f",
    "bytes": 715856
   },
   "floor": {
-   "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-w0a/ctor/bin/floor",
+   "path": "(deleted-coord-artifact)/floor",
    "sha256": "e53b69749a08c83f2bc882edc95812de0ffbaae8b4181339a8dbba2673b7a289",
    "bytes": 682904
   },
   "trunk": {
-   "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-w0a/ctor/bin/trunk",
+   "path": "(deleted-coord-artifact)/trunk",
    "sha256": "e9b4e3ba13bbb5d5506c407f3ab683063d297132f7f7ed60fb77f6b277f7c072",
    "bytes": 690080
   }

@@ -5,8 +5,8 @@
   "source_candidate": {
     "ref": "472b6705475b073e7fe08f6e11ee17fb1e29f838",
     "tree": "ebc1cee05f124c0c63977aff07a23288c19e7d00",
-    "w4b_path": "/home/zhuhe/code/litchi-worktrees/.coord/final-api-capture-472b670547/source",
-    "w5_path": "/home/zhuhe/code/litchi-worktrees/.coord/final-api-capture-472b670547/source-w5",
+    "w4b_path": "(deleted-coord-artifact)",
+    "w5_path": "(deleted-coord-artifact)",
     "clean": true
   },
   "baseline": {
@@ -101,19 +101,19 @@
   },
   "receipts": {
     "source_preparation": {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/native-w4b-w5-final-472b/receipts/source-preparation-472b.json",
+      "path": "(deleted-coord-artifact)/source-preparation-472b.json",
       "bytes": 6404,
       "sha256": "664fac47612eacc9c21caf5099785b8486e050b9dc4644ce55dc682c31d9f0b2"
     },
     "static_validation": {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/native-w4b-w5-final-472b/receipts/manifest-source-validation-472b.json",
+      "path": "(deleted-coord-artifact)/manifest-source-validation-472b.json",
       "bytes": 36381,
       "sha256": "1029b6e4f7c59ca72a0806b3f537cc2ce1f87f4e6e47c06ffd57adbbadf5e2f7"
     },
     "protocol_tests": {
       "command": "python3 -m unittest -q tools.test_native_qualification_runner tools.test_legacy_native_qualification",
       "tests_passed": 41,
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/native-w4b-w5-final-472b/receipts/protocol-tests-472b.log",
+      "path": "(deleted-coord-artifact)/protocol-tests-472b.log",
       "bytes": 332,
       "sha256": "a54eaa63cff67d4408aa370450c3249bc90b3db8eba9e47e389684484c1ce022"
     }

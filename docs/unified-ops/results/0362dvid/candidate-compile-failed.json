@@ -5,7 +5,7 @@
     "/home/zhuhe/code/litchi-worktrees/uo2-coordinator-metadata-integration/tools/native_qualification/drawingml_compile_driver.py",
     "compile",
     "--source-root",
-    "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/drawingml-native-cef9/source",
+    "(deleted-coord-artifact)",
     "--source-revision",
     "cef9dd63cbe164f3d5e7a0bfad069164a794f2bf",
     "--probe-root",
@@ -15,35 +15,35 @@
     "--role",
     "candidate",
     "--work-dir",
-    "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/drawingml-native-cef9/driver",
+    "(deleted-coord-artifact)",
     "--target-dir",
-    "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/drawingml-native-cef9/target",
+    "(deleted-coord-artifact)",
     "--output",
-    "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/drawingml-native-cef9/compile.json",
+    "(deleted-coord-artifact)",
     "--cargo",
-    "/home/zhuhe/code/litchi-worktrees/.coord/bin/cargo"
+    "(deleted-coord-artifact)"
   ],
   "exit_code": 2,
   "seconds": 27.68972169898916,
   "target_bytes": 267361502,
   "logs": {
-    "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/drawingml-native-cef9/prepare.log": {
+    "(deleted-coord-artifact)/prepare.log": {
       "bytes": 0,
       "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
     },
-    "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/drawingml-native-cef9/compile-driver.log": {
+    "(deleted-coord-artifact)/compile-driver.log": {
       "bytes": 165,
       "sha256": "1b7132280029dd598cf7e3c9f8ac9acbb8c5e35f7c43607f89783d585bb397cd"
     },
-    "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/drawingml-native-cef9/driver/check.stderr.log": {
+    "(deleted-coord-artifact)/check.stderr.log": {
       "bytes": 6605,
       "sha256": "db7c6b883082e7792401640dbbb252a2a547944a6ff4a89cedf2e92597885001"
     },
-    "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/drawingml-native-cef9/driver/check.stdout.log": {
+    "(deleted-coord-artifact)/check.stdout.log": {
       "bytes": 0,
       "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
     },
-    "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/drawingml-native-cef9/driver/generate.stderr.log": {
+    "(deleted-coord-artifact)/generate.stderr.log": {
       "bytes": 223,
       "sha256": "4169fda0c5d6cd814f8d7476f9ef6696cefa8b5a13bdb489c3dfce4512def601"
     }

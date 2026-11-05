@@ -13,7 +13,7 @@
   "maximum_rss_kib": 4293644,
   "isolation": "No concurrent cargo build, test, clippy or rustdoc; fresh debug and rustdoc caches.",
   "external_log": {
-    "path": "/home/zhuhe/code/litchi-worktrees/.coord/gates/m0361a-isolated/wsdoc.out",
+    "path": "(deleted-coord-artifact)/wsdoc.out",
     "size_bytes": 798,
     "sha256": "0344c4088a6ef3ddef0a11d9206c9c4c25f55656229aa4ec639e775d899b5c52"
   }

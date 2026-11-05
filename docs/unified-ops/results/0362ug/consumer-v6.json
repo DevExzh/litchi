@@ -1,7 +1,7 @@
 {
   "base": "a814baa1de47c0844eb1ea092805b73e7d7bb4ae",
   "compiler_receipt": {
-    "path": "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/api-assembly-consumers-v6/compiler-errors.json",
+    "path": "(deleted-coord-artifact)/compiler-errors.json",
     "bytes": 299345,
     "sha256": "77134b691f7c50fe98d18255fad4bc228d74bdcc6249f3414c9778e629e978c2"
   },

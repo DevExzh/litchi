@@ -10,21 +10,21 @@
     "probe_lock_sha256": "21e7fece767541aa3d8a189f49368dcb5a1d27a7b3ca6d137f93d4452c7d6c65"
   },
   "binaries": {
-    "allocation_base": {"path":"/home/zhuhe/code/litchi-worktrees/.coord/constructor-0361f-coordinator/matched-v22-alloc-base/iwa-constructor-probe-ceb-alloc","bytes":653552,"sha256":"868370074002ba8d17972b5a6193958bcbe55e72d354827043971f7a916096d3"},
-    "allocation_candidate": {"path":"/home/zhuhe/code/litchi-worktrees/.coord/constructor-0361f-coordinator/matched-v22-alloc-candidate/iwa-constructor-probe-ceb-pathfast-alloc","bytes":678816,"sha256":"8cc80c3681be48f1313c49d83ed56ff8cab44666eeb7f5fea73afd7eaeb75d32"},
-    "callgrind_base": {"path":"/home/zhuhe/code/litchi-worktrees/.coord/constructor-0361f-coordinator/matched-v22-alloc-base/iwa-constructor-probe-ceb-native","bytes":630256,"sha256":"06af91d3772d5d347ea7c5b62c047bed2582025039993d5ee49d61957178a675"},
-    "callgrind_candidate": {"path":"/home/zhuhe/code/litchi-worktrees/.coord/constructor-0361f-coordinator/matched-v22-alloc-candidate/iwa-constructor-probe-ceb-pathfast-native","bytes":657944,"sha256":"a140404b3a1014a2b5e2a0f1471eccbc61d6ab75f8dbab65fc477a23524c7665"}
+    "allocation_base": {"path":"(deleted-coord-artifact)","bytes":653552,"sha256":"868370074002ba8d17972b5a6193958bcbe55e72d354827043971f7a916096d3"},
+    "allocation_candidate": {"path":"(deleted-coord-artifact)","bytes":678816,"sha256":"8cc80c3681be48f1313c49d83ed56ff8cab44666eeb7f5fea73afd7eaeb75d32"},
+    "callgrind_base": {"path":"(deleted-coord-artifact)","bytes":630256,"sha256":"06af91d3772d5d347ea7c5b62c047bed2582025039993d5ee49d61957178a675"},
+    "callgrind_candidate": {"path":"(deleted-coord-artifact)","bytes":657944,"sha256":"a140404b3a1014a2b5e2a0f1471eccbc61d6ab75f8dbab65fc477a23524c7665"}
   },
   "allocation": {
     "method": "ABBA, 100 iterations per route; all four allocator counters checked for endpoint-leg stability",
-    "summary_path": "/home/zhuhe/code/litchi-worktrees/.coord/constructor-0361f-coordinator/matched-v22-alloc-ceb-pathfast/summary.json",
+    "summary_path": "(deleted-coord-artifact)/summary.json",
     "summary_bytes": 56726,
     "summary_sha256": "955202c8d0aa33a87a966e1edf1b48f2c03b480d112be89ae6f907add93ade3e",
     "result": "All 15 routes matched checksum, output bytes and output SHA-256; allocator counters were stable. FieldPath and FieldInfo remain zero-allocation; MessageInfo remains one 12-byte allocation per iteration."
   },
   "callgrind": {
     "method": "valgrind --tool=callgrind --collect-jumps=no --error-exitcode=99; Ir/op=(Ir at 12000 - Ir at 2000)/10000",
-    "manifest_path": "/home/zhuhe/code/litchi-worktrees/.coord/constructor-0361f-coordinator/count-callgrind-v22-ceb-pathfast/manifest.json",
+    "manifest_path": "(deleted-coord-artifact)/manifest.json",
     "manifest_bytes": 44651,
     "manifest_sha256": "cb1d9b4e7b867f85f2e1b6a1f035d52559ef1b49ae85048afa05545b2ce5cf73",
     "capture_files": 180,
@@ -49,7 +49,7 @@
   },
   "dynamic_archive_info": {
     "method": "The same optimized dynamic-count probe measured archive_info at 0, 1, 8, 32 and 128 messages; each row uses 2000/12000 Callgrind subtraction.",
-    "summary_path": "/home/zhuhe/code/litchi-worktrees/.coord/constructor-0361f-coordinator/count-callgrind-v22-ceb-pathfast-empty/summary.json",
+    "summary_path": "(deleted-coord-artifact)/summary.json",
     "summary_sha256": "63525e9ba152322f8fb4adfbd4ecefda16397f47ec7fb7f99fd7e8f69d1686aa",
     "rows": [
       {"messages":0,"base_ir":51.0061,"candidate_ir":87.0050,"delta_ir":35.9989},
@@ -62,7 +62,7 @@
   },
   "shape_only_diagnostic": {
     "status": "non-qualifying diagnostic; intentionally omits exact public versions values",
-    "summary_path": "/home/zhuhe/code/litchi-worktrees/.coord/constructor-0361f-coordinator/count-callgrind-v22-oldshape/summary.json",
+    "summary_path": "(deleted-coord-artifact)/summary.json",
     "summary_sha256": "72f088afa7fe0ad1cf1f8e917da058b42360700a2d0294299ee867f0c6995449",
     "formula": "about 34 + 21*N Ir/op; compared with the exact guard's 36 + 26*N, the value check costs about 2 fixed plus 5 Ir/message"
   },
