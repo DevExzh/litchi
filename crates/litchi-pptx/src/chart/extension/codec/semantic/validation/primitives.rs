@@ -29,14 +29,17 @@ pub(super) fn parse_subtotals(node: &MiniNode) -> Result<Vec<u32>> {
         if values.len() >= MAX_SUBTOTALS {
             return limit(" subtotal count");
         }
-        if child.namespace != CX
-            || child.name != "idx"
-            || !child.attributes.is_empty()
-            || !child.children.is_empty()
-        {
+        if child.namespace != CX || child.name != "idx" || !child.children.is_empty() {
             return invalid("invalid  subtotal index");
         }
-        let value = parse_u32(child.text.trim(), "subtotal index")?;
+        reject_unknown(&child.attributes, &[("", "val")], "subtotal index")?;
+        let text = child.text.trim();
+        let value = match optional(&child.attributes, "", "val") {
+            Some(value) if text.is_empty() => parse_u32(value, "subtotal index")?,
+            Some(_) => return invalid("subtotal index has both val and text"),
+            // Retain the historical text-form dialect on read.
+            None => parse_u32(text, "subtotal index")?,
+        };
         if !unique.insert(value) {
             return invalid("duplicate  subtotal index");
         }

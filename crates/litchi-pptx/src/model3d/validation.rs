@@ -392,7 +392,7 @@ fn validate_reference(
     let target = relationship.target_partname()?;
     let part = package.get_part(&target)?;
     if field == "model" {
-        if part.content_type() != MODEL_CONTENT_TYPE {
+        if !super::is_model_content_type(part.content_type()) {
             return Err(Error::ContentType {
                 expected: MODEL_CONTENT_TYPE.into(),
                 actual: part.content_type().into(),

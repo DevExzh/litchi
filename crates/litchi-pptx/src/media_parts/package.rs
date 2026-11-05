@@ -40,11 +40,29 @@ pub(crate) fn load_with_limits(
     let mut total = 0usize;
     let mut loaded: BTreeMap<String, Resource> = BTreeMap::new();
     for picture in &mut value.pictures {
-        let target = relationship_target(
+        let primary = checked_relationship(
             slide,
             &picture.relationship_id,
             conformance.media_rel(picture.kind),
         )?;
+        // Office can retain an external legacy video placeholder (including
+        // Target="NULL") alongside the actual embedded p14 media payload.
+        // Read the embedded resource without following the legacy target.
+        let target = if primary.is_external() {
+            let id = picture
+                .office_extension
+                .as_ref()
+                .and_then(|extension| extension.embed_relationship_id.as_deref())
+                .ok_or_else(|| {
+                    invalid(format!(
+                        "external slide-media relationship '{}' is not fetched",
+                        picture.relationship_id
+                    ))
+                })?;
+            relationship_target(slide, id, rt::MEDIA)?
+        } else {
+            primary.target_partname()?
+        };
         let resource = load_resource(
             package,
             &target,
@@ -175,7 +193,11 @@ pub(crate) fn validate_replay_references(
     Ok(())
 }
 
-fn relationship_target(part: &dyn Part, id: &str, expected_type: &str) -> Result<PackURI> {
+fn checked_relationship<'a>(
+    part: &'a dyn Part,
+    id: &str,
+    expected_type: &str,
+) -> Result<&'a litchi_opc::Relationship> {
     let relationship = part
         .rels()
         .get(id)
@@ -186,6 +208,11 @@ fn relationship_target(part: &dyn Part, id: &str, expected_type: &str) -> Result
             relationship.reltype()
         )));
     }
+    Ok(relationship)
+}
+
+fn relationship_target(part: &dyn Part, id: &str, expected_type: &str) -> Result<PackURI> {
+    let relationship = checked_relationship(part, id, expected_type)?;
     if relationship.is_external() {
         return Err(invalid(format!(
             "external slide-media relationship '{id}' is not fetched"

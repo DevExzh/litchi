@@ -311,9 +311,17 @@ impl Properties {
     }
 }
 
+/// Retained graphic-frame markup surrounding a native Zoom payload.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(super) struct Host {
+    pub(super) before: Vec<u8>,
+    pub(super) after: Vec<u8>,
+}
+
 /// A section zoom object.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Section {
+    pub(super) host: Option<Host>,
     pub(super) section_id: String,
     pub(super) properties: Properties,
     pub(super) fallback_xml: Vec<u8>,
@@ -341,6 +349,7 @@ impl Section {
             ));
         }
         Ok(Self {
+            host: None,
             section_id,
             properties,
             fallback_xml,
@@ -394,6 +403,7 @@ impl Section {
 /// A slide zoom object.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Slide {
+    pub(super) host: Option<Host>,
     pub(super) slide_id: u32,
     pub(super) creation_id: Option<u32>,
     pub(super) properties: Properties,
@@ -419,6 +429,7 @@ impl Slide {
             return Err(Error::Invalid("slide zoom fallback cannot be empty".into()));
         }
         Ok(Self {
+            host: None,
             slide_id,
             creation_id: None,
             properties,
@@ -636,6 +647,7 @@ impl Item {
 /// A summary zoom container containing zero or more section items.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Summary {
+    pub(super) host: Option<Host>,
     pub(super) items: Vec<Item>,
     pub(super) layout: Layout,
     pub(super) fallback_xml: Vec<u8>,
@@ -657,6 +669,7 @@ impl Summary {
             ));
         }
         Ok(Self {
+            host: None,
             items: Vec::new(),
             layout,
             fallback_xml,

@@ -42,7 +42,7 @@ struct Node {
 }
 
 impl ExtensionList {
-    /// Parse one transitional `PresentationML` `p:extLst` fragment.
+    /// Parse one native `p14:extLst` or legacy `p:extLst` fragment.
     ///
     /// # Errors
     ///
@@ -69,7 +69,11 @@ impl ExtensionList {
     }
 
     fn from_node(node: &Node, limits: Limits) -> Result<Self> {
-        require_node(node, PML, "extLst")?;
+        if node.name != "extLst" || !matches!(node.namespace.as_str(), P14 | PML) {
+            return Err(invalid(
+                "media extension list has an invalid namespace or root",
+            ));
+        }
         let xml = canonical_fragment(node, limits)?;
         let xml = String::from_utf8(xml)
             .map_err(|_err| invalid("canonical media extension-list XML is not UTF-8"))?;
@@ -257,9 +261,9 @@ fn parse_office_media(node: &Node, limits: Limits) -> Result<Extension> {
                 }
                 3
             },
-            // The p14 schema imports transitional PresentationML even when
-            // the containing slide uses the Strict namespace dialect.
-            (PML, "extLst") => {
+            // Native media declares this element in p14; its imported
+            // extension-list type still contains PresentationML p:ext.
+            (P14, "extLst") | (PML, "extLst") => {
                 if extensions
                     .replace(ExtensionList::from_node(child, limits)?)
                     .is_some()

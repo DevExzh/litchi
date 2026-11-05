@@ -803,7 +803,8 @@
         "powerpoint/powerpoint-media-objects.ppt",
         "powerpoint/powerpoint-modern-media.ppt",
         "powerpoint/powerpoint-fonts-math-handout.ppt",
-        "powerpoint/powerpoint-passive-macro.ppt"
+        "powerpoint/powerpoint-passive-macro.ppt",
+        "powerpoint/powerpoint-visual-objects.pot"
       ],
       "feature_rows": [
         "ppt-345",
@@ -811,7 +812,7 @@
         "ppt-356"
       ],
       "assertions": [
-        "Nine unencrypted PPT/PPS specimens retain exact slide counts, nonempty shape arrays for every slide, no UnreadableShape repairs and byte-identical publication."
+        "Ten unencrypted PPT/PPS/POT specimens retain exact slide counts, nonempty shape arrays for every slide, no UnreadableShape repairs and byte-identical publication."
       ],
       "scope_limit": "Materialization is not semantic completeness. Encrypted files have a separate test; animation, layout and rendering remain separate scopes."
     },
@@ -944,13 +945,14 @@
         "powerpoint/powerpoint-media-objects.ppt",
         "powerpoint/powerpoint-modern-media.ppt",
         "powerpoint/powerpoint-master-motion.ppt",
-        "powerpoint/powerpoint-fonts-math-handout.ppt"
+        "powerpoint/powerpoint-fonts-math-handout.ppt",
+        "powerpoint/powerpoint-visual-objects.pot"
       ],
       "feature_rows": [
         "ppt-359"
       ],
       "assertions": [
-        "Six native image-bearing PPT/PPS files expose the independent store counts 3/3/3/7/10/3 with nonempty payloads."
+        "Seven native image-bearing PPT/PPS/POT files expose independently specified store counts and nonempty payloads."
       ],
       "scope_limit": "Image catalog coverage; exact payload hashes are asserted separately for the media fixture, with no render or formula semantics."
     },
@@ -1011,6 +1013,378 @@
         "xls",
         "xlsb",
         "xlsx"
+      ]
+    },
+    {
+      "crate": "litchi-pptx",
+      "target": "microsoft_office_native",
+      "name": "native_powerpoint_slide_master_and_layout_root_properties_are_readable",
+      "fixtures": [
+        "powerpoint/powerpoint-master-motion.pptx"
+      ],
+      "feature_rows": [
+        "pptx-396",
+        "pptx-399",
+        "pptx-402"
+      ],
+      "assertions": [
+        "Seven exact visibility flags, one unpreserved master and all17 layout kinds/name, including omitted kinds."
+      ],
+      "scope_limit": "Read-only root properties; historical root-element failures do not reproduce on current code. No layout rendering or inheritance synthesis claim."
+    },
+    {
+      "crate": "litchi-pptx",
+      "target": "microsoft_office_native",
+      "name": "native_powerpoint_fly_in_preserves_its_shared_target_and_duration",
+      "fixtures": [
+        "powerpoint/powerpoint-master-motion.pptx"
+      ],
+      "feature_rows": [
+        "pptx-423"
+      ],
+      "assertions": [
+        "One Fly In effect targets shape2, from Left, AfterPrevious, duration1250ms; paragraph build and full timing tree retained; unchanged timing XML survives typed read/write."
+      ],
+      "scope_limit": "Direct parallel behavior duration projection only; no playback or general interactive timing evaluation."
+    },
+    {
+      "crate": "litchi-pptx",
+      "target": "microsoft_office_native",
+      "name": "native_powerpoint_variants_read_every_declared_slide_and_keep_package_members",
+      "fixtures": [
+        "powerpoint/powerpoint-text-table.pptx",
+        "powerpoint/powerpoint-visual-objects.pptx",
+        "powerpoint/powerpoint-visual-objects.potx",
+        "powerpoint/powerpoint-visual-objects.ppsx",
+        "powerpoint/powerpoint-navigation-review.pptx",
+        "powerpoint/powerpoint-media-objects.pptx",
+        "powerpoint/powerpoint-passive-macro.pptm",
+        "powerpoint/powerpoint-passive-macro.potm",
+        "powerpoint/powerpoint-passive-macro.ppsm",
+        "powerpoint/powerpoint-master-motion.pptx",
+        "powerpoint/powerpoint-modern-media.pptx",
+        "powerpoint/powerpoint-fonts-math-handout.pptx",
+        "powerpoint/powerpoint-ink-stroke.pptx",
+        "powerpoint/powerpoint-ink-replay.pptx"
+      ],
+      "feature_rows": [
+        "pptx-394",
+        "pptx-395",
+        "pptx-396"
+      ],
+      "assertions": [
+        "All14 unencrypted modern PowerPoint files retain expected slide counts, readable text/shapes/visibility and byte-identical OPC member payloads through serialization."
+      ],
+      "scope_limit": "ZIP compression/framing may change. Opening and catalog coverage do not establish all per-feature semantics; encryption is separate."
+    },
+    {
+      "crate": "litchi-pptx",
+      "target": "microsoft_office_native",
+      "name": "native_animation_accepts_separate_same_shape_behaviors_but_not_duplicate_target_children",
+      "fixtures": [
+        "powerpoint/powerpoint-master-motion.pptx"
+      ],
+      "feature_rows": [
+        "pptx-423"
+      ],
+      "assertions": [
+        "Derived duplicate targets within one tgtEl remain malformed; distinct behavior targets produce typed UnsupportedContent; an explicit preset duration700 overrides child1250."
+      ],
+      "scope_limit": "The single-target preset projection cannot represent a multi-shape preset; this refusal does not label the whole OOXML vocabulary malformed."
+    },
+    {
+      "crate": "litchi-pptx",
+      "target": "microsoft_office_native",
+      "name": "native_powerpoint_actions_include_text_hover_and_resolved_internal_slide_targets",
+      "fixtures": [
+        "powerpoint/powerpoint-navigation-review.pptx"
+      ],
+      "feature_rows": [
+        "pptx-416",
+        "pptx-417"
+      ],
+      "assertions": [
+        "Four click actions retain exact URL, tooltip, mailto, internal slide5 target and next-slide jump; text-run mouse-over exposes first-slide hover."
+      ],
+      "scope_limit": "Inert action metadata only; no following URLs, sending mail, or executing actions."
+    },
+    {
+      "crate": "litchi-pptx",
+      "target": "microsoft_office_native",
+      "name": "native_powerpoint_zooms_keep_summary_slide_and_section_targets",
+      "fixtures": [
+        "powerpoint/powerpoint-master-motion.pptx"
+      ],
+      "feature_rows": [
+        "pptx-444"
+      ],
+      "assertions": [
+        "Native graphic-frame Zooms expose two summary sections, slide target260, return-to-parent and the section target; unchanged owner XML is byte-identical."
+      ],
+      "scope_limit": "Native source Zoom read; detached fresh graphical-frame creation and generalized namespace-rebinding scenarios remain separate coverage."
+    },
+    {
+      "crate": "litchi-pptx",
+      "target": "microsoft_office_native",
+      "name": "native_powerpoint_model3d_keeps_the_exact_glb_and_raster_preview",
+      "fixtures": [
+        "powerpoint/powerpoint-modern-media.pptx"
+      ],
+      "feature_rows": [
+        "pptx-445"
+      ],
+      "assertions": [
+        "Exact1112-byte glTF payload/header/SHA-256 and native raster-preview SHA-256/content type through model3d owner."
+      ],
+      "scope_limit": "Opaque GLB/preview resources and retained scene metadata; no mesh interpretation, model animation or rendering."
+    },
+    {
+      "crate": "litchi-pptx",
+      "target": "microsoft_office_native",
+      "name": "native_powerpoint_chartex_preserves_waterfall_subtotals_and_sunburst_values",
+      "fixtures": [
+        "powerpoint/powerpoint-modern-media.pptx"
+      ],
+      "feature_rows": [
+        "pptx-419"
+      ],
+      "assertions": [
+        "Waterfall layout, eight exact numeric values and subtotal indices0/4/7; sunburst layout and16 exact values; both embedded data targets resolve."
+      ],
+      "scope_limit": "Stored chart data and metadata; no rendering, recalculation or complete embedded-workbook semantic read."
+    },
+    {
+      "crate": "litchi-pptx",
+      "target": "microsoft_office_native",
+      "name": "native_chartex_subtotal_attributes_reject_ambiguous_or_duplicate_indices",
+      "fixtures": [
+        "powerpoint/powerpoint-modern-media.pptx"
+      ],
+      "feature_rows": [
+        "pptx-419"
+      ],
+      "assertions": [
+        "Native-derived mixed val/text, duplicate, overflowing and foreign-namespace subtotal indices are rejected."
+      ],
+      "scope_limit": "Derived invalid XML; original native files remain unchanged."
+    },
+    {
+      "crate": "litchi-pptx",
+      "target": "microsoft_office_native",
+      "name": "native_model3d_accepts_the_historical_mime_alias_without_changing_payloads",
+      "fixtures": [
+        "powerpoint/powerpoint-modern-media.pptx"
+      ],
+      "feature_rows": [
+        "pptx-445"
+      ],
+      "assertions": [
+        "A derived model/gltf-binary alias preserves the exact native model payload and typed graph access."
+      ],
+      "scope_limit": "Read compatibility with the old Litchi MIME spelling; new model assets use Office model/gltf.binary."
+    },
+    {
+      "crate": "litchi-pptx",
+      "target": "microsoft_office_native",
+      "name": "native_powerpoint_video_uses_the_embedded_office_resource_and_reads_caption_cues",
+      "fixtures": [
+        "powerpoint/powerpoint-modern-media.pptx"
+      ],
+      "feature_rows": [
+        "pptx-421",
+        "pptx-422"
+      ],
+      "assertions": [
+        "Native video frame4 preserves ISO rId1 and p14 embed rId2, trim50ms, fades250/500ms, exact embedded movie hash, two caption cues and English label/language."
+      ],
+      "scope_limit": "Embedded resource selection takes precedence over the inert external legacy placeholder. No playback, remote fetch or full player behavior."
+    },
+    {
+      "crate": "litchi-pptx",
+      "target": "microsoft_office_native",
+      "name": "native_powerpoint_svg_without_a_raster_fallback_is_read_as_the_primary_image",
+      "fixtures": [
+        "powerpoint/powerpoint-modern-media.pptx"
+      ],
+      "feature_rows": [
+        "pptx-413"
+      ],
+      "assertions": [
+        "Source-backed image and SVG APIs expose native rId2 and identical418-byte SVG with exact SHA-256 despite absent raster fallback."
+      ],
+      "scope_limit": "Read-only vector resource; the paired PNG/SVG editing profile remains distinct and rendering is not performed."
+    },
+    {
+      "crate": "litchi-pptx",
+      "target": "microsoft_office_native",
+      "name": "native_vector_only_svg_still_rejects_missing_or_spoofed_relationship_owners",
+      "fixtures": [
+        "powerpoint/powerpoint-modern-media.pptx"
+      ],
+      "feature_rows": [
+        "pptx-413"
+      ],
+      "assertions": [
+        "Derived missing SVG reference and spoofed SVG namespace fail source-backed image inventory."
+      ],
+      "scope_limit": "Negative source variants; no weakened reference or namespace checks."
+    },
+    {
+      "crate": "litchi-pptx",
+      "target": "microsoft_office_native",
+      "name": "native_video_fallback_requires_an_internal_correctly_typed_office_media_edge",
+      "fixtures": [
+        "powerpoint/powerpoint-modern-media.pptx"
+      ],
+      "feature_rows": [
+        "pptx-421"
+      ],
+      "assertions": [
+        "An incorrectly typed or external p14 embed edge is rejected even when a legacy external placeholder exists."
+      ],
+      "scope_limit": "No network access; correct fallback cannot convert an invalid media edge into a readable resource."
+    },
+    {
+      "crate": "litchi-pptx",
+      "target": "microsoft_office_native",
+      "name": "native_powerpoint_sections_shows_notes_and_comment_replies_keep_their_owners",
+      "fixtures": [
+        "powerpoint/powerpoint-navigation-review.pptx",
+        "powerpoint/powerpoint-master-motion.pptx"
+      ],
+      "feature_rows": [
+        "pptx-400",
+        "pptx-401",
+        "pptx-404",
+        "pptx-430"
+      ],
+      "assertions": [
+        "Exact section memberships, custom-show IDs/order, note text and owning slide after Summary insertion; author/initials, root comment and one reply retain markers and owners."
+      ],
+      "scope_limit": "Snapshot reads only; comment task semantics, review mutation, section CRUD and note formatting remain separate work."
+    },
+    {
+      "crate": "litchi-pptx",
+      "target": "microsoft_office_native",
+      "name": "native_powerpoint_zoom_edit_keeps_graphic_frame_fallback_and_unrelated_members",
+      "fixtures": [
+        "powerpoint/powerpoint-master-motion.pptx"
+      ],
+      "feature_rows": [
+        "pptx-444",
+        "pptx-395"
+      ],
+      "assertions": [
+        "Native return-to-parent edit keeps slide260, graphic-frame metadata, fallback, blip and geometry bytes; every other OPC member is unchanged and inverse restores the before package."
+      ],
+      "scope_limit": "Existing source graphic-frame property edit only; no fresh Zoom frame authoring or native-app reopen claim."
+    },
+    {
+      "crate": "litchi-pptx",
+      "target": "microsoft_office_native",
+      "name": "native_powerpoint_model3d_asset_edit_keeps_preview_and_scene_children",
+      "fixtures": [
+        "powerpoint/powerpoint-modern-media.pptx"
+      ],
+      "feature_rows": [
+        "pptx-445",
+        "pptx-395"
+      ],
+      "assertions": [
+        "Replace Office-rewritten GLB with the tracked valid import asset; preserve preview, camera/transform/raster/viewport/light XML and unrelated members; inverse restores the before package."
+      ],
+      "scope_limit": "Uses the typed source index because native MCE active/fallback shapes share a name. No geometry rendering or model-data transformation."
+    },
+    {
+      "crate": "litchi-pptx",
+      "target": "microsoft_office_native",
+      "name": "native_powerpoint_macro_variants_keep_inert_payloads_through_title_edits",
+      "fixtures": [
+        "powerpoint/powerpoint-passive-macro.pptm",
+        "powerpoint/powerpoint-passive-macro.potm",
+        "powerpoint/powerpoint-passive-macro.ppsm"
+      ],
+      "feature_rows": [
+        "pptx-441",
+        "pptx-394",
+        "pptx-409"
+      ],
+      "assertions": [
+        "Each native macro variant exposes its own exact8192-byte VBA payload/hash; title edit/reopen retains every other member, main-part kind and exact inverse."
+      ],
+      "scope_limit": "Opaque VBA payload inspection/preservation only; no VBA compilation/execution or macro edit.",
+      "required_features": [
+        "vba-inspection"
+      ]
+    },
+    {
+      "crate": "litchi-pptx",
+      "target": "microsoft_office_native",
+      "name": "native_powerpoint_agile_password_ingress_and_rekey_preserve_clear_members",
+      "fixtures": [
+        "powerpoint/powerpoint-encrypted.pptx"
+      ],
+      "feature_rows": [
+        "pptx-439",
+        "pptx-394"
+      ],
+      "assertions": [
+        "Empty/wrong passwords fail with Password; correct password reads one slide and markers with AgileAes256Sha512; ordinary clear serialization refuses; rekey rejects old password and retains every clear member."
+      ],
+      "scope_limit": "Encrypted bytes use new entropy. Clear ZIPs remain in memory; no native-app reopen.",
+      "required_features": [
+        "encryption"
+      ]
+    },
+    {
+      "crate": "litchi",
+      "target": "microsoft_office_native",
+      "name": "native_pptx_template_show_and_macro_variants_preserve_inert_members_on_public_edits",
+      "fixtures": [
+        "powerpoint/powerpoint-visual-objects.potx",
+        "powerpoint/powerpoint-visual-objects.ppsx",
+        "powerpoint/powerpoint-passive-macro.pptm",
+        "powerpoint/powerpoint-passive-macro.potm",
+        "powerpoint/powerpoint-passive-macro.ppsm"
+      ],
+      "feature_rows": [
+        "pptx-394",
+        "pptx-395",
+        "pptx-409",
+        "pptx-441"
+      ],
+      "assertions": [
+        "Public format detection, exact original title and title edit/reopen for POTX/PPSX/PPTM/POTM/PPSM; every unrelated member, including macro payloads and content types, remains exact; inverse restores source."
+      ],
+      "scope_limit": "One public title transaction per variant; not general feature or macro-authoring parity.",
+      "required_features": [
+        "doc",
+        "docx",
+        "ppt",
+        "pptx",
+        "rtf",
+        "xls",
+        "xlsb",
+        "xlsx"
+      ]
+    },
+    {
+      "crate": "litchi-ops",
+      "target": "microsoft_office_native",
+      "name": "native_ink_deck_missing_notes_have_the_same_first_error_in_all_edit_forms",
+      "fixtures": [
+        "powerpoint/powerpoint-ink-replay.pptx"
+      ],
+      "feature_rows": [
+        "pptx-397",
+        "pptx-404"
+      ],
+      "assertions": [
+        "On eager and source-backed owners, single set, atomic batch and edit closure all report PathNotFound for missing notes; grouped forms retain item index0 and leave every source byte unchanged."
+      ],
+      "scope_limit": "First-refusal and atomicity contract only; this does not claim editing the InkAction payload itself.",
+      "required_features": [
+        "pptx"
       ]
     }
   ]

@@ -220,7 +220,9 @@ pub struct EffectInstance {
     pub effect: Effect,
     /// Trigger type
     pub trigger: Trigger,
-    /// Duration in milliseconds
+    /// Simple duration: the preset's explicit duration, or the longest
+    /// directly contained behavior duration when the preset omits it.
+    /// This does not evaluate interactive timelines or playback.
     pub duration: Duration,
     /// Delay before starting (ms)
     pub delay: u32,

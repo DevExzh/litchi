@@ -681,6 +681,7 @@ impl TimingParser {
                 }
                 if !empty {
                     pending.target_element_depth = Some(depth);
+                    pending.target_seen_in_element = false;
                 }
             }
             return Ok(());
@@ -706,14 +707,51 @@ impl TimingParser {
                 let value = attribute(element, b"spid", decoder)?
                     .ok_or_else(|| invalid("animation shape target is missing spid"))?;
                 let id = parse_shape_id(&value)?;
-                if pending.target.replace(id).is_some() {
+                if pending.target_seen_in_element {
                     return Err(invalid("animation has multiple shape targets"));
                 }
+                pending.target_seen_in_element = true;
+                if pending.target.is_some_and(|previous| previous != id) {
+                    return Err(Error::refused(
+                        litchi_core::edit::RefusalKind::UnsupportedContent,
+                        "parse_animation",
+                        "preset animation contains behaviors with distinct shape targets",
+                    ));
+                }
+                pending.target = Some(id);
             }
             return Ok(());
         }
 
+        if is_presentationml_name(namespace, element.name(), b"cBhvr") {
+            if let Some(pending) = self.pending.last_mut()
+                && depth == pending.depth + 3
+                && !empty
+            {
+                pending.behavior_depth = Some(depth);
+            }
+        }
+
         if is_presentationml_name(namespace, element.name(), b"cTn") {
+            // Native presets often omit their own dur and express it on
+            // parallel child behaviors (for example set + x/y Fly In).
+            if let Some(pending) = self.pending.last_mut()
+                && !pending.explicit_duration
+                && pending
+                    .behavior_depth
+                    .is_some_and(|behavior| depth == behavior + 1)
+                && let Some(value) = attribute(element, b"dur", decoder)?
+            {
+                pending.animation.duration =
+                    match (pending.animation.duration, parse_timing_value(&value)?) {
+                        (Duration::Indefinite, _) | (_, TimingValue::Indefinite) => {
+                            Duration::Indefinite
+                        },
+                        (Duration::Finite(current), TimingValue::Milliseconds(value)) => {
+                            Duration::Finite(current.max(value))
+                        },
+                    };
+            }
             let node_type = attribute(element, b"nodeType", decoder)?;
             let event_filter = attribute(element, b"evtFilter", decoder)?;
             let group_id = attribute(element, b"grpId", decoder)?
@@ -770,7 +808,9 @@ impl TimingParser {
                     })
                     .transpose()?
                     .unwrap_or(0);
-                let duration = match attribute(element, b"dur", decoder)? {
+                let declared_duration = attribute(element, b"dur", decoder)?;
+                let explicit_duration = declared_duration.is_some();
+                let duration = match declared_duration {
                     Some(value) => match parse_timing_value(&value)? {
                         TimingValue::Milliseconds(value) => Duration::Finite(value),
                         TimingValue::Indefinite => Duration::Indefinite,
@@ -870,6 +910,9 @@ impl TimingParser {
                     },
                     target: None,
                     target_element_depth: None,
+                    target_seen_in_element: false,
+                    explicit_duration,
+                    behavior_depth: None,
                 });
                 if empty {
                     return Err(invalid("preset animation has no shape target"));
@@ -1047,6 +1090,13 @@ impl TimingParser {
             self.paragraph_build_depth = None;
             self.paragraph_build_index = None;
             return Ok(());
+        }
+
+        if is_presentationml_name(namespace, name, b"cBhvr")
+            && let Some(pending) = self.pending.last_mut()
+            && pending.behavior_depth == Some(depth)
+        {
+            pending.behavior_depth = None;
         }
 
         if is_presentationml_name(namespace, name, b"tgtEl") {

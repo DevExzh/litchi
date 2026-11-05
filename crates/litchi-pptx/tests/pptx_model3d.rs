@@ -15,7 +15,7 @@ use litchi_pptx::{Error, Package};
 
 const MODEL_RELATIONSHIP: &str =
     "http://schemas.microsoft.com/office/2017/06/relationships/model3d";
-const MODEL_CONTENT_TYPE: &str = "model/gltf-binary";
+const MODEL_CONTENT_TYPE: &str = "model/gltf.binary";
 const MODEL_PART: &str = "/ppt/media/model3d.glb";
 const PREVIEW_PART: &str = "/ppt/media/model3d-preview.png";
 const SLIDE_PART: &str = "/ppt/slides/slide1.xml";

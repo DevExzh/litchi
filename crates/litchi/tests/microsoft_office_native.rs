@@ -260,3 +260,88 @@ fn native_ppt_table_query_edit_reopen_and_inverse_preserve_neighbor_cells() {
         original
     );
 }
+
+#[test]
+fn native_pptx_template_show_and_macro_variants_preserve_inert_members_on_public_edits() {
+    fn members(bytes: &[u8]) -> std::collections::BTreeMap<String, Vec<u8>> {
+        let reader = litchi_opc::phys_pkg::OwnedPhysPkgReader::from_bytes(
+            bytes.to_vec(),
+            litchi_opc::SourceLimits::default(),
+        )
+        .unwrap();
+        reader
+            .member_names()
+            .unwrap()
+            .into_iter()
+            .map(|name| {
+                let bytes = reader.read_member(&name).unwrap();
+                (name, bytes)
+            })
+            .collect()
+    }
+    for name in [
+        "powerpoint-visual-objects.potx",
+        "powerpoint-visual-objects.ppsx",
+        "powerpoint-passive-macro.pptm",
+        "powerpoint-passive-macro.potm",
+        "powerpoint-passive-macro.ppsm",
+    ] {
+        let file = native(&format!("powerpoint/{name}"), FileFormat::Pptx);
+        let before = file.to_bytes().unwrap();
+        let title = file
+            .get("/slide[1]/shape[1]")
+            .unwrap()
+            .view()
+            .text()
+            .unwrap()
+            .unwrap()
+            .into_owned();
+        assert_eq!(
+            title,
+            if name.starts_with("powerpoint-visual") {
+                "Native PowerPoint visual objects"
+            } else {
+                "PPT_MACRO_005"
+            }
+        );
+        let commit = file
+            .edit(|edit| {
+                edit.set(
+                    "/slide[1]/shape[1]",
+                    litchi::props! {"text"=>"Native variant edited title"},
+                )
+            })
+            .unwrap();
+        let after = commit.file().to_bytes().unwrap();
+        let reopened = litchi::open_bytes(after.clone()).unwrap();
+        assert_eq!(reopened.format(), Some(FileFormat::Pptx));
+        assert_eq!(
+            reopened
+                .get("/slide[1]/shape[1]")
+                .unwrap()
+                .view()
+                .text()
+                .unwrap()
+                .as_deref(),
+            Some("Native variant edited title")
+        );
+        let a = members(&before);
+        let b = members(&after);
+        assert_eq!(a.keys().collect::<Vec<_>>(), b.keys().collect::<Vec<_>>());
+        for (part, bytes) in a {
+            if part != "ppt/slides/slide1.xml" {
+                assert!(b[&part] == bytes, "{name}: changed {part}");
+            }
+        }
+        assert!(
+            commit
+                .patch()
+                .inverse()
+                .apply(commit.file())
+                .unwrap()
+                .to_bytes()
+                .unwrap()
+                == before
+        );
+    }
+}

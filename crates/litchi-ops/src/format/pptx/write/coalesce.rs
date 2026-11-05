@@ -193,7 +193,9 @@ enum BatchKind {
 
 #[derive(Clone)]
 struct CachedScene {
-    scene: Scene,
+    // Notes have their own scene. Planning them must not read unrelated
+    // slide shapes (which can legitimately lie outside the edit profile).
+    scene: Option<Scene>,
     shapes: Box<[usize]>,
     placeholders: Box<[usize]>,
     /// The scene positions of the slide's root tables, in `table[M]` order
@@ -582,7 +584,7 @@ fn shape_plan(
 
     if scene_cache
         .as_ref()
-        .is_none_or(|(cached_slide, _)| *cached_slide != slide)
+        .is_none_or(|(cached_slide, cached)| *cached_slide != slide || cached.scene.is_none())
     {
         let Some(scene) = file.slide_scene(slide)? else {
             return Ok(None);
@@ -780,7 +782,7 @@ fn format_plan(
     )?;
     if scene_cache
         .as_ref()
-        .is_none_or(|(cached_slide, _)| *cached_slide != slide)
+        .is_none_or(|(cached_slide, cached)| *cached_slide != slide || cached.scene.is_none())
     {
         let Some(scene) = file.slide_scene(slide)? else {
             return Ok(None);
@@ -999,14 +1001,25 @@ fn story_plan(
         staged_bytes,
         limits.max_staged_bytes(),
     )?;
-    if scene_cache
-        .as_ref()
-        .is_none_or(|(cached_slide, _)| *cached_slide != story.slide)
-    {
-        let Some(scene) = file.slide_scene(story.slide)? else {
-            return Ok(None);
+    if scene_cache.as_ref().is_none_or(|(cached_slide, cached)| {
+        *cached_slide != story.slide || (!notes && cached.scene.is_none())
+    }) {
+        let cached = if notes {
+            CachedScene {
+                scene: None,
+                shapes: Box::default(),
+                placeholders: Box::default(),
+                tables: Box::default(),
+                cells: HashMap::new(),
+                notes: None,
+            }
+        } else {
+            let Some(scene) = file.slide_scene(story.slide)? else {
+                return Ok(None);
+            };
+            cache_scene(scene)?
         };
-        *scene_cache = Some((story.slide, cache_scene(scene)?));
+        *scene_cache = Some((story.slide, cached));
     }
     let Some((_, cached)) = scene_cache.as_mut() else {
         return Err(error(
@@ -1287,7 +1300,7 @@ fn cache_scene(scene: Scene) -> Result<CachedScene> {
         }
     }
     Ok(CachedScene {
-        scene,
+        scene: Some(scene),
         shapes: shapes.into_boxed_slice(),
         placeholders: placeholders.into_boxed_slice(),
         tables: tables.into_boxed_slice(),
@@ -1351,6 +1364,8 @@ fn read_cells(
 ) -> Result<Option<Arc<Cells>>> {
     let Some(handle) = cached
         .scene
+        .as_ref()
+        .ok_or_else(|| error(Code::InternalError, "PPTX table plan has no main scene"))?
         .shape(Position::new(position))
         .map_err(|_| error(Code::InternalError, "cached PPTX table position is invalid"))?
     else {
@@ -1446,6 +1461,8 @@ fn direct_handle(cached: &CachedScene, kind: DirectKind, ordinal: usize) -> Resu
     };
     cached
         .scene
+        .as_ref()
+        .ok_or_else(|| error(Code::InternalError, "PPTX shape plan has no main scene"))?
         .shape(Position::new(position))
         .map_err(|_| error(Code::InternalError, "cached PPTX shape position is invalid"))
 }

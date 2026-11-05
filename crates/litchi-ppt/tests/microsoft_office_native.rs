@@ -39,6 +39,7 @@ fn native_powerpoint_decks_materialize_all_slide_shapes_without_dropping_any() {
         ("powerpoint-text-table.ppt", 3),
         ("powerpoint-visual-objects.ppt", 5),
         ("powerpoint-visual-objects.pps", 5),
+        ("powerpoint-visual-objects.pot", 5),
         ("powerpoint-navigation-review.ppt", 6),
         ("powerpoint-master-motion.ppt", 7),
         ("powerpoint-media-objects.ppt", 4),
@@ -425,6 +426,7 @@ fn native_powerpoint_image_catalogs_resolve_every_stored_preview() {
     for (name, count) in [
         ("powerpoint-visual-objects.ppt", 3),
         ("powerpoint-visual-objects.pps", 3),
+        ("powerpoint-visual-objects.pot", 3),
         ("powerpoint-media-objects.ppt", 3),
         ("powerpoint-modern-media.ppt", 7),
         ("powerpoint-master-motion.ppt", 10),

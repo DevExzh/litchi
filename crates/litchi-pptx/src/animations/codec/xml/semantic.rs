@@ -19,6 +19,9 @@ pub(super) struct PendingAnimation {
     pub(super) animation: EffectInstance,
     pub(super) target: Option<u32>,
     pub(super) target_element_depth: Option<usize>,
+    pub(super) target_seen_in_element: bool,
+    pub(super) explicit_duration: bool,
+    pub(super) behavior_depth: Option<usize>,
 }
 
 pub(super) struct PendingParagraphTemplate {

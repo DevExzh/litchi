@@ -265,7 +265,8 @@ pub struct Bookmark {
     pub time: Option<Offset>,
 }
 
-/// A bounded, canonical `p:extLst` fragment retained without interpretation.
+/// A bounded, canonical `p14:extLst` or legacy `p:extLst` fragment retained
+/// without interpretation.
 ///
 /// The wrapper is validated and canonicalized while retaining `QName` prefixes
 /// and their bindings. Extension payloads remain inert and are never loaded,

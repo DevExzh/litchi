@@ -1160,7 +1160,8 @@ impl SourceImageDescriptor {
         self.bounds
     }
 
-    /// Relationship ID carried by the picture's `a:blip`.
+    /// Effective image relationship: the compatibility `a:blip`, or the
+    /// native SVG relationship when the picture has no raster fallback.
     #[must_use]
     pub fn relationship_id(&self) -> &str {
         &self.relationship_id
@@ -1178,8 +1179,8 @@ impl SourceImageDescriptor {
         self.target.is_external()
     }
 
-    /// Optional typed SVG resource paired with this raster compatibility
-    /// image.  The SVG payload remains deferred until
+    /// Optional typed SVG resource, with or without a raster compatibility
+    /// image. The SVG payload remains deferred until
     /// [`SourceSlide::read_svg_image`] is called.
     #[must_use]
     pub fn svg(&self) -> Option<&SourceSvgDescriptor> {
@@ -5013,31 +5014,31 @@ fn parse_picture_relationship_inner(
                                 reader.decoder(),
                                 reader.resolver(),
                             )?;
-                            let (id, external) = match (embed, link) {
-                                (Some(id), None) => (id, false),
-                                (None, Some(id)) => (id, true),
+                            let selected = match (embed, link) {
+                                (Some(id), None) => Some((id, false)),
+                                (None, Some(id)) => Some((id, true)),
                                 (Some(_), Some(_)) => {
                                     return Err(Error::Relationship(
                                         "picture a:blip cannot carry both r:embed and r:link"
                                             .into(),
                                     ));
                                 },
-                                (None, None) => {
-                                    return Err(Error::Relationship(
-                                        "picture a:blip is missing r:embed or r:link".into(),
-                                    ));
-                                },
+                                // Native vector-only pictures put the only
+                                // image reference in the SVG extension.
+                                (None, None) => None,
                             };
-                            if id.is_empty() {
-                                return Err(Error::Relationship(
-                                    "picture a:blip relationship ID is empty".into(),
-                                ));
+                            if let Some((id, external)) = selected {
+                                if id.is_empty() {
+                                    return Err(Error::Relationship(
+                                        "picture a:blip relationship ID is empty".into(),
+                                    ));
+                                }
+                                relationship = Some(PictureRelationship {
+                                    id,
+                                    external,
+                                    svg: None,
+                                });
                             }
-                            relationship = Some(PictureRelationship {
-                                id,
-                                external,
-                                svg: None,
-                            });
                         },
                         PictureNode::SourceRectangle if blip_fill_stage <= 1 => {
                             blip_fill_stage = 2;
@@ -5273,9 +5274,8 @@ fn parse_picture_relationship_inner(
             "picture stretch requires exactly one direct fillRect".into(),
         ));
     }
-    relationship.ok_or_else(|| {
-        Error::Relationship("picture descriptor is missing its a:blip relationship".into())
-    })
+    relationship
+        .ok_or_else(|| Error::Relationship("picture a:blip is missing r:embed or r:link".into()))
 }
 
 fn validate_blip_extension_attributes(
@@ -5361,9 +5361,11 @@ fn attach_svg_relationship(
             ));
         },
     };
-    let relationship = relationship.as_mut().ok_or_else(|| {
-        Error::Relationship("picture svgBlip appears before its a:blip relationship".into())
-    })?;
+    let relationship = relationship.get_or_insert_with(|| PictureRelationship {
+        id: id.clone(),
+        external,
+        svg: None,
+    });
     if relationship.svg.is_some() {
         return Err(Error::Relationship(
             "picture contains duplicate SVG relationships".into(),

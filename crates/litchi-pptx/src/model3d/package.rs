@@ -61,11 +61,16 @@ pub(crate) fn validate_replay_part(
 ) -> Result<()> {
     match part.content_type() {
         ct::PML_SLIDE => load_all(package, part_name, limits).map(drop),
-        MODEL_CONTENT_TYPE if part.blob().len() > limits.max_model_bytes() => Err(limit(
-            crate::error::CodecLimitKind::PayloadBytes,
-            part.blob().len(),
-            limits.max_model_bytes(),
-        )),
+        value
+            if super::is_model_content_type(value)
+                && part.blob().len() > limits.max_model_bytes() =>
+        {
+            Err(limit(
+                crate::error::CodecLimitKind::PayloadBytes,
+                part.blob().len(),
+                limits.max_model_bytes(),
+            ))
+        },
         value
             if validation::is_image_content_type(value)
                 && part.blob().len() > limits.max_preview_bytes() =>

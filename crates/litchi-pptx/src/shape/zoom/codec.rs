@@ -15,8 +15,8 @@ use quick_xml::reader::NsReader;
 use crate::{Error, Result};
 
 use super::model::{
-    ImageType, Item, Layout, Link, Owner, Percentage, Properties, Relationship, Section, Slide,
-    Summary, Target, Unknown, Zoom,
+    Host, ImageType, Item, Layout, Link, Owner, Percentage, Properties, Relationship, Section,
+    Slide, Summary, Target, Unknown, Zoom,
 };
 use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
@@ -523,7 +523,43 @@ fn parse_alternate(raw: &[u8], inherited: &HashMap<String, String>) -> Result<Zo
     let mut unknown_xml = Vec::new();
     for (position, choice) in choices.iter().enumerate() {
         let payload = choice.elements();
-        let kind = payload.first().and_then(|value| {
+        let mut framed = false;
+        let mut graphic_uri = None;
+        let value = match payload.first() {
+            Some(value)
+                if is_pml_node(value, "graphicFrame")
+                    && choice.requires.iter().any(|value| {
+                        matches!(value.as_str(), SECTION_NS | SLIDE_NS | SUMMARY_NS)
+                    }) =>
+            {
+                let graphics = value
+                    .children
+                    .iter()
+                    .filter(|child| is_dml_node(child, "graphic"))
+                    .collect::<Vec<_>>();
+                if graphics.len() != 1 {
+                    return Err(Error::Invalid(
+                        "zoom graphicFrame requires one graphic".into(),
+                    ));
+                }
+                let data = graphics[0]
+                    .children
+                    .iter()
+                    .filter(|child| is_dml_node(child, "graphicData"))
+                    .collect::<Vec<_>>();
+                if data.len() != 1 || data[0].children.len() != 1 {
+                    return Err(Error::Invalid(
+                        "zoom graphicData requires one payload".into(),
+                    ));
+                }
+                graphic_uri = data[0].unqualified("uri");
+                framed = true;
+                Some(&data[0].children[0])
+            },
+            Some(value) => Some(value),
+            None => None,
+        };
+        let kind = value.and_then(|value| {
             if value.is(SECTION_NS, "sectionZm") {
                 Some(0u8)
             } else if value.is(SLIDE_NS, "sldZm") {
@@ -548,18 +584,37 @@ fn parse_alternate(raw: &[u8], inherited: &HashMap<String, String>) -> Result<Zo
             1 => SLIDE_NS,
             _ => SUMMARY_NS,
         };
+        if framed && graphic_uri != Some(expected) {
+            return Err(Error::Invalid(
+                "zoom graphicData URI does not match its payload".into(),
+            ));
+        }
         if !choice.requires.iter().any(|value| value == expected) {
             return Err(Error::Invalid(
                 "zoom Choice Requires does not name its payload namespace".into(),
             ));
         }
-        if known.replace((kind, position, &payload[0])).is_some() {
+        let value =
+            value.ok_or_else(|| Error::Invalid("zoom Choice payload disappeared".into()))?;
+        let host = if framed {
+            Some(Host {
+                before: dom
+                    .slice(&(payload[0].range.start..value.range.start))?
+                    .to_vec(),
+                after: dom
+                    .slice(&(value.range.end..payload[0].range.end))?
+                    .to_vec(),
+            })
+        } else {
+            None
+        };
+        if known.replace((kind, position, value, host)).is_some() {
             return Err(Error::Invalid(
                 "zoom AlternateContent has multiple typed choices".into(),
             ));
         }
     }
-    let Some((kind, _position, payload)) = known else {
+    let Some((kind, _position, payload, host)) = known else {
         return Ok(Zoom::Unknown(Unknown { xml: raw.to_vec() }));
     };
     let fallback_children = fallback.elements();
@@ -577,11 +632,18 @@ fn parse_alternate(raw: &[u8], inherited: &HashMap<String, String>) -> Result<Zo
         )));
     }
     let fallback_xml = dom.slice(&fallback_children[0].range)?.to_vec();
-    match kind {
+    let mut value = match kind {
         0 => parse_section(&dom, payload, fallback_xml, unknown_xml),
         1 => parse_slide(&dom, payload, fallback_xml, unknown_xml),
         _ => parse_summary(&dom, payload, fallback_xml, unknown_xml),
+    }?;
+    match &mut value {
+        Zoom::Section(value) => value.host = host,
+        Zoom::Slide(value) => value.host = host,
+        Zoom::Summary(value) => value.host = host,
+        Zoom::Unknown(_) => {},
     }
+    Ok(value)
 }
 
 fn parse_section(
@@ -608,6 +670,7 @@ fn parse_section(
         expect_pml(&children[1], "extLst")?;
     }
     Ok(Zoom::Section(Section {
+        host: None,
         section_id,
         properties,
         fallback_xml,
@@ -650,6 +713,7 @@ fn parse_slide(
         expect_pml(&children[1], "extLst")?;
     }
     Ok(Zoom::Slide(Slide {
+        host: None,
         slide_id,
         creation_id,
         properties,
@@ -731,6 +795,7 @@ fn parse_summary(
         ));
     }
     Ok(Zoom::Summary(Summary {
+        host: None,
         items,
         layout,
         fallback_xml,
@@ -753,7 +818,11 @@ fn parse_object(
     let properties = children
         .first()
         .ok_or_else(|| Error::Invalid("zoom object is missing zmPr".into()))?;
-    expect(properties, MAIN, "zmPr")?;
+    if !properties.is(object_namespace, "zmPr") && !properties.is(MAIN, "zmPr") {
+        return Err(Error::Invalid(
+            "zoom object has an invalid zmPr namespace".into(),
+        ));
+    }
     let properties = parse_properties(dom, properties)?;
     if children.len() == 2 {
         expect_pml(&children[1], "extLst")?;
@@ -1149,10 +1218,7 @@ pub(crate) fn validate_slide_id(value: u32) -> Result<()> {
 }
 
 pub(crate) fn parse_blip_relationship(xml: &[u8]) -> Result<Option<Relationship>> {
-    let mut inherited = HashMap::new();
-    inherited.insert("p166".into(), MAIN.into());
-    inherited.insert("a".into(), DML.into());
-    inherited.insert("r".into(), REL.into());
+    let inherited = fragment_namespaces();
     let dom = parse_dom(xml, &inherited)?;
     let root = dom
         .root
@@ -1291,8 +1357,7 @@ fn validate_zoom(value: &Zoom) -> Result<()> {
                     maximum: MAX_UNKNOWN_BYTES,
                 });
             }
-            let mut inherited = HashMap::new();
-            inherited.insert("mc".into(), MC.into());
+            let inherited = fragment_namespaces();
             let dom = parse_dom(&value.xml, &inherited)?;
             let alternate = dom
                 .root
@@ -1320,14 +1385,15 @@ fn validate_properties(value: &Properties) -> Result<()> {
         });
     }
     let parsed = parse_blip_relationship(&value.blip_fill_xml)?;
-    if parsed != value.image {
+    // Resolved targets are package context, not attributes of blipFill.
+    if parsed.as_ref().map(|image| (image.id(), image.link()))
+        != value.image.as_ref().map(|image| (image.id(), image.link()))
+    {
         return Err(Error::Invalid(
             "zoom image relationship metadata diverges from blipFill XML".into(),
         ));
     }
-    let mut inherited = HashMap::new();
-    inherited.insert("p166".into(), MAIN.into());
-    inherited.insert("a".into(), DML.into());
+    let inherited = fragment_namespaces();
     let dom = parse_dom(&value.shape_properties_xml, &inherited)?;
     let root = dom
         .root
@@ -1350,8 +1416,7 @@ fn validate_fallback(xml: &[u8], local: &str) -> Result<()> {
             maximum: MAX_UNKNOWN_BYTES,
         });
     }
-    let mut inherited = HashMap::new();
-    inherited.insert("p".into(), PML.into());
+    let inherited = fragment_namespaces();
     let dom = parse_dom(xml, &inherited)?;
     let node = dom
         .root
@@ -1375,8 +1440,7 @@ fn validate_optional_extension(xml: Option<&[u8]>) -> Result<()> {
             maximum: MAX_UNKNOWN_BYTES,
         });
     }
-    let mut inherited = HashMap::new();
-    inherited.insert("p".into(), PML.into());
+    let inherited = fragment_namespaces();
     let dom = parse_dom(xml, &inherited)?;
     let node = dom
         .root
@@ -1384,6 +1448,25 @@ fn validate_optional_extension(xml: Option<&[u8]>) -> Result<()> {
         .first()
         .ok_or_else(|| Error::Invalid("zoom extension XML has no root".into()))?;
     expect_pml(node, "extLst")
+}
+
+/// The canonical namespace context used by detached fragment constructors
+/// and the zoom writer. Native fragments can reference p/a/r inherited from
+/// the slide; declarations on the fragment itself still override these.
+fn fragment_namespaces() -> HashMap<String, String> {
+    [
+        ("p", PML),
+        ("a", DML),
+        ("r", REL),
+        ("mc", MC),
+        ("p166", MAIN),
+        ("psez", SECTION_NS),
+        ("pslz", SLIDE_NS),
+        ("psuz", SUMMARY_NS),
+    ]
+    .into_iter()
+    .map(|(prefix, uri)| (prefix.to_owned(), uri.to_owned()))
+    .collect()
 }
 
 fn validate_unknown<'a>(values: impl Iterator<Item = &'a Vec<u8>>) -> Result<()> {
@@ -1418,23 +1501,27 @@ pub(crate) fn write_zoom(value: &Zoom, owner: &Owner) -> Result<Vec<u8>> {
     match value {
         Zoom::Section(value) => {
             write_unknown_choices(&mut xml, &value.unknown_xml)?;
-            xml.push_str(
-                "<mc:Choice Requires=\"psez\"><psez:sectionZm><psez:sectionZmObj sectionId=\"",
-            );
+            xml.push_str("<mc:Choice Requires=\"psez\">");
+            write_host(&mut xml, &value.host, true)?;
+            xml.push_str("<psez:sectionZm><psez:sectionZmObj sectionId=\"");
             xml.push_str(&escape_xml(&value.section_id));
             xml.push_str("\">");
-            write_properties(&mut xml, &value.properties)?;
+            write_properties(&mut xml, &value.properties, "psez")?;
             if let Some(extension) = &value.extension_xml {
                 push_utf8(&mut xml, extension, "section zoom extension")?;
             }
-            xml.push_str("</psez:sectionZmObj></psez:sectionZm></mc:Choice>");
+            xml.push_str("</psez:sectionZmObj></psez:sectionZm>");
+            write_host(&mut xml, &value.host, false)?;
+            xml.push_str("</mc:Choice>");
             write_fallback(&mut xml, &value.fallback_xml)?;
         },
         Zoom::Slide(value) => {
             write_unknown_choices(&mut xml, &value.unknown_xml)?;
+            xml.push_str("<mc:Choice Requires=\"pslz\">");
+            write_host(&mut xml, &value.host, true)?;
             write!(
                 &mut xml,
-                "<mc:Choice Requires=\"pslz\"><pslz:sldZm><pslz:sldZmObj sldId=\"{}\"",
+                "<pslz:sldZm><pslz:sldZmObj sldId=\"{}\"",
                 value.slide_id
             )
             .map_err(|error| Error::Xml(error.to_string()))?;
@@ -1443,16 +1530,20 @@ pub(crate) fn write_zoom(value: &Zoom, owner: &Owner) -> Result<Vec<u8>> {
                     .map_err(|error| Error::Xml(error.to_string()))?;
             }
             xml.push('>');
-            write_properties(&mut xml, &value.properties)?;
+            write_properties(&mut xml, &value.properties, "pslz")?;
             if let Some(extension) = &value.extension_xml {
                 push_utf8(&mut xml, extension, "slide zoom extension")?;
             }
-            xml.push_str("</pslz:sldZmObj></pslz:sldZm></mc:Choice>");
+            xml.push_str("</pslz:sldZmObj></pslz:sldZm>");
+            write_host(&mut xml, &value.host, false)?;
+            xml.push_str("</mc:Choice>");
             write_fallback(&mut xml, &value.fallback_xml)?;
         },
         Zoom::Summary(value) => {
             write_unknown_choices(&mut xml, &value.unknown_xml)?;
-            xml.push_str("<mc:Choice Requires=\"psuz\"><psuz:summaryZm>");
+            xml.push_str("<mc:Choice Requires=\"psuz\">");
+            write_host(&mut xml, &value.host, true)?;
+            xml.push_str("<psuz:summaryZm>");
             for item in &value.items {
                 xml.push_str("<psuz:summaryZmObj sectionId=\"");
                 xml.push_str(&escape_xml(&item.section_id));
@@ -1484,7 +1575,7 @@ pub(crate) fn write_zoom(value: &Zoom, owner: &Owner) -> Result<Vec<u8>> {
                         .map_err(|error| Error::Xml(error.to_string()))?;
                 }
                 xml.push('>');
-                write_properties(&mut xml, &item.properties)?;
+                write_properties(&mut xml, &item.properties, "psuz")?;
                 if let Some(extension) = &item.extension_xml {
                     push_utf8(&mut xml, extension, "summary zoom item extension")?;
                 }
@@ -1497,7 +1588,9 @@ pub(crate) fn write_zoom(value: &Zoom, owner: &Owner) -> Result<Vec<u8>> {
             if let Some(extension) = &value.extension_xml {
                 push_utf8(&mut xml, extension, "summary zoom extension")?;
             }
-            xml.push_str("</psuz:summaryZm></mc:Choice>");
+            xml.push_str("</psuz:summaryZm>");
+            write_host(&mut xml, &value.host, false)?;
+            xml.push_str("</mc:Choice>");
             write_fallback(&mut xml, &value.fallback_xml)?;
         },
         Zoom::Unknown(value) => {
@@ -1515,8 +1608,21 @@ pub(crate) fn write_zoom(value: &Zoom, owner: &Owner) -> Result<Vec<u8>> {
     Ok(xml.into_bytes())
 }
 
-fn write_properties(xml: &mut String, value: &Properties) -> Result<()> {
-    xml.push_str("<p166:zmPr id=\"");
+fn write_host(xml: &mut String, host: &Option<Host>, before: bool) -> Result<()> {
+    if let Some(host) = host {
+        push_utf8(
+            xml,
+            if before { &host.before } else { &host.after },
+            "zoom graphic frame",
+        )?;
+    }
+    Ok(())
+}
+
+fn write_properties(xml: &mut String, value: &Properties, prefix: &str) -> Result<()> {
+    xml.push('<');
+    xml.push_str(prefix);
+    xml.push_str(":zmPr id=\"");
     xml.push_str(&escape_xml(&value.id));
     xml.push('"');
     if !value.return_to_parent {
@@ -1536,7 +1642,9 @@ fn write_properties(xml: &mut String, value: &Properties) -> Result<()> {
     xml.push('>');
     push_utf8(xml, &value.blip_fill_xml, "zoom blipFill")?;
     push_utf8(xml, &value.shape_properties_xml, "zoom spPr")?;
-    xml.push_str("</p166:zmPr>");
+    xml.push_str("</");
+    xml.push_str(prefix);
+    xml.push_str(":zmPr>");
     Ok(())
 }
 

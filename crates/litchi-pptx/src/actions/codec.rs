@@ -212,7 +212,9 @@ fn maybe_push(
 ) -> Result<()> {
     let trigger = if is_drawingml_name(namespace, element.name(), b"hlinkClick") {
         Trigger::Click
-    } else if is_drawingml_name(namespace, element.name(), b"hlinkHover") {
+    } else if is_drawingml_name(namespace, element.name(), b"hlinkHover")
+        || is_drawingml_name(namespace, element.name(), b"hlinkMouseOver")
+    {
         Trigger::Hover
     } else {
         return Ok(());

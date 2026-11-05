@@ -130,7 +130,7 @@ editor, playback, or native application behavior.
 
 ## Native Microsoft PowerPoint regressions
 
-`tests/microsoft_office_native.rs` covers all nine unencrypted PPT/PPS decks at
+`tests/microsoft_office_native.rs` covers all ten unencrypted PPT/PPS/POT decks at
 slide/shape materialization scope, including zero dropped-shape repairs. Focused
 checks cover grouped drawings, twelve native table cells, image slot counts and
 exact preview hashes, media/OLE metadata, custom shows, source edits and inverses,

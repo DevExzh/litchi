@@ -25,7 +25,11 @@ pub const GRAPHIC_URI: &str = litchi_drawingml::model3d::NAMESPACE;
 pub(crate) const MODEL_RELATIONSHIP: &str =
     "http://schemas.microsoft.com/office/2017/06/relationships/model3d";
 /// Content type used by Office for an embedded glTF binary model.
-pub(crate) const MODEL_CONTENT_TYPE: &str = "model/gltf-binary";
+pub(crate) const MODEL_CONTENT_TYPE: &str = "model/gltf.binary";
+
+pub(crate) fn is_model_content_type(value: &str) -> bool {
+    matches!(value, MODEL_CONTENT_TYPE | "model/gltf-binary")
+}
 
 pub(crate) const MAX_SLIDE_XML_BYTES: usize = 64 * 1024 * 1024;
 pub(crate) const MAX_MODELS_PER_SLIDE: usize = 4_096;
