@@ -339,10 +339,10 @@ impl<'a> Edit<'a> {
         budget
             .charge_selection_scan(self.source, 1)
             .map_err(map_chart_error)?;
-        // A new graph references the theme's stylesheet and caption
+        // A new graph references the theme's stylesheet and the label's
         // paragraph style; register them on the slide component first.
         let registered = if self.selection.storage_identifier.is_none() && self.after.is_some() {
-            register_dependencies(self.source, &self.selection)?
+            register_dependencies(self.source, &self.selection, self.text)?
         } else {
             None
         };
@@ -742,7 +742,7 @@ impl Package {
             .charge_validation_scan(&candidate, 1)
             .map_err(map_chart_error)?;
         let registered = if patch.selection.storage_identifier.is_none() && patch.after.is_some() {
-            register_dependencies(self, &patch.selection)?
+            register_dependencies(self, &patch.selection, patch.text)?
         } else {
             None
         };
@@ -800,8 +800,8 @@ fn shape_position(
     })
 }
 
-/// Register the new caption graph's foreign theme dependencies (stylesheet
-/// and caption paragraph style) as external references of the image's
+/// Register the new label graph's foreign theme dependencies (stylesheet
+/// and the label's paragraph style) as external references of the image's
 /// slide component, returning the registered package; `None` when every
 /// dependency is already registered. The registration leaves save tokens to
 /// the caption transaction that follows, which rewrites the same component.
@@ -809,9 +809,14 @@ fn shape_position(
 fn register_dependencies(
     source: &Package,
     selection: &super::slide_movie_caption::MovieCaptionSelection,
+    text: Text,
 ) -> Result<Option<Package>, Error> {
+    let label = match text {
+        Text::Title => litchi_iwa_style::caption::Label::Title,
+        Text::Caption => litchi_iwa_style::caption::Label::Caption,
+    };
     let dependencies =
-        super::slide_chart_caption::caption_dependencies(source).map_err(map_chart_error)?;
+        super::slide_chart_caption::caption_dependencies(source, label).map_err(map_chart_error)?;
     let mut workspace =
         super::structure::workspace::Workspace::new(source).map_err(|_| Error::InvalidSource)?;
     let slide_component = workspace

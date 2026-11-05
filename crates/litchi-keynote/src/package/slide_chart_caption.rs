@@ -85,6 +85,15 @@ pub(super) enum CaptionEdgeKind {
 }
 
 impl CaptionEdgeKind {
+    /// The drawable label the edge holds.
+    const fn label(self) -> litchi_iwa_style::caption::Label {
+        if self.is_title() {
+            litchi_iwa_style::caption::Label::Title
+        } else {
+            litchi_iwa_style::caption::Label::Caption
+        }
+    }
+
     /// Whether the edge belongs to a media drawable (movie or image).
     const fn is_media(self) -> bool {
         !matches!(self, Self::Chart)
@@ -1966,7 +1975,7 @@ pub(super) fn rewrite_caption_graph_operation_with_budget(
         if creating {
             let first = first_identifier;
             let ids = CaptionGraphIds::allocate(first)?;
-            let theme = caption_theme(source)?;
+            let theme = caption_theme(source, edge_kind.label())?;
             prove_caption_dependencies(
                 source,
                 &metadata_facts,
@@ -2776,11 +2785,7 @@ fn caption_graph_objects(
         )
         .with_max_allocations(budget.remaining_allocations());
     use litchi_iwa_style::caption;
-    let label = if edge_kind.is_title() {
-        caption::Label::Title
-    } else {
-        caption::Label::Caption
-    };
+    let label = edge_kind.label();
     budget.charge_allocation(1, 0)?;
     let (objects, report) = caption::graph_objects(
         caption::GraphIds {
@@ -2816,14 +2821,22 @@ struct CaptionTheme {
     language: Option<String>,
 }
 
-/// The theme objects a new caption graph references (stylesheet and caption
-/// paragraph style), for owners that register them before creation.
-pub(super) fn caption_dependencies(package: &Package) -> Result<[u64; 2], Error> {
-    let theme = caption_theme(package)?;
+/// The theme objects a new `label` graph references (stylesheet and the
+/// label's paragraph style), for owners that register them before creation.
+pub(super) fn caption_dependencies(
+    package: &Package,
+    label: litchi_iwa_style::caption::Label,
+) -> Result<[u64; 2], Error> {
+    let theme = caption_theme(package, label)?;
     Ok([theme.stylesheet, theme.paragraph_style])
 }
 
-fn caption_theme(package: &Package) -> Result<CaptionTheme, Error> {
+/// The stylesheet, paragraph style and language of a new `label` graph
+/// (`caption::theme_label_paragraph_style`, record 0435).
+fn caption_theme(
+    package: &Package,
+    label: litchi_iwa_style::caption::Label,
+) -> Result<CaptionTheme, Error> {
     let limits = package.wire_limits().map_err(map_wire_error)?;
     let document_candidates = package
         .state
@@ -2892,7 +2905,13 @@ fn caption_theme(package: &Package) -> Result<CaptionTheme, Error> {
     let theme_super_view = WireView::parse(theme_super, limits).map_err(map_wire_error)?;
     let presets = unique_payload_field(&theme_super_view, 210)?.ok_or(Error::InvalidSource)?;
     let presets_view = WireView::parse(presets, limits).map_err(map_wire_error)?;
-    let paragraph_style = first_reference_identifier(&presets_view, 1, limits)?;
+    // Validates every preset reference; the first is the title's style.
+    first_reference_identifier(&presets_view, 1, limits)?;
+    let paragraph_style =
+        litchi_iwa_style::caption::theme_label_paragraph_style(theme_super, label, |identifier| {
+            package.object(identifier)
+        })
+        .ok_or(Error::InvalidSource)?;
     let document_super = unique_payload_field(&document_view, 3)?.ok_or(Error::InvalidSource)?;
     let document_super_view = WireView::parse(document_super, limits).map_err(map_wire_error)?;
     let language = match unique_payload_field(&document_super_view, 3)? {
