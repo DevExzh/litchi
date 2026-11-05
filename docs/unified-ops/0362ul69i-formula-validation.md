@@ -17,7 +17,7 @@ The final Formula all-target and focused boundary lane passed under offline,
 locked, one-job, one-test-thread, debug-zero, incremental-zero, decimal
 19,000,000,000-byte live and 20,000,000,000-byte hard target guards:
 
-    /home/zhuhe/code/litchi-worktrees/.coord/formula-raw-policy-328fe19328/state/10-formula-final-validation-attempt-formula-final-validation.log
+    (deleted-coord-artifact)/10-formula-final-validation-attempt-formula-final-validation.log
     33241 bytes, SHA-256 902029b946632a680f38f205239469aa19d4436c61a15a68697033e132599f17
 
 The all-target command reported 348 library tests and nine LaTeX integration
@@ -32,7 +32,7 @@ before the final Clippy-only source/test cleanup: the production cleanup
 removes an identical MTEF charge branch and the test cleanup replaces two
 single-element clones with `from_ref`.
 
-    /home/zhuhe/code/litchi-worktrees/.coord/formula-raw-policy-328fe19328/state/06-formula-affected-consumers-attempt-affected-consumers.log
+    (deleted-coord-artifact)/06-formula-affected-consumers-attempt-affected-consumers.log
     612157 bytes, SHA-256 e2edffbd960a553dd8186c615374a222c9df119b477ea7de05116c9c58f9385e
 
 The lane emitted 687 passing test-result blocks and no compiler or test
@@ -43,7 +43,7 @@ The final strict-Clippy lane passed all seven scoped commands: Formula,
 DOC, DOCX, ops `doc,formula`, ops `docx,formula`, facade `doc,formula`, and
 facade `docx,formula`, each with `--all-targets -D warnings`:
 
-    /home/zhuhe/code/litchi-worktrees/.coord/formula-raw-policy-328fe19328/state/09-formula-affected-clippy-rerun2-attempt-affected-clippy-rerun2.log
+    (deleted-coord-artifact)/09-formula-affected-clippy-rerun2-attempt-affected-clippy-rerun2.log
     0 bytes, SHA-256 e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
 
 The Clippy target trace is 651 bytes, SHA-256
@@ -60,9 +60,9 @@ traces; no contemporaneous JSON rows existed, and none has been reconstructed.
 To close that evidence gap, a fresh slot-1 run persisted its manifest and each
 `run_step` return while reusing the compiled target:
 
-    /home/zhuhe/code/litchi-worktrees/.coord/formula-raw-policy-0362ul69-final/manifest.json
+    (deleted-coord-artifact)/manifest.json
     2768 bytes, SHA-256 ca0524a1551a3aea830cb20e9d048499f6e9dcdd5856d35676e18847d35e8300
-    /home/zhuhe/code/litchi-worktrees/.coord/formula-raw-policy-0362ul69-final/rows.json
+    (deleted-coord-artifact)/rows.json
     21236 bytes, SHA-256 c6d289bb01b4aa1ed175dc1b8690d27eed400c7b9c2bbaf59acf013b735860b6
 
 The persisted rows are `row-00.json` (4718 bytes, SHA-256

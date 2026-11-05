@@ -79,7 +79,7 @@ wrong-baseline no-mutation, and pre-existing-untracked-fixture rejection.
 The actual CLI was rerun against a fresh sparse checkout after these guards:
 
 ```text
-receipt: /home/zhuhe/code/litchi-worktrees/.coord/ppt-lazy-native-compile-20261024/preparation-sparse-cli.json
+receipt: (deleted-coord-artifact)/preparation-sparse-cli.json
 receipt SHA-256: 64051f07b614270cfb1769ecbc9752be6a16c7e6efb63daf79c0a77fa264c3fe
 baseline: 8779d059add6c90c74552801372c44f770db9f0f / 27e0b56e2f8e3ab11b00c119604b5636f358dfe2
 candidate: fb262b0bbf5160534ca5e87c63727df823a794bc / cb0965bc806b3f7c7a38f3bc340499039bf7e726
@@ -97,8 +97,8 @@ build or correctness run. Both commands were actual release builds, not
 
 | endpoint | source ref/tree | command | exit | log (bytes; SHA-256) |
 | --- | --- | --- | ---: | --- |
-| baseline | `8779d059add6c90c74552801372c44f770db9f0f` / `27e0b56e2f8e3ab11b00c119604b5636f358dfe2` | `cargo build --release --offline --locked --manifest-path tools/perf-baseline/Cargo.toml --bin ppt_lazy_native` | 101 | `/home/zhuhe/code/litchi-worktrees/.coord/ppt-lazy-native-compile-20261024/logs/baseline-8779-normal-build.log` (10,936; `db4d630ce70d67ab589b7c6cf4818bacbd4df5ef8904c532ffe6b003e3b77ceb`) |
-| old candidate | `4fbfe1205a2a9c3842cd2a439323cb98d41d7265` / `4d7de85cb49f42189b703c6cc0267997b01bfffa` | `cargo build --release --offline --locked --manifest-path tools/perf-baseline/Cargo.toml --bin ppt_lazy_native` | 101 | `/home/zhuhe/code/litchi-worktrees/.coord/ppt-lazy-native-compile-20261024/logs/candidate-4fb-normal-build.log` (9,995; `281ca113aeb9231dfab01f846d06d4865cfbea9a185e5d342b721801eb224a0c`) |
+| baseline | `8779d059add6c90c74552801372c44f770db9f0f` / `27e0b56e2f8e3ab11b00c119604b5636f358dfe2` | `cargo build --release --offline --locked --manifest-path tools/perf-baseline/Cargo.toml --bin ppt_lazy_native` | 101 | `(deleted-coord-artifact)/baseline-8779-normal-build.log` (10,936; `db4d630ce70d67ab589b7c6cf4818bacbd4df5ef8904c532ffe6b003e3b77ceb`) |
+| old candidate | `4fbfe1205a2a9c3842cd2a439323cb98d41d7265` / `4d7de85cb49f42189b703c6cc0267997b01bfffa` | `cargo build --release --offline --locked --manifest-path tools/perf-baseline/Cargo.toml --bin ppt_lazy_native` | 101 | `(deleted-coord-artifact)/candidate-4fb-normal-build.log` (9,995; `281ca113aeb9231dfab01f846d06d4865cfbea9a185e5d342b721801eb224a0c`) |
 
 The baseline log ends at the missing default fixture. The old candidate log
 ends at `litchi-doc/src/package/model.rs:730`, where the pre-merge source
@@ -114,7 +114,7 @@ failed build, not relabelled as a qualification result:
 
 | endpoint | source ref/tree | command | exit | log (bytes; SHA-256) |
 | --- | --- | --- | ---: | --- |
-| baseline retry r2 | `8779d059add6c90c74552801372c44f770db9f0f` / `27e0b56e2f8e3ab11b00c119604b5636f358dfe2` | `cargo build --release --offline --locked --manifest-path tools/perf-baseline/Cargo.toml --bin ppt_lazy_native` | 101 | `/home/zhuhe/code/litchi-worktrees/.coord/ppt-lazy-native-compile-20261024/logs/baseline-8779-r2-normal-build.log` (12,637; `d3727cdaed9fc186df484f5434b5fb72c9455cf34a1a93db4094625e187942b4`) |
+| baseline retry r2 | `8779d059add6c90c74552801372c44f770db9f0f` / `27e0b56e2f8e3ab11b00c119604b5636f358dfe2` | `cargo build --release --offline --locked --manifest-path tools/perf-baseline/Cargo.toml --bin ppt_lazy_native` | 101 | `(deleted-coord-artifact)/baseline-8779-r2-normal-build.log` (12,637; `d3727cdaed9fc186df484f5434b5fb72c9455cf34a1a93db4094625e187942b4`) |
 
 Its diagnostics identified the five additional tracked inputs now bound by
 the preparer: `ppt_with_embeded.ppt`, `video.ppt`, `bug61881.ppt`, `54016.xls`
@@ -148,7 +148,7 @@ candidate adapter was built at temporary commit
 `cb99f0c28121626e1e110ed803674ee2021c5c73`), which is the local-lock
 migration `fb262b0bbf5160534ca5e87c63727df823a794bc` plus that probe fix.
 The final preparation receipt is retained outside the repository at
-`/home/zhuhe/code/litchi-worktrees/.coord/ppt-lazy-native-compile-20261024/preparation-5067a9eac0.json`
+`(deleted-coord-artifact)/preparation-5067a9eac0.json`
 (12,580 bytes; SHA-256
 `0bbb366e920949da8f212b7a0bb2ad1c4499054cd810f5b64605078f58e573a9`).
 It binds the baseline ref/tree and the candidate ref/tree above, the
@@ -181,8 +181,8 @@ external targets below the 20-GB ceiling. The retained identities are:
 
 | endpoint | binary (bytes; SHA-256) | build log (bytes; SHA-256) | target bytes |
 | --- | --- | --- | ---: |
-| baseline | 12,130,968; `ad031ccabb073b3a719f0985088f43ee2ab9a295c9e52594a70841d8e2090a1f` | `/home/zhuhe/code/litchi-worktrees/.coord/ppt-lazy-native-compile-20261024/logs/baseline-8779-r4-probe-fix-build.log` (579; `8c584eefe62f7a91620aa6167fdbe62e18abee0e26a9200049ae6a1a3ffa3e20`) | 1,314,509,577 |
-| candidate | 12,289,336; `a62114de50bc25eaf4ba5682c632940efe3a97a1d7140dcb323105c4b1981a61` | `/home/zhuhe/code/litchi-worktrees/.coord/ppt-lazy-native-compile-20261024/logs/candidate-5067-r2-probe-fix-build.log` (224; `bd6898ccea415c2a13310fea6fe119868092b866a1d73db9e9e8190fd5a39d78`) | 1,317,080,259 |
+| baseline | 12,130,968; `ad031ccabb073b3a719f0985088f43ee2ab9a295c9e52594a70841d8e2090a1f` | `(deleted-coord-artifact)/baseline-8779-r4-probe-fix-build.log` (579; `8c584eefe62f7a91620aa6167fdbe62e18abee0e26a9200049ae6a1a3ffa3e20`) | 1,314,509,577 |
+| candidate | 12,289,336; `a62114de50bc25eaf4ba5682c632940efe3a97a1d7140dcb323105c4b1981a61` | `(deleted-coord-artifact)/candidate-5067-r2-probe-fix-build.log` (224; `bd6898ccea415c2a13310fea6fe119868092b866a1d73db9e9e8190fd5a39d78`) | 1,317,080,259 |
 
 The normal binaries were then invoked separately with exactly
 `--mode verify`. Both exited 0. Their 12,094-byte reports are retained at

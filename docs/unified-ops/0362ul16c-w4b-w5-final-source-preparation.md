@@ -10,10 +10,10 @@ receipt is [results/0362ul16c/source-preparation.json](results/0362ul16c/source-
 The fresh external source roots are:
 
 ```text
-W4b before: /home/zhuhe/code/litchi-worktrees/.coord/native-w4b-w5-final/sources/w4b-before
-W4b after:  /home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/full-gate-c796d0acc2/source
-W5 before:  /home/zhuhe/code/litchi-worktrees/.coord/native-w4b-w5-final/sources/w5-before
-W5 after:   /home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/full-gate-c796d0acc2/source-gate
+W4b before: (deleted-coord-artifact)
+W4b after:  (deleted-coord-artifact)
+W5 before:  (deleted-coord-artifact)
+W5 after:   (deleted-coord-artifact)
 ```
 
 W4b before is commit `be644568846ad2fcf0622386f2f2438d0eac21c0` with the
@@ -38,12 +38,12 @@ are allow-listed by the manifests; no candidate source path is dirty.
 ## Locks, manifests and source identity
 
 The source-preparation receipt is external at
-`/home/zhuhe/code/litchi-worktrees/.coord/native-w4b-w5-final/receipts/source-preparation-c796.json`
+`(deleted-coord-artifact)/source-preparation-c796.json`
 (6,532 bytes, SHA-256
 `dcd01ffdb8d1947e9e5f57e94d48b46b1aeae8372b633af379599a4110d88639`). It
 was produced by the current preparer, not by treating the W4b tree object as a
 commit. The static source-identity receipt is external at
-`/home/zhuhe/code/litchi-worktrees/.coord/native-w4b-w5-final/receipts/manifest-source-validation-c796.json`
+`(deleted-coord-artifact)/manifest-source-validation-c796.json`
 (33,283 bytes, SHA-256
 `1d47716fdba5029a0e791bf66abf7fb771a27daf7f13821ceb43c6e9f8c9141d`). It
 passes `load_manifest`, the workload checks, Cargo argv normalization,
@@ -73,7 +73,7 @@ round count of 7, and the same ABBA order. The correctness analyzers are the
 tracked scripts from the selected candidate sources.
 
 The protocol command passed all 41 tests; its external log is
-`/home/zhuhe/code/litchi-worktrees/.coord/native-w4b-w5-final/receipts/protocol-tests.log`
+`(deleted-coord-artifact)/protocol-tests.log`
 (332 bytes, SHA-256
 `744067b4ee12d09a8353ced5d9c89d19608ab311e78548ad08b07d2ce503c708`). No
 Cargo build, executable probe/correctness run, or quiet-host ABBA run was

@@ -50,7 +50,7 @@ curated rows where the evidence stayed outside the repository:
 | 0323 | `ppt_elements_probe`, two runs | 14 | 4 |
 | 0324 | `doc_parts_bench` trials, `doc_view_regression` | 20 | 8 |
 | 0325 | `ooxml_followups_bench`, the read-regression probe | 25 | 3 |
-| 0327 | curated from §5 (callgrind; evidence in `.coord/xls-ods-features/bench/`) | 2 | 2 |
+| 0327 | curated from §5 (callgrind; evidence in `(deleted-coord-artifact)`) | 2 | 2 |
 | 0328 | `odf_rtf_parts_bench` trials, `odf_rtf_view_regression` summary | 32 | 14 |
 | 0329 | iWork after legs | 56 | 1 |
 | 0330 | the coalesced XLSX batch, before/after | 1 | 0 |

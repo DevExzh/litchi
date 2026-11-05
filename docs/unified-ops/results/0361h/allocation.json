@@ -4,12 +4,12 @@
     {
       "candidate": "base",
       "manifest": {
-        "path": "/home/zhuhe/code/litchi-worktrees/.coord/char-style-0361h/allocation-base/manifest.json",
+        "path": "(deleted-coord-artifact)/manifest.json",
         "bytes": 4943,
         "sha256": "c455c9fff951e8f0c47baaed79538d56fabcd067c1cacbfa1c04d09abacde6b0"
       },
       "binary": {
-        "path": "/home/zhuhe/code/litchi-worktrees/.coord/char-style-0361h/build-base/char-style-allocation",
+        "path": "(deleted-coord-artifact)/char-style-allocation",
         "bytes": 2244440,
         "sha256": "f8be7484ea4f3a80abfac227708c826baacd537eef7a047ecdc1342038219826"
       },
@@ -18,7 +18,7 @@
       "rows": [
         {
           "command": [
-            "/home/zhuhe/code/litchi-worktrees/.coord/char-style-0361h/build-base/char-style-allocation",
+            "(deleted-coord-artifact)",
             "runs",
             "2",
             "100"
@@ -35,7 +35,7 @@
         },
         {
           "command": [
-            "/home/zhuhe/code/litchi-worktrees/.coord/char-style-0361h/build-base/char-style-allocation",
+            "(deleted-coord-artifact)",
             "styles",
             "2",
             "100"
@@ -52,7 +52,7 @@
         },
         {
           "command": [
-            "/home/zhuhe/code/litchi-worktrees/.coord/char-style-0361h/build-base/char-style-allocation",
+            "(deleted-coord-artifact)",
             "restyle",
             "2",
             "100"
@@ -69,7 +69,7 @@
         },
         {
           "command": [
-            "/home/zhuhe/code/litchi-worktrees/.coord/char-style-0361h/build-base/char-style-allocation",
+            "(deleted-coord-artifact)",
             "stylesheet",
             "2",
             "100"
@@ -86,7 +86,7 @@
         },
         {
           "command": [
-            "/home/zhuhe/code/litchi-worktrees/.coord/char-style-0361h/build-base/char-style-allocation",
+            "(deleted-coord-artifact)",
             "runs",
             "64",
             "100"
@@ -103,7 +103,7 @@
         },
         {
           "command": [
-            "/home/zhuhe/code/litchi-worktrees/.coord/char-style-0361h/build-base/char-style-allocation",
+            "(deleted-coord-artifact)",
             "styles",
             "64",
             "100"
@@ -120,7 +120,7 @@
         },
         {
           "command": [
-            "/home/zhuhe/code/litchi-worktrees/.coord/char-style-0361h/build-base/char-style-allocation",
+            "(deleted-coord-artifact)",
             "restyle",
             "64",
             "100"
@@ -137,7 +137,7 @@
         },
         {
           "command": [
-            "/home/zhuhe/code/litchi-worktrees/.coord/char-style-0361h/build-base/char-style-allocation",
+            "(deleted-coord-artifact)",
             "stylesheet",
             "64",
             "100"
@@ -154,7 +154,7 @@
         },
         {
           "command": [
-            "/home/zhuhe/code/litchi-worktrees/.coord/char-style-0361h/build-base/char-style-allocation",
+            "(deleted-coord-artifact)",
             "variation",
             "64",
             "100"
@@ -171,7 +171,7 @@
         },
         {
           "command": [
-            "/home/zhuhe/code/litchi-worktrees/.coord/char-style-0361h/build-base/char-style-allocation",
+            "(deleted-coord-artifact)",
             "properties",
             "64",
             "100"
@@ -188,7 +188,7 @@
         },
         {
           "command": [
-            "/home/zhuhe/code/litchi-worktrees/.coord/char-style-0361h/build-base/char-style-allocation",
+            "(deleted-coord-artifact)",
             "parent",
             "64",
             "100"
@@ -208,12 +208,12 @@
     {
       "candidate": "v2",
       "manifest": {
-        "path": "/home/zhuhe/code/litchi-worktrees/.coord/char-style-0361h/allocation-v2/manifest.json",
+        "path": "(deleted-coord-artifact)/manifest.json",
         "bytes": 8191,
         "sha256": "09bd9bdf8af01f20ac3f850f5d747d829bf4d72f51fcf26d16bb06ecbbc41935"
       },
       "binary": {
-        "path": "/home/zhuhe/code/litchi-worktrees/.coord/char-style-0361h/build-v2/char-style-allocation",
+        "path": "(deleted-coord-artifact)/char-style-allocation",
         "bytes": 2252600,
         "sha256": "d71b8921c3a8df839545a90979d32e0d5b6106306f8399cdaac2fd9926acd9af"
       },
@@ -222,7 +222,7 @@
       "rows": [
         {
           "command": [
-            "/home/zhuhe/code/litchi-worktrees/.coord/char-style-0361h/build-v2/char-style-allocation",
+            "(deleted-coord-artifact)",
             "runs",
             "2",
             "100"
@@ -239,7 +239,7 @@
         },
         {
           "command": [
-            "/home/zhuhe/code/litchi-worktrees/.coord/char-style-0361h/build-v2/char-style-allocation",
+            "(deleted-coord-artifact)",
             "styles",
             "2",
             "100"
@@ -256,7 +256,7 @@
         },
         {
           "command": [
-            "/home/zhuhe/code/litchi-worktrees/.coord/char-style-0361h/build-v2/char-style-allocation",
+            "(deleted-coord-artifact)",
             "restyle",
             "2",
             "100"
@@ -273,7 +273,7 @@
         },
         {
           "command": [
-            "/home/zhuhe/code/litchi-worktrees/.coord/char-style-0361h/build-v2/char-style-allocation",
+            "(deleted-coord-artifact)",
             "stylesheet",
             "2",
             "100"
@@ -290,7 +290,7 @@
         },
         {
           "command": [
-            "/home/zhuhe/code/litchi-worktrees/.coord/char-style-0361h/build-v2/char-style-allocation",
+            "(deleted-coord-artifact)",
             "runs",
             "64",
             "100"
@@ -307,7 +307,7 @@
         },
         {
           "command": [
-            "/home/zhuhe/code/litchi-worktrees/.coord/char-style-0361h/build-v2/char-style-allocation",
+            "(deleted-coord-artifact)",
             "styles",
             "64",
             "100"
@@ -324,7 +324,7 @@
         },
         {
           "command": [
-            "/home/zhuhe/code/litchi-worktrees/.coord/char-style-0361h/build-v2/char-style-allocation",
+            "(deleted-coord-artifact)",
             "restyle",
             "64",
             "100"
@@ -341,7 +341,7 @@
         },
         {
           "command": [
-            "/home/zhuhe/code/litchi-worktrees/.coord/char-style-0361h/build-v2/char-style-allocation",
+            "(deleted-coord-artifact)",
             "stylesheet",
             "64",
             "100"
@@ -358,7 +358,7 @@
         },
         {
           "command": [
-            "/home/zhuhe/code/litchi-worktrees/.coord/char-style-0361h/build-v2/char-style-allocation",
+            "(deleted-coord-artifact)",
             "variation",
             "64",
             "100"
@@ -375,7 +375,7 @@
         },
         {
           "command": [
-            "/home/zhuhe/code/litchi-worktrees/.coord/char-style-0361h/build-v2/char-style-allocation",
+            "(deleted-coord-artifact)",
             "properties",
             "64",
             "100"
@@ -392,7 +392,7 @@
         },
         {
           "command": [
-            "/home/zhuhe/code/litchi-worktrees/.coord/char-style-0361h/build-v2/char-style-allocation",
+            "(deleted-coord-artifact)",
             "parent",
             "64",
             "100"
@@ -534,12 +534,12 @@
     {
       "candidate": "v3",
       "manifest": {
-        "path": "/home/zhuhe/code/litchi-worktrees/.coord/char-style-0361h/allocation-v3/manifest.json",
+        "path": "(deleted-coord-artifact)/manifest.json",
         "bytes": 8186,
         "sha256": "dd6313a395ad4a26fcbcf68fa67976ea0c1d97b67e61871f07fb641c28de82cb"
       },
       "binary": {
-        "path": "/home/zhuhe/code/litchi-worktrees/.coord/char-style-0361h/build-v3/char-style-allocation",
+        "path": "(deleted-coord-artifact)/char-style-allocation",
         "bytes": 2252296,
         "sha256": "7823d60fe24185ffe6eed817945160238757fe9d0039218ba02fab4c708f128f"
       },
@@ -548,7 +548,7 @@
       "rows": [
         {
           "command": [
-            "/home/zhuhe/code/litchi-worktrees/.coord/char-style-0361h/build-v3/char-style-allocation",
+            "(deleted-coord-artifact)",
             "runs",
             "2",
             "100"
@@ -565,7 +565,7 @@
         },
         {
           "command": [
-            "/home/zhuhe/code/litchi-worktrees/.coord/char-style-0361h/build-v3/char-style-allocation",
+            "(deleted-coord-artifact)",
             "styles",
             "2",
             "100"
@@ -582,7 +582,7 @@
         },
         {
           "command": [
-            "/home/zhuhe/code/litchi-worktrees/.coord/char-style-0361h/build-v3/char-style-allocation",
+            "(deleted-coord-artifact)",
             "restyle",
             "2",
             "100"
@@ -599,7 +599,7 @@
         },
         {
           "command": [
-            "/home/zhuhe/code/litchi-worktrees/.coord/char-style-0361h/build-v3/char-style-allocation",
+            "(deleted-coord-artifact)",
             "stylesheet",
             "2",
             "100"
@@ -616,7 +616,7 @@
         },
         {
           "command": [
-            "/home/zhuhe/code/litchi-worktrees/.coord/char-style-0361h/build-v3/char-style-allocation",
+            "(deleted-coord-artifact)",
             "runs",
             "64",
             "100"
@@ -633,7 +633,7 @@
         },
         {
           "command": [
-            "/home/zhuhe/code/litchi-worktrees/.coord/char-style-0361h/build-v3/char-style-allocation",
+            "(deleted-coord-artifact)",
             "styles",
             "64",
             "100"
@@ -650,7 +650,7 @@
         },
         {
           "command": [
-            "/home/zhuhe/code/litchi-worktrees/.coord/char-style-0361h/build-v3/char-style-allocation",
+            "(deleted-coord-artifact)",
             "restyle",
             "64",
             "100"
@@ -667,7 +667,7 @@
         },
         {
           "command": [
-            "/home/zhuhe/code/litchi-worktrees/.coord/char-style-0361h/build-v3/char-style-allocation",
+            "(deleted-coord-artifact)",
             "stylesheet",
             "64",
             "100"
@@ -684,7 +684,7 @@
         },
         {
           "command": [
-            "/home/zhuhe/code/litchi-worktrees/.coord/char-style-0361h/build-v3/char-style-allocation",
+            "(deleted-coord-artifact)",
             "variation",
             "64",
             "100"
@@ -701,7 +701,7 @@
         },
         {
           "command": [
-            "/home/zhuhe/code/litchi-worktrees/.coord/char-style-0361h/build-v3/char-style-allocation",
+            "(deleted-coord-artifact)",
             "properties",
             "64",
             "100"
@@ -718,7 +718,7 @@
         },
         {
           "command": [
-            "/home/zhuhe/code/litchi-worktrees/.coord/char-style-0361h/build-v3/char-style-allocation",
+            "(deleted-coord-artifact)",
             "parent",
             "64",
             "100"

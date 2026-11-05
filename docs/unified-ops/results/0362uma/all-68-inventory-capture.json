@@ -2450,13 +2450,13 @@
     }
   ],
   "regenerator": {
-    "path": "/home/zhuhe/code/litchi-worktrees/.coord/record-inventory-20261024.py",
+    "path": "(deleted-coord-artifact)/record-inventory-20261024.py",
     "bytes": 6690,
     "sha256": "82ad87ba52cd6a99d86d499dbff953747f537afc08999de48939d28db31a505b"
   },
   "regeneration_command": [
     "python3",
-    "/home/zhuhe/code/litchi-worktrees/.coord/record-inventory-20261024.py"
+    "(deleted-coord-artifact)"
   ],
   "capture_command": [
     "python3",
@@ -2467,7 +2467,7 @@
     "--output",
     "/home/zhuhe/.cache/litchi-api-contract/49c25ef67f62a8bb943e7c6a0bf464e49ae87d07",
     "--target-dir",
-    "/home/zhuhe/code/litchi-worktrees/.coord/isolated-wsdoc/target"
+    "(deleted-coord-artifact)"
   ],
   "capture_environment": {
     "CARGO_BUILD_JOBS": "1",

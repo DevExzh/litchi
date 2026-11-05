@@ -17,7 +17,7 @@ unchanged. The initial full check on `2106417c0d` failed on those ten later
 paths and remains retained.
 
 Actual state:
-`/home/zhuhe/code/litchi-worktrees/.coord/format-0362ul93-f5-inert-ad8f6465c7`.
+`(deleted-coord-artifact)`.
 Despite the preparation directory's name, root explicitly launched the
 reviewed driver with `--go`: `cargo fmt --all -- --check` passed in 30.727
 seconds, exit 0, target 0 bytes. Root verified source/three-lock fences,
@@ -31,7 +31,7 @@ log/trace hashes, isolated preflight, live guard and terminal process samples.
 Census registration `baa35baee2` merges at `16d3ea672b`. The normal plan
 still has 53 rows; the tooling row now registers 40 modules, including
 `tools.test_prepare_raw_api_census`. Root reran 25 census/coverage and three
-runner tests, all passing. The reviewed external `.coord/gate.sh` patch was
+runner tests, all passing. The reviewed external `(deleted-coord-artifact)/gate.sh` patch was
 applied, with before/after hashes bound in record 0362ul79f and the external
 `gate-registration-0362ul79f-receipt.json` (603 bytes, SHA-256
 `323dc395ab79f34988dae102107e13fabc55e912b529a0b6448719b5045067a6`).
@@ -57,7 +57,7 @@ capabilities and selected resource ceilings must remain intact. No warning
 suppression or capability exception is accepted.
 
 Retry state:
-`/home/zhuhe/code/litchi-worktrees/.coord/pptx-combined-0362ul89-f5-actual-237d6801a6`.
+`(deleted-coord-artifact)`.
 The compiler row exits 101 after 59.157 seconds, final target 209,664,179
 bytes. Root independently verifies receipt, source/lock and ownership fences.
 
@@ -88,7 +88,7 @@ integration tests and stops on two transition writer calls missing their
 required limits argument. A complete test/example consumer audit is active;
 the next compiler run will use `--keep-going` to collect all target failures.
 The `2749` capture is retained at
-`/home/zhuhe/code/litchi-worktrees/.coord/pptx-combined-0362ul89-f5-actual-2749ced58b`:
+`(deleted-coord-artifact)`:
 `result.json`, 33,304 bytes, SHA-256
 `f3440f8a2ef9788324e9613c6402e3c4aa73070dd82a0a2b77283d224ec19f01`.
 Formatting passes; all-target compiler acceptance remains open.
@@ -112,7 +112,7 @@ registry absence and held trunk/integration heads. Actual sparse restoration
 passed. Net allocated space reclaimed: 1,555,513,344 bytes.
 
 Evidence root:
-`/home/zhuhe/code/litchi-worktrees/.coord/worktree-cleanup-2026-10-23/quarantine/wave65-raw-census/`.
+`(deleted-coord-artifact)`.
 
 | Artifact | Bytes | SHA-256 |
 |---|---:|---|

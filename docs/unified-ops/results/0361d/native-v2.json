@@ -517,28 +517,28 @@
   ],
   "artifacts": [
     {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-raw-limits/native-v2/measurements.json",
+      "path": "(deleted-coord-artifact)/measurements.json",
       "bytes": 254134,
       "sha256": "1315375c3f359c0fe58225859d7b3f8b739eab4a1302f5aa0d31b20bf58c6aa1"
     },
     {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-raw-limits/native-v2/samples.jsonl",
+      "path": "(deleted-coord-artifact)/samples.jsonl",
       "bytes": 160367,
       "sha256": "bc4e94d1546ef624db5fc8798d52b7f0a3be7d56bf8959f4f99b7621aee40f5d"
     },
     {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-raw-limits/native-v2.log",
+      "path": "(deleted-coord-artifact)/native-v2.log",
       "bytes": 1433,
       "sha256": "cfc735314295e74abe8e428c04b83b6640c82e87c93c0230d030a786072b3d41"
     }
   ],
   "command": [
     "python3",
-    "../.coord/iwa-raw-limits/snappy-probe.py",
+    "(deleted-coord-artifact)",
     "run",
-    "../.coord/iwa-raw-limits/probe-v2",
+    "(deleted-coord-artifact)",
     "--results-dir",
-    "../.coord/iwa-raw-limits/native-v2",
+    "(deleted-coord-artifact)",
     "--blocks",
     "5",
     "--target-ms",

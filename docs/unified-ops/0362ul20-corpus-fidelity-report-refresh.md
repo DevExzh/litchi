@@ -18,7 +18,7 @@ The report-only checkout was clean at source
 `c796d0acc24c7c6e6fd08980b9e31af6bb86b18b`, with the 4100 lock
 `4100b1fbb272dd24842f33a2d6f353a3f3a97dfa7e435c4649a0e1a029bfaea1`
 (`Cargo.lock`, 139,606 bytes). The fresh, external target was
-`/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/fidelity-c796-diagnostic-target`
+`(deleted-coord-artifact)`
 and measured 2,734,700,870 bytes after the run. The external temporary
 directory was empty after completion.
 
@@ -28,7 +28,7 @@ The exact generation command was run with the coordinator Cargo shim first in
 `LITCHI_BLESS=1` only in this report-only checkout:
 
 ```text
-env -u LITCHI_CAPPED -u LITCHI_BLESS PATH=/home/zhuhe/code/litchi-worktrees/.coord/bin:$PATH LITCHI_MEM_MAX=20G CARGO_BUILD_JOBS=1 RUST_TEST_THREADS=1 CARGO_INCREMENTAL=0 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_PROFILE_RELEASE_DEBUG=0 CARGO_NET_OFFLINE=true CARGO_TARGET_DIR=/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/fidelity-c796-diagnostic-target TMPDIR=/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/fidelity-c796-diagnostic-tmp LITCHI_BLESS=1 cargo test -p litchi-ops --all-features --test corpus_fidelity open_empty_edit_save_is_byte_identical --offline --locked
+env -u LITCHI_CAPPED -u LITCHI_BLESS PATH=(deleted-coord-artifact):$PATH LITCHI_MEM_MAX=20G CARGO_BUILD_JOBS=1 RUST_TEST_THREADS=1 CARGO_INCREMENTAL=0 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_PROFILE_RELEASE_DEBUG=0 CARGO_NET_OFFLINE=true CARGO_TARGET_DIR=(deleted-coord-artifact) TMPDIR=(deleted-coord-artifact) LITCHI_BLESS=1 cargo test -p litchi-ops --all-features --test corpus_fidelity open_empty_edit_save_is_byte_identical --offline --locked
 ```
 
 The fresh compile and generation passed 1/1 in 206.70s. Its external log is
@@ -64,4 +64,4 @@ SHA-256 `3a90e5fc61fceb3d3ff6e4cc4177094119bb0eb52c585cd0edf0bec95d3a3c7e`).
 This candidate-only update contains the generated `fidelity.tsv` and
 `fidelity.md` plus this record. No source, gate-owned checkout, executable, or
 large diagnostic artifact is committed; the external logs and target remain
-under `.coord/final-acceptance-2026-10-24/` for review.
+under `(deleted-coord-artifact)` for review.

@@ -14,7 +14,7 @@ Exact symbol searches confirm no caller uses the removed reexports. No
 public method or execution path changes.
 
 Retained state:
-`/home/zhuhe/code/litchi-worktrees/.coord/pptx-combined-0362ul89-f5-actual-6517f7f5c1`.
+`(deleted-coord-artifact)`.
 The compiler row exits 101 after 55.260 seconds, final target 209,550,542
 bytes. Root verifies the actual command, clean source/three-lock fences,
 log/trace hashes, isolated preflight, live guard and terminal process samples.

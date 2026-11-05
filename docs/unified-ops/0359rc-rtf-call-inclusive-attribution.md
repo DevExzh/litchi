@@ -15,7 +15,7 @@ current and candidate binaries.
 ## Workload and method
 
 The retained private probe is
-`/home/zhuhe/code/litchi-worktrees/.coord/rtf-refusals/private-probes/underline_route_probe.rs`
+`(deleted-coord-artifact)/underline_route_probe.rs`
 (1,177 bytes, SHA-256
 `c2f7ec5c3f121cabf3b143bd459cbed9dbfebe08a17e0ef7eca1520331a3a618`). Its
 cold mode parses 34 fresh `Alpha` packages and successfully applies the
@@ -98,7 +98,7 @@ identity control below tests whether they persist when executable path,
 To control for process identity and allocator startup state, each already-built
 binary was copied in turn to the same external path:
 
-`/home/zhuhe/code/litchi-worktrees/.coord/rtf-refusals/same-path-20261022/underline_route_probe`
+`(deleted-coord-artifact)`
 
 The current and candidate copies retained their original SHA-256 values, and
 each was run with the same `argv[0]`, environment, CPU 7 pinning and cold

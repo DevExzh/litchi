@@ -575,22 +575,22 @@
   "binaries": {
     "base_allocations": {
       "bytes": 655688,
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/constructor-0361f-coordinator/matched-v11-alloc-base/release/iwa-constructor-probe",
+      "path": "(deleted-coord-artifact)/iwa-constructor-probe",
       "sha256": "9b439836678e84e9fbb7b3440d5a1fb186ccb5fcea41fe45b7d1005430a28656"
     },
     "base_callgrind": {
       "bytes": 655688,
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/constructor-0361f-coordinator/matched-v10/target-base/release/iwa-constructor-probe",
+      "path": "(deleted-coord-artifact)/iwa-constructor-probe",
       "sha256": "6d60c065cab3e316416554c9ae0a4a96e50a71cb8416a6d49240e29be73720de"
     },
     "candidate_allocations": {
       "bytes": 671768,
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/constructor-0361f-coordinator/matched-v11-alloc-candidate/release/iwa-constructor-probe",
+      "path": "(deleted-coord-artifact)/iwa-constructor-probe",
       "sha256": "cb4413d353a9feccb0c13183c0c9ca19e49fb2d5b4f3145f5f728a79c37012fc"
     },
     "candidate_callgrind": {
       "bytes": 646792,
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/constructor-0361f-coordinator/matched-v11-target/release/iwa-constructor-probe",
+      "path": "(deleted-coord-artifact)/iwa-constructor-probe",
       "sha256": "b933b6fb18ef7713efcdb108cd2bcd06ee5bac4210f0998d544b5c092c5130cc"
     }
   },

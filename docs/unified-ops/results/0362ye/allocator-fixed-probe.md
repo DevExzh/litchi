@@ -16,7 +16,7 @@ archive is the tracked `odp_0362ye_probe` fixture (2,000 slides, 4 MiB media).
 | `replay` | 612845 / 5737255 | 612893 / 5821383 | 4215645 | 5546059324926701325 |
 
 The earlier fixed-buffer candidate binary is kept outside the repository at
-`/home/zhuhe/code/litchi-worktrees/.coord/odp-0362yd-candidate-target/release/examples/odp_0362ye_probe`
+`(deleted-coord-artifact)`
 (3,599,992 bytes, SHA-256
 `032047b9f559c291cc07b1052e5425b688a2e91784220c7ef57672d091136bf0`).
 The final source build used for the current Callgrind and allocator rows is
@@ -24,7 +24,7 @@ The final source build used for the current Callgrind and allocator rows is
 (3,621,528 bytes, SHA-256
 `9e76c655cc0dab3d057c99a4bc8b5e5aa90a5ee3d53ffa4207a6ac4adada0a8d`).
 The baseline binary is
-`/home/zhuhe/code/litchi-worktrees/.coord/odp-0362yd-baseline-target/release/examples/odp_0362ye_probe`
+`(deleted-coord-artifact)`
 (3,096,104 bytes, SHA-256
 `ecb034b0f57588c7d131ba9981d7004f5181ee214a88d14519f73660f35e0669`).
 
@@ -68,9 +68,9 @@ docs/unified-ops/results/0362ye/run_callgrind.sh            475e0e8f18307b4a3748
 ## Route-local Callgrind
 
 The fixed baseline rows are from
-`/home/zhuhe/code/litchi-worktrees/.coord/odp-0362ye-evidence/callgrind-4b6e2c23bc`;
+`(deleted-coord-artifact)`;
 the final candidate rows are in
-`/home/zhuhe/code/litchi-worktrees/.coord/odp-0362ye-evidence/callgrind-probe-build-current`.
+`(deleted-coord-artifact)`.
 Both use `run_callgrind.sh`, one process per route, and the same ten route
 arguments. The captures remain outside the repository.
 
@@ -131,6 +131,6 @@ median divided by the baseline median was:
 The run was pinned to CPU 5; host load was 24.85/22.44/23.91 at start and
 22.27/22.08/23.72 at end. It is therefore diagnostic only, not quiet-host
 acceptance. The raw 20,156-byte receipt is outside the repository at
-`/home/zhuhe/code/litchi-worktrees/.coord/odp-0362ye-evidence/native-small-content-memo-v3-abba-cpu5-r15-correct.txt`
+`(deleted-coord-artifact)/native-small-content-memo-v3-abba-cpu5-r15-correct.txt`
 (SHA-256
 `6f4bb23cb8c253e50dbc09671b0311a97063e5aaccba58cca6d8043193dca418`).

@@ -13,7 +13,7 @@ Final composition supersedes this pin with the 135637Z / 662a9159 plan
 recorded in [0362dvid](0362dvid-drawingml-protocol-composition.md):
 
 ```text
-.coord/final-acceptance-2026-10-24/drawingml-additional-qualification-plan-20261024T125856Z.json
+(deleted-coord-artifact)/drawingml-additional-qualification-plan-20261024T125856Z.json
 cf5208bc30eb1b650cfc7f2c15a53d6ae4d0cb3c43999236eb83bb9e58cd4eeb
 ```
 

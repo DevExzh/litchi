@@ -44,7 +44,7 @@ compatibility playback limits. The final atomic commit
 this equality and the terminal validation artifacts.
 
 Actual capped validation is retained externally at
-`/home/zhuhe/code/litchi-worktrees/.coord/imgconv-raw-limit-validation-corrected.9FTSYC/`.
+`(deleted-coord-artifact)`.
 The approved f5 runner has SHA-256
 `1904177040fc7c523582433028d9bba56efc30fe0d9d96beb554a2fab343691e`;
 the unchanged root lock is approved `4100b1fb…bfaea1`. The source overlay's

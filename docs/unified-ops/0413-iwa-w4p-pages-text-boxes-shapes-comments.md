@@ -135,7 +135,7 @@ taskset -c 3 valgrind --tool=callgrind '--toggle-collect=*probe_host*' \
 ```
 
 The raw outputs stay outside the repository, in
-`.coord/iwa-w4p/cg/` (with `cg_slice{1..4}.txt` summaries). No wall-clock
+`(deleted-coord-artifact)` (with `cg_slice{1..4}.txt` summaries). No wall-clock
 or unified-`File` claim is made.
 
 ## 6. Gaps and follow-ups

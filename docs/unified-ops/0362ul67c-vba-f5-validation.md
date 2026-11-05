@@ -19,8 +19,8 @@ The exact final receipts are outside the checkout:
 
 | item | path | bytes | SHA-256 |
 | --- | --- | ---: | --- |
-| manifest | `/home/zhuhe/code/litchi-worktrees/.coord/0362ul67-f5-c68801c837/manifest.json` | 1,471 | `a54a2b4ce295678b67db6f89169bbfe665bc82d9722f05e30e59b3e97f52e6c4` |
-| receipts | `/home/zhuhe/code/litchi-worktrees/.coord/0362ul67-f5-c68801c837/receipts.json` | 53,474 | `3b471ba182af4297ff7a446c41eb0651e71cf4af47b796848456c67996434b44` |
+| manifest | `(deleted-coord-artifact)/manifest.json` | 1,471 | `a54a2b4ce295678b67db6f89169bbfe665bc82d9722f05e30e59b3e97f52e6c4` |
+| receipts | `(deleted-coord-artifact)/receipts.json` | 53,474 | `3b471ba182af4297ff7a446c41eb0651e71cf4af47b796848456c67996434b44` |
 
 The final six rows all passed. The focused test counts are 48 VBA tests,
 5 PPT VBA-writer tests, and 1,268 PPT library tests with 1 ignored test.
@@ -51,9 +51,9 @@ passing rerun did not overwrite them:
 
 | state | failed row | receipt SHA-256 | failed log SHA-256 | repair |
 | --- | --- | --- | --- | --- |
-| `/home/zhuhe/code/litchi-worktrees/.coord/0362ul67-f5-604bce4fc5` | PPT VBA writer | `61911c4d3d12898f0929592304db7c9859f2e9c01649f65e888bd357e9edf15f` | `86370386d6272f6d10b36560166694366f4a1e8b90fd09cd7faa926d772f3382` | removed invalid `const` declarations around retained policy access |
-| `/home/zhuhe/code/litchi-worktrees/.coord/0362ul67-f5-0ca559ca6b` | affected all-target check | `7305bfa913c423cbaefb4fc5b1275195516068d5924b6fc56800f2320c748844` | `195c112ca386621c354fdd06d781c3c9dc82479175f920ae2bcbd9febbfe9a91` | migrated the scoped PPT correctness example to public APIs and current digest formatting |
-| `/home/zhuhe/code/litchi-worktrees/.coord/0362ul67-f5-6999f2669f` | no-default VBA feature boundary | `00ae3b710796445e0444dab487d655386ee6eeb412121fee39d47a5a34c96066` | `a1f3c87d4454e61915b31405d4ecb2fdbe65b179d869eeeb2debf859d2e4edb0` | passed the selected `SourceLimits` to both `CurrentUser::parse` call sites |
+| `(deleted-coord-artifact)/0362ul67-f5-604bce4fc5` | PPT VBA writer | `61911c4d3d12898f0929592304db7c9859f2e9c01649f65e888bd357e9edf15f` | `86370386d6272f6d10b36560166694366f4a1e8b90fd09cd7faa926d772f3382` | removed invalid `const` declarations around retained policy access |
+| `(deleted-coord-artifact)/0362ul67-f5-0ca559ca6b` | affected all-target check | `7305bfa913c423cbaefb4fc5b1275195516068d5924b6fc56800f2320c748844` | `195c112ca386621c354fdd06d781c3c9dc82479175f920ae2bcbd9febbfe9a91` | migrated the scoped PPT correctness example to public APIs and current digest formatting |
+| `(deleted-coord-artifact)/0362ul67-f5-6999f2669f` | no-default VBA feature boundary | `00ae3b710796445e0444dab487d655386ee6eeb412121fee39d47a5a34c96066` | `a1f3c87d4454e61915b31405d4ecb2fdbe65b179d869eeeb2debf859d2e4edb0` | passed the selected `SourceLimits` to both `CurrentUser::parse` call sites |
 
 The final `c688` source tree is identical to the tested tree except for this
 record. No evidence, executable, or third-party checkout path is committed.

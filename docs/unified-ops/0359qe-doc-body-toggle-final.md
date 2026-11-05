@@ -74,8 +74,8 @@ with no Cargo build or timing run:
 
 ```text
 python3 tools/audit_doc_chpx_history.py \
-  --candidate /home/zhuhe/code/litchi-worktrees/.coord/doc-toggle/final-results/candidate/batch-output.bin \
-  --baseline /home/zhuhe/code/litchi-worktrees/.coord/doc-toggle/final-results/baseline-batch-output.bin
+  --candidate (deleted-coord-artifact) \
+  --baseline (deleted-coord-artifact)
 ```
 
 The script uses only the Python standard library. It checks the OLE stream

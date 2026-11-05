@@ -68,7 +68,7 @@ cargo clippy --offline --locked --workspace --all-targets --all-features --keep-
 
 The run completed in 199.602 seconds with the one-job 20G memory cap and an
 external target of 4,397,247,763 bytes. The 2,403,707-byte raw log remains
-external at `.coord/budget-validation/clippy-composed-v25/check-0.log`,
+external at `(deleted-coord-artifact)/check-0.log`,
 SHA-256 `bbd34401c4ee66836da9fe8c66066c3f4308192f64ac81bdc08bbec5830a40c5`.
 The reduced receipt is `results/0362up/clippy-composed-v25.json`; source and
 lock identity were rechecked after completion. The glossary and inventory

@@ -25,7 +25,7 @@ with restrictive depth, record, payload and event bounds. No public
 limit-less twin or compatibility route is authorized.
 
 The external source review is
-`/home/zhuhe/code/litchi-worktrees/.coord/ppt-hyperlink-crud-audit-20261025/README.md`,
+`(deleted-coord-artifact)/README.md`,
 SHA-256 `d02439f327440abd75a3f55fa81dfac4012fc14bd098e660b86ec19cf2bad1b4`.
 The worker remains source-only while the coordinator owns the build slot.
 The source-contract audit in 159 does not replace these correctness and
@@ -35,7 +35,7 @@ Root starts two focused Rust checks of the already merged 157/157a changes:
 the IWA graph/index library suites and the nested owned PPT record test.
 The durable unit is `litchi-unified-contract-rust-c86a12758-v1.service`.
 Its source-bound packet is
-`/home/zhuhe/code/litchi-worktrees/.coord/contract-rust-C86a12758-20261025/`,
+`(deleted-coord-artifact)`,
 with plan SHA-256
 `e403a0c5c340454595009b35406eaa0314c691e4902c6d99d89c7949f968548a`
 and driver SHA-256

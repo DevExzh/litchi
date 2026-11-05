@@ -40,14 +40,14 @@ cargo clippy --offline -p litchi-ole-common -p litchi-xls --all-targets --all-fe
 ```
 
 Both commands used the external target
-`/home/zhuhe/code/litchi-worktrees/.coord/w5-ole-source-arc-final-target`.
+`(deleted-coord-artifact)`.
 The frozen 0359j–0359l receipts remain historical evidence; this candidate
 has no accepted performance result until the source-matched owner, cell,
 history and inverse routes are rebuilt and requalified in a quiet window.
 
 The source-matched untimed release probes and counting-allocator receipts are
 outside the checkout at
-`/home/zhuhe/code/litchi-worktrees/.coord/w5-ole-source-arc-final-20261021`.
+`(deleted-coord-artifact)`.
 The baseline is `baseline-0ce4-src-8f0ffa`; the candidate source is
 `daa2d35860` (documentation tip `8ee0e97297`).  The shared probe, clone probe
 and lock hashes are `ad4c52c0`, `0a23c99e` and `bc5a133f` respectively.  All

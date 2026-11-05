@@ -18,13 +18,13 @@ New strict tests: `hyperlinks::tests::raw_limits_bound_hyperlink_input_and_outpu
 
 ## Validation
 
-Commands were run with `/home/zhuhe/code/litchi-worktrees/.coord/w4b-xlsb-raw-policy/env.sh`:
+Commands were run with `(deleted-coord-artifact)`:
 
 - `cargo fmt --all -- --check`: exit 0.
 - `cargo test -p litchi-xlsb --all-features --offline`: exit 0; 1,332 tests passed, 0 failed.
 - `cargo clippy -p litchi-xlsb --all-targets --all-features --offline -- -D warnings`: exit 0.
 
-Logs kept outside the checkout under `/home/zhuhe/code/litchi-worktrees/.coord/w4b-xlsb-raw-policy/`: `xlsb-0360ef-tests.log` (124,574 bytes, SHA-256 `c728810cf693a9bcc61dfe835ce9fc664d37e39ee668f896c9938e96d8f0311a`) and `xlsb-0360ef-clippy.log` (172 bytes, SHA-256 `4beccec7aef354d0dd9beaddb607d9f1801fcffd74174247bcea7e8a2fe67952`).
+Logs kept outside the checkout under `(deleted-coord-artifact)`: `xlsb-0360ef-tests.log` (124,574 bytes, SHA-256 `c728810cf693a9bcc61dfe835ce9fc664d37e39ee668f896c9938e96d8f0311a`) and `xlsb-0360ef-clippy.log` (172 bytes, SHA-256 `4beccec7aef354d0dd9beaddb607d9f1801fcffd74174247bcea7e8a2fe67952`).
 
 ## Performance
 

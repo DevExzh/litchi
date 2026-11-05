@@ -12,7 +12,7 @@ completes the consumer migration without introducing an alias or adding an
 irrelevant equality operation to the iterator.
 
 The failed runner packet is
-`/home/zhuhe/code/litchi-worktrees/.coord/contract-rust-C86a12758-20261025/`.
+`(deleted-coord-artifact)`.
 Its 1,142-byte log has SHA-256
 `4cc506d3fb9ac3e133772a80a2989cd4257b82328fd99b6ef210e46bf6fc94ce`.
 Root verifies the failed terminal service, exact log and target-trace

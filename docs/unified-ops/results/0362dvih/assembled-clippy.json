@@ -3,8 +3,8 @@
   "root": "/home/zhuhe/code/litchi-worktrees/uo2-coordinator-metadata-integration",
   "lock_sha256": "4100b1fbb272dd24842f33a2d6f353a3f3a97dfa7e435c4649a0e1a029bfaea1",
   "environment": {
-    "CARGO_TARGET_DIR": "/home/zhuhe/code/litchi-worktrees/.coord/drawingml-chart-raw-target",
-    "TMPDIR": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/composed-a3ec-clippy/tmp",
+    "CARGO_TARGET_DIR": "(deleted-coord-artifact)",
+    "TMPDIR": "(deleted-coord-artifact)",
     "CARGO_BUILD_JOBS": "1",
     "RUST_TEST_THREADS": "1",
     "CARGO_INCREMENTAL": "0",
@@ -41,7 +41,7 @@
   "exit_code": 0,
   "elapsed_seconds": 204.6309096813202,
   "target_after_bytes": 7515340148,
-  "log": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/composed-a3ec-clippy/clippy.log",
+  "log": "(deleted-coord-artifact)/clippy.log",
   "log_bytes": 2845,
   "log_sha256": "364b5e63fc1d9bc8f052026362d81cdb5f0ece699069bf5e8744a933a0da8c00"
 }

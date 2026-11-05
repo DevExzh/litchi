@@ -23,7 +23,7 @@ Validation:
   --all-features --offline -- -D warnings` passed.
 
 The exact raw logs are retained outside the checkout under
-`.coord/w8-odf-raw-xml/`: `clippy-final.log` (269 bytes, SHA-256
+`(deleted-coord-artifact)`: `clippy-final.log` (269 bytes, SHA-256
 `30c3a30597f3e934f229a88109531a9fcf86ff73cbb746642fd22b017864a28a`) and
 `libs-final.log` (171190 bytes, SHA-256
 `f46ca4ddc89a33ba4288c136e437e1500c150b2ba0a65b834be9027aa7e6fc6b`).

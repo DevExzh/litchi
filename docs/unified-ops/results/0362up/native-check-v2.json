@@ -4,12 +4,12 @@
   "cwd": "/home/zhuhe/code/litchi-worktrees/uo2-budget-validation",
   "command": [
     "python3",
-    "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/run-semantic-checks-disk-guarded.py",
-    "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/native-check-v2-commands.json",
-    "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/native-check-v2"
+    "(deleted-coord-artifact)",
+    "(deleted-coord-artifact)",
+    "(deleted-coord-artifact)"
   ],
   "started_unix_seconds": 1792769713.8240561,
-  "target": "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/target",
+  "target": "(deleted-coord-artifact)",
   "lock_sha256": "52ed0cacac15b5e440349bfc0f4aca2665bcf50d59d4321624e596bb410783c6",
   "checks": [
     {
@@ -34,7 +34,7 @@
       ],
       "exit": 101,
       "seconds": 125.55505514499964,
-      "log": "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/native-check-v2/check-0.log",
+      "log": "(deleted-coord-artifact)/check-0.log",
       "bytes": 11078,
       "sha256": "dd8b66cfc01aba64e79af8d4cc3ebd9f12a84e63e94ca31989a46605309272e7",
       "target_bytes_before": 215243793,

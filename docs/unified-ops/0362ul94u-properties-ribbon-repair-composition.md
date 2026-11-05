@@ -35,5 +35,5 @@ repair chains now require fresh compiler, runtime and glossary qualification.
 Performance and final workspace acceptance remain open; nothing is pushed.
 
 The formatter-only delta is retained externally at
-`.coord/composition-format-89ay-94u/uo2-ooxml-combined-0362ul94.patch` (0 bytes, SHA-256
+`(deleted-coord-artifact)/uo2-ooxml-combined-0362ul94.patch` (0 bytes, SHA-256
 `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`).

@@ -47,7 +47,7 @@ byte and archive preflight.
 ## Validation
 
 Using the capped environment at
-`/home/zhuhe/code/litchi-worktrees/.coord/w4b-xlsb-raw-policy/env.sh`, with a
+`(deleted-coord-artifact)`, with a
 worktree-local temporary directory because the shared `/tmp` inode budget was
 exhausted:
 

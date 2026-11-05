@@ -1,8 +1,8 @@
 #!/bin/bash
 # Record 0359a ABBA builds: before = 7afba5f146 (record 0359 tip) with the
 # old-route probe, after = the 0359a head worktree. One cargo at a time.
-source /home/zhuhe/code/litchi-worktrees/.coord/w5-legacy/env.sh
-P=/home/zhuhe/code/litchi-worktrees/.coord/w5-legacy/perf2
+source /deleted-coord-artifact
+P=/deleted-coord-artifact
 W=/home/zhuhe/code/litchi-worktrees/uo2-w5-legacy
 : > $P/build.status
 for leg in before after; do

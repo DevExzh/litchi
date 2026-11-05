@@ -27,7 +27,7 @@ resource limits, typed limits, and patch conflicts.
 - `rustfmt --edition 2024` passed on all eight changed Rust files.
 - `git diff --check` passed.
 - The v8 compiler log is retained outside the checkout at
-  `/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/api-assembly-consumers-v8/check-0.log`
+  `(deleted-coord-artifact)/check-0.log`
   (34,232 bytes, SHA-256
   `8144ccd0e597790bc18a871362ac5bb69178d1323f13c3f242457b16c3a5422a`).
 - Its reduced diagnostic manifest is

@@ -16,7 +16,7 @@
       ],
       "exit": 101,
       "seconds": 50.33704752700032,
-      "log": "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/artifact-stream-semantic-v1/check-0.log",
+      "log": "(deleted-coord-artifact)/check-0.log",
       "bytes": 187109,
       "sha256": "381199955ad02a07b26d86490a23906d491fcd33f871fa6b4335f76dd1dcf95f",
       "target_bytes_before": 18588095461,

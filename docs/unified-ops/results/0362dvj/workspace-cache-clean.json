@@ -145,7 +145,7 @@
   "packages": 68,
   "exit": 0,
   "seconds": 1.178454064996913,
-  "log": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/drawingml-composed/workspace-cache-clean.log",
+  "log": "(deleted-coord-artifact)/workspace-cache-clean.log",
   "log_bytes": 38,
   "log_sha256": "e7b82893e0f3c54cb4f75a9aa39610fe77842cd6ec68b43c4ec6b1f2d0242750",
   "root_lock_sha256": "4100b1fbb272dd24842f33a2d6f353a3f3a97dfa7e435c4649a0e1a029bfaea1"

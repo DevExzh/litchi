@@ -28,7 +28,7 @@ budget.
 
 The retained external failure evidence is:
 
-`/home/zhuhe/code/litchi-worktrees/.coord/pptx-combined-0362ul89-f5-qualification-ae6f32d202/fullfeatures-tests/0000.log`
+`(deleted-coord-artifact)/0000.log`
 
 It is 378,736 bytes with SHA-256
 `4924bcd19683868b0cc259024ceefdb93f3ba4ef0d3ec7d8653fcf564639fb6a`.
@@ -47,7 +47,7 @@ or capability was changed.
 
 An external patch against the exact actual-runtime base is retained at:
 
-`/home/zhuhe/code/litchi-worktrees/.coord/pptx-combined-0362ul89/metadata-runtime-89ag-9c371c0230.patch`
+`(deleted-coord-artifact)/metadata-runtime-89ag-9c371c0230.patch`
 
 It is 2,767 bytes and has SHA-256
 `aee1fbe36766dc920438c66df3d1e47811505bd1559a7b14ce3d0ed6069bae2a`.

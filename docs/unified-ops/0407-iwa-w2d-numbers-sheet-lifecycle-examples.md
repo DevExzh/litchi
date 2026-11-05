@@ -31,18 +31,18 @@ or performance claim is made by this example relocation.
 The tracked fixture is `test-data/iwork/numbers/basic.numbers` (136,357 bytes,
 SHA-256 `f225d5b1cd59e9da454f91a96fe8f81154bc31037c10029230e75d49b45fb693`).
 Using offline mode and the isolated target directory
-`.coord/w2d-sheet-examples-7606-target`, all three commands exited 0:
+`(deleted-coord-artifact)`, all three commands exited 0:
 
 ```text
 cargo run --locked --offline -p litchi-numbers --example add_numbers_sheet -- \
   test-data/iwork/numbers/basic.numbers \
-  /home/zhuhe/code/litchi-worktrees/.coord/w2d-sheet-run.hPr2Op/add.numbers Archive
+  (deleted-coord-artifact) Archive
 cargo run --locked --offline -p litchi-numbers --example duplicate_numbers_sheet -- \
   test-data/iwork/numbers/basic.numbers \
-  /home/zhuhe/code/litchi-worktrees/.coord/w2d-sheet-run.hPr2Op/duplicate.numbers 0
+  (deleted-coord-artifact) 0
 cargo run --locked --offline -p litchi-numbers --example remove_numbers_sheet -- \
-  /home/zhuhe/code/litchi-worktrees/.coord/w2d-sheet-run.hPr2Op/duplicate.numbers \
-  /home/zhuhe/code/litchi-worktrees/.coord/w2d-sheet-run.hPr2Op/remove.numbers 1
+  (deleted-coord-artifact) \
+  (deleted-coord-artifact) 1
 ```
 
 The persisted outputs and command logs are retained outside the repository:
@@ -68,7 +68,7 @@ the exact inverse patch against the in-memory source. Scoped checks passed:
 The repository-wide boundary scan completed successfully from clean commit
 `d38473dd21`: 70 workspace packages, 314 internal dependency declarations, and
 12 explicit migration debt items passed. The external 604-byte log is
-`/home/zhuhe/code/litchi-worktrees/.coord/w2d-sheet-boundaries-d384.log`,
+`(deleted-coord-artifact)/w2d-sheet-boundaries-d384.log`,
 SHA-256
 `137949bf1118a296ac903b5401ca287559b11d7e0bad05d3bc96591d5cc7a06c`.
 The slice adds no dependency edges or boundary exceptions. No native

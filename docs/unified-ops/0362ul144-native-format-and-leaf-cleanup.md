@@ -24,7 +24,7 @@ addendum records this limitation and does not attribute it to a process race.
 The separate root removal run and its receipts remain preserved.
 
 Evidence is outside the checkout under the worktree parent's
-`.coord/worktree-cleanup-2026-10-25/trunk-consolidation/quarantine/wave105-root-removal/`:
+`(deleted-coord-artifact)`:
 
 | File | Bytes | SHA-256 |
 |---|---:|---|

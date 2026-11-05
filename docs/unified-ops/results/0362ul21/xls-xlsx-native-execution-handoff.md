@@ -4,7 +4,7 @@ This is a source-only handoff. It makes no acceptance claim and ran no Cargo,
 native, timing, allocation, profiling, or qualification command. The complete,
 hash-bound external packet is:
 
-`/home/zhuhe/code/litchi-worktrees/.coord/sheet-preparation-691941/sheet-native-execution-handoff-472b-slot3-cfb-v2.json`
+`(deleted-coord-artifact)`
 
 Packet SHA-256:
 `a203bfac3cf3f4013be3e1e6853d74dadf8b475868251e9c7ac03de8de4558fd`.

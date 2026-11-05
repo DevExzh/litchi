@@ -5,27 +5,27 @@
   "integration_head_during_removal": "c796d0acc24c7c6e6fd08980b9e31af6bb86b18b",
   "artifacts": [
     {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/worktree-cleanup-2026-10-23/quarantine/wave48/manifest.json",
+      "path": "(deleted-coord-artifact)/manifest.json",
       "bytes": 80951,
       "sha256": "2099e4deef182a9a94bddb9114050af1b8ae7cc6d3e1ab95bdcc2b062114c132"
     },
     {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/worktree-cleanup-2026-10-23/quarantine/wave48/receipt.json",
+      "path": "(deleted-coord-artifact)/receipt.json",
       "bytes": 157448,
       "sha256": "5fd036a414a7abc5166767ceb35f4beff7e07d2c44fb1cbd9a4d7dee324c7e9b"
     },
     {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/worktree-cleanup-2026-10-23/quarantine/wave48/restore-check.json",
+      "path": "(deleted-coord-artifact)/restore-check.json",
       "bytes": 2839,
       "sha256": "030d746a23d9db9030392ccc0824dd64fccd9931d5ffb1fd271680c8fbf48a66"
     },
     {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/worktree-cleanup-2026-10-23/quarantine/wave48/prepare_cleanup.py",
+      "path": "(deleted-coord-artifact)/prepare_cleanup.py",
       "bytes": 5688,
       "sha256": "54947fc5be9fde2b655e94b50409e259c60f1232b1c881316bb4928e6fc3a174"
     },
     {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/worktree-cleanup-2026-10-23/quarantine/wave48/restore.py",
+      "path": "(deleted-coord-artifact)/restore.py",
       "bytes": 664,
       "sha256": "fb1d15f55829b71d1ee0a1a626dfcb0dcb34bf0eb9f5b5e54003b61c8993d375"
     }

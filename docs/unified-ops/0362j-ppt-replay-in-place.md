@@ -109,7 +109,7 @@ Only the build manifest's stale `cargo_lock.origin` path was corrected;
 the original metadata file and unchanged lock/binary hashes are retained.
 
 Regenerate the reduction with `python3
-docs/unified-ops/results/0362j/reduce.py --coord ../.coord --out OUT`.
+docs/unified-ops/results/0362j/reduce.py --coord (deleted-coord-artifact) --out OUT`.
 The receipt records exact native commands; choose a new output directory for
 each attempt. Its artifact inventories identify every external raw file by
 name, size and SHA-256. No compiled binary or large capture is committed.
@@ -118,7 +118,7 @@ The external source manifest `ppt-replay-c0-source-digests.json` is
 1,363,016 bytes, SHA-256
 `fbd4da237806a2807efd2c4d58fd9bc700313320cc253f726849ab262ec43955`.
 Regenerate it with `python3 docs/unified-ops/results/0362f/source_manifest.py
-../.coord/ppt-replay-c0-source-20261021 OUTPUT`.
+(deleted-coord-artifact) OUTPUT`.
 
 W4/W4b/W5/W8 integration, remaining raw/shared API work, inventory/glossary
 closure and the full final workspace gate remain required. Item 22 remains

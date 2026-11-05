@@ -7,7 +7,7 @@ rustdoc, runtime, native, or performance claim.
 ## Exact failure
 
 The frozen common full-profile packet is retained at
-`/home/zhuhe/code/litchi-worktrees/.coord/uo2-coordinator-replay-integration-f5-glossary-a8d32513b8`.
+`(deleted-coord-artifact)`.
 Its source is the exact `a8d32513b8` tree.  The full rustdoc command exited
 zero; its retained log is 19,696 bytes with SHA-256
 `4e3b939741451d6e374b04fca54a70e800d79fe58ef3fc1570b0f17a300f7914`.

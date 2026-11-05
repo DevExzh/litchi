@@ -115,7 +115,7 @@ Ledger: 14 Pages and 15 Keynote rows migrate; ten native queue rows.
 ## 5. Verification
 
 On the merge of trunk `12682616f7` (`85dd7c59f1`), the gate script
-`.coord/iwa-w4t/gates.sh` passes every row (formatting, workspace and
+`(deleted-coord-artifact)` passes every row (formatting, workspace and
 `litchi-ops` feature Clippy, leaf/`litchi`/`litchi-ops` tests, boundaries,
 non-iWork gate, five glossary profiles, ledger, tool unit tests, delta,
 corpus, bench and feature matrices, pyo3, perf-baseline, four fuzz locks,

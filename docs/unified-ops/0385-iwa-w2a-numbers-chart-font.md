@@ -122,19 +122,19 @@ are outside the checkout):
 ```sh
 cd /home/zhuhe/code/litchi-worktrees/uo2-iwa-w2a-chart-font
 CARGO_BUILD_JOBS=2 CARGO_INCREMENTAL=0 \
-  CARGO_TARGET_DIR=/home/zhuhe/code/litchi-worktrees/.coord/iwa-w2a-chart-font-target-20261028 \
+  CARGO_TARGET_DIR=(deleted-coord-artifact) \
   LITCHI_MEM_MAX=20G \
   cargo test --offline --locked -p litchi-numbers --test sheet_chart_font \
     --all-features -- --nocapture
 
 CARGO_BUILD_JOBS=2 CARGO_INCREMENTAL=0 \
-  CARGO_TARGET_DIR=/home/zhuhe/code/litchi-worktrees/.coord/iwa-w2a-chart-font-target-20261028 \
+  CARGO_TARGET_DIR=(deleted-coord-artifact) \
   LITCHI_MEM_MAX=20G \
   cargo test --offline --locked -p litchi-iwa --test parity --all-features \
     numbers_sheet_chart_font -- --nocapture
 
 CARGO_BUILD_JOBS=2 CARGO_INCREMENTAL=0 \
-  CARGO_TARGET_DIR=/home/zhuhe/code/litchi-worktrees/.coord/iwa-w2a-chart-font-target-20261028 \
+  CARGO_TARGET_DIR=(deleted-coord-artifact) \
   LITCHI_MEM_MAX=20G \
   cargo test --offline --locked -p litchi-iwa --test parity --all-features \
     numbers_chart_font_cost::numbers_chart_font_facade_cost_abba \
@@ -157,7 +157,7 @@ locked Numbers fuzz workspace compiled with:
 
 ```sh
 CARGO_BUILD_JOBS=2 CARGO_INCREMENTAL=0 \
-  CARGO_TARGET_DIR=/home/zhuhe/code/litchi-worktrees/.coord/iwa-w2a-chart-font-fuzz-target-20261028 \
+  CARGO_TARGET_DIR=(deleted-coord-artifact) \
   LITCHI_MEM_MAX=20G \
   cargo check --offline --locked \
     --manifest-path crates/litchi-numbers/fuzz/Cargo.toml --bins
@@ -202,10 +202,10 @@ compilation disabled:
 
 ```text
 source: 59ffe48b3e0092840f68519571492a08b0fe5bfc
-binary: /home/zhuhe/code/litchi-worktrees/.coord/iwa-w2a-chart-font-perf-20261029-repaired/target/release/deps/parity-20d17b646a6d1747
+binary: (deleted-coord-artifact)
 size: 213,510,848 bytes
 ELF SHA-256: 4d099883840c20abf82fac49df88e1de574c6a58f34bdfdc76a7a552a122125c
-archive: /home/zhuhe/code/litchi-worktrees/.coord/iwa-w2a-chart-font-perf-20261029-repaired/parity-20d17b646a6d1747-reset-isolated-release.tar
+archive: (deleted-coord-artifact)/parity-20d17b646a6d1747-reset-isolated-release.tar
 archive mode/size: 0444 / 213,514,240 bytes
 archive SHA-256: 01d7c6b489205f5d23cbfc9576b5f7f511753933356b18c1ffdb60d31954abb9
 tar member SHA-256: 4d099883840c20abf82fac49df88e1de574c6a58f34bdfdc76a7a552a122125c
@@ -216,13 +216,13 @@ style/layout routes. It used one fresh source per route, pinned CPU 7, and
 true host/leaf/leaf/host ABBA with exactly two selected calls per side:
 
 ```text
-manifest: /home/zhuhe/code/litchi-worktrees/.coord/iwa-w2a-chart-font-perf-20261029-repaired/manifest-24-reset-isolated.json
-results: /home/zhuhe/code/litchi-worktrees/.coord/iwa-w2a-chart-font-perf-20261029-repaired/matrix24-reset-isolated/results.json
+manifest: (deleted-coord-artifact)/manifest-24-reset-isolated.json
+results: (deleted-coord-artifact)/results.json
 results SHA-256: 916982820dd0254d9b92f28142f62b81de0741413cdd21870700179e15d62fa8
 captures: 48 Callgrind files / 48 annotations / 48 stdout logs / 48 stderr logs
 raw Callgrind bytes: 22,224,570
-full probe correctness (six font routes): `/home/zhuhe/code/litchi-worktrees/.coord/iwa-w2a-chart-font-perf-20261029-repaired/correctness-font-full.log` (SHA-256 `00b7f561a20a061eebdb2893f9ea16e5c5a584eac7daf297db24d13980133bc8`), stderr empty (`e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`)
-full probe correctness (18 style/layout routes): `/home/zhuhe/code/litchi-worktrees/.coord/iwa-w2a-chart-font-perf-20261029-repaired/correctness-style-full.log` (SHA-256 `1006202a0d367176831b9ac1fdb4e3318c91162a1da76e550dd081eae2bb9bb9`), stderr empty (`e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`)
+full probe correctness (six font routes): `(deleted-coord-artifact)/correctness-font-full.log` (SHA-256 `00b7f561a20a061eebdb2893f9ea16e5c5a584eac7daf297db24d13980133bc8`), stderr empty (`e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`)
+full probe correctness (18 style/layout routes): `(deleted-coord-artifact)/correctness-style-full.log` (SHA-256 `1006202a0d367176831b9ac1fdb4e3318c91162a1da76e550dd081eae2bb9bb9`), stderr empty (`e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`)
 source-before SHA-256: df63cb852ca737c5e00325d166494d910392b38eb2b42b2514e78736c150f27e
 source-after SHA-256: 54882a78211ffbc616cfa6eaee0b7a88846852117d612d9277a60d9cf7104d84
 ```
@@ -254,13 +254,13 @@ normalizing any PROGRAM TOTALS. It verifies all 241 hashed artifacts/binaries
 and exactly two selected calls on every leg:
 
 ```text
-coordinator audit: /home/zhuhe/code/litchi-worktrees/.coord/iwa-w2a-chart-font-perf-20261029-repaired/matrix24-reset-isolated/coordinator-derived-audit.json
+coordinator audit: (deleted-coord-artifact)/coordinator-derived-audit.json
 audit SHA-256: 380557ce35908ea36299b7a65432a95a758bced5b49a39678b32a997e73fed55
-coordinator review: /home/zhuhe/code/litchi-worktrees/.coord/iwa-w2a-chart-font-perf-20261029-repaired/matrix24-reset-isolated/coordinator-review.json
+coordinator review: (deleted-coord-artifact)/coordinator-review.json
 review SHA-256: 57d6a6c23e73d73219fe7906e062f5899c889e568a01cd3c01035d98ac2fefaf
-call-count receipt: /home/zhuhe/code/litchi-worktrees/.coord/iwa-w2a-chart-font-perf-20261029-repaired/matrix24-reset-isolated/call-count-receipt.json (SHA-256 `e19bbdae0c9bfd1869d39b41d7b9d638af154b15573ee2873b6e2e9ffff38108`)
-historical strict-parser failure: /home/zhuhe/code/litchi-worktrees/.coord/iwa-w2a-chart-font-perf-20261029-repaired/matrix24-reset-isolated/call-audit-derived.failure.json (SHA-256 `226a8f4c7bdc28fc0c666a569d88c0965b2decbc001faa2ef44914ee38ff5740`)
-synthetic validator log: /home/zhuhe/code/litchi-worktrees/.coord/iwa-w2a-chart-font-perf-20261029-repaired/derived-validator-selftest.log
+call-count receipt: (deleted-coord-artifact)/call-count-receipt.json (SHA-256 `e19bbdae0c9bfd1869d39b41d7b9d638af154b15573ee2873b6e2e9ffff38108`)
+historical strict-parser failure: (deleted-coord-artifact)/call-audit-derived.failure.json (SHA-256 `226a8f4c7bdc28fc0c666a569d88c0965b2decbc001faa2ef44914ee38ff5740`)
+synthetic validator log: (deleted-coord-artifact)/derived-validator-selftest.log
 synthetic log SHA-256: a72c11d7f48cc0c1e4e659a05d8038b9d88d32ee36f9c71face0425df81f2914
 ```
 
@@ -282,9 +282,9 @@ merge invalidates this receipt. The release parity binary was built with one
 Cargo job, incremental compilation disabled, release debug information
 disabled, and `RUST_TEST_THREADS=1`:
 
-* binary: `/home/zhuhe/code/litchi-worktrees/.coord/iwa-w2a-chart-font-perf-target-20261029/release/deps/parity-9f6fee151a57f4bc`
+* binary: `(deleted-coord-artifact)`
 * binary size: 41,439,288 bytes; SHA-256 `258aaccd848ffde2069852ad8ed61f565170d9307d6046269c25f50474f3d9c3`
-* immutable binary archive: `/home/zhuhe/code/litchi-worktrees/.coord/iwa-w2a-chart-font-perf-20261029/parity-9f6fee151a57f4bc-release.tar`, mode `0444`, 41,441,280 bytes, SHA-256 `1325e220da1ab56c5b9548018298ab06906bf6a6183efd676e77ba14ebda2a05`
+* immutable binary archive: `(deleted-coord-artifact)/parity-9f6fee151a57f4bc-release.tar`, mode `0444`, 41,441,280 bytes, SHA-256 `1325e220da1ab56c5b9548018298ab06906bf6a6183efd676e77ba14ebda2a05`
 
 Each route used one common prepared input for its host/leaf pair. Setup and
 reset seeding occurred before the measured forward route symbols; the measured
@@ -307,7 +307,7 @@ All 12 Callgrind invocations exited 0, all route logs had an `ok` result and
 empty stderr, and every route is below the 5% slower bar. The external raw
 captures total 26,546,923 bytes. Their per-capture sizes and SHA-256 values,
 the two-repetition means, and the positive-exit markers are in
-`/home/zhuhe/code/litchi-worktrees/.coord/iwa-w2a-chart-font-perf-20261029/summary.tsv`
+`(deleted-coord-artifact)/summary.tsv`
 (SHA-256 `a412373721c6f5ebabdfd079e204705c1225b651507ef8d016a918f66fdb26e1`).
 The representative exact annotation was saved as
 `font_read.rep1.annotate.txt` (SHA-256
@@ -360,12 +360,12 @@ target, temporary and evidence directories are outside the checkout):
 ```sh
 cd /home/zhuhe/code/litchi-worktrees/uo2-iwa-w2a-chart-font
 env -u LITCHI_BLESS -u LITCHI_CAPPED \
-  PATH=/home/zhuhe/code/litchi-worktrees/.coord/bin:$PATH \
+  PATH=(deleted-coord-artifact):$PATH \
   LITCHI_MEM_MAX=20G CARGO_BUILD_JOBS=1 CARGO_INCREMENTAL=0 \
   CARGO_PROFILE_RELEASE_DEBUG=0 CARGO_PROFILE_DEV_DEBUG=0 \
   CARGO_PROFILE_TEST_DEBUG=0 CARGO_NET_OFFLINE=true RUST_TEST_THREADS=1 \
-  CARGO_TARGET_DIR=/home/zhuhe/code/litchi-worktrees/.coord/iwa-w2a-chart-font-perf-target-20261029 \
-  TMPDIR=/home/zhuhe/code/litchi-worktrees/.coord/iwa-w2a-chart-font-perf-tmp-20261029 \
+  CARGO_TARGET_DIR=(deleted-coord-artifact) \
+  TMPDIR=(deleted-coord-artifact) \
   cargo test --offline -p litchi-iwa --all-features --test parity \
     --release --no-run
 ```
@@ -406,7 +406,7 @@ W2A_ROUTE="$route" taskset -c 7 valgrind --tool=callgrind --quiet \
 All 36 invocations exited 0; route stderr was empty and every selected test
 reported `ok`. The external regression captures total 80,056,587 bytes, with
 per-capture sizes and SHA-256 values in
-`/home/zhuhe/code/litchi-worktrees/.coord/iwa-w2a-style-regression-20261029/summary.tsv`
+`(deleted-coord-artifact)/summary.tsv`
 (SHA-256 `6caab3d3f4d06a7c3aa3e3d5d19a6a4e0aaaf15214fd72a48484a4d2cdfe723d`).
 The positive exact test log is `correctness-18.log` (SHA-256
 `83c02acee0f9d1998b45327e2c21d96948ab3a856114c2e66cf77eef8e6f6aa2`), with

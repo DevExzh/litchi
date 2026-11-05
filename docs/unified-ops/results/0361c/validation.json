@@ -10,19 +10,19 @@
     ],
     "attempts": [
       {
-        "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-error-contract-c/check-1.log",
+        "path": "(deleted-coord-artifact)/check-1.log",
         "bytes": 8703,
         "sha256": "ba997da683d60151d91ed34f4fdf87d6559ec3013427b06ca7164df1c075a937",
         "exit_code": 101
       },
       {
-        "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-error-contract-c/check-2.log",
+        "path": "(deleted-coord-artifact)/check-2.log",
         "bytes": 3513,
         "sha256": "20d112e21f47c61a3c8b05cc60580a3cc38e6f25f300b5d6cbcc4c518ce3745a",
         "exit_code": 101
       },
       {
-        "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-error-contract-c/check-3.log",
+        "path": "(deleted-coord-artifact)/check-3.log",
         "bytes": 7172,
         "sha256": "1b6e673c1bae9b4c03fe0d1776cd527d3731c2c852bccd81ff02d3fa4a21adaa",
         "exit_code": 0
@@ -41,7 +41,7 @@
       ],
       "exit_code": 0,
       "seconds": 26.922,
-      "log": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-error-contract-c/fmt.log",
+      "log": "(deleted-coord-artifact)/fmt.log",
       "bytes": 0,
       "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
     },
@@ -74,7 +74,7 @@
       ],
       "exit_code": 0,
       "seconds": 85.515,
-      "log": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-error-contract-c/clippy.log",
+      "log": "(deleted-coord-artifact)/clippy.log",
       "bytes": 2151,
       "sha256": "4264d1bf490c22552405343275fc1c1ef6e6eeb2eeedd8be9f9364cd1ee091d0"
     },
@@ -95,7 +95,7 @@
       ],
       "exit_code": 0,
       "seconds": 38.477,
-      "log": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-error-contract-c/tests.log",
+      "log": "(deleted-coord-artifact)/tests.log",
       "bytes": 38077,
       "sha256": "0b937957cef35b0ee42006c4aee52a151e0714fd3e31e8b6c68bab35cf2e217a"
     },
@@ -119,7 +119,7 @@
       ],
       "exit_code": 0,
       "seconds": 34.754,
-      "log": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-error-contract-c/doc-litchi-iwa-core.log",
+      "log": "(deleted-coord-artifact)/doc-litchi-iwa-core.log",
       "bytes": 906,
       "sha256": "26d065ef2c1048eaf63ecddac8b23fcb9d47fe00169e751366894b738bf76910"
     },
@@ -143,7 +143,7 @@
       ],
       "exit_code": 0,
       "seconds": 23.724,
-      "log": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-error-contract-c/doc-litchi-iwa-archive.log",
+      "log": "(deleted-coord-artifact)/doc-litchi-iwa-archive.log",
       "bytes": 880,
       "sha256": "62ef2c5f02beed3aec313b58cc8dee717f60737e1c13f903d9c0a3b1242f226c"
     },
@@ -167,7 +167,7 @@
       ],
       "exit_code": 0,
       "seconds": 2.256,
-      "log": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-error-contract-c/doc-litchi-iwa-text.log",
+      "log": "(deleted-coord-artifact)/doc-litchi-iwa-text.log",
       "bytes": 379,
       "sha256": "cfa330653db72c252e58348a8220924019c933af9f9e9ddf3181154488a8ec8c"
     },
@@ -191,7 +191,7 @@
       ],
       "exit_code": 0,
       "seconds": 11.923,
-      "log": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-error-contract-c/doc-litchi-iwa.log",
+      "log": "(deleted-coord-artifact)/doc-litchi-iwa.log",
       "bytes": 1254,
       "sha256": "1c690dda0a31da2c2a10355187e6f71889e966bc192d6c7e19e784277c4c57ce"
     },
@@ -207,7 +207,7 @@
       ],
       "exit_code": 0,
       "seconds": 0.892,
-      "log": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-error-contract-c/glossary.log",
+      "log": "(deleted-coord-artifact)/glossary.log",
       "bytes": 125,
       "sha256": "a3fdfff0a73c40e90a0318a05dea650781417527daf4d869a8b131ea34b273b6"
     },
@@ -223,7 +223,7 @@
       ],
       "exit_code": 0,
       "seconds": 0.985,
-      "log": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-error-contract-c/perf.log",
+      "log": "(deleted-coord-artifact)/perf.log",
       "bytes": 60,
       "sha256": "e044439277e94567aefbb236231f11f25f54fbff842b9dc39f9c1ac704d91375"
     },
@@ -239,7 +239,7 @@
       ],
       "exit_code": 0,
       "seconds": 0.145,
-      "log": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-error-contract-c/resave.log",
+      "log": "(deleted-coord-artifact)/resave.log",
       "bytes": 1341,
       "sha256": "cfc8f53917bffd22425504c2521a779cb8e3ac51ed8632d67b5f5a80e682fcb7"
     }

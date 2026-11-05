@@ -17,7 +17,7 @@ diff from C has SHA-256
 `44d259a79e11059851b502cc5275a167e82e84b6cf1e679c951b99cb72a1ecb1`.
 
 The external setup packet is
-`/home/zhuhe/code/litchi-worktrees/.coord/ppt-hyperlink-crud-repair-20261025/`.
+`(deleted-coord-artifact)`.
 It binds the leaf source and execution environment without adding build
 artifacts to this repository:
 
@@ -37,7 +37,7 @@ commands used the leaf environment, offline/locked resolution, one build job
 and one test thread. They were direct capped-Cargo invocations rather than
 `run_safe_gate.run_step` executions, so their terminal observations are not
 accepted gate evidence. The external target was
-`/home/zhuhe/code/litchi-worktrees/.coord/targets/ppt-hyperlink-crud-repair/target`;
+`(deleted-coord-artifact)`;
 its observed size after the runs was 3,249,787,719 bytes (3.25 GB), below the
 20 GB target bound. A post-run process check found no `cargo`, `rustc`,
 `crud_matrix` or `litchi-ppt` process.
@@ -47,7 +47,7 @@ its observed size after the runs was 3,249,787,719 bytes (3.25 GB), below the
 The C1 full gate stopped at row 25, the PPT hyperlink add operation. The
 retained failure log is
 
-`/home/zhuhe/code/litchi-worktrees/.coord/final-gate-Cf8cd398a-20261025-v6-r2/state/ops-tests/0005.log`,
+`(deleted-coord-artifact)/0005.log`,
 376,777 bytes, SHA-256
 `235b2e984bb00d71b6aaffee237e20f9764fc822f023fdd0850298deae6727fd`.
 The corresponding terminal verification receipt is 6,769 bytes, SHA-256
@@ -154,7 +154,7 @@ vector and could not exercise OfficeArt depth admission.
 
 The external reduced ledger is intentionally not a raw Cargo log or an
 accepted runner receipt:
-`/home/zhuhe/code/litchi-worktrees/.coord/ppt-hyperlink-crud-repair-20261025/repair-158-receipt.json`,
+`(deleted-coord-artifact)/repair-158-receipt.json`,
 4,183 bytes, SHA-256
 `6a19ae530f3efc59c3b17900b6d5aacb24f51615196bf3356caa9017da0f7955`.
 It records the exact argv, source state, session identifiers, and the author's
@@ -180,7 +180,7 @@ The corrected unit command observed before the final nested-depth assertion
 was:
 
 ```text
-source /home/zhuhe/code/litchi-worktrees/.coord/ppt-hyperlink-crud-repair/env.sh &&
+source (deleted-coord-artifact) &&
 cargo test -p litchi-ppt --lib \
   odraw::tests::source_limits_intersect_officeart_safety_ceiling \
   -- --exact --nocapture
@@ -189,7 +189,7 @@ cargo test -p litchi-ppt --lib \
 The all-feature CRUD command was:
 
 ```text
-source /home/zhuhe/code/litchi-worktrees/.coord/ppt-hyperlink-crud-repair/env.sh &&
+source (deleted-coord-artifact) &&
 cargo test -p litchi-ops --all-features --test crud_matrix \
   crud_checklist_per_format -- --exact --nocapture
 ```
@@ -236,5 +236,4 @@ runner evidence:
 - `litchi_ppt-467504ad8775dece`: SHA-256
   `bf9a07f827a84e20044d3eb2a36e2777b71a8e3e4ef6ca949ed1521c96a1222a`
 
-All large evidence and binaries remain external under the coordinator
-`.coord` area. Nothing is pushed by this leaf.
+All large evidence and binaries remain external. Nothing is pushed by this leaf.

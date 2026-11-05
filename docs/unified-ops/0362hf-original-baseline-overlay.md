@@ -48,7 +48,7 @@ ROOT=/home/zhuhe/code/litchi-worktrees/uo2-w8-readiness
 SRC=/external/w8-f2-workspace
 ARCHIVE=/external/w8-f2.tar
 LOCK="$SRC/Cargo.lock"
-OUT=/external/.coord/w8-f2-preparation
+OUT=(deleted-coord-artifact)
 
 git -C "$ROOT" archive --format=tar --output="$ARCHIVE" \
   f2bbbc8d07ab5da26c180f1ff74813d39f632d54
@@ -98,7 +98,7 @@ is considered.
 
 The one permitted original-f2 build and the untimed validation have now been
 run in the external workspace
-`/home/zhuhe/code/litchi-worktrees/.coord/w8-f2-baseline-sAirXf`.  This is a
+`(deleted-coord-artifact)`.  This is a
 before-leg capability/fidelity receipt only; it makes no native qualification,
 acceptance, or performance claim.
 

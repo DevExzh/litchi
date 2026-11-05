@@ -171,7 +171,7 @@
     "docs/unified-ops/results/0359e/object-budget-probe.py": "c6d10574823d688d55aa088fe359b5bbd0b216bd3de80b6c34fbedc99df9bbd8",
     "docs/unified-ops/results/0359e/object-budget-probe.rs": "e1118dc32fa44ee41b28838408a0856b287c87565aa9ab58270f3b08513bcef4"
   },
-  "external_log_directory": "/home/zhuhe/code/litchi-worktrees/.coord/exact-limits",
+  "external_log_directory": "(deleted-coord-artifact)",
   "performance": {
     "measurements": "object-measurements.json",
     "large_replay_followup": "large-replay-followup.json",

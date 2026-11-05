@@ -6,7 +6,7 @@ readonly foreign-base no-op assertion from record134; its other four
 readonly tests and the revision test pass. Root verifies the failed terminal
 capture before changing source. Its final target occupies 487,056,388 bytes.
 Evidence under the worktree parent's
-`.coord/ooxml-pptx-joint-c780cf4c7-f5-runtime-pptx-minimal1-v1/` is preserved:
+`(deleted-coord-artifact)` is preserved:
 
 | File | Bytes | SHA-256 |
 |---|---:|---|
@@ -14,7 +14,7 @@ Evidence under the worktree parent's
 | `result.json` | 14,034 | `4899f16d03589c333ea7a06e99ce8632aba7a6a2a61fde8db80430744a912ccd` |
 
 The capture is reproducible with its source-bound `run_f5.py --go` in fresh
-state/target directories; `.coord/checkpoint96/verify_capture.py STATE`
+state/target directories; `(deleted-coord-artifact) STATE`
 checks the terminal evidence. The helper exits1, so the diagnostic adapter
 correctly refuses continuation as an ordinary direct-Cargo exit101 failure.
 No failed result is relabelled.
@@ -31,7 +31,7 @@ The composed commit is `e7841dd222f17a00abe79c5ae034ad18cde3f45d`, tree
 `997c04a1e5b5014131c99d678508cb5617bdaa7f`. All five changed files exactly
 match their reviewed leaves, and all three approved role locks are unchanged.
 The external composition proof is
-`.coord/runtime-repair-composition-0362ul140.json`, 2,081 bytes, SHA-256
+`(deleted-coord-artifact)/runtime-repair-composition-0362ul140.json`, 2,081 bytes, SHA-256
 `162a419604586af62732c67eb76e93d82fbded25e7e14f31539b7df939f65b92`.
 The integrated glossary/raw-coverage suite passes all 75 Python tests.
 Repaired-source Rust runtime qualification remains pending.
@@ -42,7 +42,7 @@ It will run once on the final composed source, with six distinct compiler
 profiles and five distinct runtime profiles added. Isolated wsdoc row34 and
 core/ops/facade rustdoc row36 remain mandatory. Exact command coverage and
 the unchanged resource guards are recorded in
-`.coord/final-gate-coverage-780cf4c7/coverage-map.json`, 19,676 bytes, SHA-256
+`(deleted-coord-artifact)/coverage-map.json`, 19,676 bytes, SHA-256
 `059eb2c0f076dd5c6072482255aa950cd1e135325367afe773a8f7e8d40b0bde`.
 This map is a plan, not an execution receipt. The C-only outer16 and minimal
 tail packets remain inert; their required coverage will run on repaired

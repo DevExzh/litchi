@@ -37,16 +37,16 @@ ordinary staged canonical write.
 
 The final source commit was validated with the memory-capped cargo shim, one
 job, `CARGO_INCREMENTAL=0`, debug information disabled, offline locked
-resolution, and `TMPDIR=/home/zhuhe/code/litchi-worktrees/.coord/odg-joined-v4/tmp`.
+resolution, and `TMPDIR=(deleted-coord-artifact)`.
 The isolated target was
-`/home/zhuhe/code/litchi-worktrees/.coord/odg-joined-v2/target`, measured at
+`(deleted-coord-artifact)`, measured at
 415 MiB after the run.  External receipts are intentionally not tracked:
 
 | Command | Receipt | Size | SHA-256 |
 |---|---|---:|---|
-| `cargo check --offline --locked --all-targets --all-features -p litchi-odg -j 1` | `.coord/odg-joined-v4/u-final-check2.log` | 162 bytes | `36c58d9dd887a198d3592545144b14c3a6eb539f8121deb569529e1ca3538814` |
-| `cargo clippy --offline --locked --all-targets --all-features -p litchi-odg -j 1 -- -D warnings` | `.coord/odg-joined-v4/u-final-clippy.log` | 162 bytes | `22cd5daeeb732537aa1078eb577e027bba3bb114d8b504140ff3d655acd54edd` |
-| `cargo test --offline --locked --all-features -p litchi-odg --test package_semantics --test transition_review --test capability_transactions -j 1` | `.coord/odg-joined-v4/u-final-tests.log` | 5078 bytes | `ccca2182bfbbfb310b06885915941b76f0e667864c20b0e05df930107167e060` |
+| `cargo check --offline --locked --all-targets --all-features -p litchi-odg -j 1` | `(deleted-coord-artifact)/u-final-check2.log` | 162 bytes | `36c58d9dd887a198d3592545144b14c3a6eb539f8121deb569529e1ca3538814` |
+| `cargo clippy --offline --locked --all-targets --all-features -p litchi-odg -j 1 -- -D warnings` | `(deleted-coord-artifact)/u-final-clippy.log` | 162 bytes | `22cd5daeeb732537aa1078eb577e027bba3bb114d8b504140ff3d655acd54edd` |
+| `cargo test --offline --locked --all-features -p litchi-odg --test package_semantics --test transition_review --test capability_transactions -j 1` | `(deleted-coord-artifact)/u-final-tests.log` | 5078 bytes | `ccca2182bfbbfb310b06885915941b76f0e667864c20b0e05df930107167e060` |
 
 The final focused run passed 8 capability tests, 26 package-semantic tests,
 and 21 transition-review tests (55 total).  The standalone transition rerun

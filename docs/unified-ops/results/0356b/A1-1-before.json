@@ -10,7 +10,7 @@
     "instrumentation": "none"
   },
   "binary_identity": {
-    "path": "/home/zhuhe/code/litchi-worktrees/.coord/w2-pptx/base-target/release/litchi-perf-baseline",
+    "path": "(deleted-coord-artifact)/litchi-perf-baseline",
     "binary_sha256": "1426b40f5568448f61d598b7d180401c419987e6b466bc3ad679d90199b742e1",
     "binary_bytes": 97041976,
     "mode_bits": 509,

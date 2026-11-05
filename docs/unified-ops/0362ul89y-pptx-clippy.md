@@ -30,7 +30,7 @@ No runtime, corpus or performance result is inferred; a fresh strict-Clippy
 capture and downstream qualification remain required.
 
 The actual capture remains outside Git at
-`/home/zhuhe/code/litchi-worktrees/.coord/pptx-combined-0362ul89-f5-qualification-v2-02b2489ead`.
+`(deleted-coord-artifact)`.
 
 | Artifact | Bytes | SHA-256 |
 | --- | ---: | --- |
@@ -40,7 +40,7 @@ The actual capture remains outside Git at
 | `result.json` | 37,850 | `5878d7e3ed980656fefa0ddb83823d3fa077e3041ee8cde4cf058f0f092f1274` |
 
 The source patch is retained outside Git at
-`/home/zhuhe/code/litchi-worktrees/.coord/0362ul89y-pptx-clippy.patch`:
+`(deleted-coord-artifact)/0362ul89y-pptx-clippy.patch`:
 6,007 bytes, SHA-256
 `c40f95414777d4b3c9e2bbfd29c631b7a11b36c8a927d72e4cc6a55a6227840c`.
 No Cargo, build or rustdoc command was run for this repair.

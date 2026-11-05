@@ -517,49 +517,49 @@
   ],
   "artifacts": [
     {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-raw-limits/native-v3/measurements.json",
+      "path": "(deleted-coord-artifact)/measurements.json",
       "bytes": 254509,
       "sha256": "490ebf39ae596a6153cccbf9ca74f7b72ad670ef0fbdc69c3bbbd6291cd7746a"
     },
     {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-raw-limits/native-v3/samples.jsonl",
+      "path": "(deleted-coord-artifact)/samples.jsonl",
       "bytes": 183106,
       "sha256": "152a1ac40752d6c64ec21ea6006845a819fefd31005c4f9eb013d91d312b0586"
     },
     {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-raw-limits/native-v3.log",
+      "path": "(deleted-coord-artifact)/native-v3.log",
       "bytes": 1425,
       "sha256": "89bd05f651bd645de93ff8b509e0dd140ba461c6dde9f245fc3ba993181675e7"
     }
   ],
   "build_artifacts": [
     {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-raw-limits/probe-v3/before/source-digests.json",
+      "path": "(deleted-coord-artifact)/source-digests.json",
       "bytes": 59186,
       "sha256": "baa5273285bfbfd5ed8b37116836876281bb87be61ea38e430285e77dd2ddbf7"
     },
     {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-raw-limits/probe-v3/before/build-timed.log",
+      "path": "(deleted-coord-artifact)/build-timed.log",
       "bytes": 4047,
       "sha256": "3c7fefa83c743efa510c8d60c5f60bc24716254cbc27c42f628b4874aa9eecbc"
     },
     {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-raw-limits/probe-v3/before/build-allocations.log",
+      "path": "(deleted-coord-artifact)/build-allocations.log",
       "bytes": 259,
       "sha256": "93ca956dbd2b26ef6da02d33f3bbe50c2cb494ecf71bbfec8ff8f9f54a92b178"
     },
     {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-raw-limits/probe-v3/after/source-digests.json",
+      "path": "(deleted-coord-artifact)/source-digests.json",
       "bytes": 59186,
       "sha256": "72a3dcddcdb0e7aada675c745fc7afd4ab06344a52069944be625389836af16d"
     },
     {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-raw-limits/probe-v3/after/build-timed.log",
+      "path": "(deleted-coord-artifact)/build-timed.log",
       "bytes": 4038,
       "sha256": "c398c6ab1c0fc253c3008933bfdee5e95d936849c14336c9507e88fac651f214"
     },
     {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-raw-limits/probe-v3/after/build-allocations.log",
+      "path": "(deleted-coord-artifact)/build-allocations.log",
       "bytes": 258,
       "sha256": "815d81d12a5e243800d74d423b6d4112c57c152d1cb78699b98159a64a412c50"
     }
@@ -568,9 +568,9 @@
     "python3",
     "docs/unified-ops/results/0361d/snappy-probe.py",
     "run",
-    "/home/zhuhe/code/litchi-worktrees/.coord/iwa-raw-limits/probe-v3",
+    "(deleted-coord-artifact)",
     "--results-dir",
-    "/home/zhuhe/code/litchi-worktrees/.coord/iwa-raw-limits/native-v3",
+    "(deleted-coord-artifact)",
     "--blocks",
     "5",
     "--target-ms",

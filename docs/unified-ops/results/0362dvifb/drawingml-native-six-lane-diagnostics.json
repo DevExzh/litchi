@@ -51,7 +51,7 @@
   "build": {
     "cwd": "/home/zhuhe/code/litchi-worktrees/uo2-drawingml-native-raw-repair",
     "argv": [
-      "/home/zhuhe/code/litchi-worktrees/.coord/bin/cargo",
+      "(deleted-coord-artifact)",
       "build",
       "--manifest-path",
       "tools/perf-baseline/Cargo.toml",
@@ -62,7 +62,7 @@
       "--offline",
       "--locked",
       "--target-dir",
-      "/home/zhuhe/code/litchi-worktrees/.coord/drawingml-native-raw-repair-target",
+      "(deleted-coord-artifact)",
       "-j",
       "1"
     ],
@@ -75,7 +75,7 @@
       "CARGO_INCREMENTAL": "0",
       "CARGO_PROFILE_DEV_DEBUG": "0",
       "CARGO_PROFILE_TEST_DEBUG": "0",
-      "PATH_prepend": "/home/zhuhe/code/litchi-worktrees/.coord/bin"
+      "PATH_prepend": "(deleted-coord-artifact)"
     },
     "features": [
       "current-api",
@@ -91,20 +91,20 @@
     "jobs": 1,
     "exit": 0,
     "binary": {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/drawingml-native-raw-repair-target/debug/drawingml-raw-native",
+      "path": "(deleted-coord-artifact)/drawingml-raw-native",
       "bytes": 25154104,
       "sha256": "82182f0ba0fb5ba174a0ecff5430d1f702a35eae4595e17a308e47ac09378430"
     },
     "target_after_bytes": 5419181476,
     "debug_log": {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/drawingml-native-raw-six.yo47Ie/debug-build.log",
+      "path": "(deleted-coord-artifact)/debug-build.log",
       "bytes": 32310,
       "sha256": "d81620e05b31f906ffac227b859856b15c9855d8ca0158b0488e348d4a721940"
     },
     "canceled_release_attempt": {
       "exit": 130,
       "log": {
-        "path": "/home/zhuhe/code/litchi-worktrees/.coord/drawingml-native-raw-six.yo47Ie/build.log",
+        "path": "(deleted-coord-artifact)/build.log",
         "bytes": 10406,
         "sha256": "3442479a3af8f10185fcef6f603245d1d4ae6c716f8a58a671b61e2c2a76dfd3"
       },
@@ -114,17 +114,17 @@
   "runtime": {
     "cwd": "/home/zhuhe/code/litchi-worktrees/uo2-drawingml-native-raw-repair",
     "command_log": {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/drawingml-native-raw-six.yo47Ie/runtime-commands.txt",
+      "path": "(deleted-coord-artifact)/runtime-commands.txt",
       "bytes": 4134,
       "sha256": "278fcb5cc24b93f80a25c549f604127427265f6c15c6b4a8ee52a210ebb41b13"
     },
     "environment_log": {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/drawingml-native-raw-six.yo47Ie/runtime-env.txt",
+      "path": "(deleted-coord-artifact)/runtime-env.txt",
       "bytes": 230,
       "sha256": "286bd7a02463dc27a4d4a9cdbafc867211bfa96c9fe8b4cd9c44f610c8c11ca0"
     },
     "summary_log": {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/drawingml-native-raw-six.yo47Ie/runtime-summary.txt",
+      "path": "(deleted-coord-artifact)/runtime-summary.txt",
       "bytes": 314,
       "sha256": "4c1f36ab4d6b7ad067c7a6fb69c55fb3c23025d6c5b9b2161bfd4c290ea0505c"
     },
@@ -145,7 +145,7 @@
       {
         "id": "chart",
         "report": {
-          "path": "/home/zhuhe/code/litchi-worktrees/.coord/drawingml-native-raw-six.yo47Ie/normal/drawingml-chart-raw.json",
+          "path": "(deleted-coord-artifact)/drawingml-chart-raw.json",
           "bytes": 61312,
           "sha256": "d6089c16935600702d31ebf861df73abb1ebceaa8af1dac43a0a91f581d5e217"
         },
@@ -157,12 +157,12 @@
         "process_exit": 0,
         "sidecars": {
           "stdout": {
-            "path": "/home/zhuhe/code/litchi-worktrees/.coord/drawingml-native-raw-six.yo47Ie/normal/drawingml-chart-raw.stdout",
+            "path": "(deleted-coord-artifact)/drawingml-chart-raw.stdout",
             "bytes": 0,
             "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
           },
           "stderr": {
-            "path": "/home/zhuhe/code/litchi-worktrees/.coord/drawingml-native-raw-six.yo47Ie/normal/drawingml-chart-raw.stderr",
+            "path": "(deleted-coord-artifact)/drawingml-chart-raw.stderr",
             "bytes": 2232,
             "sha256": "af69c60ab304faf1face3c6c5959956b0b25daa6091041b6d8a7d07a9655f1f4"
           }
@@ -353,7 +353,7 @@
       {
         "id": "diagram",
         "report": {
-          "path": "/home/zhuhe/code/litchi-worktrees/.coord/drawingml-native-raw-six.yo47Ie/normal/drawingml-diagram-raw.json",
+          "path": "(deleted-coord-artifact)/drawingml-diagram-raw.json",
           "bytes": 61248,
           "sha256": "c8b7042217adeeb2985b7e461a5c67a8ce0e9ca0fb9786d82a0425b71e49542e"
         },
@@ -365,12 +365,12 @@
         "process_exit": 0,
         "sidecars": {
           "stdout": {
-            "path": "/home/zhuhe/code/litchi-worktrees/.coord/drawingml-native-raw-six.yo47Ie/normal/drawingml-diagram-raw.stdout",
+            "path": "(deleted-coord-artifact)/drawingml-diagram-raw.stdout",
             "bytes": 0,
             "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
           },
           "stderr": {
-            "path": "/home/zhuhe/code/litchi-worktrees/.coord/drawingml-native-raw-six.yo47Ie/normal/drawingml-diagram-raw.stderr",
+            "path": "(deleted-coord-artifact)/drawingml-diagram-raw.stderr",
             "bytes": 2232,
             "sha256": "6c22219b9951784aad772cf54e7ce2e1d81f47beca9148fc6f5df4f56616956b"
           }
@@ -561,7 +561,7 @@
       {
         "id": "text_media",
         "report": {
-          "path": "/home/zhuhe/code/litchi-worktrees/.coord/drawingml-native-raw-six.yo47Ie/normal/drawingml-text-media-raw.json",
+          "path": "(deleted-coord-artifact)/drawingml-text-media-raw.json",
           "bytes": 79084,
           "sha256": "4b1a356f58303cb6cac2d2a28262afc8abb1b1722d07d0d9cf08be1f69156afb"
         },
@@ -573,12 +573,12 @@
         "process_exit": 0,
         "sidecars": {
           "stdout": {
-            "path": "/home/zhuhe/code/litchi-worktrees/.coord/drawingml-native-raw-six.yo47Ie/normal/drawingml-text-media-raw.stdout",
+            "path": "(deleted-coord-artifact)/drawingml-text-media-raw.stdout",
             "bytes": 0,
             "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
           },
           "stderr": {
-            "path": "/home/zhuhe/code/litchi-worktrees/.coord/drawingml-native-raw-six.yo47Ie/normal/drawingml-text-media-raw.stderr",
+            "path": "(deleted-coord-artifact)/drawingml-text-media-raw.stderr",
             "bytes": 2239,
             "sha256": "7075de856b88d7f31fe9f07cb4262c73343ec9ace2d25f78988398c22bcb35bf"
           }
@@ -1096,7 +1096,7 @@
       {
         "id": "theme_ink_bulk",
         "report": {
-          "path": "/home/zhuhe/code/litchi-worktrees/.coord/drawingml-native-raw-six.yo47Ie/normal/drawingml-theme-ink.json",
+          "path": "(deleted-coord-artifact)/drawingml-theme-ink.json",
           "bytes": 67713,
           "sha256": "f7cea2a8881e77f1d88bbf7fe55096045b320967f546f67342a378308ee65ca7"
         },
@@ -1417,7 +1417,7 @@
       {
         "id": "geometry",
         "report": {
-          "path": "/home/zhuhe/code/litchi-worktrees/.coord/drawingml-native-raw-six.yo47Ie/normal/drawingml-geometry-color-formatcode2-transform.json",
+          "path": "(deleted-coord-artifact)/drawingml-geometry-color-formatcode2-transform.json",
           "bytes": 80771,
           "sha256": "0a16b9762bf447d394338cc8fedb0a841539056f1b31fbe3c87d936c77b22b51"
         },
@@ -1429,12 +1429,12 @@
         "process_exit": 0,
         "sidecars": {
           "stdout": {
-            "path": "/home/zhuhe/code/litchi-worktrees/.coord/drawingml-native-raw-six.yo47Ie/normal/drawingml-geometry-color-formatcode2-transform.stdout",
+            "path": "(deleted-coord-artifact)/drawingml-geometry-color-formatcode2-transform.stdout",
             "bytes": 0,
             "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
           },
           "stderr": {
-            "path": "/home/zhuhe/code/litchi-worktrees/.coord/drawingml-native-raw-six.yo47Ie/normal/drawingml-geometry-color-formatcode2-transform.stderr",
+            "path": "(deleted-coord-artifact)/drawingml-geometry-color-formatcode2-transform.stderr",
             "bytes": 2280,
             "sha256": "85fc27efacef9599dfd146c08be12e784e1c8a0eb8a9bc656381cf7220f81fe3"
           }
@@ -1970,7 +1970,7 @@
       {
         "id": "theme_family",
         "report": {
-          "path": "/home/zhuhe/code/litchi-worktrees/.coord/drawingml-native-raw-six.yo47Ie/normal/drawingml-theme-family-raw.json",
+          "path": "(deleted-coord-artifact)/drawingml-theme-family-raw.json",
           "bytes": 63572,
           "sha256": "c7dd9729c978e3b5421b526d41a9cc9f3371ef2fd43a49fddc87350d61a9fe3c"
         },
@@ -1982,12 +1982,12 @@
         "process_exit": 0,
         "sidecars": {
           "stdout": {
-            "path": "/home/zhuhe/code/litchi-worktrees/.coord/drawingml-native-raw-six.yo47Ie/normal/drawingml-theme-family-raw.stdout",
+            "path": "(deleted-coord-artifact)/drawingml-theme-family-raw.stdout",
             "bytes": 0,
             "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
           },
           "stderr": {
-            "path": "/home/zhuhe/code/litchi-worktrees/.coord/drawingml-native-raw-six.yo47Ie/normal/drawingml-theme-family-raw.stderr",
+            "path": "(deleted-coord-artifact)/drawingml-theme-family-raw.stderr",
             "bytes": 2253,
             "sha256": "91850492705175c058703ef7e19e7470fb1d1d81e812bb00112e493f26facb83"
           }
@@ -2228,7 +2228,7 @@
       "exit": 1,
       "reason": "JSON output path already existed; no report was accepted from this attempt. Its stderr sidecar is retained externally.",
       "stderr": {
-        "path": "/home/zhuhe/code/litchi-worktrees/.coord/drawingml-native-raw-six.yo47Ie/normal/drawingml-theme-ink.stderr",
+        "path": "(deleted-coord-artifact)/drawingml-theme-ink.stderr",
         "bytes": 2760,
         "sha256": "77c5f8641a504212972ab9a1dc71b4fd5663bfcac2c30b0dc63dbf6e2483b0f5"
       }
@@ -2237,125 +2237,125 @@
   },
   "external_artifacts": {
     "runtime-commands.txt": {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/drawingml-native-raw-six.yo47Ie/runtime-commands.txt",
+      "path": "(deleted-coord-artifact)/runtime-commands.txt",
       "bytes": 4134,
       "sha256": "278fcb5cc24b93f80a25c549f604127427265f6c15c6b4a8ee52a210ebb41b13"
     },
     "runtime-env.txt": {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/drawingml-native-raw-six.yo47Ie/runtime-env.txt",
+      "path": "(deleted-coord-artifact)/runtime-env.txt",
       "bytes": 230,
       "sha256": "286bd7a02463dc27a4d4a9cdbafc867211bfa96c9fe8b4cd9c44f610c8c11ca0"
     },
     "runtime-summary.txt": {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/drawingml-native-raw-six.yo47Ie/runtime-summary.txt",
+      "path": "(deleted-coord-artifact)/runtime-summary.txt",
       "bytes": 314,
       "sha256": "4c1f36ab4d6b7ad067c7a6fb69c55fb3c23025d6c5b9b2161bfd4c290ea0505c"
     },
     "debug-build.log": {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/drawingml-native-raw-six.yo47Ie/debug-build.log",
+      "path": "(deleted-coord-artifact)/debug-build.log",
       "bytes": 32310,
       "sha256": "d81620e05b31f906ffac227b859856b15c9855d8ca0158b0488e348d4a721940"
     },
     "build.log": {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/drawingml-native-raw-six.yo47Ie/build.log",
+      "path": "(deleted-coord-artifact)/build.log",
       "bytes": 10406,
       "sha256": "3442479a3af8f10185fcef6f603245d1d4ae6c716f8a58a671b61e2c2a76dfd3"
     },
     "normal/drawingml-chart-raw.json": {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/drawingml-native-raw-six.yo47Ie/normal/drawingml-chart-raw.json",
+      "path": "(deleted-coord-artifact)/drawingml-chart-raw.json",
       "bytes": 61312,
       "sha256": "d6089c16935600702d31ebf861df73abb1ebceaa8af1dac43a0a91f581d5e217"
     },
     "normal/drawingml-chart-raw.stderr": {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/drawingml-native-raw-six.yo47Ie/normal/drawingml-chart-raw.stderr",
+      "path": "(deleted-coord-artifact)/drawingml-chart-raw.stderr",
       "bytes": 2232,
       "sha256": "af69c60ab304faf1face3c6c5959956b0b25daa6091041b6d8a7d07a9655f1f4"
     },
     "normal/drawingml-chart-raw.stdout": {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/drawingml-native-raw-six.yo47Ie/normal/drawingml-chart-raw.stdout",
+      "path": "(deleted-coord-artifact)/drawingml-chart-raw.stdout",
       "bytes": 0,
       "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
     },
     "normal/drawingml-diagram-raw.json": {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/drawingml-native-raw-six.yo47Ie/normal/drawingml-diagram-raw.json",
+      "path": "(deleted-coord-artifact)/drawingml-diagram-raw.json",
       "bytes": 61248,
       "sha256": "c8b7042217adeeb2985b7e461a5c67a8ce0e9ca0fb9786d82a0425b71e49542e"
     },
     "normal/drawingml-diagram-raw.stderr": {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/drawingml-native-raw-six.yo47Ie/normal/drawingml-diagram-raw.stderr",
+      "path": "(deleted-coord-artifact)/drawingml-diagram-raw.stderr",
       "bytes": 2232,
       "sha256": "6c22219b9951784aad772cf54e7ce2e1d81f47beca9148fc6f5df4f56616956b"
     },
     "normal/drawingml-diagram-raw.stdout": {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/drawingml-native-raw-six.yo47Ie/normal/drawingml-diagram-raw.stdout",
+      "path": "(deleted-coord-artifact)/drawingml-diagram-raw.stdout",
       "bytes": 0,
       "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
     },
     "normal/drawingml-geometry-color-formatcode2-transform.json": {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/drawingml-native-raw-six.yo47Ie/normal/drawingml-geometry-color-formatcode2-transform.json",
+      "path": "(deleted-coord-artifact)/drawingml-geometry-color-formatcode2-transform.json",
       "bytes": 80771,
       "sha256": "0a16b9762bf447d394338cc8fedb0a841539056f1b31fbe3c87d936c77b22b51"
     },
     "normal/drawingml-geometry-color-formatcode2-transform.stderr": {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/drawingml-native-raw-six.yo47Ie/normal/drawingml-geometry-color-formatcode2-transform.stderr",
+      "path": "(deleted-coord-artifact)/drawingml-geometry-color-formatcode2-transform.stderr",
       "bytes": 2280,
       "sha256": "85fc27efacef9599dfd146c08be12e784e1c8a0eb8a9bc656381cf7220f81fe3"
     },
     "normal/drawingml-geometry-color-formatcode2-transform.stdout": {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/drawingml-native-raw-six.yo47Ie/normal/drawingml-geometry-color-formatcode2-transform.stdout",
+      "path": "(deleted-coord-artifact)/drawingml-geometry-color-formatcode2-transform.stdout",
       "bytes": 0,
       "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
     },
     "normal/drawingml-text-media-raw.json": {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/drawingml-native-raw-six.yo47Ie/normal/drawingml-text-media-raw.json",
+      "path": "(deleted-coord-artifact)/drawingml-text-media-raw.json",
       "bytes": 79084,
       "sha256": "4b1a356f58303cb6cac2d2a28262afc8abb1b1722d07d0d9cf08be1f69156afb"
     },
     "normal/drawingml-text-media-raw.stderr": {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/drawingml-native-raw-six.yo47Ie/normal/drawingml-text-media-raw.stderr",
+      "path": "(deleted-coord-artifact)/drawingml-text-media-raw.stderr",
       "bytes": 2239,
       "sha256": "7075de856b88d7f31fe9f07cb4262c73343ec9ace2d25f78988398c22bcb35bf"
     },
     "normal/drawingml-text-media-raw.stdout": {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/drawingml-native-raw-six.yo47Ie/normal/drawingml-text-media-raw.stdout",
+      "path": "(deleted-coord-artifact)/drawingml-text-media-raw.stdout",
       "bytes": 0,
       "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
     },
     "normal/drawingml-theme-family-raw.json": {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/drawingml-native-raw-six.yo47Ie/normal/drawingml-theme-family-raw.json",
+      "path": "(deleted-coord-artifact)/drawingml-theme-family-raw.json",
       "bytes": 63572,
       "sha256": "c7dd9729c978e3b5421b526d41a9cc9f3371ef2fd43a49fddc87350d61a9fe3c"
     },
     "normal/drawingml-theme-family-raw.stderr": {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/drawingml-native-raw-six.yo47Ie/normal/drawingml-theme-family-raw.stderr",
+      "path": "(deleted-coord-artifact)/drawingml-theme-family-raw.stderr",
       "bytes": 2253,
       "sha256": "91850492705175c058703ef7e19e7470fb1d1d81e812bb00112e493f26facb83"
     },
     "normal/drawingml-theme-family-raw.stdout": {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/drawingml-native-raw-six.yo47Ie/normal/drawingml-theme-family-raw.stdout",
+      "path": "(deleted-coord-artifact)/drawingml-theme-family-raw.stdout",
       "bytes": 0,
       "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
     },
     "normal/drawingml-theme-ink.json": {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/drawingml-native-raw-six.yo47Ie/normal/drawingml-theme-ink.json",
+      "path": "(deleted-coord-artifact)/drawingml-theme-ink.json",
       "bytes": 67713,
       "sha256": "f7cea2a8881e77f1d88bbf7fe55096045b320967f546f67342a378308ee65ca7"
     },
     "normal/drawingml-theme-ink.stderr": {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/drawingml-native-raw-six.yo47Ie/normal/drawingml-theme-ink.stderr",
+      "path": "(deleted-coord-artifact)/drawingml-theme-ink.stderr",
       "bytes": 2760,
       "sha256": "77c5f8641a504212972ab9a1dc71b4fd5663bfcac2c30b0dc63dbf6e2483b0f5"
     },
     "normal/drawingml-theme-ink.stdout": {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/drawingml-native-raw-six.yo47Ie/normal/drawingml-theme-ink.stdout",
+      "path": "(deleted-coord-artifact)/drawingml-theme-ink.stdout",
       "bytes": 0,
       "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
     }
   },
   "preserved_prior_diagnostics": [
-    "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/drawingml-native-dvif-v5",
-    "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/drawingml-native-dvif-v7",
-    "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/drawingml-native-5c67/compile-preflight-diagnostics.json"
+    "(deleted-coord-artifact)",
+    "(deleted-coord-artifact)",
+    "(deleted-coord-artifact)"
   ],
-  "evidence_policy": "Only this reduced receipt is committed. The six reports, sidecars, build logs, binary, and target remain external under .coord; no binary or evidence file is added to the repository."
+  "evidence_policy": "Only this reduced receipt is committed. The six reports, sidecars, build logs, binary, and target remain external; no binary or evidence file is added to the repository."
 }

@@ -8,7 +8,7 @@ and 1,386 filtered out in 4.52 seconds. Final target size is 798,501,049 bytes.
 Root verifies every receipt, source/three-lock fence, command, log/trace,
 resource guard and terminal ownership; the persistent session exits 0.
 
-Capture: `.coord/pptx-combined-0362ul89-f5-qualification-e10039df1c`.
+Capture: `(deleted-coord-artifact)`.
 
 | Artifact | Bytes | SHA-256 |
 |---|---:|---|

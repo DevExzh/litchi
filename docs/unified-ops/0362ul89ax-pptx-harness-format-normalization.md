@@ -12,7 +12,7 @@ Before normalization, the isolated 89aw baseline has identical bytes. It must
 receive exactly this normalization before any paired build.
 
 Preimage and postimage remain outside Git in
-`.coord/pptx-combined-0362ul89/format-89ax/`:
+`(deleted-coord-artifact)`:
 
 | File | Bytes | SHA-256 |
 |---|---:|---|
@@ -20,7 +20,7 @@ Preimage and postimage remain outside Git in
 | `lib.rs.after` | 3,088,522 | `bc99dc96f72de24ca00e3dbab687bb9b9d059edd59f392a7be1885015a0732ab` |
 
 The 0362ul89-f5-consumer-v2-cc2 packet is retained at
-`.coord/pptx-combined-0362ul89-f5-consumer-v2-cc2ab3f79d`. Its `rows.json`
+`(deleted-coord-artifact)`. Its `rows.json`
 is 28,747 bytes, SHA-256
 `0a230a2d2df8a128a8b350cb27ca7e072de73eef3d06e98f657ff5c3a69a0cd6`;
 `result.json` is 30,250 bytes, SHA-256

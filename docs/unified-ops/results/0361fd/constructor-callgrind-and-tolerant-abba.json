@@ -1,7 +1,7 @@
 {
  "binaries": [
-  "3d3757b48de3488dac1a36ca628fe4987fbbba16743cdef5013a014afb5719fd  /home/zhuhe/code/litchi-worktrees/.coord/constructor-0361f-coordinator/matched-v5/build-base/constructor-native",
-  "4eebb855c17f7342a5e0959cb317850d920242f87691f8b03ab8922fb929b64c  /home/zhuhe/code/litchi-worktrees/.coord/constructor-0361f-coordinator/matched-v5/build-candidate/constructor-native"
+  "3d3757b48de3488dac1a36ca628fe4987fbbba16743cdef5013a014afb5719fd  (deleted-coord-artifact)/constructor-native",
+  "4eebb855c17f7342a5e0959cb317850d920242f87691f8b03ab8922fb929b64c  (deleted-coord-artifact)/constructor-native"
  ],
  "routes": {
   "field_path": {

@@ -28,7 +28,7 @@ limits argument. No public compatibility alias remains.
 
 All commands were run from the branch worktree with the capped environment,
 `CARGO_BUILD_JOBS=2`, `RUST_TEST_THREADS=2`, `LITCHI_MEM_MAX=20G`, and the
-external target `/home/zhuhe/code/litchi-worktrees/.coord/w8-docx-story-target`.
+external target `(deleted-coord-artifact)`.
 
 - `cargo check --offline -p litchi-docx --tests` — passed.
 - `cargo test --offline -p litchi-docx --test source_backed_story_text --test source_backed_secondary_story_text --test source_backed_glossary_story_text` — 57 passed. Receipt: `targeted-tests-final.log`, 5,192 bytes, SHA-256
@@ -41,5 +41,5 @@ external target `/home/zhuhe/code/litchi-worktrees/.coord/w8-docx-story-target`.
 - Targeted rustfmt checks for all changed Rust files — passed.
 
 The receipts remain outside the repository under
-`/home/zhuhe/code/litchi-worktrees/.coord/w8-docx-story-text/`; no binaries or
+`(deleted-coord-artifact)`; no binaries or
 large evidence files are committed.

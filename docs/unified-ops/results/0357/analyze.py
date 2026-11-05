@@ -1,5 +1,5 @@
 import json, glob, statistics, collections
-D='/home/zhuhe/code/litchi-worktrees/.coord/w3-ppt/perf/'
+D='/deleted-coord-artifact/'
 rows=collections.defaultdict(lambda: {'before':[], 'after':[]})
 for f in glob.glob(D+'*-*-[0-9].json'):
     kind, leg, _ = f.rsplit('/',1)[1][:-5].split('-')

@@ -24,27 +24,27 @@
   "quarantine_regular_modes": "664",
   "artifacts": {
     "manifest.json": {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/worktree-cleanup-2026-10-23/quarantine/wave46/manifest.json",
+      "path": "(deleted-coord-artifact)/manifest.json",
       "bytes": 82605,
       "sha256": "0fde1ea674be9823f0e79f10ee6bd90a88e768b177a20f09cdf755368b7bd2fa"
     },
     "receipt.json": {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/worktree-cleanup-2026-10-23/quarantine/wave46/receipt.json",
+      "path": "(deleted-coord-artifact)/receipt.json",
       "bytes": 143657,
       "sha256": "1a84eebfc96fc24b3abc6d5c72e79005ca38986684e191f34cb3485c45cdcb39"
     },
     "drawingml-native-rss-repair-receipt.json": {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/worktree-cleanup-2026-10-23/quarantine/wave46/drawingml-native-rss-repair-receipt.json",
+      "path": "(deleted-coord-artifact)/drawingml-native-rss-repair-receipt.json",
       "bytes": 143122,
       "sha256": "9d2868011fd99806349d7d1be084372c6aa9d69a62584910f82187d00969d18e"
     },
     "ppt-lazy-native-protocol-receipt.json": {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/worktree-cleanup-2026-10-23/quarantine/wave46/ppt-lazy-native-protocol-receipt.json",
+      "path": "(deleted-coord-artifact)/ppt-lazy-native-protocol-receipt.json",
       "bytes": 143113,
       "sha256": "75fe732e7d539a01bec8a8b5aa2ac0f5ee34d8fe09ed8347dc386905883ed132"
     },
     "restore-check.json": {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/worktree-cleanup-2026-10-23/quarantine/wave46/restore-check.json",
+      "path": "(deleted-coord-artifact)/restore-check.json",
       "bytes": 7501,
       "sha256": "56cdc1d16f7810450d79c5a7568aa8fabea8646cb8510793830cc73ddbdbcfd1"
     }

@@ -13,7 +13,7 @@ retains the same `CHAR` charge and emitted bytes.
 
 The external f5 receipt is:
 
-    /home/zhuhe/code/litchi-worktrees/.coord/formula-raw-policy-328fe19328/state/07-formula-affected-clippy-attempt-affected-clippy.log
+    (deleted-coord-artifact)/07-formula-affected-clippy-attempt-affected-clippy.log
     829 bytes, SHA-256 75c6fd4c291eb7f8a9d1048cffe09f6bf7cb5f06e066fd734d1d5c9a78695f87
 
 The command exited 101 at the first package, with no resource or provenance

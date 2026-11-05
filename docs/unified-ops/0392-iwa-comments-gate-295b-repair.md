@@ -100,7 +100,7 @@ The affected generated documents were checked against `target/api-glossary`
 with `RUSTC_BOOTSTRAP=1` using `--profile iwa-table`,
 `--profile numbers-minimal`, and `--profile numbers-full`; all three passed.
 The current external receipts are under
-`/home/zhuhe/code/litchi-worktrees/.coord/iwa-w1g-comments-gate-6eebe0bab3/gates/`.
+`(deleted-coord-artifact)`.
 The original six Numbers comment suites and the 13-case clear-safety run were
 rerun after the proof-only merge; their external receipts are
 `original-six/run.log` and `gates/clear-safety-13.log` in that directory.
@@ -110,7 +110,7 @@ rerun after the proof-only merge; their external receipts are
 The authorized 12-route matrix was rerun on runtime source
 `67427c20f10dc51f45e772f08da6c1763a04505d` using the feature-enabled release
 parity test binary. The immutable binary is external at
-`/home/zhuhe/code/litchi-worktrees/.coord/iwa-w1g-comments-final-67427c20f10dc51f45e772f08da6c1763a04505d/bin/parity-67427c20f10dc51f45e772f08da6c1763a04505d`, size 41,380,128 bytes, SHA-256 `bf8ff72a505f712b5886faba58200582da8881c2ca3159ccb56dc76b0c860ae1`. The build receipt and runner result are in the same external directory; the runner used CPU 3, Callgrind ABBA, release mode, and fresh external output `measure-12-final`.
+`(deleted-coord-artifact)/parity-67427c20f10dc51f45e772f08da6c1763a04505d`, size 41,380,128 bytes, SHA-256 `bf8ff72a505f712b5886faba58200582da8881c2ca3159ccb56dc76b0c860ae1`. The build receipt and runner result are in the same external directory; the runner used CPU 3, Callgrind ABBA, release mode, and fresh external output `measure-12-final`.
 
 All 12 routes passed, yielding 24 callgrind captures and 36 exact-test logs; every route stayed within the 5% slowdown bar:
 

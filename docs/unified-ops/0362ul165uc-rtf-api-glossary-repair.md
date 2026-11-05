@@ -39,4 +39,4 @@ Cargo, rustc, native producers, and the heavy gate were not run in this
 source-only leaf. The coordinator should run the RTF library/tests, the
 RTF rustdoc/API-glossary profile, operations RTF consumers, and the relevant
 clippy rows from the recorded diagnostic attempt
-`.coord/final-gate-current-remaining20-diagnostic-20261026-v3-state/46-api-glossary-attempt-current-remaining20-full53-46.log`.
+`(deleted-coord-artifact)`.

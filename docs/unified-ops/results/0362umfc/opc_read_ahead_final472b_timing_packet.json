@@ -12,7 +12,7 @@
     "test_result": "5 tests passed"
   },
   "accepted_prefix_receipt": {
-    "path": "/home/zhuhe/code/litchi-worktrees/.coord/final-api-capture-472b670547/opc-read-ahead-final472b-prep/prefix-diagnostic-receipt-fixture-rerun.json",
+    "path": "(deleted-coord-artifact)/prefix-diagnostic-receipt-fixture-rerun.json",
     "bytes": 8851,
     "sha256": "1559c13d0a4cd05eef6b3defaab304a3ecfa55b4b504ce8b2d15d3ea20f2f6e3",
     "classification": "compile_and_one_sample_correctness_diagnostics_only",
@@ -20,26 +20,26 @@
   },
   "source": {
     "baseline": {
-      "root": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/opc-read-ahead-c796-prep/source-baseline-410",
+      "root": "(deleted-coord-artifact)",
       "revision": "410bd99f00fdfb4161a94215710340f16ea536bb",
       "tree": "41850bc694ccfda6f84510611d32fe452248773d",
       "status": "clean",
       "manifest_sha256": "c944031ad9afbfef854cac48d400d30fdf6135e3f2c83d105bbf014f1d3dab40",
       "lock": {
-        "path": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/opc-read-ahead-c796-prep/source-baseline-410/tools/perf-baseline/Cargo.lock",
+        "path": "(deleted-coord-artifact)/Cargo.lock",
         "bytes": 57158,
         "sha256": "4def018e9c1d5f409b8c60d6cc0b8f114c486ab3f8fed2c7a4e9c7baf21c5184"
       },
       "probe_sha256": "6592815ab69ea362d0163b4548d141c4e7e07cdd1f387f7075aaa18f207fe75f"
     },
     "candidate": {
-      "root": "/home/zhuhe/code/litchi-worktrees/.coord/final-api-capture-472b670547/source",
+      "root": "(deleted-coord-artifact)",
       "revision": "472b6705475b073e7fe08f6e11ee17fb1e29f838",
       "tree": "ebc1cee05f124c0c63977aff07a23288c19e7d00",
       "status": "clean",
       "manifest_sha256": "61e103809753ffc528b2cd2c2e00a1525d40fc4e6360668ad982bec22a60bb73",
       "lock": {
-        "path": "/home/zhuhe/code/litchi-worktrees/.coord/final-api-capture-472b670547/source/tools/perf-baseline/Cargo.lock",
+        "path": "(deleted-coord-artifact)/Cargo.lock",
         "bytes": 57227,
         "sha256": "eac86284f67136aa856a8dcb6f383178b89ca92b26434a3de1d7408d68f2690c"
       },
@@ -68,15 +68,15 @@
     "fixture_rule": "tracked test-data only; no 3rdparty path"
   },
   "accepted_binaries": {
-    "run_root": "/home/zhuhe/code/litchi-worktrees/.coord/final-api-capture-472b670547/opc-read-ahead-final472b-run-fixture-rerun-20261024T193000Z",
+    "run_root": "(deleted-coord-artifact)",
     "baseline": {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/final-api-capture-472b670547/opc-read-ahead-final472b-run-fixture-rerun-20261024T193000Z/target-baseline/release/litchi-perf-baseline",
+      "path": "(deleted-coord-artifact)/litchi-perf-baseline",
       "bytes": 101339896,
       "sha256": "acbc53ac9c05edd156fe31fe9650675ffe57322b3ba4e3943bf94dab0d6bd7b2",
       "target_bytes": 1403891794
     },
     "candidate": {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/final-api-capture-472b670547/opc-read-ahead-final472b-run-fixture-rerun-20261024T193000Z/target-candidate/release/litchi-perf-baseline",
+      "path": "(deleted-coord-artifact)/litchi-perf-baseline",
       "bytes": 101711056,
       "sha256": "8acb79ffb76538af0ca67f71b81f88dec34fd572eaa38ddd90cfc5db71fa5092",
       "target_bytes": 1414209073
@@ -92,9 +92,9 @@
     "selection_rule": "recheck allowed affinity and quiet host immediately before and during every leg; CPU29 is not a grant"
   },
   "fresh_paths": {
-    "output_dir": "/home/zhuhe/code/litchi-worktrees/.coord/final-api-capture-472b670547/opc-read-ahead-final472b-timing-20261024T210504Z",
-    "tmpdir": "/home/zhuhe/code/litchi-worktrees/.coord/final-api-capture-472b670547/opc-read-ahead-final472b-timing-tmp-20261024T210504Z",
-    "cpu_lock": "/home/zhuhe/code/litchi-worktrees/.coord/final-api-capture-472b670547/opc-read-ahead-final472b-timing-20261024T210504Z.cpu.lock",
+    "output_dir": "(deleted-coord-artifact)",
+    "tmpdir": "(deleted-coord-artifact)",
+    "cpu_lock": "(deleted-coord-artifact)",
     "observed_absent_at_preparation": true,
     "must_remain_fresh_and_absent_until_start": true
   },
@@ -143,11 +143,11 @@
     "comparison": "median(candidate b1,b2) versus median(baseline a1,a2), separately per policy; coordinator budget applies unchanged",
     "allocator": "not_applicable"
   },
-  "command_shell": "cd /home/zhuhe/code/litchi-worktrees/uo2-drawingml-native-raw-repair && env -u LITCHI_CAPPED -u LITCHI_BLESS -u RUSTFLAGS PATH=/home/zhuhe/code/litchi-worktrees/.coord/bin:$PATH LITCHI_MEM_MAX=20G CARGO_BUILD_JOBS=1 RAYON_NUM_THREADS=1 CARGO_INCREMENTAL=0 CARGO_NET_OFFLINE=true CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_RELEASE_DEBUG=0 CARGO_PROFILE_RELEASE_LTO=false CARGO_PROFILE_TEST_DEBUG=0 RUSTUP_TOOLCHAIN=1.95.0 TMPDIR=/home/zhuhe/code/litchi-worktrees/.coord/final-api-capture-472b670547/opc-read-ahead-final472b-timing-tmp-20261024T210504Z python3 docs/unified-ops/results/0362umf/opc_read_ahead_timing.py --baseline-binary /home/zhuhe/code/litchi-worktrees/.coord/final-api-capture-472b670547/opc-read-ahead-final472b-run-fixture-rerun-20261024T193000Z/target-baseline/release/litchi-perf-baseline --candidate-binary /home/zhuhe/code/litchi-worktrees/.coord/final-api-capture-472b670547/opc-read-ahead-final472b-run-fixture-rerun-20261024T193000Z/target-candidate/release/litchi-perf-baseline --baseline-revision 410bd99f00fdfb4161a94215710340f16ea536bb --candidate-revision 472b6705475b073e7fe08f6e11ee17fb1e29f838 --baseline-source /home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/opc-read-ahead-c796-prep/source-baseline-410 --candidate-source /home/zhuhe/code/litchi-worktrees/.coord/final-api-capture-472b670547/source --baseline-tree 41850bc694ccfda6f84510611d32fe452248773d --candidate-tree ebc1cee05f124c0c63977aff07a23288c19e7d00 --target-baseline /home/zhuhe/code/litchi-worktrees/.coord/final-api-capture-472b670547/opc-read-ahead-final472b-run-fixture-rerun-20261024T193000Z/target-baseline --target-candidate /home/zhuhe/code/litchi-worktrees/.coord/final-api-capture-472b670547/opc-read-ahead-final472b-run-fixture-rerun-20261024T193000Z/target-candidate --output-dir /home/zhuhe/code/litchi-worktrees/.coord/final-api-capture-472b670547/opc-read-ahead-final472b-timing-20261024T210504Z --tmpdir /home/zhuhe/code/litchi-worktrees/.coord/final-api-capture-472b670547/opc-read-ahead-final472b-timing-tmp-20261024T210504Z --cpu-lock /home/zhuhe/code/litchi-worktrees/.coord/final-api-capture-472b670547/opc-read-ahead-final472b-timing-20261024T210504Z.cpu.lock --cpu 29 --samples 30 --warmup 3 --timeout-seconds 120 --poll-seconds 0.1 --max-rss-bytes 20000000000 --max-target-bytes 20000000000 --max-output-bytes 4194304 --max-report-bytes 4194304 --max-host-bytes 16777216 --max-event-bytes 1048576 --max-receipt-bytes 1048576 --max-load-delta 1.0 --max-prerun-load 1.0",
+  "command_shell": "cd /home/zhuhe/code/litchi-worktrees/uo2-drawingml-native-raw-repair && env -u LITCHI_CAPPED -u LITCHI_BLESS -u RUSTFLAGS PATH=(deleted-coord-artifact):$PATH LITCHI_MEM_MAX=20G CARGO_BUILD_JOBS=1 RAYON_NUM_THREADS=1 CARGO_INCREMENTAL=0 CARGO_NET_OFFLINE=true CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_RELEASE_DEBUG=0 CARGO_PROFILE_RELEASE_LTO=false CARGO_PROFILE_TEST_DEBUG=0 RUSTUP_TOOLCHAIN=1.95.0 TMPDIR=(deleted-coord-artifact) python3 docs/unified-ops/results/0362umf/opc_read_ahead_timing.py --baseline-binary (deleted-coord-artifact) --candidate-binary (deleted-coord-artifact) --baseline-revision 410bd99f00fdfb4161a94215710340f16ea536bb --candidate-revision 472b6705475b073e7fe08f6e11ee17fb1e29f838 --baseline-source (deleted-coord-artifact) --candidate-source (deleted-coord-artifact) --baseline-tree 41850bc694ccfda6f84510611d32fe452248773d --candidate-tree ebc1cee05f124c0c63977aff07a23288c19e7d00 --target-baseline (deleted-coord-artifact) --target-candidate (deleted-coord-artifact) --output-dir (deleted-coord-artifact) --tmpdir (deleted-coord-artifact) --cpu-lock (deleted-coord-artifact) --cpu 29 --samples 30 --warmup 3 --timeout-seconds 120 --poll-seconds 0.1 --max-rss-bytes 20000000000 --max-target-bytes 20000000000 --max-output-bytes 4194304 --max-report-bytes 4194304 --max-host-bytes 16777216 --max-event-bytes 1048576 --max-receipt-bytes 1048576 --max-load-delta 1.0 --max-prerun-load 1.0",
   "superseded_preserved": {
     "original_all_in_one_script_sha256": "5b20c3980e6892c5485d99b28dcc455e3e823c0d8190d0cabd87fee51c6a3ddb",
-    "original_failed_run_root": "/home/zhuhe/code/litchi-worktrees/.coord/final-api-capture-472b670547/opc-read-ahead-final472b-run",
-    "corrected_build_run_root": "/home/zhuhe/code/litchi-worktrees/.coord/final-api-capture-472b670547/opc-read-ahead-final472b-run-fixture-rerun-20261024T193000Z",
+    "original_failed_run_root": "(deleted-coord-artifact)",
+    "corrected_build_run_root": "(deleted-coord-artifact)",
     "rule": "do not invoke the original all-in-one script or overwrite either preserved root"
   }
 }

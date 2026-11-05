@@ -21,7 +21,7 @@ had terminated before reviewing the separate row-36 invocation.
 ## Retained evidence
 
 Endpoint:
-`/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/full-gate-9781-isolated-wsdoc-f5f3-rerun/`.
+`(deleted-coord-artifact)`.
 
 | Artifact | Bytes | SHA-256 |
 | --- | ---: | --- |
@@ -52,7 +52,7 @@ The run uses the retained f5 runner from
   `495e24c6f60b238378386d86ac4158cba904992ce8870a9494f2c4a0eedd256d`.
 
 Reproduce with that runner's `--only wsdoc`, the frozen source at
-`/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/full-gate-9781cf6d87/source`,
+`(deleted-coord-artifact)`,
 and fresh `--target` and `--state` directories. Keep compilation and native
 measurement jobs stopped for the isolated documentation selection. Do not
 reuse or overwrite the accepted endpoint.
@@ -75,7 +75,7 @@ in 612.126 seconds with no diagnostics. All three generated crate indexes
 exist. All six locks remain unchanged and the source remains clean.
 
 Endpoint:
-`/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/full-gate-9781-isolated-rustdoc-f5f3/`.
+`(deleted-coord-artifact)`.
 
 | Artifact | Bytes | SHA-256 |
 | --- | ---: | --- |

@@ -36,11 +36,11 @@ Validation on the final source:
   -D warnings` passed.
 
 The complete test log is retained outside the checkout at
-`.coord/w4b-xlsb-raw-policy/xlsb-auto-page-watches-tests-final.log` (113825
+`(deleted-coord-artifact)/xlsb-auto-page-watches-tests-final.log` (113825
 bytes, SHA-256
 `a3c60188eef35babce55b84cb994b67e901433d59998328bd3077c8ad011dd7f`). The
 Clippy log is retained outside the checkout at
-`.coord/w4b-xlsb-raw-policy/xlsb-auto-page-watches-clippy-final.log` (171
+`(deleted-coord-artifact)/xlsb-auto-page-watches-clippy-final.log` (171
 bytes, SHA-256
 `1db3448a5429562e6cc3a4b7322193876b82d615961ba9950e6b1aa36c96c570`).
 

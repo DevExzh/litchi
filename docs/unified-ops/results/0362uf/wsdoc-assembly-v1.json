@@ -10,14 +10,14 @@
     }
   },
   "root": "/home/zhuhe/code/litchi-worktrees/uo2-coordinator-metadata-integration",
-  "target": "/home/zhuhe/code/litchi-worktrees/.coord/isolated-wsdoc/target",
+  "target": "(deleted-coord-artifact)",
   "policy": {
     "runner_files": {
-      "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/gate-safe/run_safe_gate.py": "592ff5f7ad8493641ba6df7308bd66a97bddced35fc616c5803aacc5d30dcd2c",
-      "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/gate-safe/safe_chunked_tests.py": "70fdb56c96e4ed9e1d1e0d2b1e9c7f1db148a2115fb25246d13464569290cc35",
-      "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/gate-safe/bin/cargo": "495e24c6f60b238378386d86ac4158cba904992ce8870a9494f2c4a0eedd256d"
+      "(deleted-coord-artifact)/run_safe_gate.py": "592ff5f7ad8493641ba6df7308bd66a97bddced35fc616c5803aacc5d30dcd2c",
+      "(deleted-coord-artifact)/safe_chunked_tests.py": "70fdb56c96e4ed9e1d1e0d2b1e9c7f1db148a2115fb25246d13464569290cc35",
+      "(deleted-coord-artifact)/cargo": "495e24c6f60b238378386d86ac4158cba904992ce8870a9494f2c4a0eedd256d"
     },
-    "cargo_wrapper": "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/gate-safe/bin/cargo",
+    "cargo_wrapper": "(deleted-coord-artifact)",
     "offline": true,
     "locked": true,
     "memory_max": "20G",
@@ -53,7 +53,7 @@
         "--all-features"
       ],
       "environment": {
-        "CARGO_TARGET_DIR": "/home/zhuhe/code/litchi-worktrees/.coord/isolated-wsdoc/target",
+        "CARGO_TARGET_DIR": "(deleted-coord-artifact)",
         "CARGO_NET_OFFLINE": "true",
         "LITCHI_MEM_MAX": "20G",
         "CARGO_BUILD_JOBS": "1",
@@ -63,7 +63,7 @@
       },
       "exit": 101,
       "seconds": 583.2082588672638,
-      "log": "/home/zhuhe/code/litchi-worktrees/.coord/isolated-wsdoc/wsdoc-eb718/34-wsdoc.log",
+      "log": "(deleted-coord-artifact)/34-wsdoc.log",
       "log_bytes": 389,
       "log_sha256": "0f0667af960b657b9a1742111e4496cd79bc78aea849b493ee321028b7b3afc1",
       "target_bytes_after": 3102195742,
@@ -91,15 +91,15 @@
         {
           "pid": "2381970",
           "cargo_command": "doc",
-          "target": "/home/zhuhe/code/litchi-worktrees/.coord/isolated-wsdoc/target"
+          "target": "(deleted-coord-artifact)"
         }
       ],
       "cargo_target_sizes": {
-        "/home/zhuhe/code/litchi-worktrees/.coord/isolated-wsdoc/target": {
+        "(deleted-coord-artifact)": {
           "bytes": 3102195742
         }
       },
-      "cargo_target_trace_file": "/home/zhuhe/code/litchi-worktrees/.coord/isolated-wsdoc/wsdoc-eb718/34-cargo-targets.tsv",
+      "cargo_target_trace_file": "(deleted-coord-artifact)/34-cargo-targets.tsv",
       "cargo_target_trace_bytes": 75,
       "cargo_target_trace_sha256": "2822d39f88964b51c474fb39fe332c6e2e6fd6d887d768c065adb72d720aa8ff",
       "preflight": {

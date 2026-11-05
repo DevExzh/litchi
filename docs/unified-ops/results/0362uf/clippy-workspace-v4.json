@@ -4,12 +4,12 @@
   "cwd": "/home/zhuhe/code/litchi-worktrees/uo2-coordinator-metadata-integration",
   "command": [
     "python3",
-    "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/run-semantic-checks-disk-guarded.py",
-    "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/clippy-workspace-v4-commands.json",
-    "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/clippy-workspace-v4"
+    "(deleted-coord-artifact)",
+    "(deleted-coord-artifact)",
+    "(deleted-coord-artifact)"
   ],
   "started_unix_seconds": 1792772571.2003434,
-  "target": "/home/zhuhe/code/litchi-worktrees/.coord/isolated-wsdoc/target",
+  "target": "(deleted-coord-artifact)",
   "lock_sha256": "52ed0cacac15b5e440349bfc0f4aca2665bcf50d59d4321624e596bb410783c6",
   "checks": [
     {
@@ -28,7 +28,7 @@
       ],
       "exit": 101,
       "seconds": 743.0287201630017,
-      "log": "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/clippy-workspace-v4/check-0.log",
+      "log": "(deleted-coord-artifact)/check-0.log",
       "bytes": 12934,
       "sha256": "3d9fa3e00ce9eb4d026336220a83e3346b2571df80111b2eb796ca0e4b21534a",
       "target_bytes_before": 3440007569,

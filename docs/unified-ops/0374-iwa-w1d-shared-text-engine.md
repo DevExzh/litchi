@@ -162,7 +162,7 @@ alignment sets on one storage:
 The 1k batch was not run because the host is too slow at that size.
 
 Callgrind outputs are kept outside the repository, in
-`.coord/iwa-w1d/cg/`. Rerun the commands in the probe file's header to
+`(deleted-coord-artifact)`. Rerun the commands in the probe file's header to
 regenerate them.
 
 | File | Bytes | SHA-256 |

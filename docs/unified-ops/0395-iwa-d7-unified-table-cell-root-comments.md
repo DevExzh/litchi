@@ -85,15 +85,15 @@ and Keynote is 394,295,392 bytes (SHA-256
 `adf4d93cbd21114095727cd09ff3301ab06559045528848ed9aadaf9f25c01f4`).
 
 ```text
-CARGO_TARGET_DIR=/home/zhuhe/code/litchi-worktrees/.coord/d7-comments-perf-b6bbb77202/target CARGO_INCREMENTAL=0 CARGO_PROFILE_RELEASE_DEBUG=1 CARGO_BUILD_JOBS=4 RUST_TEST_THREADS=1 CARGO_NET_OFFLINE=true cargo test --release --locked --offline -p litchi-ops --all-features --test pages_unified --test keynote_unified --no-run
+CARGO_TARGET_DIR=(deleted-coord-artifact) CARGO_INCREMENTAL=0 CARGO_PROFILE_RELEASE_DEBUG=1 CARGO_BUILD_JOBS=4 RUST_TEST_THREADS=1 CARGO_NET_OFFLINE=true cargo test --release --locked --offline -p litchi-ops --all-features --test pages_unified --test keynote_unified --no-run
 ```
 
 The build log is external at
-`/home/zhuhe/code/litchi-worktrees/.coord/d7-comments-perf-b6bbb77202/build-a24f121a14.log`
+`(deleted-coord-artifact)/build-a24f121a14.log`
 (SHA-256 `c2b8447f8b843f5e7506d1a6e614cddf23074db0dbfcd3b5f4e4cbbb8287d30d`).
 The complete compact receipt, including all 16 raw capture/log/annotation
 hashes, is
-`/home/zhuhe/code/litchi-worktrees/.coord/d7-comments-perf-b6bbb77202/coordinator-review-a24f121a14.json`
+`(deleted-coord-artifact)/coordinator-review-a24f121a14.json`
 (SHA-256 `67c36d5fa19d8c4b8b53d36d53677ebe07104382bb285cfca3f2bbd38ca5b259`).
 The raw captures and threshold-100 inclusive annotations are under the same
 external directory in `callgrind-a24f121a14/`; the earlier d4 captures remain

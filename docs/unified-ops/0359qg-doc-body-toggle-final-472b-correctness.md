@@ -14,7 +14,7 @@ All generated targets, logs, binaries, probe JSON, OLE outputs, and the full
 receipt are outside the checkout:
 
 ~~~text
-/home/zhuhe/code/litchi-worktrees/.coord/doc-toggle-472b-build-20261024
+(deleted-coord-artifact)
 ~~~
 
 The candidate and baseline were both prepared from the final production
@@ -22,8 +22,8 @@ endpoint:
 
 | item | identity |
 |---|---|
-| candidate source | `/home/zhuhe/code/litchi-worktrees/.coord/final-api-capture-472b670547/source` |
-| baseline source | `/home/zhuhe/code/litchi-worktrees/.coord/final-api-capture-472b670547/doc-body-baseline` |
+| candidate source | `(deleted-coord-artifact)` |
+| baseline source | `(deleted-coord-artifact)` |
 | commit (both) | `472b6705475b073e7fe08f6e11ee17fb1e29f838` |
 | tree (both) | `ebc1cee05f124c0c63977aff07a23288c19e7d00` |
 | Cargo.lock SHA-256 (both) | `4100b1fbb272dd24842f33a2d6f353a3f3a97dfa7e435c4649a0e1a029bfaea1` |
@@ -53,7 +53,7 @@ The complete external receipt, including every source, command, lock, log,
 binary, output, and target-size identity, is:
 
 ~~~text
-/home/zhuhe/code/litchi-worktrees/.coord/doc-toggle-472b-build-20261024/actual-receipt.txt
+(deleted-coord-artifact)/actual-receipt.txt
 SHA-256 a0dfb1d1b66c16249939a702d26565466a3ca8b86d11e9bc87461bf5df414b3a
 ~~~
 

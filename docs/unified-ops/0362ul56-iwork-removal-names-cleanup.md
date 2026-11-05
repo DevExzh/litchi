@@ -29,7 +29,7 @@ filesystem free-space change.
 
 All artifacts below remain outside Git under:
 
-`/home/zhuhe/code/litchi-worktrees/.coord/worktree-cleanup-2026-10-23/quarantine/wave57-iwa-removal-result-names`
+`(deleted-coord-artifact)`
 
 | Artifact | Bytes | SHA-256 |
 | --- | ---: | --- |

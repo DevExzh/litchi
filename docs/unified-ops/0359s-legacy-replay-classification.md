@@ -33,7 +33,7 @@ On 2026-10-22 these commands ran from the sparse validation tree at
 `/home/zhuhe/code/litchi-worktrees/uo2-doc-toggle/target` target. Every cargo
 command used `--offline --locked`, `CARGO_BUILD_JOBS=1`,
 `RUST_TEST_THREADS=1`, and a bounded `TMPDIR` under
-`/home/zhuhe/code/litchi-worktrees/.coord/legacy-replay-errors-validation`.
+`(deleted-coord-artifact)`.
 Logs remain outside the checkout in that directory.
 
 All final validation commands passed:

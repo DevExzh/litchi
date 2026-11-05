@@ -2,7 +2,7 @@
   "status": "receipts verified; coordinator review required",
   "build": {
     "receipt": {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/durable-ink-0362l/matched-v1/build.json",
+      "path": "(deleted-coord-artifact)/build.json",
       "bytes": 84938,
       "sha256": "1479d5b76a908b0697fcf56926012242f1f82485385cbec60383fc59a807a295"
     },
@@ -27,23 +27,23 @@
         "source": {
           "commit": "d0406be01712496ca0d43354edf4d2fe80162553",
           "manifest": {
-            "path": "/home/zhuhe/code/litchi-worktrees/.coord/durable-ink-0362l/matched-v1/source-base.json",
+            "path": "(deleted-coord-artifact)/source-base.json",
             "bytes": 2026560,
             "sha256": "42086f347bf5fa1f2aa44de7dbba13b947331ad58e95112f68c6960cfa9e6f1d"
           }
         },
         "project_manifest": {
-          "path": "/home/zhuhe/code/litchi-worktrees/.coord/durable-ink-0362l/matched-v1/project-base/Cargo.toml",
+          "path": "(deleted-coord-artifact)/Cargo.toml",
           "bytes": 606,
           "sha256": "8360c20db4e7cef166d339e069dec3ea45bec97238748c6e87ac499109c2c293"
         },
         "project_source": {
-          "path": "/home/zhuhe/code/litchi-worktrees/.coord/durable-ink-0362l/matched-v1/project-base/src/main.rs",
+          "path": "(deleted-coord-artifact)/main.rs",
           "bytes": 9936,
           "sha256": "483619c7953bc615810b7486d114489022ae452da2c7130a72d8b29699838618"
         },
         "lock": {
-          "path": "/home/zhuhe/code/litchi-worktrees/.coord/durable-ink-0362l/matched-v1/project-base/Cargo.lock",
+          "path": "(deleted-coord-artifact)/Cargo.lock",
           "bytes": 30061,
           "sha256": "78e8a649ec689dad6be54d3929e90cd70a153c8d04d90bd0e7087cbe0ae67b81"
         },
@@ -779,12 +779,12 @@
         "cargo": "cargo 1.95.0 (f2d3ce0bd 2026-03-21)\n",
         "binaries": {
           "native": {
-            "path": "/home/zhuhe/code/litchi-worktrees/.coord/durable-ink-0362l/matched-v1/build-base/ink-native",
+            "path": "(deleted-coord-artifact)/ink-native",
             "bytes": 3877360,
             "sha256": "46259d01c2c8696f81cce7473514ca636b70015abbd7319d1aec93747db99a00"
           },
           "allocation": {
-            "path": "/home/zhuhe/code/litchi-worktrees/.coord/durable-ink-0362l/matched-v1/build-base/ink-allocation",
+            "path": "(deleted-coord-artifact)/ink-allocation",
             "bytes": 4092912,
             "sha256": "70cb9b24c802eaef5376936237e6a36a312ac4730126bbc9e0fbf9edf679c946"
           }
@@ -796,17 +796,17 @@
               "generate-lockfile",
               "--offline"
             ],
-            "cwd": "/home/zhuhe/code/litchi-worktrees/.coord/durable-ink-0362l/matched-v1/project-base",
+            "cwd": "(deleted-coord-artifact)",
             "started_ns": 1792634070136220898,
             "finished_ns": 1792634070248053011,
             "exit_code": 0,
             "stdout": {
-              "path": "/home/zhuhe/code/litchi-worktrees/.coord/durable-ink-0362l/matched-v1/build-base/lock.stdout",
+              "path": "(deleted-coord-artifact)/lock.stdout",
               "bytes": 0,
               "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
             },
             "stderr": {
-              "path": "/home/zhuhe/code/litchi-worktrees/.coord/durable-ink-0362l/matched-v1/build-base/lock.stderr",
+              "path": "(deleted-coord-artifact)/lock.stderr",
               "bytes": 124,
               "sha256": "5e40882570df1ab7e0cf9f4711a632206af6e244ec5541b235f57b2a2ec15cc5"
             }
@@ -816,17 +816,17 @@
               "rustc",
               "-Vv"
             ],
-            "cwd": "/home/zhuhe/code/litchi-worktrees/.coord/durable-ink-0362l/matched-v1/project-base",
+            "cwd": "(deleted-coord-artifact)",
             "started_ns": 1792634070248326692,
             "finished_ns": 1792634070265874438,
             "exit_code": 0,
             "stdout": {
-              "path": "/home/zhuhe/code/litchi-worktrees/.coord/durable-ink-0362l/matched-v1/build-base/rustc.stdout",
+              "path": "(deleted-coord-artifact)/rustc.stdout",
               "bytes": 196,
               "sha256": "4fdff2578428e9c5c08ddd7a0d3079c1a106b1cdaa46e73e46f7cd32b0fb9cad"
             },
             "stderr": {
-              "path": "/home/zhuhe/code/litchi-worktrees/.coord/durable-ink-0362l/matched-v1/build-base/rustc.stderr",
+              "path": "(deleted-coord-artifact)/rustc.stderr",
               "bytes": 0,
               "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
             }
@@ -836,17 +836,17 @@
               "cargo",
               "--version"
             ],
-            "cwd": "/home/zhuhe/code/litchi-worktrees/.coord/durable-ink-0362l/matched-v1/project-base",
+            "cwd": "(deleted-coord-artifact)",
             "started_ns": 1792634070266055659,
             "finished_ns": 1792634070296034863,
             "exit_code": 0,
             "stdout": {
-              "path": "/home/zhuhe/code/litchi-worktrees/.coord/durable-ink-0362l/matched-v1/build-base/cargo.stdout",
+              "path": "(deleted-coord-artifact)/cargo.stdout",
               "bytes": 36,
               "sha256": "c10ec31b8c6e6e2693cf65fc1971b41edbc3da1ae7db6f9f3f36c4823f8dcab5"
             },
             "stderr": {
-              "path": "/home/zhuhe/code/litchi-worktrees/.coord/durable-ink-0362l/matched-v1/build-base/cargo.stderr",
+              "path": "(deleted-coord-artifact)/cargo.stderr",
               "bytes": 0,
               "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
             }
@@ -862,38 +862,38 @@
               "--features",
               "before"
             ],
-            "cwd": "/home/zhuhe/code/litchi-worktrees/.coord/durable-ink-0362l/matched-v1/project-base",
+            "cwd": "(deleted-coord-artifact)",
             "started_ns": 1792634070298615158,
             "finished_ns": 1792634215214114905,
             "exit_code": 0,
             "stdout": {
-              "path": "/home/zhuhe/code/litchi-worktrees/.coord/durable-ink-0362l/matched-v1/build-base/native.stdout",
+              "path": "(deleted-coord-artifact)/native.stdout",
               "bytes": 117470,
               "sha256": "d908ddad31ee5038a4488c2850c65d8535bb2910e026ca38a4638bee4ad63258"
             },
             "stderr": {
-              "path": "/home/zhuhe/code/litchi-worktrees/.coord/durable-ink-0362l/matched-v1/build-base/native.stderr",
+              "path": "(deleted-coord-artifact)/native.stderr",
               "bytes": 4216,
               "sha256": "3f848dbe7cb7126cd1d1860be6d8ce8c5d0a1f983aa6c685f47f9cd9840b5cc3"
             }
           },
           {
             "command": [
-              "/home/zhuhe/code/litchi-worktrees/.coord/durable-ink-0362l/matched-v1/build-base/ink-native",
+              "(deleted-coord-artifact)",
               "validate_outputs",
-              "/home/zhuhe/code/litchi-worktrees/.coord/durable-ink-0362l/matched-v1/validation-base-native"
+              "(deleted-coord-artifact)"
             ],
-            "cwd": "/home/zhuhe/code/litchi-worktrees/.coord/durable-ink-0362l/matched-v1/project-base",
+            "cwd": "(deleted-coord-artifact)",
             "started_ns": 1792634215217939716,
             "finished_ns": 1792634215240871019,
             "exit_code": 0,
             "stdout": {
-              "path": "/home/zhuhe/code/litchi-worktrees/.coord/durable-ink-0362l/matched-v1/build-base/native-validation.stdout",
+              "path": "(deleted-coord-artifact)/native-validation.stdout",
               "bytes": 0,
               "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
             },
             "stderr": {
-              "path": "/home/zhuhe/code/litchi-worktrees/.coord/durable-ink-0362l/matched-v1/build-base/native-validation.stderr",
+              "path": "(deleted-coord-artifact)/native-validation.stderr",
               "bytes": 0,
               "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
             }
@@ -909,38 +909,38 @@
               "--features",
               "before,allocations"
             ],
-            "cwd": "/home/zhuhe/code/litchi-worktrees/.coord/durable-ink-0362l/matched-v1/project-base",
+            "cwd": "(deleted-coord-artifact)",
             "started_ns": 1792634215241582993,
             "finished_ns": 1792634237098559462,
             "exit_code": 0,
             "stdout": {
-              "path": "/home/zhuhe/code/litchi-worktrees/.coord/durable-ink-0362l/matched-v1/build-base/allocation.stdout",
+              "path": "(deleted-coord-artifact)/allocation.stdout",
               "bytes": 117360,
               "sha256": "3ab200f9de3c9e8686cee4ac78be202f47bc54c2900a318eea9be3629444e34a"
             },
             "stderr": {
-              "path": "/home/zhuhe/code/litchi-worktrees/.coord/durable-ink-0362l/matched-v1/build-base/allocation.stderr",
+              "path": "(deleted-coord-artifact)/allocation.stderr",
               "bytes": 183,
               "sha256": "a40e51c4db8417c382fc74ba4d222ad8a1ed426411264975c1acc5bd120ca11c"
             }
           },
           {
             "command": [
-              "/home/zhuhe/code/litchi-worktrees/.coord/durable-ink-0362l/matched-v1/build-base/ink-allocation",
+              "(deleted-coord-artifact)",
               "validate_outputs",
-              "/home/zhuhe/code/litchi-worktrees/.coord/durable-ink-0362l/matched-v1/validation-base-allocation"
+              "(deleted-coord-artifact)"
             ],
-            "cwd": "/home/zhuhe/code/litchi-worktrees/.coord/durable-ink-0362l/matched-v1/project-base",
+            "cwd": "(deleted-coord-artifact)",
             "started_ns": 1792634237101827019,
             "finished_ns": 1792634237124965916,
             "exit_code": 0,
             "stdout": {
-              "path": "/home/zhuhe/code/litchi-worktrees/.coord/durable-ink-0362l/matched-v1/build-base/allocation-validation.stdout",
+              "path": "(deleted-coord-artifact)/allocation-validation.stdout",
               "bytes": 0,
               "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
             },
             "stderr": {
-              "path": "/home/zhuhe/code/litchi-worktrees/.coord/durable-ink-0362l/matched-v1/build-base/allocation-validation.stderr",
+              "path": "(deleted-coord-artifact)/allocation-validation.stderr",
               "bytes": 0,
               "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
             }
@@ -949,64 +949,64 @@
         "validation": {
           "native": [
             {
-              "path": "/home/zhuhe/code/litchi-worktrees/.coord/durable-ink-0362l/matched-v1/validation-base-native/forward.docx",
+              "path": "(deleted-coord-artifact)/forward.docx",
               "bytes": 4249,
               "sha256": "735848b611c697d71c1c12c2527b6dc8f4a3b899c38d0f35f3b6d8f0fd64bcae"
             },
             {
-              "path": "/home/zhuhe/code/litchi-worktrees/.coord/durable-ink-0362l/matched-v1/validation-base-native/forward.json",
+              "path": "(deleted-coord-artifact)/forward.json",
               "bytes": 127509,
               "sha256": "a9e0acc66a795deb9586fa4445b687ae98ee9821ad6281d3db21103a921622e2"
             },
             {
-              "path": "/home/zhuhe/code/litchi-worktrees/.coord/durable-ink-0362l/matched-v1/validation-base-native/inverse.docx",
+              "path": "(deleted-coord-artifact)/inverse.docx",
               "bytes": 3592,
               "sha256": "b24698282d77f5fcf2ee9f6956661496570903c36e062226573102b5be6a37a5"
             },
             {
-              "path": "/home/zhuhe/code/litchi-worktrees/.coord/durable-ink-0362l/matched-v1/validation-base-native/inverse.json",
+              "path": "(deleted-coord-artifact)/inverse.json",
               "bytes": 127509,
               "sha256": "9e827557b699a69595ff9a339a2ed4426ef5f7477952f42ecdfc5b3a8df9cd55"
             },
             {
-              "path": "/home/zhuhe/code/litchi-worktrees/.coord/durable-ink-0362l/matched-v1/validation-base-native/noop.docx",
+              "path": "(deleted-coord-artifact)/noop.docx",
               "bytes": 3592,
               "sha256": "b24698282d77f5fcf2ee9f6956661496570903c36e062226573102b5be6a37a5"
             },
             {
-              "path": "/home/zhuhe/code/litchi-worktrees/.coord/durable-ink-0362l/matched-v1/validation-base-native/source.docx",
+              "path": "(deleted-coord-artifact)/source.docx",
               "bytes": 3592,
               "sha256": "b24698282d77f5fcf2ee9f6956661496570903c36e062226573102b5be6a37a5"
             }
           ],
           "allocation": [
             {
-              "path": "/home/zhuhe/code/litchi-worktrees/.coord/durable-ink-0362l/matched-v1/validation-base-allocation/forward.docx",
+              "path": "(deleted-coord-artifact)/forward.docx",
               "bytes": 4249,
               "sha256": "735848b611c697d71c1c12c2527b6dc8f4a3b899c38d0f35f3b6d8f0fd64bcae"
             },
             {
-              "path": "/home/zhuhe/code/litchi-worktrees/.coord/durable-ink-0362l/matched-v1/validation-base-allocation/forward.json",
+              "path": "(deleted-coord-artifact)/forward.json",
               "bytes": 127509,
               "sha256": "a9e0acc66a795deb9586fa4445b687ae98ee9821ad6281d3db21103a921622e2"
             },
             {
-              "path": "/home/zhuhe/code/litchi-worktrees/.coord/durable-ink-0362l/matched-v1/validation-base-allocation/inverse.docx",
+              "path": "(deleted-coord-artifact)/inverse.docx",
               "bytes": 3592,
               "sha256": "b24698282d77f5fcf2ee9f6956661496570903c36e062226573102b5be6a37a5"
             },
             {
-              "path": "/home/zhuhe/code/litchi-worktrees/.coord/durable-ink-0362l/matched-v1/validation-base-allocation/inverse.json",
+              "path": "(deleted-coord-artifact)/inverse.json",
               "bytes": 127509,
               "sha256": "9e827557b699a69595ff9a339a2ed4426ef5f7477952f42ecdfc5b3a8df9cd55"
             },
             {
-              "path": "/home/zhuhe/code/litchi-worktrees/.coord/durable-ink-0362l/matched-v1/validation-base-allocation/noop.docx",
+              "path": "(deleted-coord-artifact)/noop.docx",
               "bytes": 3592,
               "sha256": "b24698282d77f5fcf2ee9f6956661496570903c36e062226573102b5be6a37a5"
             },
             {
-              "path": "/home/zhuhe/code/litchi-worktrees/.coord/durable-ink-0362l/matched-v1/validation-base-allocation/source.docx",
+              "path": "(deleted-coord-artifact)/source.docx",
               "bytes": 3592,
               "sha256": "b24698282d77f5fcf2ee9f6956661496570903c36e062226573102b5be6a37a5"
             }
@@ -1017,23 +1017,23 @@
         "source": {
           "commit": "5559d9eaeff503f0e3bfce55d633b7b8203005be",
           "manifest": {
-            "path": "/home/zhuhe/code/litchi-worktrees/.coord/durable-ink-0362l/matched-v1/source-candidate.json",
+            "path": "(deleted-coord-artifact)/source-candidate.json",
             "bytes": 2026565,
             "sha256": "0f70de64f1523a18ee6b666d5786ca25cdf770cd504266523df37d423e84bceb"
           }
         },
         "project_manifest": {
-          "path": "/home/zhuhe/code/litchi-worktrees/.coord/durable-ink-0362l/matched-v1/project-candidate/Cargo.toml",
+          "path": "(deleted-coord-artifact)/Cargo.toml",
           "bytes": 621,
           "sha256": "4283f8457311f23f560df4d3330151fa8ee73ecffbdf85643fd9dc9d765bd32a"
         },
         "project_source": {
-          "path": "/home/zhuhe/code/litchi-worktrees/.coord/durable-ink-0362l/matched-v1/project-candidate/src/main.rs",
+          "path": "(deleted-coord-artifact)/main.rs",
           "bytes": 9936,
           "sha256": "483619c7953bc615810b7486d114489022ae452da2c7130a72d8b29699838618"
         },
         "lock": {
-          "path": "/home/zhuhe/code/litchi-worktrees/.coord/durable-ink-0362l/matched-v1/project-candidate/Cargo.lock",
+          "path": "(deleted-coord-artifact)/Cargo.lock",
           "bytes": 30061,
           "sha256": "78e8a649ec689dad6be54d3929e90cd70a153c8d04d90bd0e7087cbe0ae67b81"
         },
@@ -1769,12 +1769,12 @@
         "cargo": "cargo 1.95.0 (f2d3ce0bd 2026-03-21)\n",
         "binaries": {
           "native": {
-            "path": "/home/zhuhe/code/litchi-worktrees/.coord/durable-ink-0362l/matched-v1/build-candidate/ink-native",
+            "path": "(deleted-coord-artifact)/ink-native",
             "bytes": 3878240,
             "sha256": "befdb424afac8e8e9656c459d9c0aaa9f5b76e52b647de483d4337620c6dca96"
           },
           "allocation": {
-            "path": "/home/zhuhe/code/litchi-worktrees/.coord/durable-ink-0362l/matched-v1/build-candidate/ink-allocation",
+            "path": "(deleted-coord-artifact)/ink-allocation",
             "bytes": 4093752,
             "sha256": "92f59bc105e9c8ca633296438e3e059e3f3e7fbd94c770271e69631e957ec201"
           }
@@ -1785,17 +1785,17 @@
               "rustc",
               "-Vv"
             ],
-            "cwd": "/home/zhuhe/code/litchi-worktrees/.coord/durable-ink-0362l/matched-v1/project-candidate",
+            "cwd": "(deleted-coord-artifact)",
             "started_ns": 1792634239357037571,
             "finished_ns": 1792634239374632387,
             "exit_code": 0,
             "stdout": {
-              "path": "/home/zhuhe/code/litchi-worktrees/.coord/durable-ink-0362l/matched-v1/build-candidate/rustc.stdout",
+              "path": "(deleted-coord-artifact)/rustc.stdout",
               "bytes": 196,
               "sha256": "4fdff2578428e9c5c08ddd7a0d3079c1a106b1cdaa46e73e46f7cd32b0fb9cad"
             },
             "stderr": {
-              "path": "/home/zhuhe/code/litchi-worktrees/.coord/durable-ink-0362l/matched-v1/build-candidate/rustc.stderr",
+              "path": "(deleted-coord-artifact)/rustc.stderr",
               "bytes": 0,
               "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
             }
@@ -1805,17 +1805,17 @@
               "cargo",
               "--version"
             ],
-            "cwd": "/home/zhuhe/code/litchi-worktrees/.coord/durable-ink-0362l/matched-v1/project-candidate",
+            "cwd": "(deleted-coord-artifact)",
             "started_ns": 1792634239374817808,
             "finished_ns": 1792634239408678592,
             "exit_code": 0,
             "stdout": {
-              "path": "/home/zhuhe/code/litchi-worktrees/.coord/durable-ink-0362l/matched-v1/build-candidate/cargo.stdout",
+              "path": "(deleted-coord-artifact)/cargo.stdout",
               "bytes": 36,
               "sha256": "c10ec31b8c6e6e2693cf65fc1971b41edbc3da1ae7db6f9f3f36c4823f8dcab5"
             },
             "stderr": {
-              "path": "/home/zhuhe/code/litchi-worktrees/.coord/durable-ink-0362l/matched-v1/build-candidate/cargo.stderr",
+              "path": "(deleted-coord-artifact)/cargo.stderr",
               "bytes": 0,
               "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
             }
@@ -1829,38 +1829,38 @@
               "--release",
               "--message-format=json-render-diagnostics"
             ],
-            "cwd": "/home/zhuhe/code/litchi-worktrees/.coord/durable-ink-0362l/matched-v1/project-candidate",
+            "cwd": "(deleted-coord-artifact)",
             "started_ns": 1792634239411365677,
             "finished_ns": 1792634386330692569,
             "exit_code": 0,
             "stdout": {
-              "path": "/home/zhuhe/code/litchi-worktrees/.coord/durable-ink-0362l/matched-v1/build-candidate/native.stdout",
+              "path": "(deleted-coord-artifact)/native.stdout",
               "bytes": 118806,
               "sha256": "186479f6862ec57b9d554923ff519be155f182913386adce82f53c9f8b179afc"
             },
             "stderr": {
-              "path": "/home/zhuhe/code/litchi-worktrees/.coord/durable-ink-0362l/matched-v1/build-candidate/native.stderr",
+              "path": "(deleted-coord-artifact)/native.stderr",
               "bytes": 4261,
               "sha256": "ad62c2a7cf3d2099fe95dbe90ca785a6c0dec120518271869cce80571ae6f226"
             }
           },
           {
             "command": [
-              "/home/zhuhe/code/litchi-worktrees/.coord/durable-ink-0362l/matched-v1/build-candidate/ink-native",
+              "(deleted-coord-artifact)",
               "validate_outputs",
-              "/home/zhuhe/code/litchi-worktrees/.coord/durable-ink-0362l/matched-v1/validation-candidate-native"
+              "(deleted-coord-artifact)"
             ],
-            "cwd": "/home/zhuhe/code/litchi-worktrees/.coord/durable-ink-0362l/matched-v1/project-candidate",
+            "cwd": "(deleted-coord-artifact)",
             "started_ns": 1792634386334445849,
             "finished_ns": 1792634386357669236,
             "exit_code": 0,
             "stdout": {
-              "path": "/home/zhuhe/code/litchi-worktrees/.coord/durable-ink-0362l/matched-v1/build-candidate/native-validation.stdout",
+              "path": "(deleted-coord-artifact)/native-validation.stdout",
               "bytes": 0,
               "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
             },
             "stderr": {
-              "path": "/home/zhuhe/code/litchi-worktrees/.coord/durable-ink-0362l/matched-v1/build-candidate/native-validation.stderr",
+              "path": "(deleted-coord-artifact)/native-validation.stderr",
               "bytes": 0,
               "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
             }
@@ -1876,38 +1876,38 @@
               "--features",
               "allocations"
             ],
-            "cwd": "/home/zhuhe/code/litchi-worktrees/.coord/durable-ink-0362l/matched-v1/project-candidate",
+            "cwd": "(deleted-coord-artifact)",
             "started_ns": 1792634386358461460,
             "finished_ns": 1792634408088723401,
             "exit_code": 0,
             "stdout": {
-              "path": "/home/zhuhe/code/litchi-worktrees/.coord/durable-ink-0362l/matched-v1/build-candidate/allocation.stdout",
+              "path": "(deleted-coord-artifact)/allocation.stdout",
               "bytes": 118696,
               "sha256": "13431762835a150faf1b7381ede45396d4ff98f9c07645112d45351b01fbd0e9"
             },
             "stderr": {
-              "path": "/home/zhuhe/code/litchi-worktrees/.coord/durable-ink-0362l/matched-v1/build-candidate/allocation.stderr",
+              "path": "(deleted-coord-artifact)/allocation.stderr",
               "bytes": 188,
               "sha256": "6812a84c383574671bccfc262defacb3823593ecbb96640ba89abcabd381d069"
             }
           },
           {
             "command": [
-              "/home/zhuhe/code/litchi-worktrees/.coord/durable-ink-0362l/matched-v1/build-candidate/ink-allocation",
+              "(deleted-coord-artifact)",
               "validate_outputs",
-              "/home/zhuhe/code/litchi-worktrees/.coord/durable-ink-0362l/matched-v1/validation-candidate-allocation"
+              "(deleted-coord-artifact)"
             ],
-            "cwd": "/home/zhuhe/code/litchi-worktrees/.coord/durable-ink-0362l/matched-v1/project-candidate",
+            "cwd": "(deleted-coord-artifact)",
             "started_ns": 1792634408092072279,
             "finished_ns": 1792634408114805203,
             "exit_code": 0,
             "stdout": {
-              "path": "/home/zhuhe/code/litchi-worktrees/.coord/durable-ink-0362l/matched-v1/build-candidate/allocation-validation.stdout",
+              "path": "(deleted-coord-artifact)/allocation-validation.stdout",
               "bytes": 0,
               "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
             },
             "stderr": {
-              "path": "/home/zhuhe/code/litchi-worktrees/.coord/durable-ink-0362l/matched-v1/build-candidate/allocation-validation.stderr",
+              "path": "(deleted-coord-artifact)/allocation-validation.stderr",
               "bytes": 0,
               "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
             }
@@ -1916,64 +1916,64 @@
         "validation": {
           "native": [
             {
-              "path": "/home/zhuhe/code/litchi-worktrees/.coord/durable-ink-0362l/matched-v1/validation-candidate-native/forward.docx",
+              "path": "(deleted-coord-artifact)/forward.docx",
               "bytes": 4249,
               "sha256": "735848b611c697d71c1c12c2527b6dc8f4a3b899c38d0f35f3b6d8f0fd64bcae"
             },
             {
-              "path": "/home/zhuhe/code/litchi-worktrees/.coord/durable-ink-0362l/matched-v1/validation-candidate-native/forward.json",
+              "path": "(deleted-coord-artifact)/forward.json",
               "bytes": 127509,
               "sha256": "a9e0acc66a795deb9586fa4445b687ae98ee9821ad6281d3db21103a921622e2"
             },
             {
-              "path": "/home/zhuhe/code/litchi-worktrees/.coord/durable-ink-0362l/matched-v1/validation-candidate-native/inverse.docx",
+              "path": "(deleted-coord-artifact)/inverse.docx",
               "bytes": 3592,
               "sha256": "b24698282d77f5fcf2ee9f6956661496570903c36e062226573102b5be6a37a5"
             },
             {
-              "path": "/home/zhuhe/code/litchi-worktrees/.coord/durable-ink-0362l/matched-v1/validation-candidate-native/inverse.json",
+              "path": "(deleted-coord-artifact)/inverse.json",
               "bytes": 127509,
               "sha256": "9e827557b699a69595ff9a339a2ed4426ef5f7477952f42ecdfc5b3a8df9cd55"
             },
             {
-              "path": "/home/zhuhe/code/litchi-worktrees/.coord/durable-ink-0362l/matched-v1/validation-candidate-native/noop.docx",
+              "path": "(deleted-coord-artifact)/noop.docx",
               "bytes": 3592,
               "sha256": "b24698282d77f5fcf2ee9f6956661496570903c36e062226573102b5be6a37a5"
             },
             {
-              "path": "/home/zhuhe/code/litchi-worktrees/.coord/durable-ink-0362l/matched-v1/validation-candidate-native/source.docx",
+              "path": "(deleted-coord-artifact)/source.docx",
               "bytes": 3592,
               "sha256": "b24698282d77f5fcf2ee9f6956661496570903c36e062226573102b5be6a37a5"
             }
           ],
           "allocation": [
             {
-              "path": "/home/zhuhe/code/litchi-worktrees/.coord/durable-ink-0362l/matched-v1/validation-candidate-allocation/forward.docx",
+              "path": "(deleted-coord-artifact)/forward.docx",
               "bytes": 4249,
               "sha256": "735848b611c697d71c1c12c2527b6dc8f4a3b899c38d0f35f3b6d8f0fd64bcae"
             },
             {
-              "path": "/home/zhuhe/code/litchi-worktrees/.coord/durable-ink-0362l/matched-v1/validation-candidate-allocation/forward.json",
+              "path": "(deleted-coord-artifact)/forward.json",
               "bytes": 127509,
               "sha256": "a9e0acc66a795deb9586fa4445b687ae98ee9821ad6281d3db21103a921622e2"
             },
             {
-              "path": "/home/zhuhe/code/litchi-worktrees/.coord/durable-ink-0362l/matched-v1/validation-candidate-allocation/inverse.docx",
+              "path": "(deleted-coord-artifact)/inverse.docx",
               "bytes": 3592,
               "sha256": "b24698282d77f5fcf2ee9f6956661496570903c36e062226573102b5be6a37a5"
             },
             {
-              "path": "/home/zhuhe/code/litchi-worktrees/.coord/durable-ink-0362l/matched-v1/validation-candidate-allocation/inverse.json",
+              "path": "(deleted-coord-artifact)/inverse.json",
               "bytes": 127509,
               "sha256": "9e827557b699a69595ff9a339a2ed4426ef5f7477952f42ecdfc5b3a8df9cd55"
             },
             {
-              "path": "/home/zhuhe/code/litchi-worktrees/.coord/durable-ink-0362l/matched-v1/validation-candidate-allocation/noop.docx",
+              "path": "(deleted-coord-artifact)/noop.docx",
               "bytes": 3592,
               "sha256": "b24698282d77f5fcf2ee9f6956661496570903c36e062226573102b5be6a37a5"
             },
             {
-              "path": "/home/zhuhe/code/litchi-worktrees/.coord/durable-ink-0362l/matched-v1/validation-candidate-allocation/source.docx",
+              "path": "(deleted-coord-artifact)/source.docx",
               "bytes": 3592,
               "sha256": "b24698282d77f5fcf2ee9f6956661496570903c36e062226573102b5be6a37a5"
             }
@@ -1984,7 +1984,7 @@
   },
   "allocations": {
     "receipt": {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/durable-ink-0362l/matched-v1/allocation-a1/manifest.json",
+      "path": "(deleted-coord-artifact)/manifest.json",
       "bytes": 20086,
       "sha256": "bcf790ff7df6cfe81654d7c52e3318b59745374e4da806dbf2e486fe842607e0"
     },
@@ -2124,7 +2124,7 @@
     ],
     "minimum_sample_ns": null,
     "inventory": {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/durable-ink-0362l/matched-v1/native-artifacts.json",
+      "path": "(deleted-coord-artifact)/native-artifacts.json",
       "bytes": 3,
       "sha256": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570"
     }

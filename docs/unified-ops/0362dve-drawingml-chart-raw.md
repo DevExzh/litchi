@@ -61,7 +61,7 @@ The source checks were `rustfmt --edition 2024` on all changed Rust files and
 `git diff --check`. With the repository capped shim, one build job, offline
 locked dependencies, one test thread, zero incremental compilation, an
 external `TMPDIR`, and external target
-`/home/zhuhe/code/litchi-worktrees/.coord/drawingml-chart-raw-target`
+`(deleted-coord-artifact)`
 (5,977,097,991 bytes, below 20 GB), these commands passed:
 
 ```text

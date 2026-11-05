@@ -28,7 +28,7 @@ Validation:
 * `cargo clippy -p litchi-odf-common -p litchi-odt -p litchi-ods --all-targets --all-features --offline -- -D warnings` passed.
 
 The exact logs are retained outside the checkout under
-`.coord/w8-odf-raw-xml/`: `namespace-uri-libs-final.log` (329690 bytes,
+`(deleted-coord-artifact)`: `namespace-uri-libs-final.log` (329690 bytes,
 SHA-256 `a739fc424a17ff0a506b3852f81df98152596a1ecff7fb2afa43519a5c20c8ac`)
 and `namespace-uri-clippy-final.log` (387 bytes, SHA-256
 `b16356d59ffb7170ad0adb296f9a058457ee5fb0834ba1cb4d33b1895dc998c1`).

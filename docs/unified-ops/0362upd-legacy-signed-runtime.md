@@ -44,16 +44,16 @@ All commands ran with one build job, debug information disabled, incremental
 compilation disabled, locked/offline dependencies, and the coordinator memory
 shim first on `PATH`. The exact source pin for every receipt is
 `77bc2d3ac2f58808b153f50c8f76c1d2c552cde2`. Logs remain outside the checkout
-under `/home/zhuhe/code/litchi-worktrees/.coord/xls-signed-runtime/logs/`.
+under `(deleted-coord-artifact)`.
 
 The shared environment prefix was:
 
 ```text
-PATH=/home/zhuhe/code/litchi-worktrees/.coord/bin:$PATH
-CARGO_TARGET_DIR=/home/zhuhe/code/litchi-worktrees/.coord/xls-signed-runtime/target20e9
+PATH=(deleted-coord-artifact):$PATH
+CARGO_TARGET_DIR=(deleted-coord-artifact)
 CARGO_BUILD_JOBS=1 CARGO_INCREMENTAL=0 CARGO_PROFILE_DEV_DEBUG=0
 CARGO_PROFILE_TEST_DEBUG=0
-TMPDIR=/home/zhuhe/code/litchi-worktrees/.coord/xls-signed-runtime/tmp20e9
+TMPDIR=(deleted-coord-artifact)
 ```
 
 | Check | Exact command after the shared prefix | Exit | External log (bytes, SHA-256) |
@@ -72,5 +72,5 @@ Additional source-limit regressions were also run against the same pin:
 | Profiled original entry limit | `cargo test -p litchi-doc --features performance-diagnostics --lib --locked --offline body_text::tests::profiled_signed_fallback_preserves_original_source_limits -- --nocapture --exact --test-threads=1` | 0 | `doc-profiled-signed-limit-post-77bc.log` (410, `295557140aaebeecc6ebdf391f15be6bd00c1a92b5b7bb15e8604340951045ba`) |
 
 Final external Cargo target size: **778,307,116 bytes** at
-`/home/zhuhe/code/litchi-worktrees/.coord/xls-signed-runtime/target20e9`.
+`(deleted-coord-artifact)`.
 No target contents, binaries, or evidence logs are tracked in this commit.

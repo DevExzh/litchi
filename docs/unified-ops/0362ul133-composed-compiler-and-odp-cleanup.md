@@ -11,7 +11,7 @@ Final target size is 1,147,736,122 bytes. These are compilation results;
 they do not establish runtime fidelity or performance acceptance.
 
 Evidence is external under the worktree parent's
-`.coord/uo2-coordinator-replay-integration-f5-compiler-780cf4c7/`:
+`(deleted-coord-artifact)`:
 
 | File | Bytes | SHA-256 |
 |---|---:|---|
@@ -21,19 +21,19 @@ Evidence is external under the worktree parent's
 
 Reproduction uses that source and the three approved locks from 132 with a
 fresh copy of the packet/target, followed by `python3 -B run_f5.py --go`.
-The root verifier is `.coord/checkpoint96/verify_capture.py STATE`.
+The root verifier is `(deleted-coord-artifact) STATE`.
 After successful terminal verification and a fresh root preflight, the
 34-group runtime packet starts at
-`.coord/ooxml-pptx-joint-c780cf4c7-f5-runtime/`. Its result remains pending.
+`(deleted-coord-artifact)`. Its result remains pending.
 The reviewed glossary26 and full53 packets retain isolated rustdoc rows.
 
 ## Cleanup101
 
 Root removes two obsolete detached ODP checkouts without force:
-`.coord/odp-matched-e4-source-20261024` and
+`(deleted-coord-artifact)` and
 `uo2-odp-heap-repair-0362yd-baseline`. Both have the canonical historical
 `e4a0614f5d3a1d768346cc33a4a3b86522dda986` tree. The required comparison
-endpoint `.coord/odp-0362yd-baseline-clean` remains unchanged.
+endpoint `(deleted-coord-artifact)` remains unchanged.
 
 The stale sparse checkout's lock, route overlay and probe are archived,
 restored from the archive and reverified before removal. The route is
@@ -50,7 +50,7 @@ paths/registrations and unchanged root/integration heads, refs, canonical
 baseline, archives, approved locks and protected constructor probe.
 
 Evidence is under external
-`.coord/worktree-cleanup-2026-10-25/trunk-consolidation/`:
+`(deleted-coord-artifact)`:
 
 | Receipt | SHA-256 |
 |---|---|

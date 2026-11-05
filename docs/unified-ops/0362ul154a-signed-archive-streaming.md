@@ -26,7 +26,7 @@ PYTHONDONTWRITEBYTECODE=1 python3 -B -m unittest \
 ```
 
 The external log is
-`/home/zhuhe/code/litchi-worktrees/.coord/protocol-P-streaming-154a-20261025/focused-tests.log`,
+`(deleted-coord-artifact)/focused-tests.log`,
 124 bytes, SHA-256
 `a30729f89e79713a7da5fcd1c31463cb6a770c6a0a6737331e0471994f48e2af`.
 This is a source-only protocol check; it does not claim native, corpus,

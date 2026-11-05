@@ -143,7 +143,7 @@ Setup:
 - Three processes. Each runs leaf and unified ABBA and prints medians.
 - Workbook: 40 notes, 40 conditional formats, 40 validations, 40 hyperlinks
   and 40 shapes.
-- Raw lines: `.coord/xlsb-features/bench3.jsonl`, not committed.
+- Raw lines: `(deleted-coord-artifact)`, not committed.
 
 | scenario | leaf µs | unified µs | ratios (3 runs) |
 |---|---:|---:|---|

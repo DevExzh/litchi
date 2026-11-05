@@ -31,7 +31,7 @@ display remains content-free.
 ## Validation
 
 Validation was run from the fresh `uo2/pptx-refusal-kind` leaf using
-`.coord/pptx-refusal-kind/env.sh`. The environment used the repository's
+`(deleted-coord-artifact)`. The environment used the repository's
 memory-capped cargo shim with `LITCHI_MEM_MAX=20G`,
 `CARGO_BUILD_JOBS=1`, `RUST_TEST_THREADS=1`, `CARGO_INCREMENTAL=0`,
 `CARGO_NET_OFFLINE=true`, and external `CARGO_TARGET_DIR` and `TMPDIR`.
@@ -41,7 +41,7 @@ was 139592 bytes with SHA-256
 `6d7895e6056c931fc19780ff4d0a031230e2ac79b9b30a9060bc8b6fad6747da`.
 
 All raw logs and receipts are in
-`/home/zhuhe/code/litchi-worktrees/.coord/pptx-refusal-kind/validation-18346e7f88/`.
+`(deleted-coord-artifact)`.
 The raw-log evidence is:
 
 | Check | Command result | Raw log (bytes; SHA-256) |
@@ -74,7 +74,7 @@ the generated table are in `d9baa98c3188a7367b7012185ae98c01305f5e31`.
 The final checks ran at that commit with the same ignored 139592-byte
 `Cargo.lock` overlay and SHA-256 recorded above. Their raw logs and receipts
 are in
-`/home/zhuhe/code/litchi-worktrees/.coord/pptx-refusal-kind/validation-d9baa98c31/`:
+`(deleted-coord-artifact)`:
 
 | Check | Result | Raw log (bytes; SHA-256) |
 | --- | --- | --- |
@@ -98,7 +98,7 @@ follow-up check above passed after the single-line regeneration.
 The coordinator verified all seven captured logs against their adjacent
 source/command/exit receipts before merge. Root Cargo, toolchain, Clippy and
 Cargo configuration match the committed inputs. The absolute environment
-script is `/home/zhuhe/code/litchi-worktrees/.coord/pptx-refusal-kind/env.sh`
+script is `(deleted-coord-artifact)/env.sh`
 (500 bytes, SHA-256
 `acbca6ffa6ff89d4f5322bccced729a48e08a5cf50174fb1587202c533310ae5`).
 The target-size cap is 20,000,000,000 bytes, separate from the `20G`

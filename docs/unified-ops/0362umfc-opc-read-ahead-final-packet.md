@@ -18,8 +18,7 @@ guard sha256: db48dde4633f98d9ae9f39706c772af79462abf4d287f09264bfd0240435e4ae
 The accepted input receipt is the preserved external file:
 
 ```text
-/home/zhuhe/code/litchi-worktrees/.coord/final-api-capture-472b670547/
-opc-read-ahead-final472b-prep/prefix-diagnostic-receipt-fixture-rerun.json
+(deleted-coord-artifact)/prefix-diagnostic-receipt-fixture-rerun.json
 bytes: 8851
 sha256: 1559c13d0a4cd05eef6b3defaab304a3ecfa55b4b504ce8b2d15d3ea20f2f6e3
 ```
@@ -39,10 +38,8 @@ exact policies, and the fixed `a1,b1,b2,a2` order.  Its output and temporary
 paths were absent at packet creation:
 
 ```text
-/home/zhuhe/code/litchi-worktrees/.coord/final-api-capture-472b670547/
-opc-read-ahead-final472b-timing-20261024T210504Z
-/home/zhuhe/code/litchi-worktrees/.coord/final-api-capture-472b670547/
-opc-read-ahead-final472b-timing-tmp-20261024T210504Z
+(deleted-coord-artifact)
+(deleted-coord-artifact)
 ```
 
 The quiet-host fence must be rechecked immediately before launch and during

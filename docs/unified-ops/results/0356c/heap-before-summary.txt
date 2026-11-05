@@ -1,5 +1,5 @@
-reading file "../.coord/pptx-manifest/compact-heap-before.zst" - please wait, this might take some time...
-Debuggee command was: ../.coord/pptx-manifest/binaries/compact-before
+reading file "(deleted-coord-artifact)" - please wait, this might take some time...
+Debuggee command was: (deleted-coord-artifact)
 finished reading file, now analyzing data:
 
 total runtime: 27.197000s.

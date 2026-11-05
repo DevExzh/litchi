@@ -31,14 +31,14 @@ directories were reused without cleaning or overwriting their recorded
 binaries:
 
 ```sh
-source /home/zhuhe/code/litchi-worktrees/.coord/w4-xlsx/env.sh
-CARGO_TARGET_DIR=/home/zhuhe/code/litchi-worktrees/.coord/w4-xlsx/targets/final-b1a5-alloc \
+source (deleted-coord-artifact)
+CARGO_TARGET_DIR=(deleted-coord-artifact) \
   CARGO_BUILD_JOBS=1 CARGO_INCREMENTAL=0 CARGO_PROFILE_RELEASE_DEBUG=0 \
   LITCHI_MEM_MAX=20G cargo build --release --locked \
   --manifest-path tools/perf-baseline/unified-xlsx-raw-identity/Cargo.toml \
   --bin xlsx-raw-identity-alloc --features allocator-metrics
 
-CARGO_TARGET_DIR=/home/zhuhe/code/litchi-worktrees/.coord/w4-xlsx/targets/final-b1a5-main \
+CARGO_TARGET_DIR=(deleted-coord-artifact) \
   CARGO_BUILD_JOBS=1 CARGO_INCREMENTAL=0 CARGO_PROFILE_RELEASE_DEBUG=0 \
   LITCHI_MEM_MAX=20G cargo build --release --locked \
   --manifest-path tools/perf-baseline/unified-xlsx-raw-identity/Cargo.toml \
@@ -91,7 +91,7 @@ measurements rather than hiding it in setup.
 ## External evidence and Callgrind status
 
 Raw evidence is outside the checkout at
-`/home/zhuhe/code/litchi-worktrees/.coord/w4-xlsx/evidence/raw-qualification-ff86/`.
+`(deleted-coord-artifact)`.
 The reduced report hashes are:
 
 | artifact | bytes | SHA-256 |
@@ -112,10 +112,10 @@ The reproducible diagnostic command was:
 
 ```sh
 taskset -c 0 valgrind --tool=callgrind --quiet \
-  --callgrind-out-file=/home/zhuhe/code/litchi-worktrees/.coord/w4-xlsx/evidence/raw-qualification-ff86/callgrind-ff86-native.out \
-  /home/zhuhe/code/litchi-worktrees/.coord/w4-xlsx/targets/final-b1a5-main/release/xlsx-raw-identity-native \
+  --callgrind-out-file=(deleted-coord-artifact) \
+  (deleted-coord-artifact) \
   xlsx-raw-identity --api-variant candidate \
   --source-revision ff86f4a1c07f05a98a8dddf272daef56942656ea \
   --iterations 1 --warmups 1 \
-  --json /home/zhuhe/code/litchi-worktrees/.coord/w4-xlsx/evidence/raw-qualification-ff86/candidate-callgrind.json
+  --json (deleted-coord-artifact)
 ```

@@ -51,7 +51,7 @@ actual pinned check was a current-candidate check at the 35e37 staging fence;
 it failed because current `Package::parse` expects `&str` rather than the
 provided `&Vec<u8>`, and current `Package::apply` returns `edit::Commit`, not a
 `Package` with `.to_bytes()`.  The retained receipt is
-`/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/rtf-probe-compile/check-before.json`
+`(deleted-coord-artifact)/check-before.json`
 (SHA-256 `f3af926353fc3db4f74221f62ed4f4743cc6b31c359ab42415c8f1500e33bda4`),
 with log SHA-256
 `119d4216675ee79a7e89e17579f019dd4fe3a6d43c08a8bd22d87c37622fd103` and exit
@@ -59,12 +59,12 @@ status 101.  This failure is diagnostic evidence, not a passing build.
 
 ## Focused validation
 
-The capped environment was `PATH` with `.coord/bin` first,
+The capped environment was `PATH` with `(deleted-coord-artifact)` first,
 `LITCHI_CAPPED`/`LITCHI_BLESS` unset, `LITCHI_MEM_MAX=20G`,
 `CARGO_BUILD_JOBS=1`, `CARGO_INCREMENTAL=0`, offline and locked, with each
 target kept below 20,000,000,000 bytes.  The two live current-crate commands
 ran in the source-only scratch checkout
-`/home/zhuhe/code/litchi-worktrees/.coord/rtf-live-current-kQPuva`, with the
+`(deleted-coord-artifact)`, with the
 4100 lock recorded above; that lock was not added to this repair worktree.
 The corrected commands were:
 
@@ -91,7 +91,7 @@ validation=passed, native_error_api=litchi_rtf::edit::Error::Refused(Refusal), a
 ```
 
 The candidate locked-check log is retained outside the checkout at
-`.coord/rtf-probe-compile/adapter-current-replay-check-locked.log` (SHA-256
+`(deleted-coord-artifact)/adapter-current-replay-check-locked.log` (SHA-256
 `af85ce854be3c52fc68baa257d3e0d70cd99db90c7360f0d341de54547dd8d94`); the
 candidate check-only log is `adapter-current-replay-check-only.log` (SHA-256
 `1085023a13a390e62f118723aa027ee94c59b93c3ad3e44386f7272cbf8fb837`).  The

@@ -28,7 +28,7 @@ change or repaired-source runtime pass is claimed.
 Root independently verifies the terminal capture, source and all three
 approved locks, exact commands, logs/traces, process exit and target bounds.
 Evidence is external under the worktree parent's
-`.coord/ooxml-pptx-joint-c780cf4c7-f5-runtime/`:
+`(deleted-coord-artifact)`:
 
 | File | Bytes | SHA-256 |
 |---|---:|---|
@@ -39,7 +39,7 @@ Evidence is external under the worktree parent's
 The scoped reproduction is the packet's captured chunk31 command, under
 the approved F5 supervisor and the same source/locks; the complete packet
 uses `python3 -B run_f5.py --go` with fresh state/target directories. Root
-terminal verification uses `.coord/checkpoint96/verify_capture.py STATE`.
+terminal verification uses `(deleted-coord-artifact) STATE`.
 The failed capture remains unchanged. Remaining coverage is prepared as a
 separate diagnostic continuation. Glossary26 starts on the same frozen C
 after root preflight; its result remains pending.

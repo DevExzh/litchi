@@ -48,16 +48,16 @@ proves current-package policy state rather than source-only policy checks.
 
 The source commit was validated with the memory-capped cargo shim, one job,
 `CARGO_INCREMENTAL=0`, debug information disabled, offline locked resolution,
-and `TMPDIR=/home/zhuhe/code/litchi-worktrees/.coord/odg-joined-v4/tmp`.  The
+and `TMPDIR=(deleted-coord-artifact)`.  The
 owned isolated target was
-`/home/zhuhe/code/litchi-worktrees/.coord/odg-joined-v2/target`, measured at
+`(deleted-coord-artifact)`, measured at
 414 MiB after the run.  External receipts are intentionally not tracked:
 
 | Command | Receipt | Size | SHA-256 |
 |---|---|---:|---|
-| `cargo check --offline --locked --all-targets --all-features -p litchi-odg -j 1` | `.coord/odg-joined-v4/final-check.log` | 162 bytes | `e69de7b1c10bfef88f12096e8175f2d2fa1c38099d53490f0593a5652cfd26fc` |
-| `cargo clippy --offline --locked --all-targets --all-features -p litchi-odg -j 1 -- -D warnings` | `.coord/odg-joined-v4/final-clippy.log` | 162 bytes | `8d25179bc5fc58c574f54aa89d66b84337247fc986e4753a2ab7ee5bf44a6069` |
-| `cargo test --offline --locked --all-features -p litchi-odg --test package_semantics --test transition_review --test capability_transactions -j 1` | `.coord/odg-joined-v4/final-tests.log` | 5063 bytes | `cca93855dafe53f62bfa48af1c5891a0d131e1f9a480e26ae1170d63907ee196` |
+| `cargo check --offline --locked --all-targets --all-features -p litchi-odg -j 1` | `(deleted-coord-artifact)/final-check.log` | 162 bytes | `e69de7b1c10bfef88f12096e8175f2d2fa1c38099d53490f0593a5652cfd26fc` |
+| `cargo clippy --offline --locked --all-targets --all-features -p litchi-odg -j 1 -- -D warnings` | `(deleted-coord-artifact)/final-clippy.log` | 162 bytes | `8d25179bc5fc58c574f54aa89d66b84337247fc986e4753a2ab7ee5bf44a6069` |
+| `cargo test --offline --locked --all-features -p litchi-odg --test package_semantics --test transition_review --test capability_transactions -j 1` | `(deleted-coord-artifact)/final-tests.log` | 5063 bytes | `cca93855dafe53f62bfa48af1c5891a0d131e1f9a480e26ae1170d63907ee196` |
 
 The focused run passed 8 capability tests, 26 package-semantic tests and 20
 transition-review tests (54 total).  `cargo fmt -p litchi-odg -- --check`,

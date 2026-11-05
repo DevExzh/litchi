@@ -120,7 +120,7 @@ input).
 ## 6. Verification
 
 On the merge of trunk `8022ffd507` (gate script
-`.coord/iwa-w1a/gates3.sh`, sequential, `CARGO_BUILD_JOBS=6`), then the
+`(deleted-coord-artifact)`, sequential, `CARGO_BUILD_JOBS=6`), then the
 placement follow-up:
 
 | Command | Exit |

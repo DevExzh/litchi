@@ -4,7 +4,7 @@ This source-only leaf is based on integration commit
 `88ca2fd38fdd23ca2ee4ad22449a83893804e4e1`. It registers the new
 `tools.test_prepare_raw_api_census` module in the canonical tracked safe-gate
 runner's existing `tooling-unit` row. The active approved runner worktree and
-the external `.coord/gate.sh` were not modified; the coordinator applies the
+the external `(deleted-coord-artifact)` were not modified; the coordinator applies the
 tracked change and the external patch separately after review. Existing F5
 runner hashes and all historical capture receipts remain immutable.
 
@@ -27,7 +27,7 @@ the 53-step plan, target-guard setting, ownership, cleanup and cap policy.
 
 The external coordinator patch is retained at
 `docs/unified-ops/results/0362ul79f/gate-sh-tooling.patch`. It is a one-token
-insertion into the current external `.coord/gate.sh` `toolunit` command. The
+insertion into the current external `(deleted-coord-artifact)/gate.sh` `toolunit` command. The
 external file was not edited: its observed pre-patch size/hash are 6,249
 bytes / `23170aedf5583e637b48eacb79f7976eef65c83e3fbe9f3c3749ddd807e1671c`,
 and the expected post-patch size/hash are 6,283 bytes /

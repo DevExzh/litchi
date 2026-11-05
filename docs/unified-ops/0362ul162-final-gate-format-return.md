@@ -19,7 +19,7 @@ a fresh committed successor and fresh state; the failed C2 packet remains
 historical and cannot be relabeled.
 
 External packet:
-`/home/zhuhe/code/litchi-worktrees/.coord/final-gate-C2-e7aca04f06-20261026/`.
+`(deleted-coord-artifact)`.
 
 | Artifact | Bytes | SHA-256 |
 | --- | ---: | --- |

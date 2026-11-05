@@ -2,7 +2,7 @@
   "logs": [
     {
       "artifact": {
-        "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-integration-0362f/admission/clippy.log",
+        "path": "(deleted-coord-artifact)/clippy.log",
         "bytes": 162,
         "sha256": "2cc0c514c3537319e1dde65906ec758fabea6093cdf4157910d4a4214102d333"
       },
@@ -10,7 +10,7 @@
     },
     {
       "artifact": {
-        "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-integration-0362f/admission/fmt-check.log",
+        "path": "(deleted-coord-artifact)/fmt-check.log",
         "bytes": 0,
         "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
       },
@@ -18,7 +18,7 @@
     },
     {
       "artifact": {
-        "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-integration-0362f/admission/fmt.log",
+        "path": "(deleted-coord-artifact)/fmt.log",
         "bytes": 0,
         "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
       },
@@ -26,7 +26,7 @@
     },
     {
       "artifact": {
-        "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-integration-0362f/admission/ppt-scoped.log",
+        "path": "(deleted-coord-artifact)/ppt-scoped.log",
         "bytes": 1640,
         "sha256": "d3e744b0dfd17c43d68719779b6a4848db769b08524b8daa1050a8b7371376df"
       },
@@ -41,7 +41,7 @@
     },
     {
       "artifact": {
-        "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-integration-0362f/cfb-visitor.log",
+        "path": "(deleted-coord-artifact)/cfb-visitor.log",
         "bytes": 678,
         "sha256": "837fa0ac437be14bf120759a46ef96f4fb86799d20849ff27d288d50913911fb"
       },
@@ -56,7 +56,7 @@
     },
     {
       "artifact": {
-        "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-integration-0362f/final/clippy.log",
+        "path": "(deleted-coord-artifact)/clippy.log",
         "bytes": 162,
         "sha256": "2574fd3685b2615deedb4cc4fe2c465bef6bbcfe7c080bf33e14569dd1cd58f6"
       },
@@ -64,7 +64,7 @@
     },
     {
       "artifact": {
-        "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-integration-0362f/final/fmt-check.log",
+        "path": "(deleted-coord-artifact)/fmt-check.log",
         "bytes": 0,
         "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
       },
@@ -72,7 +72,7 @@
     },
     {
       "artifact": {
-        "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-integration-0362f/final/fmt.log",
+        "path": "(deleted-coord-artifact)/fmt.log",
         "bytes": 0,
         "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
       },
@@ -80,7 +80,7 @@
     },
     {
       "artifact": {
-        "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-integration-0362f/final/ppt-directory-bound.log",
+        "path": "(deleted-coord-artifact)/ppt-directory-bound.log",
         "bytes": 442,
         "sha256": "69e2a0beb2ed46720c9e84e0ffd6c6e5c1292acacd0ecbb77f50a2f5f9ca45f3"
       },
@@ -95,7 +95,7 @@
     },
     {
       "artifact": {
-        "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-integration-0362f/fmt.log",
+        "path": "(deleted-coord-artifact)/fmt.log",
         "bytes": 0,
         "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
       },
@@ -103,7 +103,7 @@
     },
     {
       "artifact": {
-        "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-integration-0362f/followup/clippy.log",
+        "path": "(deleted-coord-artifact)/clippy.log",
         "bytes": 3422,
         "sha256": "31152c9a07f3fbf5f3530299614ecb966fab9851ec09a1e56004581408fdebce"
       },
@@ -111,7 +111,7 @@
     },
     {
       "artifact": {
-        "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-integration-0362f/followup/fmt-check.log",
+        "path": "(deleted-coord-artifact)/fmt-check.log",
         "bytes": 0,
         "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
       },
@@ -119,7 +119,7 @@
     },
     {
       "artifact": {
-        "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-integration-0362f/followup/fmt.log",
+        "path": "(deleted-coord-artifact)/fmt.log",
         "bytes": 0,
         "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
       },
@@ -127,7 +127,7 @@
     },
     {
       "artifact": {
-        "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-integration-0362f/followup/integration-tests.log",
+        "path": "(deleted-coord-artifact)/integration-tests.log",
         "bytes": 38157,
         "sha256": "f1893a2c2f4e23b9edf1b177deb1d9db788461217e2700851c867a0e88d75c2f"
       },
@@ -496,7 +496,7 @@
     },
     {
       "artifact": {
-        "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-integration-0362f/followup/ppt-signature.log",
+        "path": "(deleted-coord-artifact)/ppt-signature.log",
         "bytes": 452,
         "sha256": "8477cd39fc6565a5a375e4bbaabd3c3d824e1d4e785f2740b81803e127e38741"
       },
@@ -511,7 +511,7 @@
     },
     {
       "artifact": {
-        "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-integration-0362f/lib-tests.log",
+        "path": "(deleted-coord-artifact)/lib-tests.log",
         "bytes": 148814,
         "sha256": "7c363aa73d4789b00e6a7083d7dcb39b4317413b0e3453201b3ba803c3c310fd"
       },
@@ -532,7 +532,7 @@
     },
     {
       "artifact": {
-        "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-integration-0362f/ppt-signature.log",
+        "path": "(deleted-coord-artifact)/ppt-signature.log",
         "bytes": 1787,
         "sha256": "9195e3a5f33e3cbeee716c34bcc662c8a38200572c2f30e56be2ff4218f87742"
       },
@@ -548,7 +548,7 @@
   ],
   "checks": [
     {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-integration-0362f/admission/checks.json",
+      "path": "(deleted-coord-artifact)",
       "receipts": [
         {
           "label": "fmt",
@@ -613,7 +613,7 @@
       ]
     },
     {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-integration-0362f/checks.json",
+      "path": "(deleted-coord-artifact)",
       "receipts": [
         {
           "label": "fmt",
@@ -662,7 +662,7 @@
       ]
     },
     {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-integration-0362f/final/checks.json",
+      "path": "(deleted-coord-artifact)",
       "receipts": [
         {
           "label": "fmt",
@@ -727,7 +727,7 @@
       ]
     },
     {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-integration-0362f/followup/checks.json",
+      "path": "(deleted-coord-artifact)",
       "receipts": [
         {
           "label": "fmt",

@@ -97,13 +97,13 @@ operation, commit, serialize; two calls each).
 The Numbers removal is unchanged from 0425 (84,107,402 there; +0.02%).
 Receipt `results/0427/callgrind-chart-captions.json` (binary SHA-256,
 build and run commands, per-capture size and SHA-256); raw captures in
-`.coord/iwa-w4n/cg/` (outside the repository). The bench matrix lists 0427
+`(deleted-coord-artifact)` (outside the repository). The bench matrix lists 0427
 under `evidence_without_rows` (leaf-versus-host evidence).
 
 ## 5. Gates
 
 Run on `7c10e53acc` + the record files (trunk `27939b7955`); logs
-`.coord/iwa-w4n/gates/` (one command at a time). Every command exits 0:
+`(deleted-coord-artifact)` (one command at a time). Every command exits 0:
 
 | Gate | Exit |
 |---|---:|

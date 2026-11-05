@@ -49,7 +49,7 @@
         "warnings"
       ],
       "environment": {
-        "CARGO_TARGET_DIR": "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/target",
+        "CARGO_TARGET_DIR": "(deleted-coord-artifact)",
         "CARGO_NET_OFFLINE": "true",
         "LITCHI_MEM_MAX": "20G",
         "CARGO_BUILD_JOBS": "1",
@@ -59,7 +59,7 @@
       },
       "exit": 0,
       "seconds": 167.2716827392578,
-      "log": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/composed-strict-97817cb75f/01-clippy-all-features-attempt-1792816909686570830-4053760.log",
+      "log": "(deleted-coord-artifact)/01-clippy-all-features-attempt-1792816909686570830-4053760.log",
       "log_bytes": 0,
       "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "target_bytes_after": 4706734564,
@@ -119,15 +119,15 @@
         {
           "pid": "4055356",
           "cargo_command": "clippy",
-          "target": "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/target"
+          "target": "(deleted-coord-artifact)"
         }
       ],
       "cargo_target_sizes": {
-        "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/target": {
+        "(deleted-coord-artifact)": {
           "bytes": 4706734564
         }
       },
-      "cargo_target_trace_file": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/composed-strict-97817cb75f/01-clippy-all-features-attempt-1792816909686570830-4053760-cargo-targets.tsv",
+      "cargo_target_trace_file": "(deleted-coord-artifact)/01-clippy-all-features-attempt-1792816909686570830-4053760-cargo-targets.tsv",
       "cargo_target_trace_bytes": 81,
       "cargo_target_trace_sha256": "c32cd6201bb9102ba33919fecb573e5bd2df7e7e8bbb9ad58a756c04d81923c6",
       "preflight": {
@@ -206,6 +206,6 @@
       "status": "passed"
     }
   ],
-  "external_state": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/composed-strict-97817cb75f/state.json",
+  "external_state": "(deleted-coord-artifact)/state.json",
   "external_state_sha256": "25978660d1f3f3d23d1c30df4c089ddbda940081797bcea836843373b3593e85"
 }

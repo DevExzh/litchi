@@ -6,7 +6,7 @@ a new compiler, runtime, performance, or qualification result.
 The frozen source base is
 `ef9470f7da08a131f31600041f9d562203d62bfa`. The bounded full-feature test log
 is outside Git at
-`/home/zhuhe/code/litchi-worktrees/.coord/pptx-combined-0362ul89-f5-qualification-ef9470f7da/fullfeatures-tests/0000.log`
+`(deleted-coord-artifact)/0000.log`
 (548,761 bytes, SHA-256
 `cfe5aa3f9c4082d67019cfc8285a121768d0a5e3063f8e0c064bfcbda60d3fef`). The
 owned failure was

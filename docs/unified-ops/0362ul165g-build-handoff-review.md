@@ -96,7 +96,7 @@ or performance exception is recorded.
 
 ## Evidence
 
-Paths are relative to `/home/zhuhe/code/litchi-worktrees/.coord/`.
+Paths are relative to `(deleted-coord-artifact)`.
 
 | Artifact | Bytes | SHA-256 |
 | --- | ---: | --- |

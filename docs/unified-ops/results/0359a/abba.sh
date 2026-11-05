@@ -2,7 +2,7 @@
 # Record 0359a: binary-level A-B-B-A of legacy_w5_source_probe and
 # legacy_w5_probe, base (7afba5f146, record 0359 tip) vs head (0359a),
 # release, pinned to one CPU, each run in a 20 GB memory scope.
-P=${P:-/home/zhuhe/code/litchi-worktrees/.coord/w5-legacy/perf2}; CPU=${CPU:-29}; ROUNDS=${ROUNDS:-31}
+P=${P:-/deleted-coord-artifact}; CPU=${CPU:-29}; ROUNDS=${ROUNDS:-31}
 OUT=${OUT:-$P/out}; mkdir -p "$OUT"
 export LITCHI_PROBE_BATCH_ROUNDS=${LITCHI_PROBE_BATCH_ROUNDS:-7}
 run() {

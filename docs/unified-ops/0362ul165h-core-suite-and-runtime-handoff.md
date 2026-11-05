@@ -117,7 +117,7 @@ cumulative removal remains 277 worktrees and 439 refs.
 
 ## Evidence
 
-Paths are relative to `/home/zhuhe/code/litchi-worktrees/.coord/`.
+Paths are relative to `(deleted-coord-artifact)`.
 
 | Artifact | Bytes | SHA-256 |
 | --- | ---: | --- |
@@ -139,7 +139,7 @@ Paths are relative to `/home/zhuhe/code/litchi-worktrees/.coord/`.
 | `branch-worktree-165h-20261026/observation.json` | 17,527 | `9fcdb40cf39bdd82ea70af424e197f9798d0bb8527f9eb243ae9f480ea07f9fe` |
 
 The restored flat-parts and W6 preparations remain in repair. The preserved e4a
-baseline at `.coord/odp-0362yd-baseline-clean` contains a 139,425-byte root
+baseline at `(deleted-coord-artifact)` contains a 139,425-byte root
 lock, SHA-256
 `04665b965a919412e29c8772956ddf6267264fa40e3e0ef7c9967fd2eb584171`;
 the W6 worker is checking whether its provenance and dependency graph can

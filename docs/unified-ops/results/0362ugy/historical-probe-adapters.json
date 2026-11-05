@@ -5,7 +5,7 @@
   "independent_review": "READY",
   "qualification_claim": false,
   "preparation": {
-    "path": "/home/zhuhe/code/litchi-worktrees/.coord/native-w4b-w5-stable-v5/receipts/source-preparation-v5.json",
+    "path": "(deleted-coord-artifact)/source-preparation-v5.json",
     "bytes": 6404,
     "sha256": "a69fe921256a9ec2f612dc7ad0bca20c5dadda861c71c9bad2a3f1856466efd0"
   },
@@ -14,20 +14,20 @@
     "w4b": {
       "analyzer": {
         "bytes": 1669,
-        "path": "/home/zhuhe/code/litchi-worktrees/.coord/native-w4b-w5-stable/sources/w4b-after/docs/unified-ops/results/0360b/analyze.py",
+        "path": "(deleted-coord-artifact)/analyze.py",
         "sha256": "40dad0845086f3d082765d79c52ca83f13aab450a64801ef61acf9a36f82a493"
       },
       "baseline": {
         "clean": false,
         "head": "be644568846ad2fcf0622386f2f2438d0eac21c0",
-        "path": "/home/zhuhe/code/litchi-worktrees/.coord/native-w4b-w5-stable-v5/sources/w4b-before",
+        "path": "(deleted-coord-artifact)/w4b-before",
         "status_sha256": "e7e6d3b98d6d75654e6fc6c9dee29aefb9efa9b2179c9af78510947c4eb22eb8",
         "tree": "684a028b2ae30a3a110b87bf6743fc598c6691a2"
       },
       "baseline_before_overlay": {
         "clean": true,
         "head": "be644568846ad2fcf0622386f2f2438d0eac21c0",
-        "path": "/home/zhuhe/code/litchi-worktrees/.coord/native-w4b-w5-stable-v5/sources/w4b-before",
+        "path": "(deleted-coord-artifact)/w4b-before",
         "status_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
         "tree": "684a028b2ae30a3a110b87bf6743fc598c6691a2"
       },
@@ -35,7 +35,7 @@
       "candidate": {
         "clean": true,
         "head": "b6732d02b241705ba153c1a2cb9ff03bf0a13f93",
-        "path": "/home/zhuhe/code/litchi-worktrees/.coord/native-w4b-w5-stable/sources/w4b-after",
+        "path": "(deleted-coord-artifact)/w4b-after",
         "status_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
         "tree": "bc5ae81f406ea2d3a7e2e5e8578fbfd51e5264a7"
       },
@@ -46,9 +46,9 @@
           "candidate_bytes": 10509,
           "candidate_sha256": "3641724a4ff8abf92de0e6307077c1f63574e7c41b93cf06e7cef3038586ac36",
           "content_sha256": "ec922a2001ba4605bc112b9a1fe1efa81fae7e4eefbd100ed2ffbe0371b126ea",
-          "destination": "/home/zhuhe/code/litchi-worktrees/.coord/native-w4b-w5-stable-v5/sources/w4b-before/crates/litchi-ops/examples/xlsb_w4b_probe.rs",
+          "destination": "(deleted-coord-artifact)/xlsb_w4b_probe.rs",
           "destination_sha256": "ec922a2001ba4605bc112b9a1fe1efa81fae7e4eefbd100ed2ffbe0371b126ea",
-          "source": "/home/zhuhe/code/litchi-worktrees/.coord/native-w4b-w5-stable/sources/w4b-after/crates/litchi-ops/examples/xlsb_w4b_probe.rs",
+          "source": "(deleted-coord-artifact)/xlsb_w4b_probe.rs",
           "source_bytes": 10509,
           "source_sha256": "3641724a4ff8abf92de0e6307077c1f63574e7c41b93cf06e7cef3038586ac36"
         },
@@ -61,8 +61,8 @@
           "bytes": 85354,
           "candidate_bytes": 86787,
           "candidate_sha256": "825183aec7c8afb87d67ea6c0812f755523ebdf2bb7df6fa5476f4e655418c7b",
-          "destination": "/home/zhuhe/code/litchi-worktrees/.coord/native-w4b-w5-stable-v5/sources/w4b-before/tools/perf-baseline/src/bin/xlsb_crud.rs",
-          "source": "/home/zhuhe/code/litchi-worktrees/.coord/native-w4b-w5-stable/sources/w4b-after/tools/perf-baseline/src/bin/xlsb_crud.rs",
+          "destination": "(deleted-coord-artifact)/xlsb_crud.rs",
+          "source": "(deleted-coord-artifact)/xlsb_crud.rs",
           "source_bytes": 86787,
           "source_sha256": "825183aec7c8afb87d67ea6c0812f755523ebdf2bb7df6fa5476f4e655418c7b"
         }
@@ -72,20 +72,20 @@
     "w5": {
       "analyzer": {
         "bytes": 2756,
-        "path": "/home/zhuhe/code/litchi-worktrees/.coord/native-w4b-w5-stable/sources/w5-after/docs/unified-ops/results/0359a/analyze.py",
+        "path": "(deleted-coord-artifact)/analyze.py",
         "sha256": "14bf15e41202cd610c8bcecb2d239d9ceef3256b354c9144b8b6aa1a808f4d21"
       },
       "baseline": {
         "clean": false,
         "head": "7afba5f146aa1a16eba73ebed2144dd041b33fb5",
-        "path": "/home/zhuhe/code/litchi-worktrees/.coord/native-w4b-w5-stable-v5/sources/w5-before",
+        "path": "(deleted-coord-artifact)/w5-before",
         "status_sha256": "8a05658372f046d5f67ec8caf915bb7718751501c854837a4157f1d153cdf009",
         "tree": "4940682589d406cfe0cfc38457143699eae45ab0"
       },
       "baseline_before_overlay": {
         "clean": true,
         "head": "7afba5f146aa1a16eba73ebed2144dd041b33fb5",
-        "path": "/home/zhuhe/code/litchi-worktrees/.coord/native-w4b-w5-stable-v5/sources/w5-before",
+        "path": "(deleted-coord-artifact)/w5-before",
         "status_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
         "tree": "4940682589d406cfe0cfc38457143699eae45ab0"
       },
@@ -93,7 +93,7 @@
       "candidate": {
         "clean": true,
         "head": "b6732d02b241705ba153c1a2cb9ff03bf0a13f93",
-        "path": "/home/zhuhe/code/litchi-worktrees/.coord/native-w4b-w5-stable/sources/w5-after",
+        "path": "(deleted-coord-artifact)/w5-after",
         "status_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
         "tree": "bc5ae81f406ea2d3a7e2e5e8578fbfd51e5264a7"
       },
@@ -102,18 +102,18 @@
           "bytes": 19853,
           "candidate_probe_sha256": "83b5eb8bf31cee397aaffd3cd784d3da1596a4cc99eb7fdca259a85ff3256def",
           "content_sha256": "1b581040b65a5baedd0368c026599a2c6746415afc2d8a67d622091112d928f8",
-          "destination": "/home/zhuhe/code/litchi-worktrees/.coord/native-w4b-w5-stable-v5/sources/w5-before/crates/litchi-ops/examples/legacy_w5_source_probe.rs",
+          "destination": "(deleted-coord-artifact)/legacy_w5_source_probe.rs",
           "destination_sha256": "1b581040b65a5baedd0368c026599a2c6746415afc2d8a67d622091112d928f8",
           "routes_before_sha256": "237d7242d9fa4db2a3e1589f26b175eff564bb6de680bb217df24f021c698915",
-          "source": "/home/zhuhe/code/litchi-worktrees/.coord/native-w4b-w5-stable/sources/w5-after/crates/litchi-ops/examples/legacy_w5_source_probe.rs",
+          "source": "(deleted-coord-artifact)/legacy_w5_source_probe.rs",
           "source_bytes": 19083,
           "source_sha256": "83b5eb8bf31cee397aaffd3cd784d3da1596a4cc99eb7fdca259a85ff3256def"
         },
         {
           "bytes": 5381,
-          "destination": "/home/zhuhe/code/litchi-worktrees/.coord/native-w4b-w5-stable-v5/sources/w5-before/docs/unified-ops/results/0359a/routes_before.rs",
+          "destination": "(deleted-coord-artifact)/routes_before.rs",
           "destination_sha256": "237d7242d9fa4db2a3e1589f26b175eff564bb6de680bb217df24f021c698915",
-          "source": "/home/zhuhe/code/litchi-worktrees/.coord/native-w4b-w5-stable/sources/w5-after/docs/unified-ops/results/0359a/routes_before.rs",
+          "source": "(deleted-coord-artifact)/routes_before.rs",
           "source_sha256": "237d7242d9fa4db2a3e1589f26b175eff564bb6de680bb217df24f021c698915"
         }
       ],
@@ -131,33 +131,33 @@
   "tests_passed": 21,
   "logs": [
     {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/native-w4b-w5-diagnostic-v2/logs/native-qualification-runner-ccc536d524-tests.log",
+      "path": "(deleted-coord-artifact)/native-qualification-runner-ccc536d524-tests.log",
       "bytes": 354,
       "sha256": "1bdfdd836d197117671644c868e56a3d38a03da5e38bb2662db1b5de8a1c1f5a"
     },
     {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/native-w4b-w5-diagnostic-v2/logs/w4b-xlsb-probe-check.log",
+      "path": "(deleted-coord-artifact)/w4b-xlsb-probe-check.log",
       "bytes": 6154,
       "sha256": "9749a396463cd3d6dfc12743ea9b36cd6eac6c11ecc294f06b1c75b3ee5b7bd4"
     },
     {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/native-w4b-w5-diagnostic-v2/logs/w4b-sheet-check.log",
+      "path": "(deleted-coord-artifact)/w4b-sheet-check.log",
       "bytes": 7210,
       "sha256": "10084308e8bcbe17cfc3567f31e16b29d51d38844972f685003afe39d4f685fd"
     },
     {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/native-w4b-w5-diagnostic-v2/logs/w4b-crud-check.log",
+      "path": "(deleted-coord-artifact)/w4b-crud-check.log",
       "bytes": 11342,
       "sha256": "567cabb7c25870629220246c75cce2d16636cdf91a619bdb0c252ae730eb4930"
     },
     {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/native-w4b-w5-diagnostic-v2/logs/w5-probes-check-v5.log",
+      "path": "(deleted-coord-artifact)/w5-probes-check-v5.log",
       "bytes": 6265,
       "sha256": "d0e8b99d98a9429f2efb9685e6fce93f6c72ead5e6e3f322022127d0bddfd695"
     }
   ],
   "w5_diagnostic": {
-    "cwd": "/home/zhuhe/code/litchi-worktrees/.coord/native-w4b-w5-stable-v5/sources/w5-before",
+    "cwd": "(deleted-coord-artifact)",
     "command": [
       "cargo",
       "check",
@@ -185,8 +185,8 @@
       "CARGO_INCREMENTAL": "0",
       "CARGO_PROFILE_RELEASE_DEBUG": "0",
       "CARGO_NET_OFFLINE": "true",
-      "CARGO_TARGET_DIR": "/home/zhuhe/code/litchi-worktrees/.coord/native-w4b-w5-diagnostic-v2/target-w5-v2",
-      "TMPDIR": "/home/zhuhe/code/litchi-worktrees/.coord/native-w4b-w5-diagnostic-v2/tmp"
+      "CARGO_TARGET_DIR": "(deleted-coord-artifact)",
+      "TMPDIR": "(deleted-coord-artifact)"
     },
     "boundary_note": "Owner-supplied exact command; successful log identifies v5 package paths. W4b diagnostic logs retain their v4 source/lock/command headers. Their adapted probe/CRUD hashes equal v5; none of these checks builds a qualified native executable."
   }

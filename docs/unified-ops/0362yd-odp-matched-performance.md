@@ -54,7 +54,7 @@ The largest deterministic instruction increase is repeated `write_text` at 1.024
 | 12385 candidate probe binary | 3,541,224 | `37dfcc678f563552af0b07e5073e33bf62537522fe4d2a48fa5fd3bc0e4cf1d0` |
 | f755 secondary probe binary | 3,048,576 | `ac4e7def67295292afd0891ec5f9c8101308d53d8a4b6b0f814cb0fb90823490` |
 
-The binaries and Callgrind captures remain outside the repository under `/home/zhuhe/code/litchi-worktrees/.coord/odp-0362yd-evidence/`; the committed receipt records their paths, sizes, and hashes in [`artifacts.sha256`](results/0362yd/artifacts.sha256). No binary or capture is committed.
+The binaries and Callgrind captures remain outside the repository under `(deleted-coord-artifact)`; the committed receipt records their paths, sizes, and hashes in [`artifacts.sha256`](results/0362yd/artifacts.sha256). No binary or capture is committed.
 
 ## Validation
 

@@ -41,7 +41,7 @@ leaf.
 ## Validation provenance
 
 The approved scoped F5 is recorded at
-`/home/zhuhe/code/litchi-worktrees/.coord/0362ul66-f5-actual-67613f5dd0` and
+`(deleted-coord-artifact)` and
 passed all 16 rows on the validated leaf.  Its source was clean and used the
 approved lock digests:
 

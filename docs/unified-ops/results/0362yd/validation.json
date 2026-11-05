@@ -5,7 +5,7 @@
     "commit": "e4a0614f5d3a1d768346cc33a4a3b86522dda986",
     "role": "0358a changed-route pre-source-backed-family baseline",
     "binary": {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/odp-0362yd-evidence/odp_0362yd_baseline_e4a0614f5d",
+      "path": "(deleted-coord-artifact)/odp_0362yd_baseline_e4a0614f5d",
       "bytes": 3048448,
       "sha256": "6af07f71a4257195fb2b66eb6e34159a5b0d1159250ae3ef431a5748265e225f"
     }
@@ -13,7 +13,7 @@
   "candidate": {
     "commit": "12385bc0453978b5406da808d430abae9ce77b5b",
     "binary": {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/odp-0362yd-evidence/odp_0362yd_candidate_12385bc",
+      "path": "(deleted-coord-artifact)/odp_0362yd_candidate_12385bc",
       "bytes": 3541224,
       "sha256": "37dfcc678f563552af0b07e5073e33bf62537522fe4d2a48fa5fd3bc0e4cf1d0"
     }
@@ -323,12 +323,12 @@
     "comparison": "output_bytes and deterministic DefaultHasher SipHash equal for every route; replay baseline is old equivalent publication because e4a predates Patch"
   },
   "commands": {
-    "before_build": "ODP_PROBE_ROUTE=/home/zhuhe/code/litchi-worktrees/uo2-odp-heap-repair/docs/unified-ops/results/0362yd/route_before.rs CARGO_TARGET_DIR=/home/zhuhe/code/litchi-worktrees/.coord/odp-0362yd-baseline-target CARGO_BUILD_JOBS=1 TMPDIR=/home/zhuhe/code/litchi-worktrees/.coord/odp-0362yd-tmp cargo run --offline --release -p litchi-ops --features odp --example odp_0362yd_probe",
-    "after_build": "ODP_PROBE_ROUTE=/home/zhuhe/code/litchi-worktrees/uo2-odp-heap-repair/docs/unified-ops/results/0362yd/route_after.rs CARGO_TARGET_DIR=/home/zhuhe/code/litchi-worktrees/.coord/odp-0362yd-candidate-target CARGO_BUILD_JOBS=1 TMPDIR=/home/zhuhe/code/litchi-worktrees/.coord/odp-0362yd-tmp cargo run --offline --release -p litchi-ops --features odp --example odp_0362yd_probe",
-    "allocator": "TMPDIR=/home/zhuhe/code/litchi-worktrees/.coord/odp-0362yd-tmp docs/unified-ops/results/0362yd/run_allocator_routes.sh /home/zhuhe/code/litchi-worktrees/.coord/odp-0362yd-evidence/odp_0362yd_probe before-or-after /home/zhuhe/code/litchi-worktrees/.coord/odp-0362yd-evidence/allocator-before-or-after",
-    "callgrind": "TMPDIR=/home/zhuhe/code/litchi-worktrees/.coord/odp-0362yd-tmp docs/unified-ops/results/0362yd/run_callgrind.sh /home/zhuhe/code/litchi-worktrees/.coord/odp-0362yd-evidence/odp_0362yd_probe before-or-after /home/zhuhe/code/litchi-worktrees/.coord/odp-0362yd-evidence/callgrind-before-or-after",
-    "before_prepare": "cp /home/zhuhe/code/litchi-worktrees/uo2-odp-heap-repair/docs/unified-ops/results/0362yd/odp_0362yd_probe.rs crates/litchi-ops/examples/odp_0362yd_probe.rs; cp /home/zhuhe/code/litchi-worktrees/uo2-odp-heap-repair/docs/unified-ops/results/0362yd/route_before.rs /home/zhuhe/code/litchi-worktrees/.coord/odp-0362yd/route_baseline.rs",
-    "after_prepare": "cp /home/zhuhe/code/litchi-worktrees/uo2-odp-heap-repair/docs/unified-ops/results/0362yd/odp_0362yd_probe.rs crates/litchi-ops/examples/odp_0362yd_probe.rs; cp /home/zhuhe/code/litchi-worktrees/uo2-odp-heap-repair/docs/unified-ops/results/0362yd/route_after.rs /home/zhuhe/code/litchi-worktrees/.coord/odp-0362yd/route_candidate.rs"
+    "before_build": "ODP_PROBE_ROUTE=/home/zhuhe/code/litchi-worktrees/uo2-odp-heap-repair/docs/unified-ops/results/0362yd/route_before.rs CARGO_TARGET_DIR=(deleted-coord-artifact) CARGO_BUILD_JOBS=1 TMPDIR=(deleted-coord-artifact) cargo run --offline --release -p litchi-ops --features odp --example odp_0362yd_probe",
+    "after_build": "ODP_PROBE_ROUTE=/home/zhuhe/code/litchi-worktrees/uo2-odp-heap-repair/docs/unified-ops/results/0362yd/route_after.rs CARGO_TARGET_DIR=(deleted-coord-artifact) CARGO_BUILD_JOBS=1 TMPDIR=(deleted-coord-artifact) cargo run --offline --release -p litchi-ops --features odp --example odp_0362yd_probe",
+    "allocator": "TMPDIR=(deleted-coord-artifact) docs/unified-ops/results/0362yd/run_allocator_routes.sh (deleted-coord-artifact) before-or-after (deleted-coord-artifact)",
+    "callgrind": "TMPDIR=(deleted-coord-artifact) docs/unified-ops/results/0362yd/run_callgrind.sh (deleted-coord-artifact) before-or-after (deleted-coord-artifact)",
+    "before_prepare": "cp /home/zhuhe/code/litchi-worktrees/uo2-odp-heap-repair/docs/unified-ops/results/0362yd/odp_0362yd_probe.rs crates/litchi-ops/examples/odp_0362yd_probe.rs; cp /home/zhuhe/code/litchi-worktrees/uo2-odp-heap-repair/docs/unified-ops/results/0362yd/route_before.rs (deleted-coord-artifact)",
+    "after_prepare": "cp /home/zhuhe/code/litchi-worktrees/uo2-odp-heap-repair/docs/unified-ops/results/0362yd/odp_0362yd_probe.rs crates/litchi-ops/examples/odp_0362yd_probe.rs; cp /home/zhuhe/code/litchi-worktrees/uo2-odp-heap-repair/docs/unified-ops/results/0362yd/route_after.rs (deleted-coord-artifact)"
   },
   "f755_secondary_attempt": {
     "commit": "f755903f4536582bbdce0a610c0651b9cbe19b7d",

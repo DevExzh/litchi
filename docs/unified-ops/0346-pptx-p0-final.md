@@ -4,7 +4,7 @@
   `926cbde41e`; trunk merged at `d392343e02` (records 0343, 0344, 0345,
   0347).
 - Date: 2026-10-19
-- Input: the second definition-of-done audit (`.coord/r9/dod-audit-2026-10-19.md`
+- Input: the second definition-of-done audit (`(deleted-coord-artifact)`
   §2, §3, §12.1 item 2): 16 PPTX P0 delta rows `planned` (`pptx-p0-residue`,
   record 0333 F1–F2) and 4 P0 modern-comment reads `unlisted`; record 0333
   F3 (cell and notes text coalescing).
@@ -229,7 +229,7 @@ the notes part: follow-up 0346-P2, one pass over all chunks).
 
 On the merged tree (`d392343e02` and the record commits on top); cargo
 through the memory-capped shim, `CARGO_BUILD_JOBS=6`, `RUST_TEST_THREADS=8`;
-every exit status checked (`.coord/pptx-p0b/gate-logs/summary.txt`).
+every exit status checked (`(deleted-coord-artifact)`).
 
 | gate | exit |
 |---|---:|

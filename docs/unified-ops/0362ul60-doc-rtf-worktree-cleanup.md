@@ -32,7 +32,7 @@ filesystem free-space delta is claimed during concurrent builds.
 Total net checkout-allocation reduction: **7,592,120,320 bytes**.
 
 Evidence remains under
-`.coord/worktree-cleanup-2026-10-23/quarantine/`, in the two directories named
+`(deleted-coord-artifact)`, in the two directories named
 below. The manifest retains its original preflight status; the final receipt
 records the refreshed checks and successful removal.
 

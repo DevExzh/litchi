@@ -34,7 +34,7 @@ sha256 495e24c6f60b238378386d86ac4158cba904992ce8870a9494f2c4a0eedd256d
 Use a fresh target outside the worktree, with one build job, one test thread,
 no incremental artifacts, debug information disabled, and the existing 20 GiB
 memory / 18 GiB start / 19 GiB live / 20 GiB hard target guards.  Keep the
-target and all logs under `.coord`; none are source evidence for this commit.
+target and all logs outside the repository; none are source evidence for this commit.
 
 ## Scoped build and test matrix
 

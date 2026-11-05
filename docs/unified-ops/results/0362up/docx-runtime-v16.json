@@ -4,12 +4,12 @@
   "cwd": "/home/zhuhe/code/litchi-worktrees/uo2-budget-validation",
   "command": [
     "python3",
-    "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/run-semantic-checks-disk-guarded.py",
-    "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/docx-runtime-v16-commands.json",
-    "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/docx-runtime-v16"
+    "(deleted-coord-artifact)",
+    "(deleted-coord-artifact)",
+    "(deleted-coord-artifact)"
   ],
   "started_unix_seconds": 1792784713.2102165,
-  "target": "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/target",
+  "target": "(deleted-coord-artifact)",
   "lock_sha256": "52ed0cacac15b5e440349bfc0f4aca2665bcf50d59d4321624e596bb410783c6",
   "checks": [
     {
@@ -28,13 +28,13 @@
       ],
       "exit": 101,
       "seconds": 152.4318069610017,
-      "log": "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/docx-runtime-v16/check-0.log",
+      "log": "(deleted-coord-artifact)/check-0.log",
       "bytes": 354302,
       "sha256": "87ae1aebe8ce3afb07b7fcb92cbf71bae9582fd135129d7268c5d3b186969e5f",
       "target_bytes_before": 3393442677,
       "completed_test_executables_pruned": [
         {
-          "path": "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/target/debug/deps/litchi_docx-67ae2d927f03ad6a",
+          "path": "(deleted-coord-artifact)/litchi_docx-67ae2d927f03ad6a",
           "bytes": 73510512,
           "sha256": "7e220d19f6dca74403a1c9c6c9560d27bf4c0b90729aa769443bcc3feeffb4b1"
         }

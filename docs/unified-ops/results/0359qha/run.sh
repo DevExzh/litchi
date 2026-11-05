@@ -9,9 +9,9 @@ set -u -o pipefail
 # environment below is part of the sample-count contract.
 
 ROOT=${ROOT:-/home/zhuhe/code/litchi-worktrees}
-BASE_RUN=${BASE_RUN:-$ROOT/.coord/doc-toggle-472b-build-20261024}
+BASE_RUN=${BASE_RUN:-/deleted-coord-artifact}
 SOURCE_SHORT=${SOURCE_SHORT:-472b}
-RUN=${RUN:-$ROOT/.coord/doc-toggle-472b-performance-$SOURCE_SHORT}
+RUN=${RUN:-/deleted-coord-artifact}
 PHASE=${PHASE:-native}
 CPU=${CPU:?set CPU to the quiet pinned CPU}
 ROUNDS=31
@@ -27,8 +27,8 @@ MAX_LOAD=1.0
 MEMORY_MAX=20G
 MEMORY_SWAP_MAX=0
 
-CAND_SRC=$ROOT/.coord/final-api-capture-472b670547/source
-BASE_SRC=$ROOT/.coord/final-api-capture-472b670547/doc-body-baseline
+CAND_SRC=/deleted-coord-artifact
+BASE_SRC=/deleted-coord-artifact
 CAND_BIN=$BASE_RUN/target-candidate/release/examples/legacy_w5_source_probe
 BASE_BIN=$BASE_RUN/target-baseline/release/examples/legacy_w5_source_probe
 VALIDATOR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/validate.py

@@ -99,8 +99,8 @@ Regenerate the summary with:
 
 ```sh
 python3 docs/unified-ops/results/0361h/collect.py \
-  --coord ../.coord/char-style-0361h --out docs/unified-ops/results/0361h \
-  --native ../.coord/char-style-0361h/native-v3-a2
+  --coord (deleted-coord-artifact) --out docs/unified-ops/results/0361h \
+  --native (deleted-coord-artifact)
 ```
 
 The source snapshots contain `git archive 61515148e1 Cargo.toml

@@ -41,7 +41,7 @@ release debug information disabled, a 20 GiB systemd memory cap, and a
 `TMPDIR` under `/home/zhuhe`. The command was:
 
 ```text
-CARGO_TARGET_DIR=/home/zhuhe/code/litchi-worktrees/.coord/rtf-refusals/target-replay-arc CARGO_BUILD_JOBS=1 CARGO_INCREMENTAL=0 CARGO_PROFILE_RELEASE_DEBUG=0 LITCHI_MEM_MAX=20G TMPDIR=/home/zhuhe/.cache/rtf-refusal-perf cargo build --release -p litchi-rtf --example refusal_contract_bench
+CARGO_TARGET_DIR=(deleted-coord-artifact) CARGO_BUILD_JOBS=1 CARGO_INCREMENTAL=0 CARGO_PROFILE_RELEASE_DEBUG=0 LITCHI_MEM_MAX=20G TMPDIR=/home/zhuhe/.cache/rtf-refusal-perf cargo build --release -p litchi-rtf --example refusal_contract_bench
 ```
 
 It was compared with the original 0359b binary
@@ -81,7 +81,7 @@ replay after dropping the source patch owner. No error, output or inverse
 assertion changed.
 
 The external receipts are under
-`/home/zhuhe/code/litchi-worktrees/.coord/rtf-refusals/`:
+`(deleted-coord-artifact)`:
 
 - `heap-repair-final-20261022/`, whose four compressed captures are 18,654 to
   19,293 bytes;

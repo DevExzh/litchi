@@ -19,7 +19,7 @@ preparation policy, nested manifest values and top-level fields, along with
 the unchanged baseline. The external patch preparation also passes six
 checks, including mutations of the nested/top-level candidate, baseline and
 preparation values. Its apply-ready patch is preserved under
-`.coord/native-final-bindings-20261025/drawingml-role-lock-v3/`, SHA-256
+`(deleted-coord-artifact)`, SHA-256
 `381ccd254016b2c9158079dc6110a7171819ab331e2a49a6a59f872e3e84db9b`.
 
 All 26 focused tests pass with:

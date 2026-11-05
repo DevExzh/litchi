@@ -13,7 +13,7 @@ onto `5ec78a48589c7ab4396ee90cb1f6d41cf7f1aaa6`:
 All patches apply without conflict. Their shared ops test file contains both
 sets of consumer regressions. Source-only formatting normalizes the exact
 composed preimages, retained outside the repository under
-`.coord/ooxml-combined-0362ul94/composition-94i-format/`.
+`(deleted-coord-artifact)`.
 
 Custom XML preserves original prefixes, quotes and opaque markup while
 applying exact bounded lexical edits. Selected MCE branches map directly to
@@ -46,7 +46,7 @@ glossary and performance qualification remain required.
 
 The prior downstream capture on `5ec78a4858` passed formatting and OPC
 compilation, then failed the four-format compiler row. Evidence remains at
-`.coord/ooxml-combined-0362ul94-f5-consumers-5ec78a4858`:
+`(deleted-coord-artifact)`:
 `result.json` is 17,338 bytes, SHA-256
 `c01eedfe86b84f78a6d302914a269fa99d2d7664fc4da5304a1275b77470331a`.
 Root verified its complete command, source, three-lock, log/trace, guard and

@@ -88,7 +88,7 @@ W4D_ROUTE=<route> taskset -c 3 valgrind --tool=callgrind target/release/deps/par
 callgrind_annotate --inclusive=yes callgrind.out.<pid> | grep w4d_
 ```
 
-The raw outputs stay in the session scratch (`.coord/iwa-w4d/cg/`).
+The raw outputs stay in the session scratch (`(deleted-coord-artifact)`).
 
 ## 5. Verification
 

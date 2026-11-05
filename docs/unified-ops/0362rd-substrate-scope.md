@@ -214,7 +214,7 @@ format substrate than to generic ZIP. It is nevertheless absent from the
 `litchi-xlsx`/`litchi-xlsb` may not publish free public functions that mutate a
 raw `OpcPackage`; their raw escape is `Package::edit_opc`, while
 `litchi-ooxml-common` may stage against `&OpcPackage` and commit a new package
-(`.coord/w4-xlsx/brief-common.md:82-95`). ADR 0034 also explicitly names OPC's
+(`(deleted-coord-artifact):82-95`). ADR 0034 also explicitly names OPC's
 `ReadLimits` to `SourceLimits` rename (`docs/adr/0034...:169-181`).
 
 The original 0362 survey recorded 31 public declarations with a

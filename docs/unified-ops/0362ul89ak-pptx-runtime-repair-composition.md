@@ -38,7 +38,7 @@ golden still requires isolated actual regeneration and complete comparison
 before a separately reviewed artifact commit.
 
 External capture:
-`.coord/pptx-combined-0362ul89-f5-qualification-ae6f32d202`.
+`(deleted-coord-artifact)`.
 
 - `result.json`: 42,519 bytes, SHA-256
   `4b8e178cf9d63f55e1cc445c85e6d32ce32e49df2b70c91e84c9d978b3f7758e`.

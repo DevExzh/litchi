@@ -12,7 +12,7 @@ unnecessary allocation and clone.
 
 The external f5 receipt is:
 
-    /home/zhuhe/code/litchi-worktrees/.coord/formula-raw-policy-328fe19328/state/08-formula-affected-clippy-rerun-attempt-affected-clippy-rerun.log
+    (deleted-coord-artifact)/08-formula-affected-clippy-rerun-attempt-affected-clippy-rerun.log
     1179 bytes, SHA-256 4309bc37abb6d0c31372619439c2a58945f8c3ad5414100c6c64dcc332a6d6d7
 
 The command exited 101 at the first test target, with no resource or

@@ -14,8 +14,8 @@ Validation receipt for source `ca738e3689` (the import-only follow-up to
 `00fb949e54`):
 
 ```text
-source /home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/env.sh
-export CARGO_TARGET_DIR=/home/zhuhe/code/litchi-worktrees/.coord/drawingml-fragments-raw-target
+source (deleted-coord-artifact)
+export CARGO_TARGET_DIR=(deleted-coord-artifact)
 export CARGO_BUILD_JOBS=1 RUST_TEST_THREADS=1 CARGO_NET_OFFLINE=true
 cargo test --offline -p litchi-pptx shape::model::tests::subordinate_readers_use_the_scene_input_budget --lib
 cargo test --offline -p litchi-pptx --test shape_text_body owned_lazy_body_keeps_the_caller_limits
@@ -31,7 +31,7 @@ the pre-run lock hash and per-command post hashes were not captured.
 
 No external raw command log was retained; the output was observed in the
 interactive validation session. The shared external target was
-`/home/zhuhe/code/litchi-worktrees/.coord/drawingml-fragments-raw-target`;
+`(deleted-coord-artifact)`;
 its current post-inspection apparent size is 777,184,046 bytes. Command-time
 pre/post target measurements and log byte/hash receipts were not captured.
 This is diagnostic leaf validation only (`6d`); assembled `4100` workspace

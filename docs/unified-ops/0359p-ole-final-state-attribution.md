@@ -14,12 +14,12 @@ acceptance exception.
 ## Paired final count
 
 The protected candidate binary is outside the checkout at
-`/home/zhuhe/code/litchi-worktrees/.coord/w5-ole-source-arc-retag-20261022/protected/candidate-base-package-edit-cf3c9a4eb6c8b1d661ee57cef238de78ed67bb29/ole_w5_probe`.
+`(deleted-coord-artifact)`.
 Its SHA-256 is
 `a74a1044ce7ec48f4192cff43d43424547577b13287ac02a3cf12061b03024d9`, and
 its size is 9,217,056 bytes.  The matched baseline is the protected binary
 at
-`/home/zhuhe/code/litchi-worktrees/.coord/w5-ole-source-arc-final-20261021/protected/base-alloc/ole_w5_probe`,
+`(deleted-coord-artifact)`,
 SHA-256
 `23a7088c3f9a6563adc3ae1de644a0d2b05fe91604824afd7517aa426c981fc0`.
 The probe source and runner are the immutable 0359n inputs: their SHA-256
@@ -27,7 +27,7 @@ values are `ad4c52c01333fbc13c7b3cca18e2c0a0d2ccf89d5c07972e2e453fa9bd8d713a`
 and `70d07e3b07bce4237536f1239be66aed23621a19b999d79b2230abd9f3c50b93`.
 
 The reduced paired receipt is outside the checkout at
-`/home/zhuhe/code/litchi-worktrees/.coord/w5-ole-source-arc-retag-20261022/counting-base-package-edit-v2`.
+`(deleted-coord-artifact)`.
 Its `MANIFEST.txt` is 3,676 bytes with SHA-256
 `c8d84f7576856c788db0dcb786b7bf8096b93b2aec188bdf0964a60ee86e0bd4`.
 Each route used `--warmup 0 --samples 1 --batch 1`, and the history routes
@@ -51,7 +51,7 @@ retained as an open allocation result rather than being called noise.
 
 A direct, one-sample heaptrack capture was used for source attribution only;
 it is not a timing or acceptance measurement.  The external directory is
-`/home/zhuhe/code/litchi-worktrees/.coord/w5-ole-source-arc-retag-20261022/heaptrack-final-cf3c-xls-cells`
+`(deleted-coord-artifact)`
 and is 996 KiB.  The compressed baseline and candidate captures have SHA-256
 `2d35b32413b1c330d180549d938889f5a596e0e465ed69822e043e6528a161ac` and
 `12c64fbd325f42f2e1f87a0150de8533161a48ea3be5def17b2bebd8efc42e60`.

@@ -27,7 +27,7 @@ The XLSX doctest result below remains part of this receipt.
 - Repository root: `/home/zhuhe/code/litchi-worktrees/uo2-xlsx-lazy-entry`
 - Root `Cargo.toml`: 10,672 bytes, SHA-256
   `f5ec007892023b38f1deaef1ce20714db58b58448a3bea088be3b847b84570de`
-- Toolchain/build environment: `/home/zhuhe/code/litchi-worktrees/.coord/xlsx-lazy-entry/env.sh`
+- Toolchain/build environment: `(deleted-coord-artifact)/env.sh`
 - `env.sh`: 489 bytes, SHA-256
   `85c2df8dedebbf2167037549733f70b9721d5a0eeb99f9b05760e91ad2dc1631`
 - Cargo config: `.cargo/config.toml`, 470 bytes, SHA-256
@@ -35,7 +35,7 @@ The XLSX doctest result below remains part of this receipt.
 - Rust: `rustc 1.95.0 (59807616e 2026-04-14)`, host
   `x86_64-unknown-linux-gnu`, LLVM `22.1.2`
 - Cargo: `cargo 1.95.0 (f2d3ce0bd 2026-03-21)`
-- Cargo target: `/home/zhuhe/code/litchi-worktrees/.coord/xlsx-lazy-entry/target`
+- Cargo target: `(deleted-coord-artifact)`
 - `CARGO_BUILD_JOBS=1`, `RUST_TEST_THREADS=1`, `CARGO_INCREMENTAL=0`,
   `CARGO_PROFILE_DEV_DEBUG=0`, `CARGO_PROFILE_TEST_DEBUG=0`,
   `CARGO_PROFILE_RELEASE_DEBUG=0`, `CARGO_NET_OFFLINE=true`,
@@ -56,13 +56,13 @@ Lock identities used by the commands:
 | `tools/perf-baseline-f3/Cargo.lock` | 34,004 | `e263612d864e4592b80be6ef626948a4eb73b9be31537ac78f5ea00243fc62fb` |
 | `tools/perf-baseline/unified-xlsx-batch/Cargo.lock` | 30,990 | `aec8986b4755544318b7926ff9ce3c0b921263309a83d9afdcccbe1801e93c6c` |
 | `tools/perf-baseline/unified-xlsx-raw-identity/Cargo.lock` | 30,553 | `8b61b3c5e17b1c32d89139c97a26145117794afae83dd8fef3c9a7aff8765ee6` |
-| generated fuzz lock (external) `/home/zhuhe/code/litchi-worktrees/.coord/xlsx-lazy-entry/ops-fuzz-generated-Cargo.lock` | 32,534 | `10708241205e4a90c0120b3f41a77e7548715761801d66da2d55911e59e9ab8a` |
+| generated fuzz lock (external) `(deleted-coord-artifact)/ops-fuzz-generated-Cargo.lock` | 32,534 | `10708241205e4a90c0120b3f41a77e7548715761801d66da2d55911e59e9ab8a` |
 
 ## Commands and receipts
 
 All commands were run from the repository root after sourcing the environment
 above. Logs are retained outside the repository under
-`/home/zhuhe/code/litchi-worktrees/.coord/xlsx-lazy-entry/`.
+`(deleted-coord-artifact)`.
 
 | Check | Exact source state | Command | Result and external log |
 | --- | --- | --- | --- |

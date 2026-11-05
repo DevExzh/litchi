@@ -38,22 +38,22 @@ SHA-256 `52ed0cacac15b5e440349bfc0f4aca2665bcf50d59d4321624e596bb410783c6`.
 The capped shim was first in `PATH`, `LITCHI_MEM_MAX=20G`, one build job,
 incremental disabled, dev/test debug disabled, offline locked dependencies,
 external `TMPDIR`, and target
-`/home/zhuhe/code/litchi-worktrees/.coord/drawingml-limits/target`.
+`(deleted-coord-artifact)`.
 The target measured 2,232,611,316 bytes after the run.
 
 Focused precommit command (14 Theme codec tests passed):
 
 ```text
-env PATH=/home/zhuhe/code/litchi-worktrees/.coord/bin:$PATH LITCHI_CAPPED= LITCHI_BLESS= LITCHI_MEM_MAX=20G CARGO_BUILD_JOBS=1 CARGO_INCREMENTAL=0 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_TARGET_DIR=/home/zhuhe/code/litchi-worktrees/.coord/drawingml-limits/target TMPDIR=/home/zhuhe/code/litchi-worktrees/.coord/drawingml-limits/tmp-final-nested cargo test -p litchi-drawingml theme::codec::tests --all-targets --offline --locked
+env PATH=(deleted-coord-artifact):$PATH LITCHI_CAPPED= LITCHI_BLESS= LITCHI_MEM_MAX=20G CARGO_BUILD_JOBS=1 CARGO_INCREMENTAL=0 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_TARGET_DIR=(deleted-coord-artifact) TMPDIR=(deleted-coord-artifact) cargo test -p litchi-drawingml theme::codec::tests --all-targets --offline --locked
 ```
 
 Final all-target precommit command exited 0; its external log is
-`/home/zhuhe/code/litchi-worktrees/.coord/drawingml-limits/drawingml-final-nested.log`,
+`(deleted-coord-artifact)/drawingml-final-nested.log`,
 40,252 bytes, SHA-256
 `e8e33f67cbf9b3732acc3c039bb41a690a87ceda4d65485ab8266384b9c5eccf`:
 
 ```text
-env PATH=/home/zhuhe/code/litchi-worktrees/.coord/bin:$PATH LITCHI_CAPPED= LITCHI_BLESS= LITCHI_MEM_MAX=20G CARGO_BUILD_JOBS=1 CARGO_INCREMENTAL=0 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_TARGET_DIR=/home/zhuhe/code/litchi-worktrees/.coord/drawingml-limits/target TMPDIR=/home/zhuhe/code/litchi-worktrees/.coord/drawingml-limits/tmp-final-nested cargo test -p litchi-drawingml --all-targets --offline --locked
+env PATH=(deleted-coord-artifact):$PATH LITCHI_CAPPED= LITCHI_BLESS= LITCHI_MEM_MAX=20G CARGO_BUILD_JOBS=1 CARGO_INCREMENTAL=0 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_TARGET_DIR=(deleted-coord-artifact) TMPDIR=(deleted-coord-artifact) cargo test -p litchi-drawingml --all-targets --offline --locked
 ```
 
 The follow-up focused command ran against the source that became
@@ -62,7 +62,7 @@ tests. Its external log is 6,985 bytes, SHA-256
 `b05d38ec5d07f5d942661e8dc15eeb4be12025515dbfccc4f450a062a875641a`:
 
 ```text
-env PATH=/home/zhuhe/code/litchi-worktrees/.coord/bin:$PATH LITCHI_CAPPED= LITCHI_BLESS= LITCHI_MEM_MAX=20G CARGO_BUILD_JOBS=1 CARGO_INCREMENTAL=0 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_TARGET_DIR=/home/zhuhe/code/litchi-worktrees/.coord/drawingml-limits/target TMPDIR=/home/zhuhe/code/litchi-worktrees/.coord/drawingml-limits/tmp-final-opaque cargo test -p litchi-drawingml theme::codec::tests --all-targets --offline --locked
+env PATH=(deleted-coord-artifact):$PATH LITCHI_CAPPED= LITCHI_BLESS= LITCHI_MEM_MAX=20G CARGO_BUILD_JOBS=1 CARGO_INCREMENTAL=0 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_TARGET_DIR=(deleted-coord-artifact) TMPDIR=(deleted-coord-artifact) cargo test -p litchi-drawingml theme::codec::tests --all-targets --offline --locked
 ```
 
 `cargo fmt --all -- --check` and `git diff --check` passed. The staged large
@@ -78,7 +78,7 @@ not a pass. It exited 101 with the command below; log size was 298 bytes and
 SHA-256 `408841b16b557ec63fabc2b00f3c191ca9af807b53abcfb63f326adcc7ef4d5a`:
 
 ```text
-env -u LITCHI_CAPPED -u LITCHI_BLESS PATH=/home/zhuhe/code/litchi-worktrees/.coord/bin:$PATH LITCHI_MEM_MAX=20G CARGO_BUILD_JOBS=1 CARGO_INCREMENTAL=0 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_PROFILE_RELEASE_DEBUG=0 CARGO_PROFILE_BENCH_DEBUG=0 TMPDIR=/home/zhuhe/code/litchi-worktrees/.coord/drawingml-limits/tmp cargo check --manifest-path tools/perf-baseline/unified-chart-add/Cargo.toml --offline --locked --target-dir /home/zhuhe/code/litchi-worktrees/.coord/drawingml-limits/unified-chart-target
+env -u LITCHI_CAPPED -u LITCHI_BLESS PATH=(deleted-coord-artifact):$PATH LITCHI_MEM_MAX=20G CARGO_BUILD_JOBS=1 CARGO_INCREMENTAL=0 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_PROFILE_RELEASE_DEBUG=0 CARGO_PROFILE_BENCH_DEBUG=0 TMPDIR=(deleted-coord-artifact) cargo check --manifest-path tools/perf-baseline/unified-chart-add/Cargo.toml --offline --locked --target-dir (deleted-coord-artifact)
 ```
 
 The preserved-registry local-package lock repair and its successful rerun are

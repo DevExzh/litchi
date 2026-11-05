@@ -17,11 +17,11 @@ publication with `FormulaWork { observed: 3, maximum: 1 }`. The authored
 formula is a one-node numeric AST; the observed three is the resolved
 owner-registry entry count, not AST work. The independent repro was run
 against frozen coordinator source `9932c7d069` from
-`/home/zhuhe/code/litchi-worktrees/.coord/w2d-formula-dup-repro-9932`:
+`(deleted-coord-artifact)`:
 
 - source `crates/litchi-numbers/tests/formula_dup_repro.rs`, SHA-256
   `25a45901ea564cc7bae6276867c5b5ec9ae308e181bbdd339b1367ce10df2602`;
-- log `/home/zhuhe/code/litchi-worktrees/.coord/w2d-formula-dup-repro-9932.log`,
+- log `(deleted-coord-artifact)/w2d-formula-dup-repro-9932.log`,
   18,472 bytes, SHA-256
   `1640144d7ff691b65c924ea54ee552255c83173bd412a5d9ef2a4d9387368c3b`.
 
@@ -76,7 +76,7 @@ isolated edit or as a whole-file benchmark.
 Frozen source: `2e1a7a3f6ad31e6546bfe7b0557246af949e7eb5` (the docs-only
 current WP tip after merge `f6c8ec8d05c17c857717e3aabbd458c775f6679e`).
 Release binary (kept outside the repository):
-`/home/zhuhe/code/litchi-worktrees/.coord/iwa-w1f-owner-admission/perf/rerun-2e1a7a3f6a/archive/parity-96c80ba0598fc9992029b4c8fbf395b9a45c9beb6f40abf35d6f234dbc1dcd0c`,
+`(deleted-coord-artifact)/parity-96c80ba0598fc9992029b4c8fbf395b9a45c9beb6f40abf35d6f234dbc1dcd0c`,
 210,625,192 bytes, mode 0555, SHA-256
 `96c80ba0598fc9992029b4c8fbf395b9a45c9beb6f40abf35d6f234dbc1dcd0c`.
 
@@ -98,13 +98,13 @@ Regenerate the complete set with:
 
 ```sh
 CARGO_BUILD_JOBS=4 CARGO_INCREMENTAL=0 \
-  CARGO_TARGET_DIR=/home/zhuhe/code/litchi-worktrees/.coord/iwa-w1f-owner-admission/perf/rerun-2e1a7a3f6a/target \
+  CARGO_TARGET_DIR=(deleted-coord-artifact) \
   CARGO_PROFILE_RELEASE_DEBUG=1 \
   cargo test --release --locked --offline -p litchi-iwa --test parity --no-run
 taskset -c 3 valgrind --tool=callgrind \
-  --callgrind-out-file=/home/zhuhe/code/litchi-worktrees/.coord/iwa-w1f-owner-admission/perf/callgrind/basic.host \
+  --callgrind-out-file=(deleted-coord-artifact)/basic.host \
   --toggle-collect='*numbers_formula_author_cases::host_route*' \
-  /home/zhuhe/code/litchi-worktrees/.coord/iwa-w1f-owner-admission/perf/rerun-2e1a7a3f6a/archive/parity-96c80ba0598fc9992029b4c8fbf395b9a45c9beb6f40abf35d6f234dbc1dcd0c \
+  (deleted-coord-artifact)/parity-96c80ba0598fc9992029b4c8fbf395b9a45c9beb6f40abf35d6f234dbc1dcd0c \
   --ignored --exact numbers_formula_author_cases::numbers_table_formula_author_cost_abba --test-threads=1
 # Repeat with leaf_cost_route, the graph/cached exact test names, and the
 # owner route toggles host_formula_owner_admission_route and

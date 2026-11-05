@@ -14,7 +14,7 @@ repair and must be reviewed and run through the coordinator's approved
 `run_safe_gate.run_step` before acceptance.
 
 The return audit is
-`/home/zhuhe/code/litchi-worktrees/.coord/ppt-hyperlink-crud-audit-20261025/README.md`,
+`(deleted-coord-artifact)/README.md`,
 SHA-256
 `d02439f327440abd75a3f55fa81dfac4012fc14bd098e660b86ec19cf2bad1b4`.
 It identified a unit mismatch in the OfficeArt adapter, dropped payload and
@@ -81,5 +81,5 @@ must bind this exact committed source and run, at minimum, the focused
 `litchi-ppt` OfficeArt limit test, the text/notes/picture-bullet restrictive
 tests, the 0294 hyperlink fidelity test, and the relevant PPT CRUD/gate
 checks via the approved capped runner. Any resulting logs, process receipts,
-target bounds, and source hashes remain external under `.coord`; this record
+target bounds, and source hashes remain external; this record
 does not add binaries or large evidence.

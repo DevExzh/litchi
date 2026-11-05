@@ -40,7 +40,7 @@
       "base_sha256": "858bc0ca15473c6a0fb73a8dbb99fe4309cc3fab74831f94821010275e646bb3",
       "candidate_sha256": "98743620f0442548341265fab16c8c20f11f939944481f68466a29f580311324"
     },
-    "capture_directory": "/home/zhuhe/code/litchi-worktrees/.coord/constructor-0361f-coordinator/count-callgrind-v16",
+    "capture_directory": "(deleted-coord-artifact)",
     "capture_manifest_sha256": "69cc3f6d2f591aa60257693f4ab3c2ce638c98ae3f7a745908255fa84f2354fd",
     "capture_manifest_files": 48,
     "capture_bytes": 5208388,

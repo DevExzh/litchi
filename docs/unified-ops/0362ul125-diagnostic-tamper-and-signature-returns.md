@@ -28,7 +28,7 @@ remain unrun at this capture.
 
 Root verifies both terminal captures with `checkpoint96/verify_capture.py`
 before any source or lock change. Packets are relative to the worktree
-parent's `.coord/`:
+parent's `(deleted-coord-artifact)`:
 
 | Packet | Result bytes / SHA-256 | Rows bytes / SHA-256 |
 |---|---|---|
@@ -73,7 +73,7 @@ is returned for implementation of the actual guarded execution path.
 ## Cleanup96
 
 Six obsolete DML/RTF diagnostic worktrees are removed: the five
-`/tmp/dml-paired-ef3d/` checkouts and `.coord/rtf-candidate-compile`. Root
+`/tmp/dml-paired-ef3d/` checkouts and `(deleted-coord-artifact)`. Root
 verifies all 45 payload files against their archives, actually restores
 their bytes and modes, and checks each tracked patch replay against its
 exact Git base. All six tips are integration ancestors. The four canonical
@@ -88,7 +88,7 @@ open descriptors. Root verifies the six paths and registrations are absent
 and every archive and canonical control remains intact.
 
 External evidence is under
-`.coord/worktree-cleanup-2026-10-25/trunk-consolidation/`:
+`(deleted-coord-artifact)`:
 
 | Receipt | SHA-256 |
 |---|---|

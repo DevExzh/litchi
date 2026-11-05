@@ -73,7 +73,7 @@ The adapter test suite also rejects an accidental fourth `.resolve()` call.
 ## Frozen failure and validation
 
 The frozen pre-repair protocol log was
-`/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/native-protocol-tests-2df.log`
+`(deleted-coord-artifact)/native-protocol-tests-2df.log`
 (14,075 bytes, SHA-256
 `ee015827821a3c6aa231c93481384729d9255c35e287b1e451d5ed24221b426d`).  It
 reported 11 errors, all from the stale reviewed-probe identity: the current
@@ -86,7 +86,7 @@ python3 -m unittest -v tools.test_w8_file_provenance tools.test_w8_original_base
 ```
 
 The preserved raw log is outside the repository at
-`/home/zhuhe/code/litchi-worktrees/.coord/final-w8-probe-binding/w8-binding-tests.log`:
+`(deleted-coord-artifact)/w8-binding-tests.log`:
 3,141 bytes, SHA-256
 `5e31470bd6bd178a03770f7bf7f95293dd0e69431b36dc4eb45c4f0dcb9bd8d7`.
 All 18 tests passed, with zero failures, errors or skips.  The route tests
@@ -95,7 +95,7 @@ continued to prove only the four legacy result-field translations.
 
 The successor adapter validation reran the same command after the f2
 translation was added.  Its raw log is outside the repository at
-`/home/zhuhe/code/litchi-worktrees/.coord/final-w8-probe-binding/w8-binding-tests-adapter.log`:
+`(deleted-coord-artifact)/w8-binding-tests-adapter.log`:
 3,471 bytes, SHA-256
 `0a113676e195f019566954d16bb39a8e1a169620c6de687ee1ca57ed7099b930`.
 All 20 tests passed, with zero failures, errors or skips, including the
@@ -103,7 +103,7 @@ byte-identity and extra-resolution fail-closed checks.
 
 The portability successor reran the same 20-test command with the Git-object
 lookup removed from the unit test.  Its raw log is outside the repository at
-`/home/zhuhe/code/litchi-worktrees/.coord/final-w8-probe-binding/w8-binding-tests-portable.log`:
+`(deleted-coord-artifact)/w8-binding-tests-portable.log`:
 3,467 bytes, SHA-256
 `2ca4faa697bf42f1ddbfeeea3efb347a51ca5b77cc28ae43f7f00ef28e274e06`.
 All 20 tests passed, with zero failures, errors or skips.

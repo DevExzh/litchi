@@ -7,24 +7,24 @@
   "harness_sha256": "551e5440ae82bfe983fb74c8a5e4e36e727176469efda0998e9b3c29d79b1a4d",
     "build": {
         "candidate_cwd": "/home/zhuhe/code/litchi-worktrees/uo2-fin-perf",
-        "candidate_command": "PATH=/home/zhuhe/code/litchi-worktrees/.coord/bin:$HOME/.cargo/bin:$PATH CARGO_TARGET_DIR=/home/zhuhe/code/litchi-worktrees/uo2-fin-perf/target CARGO_INCREMENTAL=0 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_BUILD_JOBS=6 cargo build --release --offline --manifest-path tools/perf-baseline/unified-fin-perf/Cargo.toml",
-        "baseline_cwd": "/home/zhuhe/code/litchi-worktrees/.coord/fin-perf/base",
-        "baseline_command": "PATH=/home/zhuhe/code/litchi-worktrees/.coord/bin:$HOME/.cargo/bin:$PATH CARGO_TARGET_DIR=/home/zhuhe/code/litchi-worktrees/.coord/fin-perf/base-target CARGO_INCREMENTAL=0 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_BUILD_JOBS=6 cargo build --release --offline --manifest-path tools/perf-baseline/unified-fin-perf/Cargo.toml --features base",
+        "candidate_command": "PATH=(deleted-coord-artifact):$HOME/.cargo/bin:$PATH CARGO_TARGET_DIR=/home/zhuhe/code/litchi-worktrees/uo2-fin-perf/target CARGO_INCREMENTAL=0 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_BUILD_JOBS=6 cargo build --release --offline --manifest-path tools/perf-baseline/unified-fin-perf/Cargo.toml",
+        "baseline_cwd": "(deleted-coord-artifact)",
+        "baseline_command": "PATH=(deleted-coord-artifact):$HOME/.cargo/bin:$PATH CARGO_TARGET_DIR=(deleted-coord-artifact) CARGO_INCREMENTAL=0 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_BUILD_JOBS=6 cargo build --release --offline --manifest-path tools/perf-baseline/unified-fin-perf/Cargo.toml --features base",
         "harness_source": "tools/perf-baseline/unified-fin-perf",
-        "binary_copy": "cp target/release/unified-fin-perf /home/zhuhe/code/litchi-worktrees/.coord/fin-perf/bin/fin-cand"
+        "binary_copy": "cp target/release/unified-fin-perf (deleted-coord-artifact)"
     },
   "baseline_binary": {
-    "path": "/home/zhuhe/code/litchi-worktrees/.coord/fin-perf/bin/fin-base",
+    "path": "(deleted-coord-artifact)/fin-base",
     "sha256": "1c8d4b7abdf94f7d3ad0a7b6665cf512a4ebbc9ae9d76786d76779e1f96e883b",
         "size_bytes": 362495936
   },
   "candidate_binary": {
-    "path": "/home/zhuhe/code/litchi-worktrees/.coord/fin-perf/bin/fin-cand",
+    "path": "(deleted-coord-artifact)/fin-cand",
     "sha256": "7da00dec5c3eb61eb4824919b88cfbec7bf9a6df9c95a776b98af31ead152cd6",
     "size_bytes": 384736336
   },
-  "raw_capture_directory": "/home/zhuhe/code/litchi-worktrees/.coord/fin-perf/cga-f2-final2-20261028",
-  "raw_summary": "/home/zhuhe/code/litchi-worktrees/.coord/fin-perf/cga-f2-final2-20261028.tsv",
+  "raw_capture_directory": "(deleted-coord-artifact)",
+  "raw_summary": "(deleted-coord-artifact)/cga-f2-final2-20261028.tsv",
   "command": "CGDIR=cga-f2-final2-20261028 cg-list.sh <(awk '$2 ~ /^(docx|xlsx|pptx)_eager_metadata_title_set$/' routes.tsv) cga-f2-final2-20261028.tsv 'base cand' 2",
   "counted_calls_per_route": 3,
   "warmup": "one uncounted call on both sides; fin_perf_region only",

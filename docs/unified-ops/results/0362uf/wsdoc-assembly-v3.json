@@ -4,12 +4,12 @@
   "cwd": "/home/zhuhe/code/litchi-worktrees/uo2-coordinator-metadata-integration",
   "command": [
     "python3",
-    "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/run-semantic-checks-disk-guarded.py",
-    "/home/zhuhe/code/litchi-worktrees/.coord/isolated-wsdoc/wsdoc-v3-commands.json",
-    "/home/zhuhe/code/litchi-worktrees/.coord/isolated-wsdoc/wsdoc-v3-checks"
+    "(deleted-coord-artifact)",
+    "(deleted-coord-artifact)",
+    "(deleted-coord-artifact)"
   ],
   "started_unix_seconds": 1792771506.2854438,
-  "target": "/home/zhuhe/code/litchi-worktrees/.coord/isolated-wsdoc/target",
+  "target": "(deleted-coord-artifact)",
   "isolated_builders_before": [],
   "lock_sha256": "52ed0cacac15b5e440349bfc0f4aca2665bcf50d59d4321624e596bb410783c6",
   "checks": [
@@ -26,7 +26,7 @@
       ],
       "exit": 101,
       "seconds": 291.99550623399773,
-      "log": "/home/zhuhe/code/litchi-worktrees/.coord/isolated-wsdoc/wsdoc-v3-checks/check-0.log",
+      "log": "(deleted-coord-artifact)/check-0.log",
       "bytes": 5007,
       "sha256": "8a1c48a85ecb9f212e71dc3e0b968a3db877c0f7cb4c4b55aee036f693ea9f56",
       "target_bytes_before": 3197174128,

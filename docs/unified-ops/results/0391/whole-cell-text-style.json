@@ -10,21 +10,21 @@
     "source_bound": true
   },
   "evidence": {
-    "external_root": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-w1g-final-c9f74916c7",
+    "external_root": "(deleted-coord-artifact)",
     "manifest": {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-w1g-final-c9f74916c7/measure-6cb1a8fcb7b86dbe9f46e86e535edd503f988b212e02490507c8ec0774294190/callgrind/manifest-3routes-c9f74916c7.json",
+      "path": "(deleted-coord-artifact)/manifest-3routes-c9f74916c7.json",
       "sha256": "f2e6364501648516247f21532141474643296f2098a9194bd51d7008d253f14c"
     },
     "results": {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-w1g-final-c9f74916c7/measure-6cb1a8fcb7b86dbe9f46e86e535edd503f988b212e02490507c8ec0774294190/callgrind/results-3routes-c9f74916c7.json",
+      "path": "(deleted-coord-artifact)/results-3routes-c9f74916c7.json",
       "sha256": "7e6975b99f292de8b9055c848c033dbbac8a792bf368bbf79d10b459c80cf039"
     },
     "derived_audit": {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-w1g-final-c9f74916c7/measure-6cb1a8fcb7b86dbe9f46e86e535edd503f988b212e02490507c8ec0774294190/callgrind/derived-3routes-c9f74916c7.json",
+      "path": "(deleted-coord-artifact)/derived-3routes-c9f74916c7.json",
       "sha256": "52662a4a1d72632c88d0f819c826737c337c3c3eb7f68e80a0ffb7eb27e1999c"
     },
     "validator": {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/resume-20261028/perf/iwork-probe-isolation-final/validate_call_audit.py",
+      "path": "(deleted-coord-artifact)/validate_call_audit.py",
       "sha256": "c0637e4304f5fdbfae6fca6b0e9a9c17f7d10cb9a56c7df6846951fa4bdf6b8e"
     },
     "binary": {
@@ -33,7 +33,7 @@
       "mode": "0555"
     },
     "coordinator_review": {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-w1g-final-c9f74916c7/coordinator-review.json",
+      "path": "(deleted-coord-artifact)/coordinator-review.json",
       "sha256": "e1c6eeed7ba89300797fc38d27529e54c3f66c7a46ead058f08baff38a43ac49"
     }
   },

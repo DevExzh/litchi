@@ -9,7 +9,7 @@ performance run was performed.
 Three outcomes are kept separate:
 
 1. The first shell launch attempted to redirect to
-   `/home/zhuhe/code/litchi-worktrees/.coord/tooling-row-317f6482421e8a50a0361d1590d19077518c7fb-20261025T-wrapper.log`
+   `(deleted-coord-artifact)`
    before its parent directory existed. It exited before starting
    `run_safe_gate.py`; no runner state, test process, or source capture was
    created. This is a setup failure, not a source-run receipt.
@@ -20,7 +20,7 @@ Three outcomes are kept separate:
    correctly rejected that receipt for provenance change; it remains failed
    historical evidence and is not acceptance evidence.
 3. The accepted run used the independently hydrated detached worktree
-   `/home/zhuhe/code/litchi-worktrees/.coord/tooling-11048-source` at fixed
+   `(deleted-coord-artifact)` at fixed
    `11048ed3cbcd664308d5ad77c8361f21802578a4`. Root verified its top-level,
    detached HEAD, clean status, full tracked hydration, runner root, and lock
    identities before launch. Integration was not used by that command.
@@ -31,7 +31,7 @@ none of these failed receipts is relabelled as a pass.
 ## Detached source and command
 
 The preflight manifest is external at
-`/home/zhuhe/code/litchi-worktrees/.coord/tooling-11048-source-manifest.json`
+`(deleted-coord-artifact)/tooling-11048-source-manifest.json`
 (3,811 bytes, SHA-256
 `70b60cd846c0d0cd1840b7f4f003f3f010689895ea874f3aebf308ac2b03583f`). It
 records 461,107 tracked files, zero skip-worktree entries, and 39 modules.
@@ -50,10 +50,10 @@ identity. The exact launched command was:
 
 ```text
 env -u PYTHONPATH -u CARGO_TARGET_DIR -u LITCHI_GATE_TARGET_ROOT PYTHONDONTWRITEBYTECODE=1 \
-  python3 /home/zhuhe/code/litchi-worktrees/.coord/tooling-11048-source/docs/unified-ops/results/0362ul29/tooling/run_safe_gate.py \
-  --root /home/zhuhe/code/litchi-worktrees/.coord/tooling-11048-source \
-  --target /home/zhuhe/code/litchi-worktrees/.coord/tooling-row-11048-detached-20261025T/target \
-  --state /home/zhuhe/code/litchi-worktrees/.coord/tooling-row-11048-detached-20261025T-state \
+  python3 (deleted-coord-artifact) \
+  --root (deleted-coord-artifact) \
+  --target (deleted-coord-artifact) \
+  --state (deleted-coord-artifact) \
   --only tooling-unit
 ```
 
@@ -63,17 +63,17 @@ exact 11048 commit; the live worktree matched those identities.
 ## Accepted detached receipt
 
 The external wrapper is
-`/home/zhuhe/code/litchi-worktrees/.coord/tooling-row-11048-detached-20261025T-wrapper.log`
+`(deleted-coord-artifact)/tooling-row-11048-detached-20261025T-wrapper.log`
 (4,121 bytes, SHA-256
 `d5bb90124ab842f33923edbaff95a687cc7dc56affd73b6e4fdad2485ff438b3`). The
 corresponding overall state receipt is
-`/home/zhuhe/code/litchi-worktrees/.coord/tooling-row-11048-detached-20261025T-state/state.json`
+`(deleted-coord-artifact)/state.json`
 (10,603 bytes, SHA-256
 `07ceb0ca5851dd1479b6a6e01fc0adc11d846cd95b84c8bf8d199b6e295e6880`). The
 overall state status is `partial-passed` because this capture selected only
 row 48 of 53; its row 48 status is `passed` with effective exit 0. The
 child log is
-`/home/zhuhe/code/litchi-worktrees/.coord/tooling-row-11048-detached-20261025T-state/48-tooling-unit-attempt-1792903033125826266-1634645.log`
+`(deleted-coord-artifact)/48-tooling-unit-attempt-1792903033125826266-1634645.log`
 (635,222 bytes, SHA-256
 `d3bb1741180463c5883ab9e8644192dcb6446e52eaec3ad6ad2843fe57391950`).
 

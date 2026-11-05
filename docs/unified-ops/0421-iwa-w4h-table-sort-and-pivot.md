@@ -156,5 +156,5 @@ execution row names the shared executor.
 
 ## 7. Verification
 
-The gate list of `.coord/iwa-w4h/gates.sh` runs on the merge of trunk; its
+The gate list of `(deleted-coord-artifact)` runs on the merge of trunk; its
 result is reported in the hand-off.

@@ -2,7 +2,7 @@
 # cg-one.sh <side base|cand> <group> <route> <leg>: one callgrind run of one
 # route leg; counts only fin_perf_region (the timed calls).
 set -u
-F=/home/zhuhe/code/litchi-worktrees/.coord/fin-perf
+F=/deleted-coord-artifact
 side=$1 group=$2 route=$3 leg=$4
 format=${route%%_*}
 iters=3; [[ $group == batch ]] && iters=1

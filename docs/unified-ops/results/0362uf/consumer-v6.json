@@ -12,7 +12,7 @@
   ],
   "outcome": "compiler_errors; runner ended without persisting its final exit receipt",
   "exit": null,
-  "log": "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/api-assembly-consumers-v6/check-0.log",
+  "log": "(deleted-coord-artifact)/check-0.log",
   "bytes": 260683,
   "sha256": "3d62f2357c481a2f22db17fd2696953d3f7dcf6e20f332172c39ab033e1455bb",
   "harness_reached": false,

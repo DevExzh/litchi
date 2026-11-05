@@ -7,9 +7,9 @@ receipt and carries the c8ef binary hashes, matched Callgrind distribution,
 default/managed/custom allocator rows and exact source-test results.
 
 The earlier raw reports remain outside the checkout at
-/home/zhuhe/code/litchi-worktrees/.coord/w4-xlsx/allocator-reader-state-repair-profiles
+(deleted-coord-artifact)
 and
-/home/zhuhe/code/litchi-worktrees/.coord/w4-xlsx/reader-callgrind-v1.
+(deleted-coord-artifact).
 The earlier single matched Callgrind pair was +248,268 Ir; it is retained as
 historical diagnostic evidence and is not an acceptance result. The earlier
 candidate's +64 lazy reader-state calls are superseded by the c8ef result,

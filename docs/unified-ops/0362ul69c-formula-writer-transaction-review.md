@@ -42,7 +42,7 @@ resolve dependencies again:
 | `tools/perf-execution/Cargo.lock` | 26,543 | `2e657990eedc21de6c4ce31ac48be2955f1b75f05d1697c0054c3de5ca914340` | original perf-execution tool lock |
 
 The canonical root lock is retained outside the checkout at
-`/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/locks/4100b1fbb272dd24842f33a2d6f353a3f3a97dfa7e435c4649a0e1a029bfaea1.Cargo.lock`.
+`(deleted-coord-artifact)/4100b1fbb272dd24842f33a2d6f353a3f3a97dfa7e435c4649a0e1a029bfaea1.Cargo.lock`.
 Hydration copies that file into the disposable validation source and verifies
 the size and digest before any build. The tracked tool lock files above are
 also copied or used in place, with their recorded digests checked. No

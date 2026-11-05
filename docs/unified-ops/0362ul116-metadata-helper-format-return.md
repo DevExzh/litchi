@@ -7,7 +7,7 @@ property context, refusal classification and consumer behavior are unchanged.
 
 The coordinator verified the terminal failed capture before editing source.
 No Cargo row ran. The external packet is
-`.coord/uo2-coordinator-replay-integration-f5-compiler-fcc04996` under the
+`(deleted-coord-artifact)` under the
 worktree parent. Its `rows.json` is 34,428 bytes, SHA-256
 `8019e7e80d6d69a663909c6c5335835f7bd6fec7dd4813a0b36b3fab41021788`;
 `result.json` is 36,143 bytes, SHA-256

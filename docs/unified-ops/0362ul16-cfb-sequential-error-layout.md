@@ -29,7 +29,7 @@ copied root lock is SHA-256
 The exact command outcomes and resource identity are recorded in the small
 [validation receipt](results/0362ul16/validation-receipt.json). Every listed
 command exited zero. The external Cargo target was
-`/home/zhuhe/code/litchi-worktrees/.coord/cfb-sequential-error-layout/target`;
+`(deleted-coord-artifact)`;
 its post-validation `du -sb` size was 1,024,944,765 bytes (the sum of regular
 file sizes was 1,182,800,909 bytes). Validation command output was sent to the
 terminal rather than redirected, so no command-log path, SHA-256 or byte count

@@ -24,7 +24,7 @@
       ],
       "exit": 0,
       "seconds": 54.257765701040626,
-      "log": "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/ink-assembly-v1/check-0.log",
+      "log": "(deleted-coord-artifact)/check-0.log",
       "bytes": 13229,
       "sha256": "cd4694a0c60c20a620dbe3a0eef0527dca93289e84b8515e1253f67cbb1946ef"
     },
@@ -48,7 +48,7 @@
       ],
       "exit": 0,
       "seconds": 452.6136858749669,
-      "log": "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/ink-assembly-v1/check-1.log",
+      "log": "(deleted-coord-artifact)/check-1.log",
       "bytes": 4606,
       "sha256": "429128cb4fb1da2817829a9b2cc52166c0975b5379ab60299c4651c80360797f"
     }
@@ -57,11 +57,11 @@
     {
       "command": [
         "python3",
-        "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/ink-gates.py"
+        "(deleted-coord-artifact)"
       ],
       "exit": 0,
       "seconds": 109.90734756505117,
-      "log": "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/ink-gates-v1/check-0.log",
+      "log": "(deleted-coord-artifact)/check-0.log",
       "bytes": 5260,
       "sha256": "2aee690117c4f7faadf74841b40e8fc9037373fd55fbb87b280ac929aa7dd81c"
     }
@@ -69,13 +69,13 @@
   "rustdoc_captures": [
     {
       "profile": "docx-minimal",
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/ink-docx-minimal.json",
+      "path": "(deleted-coord-artifact)/ink-docx-minimal.json",
       "bytes": 76823695,
       "sha256": "8347e8b03faa249b36e9e402fd6302fc062a733005f9e09a5e57d820c5efa1c7"
     },
     {
       "profile": "docx-full",
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/ink-docx-full.json",
+      "path": "(deleted-coord-artifact)/ink-docx-full.json",
       "bytes": 78540789,
       "sha256": "37d58f6058a454da7b3d770df05e27d83c311dd3e9c876a787b61809d99d75f0"
     }

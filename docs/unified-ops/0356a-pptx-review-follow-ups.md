@@ -20,7 +20,7 @@
 | Decision | Done |
 |---|---|
 | P1: source-backed stream editors get the family shape on the source-backed owner, no capability loss | `source::Package::edit()` was already the source-backed slide, multi-slide and order family; its `Commit` is now the core triad alias and the module carries `Error`, `LimitKind`, `Diagnostics`. The SVG editors become `source::svg` (`Package::edit_svg_images`: `replace`, `attach`, `detach`, `image`, `attachment`; `apply_svg_images`). The 20 `SourceBacked{Slide, SlideBatch, SlideOrder, Svg, SvgAttachment}{Edit, Commit, Patch, Snapshot}` types and the editor's `edit_*`/`publish_*_to_stream` routes are crate-private and banned |
-| P2: no public function mutates a raw `OpcPackage` | 0 (was 63 definitions; checked over the rustdoc JSON, `.coord/w2-pptx/scripts/rawmut.py`). 11 new families; the raw twins of 8 existing ones are crate-private |
+| P2: no public function mutates a raw `OpcPackage` | 0 (was 63 definitions; checked over the rustdoc JSON, `(deleted-coord-artifact)`). 11 new families; the raw twins of 8 existing ones are crate-private |
 | P3: families take the API's selectors | `slide::{Selector, MasterId, LayoutId, Owner}`, `Position` for an item on a slide, typed XML IDs (author, comment, section, slide ID); package-level parts are documented (§2.3) |
 | P4: the inventory counts a core `Commit` alias as having the accessors | `tools/api_debt_inventory.py`; `results/0351/inventory.tsv` regenerated (§5) |
 
@@ -87,7 +87,7 @@ former `publish_*_to_stream` routes did.
 ### 2.2 P2: raw `OpcPackage` mutators
 
 New families, generated from the raw functions they replace
-(`.coord/w2-pptx/scripts/raw_family.py`) and documented per verb:
+(`(deleted-coord-artifact)`) and documented per verb:
 
 | Family | `Package::edit_x` | Verbs |
 |---|---|---|
@@ -158,7 +158,7 @@ names every `Presentation`). The regenerated
 included): 216,674 bytes, SHA-256
 `19f315dde216931d280662d8f655a8a7c1240a407db3f1384ecec9fde3cbf6fd`
 (0351 cites the trunk `5ff605692e` file). Regenerate with
-`.coord/w2-pptx/scripts/inventory.sh` (the 0351 docstring commands, one
+`(deleted-coord-artifact)/inventory.sh` (the 0351 docstring commands, one
 crate at a time).
 
 ## 3. Behaviour (accepted in review, recorded here)
@@ -216,7 +216,7 @@ leaf and unified bytes (all equal). The matrix rows supersede 0356's.
 ## 5. Gates
 
 On the tree merged with trunk `7893492f9e` (merge `2764481df0`); logs in
-`.coord/w2-pptx/gate-logs/` (`gates-summary.txt`). The workspace commands
+`(deleted-coord-artifact)` (`gates-summary.txt`). The workspace commands
 exclude only `litchi-ods` (its purged evidence fixture, as in 0356).
 
 | gate | exit |

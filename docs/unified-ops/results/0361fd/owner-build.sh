@@ -4,7 +4,7 @@
 set -euo pipefail
 src=$(realpath "$1"); out=$(realpath -m "$2"); here=$(dirname "$(realpath "$0")")
 mkdir -p "$out"
-source /home/zhuhe/code/litchi-worktrees/.coord/coordinator-constructors/env.sh
+source /deleted-coord-artifact
 export CARGO_TARGET_DIR="$out/target" CARGO_PROFILE_RELEASE_DEBUG=0
 cd "$src"
 cargo build --offline --locked --release --lib -p litchi-numbers -p litchi-keynote -p litchi-pages \

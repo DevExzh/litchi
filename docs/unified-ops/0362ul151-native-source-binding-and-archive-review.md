@@ -30,7 +30,7 @@ All six focused tests pass, including two real isolated Python-only steps
 through the approved runner with the complete ten-tool P closure.
 
 Root runs the candidate stage against C and P. The output is external at
-`.coord/drawingml-Cf8cd398a-P4ab42bb-candidate-v4/`. Root verifies all five
+`(deleted-coord-artifact)`. Root verifies all five
 artifact hashes and confirms that the annotated Python binding literal equals
 its JSON representation. The generation receipt is 7,643 bytes, SHA-256
 `7138461e16245fcf58079ed2f98a27891349de96517f6d2d13f6eecbe4a740c0`.
@@ -73,7 +73,7 @@ root confirms its receipt, empty stderr and unchanged file identity after the
 rename. The archive SHA-256 is
 `1e112a4b41498d6f37ad888f3f1cbcabadc6cb078dff0828031403fec2010e63`.
 The complete receipt and regeneration script remain outside Git at
-`.coord/native-Cf8cd398a-source-archives-20261025/`.
+`(deleted-coord-artifact)`.
 
 Regeneration uses the frozen commit, with the output outside every checkout:
 

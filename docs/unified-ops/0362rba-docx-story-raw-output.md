@@ -44,14 +44,14 @@ small fixture: 45 fewer allocations (about 4.5%) without a measured peak
 increase. The heaptrack peak is the allocation-trace peak for this filtered
 test, not a process RSS claim. Raw captures and analysis are outside the
 repository under
-`/home/zhuhe/code/litchi-worktrees/.coord/w8-docx-story-text/allocation-main/`.
+`(deleted-coord-artifact)`.
 
 The binaries were built with:
 
 ```text
-source /home/zhuhe/code/litchi-worktrees/.coord/w8-file/env.sh
+source (deleted-coord-artifact)
 export CARGO_BUILD_JOBS=1 RUST_TEST_THREADS=1 LITCHI_MEM_MAX=20G
-export TMPDIR=/home/zhuhe/code/litchi-worktrees/.coord/w8-docx-story-text/tmp
+export TMPDIR=(deleted-coord-artifact)
 cargo test --offline --locked -p litchi-docx --test source_backed_story_text --no-run
 ```
 
@@ -66,7 +66,7 @@ heaptrack --analyze <external-output>.zst
 
 The final focused command passed 58 tests (14 story, 25 secondary-story, and
 19 glossary-story tests). Its external log is
-`/home/zhuhe/code/litchi-worktrees/.coord/w8-docx-story-text/story-focused-final.log`,
+`(deleted-coord-artifact)/story-focused-final.log`,
 5,248 bytes, SHA-256
 `eccfff9bd1af551776b6a3d7f80ac5a189c1aa04ddaacdc627023f5fb0df5096`.
 The command was:
@@ -80,7 +80,7 @@ cargo test --offline --locked -p litchi-docx \
 
 Strict all-target/all-feature Clippy passed with `-D warnings`; its final
 external log is
-`/home/zhuhe/code/litchi-worktrees/.coord/w8-docx-story-text/story-clippy-final.log`
+`(deleted-coord-artifact)/story-clippy-final.log`
 (171 bytes), SHA-256
 `baf608fec5bce8dff5e8910f207ba20ba4374af6b03ae7a9fd6b2cffdc1145ba`.
 Targeted rustfmt and `git diff --check` also passed. No binaries or large

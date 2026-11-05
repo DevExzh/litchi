@@ -117,7 +117,7 @@ coordinator cargo shim, `LITCHI_MEM_MAX=20G`, `CARGO_BUILD_JOBS=1`,
 `RUST_TEST_THREADS=1`, offline mode, and target
 `/home/zhuhe/code/litchi-targets/uo2-iwa-protos-alias-repair` (822 MiB after
 validation); the temporary directory was
-`/home/zhuhe/code/litchi-worktrees/.coord/iwa-protos-alias-repair-tmp`.
+`(deleted-coord-artifact)`.
 Session receipts were 79655, 98489,
 35753 and 75652 respectively; no durable command-log hash was retained.  An
 earlier sibling-lock attempt (session 79727, lock prefix `6d7895e`) was

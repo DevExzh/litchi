@@ -1,5 +1,5 @@
 #!/bin/bash
-F=/home/zhuhe/code/litchi-worktrees/.coord/fin-perf
+F=/deleted-coord-artifact
 side=$1 case=$2 n=$3
 out=$F/cgpb/$side.$case.$n
 mkdir -p $F/cgpb

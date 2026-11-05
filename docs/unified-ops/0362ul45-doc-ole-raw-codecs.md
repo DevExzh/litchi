@@ -106,8 +106,8 @@ approved workspace lock was `Cargo.lock`, SHA-256
 
 The final source-equality run used fresh state and target directories retained
 outside the repository at
-`/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-25/cfb-doc-raw-167838/scoped-doc-ole-1792889775259036239` and
-`/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-25/cfb-doc-raw-167838/scoped-doc-ole-1792889775259036239/target`.
+`(deleted-coord-artifact)` and
+`(deleted-coord-artifact)`.
 All seven commands were `isolated=False` as permitted for this targeted cohort,
 and every command exited zero:
 
@@ -144,7 +144,7 @@ The first failed source had the missing `BytesStartExt` import and temporary
 UTF-16 byte-array borrows; the second then exposed the DOC toolbar input
 lifetime.  The latter two were Rust 1.95 clippy diagnostics fixed by the final
 source tip.  The common prefix for the abbreviated paths above is
-`/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-25/cfb-doc-raw-167838`.
+`(deleted-coord-artifact)`.
 
 The broad `clippy-leaves` gate was previously attempted on source tip
 `cf5226b3eaeb6014c8b38592d6c58d124568ba9b`.  It exited 101 after 531.436594 s
@@ -166,15 +166,15 @@ approved runner was rerun with fresh state and target directories:
 
 ```text
 root   /home/zhuhe/code/litchi-worktrees/uo2-cfb-doc-olerawcodec
-state  /home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-25/cfb-doc-raw-75841b8fbd/state
-target /home/zhuhe/code/litchi-worktrees/.coord/targets/cfb-doc-raw-75841b8fbd/target
+state  (deleted-coord-artifact)
+target (deleted-coord-artifact)
 command python3 run_safe_gate.py --only fmt,tests-leaves
 fmt    exit 0, 29.3 s, log SHA-256 e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
 tests  exit 1, 484.874877 s, target 1,144,826,751 B
 ```
 
 The complete `tests-leaves` receipt is
-`/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-25/cfb-doc-raw-75841b8fbd/state/30-tests-leaves-attempt-1792887298593559226-4032954.log`,
+`(deleted-coord-artifact)/30-tests-leaves-attempt-1792887298593559226-4032954.log`,
 SHA-256 `c62c50e538fbd555edc485edb870de60351f7fcc6f405a82eed63e2a2b4a6703`.
 The DOC and OLE package chunks compiled and passed in that predefined step;
 the terminal failure was step 85, the unrelated `litchi-drawingml` doctest

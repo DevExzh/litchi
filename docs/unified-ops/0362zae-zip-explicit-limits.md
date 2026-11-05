@@ -89,7 +89,7 @@ Validation used the coordinator-approved environment: the build shim was first
 in `PATH`, `LITCHI_CAPPED` and `LITCHI_BLESS` were unset,
 `LITCHI_MEM_MAX=20G`, `CARGO_BUILD_JOBS=1`, `RUST_TEST_THREADS=1`,
 `CARGO_INCREMENTAL=0`, and the external target was
-`/home/zhuhe/code/litchi-worktrees/.coord/zip-explicit-limits-target`.
+`(deleted-coord-artifact)`.
 Both Cargo commands were offline and explicitly `--locked` against that
 52ed… lock:
 

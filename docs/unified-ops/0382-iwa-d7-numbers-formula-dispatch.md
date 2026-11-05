@@ -87,10 +87,10 @@ slice adds no duplicate queue row.
 The probe was built outside the repository with this complete command:
 
 ```text
-CARGO_TARGET_DIR=/home/zhuhe/code/litchi-worktrees/.coord/d7-formula-perf-8b3ef8b/target \
+CARGO_TARGET_DIR=(deleted-coord-artifact) \
 CARGO_INCREMENTAL=0 CARGO_PROFILE_RELEASE_DEBUG=1 CARGO_BUILD_JOBS=4 \
 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 \
-RUST_TEST_THREADS=1 PATH=/home/zhuhe/code/litchi-worktrees/.coord/bin:$PATH \
+RUST_TEST_THREADS=1 PATH=(deleted-coord-artifact):$PATH \
 cargo test --release --locked --offline -p litchi-ops --features numbers --test numbers_unified --no-run
 ```
 
@@ -98,13 +98,13 @@ The source fixture is `test-data/iwork/numbers/formula-budget-native.numbers`,
 101,345 bytes, SHA-256
 `6726414adc52762fab5ce3c52d6244d8d55958cf9fc4ee8bb26c00234f048fd3`. The
 release test binary is
-`/home/zhuhe/code/litchi-worktrees/.coord/d7-formula-perf-8b3ef8b/target/release/deps/numbers_unified-f84504c3e8179e98`,
+`(deleted-coord-artifact)`,
 45,449,512 bytes, SHA-256
 `f67ab82972b9c4001350e24e36f4601b4ce0632a1036c5f30d87e92f94ffe079`.
 The route symbols were checked with:
 
 ```text
-nm -C /home/zhuhe/code/litchi-worktrees/.coord/d7-formula-perf-8b3ef8b/target/release/deps/numbers_unified-f84504c3e8179e98 | rg 'unified_cached_formula_route|direct_cached_formula_route'
+nm -C (deleted-coord-artifact) | rg 'unified_cached_formula_route|direct_cached_formula_route'
 ```
 
 Each pinned pass ran the ignored test with the exact filter and output file
@@ -112,19 +112,19 @@ below. Both logs report one passing test and exact unified/direct output
 equality:
 
 ```text
-taskset -c 3 valgrind --tool=callgrind --quiet --collect-atstart=no --toggle-collect='*numbers_unified::unified_cached_formula_route*' --callgrind-out-file=/home/zhuhe/code/litchi-worktrees/.coord/d7-formula-perf-8b3ef8b/callgrind/unified.callgrind /home/zhuhe/code/litchi-worktrees/.coord/d7-formula-perf-8b3ef8b/target/release/deps/numbers_unified-f84504c3e8179e98 --ignored --exact cached_formula_full_file_cost_abba --test-threads=1 > /home/zhuhe/code/litchi-worktrees/.coord/d7-formula-perf-8b3ef8b/callgrind/unified.log 2>&1
-taskset -c 3 valgrind --tool=callgrind --quiet --collect-atstart=no --toggle-collect='*numbers_unified::direct_cached_formula_route*' --callgrind-out-file=/home/zhuhe/code/litchi-worktrees/.coord/d7-formula-perf-8b3ef8b/callgrind/direct.callgrind /home/zhuhe/code/litchi-worktrees/.coord/d7-formula-perf-8b3ef8b/target/release/deps/numbers_unified-f84504c3e8179e98 --ignored --exact cached_formula_full_file_cost_abba --test-threads=1 > /home/zhuhe/code/litchi-worktrees/.coord/d7-formula-perf-8b3ef8b/callgrind/direct.log 2>&1
-callgrind_annotate --inclusive=yes --threshold=0 /home/zhuhe/code/litchi-worktrees/.coord/d7-formula-perf-8b3ef8b/callgrind/unified.callgrind > /home/zhuhe/code/litchi-worktrees/.coord/d7-formula-perf-8b3ef8b/callgrind/unified.annotation.txt
-callgrind_annotate --inclusive=yes --threshold=0 /home/zhuhe/code/litchi-worktrees/.coord/d7-formula-perf-8b3ef8b/callgrind/direct.callgrind > /home/zhuhe/code/litchi-worktrees/.coord/d7-formula-perf-8b3ef8b/callgrind/direct.annotation.txt
-sha256sum /home/zhuhe/code/litchi-worktrees/.coord/d7-formula-perf-8b3ef8b/target/release/deps/numbers_unified-f84504c3e8179e98 /home/zhuhe/code/litchi-worktrees/.coord/d7-formula-perf-8b3ef8b/callgrind/unified.callgrind /home/zhuhe/code/litchi-worktrees/.coord/d7-formula-perf-8b3ef8b/callgrind/direct.callgrind /home/zhuhe/code/litchi-worktrees/.coord/d7-formula-perf-8b3ef8b/callgrind/unified.log /home/zhuhe/code/litchi-worktrees/.coord/d7-formula-perf-8b3ef8b/callgrind/direct.log /home/zhuhe/code/litchi-worktrees/.coord/d7-formula-perf-8b3ef8b/callgrind/unified.annotation.txt /home/zhuhe/code/litchi-worktrees/.coord/d7-formula-perf-8b3ef8b/callgrind/direct.annotation.txt
-stat -c '%s %n' /home/zhuhe/code/litchi-worktrees/.coord/d7-formula-perf-8b3ef8b/target/release/deps/numbers_unified-f84504c3e8179e98 /home/zhuhe/code/litchi-worktrees/.coord/d7-formula-perf-8b3ef8b/callgrind/unified.callgrind /home/zhuhe/code/litchi-worktrees/.coord/d7-formula-perf-8b3ef8b/callgrind/direct.callgrind /home/zhuhe/code/litchi-worktrees/.coord/d7-formula-perf-8b3ef8b/callgrind/unified.log /home/zhuhe/code/litchi-worktrees/.coord/d7-formula-perf-8b3ef8b/callgrind/unified.annotation.txt /home/zhuhe/code/litchi-worktrees/.coord/d7-formula-perf-8b3ef8b/callgrind/direct.log /home/zhuhe/code/litchi-worktrees/.coord/d7-formula-perf-8b3ef8b/callgrind/direct.annotation.txt
+taskset -c 3 valgrind --tool=callgrind --quiet --collect-atstart=no --toggle-collect='*numbers_unified::unified_cached_formula_route*' --callgrind-out-file=(deleted-coord-artifact) (deleted-coord-artifact) --ignored --exact cached_formula_full_file_cost_abba --test-threads=1 > (deleted-coord-artifact) 2>&1
+taskset -c 3 valgrind --tool=callgrind --quiet --collect-atstart=no --toggle-collect='*numbers_unified::direct_cached_formula_route*' --callgrind-out-file=(deleted-coord-artifact) (deleted-coord-artifact) --ignored --exact cached_formula_full_file_cost_abba --test-threads=1 > (deleted-coord-artifact) 2>&1
+callgrind_annotate --inclusive=yes --threshold=0 (deleted-coord-artifact) > (deleted-coord-artifact)
+callgrind_annotate --inclusive=yes --threshold=0 (deleted-coord-artifact) > (deleted-coord-artifact)
+sha256sum (deleted-coord-artifact) (deleted-coord-artifact) (deleted-coord-artifact) (deleted-coord-artifact) (deleted-coord-artifact) (deleted-coord-artifact) (deleted-coord-artifact)
+stat -c '%s %n' (deleted-coord-artifact) (deleted-coord-artifact) (deleted-coord-artifact) (deleted-coord-artifact) (deleted-coord-artifact) (deleted-coord-artifact) (deleted-coord-artifact)
 ```
 
 The unified route recorded 75,491,093 Ir; the direct leaf route recorded
 75,041,444 Ir, for +449,649 Ir (+0.599201%) on the unified route. The
 annotation totals match those route totals. The raw receipts remain outside
 the repository under
-`/home/zhuhe/code/litchi-worktrees/.coord/d7-formula-perf-8b3ef8b/callgrind/`:
+`(deleted-coord-artifact)`:
 
 | Artifact | Bytes | SHA-256 |
 |---|---:|---|

@@ -4,7 +4,7 @@ The actual guarded standalone consumer check passes on clean composed source
 `ee7e9955d3bc6f6942a2c4434c1e1a4cfec16c63`, including the font, crypto,
 Markdown and RTF migrations and both PPT benchmark repairs in 0362ul39b.
 The detached capture is
-`.coord/final-composed-ee7e9955-validation/source`. The command is:
+`(deleted-coord-artifact)`. The command is:
 
 ```sh
 cd tools/perf-baseline
@@ -18,7 +18,7 @@ finishes at 2,851,946,744 bytes, below the 19,000,000,000-byte live and
 thread, zero debug/incremental artifacts and the 20G memory cap.
 
 The receipt directory is
-`.coord/final-composed-ee7e9955-validation/f5-perf-validation`. Its reduced
+`(deleted-coord-artifact)`. Its reduced
 identities are:
 
 | Artifact | Bytes | SHA-256 |
@@ -60,7 +60,7 @@ cd tools/native-resave && cargo check --offline --locked --all-targets
 ```
 
 The external state directory is
-`.coord/final-composed-ebc742-validation/f5-perf-native-validation`.
+`(deleted-coord-artifact)`.
 `result.json` is 17,077 bytes with SHA-256
 `b90f9a2fe8e77a5026af7fad9ef0d4956490aecd1ecc14a499477b5b9faba60d`;
 `rows.json` is 16,063 bytes with SHA-256

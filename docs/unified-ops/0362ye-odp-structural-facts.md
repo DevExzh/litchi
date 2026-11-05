@@ -73,7 +73,7 @@ The current candidate probe binary is outside the repository at
 size 3,599,992 bytes, SHA-256
 `f4b3e47bdcceb9e9e536a3c94b181bde040360ffd66c78ead73feb74562737f9`.
 The accepted e4a baseline binary is at
-`/home/zhuhe/code/litchi-worktrees/.coord/odp-0362yd-baseline-target/release/examples/odp_0362ye_probe`,
+`(deleted-coord-artifact)`,
 size 3,096,104 bytes, SHA-256
 `ecb034b0f57588c7d131ba9981d7004f5181ee214a88d14519f73660f35e0669`.
 Both were run with the tracked route drivers and one build job with

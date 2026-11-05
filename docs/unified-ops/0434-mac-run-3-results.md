@@ -290,7 +290,7 @@ My reading: D1 asks a route to pass native open, save, close and reopen, and tho
 
 ## 13. Gates
 
-No Rust changed, so `cargo fmt`, clippy, doc and the crate tests were not run; they have nothing new to check. A temporary reader probe was built with `cargo test -p litchi-numbers` (exit 0) and removed. Logs are in `.coord/iwa-w7/gates/`.
+No Rust changed, so `cargo fmt`, clippy, doc and the crate tests were not run; they have nothing new to check. A temporary reader probe was built with `cargo test -p litchi-numbers` (exit 0) and removed. Logs are in `(deleted-coord-artifact)`.
 
 | Gate | Exit |
 |---|---:|

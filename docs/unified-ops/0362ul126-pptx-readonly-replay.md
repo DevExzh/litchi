@@ -8,7 +8,7 @@ the assertion at line 169 reported that the expanded owner was not refused by
 a typed bound.
 
 The captured log is
-`.coord/ooxml-pptx-joint-a8d32513b8-f5-runtime-pptx-tail-remaining17-v2/24-pptx-full-chunk-31-attempt-actual-f5-24.log`
+`(deleted-coord-artifact)/24-pptx-full-chunk-31-attempt-actual-f5-24.log`
 (227,285 bytes, SHA-256
 `4809895faad74af3e2eea5540514e52a80e7579445392cc0087b1e5a4b6d20ca`).
 The frozen source is `a8d32513b8e427c6d234ddd17fb836b0e8d2477b`.

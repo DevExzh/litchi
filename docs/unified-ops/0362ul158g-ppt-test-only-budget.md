@@ -10,7 +10,7 @@ paths continue to use their admitted source limits. This changes no runtime
 policy and adds no lint waiver. Rustfmt and `git diff --check` pass.
 
 The failed run remains external at
-`/home/zhuhe/code/litchi-worktrees/.coord/ppt-158f-focused-20261026/`.
+`(deleted-coord-artifact)`.
 Root verified the logs, target traces, unchanged source and three locks,
 and empty owned processes. Its `root-terminal-verification.json` is 1,475
 bytes, SHA-256

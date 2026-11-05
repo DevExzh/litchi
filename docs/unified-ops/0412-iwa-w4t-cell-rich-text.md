@@ -117,7 +117,7 @@ with `cargo test -p litchi-iwa --all-features --test parity --release
 (`cost_probes::{host,leaf}_cell_{text,list}` for Numbers,
 `pages_cost_probes::{probe_host,probe_leaf}` for the new probes), ABBA
 order. Captures stay outside the repository in
-`.coord/iwa-w4t/callgrind/s4-*.out`.
+`(deleted-coord-artifact)`.
 
 | Route (probe) | Host Ir | Leaf Ir | Leaf/host |
 |---|---:|---:|---:|
@@ -196,7 +196,7 @@ method as §4, `*_cell_{control,numeral}_format_cost_abba`):
 ## 6. Verification
 
 On the merge of trunk `1bc0d4c996` (sequential gate script
-`.coord/iwa-w4t/gates.sh`, `CARGO_BUILD_JOBS=6`):
+`(deleted-coord-artifact)`, `CARGO_BUILD_JOBS=6`):
 
 | Command | Exit |
 |---|---|

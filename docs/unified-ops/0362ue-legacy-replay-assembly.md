@@ -15,7 +15,7 @@ the exact committed artifact. No production policy or error precedence changed.
 Direct rustfmt passed. The combined tests and affected-consumer checks will
 be rerun on the committed correction. The failed run is retained externally:
 
-- Log: `/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/legacy-replay-combined-v1/check-0.log`
+- Log: `(deleted-coord-artifact)/check-0.log`
 - Size: 229,601 bytes.
 - SHA-256: `81e322c5d5a8b34fa3a6b97814dcb7f8a9eadad4a9835ba97cb42b902839d57a`.
 - Command: `cargo test --offline --locked --all-features --message-format json-render-diagnostics -p litchi-doc --lib`.

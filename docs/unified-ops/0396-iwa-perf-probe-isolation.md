@@ -13,7 +13,7 @@
 ## Raw-audit findings
 
 The retained audit
-`/home/zhuhe/code/litchi-worktrees/.coord/resume-20261028/perf/final-1bc8f22499-iwork/capture/coordinator-probe-call-audit.json`
+`(deleted-coord-artifact)`
 contains 137 legs. The paired host/leaf contract is two selected calls per
 side; the one existing Pages hidden-axis leaf-only route is the sole intentional
 one-call exception. This WP repairs:

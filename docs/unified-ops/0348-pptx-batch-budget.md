@@ -258,7 +258,7 @@ record 0349), rerun in full; cargo through the memory-capped shim,
 `CARGO_BUILD_JOBS=6`, `RUST_TEST_THREADS=8`; every exit status checked. The
 litchi-ops test chunks include `tests/pptx_batch_equivalence.rs`.
 
-Logs: `.coord/pptx-batch/gate-logs/` (`summary.txt`).
+Logs: `(deleted-coord-artifact)` (`summary.txt`).
 
 | gate | exit |
 |---|---:|

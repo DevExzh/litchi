@@ -13,8 +13,8 @@
     ],
     "feature_check": "cargo tree --offline --locked -p litchi-iwa-core -e features showed smallvec default and union features active in the iwa-core graph.",
     "probe": {
-      "base_project": "/home/zhuhe/code/litchi-worktrees/.coord/constructor-0361f-coordinator/matched-v24-project-base",
-      "candidate_project": "/home/zhuhe/code/litchi-worktrees/.coord/constructor-0361f-coordinator/matched-v24-project-candidate",
+      "base_project": "(deleted-coord-artifact)",
+      "candidate_project": "(deleted-coord-artifact)",
       "base_main_sha256": "5af21e72fb796b9fc1e912e468bfb967ed0770c469e2773b2f1cace1552c1452",
       "candidate_main_sha256": "d54d828ff5866fb5df8c7fecff67627717c6da3863202a0ef75a883bf295fe87",
       "base_lock_sha256": "551fd8812350c2b13b5d1791fb8773ba4a50c71801728c3a18f6c1dca3f7f89a",
@@ -24,44 +24,44 @@
   "matched_targets": {
     "build": "CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 cargo build --release --manifest-path <project>/Cargo.toml --target-dir <target>",
     "base": {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/constructor-0361f-coordinator/matched-v24-target-base",
+      "path": "(deleted-coord-artifact)",
       "disk_bytes": 753422513,
       "files": 1498
     },
     "candidate": {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/constructor-0361f-coordinator/matched-v24-target-candidate",
+      "path": "(deleted-coord-artifact)",
       "disk_bytes": 476841172,
       "files": 1128
     }
   },
   "binaries": {
     "allocation_base": {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/constructor-0361f-coordinator/matched-v24-alloc-base/iwa-constructor-probe-v24-base-alloc",
+      "path": "(deleted-coord-artifact)/iwa-constructor-probe-v24-base-alloc",
       "bytes": 658296,
       "sha256": "d3bfb49e8df6487a3790928893837059f7e71dcb3e9b987e81dd7d507b34b643"
     },
     "allocation_candidate": {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/constructor-0361f-coordinator/matched-v24-alloc-candidate/iwa-constructor-probe-v24-smallvec-alloc",
+      "path": "(deleted-coord-artifact)/iwa-constructor-probe-v24-smallvec-alloc",
       "bytes": 698704,
       "sha256": "498f998775c7caa1ca94cc8b30b7557c348dca8240acf3369da6d7747ff858be"
     },
     "callgrind_base": {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/constructor-0361f-coordinator/matched-v24-callgrind/iwa-constructor-probe-v24-base",
+      "path": "(deleted-coord-artifact)/iwa-constructor-probe-v24-base",
       "bytes": 633744,
       "sha256": "a40ed830e640f3992ac288ec1691639e3a44689f020d4acd7fc94977eec5dda0"
     },
     "callgrind_candidate": {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/constructor-0361f-coordinator/matched-v24-callgrind/iwa-constructor-probe-v24-smallvec",
+      "path": "(deleted-coord-artifact)/iwa-constructor-probe-v24-smallvec",
       "bytes": 677464,
       "sha256": "130713a57c1213ea12cfceaabc4d2f101eb110665fce1238c69b01c7263c1e81"
     },
     "representation_baseline_allocation": {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/constructor-0361f-coordinator/matched-v24-alloc-pre-smallvec/iwa-constructor-probe-v24-pre-smallvec-alloc",
+      "path": "(deleted-coord-artifact)/iwa-constructor-probe-v24-pre-smallvec-alloc",
       "bytes": 691072,
       "sha256": "375517f320fc4da89ed5a55de5cd7bc9715ee59f237383f7ac5309531f07eb86"
     },
     "representation_baseline_callgrind": {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/constructor-0361f-coordinator/matched-v24-callgrind-pre-smallvec/iwa-constructor-probe-v24-pre-smallvec",
+      "path": "(deleted-coord-artifact)/iwa-constructor-probe-v24-pre-smallvec",
       "bytes": 670208,
       "sha256": "3865de8075c848ed45eb45b30e0a4fe60fd6101ccb475acd6e607d0a8cba6bdb"
     }
@@ -76,7 +76,7 @@
   },
   "allocation": {
     "method": "ABBA, 100 iterations per route, allocator-enabled matched release probes; all counters, checksum, output length and output SHA-256 checked",
-    "summary_path": "/home/zhuhe/code/litchi-worktrees/.coord/constructor-0361f-coordinator/matched-v24-alloc-repr-results/summary.tsv",
+    "summary_path": "(deleted-coord-artifact)/summary.tsv",
     "summary_bytes": 19664,
     "summary_sha256": "63a0b0c1b945bbfde4b3b688928b074aaa483b39addd930cf67872226e819df0",
     "representative_representation_deltas": [
@@ -92,7 +92,7 @@
   },
   "callgrind": {
     "method": "valgrind --tool=callgrind --collect-jumps=no --error-exitcode=99; Ir/op=(Ir at 12000 - Ir at 2000)/10000; 2000 and 12000 runs were collected for fixed and raw-count routes",
-    "summary_path": "/home/zhuhe/code/litchi-worktrees/.coord/constructor-0361f-coordinator/matched-v24-callgrind-repr-results/summary.tsv",
+    "summary_path": "(deleted-coord-artifact)/summary.tsv",
     "summary_bytes": 15434,
     "summary_sha256": "f41abb6aaf2d506fbee9b22f30e1846bf101c24cdae644c9694aadc341c34412",
     "representative_rows": [
@@ -111,8 +111,8 @@
     "interpretation": "Absolute and per-operation deltas are negative against the exact pre-migration representation. The full raw constructor and object routes therefore do not reproduce the earlier Vec-allocation regression; native timing is still unqualified."
   },
   "external_summaries": [
-    {"path":"/home/zhuhe/code/litchi-worktrees/.coord/constructor-0361f-coordinator/matched-v24-alloc-results/summary.tsv","bytes":19738,"sha256":"ff6e77dbd73ecacb19e7115acb4bd770d37c64c8863a2bd663a6fc61b6e3a455"},
-    {"path":"/home/zhuhe/code/litchi-worktrees/.coord/constructor-0361f-coordinator/matched-v24-callgrind-results/summary.tsv","bytes":15478,"sha256":"3cb9928932aa2ecfac14e758e142191dc93abe8cd8a6884eb990b64e4671e7cd"}
+    {"path":"(deleted-coord-artifact)/summary.tsv","bytes":19738,"sha256":"ff6e77dbd73ecacb19e7115acb4bd770d37c64c8863a2bd663a6fc61b6e3a455"},
+    {"path":"(deleted-coord-artifact)/summary.tsv","bytes":15478,"sha256":"3cb9928932aa2ecfac14e758e142191dc93abe8cd8a6884eb990b64e4671e7cd"}
   ],
   "validation": {
     "core_tests": "cargo test --offline --locked -p litchi-iwa-core --lib: 84 passed, 0 failed",

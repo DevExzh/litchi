@@ -15,7 +15,7 @@ with 8 of 9 tests passing. The one failure was at line 557 of
 DOCX's direct `Error::Signed`, while the shared `assert_signed` helper expected
 the lower-level `Error::Opc(OpcError::SignedSourceRequiresExplicitPolicy)`.
 The diagnostic is retained outside the repository at
-`/home/zhuhe/code/litchi-worktrees/.coord/ooxml-pptx-joint-ea5c95e212-f5-runtime-remaining33/08-tests-docx-package-signature-policy-attempt-actual-f5-08.log`
+`(deleted-coord-artifact)/08-tests-docx-package-signature-policy-attempt-actual-f5-08.log`
 (18,612 bytes, SHA-256
 `bba781aa6161f4ba549d45b9ccce907609b8555198f0dec9c49c9d525b58cf6d`).
 

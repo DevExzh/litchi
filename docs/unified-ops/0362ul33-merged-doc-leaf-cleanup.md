@@ -20,7 +20,7 @@ payload's hash and mode, then removed the temporary restored copy and
 worktree without force. The original branch remains available.
 
 Evidence is under
-`/home/zhuhe/code/litchi-worktrees/.coord/worktree-cleanup-2026-10-23/quarantine/wave53-doc-body-toggle-final/`:
+`(deleted-coord-artifact)`:
 
 | Artifact | Bytes | SHA-256 |
 | --- | ---: | --- |

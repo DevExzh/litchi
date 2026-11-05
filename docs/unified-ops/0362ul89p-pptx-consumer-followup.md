@@ -6,11 +6,11 @@ it does not claim a compiler, runtime, performance, or qualification result.
 The frozen source base is
 `15d8d53a0cf6d27f350b866463b4235bf26b08d9`. The keep-going diagnostic log is
 outside Git at
-`/home/zhuhe/code/litchi-worktrees/.coord/pptx-combined-0362ul89-f5-actual-15d8d53a0c/01-pptx-all-features-check-attempt-actual-f5-01.log`
+`(deleted-coord-artifact)/01-pptx-all-features-check-attempt-actual-f5-01.log`
 (100,739 bytes, SHA-256
 `a31129804840cddda84361dc4201852856d55afc25de7f0d49cc7d5868295084`). Its
 diagnostic index is outside Git at
-`/home/zhuhe/code/litchi-worktrees/.coord/pptx-combined-0362ul89-f5-actual-15d8d53a0c/diagnostics-index.json`
+`(deleted-coord-artifact)/diagnostics-index.json`
 (18,586 bytes, SHA-256
 `c25bee0ed0c486cd54e2d132c928509bfb08484991437136c53c403104b5d3be`). The
 index contains 19 diagnostics in six distinct test files, beyond the limited

@@ -16,7 +16,7 @@ production operation changes. The corrected source requires a new guarded
 PPT and downstream consumer run before composed acceptance.
 
 The original detached capture and failed evidence remain intact under
-`.coord/final-composed-b8897649-font-validation/`. Its `f5-validation/result.json`
+`(deleted-coord-artifact)`. Its `f5-validation/result.json`
 is 94,117 bytes, SHA-256
 `282c1f878f14e5c97d9e9f7dfa8f6811067f502415a3e0c72a913a852297abe9`.
 The failed `08-check-litchi-ppt-attempt-b889-f5-08.log` has SHA-256

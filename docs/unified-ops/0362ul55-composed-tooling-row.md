@@ -22,7 +22,7 @@ lifecycle and PPT wiring suites pass 44 tests.
 ## Actual run
 
 ```text
-env -u PYTHONPATH -u CARGO_TARGET_DIR python3 docs/unified-ops/results/0362ul29/tooling/run_safe_gate.py --root /home/zhuhe/code/litchi-worktrees/uo2-coordinator-metadata-integration --target /home/zhuhe/code/litchi-worktrees/.coord/tooling-row-a10687e3b2-20261025T2/target --state /home/zhuhe/code/litchi-worktrees/.coord/tooling-row-a10687e3b2-20261025T2-state --only tooling-unit
+env -u PYTHONPATH -u CARGO_TARGET_DIR python3 docs/unified-ops/results/0362ul29/tooling/run_safe_gate.py --root /home/zhuhe/code/litchi-worktrees/uo2-coordinator-metadata-integration --target (deleted-coord-artifact) --state (deleted-coord-artifact) --only tooling-unit
 ```
 
 Source HEAD and tracked status remain unchanged. The three observed Cargo
@@ -33,7 +33,7 @@ runner PID 3854373 is gone. Concurrent, separately owned compiler processes
 are recorded in the preflight and are not attributed to this row.
 
 All artifacts below remain under external root
-`/home/zhuhe/code/litchi-worktrees/.coord/`.
+`(deleted-coord-artifact)`.
 
 | Artifact | Bytes | SHA-256 |
 | --- | ---: | --- |
@@ -51,7 +51,7 @@ It is not counted as a passed attempt.
 
 ## Legacy gate synchronization
 
-The external `.coord/gate.sh` still had an eight-module tooling command.
+The external `(deleted-coord-artifact)` still had an eight-module tooling command.
 Only that command is synchronized to the same 35 modules. Shell syntax and
 exact argv comparison pass. Its former file is retained externally:
 5,024 bytes, SHA-256

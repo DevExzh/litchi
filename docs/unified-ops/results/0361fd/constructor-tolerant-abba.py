@@ -10,7 +10,7 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent.parent
 ROUTES = ("field_path", "field_info", "message_info", "archive_info", "archive_object", "archive_object_reject", "parse", "validate", "encode", "retained_parse", "retained_validate", "retained_encoded_len", "retained_encode", "retained_validate_tight", "retained_encode_tight")
-V5 = Path("/home/zhuhe/code/litchi-worktrees/.coord/constructor-0361f-coordinator/matched-v5")
+V5 = Path("/deleted-coord-artifact")
 BLOCKERS = re.compile(r"^(cargo|rustc|rustdoc|clippy-driver|valgrind|callgrind.*|memcheck.*|dhat.*|cc|c\+\+|clang|gcc|ld|lld|mold|cc1|cc1plus)$")
 TARGET_NS = 500_000_000
 

@@ -31,9 +31,9 @@ selected with `--no-default-features --features allocator-metrics,legacy-xlsx-ra
 ## Evidence
 
 Evidence is outside the checkout at
-`/home/zhuhe/code/litchi-worktrees/.coord/w4-xlsx/evidence/raw-qualification-0bef/`.
+`(deleted-coord-artifact)`.
 The protected target is
-`/home/zhuhe/code/litchi-worktrees/.coord/w4-xlsx/targets/reader-paths-e63/`;
+`(deleted-coord-artifact)`;
 its pre-existing `xlsx_source_reader_paths_alloc` binary was not overwritten.
 The new binaries are named `xlsx-raw-identity-alloc` and
 `xlsx-raw-identity-native`.

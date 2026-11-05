@@ -49,14 +49,14 @@ the read-only `Drawing` projection.
 The source commit above was validated with the memory-capped cargo shim, one
 build job, disabled debug information, `CARGO_INCREMENTAL=0`, and
 `TMPDIR=/tmp/claude-1001/odg-joined`. The isolated target was
-`/home/zhuhe/code/litchi-worktrees/.coord/odg-joined/target`, measured at
+`(deleted-coord-artifact)`, measured at
 413 MiB after the run. These external receipts are intentionally not tracked:
 
 | Command | Receipt | Size | SHA-256 |
 |---|---|---:|---|
-| `cargo check --offline --locked --all-targets --all-features -p litchi-odg` | `.coord/odg-joined/check-final.log` | 162 bytes | `fae313f565339b7b03e998bd01cdb4767541cdc4d23e63c4190aa48ee1dcecef` |
-| strict `cargo clippy --offline --locked --all-targets --all-features -p litchi-odg -- -D warnings` | `.coord/odg-joined/clippy-final.log` | 162 bytes | `ead0e57dd22a0aaa12e2e4065904af2b38851392f96181ca20d6b5c11e711396` |
-| focused `cargo test --offline --locked --all-features -p litchi-odg --test package_semantics --test transition_review --test capability_transactions` | `.coord/odg-joined/tests-final.log` | 4368 bytes | `c52fa40ef7b8f3e1108afe96383bd393467e66ba88723f44fb84b2f42b2bebb8` |
+| `cargo check --offline --locked --all-targets --all-features -p litchi-odg` | `(deleted-coord-artifact)/check-final.log` | 162 bytes | `fae313f565339b7b03e998bd01cdb4767541cdc4d23e63c4190aa48ee1dcecef` |
+| strict `cargo clippy --offline --locked --all-targets --all-features -p litchi-odg -- -D warnings` | `(deleted-coord-artifact)/clippy-final.log` | 162 bytes | `ead0e57dd22a0aaa12e2e4065904af2b38851392f96181ca20d6b5c11e711396` |
+| focused `cargo test --offline --locked --all-features -p litchi-odg --test package_semantics --test transition_review --test capability_transactions` | `(deleted-coord-artifact)/tests-final.log` | 4368 bytes | `c52fa40ef7b8f3e1108afe96383bd393467e66ba88723f44fb84b2f42b2bebb8` |
 
 The focused run passed 26 package-semantic tests, 11 transition tests and 8
 capability tests. Rustfmt, `git diff --check`, the API glossary JSON parse and

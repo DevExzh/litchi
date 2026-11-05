@@ -37,7 +37,7 @@ removes only completed executable artifacts and checks target headroom before
 each command; protected release/measurement artifacts are retained. Final
 test receipts, allocation/native qualification and the final workspace gate
 remain required. The complete command logs are retained outside the checkout
-under `.coord/replay-integration/`.
+under `(deleted-coord-artifact)`.
 
 The first merged run exposed seven facade RTF test consumers that still
 required opened-object identity. They now verify forward replay on an
@@ -48,7 +48,7 @@ base is still rejected. Group 87 then exposed XLSB refusal classifications
 that require a source repair and typed consumer assertions. No test output or
 capability golden was blessed to hide that failure.
 
-The resumed-session handoff in `.coord/triage-2026-10-22.md` supersedes the
+The resumed-session handoff in `(deleted-coord-artifact)` supersedes the
 old full-run schedule: preserve completed and failed group receipts, integrate
 the committed RTF, DOCX, durable-Ink and raw-policy slices, then run affected
 validation on the combined source. The interrupted 225-group run is partial

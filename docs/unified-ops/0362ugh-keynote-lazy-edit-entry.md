@@ -101,7 +101,7 @@ baseline registry package versions were retained. Therefore the Keynote/ops
 `K` receipts still apply to their unchanged source; the standalone harness
 receipts require a rerun against the corrected lock. Raw logs
 remain outside the repository under
-`/home/zhuhe/code/litchi-worktrees/.coord/keynote-lazy-entry/`.
+`(deleted-coord-artifact)`.
 
 ```text
 cargo test --offline --locked -p litchi-keynote --all-features -j 1
@@ -188,10 +188,10 @@ cargo clippy --offline --locked -p litchi-iwa --all-targets --all-features -j 1 
 ```
 
 All raw logs remain outside the repository under
-`/home/zhuhe/code/litchi-worktrees/.coord/keynote-lazy-entry/`.
+`(deleted-coord-artifact)`.
 
 The final assigned target tree was
-`/home/zhuhe/code/litchi-worktrees/.coord/keynote-lazy-entry/target`, exactly
+`(deleted-coord-artifact)`, exactly
 `6818426880` bytes by `du -sB1`. The environment fingerprints were:
 
 ```text
@@ -199,5 +199,5 @@ The final assigned target tree was
 rust-toolchain.toml                                     e3a213e0d222e94d213cafbc20932eb3f76c643b4dd63756acf95192df2aa310
 Cargo.lock                                               6d7895e6056c931fc19780ff4d0a031230e2ac79b9b30a9060bc8b6fad6747da
 tools/perf-baseline/unified-batch-closure/Cargo.lock     95aed16c860cd6082cd50a39aabf29779b89bdb004c8263674e042d84a007870
-.coord/keynote-lazy-entry/env.sh                         42d98d07d010d128109f1a2b1d4cf58e78788ce576579fe71d7a97be1d0c008c
+(deleted-coord-artifact)/env.sh                         42d98d07d010d128109f1a2b1d4cf58e78788ce576579fe71d7a97be1d0c008c
 ```

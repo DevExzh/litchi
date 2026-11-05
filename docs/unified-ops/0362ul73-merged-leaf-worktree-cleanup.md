@@ -37,7 +37,7 @@ complete final quarantine, including receipts and summary, allocates
 filesystem free-space delta is claimed during concurrent builds.
 
 Evidence remains under
-`.coord/worktree-cleanup-2026-10-23/quarantine/wave59/`. To reproduce a restore,
+`(deleted-coord-artifact)`. To reproduce a restore,
 create a sparse worktree at the retained leaf tip and run that leaf's
 `restore.py <worktree> --dry-run`, followed by `restore.py <worktree>`.
 Keep its manifest and ignored payload together. All four restore helpers

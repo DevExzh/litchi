@@ -10,7 +10,7 @@
       "name": "check",
       "command": "cargo check --workspace --all-targets --all-features",
       "exit_code": 0,
-      "log": "/home/zhuhe/code/litchi-worktrees/.coord/w4-xlsx/alias-check.log",
+      "log": "(deleted-coord-artifact)/alias-check.log",
       "bytes": 540,
       "sha256": "5f54140dcf593c13578a08997efff73820d75d0b9ce5804d26d121540cec50a4"
     },
@@ -18,7 +18,7 @@
       "name": "tests",
       "command": "cargo test -p litchi-xlsx --all-features --test source_backed_hyperlinks --test xlsx_hyperlink_crud --test drawing_content_part --test form_control_properties",
       "exit_code": 0,
-      "log": "/home/zhuhe/code/litchi-worktrees/.coord/w4-xlsx/alias-tests.log",
+      "log": "(deleted-coord-artifact)/alias-tests.log",
       "bytes": 4749,
       "sha256": "98b6136319a42d768df7801b510c413ec3900242755e01f796f171f14f8e552a"
     },
@@ -26,7 +26,7 @@
       "name": "pivot",
       "command": "cargo test -p litchi-xlsx --all-features --lib pivot",
       "exit_code": 0,
-      "log": "/home/zhuhe/code/litchi-worktrees/.coord/w4-xlsx/alias-pivot.log",
+      "log": "(deleted-coord-artifact)/alias-pivot.log",
       "bytes": 19985,
       "sha256": "1ff861477c409afd9f674e8a7b66adbc251771508b0ed1d8da1d24517ab74193"
     },
@@ -34,7 +34,7 @@
       "name": "custom-xml",
       "command": "cargo test -p litchi-ooxml-common --all-features --lib custom_xml",
       "exit_code": 0,
-      "log": "/home/zhuhe/code/litchi-worktrees/.coord/w4-xlsx/alias-custom-xml.log",
+      "log": "(deleted-coord-artifact)/alias-custom-xml.log",
       "bytes": 1597,
       "sha256": "f36a482315e20cb5de65b5e178b77370a8e8b78b2eea6db685e4e1ecf041fd52"
     },
@@ -42,7 +42,7 @@
       "name": "clippy",
       "command": "cargo clippy -p litchi-xlsx -p litchi-ooxml-common --all-targets --all-features -- -D warnings",
       "exit_code": 0,
-      "log": "/home/zhuhe/code/litchi-worktrees/.coord/w4-xlsx/alias-clippy.log",
+      "log": "(deleted-coord-artifact)/alias-clippy.log",
       "bytes": 1218,
       "sha256": "e86a741386bb30f2107eff79434be456ad7db1372dff0e6ba5953ec5e86c5dbf"
     },
@@ -50,7 +50,7 @@
       "name": "docs",
       "command": "RUSTDOCFLAGS=-Dwarnings cargo doc -p litchi-xlsx -p litchi-ooxml-common --no-deps --all-features",
       "exit_code": 0,
-      "log": "/home/zhuhe/code/litchi-worktrees/.coord/w4-xlsx/alias-docs.log",
+      "log": "(deleted-coord-artifact)/alias-docs.log",
       "bytes": 746,
       "sha256": "72d4b12ea60765df0349636eb9aad35841ce0dabc5086c2c9ce38a3b84ee5458"
     },
@@ -58,7 +58,7 @@
       "name": "harness",
       "command": "cargo check --manifest-path tools/perf-baseline/Cargo.toml --locked --all-targets",
       "exit_code": 0,
-      "log": "/home/zhuhe/code/litchi-worktrees/.coord/w4-xlsx/alias-harness.log",
+      "log": "(deleted-coord-artifact)/alias-harness.log",
       "bytes": 1105,
       "sha256": "d4111a3f231965387d3dc6c60176c11bcf32d628c5aa2070cee2b09c950d9f92"
     },
@@ -66,7 +66,7 @@
       "name": "xlsx-minimal",
       "command": "python3 tools/check_api_glossary.py --profile xlsx-minimal --target-dir target/gate",
       "exit_code": 0,
-      "log": "/home/zhuhe/code/litchi-worktrees/.coord/w4-xlsx/alias-xlsx-minimal.log",
+      "log": "(deleted-coord-artifact)/alias-xlsx-minimal.log",
       "bytes": 639,
       "sha256": "f79f4e4d037168707272b6db35db0f88e3bd1509f4e24f5806421b3bf1fbc867"
     },
@@ -74,7 +74,7 @@
       "name": "xlsx-full",
       "command": "python3 tools/check_api_glossary.py --profile xlsx-full --target-dir target/gate",
       "exit_code": 0,
-      "log": "/home/zhuhe/code/litchi-worktrees/.coord/w4-xlsx/alias-xlsx-full.log",
+      "log": "(deleted-coord-artifact)/alias-xlsx-full.log",
       "bytes": 639,
       "sha256": "46d1420a7bf843a020cad5f907d29d89578a9ec61261f35428e3ee3f7b01d421"
     },
@@ -82,7 +82,7 @@
       "name": "ooxml-common-minimal",
       "command": "python3 tools/check_api_glossary.py --profile ooxml-common-minimal --target-dir target/gate",
       "exit_code": 0,
-      "log": "/home/zhuhe/code/litchi-worktrees/.coord/w4-xlsx/alias-ooxml-common-minimal.log",
+      "log": "(deleted-coord-artifact)/alias-ooxml-common-minimal.log",
       "bytes": 299,
       "sha256": "748c90921f577cbecb079bbeb3fca1b95fb663012bad1b9ec1e0f820e61aaa9b"
     },
@@ -90,7 +90,7 @@
       "name": "ooxml-common-full",
       "command": "python3 tools/check_api_glossary.py --profile ooxml-common-full --target-dir target/gate",
       "exit_code": 0,
-      "log": "/home/zhuhe/code/litchi-worktrees/.coord/w4-xlsx/alias-ooxml-common-full.log",
+      "log": "(deleted-coord-artifact)/alias-ooxml-common-full.log",
       "bytes": 299,
       "sha256": "83d2dceb967fc19b17d60ebacb8a9b43321dda473a0cb327c8040d78fa282344"
     }

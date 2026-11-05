@@ -21,7 +21,7 @@ Formatting passed with `cargo fmt --all -- --check`.
 Exact focused command on the repaired source:
 
 ```text
-env TMPDIR=/tmp/signed-native-xlsx-clippy-v23 CARGO_TARGET_DIR=/home/zhuhe/code/litchi-worktrees/uo2-xlsx-normalization-repair/.coord/signed-native-repair/target CARGO_INCREMENTAL=0 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_BUILD_JOBS=1 RUST_TEST_THREADS=1 LITCHI_MEM_MAX=20G PATH=/home/zhuhe/code/litchi-worktrees/.coord/bin:$PATH cargo clippy -p litchi-xlsx --all-targets --all-features --offline --locked -- -D warnings
+env TMPDIR=/tmp/signed-native-xlsx-clippy-v23 CARGO_TARGET_DIR=(deleted-coord-artifact) CARGO_INCREMENTAL=0 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_BUILD_JOBS=1 RUST_TEST_THREADS=1 LITCHI_MEM_MAX=20G PATH=(deleted-coord-artifact):$PATH cargo clippy -p litchi-xlsx --all-targets --all-features --offline --locked -- -D warnings
 ```
 
 Result: exit `0`; `litchi-xlsx` checked successfully in `1m 04s` with no

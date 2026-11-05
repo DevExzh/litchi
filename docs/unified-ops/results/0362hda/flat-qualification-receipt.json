@@ -2,18 +2,18 @@
   "binaries": {
     "base": {
       "bytes": 3563672,
-      "path": "external:.coord/w8-odf-flat-limits/probe-target-base/release/odf_flat_qualification_probe",
+      "path": "external:(deleted-coord-artifact)",
       "sha256": "7c6e576e709b9bdc3e1aaacb1a22b016c0eeeae921039b5decf1b16217973fef"
     },
     "final": {
       "bytes": 2794872,
-      "path": "external:.coord/w8-odf-flat-limits/probe-target-final/release/odf_flat_qualification_probe",
+      "path": "external:(deleted-coord-artifact)",
       "sha256": "694c9eb532dc6516cdd48d569b9e0f8460161defe344f465a17de7253725684d"
     }
   },
   "build_commands": [
-    "source /home/zhuhe/code/litchi-worktrees/.coord/w8-odf-flat-limits/env.sh; export CARGO_NET_OFFLINE=true CARGO_BUILD_JOBS=1 CARGO_TARGET_DIR=/home/zhuhe/code/litchi-worktrees/.coord/w8-odf-flat-limits/probe-target-base; cargo build --release --offline",
-    "source /home/zhuhe/code/litchi-worktrees/.coord/w8-odf-flat-limits/env.sh; export CARGO_NET_OFFLINE=true CARGO_BUILD_JOBS=1 CARGO_TARGET_DIR=/home/zhuhe/code/litchi-worktrees/.coord/w8-odf-flat-limits/probe-target-final; cargo build --release --offline --features final"
+    "source (deleted-coord-artifact); export CARGO_NET_OFFLINE=true CARGO_BUILD_JOBS=1 CARGO_TARGET_DIR=(deleted-coord-artifact); cargo build --release --offline",
+    "source (deleted-coord-artifact); export CARGO_NET_OFFLINE=true CARGO_BUILD_JOBS=1 CARGO_TARGET_DIR=(deleted-coord-artifact); cargo build --release --offline --features final"
   ],
   "claims": {
     "allocation": "four legs are identical within each endpoint for every route; split is lower allocation in final, other successful routes are equal",
@@ -49,10 +49,10 @@
     "identical": true
   },
   "ods_gate": {
-    "command": "source /home/zhuhe/code/litchi-worktrees/.coord/w8-odf-flat-limits/env.sh; export CARGO_NET_OFFLINE=true; python3 /home/zhuhe/code/litchi-worktrees/.coord/scripts/chunked-cargo-tests.py -p litchi-ods --all-features",
+    "command": "source (deleted-coord-artifact); export CARGO_NET_OFFLINE=true; python3 (deleted-coord-artifact) -p litchi-ods --all-features",
     "external_log": {
       "bytes": 183230,
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/w8-odf-flat-limits/ods-gate-full.log",
+      "path": "(deleted-coord-artifact)/ods-gate-full.log",
       "sha256": "32921e8cfdab15c4eeaccb52f3dcdef47b7ea4e49661a0aa73a65ad1ba718062"
     },
     "result": "1768 passed, 0 failed, 13 filtered compile/doctest cases across 18 commands/120 result blocks"
@@ -567,7 +567,7 @@
       }
     ],
     "order": "base, final, final, base",
-    "raw_receipts_external": "/home/zhuhe/code/litchi-worktrees/.coord/w8-odf-flat-limits/counting-abba-20261022",
+    "raw_receipts_external": "(deleted-coord-artifact)",
     "routes": [
       "split",
       "to_package",

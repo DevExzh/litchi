@@ -72,9 +72,9 @@ Cargo selected the locally available latest compatible transitive versions,
 producing root-lock SHA-256
 `558fafc4fdaf4d517aef588586b8fcde52efa11f683b54e5e96a6fa7a82e2ab0` (139,607
 bytes). The byte-for-byte preserved copy is outside the checkout at
-`/home/zhuhe/code/litchi-worktrees/.coord/0362ul65-f5-exact-7a760a3a46/Cargo.lock.generated-558fafc4fdaf4d517aef588586b8fcde52efa11f683b54e5e96a6fa7a82e2ab0`.
+`(deleted-coord-artifact)/Cargo.lock.generated-558fafc4fdaf4d517aef588586b8fcde52efa11f683b54e5e96a6fa7a82e2ab0`.
 The approved lock is
-`/home/zhuhe/code/litchi-worktrees/.coord/integration-font-lock-transition-20261025/Cargo.lock.before-font-4100`,
+`(deleted-coord-artifact)`,
 SHA-256
 `4100b1fbb272dd24842f33a2d6f353a3f3a97dfa7e435c4649a0e1a029bfaea1` (139,606
 bytes). Complete TOML comparison found six registry substitutions: `cc`
@@ -85,7 +85,7 @@ bytes). Complete TOML comparison found six registry substitutions: `cc`
 change authorized those resolutions.
 
 The prior receipt remains preserved at
-`/home/zhuhe/code/litchi-worktrees/.coord/0362ul65-f5-exact-7a760a3a46/result.json`
+`(deleted-coord-artifact)/result.json`
 (SHA-256
 `13d068950fc9bf167a91679d2f01734aa854f7ce8a9baa6dbcbe2baaedb2d561`). Its
 RTF tests and scoped checks passed, but those results are diagnostic only
@@ -96,7 +96,7 @@ known historical PPT caller at
 until the coordinator composes the owning PPT repair.
 
 The earlier broad `tests-leaves` attempt is preserved at
-`/home/zhuhe/code/litchi-worktrees/.coord/0362ul65-f5-7a760a3a46/state.json`.
+`(deleted-coord-artifact)`.
 No new Cargo command is recorded in this correction.
 
 ## Approved-lock f5 rerun
@@ -121,7 +121,7 @@ guards. The target was reused from the preserved diagnostic run and remained
 well below the guards (maximum 4,832,336,502 bytes).
 
 The new receipt directory is
-`/home/zhuhe/code/litchi-worktrees/.coord/0362ul65-f5-approved-4100-7a760a3a46`.
+`(deleted-coord-artifact)`.
 Its `result.json` has SHA-256
 `9c4f31ac7ce10820854e35ad5ec02d46aa7df0c74214c6881d21faacd5922917`; the
 manifest and row receipts have SHA-256

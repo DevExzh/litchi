@@ -19,7 +19,7 @@
   ],
   "exit": 0,
   "seconds": 30.20574162999401,
-  "log": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/ppt-fixture-closure-merge/combined-tests.log",
+  "log": "(deleted-coord-artifact)/combined-tests.log",
   "log_bytes": 428,
   "log_sha256": "55c686a9727e6834acac16e7b49316c1008d9619b468f7d32739bb1be7c811b1",
   "scope": "Composed Python protocol and preparation validation; no native measurement"

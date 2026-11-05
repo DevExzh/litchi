@@ -4,7 +4,7 @@ This follow-up preserves the earlier failed build and repair packets and
 records a fresh source-only candidate endpoint after review found that the
 old repair overlay changed active consumers outside the isolated F3 probe.
 
-- Candidate: `/home/zhuhe/code/litchi-worktrees/.coord/sheet-preparation-691941/xls-f3-candidate-472b-repair-v2`
+- Candidate: `(deleted-coord-artifact)`
   at `472b6705475b073e7fe08f6e11ee17fb1e29f838`, tree
   `ebc1cee05f124c0c63977aff07a23288c19e7d00`; status and diff are clean.
 - The endpoint uses the exact tracked 472b `perf-baseline/src/lib.rs` and
@@ -25,9 +25,9 @@ old repair overlay changed active consumers outside the isolated F3 probe.
 
 Packets:
 
-- `/home/zhuhe/code/litchi-worktrees/.coord/sheet-preparation-691941/xls-f3-repair-source-preparation-472b-v2.json`
+- `(deleted-coord-artifact)/xls-f3-repair-source-preparation-472b-v2.json`
   SHA-256 `6612b3408991a234797ec9ae20d89b864ab8971aa3cb2c5e0e8e79ca6b1c739f`.
-- `/home/zhuhe/code/litchi-worktrees/.coord/sheet-preparation-691941/sheet-native-readiness-472b-f3-repair-v2.json`
+- `(deleted-coord-artifact)/sheet-native-readiness-472b-f3-repair-v2.json`
   SHA-256 `2e57e9e20caf9e2994b0abab92c62f15c1d212d90fcb9a35913cc27b98e09aff`.
 
 The historical baseline endpoint, successful baseline binary, prior receipt,

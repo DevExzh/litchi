@@ -36,7 +36,7 @@ third-party inputs:
   build --offline -p litchi-numbers --example create_numbers_sparse_table` —
   pass.
 - `./target/debug/examples/create_numbers_sparse_table
-  /home/zhuhe/code/litchi-worktrees/.coord/w2d-sparse-run.wdDKig/sparse.numbers`
+  (deleted-coord-artifact)`
   — exit 0. The example's three semantic readbacks, both exact inverse
   assertions, dimensions, and reopened readback all passed. Output SHA-256:
   `bf0ea9cbb993c3e236966a65702b633568d073c001048465a84739604f327081`.

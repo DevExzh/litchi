@@ -11,20 +11,20 @@ The final production candidate is
 d0406be01712496ca0d43354edf4d2fe80162553. The candidate is the clean,
 read-only source root:
 
-    /home/zhuhe/code/litchi-worktrees/.coord/final-api-capture-472b670547/source
+    (deleted-coord-artifact)
 
 The candidate tree is ebc1cee05f124c0c63977aff07a23288c19e7d00; the baseline
 tree is 85e61e6307c7f31df29679f1fc46313f86f368ff. Both use the reviewed root
 lock 4100b1fbb272dd24842f33a2d6f353a3f3a97dfa7e435c4649a0e1a029bfaea1,
 139,606 bytes, SHA-256 equal to its filename, retained at:
 
-    /home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/locks/4100b1fbb272dd24842f33a2d6f353a3f3a97dfa7e435c4649a0e1a029bfaea1.Cargo.lock
+    (deleted-coord-artifact)/4100b1fbb272dd24842f33a2d6f353a3f3a97dfa7e435c4649a0e1a029bfaea1.Cargo.lock
 
 The source/protocol preparation receipt is outside Git. It was regenerated
 after adding the bounded outer boundary; the previous v2 receipt remains
 identified only as historical provenance:
 
-    /home/zhuhe/code/litchi-worktrees/.coord/durable-ink-final-472b/source-preparation.json
+    (deleted-coord-artifact)/source-preparation.json
     21715 bytes, SHA-256 68259481ceb41a58cc2371457f06a942f86cd62c2ba5f3ade6d5180a15a8620f
 
 The superseded v2 receipt was 13,470 bytes with SHA-256
@@ -90,22 +90,22 @@ preflight, and six-route fidelity contract.
 ## Exact future commands
 
 All build, target, binary, timing and raw receipt paths remain external under
-/home/zhuhe/code/litchi-worktrees/.coord/durable-ink-final-472b/. Use the
+(deleted-coord-artifact). Use the
 reviewed Cargo wrapper
-/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/gate-safe-drawingml-20261024/bin/cargo
+(deleted-coord-artifact)
 (SHA-256 495e24c6f60b238378386d86ac4158cba904992ce8870a9494f2c4a0eedd256d),
 one build job, offline/locked mode, incremental off, LITCHI_MEM_MAX=20G,
 19.2-GB preflight and 20-GB hard target guards.
 
 Build and correctness:
 
-    PATH=/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/gate-safe-drawingml-20261024/bin:$PATH \
+    PATH=(deleted-coord-artifact):$PATH \
     LITCHI_MEM_MAX=20G CARGO_BUILD_JOBS=1 CARGO_INCREMENTAL=0 CARGO_NET_OFFLINE=true \
-    python3 /home/zhuhe/code/litchi-worktrees/.coord/final-api-capture-472b670547/source/docs/unified-ops/results/0362l/ink-qualify.py build \
-      /home/zhuhe/code/litchi-worktrees/.coord/durable-ink-final-472b/run-final \
+    python3 (deleted-coord-artifact) build \
+      (deleted-coord-artifact) \
       --base d0406be01712496ca0d43354edf4d2fe80162553 \
       --candidate 472b6705475b073e7fe08f6e11ee17fb1e29f838 \
-      --lock /home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/locks/4100b1fbb272dd24842f33a2d6f353a3f3a97dfa7e435c4649a0e1a029bfaea1.Cargo.lock
+      --lock (deleted-coord-artifact)/4100b1fbb272dd24842f33a2d6f353a3f3a97dfa7e435c4649a0e1a029bfaea1.Cargo.lock
 
 The builder retains the existing four endpoint commands: cargo generate-lockfile
 --offline; cargo build --offline --locked --release
@@ -121,17 +121,17 @@ the old LITCHI_MEM_MAX/Cargo environment is intentionally not carried into
 this plain-Python phase:
 
     python3 tools/ink_safe_runner.py allocation \
-      --output /home/zhuhe/code/litchi-worktrees/.coord/durable-ink-final-472b/run-final/allocation-472b-a1 \
-      --tmp /home/zhuhe/code/litchi-worktrees/.coord/durable-ink-final-472b/tmp-allocation-472b-a1 \
-      --log-dir /home/zhuhe/code/litchi-worktrees/.coord/durable-ink-final-472b/run-final/outer-allocation-472b-a1 \
+      --output (deleted-coord-artifact) \
+      --tmp (deleted-coord-artifact) \
+      --log-dir (deleted-coord-artifact) \
       --unit litchi-docx-ink-allocation-472b-a1.scope \
       --deadline 1800 --output-cap 1000000000 --tmp-cap 1000000000 \
-      -- python3 /home/zhuhe/code/litchi-worktrees/.coord/final-api-capture-472b670547/source/docs/unified-ops/results/0362l/ink-qualify.py \
-      allocation /home/zhuhe/code/litchi-worktrees/.coord/durable-ink-final-472b/run-final \
+      -- python3 (deleted-coord-artifact) \
+      allocation (deleted-coord-artifact) \
       --attempt allocation-472b-a1
 
 The effective child environment has
-TMPDIR=/home/zhuhe/code/litchi-worktrees/.coord/durable-ink-final-472b/tmp-allocation-472b-a1,
+TMPDIR=(deleted-coord-artifact),
 set by the owned systemd unit. The output, TMP and outer-log paths are fresh
 and pairwise disjoint.
 
@@ -142,19 +142,19 @@ checksums/output and paired allocation/bytes/retained/peak counters.
 Native ABBA, only after a quiet coordinator grant and successful correctness:
 
     python3 tools/ink_safe_runner.py abba \
-      --output /home/zhuhe/code/litchi-worktrees/.coord/durable-ink-final-472b/run-final/native-472b-a1 \
-      --tmp /home/zhuhe/code/litchi-worktrees/.coord/durable-ink-final-472b/tmp-native-472b-a1 \
-      --log-dir /home/zhuhe/code/litchi-worktrees/.coord/durable-ink-final-472b/run-final/outer-native-472b-a1 \
+      --output (deleted-coord-artifact) \
+      --tmp (deleted-coord-artifact) \
+      --log-dir (deleted-coord-artifact) \
       --unit litchi-docx-ink-abba-472b-a1.scope \
       --deadline 7200 --output-cap 1000000000 --tmp-cap 1000000000 \
-      -- python3 /home/zhuhe/code/litchi-worktrees/.coord/final-api-capture-472b670547/source/docs/unified-ops/results/0362l/ink-abba.py \
-      /home/zhuhe/code/litchi-worktrees/.coord/durable-ink-final-472b/run-final/build-base/ink-native \
-      /home/zhuhe/code/litchi-worktrees/.coord/durable-ink-final-472b/run-final/build-candidate/ink-native \
-      /home/zhuhe/code/litchi-worktrees/.coord/durable-ink-final-472b/run-final/native-472b-a1 \
-      --build-manifest /home/zhuhe/code/litchi-worktrees/.coord/durable-ink-final-472b/run-final/build.json --cpu 29
+      -- python3 (deleted-coord-artifact) \
+      (deleted-coord-artifact) \
+      (deleted-coord-artifact) \
+      (deleted-coord-artifact) \
+      --build-manifest (deleted-coord-artifact) --cpu 29
 
 The effective child TMPDIR is
-/home/zhuhe/code/litchi-worktrees/.coord/durable-ink-final-472b/tmp-native-472b-a1.
+(deleted-coord-artifact).
 The systemd-259 scope binds MemoryAccounting=yes, MemoryMax=20,000,000,000,
 MemorySwapMax=0, RuntimeMaxSec=7200, TasksMax=4096 and
 KillMode=control-group. The child launcher
@@ -170,18 +170,18 @@ host-overlap, descendant and unrelated-process guards. Collection is also
 bounded and uses a separate fresh output/TMP/log set:
 
     python3 tools/ink_safe_runner.py collect \
-      --output /home/zhuhe/code/litchi-worktrees/.coord/durable-ink-final-472b/run-final/evidence-472b-a1 \
-      --tmp /home/zhuhe/code/litchi-worktrees/.coord/durable-ink-final-472b/tmp-collect-472b-a1 \
-      --log-dir /home/zhuhe/code/litchi-worktrees/.coord/durable-ink-final-472b/run-final/outer-collect-472b-a1 \
+      --output (deleted-coord-artifact) \
+      --tmp (deleted-coord-artifact) \
+      --log-dir (deleted-coord-artifact) \
       --unit litchi-docx-ink-collect-472b-a1.scope \
       --deadline 900 --output-cap 1000000000 --tmp-cap 1000000000 \
-      -- python3 /home/zhuhe/code/litchi-worktrees/.coord/final-api-capture-472b670547/source/docs/unified-ops/results/0362l/ink-collect.py \
-      /home/zhuhe/code/litchi-worktrees/.coord/durable-ink-final-472b/run-final \
+      -- python3 (deleted-coord-artifact) \
+      (deleted-coord-artifact) \
       --allocation allocation-472b-a1 \
-      --out /home/zhuhe/code/litchi-worktrees/.coord/durable-ink-final-472b/run-final/evidence-472b-a1
+      --out (deleted-coord-artifact)
 
 The effective child TMPDIR is
-/home/zhuhe/code/litchi-worktrees/.coord/durable-ink-final-472b/tmp-collect-472b-a1.
+(deleted-coord-artifact).
 
 ## Actual outer-boundary preflight
 
@@ -189,7 +189,7 @@ Before binding the corrected receipt, the documented phase-first CLI was run
 against the host's real systemd 259 with the harmless inner command /bin/true;
 no Ink binary, Cargo process or profiler was invoked. The exact preflight used
 fresh paths under
-/home/zhuhe/code/litchi-worktrees/.coord/durable-ink-final-472b/boundary-preflight-atxyDJ/,
+(deleted-coord-artifact),
 returned zero, produced a complete outer receipt, and removed its TMP tree.
 The receipt is 2,648 bytes with SHA-256
 2ea59079b7c100ffc406d975ab7cd887cc78e1bb9c3298348b071795b18f9d26.
@@ -202,7 +202,7 @@ The hard deadline property was separately verified on a live harmless scope:
 systemd 259 reported RuntimeMaxUSec=2h and a non-empty scope ControlGroup for
 RuntimeMaxSec=7200 while /bin/sleep 2 was running. Its 124-byte launcher log
 is external at
-/home/zhuhe/code/litchi-worktrees/.coord/durable-ink-final-472b/runtime-property-mYimjA/run.log,
+(deleted-coord-artifact)/run.log,
 SHA-256
 64f137a66a92b43f27f62e42be8f1064ec3ac3ae67effca3ad0d1ae7c4530ecc.
 
@@ -213,7 +213,7 @@ cgroup, and the recorded escaped child PID 2211118 was gone. The external
 receipt is 2,941 bytes,
 SHA-256
 179a4d83f08eb378f5542856b8d078ccca0dc3722a32b956f93e232733f31952, under
-/home/zhuhe/code/litchi-worktrees/.coord/durable-ink-final-472b/escaped-child-GPCXUn/.
+(deleted-coord-artifact).
 
 ## Source-only validation
 
@@ -231,7 +231,7 @@ f2340aa2053a227b6ff1b8702f88b7ce7824877eeab40e29c929aab4d29a5110.
 The reviewed build command above was run once at the fresh external output
 root:
 
-    /home/zhuhe/code/litchi-worktrees/.coord/durable-ink-final-472b/run-final
+    (deleted-coord-artifact)
 
 The runner was PID 712349 (tool session 87275). Its baseline Cargo child was
 PID 712779 and its candidate Cargo child was PID 741799. No runner quiet-state
@@ -319,13 +319,13 @@ runner, which reads and hash-binds the build manifest before using its
 protected allocation binaries:
 
     python3 tools/ink_safe_runner.py allocation \
-      --output /home/zhuhe/code/litchi-worktrees/.coord/durable-ink-final-472b/run-final/allocation-472b-a1 \
-      --tmp /home/zhuhe/code/litchi-worktrees/.coord/durable-ink-final-472b/tmp-allocation-472b-a1 \
-      --log-dir /home/zhuhe/code/litchi-worktrees/.coord/durable-ink-final-472b/run-final/outer-allocation-472b-a1 \
+      --output (deleted-coord-artifact) \
+      --tmp (deleted-coord-artifact) \
+      --log-dir (deleted-coord-artifact) \
       --unit litchi-docx-ink-allocation-472b-a1.scope \
       --deadline 1800 --output-cap 1000000000 --tmp-cap 1000000000 \
-      -- python3 /home/zhuhe/code/litchi-worktrees/.coord/final-api-capture-472b670547/source/docs/unified-ops/results/0362l/ink-qualify.py allocation \
-      /home/zhuhe/code/litchi-worktrees/.coord/durable-ink-final-472b/run-final \
+      -- python3 (deleted-coord-artifact) allocation \
+      (deleted-coord-artifact) \
       --attempt allocation-472b-a1
 
 It performs 24 untimed probe invocations: six routes, 100 iterations each,
@@ -338,16 +338,16 @@ quiet-window claim.
 After the quiet native phase, the exact bounded ABBA invocation is:
 
     python3 tools/ink_safe_runner.py abba \
-      --output /home/zhuhe/code/litchi-worktrees/.coord/durable-ink-final-472b/run-final/native-472b-a1 \
-      --tmp /home/zhuhe/code/litchi-worktrees/.coord/durable-ink-final-472b/tmp-native-472b-a1 \
-      --log-dir /home/zhuhe/code/litchi-worktrees/.coord/durable-ink-final-472b/run-final/outer-native-472b-a1 \
+      --output (deleted-coord-artifact) \
+      --tmp (deleted-coord-artifact) \
+      --log-dir (deleted-coord-artifact) \
       --unit litchi-docx-ink-abba-472b-a1.scope \
       --deadline 7200 --output-cap 1000000000 --tmp-cap 1000000000 \
-      -- python3 /home/zhuhe/code/litchi-worktrees/.coord/final-api-capture-472b670547/source/docs/unified-ops/results/0362l/ink-abba.py \
-      /home/zhuhe/code/litchi-worktrees/.coord/durable-ink-final-472b/run-final/build-base/ink-native \
-      /home/zhuhe/code/litchi-worktrees/.coord/durable-ink-final-472b/run-final/build-candidate/ink-native \
-      /home/zhuhe/code/litchi-worktrees/.coord/durable-ink-final-472b/run-final/native-472b-a1 \
-      --build-manifest /home/zhuhe/code/litchi-worktrees/.coord/durable-ink-final-472b/run-final/build.json \
+      -- python3 (deleted-coord-artifact) \
+      (deleted-coord-artifact) \
+      (deleted-coord-artifact) \
+      (deleted-coord-artifact) \
+      --build-manifest (deleted-coord-artifact) \
       --cpu 29
 
 CPU 29 is currently in the host affinity, but that is not a coordinator quiet
@@ -374,15 +374,15 @@ Once allocation and native receipts exist, the exact bounded collector
 invocation is:
 
     python3 tools/ink_safe_runner.py collect \
-      --output /home/zhuhe/code/litchi-worktrees/.coord/durable-ink-final-472b/run-final/evidence-472b-a1 \
-      --tmp /home/zhuhe/code/litchi-worktrees/.coord/durable-ink-final-472b/tmp-collect-472b-a1 \
-      --log-dir /home/zhuhe/code/litchi-worktrees/.coord/durable-ink-final-472b/run-final/outer-collect-472b-a1 \
+      --output (deleted-coord-artifact) \
+      --tmp (deleted-coord-artifact) \
+      --log-dir (deleted-coord-artifact) \
       --unit litchi-docx-ink-collect-472b-a1.scope \
       --deadline 900 --output-cap 1000000000 --tmp-cap 1000000000 \
-      -- python3 /home/zhuhe/code/litchi-worktrees/.coord/final-api-capture-472b670547/source/docs/unified-ops/results/0362l/ink-collect.py \
-      /home/zhuhe/code/litchi-worktrees/.coord/durable-ink-final-472b/run-final \
+      -- python3 (deleted-coord-artifact) \
+      (deleted-coord-artifact) \
       --allocation allocation-472b-a1 \
-      --out /home/zhuhe/code/litchi-worktrees/.coord/durable-ink-final-472b/run-final/evidence-472b-a1
+      --out (deleted-coord-artifact)
 
 It requires a complete native attempt, so it is intentionally not run during
 this source-only handoff.

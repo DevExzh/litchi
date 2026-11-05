@@ -97,7 +97,7 @@ cargo test -p litchi-ops --all-features --lib \
 The first paragraph-marker attempt was not a source failure: the linker could
 not create a temporary file because `/tmp` had exhausted its inode quota
 (`df -i /tmp`: 100%). It was rerun unchanged with
-`TMPDIR=/home/zhuhe/code/litchi-worktrees/.coord/docx-runtime/tmp`.
+`TMPDIR=(deleted-coord-artifact)`.
 
 | Follow-up log | Bytes | SHA-256 |
 | --- | ---: | --- |

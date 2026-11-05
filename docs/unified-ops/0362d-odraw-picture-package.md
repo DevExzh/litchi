@@ -178,7 +178,7 @@ From the commit containing this record, use the capped cargo environment and
 an external output directory:
 
 ```sh
-source ../.coord/w4-xlsx/env.sh
+source (deleted-coord-artifact)
 python3 docs/unified-ops/results/0362d/picture-probe.py build /tmp/picture-0362d-repro
 # Run only in a coordinator-approved quiet window.
 python3 docs/unified-ops/results/0362d/picture-probe.py run /tmp/picture-0362d-repro --blocks 3 --target-ms 500
@@ -189,7 +189,7 @@ timed/allocation binaries. The receipt records their sizes and SHA-256 values,
 the compiler version, lockfile hashes and every copied source hash. It includes
 the driver and runner SHA-256 values. No compiled binary is committed. Frozen
 sources, logs, binaries and per-route checkpoints remain under the external
-`/home/zhuhe/code/litchi-worktrees/.coord/odraw-picture/probe-v1` and `probe-v2`.
+`(deleted-coord-artifact)` and `probe-v2`.
 The two source archives in that external parent directory are:
 
 | Artifact | Bytes | SHA-256 |

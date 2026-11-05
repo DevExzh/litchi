@@ -65,6 +65,6 @@ postconditions pass. The external partial receipt
 The full gate and current-native emitter remain live. No additional Cargo or
 native run is admitted while the full gate owns the build slot.
 
-All external paths above are beneath `/home/zhuhe/code/litchi-worktrees/.coord`.
+All external paths above are beneath `(deleted-coord-artifact)`.
 Common-P installation, terminal gates, native fidelity/performance, census
 review, final trunk integration and cleanup remain open. Nothing is pushed.

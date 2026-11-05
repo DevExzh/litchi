@@ -85,7 +85,7 @@ Static checks performed before commit were:
 
 Coordinator validation was run from detached source tip
 `d3d666626aab1dd11eddec23c9f23faf202c388d` in the external checkout
-`.coord/rtf-validation-e95540ebd3/source`, with a clean tracked status and
+`(deleted-coord-artifact)`, with a clean tracked status and
 root `Cargo.lock` SHA
 `4100b1fbb272dd24842f33a2d6f353a3f3a97dfa7e435c4649a0e1a029bfaea1`. The
 runner was
@@ -95,7 +95,7 @@ Every command used the coordinator Cargo shim, offline locked resolution,
 `LITCHI_MEM_MAX=20G`, one Cargo job, one test thread, incremental disabled,
 debug information disabled, and an external temporary directory. The fresh
 receipt state is
-`.coord/rtf-validation-d3d666626a-full/state.json`; its target peaked at
+`(deleted-coord-artifact)`; its target peaked at
 `3,431,641,612` bytes. All ten rows passed: RTF library tests, RTF tests,
 RTF doctests, RTF all-target clippy, operations RTF tests and clippy, facade
 RTF tests and clippy, and core tests and clippy. The final row logs and
@@ -113,7 +113,7 @@ all-target check was run from source tip
 standalone `tools/perf-baseline/Cargo.lock` SHA
 `eac86284f67136aa856a8dcb6f383178b89ca92b26434a3de1d7408d68f2690c`. It
 passed with exit 0; the external receipt is
-`.coord/rtf-validation-a41a0dc163-perf/state.json` (SHA
+`(deleted-coord-artifact)/state.json` (SHA
 `95d1a3a91b741f549091aeaa6e6b718910c5df979e48b432ab8c43e6585ac780`), the
 40,182-byte log SHA is
 `380342fdfd3d151ceea302a6b1b56acc599cca5acb7154aa4340388c6f9af0e3`, and

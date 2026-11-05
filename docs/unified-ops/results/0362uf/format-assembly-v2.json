@@ -13,11 +13,11 @@
   "target": "/home/zhuhe/code/litchi-worktrees/unified-ops-api/target",
   "policy": {
     "runner_files": {
-      "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/gate-safe/run_safe_gate.py": "592ff5f7ad8493641ba6df7308bd66a97bddced35fc616c5803aacc5d30dcd2c",
-      "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/gate-safe/safe_chunked_tests.py": "70fdb56c96e4ed9e1d1e0d2b1e9c7f1db148a2115fb25246d13464569290cc35",
-      "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/gate-safe/bin/cargo": "495e24c6f60b238378386d86ac4158cba904992ce8870a9494f2c4a0eedd256d"
+      "(deleted-coord-artifact)/run_safe_gate.py": "592ff5f7ad8493641ba6df7308bd66a97bddced35fc616c5803aacc5d30dcd2c",
+      "(deleted-coord-artifact)/safe_chunked_tests.py": "70fdb56c96e4ed9e1d1e0d2b1e9c7f1db148a2115fb25246d13464569290cc35",
+      "(deleted-coord-artifact)/cargo": "495e24c6f60b238378386d86ac4158cba904992ce8870a9494f2c4a0eedd256d"
     },
-    "cargo_wrapper": "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/gate-safe/bin/cargo",
+    "cargo_wrapper": "(deleted-coord-artifact)",
     "offline": true,
     "locked": true,
     "memory_max": "20G",
@@ -60,7 +60,7 @@
       },
       "exit": 1,
       "seconds": 28.882758855819702,
-      "log": "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/gate-safe/format-3107/00-fmt.log",
+      "log": "(deleted-coord-artifact)/00-fmt.log",
       "log_bytes": 678,
       "log_sha256": "f47458fe7574e6148a7b17b44ccacfeeb359dee2ca3a1a69755129809cd0859b",
       "target_bytes_after": 19050143571,
@@ -96,7 +96,7 @@
           "bytes": 19050143571
         }
       },
-      "cargo_target_trace_file": "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/gate-safe/format-3107/00-cargo-targets.tsv",
+      "cargo_target_trace_file": "(deleted-coord-artifact)/00-cargo-targets.tsv",
       "cargo_target_trace_bytes": 69,
       "cargo_target_trace_sha256": "0da528237e288e0a235e80b939bcefa4bc6f29cab582300d2d6adcc16b7b6fdd",
       "preflight": {
@@ -116,7 +116,7 @@
             "ppid": 2234598,
             "executable": "rustc",
             "cwd": "/home/zhuhe/code/litchi-worktrees/uo2-budget-validation",
-            "command": "/home/zhuhe/.rustup/toolchains/1.95.0-x86_64-unknown-linux-gnu/bin/rustc --crate-name litchi_odf_formula --edition=2024 crates/litchi-odf-formula/src/lib.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --crate-type lib --emit=dep-info,metadata -C embed-bitcode=no --deny=clippy::all --deny=unused --deny=rust_2018_idioms --deny=nonstandard_style --deny=future_incompatible --deny=unused_qualifications --deny=unused_must_use --deny=unreachable_pub --deny=unknown_lints --deny=unfulfilled_lint_expectations --deny=unexpected_cfgs --deny=rustdoc::unescaped_backticks --deny=trivial_numeric_casts --deny=trivial_casts --deny=text_direction_codepoint_in_literal --deny=text_direction_codepoint_in_comment --deny=renamed_and_removed_lints --deny=rustdoc::redundant_explicit_links --deny=rustdoc::private_intra_doc_links --deny=non_ascii_idents --allow=clippy::needless_return --allow=clippy::manual_saturating_arithmetic --allow=clippy::manual_is_multiple_of --deny=rustdoc::invalid_rust_codeblocks --deny=rustdoc::invalid_html_tags --deny=rustdoc::invalid_codeblock_attributes --allow=clippy::if_same_then_else --allow=clippy::disallowed_methods --allow=clippy::collapsible_match --allow=clippy::collapsible_if --deny=rustdoc::broken_intra_doc_links --deny=rustdoc::bare_urls --check-cfg cfg(docsrs,test) --check-cfg cfg(feature, values()) -C metadata=ae2bd2bf73980bf2 -C extra-filename=-521fb0b7a6c58758 --out-dir /home/zhuhe/code/litchi-worktrees/.coord/budget-validation/target/debug/deps -C strip=debuginfo -L dependency=/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/target/debug/deps --extern litchi_core=/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/target/debug/deps/liblitchi_core-a00b00250fcfc49c.rmeta --extern litchi_odf_common=/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/target/debug/deps/liblitchi_odf_common-18a16f214f1586a0.rmeta --extern quick_xml=/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/target/debug/deps/libquick_xml-68220c8f6684876f.rmeta"
+            "command": "/home/zhuhe/.rustup/toolchains/1.95.0-x86_64-unknown-linux-gnu/bin/rustc --crate-name litchi_odf_formula --edition=2024 crates/litchi-odf-formula/src/lib.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --crate-type lib --emit=dep-info,metadata -C embed-bitcode=no --deny=clippy::all --deny=unused --deny=rust_2018_idioms --deny=nonstandard_style --deny=future_incompatible --deny=unused_qualifications --deny=unused_must_use --deny=unreachable_pub --deny=unknown_lints --deny=unfulfilled_lint_expectations --deny=unexpected_cfgs --deny=rustdoc::unescaped_backticks --deny=trivial_numeric_casts --deny=trivial_casts --deny=text_direction_codepoint_in_literal --deny=text_direction_codepoint_in_comment --deny=renamed_and_removed_lints --deny=rustdoc::redundant_explicit_links --deny=rustdoc::private_intra_doc_links --deny=non_ascii_idents --allow=clippy::needless_return --allow=clippy::manual_saturating_arithmetic --allow=clippy::manual_is_multiple_of --deny=rustdoc::invalid_rust_codeblocks --deny=rustdoc::invalid_html_tags --deny=rustdoc::invalid_codeblock_attributes --allow=clippy::if_same_then_else --allow=clippy::disallowed_methods --allow=clippy::collapsible_match --allow=clippy::collapsible_if --deny=rustdoc::broken_intra_doc_links --deny=rustdoc::bare_urls --check-cfg cfg(docsrs,test) --check-cfg cfg(feature, values()) -C metadata=ae2bd2bf73980bf2 -C extra-filename=-521fb0b7a6c58758 --out-dir (deleted-coord-artifact) -C strip=debuginfo -L dependency=(deleted-coord-artifact) --extern litchi_core=(deleted-coord-artifact) --extern litchi_odf_common=(deleted-coord-artifact) --extern quick_xml=(deleted-coord-artifact)"
           }
         ]
       },

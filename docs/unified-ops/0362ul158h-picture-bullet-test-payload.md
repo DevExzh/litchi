@@ -13,7 +13,7 @@ exact OfficeArt framing checks. The signature is an opaque BLIP test payload,
 not a complete PNG image. Production code is unchanged.
 
 The failed run and root's verified terminal receipt remain external under
-`/home/zhuhe/code/litchi-worktrees/.coord/ppt-158g-focused-20261026/`.
+`(deleted-coord-artifact)`.
 Root verified command/log/target identities, unchanged source and locks,
 and empty owned processes. The next approved run must execute the previously
 unrun integration, classification and all-format CRUD rows.

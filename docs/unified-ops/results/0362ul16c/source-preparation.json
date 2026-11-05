@@ -62,19 +62,19 @@
   },
   "receipts": {
     "source_preparation": {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/native-w4b-w5-final/receipts/source-preparation-c796.json",
+      "path": "(deleted-coord-artifact)/source-preparation-c796.json",
       "bytes": 6532,
       "sha256": "dcd01ffdb8d1947e9e5f57e94d48b46b1aeae8372b633af379599a4110d88639"
     },
     "manifest_source_validation": {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/native-w4b-w5-final/receipts/manifest-source-validation-c796.json",
+      "path": "(deleted-coord-artifact)/manifest-source-validation-c796.json",
       "bytes": 33283,
       "sha256": "1d47716fdba5029a0e791bf66abf7fb771a27daf7f13821ceb43c6e9f8c9141d"
     },
     "protocol_tests": {
       "command": "python3 -m unittest -q tools.test_native_qualification_runner tools.test_legacy_native_qualification",
       "tests_passed": 41,
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/native-w4b-w5-final/receipts/protocol-tests.log",
+      "path": "(deleted-coord-artifact)/protocol-tests.log",
       "bytes": 332,
       "sha256": "744067b4ee12d09a8353ced5d9c89d19608ab311e78548ad08b07d2ce503c708"
     }

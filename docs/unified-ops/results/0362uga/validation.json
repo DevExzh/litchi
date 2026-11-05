@@ -20,10 +20,10 @@
     "target_hard_cap_bytes": 20000000000
   },
   "preflight": {
-    "command": "source /home/zhuhe/code/litchi-worktrees/.coord/odp-lazy-entry/env.sh; rustc --version; cargo --version; for path in clippy.toml rust-toolchain.toml .cargo/config.toml; do test -f \"$path\"; printf '%s present\\n' \"$path\"; done; printf 'jobs=%s mem=%s incremental=%s target=%s tmp=%s\\n' \"$CARGO_BUILD_JOBS\" \"$LITCHI_MEM_MAX\" \"$CARGO_INCREMENTAL\" \"$CARGO_TARGET_DIR\" \"$TMPDIR\"; du -sb \"$CARGO_TARGET_DIR\"",
+    "command": "source (deleted-coord-artifact); rustc --version; cargo --version; for path in clippy.toml rust-toolchain.toml .cargo/config.toml; do test -f \"$path\"; printf '%s present\\n' \"$path\"; done; printf 'jobs=%s mem=%s incremental=%s target=%s tmp=%s\\n' \"$CARGO_BUILD_JOBS\" \"$LITCHI_MEM_MAX\" \"$CARGO_INCREMENTAL\" \"$CARGO_TARGET_DIR\" \"$TMPDIR\"; du -sb \"$CARGO_TARGET_DIR\"",
     "result": "passed",
     "log": {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/odp-lazy-entry/validation-363a2497f9-preflight.log",
+      "path": "(deleted-coord-artifact)/validation-363a2497f9-preflight.log",
       "bytes": 384,
       "sha256": "7aa874fd72ea71997021f715ffff3be5eef8b6ab28f93acaf1fea209620d7ca0"
     }
@@ -38,7 +38,7 @@
       "ignored": 0,
       "measured": 0,
       "log": {
-        "path": "/home/zhuhe/code/litchi-worktrees/.coord/odp-lazy-entry/validation-363a2497f9-tests.log",
+        "path": "(deleted-coord-artifact)/validation-363a2497f9-tests.log",
         "bytes": 44539,
         "sha256": "2ec7acd4222f9fcf4dafa34caaf99bc1b514a01f42aa9e327e9d369a10f2274f"
       }
@@ -47,7 +47,7 @@
       "command": "cargo clippy --offline --locked -p litchi-odp --all-targets --all-features -- -D warnings",
       "result": "passed",
       "log": {
-        "path": "/home/zhuhe/code/litchi-worktrees/.coord/odp-lazy-entry/validation-363a2497f9-clippy.log",
+        "path": "(deleted-coord-artifact)/validation-363a2497f9-clippy.log",
         "bytes": 165,
         "sha256": "ef21e46bac2f67006e53a3e1d85836dcadb4f10893be3e3a00c32c2077b5c97a"
       }
@@ -56,7 +56,7 @@
       "command": "cargo check --offline --locked -p litchi-ops --all-targets --all-features",
       "result": "passed",
       "log": {
-        "path": "/home/zhuhe/code/litchi-worktrees/.coord/odp-lazy-entry/validation-363a2497f9-ops-check.log",
+        "path": "(deleted-coord-artifact)/validation-363a2497f9-ops-check.log",
         "bytes": 269,
         "sha256": "1426beb5311ccfd8045f2d555741df8576914a1505ac59a148ec09dafe05d604"
       }
@@ -68,14 +68,14 @@
       ],
       "result": "passed",
       "log": {
-        "path": "/home/zhuhe/code/litchi-worktrees/.coord/odp-lazy-entry/validation-363a2497f9-static.log",
+        "path": "(deleted-coord-artifact)/validation-363a2497f9-static.log",
         "bytes": 325,
         "sha256": "3852f8a022ccdcb623ff72e000fa1ea8b759e8b4ed9a30b8c46c9339f4b43131"
       }
     }
   ],
   "target": {
-    "path": "/home/zhuhe/code/litchi-worktrees/.coord/odp-lazy-entry/target",
+    "path": "(deleted-coord-artifact)",
     "bytes_before_last_observation": 1464103366,
     "bytes_after": 1464103546,
     "hard_cap_bytes": 20000000000

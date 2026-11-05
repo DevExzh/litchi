@@ -2,7 +2,7 @@
   "schema": "litchi.composed-gate-repair.v1",
   "artifacts": [
     {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/cfb-composed-06f9241a23/receipt.json",
+      "path": "(deleted-coord-artifact)/receipt.json",
       "bytes": 3136,
       "sha256": "fb8dfc55314f964075d4ae6a61dc6f664d767baad5e663f942e66ccfa5206c9d",
       "receipt": {
@@ -11,9 +11,9 @@
         "lock_sha256": "4100b1fbb272dd24842f33a2d6f353a3f3a97dfa7e435c4649a0e1a029bfaea1",
         "source_file_sha256": "c41bb4b3007f2b7fe9b80f777040929884c6cf88df760a3de769e8d2248318eb",
         "env": {
-          "PATH": "/home/zhuhe/code/litchi-worktrees/.coord/bin:/home/zhuhe/.local/bin:/home/zhuhe/.codex/packages/standalone/releases/0.164.0-x86_64-unknown-linux-musl/codex-path:/home/zhuhe/.codex/tmp/arg0-linux/codex-arg0FCLdkN:/home/zhuhe/.codex/tmp/arg0-linux/codex-arg00dw7C8:/home/zhuhe/.local/bin:/home/zhuhe/.kimi-code/bin:/home/zhuhe/.bun/bin:/home/zhuhe/.local/bin:/run/user/1001/fnm_multishells/146209_1792754085282/bin:/home/zhuhe/.local/bin:/home/zhuhe/.moon/bin:/home/zhuhe/.kimi-code/bin:/home/zhuhe/.bun/bin:/home/zhuhe/.local/bin:/run/user/1001/fnm_multishells/52327_1792753151407/bin:/home/zhuhe/.cargo/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/home/zhuhe/.fzf/bin:/home/zhuhe/go/bin:/home/zhuhe/go/bin",
-          "CARGO_TARGET_DIR": "/home/zhuhe/code/litchi-worktrees/.coord/drawingml-chart-raw-target",
-          "TMPDIR": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/cfb-composed-06f9241a23/tmp",
+          "PATH": "(deleted-coord-artifact):/home/zhuhe/.local/bin:/home/zhuhe/.codex/packages/standalone/releases/0.164.0-x86_64-unknown-linux-musl/codex-path:/home/zhuhe/.codex/tmp/arg0-linux/codex-arg0FCLdkN:/home/zhuhe/.codex/tmp/arg0-linux/codex-arg00dw7C8:/home/zhuhe/.local/bin:/home/zhuhe/.kimi-code/bin:/home/zhuhe/.bun/bin:/home/zhuhe/.local/bin:/run/user/1001/fnm_multishells/146209_1792754085282/bin:/home/zhuhe/.local/bin:/home/zhuhe/.moon/bin:/home/zhuhe/.kimi-code/bin:/home/zhuhe/.bun/bin:/home/zhuhe/.local/bin:/run/user/1001/fnm_multishells/52327_1792753151407/bin:/home/zhuhe/.cargo/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/home/zhuhe/.fzf/bin:/home/zhuhe/go/bin:/home/zhuhe/go/bin",
+          "CARGO_TARGET_DIR": "(deleted-coord-artifact)",
+          "TMPDIR": "(deleted-coord-artifact)",
           "CARGO_BUILD_JOBS": "1",
           "RUST_TEST_THREADS": "1",
           "CARGO_INCREMENTAL": "0",
@@ -42,7 +42,7 @@
             "elapsed_seconds": 40.92290663719177,
             "target_before_bytes": 6595576309,
             "target_after_bytes": 6685551656,
-            "log": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/cfb-composed-06f9241a23/cfb-tests.log",
+            "log": "(deleted-coord-artifact)/cfb-tests.log",
             "log_bytes": 48723,
             "log_sha256": "6f652cc2b62f3f05cc42c366ac03c3396932bca3ed0a7e82f5c7e9efe63e87db"
           },
@@ -72,7 +72,7 @@
             "elapsed_seconds": 87.32262587547302,
             "target_before_bytes": 6685551656,
             "target_after_bytes": 6940163424,
-            "log": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/cfb-composed-06f9241a23/all-features-clippy.log",
+            "log": "(deleted-coord-artifact)/all-features-clippy.log",
             "log_bytes": 12048,
             "log_sha256": "1e4ffeca1f2f24c3e5d1ad20cf97337b87bbf179b3b7b7be42a8dad4e1773b7c"
           }
@@ -81,7 +81,7 @@
       }
     },
     {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/drawingml-clippy-repair-06f/receipt.json",
+      "path": "(deleted-coord-artifact)/receipt.json",
       "bytes": 3860,
       "sha256": "c07a82a57fde6be450747b78e994b612ff0064594caf9cbc2c15262af572e597",
       "receipt": {
@@ -97,9 +97,9 @@
         "root": "/home/zhuhe/code/litchi-worktrees/uo2-coordinator-metadata-integration",
         "lock_sha256": "4100b1fbb272dd24842f33a2d6f353a3f3a97dfa7e435c4649a0e1a029bfaea1",
         "environment": {
-          "PATH": "/home/zhuhe/code/litchi-worktrees/.coord/bin:/home/zhuhe/.local/bin:/home/zhuhe/.codex/packages/standalone/releases/0.164.0-x86_64-unknown-linux-musl/codex-path:/home/zhuhe/.codex/tmp/arg0-linux/codex-arg0FCLdkN:/home/zhuhe/.codex/tmp/arg0-linux/codex-arg00dw7C8:/home/zhuhe/.local/bin:/home/zhuhe/.kimi-code/bin:/home/zhuhe/.bun/bin:/home/zhuhe/.local/bin:/run/user/1001/fnm_multishells/146209_1792754085282/bin:/home/zhuhe/.local/bin:/home/zhuhe/.moon/bin:/home/zhuhe/.kimi-code/bin:/home/zhuhe/.bun/bin:/home/zhuhe/.local/bin:/run/user/1001/fnm_multishells/52327_1792753151407/bin:/home/zhuhe/.cargo/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/home/zhuhe/.fzf/bin:/home/zhuhe/go/bin:/home/zhuhe/go/bin",
-          "CARGO_TARGET_DIR": "/home/zhuhe/code/litchi-worktrees/.coord/drawingml-chart-raw-target",
-          "TMPDIR": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/drawingml-clippy-repair-06f/tmp",
+          "PATH": "(deleted-coord-artifact):/home/zhuhe/.local/bin:/home/zhuhe/.codex/packages/standalone/releases/0.164.0-x86_64-unknown-linux-musl/codex-path:/home/zhuhe/.codex/tmp/arg0-linux/codex-arg0FCLdkN:/home/zhuhe/.codex/tmp/arg0-linux/codex-arg00dw7C8:/home/zhuhe/.local/bin:/home/zhuhe/.kimi-code/bin:/home/zhuhe/.bun/bin:/home/zhuhe/.local/bin:/run/user/1001/fnm_multishells/146209_1792754085282/bin:/home/zhuhe/.local/bin:/home/zhuhe/.moon/bin:/home/zhuhe/.kimi-code/bin:/home/zhuhe/.bun/bin:/home/zhuhe/.local/bin:/run/user/1001/fnm_multishells/52327_1792753151407/bin:/home/zhuhe/.cargo/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/home/zhuhe/.fzf/bin:/home/zhuhe/go/bin:/home/zhuhe/go/bin",
+          "CARGO_TARGET_DIR": "(deleted-coord-artifact)",
+          "TMPDIR": "(deleted-coord-artifact)",
           "CARGO_BUILD_JOBS": "1",
           "RUST_TEST_THREADS": "1",
           "CARGO_INCREMENTAL": "0",
@@ -129,7 +129,7 @@
             "elapsed_seconds": 34.67758822441101,
             "target_before_bytes": 6940163424,
             "target_after_bytes": 7161067490,
-            "log": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/drawingml-clippy-repair-06f/drawingml-tests.log",
+            "log": "(deleted-coord-artifact)/drawingml-tests.log",
             "log_bytes": 44848,
             "log_sha256": "5e79f9b78cd404a4a865f77c119caf9b5aed46a52df6b6b1c448c4a426b7b31f"
           },
@@ -159,7 +159,7 @@
             "elapsed_seconds": 20.616219997406006,
             "target_before_bytes": 7161067490,
             "target_after_bytes": 7204379830,
-            "log": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/drawingml-clippy-repair-06f/all-features-clippy.log",
+            "log": "(deleted-coord-artifact)/all-features-clippy.log",
             "log_bytes": 3368,
             "log_sha256": "123dedd05a313e3cc1797e357cb65495249fd7ba54ab04ea26bc343c05eb6d0d"
           }
@@ -168,7 +168,7 @@
       }
     },
     {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/drawingml-clippy-repair-06f-r2/receipt.json",
+      "path": "(deleted-coord-artifact)/receipt.json",
       "bytes": 2268,
       "sha256": "149812dff601d988bd829e1c4806594c3f88f72a86d1aa4ab92a6080ad9cd40c",
       "receipt": {
@@ -184,8 +184,8 @@
         },
         "lock_sha256": "4100b1fbb272dd24842f33a2d6f353a3f3a97dfa7e435c4649a0e1a029bfaea1",
         "environment": {
-          "CARGO_TARGET_DIR": "/home/zhuhe/code/litchi-worktrees/.coord/drawingml-chart-raw-target",
-          "TMPDIR": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/drawingml-clippy-repair-06f-r2/tmp",
+          "CARGO_TARGET_DIR": "(deleted-coord-artifact)",
+          "TMPDIR": "(deleted-coord-artifact)",
           "CARGO_BUILD_JOBS": "1",
           "RUST_TEST_THREADS": "1",
           "CARGO_INCREMENTAL": "0",
@@ -221,7 +221,7 @@
         "status": "failed",
         "exit_code": 101,
         "elapsed_seconds": 166.5244846343994,
-        "log": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/drawingml-clippy-repair-06f-r2/all-features-clippy.log",
+        "log": "(deleted-coord-artifact)/all-features-clippy.log",
         "log_bytes": 10779,
         "log_sha256": "e67535502a3006490cd84dac694dd4eb24490fc4d083afee41d6619b53ae4dee",
         "target_after_bytes": 7473447646
@@ -240,7 +240,7 @@
     ],
     "tests": 41,
     "exit_code": 0,
-    "log": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/drawingml-owner-9d-composed/tooling.log",
+    "log": "(deleted-coord-artifact)/tooling.log",
     "log_bytes": 374,
     "log_sha256": "f694191348d8f215cc83caa9a76498c469c30fc0675fa34409ec8ad921c5deca"
   },
@@ -249,7 +249,7 @@
     "drawingml_tests": 486
   },
   "ppt_082_diagnostic": {
-    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-lazy-native-compile-20261024/diagnostic-receipt-082fbeafe8.json",
+    "path": "(deleted-coord-artifact)/diagnostic-receipt-082fbeafe8.json",
     "bytes": 4564,
     "sha256": "3340a422d44ebf1f89b4bf887abe4c48c42422ce0a6f9b693629777cd4b50ba3",
     "receipt": {
@@ -260,12 +260,12 @@
         "source_commit": "ee74c234972527b6cf906a094c30f133b95d6701",
         "source_tree": "c97a7201ce8126d7f7827c8401973455a2321c6e",
         "candidate_preparation": {
-          "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-lazy-native-compile-20261024/preparation-082fbeafe8.json",
+          "path": "(deleted-coord-artifact)/preparation-082fbeafe8.json",
           "bytes": 12230,
           "sha256": "ddee2942921348aaa1b8968860c36ff8a3fdc865fbc3245ca3f621318ad66514"
         },
         "candidate_preparation_log": {
-          "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-lazy-native-compile-20261024/logs/preparation-082fbeafe8.log",
+          "path": "(deleted-coord-artifact)/preparation-082fbeafe8.log",
           "bytes": 0,
           "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
           "exit": 0
@@ -354,7 +354,7 @@
         }
       },
       "candidate": {
-        "root": "/home/zhuhe/code/litchi-worktrees/.coord/final-api-capture-082fbeafe8/source",
+        "root": "(deleted-coord-artifact)",
         "head": "082fbeafe8f1e68c7118ec8561b5bd6fe1577415",
         "tree": "ba03f0a148c3029a3e2cbec47abce8e2813b3f1b",
         "lock": {

@@ -1,5 +1,5 @@
 {
-  "path": "/home/zhuhe/code/litchi-worktrees/.coord/odraw-limits/probe/cursor-repair-sources.tar.gz",
+  "path": "(deleted-coord-artifact)/cursor-repair-sources.tar.gz",
   "bytes": 88116,
   "sha256": "dba942aaeee5457adf7849c407167a3dfb7feb363f1ce4c3b86d1984f597c031",
   "build": "cargo build --release --offline --manifest-path <extracted>/Cargo.toml",

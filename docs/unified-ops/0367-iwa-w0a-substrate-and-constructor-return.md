@@ -300,6 +300,6 @@ Committed (small): [`constructor-evidence.json`](results/0367/constructor-eviden
 lock hashes), [`owner-routes.json`](results/0367/owner-routes.json), the probe
 source and the three scripts. Binaries, captures and source snapshots stay
 outside the repository under
-`/home/zhuhe/code/litchi-worktrees/.coord/iwa-w0a/{ctor,owner}`; the JSON
+`(deleted-coord-artifact)`; the JSON
 files record their paths and SHA-256 (candidate callgrind binary `cce3f2f5…`,
 baseline `e82c777b…`).

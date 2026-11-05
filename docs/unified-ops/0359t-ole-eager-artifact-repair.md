@@ -16,7 +16,7 @@ CFB owner.
 ## Paired allocator receipt
 
 The reduced receipt is outside the checkout at
-`/home/zhuhe/code/litchi-worktrees/.coord/w5-ole-source-arc-retag-20261022/counting-arcvec-current-20261022`.
+`(deleted-coord-artifact)`.
 Its `MANIFEST.txt` is 3,691 bytes with SHA-256
 `0c81f2f4963b2b63846868bc1d63fc45941ea0cb3ea9f9899c3814be77e5eee0`.
 The preserved runner SHA-256 is

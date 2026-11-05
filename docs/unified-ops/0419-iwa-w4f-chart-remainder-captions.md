@@ -46,12 +46,12 @@ W4-C style rows of `0363-mac-queue.md` cover the routes.
 Probe `crates/litchi-iwa/tests/parity/chart_property_cost.rs` (the 0414
 method: release, CPU 3, ABBA, inclusive Ir of `w4c_host_route` and
 `w4c_leaf_route`). Receipt `results/0419/callgrind-radar.json`; raw captures
-in `.coord/iwa-w4f/cg1/`.
+in `(deleted-coord-artifact)`.
 
 ### 1.1 Slice 1 gates
 
 Branch with trunk `56df8948b0` merged at `3c67e8b134`; logs
-`.coord/iwa-w4f/gates1`. Every command of the 0414 §8 list exits 0: fmt;
+`(deleted-coord-artifact)`. Every command of the 0414 §8 list exits 0: fmt;
 clippy -D warnings on the five touched crates with `litchi-ops`, `litchi`
 and `litchi-py` (all features), the leaf crates without features, and
 `litchi-ops` with no features and with each of `numbers`, `pages`,
@@ -66,7 +66,7 @@ Trunk `ee40f1a375` (W4-E slice 1, W4-T 0412e) was then merged at
 `befda82d89` (bench-matrix conflict resolved by regeneration). On that merge
 fmt, clippy -D warnings on the five touched crates, the parity chart cases
 (328 passed), the crate-boundary check, the glossary, the ledger and the
-bench matrix exit 0 (logs `.coord/iwa-w4f/gates1b`). Target 13 GB after
+bench matrix exit 0 (logs `(deleted-coord-artifact)`). Target 13 GB after
 pruning.
 
 ## 2. Slice 2: reference lines
@@ -100,7 +100,7 @@ every state on each format (Tier A). Six macOS-queue rows added.
 | numbers_reference_lines_set | 214,628,424 | 115,862,233 | 0.5398 |
 
 Receipt `results/0419/callgrind-reference-lines.json`; raw captures in
-`.coord/iwa-w4f/cg2/`.
+`(deleted-coord-artifact)`.
 
 ### 2.1 Rows already served by a leaf route
 
@@ -119,7 +119,7 @@ Three host-only rows needed only parity and a ledger flip:
 ### 2.2 Slice 2 gates
 
 Branch with trunk `4fc8e11883` merged at `c22d1206c0`; logs
-`.coord/iwa-w4f/gates2`: every command of the 0414 §8 list exits 0 (the
+`(deleted-coord-artifact)`: every command of the 0414 §8 list exits 0 (the
 same list as §1.1), plus the Python gates (boundaries, non-iWork, tool unit
 tests, ledger, OfficeCLI delta and corpus, bench matrix).
 
@@ -143,10 +143,10 @@ requires allowed objects to exist in the source) and whose allowed fields
 include every outer field the locality checks must exempt; the Numbers
 family follows `sheet_chart_legend_style.rs` (workspace + `publish_changes_exact`).
 The cost probe is `chart_property_cost.rs` (`W4C_ROUTE`), the receipt
-writer `.coord/iwa-w4f/tools/receipt.py`.
+writer `(deleted-coord-artifact)`.
 
 Post-merge (trunk `d4121f4af7` merged at `c5effae1c6`, mac-queue conflict
 resolved by keeping both sides): fmt, clippy -D warnings on the five touched
 crates, the parity chart cases (337 passed), glossary, crate boundaries,
-ledger and bench matrix exit 0 (logs `.coord/iwa-w4f/gates2b`). Target
+ledger and bench matrix exit 0 (logs `(deleted-coord-artifact)`). Target
 13 GB.

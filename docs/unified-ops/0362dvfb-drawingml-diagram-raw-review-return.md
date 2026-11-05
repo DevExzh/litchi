@@ -78,13 +78,13 @@ at `9786dcf450` and is covered by the final 252-test run below.
 The validation ran on 2026-10-24 with the repository memory-capped cargo shim,
 `LITCHI_MEM_MAX=20G`, one build job, offline dependencies, `--locked`, and the
 external target
-`/home/zhuhe/code/litchi-worktrees/.coord/drawingml-diagram-raw-validation-20261024/target`.
+`(deleted-coord-artifact)`.
 The target occupied `1,199,374,430` bytes at the end of the last command, well
 below the 20 GB lane cap. No owned Cargo, rustc or rustdoc process remains.
 
 The root lock was not regenerated. The pre-existing ignored lock was preserved
 at
-`/home/zhuhe/code/litchi-worktrees/.coord/drawingml-diagram-raw-validation-20261024/Cargo.lock.before-6d7895e6056c931fc19780ff4d0a031230e2ac79b9b30a9060bc8b6fad6747da`:
+`(deleted-coord-artifact)/Cargo.lock.before-6d7895e6056c931fc19780ff4d0a031230e2ac79b9b30a9060bc8b6fad6747da`:
 139,592 bytes, mode `664`, SHA-256
 `6d7895e6056c931fc19780ff4d0a031230e2ac79b9b30a9060bc8b6fad6747da`.
 The installed root lock is the verified 52ed acceptance lock: 139,591 bytes,
@@ -98,15 +98,15 @@ The complete pre/post lock receipt is outside the repository at
 The exact commands were:
 
 ```text
-env PATH=/home/zhuhe/code/litchi-worktrees/.coord/bin:$PATH LITCHI_MEM_MAX=20G CARGO_NET_OFFLINE=true CARGO_TARGET_DIR=/home/zhuhe/code/litchi-worktrees/.coord/drawingml-diagram-raw-validation-20261024/target TMPDIR=/home/zhuhe/code/litchi-worktrees/.coord/drawingml-diagram-raw-validation-20261024/tmp CARGO_BUILD_JOBS=1 CARGO_INCREMENTAL=0 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 RUST_TEST_THREADS=1 cargo test -p litchi-drawingml --all-features --offline --locked --lib --tests --no-fail-fast --jobs 1
-env PATH=/home/zhuhe/code/litchi-worktrees/.coord/bin:$PATH LITCHI_MEM_MAX=20G CARGO_NET_OFFLINE=true CARGO_TARGET_DIR=/home/zhuhe/code/litchi-worktrees/.coord/drawingml-diagram-raw-validation-20261024/target TMPDIR=/home/zhuhe/code/litchi-worktrees/.coord/drawingml-diagram-raw-validation-20261024/tmp CARGO_BUILD_JOBS=1 CARGO_INCREMENTAL=0 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 RUST_TEST_THREADS=1 cargo check -p litchi-docx -p litchi-pptx -p litchi-ops --all-features --offline --locked --lib --jobs 1
-env PATH=/home/zhuhe/code/litchi-worktrees/.coord/bin:$PATH LITCHI_MEM_MAX=20G CARGO_NET_OFFLINE=true CARGO_TARGET_DIR=/home/zhuhe/code/litchi-worktrees/.coord/drawingml-diagram-raw-validation-20261024/target TMPDIR=/home/zhuhe/code/litchi-worktrees/.coord/drawingml-diagram-raw-validation-20261024/tmp CARGO_BUILD_JOBS=1 CARGO_INCREMENTAL=0 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 RUST_TEST_THREADS=1 cargo check --manifest-path tools/perf-baseline/unified-smartart/Cargo.toml --all-features --offline --locked --jobs 1
+env PATH=(deleted-coord-artifact):$PATH LITCHI_MEM_MAX=20G CARGO_NET_OFFLINE=true CARGO_TARGET_DIR=(deleted-coord-artifact) TMPDIR=(deleted-coord-artifact) CARGO_BUILD_JOBS=1 CARGO_INCREMENTAL=0 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 RUST_TEST_THREADS=1 cargo test -p litchi-drawingml --all-features --offline --locked --lib --tests --no-fail-fast --jobs 1
+env PATH=(deleted-coord-artifact):$PATH LITCHI_MEM_MAX=20G CARGO_NET_OFFLINE=true CARGO_TARGET_DIR=(deleted-coord-artifact) TMPDIR=(deleted-coord-artifact) CARGO_BUILD_JOBS=1 CARGO_INCREMENTAL=0 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 RUST_TEST_THREADS=1 cargo check -p litchi-docx -p litchi-pptx -p litchi-ops --all-features --offline --locked --lib --jobs 1
+env PATH=(deleted-coord-artifact):$PATH LITCHI_MEM_MAX=20G CARGO_NET_OFFLINE=true CARGO_TARGET_DIR=(deleted-coord-artifact) TMPDIR=(deleted-coord-artifact) CARGO_BUILD_JOBS=1 CARGO_INCREMENTAL=0 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 RUST_TEST_THREADS=1 cargo check --manifest-path tools/perf-baseline/unified-smartart/Cargo.toml --all-features --offline --locked --jobs 1
 ```
 
 Results and external log artifacts:
 
 All three logs are in
-`/home/zhuhe/code/litchi-worktrees/.coord/drawingml-diagram-raw-validation-20261024/`.
+`(deleted-coord-artifact)`.
 
 | Check | Result | External log (SHA-256 of final file) |
 | --- | --- | --- |

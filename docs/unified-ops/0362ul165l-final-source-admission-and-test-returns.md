@@ -137,7 +137,7 @@ is the only deferral. Nothing is pushed.
 
 ## Evidence
 
-Paths below are relative to `/home/zhuhe/code/litchi-worktrees/.coord/`.
+Paths below are relative to `(deleted-coord-artifact)`.
 
 | Artifact | Bytes | SHA-256 |
 | --- | ---: | --- |

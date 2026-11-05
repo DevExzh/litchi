@@ -239,7 +239,7 @@ Matrix rows: `p0355a` in `tools/unified_bench_matrix.py`.
 
 Run on the final tree after the trunk merge (`fcf1f8ff44`) with the
 wave's `env.sh` (`CARGO_BUILD_JOBS=6`, `RUST_TEST_THREADS=8`);
-`.coord/w1-docx/scripts/gates.sh` runs each command and records its exit
+`(deleted-coord-artifact)` runs each command and records its exit
 code. All exited 0; the DOCX test target was re-run after this record's
 example was fixed (its first run failed to compile the example).
 
@@ -266,7 +266,7 @@ example was fixed (its first run failed to compile the example).
 `cargo check --workspace --all-targets --all-features` also fails on
 `crates/litchi-ods/tests/ods_formula_conditional_native.rs`, which
 `include_str!`s an evidence file the 2026-10-05 rewrite purged; that is on
-trunk and outside this wave. Target directory: 20 GB at the end of the gate run, 16 GB after removing test executables and examples (release builds in `.coord/w1-docx/rel-{base,head}`, 0.7 GB each).
+trunk and outside this wave. Target directory: 20 GB at the end of the gate run, 16 GB after removing test executables and examples (release builds in `(deleted-coord-artifact)`, 0.7 GB each).
 
 ## 7. Follow-ups
 

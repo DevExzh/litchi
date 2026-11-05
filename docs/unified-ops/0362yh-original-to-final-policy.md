@@ -57,7 +57,7 @@ The reduced build-free rebind receipt is
 candidate fixture/projection, the exact six local graph additions, and the
 stale f2 endpoint and b673 candidate-lock inputs that are explicitly rejected.
 The completed immutable-f2 closure receipt is external at
-`/home/zhuhe/code/litchi-worktrees/.coord/w8-c796-final-prep/provenance/original-baseline-assembly.json`:
+`(deleted-coord-artifact)/original-baseline-assembly.json`:
 it verifies 459,676 production files, tree SHA
 `23e332254abb024cbf9b038b8219b861e363fe474423bccc6122c3183b4d1437`, the
 139,441-byte historical lock, and the reviewed 153,482-byte consumer-only

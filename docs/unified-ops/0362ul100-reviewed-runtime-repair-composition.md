@@ -38,7 +38,7 @@ original formatting statements were premature. Follow-ups `fc5ef75a9e` and
 all five changed PPTX Rust paths and verifies them; all thirteen changed
 OOXML Rust paths already match and pass the actual check. The source correction
 is formatting-only. External formatter patches are retained in
-`.coord/composition-format-89ay-94u/`; no passing compiler/runtime result is
+`(deleted-coord-artifact)`; no passing compiler/runtime result is
 inferred from these checks.
 
 ## Equivalent measurement harness
@@ -49,7 +49,7 @@ formatting. Root verifies all eight harness tool blobs match final PPTX
 `fc5ef75a9e`, and the baseline production crates, root manifest/configuration
 and fixtures remain byte-identical to `76371266514feb010ef7478c26e963debcc7fa59`.
 This endpoint is never merged into trunk. The external proof is
-`.coord/composition-format-89ay-94u/baseline-harness-proof.json`, 988 bytes,
+`(deleted-coord-artifact)/baseline-harness-proof.json`, 988 bytes,
 SHA-256 `c95b06b25567474efe626f07ad86c502b06c986d94e27612e75135f06ba489e5`.
 No benchmark or performance acceptance is claimed.
 
@@ -73,7 +73,7 @@ the private candidate and verifies formatting. Behavior and assertions remain
 unchanged. Both compiler and runtime packets need fresh bindings; no compiler
 or runtime pass is claimed for 89az.
 
-Packet `.coord/pptx-combined-0362ul89-f5-consumer-fc5ef75a9e` is retained:
+Packet `(deleted-coord-artifact)` is retained:
 `rows.json` 32,605 bytes, SHA-256
 `5f76adcb13d42c6b3f3eb97f529cf30c72e5cc5327c456230e392473c37f922e`;
 `result.json` 34,318 bytes, SHA-256
@@ -88,7 +88,7 @@ entries, zero remaining holders and unchanged protected probe. The live-holder
 60,657,246,208 bytes. External captures and targets remain untouched.
 
 Evidence directory:
-`.coord/worktree-cleanup-2026-10-25/quarantine/wave71-pptx-89as-89aq-ooxml-94p-94q/`.
+`(deleted-coord-artifact)`.
 
 | Artifact | Bytes | SHA-256 |
 |---|---:|---|
@@ -127,7 +127,7 @@ remain separately prepared and unrun.
 | `ooxml-combined-0362ul94-f5-final-b73ee18a/rows.json` | 12,754 | `78d87a03eb0857e7a9083063d9878a93602a9c5120b31f8851b51f0355cdfa63` |
 | Same packet `result.json` | 13,874 | `a2086da6604d6f0d0c9ba623c308a9a5f91592560bc06e39d429c3476b7e2e91` |
 
-All capture paths above are relative to the external `.coord/` directory.
+All capture paths above are relative to the external `(deleted-coord-artifact)` directory.
 Unrun rows remain open. No source behavior, limit, API or test assertion is
 relaxed by either compiler repair.
 

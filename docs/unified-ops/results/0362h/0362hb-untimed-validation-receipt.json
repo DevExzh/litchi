@@ -1,11 +1,11 @@
 {
   "schema": "litchi_file_untimed_validation.v1",
   "source_commit": "95c114cd2a",
-  "build_command": "source .coord/w8-file/env.sh && CARGO_BUILD_JOBS=1 cargo build --offline --locked -p litchi-ops --all-features --example file_w8_qualified_probe",
+  "build_command": "source (deleted-coord-artifact) && CARGO_BUILD_JOBS=1 cargo build --offline --locked -p litchi-ops --all-features --example file_w8_qualified_probe",
   "route_count": 109,
   "artifacts": {
     "source": {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/w8-file-qualification-e44d7b7160-v4/source.tar",
+      "path": "(deleted-coord-artifact)/source.tar",
       "bytes": 245760,
       "sha256": "07cd6ff373721adcbda8c80190f312546ebe04c7a47f8e63f97a9d1a74f85ec5"
     },
@@ -15,7 +15,7 @@
       "sha256": "d84712d0bfe1322eda59a37006eaec8da424c4aaedfda4a2e45363ac7ac05abe"
     },
     "binary": {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/w8-file-qualification-e44d7b7160-v4/file_w8_qualified_probe",
+      "path": "(deleted-coord-artifact)/file_w8_qualified_probe",
       "bytes": 244723872,
       "sha256": "154268b7c7510ff383aa7d52fb01df7c19d409d0298de2f2b4a2dfcda730088e"
     },
@@ -25,7 +25,7 @@
       "sha256": "1d0c16ee87fc2daf98da8722ec07d38b8f8341c4a0163d7307640d29802797dc"
     },
     "routes": {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/w8-file-qualification-e44d7b7160-v4/matrix/routes.jsonl",
+      "path": "(deleted-coord-artifact)/routes.jsonl",
       "bytes": 238193,
       "sha256": "877802466f1a0b4338b57e58a2cc9ad614427869ad4eef69e1bf7f6b78f71761"
     }
@@ -1342,10 +1342,10 @@
   ],
   "superseded_failures": [
     {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/w8-file-qualification-e44d7b7160-v4/superseded-odp-one-scene-batch100.receipt.json",
+      "path": "(deleted-coord-artifact)/superseded-odp-one-scene-batch100.receipt.json",
       "bytes": 971,
       "sha256": "155b26508fa00ead8ef1a7d35a465a11dc8533107969905cffd72c72c161c658",
-      "probe_variant_path": "/home/zhuhe/code/litchi-worktrees/.coord/w8-file-qualification-e44d7b7160-v4/superseded-odp-one-scene-batch100-probe.rs",
+      "probe_variant_path": "(deleted-coord-artifact)/superseded-odp-one-scene-batch100-probe.rs",
       "probe_variant_bytes": 72713,
       "probe_variant_sha256": "07c6fcf2097df901f0a8adf79d2c53e50aadcd10ba8300cfd0587b5b10cb1693"
     }

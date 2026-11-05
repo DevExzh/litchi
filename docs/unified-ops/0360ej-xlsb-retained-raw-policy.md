@@ -42,7 +42,7 @@ migrated to the required decode argument in this slice.
 ## Validation
 
 Commands used the capped environment at
-`/home/zhuhe/code/litchi-worktrees/.coord/w4b-xlsb-raw-policy/env.sh`, with
+`(deleted-coord-artifact)`, with
 `CARGO_BUILD_JOBS=1` and a worktree-local `TMPDIR` because the shared `/tmp`
 tmpfs inode budget was exhausted:
 

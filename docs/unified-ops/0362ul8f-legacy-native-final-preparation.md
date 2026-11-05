@@ -7,7 +7,7 @@ capture, or acceptance result is claimed.
 ## Frozen endpoints and tooling
 
 The production candidate is the immutable external worktree
-`/home/zhuhe/code/litchi-worktrees/.coord/final-api-capture-472b670547/source`
+`(deleted-coord-artifact)`
 at `472b6705475b073e7fe08f6e11ee17fb1e29f838`.  The repaired preparation,
 runner, and validator are taken from the integration checkout at
 `93bdf16bf4c7a1e28205f789cfa500e6fb946166` (which contains the
@@ -20,7 +20,7 @@ tools/native_qualification_runner.py                         0864679291b3a2aaac9
 ```
 
 The fresh packet is outside the repository at
-`/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/legacy-native-repaired-472b-2b01`.
+`(deleted-coord-artifact)`.
 It has separate absolute manifests and source-preparation receipts for RTF,
 OLE-properties, and XLS-properties.  The RTF and XLS manifests initially had
 an incorrect candidate-root prefix; the runner rejected that path before any
@@ -80,9 +80,9 @@ Preparation used the repaired script with the absolute packet manifests and
 the immutable source endpoints:
 
 ```text
-PYTHONDONTWRITEBYTECODE=1 python3 /home/zhuhe/code/litchi-worktrees/uo2-coordinator-metadata-integration/tools/native_qualification/prepare_legacy_native_inputs.py --lane legacy-rtf --manifest /home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/legacy-native-repaired-472b-2b01/rtf/driver/legacy-rtf-final.json --before /home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/legacy-native-repaired-472b-2b01/rtf/source-baseline --after /home/zhuhe/code/litchi-worktrees/.coord/final-api-capture-472b670547/source --output /home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/legacy-native-repaired-472b-2b01/rtf/driver/source-preparation.json
-PYTHONDONTWRITEBYTECODE=1 python3 /home/zhuhe/code/litchi-worktrees/uo2-coordinator-metadata-integration/tools/native_qualification/prepare_legacy_native_inputs.py --lane legacy-ole-properties --manifest /home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/legacy-native-repaired-472b-2b01/ole/driver/legacy-ole-properties-final.json --before /home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/legacy-native-repaired-472b-2b01/ole/source-baseline --after /home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/legacy-native-repaired-472b-2b01/ole/source-candidate --output /home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/legacy-native-repaired-472b-2b01/ole/driver/source-preparation.json
-PYTHONDONTWRITEBYTECODE=1 python3 /home/zhuhe/code/litchi-worktrees/uo2-coordinator-metadata-integration/tools/native_qualification/prepare_legacy_native_inputs.py --lane legacy-xls-properties --manifest /home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/legacy-native-repaired-472b-2b01/xls/driver/legacy-xls-properties-final.json --before /home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/legacy-native-repaired-472b-2b01/xls/source-baseline --after /home/zhuhe/code/litchi-worktrees/.coord/final-api-capture-472b670547/source --output /home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/legacy-native-repaired-472b-2b01/xls/driver/source-preparation.json
+PYTHONDONTWRITEBYTECODE=1 python3 /home/zhuhe/code/litchi-worktrees/uo2-coordinator-metadata-integration/tools/native_qualification/prepare_legacy_native_inputs.py --lane legacy-rtf --manifest (deleted-coord-artifact) --before (deleted-coord-artifact) --after (deleted-coord-artifact) --output (deleted-coord-artifact)
+PYTHONDONTWRITEBYTECODE=1 python3 /home/zhuhe/code/litchi-worktrees/uo2-coordinator-metadata-integration/tools/native_qualification/prepare_legacy_native_inputs.py --lane legacy-ole-properties --manifest (deleted-coord-artifact) --before (deleted-coord-artifact) --after (deleted-coord-artifact) --output (deleted-coord-artifact)
+PYTHONDONTWRITEBYTECODE=1 python3 /home/zhuhe/code/litchi-worktrees/uo2-coordinator-metadata-integration/tools/native_qualification/prepare_legacy_native_inputs.py --lane legacy-xls-properties --manifest (deleted-coord-artifact) --before (deleted-coord-artifact) --after (deleted-coord-artifact) --output (deleted-coord-artifact)
 ```
 
 The follow-up source-only check loaded each manifest and receipt, called the
@@ -96,7 +96,7 @@ When a build slot is granted, the recorded command shape is the following for
 each absolute manifest, with `build` followed by `abba`:
 
 ```text
-PATH=/home/zhuhe/code/litchi-worktrees/.coord/bin:$PATH
+PATH=(deleted-coord-artifact):$PATH
 unset LITCHI_CAPPED LITCHI_BLESS
 LITCHI_MEM_MAX=20G CARGO_BUILD_JOBS=1 CARGO_INCREMENTAL=0 \
   python3 /home/zhuhe/code/litchi-worktrees/uo2-coordinator-metadata-integration/tools/native_qualification_runner.py \

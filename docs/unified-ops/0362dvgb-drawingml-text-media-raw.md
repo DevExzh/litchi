@@ -115,7 +115,7 @@ rerun with `--locked` and passed.  The final six terminal results were:
 - XLSX contextual SVG source: passed (`xlsx-contextual-locked-final3.log`).
 
 All six used one owned external Cargo target at
-`/home/zhuhe/code/litchi-worktrees/.coord/drawingml-text-media-raw/standalone-target`,
+`(deleted-coord-artifact)`,
 the capped shim, `LITCHI_MEM_MAX=20G`, `CARGO_BUILD_JOBS=1`,
 `CARGO_NET_OFFLINE=true`, `CARGO_TARGET_DIR` set to that path,
 `--locked --offline --all-targets`, and no profile execution.  Its final size

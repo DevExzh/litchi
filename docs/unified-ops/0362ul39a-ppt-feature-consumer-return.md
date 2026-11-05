@@ -11,7 +11,7 @@ Both calls now pass the same retained source limits already used to preflight
 and load the owning presentation. No public limit-less twin is restored.
 The required non-encryption compiler and standalone consumer rerun remains
 pending; the failed RTF receipt is retained at
-`.coord/0362ul65-f5-exact-7a760a3a46/result.json`. Its lock provenance is being
+`(deleted-coord-artifact)`. Its lock provenance is being
 reviewed separately, so this record makes no RTF acceptance claim.
 
 This repair changes the two feature-gated consumers together. The shared

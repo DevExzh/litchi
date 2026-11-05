@@ -20,11 +20,11 @@
     {
       "label": "drawingml-native-tests-precommit",
       "phase": "precommit",
-      "command": "env -u LITCHI_CAPPED -u LITCHI_BLESS PATH=/home/zhuhe/code/litchi-worktrees/.coord/bin:$PATH LITCHI_MEM_MAX=20G CARGO_BUILD_JOBS=1 CARGO_INCREMENTAL=0 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_PROFILE_RELEASE_DEBUG=0 CARGO_PROFILE_BENCH_DEBUG=0 TMPDIR=/home/zhuhe/code/litchi-worktrees/.coord/drawingml-limits/tmp cargo test --package litchi-drawingml --all-features --offline --locked --target-dir /home/zhuhe/code/litchi-worktrees/.coord/drawingml-limits/target",
+      "command": "env -u LITCHI_CAPPED -u LITCHI_BLESS PATH=(deleted-coord-artifact):$PATH LITCHI_MEM_MAX=20G CARGO_BUILD_JOBS=1 CARGO_INCREMENTAL=0 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_PROFILE_RELEASE_DEBUG=0 CARGO_PROFILE_BENCH_DEBUG=0 TMPDIR=(deleted-coord-artifact) cargo test --package litchi-drawingml --all-features --offline --locked --target-dir (deleted-coord-artifact)",
       "exit_code": 0,
       "result": "235 unit tests and DrawingML integration suites passed",
       "log": {
-        "path": "/home/zhuhe/code/litchi-worktrees/.coord/drawingml-limits/actions-native-tests.log",
+        "path": "(deleted-coord-artifact)/actions-native-tests.log",
         "bytes": 38923,
         "sha256": "752ace1539c0ad0f9838e5c15183147f9fd3b0032b1020cb156018050b685615"
       }
@@ -32,11 +32,11 @@
     {
       "label": "pptx-consumer-check-precommit",
       "phase": "precommit",
-      "command": "env -u LITCHI_CAPPED -u LITCHI_BLESS PATH=/home/zhuhe/code/litchi-worktrees/.coord/bin:$PATH LITCHI_MEM_MAX=20G CARGO_BUILD_JOBS=1 CARGO_INCREMENTAL=0 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_PROFILE_RELEASE_DEBUG=0 CARGO_PROFILE_BENCH_DEBUG=0 TMPDIR=/home/zhuhe/code/litchi-worktrees/.coord/drawingml-limits/tmp cargo check --package litchi-pptx --all-features --offline --locked --target-dir /home/zhuhe/code/litchi-worktrees/.coord/drawingml-limits/target",
+      "command": "env -u LITCHI_CAPPED -u LITCHI_BLESS PATH=(deleted-coord-artifact):$PATH LITCHI_MEM_MAX=20G CARGO_BUILD_JOBS=1 CARGO_INCREMENTAL=0 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_PROFILE_RELEASE_DEBUG=0 CARGO_PROFILE_BENCH_DEBUG=0 TMPDIR=(deleted-coord-artifact) cargo check --package litchi-pptx --all-features --offline --locked --target-dir (deleted-coord-artifact)",
       "exit_code": 0,
       "result": "litchi-pptx finished dev-profile check",
       "log": {
-        "path": "/home/zhuhe/code/litchi-worktrees/.coord/drawingml-limits/pptx-consumer-check.log",
+        "path": "(deleted-coord-artifact)/pptx-consumer-check.log",
         "bytes": 168,
         "sha256": "7aa8c73e980876904b7a4ef4b964aa6fdb3cdbf16eeba6e840c6a2c50d47a881"
       }
@@ -44,11 +44,11 @@
     {
       "label": "docx-consumer-check-precommit",
       "phase": "precommit",
-      "command": "env -u LITCHI_CAPPED -u LITCHI_BLESS PATH=/home/zhuhe/code/litchi-worktrees/.coord/bin:$PATH LITCHI_MEM_MAX=20G CARGO_BUILD_JOBS=1 CARGO_INCREMENTAL=0 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_PROFILE_RELEASE_DEBUG=0 CARGO_PROFILE_BENCH_DEBUG=0 TMPDIR=/home/zhuhe/code/litchi-worktrees/.coord/drawingml-limits/tmp CARGO_TARGET_DIR=/home/zhuhe/code/litchi-worktrees/.coord/drawingml-limits/target cargo check --offline --locked --workspace --all-features -p litchi-docx",
+      "command": "env -u LITCHI_CAPPED -u LITCHI_BLESS PATH=(deleted-coord-artifact):$PATH LITCHI_MEM_MAX=20G CARGO_BUILD_JOBS=1 CARGO_INCREMENTAL=0 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_PROFILE_RELEASE_DEBUG=0 CARGO_PROFILE_BENCH_DEBUG=0 TMPDIR=(deleted-coord-artifact) CARGO_TARGET_DIR=(deleted-coord-artifact) cargo check --offline --locked --workspace --all-features -p litchi-docx",
       "exit_code": 0,
       "result": "workspace dependency graph and litchi-docx consumer finished dev-profile check",
       "log": {
-        "path": "/home/zhuhe/code/litchi-worktrees/.coord/drawingml-limits/docx-consumer-check.log",
+        "path": "(deleted-coord-artifact)/docx-consumer-check.log",
         "bytes": 8775,
         "sha256": "be9a00ff3d807cb573ffbc74d09ec9bebb78bf94933b5b1a0f08eebfec7a5cbf"
       }
@@ -56,16 +56,16 @@
     {
       "label": "drawingml-glossary-rustdoc-precommit",
       "phase": "precommit",
-      "command": "env -u LITCHI_CAPPED -u LITCHI_BLESS PATH=/home/zhuhe/code/litchi-worktrees/.coord/bin:$PATH LITCHI_MEM_MAX=20G CARGO_BUILD_JOBS=1 CARGO_INCREMENTAL=0 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_PROFILE_RELEASE_DEBUG=0 CARGO_PROFILE_BENCH_DEBUG=0 TMPDIR=/home/zhuhe/code/litchi-worktrees/.coord/drawingml-limits/tmp RUSTC_BOOTSTRAP=1 python3 tools/check_api_glossary.py --profile drawingml --target-dir /home/zhuhe/code/litchi-worktrees/.coord/drawingml-limits/glossary-target",
+      "command": "env -u LITCHI_CAPPED -u LITCHI_BLESS PATH=(deleted-coord-artifact):$PATH LITCHI_MEM_MAX=20G CARGO_BUILD_JOBS=1 CARGO_INCREMENTAL=0 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_PROFILE_RELEASE_DEBUG=0 CARGO_PROFILE_BENCH_DEBUG=0 TMPDIR=(deleted-coord-artifact) RUSTC_BOOTSTRAP=1 python3 tools/check_api_glossary.py --profile drawingml --target-dir (deleted-coord-artifact)",
       "exit_code": 1,
       "result": "rustdoc build succeeded; gate is held by the known Error type/proc-macro namespace collision in checker traversal",
       "log": {
-        "path": "/home/zhuhe/code/litchi-worktrees/.coord/drawingml-limits/glossary.log",
+        "path": "(deleted-coord-artifact)/glossary.log",
         "bytes": 523,
         "sha256": "c5cfcf18e2e12bf8e227358c48a0a9dc9feb9f80512dd0c60d806dbcad0ec495"
       },
       "rustdoc_json": {
-        "path": "/home/zhuhe/code/litchi-worktrees/.coord/drawingml-limits/glossary-target/doc/litchi_drawingml.json",
+        "path": "(deleted-coord-artifact)/litchi_drawingml.json",
         "bytes": 28010477,
         "sha256": "cb6a1b0e61511c7e4c486a58ada198fd546e1303f835ab0323232377af3adaea",
         "collision_ids": [4035, 4036],
@@ -77,11 +77,11 @@
     {
       "label": "standalone-unified-chart-add-locked-before-repair",
       "phase": "prior-0362dv-diagnostic",
-      "command": "env -u LITCHI_CAPPED -u LITCHI_BLESS PATH=/home/zhuhe/code/litchi-worktrees/.coord/bin:$PATH LITCHI_MEM_MAX=20G CARGO_BUILD_JOBS=1 CARGO_INCREMENTAL=0 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_PROFILE_RELEASE_DEBUG=0 CARGO_PROFILE_BENCH_DEBUG=0 TMPDIR=/home/zhuhe/code/litchi-worktrees/.coord/drawingml-limits/tmp cargo check --manifest-path tools/perf-baseline/unified-chart-add/Cargo.toml --offline --locked --target-dir /home/zhuhe/code/litchi-worktrees/.coord/drawingml-limits/unified-chart-target",
+      "command": "env -u LITCHI_CAPPED -u LITCHI_BLESS PATH=(deleted-coord-artifact):$PATH LITCHI_MEM_MAX=20G CARGO_BUILD_JOBS=1 CARGO_INCREMENTAL=0 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_PROFILE_RELEASE_DEBUG=0 CARGO_PROFILE_BENCH_DEBUG=0 TMPDIR=(deleted-coord-artifact) cargo check --manifest-path tools/perf-baseline/unified-chart-add/Cargo.toml --offline --locked --target-dir (deleted-coord-artifact)",
       "exit_code": 101,
       "result": "tracked standalone lock was stale and --locked refused the missing local dependency graph edges",
       "log": {
-        "path": "/home/zhuhe/code/litchi-worktrees/.coord/drawingml-limits/unified-chart-check.log",
+        "path": "(deleted-coord-artifact)/unified-chart-check.log",
         "bytes": 298,
         "sha256": "408841b16b557ec63fabc2b00f3c191ca9af807b53abcfb63f326adcc7ef4d5a"
       },

@@ -58,4 +58,4 @@ With `CARGO_BUILD_JOBS=4`, `CARGO_INCREMENTAL=0`, and
 - Clear output SHA-256:
   `fea6baf2ac44cd0e3c2f53f1290dac265ea65af4d84277c4f5b3c53463e76fd9`.
 - External run logs and outputs are retained under
-  `/home/zhuhe/code/litchi-worktrees/.coord/resume-20261028/perf/w2d-0394/run-final`.
+  `(deleted-coord-artifact)`.

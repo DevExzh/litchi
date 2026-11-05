@@ -80,7 +80,7 @@ event, text, graph, and metadata bounds.
 
 The allocated DOCX Cargo lane supplied the following bounded test receipts.
 The copied logs are outside the checkout at
-`/home/zhuhe/code/litchi-worktrees/.coord/w8-docx-helper-final-evidence/` and
+`(deleted-coord-artifact)` and
 are intentionally not tracked.
 
 | Run | Source commit / tree | Command | Exit | Tests | Log size / SHA-256 |
@@ -93,7 +93,7 @@ are intentionally not tracked.
 | Raw public integration (diagnostic) | `3b3a7c66fbfa8b5364bfa9578ea60079d9a6ea62` / `f2564573ba96a3393ccd10e265f6eda27ea9001c` | `cargo test -p litchi-docx --test glossary_api -- --test-threads=1` | 101 | compile blocked before tests by pre-existing `dead_code` denies | 1,143 bytes / `4c635ec9b025d918b1f5f68ba9cf35c53b2c0314dde3ea0d504c033386bb29e0` |
 | Raw public integration (lint-override diagnostic) | `3b3a7c66fbfa8b5364bfa9578ea60079d9a6ea62` / `f2564573ba96a3393ccd10e265f6eda27ea9001c` | `RUSTFLAGS=-Adead_code cargo test -p litchi-docx --test glossary_api -- --test-threads=1` | 0 | 1 passed | 4,338 bytes / `954ce4d662bfe801f05677eff19384e4b554004c318008be544c973176a0dc35` |
 
-The seven bounded runs used `PATH=/home/zhuhe/code/litchi-worktrees/.coord/bin:$PATH`,
+The seven bounded runs used `PATH=(deleted-coord-artifact):$PATH`,
 `CARGO_TARGET_DIR=/home/zhuhe/code/litchi-worktrees/uo2-docx-p0/target`,
 `CARGO_BUILD_JOBS=1`, `CARGO_INCREMENTAL=0`,
 `CARGO_PROFILE_DEV_DEBUG=0`, `CARGO_PROFILE_TEST_DEBUG=0`,
@@ -109,25 +109,25 @@ diagnostic used `TMPDIR=/tmp/litchi-docx-glossary-api-final-override-3b3a7c66fb`
 and `RUSTFLAGS=-Adead_code`.
 The earlier focused log is
 `glossary-56.cargo.log`
-(`/home/zhuhe/code/litchi-worktrees/.coord/w8-docx-helper-final-evidence/glossary-56.cargo.log`);
+(`(deleted-coord-artifact)`);
 the generated-root preflight focused log is
 `glossary-58-e43e9a8e9.cargo.log`
-(`/home/zhuhe/code/litchi-worktrees/.coord/w8-docx-helper-final-evidence/glossary-58-e43e9a8e9.cargo.log`),
+(`(deleted-coord-artifact)`),
 the prepared-admission focused log is
 `glossary-59-3b3a7c66fb.cargo.log`
-(`/home/zhuhe/code/litchi-worktrees/.coord/w8-docx-helper-final-evidence/glossary-59-3b3a7c66fb.cargo.log`),
+(`(deleted-coord-artifact)`),
 the final library log is
 `docx-lib-1491-3b3a7c66fb.cargo.log`
-(`/home/zhuhe/code/litchi-worktrees/.coord/w8-docx-helper-final-evidence/docx-lib-1491-3b3a7c66fb.cargo.log`),
+(`(deleted-coord-artifact)`),
 and the raw integration diagnostic is
 `glossary-api-integration-3b3a7c66fb.cargo.log`
-(`/home/zhuhe/code/litchi-worktrees/.coord/w8-docx-helper-final-evidence/glossary-api-integration-3b3a7c66fb.cargo.log`).
+(`(deleted-coord-artifact)`).
 The lint-override integration diagnostic is
 `glossary-api-integration-override-3b3a7c66fb.cargo.log`
-(`/home/zhuhe/code/litchi-worktrees/.coord/w8-docx-helper-final-evidence/glossary-api-integration-override-3b3a7c66fb.cargo.log`).
+(`(deleted-coord-artifact)`).
 The earlier library log is
 `docx-lib-1488.cargo.log`
-(`/home/zhuhe/code/litchi-worktrees/.coord/w8-docx-helper-final-evidence/docx-lib-1488.cargo.log`).
+(`(deleted-coord-artifact)/docx-lib-1488.cargo.log`).
 The final target directory measured 2,564,794,152 bytes (2.4G).
 
 The generated-root preflight rerun used source `e43e9a8e9a`; the prepared-

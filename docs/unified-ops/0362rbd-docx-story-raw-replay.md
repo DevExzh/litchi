@@ -49,5 +49,5 @@ the existing selector/content proof into a private helper and leaves public
 raw re-admission unchanged. A fresh capped focused run is required before
 this slice is treated as fully validated. The original pre-migration
 `Snapshot::edit` lifecycle comparison is prepared separately at
-`/home/zhuhe/code/litchi-worktrees/.coord/w8-docx-story-text` and is likewise
+`(deleted-coord-artifact)` and is likewise
 pending the coordinator's build release.

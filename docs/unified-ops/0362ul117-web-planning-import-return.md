@@ -11,7 +11,7 @@ behavior, limits and all consumers remain unchanged. No lint suppression is
 introduced.
 
 Root verifies the failed terminal capture before editing. The external packet
-is `.coord/uo2-coordinator-replay-integration-f5-compiler-11be7c2e` under the
+is `(deleted-coord-artifact)` under the
 worktree parent. Its `rows.json` is 38,321 bytes, SHA-256
 `677803d5b07a7a37c6708dd9e6443837c2fce33c1193049d05a2c3bf93b1d4ed`;
 `result.json` is 40,248 bytes, SHA-256

@@ -55,7 +55,7 @@ has a W4-E row in `0363-mac-queue.md`.
 Callgrind on a release build with debug info, CPU 3, ABBA, two calls of
 each route (open, edit, commit, serialize); probe
 `chart_create_cases::w4e_chart_create_cost_abba`, selected with
-`W4E_CHART_ROUTE`. Raw outputs: `.coord/iwa-w4e/cg/cg_<route>.out`.
+`W4E_CHART_ROUTE`. Raw outputs: `(deleted-coord-artifact)`.
 
 | Route | Host Ir | Leaf Ir | Δ |
 |---|---:|---:|---:|
@@ -76,7 +76,7 @@ callgrind_annotate --inclusive=yes callgrind.out.<pid> | grep w4e_chart_
 Run on `b95ef0bb20` (trunk `b667dc4246`, unchanged) with this record in the
 working tree, build env of the coordinator rules (`CARGO_BUILD_JOBS=6`,
 `RUST_TEST_THREADS=8`), one cargo command at a time, test executables pruned
-after each chunk (script and log: `.coord/iwa-w4e/gate.sh`, `gate-s1.log`).
+after each chunk (script and log: `(deleted-coord-artifact)`, `gate-s1.log`).
 No litchi-ops dispatch arm changed, so the capability/registry goldens and
 the OfficeCLI corpus were not re-blessed. Every row exited 0:
 

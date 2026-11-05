@@ -17,7 +17,7 @@
       ],
       "exit": 1,
       "seconds": 33.9141493749994,
-      "log": "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/python-assembly-v1/check-0.log",
+      "log": "(deleted-coord-artifact)/check-0.log",
       "bytes": 637664,
       "sha256": "424e28aaaedd5944ca0392b491f3e214ff090a953435acfd541000f84fccc651"
     },
@@ -28,7 +28,7 @@
       ],
       "exit": 1,
       "seconds": 279.41456936099894,
-      "log": "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/python-assembly-v1/check-1.log",
+      "log": "(deleted-coord-artifact)/check-1.log",
       "bytes": 362,
       "sha256": "6bb37b1e729b56bc4674f0278b61999efe6381c1a4ada79d2881e02cc864e5da"
     },
@@ -40,7 +40,7 @@
       ],
       "exit": 1,
       "seconds": 0.2529503149999073,
-      "log": "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/python-assembly-v1/check-2.log",
+      "log": "(deleted-coord-artifact)/check-2.log",
       "bytes": 3404,
       "sha256": "b274428a863d4b15af28c3d9a76c092cbe14f2d7e583933050d837b85d5bb3a9"
     },
@@ -52,7 +52,7 @@
       ],
       "exit": 0,
       "seconds": 0.542485697000302,
-      "log": "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/python-assembly-v1/check-3.log",
+      "log": "(deleted-coord-artifact)/check-3.log",
       "bytes": 0,
       "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
     },
@@ -64,7 +64,7 @@
       ],
       "exit": 0,
       "seconds": 1.0569447120014956,
-      "log": "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/python-assembly-v1/check-4.log",
+      "log": "(deleted-coord-artifact)/check-4.log",
       "bytes": 0,
       "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
     }

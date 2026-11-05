@@ -118,7 +118,7 @@ receipt is preserved, unlike the disclosed v1 overwrite incident.
 
 ## External evidence
 
-Paths are relative to `/home/zhuhe/code/litchi-worktrees/.coord/`. These are
+Paths are relative to `(deleted-coord-artifact)`. These are
 source-only receipts; no Cargo, archive, native or measurement run is claimed.
 
 | Artifact | Bytes | SHA-256 |

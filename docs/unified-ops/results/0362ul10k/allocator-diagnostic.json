@@ -623,13 +623,13 @@
         }
       },
       "command": [
-        "/home/zhuhe/code/litchi-worktrees/.coord/bin/cargo",
+        "(deleted-coord-artifact)",
         "build",
         "--release",
         "--offline",
         "--locked",
         "--manifest-path",
-        "/home/zhuhe/code/litchi-worktrees/.coord/ole-owner-preparation-drivers-29f/candidate/Cargo.toml",
+        "(deleted-coord-artifact)",
         "--no-default-features",
         "--features",
         "current-api,w5-counting-allocator",
@@ -669,13 +669,13 @@
         }
       },
       "command": [
-        "/home/zhuhe/code/litchi-worktrees/.coord/bin/cargo",
+        "(deleted-coord-artifact)",
         "build",
         "--release",
         "--offline",
         "--locked",
         "--manifest-path",
-        "/home/zhuhe/code/litchi-worktrees/.coord/ole-owner-preparation-drivers-29f/baseline/Cargo.toml",
+        "(deleted-coord-artifact)",
         "--no-default-features",
         "--features",
         "legacy-owner-api,legacy-property-api,w5-counting-allocator",
@@ -703,31 +703,31 @@
       "files": {
         "Cargo.lock": {
           "bytes": 33735,
-          "path": "/home/zhuhe/code/litchi-worktrees/.coord/ole-owner-preparation-drivers-29f/candidate/Cargo.lock",
+          "path": "(deleted-coord-artifact)/Cargo.lock",
           "sha256": "5a07adc1d62dea06dbac60986faa020007882506523dde49e4605708e1276aaf"
         },
         "Cargo.toml": {
           "bytes": 1140,
-          "path": "/home/zhuhe/code/litchi-worktrees/.coord/ole-owner-preparation-drivers-29f/candidate/Cargo.toml",
+          "path": "(deleted-coord-artifact)/Cargo.toml",
           "sha256": "6486356f5fff18e6805380a0fb6ef4f81b6eee47fb36a4776f0a45d3de91ad5d"
         }
       },
-      "root": "/home/zhuhe/code/litchi-worktrees/.coord/ole-owner-preparation-drivers-29f/candidate"
+      "root": "(deleted-coord-artifact)"
     },
     "before": {
       "files": {
         "Cargo.lock": {
           "bytes": 33719,
-          "path": "/home/zhuhe/code/litchi-worktrees/.coord/ole-owner-preparation-drivers-29f/baseline/Cargo.lock",
+          "path": "(deleted-coord-artifact)/Cargo.lock",
           "sha256": "450f43c6b74536ef552bd5e9a19e321a3c0dea745f645fecc0aa9abe37868e14"
         },
         "Cargo.toml": {
           "bytes": 1152,
-          "path": "/home/zhuhe/code/litchi-worktrees/.coord/ole-owner-preparation-drivers-29f/baseline/Cargo.toml",
+          "path": "(deleted-coord-artifact)/Cargo.toml",
           "sha256": "80fadfb717d1cb0b2540b5387c6edbec3bdfec38903b11e8d5dab21fa7279bf4"
         }
       },
-      "root": "/home/zhuhe/code/litchi-worktrees/.coord/ole-owner-preparation-drivers-29f/baseline"
+      "root": "(deleted-coord-artifact)"
     }
   },
   "independent_validator": {
@@ -1286,7 +1286,7 @@
       "clean": true,
       "head": "29f072f19c53503395164fcb3a618c44fc22cf75",
       "production_tree_sha256": "0e4e85e7ff2789c582c11aa9160eec746fda0cf70c1a64f96eae3ca358feba2b",
-      "root": "/home/zhuhe/code/litchi-worktrees/.coord/final-api-capture-29f072f/source",
+      "root": "(deleted-coord-artifact)",
       "status": "",
       "status_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "tree": "6d9d110c8c7f72a3b5646e5423fa2d0147d6c225"
@@ -1295,7 +1295,7 @@
       "clean": true,
       "head": "0ce4bb8b61f03a1e5497633f51b954e76f98aa8c",
       "production_tree_sha256": "47b8a0ecfbb2d63ace8dcf37a19f6cee1b01082438ee692af4918621fe219ea0",
-      "root": "/home/zhuhe/code/litchi-worktrees/.coord/ole-owner-preparation-baseline-0ce4",
+      "root": "(deleted-coord-artifact)",
       "status": "",
       "status_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "tree": "f54db6e7c4b759b60cf50738698387ab93de59d6"

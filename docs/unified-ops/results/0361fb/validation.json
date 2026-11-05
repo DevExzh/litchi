@@ -28,7 +28,7 @@
     ],
     "exit": 101,
     "seconds": 48.609351998893544,
-    "log": "/home/zhuhe/code/litchi-worktrees/.coord/constructor-0361f-coordinator/retained-header-v1/regression.log",
+    "log": "(deleted-coord-artifact)/regression.log",
     "bytes": 1755,
     "sha256": "02b6eec4b2bf92de3f3995f6be1062975aea1f296b24614876174176738cd89f"
   },
@@ -43,7 +43,7 @@
         ],
         "exit": 0,
         "seconds": 0.20925897697452456,
-        "log": "/home/zhuhe/code/litchi-worktrees/.coord/constructor-0361f-coordinator/retained-header-v2/check-0.log",
+        "log": "(deleted-coord-artifact)/check-0.log",
         "bytes": 0,
         "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
       },
@@ -59,7 +59,7 @@
         ],
         "exit": 0,
         "seconds": 3.6061883930815384,
-        "log": "/home/zhuhe/code/litchi-worktrees/.coord/constructor-0361f-coordinator/retained-header-v2/check-1.log",
+        "log": "(deleted-coord-artifact)/check-1.log",
         "bytes": 10649,
         "sha256": "3cf96efce16296277f60fa50dc06a2a16644ac7a0c8f34af48b0349cf4cc5897"
       },
@@ -79,7 +79,7 @@
         ],
         "exit": 0,
         "seconds": 43.634389317943715,
-        "log": "/home/zhuhe/code/litchi-worktrees/.coord/constructor-0361f-coordinator/retained-header-v2/check-2.log",
+        "log": "(deleted-coord-artifact)/check-2.log",
         "bytes": 525,
         "sha256": "6a676440848c92531cf3573fbad8a6ec8ef6a7d03622de898245c347325dbd17"
       }
@@ -96,7 +96,7 @@
         ],
         "exit": 0,
         "seconds": 0.1622654830571264,
-        "log": "/home/zhuhe/code/litchi-worktrees/.coord/constructor-0361f-coordinator/retained-header-v3/check-0.log",
+        "log": "(deleted-coord-artifact)/check-0.log",
         "bytes": 0,
         "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
       },
@@ -112,7 +112,7 @@
         ],
         "exit": 0,
         "seconds": 3.34821459709201,
-        "log": "/home/zhuhe/code/litchi-worktrees/.coord/constructor-0361f-coordinator/retained-header-v3/check-1.log",
+        "log": "(deleted-coord-artifact)/check-1.log",
         "bytes": 10649,
         "sha256": "7cbb1d5b15a2afe95a673a01076bcb44dd51b35c8d93d2a57dc0685b01254b16"
       },
@@ -132,7 +132,7 @@
         ],
         "exit": 0,
         "seconds": 2.277042430941947,
-        "log": "/home/zhuhe/code/litchi-worktrees/.coord/constructor-0361f-coordinator/retained-header-v3/check-2.log",
+        "log": "(deleted-coord-artifact)/check-2.log",
         "bytes": 184,
         "sha256": "5d5ef23b866771c2023f8365b0bc9e6c92f77306e6ab62b7a41903dc171dd830"
       }

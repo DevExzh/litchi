@@ -72,7 +72,7 @@
     "Shared OLE typed budgets and publication audit, every consumer migrated",
     "Integrated corpus, performance, inventory and full 53-check gate after W4/W4b/W8 merge"
   ],
-  "raw_log_directory": "/home/zhuhe/code/litchi-worktrees/.coord/exact-limits",
+  "raw_log_directory": "(deleted-coord-artifact)",
   "checks": {
     "tests": {
       "command": "cargo test --locked -p litchi-ograph --all-features",

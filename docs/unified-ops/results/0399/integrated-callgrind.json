@@ -13,10 +13,10 @@
     "wall_time_claim": false
   },
   "evidence": {
-    "capture_root": "/home/zhuhe/code/litchi-worktrees/.coord/d7-chart-font-size-capture-be2b-cpu5-20261029",
+    "capture_root": "(deleted-coord-artifact)",
     "performance_report_sha256": "36c5df491421807c2a83bef38fd410f9d59ee95560a9a8b2d1fd5c2e9adcf9df",
     "derived_validator_sha256": "6c748ae1b2b0b84847abdf8639f446eac7b0fb0ca2909ddbc48201efa50295c9",
-    "validator": "/home/zhuhe/code/litchi-worktrees/.coord/resume-20261028/perf/iwork-probe-isolation-final/validate_call_audit.py",
+    "validator": "(deleted-coord-artifact)/validate_call_audit.py",
     "validator_sha256": "c0637e4304f5fdbfae6fca6b0e9a9c17f7d10cb9a56c7df6846951fa4bdf6b8e",
     "binary_sha256": "2beaa8f51fc22b53a9fb4fe2ebd3f95efc24fd69a0cc752f83902b7e6a422f8b",
     "binary_bytes": 359772600

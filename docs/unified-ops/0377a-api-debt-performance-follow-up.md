@@ -68,7 +68,7 @@ corrected-warmup run from the candidate source above. F2 was rebuilt from
 source commit `123409faecd8` after the provenance repair and rerun for all
 three OOXML metadata routes. The F2 raw captures are outside the repository
 at
-`/home/zhuhe/code/litchi-worktrees/.coord/fin-perf/cga-f2-final2-20261028/`;
+`(deleted-coord-artifact)`;
 the complete compact artifact manifest is
 `results/0377a/manifest.json`. The committed receipt is
 `results/0377a/callgrind.tsv`.
@@ -112,7 +112,7 @@ and carry no unified leaf budget.
 The first integrated candidate, `bb2475b8b0c11c8cef304178ee3fca1f590e9633`,
 failed the source-bound XLSX 1,000-cell unified instruction route. Its
 preserved receipt is outside the repository at
-`/home/zhuhe/code/litchi-worktrees/.coord/resume-20261028/perf/fin-final-bb2475b8b0/`:
+`(deleted-coord-artifact)`:
 base totals were 30,045,503 and 29,998,170 Ir, candidate totals were
 31,582,848 and 31,580,006 Ir, with median ratio 1.051948538 and worst ratio
 1.052825822. This failed receipt remains evidence; it was not overwritten.
@@ -120,12 +120,12 @@ base totals were 30,045,503 and 29,998,170 Ir, candidate totals were
 The first bounded predecessor, `27a22f7ccaf6ab3889040bb8d10300c802e325fe`,
 also failed under the matching release-debug configuration. Its preserved
 ABBA capture directory is
-`/home/zhuhe/code/litchi-worktrees/.coord/fin-perf/repair-27a22-batch1000-debug1-preopt/`:
+`(deleted-coord-artifact)`:
 base totals were 30,007,770 and 30,011,846 Ir, candidate totals were
 31,611,640 and 31,690,204 Ir, with paired ratios 1.053448490 and
 1.055923184, median 1.054685837 and worst 1.055923184. The earlier diagnostic
 debug-info-off run is retained separately at
-`/home/zhuhe/code/litchi-worktrees/.coord/fin-perf/repair-27a22-batch1000/`:
+`(deleted-coord-artifact)`:
 30,049,152 / 31,683,801 / 31,598,838 / 30,056,013 Ir, median 1.052865416
 and worst 1.054399172. Neither failed receipt was replaced by the repaired
 run below.
@@ -145,11 +145,11 @@ the harness profile (matching the baseline), LTO and panic-abort:
 
 ```text
 cwd=/home/zhuhe/code/litchi-worktrees/uo2-fin-perf
-env PATH=/home/zhuhe/code/litchi-worktrees/.coord/bin:$HOME/.cargo/bin:$PATH CARGO_TARGET_DIR=/home/zhuhe/code/litchi-worktrees/uo2-fin-perf/target CARGO_INCREMENTAL=0 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_BUILD_JOBS=4 RUST_TEST_THREADS=4 cargo build --release --offline --locked --manifest-path tools/perf-baseline/unified-fin-perf/Cargo.toml
+env PATH=(deleted-coord-artifact):$HOME/.cargo/bin:$PATH CARGO_TARGET_DIR=/home/zhuhe/code/litchi-worktrees/uo2-fin-perf/target CARGO_INCREMENTAL=0 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_BUILD_JOBS=4 RUST_TEST_THREADS=4 cargo build --release --offline --locked --manifest-path tools/perf-baseline/unified-fin-perf/Cargo.toml
 ```
 
 The candidate copy is
-`/home/zhuhe/code/litchi-worktrees/.coord/fin-perf/bin/fin-cand-1abe5a5cf7-debug1`,
+`(deleted-coord-artifact)`,
 385,525,480 bytes, SHA-256
 `0c55e2ab3f8142003c16b0431049924c923397774a85a0946d0e38cc64074c22`.
 The baseline is `fin-base`, source `839212fa9da2e4eff14dcae9c3aa242e49f25729`,
@@ -160,7 +160,7 @@ Using the corrected `fin_perf_region` harness (main source SHA-256
 `551e5440ae82bfe983fb74c8a5e4e36e727176469efda0998e9b3c29d79b1a4d`),
 Callgrind, `taskset -c 47`, and ABBA order `base, candidate, candidate, base`,
 the retained captures are in
-`/home/zhuhe/code/litchi-worktrees/.coord/fin-perf/repair-1abe5a5cf7-batch1000-debug1/`.
+`(deleted-coord-artifact)`.
 The route printed a successful JSON result in every log and all four counted
 totals were positive:
 
@@ -185,11 +185,11 @@ systemd-run --user --scope --quiet --collect \
   -p OOMPolicy=continue -p MemoryMax=20G -p MemorySwapMax=0 -- \
   taskset --cpu-list 47 valgrind --tool=callgrind --collect-atstart=no \
   --toggle-collect='*fin_perf_region*' \
-  --callgrind-out-file=/home/zhuhe/code/litchi-worktrees/.coord/fin-perf/repair-1abe5a5cf7-batch1000-debug1/<capture>.cg \
-  /home/zhuhe/code/litchi-worktrees/.coord/fin-perf/bin/<fin-base-or-fin-cand-1abe5a5cf7-debug1> \
+  --callgrind-out-file=(deleted-coord-artifact) \
+  (deleted-coord-artifact) \
   --groups batch --formats xlsx \
   --routes xlsx_eager_cell_value_set_batch1000 --callgrind unified --iterations 1 \
-  > /home/zhuhe/code/litchi-worktrees/.coord/fin-perf/repair-1abe5a5cf7-batch1000-debug1/<capture>.log 2>&1
+  > (deleted-coord-artifact) 2>&1
 ```
 
 For symbol attribution, run the same `callgrind_annotate` command used by the
@@ -198,8 +198,8 @@ text file (the raw `.cg` and annotation files remain outside the repository):
 
 ```sh
 callgrind_annotate --auto=yes --inclusive=no --threshold=1 \
-  /home/zhuhe/code/litchi-worktrees/.coord/fin-perf/repair-1abe5a5cf7-batch1000-debug1/<capture>.cg \
-  > /home/zhuhe/code/litchi-worktrees/.coord/fin-perf/repair-1abe5a5cf7-batch1000-debug1/<capture>.annotate.txt
+  (deleted-coord-artifact) \
+  > (deleted-coord-artifact)
 ```
 
 The focused verification covered the unsigned coalescer's scalar/no-op and

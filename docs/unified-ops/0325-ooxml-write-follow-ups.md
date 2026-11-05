@@ -116,7 +116,7 @@ byte of the part is kept.
 ## 5. Byte identity
 
 The drawing refactor was checked with a probe of public leaf APIs
-(`.coord/ooxml-followups/probe/`, not committed), built on the base tree
+(`(deleted-coord-artifact)`, not committed), built on the base tree
 (`git archive fde847fe90`) and on this branch. It covers, on XLSX and XLSB:
 three notes added, one removed, one replaced; two shapes (solid and scheme
 fills, line with dash, font, margins, rotation) and a picture added;
@@ -219,7 +219,7 @@ output is in [results/0325/read-regression.txt](results/0325/read-regression.txt
 
 Run on the merged tree (`8f91bb2cbb` and the record commit); cargo through
 the memory-capped shim, `CARGO_BUILD_JOBS=6`, `RUST_TEST_THREADS=8`. Logs:
-`.coord/ooxml-followups/gate-*.out`.
+`(deleted-coord-artifact)`.
 
 | command | exit | notes |
 |---|---:|---|

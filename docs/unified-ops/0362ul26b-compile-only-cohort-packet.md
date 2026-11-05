@@ -8,7 +8,7 @@ ODF paired runners remain globally quiet.
 
 ## Frozen inputs and fresh packet
 
-The accepted production candidate is `/home/zhuhe/code/litchi-worktrees/.coord/final-api-capture-472b670547/source`,
+The accepted production candidate is `(deleted-coord-artifact)`,
 HEAD `472b6705475b073e7fe08f6e11ee17fb1e29f838`, tree
 `ebc1cee05f124c0c63977aff07a23288c19e7d00`. The five lanes and their
 reviewed baseline endpoints are:
@@ -43,7 +43,7 @@ neither class was overwritten.
 
 Fresh rendered copies and receipts are outside Git at:
 
-`/home/zhuhe/code/litchi-worktrees/.coord/cfb-compile-cohort-20261024/packet-v1/`
+`(deleted-coord-artifact)`
 
 The generated manifest identities are:
 
@@ -63,7 +63,7 @@ empty. No old output, target, or TMP path was reused.
 The external receipt is 33,078 bytes,
 SHA-256 `460ef0f380828d20ef74059489d32e0dfad08d68cf670c76f13b5d87ec343e8c`:
 
-`/home/zhuhe/code/litchi-worktrees/.coord/cfb-compile-cohort-20261024/packet-v1/packet-receipt.json`
+`(deleted-coord-artifact)/packet-receipt.json`
 
 ## Permit and phase binding
 
@@ -93,7 +93,7 @@ started with the generic runner, for example:
 ```sh
 unset LITCHI_CAPPED LITCHI_BLESS
 python3 tools/native_qualification_runner.py \
-  --manifest /home/zhuhe/code/litchi-worktrees/.coord/cfb-compile-cohort-20261024/packet-v1/manifests/w4b-xlsb-compile-only.json \
+  --manifest (deleted-coord-artifact) \
   --phase build
 ```
 
@@ -159,7 +159,7 @@ The v1 packet above remains immutable. This v2 packet preserves the same
 explicit TMPDIR to both manifests, and regenerates every manifest-bound
 receipt and permit. It is outside Git at:
 
-`/home/zhuhe/code/litchi-worktrees/.coord/cfb-compile-cohort-20261024/packet-v2/`
+`(deleted-coord-artifact)`
 
 The v2 manifest identities and TMPDIR bindings are:
 
@@ -218,7 +218,7 @@ known unleased full-gate builder is active:
 ```sh
 unset LITCHI_CAPPED LITCHI_BLESS
 python3 tools/native_qualification_runner.py \
-  --manifest /home/zhuhe/code/litchi-worktrees/.coord/cfb-compile-cohort-20261024/packet-v2/manifests/w4b-xlsb-compile-only.json \
+  --manifest (deleted-coord-artifact) \
   --phase build
 ```
 

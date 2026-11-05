@@ -46,7 +46,7 @@ The approved `Cargo.lock` is SHA-256
 `4100b1fbb272dd24842f33a2d6f353a3f3a97dfa7e435c4649a0e1a029bfaea1`.
 The capped coordinator cargo shim was used with one build job, offline locked
 resolution, incremental compilation disabled, and target
-`/home/zhuhe/code/litchi-worktrees/.coord/ppt-record-limits/target`.
+`(deleted-coord-artifact)`.
 
 Focused commands passed:
 
@@ -96,7 +96,7 @@ the coordinator's external evidence) are:
 
 * Exact copied-payload boundary test, source
   `884d7f7232414a6b9d4e493884aca1808286e487`, state
-  `/home/zhuhe/code/litchi-worktrees/.coord/ppt-record-limits-884d7-validation-20261025`:
+  `(deleted-coord-artifact)`:
   log `00-ppt-record-copy-boundary-attempt-884d7-1.log`, SHA-256
   `522ecd722eb73cd2ad491ef149f31df346d1455ba50b1042319afa48722aff60`;
   target trace SHA-256
@@ -125,7 +125,7 @@ the coordinator's external evidence) are:
   `7e64a70e95a2f5ebf9b0fd51de4d94123694c6a72b5d71c554158aabacbd1c9c`.
 * Final affected all-target clippy, source
   `6b4315487773490731f4da56b04760cbc1739f94`, state
-  `/home/zhuhe/code/litchi-worktrees/.coord/ppt-record-limits-6b4315-clippy-20261025`:
+  `(deleted-coord-artifact)`:
   log `00-ppt-ops-facade-clippy-final-attempt-6b4315-1.log`, SHA-256
   `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`;
   trace SHA-256

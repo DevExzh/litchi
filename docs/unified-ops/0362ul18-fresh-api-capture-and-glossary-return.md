@@ -18,7 +18,7 @@ env -u LITCHI_CAPPED -u LITCHI_BLESS \
   LITCHI_MEM_MAX=20G \
   python3 tools/final_api_inventory.py --root "$CAPTURE_SOURCE" \
   --output "$CAPTURE_OUTPUT" --target-dir "$CAPTURE_TARGET" \
-  --cargo /home/zhuhe/code/litchi-worktrees/.coord/bin/cargo --no-reuse
+  --cargo (deleted-coord-artifact) --no-reuse
 ```
 
 The full gate continues on its own immutable c796 checkout, including eventual feature-specific glossary checks and actual corpus verification. The raw report rename, native qualification and final glossary closure remain required. Only redaction audit 22 is deferred. Nothing is pushed.

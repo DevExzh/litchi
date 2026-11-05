@@ -43,9 +43,9 @@ run time.
 
 ```bash
 ROOT=/home/zhuhe/code/litchi-worktrees/unified-ops-api
-V1=/home/zhuhe/code/litchi-worktrees/.coord/w8-472b-native.V1lU2E
+V1=(deleted-coord-artifact)
 RUN_ID=20261024T000000Z-<unique>
-SCRATCH=/home/zhuhe/code/litchi-worktrees/.coord/w8-quiet-abba.$RUN_ID
+SCRATCH=(deleted-coord-artifact)
 mkdir "$SCRATCH"
 
 python3 "$ROOT/docs/unified-ops/results/0362ul32/w8-quiet-abba.py" prepare \

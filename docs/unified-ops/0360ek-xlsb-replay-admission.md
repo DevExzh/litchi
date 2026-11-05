@@ -57,7 +57,7 @@ remain crate-private and are not public raw entry points.
 ## Validation
 
 All commands used the capped environment at
-`/home/zhuhe/code/litchi-worktrees/.coord/w4b-xlsb-raw-policy/env.sh`, with
+`(deleted-coord-artifact)`, with
 `CARGO_BUILD_JOBS=1`, `CARGO_TARGET_DIR=/home/zhuhe/code/litchi-worktrees/target-w4b-xlsb-replay`,
 and a worktree-local `TMPDIR` because the shared `/tmp` inode budget was
 exhausted:

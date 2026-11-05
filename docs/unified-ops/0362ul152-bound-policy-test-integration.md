@@ -17,7 +17,7 @@ retains that rejection, and explicit pending fixtures retain the earlier
 missing-binding coverage.
 
 The combined five-file patch remains external at
-`.coord/drawingml-final-binding-integration-v1/combined-integration.patch`:
+`(deleted-coord-artifact)/combined-integration.patch`:
 143,584 bytes, SHA-256
 `4d9616546aac92b0ba5b86c1b333e819786588d4fcce0989ef96181d8766ec78`.
 Root independently applies it to copied source files and verifies the exact

@@ -10,29 +10,29 @@
   },
   "binaries": {
     "allocation_base": {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/constructor-0361f-coordinator/matched-v22-alloc-base/iwa-constructor-probe-ceb-alloc",
+      "path": "(deleted-coord-artifact)/iwa-constructor-probe-ceb-alloc",
       "bytes": 653552,
       "sha256": "868370074002ba8d17972b5a6193958bcbe55e72d354827043971f7a916096d3"
     },
     "allocation_candidate": {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/constructor-0361f-coordinator/matched-v22-alloc-candidate/iwa-constructor-probe-ceb",
+      "path": "(deleted-coord-artifact)/iwa-constructor-probe-ceb",
       "bytes": 679088,
       "sha256": "1907ee4530c1da36c02ee129fe860e2047409154371861e1b425b5e8e10c87fc"
     },
     "callgrind_base": {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/constructor-0361f-coordinator/matched-v22-alloc-base/iwa-constructor-probe-ceb-native",
+      "path": "(deleted-coord-artifact)/iwa-constructor-probe-ceb-native",
       "bytes": 630256,
       "sha256": "06af91d3772d5d347ea7c5b62c047bed2582025039993d5ee49d61957178a675"
     },
     "callgrind_candidate": {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/constructor-0361f-coordinator/matched-v22-alloc-candidate/iwa-constructor-probe-ceb-native",
+      "path": "(deleted-coord-artifact)/iwa-constructor-probe-ceb-native",
       "bytes": 658216,
       "sha256": "bf6eb6505296fd1fced8e2041dced00ab66869cc01b3c8e6fdd25716edff293a"
     }
   },
   "allocation": {
     "method": "ABBA, 100 iterations per route; tuple is [peak, retained, allocated, allocations]",
-    "summary_path": "/home/zhuhe/code/litchi-worktrees/.coord/constructor-0361f-coordinator/matched-v22-alloc-ceb-matched-alloc/summary.json",
+    "summary_path": "(deleted-coord-artifact)/summary.json",
     "summary_bytes": 55855,
     "summary_sha256": "859aef313e4094578f8d85cea0e4a6cd9372dbefbfb05de77237aaea6a903127",
     "rows": [
@@ -55,7 +55,7 @@
   },
   "callgrind": {
     "method": "valgrind --tool=callgrind --collect-jumps=no --error-exitcode=99; Ir/op=(Ir at 12000 - Ir at 2000)/10000",
-    "manifest_path": "/home/zhuhe/code/litchi-worktrees/.coord/constructor-0361f-coordinator/count-callgrind-v22-ceb-matched/manifest.json",
+    "manifest_path": "(deleted-coord-artifact)/manifest.json",
     "manifest_bytes": 49463,
     "manifest_sha256": "2a8d736e8a7788657b4a1d66cf0736a6bdd907130fb4ab2c00faa4b6d99cd8fb",
     "capture_files": 180,

@@ -54,5 +54,5 @@ existing perf-baseline normal and allocator binaries dispatch the selector;
 the normal target records elapsed samples and unavailable allocation status,
 while the allocator target records operation-scoped allocation samples. The
 existing coordinator target root at
-`/home/zhuhe/code/litchi-worktrees/.coord/w4-xlsx/targets` is available for a
+`(deleted-coord-artifact)` is available for a
 later assigned run; this commit creates no target or evidence artifact.

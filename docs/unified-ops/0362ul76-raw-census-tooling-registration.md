@@ -4,7 +4,7 @@ This source-only leaf is based on integration commit
 `6b95d8955412c68821c7b961335ab93c79ebd06b`, which contains the reviewed raw
 callable census from 0362ul71. It registers that census's Python unit suite in
 the tracked safe-gate tooling row. The active approved runner worktree and the
-external `.coord/gate.sh` were not modified; the coordinator applies the leaf
+external `(deleted-coord-artifact)` were not modified; the coordinator applies the leaf
 after review. The separate DrawingML-v2 registration remains out of scope
 until its source is merged.
 
@@ -43,8 +43,8 @@ An AST/constructor check reports 53 normal steps, one `tooling-unit` step,
 and 36 registered test modules with `tools.test_raw_api_coverage` present.
 No Cargo, rustdoc, native, timing or full-gate command ran.
 
-Coordinator integration also updates the external `.coord/gate.sh` tooling
+Coordinator integration also updates the external `(deleted-coord-artifact)/gate.sh` tooling
 row to the same 36 modules. Its prior bytes are retained at
-`.coord/gate.sh.before-0362ul76` (SHA-256 `1ad5e255780c85a7bdc468414d64d4a288f2d484c80dee8fab5872862b732876`);
+`(deleted-coord-artifact)/gate.sh.before-0362ul76` (SHA-256 `1ad5e255780c85a7bdc468414d64d4a288f2d484c80dee8fab5872862b732876`);
 the updated script has SHA-256 `33b8dbad688f8a9a221bfb85eb668fddc1a789193a6096425182e7045628d179`.
 The original approved f5 runner worktree and active captured runs remain unchanged.

@@ -147,7 +147,7 @@ five differ, and field by field they differ only in the paragraph style:
 
 Callgrind, release with debug lines, CPU 5, ABBA, inclusive Ir of a one-route probe over the same input.
 Base is the four changed source files at `3001da641b` in this tree. Probes and binaries are in
-`.coord/iwa-w8/perf/`, not committed; SHA-256 of the binaries: Numbers base `3afebca6…`, new `a8f3bd69…`;
+`(deleted-coord-artifact)`, not committed; SHA-256 of the binaries: Numbers base `3afebca6…`, new `a8f3bd69…`;
 Keynote base `f80d1cc6…`, new `219d5a9a…`. The comparison is the previous leaf: the host is gone.
 
 | Route | Base Ir (A, A) | Branch Ir (B, B) | Change |
@@ -162,7 +162,7 @@ Budget +5%. No unified route changed, so there is no unified-against-leaf measur
 
 ## 7. Run 4 and the queue
 
-`.coord/iwa-w8/out4/`, tar `.coord/iwa-w8/out4.tgz` (1,283,567 bytes, SHA-256
+`(deleted-coord-artifact)`, tar `(deleted-coord-artifact)/out4.tgz` (1,283,567 bytes, SHA-256
 `98fa06d96819ed055b5049307bcd8359d4aebc1d33738ac0dba12a05ba6e7d6b`), not committed. `results/0435/run4-packages.tsv`
 lists every package, its hash, what it replaces, and its rows. Seven packages:
 `W8-P0290`, `W8-P1129`, `W8-P1130`, `W8-P1145`, `W8-P1146`, plus `W8-native-parent-new-caption` and
@@ -209,7 +209,7 @@ pass is entered by hand, from `run4-packages.tsv`. No tool option was added: thi
 
 ## 10. Gates
 
-Logs are in `.coord/iwa-w8/gates/`. All exit 0 on the final run. No golden was re-blessed: no capability, corpus or
+Logs are in `(deleted-coord-artifact)`. All exit 0 on the final run. No golden was re-blessed: no capability, corpus or
 registry output changed, and the tests passed against the goldens as they were.
 
 | Gate | Exit |

@@ -30,39 +30,39 @@
   "candidate": {
     "commit": "472b6705475b073e7fe08f6e11ee17fb1e29f838",
     "tree": "ebc1cee05f124c0c63977aff07a23288c19e7d00",
-    "root": "/home/zhuhe/code/litchi-worktrees/.coord/final-api-capture-472b670547/source",
+    "root": "(deleted-coord-artifact)",
     "root_lock_sha256": "4100b1fbb272dd24842f33a2d6f353a3f3a97dfa7e435c4649a0e1a029bfaea1"
   },
   "odp": {
     "status": "blocked_pending_build_and_memory",
-    "packet_root": "/home/zhuhe/code/litchi-worktrees/.coord/odp-final-build-prep-472b670547",
+    "packet_root": "(deleted-coord-artifact)",
     "packet": [
       {
-        "path": "/home/zhuhe/code/litchi-worktrees/.coord/odp-final-build-prep-472b670547/input.json",
+        "path": "(deleted-coord-artifact)/input.json",
         "bytes": 1659,
         "sha256": "5992db0a0520ae3dedb47e44f5d584a8e1890c544d2611fca92db6482f6c47e6",
         "role": "corrected runner manifest"
       },
       {
-        "path": "/home/zhuhe/code/litchi-worktrees/.coord/odp-final-build-prep-472b670547/plan.json",
+        "path": "(deleted-coord-artifact)/plan.json",
         "bytes": 1950,
         "sha256": "d213e7c0158757a1e9ff51c6649c2da8a5dafa69469bb73dbcc22f99114fcc5b",
         "role": "plan with expected binary paths"
       },
       {
-        "path": "/home/zhuhe/code/litchi-worktrees/.coord/odp-final-build-prep-472b670547/build-handoff.json",
+        "path": "(deleted-coord-artifact)/build-handoff.json",
         "bytes": 12702,
         "sha256": "33943e0c7c0cce75acb104169a550506b95f1d21e3df869de277cae76898153d",
         "role": "source identities, guarded build and validator commands"
       },
       {
-        "path": "/home/zhuhe/code/litchi-worktrees/.coord/odp-final-build-prep-472b670547/memory-protocol.json",
+        "path": "(deleted-coord-artifact)/memory-protocol.json",
         "bytes": 6975,
         "sha256": "f929413cb6860604148c67c95c44088c0a23ddfe3b4a722e5461643727fa8180",
         "role": "separate peak-heap qualification protocol"
       },
       {
-        "path": "/home/zhuhe/code/litchi-worktrees/.coord/odp-final-build-prep-472b670547/qualification-run/manifest-plan/plan.json",
+        "path": "(deleted-coord-artifact)/plan.json",
         "bytes": 1985,
         "sha256": "3c8922eac7d6a40d424f5be109aef3d8298d4550575ce21c534ddf66ffb7d191",
         "role": "source-only runner --plan validation receipt"
@@ -73,9 +73,9 @@
       "tree": "a1d3d5fb726673f8a162d4d9c4265f6ae79fcd4b",
       "adapter_sha256": "47cc7a780d93b23015ff698216e98ce9597ee300ee1b34ae21a39276b2baded7",
       "adapter_provenance_commit": "61e117fe4d6bbbc341cc146f5fe8e6f1d67ce709",
-      "binary_expected_path": "/home/zhuhe/code/litchi-worktrees/.coord/odp-final-build-prep-472b670547/targets/baseline/release/examples/odp_native_qualification_legacy_probe"
+      "binary_expected_path": "(deleted-coord-artifact)/odp_native_qualification_legacy_probe"
     },
-    "candidate_binary_expected_path": "/home/zhuhe/code/litchi-worktrees/.coord/odp-final-build-prep-472b670547/targets/candidate/release/odp_native_qualification_probe",
+    "candidate_binary_expected_path": "(deleted-coord-artifact)",
     "expected_sequential_build_count": 2,
     "memory": {
       "status": "separate_run_required",

@@ -1,24 +1,24 @@
 [
   {
-    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-final-admission-20261021/source-digests.json",
+    "path": "(deleted-coord-artifact)/source-digests.json",
     "bytes": 1363443,
     "sha256": "e2904c09c7d4ed9b36e29291c32275e132600341d10a13beca48592d0cffbab3",
     "regenerate": "python3 docs/unified-ops/results/0362f/source_manifest.py ISOLATED_SOURCE OUT/source-digests.json"
   },
   {
-    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-final-admission-20261021/metadata.json",
+    "path": "(deleted-coord-artifact)/metadata.json",
     "bytes": 2827842,
     "sha256": "fe3ba561858131e95d06d83b17087cc0f6edd932b91bcbab898e14274fa02b0d",
     "regenerate": "cargo metadata --offline --format-version 1"
   },
   {
-    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-final-admission-20261021/integration.patch",
+    "path": "(deleted-coord-artifact)/integration.patch",
     "bytes": 66660,
     "sha256": "3d725e367f95ffa732be299a9c4f27590e1594bad71eeb81904cca4226e0b7b6",
     "regenerate": "git diff 00673b9006 be72b3a163 --binary"
   },
   {
-    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-final-admission-20261021/build.log",
+    "path": "(deleted-coord-artifact)/build.log",
     "bytes": 4693,
     "sha256": "c3044daa6148719ea50effc1861ad26262f72e60ebd8aca68b20b348a27dc2d9",
     "regenerate": "cargo build --release --offline --locked -p litchi-ppt --example scoped_patch_probe"

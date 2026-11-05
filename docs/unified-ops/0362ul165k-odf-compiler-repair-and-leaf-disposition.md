@@ -88,7 +88,7 @@ open. Memo 22 remains the only deferral. Nothing is pushed.
 
 ## Evidence
 
-All paths below are beneath `/home/zhuhe/code/litchi-worktrees/.coord/`.
+All paths below are beneath `(deleted-coord-artifact)`.
 Logs, binaries and build caches remain outside the repository.
 
 | Artifact | Bytes | SHA-256 |

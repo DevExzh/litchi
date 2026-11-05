@@ -78,7 +78,7 @@ baseline, current binary and candidate with output, error disposition and
 allocation checks.
 
 External receipts remain under
-`/home/zhuhe/code/litchi-worktrees/.coord/rtf-refusals/`:
+`(deleted-coord-artifact)`:
 
 - `heap-qual-20261022/` — original/candidate A-B-B-A captures;
 - `heap-diag-current-20261022/` — current/candidate A-B-B-A captures;

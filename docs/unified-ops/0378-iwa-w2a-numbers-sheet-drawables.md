@@ -106,7 +106,7 @@ Callgrind, release with debug info, CPU 3 pinned (`taskset -c 3`), ABBA
 `w2a_leaf_route` (two calls each: open + one operation + commit + serialize;
 selectors resolved outside). Probe: `crates/litchi-iwa/tests/parity/numbers_w2a_cost.rs`
 (command in its header). Outputs are kept outside the repository in
-`.coord/iwa-w2a/cg/`.
+`(deleted-coord-artifact)`.
 
 | Route (fixture) | Host Ir | Leaf Ir | Δ |
 |---|---:|---:|---:|

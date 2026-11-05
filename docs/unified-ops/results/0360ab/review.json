@@ -49,7 +49,7 @@
       ],
       "exit": 0,
       "seconds": 24.83079373498913,
-      "log": "/home/zhuhe/code/litchi-worktrees/.coord/w4-integration-review/scope-review-v1/check-0.log",
+      "log": "(deleted-coord-artifact)/check-0.log",
       "bytes": 1948,
       "sha256": "eb6fa6c34a2dfc424b9767e9eeb393b476713fbdf541d404f8ea98ba7fcfef1d",
       "interpretation": "incorrect filter selected zero tests; not a test pass"
@@ -67,7 +67,7 @@
       ],
       "exit": 101,
       "seconds": 0.1225063749589026,
-      "log": "/home/zhuhe/code/litchi-worktrees/.coord/w4-integration-review/scope-review-v2/check-0.log",
+      "log": "(deleted-coord-artifact)/check-0.log",
       "bytes": 1752,
       "sha256": "ad45e01e3fc4d662f4952f690972b296b8e779e54c54600e4c0179408489790d",
       "interpretation": "both required capability regressions reproduce (0 passed, 2 failed)"

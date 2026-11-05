@@ -13,7 +13,7 @@ non-forced removal. The validation target and evidence remain untouched.
 The protected 15-byte trunk constructor probe remains unchanged.
 
 The external evidence root is
-`/home/zhuhe/code/litchi-worktrees/.coord/worktree-cleanup-2026-10-23/quarantine/wave49-scoped/`:
+`(deleted-coord-artifact)`:
 
 | Artifact | SHA-256 |
 | --- | --- |
@@ -24,7 +24,7 @@ The external evidence root is
 The coordinator independently verified those artifacts, all six quarantined
 payloads and modes, retained branch ancestry, worktree absence and the
 protected validation directory's identity. Its external receipt is
-`.coord/worktree-cleanup-2026-10-23/coordinator-wave49-verification.json`,
+`(deleted-coord-artifact)/coordinator-wave49-verification.json`,
 SHA-256 `1189c2a74c69cf541529ba3439a7e426f538aeb06664b3f2330ad6833ac3df9a`.
 
 An earlier broad audit was stopped before any payload move or removal; its

@@ -80,7 +80,7 @@ paths; eight ODP doctests use the previous projection/error spellings.
 Dedicated repairs preserve the retention assertion and every example.
 
 The completed failing chunks remain at
-`/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/remaining-leaves-f6fe430a4d/leaf-tests/`:
+`(deleted-coord-artifact)`:
 
 | Log | Bytes | SHA-256 |
 | --- | ---: | --- |
@@ -91,7 +91,7 @@ The completed failing chunks remain at
 After the reviewed boundary and corpus-receipt merges, all 14 final tooling
 modules pass together: 1,413 tests in 45.816 seconds at `885cdc82af`.
 The external command/source-bound log is
-`.coord/final-acceptance-2026-10-24/composed-tooling-885cdc82af.log`,
+`(deleted-coord-artifact)/composed-tooling-885cdc82af.log`,
 634,360 bytes, SHA-256
 `b54f9fbdc25056c61317af08bde26517fc0d9d7246fda8c3db5d762b55b3f2e8`.
 This is a composed tooling pass, not the complete source gate.

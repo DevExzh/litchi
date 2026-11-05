@@ -90,7 +90,7 @@ reviewed and passes 1,767 tests across 119 successful result blocks, including
 702 library tests. Strict all-target/all-feature Clippy also passes. Both
 final commands use the repository's pinned Rust 1.95 and tracked root Clippy
 configuration. The raw logs are
-`/home/zhuhe/code/litchi-worktrees/.coord/ods-lazy-entry/ods-full-tests-pinned195.log`
+`(deleted-coord-artifact)/ods-full-tests-pinned195.log`
 (182,062 bytes, SHA-256
 `81f35af676d3546b6f94f7b9253b72e3f5be9026677ace21a288855afd3b9bba`)
 and `ods-all-targets-clippy-pinned195.log` beside it (729 bytes, SHA-256
@@ -215,7 +215,7 @@ The omitted file contains the lint alias, not compiler flags.
 Reviewed ODF shared-triad tooling `7f85a0dd5d` is included in that assembly so
 its Rust probe will be compiled in the all-feature facade checks. The
 coordinator's three ODF unittest modules pass 18 tests; external log
-`/home/zhuhe/code/litchi-worktrees/.coord/odf-protocol-review-7f85/tests.log`
+`(deleted-coord-artifact)/tests.log`
 is 117 bytes, SHA-256
 `f10ec9ad7e06e8c5f41a75ab1f59b65505def0a0a9d05a795a2c958278cdb60e`.
 Review covers normalized manifest/ZIP proofs, allocator observation boundaries,

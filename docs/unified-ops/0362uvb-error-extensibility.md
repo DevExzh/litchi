@@ -38,7 +38,7 @@ The leaf was checked with the memory-capped, single-job environment and an
 external target:
 
 ```text
-env CARGO_TARGET_DIR=/home/zhuhe/code/litchi-worktrees/.coord/exhaustive-error-own/target CARGO_BUILD_JOBS=1 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 CARGO_NET_OFFLINE=true LITCHI_MEM_MAX=20G PATH=/home/zhuhe/code/litchi-worktrees/.coord/bin:$PATH cargo check --workspace --all-targets --all-features --locked
+env CARGO_TARGET_DIR=(deleted-coord-artifact) CARGO_BUILD_JOBS=1 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 CARGO_NET_OFFLINE=true LITCHI_MEM_MAX=20G PATH=(deleted-coord-artifact):$PATH cargo check --workspace --all-targets --all-features --locked
 ```
 
 It passed after the consumer migrations. `cargo fmt --all -- --check`,

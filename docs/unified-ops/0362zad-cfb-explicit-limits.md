@@ -92,7 +92,7 @@ worktree lock matched byte-for-byte. Commands used the shim PATH, unset
 `LITCHI_CAPPED`/`LITCHI_BLESS`, `LITCHI_MEM_MAX=20G`,
 `CARGO_BUILD_JOBS=1`, `RUST_TEST_THREADS=1`, `CARGO_INCREMENTAL=0`,
 `CARGO_NET_OFFLINE=true`, and external target
-`/home/zhuhe/code/litchi-worktrees/.coord/target-cfb-explicit-limits` (actual
+`(deleted-coord-artifact)` (actual
 size 2,355,002,392 bytes, below the 20 GB cap).
 
 The focused CFB command

@@ -26,7 +26,7 @@ altered.
 
 The qualification evidence is retained outside the repository at:
 
-`.coord/pptx-combined-0362ul89-f5-qualification-v2-02b2489ead/02-pptx-strict-clippy-all-features-attempt-qualification-f5-02.log`
+`(deleted-coord-artifact)`
 
 The 59,454-byte log has SHA-256
 `bfe533c51350b5e9bfdeeb60ec6db7485f033679a4962e47d0264b14751785f6`.

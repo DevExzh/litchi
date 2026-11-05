@@ -10,7 +10,7 @@ unchanged and is not relabeled by this run.
 The endpoint was fresh before launch:
 
 ```
-/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/full-gate-9781-ordinary-25-33-84f87
+(deleted-coord-artifact)
 ```
 
 The selected steps were indexes 25–33, in this order:
@@ -24,10 +24,10 @@ tests-workspace-excluding-ods-ops
 The exact command was:
 
 ```
-python3 /home/zhuhe/code/litchi-worktrees/.coord/gate-repair-0362ul29/source/docs/unified-ops/results/0362ul29/tooling/run_safe_gate.py \
-  --root /home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/full-gate-9781cf6d87/source \
-  --target /home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/full-gate-9781-ordinary-25-33-84f87/target \
-  --state /home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/full-gate-9781-ordinary-25-33-84f87 \
+python3 (deleted-coord-artifact) \
+  --root (deleted-coord-artifact) \
+  --target (deleted-coord-artifact) \
+  --state (deleted-coord-artifact) \
   --only tests-ops,tests-facade,tests-core,clippy-leaves,clippy-ods,tests-leaves,tests-ods-full,clippy-workspace,tests-workspace-excluding-ods-ops
 ```
 

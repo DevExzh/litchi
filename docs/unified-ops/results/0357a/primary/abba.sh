@@ -1,5 +1,5 @@
 #!/bin/bash
-B=/home/zhuhe/code/litchi-worktrees/.coord/w3-ppt; cd $B/perf2; CPU=29
+B=/deleted-coord-artifact; cd $B/perf2; CPU=29
 run() { taskset -c $CPU $B/tgt-$1/release/examples/$2 ${@:4} > $3 2>>log.txt || echo "FAIL $3" >> log.txt; }
 echo "start $(date +%T) load $(cut -d' ' -f1 /proc/loadavg)" >> log.txt
 for leg in before after after before; do

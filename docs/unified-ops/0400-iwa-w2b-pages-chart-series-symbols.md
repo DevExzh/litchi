@@ -82,7 +82,7 @@ The source-bound CPU5 release capture and raw-call validator are recorded in
 `docs/unified-ops/results/0400/integrated-callgrind.json`; all four leaf/host
 instruction ratios are below the 1.05 admission bar. The raw captures and
 threshold-100 annotations remain outside the repository at
-`/home/zhuhe/code/litchi-worktrees/.coord/iwa-w2b-pages-symbols-final-0555-a06fd62966-cpu5`.
+`(deleted-coord-artifact)`.
 
 ### Final facade qualification
 
@@ -99,7 +99,7 @@ head, lockfile hash, CPU5 plan, raw artifacts and the c063 validator receipt.
 The executed capture filenames include the route-qualified
 `all_symbols_read`/`all_symbols_set` names; the output-name-only correction
 manifest is preserved at
-`/home/zhuhe/code/litchi-worktrees/.coord/iwa-w2b-pages-symbols-build-0555-a06fd62966/capture-correction-v2.json`
+`(deleted-coord-artifact)/capture-correction-v2.json`
 (SHA-256
 `14f62c8d418b5216c384507422695f1ad0b832b64753fca506a89cacf9a19c02`). It
 binds the actual argv, environment, wrapper toggle, raw/log/status/annotation

@@ -102,9 +102,9 @@ clippy 0.1.95 (59807616e1 2026-04-14)
 ```
 
 All Cargo commands used the memory-capped environment in
-`.coord/ods-lazy-entry/env.sh`, offline/locked resolution, one build job, and
+`(deleted-coord-artifact)`, offline/locked resolution, one build job, and
 the external target
-`/home/zhuhe/code/litchi-worktrees/.coord/ods-lazy-entry/target`. Its final
+`(deleted-coord-artifact)`. Its final
 size was 3,024,349,798 bytes, below the 19.2-billion-byte preflight and
 20-billion-byte hard ceiling.
 
@@ -113,7 +113,7 @@ size was 3,024,349,798 bytes, below the 19.2-billion-byte preflight and
 The full ODS suite was run as:
 
 ```text
-source /home/zhuhe/code/litchi-worktrees/.coord/ods-lazy-entry/env.sh
+source (deleted-coord-artifact)
 cargo test --offline --locked -j1 -p litchi-ods --all-targets
 ```
 
@@ -122,18 +122,18 @@ raw log remains external:
 
 | command | log bytes | SHA-256 |
 | --- | ---: | --- |
-| `/home/zhuhe/code/litchi-worktrees/.coord/ods-lazy-entry/ods-full-tests-1fdfcdcdba.log` | 181,605 | `9067fb06658fbc3b37dabb7768b40d43fc520bfd68e4bb96f7416e229bb8a14a` |
+| `(deleted-coord-artifact)/ods-full-tests-1fdfcdcdba.log` | 181,605 | `9067fb06658fbc3b37dabb7768b40d43fc520bfd68e4bb96f7416e229bb8a14a` |
 
 Strict all-target/all-feature Clippy was run as:
 
 ```text
-source /home/zhuhe/code/litchi-worktrees/.coord/ods-lazy-entry/env.sh
+source (deleted-coord-artifact)
 cargo clippy --offline --locked -j1 -p litchi-ods \
   --all-targets --all-features -- -D warnings
 ```
 
 It exited `0` in 59.61 seconds with no diagnostics. The raw log is
-`/home/zhuhe/code/litchi-worktrees/.coord/ods-lazy-entry/ods-all-targets-clippy-1fdfcdcdba.log`,
+`(deleted-coord-artifact)/ods-all-targets-clippy-1fdfcdcdba.log`,
 165 bytes, SHA-256
 `8a3273376dbbad60659de5d638bb73466f63177a29f171894a43a3f479e758c5`.
 

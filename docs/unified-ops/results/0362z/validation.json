@@ -18,49 +18,49 @@
     {
       "name": "cargo-check",
       "result": "pass",
-      "log": ".coord/w8-docx-svg/check.log",
+      "log": "(deleted-coord-artifact)/check.log",
       "bytes": 2922,
       "sha256": "c2ae94a666c8f553c1c3f25979dc6c7bae84ae58d895a681f9f1f7f0dafeec"
     },
     {
       "name": "drawing-svg-lifecycle",
       "result": "pass: 24 passed",
-      "log": ".coord/w8-docx-svg/focused-test.log",
+      "log": "(deleted-coord-artifact)/focused-test.log",
       "bytes": 4274,
       "sha256": "3b57e42ecbd4df70b6c621dbb16f0dea4ea8997c37bdbd9f3c595f661199b735"
     },
     {
       "name": "clippy",
       "result": "pass",
-      "log": ".coord/w8-docx-svg/clippy-final.log",
+      "log": "(deleted-coord-artifact)/clippy-final.log",
       "bytes": 1664,
       "sha256": "90d45121cce726de32686dff9836893503b34552222f2721a29e157f5713f1d3"
     },
     {
       "name": "rustdoc",
       "result": "pass",
-      "log": ".coord/w8-docx-svg/doc-final.log",
+      "log": "(deleted-coord-artifact)/doc-final.log",
       "bytes": 465,
       "sha256": "c2a99dc706e750a5d9fb2de57c31f3170919f60fec93a36ed3b631ae5fce93ed"
     },
     {
       "name": "glossary-docx-minimal",
       "result": "pass",
-      "log": ".coord/w8-docx-svg/glossary-minimal-final.log",
+      "log": "(deleted-coord-artifact)/glossary-minimal-final.log",
       "bytes": 155,
       "sha256": "9b13496e8f18c392593239a7d7bb8114d693599c3ab32bb10f14694c4dad5282"
     },
     {
       "name": "glossary-docx-full",
       "result": "pass",
-      "log": ".coord/w8-docx-svg/glossary-full-final.log",
+      "log": "(deleted-coord-artifact)/glossary-full-final.log",
       "bytes": 155,
       "sha256": "7fabdc123dca52f5526edb3a1a5358ca03835d31ed16dd5bc86bd1bbe7d3b119"
     },
     {
       "name": "api-debt-inventory",
       "result": "pass: no SVG rows; 24 residual non-SVG rows",
-      "log": ".coord/w8-docx-svg/api-debt-final.tsv",
+      "log": "(deleted-coord-artifact)/api-debt-final.tsv",
       "bytes": 2975,
       "sha256": "a88e1604589bcecf668582134a49f53df3d6ab7109153b0b4c555ba6b8b26f37"
     }

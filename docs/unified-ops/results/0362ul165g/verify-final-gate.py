@@ -7,7 +7,7 @@ import json
 import pathlib
 import subprocess
 
-BASE = pathlib.Path('/home/zhuhe/code/litchi-worktrees/.coord')
+BASE = pathlib.Path('/deleted-coord-artifact')
 PACKET = BASE / 'final-gate-C2a-33a0a63d35-20261026'
 STATE = BASE / 'final-gate-C2a-33a0a63d35-state-20261026'
 DRIVER = BASE / 'final-gate-C2a-33a0a63d35-driver-20261026/final_gate_v6.py'

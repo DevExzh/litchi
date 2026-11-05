@@ -16,7 +16,7 @@ explicit role locks:
 | candidate | `5a07adc1d62dea06dbac60986faa020007882506523dde49e4605708e1276aaf` | `litchi-perf-baseline` → `sha2 0.11.0`; `litchi-odraw` → `litchi-core` |
 
 Both role locks are external files under
-`/home/zhuhe/code/litchi-worktrees/.coord/ole-owner-driver-locks-e786/` and
+`(deleted-coord-artifact)` and
 are byte-for-byte the base lock plus those listed dependency edges.  The
 preparer and the independent validator parse both locks, require identical
 package identity sets, and compare every registry package's name, version,

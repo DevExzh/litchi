@@ -26,7 +26,7 @@
   ],
   "exit_code": 0,
   "seconds": 28.04733591999684,
-  "log": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/ole-oracle-metadata-repair/tooling.log",
+  "log": "(deleted-coord-artifact)/tooling.log",
   "log_bytes": 400,
   "log_sha256": "35ea09759cbfced73f6ad4764a1c6bb7de6100af7e0e5bdfff373d13d4d306a8",
   "actual_oracle_validation": [

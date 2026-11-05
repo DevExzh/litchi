@@ -8,7 +8,7 @@ correctly gated for tests; the workspace's `-D unused` policy made that a
 compile failure. The preserved state is:
 
 ```text
-/home/zhuhe/code/litchi-worktrees/.coord/0362ul87a-f5-842b9b1042/
+(deleted-coord-artifact)
 ```
 
 The failed receipt identities are `rows.json` SHA-256

@@ -6,7 +6,7 @@ execution, and runtime tests were not run in this source-only lane.
 Base: `15d8d53a0cf6d27f350b866463b4235bf26b08d9`.
 
 The assigned keep-going diagnostics contained 130 entries. The compiler log is
-`.coord/pptx-combined-0362ul89-f5-actual-15d8d53a0c/01-pptx-all-features-check-attempt-actual-f5-01.log`
+`(deleted-coord-artifact)/01-pptx-all-features-check-attempt-actual-f5-01.log`
 (100,739 bytes, SHA-256
 `a31129804840cddda84361dc4201852856d55afc25de7f0d49cc7d5868295084`); its
 diagnostics index SHA-256 is

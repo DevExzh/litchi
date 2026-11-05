@@ -54,15 +54,15 @@ Every Cargo command below began with this exact source command, in the stated
 worktree:
 
 ```sh
-source /home/zhuhe/code/litchi-worktrees/.coord/pages-lazy-entry/env.sh
+source (deleted-coord-artifact)
 ```
 
 The environment file is SHA-256
 `5f9a0886c7b7cd7f52c52942bf696b5748e2fa99c273523b1a10a2be3503b7e1` and sets
 `CARGO_BUILD_JOBS=1`, `RUST_TEST_THREADS=1`, `CARGO_INCREMENTAL=0`, offline
 Cargo, zero debug information, `LITCHI_MEM_MAX=20G`, target directory
-`/home/zhuhe/code/litchi-worktrees/.coord/pages-lazy-entry/target`, and
-`TMPDIR=/home/zhuhe/code/litchi-worktrees/.coord/pages-lazy-entry/tmp`.
+`(deleted-coord-artifact)`, and
+`TMPDIR=(deleted-coord-artifact)`.
 
 The pinned toolchain is Rust `rustc 1.95.0 (59807616e 2026-04-14)` and Cargo
 `1.95.0 (f2d3ce0bd 2026-03-21)`, from `rust-toolchain.toml`.  Configuration
@@ -100,65 +100,65 @@ closed artifacts.
 ### Pages
 
 ```sh
-source /home/zhuhe/code/litchi-worktrees/.coord/pages-lazy-entry/env.sh
+source (deleted-coord-artifact)
 cargo test --offline --locked -p litchi-pages --all-features --all-targets --no-fail-fast --message-format=short -j 1
 ```
 
 Source: `57b14d3f2a95081a07512feb8c7da38efe00c47b`.  Result: 61 result
 blocks, **719 passed, 0 failed, 0 ignored**.  Log:
-`/home/zhuhe/code/litchi-worktrees/.coord/pages-lazy-entry/combined-pages-tests-v4.log`
+`(deleted-coord-artifact)/combined-pages-tests-v4.log`
 (75,020 bytes, SHA-256
 `d8e6eb3cad4471a315298822089e83fb0cdc814becfac54ff17708ce01208ba9`).
 
 ### Numbers
 
 ```sh
-source /home/zhuhe/code/litchi-worktrees/.coord/pages-lazy-entry/env.sh
+source (deleted-coord-artifact)
 cargo test --offline --locked -p litchi-numbers --all-features --all-targets --no-fail-fast --message-format=short -j 1
 ```
 
 Source: `177d0070928d70f5c9055b0a0f6608658385921c`.  Result: 87 result
 blocks, **1,081 passed, 0 failed, 4 ignored**.  Log:
-`/home/zhuhe/code/litchi-worktrees/.coord/pages-lazy-entry/combined-numbers-tests-v3.log`
+`(deleted-coord-artifact)/combined-numbers-tests-v3.log`
 (119,073 bytes, SHA-256
 `3fe2a3a7f2b6c984af4b9dde1ea0d8852f8ded6a01edc6d437c39e6d5a46b91c`).
 
 ### Keynote
 
 ```sh
-source /home/zhuhe/code/litchi-worktrees/.coord/pages-lazy-entry/env.sh
+source (deleted-coord-artifact)
 cargo test --offline --locked -p litchi-keynote --all-features --all-targets --no-fail-fast --message-format=short -j 1
 ```
 
 Source: `131bac621b21a6182fb439c00ca9794fc650de15`.  Result: 103 result
 blocks, **1,115 passed, 0 failed, 1 ignored**.  Log:
-`/home/zhuhe/code/litchi-worktrees/.coord/pages-lazy-entry/combined-keynote-tests-v3.log`
+`(deleted-coord-artifact)/combined-keynote-tests-v3.log`
 (118,228 bytes, SHA-256
 `3edc37a582684d85471570534021fa79132f7305de614b39add6202b993305d6`).
 
 ### IWA
 
 ```sh
-source /home/zhuhe/code/litchi-worktrees/.coord/pages-lazy-entry/env.sh
+source (deleted-coord-artifact)
 cargo test --offline --locked -p litchi-iwa --all-features --all-targets --no-fail-fast --message-format=short -j 1
 ```
 
 Source: `4c323ae060bb0755080ced56cf6ebc6b49a294b1`.  Result: 225 result
 blocks, **1,780 passed, 0 failed, 0 ignored**.  Log:
-`/home/zhuhe/code/litchi-worktrees/.coord/pages-lazy-entry/combined-iwa-tests-v3.log`
+`(deleted-coord-artifact)/combined-iwa-tests-v3.log`
 (244,195 bytes, SHA-256
 `3f044fd6b705327e87ee57abfd3db839ed95f4598c4043b837d28811186aa19e`).
 
 ### Published doctests
 
 ```sh
-source /home/zhuhe/code/litchi-worktrees/.coord/pages-lazy-entry/env.sh
+source (deleted-coord-artifact)
 cargo test --offline --locked -p litchi-pages -p litchi-numbers -p litchi-keynote -p litchi-iwa --all-features --doc --no-fail-fast --message-format=short -j 1
 ```
 
 Source: `4c323ae060bb0755080ced56cf6ebc6b49a294b1`.  Result: 4 crate result
 blocks, **96 passed, 0 failed, 2 ignored**.  Log:
-`/home/zhuhe/code/litchi-worktrees/.coord/pages-lazy-entry/combined-iwork-doctests-v1.log`
+`(deleted-coord-artifact)/combined-iwork-doctests-v1.log`
 (11,634 bytes, SHA-256
 `dc1fc9fb12d4981b1abf4bf4f395c7ab74032917f5a654f5cf04e766c5413c56`).
 
@@ -167,13 +167,13 @@ blocks, **96 passed, 0 failed, 2 ignored**.  Log:
 ### Combined iWork Clippy
 
 ```sh
-source /home/zhuhe/code/litchi-worktrees/.coord/pages-lazy-entry/env.sh
+source (deleted-coord-artifact)
 cargo clippy --offline --locked -p litchi-pages -p litchi-numbers -p litchi-keynote -p litchi-iwa --all-targets --all-features -j 1 -- -D warnings
 ```
 
 Source: `4c323ae060bb0755080ced56cf6ebc6b49a294b1`.  Exit 0 with 22
 check/compile lines.  Log:
-`/home/zhuhe/code/litchi-worktrees/.coord/pages-lazy-entry/combined-iwork-clippy-v1.log`
+`(deleted-coord-artifact)/combined-iwork-clippy-v1.log`
 (1,832 bytes, SHA-256
 `88c527ae5845ae71097d667812aad3d6cf6a6bf906bdce8d934d2cb46e3642ed`).
 
@@ -181,19 +181,19 @@ The later Pages ledger/redaction delta was checked separately at the final
 Pages source:
 
 ```sh
-source /home/zhuhe/code/litchi-worktrees/.coord/pages-lazy-entry/env.sh
+source (deleted-coord-artifact)
 cargo clippy --offline --locked -p litchi-pages --all-targets --all-features -j 1 -- -D warnings
 ```
 
 Source: `57b14d3f2a95081a07512feb8c7da38efe00c47b`.  Exit 0.  Log:
-`/home/zhuhe/code/litchi-worktrees/.coord/pages-lazy-entry/pages-clippy-v2.log`
+`(deleted-coord-artifact)/pages-clippy-v2.log`
 (899 bytes, SHA-256
 `a66a5d2bdf7f429c1a44a4dec732ee3feaf6be5e0ae95a8688fd266c4369e9ea`).
 
 ### Unified facade
 
 ```sh
-source /home/zhuhe/code/litchi-worktrees/.coord/pages-lazy-entry/env.sh
+source (deleted-coord-artifact)
 cargo test --offline --locked -p litchi --all-features \
   --test iwork_file \
   --test iwork_merge_readers \
@@ -211,7 +211,7 @@ cargo test --offline --locked -p litchi --all-features \
 
 Source: `4c323ae060bb0755080ced56cf6ebc6b49a294b1`.  Result: 11 result
 blocks, **50 passed, 0 failed, 0 ignored**.  Log:
-`/home/zhuhe/code/litchi-worktrees/.coord/pages-lazy-entry/combined-litchi-facade-tests-v1.log`
+`(deleted-coord-artifact)/combined-litchi-facade-tests-v1.log`
 (23,412 bytes, SHA-256
 `08f58f21e6206801dfbd84b5d02b8d3efcfd5908e72e4d5d4ac033abfd59d629`).
 This selected consumer run predates the final Pages ledger-only and fuzz-only
@@ -220,13 +220,13 @@ commits; it is not presented as a post-`a0bf` whole-facade run.
 ### Operations target
 
 ```sh
-source /home/zhuhe/code/litchi-worktrees/.coord/pages-lazy-entry/env.sh
+source (deleted-coord-artifact)
 cargo check --offline --locked -p litchi-ops --all-targets --all-features -j 1
 ```
 
 Source: `5ac9b25891b1c4512f328aa0005c2d3f31bb756b`.  Exit 0 with one check
 line.  Log:
-`/home/zhuhe/code/litchi-worktrees/.coord/pages-lazy-entry/ops-check-v2.log`
+`(deleted-coord-artifact)/ops-check-v2.log`
 (167 bytes, SHA-256
 `44a638ee4929b8c234f838bec2c11390a17202abb05ec2c8118fc715529f0e0b`).
 
@@ -236,7 +236,7 @@ The fuzz package has no tracked lock, so this command intentionally omits
 `--locked`; it remains offline and single-job:
 
 ```sh
-source /home/zhuhe/code/litchi-worktrees/.coord/pages-lazy-entry/env.sh
+source (deleted-coord-artifact)
 cargo check --offline --manifest-path crates/litchi/fuzz/Cargo.toml --all-targets -j 1
 ```
 
@@ -245,31 +245,31 @@ warnings are the three pre-existing unused media constants
 `REPLACED_MOVIE_BYTES`, `REPLACED_POSTER_BYTES` and `REPLACED_AUDIO_BYTES` in
 `fuzz_targets/keynote_slide_media_data_seed.rs`; the lazy slide-text `Result`
 warning was fixed in `a0bf`.  Log:
-`/home/zhuhe/code/litchi-worktrees/.coord/pages-lazy-entry/litchi-fuzz-check-v3.log`
+`(deleted-coord-artifact)/litchi-fuzz-check-v3.log`
 (1,049 bytes, SHA-256
 `801da79e5e730b965f07c9fecfcb61ab9ab08901c7cd9177b265d1d6bc4a778c`).
 
 ### Minimal unified-batch harness
 
 ```sh
-source /home/zhuhe/code/litchi-worktrees/.coord/pages-lazy-entry/env.sh
+source (deleted-coord-artifact)
 cargo check --offline --locked --manifest-path tools/perf-baseline/unified-batch-closure/Cargo.toml --no-default-features --features pages,keynote,numbers --all-targets -j 1
 ```
 
 Source: `a0bf134246bb19f171d34f61822aa072d30a3fd7`.  Exit 0.  Log:
-`/home/zhuhe/code/litchi-worktrees/.coord/pages-lazy-entry/unified-batch-iwork-check-v2.log`
+`(deleted-coord-artifact)/unified-batch-iwork-check-v2.log`
 (60 bytes, SHA-256
 `dede40800e26c8c8f3fbde8303ac3d28a9c607bcd68871b4b59a36596409a3cf`).
 
 The corresponding strict check was:
 
 ```sh
-source /home/zhuhe/code/litchi-worktrees/.coord/pages-lazy-entry/env.sh
+source (deleted-coord-artifact)
 cargo clippy --offline --locked --manifest-path tools/perf-baseline/unified-batch-closure/Cargo.toml --no-default-features --features pages,keynote,numbers --all-targets -j 1 -- -D warnings
 ```
 
 Source: `a0bf134246bb19f171d34f61822aa072d30a3fd7`.  Exit 0.  Log:
-`/home/zhuhe/code/litchi-worktrees/.coord/pages-lazy-entry/unified-batch-iwork-clippy-v1.log`
+`(deleted-coord-artifact)/unified-batch-iwork-clippy-v1.log`
 (210 bytes, SHA-256
 `65716b8aae6840c1087a81b20a3f1e66bea35b46bd1eaed9e76d5bd6ba753f74`).
 
@@ -281,20 +281,20 @@ receipt above.
 
 | Diagnostic log | Size / SHA-256 | Diagnosis and resolution |
 | --- | --- | --- |
-| `/home/zhuhe/code/litchi-worktrees/.coord/pages-lazy-entry/combined-pages-tests.log` | 1,042 bytes / `f65799a70d798235d9024cf678a45a2723c83e06b91528a6ab9b5bec4502a4dd` | Pages body-footnote Arc type mismatch; fixed by retaining the shared `Arc<Footnote>`. |
-| `/home/zhuhe/code/litchi-worktrees/.coord/pages-lazy-entry/combined-pages-tests-v3.log` | 890 bytes / `c15fbfd0ccef3b31be775ff9e6248e2cb295c2580d685c418450a79dc9a571ba` | Lazy-ledger tests accessed private `WireBudget` fields; assertions were changed to the typed payload-work accessors. |
-| `/home/zhuhe/code/litchi-worktrees/.coord/pages-lazy-entry/combined-numbers-tests-v2.log` | 119,322 bytes / `f25737c0fcbc6b72754083c6929b1a070be06c84d5d04e1aa8bab78b5a718040` | The new retry test used a single-cell `Region::new(0, 0, 1, 1)` where a merge region was required; the test now uses a valid 1×2 region. |
-| `/home/zhuhe/code/litchi-worktrees/.coord/pages-lazy-entry/combined-keynote-tests-v1.log` | 894 bytes / `5f1ac0c11e622c7b25dc89def87697c5e3803e0dcef4bd85e3716a51586febb1` | Missing `SelectorBytes` match in the movie-caption limit mapping; fixed in the Keynote consumer. |
-| `/home/zhuhe/code/litchi-worktrees/.coord/pages-lazy-entry/combined-keynote-tests-v2.log` | 321 bytes / `f0fd0bae8993bab19f7dc178572f98429c8e65e427fcdf20b39300c72384b8f1` | Composed edit test modules both declared `tests`; separated the modules. |
-| `/home/zhuhe/code/litchi-worktrees/.coord/pages-lazy-entry/combined-iwa-tests-v1.log` | 1,153 bytes / `cb9a5f06fd291ebca4258415a4049756edba5f62ff3b7a30a650c680f3399ff2` | Sparse checkout omitted the already-tracked `media/litchi_logo.png`; the sparse path was restored without adding a fixture. |
-| `/home/zhuhe/code/litchi-worktrees/.coord/pages-lazy-entry/combined-iwa-tests-v2.log` | 244,892 bytes / `0db9095ec43908da55259ba8c8f524a8663bc1bc89d976dc81580833530478e6` | Existing header/footer assertion still expected eager construction to reject an invalid selector; it now resolves the deferred selector on access. |
-| `/home/zhuhe/code/litchi-worktrees/.coord/pages-lazy-entry/ops-check-v1.log` | 12,727 bytes / `63b5831de816f8529a65c7964961055fac75452eec8536aa6690545ca1625f38` | The OLE example called `.expect()` on the still-infallible XLS/PPT getters; `5ac9` removed those calls. The queued PPT packet must restore its own fallible access when merged. |
-| `/home/zhuhe/code/litchi-worktrees/.coord/pages-lazy-entry/litchi-fuzz-check-v1.log` | 279 bytes / `05aec1489b55fdccb30b9e8a8ac138785890090e04d9190ff79893267fb7dd49` | `--locked` correctly refused because the standalone fuzz manifest has no tracked lock; the final check used offline unlocked dependency resolution and kept its generated lock ignored. |
+| `(deleted-coord-artifact)/combined-pages-tests.log` | 1,042 bytes / `f65799a70d798235d9024cf678a45a2723c83e06b91528a6ab9b5bec4502a4dd` | Pages body-footnote Arc type mismatch; fixed by retaining the shared `Arc<Footnote>`. |
+| `(deleted-coord-artifact)/combined-pages-tests-v3.log` | 890 bytes / `c15fbfd0ccef3b31be775ff9e6248e2cb295c2580d685c418450a79dc9a571ba` | Lazy-ledger tests accessed private `WireBudget` fields; assertions were changed to the typed payload-work accessors. |
+| `(deleted-coord-artifact)/combined-numbers-tests-v2.log` | 119,322 bytes / `f25737c0fcbc6b72754083c6929b1a070be06c84d5d04e1aa8bab78b5a718040` | The new retry test used a single-cell `Region::new(0, 0, 1, 1)` where a merge region was required; the test now uses a valid 1×2 region. |
+| `(deleted-coord-artifact)/combined-keynote-tests-v1.log` | 894 bytes / `5f1ac0c11e622c7b25dc89def87697c5e3803e0dcef4bd85e3716a51586febb1` | Missing `SelectorBytes` match in the movie-caption limit mapping; fixed in the Keynote consumer. |
+| `(deleted-coord-artifact)/combined-keynote-tests-v2.log` | 321 bytes / `f0fd0bae8993bab19f7dc178572f98429c8e65e427fcdf20b39300c72384b8f1` | Composed edit test modules both declared `tests`; separated the modules. |
+| `(deleted-coord-artifact)/combined-iwa-tests-v1.log` | 1,153 bytes / `cb9a5f06fd291ebca4258415a4049756edba5f62ff3b7a30a650c680f3399ff2` | Sparse checkout omitted the already-tracked `media/litchi_logo.png`; the sparse path was restored without adding a fixture. |
+| `(deleted-coord-artifact)/combined-iwa-tests-v2.log` | 244,892 bytes / `0db9095ec43908da55259ba8c8f524a8663bc1bc89d976dc81580833530478e6` | Existing header/footer assertion still expected eager construction to reject an invalid selector; it now resolves the deferred selector on access. |
+| `(deleted-coord-artifact)/ops-check-v1.log` | 12,727 bytes / `63b5831de816f8529a65c7964961055fac75452eec8536aa6690545ca1625f38` | The OLE example called `.expect()` on the still-infallible XLS/PPT getters; `5ac9` removed those calls. The queued PPT packet must restore its own fallible access when merged. |
+| `(deleted-coord-artifact)/litchi-fuzz-check-v1.log` | 279 bytes / `05aec1489b55fdccb30b9e8a8ac138785890090e04d9190ff79893267fb7dd49` | `--locked` correctly refused because the standalone fuzz manifest has no tracked lock; the final check used offline unlocked dependency resolution and kept its generated lock ignored. |
 
 The old fuzz v2 check was successful but emitted the three pre-existing media
 constant warnings and one wave-introduced unused `Result` warning.  Its log is
 retained for provenance at
-`/home/zhuhe/code/litchi-worktrees/.coord/pages-lazy-entry/litchi-fuzz-check-v2.log`
+`(deleted-coord-artifact)/litchi-fuzz-check-v2.log`
 (5,464 bytes, SHA-256
 `4521fff1dedc537d208ebae33c335c5581ed373400ee3c61312d18ed458afd9a`).
 Only the three media warnings remain in the final v3 check.

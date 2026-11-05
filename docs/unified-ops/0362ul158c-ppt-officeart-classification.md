@@ -9,7 +9,7 @@ was run in this follow-up.
 This change is on `uo2/ppt-hyperlink-crud-repair`, continuing committed
 source `db70fac03b48d80e97a932bb2f4a2fa1802450e4`. It integrates the reviewed
 external patch
-`/home/zhuhe/code/litchi-worktrees/.coord/ppt-officeart-classification-20261026/ppt-officeart-classification.patch`
+`(deleted-coord-artifact)/ppt-officeart-classification.patch`
 with SHA-256
 `d39c5a54a4c13491ed4a9b098c329842cc4f36dc8ee8b4fe94cf29118c73024f`.
 

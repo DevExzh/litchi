@@ -19,7 +19,7 @@
   ],
   "exit": 0,
   "seconds": 27.167985088992282,
-  "log": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/ppt-correctness-merge/combined-tests.log",
+  "log": "(deleted-coord-artifact)/combined-tests.log",
   "log_bytes": 428,
   "log_sha256": "556668301476890f96332b7a33b9190beb1e9fb43588cea857f077bce1faacd3",
   "scope": "Composed Python validation of PPT probe/correctness packet; no timing measurement"

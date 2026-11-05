@@ -28,5 +28,5 @@ baseline must contain the identical normalized harness before paired builds.
 This is private composition, not final acceptance or publication.
 
 The formatter-only delta is retained externally at
-`.coord/composition-format-89ay-94u/uo2-pptx-combined-0362ul89.patch` (10775 bytes, SHA-256
+`(deleted-coord-artifact)/uo2-pptx-combined-0362ul89.patch` (10775 bytes, SHA-256
 `0f9e8f95027a36fb9f3acf072f1ef415bdb2d4df64ff2b561e3fcda3ed69be09`).

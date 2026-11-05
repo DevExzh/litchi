@@ -32,7 +32,7 @@ while exact no-ops preserve source bytes and signatures.
 ## Validation
 
 The lane used the memory-capped W8 environment, one build/test worker, and
-`CARGO_TARGET_DIR=/home/zhuhe/code/litchi-worktrees/.coord/0362rg-docx-redact-sanitize-target`.
+`CARGO_TARGET_DIR=(deleted-coord-artifact)`.
 
 - `cargo test -p litchi-docx --all-features` passed, including 1,490 unit tests,
   all DOCX integration suites, and 168 passing doctests (31 ignored).

@@ -4,12 +4,12 @@
   "cwd": "/home/zhuhe/code/litchi-worktrees/uo2-budget-validation",
   "command": [
     "python3",
-    "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/run-semantic-checks-disk-guarded.py",
-    "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/xls-xlsx-runtime-v2-commands.json",
-    "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/xls-xlsx-runtime-v2"
+    "(deleted-coord-artifact)",
+    "(deleted-coord-artifact)",
+    "(deleted-coord-artifact)"
   ],
   "started_unix_seconds": 1792775044.7413144,
-  "target": "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/target",
+  "target": "(deleted-coord-artifact)",
   "lock_sha256": "52ed0cacac15b5e440349bfc0f4aca2665bcf50d59d4321624e596bb410783c6",
   "checks": [
     {
@@ -29,433 +29,433 @@
       ],
       "exit": 0,
       "seconds": 93.54269975300122,
-      "log": "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/xls-xlsx-runtime-v2/check-0.log",
+      "log": "(deleted-coord-artifact)/check-0.log",
       "bytes": 353778,
       "sha256": "dfaf6e36d39b5a054ad74c64e841e8a54afcd201e71454c007ce3cb4807436f2",
       "target_bytes_before": 1227697607,
       "completed_test_executables_pruned": [
         {
-          "path": "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/target/debug/deps/builder-d2e1c5eb7509ba26",
+          "path": "(deleted-coord-artifact)/builder-d2e1c5eb7509ba26",
           "bytes": 19112120,
           "sha256": "a9d32d06c9affa69ecad218fe0063b02f47059994cb540a1ae5f4b47c87e7c7f"
         },
         {
-          "path": "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/target/debug/deps/encryption_entropy-4b9ffd1d52b5ca0a",
+          "path": "(deleted-coord-artifact)/encryption_entropy-4b9ffd1d52b5ca0a",
           "bytes": 13456568,
           "sha256": "e7951f48ca48de59fda01adf8520a6e42b91f3c2b712bf9ea4afb38139ad3622"
         },
         {
-          "path": "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/target/debug/deps/litchi_xls-6c78a4b21e41a5ad",
+          "path": "(deleted-coord-artifact)/litchi_xls-6c78a4b21e41a5ad",
           "bytes": 37271272,
           "sha256": "c0a881fd1f6d4c700195ffc59da0b6642f3e595c611abfa0ee4151b9de357f81"
         },
         {
-          "path": "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/target/debug/deps/package_owner-877981b3da6d8d95",
+          "path": "(deleted-coord-artifact)/package_owner-877981b3da6d8d95",
           "bytes": 19507352,
           "sha256": "f7ac555ce796127c43aaed14114fadcc0f5bde9a73be4b5c8536bab72cea4def"
         },
         {
-          "path": "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/target/debug/deps/package_security-00143ad5b4244d60",
+          "path": "(deleted-coord-artifact)/package_security-00143ad5b4244d60",
           "bytes": 14342856,
           "sha256": "6b7beddb2de99a398324c4802f09d9da41d391b613c93fc1da2bf0fdeb828ef6"
         },
         {
-          "path": "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/target/debug/deps/read_projection-0d6fc6968d9c6195",
+          "path": "(deleted-coord-artifact)/read_projection-0d6fc6968d9c6195",
           "bytes": 14432664,
           "sha256": "608b438730c94134500c63608a3baabe6bee53982eda55a165e91d770818abfd"
         },
         {
-          "path": "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/target/debug/deps/save_durability-e29e60ceb92b78f9",
+          "path": "(deleted-coord-artifact)/save_durability-e29e60ceb92b78f9",
           "bytes": 16456384,
           "sha256": "b1f72ff0eb149919ccbd86ab43cda6cbf3503c1b14e7e01fa9756fa25a09e61b"
         },
         {
-          "path": "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/target/debug/deps/sheet_features-d92013c0b43dcc55",
+          "path": "(deleted-coord-artifact)/sheet_features-d92013c0b43dcc55",
           "bytes": 16333920,
           "sha256": "3d9f6074a7a7bd2b770fb09dfbe10a42144ff21c8829e47e972bb92f3b503bef"
         },
         {
-          "path": "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/target/debug/deps/source_backed-c0a9581e94788597",
+          "path": "(deleted-coord-artifact)/source_backed-c0a9581e94788597",
           "bytes": 18332272,
           "sha256": "9b7ed206d47c09fc2b050fdb9b3b81791b9120d9322cc51bd189b7c66018ab00"
         },
         {
-          "path": "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/target/debug/deps/sst_scan_allocations-cc44f27db1a50944",
+          "path": "(deleted-coord-artifact)/sst_scan_allocations-cc44f27db1a50944",
           "bytes": 5186560,
           "sha256": "9c02dfbac2a21c68a7352a74bc517c358c94e2f26299c9eb43c768bc768d545f"
         },
         {
-          "path": "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/target/debug/deps/v7_review_probe-52d168ca7a170162",
+          "path": "(deleted-coord-artifact)/v7_review_probe-52d168ca7a170162",
           "bytes": 2612760,
           "sha256": "a6a7d96150bb25683434b6c0ddee8599f268ffe96f308d39cfef18afb1386573"
         },
         {
-          "path": "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/target/debug/deps/validation-dc7da776d5c5246a",
+          "path": "(deleted-coord-artifact)/validation-dc7da776d5c5246a",
           "bytes": 14546480,
           "sha256": "22e7ecfd88978bb44d945ecb96e43815a7670ff66db21e6b67bb28942de9ebcf"
         },
         {
-          "path": "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/target/debug/deps/xls_alignment-68b15bdd440b3ec7",
+          "path": "(deleted-coord-artifact)/xls_alignment-68b15bdd440b3ec7",
           "bytes": 9457096,
           "sha256": "7567fa88d4dca889da6b9e5049da5060aa0000b2b4eec1edccf975ef0154dd4a"
         },
         {
-          "path": "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/target/debug/deps/xls_array_formulas-0848ac8c122c5936",
+          "path": "(deleted-coord-artifact)/xls_array_formulas-0848ac8c122c5936",
           "bytes": 13545216,
           "sha256": "289e83caa5343b1669d6490a0c9c868a03cacf6074bc60f44bdfc608715ac71b"
         },
         {
-          "path": "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/target/debug/deps/xls_autofilter12-bc03705da5bdc396",
+          "path": "(deleted-coord-artifact)/xls_autofilter12-bc03705da5bdc396",
           "bytes": 14046984,
           "sha256": "d90e50f8a81e1d9caea56760848a175548d3efd9bc5d7e89b4d8307f4ce639fc"
         },
         {
-          "path": "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/target/debug/deps/xls_book_ext-d99f1b0218c2b485",
+          "path": "(deleted-coord-artifact)/xls_book_ext-d99f1b0218c2b485",
           "bytes": 13434984,
           "sha256": "fcfa0e6bbb3430f823ec83ee6f7a748ec36843f5f2d5bb5a02110f0c8710bf5e"
         },
         {
-          "path": "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/target/debug/deps/xls_border_fill-49899cf90c187f2f",
+          "path": "(deleted-coord-artifact)/xls_border_fill-49899cf90c187f2f",
           "bytes": 9468312,
           "sha256": "7f5211a7e92e791e1105f7904389b23b1eae4024e1642272dab564a5f6a1977f"
         },
         {
-          "path": "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/target/debug/deps/xls_calculation-bffa9a6700bea5de",
+          "path": "(deleted-coord-artifact)/xls_calculation-bffa9a6700bea5de",
           "bytes": 14012320,
           "sha256": "8162d6fe3f8c505bb465dadf847612724a0bc218c0b95e1a48e9f2ed0467524d"
         },
         {
-          "path": "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/target/debug/deps/xls_charts-5ad0161bc4b53a55",
+          "path": "(deleted-coord-artifact)/xls_charts-5ad0161bc4b53a55",
           "bytes": 15622624,
           "sha256": "8a720d10e352c46711013a53d4693f418afa5f2a115f8081e121e863eb3de31b"
         },
         {
-          "path": "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/target/debug/deps/xls_comment_transactions-5fca7b8f8d3661bb",
+          "path": "(deleted-coord-artifact)/xls_comment_transactions-5fca7b8f8d3661bb",
           "bytes": 17050096,
           "sha256": "3b8ae890abd2c2581650a9033ff64a471109e2c34565dc2ec6892beb3dce07b2"
         },
         {
-          "path": "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/target/debug/deps/xls_comments_writer-855fecf38744cc77",
+          "path": "(deleted-coord-artifact)/xls_comments_writer-855fecf38744cc77",
           "bytes": 13768760,
           "sha256": "6a2615e18dd820ef818482f175cfd3cb08d9e704ca1f0c2a48ebd00bde962ed4"
         },
         {
-          "path": "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/target/debug/deps/xls_conditional_format-933ff2ae80e00046",
+          "path": "(deleted-coord-artifact)/xls_conditional_format-933ff2ae80e00046",
           "bytes": 13432120,
           "sha256": "608e2e42e12fbfe80766e2a9daa977ba5b178c8445e3dea3c867c0db81422585"
         },
         {
-          "path": "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/target/debug/deps/xls_consolidation-f0333770af418bd4",
+          "path": "(deleted-coord-artifact)/xls_consolidation-f0333770af418bd4",
           "bytes": 13925672,
           "sha256": "6870d967ee8e5a2e5861ed2ea5f3f79be042d43875f398e20901caf75edd98cf"
         },
         {
-          "path": "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/target/debug/deps/xls_custom_table_styles_writer-231accabae572f56",
+          "path": "(deleted-coord-artifact)/xls_custom_table_styles_writer-231accabae572f56",
           "bytes": 13516032,
           "sha256": "04c1af28616e24c00982496a00bbdbf6a7fd93b2a070a3bc47cb3ffdc4690c77"
         },
         {
-          "path": "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/target/debug/deps/xls_custom_views-f25c52d8ae5b3139",
+          "path": "(deleted-coord-artifact)/xls_custom_views-f25c52d8ae5b3139",
           "bytes": 9487432,
           "sha256": "3b38268fd3937b6a3a722c69a4e85157a9b078f0b610b0680e8279d0a0bc9784"
         },
         {
-          "path": "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/target/debug/deps/xls_data_tables-b99298917185b722",
+          "path": "(deleted-coord-artifact)/xls_data_tables-b99298917185b722",
           "bytes": 13453560,
           "sha256": "58e36e91e65892c9da9af546dc447b54abc21609a54872b4eba3f62e82a4274f"
         },
         {
-          "path": "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/target/debug/deps/xls_data_validation-8d46768dbf2e3c1f",
+          "path": "(deleted-coord-artifact)/xls_data_validation-8d46768dbf2e3c1f",
           "bytes": 13481728,
           "sha256": "ccf751b246370ce64c425865c702a605030c6b10076ebf1a49c3a94a44c64330"
         },
         {
-          "path": "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/target/debug/deps/xls_defined_name_metadata-97e997d50c384af2",
+          "path": "(deleted-coord-artifact)/xls_defined_name_metadata-97e997d50c384af2",
           "bytes": 13996216,
           "sha256": "9238c9a87e7eca1a1c7fee631dca12adb2ac84bc071b82259dc04ec15d33f0b8"
         },
         {
-          "path": "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/target/debug/deps/xls_environment-b6120cf9aa307f12",
+          "path": "(deleted-coord-artifact)/xls_environment-b6120cf9aa307f12",
           "bytes": 13912104,
           "sha256": "505b1d281293f2c38b96301d511805b8afd4795c1efce1c82319e8d608813ee1"
         },
         {
-          "path": "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/target/debug/deps/xls_external_links-4836b4841f17c49b",
+          "path": "(deleted-coord-artifact)/xls_external_links-4836b4841f17c49b",
           "bytes": 13928936,
           "sha256": "e76de4e24b7b6fc6d6e71697027990247cec7d363beceeb2fca5f447569d5708"
         },
         {
-          "path": "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/target/debug/deps/xls_external_names-5721754f13f6f3d8",
+          "path": "(deleted-coord-artifact)/xls_external_names-5721754f13f6f3d8",
           "bytes": 13944680,
           "sha256": "7432425292d9adbca12c7b952d5053824bd8fb303d59bf8b37527a26c5e7dd12"
         },
         {
-          "path": "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/target/debug/deps/xls_external_tables-54a7c8bc2fc68197",
+          "path": "(deleted-coord-artifact)/xls_external_tables-54a7c8bc2fc68197",
           "bytes": 13697648,
           "sha256": "a2c9dfd0132a9040dbe44a894d09d9ea9fc5a5705746f92c1ce8692e2267e1c7"
         },
         {
-          "path": "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/target/debug/deps/xls_fonts-46733e044995277b",
+          "path": "(deleted-coord-artifact)/xls_fonts-46733e044995277b",
           "bytes": 9479640,
           "sha256": "6af78b27bf9a7e4f773d76603c8a2d41fdc3fb056786d3e788f63848f8a31030"
         },
         {
-          "path": "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/target/debug/deps/xls_form_controls-856ea69ab5f82a41",
+          "path": "(deleted-coord-artifact)/xls_form_controls-856ea69ab5f82a41",
           "bytes": 15635144,
           "sha256": "639a07514ef6880f9e7d1e9822f28b192433425acf8aaceb4f230b07b4ae8f12"
         },
         {
-          "path": "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/target/debug/deps/xls_formula_ancillary_rejections-566858d2b69e7df8",
+          "path": "(deleted-coord-artifact)/xls_formula_ancillary_rejections-566858d2b69e7df8",
           "bytes": 2730392,
           "sha256": "7ca915da988085c14eaa183058c0f0e0104d2d1c34e64c73c82e8555cc386186"
         },
         {
-          "path": "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/target/debug/deps/xls_formula_errors-80bf83c64047b648",
+          "path": "(deleted-coord-artifact)/xls_formula_errors-80bf83c64047b648",
           "bytes": 9449264,
           "sha256": "e6f011a0d21185dcf8f4104c305fc77f17d3dc84a7c8930a254e29bb177d0998"
         },
         {
-          "path": "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/target/debug/deps/xls_function_groups-86c7845356f057f2",
+          "path": "(deleted-coord-artifact)/xls_function_groups-86c7845356f057f2",
           "bytes": 13933368,
           "sha256": "d0dcd72325b60c24da46344f7ef7aeaa033786e2849f94a21f81ae7332c23cf8"
         },
         {
-          "path": "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/target/debug/deps/xls_header_footer-3b09ea99a0834162",
+          "path": "(deleted-coord-artifact)/xls_header_footer-3b09ea99a0834162",
           "bytes": 13445800,
           "sha256": "3ddf95d6b11e14bdae6322fa95f96716cdaccfa9da72dadb2cc855e6bcf673b9"
         },
         {
-          "path": "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/target/debug/deps/xls_host_capabilities-77bbf32c4ba7d7b3",
+          "path": "(deleted-coord-artifact)/xls_host_capabilities-77bbf32c4ba7d7b3",
           "bytes": 11670256,
           "sha256": "8c413418ecf48205dc2fe5163d0e42e1eb82a2c8c71a78d8056a112bf053ee47"
         },
         {
-          "path": "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/target/debug/deps/xls_leniency-4e1004cf90a00bc2",
+          "path": "(deleted-coord-artifact)/xls_leniency-4e1004cf90a00bc2",
           "bytes": 14255784,
           "sha256": "03e2d4c34e588d8680b9e9a271bca910a2682f1e4f934f6bb15d1323e63e068b"
         },
         {
-          "path": "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/target/debug/deps/xls_leniency_defaults-091dddfa160ed427",
+          "path": "(deleted-coord-artifact)/xls_leniency_defaults-091dddfa160ed427",
           "bytes": 14890032,
           "sha256": "6c9e1e08a67c582ea04b4620bfa64b4d4ea535c868df3058ccf01144d1918575"
         },
         {
-          "path": "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/target/debug/deps/xls_list_objects-44a01a2b76e3b1cc",
+          "path": "(deleted-coord-artifact)/xls_list_objects-44a01a2b76e3b1cc",
           "bytes": 14179264,
           "sha256": "00bc22c35c1863779fde772f1229b0f6584ca1f0c46f5a3819909976bfbf6ce0"
         },
         {
-          "path": "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/target/debug/deps/xls_metadata-c7962b9baba644c9",
+          "path": "(deleted-coord-artifact)/xls_metadata-c7962b9baba644c9",
           "bytes": 15027400,
           "sha256": "9bd2295bb1771016eabf3fb19b5d58c18fe3125d795634bd01a66bbf345b3bba"
         },
         {
-          "path": "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/target/debug/deps/xls_mutation_policy-1181a2054253639c",
+          "path": "(deleted-coord-artifact)/xls_mutation_policy-1181a2054253639c",
           "bytes": 13645752,
           "sha256": "a051244a4ef0fc390000620b0b12baad9dd7ad843fe0e7160889c456a162d7ec"
         },
         {
-          "path": "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/target/debug/deps/xls_ole_objects-7cc5006f7d71946f",
+          "path": "(deleted-coord-artifact)/xls_ole_objects-7cc5006f7d71946f",
           "bytes": 15801448,
           "sha256": "00e12a01f7453c6373aa2d32962b4f41b1195c99995f1e29cc6488224640eda0"
         },
         {
-          "path": "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/target/debug/deps/xls_open_options-cdeea1baa8c71a66",
+          "path": "(deleted-coord-artifact)/xls_open_options-cdeea1baa8c71a66",
           "bytes": 13926184,
           "sha256": "27ef517ddc9efc75cb7e723fa0f0138852b0d0bc8135dbf73b6f7704e6eda8c4"
         },
         {
-          "path": "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/target/debug/deps/xls_page_setup-a3d8abfc95c965ce",
+          "path": "(deleted-coord-artifact)/xls_page_setup-a3d8abfc95c965ce",
           "bytes": 13439360,
           "sha256": "28ebcf927dfb32898325f85ddfd7b23a6a38825aa4231c3660989d759e7654f1"
         },
         {
-          "path": "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/target/debug/deps/xls_palette-cebbd2feff4148b8",
+          "path": "(deleted-coord-artifact)/xls_palette-cebbd2feff4148b8",
           "bytes": 9456032,
           "sha256": "924d938e725a62a00330f1eaa0a9f64b64fb61ef554938660cec9d2ff1029c38"
         },
         {
-          "path": "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/target/debug/deps/xls_phonetic_info-7eb19982cba9448c",
+          "path": "(deleted-coord-artifact)/xls_phonetic_info-7eb19982cba9448c",
           "bytes": 13455360,
           "sha256": "f27d208179f75efebc4a737bc70d8cd2ab6419c13e36e3bf6e8cedc37c17ab4d"
         },
         {
-          "path": "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/target/debug/deps/xls_pivot_cache_grouping-761c7f8974270d08",
+          "path": "(deleted-coord-artifact)/xls_pivot_cache_grouping-761c7f8974270d08",
           "bytes": 14297288,
           "sha256": "ffd2cd31e46f455dd46253d82273989f8f416253625a60328a7ad3a6aa936a77"
         },
         {
-          "path": "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/target/debug/deps/xls_pivot_cache_links-16a5ba1ea5b46362",
+          "path": "(deleted-coord-artifact)/xls_pivot_cache_links-16a5ba1ea5b46362",
           "bytes": 13766768,
           "sha256": "102f681a951385805004787881b7870481f5ec8c9486752d468c3693ba6e9040"
         },
         {
-          "path": "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/target/debug/deps/xls_pivot_cache_values-c0111620058ed359",
+          "path": "(deleted-coord-artifact)/xls_pivot_cache_values-c0111620058ed359",
           "bytes": 14319440,
           "sha256": "49bb41e89ae30c7002507acc5d4f73d694c7dca68db82ed133099fe0be91b9df"
         },
         {
-          "path": "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/target/debug/deps/xls_pivot_view_reader-a474e29635e6d68f",
+          "path": "(deleted-coord-artifact)/xls_pivot_view_reader-a474e29635e6d68f",
           "bytes": 15204520,
           "sha256": "347f61ec164e5e8f5ce1f19cc02c3eee8a7f2ce903975ed10bd37d9fcdf58498"
         },
         {
-          "path": "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/target/debug/deps/xls_protection-1557c14a73727f22",
+          "path": "(deleted-coord-artifact)/xls_protection-1557c14a73727f22",
           "bytes": 13417648,
           "sha256": "5e51cfc16bed51494ee4058322df14d7792d3382b06946079b7dc4199a16f692"
         },
         {
-          "path": "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/target/debug/deps/xls_query_index_cache-132c613956cb584d",
+          "path": "(deleted-coord-artifact)/xls_query_index_cache-132c613956cb584d",
           "bytes": 6751368,
           "sha256": "dd0bc1d94325fb1cff8c2c49d8ddd8a5595514ee2ca80877a09c7270ef4e20b1"
         },
         {
-          "path": "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/target/debug/deps/xls_query_tables-381677aa7f8c0a1f",
+          "path": "(deleted-coord-artifact)/xls_query_tables-381677aa7f8c0a1f",
           "bytes": 9512896,
           "sha256": "9fb753b2d8294abeb7f734fca67121b49d6d7024d2a199c17cddffed0c13ac20"
         },
         {
-          "path": "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/target/debug/deps/xls_real_time_data-0a4c01107d6120af",
+          "path": "(deleted-coord-artifact)/xls_real_time_data-0a4c01107d6120af",
           "bytes": 13472976,
           "sha256": "38c96ad473816aacd723e65138067368e06efafcf49362585c7005ca9f2ee721"
         },
         {
-          "path": "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/target/debug/deps/xls_revision_log-6867304b03ba1374",
+          "path": "(deleted-coord-artifact)/xls_revision_log-6867304b03ba1374",
           "bytes": 13663808,
           "sha256": "a3cf1d9b2de85b24bd7cf6f2b6170ce9bd9790b30044d6df863ea03bc08bed92"
         },
         {
-          "path": "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/target/debug/deps/xls_row_block_index-0529e92600d1ddea",
+          "path": "(deleted-coord-artifact)/xls_row_block_index-0529e92600d1ddea",
           "bytes": 9476360,
           "sha256": "694bd863ed939f2626068f3d2bb355c291da11ff1fbb62bba763d344f33e01f0"
         },
         {
-          "path": "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/target/debug/deps/xls_row_block_writer-b4a55252ea5c8528",
+          "path": "(deleted-coord-artifact)/xls_row_block_writer-b4a55252ea5c8528",
           "bytes": 13447088,
           "sha256": "4664f4f94cc6905037272d65ab84314ee6c51244874c5f9783da860266b92112"
         },
         {
-          "path": "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/target/debug/deps/xls_scenario-539aa8b1459faeeb",
+          "path": "(deleted-coord-artifact)/xls_scenario-539aa8b1459faeeb",
           "bytes": 13933992,
           "sha256": "fdc6a2269126793014bccc66bacc6f74a8eceb74113f1e66070a3218ca1567a9"
         },
         {
-          "path": "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/target/debug/deps/xls_shape_groups_writer-4d0423136563a3b4",
+          "path": "(deleted-coord-artifact)/xls_shape_groups_writer-4d0423136563a3b4",
           "bytes": 13836000,
           "sha256": "c4df90626feed997e8f785457a3eb2d527b7e1f8122c8fe16637e9925516ebef"
         },
         {
-          "path": "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/target/debug/deps/xls_shapes_writer-28124aae69c1e219",
+          "path": "(deleted-coord-artifact)/xls_shapes_writer-28124aae69c1e219",
           "bytes": 14104328,
           "sha256": "7392275de345cb701194303b177d76d985f769c1cbdbe03f997a44ef980350dd"
         },
         {
-          "path": "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/target/debug/deps/xls_shared_string_index-0acc3f563fc62330",
+          "path": "(deleted-coord-artifact)/xls_shared_string_index-0acc3f563fc62330",
           "bytes": 9446640,
           "sha256": "97dc29e0a56079fa171d613f8d6c35e6a6099e84497a9dea36be08a49f26f0fb"
         },
         {
-          "path": "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/target/debug/deps/xls_shared_string_properties-3425d1f551809908",
+          "path": "(deleted-coord-artifact)/xls_shared_string_properties-3425d1f551809908",
           "bytes": 9462944,
           "sha256": "f97484b0a803a7f20f61ef10e4a58be33d2382a164566e50d6e338145de7d137"
         },
         {
-          "path": "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/target/debug/deps/xls_sheet_ext-ef8126630482466c",
+          "path": "(deleted-coord-artifact)/xls_sheet_ext-ef8126630482466c",
           "bytes": 13436912,
           "sha256": "e002ea9fcbb0a4f9f591eb59755c46cdc5fb4696393bc9f2d885adb3433d89c5"
         },
         {
-          "path": "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/target/debug/deps/xls_sheet_layout-3b7b1bab545780d1",
+          "path": "(deleted-coord-artifact)/xls_sheet_layout-3b7b1bab545780d1",
           "bytes": 13916368,
           "sha256": "ad4152f088d5ba077d0f8400e6fe7f70cbd698f04cadb88254444aa22d20faf8"
         },
         {
-          "path": "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/target/debug/deps/xls_sort_data-ab6d0c337b0bbc4d",
+          "path": "(deleted-coord-artifact)/xls_sort_data-ab6d0c337b0bbc4d",
           "bytes": 13501968,
           "sha256": "60c6f9e6ac21f42b6e5da18151f4f51494ff00dcaf8336597724d4f7b5892233"
         },
         {
-          "path": "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/target/debug/deps/xls_style_ext-2da178a02b968a7b",
+          "path": "(deleted-coord-artifact)/xls_style_ext-2da178a02b968a7b",
           "bytes": 13477032,
           "sha256": "17c536dbcc39e237bae679835e9dc6d1669c070b9512248ae941974f1c104aa6"
         },
         {
-          "path": "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/target/debug/deps/xls_theme-b0c2b43a1a034d38",
+          "path": "(deleted-coord-artifact)/xls_theme-b0c2b43a1a034d38",
           "bytes": 13447480,
           "sha256": "d563dfa1c9803f4e5825684415eeced6a1720b44c174b0f3ab28fe530327915d"
         },
         {
-          "path": "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/target/debug/deps/xls_toolbar-3952688058d33647",
+          "path": "(deleted-coord-artifact)/xls_toolbar-3952688058d33647",
           "bytes": 13598456,
           "sha256": "ea3eff158276c4b1ad7e7bf8c01c63e5689349c296339fe921da40d14ef5040b"
         },
         {
-          "path": "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/target/debug/deps/xls_user_names-bb653735982358f1",
+          "path": "(deleted-coord-artifact)/xls_user_names-bb653735982358f1",
           "bytes": 15932528,
           "sha256": "675779569da66c0dd51bae48a1dcb60ae37f457ea1077666028deb3a15c64297"
         },
         {
-          "path": "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/target/debug/deps/xls_vba_metadata-11617950d0d24674",
+          "path": "(deleted-coord-artifact)/xls_vba_metadata-11617950d0d24674",
           "bytes": 14746728,
           "sha256": "c654dc130ce133752e435b3e58ad0f9b64826cf497a69738b574fe4563f852ca"
         },
         {
-          "path": "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/target/debug/deps/xls_view-c86bda04cb539e4d",
+          "path": "(deleted-coord-artifact)/xls_view-c86bda04cb539e4d",
           "bytes": 9456304,
           "sha256": "90edd887a36d06f423a31d1c9a9ffb2fd50dae17a548e8cd0a1928b64de06a91"
         },
         {
-          "path": "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/target/debug/deps/xls_view_writer-3d95d7dd08089e13",
+          "path": "(deleted-coord-artifact)/xls_view_writer-3d95d7dd08089e13",
           "bytes": 13445944,
           "sha256": "98cdbc3d1cfc87d69021feaeecee70898a9a6502e4a5d9fe6cfba0371cb0c0b9"
         },
         {
-          "path": "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/target/debug/deps/xls_web_pub-3a75a430fd262d00",
+          "path": "(deleted-coord-artifact)/xls_web_pub-3a75a430fd262d00",
           "bytes": 13456784,
           "sha256": "2807cfcd02bd24ca38ec458b6a2135fec06702f1c501a59769f9770036c8627a"
         },
         {
-          "path": "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/target/debug/deps/xls_workbook_view-8acab27386072cad",
+          "path": "(deleted-coord-artifact)/xls_workbook_view-8acab27386072cad",
           "bytes": 13948288,
           "sha256": "352361ac5b1c6c2cca1f371551185bf0b87c41c34a61302d9ee678431e1af34c"
         },
         {
-          "path": "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/target/debug/deps/xls_writer_encryption-250706d2624386be",
+          "path": "(deleted-coord-artifact)/xls_writer_encryption-250706d2624386be",
           "bytes": 13868160,
           "sha256": "bb85fdf3bbe539877a50750e7d140c3d6a81b81a76f5e879922e14e46b880cec"
         },
         {
-          "path": "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/target/debug/deps/xls_writer_length_fields-42fb9e3f6d8eec06",
+          "path": "(deleted-coord-artifact)/xls_writer_length_fields-42fb9e3f6d8eec06",
           "bytes": 15156448,
           "sha256": "50b98bdb051835d7c5d7733d2d6991d26e29aea5b0e06cfc0009601d1a46827a"
         },
         {
-          "path": "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/target/debug/deps/xls_writer_locations-9bfb1cd89b1f6efc",
+          "path": "(deleted-coord-artifact)/xls_writer_locations-9bfb1cd89b1f6efc",
           "bytes": 13478680,
           "sha256": "89a20025aded1d173bff729b39dfec3a6ed83c75cad4ab907210d806143aecb3"
         },
         {
-          "path": "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/target/debug/deps/xls_writer_round_trip_property-11c634526e840be8",
+          "path": "(deleted-coord-artifact)/xls_writer_round_trip_property-11c634526e840be8",
           "bytes": 14110112,
           "sha256": "f3f3f45e0659217f872b40df4badacd6267e4579c53eab72e1abb0c53f6a3a2b"
         },
         {
-          "path": "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/target/debug/deps/xls_writer_string_limits-d015c31e13c5504e",
+          "path": "(deleted-coord-artifact)/xls_writer_string_limits-d015c31e13c5504e",
           "bytes": 13706016,
           "sha256": "ee42385d844cf51b23a654bb5711fd0060e0042b7117750536591ba8213e5beb"
         },
         {
-          "path": "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/target/debug/deps/xls_writer_text_goldens-139349ef08082a89",
+          "path": "(deleted-coord-artifact)/xls_writer_text_goldens-139349ef08082a89",
           "bytes": 13590752,
           "sha256": "c0e0c74c073aa4553d084b7c305693229c10316f5aa288cde6caad1ad2e49a54"
         },
         {
-          "path": "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/target/debug/deps/xls_xf_ext-5cd93491da073811",
+          "path": "(deleted-coord-artifact)/xls_xf_ext-5cd93491da073811",
           "bytes": 13467488,
           "sha256": "ed17b30c2b1dd236d0b3596d0fb2a8c53cbae88b9e22d0b2187ed448822b080d"
         },
         {
-          "path": "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/target/debug/deps/xls_xf_inheritance-9413463226a13b4e",
+          "path": "(deleted-coord-artifact)/xls_xf_inheritance-9413463226a13b4e",
           "bytes": 9453648,
           "sha256": "4d74c37b69927c460dc5610057fdef81f2d45b66f415fc7ab3b430256dd16dc4"
         }
@@ -477,13 +477,13 @@
       ],
       "exit": 101,
       "seconds": 392.40291196900216,
-      "log": "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/xls-xlsx-runtime-v2/check-1.log",
+      "log": "(deleted-coord-artifact)/check-1.log",
       "bytes": 318112,
       "sha256": "a3fbd7145d5298bea94eae3ce1e6e4239d5f9258ee1dc8a5f8508e3281b6c433",
       "target_bytes_before": 1227697607,
       "completed_test_executables_pruned": [
         {
-          "path": "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/target/debug/deps/litchi_xlsx-d9f14220abb11437",
+          "path": "(deleted-coord-artifact)/litchi_xlsx-d9f14220abb11437",
           "bytes": 105615936,
           "sha256": "a8cdb619d0f5e20de52ce3173918c90558bb5dee7fbb1968cf80270cacea5efd"
         }

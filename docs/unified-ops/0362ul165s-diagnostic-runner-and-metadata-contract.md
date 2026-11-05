@@ -82,7 +82,7 @@ a closed historical receipt alone does not require keeping a checkout.
 
 ## Evidence
 
-Paths are relative to `/home/zhuhe/code/litchi-worktrees/.coord/`.
+Paths are relative to `(deleted-coord-artifact)`.
 
 | Artifact | SHA-256 |
 | --- | --- |

@@ -40,7 +40,7 @@ At the chart merge, 77 focused tooling tests pass. Workspace formatting then
 finds three existing IWA alias-migration formatting leftovers in two files.
 Commit `2b83731236` fixes those lines; `cargo fmt --all -- --check` passes.
 The failed and successful logs remain outside Git under
-`.coord/final-acceptance-2026-10-24/` as
+`(deleted-coord-artifact)` as
 `fmt-chart-1f2d0509b5.log` (1,788 bytes) and
 `fmt-iwa-alias-correction.log` (empty successful output). This formatting
 result precedes the later raw and ZIP merges and is not a final gate result.
@@ -57,7 +57,7 @@ adopts the reviewed leaf lock without dependency resolution or regeneration:
 All 518 registry package identities remain unchanged. The only package-graph
 difference is that local dependency edge. Both lock inputs and the reduced
 `legacy-raw-pin-transition.json` receipt remain outside Git under
-`.coord/final-acceptance-2026-10-24/locks/`. Historical frozen-49c captures
+`(deleted-coord-artifact)`. Historical frozen-49c captures
 and their 52ed input remain untouched. The six-version-different 6d graph
 remains diagnostic and is not substituted for either pin.
 

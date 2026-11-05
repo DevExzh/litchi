@@ -25,7 +25,7 @@
   "checks": [
     {
       "receipt": {
-        "path": "/home/zhuhe/code/litchi-worktrees/.coord/durable-ink-0362l/v6/checks.json",
+        "path": "(deleted-coord-artifact)/checks.json",
         "bytes": 2065,
         "sha256": "1cd4cf649c1eb7f1976352088107d0b77a098df51b27bb160dc57557aac6000c"
       },
@@ -44,7 +44,7 @@
           ],
           "exit": 0,
           "seconds": 63.682637360994704,
-          "log": "/home/zhuhe/code/litchi-worktrees/.coord/durable-ink-0362l/v6/check-0.log",
+          "log": "(deleted-coord-artifact)/check-0.log",
           "bytes": 8436,
           "sha256": "4d46e4c9e6ac5a13aa57a6138e46d9961136d6739c0b16512d947d2ce30df7ae"
         },
@@ -61,7 +61,7 @@
           ],
           "exit": 0,
           "seconds": 72.98757125099655,
-          "log": "/home/zhuhe/code/litchi-worktrees/.coord/durable-ink-0362l/v6/check-1.log",
+          "log": "(deleted-coord-artifact)/check-1.log",
           "bytes": 133339,
           "sha256": "6d346660b6490eb58312b7757d0275705ead65d8366b9880dcdc25ddcca59ec4"
         },
@@ -78,7 +78,7 @@
           ],
           "exit": 0,
           "seconds": 4.143280855030753,
-          "log": "/home/zhuhe/code/litchi-worktrees/.coord/durable-ink-0362l/v6/check-2.log",
+          "log": "(deleted-coord-artifact)/check-2.log",
           "bytes": 23296,
           "sha256": "c5adb4ef104dbef0fefb9722b411756f343b044c2dfa95a4f2d8fa6b20d3d643"
         },
@@ -98,7 +98,7 @@
           ],
           "exit": 0,
           "seconds": 65.766519614961,
-          "log": "/home/zhuhe/code/litchi-worktrees/.coord/durable-ink-0362l/v6/check-3.log",
+          "log": "(deleted-coord-artifact)/check-3.log",
           "bytes": 2498,
           "sha256": "83cc510e1ec176dec2c0dc311ea7af7f4b44d174360b9a99095efe54c67a4dd7"
         },
@@ -113,7 +113,7 @@
           ],
           "exit": 0,
           "seconds": 1.821963447961025,
-          "log": "/home/zhuhe/code/litchi-worktrees/.coord/durable-ink-0362l/v6/check-4.log",
+          "log": "(deleted-coord-artifact)/check-4.log",
           "bytes": 0,
           "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
         }
@@ -121,7 +121,7 @@
     },
     {
       "receipt": {
-        "path": "/home/zhuhe/code/litchi-worktrees/.coord/durable-ink-0362l/glossary-v2/checks.json",
+        "path": "(deleted-coord-artifact)/checks.json",
         "bytes": 923,
         "sha256": "daf37748f4f1635259d95951c7a164eba143cf13c4576624dea9da77528956e3"
       },
@@ -137,7 +137,7 @@
           ],
           "exit": 0,
           "seconds": 23.692366464063525,
-          "log": "/home/zhuhe/code/litchi-worktrees/.coord/durable-ink-0362l/glossary-v2/check-0.log",
+          "log": "(deleted-coord-artifact)/check-0.log",
           "bytes": 1913,
           "sha256": "c0f2923fc8b2dcebd3fb1c3b7a361ce032937ad3ccf060989868bcb18fba9b1e"
         },
@@ -152,7 +152,7 @@
           ],
           "exit": 0,
           "seconds": 31.05524274299387,
-          "log": "/home/zhuhe/code/litchi-worktrees/.coord/durable-ink-0362l/glossary-v2/check-1.log",
+          "log": "(deleted-coord-artifact)/check-1.log",
           "bytes": 3055,
           "sha256": "23a4cb083aac7514cffe6067152222cc5cf8650817081819010f2fed99569292"
         }

@@ -7,17 +7,17 @@
   "failed": 4,
   "artifacts": [
     {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/final-api-glossary-a3ec979993-20261024-1712/results.tsv",
+      "path": "(deleted-coord-artifact)/results.tsv",
       "bytes": 58478,
       "sha256": "ae35bcc09db7fd67e5a487cb99b2207b45454dcada280d255b0d7c56fd4c08e5"
     },
     {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/final-api-glossary-a3ec979993-20261024-1712/profiles.tsv",
+      "path": "(deleted-coord-artifact)/profiles.tsv",
       "bytes": 1387,
       "sha256": "c7b5ff9265ed5bfde1bb0cb4caf7a04b39069df0fb1a643e217db8659a50fb3a"
     },
     {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/final-api-glossary-a3ec979993-20261024-1712/provenance.txt",
+      "path": "(deleted-coord-artifact)/provenance.txt",
       "bytes": 1018,
       "sha256": "e069e5f396508ed58adea1acc870bee0beb0a0cf32afd102ee6359d015169f2e"
     }
@@ -27,49 +27,49 @@
     {
       "profile": "docx-minimal",
       "package": "litchi-docx",
-      "json": "/home/zhuhe/code/litchi-worktrees/.coord/final-api-capture-a3ec979993/output/inventory/litchi_docx.json",
+      "json": "(deleted-coord-artifact)/litchi_docx.json",
       "json_sha256": "eb4a2574d06a17405a07e4e45aa2d517c9f9e86af00abe40dbd2b9cdbbf1292a",
-      "command": "env -u LITCHI_CAPPED -u LITCHI_BLESS /usr/bin/python3 /home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/full-gate-a3ec979993/source/tools/check_api_glossary.py --policy /home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/full-gate-a3ec979993/source/tools/api_glossary.json --profile docx-minimal --json /home/zhuhe/code/litchi-worktrees/.coord/final-api-capture-a3ec979993/output/inventory/litchi_docx.json",
+      "command": "env -u LITCHI_CAPPED -u LITCHI_BLESS /usr/bin/python3 (deleted-coord-artifact) --policy (deleted-coord-artifact) --profile docx-minimal --json (deleted-coord-artifact)",
       "exit": "1",
-      "stdout": "/home/zhuhe/code/litchi-worktrees/.coord/final-api-glossary-a3ec979993-20261024-1712/logs/docx-minimal.stdout.log",
+      "stdout": "(deleted-coord-artifact)/docx-minimal.stdout.log",
       "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "stderr": "/home/zhuhe/code/litchi-worktrees/.coord/final-api-glossary-a3ec979993-20261024-1712/logs/docx-minimal.stderr.log",
+      "stderr": "(deleted-coord-artifact)/docx-minimal.stderr.log",
       "stderr_sha256": "7c9ee2bd1555efbff8a48c7af549764604f6e2dba5023f99ce3c4cb2e8cfa3e7"
     },
     {
       "profile": "docx-full",
       "package": "litchi-docx",
-      "json": "/home/zhuhe/code/litchi-worktrees/.coord/final-api-capture-a3ec979993/output/inventory/litchi_docx.json",
+      "json": "(deleted-coord-artifact)/litchi_docx.json",
       "json_sha256": "eb4a2574d06a17405a07e4e45aa2d517c9f9e86af00abe40dbd2b9cdbbf1292a",
-      "command": "env -u LITCHI_CAPPED -u LITCHI_BLESS /usr/bin/python3 /home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/full-gate-a3ec979993/source/tools/check_api_glossary.py --policy /home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/full-gate-a3ec979993/source/tools/api_glossary.json --profile docx-full --json /home/zhuhe/code/litchi-worktrees/.coord/final-api-capture-a3ec979993/output/inventory/litchi_docx.json",
+      "command": "env -u LITCHI_CAPPED -u LITCHI_BLESS /usr/bin/python3 (deleted-coord-artifact) --policy (deleted-coord-artifact) --profile docx-full --json (deleted-coord-artifact)",
       "exit": "1",
-      "stdout": "/home/zhuhe/code/litchi-worktrees/.coord/final-api-glossary-a3ec979993-20261024-1712/logs/docx-full.stdout.log",
+      "stdout": "(deleted-coord-artifact)/docx-full.stdout.log",
       "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "stderr": "/home/zhuhe/code/litchi-worktrees/.coord/final-api-glossary-a3ec979993-20261024-1712/logs/docx-full.stderr.log",
+      "stderr": "(deleted-coord-artifact)/docx-full.stderr.log",
       "stderr_sha256": "0f8086b11f521e8451d4fb6bfe1c63cdab41881aa7d604559ca5c56579309d1b"
     },
     {
       "profile": "soapberry-zip",
       "package": "soapberry-zip",
-      "json": "/home/zhuhe/code/litchi-worktrees/.coord/final-api-capture-a3ec979993/output/inventory/soapberry_zip.json",
+      "json": "(deleted-coord-artifact)/soapberry_zip.json",
       "json_sha256": "8e04110cd7d7d197a49934930aa53d97d6f20b93ca42e35f14e14773705c1d05",
-      "command": "env -u LITCHI_CAPPED -u LITCHI_BLESS /usr/bin/python3 /home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/full-gate-a3ec979993/source/tools/check_api_glossary.py --policy /home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/full-gate-a3ec979993/source/tools/api_glossary.json --profile soapberry-zip --json /home/zhuhe/code/litchi-worktrees/.coord/final-api-capture-a3ec979993/output/inventory/soapberry_zip.json",
+      "command": "env -u LITCHI_CAPPED -u LITCHI_BLESS /usr/bin/python3 (deleted-coord-artifact) --policy (deleted-coord-artifact) --profile soapberry-zip --json (deleted-coord-artifact)",
       "exit": "1",
-      "stdout": "/home/zhuhe/code/litchi-worktrees/.coord/final-api-glossary-a3ec979993-20261024-1712/logs/soapberry-zip.stdout.log",
+      "stdout": "(deleted-coord-artifact)/soapberry-zip.stdout.log",
       "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "stderr": "/home/zhuhe/code/litchi-worktrees/.coord/final-api-glossary-a3ec979993-20261024-1712/logs/soapberry-zip.stderr.log",
+      "stderr": "(deleted-coord-artifact)/soapberry-zip.stderr.log",
       "stderr_sha256": "2b480b47f61a7c382b8653f8047a2aceb92ae6f4d08b726b8cf831f391d4be7e"
     },
     {
       "profile": "keynote-minimal",
       "package": "litchi-keynote",
-      "json": "/home/zhuhe/code/litchi-worktrees/.coord/final-api-capture-a3ec979993/output/inventory/litchi_keynote.json",
+      "json": "(deleted-coord-artifact)/litchi_keynote.json",
       "json_sha256": "4590b4524fc4dbf58a6494e6811639d22b1019cce19599be7518b1676536699b",
-      "command": "env -u LITCHI_CAPPED -u LITCHI_BLESS /usr/bin/python3 /home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/full-gate-a3ec979993/source/tools/check_api_glossary.py --policy /home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/full-gate-a3ec979993/source/tools/api_glossary.json --profile keynote-minimal --json /home/zhuhe/code/litchi-worktrees/.coord/final-api-capture-a3ec979993/output/inventory/litchi_keynote.json",
+      "command": "env -u LITCHI_CAPPED -u LITCHI_BLESS /usr/bin/python3 (deleted-coord-artifact) --policy (deleted-coord-artifact) --profile keynote-minimal --json (deleted-coord-artifact)",
       "exit": "1",
-      "stdout": "/home/zhuhe/code/litchi-worktrees/.coord/final-api-glossary-a3ec979993-20261024-1712/logs/keynote-minimal.stdout.log",
+      "stdout": "(deleted-coord-artifact)/keynote-minimal.stdout.log",
       "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "stderr": "/home/zhuhe/code/litchi-worktrees/.coord/final-api-glossary-a3ec979993-20261024-1712/logs/keynote-minimal.stderr.log",
+      "stderr": "(deleted-coord-artifact)/keynote-minimal.stderr.log",
       "stderr_sha256": "705a2c10ab4737f02241d28900a748f509802b748bce2308e6d2fc9b52273713"
     }
   ],

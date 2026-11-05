@@ -30,7 +30,7 @@ existing decoder semantics.
 All commands used the memory-capped cargo shim, one build job, `--locked
 --offline`, and an external target directory. No native timing was run.
 
-Pre-repair identity (`.coord/drawingml-chart-raw-validation-vc/pre-identities-a5c79ccc2a.txt`):
+Pre-repair identity (`(deleted-coord-artifact)`):
 
 - source `a5c79ccc2a93844c4518b0233eb4b9f02810539f`
 - source tree `1e8b7826112b0d61fa4d9a146e7a6ef28b9936cb`
@@ -38,14 +38,14 @@ Pre-repair identity (`.coord/drawingml-chart-raw-validation-vc/pre-identities-a5
   `52ed0cacac15b5e440349bfc0f4aca2665bcf50d59d4321624e596bb410783c6`
 - lock blob `ce39fdc781093aa0819bcd17d41af891d4f33bcc`
 
-Final identity (`.coord/drawingml-chart-raw-validation-vc/post-identities-9280092a3c.txt`):
+Final identity (`(deleted-coord-artifact)`):
 
 - source `9280092a3cb35473efa75e4ec57debad800d5e95`
 - source tree `83584e39954becba18543aad559ff7245386bd8c`
 - the lock SHA-256 and blob are unchanged
 - target directory size `6,090,876,243` bytes, below the 20 GB cap
 
-Passing logs under `.coord/drawingml-chart-raw-validation-vc/`:
+Passing logs under `(deleted-coord-artifact)`:
 
 - `dml-all-features-lib-tests-9280092a3c.log`: 245 library tests and all
   DrawingML integration targets passed.

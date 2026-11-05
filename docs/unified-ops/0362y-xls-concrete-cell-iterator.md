@@ -80,8 +80,8 @@ one identical harness. The overlay is deterministic and auditable:
 ```sh
 REPO=/home/zhuhe/code/litchi-worktrees/uo2-xls-f3-qualification
 HARNESS_REF=0b8f68d7e9d3c97cfa62cedceacdeb2ad5f4ba76
-BASE=/home/zhuhe/code/litchi-worktrees/.coord/xls-f3-qualification/source-base-9b1f96d6dc
-CAND=/home/zhuhe/code/litchi-worktrees/.coord/xls-f3-qualification/source-candidate-0b8f68d7e9
+BASE=(deleted-coord-artifact)
+CAND=(deleted-coord-artifact)
 PROBE_PATHS=(
   tools/perf-baseline/src/xls_f3_qualification.rs
   tools/perf-baseline/src/xls_f3_corpus.rs
@@ -201,21 +201,14 @@ The qualification receipt is expected to make this checklist auditable:
 | CSV protocol | exact header and exact field set on every row, with stable sample/output identities |
 
 The old external W5 probe at
-`/home/zhuhe/code/litchi-worktrees/.coord/w5-ole-source-arc-final-20261021`
+`(deleted-coord-artifact)`
 is a method template only: its `xls_cells` and `xls_cells_stage` routes use
 `litchi_xls::Package` and are eager. It must not be used as the deferred F3
 binary. Keep all new source snapshots, binaries, captures and reports outside
 the checkout, for example:
 
 ```text
-/home/zhuhe/code/litchi-worktrees/.coord/xls-f3-qualification/
-  source-base-9b1f96d6dc/
-  source-candidate-0b8f68d7e9/
-  target-base-release/
-  target-candidate-release/
-  binaries/
-  abba/
-  heap/
+(deleted-coord-artifact)
 ```
 
 Build each source snapshot with a distinct target and one worker after the
@@ -223,26 +216,26 @@ coordinator grants the slot (the command is recorded here, but was not run in
 this leaf):
 
 ```sh
-source /home/zhuhe/code/litchi-worktrees/.coord/xls-f3-qualification/env.sh
+source (deleted-coord-artifact)
 CARGO_BUILD_JOBS=1 CARGO_INCREMENTAL=0 \
-  CARGO_TARGET_DIR=/home/zhuhe/code/litchi-worktrees/.coord/xls-f3-qualification/target-base-release \
+  CARGO_TARGET_DIR=(deleted-coord-artifact) \
   cargo build --offline --locked --release \
-  --manifest-path /home/zhuhe/code/litchi-worktrees/.coord/xls-f3-qualification/source-base-9b1f96d6dc/tools/perf-baseline-f3/Cargo.toml \
+  --manifest-path (deleted-coord-artifact) \
   --example xls_f3_qualification
 CARGO_BUILD_JOBS=1 CARGO_INCREMENTAL=0 \
-  CARGO_TARGET_DIR=/home/zhuhe/code/litchi-worktrees/.coord/xls-f3-qualification/target-candidate-release \
+  CARGO_TARGET_DIR=(deleted-coord-artifact) \
   cargo build --offline --locked --release \
-  --manifest-path /home/zhuhe/code/litchi-worktrees/.coord/xls-f3-qualification/source-candidate-0b8f68d7e9/tools/perf-baseline-f3/Cargo.toml \
+  --manifest-path (deleted-coord-artifact) \
   --example xls_f3_qualification
-mkdir -p /home/zhuhe/code/litchi-worktrees/.coord/xls-f3-qualification/binaries/base \
-  /home/zhuhe/code/litchi-worktrees/.coord/xls-f3-qualification/binaries/candidate
-cp /home/zhuhe/code/litchi-worktrees/.coord/xls-f3-qualification/target-base-release/examples/xls_f3_qualification \
-  /home/zhuhe/code/litchi-worktrees/.coord/xls-f3-qualification/binaries/base/xls_f3_qualification
-cp /home/zhuhe/code/litchi-worktrees/.coord/xls-f3-qualification/target-candidate-release/examples/xls_f3_qualification \
-  /home/zhuhe/code/litchi-worktrees/.coord/xls-f3-qualification/binaries/candidate/xls_f3_qualification
+mkdir -p (deleted-coord-artifact) \
+  (deleted-coord-artifact)
+cp (deleted-coord-artifact) \
+  (deleted-coord-artifact)
+cp (deleted-coord-artifact) \
+  (deleted-coord-artifact)
 sha256sum \
-  /home/zhuhe/code/litchi-worktrees/.coord/xls-f3-qualification/binaries/base/xls_f3_qualification \
-  /home/zhuhe/code/litchi-worktrees/.coord/xls-f3-qualification/binaries/candidate/xls_f3_qualification
+  (deleted-coord-artifact) \
+  (deleted-coord-artifact)
 ```
 
 The F3 probe binary name above is the implemented qualification entry point.
@@ -269,14 +262,14 @@ requires `--diagnostic` and its receipt has `qualification_eligible: false`;
 only the default six-cell matrix is eligible:
 
 ```sh
-BASE=/home/zhuhe/code/litchi-worktrees/.coord/xls-f3-qualification/binaries/base/xls_f3_qualification
-CAND=/home/zhuhe/code/litchi-worktrees/.coord/xls-f3-qualification/binaries/candidate/xls_f3_qualification
-OUT=/home/zhuhe/code/litchi-worktrees/.coord/xls-f3-qualification/abba
+BASE=(deleted-coord-artifact)
+CAND=(deleted-coord-artifact)
+OUT=(deleted-coord-artifact)
 python3 /home/zhuhe/code/litchi-worktrees/uo2-xls-f3-qualification/tools/xls_f3_qualification_abba.py \
   --control-binary "$BASE" \
   --candidate-binary "$CAND" \
-  --control-source /home/zhuhe/code/litchi-worktrees/.coord/xls-f3-qualification/source-base-9b1f96d6dc \
-  --candidate-source /home/zhuhe/code/litchi-worktrees/.coord/xls-f3-qualification/source-candidate-0b8f68d7e9 \
+  --control-source (deleted-coord-artifact) \
+  --candidate-source (deleted-coord-artifact) \
   --output-dir "$OUT" \
   --cpu "${CPU}" \
   --memory-limit-bytes 2147483648 \
@@ -305,12 +298,12 @@ instrumentation overhead, not a native route-timing result:
 HEAPTRACK=$(command -v heaptrack)
 HEAPTRACK_PRINT=$(command -v heaptrack_print)
 for side in base candidate; do
-  binary=/home/zhuhe/code/litchi-worktrees/.coord/xls-f3-qualification/binaries/$side/xls_f3_qualification
+  binary=(deleted-coord-artifact)
   implementation=baseline
   if [ "$side" = candidate ]; then implementation=candidate; fi
   for route in write-only first-read read-after-write; do
     for corpus in number rk-mulrk; do
-      dir=/home/zhuhe/code/litchi-worktrees/.coord/xls-f3-qualification/heap/$side/$route/$corpus
+      dir=(deleted-coord-artifact)
       mkdir -p "$dir"
       "$HEAPTRACK" --record-only --output "$dir/heaptrack" "$binary" \
         --implementation "$implementation" --route "$route" --corpus "$corpus" \

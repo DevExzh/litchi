@@ -16,7 +16,7 @@ staging, commit, and serialization and therefore does not identify the costly
 phase.
 
 The paired v3 receipt is outside the checkout at
-`/home/zhuhe/code/litchi-worktrees/.coord/w5-ole/abba-final-851ca549ba-v3`.
+`(deleted-coord-artifact)`.
 Its SHA-256 manifest is
 `6c15962e95a533acd277746d4d1d1b0b737df5b7b677aca5a314a0f33d14e2dd`.
 The protected binaries and their source/provenance are recorded in

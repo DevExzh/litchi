@@ -9,7 +9,7 @@ diagnostics from the PPTX combined candidate at
 `919a772ec37db9bd33b71c22d733415ffae08c6d`.  The retained external compiler
 log is:
 
-`/home/zhuhe/code/litchi-worktrees/.coord/pptx-combined-0362ul89-f5-actual-919a772ec3/01-pptx-all-features-check-attempt-actual-f5-01.log`
+`(deleted-coord-artifact)/01-pptx-all-features-check-attempt-actual-f5-01.log`
 
 It is 27,685 bytes with SHA-256
 `c9daebdd4b088e1f89cad4b09b8da3b2ee8f3aa403dce096d57f7a9eb00109bb`.
@@ -61,7 +61,7 @@ internal callsites.  No `dead_code` allowance or alias was added.
 
 The exact source patch from the frozen base to the source tip is retained
 outside the repository at
-`/home/zhuhe/code/litchi-worktrees/.coord/pptx-919-dead-code-89w-6c9a175a0f.patch`.
+`(deleted-coord-artifact)/pptx-919-dead-code-89w-6c9a175a0f.patch`.
 It is 7,960 bytes with SHA-256
 `81a30f8c024fb84da2267bb1242d49e72713ad05664a460e8108d98bef8b3bcd`.
 

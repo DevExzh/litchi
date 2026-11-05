@@ -13,13 +13,13 @@
     "sha256": "4100b1fbb272dd24842f33a2d6f353a3f3a97dfa7e435c4649a0e1a029bfaea1"
   },
   "environment": {
-    "cargo": "/home/zhuhe/code/litchi-worktrees/.coord/bin/cargo",
+    "cargo": "(deleted-coord-artifact)",
     "offline": true,
     "locked": true,
     "cargo_build_jobs": 1,
     "rust_test_threads": 1,
     "memory_cap": "20G",
-    "target": "/home/zhuhe/code/litchi-worktrees/.coord/cfb-sequential-error-layout/target",
+    "target": "(deleted-coord-artifact)",
     "target_du_sb_bytes_after": 1024944765,
     "target_regular_file_bytes_after": 1182800909
   },

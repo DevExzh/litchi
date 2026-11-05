@@ -24,7 +24,7 @@
       128
     ],
     "output_check": "Every base and candidate row has matching checksum, encoded byte length and output SHA-256.",
-    "raw_artifacts": "The captures and executables remain outside the repository under /home/zhuhe/code/litchi-worktrees/.coord/constructor-0361f-coordinator."
+    "raw_artifacts": "The captures and executables remain outside the repository under (deleted-coord-artifact)."
   },
   "consumer_audit": {
     "result": "No production raw Vec<MessageInfo> ArchiveInfo::new consumer is equivalent to push_new.",
@@ -42,7 +42,7 @@
       "base": "d3ff541f17c9ae5983adfe5e4e105993b9a15d28011ab790374c8ff6221c6fc8",
       "candidate": "9a3f63c7346be58d0dad07d7f81d9649aa30349434a19dd22203684071397e8b"
     },
-    "capture_directory": "/home/zhuhe/code/litchi-worktrees/.coord/constructor-0361f-coordinator/count-callgrind-v20-archive-serialize",
+    "capture_directory": "(deleted-coord-artifact)",
     "capture_manifest_sha256": "f8142abd30ae9c0fe173d2d4756afdb5775c14d25f8999fc55bcd5290eb86f27",
     "capture_files": 16,
     "capture_bytes": 1773127,
@@ -91,7 +91,7 @@
       "base": "d3ff541f17c9ae5983adfe5e4e105993b9a15d28011ab790374c8ff6221c6fc8",
       "candidate": "9a3f63c7346be58d0dad07d7f81d9649aa30349434a19dd22203684071397e8b"
     },
-    "capture_directory": "/home/zhuhe/code/litchi-worktrees/.coord/constructor-0361f-coordinator/count-callgrind-v21-raw-inline",
+    "capture_directory": "(deleted-coord-artifact)",
     "capture_manifest_sha256": "211df51863e86e5d2881b129f86aaa3bcf6968f9cd3babae1285a28ad61a3460",
     "capture_files": 32,
     "capture_bytes": 3444377,
@@ -193,7 +193,7 @@
     },
     "callgrind": {
       "command": "valgrind --tool=callgrind --collect-jumps=no; Ir/op=(Ir at 12,000 - Ir at 2,000)/10,000",
-      "capture_directory": "/home/zhuhe/code/litchi-worktrees/.coord/constructor-0361f-coordinator/count-callgrind-v22-attribution",
+      "capture_directory": "(deleted-coord-artifact)",
       "capture_files": 12,
       "capture_bytes": 429360,
       "capture_manifest_sha256": "707aff57cfc00ce99e53aed2b2c57a1a84cea2f7809689a667c977cfda5ad17c",
@@ -271,7 +271,7 @@
     },
     "allocation": {
       "probe": "count-candidate-v14 with allocations feature; 100 iterations per row; setup outside timed loop.",
-      "capture_directory": "/home/zhuhe/code/litchi-worktrees/.coord/constructor-0361f-coordinator/matched-v22-alloc-results",
+      "capture_directory": "(deleted-coord-artifact)",
       "capture_files": 80,
       "capture_bytes": 22638,
       "capture_manifest_sha256": "bd657d49df12f94501a0d7bad2cb68817268ca24a90446018d1a1efc1c448a41",
@@ -641,7 +641,7 @@
     },
     "status": "Instruction-count regression remains returned; matched allocation evidence shows no added heap or allocation-count cost, and the source attribution separates required public-field admission from MessageInfo construction and fixture assembly.",
     "collection_diagnostic": {
-      "capture_directory": "/home/zhuhe/code/litchi-worktrees/.coord/constructor-0361f-coordinator/count-callgrind-v22-collection",
+      "capture_directory": "(deleted-coord-artifact)",
       "capture_files": 96,
       "capture_bytes": 3503990,
       "capture_manifest_sha256": "d070b25a50c16c4f2a2ffb6455b2e7b9defb95d365dcc7d9f8b60db798797ca9",

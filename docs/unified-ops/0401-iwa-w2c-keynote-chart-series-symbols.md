@@ -106,7 +106,7 @@ all-series route. The one-series set leaf wrapper performs a full-family read,
 modifies the selected index, then performs the full-family read-modify-set.
 
 The final source-scoped release Callgrind receipt is outside the repository at
-`/home/zhuhe/code/litchi-worktrees/.coord/iwa-w2c-series-typed-errors-perf-babab049dfd5094f9bcc555e4d2beae7799a9fac/`.
+`(deleted-coord-artifact)`.
 It is bound to source `babab049dfd5094f9bcc555e4d2beae7799a9fac`; its immutable
 ELF is 216,072,352 bytes, mode 0555, SHA-256
 `b13f21e620dc53ce8a70fa01efcc9aecbe6a84395949837fc6f21636ba9f7757`; the

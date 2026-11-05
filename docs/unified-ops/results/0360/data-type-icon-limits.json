@@ -7,7 +7,7 @@
       "name": "limits-test",
       "command": "cargo test -p litchi-xlsx --all-features --lib data_type_icons",
       "exit_code": 0,
-      "log": "/home/zhuhe/code/litchi-worktrees/.coord/w4-xlsx/icon-limits-test.log",
+      "log": "(deleted-coord-artifact)/icon-limits-test.log",
       "bytes": 1417,
       "sha256": "a9f2aa2ddea85efa3346ea65fa35641eacb982cc89fe1bf652898ef712dc140b"
     },
@@ -15,7 +15,7 @@
       "name": "views",
       "command": "cargo test -p litchi-xlsx --all-features --lib sheet_view",
       "exit_code": 0,
-      "log": "/home/zhuhe/code/litchi-worktrees/.coord/w4-xlsx/icon-views.log",
+      "log": "(deleted-coord-artifact)/icon-views.log",
       "bytes": 2587,
       "sha256": "f75479a4eea06864e95ac08be3751a1b66a7a642245c7f761bbfa9188040fc4e"
     },
@@ -23,7 +23,7 @@
       "name": "clippy",
       "command": "cargo clippy -p litchi-xlsx -p litchi-ops --all-targets --all-features -- -D warnings",
       "exit_code": 0,
-      "log": "/home/zhuhe/code/litchi-worktrees/.coord/w4-xlsx/icon-clippy.log",
+      "log": "(deleted-coord-artifact)/icon-clippy.log",
       "bytes": 4819,
       "sha256": "decaabc11115219976e66131d52d6d6b890e18a4da0aa55b9cbee28e339d48d0"
     },
@@ -31,7 +31,7 @@
       "name": "docs",
       "command": "RUSTDOCFLAGS=-Dwarnings cargo doc -p litchi-xlsx --no-deps --all-features",
       "exit_code": 0,
-      "log": "/home/zhuhe/code/litchi-worktrees/.coord/w4-xlsx/icon-docs.log",
+      "log": "(deleted-coord-artifact)/icon-docs.log",
       "bytes": 252,
       "sha256": "9177f3dfcb7ef6168ade9acf3690c05eaed9051d33292f09b9ae427d8b25eba3"
     },
@@ -39,7 +39,7 @@
       "name": "xlsx-minimal",
       "command": "python3 tools/check_api_glossary.py --profile xlsx-minimal --target-dir target/gate",
       "exit_code": 0,
-      "log": "/home/zhuhe/code/litchi-worktrees/.coord/w4-xlsx/icon-xlsx-minimal.log",
+      "log": "(deleted-coord-artifact)/icon-xlsx-minimal.log",
       "bytes": 285,
       "sha256": "0cbc560f71f0fb076634a480a1b93d7d9a1e7e5031775668dd9f553743562255"
     },
@@ -47,7 +47,7 @@
       "name": "xlsx-full",
       "command": "python3 tools/check_api_glossary.py --profile xlsx-full --target-dir target/gate",
       "exit_code": 0,
-      "log": "/home/zhuhe/code/litchi-worktrees/.coord/w4-xlsx/icon-xlsx-full.log",
+      "log": "(deleted-coord-artifact)/icon-xlsx-full.log",
       "bytes": 285,
       "sha256": "94890722936ca7d95142f9154a2dde219e9f996a4b04286ca6a72d23f31c0e02"
     }

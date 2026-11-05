@@ -181,7 +181,7 @@ separate consumer commits.
 [consumer-v14.json](results/0362uf/consumer-v14.json) retains both command
 receipts. Neither harness group was reached. The inactive incremental cache
 (498,384,649 bytes) was moved intact outside the capped target, with 564 file
-hashes in `.coord/replay-integration/cache-archive-20261023/manifest.json`;
+hashes in `(deleted-coord-artifact)/manifest.json`;
 current builds disable incremental compilation. No measured binary was removed.
 
 The fifteenth attempt on `65136c31d7` passed OPC/ZIP and reached the broader

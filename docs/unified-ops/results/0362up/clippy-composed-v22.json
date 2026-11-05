@@ -4,12 +4,12 @@
   "cwd": "/home/zhuhe/code/litchi-worktrees/uo2-budget-validation",
   "command": [
     "python3",
-    "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/run-semantic-checks-disk-guarded.py",
-    "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/clippy-composed-v22-commands.json",
-    "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/clippy-composed-v22"
+    "(deleted-coord-artifact)",
+    "(deleted-coord-artifact)",
+    "(deleted-coord-artifact)"
   ],
   "started_unix_seconds": 1792787348.162432,
-  "target": "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/target",
+  "target": "(deleted-coord-artifact)",
   "lock_sha256": "52ed0cacac15b5e440349bfc0f4aca2665bcf50d59d4321624e596bb410783c6",
   "checks": [
     {
@@ -29,7 +29,7 @@
       ],
       "exit": 101,
       "seconds": 829.7478441740022,
-      "log": "/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/clippy-composed-v22/check-0.log",
+      "log": "(deleted-coord-artifact)/check-0.log",
       "bytes": 1832833,
       "sha256": "9e78e2985cb42e9ff1d7e93061e59697383039faf1d5b6183f108854ba99e4b1",
       "target_bytes_before": 3987244210,

@@ -38,7 +38,7 @@ clean tracked tree and only the approved root `Cargo.lock` in the ignored
 file list; the two nested role locks remain tracked and unchanged.
 
 Evidence is outside the checkout under the worktree parent's
-`.coord/integration-ignored-overlay-2026-10-25/`:
+`(deleted-coord-artifact)`:
 
 | File | Bytes | SHA-256 |
 |---|---:|---|

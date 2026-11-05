@@ -1,7 +1,7 @@
 {
   "source_revision": "642f2e45f6bda1b642890128408cc243e29aa953",
   "command": [
-    "/home/zhuhe/code/litchi-worktrees/.coord/bin/cargo",
+    "(deleted-coord-artifact)",
     "rustdoc",
     "-p",
     "litchi-drawingml",
@@ -19,10 +19,10 @@
   "root_lock_sha256": "4100b1fbb272dd24842f33a2d6f353a3f3a97dfa7e435c4649a0e1a029bfaea1",
   "exit_code": 0,
   "seconds": 20.670970381994266,
-  "log": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/drawingml-rustdoc-link/rustdoc.log",
+  "log": "(deleted-coord-artifact)/rustdoc.log",
   "log_bytes": 2548,
   "log_sha256": "34b76f542fc50d5ce0aecb2ea631784d9ae9ac451d2676adbd6bb9881e4610c7",
-  "target": "/home/zhuhe/code/litchi-worktrees/.coord/drawingml-chart-raw-target",
+  "target": "(deleted-coord-artifact)",
   "target_bytes": 6083810704,
   "memory_cap": "20G",
   "jobs": 1

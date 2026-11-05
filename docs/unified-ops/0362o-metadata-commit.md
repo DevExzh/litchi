@@ -27,7 +27,7 @@ commit shape. It is source work only; no performance qualification is claimed.
 ## Validation
 
 The following commands were run from the metadata worktree with the capped
-`.coord/w8-file/env.sh` environment, `CARGO_BUILD_JOBS=2`,
+`(deleted-coord-artifact)` environment, `CARGO_BUILD_JOBS=2`,
 `RUST_TEST_THREADS=2`, and a worktree-local target:
 
 ```text

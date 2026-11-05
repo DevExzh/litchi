@@ -13,11 +13,11 @@
   "target": "/home/zhuhe/code/litchi-worktrees/unified-ops-api/target",
   "policy": {
     "runner_files": {
-      "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/gate-safe/run_safe_gate.py": "592ff5f7ad8493641ba6df7308bd66a97bddced35fc616c5803aacc5d30dcd2c",
-      "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/gate-safe/safe_chunked_tests.py": "70fdb56c96e4ed9e1d1e0d2b1e9c7f1db148a2115fb25246d13464569290cc35",
-      "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/gate-safe/bin/cargo": "495e24c6f60b238378386d86ac4158cba904992ce8870a9494f2c4a0eedd256d"
+      "(deleted-coord-artifact)/run_safe_gate.py": "592ff5f7ad8493641ba6df7308bd66a97bddced35fc616c5803aacc5d30dcd2c",
+      "(deleted-coord-artifact)/safe_chunked_tests.py": "70fdb56c96e4ed9e1d1e0d2b1e9c7f1db148a2115fb25246d13464569290cc35",
+      "(deleted-coord-artifact)/cargo": "495e24c6f60b238378386d86ac4158cba904992ce8870a9494f2c4a0eedd256d"
     },
-    "cargo_wrapper": "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/gate-safe/bin/cargo",
+    "cargo_wrapper": "(deleted-coord-artifact)",
     "offline": true,
     "locked": true,
     "memory_max": "20G",
@@ -72,7 +72,7 @@
       },
       "exit": 101,
       "seconds": 18.478426694869995,
-      "log": "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/gate-safe/clippy-assembly-v1/01-clippy-all-features.log",
+      "log": "(deleted-coord-artifact)/01-clippy-all-features.log",
       "log_bytes": 1662,
       "log_sha256": "f8f81d2e8807a175f36b2a5ef3780bec9894891b90f35951c8097bce2f65ff5d",
       "target_bytes_after": 18676904118,
@@ -108,7 +108,7 @@
           "bytes": 18676904118
         }
       },
-      "cargo_target_trace_file": "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/gate-safe/clippy-assembly-v1/01-cargo-targets.tsv",
+      "cargo_target_trace_file": "(deleted-coord-artifact)/01-cargo-targets.tsv",
       "cargo_target_trace_bytes": 72,
       "cargo_target_trace_sha256": "d730452b0baa2302d8213021a2e82b593f5933b683c804b7e1b6e95e9a4a1896",
       "preflight": {

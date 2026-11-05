@@ -59,7 +59,7 @@ Eight macOS-queue rows added (the six setters and two reads).
 Probe `chart_property_cost.rs` (`W4C_ROUTE`, release, CPU 3, ABBA, inclusive
 Ir of `w4c_host_route`/`w4c_leaf_route`; the route sets fixed bounds 0–50).
 Receipt `results/0422/callgrind-value-axis.json`; raw captures in
-`.coord/iwa-w4i/cg1/`. Keynote has no host value-axis route to compare; its
+`(deleted-coord-artifact)`. Keynote has no host value-axis route to compare; its
 transaction path is unchanged apart from the shared rule calls.
 
 ## 2. Slice 2: shared data-owner transitions; Pages chart background image
@@ -86,13 +86,13 @@ a package with a map, which the parity case caught).
 | pages_background_image_set | 1,310,073,205 | 63,127,004 | 0.0482 |
 
 Receipt `results/0422/callgrind-background-image.json`; raw captures in
-`.coord/iwa-w4i/cg2/`.
+`(deleted-coord-artifact)`.
 
 ### 2.1 Gates (slices 1 and 2)
 
 Branch with trunk `44aa1ee06d` (W4-G 0420) merged at `4ea803b0dc`
 (mac-queue conflict resolved by keeping both sides); logs
-`.coord/iwa-w4i/gates2`. Every command of the 0414 §8 list exits 0: fmt;
+`(deleted-coord-artifact)`. Every command of the 0414 §8 list exits 0: fmt;
 clippy -D warnings on the five touched crates with `litchi-ops`, `litchi`
 and `litchi-py` (all features), the leaf crates without features, and
 `litchi-ops` with no features and with each of `numbers`, `pages`,
@@ -128,12 +128,12 @@ the Pages sequences (§2), Tier B (Keynote: root previews), macOS-queued.
 | keynote_background_image_set | 962,539,495 | 99,001,064 | 0.1029 |
 
 Receipt `results/0422/callgrind-background-image-numbers-keynote.json`; raw
-captures in `.coord/iwa-w4i/cg3/`.
+captures in `(deleted-coord-artifact)`.
 
 ### 3.1 Slice 3 gates
 
 Branch with trunk `41ee75653b` merged at `f1425d9c6f` (mac-queue conflict
-resolved by keeping both sides); logs `.coord/iwa-w4i/gates3`: all 33 rows
+resolved by keeping both sides); logs `(deleted-coord-artifact)`: all 33 rows
 exit 0 (fmt; the seven Python gates including the ledger and the bench
 matrix; clippy -D warnings with all features, without features and per
 `litchi-ops` format feature; rustdoc -Dwarnings; the glossary; the leaf,
@@ -208,5 +208,5 @@ only when the data metadata map lists it or a message info references it
 (`data_owner::release`); each core's locality check is where a new
 publication shape is admitted, gated on the scope's allowed fields. Cost
 probe `chart_property_cost.rs` (`W4C_ROUTE`); receipt writer
-`.coord/iwa-w4i/tools/receipt.py`; ledger flips with
-`.coord/iwa-w4i/tools/flip_rows.py` and a JSON spec.
+`(deleted-coord-artifact)`; ledger flips with
+`(deleted-coord-artifact)` and a JSON spec.

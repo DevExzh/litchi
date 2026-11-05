@@ -151,13 +151,13 @@ The fuzz target `numbers_table_cell_comment_reply` no longer calls the compatibi
 
 `mac_queue_file_routes` and `mac_queue_native_routes` ran before (at `3001da641b`) and after. Of 28
 files, 26 hash the same; the 2 that differ are the two `Identity::generate()` Pages documents, which
-also differ between two runs of the same binary. Before: `.coord/iwa-w9/before.sha`, after:
-`.coord/iwa-w9/after.sha`.
+also differ between two runs of the same binary. Before: `(deleted-coord-artifact)`, after:
+`(deleted-coord-artifact)`.
 
 ## 6. Verification
 
 Code head `8d37f51f18`, plus the docs and the one policy-line commit; only matrix text under
-`crates/` changed after the tests ran. Logs: `.coord/iwa-w9/gates/`.
+`crates/` changed after the tests ran. Logs: `(deleted-coord-artifact)`.
 
 | Command | Exit |
 |---|---:|

@@ -20,7 +20,7 @@ arguments, and four structural-limit `SourceLimitsBuilder` arguments.
 The immutable actual state is:
 
 ```text
-/home/zhuhe/code/litchi-worktrees/.coord/ooxml-combined-0362ul94-f5-actual-0395ca40f4
+(deleted-coord-artifact)
 ```
 
 | Artifact | Bytes | SHA-256 |

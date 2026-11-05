@@ -22,7 +22,7 @@ This is execution readiness, not a completed gate or performance receipt.
 ## Runner identity and reproduction
 
 The external runner is
-`/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/gate-safe/run_safe_gate.py`.
+`(deleted-coord-artifact)`.
 The preserved predecessor for the current successor is
 `run_safe_gate-before-0362uv-procrace.py` beside it. Earlier post-exit
 successors and their predecessors remain beside them for provenance.
@@ -47,7 +47,7 @@ gate launch records all three source hashes in its plan.
 The build-free regression command passes:
 
 ```text
-python3 docs/unified-ops/results/0362uv/verify_safe_gate.py --runner /home/zhuhe/code/litchi-worktrees/.coord/replay-integration/gate-safe/run_safe_gate.py --root /home/zhuhe/code/litchi-worktrees/uo2-coordinator-metadata-integration --scratch /home/zhuhe/code/litchi-worktrees/.coord/replay-integration/gate-safe/verification-tmp-procrace
+python3 docs/unified-ops/results/0362uv/verify_safe_gate.py --runner (deleted-coord-artifact) --root /home/zhuhe/code/litchi-worktrees/uo2-coordinator-metadata-integration --scratch (deleted-coord-artifact)
 ```
 
 It verifies the 53-step plan, inventory test registration, cap-marker
@@ -73,7 +73,7 @@ The actual native/ABBA runs remain separate required receipts, including the
 IWA constructor/owner, W4b/W5, ODP, W8, XLS F3, XLSX source families and the
 new ODF shared-triad lane. No unit-test pass substitutes for those runs.
 
-Run final inventory separately with `.coord/bin` first on `PATH`; its shim
+Run final inventory separately with `(deleted-coord-artifact)` first on `PATH`; its shim
 verification expects that capped wrapper, not the gate-local wrapper. Both
 phases use external output and temporary storage and may reuse one bounded
 target cache, sequentially. Each still requires the 19.2-billion-byte target

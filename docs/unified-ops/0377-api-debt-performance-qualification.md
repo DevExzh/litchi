@@ -387,7 +387,7 @@ Committed (`results/0377/`, 160 KB): `callgrind.tsv`, `abba.json`,
 `perf-baseline-rerun.tsv`, `python.json`, `binaries.sha256`, and the scripts
 `build.sh`, `abba.sh`, `callgrind-*.sh`, `summarize.py`, `table.py`,
 `python_bench.py`. Raw callgrind/cachegrind outputs and per-run JSON stay in
-`/home/zhuhe/code/litchi-worktrees/.coord/fin-perf/` (regenerate with the
+`(deleted-coord-artifact)` (regenerate with the
 scripts against the binaries of `binaries.sha256`).
 
 ## 9. Gaps and follow-ups

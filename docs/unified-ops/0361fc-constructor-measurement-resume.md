@@ -38,10 +38,10 @@ For attempt number N (the next consecutive number), run from this worktree:
 
 ```sh
 python3 docs/unified-ops/results/0361fc/constructor-abba.py \
-  ../.coord/constructor-0361f-coordinator/matched-v5/build-base/constructor-native \
-  ../.coord/constructor-0361f-coordinator/matched-v5/build-candidate/constructor-native \
-  ../.coord/constructor-0361f-coordinator/matched-v5/native-aN \
-  > ../.coord/constructor-0361f-coordinator/matched-v5/native-aN.log 2>&1
+  (deleted-coord-artifact) \
+  (deleted-coord-artifact) \
+  (deleted-coord-artifact) \
+  > (deleted-coord-artifact) 2>&1
 ```
 
 The coordinator must obtain a quiet host window before starting. All scripts,

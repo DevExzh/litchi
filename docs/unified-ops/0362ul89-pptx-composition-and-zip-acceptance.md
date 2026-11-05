@@ -23,7 +23,7 @@ logs, traces, target guards and empty terminal process ownership. The 99
 selected glossary/inventory/census/fixture-guard tool tests also pass.
 
 The actual state remains outside Git at
-`.coord/0362ul86-f5-actual-e49a1062ec` in the worktrees parent directory:
+`(deleted-coord-artifact)` in the worktrees parent directory:
 
 | Artifact | Bytes | SHA-256 |
 | --- | ---: | --- |

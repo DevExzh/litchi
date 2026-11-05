@@ -10,7 +10,7 @@ This source-only follow-up is based on the `123` repair commit
 review return without changing the producer or publication path.
 
 The preserved diagnostic remains
-`.coord/ooxml-pptx-joint-a8d32513b8-f5-runtime-remaining34/12-tests-docx-web-extensions-attempt-actual-f5-12.log`
+`(deleted-coord-artifact)/12-tests-docx-web-extensions-attempt-actual-f5-12.log`
 (18,605 bytes, SHA-256
 `ec5efd1ebbcd501dc42cd9756e8c26a73c7d1a9e11c99eb78a26f0bad41e44a9`): 33
 tests passed and `durable::durable_stale_and_wire_tampering_are_atomic` was

@@ -7,7 +7,7 @@ Cargo, rustdoc, runtime, native, or performance claim.
 ## Retained failure
 
 The suffix glossary packet is retained at
-`/home/zhuhe/code/litchi-worktrees/.coord/uo2-coordinator-replay-integration-f5-glossary-suffix-a8d32513b8`.
+`(deleted-coord-artifact)`.
 Its rustdoc attempt was bound to source commit
 `a8d32513b8e427c6d234ddd17fb836b0e8d2477b`, exited 101, and produced a
 20,177-byte log with SHA-256

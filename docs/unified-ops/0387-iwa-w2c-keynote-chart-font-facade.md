@@ -132,13 +132,13 @@ SHA-256 `f7cca120269bcdaaad88f826299ccc51564bcc73985091446d8acc23b0b845bb`.
 The archived/staged release binary is 214039104 bytes with SHA-256
 `8871832870087b200d22336f8116662e7898c3c63e79aad3dd41476cb7cc78e5`.
 The external run receipt is
-`/home/zhuhe/code/litchi-worktrees/.coord/resume-20261029/perf/runs/keynote-chart-font-f875e5c3c9-cpu5/results.json`;
+`(deleted-coord-artifact)/results.json`;
 its SHA-256 is
 `24740463740b65be29dd53a5df66c1ebbe88164de2b3869e00eb0347ada4a1c1` and the
 artifact index SHA-256 is
 `aede7d3abf82ecf9c5952e45a5cb3b98944f1bf10abe992844b40d542839e77c`;
 the raw selected-call audit is
-`/home/zhuhe/code/litchi-worktrees/.coord/resume-20261029/perf/keynote-chart-font-six-call-audit.json`
+`(deleted-coord-artifact)/keynote-chart-font-six-call-audit.json`
 and its validation SHA-256 is
 `2a1336821da846a6c0a808974660b9f98754b9610a0f4e97a6aee389ef670cd0`.
 

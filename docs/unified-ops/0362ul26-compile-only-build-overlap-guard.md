@@ -60,7 +60,7 @@ No Cargo or native qualification command was run. The exact reduced receipt is
 | `python3 -m unittest tools.test_drawingml_raw_qualification tools.test_legacy_native_qualification -v` | 31 tests passed, exit 0 |
 
 External logs are under
-`/home/zhuhe/code/litchi-worktrees/.coord/cfb-compile-overlap-protocol-20261024-rereview/`.
+`(deleted-coord-artifact)`.
 The final runner source is 176,110 bytes (SHA-256
 `f550adf27ff6559a2318cc456c6f8cc4f3d338e74119e21c470e2c767452bf03`) and its
 focused test source is 68,468 bytes (SHA-256

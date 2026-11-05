@@ -14,7 +14,7 @@
     ]
   },
   "preserved_prior_packet": {
-    "root": "/home/zhuhe/code/litchi-worktrees/.coord/odp-final-build-prep-472b670547",
+    "root": "(deleted-coord-artifact)",
     "input_sha256": "5992db0a0520ae3dedb47e44f5d584a8e1890c544d2611fca92db6482f6c47e6",
     "plan_sha256": "d213e7c0158757a1e9ff51c6649c2da8a5dafa69469bb73dbcc22f99114fcc5b",
     "build_handoff_sha256": "33943e0c7c0cce75acb104169a550506b95f1d21e3df869de277cae76898153d",
@@ -22,35 +22,35 @@
     "failed_review_counts_preserved": true
   },
   "repaired_packet": {
-    "root": "/home/zhuhe/code/litchi-worktrees/.coord/odp-final-build-prep-472b670547-repair-40165ae0af",
+    "root": "(deleted-coord-artifact)",
     "status": "build_required",
     "files": [
       {
-        "path": "/home/zhuhe/code/litchi-worktrees/.coord/odp-final-build-prep-472b670547-repair-40165ae0af/input.json",
+        "path": "(deleted-coord-artifact)/input.json",
         "bytes": 1749,
         "sha256": "a7f598369ee2698a8ae265c71921f112f352e08a9bcedbd44977ee31811a6aac",
         "role": "corrected runner manifest"
       },
       {
-        "path": "/home/zhuhe/code/litchi-worktrees/.coord/odp-final-build-prep-472b670547-repair-40165ae0af/plan.json",
+        "path": "(deleted-coord-artifact)/plan.json",
         "bytes": 2058,
         "sha256": "dfb286badeefbd5b036730500f7da182c5ec8b9da201dcd573cfacc5cb19a342",
         "role": "plan with corrected executable paths"
       },
       {
-        "path": "/home/zhuhe/code/litchi-worktrees/.coord/odp-final-build-prep-472b670547-repair-40165ae0af/build-handoff.json",
+        "path": "(deleted-coord-artifact)/build-handoff.json",
         "bytes": 14430,
         "sha256": "41012547d456a841d260952b08bf76bfcd5c22976349b6624752e0bf5e9efa62",
         "role": "lock-fenced builds and source-only validators"
       },
       {
-        "path": "/home/zhuhe/code/litchi-worktrees/.coord/odp-final-build-prep-472b670547-repair-40165ae0af/memory-protocol.json",
+        "path": "(deleted-coord-artifact)/memory-protocol.json",
         "bytes": 10850,
         "sha256": "44103b2a571a3dfb309e0aad5deed383deb63b8d3226b10a496050031f9c31cf",
         "role": "exported-TMPDIR dynamic heaptrack protocol"
       },
       {
-        "path": "/home/zhuhe/code/litchi-worktrees/.coord/odp-final-build-prep-472b670547-repair-40165ae0af/qualification-run/manifest-plan/plan.json",
+        "path": "(deleted-coord-artifact)/plan.json",
         "bytes": 2093,
         "sha256": "a975c2d5598953e702d8079269dc441b09f6c4a599888cbc13ff3a1bc193c8f6",
         "role": "source-only runner --plan receipt"

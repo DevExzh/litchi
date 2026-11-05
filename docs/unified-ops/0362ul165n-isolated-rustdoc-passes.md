@@ -35,13 +35,13 @@ selection, all 28 qualification groups and final acceptance remain required.
 Nothing is pushed.
 
 Root's verification receipt is
-`/home/zhuhe/code/litchi-worktrees/.coord/rest29-isolated-wsdoc-verification-20261026/receipt.json`
+`(deleted-coord-artifact)/receipt.json`
 (2,517 bytes, SHA-256
 `a5d2dacce7f539a313fecc3f3089700872eb1324ad39f9d266190d0c6e443de4`).
 It includes the exact commands, source/lock identities and log identities;
 the adjacent `row-34.json` and `row-35.json` preserve the completed rows.
 
-Additional receipts under the same `.coord/` directory:
+Additional receipts under the same `(deleted-coord-artifact)` directory:
 
 | Artifact | SHA-256 |
 | --- | --- |

@@ -31,14 +31,14 @@ New strict tests: `package::table::tests::raw_limits_bound_table_records_and_str
 
 ## Validation
 
-Commands were run with `/home/zhuhe/code/litchi-worktrees/.coord/w4b-xlsb-raw-policy/env.sh`:
+Commands were run with `(deleted-coord-artifact)`:
 
 - `cargo fmt --all -- --check`: exit 0.
 - `cargo test -p litchi-xlsb --all-features --offline`: exit 0; 1,338 passed, 0 failed.
 - `cargo clippy -p litchi-xlsb --all-targets --all-features --offline -- -D warnings`: exit 0.
 - `cargo check -p litchi-ops -p litchi -p litchi-cli --all-targets --all-features --offline`: exit 0.
 
-Logs under `/home/zhuhe/code/litchi-worktrees/.coord/w4b-xlsb-raw-policy/`: `xlsb-0360eh-tests.log` (121,831 bytes, SHA-256 `d87e57b1a0a0b02f535d93e4908d1c4699bad816ed9f34d0821f2cd22d9eabda`) and `xlsb-0360eh-clippy.log` (171 bytes, SHA-256 `d54cc455049d1b9d7ba8009f096dfd41efac50265e9d666c5ce63e8cde28a7dc`).
+Logs under `(deleted-coord-artifact)`: `xlsb-0360eh-tests.log` (121,831 bytes, SHA-256 `d87e57b1a0a0b02f535d93e4908d1c4699bad816ed9f34d0821f2cd22d9eabda`) and `xlsb-0360eh-clippy.log` (171 bytes, SHA-256 `d54cc455049d1b9d7ba8009f096dfd41efac50265e9d666c5ce63e8cde28a7dc`).
 
 ## Performance
 

@@ -7,7 +7,7 @@
 # Binaries: $P/tgt-{before,w6base,after}/release/examples/*; hashes in binaries.sha256.
 # Each probe dumps its first-round outputs once per leg (sb-<leg>-<n>/) for the
 # byte-identity check of analyze.py.
-P=${P:-/home/zhuhe/code/litchi-worktrees/.coord/w6-odf/perf}; CPU=${CPU:-29}
+P=${P:-/deleted-coord-artifact}; CPU=${CPU:-29}
 SB_ROUNDS=${SB_ROUNDS:-15}; W6_ROUNDS=${W6_ROUNDS:-61}
 OUT=${OUT:-$P/out-0358a}; mkdir -p "$OUT"
 cd /home/zhuhe/code/litchi-worktrees/uo2-w6-odf/crates/litchi-ops

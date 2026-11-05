@@ -90,7 +90,7 @@ query differential passes all 895 digest keys after the Numbers-only golden
 refresh. Registry goldens pass for Pages, Keynote and Numbers.
 
 The original failing c07 receipt remains preserved externally at
-`.coord/resume-20261028/full-c07e6208cc/25-tests-ops.out`; it is historical
+`(deleted-coord-artifact)`; it is historical
 failure evidence, not a green result. The current integrated candidate still
 requires the coordinator's complete gate on one clean commit. Native
 verification and performance qualification are outside this report-closure

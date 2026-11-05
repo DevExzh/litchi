@@ -31,7 +31,7 @@ retains SHA-256
 registry version or checksum changes).
 
 ```text
-source /home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/env.sh
+source (deleted-coord-artifact)
 cargo test --locked --offline --all-features -p litchi-xls \
   --test xls_revision_log -- --nocapture
 PASS — 4 passed; 0 failed

@@ -3,7 +3,7 @@
   "verified_utc": "2026-10-24T18:20:53Z",
   "scope": "read-only verification; no Cargo command or source edit",
   "capture": {
-    "root": "/home/zhuhe/code/litchi-worktrees/.coord/final-api-capture-472b670547",
+    "root": "(deleted-coord-artifact)",
     "status": "complete",
     "phase": "complete",
     "package_count": 68,
@@ -18,7 +18,7 @@
       "sha256": "4100b1fbb272dd24842f33a2d6f353a3f3a97dfa7e435c4649a0e1a029bfaea1"
     },
     "package_set_sha256": "afeface99e189880df1fea08aa4426b5ef10fa77b23f1a279bf665a20a1cdd8f",
-    "capture_command": "env -u LITCHI_CAPPED -u LITCHI_BLESS PATH=/home/zhuhe/code/litchi-worktrees/.coord/bin:$PATH LITCHI_MEM_MAX=20G CARGO_BUILD_JOBS=1 RUST_TEST_THREADS=1 CARGO_INCREMENTAL=0 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_PROFILE_RELEASE_DEBUG=0 CARGO_NET_OFFLINE=true LC_ALL=C CARGO_TARGET_DIR=$CAP/target TMPDIR=$CAP/output/tmp python3 $SOURCE/tools/final_api_inventory.py --root $SOURCE --output $CAP/output --target-dir $CAP/target --cargo /home/zhuhe/code/litchi-worktrees/.coord/bin/cargo --no-reuse",
+    "capture_command": "env -u LITCHI_CAPPED -u LITCHI_BLESS PATH=(deleted-coord-artifact):$PATH LITCHI_MEM_MAX=20G CARGO_BUILD_JOBS=1 RUST_TEST_THREADS=1 CARGO_INCREMENTAL=0 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_PROFILE_RELEASE_DEBUG=0 CARGO_NET_OFFLINE=true LC_ALL=C CARGO_TARGET_DIR=$CAP/target TMPDIR=$CAP/output/tmp python3 $SOURCE/tools/final_api_inventory.py --root $SOURCE --output $CAP/output --target-dir $CAP/target --cargo (deleted-coord-artifact) --no-reuse",
     "output_files": {
       "run.json": {"bytes": 2103, "sha256": "0bbb223325f181f996c0d6b3f42ff2e769c390a75b12468b5265d9b55ca24f61"},
       "packages.json": {"bytes": 15728, "sha256": "64138cbadf11856610c3d9b8261f3164d9a76290256131f59af3a36db4fcea4c"},
@@ -119,7 +119,7 @@
     }
   },
   "supplemental_glossary_current": {
-    "root": "/home/zhuhe/code/litchi-worktrees/.coord/final-api-glossary-472b670547-20261024-1819",
+    "root": "(deleted-coord-artifact)",
     "source_commit": "472b6705475b073e7fe08f6e11ee17fb1e29f838",
     "policy_sha256": "ccd0b4abe58d2d6eb46a54269bfaccd5cf24e27128166c3605c9e6016dd79887",
     "checker_sha256": "7f36d39ada53f95ac457237f7d9d77eab4c2f93ea7c714a79ad438c7c7436e48",

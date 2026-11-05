@@ -37,11 +37,11 @@ Validation on the final source:
 * No native timing or binary evidence is claimed by this record.
 
 The complete integration log is retained outside the checkout at
-`.coord/w4b-xlsb-raw-policy/xlsb-named-ranges-tests.log` (113908 bytes,
+`(deleted-coord-artifact)/xlsb-named-ranges-tests.log` (113908 bytes,
 SHA-256
 `0bee7aad32576a76f4b28d1fe2e3ea3c41dbc7c1e3b94dac050b0a25098cd098`). The
 Clippy log is retained outside the checkout at
-`.coord/w4b-xlsb-raw-policy/xlsb-named-ranges-clippy.log` (172 bytes,
+`(deleted-coord-artifact)/xlsb-named-ranges-clippy.log` (172 bytes,
 SHA-256
 `637a70c8c5a14fdc047b254c8a6dd945e8464a47629f0bde28ebe128e1b82de8`).
 

@@ -9,7 +9,7 @@
       "LITCHI_PROBE_ONLY": "doc/leaf_write",
       "LITCHI_PROBE_BATCH_ROUNDS": "1 for Massif and Callgrind; 3 for native",
       "argv": ["legacy_w5_source_probe", "1 or 3"],
-      "runner": "/home/zhuhe/code/litchi-worktrees/.coord/doc-toggle/tmp/runner/legacy_w5_source_probe"
+      "runner": "(deleted-coord-artifact)"
     }
   },
   "source_assemblies": {
@@ -37,12 +37,12 @@
     "cargo_incremental": 0,
     "memory_cap": "20G for profilers; cargo shim was on PATH",
     "before": {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/doc-toggle/before-qualified-legacy_w5_source_probe",
+      "path": "(deleted-coord-artifact)/before-qualified-legacy_w5_source_probe",
       "bytes": 13346048,
       "sha256": "0c4392e6cbf5a65b5e3901fdc860cec80ce29518b11e47b70620641df405c92a"
     },
     "after": {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/doc-toggle/after-qualified-legacy_w5_source_probe",
+      "path": "(deleted-coord-artifact)/after-qualified-legacy_w5_source_probe",
       "bytes": 13346080,
       "sha256": "cfdf1e3040b9b742551d80cd583fc28de4f366f9f9bc9fb7198e91aa3352384f"
     }

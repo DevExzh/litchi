@@ -27,7 +27,7 @@ the independent exact/one-under archive checks. Source review accepts
 The 120/120a leaf tip is `35b0018513ea1d234342b2f793ca6dd733efe0f1`.
 These reviewed leaves are held separately while diagnostics use frozen a8.
 
-The external packets below are relative to the worktree parent's `.coord/`.
+The external packets below are relative to the worktree parent's `(deleted-coord-artifact)`.
 
 | Packet | Result SHA-256 | Rows SHA-256 |
 |---|---|---|

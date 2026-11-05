@@ -25,7 +25,7 @@ contains all 42 modules. Row 37 must pass before its OfficeCLI TSV is copied
 and verified externally; row 38 cannot start before that preservation.
 
 The reviewed packet is external at
-`.coord/final-gate-Cf8cd398a-20261025-v6-final/` under the worktree parent:
+`(deleted-coord-artifact)` under the worktree parent:
 
 | Artifact | Bytes | SHA-256 |
 |---|---:|---|
@@ -38,12 +38,12 @@ Root starts the reviewed driver from the parent worktree directory with:
 
 ```sh
 PYTHONDONTWRITEBYTECODE=1 python3 -B \
-  .coord/final-gate-Cf8cd398a-20261025-v6-final/final_gate_v6.py --go \
+  (deleted-coord-artifact)/final_gate_v6.py --go \
   --expected-plan-sha256 8059ad69f2eacd9a5b59d2b738c8b6ea86944196b261e1d946dc5e4d7ea1103b \
   --root uo2-coordinator-metadata-integration \
-  --packet .coord/final-gate-Cf8cd398a-20261025-v6-final/packet \
-  --state .coord/final-gate-Cf8cd398a-20261025-v6-final/state \
-  --target .coord/targets/final-gate-Cf8cd398a-20261025-v6-final/target
+  --packet (deleted-coord-artifact) \
+  --state (deleted-coord-artifact) \
+  --target (deleted-coord-artifact)
 ```
 
 The driver runs seven compiler supplements, full53 and five runtime

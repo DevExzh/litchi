@@ -70,10 +70,10 @@ to the ignored worktree `Cargo.lock`, with SHA-256
 removed after the run. Rust `1.95.0`, `--offline --locked`,
 `CARGO_BUILD_JOBS=1`, `RUST_TEST_THREADS=1`, debug info off, and incremental
 compilation off were used. The fresh external target was
-`/home/zhuhe/code/litchi-worktrees/.coord/targets/0362ul51c-e71f7b95/target`,
+`(deleted-coord-artifact)`,
 which measured 3,986,141,931 bytes at capture (<20 GiB). Logs are retained
 outside the repository at
-`/home/zhuhe/code/litchi-worktrees/.coord/0362ul51c-validation-e71f7b95/logs/`.
+`(deleted-coord-artifact)`.
 
 Successful steps (all exit 0) were:
 
@@ -144,7 +144,7 @@ DrawingML library, geometry and transform tests; SpreadsheetDrawing all-target
 tests; XLSX and XLSB all-target checks; XLSX/XLSB ops check; DrawingML library
 Clippy; SpreadsheetDrawing/XLSX/XLSB all-target Clippy; and ops Clippy.
 The external state is
-`.coord/0362ul51c-f5-e71f7b95-scoped2/state.json` (70,630 bytes, SHA-256
+`(deleted-coord-artifact)/state.json` (70,630 bytes, SHA-256
 `45de0b60dc09d9a205b0d296192e9e0cbc5f01ddd79d0b3b05ac858235ad472c`).
 Its driver log SHA-256 is
 `c085ed2f2c03ee8e0059d1f91fa032fb28628c2eb9647f7b44358a2c6ab91af7`.

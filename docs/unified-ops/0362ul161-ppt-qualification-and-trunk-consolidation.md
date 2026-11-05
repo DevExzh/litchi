@@ -32,7 +32,7 @@ making byte preservation observable while correcting its assertion types.
 All changed Rust files pass rustfmt. Failed packets remain intact.
 
 The final focused packet is external at
-`/home/zhuhe/code/litchi-worktrees/.coord/ppt-158h-focused-20261026/`.
+`(deleted-coord-artifact)`.
 Its `root-terminal-verification.json` is 2,423 bytes, SHA-256
 `acc52ccc6d295ef29ba45b202758d3f91e4f3ea3fe00305f787155a51a0d9922`.
 The plan SHA-256 is
@@ -54,7 +54,7 @@ Required baseline checkouts remain until their qualification closes.
 
 The checkout had 320,315,392 allocated bytes and its test cache had
 3,335,327,744 allocated bytes. These are allocation ledgers, not measured
-free-space gains. External evidence under `.coord/cleanup-ppt-158-20261026/`:
+free-space gains. External evidence under `(deleted-coord-artifact)`:
 
 | Artifact | Bytes | SHA-256 |
 | --- | ---: | --- |
@@ -66,7 +66,7 @@ Before the trunk merge, root preserves the original 15-byte untracked
 probe. The ignored root Cargo lock is also preserved before migration to the
 qualified candidate lock; both tracked tool locks arrive through the merge.
 All three root locks then match the integration worktree. The external
-`.coord/root-probe-before-c2-integration-20261026/receipt.json` is 2,409 bytes,
+`(deleted-coord-artifact)/receipt.json` is 2,409 bytes,
 SHA-256 `46e0d85a501436b399e4897a491841ad7f7a43a74121495dd18afce4013e29fc`.
 The receipt discloses the initial postcheck's incorrect unchanged-lock
 assumption. No source or original local content is lost.

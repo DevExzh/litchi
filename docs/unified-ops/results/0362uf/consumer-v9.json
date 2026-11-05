@@ -14,7 +14,7 @@
       ],
       "exit": 101,
       "seconds": 215.67205425799966,
-      "log": "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/api-assembly-consumers-v9/check-0.log",
+      "log": "(deleted-coord-artifact)/check-0.log",
       "bytes": 68469,
       "sha256": "cb259594b244f0f1544fe7bd38c131024340c85badb0185d07ac4c43f882e21d",
       "target_bytes_before": 18305135614,

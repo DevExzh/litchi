@@ -21,7 +21,7 @@
     "unique_passes": 2109,
     "ignored": 3,
     "commands": 6,
-    "manifest": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-e3aa-release-source-20261021/manifest.json",
+    "manifest": "(deleted-coord-artifact)/manifest.json",
     "manifest_sha256": "d35767eb9b513ddc7f0080a3947d272b15f92d785ce26e127e30f9ef74aaf6fe"
   },
   "performance": "Must independently pass matched-Sip replay comparison and original-baseline first-commit/steady/replay/retention comparison. No old returned measurements are pooled with this candidate."

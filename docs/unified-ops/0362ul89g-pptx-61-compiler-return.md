@@ -6,7 +6,7 @@ performance, or qualification result is claimed.
 The repair is based on frozen source `00a42a7d4c9bfead038e2e40c57a0c14291e5ecb`
 and addresses only the assigned `litchi-pptx` 61-scope diagnostics. The
 129,953-byte diagnostic log is retained outside Git at
-`/home/zhuhe/code/litchi-worktrees/.coord/pptx-combined-0362ul89-f5-actual-00a42a7d4c/01-pptx-all-features-check-attempt-actual-f5-01.log`
+`(deleted-coord-artifact)/01-pptx-all-features-check-attempt-actual-f5-01.log`
 with SHA-256
 `d7f08d8f7a99af9566b704d86cc9ca0066f28e745d2c0f5ac0cdd3e6ec11628f`.
 

@@ -10,23 +10,23 @@ release binary; capability claims are not accepted as free-form metadata.
 
 The two pinned source inputs are:
 
-* Original f2: `/home/zhuhe/code/litchi-worktrees/.coord/w8-f2-baseline-sAirXf/src`,
+* Original f2: `(deleted-coord-artifact)`,
   commit `f2bbbc8d07ab5da26c180f1ff74813d39f632d54`.
   Its reviewed source archive is
-  `/home/zhuhe/code/litchi-worktrees/.coord/w8-f2-baseline-sAirXf/f2-source.tar`
+  `(deleted-coord-artifact)/f2-source.tar`
   (6,614,528,000 bytes,
   SHA-256 `de625729ec8e6f8055e619443ad31bf1a91719cd31465975f951d54dbc1c2280`).
   The source-assembly receipt is
-  `/home/zhuhe/code/litchi-worktrees/.coord/w8-f2-baseline-sAirXf/out/provenance/original-baseline-source-assembly.json`
+  `(deleted-coord-artifact)/original-baseline-source-assembly.json`
   (SHA-256
   `b9de004ed2a74a509ebc2e3879b8d8812fcf543b92cb8bccf740ec82486ea44d`),
   and its compatibility adapter patch is bound by that receipt (153,188
   bytes, SHA-256
   `a6ffa1cc542caba1bac4d57fdf9a8e614300c8f3ac9a60716fe86dde74c7175e`).
-* Final capture: `/home/zhuhe/code/litchi-worktrees/.coord/final-api-capture-472b670547/source`,
+* Final capture: `(deleted-coord-artifact)`,
   commit `472b6705475b073e7fe08f6e11ee17fb1e29f838`.  `prepare` accepts the
   retained reviewed archive
-  `/home/zhuhe/code/litchi-worktrees/.coord/w8-472b-native.V1lU2E/candidate/472b-source.tar`,
+  `(deleted-coord-artifact)/472b-source.tar`,
   checks every archive member against the pinned Git tree, and requires
   6,634,147,840 bytes with SHA-256
   `44c11e933974c8fa3d6a67b46739bedeef866e60fbd4360ffe7f3bb8a4dc2274`.
@@ -78,7 +78,7 @@ execution, or native qualification is performed by this driver lane.
 ## Completed f2 handoff
 
 The successful source-only f2 receipt is rooted at
-`/home/zhuhe/code/litchi-worktrees/.coord/signed-build-adapter-f2-current-ppoSOO/prepared`.
+`(deleted-coord-artifact)`.
 The endpoint files are immutable external receipts; their exact sizes and
 SHA-256 values are:
 
@@ -104,8 +104,8 @@ TMPDIR directories and enforces the 20-GB cap:
 ```sh
 set -euo pipefail
 INTEGRATION=/home/zhuhe/code/litchi-worktrees/uo2-coordinator-metadata-integration
-PREPARED=/home/zhuhe/code/litchi-worktrees/.coord/signed-build-adapter-f2-current-ppoSOO/prepared
-CARGO_SHIM=/home/zhuhe/code/litchi-worktrees/.coord/bin/cargo
+PREPARED=(deleted-coord-artifact)
+CARGO_SHIM=(deleted-coord-artifact)
 unset LITCHI_CAPPED LITCHI_BLESS
 git -C "$INTEGRATION" merge-base --is-ancestor \
   1c2ce1f7d5230abf6c364b62a19807290ed2bc29 HEAD

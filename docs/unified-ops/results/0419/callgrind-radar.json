@@ -2,10 +2,10 @@
   "record": "0419",
   "slice": "1",
   "binary_sha256": "09a93187261869eb6c6a0549a9d3feea261f7e57ddb823c515b5be98577d8173",
-  "build": "source .coord/iwa-w4f/env.sh; cargo test --release -p litchi-iwa --all-features --test parity --no-run",
+  "build": "source (deleted-coord-artifact); cargo test --release -p litchi-iwa --all-features --test parity --no-run",
   "run": "W4C_ROUTE=<route> taskset -c 3 valgrind --tool=callgrind <binary> --ignored --exact chart_property_cost::chart_property_route_cost_abba --test-threads=1",
   "metric": "inclusive Ir of w4c_host_route / w4c_leaf_route, two calls each (ABBA)",
-  "captures_dir": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-w4f/cg1 (outside the repository)",
+  "captures_dir": "(deleted-coord-artifact) (outside the repository)",
   "routes": [
     {
       "route": "keynote_radar_set",

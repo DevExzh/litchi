@@ -1,11 +1,11 @@
 {
   "record": "0427",
   "binary_sha256": "2d24d046d805177b300662ae46b564d274283994307d8fa29d79b6ee2b87bbf2",
-  "build": "source .coord/iwa-w4n/env.sh; cargo test --release -p litchi-iwa --all-features --test parity --no-run",
+  "build": "source (deleted-coord-artifact); cargo test --release -p litchi-iwa --all-features --test parity --no-run",
   "run": "cd crates/litchi-iwa; <VAR>=<route> taskset -c 3 valgrind --tool=callgrind <binary> --ignored --exact <probe> --test-threads=1 (Numbers: W4L_ROUTE, numbers_caption_cases::numbers_caption_route_cost_abba; Pages: W4N_ROUTE, pages_chart_caption_cases::pages_chart_caption_route_cost_abba)",
   "metric": "inclusive Ir of the probe host route / leaf route functions, two calls each (ABBA)",
   "budget": "leaf <= 1.05 x host",
-  "captures_dir": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-w4n/cg (outside the repository)",
+  "captures_dir": "(deleted-coord-artifact) (outside the repository)",
   "routes": [
     {
       "format": "numbers",

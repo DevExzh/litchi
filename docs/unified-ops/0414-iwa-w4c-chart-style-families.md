@@ -101,7 +101,7 @@ The Keynote and Pages cases are mechanical ports of the Numbers chart cases
 their container argument (slide index; none for Pages), the leaf position of
 the host-added chart (Keynote: the slide's second chart; Pages: the body's
 only discoverable chart) and the publication policy. The port script is kept
-outside the repository (`.coord/iwa-w4c/tools/port_parity.py`) and records
+outside the repository (`(deleted-coord-artifact)`) and records
 every rewrite it applies. Properties the host does not have for a format are
 dropped from its port (Keynote: legend visibility — a separate W1-C family —
 and hidden data; Pages: hidden data).
@@ -141,7 +141,7 @@ serialize for writes) on a chart the host added to the native fixture.
 Probe: `crates/litchi-iwa/tests/parity/chart_property_cost.rs`. Reduced
 receipt: `results/0414/callgrind-slice1.json` (binary SHA-256, capture file
 names, sizes and hashes; the 16 MB of raw captures stay outside the
-repository in `.coord/iwa-w4c/cg/`).
+repository in `(deleted-coord-artifact)`).
 
 | Route | Host Ir | Leaf Ir | Leaf/host |
 |---|---:|---:|---:|
@@ -205,7 +205,7 @@ hand-off (§8, added when the slice is handed over).
 ## 8. Hand-off gates (slice 1)
 
 Run on the branch with trunk merged (`2b8c473445`, trunk `fc7a879e7c`),
-build env of the coordinator rules. Logs: `.coord/iwa-w4c/gates1`, `gates2`.
+build env of the coordinator rules. Logs: `(deleted-coord-artifact)`, `gates2`.
 
 | Command | Exit |
 |---|---|
@@ -252,7 +252,7 @@ fixtures. All flipped routes already had macOS-queue rows (the family routes
 of slice 1 and 0378).
 
 Performance (same probe and method as §5; receipt
-`results/0414/callgrind-slice2.json`, raw captures in `.coord/iwa-w4c/cg2/`):
+`results/0414/callgrind-slice2.json`, raw captures in `(deleted-coord-artifact)`):
 
 | Route | Host Ir | Leaf Ir | Leaf/host |
 |---|---:|---:|---:|
@@ -267,7 +267,7 @@ Performance (same probe and method as §5; receipt
 | Numbers border stroke set | 187,014,852 | 44,512,260 | 0.2380 |
 
 Slice 2 gates (branch with trunk `cd89e91f63`-line merged; logs
-`.coord/iwa-w4c/gates3`): every command of §8 exits 0 — fmt, the four clippy
+`(deleted-coord-artifact)`): every command of §8 exits 0 — fmt, the four clippy
 sets, rustdoc, the glossary (after re-exporting the axis values through the
 family modules, which the crate-boundary check requires), the leaf, `litchi-iwa`
 (parity included), `litchi` and nine `litchi-ops` test groups, pyo3,
@@ -300,11 +300,11 @@ host); reads Tier A. Seven macOS-queue routes added.
 | Pages style set (re-run) | 1,197,838,136 | 46,892,401 | 0.0391 |
 
 Receipt `results/0414/callgrind-slice3.json`; raw captures in
-`.coord/iwa-w4c/cg3/`. Legend font and font size (a paragraph-style graph like
+`(deleted-coord-artifact)`. Legend font and font size (a paragraph-style graph like
 `chart_font`) follow in the next slice.
 
 Slice 3 gates (trunk `5b5dad5c57` merged at `9cfdf2f69d`; logs
-`.coord/iwa-w4c/gates4`): every command of §8 exits 0.
+`(deleted-coord-artifact)`): every command of §8 exits 0.
 
 ## 11. Slice 4: chart background fill and 3D lighting
 
@@ -336,13 +336,13 @@ routes.
 | Numbers lighting set | 155,704,752 | 44,588,686 | 0.2864 |
 
 Receipt `results/0414/callgrind-slice4.json`; raw captures in
-`.coord/iwa-w4c/cg4/`. The release binary carries no debug info (the slice 3
+`(deleted-coord-artifact)`. The release binary carries no debug info (the slice 3
 receipt's build line names `CARGO_PROFILE_RELEASE_DEBUG=1`, which the build
 environment never set; the measured symbols are the probe's `#[inline(never)]`
 routes either way). Chart shadow, category labels and legend fonts follow.
 
 Slice 4 gates (trunk `d67a878026` merged at `b7ca9b584f`; logs
-`.coord/iwa-w4c/gates5`): every command of §8 exits 0; target 15 GB after
+`(deleted-coord-artifact)`): every command of §8 exits 0; target 15 GB after
 pruning.
 
 ## 12. Slice 5: lighting validation, chart shadow, category label layout
@@ -392,14 +392,14 @@ routes.
 | Numbers category labels set | 178,412,990 | 44,534,500 | 0.2496 |
 
 Receipt `results/0414/callgrind-slice5.json`; raw captures in
-`.coord/iwa-w4c/cg5/`. The style engines' public surface only grew (new
+`(deleted-coord-artifact)`. The style engines' public surface only grew (new
 variants of `#[non_exhaustive]` enums and new payload functions), so W4-D's
 chart lifecycle work is unaffected. Legend font and font size follow.
 
 Slice 5 gates: trunk `8010cc9fb4` merged at `3fb4b2bb82`; every command of
-§8 exits 0 (logs `.coord/iwa-w4c/gates6`). Trunk `0c9838a622` (W4-T cell
+§8 exits 0 (logs `(deleted-coord-artifact)`). Trunk `0c9838a622` (W4-T cell
 appearance) was then merged at `44e529905b`. On that merge, the following were re-run
-and exit 0 (logs `.coord/iwa-w4c/gates6b`): ledger, glossary, the clippy leg
+and exit 0 (logs `(deleted-coord-artifact)`): ledger, glossary, the clippy leg
 over the five touched crates, `cargo test -p litchi-numbers --all-features`,
 the chart parity cases, fmt and the bench matrix. Target 12 GB after pruning.
 
@@ -430,17 +430,17 @@ parity `publish` helper does not rewrite metadata.
 | Numbers legend font set | 570,407,936 | 185,136,912 | 0.3246 |
 
 Receipt `results/0414/callgrind-slice6.json`; raw captures in
-`.coord/iwa-w4c/cg6/`.
+`(deleted-coord-artifact)`.
 
 Slice 6 gates: trunk `10af106c18` (W4-D slice 1) merged at `147881a72c`.
-Every command of §8 exits 0 (logs `.coord/iwa-w4c/gates7`), except the
+Every command of §8 exits 0 (logs `(deleted-coord-artifact)`), except the
 crate-boundary check, which first refused the Keynote `chart::legend_style`
 re-export of `litchi_iwa_text`. Those types are now re-exported through
 `slide_chart_font`, as the chart font family does. After that fix, the
 boundary check, clippy -D warnings and rustdoc for litchi-keynote, the
 Keynote legend parity cases and the glossary check exit 0.
 Trunk `b440f4b424` (W4-T comment threads) was then merged at `b07c024505`. On that
-merge the following re-ran and exit 0 (logs `.coord/iwa-w4c/gates7b`):
+merge the following re-ran and exit 0 (logs `(deleted-coord-artifact)`):
 ledger, glossary, clippy -D warnings on the six touched crates, the
 litchi-keynote and litchi-pages tests, the whole parity target (1043 passed),
 fmt, the crate-boundary check and the bench matrix. Target 3.4 GB after
@@ -486,14 +486,14 @@ Radar series style (2 rows per format) follows with the remaining items.
 | numbers_label_locations_set | 241,202,892 | 60,372,687 | 0.2503 |
 
 Receipt `results/0414/callgrind-slice7.json`; raw captures in
-`.coord/iwa-w4c/cg7/`.
+`(deleted-coord-artifact)`.
 
 Slice 7 gates: trunk `b667dc4246` merged at `52d072be1d`; every command of
-§8 exits 0 (logs `.coord/iwa-w4c/gates8`), except the first full clippy leg,
+§8 exits 0 (logs `(deleted-coord-artifact)`), except the first full clippy leg,
 which refused a redundant `TextFont::from` in the new shared-variation case.
 That was fixed, and the re-run full clippy leg exits 0 (`clippy_all2.log`).
 Trunk `1cafb9dfc2` (W4-T Numbers comment replies) was then merged at `2d1383251e`.
-The following re-ran on that merge and exit 0 (logs `.coord/iwa-w4c/gates8b`):
+The following re-ran on that merge and exit 0 (logs `(deleted-coord-artifact)`):
 ledger, glossary, clippy -D warnings on five crates, the litchi-numbers tests,
 the chart parity cases, fmt, boundaries and bench. Target 11 GB after
 pruning.

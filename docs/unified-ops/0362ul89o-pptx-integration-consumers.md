@@ -5,11 +5,11 @@ compiler, runtime, performance, or qualification result is claimed here.
 
 The source base is `2749ced58b3837c477fad3a77bed633d922cc252`. The preserved
 F5 diagnostic log is outside Git at
-`/home/zhuhe/code/litchi-worktrees/.coord/pptx-combined-0362ul89-f5-actual-2749ced58b/01-pptx-all-features-check-attempt-actual-f5-01.log`
+`(deleted-coord-artifact)/01-pptx-all-features-check-attempt-actual-f5-01.log`
 (26,413 bytes, SHA-256
 `6426504ce368cb6721a0c2cbcdc2161854bb85baf667a11336e6f3aaeb76b730`). Its
 diagnostics index is outside Git at
-`/home/zhuhe/code/litchi-worktrees/.coord/pptx-combined-0362ul89-f5-actual-2749ced58b/diagnostics-index.json`
+`(deleted-coord-artifact)/diagnostics-index.json`
 (363 bytes, SHA-256
 `c4ef106aab2dbb61ac0ea2e07643c4b0019c9200f6d3bbadfad2f91a7a05820d`). The
 index records exactly two errors, both missing the required second argument to

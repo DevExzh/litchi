@@ -2,8 +2,8 @@
 # Record 0360b: release builds of the probes, base (git archive of the
 # merge-tree 684a028b2a = uo2/w4-xlsx 635b884c7c + trunk) and head (uo2/w4b-xlsb).
 set -e
-source /home/zhuhe/code/litchi-worktrees/.coord/w4b-xlsb/env.sh
-P=/home/zhuhe/code/litchi-worktrees/.coord/w4b-xlsb/perf
+source /deleted-coord-artifact
+P=/deleted-coord-artifact
 build() { # $1 = leg, $2 = source root
   export CARGO_TARGET_DIR=$P/tgt-$1
   cd $2

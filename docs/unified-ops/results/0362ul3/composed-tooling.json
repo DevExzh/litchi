@@ -23,7 +23,7 @@
   "started": "2026-10-24T09:22:55.878835+00:00",
   "seconds": 48.20980750999297,
   "exit_code": 0,
-  "log": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/composed-tooling-83a0ace78b.log",
+  "log": "(deleted-coord-artifact)/composed-tooling-83a0ace78b.log",
   "bytes": 633734,
   "sha256": "f12da526f0dea17c39c98e30ae086495a0726e546a1ba6f8a64f881e9d048a22",
   "tests_passed": 1428,

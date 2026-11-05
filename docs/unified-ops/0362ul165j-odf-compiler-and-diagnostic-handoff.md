@@ -87,7 +87,7 @@ deferred. Nothing is pushed.
 
 ## Evidence
 
-Paths are relative to `/home/zhuhe/code/litchi-worktrees/.coord/`.
+Paths are relative to `(deleted-coord-artifact)`.
 
 | Artifact | Bytes | SHA-256 |
 | --- | ---: | --- |
@@ -109,7 +109,7 @@ input lock, is:
 
 ```sh
 LITCHI_MEM_MAX=20G CARGO_BUILD_JOBS=1 CARGO_INCREMENTAL=0 \
-  /home/zhuhe/code/litchi-worktrees/.coord/bin/cargo metadata \
+  (deleted-coord-artifact) metadata \
   --offline --format-version 1 --manifest-path tools/perf-baseline/Cargo.toml
 ```
 

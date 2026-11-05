@@ -3,7 +3,7 @@
 This source-only follow-up repairs the DOCX diagnostics from the actual
 consumer capture on `5ec78a48589c7ab4396ee90cb1f6d41cf7f1aaa6`. The immutable
 capture is retained outside the checkout at
-`/home/zhuhe/code/litchi-worktrees/.coord/ooxml-combined-0362ul94-f5-consumers-5ec78a4858`.
+`(deleted-coord-artifact)`.
 
 The captured DOCX failures were:
 

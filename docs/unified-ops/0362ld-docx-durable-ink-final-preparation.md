@@ -10,19 +10,19 @@ The final pair is the committed baseline d0406be01712496ca0d43354edf4d2fe8016255
 and candidate c796d0acc24c7c6e6fd08980b9e31af6bb86b18b. The candidate source
 checkout is the read-only full-gate root:
 
-    /home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/full-gate-c796d0acc2/source
+    (deleted-coord-artifact)
 
 Its root Cargo.lock is the reviewed 4100b1fbb272dd24842f33a2d6f353a3f3a97dfa7e435c4649a0e1a029bfaea1
 lock (139,606 bytes). The lock is also retained at:
 
-    /home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/locks/4100b1fbb272dd24842f33a2d6f353a3f3a97dfa7e435c4649a0e1a029bfaea1.Cargo.lock
+    (deleted-coord-artifact)/4100b1fbb272dd24842f33a2d6f353a3f3a97dfa7e435c4649a0e1a029bfaea1.Cargo.lock
 
 The source-only packet materialized fresh archives and manifests from the
 canonical ink-qualify.py snapshot helper. It did not modify either endpoint,
 regenerate the root lock, or reuse/relabel any older d040/e157 measurement.
 The complete receipt is outside Git:
 
-    /home/zhuhe/code/litchi-worktrees/.coord/durable-ink-final-c796/source-preparation.json
+    (deleted-coord-artifact)/source-preparation.json
     10657 bytes, SHA-256 d02c731dda4da7e48bf372ed53533f1d426051958856b887d75b0c1fd6e26773
 
 The receipt binds these fresh source artifacts:
@@ -73,9 +73,9 @@ checksum from the 4100 lock.
 
 All generated projects, targets, logs, binaries and raw receipts remain under
 the external directory
-/home/zhuhe/code/litchi-worktrees/.coord/durable-ink-final-c796/. The reviewed
+(deleted-coord-artifact). The reviewed
 Cargo wrapper is
-/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/gate-safe-drawingml-20261024/bin/cargo
+(deleted-coord-artifact)
 (SHA-256
 495e24c6f60b238378386d86ac4158cba904992ce8870a9494f2c4a0eedd256d). Use one
 Cargo job, offline and locked mode, incremental compilation off, the 20-GiB
@@ -83,13 +83,13 @@ memory cap, and the wrapper’s 19.2-GB preflight/20-GB hard target guards.
 
 After a coordinator grants the build slot, the exact source/probe build is:
 
-    PATH=/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/gate-safe-drawingml-20261024/bin:$PATH \
+    PATH=(deleted-coord-artifact):$PATH \
     LITCHI_MEM_MAX=20G CARGO_BUILD_JOBS=1 CARGO_INCREMENTAL=0 CARGO_NET_OFFLINE=true \
-    python3 /home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/full-gate-c796d0acc2/source/docs/unified-ops/results/0362l/ink-qualify.py build \
-      /home/zhuhe/code/litchi-worktrees/.coord/durable-ink-final-c796/run-final \
+    python3 (deleted-coord-artifact) build \
+      (deleted-coord-artifact) \
       --base d0406be01712496ca0d43354edf4d2fe80162553 \
       --candidate c796d0acc24c7c6e6fd08980b9e31af6bb86b18b \
-      --lock /home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/locks/4100b1fbb272dd24842f33a2d6f353a3f3a97dfa7e435c4649a0e1a029bfaea1.Cargo.lock
+      --lock (deleted-coord-artifact)/4100b1fbb272dd24842f33a2d6f353a3f3a97dfa7e435c4649a0e1a029bfaea1.Cargo.lock
 
 The builder’s endpoint commands are fixed as follows. It generates the
 isolated probe lock offline once, reuses that matched project lock for both
@@ -110,10 +110,10 @@ JSON, stream settings or source/lock/compiler identity fail closed.
 
 The optional allocation pass is not a timing claim. It is the exact command:
 
-    PATH=/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/gate-safe-drawingml-20261024/bin:$PATH \
+    PATH=(deleted-coord-artifact):$PATH \
     LITCHI_MEM_MAX=20G CARGO_BUILD_JOBS=1 CARGO_INCREMENTAL=0 CARGO_NET_OFFLINE=true \
-    python3 /home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/full-gate-c796d0acc2/source/docs/unified-ops/results/0362l/ink-qualify.py allocation \
-      /home/zhuhe/code/litchi-worktrees/.coord/durable-ink-final-c796/run-final --attempt allocation-c796-a1
+    python3 (deleted-coord-artifact) allocation \
+      (deleted-coord-artifact) --attempt allocation-c796-a1
 
 It runs each of forward, inverse, noop, forward_write, inverse_write and
 noop_write for 100 operations in exact order base, candidate, candidate, base,
@@ -126,13 +126,13 @@ coordinator-approved CPU window, run the exact native ABBA command below. CPU
 29 is the prepared affinity; the runner first requires that CPU in the current
 affinity and records every host guard.
 
-    PATH=/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/gate-safe-drawingml-20261024/bin:$PATH \
+    PATH=(deleted-coord-artifact):$PATH \
     LITCHI_MEM_MAX=20G CARGO_BUILD_JOBS=1 CARGO_INCREMENTAL=0 CARGO_NET_OFFLINE=true \
-    python3 /home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/full-gate-c796d0acc2/source/docs/unified-ops/results/0362l/ink-abba.py \
-      /home/zhuhe/code/litchi-worktrees/.coord/durable-ink-final-c796/run-final/build-base/ink-native \
-      /home/zhuhe/code/litchi-worktrees/.coord/durable-ink-final-c796/run-final/build-candidate/ink-native \
-      /home/zhuhe/code/litchi-worktrees/.coord/durable-ink-final-c796/run-final/native-c796-a1 \
-      --build-manifest /home/zhuhe/code/litchi-worktrees/.coord/durable-ink-final-c796/run-final/build.json --cpu 29
+    python3 (deleted-coord-artifact) \
+      (deleted-coord-artifact) \
+      (deleted-coord-artifact) \
+      (deleted-coord-artifact) \
+      --build-manifest (deleted-coord-artifact) --cpu 29
 
 For every route the runner calibrates both endpoints to at least 500 ms,
 warms each side twice, then records five A, B, B, A blocks with a minimum
@@ -140,10 +140,10 @@ warms each side twice, then records five A, B, B, A blocks with a minimum
 host overlap and unrelated Cargo/rustc/rustdoc/rustfmt/clippy/profiler work.
 The final collector command is:
 
-    python3 /home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/full-gate-c796d0acc2/source/docs/unified-ops/results/0362l/ink-collect.py \
-      /home/zhuhe/code/litchi-worktrees/.coord/durable-ink-final-c796/run-final \
+    python3 (deleted-coord-artifact) \
+      (deleted-coord-artifact) \
       --allocation allocation-c796-a1 \
-      --out /home/zhuhe/code/litchi-worktrees/.coord/durable-ink-final-c796/run-final/evidence
+      --out (deleted-coord-artifact)
 
 ## Source-only validation completed
 

@@ -16,7 +16,7 @@ The tracked safe-gate tooling argv adds `tools.test_drawingml_raw_policy_v2`:
 bytes with SHA-256
 `3a539275603dfc3e083fbfa156c0b6f3165f0c6c773a65eab7fad4573795668c`.
 The external gate recipe receives the same registration; its previous bytes
-are preserved in `.coord/gate.sh.before-0362ul72` (6,143 bytes, SHA-256
+are preserved in `(deleted-coord-artifact)` (6,143 bytes, SHA-256
 `33b8dbad688f8a9a221bfb85eb668fddc1a789193a6096425182e7045628d179`).
 The updated recipe is 6,178 bytes with SHA-256
 `8c5dbc25d083e96492458aaf257ab825873c336814234c910a5495c9c3af52ba`.

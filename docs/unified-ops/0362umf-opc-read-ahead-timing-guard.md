@@ -11,20 +11,17 @@ acceptance result was produced by this commit.
 The preserved all-in-one recipe remains external and unchanged:
 
 ```text
-script: /home/zhuhe/code/litchi-worktrees/.coord/final-api-capture-472b670547/
-        opc-read-ahead-final472b-prep/run-opc-read-ahead-final472b.sh
+script: (deleted-coord-artifact)/run-opc-read-ahead-final472b.sh
 sha256: 5b20c3980e6892c5485d99b28dcc455e3e823c0d8190d0cabd87fee51c6a3ddb
 ```
 
 The independently prepared prefix is:
 
 ```text
-script: /home/zhuhe/code/litchi-worktrees/.coord/final-api-capture-472b670547/
-        opc-read-ahead-final472b-prep/build-correctness-prefix-final472b.sh
+script: (deleted-coord-artifact)/build-correctness-prefix-final472b.sh
 sha256: 9729d18cc321e8954305dd49022c913740474df6d11a2520530c2eb07e385266
 bytes:  5786
-diff:   /home/zhuhe/code/litchi-worktrees/.coord/final-api-capture-472b670547/
-        opc-read-ahead-final472b-prep/build-correctness-prefix-final472b.diff
+diff:   (deleted-coord-artifact)/build-correctness-prefix-final472b.diff
 diff sha256: 0bd44e98e06727469d1df861bccd7d97297381764e9777d47d41b4d5efba70f4
 ```
 
@@ -41,8 +38,8 @@ The endpoints remain the exact clean source pair:
 
 | endpoint | revision | tree | source checkout |
 | --- | --- | --- | --- |
-| baseline | `410bd99f00fdfb4161a94215710340f16ea536bb` | `41850bc694ccfda6f84510611d32fe452248773d` | `/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/opc-read-ahead-c796-prep/source-baseline-410` |
-| candidate | `472b6705475b073e7fe08f6e11ee17fb1e29f838` | `ebc1cee05f124c0c63977aff07a23288c19e7d00` | `/home/zhuhe/code/litchi-worktrees/.coord/final-api-capture-472b670547/source` |
+| baseline | `410bd99f00fdfb4161a94215710340f16ea536bb` | `41850bc694ccfda6f84510611d32fe452248773d` | `(deleted-coord-artifact)` |
+| candidate | `472b6705475b073e7fe08f6e11ee17fb1e29f838` | `ebc1cee05f124c0c63977aff07a23288c19e7d00` | `(deleted-coord-artifact)` |
 
 ## Timing-driver repair
 
@@ -77,8 +74,8 @@ python3 docs/unified-ops/results/0362umf/opc_read_ahead_timing.py \
   --candidate-revision 472b6705475b073e7fe08f6e11ee17fb1e29f838 \
   --baseline-tree 41850bc694ccfda6f84510611d32fe452248773d \
   --candidate-tree ebc1cee05f124c0c63977aff07a23288c19e7d00 \
-  --baseline-source /home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/opc-read-ahead-c796-prep/source-baseline-410 \
-  --candidate-source /home/zhuhe/code/litchi-worktrees/.coord/final-api-capture-472b670547/source \
+  --baseline-source (deleted-coord-artifact) \
+  --candidate-source (deleted-coord-artifact) \
   --target-baseline "$RUN_ROOT/target-baseline" \
   --target-candidate "$RUN_ROOT/target-candidate" \
   --output-dir "$RUN_ROOT/timing" \
@@ -88,7 +85,7 @@ python3 docs/unified-ops/results/0362umf/opc_read_ahead_timing.py \
 ```
 
 `RUN_ROOT` is the fresh external
-`/home/zhuhe/code/litchi-worktrees/.coord/final-api-capture-472b670547/opc-read-ahead-final472b-run`.
+`(deleted-coord-artifact)`.
 The command is not a claim that timing has run.  The final receipt remains
 latency-only; allocator qualification is out of scope and must not be
 inferred from the ordinary binary.

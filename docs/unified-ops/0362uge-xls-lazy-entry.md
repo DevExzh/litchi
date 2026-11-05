@@ -27,12 +27,12 @@ the existing failure-atomic overlap contract.
 Source tip before this change: `7559f44aa975254bd96f6e28eee17366b0ebeb6a`.
 
 The isolated Cargo target was
-`/home/zhuhe/code/litchi-worktrees/.coord/xls-lazy-entry/target` (1.4 GiB at
+`(deleted-coord-artifact)` (1.4 GiB at
 the last check); no binaries or captures are committed. Commands used with
 the assigned one-job offline/locked environment were:
 
 ```text
-source /home/zhuhe/code/litchi-worktrees/.coord/xls-lazy-entry/env.sh
+source (deleted-coord-artifact)
 CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 cargo test -p litchi-xls --lib --no-default-features --locked --offline
 CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 cargo test -p litchi-xls --lib --no-default-features --locked --offline user_names::tests
 CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 cargo test -p litchi-xls --test xls_user_names --no-default-features --locked --offline
@@ -93,7 +93,7 @@ consumer test passed 4/4.
 Commands, using the assigned one-job capped offline/locked environment:
 
 ```text
-source /home/zhuhe/code/litchi-worktrees/.coord/xls-lazy-entry/env.sh
+source (deleted-coord-artifact)
 cargo test -p litchi-xls --lib package::edit::tests::capture_source_guard_promotes_target_error_to_original_source_changed --locked --offline
 cargo test -p litchi-xls --all-features --test source_backed --test package_owner --locked --offline
 cargo test -p litchi-xls --all-targets --all-features --locked --offline
@@ -113,4 +113,4 @@ check-ops-all-targets-b8ed.log  269 B     2fa2e5e506cda33bd5977cf7717de30ab0a9d2
 ops-xls-ole-metadata-b8ed.log   784 B     acb4f39cba2b76d8ff32beb77f404143c19eee81b425493e4bb817721329d8ab
 ```
 
-The target directory was `/home/zhuhe/code/litchi-worktrees/.coord/xls-lazy-entry/target` and measured 4,553,717,719 bytes after validation. No benchmark, native ABBA, or qualification claim is made.
+The target directory was `(deleted-coord-artifact)` and measured 4,553,717,719 bytes after validation. No benchmark, native ABBA, or qualification claim is made.

@@ -43,14 +43,14 @@ cargo clippy --offline --locked --all-targets --all-features \
   -p litchi-odc -p litchi-odi -p litchi-odm -p litchi-oth -- -D warnings
 ```
 
-Both used `CARGO_TARGET_DIR=/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/target`,
+Both used `CARGO_TARGET_DIR=(deleted-coord-artifact)`,
 which measured 4,330,035,351 bytes (4.2G) after validation. The concise
 external receipts are retained outside the checkout:
 
 | Command | Receipt | Size | SHA-256 |
 |---|---|---:|---|
-| `cargo check` | `.coord/odf-shared-types-v2/check.log` | 820 bytes | `250d42c6c9859f1ab84646ba2bf0473ad4dac84b900585b6a94a3bc043abdfda` |
-| strict `cargo clippy` | `.coord/odf-shared-types-v2/clippy.log` | 836 bytes | `6ccfea6a4d032e972f40ee61879faf0cde9ebd0608de371c873f76b0d2fd1759` |
+| `cargo check` | `(deleted-coord-artifact)/check.log` | 820 bytes | `250d42c6c9859f1ab84646ba2bf0473ad4dac84b900585b6a94a3bc043abdfda` |
+| strict `cargo clippy` | `(deleted-coord-artifact)/clippy.log` | 836 bytes | `6ccfea6a4d032e972f40ee61879faf0cde9ebd0608de371c873f76b0d2fd1759` |
 
 Rustfmt (`rustfmt --edition 2024 --check`), `git diff --check`, and the
 repository artifact guards also passed. The ODM transaction now evaluates

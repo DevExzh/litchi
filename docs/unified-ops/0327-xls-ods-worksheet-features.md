@@ -129,7 +129,7 @@ Follow-up: thread one parsed `Archive` through a verb's helpers.
 Existing outputs are unchanged: every pre-existing golden other than the
 XLS and ODS rows is byte-identical, and the crud checklist changed only in
 the XLS and ODS rows. Evidence (callgrind outputs, logs) stays in the
-coordinator scratch directory `.coord/xls-ods-features/bench/`.
+coordinator scratch directory `(deleted-coord-artifact)`.
 
 ## 6. Gates
 

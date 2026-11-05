@@ -23,7 +23,7 @@ all-target performance-diagnostics Clippy pass after this correction.
 ## Allocation receipt
 
 The paired counting-allocator receipt is outside the checkout at
-`/home/zhuhe/code/litchi-worktrees/.coord/w5-ole/counting-cow-ad990-inplace-20261021`.
+`(deleted-coord-artifact)`.
 Its 14,592-byte directory has manifest SHA-256
 `b143a9927bdc0030ca09c62d1eb2a5b53978e06039d16969663165fb2bd6af80`.
 The runner SHA-256 is
@@ -41,10 +41,10 @@ the matched lock; the baseline uses the immutable `baseline-0ce4-src-8f0ffa`
 source snapshot. The exact build command was:
 
 ```text
-source /home/zhuhe/code/litchi-worktrees/.coord/w5-ole/env.sh
+source (deleted-coord-artifact)
 export CARGO_BUILD_JOBS=1
-export CARGO_TARGET_DIR=/home/zhuhe/code/litchi-worktrees/.coord/w5-ole/target-alloc-cow-current3
-cargo build --release --offline --locked --manifest-path /home/zhuhe/code/litchi-worktrees/.coord/w5-ole/matched-harness/current/Cargo.toml --examples --features current-api,w5-counting-allocator
+export CARGO_TARGET_DIR=(deleted-coord-artifact)
+cargo build --release --offline --locked --manifest-path (deleted-coord-artifact) --examples --features current-api,w5-counting-allocator
 ```
 
 The runner reports allocation counters only; it does not report native
@@ -57,7 +57,7 @@ Compared with the prior COW candidate, the extra 152-byte state allocation per
 publication and the 128-step 19,456-byte history increase are gone.
 
 The final untimed native pair is protected outside the checkout at
-`/home/zhuhe/code/litchi-worktrees/.coord/w5-ole/final-probes-a84650cd70`.
+`(deleted-coord-artifact)`.
 Its manifest SHA-256 is
 `92e3b027ac33e58cadbb1d5087990336cabbfd94758487475b20f09405c989b6`.
 The protected current binaries are `ole_w5_probe` SHA-256
@@ -71,11 +71,11 @@ The matched baseline binaries are retained there with SHA-256 values
 ## Frozen native qualification runner
 
 The final runner is outside the checkout at
-`/home/zhuhe/code/litchi-worktrees/.coord/w5-ole/matched-harness/run-matched-w5-a84650-final.py`.
+`(deleted-coord-artifact)/run-matched-w5-a84650-final.py`.
 It is mode `0555`, 21,359 bytes, and has SHA-256
 `88ff6682ff2d4437e188aa77cdcff97cf159a2f96da7d1b8b2d56258292bb1a1`.
 The previous runner remains preserved at
-`/home/zhuhe/code/litchi-worktrees/.coord/w5-ole/matched-harness/run-matched-w5-cow.py`
+`(deleted-coord-artifact)/run-matched-w5-cow.py`
 with SHA-256
 `ca12ae007b4babebbc1c1302edc849dd5c27601fa7cb8d8ed458cdd474b1c37e`.
 
@@ -83,15 +83,15 @@ The exact final command, which must be run only after a coordinator quiet
 grant and with a new output directory, is:
 
 ```text
-python3 /home/zhuhe/code/litchi-worktrees/.coord/w5-ole/matched-harness/run-matched-w5-a84650-final.py \
-  --before /home/zhuhe/code/litchi-worktrees/.coord/w5-ole/final-probes-a84650cd70/baseline/ole_w5_probe \
-  --after /home/zhuhe/code/litchi-worktrees/.coord/w5-ole/final-probes-a84650cd70/candidate/ole_w5_probe \
-  --clone-before /home/zhuhe/code/litchi-worktrees/.coord/w5-ole/final-probes-a84650cd70/baseline/ole_package_clone_probe \
-  --clone-after /home/zhuhe/code/litchi-worktrees/.coord/w5-ole/final-probes-a84650cd70/candidate/ole_package_clone_probe \
-  --out /home/zhuhe/code/litchi-worktrees/.coord/w5-ole/abba-a84650-final \
-  --before-source /home/zhuhe/code/litchi-worktrees/.coord/w5-ole/matched-harness/baseline/examples/ole_w5_probe.rs \
-  --after-source /home/zhuhe/code/litchi-worktrees/.coord/w5-ole/matched-harness/current/examples/ole_w5_probe.rs \
-  --lock /home/zhuhe/code/litchi-worktrees/.coord/w5-ole/matched-harness/current/Cargo.lock \
+python3 (deleted-coord-artifact) \
+  --before (deleted-coord-artifact) \
+  --after (deleted-coord-artifact) \
+  --clone-before (deleted-coord-artifact) \
+  --clone-after (deleted-coord-artifact) \
+  --out (deleted-coord-artifact) \
+  --before-source (deleted-coord-artifact) \
+  --after-source (deleted-coord-artifact) \
+  --lock (deleted-coord-artifact) \
   --before-id baseline-0ce4-src-8f0ffa \
   --after-id a84650cd70 --cpu 29 --blocks 5
 ```
@@ -170,7 +170,7 @@ checks, and accepted batched legs of at least 250 ms.
 
 The first execution of the frozen command was deliberately rejected by its
 host guard and is retained outside the checkout at
-`/home/zhuhe/code/litchi-worktrees/.coord/w5-ole/abba-a84650-final` (62 MiB).
+`(deleted-coord-artifact)` (62 MiB).
 It reached four of five clone blocks and then stopped at
 `clone-b04-1-after-after`. The guard found the real external
 `scripts/test-adblock-ag-antiblock-program.py` process and its

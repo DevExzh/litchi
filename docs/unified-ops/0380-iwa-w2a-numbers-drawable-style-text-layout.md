@@ -74,7 +74,7 @@ source SHA-256 is `ca4306d4d601dc1894b618e253cda05e38a1a3ef2720a96a3d0ea6752131d
 The release test binary is 39,638,264 bytes with SHA-256
 `3d3bce24be93efe0af38503108b61f26c613c2f504c1b25907cac69c24ca7737`.
 The 18 raw captures total 39,853,563 bytes under
-`/home/zhuhe/code/litchi-worktrees/.coord/iwa-w2a-cost-20261028/`; the compact
+`(deleted-coord-artifact)`; the compact
 per-route receipt is `summary.tsv` (2,321 bytes, SHA-256
 `e0f8b9ac630508291c40d4de0eee6a60acef2feee85c4f902955d33eb5441126`) and
 contains each host/leaf Ir count, delta, capture size and capture SHA-256.
@@ -85,12 +85,12 @@ command (the target and temporary directories are external):
 ```sh
 cd /home/zhuhe/code/litchi-worktrees/uo2-iwa-w2a
 env -u LITCHI_BLESS -u LITCHI_CAPPED \
-  PATH=/home/zhuhe/code/litchi-worktrees/.coord/bin:$PATH \
+  PATH=(deleted-coord-artifact):$PATH \
   LITCHI_MEM_MAX=20G CARGO_BUILD_JOBS=1 CARGO_INCREMENTAL=0 \
   CARGO_PROFILE_RELEASE_DEBUG=0 CARGO_PROFILE_DEV_DEBUG=0 \
   CARGO_PROFILE_TEST_DEBUG=0 CARGO_NET_OFFLINE=true RUST_TEST_THREADS=1 \
-  CARGO_TARGET_DIR=/home/zhuhe/code/litchi-worktrees/.coord/iwa-w2a-target-20261028 \
-  TMPDIR=/home/zhuhe/code/litchi-worktrees/.coord/iwa-w2a-tmp-20261028 \
+  CARGO_TARGET_DIR=(deleted-coord-artifact) \
+  TMPDIR=(deleted-coord-artifact) \
   cargo test --offline --locked -p litchi-iwa --all-features \
     --test parity --release --no-run
 ```
@@ -102,8 +102,8 @@ changing the checkout as follows. `ROUTES_3` is the 18-entry list in
 
 ```sh
 cd /home/zhuhe/code/litchi-worktrees/uo2-iwa-w2a
-probe_dir=/home/zhuhe/code/litchi-worktrees/.coord/iwa-w2a-cost-20261028
-binary=/home/zhuhe/code/litchi-worktrees/.coord/iwa-w2a-target-20261028/release/deps/parity-5e410c7ba68c5074
+probe_dir=(deleted-coord-artifact)
+binary=(deleted-coord-artifact)
 for route in \
   shape_style_fill_set shape_style_fill_reset shape_style_fill_read \
   shape_style_stroke_set shape_style_stroke_reset shape_style_stroke_read \
@@ -130,7 +130,7 @@ row:
 ```sh
 cd /home/zhuhe/code/litchi-worktrees/uo2-iwa-w2a
 callgrind_annotate --auto=no --inclusive=yes --tree=none --show-percs=no \
-  /home/zhuhe/code/litchi-worktrees/.coord/iwa-w2a-cost-20261028/shape_style_fill_set.callgrind \
+  (deleted-coord-artifact) \
   | rg 'w2a_(host|leaf)_route_3|PROGRAM TOTALS'
 ```
 

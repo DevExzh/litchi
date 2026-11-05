@@ -5,7 +5,7 @@
   (record 0347).
 - Date: 2026-10-19
 - Input: the second definition-of-done audit
-  (`.coord/r9/dod-audit-2026-10-19.md` §2, §3, §12.1 item 1, package A):
+  (`(deleted-coord-artifact)` §2, §3, §12.1 item 1, package A):
   10 DOCX P0 rows of the OfficeCLI capability delta were still `planned`
   (`docx-p0-residue`: the `column` element, `column.width`, `column.text`,
   `cell.text`, `hyperlink.tooltip`; `docx-picture-comment-follow-ups`:

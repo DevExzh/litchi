@@ -5,7 +5,7 @@ force. All branch references remain at their recorded tips.
 
 | Worktree | Retained branch | Tip |
 | --- | --- | --- |
-| `.coord/glossary-source-reconciliation` | `uo2-glossary-source-reconciliation` | `bddab5e261ded19ded27bf2773a8a4ec413bf0dd` |
+| `(deleted-coord-artifact)` | `uo2-glossary-source-reconciliation` | `bddab5e261ded19ded27bf2773a8a4ec413bf0dd` |
 | `uo2-signed-pptx-budget` | `uo2/signed-pptx-budget` | `50cb32a80a10bfe871df2d1cc2bd183c7d628e08` |
 | `uo2-signed-replay` | `uo2/signed-replay` | `06afe43fa08a4bddbdab0745b54042f6106dde8e` |
 | `uo2-signed-xlsb-budget` | `uo2/signed-xlsb-budget` | `509bf28e7531ad75f278eaec3a732714a243915a` |
@@ -27,7 +27,7 @@ no dependency on a removed worktree. The protected 15-byte trunk probe is
 unchanged. No numerical free-space saving or performance result is claimed.
 
 Evidence remains under
-`/home/zhuhe/code/litchi-worktrees/.coord/worktree-cleanup-2026-10-23/quarantine/`:
+`(deleted-coord-artifact)`:
 
 | Relative artifact | Bytes | SHA-256 |
 | --- | ---: | --- |

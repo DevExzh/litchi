@@ -29,7 +29,7 @@
     "coverage": "real EmbeddedPayload and Snapshot entry points plus typed XLS boundary tests"
   },
   "performance": "No timing claim in this slice. The configured comparisons, default ceilings and successful publication operations are retained. Integrated corpus/performance validation remains required after the shared OLE/Graph typed-budget migration.",
-  "raw_log_directory": "/home/zhuhe/code/litchi-worktrees/.coord/exact-limits",
+  "raw_log_directory": "(deleted-coord-artifact)",
   "checks": {
     "check": {
       "command": "cargo check --locked -p litchi-xls --all-targets --all-features",

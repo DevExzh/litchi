@@ -39,11 +39,11 @@ The commands used the pinned workspace lock
 `52ed0cacac15b5e440349bfc0f4aca2665bcf50d59d4321624e596bb410783c6`
 (139,591 bytes), one capped build job, offline locked dependencies, debug
 information disabled, and the external target
-`/home/zhuhe/code/litchi-worktrees/.coord/theme-family/target` (816,108,921
+`(deleted-coord-artifact)` (816,108,921
 bytes after completion). Both commands exited 0:
 
 ```text
-env -u LITCHI_CAPPED -u LITCHI_BLESS PATH=/home/zhuhe/code/litchi-worktrees/.coord/bin:$PATH LITCHI_MEM_MAX=20G CARGO_BUILD_JOBS=1 CARGO_INCREMENTAL=0 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_PROFILE_RELEASE_DEBUG=0 CARGO_PROFILE_BENCH_DEBUG=0 TMPDIR=/home/zhuhe/code/litchi-worktrees/.coord/theme-family/tmp cargo test -p litchi-drawingml --all-features --offline --locked --test ink_action_edit --test ink_action_profile --test theme_family_foreign_uri --test theme_family_mce --test theme_family_ownership --test theme_family_xml_grammar --test theme_part --no-fail-fast --target-dir /home/zhuhe/code/litchi-worktrees/.coord/theme-family/target
+env -u LITCHI_CAPPED -u LITCHI_BLESS PATH=(deleted-coord-artifact):$PATH LITCHI_MEM_MAX=20G CARGO_BUILD_JOBS=1 CARGO_INCREMENTAL=0 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_PROFILE_RELEASE_DEBUG=0 CARGO_PROFILE_BENCH_DEBUG=0 TMPDIR=(deleted-coord-artifact) cargo test -p litchi-drawingml --all-features --offline --locked --test ink_action_edit --test ink_action_profile --test theme_family_foreign_uri --test theme_family_mce --test theme_family_ownership --test theme_family_xml_grammar --test theme_part --no-fail-fast --target-dir (deleted-coord-artifact)
 ```
 
 23 action-edit tests, 21 action-profile tests, 1 foreign-URI test, 4 MCE
@@ -53,7 +53,7 @@ passed. The retained log is
 SHA-256 `22073f1494be02da4501e6f0cb9023ee23d3742c672e8ad600591ccbb8b57b1e`).
 
 ```text
-env -u LITCHI_CAPPED -u LITCHI_BLESS PATH=/home/zhuhe/code/litchi-worktrees/.coord/bin:$PATH LITCHI_MEM_MAX=20G CARGO_BUILD_JOBS=1 CARGO_INCREMENTAL=0 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_PROFILE_RELEASE_DEBUG=0 CARGO_PROFILE_BENCH_DEBUG=0 TMPDIR=/home/zhuhe/code/litchi-worktrees/.coord/theme-family/tmp cargo test -p litchi-xlsb --all-features --offline --locked --lib theme --no-fail-fast --target-dir /home/zhuhe/code/litchi-worktrees/.coord/theme-family/target
+env -u LITCHI_CAPPED -u LITCHI_BLESS PATH=(deleted-coord-artifact):$PATH LITCHI_MEM_MAX=20G CARGO_BUILD_JOBS=1 CARGO_INCREMENTAL=0 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_PROFILE_RELEASE_DEBUG=0 CARGO_PROFILE_BENCH_DEBUG=0 TMPDIR=(deleted-coord-artifact) cargo test -p litchi-xlsb --all-features --offline --locked --lib theme --no-fail-fast --target-dir (deleted-coord-artifact)
 ```
 
 The XLSB theme-filtered library suite passed 12 tests (767 filtered). Its

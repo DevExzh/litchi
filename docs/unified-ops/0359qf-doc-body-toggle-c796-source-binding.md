@@ -11,7 +11,7 @@
 ## Source binding
 
 The read-only acceptance candidate was
-/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/full-gate-c796d0acc2/source.
+(deleted-coord-artifact).
 Its exact source identity is:
 
 | item | identity |
@@ -26,7 +26,7 @@ The qualification copies are source-bound to that commit:
 
 - candidate: /home/zhuhe/code/litchi-worktrees/uo2-doc-body-toggle-final,
   branch uo2/doc-body-toggle-final-qualification;
-- baseline: /home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/doc-body-c796-baseline,
+- baseline: (deleted-coord-artifact),
   detached at the same commit, with the overlay below.
 
 The candidate body and revision files have SHA-256
@@ -76,8 +76,8 @@ presented as c796 measurements.
 The overlay can be independently rechecked without Cargo:
 
 ~~~sh
-REVIEWED=/home/zhuhe/code/litchi-worktrees/.coord/doc-toggle/final-source-baseline
-BASE=/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/doc-body-c796-baseline
+REVIEWED=(deleted-coord-artifact)
+BASE=(deleted-coord-artifact)
 PACKET=/home/zhuhe/code/litchi-worktrees/uo2-doc-body-toggle-final
 git -C "$PACKET" diff c796d0acc24c7c6e6fd08980b9e31af6bb86b18b --binary -- crates/litchi-ops/examples/legacy_w5_source_probe.rs |
   git -C "$BASE" apply --check -
@@ -97,13 +97,13 @@ executable qualification endpoint is now the final production capture:
 
 | item | final-production identity |
 |---|---|
-| read-only candidate | /home/zhuhe/code/litchi-worktrees/.coord/final-api-capture-472b670547/source |
+| read-only candidate | (deleted-coord-artifact) |
 | commit | 472b6705475b073e7fe08f6e11ee17fb1e29f838 |
 | tree | ebc1cee05f124c0c63977aff07a23288c19e7d00 |
 | Cargo.lock SHA-256 | 4100b1fbb272dd24842f33a2d6f353a3f3a97dfa7e435c4649a0e1a029bfaea1 |
 | rust-toolchain.toml SHA-256 | e3a213e0d222e94d213cafbc20932eb3f76c643b4dd63756acf95192df2aa310 |
 | .cargo/config.toml SHA-256 | 50b044c83828f2c448ee59c362afaa79de2dd47fbd390f0cd2888391f1d1119d |
-| prepared baseline | /home/zhuhe/code/litchi-worktrees/.coord/final-api-capture-472b670547/doc-body-baseline |
+| prepared baseline | (deleted-coord-artifact) |
 | baseline base commit/tree | 472b6705475b073e7fe08f6e11ee17fb1e29f838 / ebc1cee05f124c0c63977aff07a23288c19e7d00 |
 
 The prepared baseline is the same 472b tree with exactly the reviewed
@@ -126,8 +126,8 @@ expected body files modified (plus its ignored copied Cargo.lock).
 Verify the final source-only preparation without Cargo:
 
 ~~~sh
-FINAL=/home/zhuhe/code/litchi-worktrees/.coord/final-api-capture-472b670547/source
-BASE=/home/zhuhe/code/litchi-worktrees/.coord/final-api-capture-472b670547/doc-body-baseline
+FINAL=(deleted-coord-artifact)
+BASE=(deleted-coord-artifact)
 git -C "$FINAL" rev-parse HEAD HEAD^{tree}
 git -C "$BASE" rev-parse HEAD HEAD^{tree}
 git -C "$BASE" diff --name-only HEAD -- crates/litchi-doc/src/body_text.rs crates/litchi-doc/src/tracked_revision/package.rs
@@ -156,11 +156,11 @@ The following commands are the exact pending run protocol. They use the
 single pinned CPU. They are recorded here, not claimed as run results.
 
 ~~~sh
-source /home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/env.sh
+source (deleted-coord-artifact)
 ROOT=/home/zhuhe/code/litchi-worktrees
-CAND=$ROOT/.coord/final-api-capture-472b670547/source
-BASE=$ROOT/.coord/final-api-capture-472b670547/doc-body-baseline
-RUN=$ROOT/.coord/doc-toggle-472b-qualification
+CAND=(deleted-coord-artifact)
+BASE=(deleted-coord-artifact)
+RUN=(deleted-coord-artifact)
 CPU=29
 mkdir -p "$RUN/candidate" "$RUN/baseline" "$RUN/abba" "$RUN/allocation" "$RUN/tmp"
 

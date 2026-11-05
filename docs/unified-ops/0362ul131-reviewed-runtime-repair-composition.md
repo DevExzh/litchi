@@ -7,7 +7,7 @@ classification, OPC source freshness and tooling. Root verifies the terminal
 capture, all physical logs/traces, source and three locks, process exit and
 target bounds before composing repairs. These passes remain a8 results.
 
-Packet: `.coord/ooxml-pptx-joint-a8d32513b8-f5-runtime-remaining16-v2`
+Packet: `(deleted-coord-artifact)`
 relative to the worktree parent. Its `rows.json` is 63,156 bytes, SHA-256
 `9f7f21e0f7b000d059dde9ed92cd0fcac6f7e28ec5b6195bfc5146dc8d573336`;
 `result.json` is 67,172 bytes, SHA-256
@@ -49,8 +49,8 @@ External receipts:
 
 | Artifact | SHA-256 |
 |---|---|
-| `.coord/runtime-repair-composition-0362ul131.json` | `3d281d01af66c738d74165c5d6018676cd1989fcc9102bf587563fbb907cbb82` |
-| `.coord/runtime-repair-0362ul131-source-proof.json` (5,199 bytes) | `e22c76b1f55db04a3e466a1a09afc3dce0dab2e2d03f13685f279fc7ba354dbb` |
+| `(deleted-coord-artifact)/runtime-repair-composition-0362ul131.json` | `3d281d01af66c738d74165c5d6018676cd1989fcc9102bf587563fbb907cbb82` |
+| `(deleted-coord-artifact)/runtime-repair-0362ul131-source-proof.json` (5,199 bytes) | `e22c76b1f55db04a3e466a1a09afc3dce0dab2e2d03f13685f279fc7ba354dbb` |
 
 All three locks are unchanged: root `02fda254…`, performance `de1f8ae5…`,
 native `989da70f…`, with full identities retained in the composition receipt.
@@ -63,7 +63,7 @@ execution for source-fence, fidelity and measurement-evidence defects.
 
 ## Cleanup100
 
-Root removes the unused `.coord/doc-toggle/final-source-candidate` checkout
+Root removes the unused `(deleted-coord-artifact)` checkout
 at `3cad59be707c7431bc1a8c115e1ff534a048dc57`, a retained integration ancestor.
 The clean candidate has no unique source changes or active tracked harness
 reference. Its sole ignored lock is archived and actually restored with
@@ -78,7 +78,7 @@ holder or unclassified error. Inaccessible system/container and named
 same-user services remain disclosed. Root verifies path/registration absence,
 baseline and protected-probe identities, and the preserved lock after removal.
 
-Evidence under `.coord/worktree-cleanup-2026-10-25/trunk-consolidation/`:
+Evidence under `(deleted-coord-artifact)`:
 
 | Artifact | SHA-256 |
 |---|---|

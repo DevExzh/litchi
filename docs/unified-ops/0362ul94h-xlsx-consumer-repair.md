@@ -3,7 +3,7 @@
 This source-only follow-up repairs the XLSX diagnostic from the actual OOXML
 consumer check at `5ec78a48589c7ab4396ee90cb1f6d41cf7f1aaa6`.  The retained
 compiler log is outside the repository at
-`/home/zhuhe/code/litchi-worktrees/.coord/ooxml-combined-0362ul94-f5-consumers-5ec78a4858/02-check-leaves-attempt-actual-f5-02.log`;
+`(deleted-coord-artifact)/02-check-leaves-attempt-actual-f5-02.log`;
 it is 33,227 bytes with SHA-256
 `bde73361831156dabd2d8b7032b40ef472506856aa4dda8be40781425eaba220`.
 

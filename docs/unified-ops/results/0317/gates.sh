@@ -1,9 +1,9 @@
 #!/bin/bash
 # Record 0317 gates; one cargo command at a time; each exit status logged.
 cd /home/zhuhe/code/litchi-worktrees/uo2-opc-proofs
-. /home/zhuhe/code/litchi-worktrees/.coord/opc-proofs/env.sh
-LOG=/home/zhuhe/code/litchi-worktrees/.coord/opc-proofs/gates.log
-OUT=/home/zhuhe/code/litchi-worktrees/.coord/opc-proofs/gates-out
+. /deleted-coord-artifact
+LOG=/deleted-coord-artifact
+OUT=/deleted-coord-artifact
 mkdir -p $OUT; : > $LOG
 n=0
 run() { n=$((n+1)); "$@" > $OUT/$n.txt 2>&1; echo "$? :: $*" >> $LOG; }

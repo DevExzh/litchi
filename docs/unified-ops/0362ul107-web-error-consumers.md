@@ -18,7 +18,7 @@ text after the shared OOXML adapter began returning DOCX's typed
 `Error::PatchConflict` with its fixed content-free reason.
 
 The captured diagnostic remains outside the repository at
-`/home/zhuhe/code/litchi-worktrees/.coord/ooxml-pptx-joint-e130751fc5-f5-runtime-remaining33/11-tests-docx-web-extensions-attempt-actual-f5-11.log`
+`(deleted-coord-artifact)/11-tests-docx-web-extensions-attempt-actual-f5-11.log`
 (22,345 bytes, SHA-256
 `a1ff45c4d8d9a30985407292221578b1ed77024ce95af156b15dceff2af61d25`).
 

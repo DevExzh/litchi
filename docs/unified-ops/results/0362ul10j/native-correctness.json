@@ -19,13 +19,13 @@
         }
       },
       "command": [
-        "/home/zhuhe/code/litchi-worktrees/.coord/bin/cargo",
+        "(deleted-coord-artifact)",
         "build",
         "--release",
         "--offline",
         "--locked",
         "--manifest-path",
-        "/home/zhuhe/code/litchi-worktrees/.coord/ole-owner-preparation-drivers-29f/baseline/Cargo.toml",
+        "(deleted-coord-artifact)",
         "--no-default-features",
         "--features",
         "legacy-owner-api,legacy-property-api",
@@ -70,13 +70,13 @@
         }
       },
       "command": [
-        "/home/zhuhe/code/litchi-worktrees/.coord/bin/cargo",
+        "(deleted-coord-artifact)",
         "build",
         "--release",
         "--offline",
         "--locked",
         "--manifest-path",
-        "/home/zhuhe/code/litchi-worktrees/.coord/ole-owner-preparation-drivers-29f/candidate/Cargo.toml",
+        "(deleted-coord-artifact)",
         "--no-default-features",
         "--features",
         "current-api",
@@ -109,61 +109,61 @@
       "files": [
         {
           "bytes": 33719,
-          "path": "/home/zhuhe/code/litchi-worktrees/.coord/ole-owner-preparation-drivers-29f/baseline/Cargo.lock",
+          "path": "(deleted-coord-artifact)/Cargo.lock",
           "sha256": "450f43c6b74536ef552bd5e9a19e321a3c0dea745f645fecc0aa9abe37868e14"
         },
         {
           "bytes": 1152,
-          "path": "/home/zhuhe/code/litchi-worktrees/.coord/ole-owner-preparation-drivers-29f/baseline/Cargo.toml",
+          "path": "(deleted-coord-artifact)/Cargo.toml",
           "sha256": "80fadfb717d1cb0b2540b5387c6edbec3bdfec38903b11e8d5dab21fa7279bf4"
         },
         {
           "bytes": 38379,
-          "path": "/home/zhuhe/code/litchi-worktrees/.coord/ole-owner-preparation-drivers-29f/baseline/examples/ole_owner_oracle.rs",
+          "path": "(deleted-coord-artifact)/ole_owner_oracle.rs",
           "sha256": "60b506c1bfc277c260933730ce2f754e59f4745d40c753ffa95900b49d276daf"
         },
         {
           "bytes": 4995,
-          "path": "/home/zhuhe/code/litchi-worktrees/.coord/ole-owner-preparation-drivers-29f/baseline/examples/ole_package_clone_probe.rs",
+          "path": "(deleted-coord-artifact)/ole_package_clone_probe.rs",
           "sha256": "0a23c99ed8958e0df1aa51e5f37e7a949328149074b2096613c972d2b8cf6e98"
         },
         {
           "bytes": 36709,
-          "path": "/home/zhuhe/code/litchi-worktrees/.coord/ole-owner-preparation-drivers-29f/baseline/examples/ole_w5_probe.rs",
+          "path": "(deleted-coord-artifact)/ole_w5_probe.rs",
           "sha256": "ad4c52c01333fbc13c7b3cca18e2c0a0d2ccf89d5c07972e2e453fa9bd8d713a"
         }
       ],
-      "root": "/home/zhuhe/code/litchi-worktrees/.coord/ole-owner-preparation-drivers-29f/baseline"
+      "root": "(deleted-coord-artifact)"
     },
     "candidate": {
       "files": [
         {
           "bytes": 33735,
-          "path": "/home/zhuhe/code/litchi-worktrees/.coord/ole-owner-preparation-drivers-29f/candidate/Cargo.lock",
+          "path": "(deleted-coord-artifact)/Cargo.lock",
           "sha256": "5a07adc1d62dea06dbac60986faa020007882506523dde49e4605708e1276aaf"
         },
         {
           "bytes": 1140,
-          "path": "/home/zhuhe/code/litchi-worktrees/.coord/ole-owner-preparation-drivers-29f/candidate/Cargo.toml",
+          "path": "(deleted-coord-artifact)/Cargo.toml",
           "sha256": "6486356f5fff18e6805380a0fb6ef4f81b6eee47fb36a4776f0a45d3de91ad5d"
         },
         {
           "bytes": 38379,
-          "path": "/home/zhuhe/code/litchi-worktrees/.coord/ole-owner-preparation-drivers-29f/candidate/examples/ole_owner_oracle.rs",
+          "path": "(deleted-coord-artifact)/ole_owner_oracle.rs",
           "sha256": "60b506c1bfc277c260933730ce2f754e59f4745d40c753ffa95900b49d276daf"
         },
         {
           "bytes": 4995,
-          "path": "/home/zhuhe/code/litchi-worktrees/.coord/ole-owner-preparation-drivers-29f/candidate/examples/ole_package_clone_probe.rs",
+          "path": "(deleted-coord-artifact)/ole_package_clone_probe.rs",
           "sha256": "0a23c99ed8958e0df1aa51e5f37e7a949328149074b2096613c972d2b8cf6e98"
         },
         {
           "bytes": 36742,
-          "path": "/home/zhuhe/code/litchi-worktrees/.coord/ole-owner-preparation-drivers-29f/candidate/examples/ole_w5_probe.rs",
+          "path": "(deleted-coord-artifact)/ole_w5_probe.rs",
           "sha256": "dc11e6533c43434c314bd359ad68e458555291f4c134b44b13c1f3ce29fb4508"
         }
       ],
-      "root": "/home/zhuhe/code/litchi-worktrees/.coord/ole-owner-preparation-drivers-29f/candidate"
+      "root": "(deleted-coord-artifact)"
     }
   },
   "oracle": {
@@ -403,13 +403,13 @@
   "source": {
     "baseline": {
       "commit": "0ce4bb8b61f03a1e5497633f51b954e76f98aa8c",
-      "root": "/home/zhuhe/code/litchi-worktrees/.coord/ole-owner-preparation-baseline-0ce4",
+      "root": "(deleted-coord-artifact)",
       "status": "",
       "tree": "f54db6e7c4b759b60cf50738698387ab93de59d6"
     },
     "candidate": {
       "commit": "29f072f19c53503395164fcb3a618c44fc22cf75",
-      "root": "/home/zhuhe/code/litchi-worktrees/.coord/final-api-capture-29f072f/source",
+      "root": "(deleted-coord-artifact)",
       "status": "",
       "tree": "6d9d110c8c7f72a3b5646e5423fa2d0147d6c225"
     }

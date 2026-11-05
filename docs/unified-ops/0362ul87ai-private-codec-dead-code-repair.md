@@ -6,7 +6,7 @@ The coordinator-approved F5 attempt for
 at row 1, `check-common`. The preserved state is:
 
 ```text
-/home/zhuhe/code/litchi-worktrees/.coord/0362ul87a-f5-27be5389f7/
+(deleted-coord-artifact)
 ```
 
 Cargo reported 22 `unused` errors after the stale `clear` call was repaired:

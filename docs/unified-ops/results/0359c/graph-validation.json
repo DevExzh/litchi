@@ -65,7 +65,7 @@
     "Shared OLE snapshot publication semantic audit",
     "Integrated corpus/code-disposition, performance and full workspace gate"
   ],
-  "raw_log_directory": "/home/zhuhe/code/litchi-worktrees/.coord/exact-limits",
+  "raw_log_directory": "(deleted-coord-artifact)",
   "checks": {
     "check": {
       "command": "cargo check --locked -p litchi-ograph -p litchi-ppt --all-targets --all-features",

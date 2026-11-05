@@ -78,10 +78,10 @@ offline dependencies, and the external target
 
 | Command | Result |
 | --- | --- |
-| `PATH=/home/zhuhe/code/litchi-worktrees/.coord/bin:$PATH CARGO_TARGET_DIR=/tmp/uo2-drawingml-diagram-raw-target.f3Kak0 TMPDIR=/tmp/uo2-drawingml-diagram-raw-tmp.5GD8hv CARGO_BUILD_JOBS=1 CARGO_INCREMENTAL=0 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 RUST_TEST_THREADS=1 cargo test -p litchi-drawingml --all-features --offline --locked --lib --tests --no-fail-fast --jobs 1` | Passed: 245 `litchi-drawingml` unit tests and all integration suites. |
-| `PATH=/home/zhuhe/code/litchi-worktrees/.coord/bin:$PATH CARGO_TARGET_DIR=/tmp/uo2-drawingml-diagram-raw-target.f3Kak0 TMPDIR=/tmp/uo2-drawingml-diagram-raw-tmp.5GD8hv CARGO_BUILD_JOBS=1 CARGO_INCREMENTAL=0 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 RUST_TEST_THREADS=1 cargo check -p litchi-docx -p litchi-pptx -p litchi-ops --all-features --offline --locked --lib --jobs 1` | Passed. |
-| `PATH=/home/zhuhe/code/litchi-worktrees/.coord/bin:$PATH CARGO_TARGET_DIR=/tmp/uo2-drawingml-diagram-raw-target.f3Kak0 TMPDIR=/tmp/uo2-drawingml-diagram-raw-tmp.5GD8hv CARGO_BUILD_JOBS=1 CARGO_INCREMENTAL=0 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 RUST_TEST_THREADS=1 cargo check --manifest-path tools/perf-baseline/unified-smartart/Cargo.toml --all-features --offline --locked --jobs 1` | Passed after the tracked harness lockfile was refreshed for the current workspace dependency set. |
-| `PATH=/home/zhuhe/code/litchi-worktrees/.coord/bin:$PATH CARGO_TARGET_DIR=/tmp/uo2-drawingml-diagram-raw-target.f3Kak0 TMPDIR=/tmp/uo2-drawingml-diagram-raw-tmp.5GD8hv CARGO_BUILD_JOBS=1 cargo fmt --all -- --check` | Passed. |
+| `PATH=(deleted-coord-artifact):$PATH CARGO_TARGET_DIR=/tmp/uo2-drawingml-diagram-raw-target.f3Kak0 TMPDIR=/tmp/uo2-drawingml-diagram-raw-tmp.5GD8hv CARGO_BUILD_JOBS=1 CARGO_INCREMENTAL=0 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 RUST_TEST_THREADS=1 cargo test -p litchi-drawingml --all-features --offline --locked --lib --tests --no-fail-fast --jobs 1` | Passed: 245 `litchi-drawingml` unit tests and all integration suites. |
+| `PATH=(deleted-coord-artifact):$PATH CARGO_TARGET_DIR=/tmp/uo2-drawingml-diagram-raw-target.f3Kak0 TMPDIR=/tmp/uo2-drawingml-diagram-raw-tmp.5GD8hv CARGO_BUILD_JOBS=1 CARGO_INCREMENTAL=0 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 RUST_TEST_THREADS=1 cargo check -p litchi-docx -p litchi-pptx -p litchi-ops --all-features --offline --locked --lib --jobs 1` | Passed. |
+| `PATH=(deleted-coord-artifact):$PATH CARGO_TARGET_DIR=/tmp/uo2-drawingml-diagram-raw-target.f3Kak0 TMPDIR=/tmp/uo2-drawingml-diagram-raw-tmp.5GD8hv CARGO_BUILD_JOBS=1 CARGO_INCREMENTAL=0 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 RUST_TEST_THREADS=1 cargo check --manifest-path tools/perf-baseline/unified-smartart/Cargo.toml --all-features --offline --locked --jobs 1` | Passed after the tracked harness lockfile was refreshed for the current workspace dependency set. |
+| `PATH=(deleted-coord-artifact):$PATH CARGO_TARGET_DIR=/tmp/uo2-drawingml-diagram-raw-target.f3Kak0 TMPDIR=/tmp/uo2-drawingml-diagram-raw-tmp.5GD8hv CARGO_BUILD_JOBS=1 cargo fmt --all -- --check` | Passed. |
 | `git diff --check` | Passed before the source commit. |
 
 The external target measured `1,199,565,942` bytes and the temporary directory
@@ -115,7 +115,7 @@ reproducible identifiers for the checked packet.
 At the final process check, no owned DrawingML test, rustdoc or glossary
 process remained. A separate chart-lane Cargo test was still running in
 `/home/zhuhe/code/litchi-worktrees/uo2-drawingml-chart-raw` with its own
-`.coord/drawingml-chart-raw-target`; it was unrelated and was left untouched.
+`(deleted-coord-artifact)`; it was unrelated and was left untouched.
 
 No fixtures, binaries, large evidence artifacts or `3rdparty/` references are
 introduced by this return. The receipt does not claim ABBA performance or

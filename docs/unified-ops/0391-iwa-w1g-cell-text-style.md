@@ -101,7 +101,7 @@ duplicate/unknown locality, nested-font pre-admission, residual BNC fields,
 zero ceilings and low field/work/allocation cases), nine Numbers
 `cell_text_style` tests, two Numbers header-policy tests, formatting, and
 strict Clippy for both crates. The current-source logs are retained outside
-the checkout under `/home/zhuhe/code/litchi-worktrees/.coord/`.
+the checkout under `(deleted-coord-artifact)`.
 Workspace-level glossary, boundary, ledger, rustdoc and fuzz-lock gates remain
 coordinator checks on the integrated candidate; they are not inferred from
 this scoped record. The generated fuzz targets remain outside the checkout.
@@ -112,7 +112,7 @@ and `numbers-full` profiles, the exit-ledger check, crate-boundary check (70
 packages, 314 internal declarations, 12 explicit debt items), example-target
 check, no-3rdparty suite (75 tests), and the benchmark-matrix check all pass.
 All 20 locked fuzz workspaces also pass in the external capped-target run
-`/home/zhuhe/code/litchi-worktrees/.coord/iwa-w1g-final-c9f74916c7/fuzz-locks-c52439a057.log`
+`(deleted-coord-artifact)`
 (SHA-256 `e410d50453aecc7cb1e2aad97aa9c405b111f0f22e05145363c22e0b1c07c287ad`).
 
 The Numbers compatibility proof covers the 17-property host set/reset/read
@@ -142,7 +142,7 @@ decorates header buckets with a retained unknown field and exercises empty G22
 plus the first missing row in an existing tile. It compares both bucket counts
 and unknown fields, tile row/cell presence, host and leaf semantic styles, and
 the exact leaf inverse. The current-source log is retained at
-`/home/zhuhe/code/litchi-worktrees/.coord/iwa-w1g-header-6d5f02c0a1/header-controls.out`.
+`(deleted-coord-artifact)`.
 The shared header delta helper also partitions rows that cross the 65,536-row
 bucket boundary while retaining global row indices; the adapter rewrites each
 owned row bucket and publishes the column bucket once. A source that requires
@@ -183,13 +183,13 @@ retained as context only. The current scoped evidence is external and bound
 to clean source `c9f74916c73772bc57b9218d99220170ddb7504d`:
 
 - normalized three-route manifest:
-  `/home/zhuhe/code/litchi-worktrees/.coord/iwa-w1g-final-c9f74916c7/measure-6cb1a8fcb7b86dbe9f46e86e535edd503f988b212e02490507c8ec0774294190/callgrind/manifest-3routes-c9f74916c7.json`
+  `(deleted-coord-artifact)/manifest-3routes-c9f74916c7.json`
   (SHA-256 `f2e6364501648516247f21532141474643296f2098a9194bd51d7008d253f14c`);
 - normalized results:
-  `/home/zhuhe/code/litchi-worktrees/.coord/iwa-w1g-final-c9f74916c7/measure-6cb1a8fcb7b86dbe9f46e86e535edd503f988b212e02490507c8ec0774294190/callgrind/results-3routes-c9f74916c7.json`
+  `(deleted-coord-artifact)/results-3routes-c9f74916c7.json`
   (SHA-256 `7e6975b99f292de8b9055c848c033dbbac8a792bf368bbf79d10b459c80cf039`);
 - c063 derived audit:
-  `/home/zhuhe/code/litchi-worktrees/.coord/iwa-w1g-final-c9f74916c7/measure-6cb1a8fcb7b86dbe9f46e86e535edd503f988b212e02490507c8ec0774294190/callgrind/derived-3routes-c9f74916c7.json`
+  `(deleted-coord-artifact)/derived-3routes-c9f74916c7.json`
   (SHA-256 `52662a4a1d72632c88d0f819c826737c337c3c3eb7f68e80a0ffb7eb27e1999c`);
 - immutable release-debug ELF: 214,625,544 bytes, mode `0555`, SHA-256
   `6cb1a8fcb7b86dbe9f46e86e535edd503f988b212e02490507c8ec0774294190`.

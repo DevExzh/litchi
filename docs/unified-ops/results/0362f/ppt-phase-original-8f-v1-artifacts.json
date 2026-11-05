@@ -1,16 +1,16 @@
 [
   {
-    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-8f-v1/abort.json",
+    "path": "(deleted-coord-artifact)/abort.json",
     "bytes": 259,
     "sha256": "14029d2c9af1344844ce116496f7ba9f976d4c8d9ae7de4a0332de2ead1e816b"
   },
   {
-    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-8f-v1/calibration-before-before.host.json",
+    "path": "(deleted-coord-artifact)/calibration-before-before.host.json",
     "bytes": 59553,
     "sha256": "6282e4f8037493e9719d2c28a0868e9dbb9db5aca6bfb6e31f9309402279bd9c"
   },
   {
-    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-8f-v1/measurements.json",
+    "path": "(deleted-coord-artifact)/measurements.json",
     "bytes": 2605,
     "sha256": "1cc5f81dadbdb889d0268e09d1e72d38b13785be47ea6cc0e8ecbf9437a991c9"
   }

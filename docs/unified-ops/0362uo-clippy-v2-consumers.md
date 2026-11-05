@@ -11,7 +11,7 @@ remain where the source and destination error types differ, and all selected
 source policies and publication fences are unchanged.
 
 The immutable terminal log is retained outside the checkout at
-`/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/clippy-workspace-v2/check-0.log`
+`(deleted-coord-artifact)/check-0.log`
 (28,036 bytes, SHA-256
 `7254dd2fba24fb3c589e934d2b5e2034f033fa66ba6063b62f40d56f6044ef57`). The
 command exited 101 on the unmodified integration source after 448.53 seconds;

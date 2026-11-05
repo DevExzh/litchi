@@ -21,7 +21,7 @@ parser implementation remains unchanged in this return.
 
 The external f5 receipt is:
 
-    /home/zhuhe/code/litchi-worktrees/.coord/formula-raw-policy-328fe19328/state/02-formula-all-targets-tests-attempt-formula-all-targets-fixtures-fixed.log
+    (deleted-coord-artifact)/02-formula-all-targets-tests-attempt-formula-all-targets-fixtures-fixed.log
     28403 bytes, SHA-256 4e3f79eb537fb124d8cdbed90aff6c7fe61b17c9289eb47a3857f2735ae44700
 
 The command exited 101 after 345 passing tests, three failures, and nine

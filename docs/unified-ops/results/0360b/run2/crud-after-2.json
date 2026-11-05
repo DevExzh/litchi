@@ -2,7 +2,7 @@
   "schema": "xlsb-crud-v2",
   "generator": "litchi-xlsb-semantic-crud-poi-v1",
   "binary_identity": {
-    "path": "/home/zhuhe/code/litchi-worktrees/.coord/w4b-xlsb/perf/tgt-after/release/xlsb_crud",
+    "path": "(deleted-coord-artifact)/xlsb_crud",
     "binary_sha256": "4a491a593ef0c2b8bcd890487baa59946b60b24525355933716f1a570ddf2ef9",
     "binary_bytes": 25181720,
     "mode_bits": 509,

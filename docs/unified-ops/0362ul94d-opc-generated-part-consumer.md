@@ -8,7 +8,7 @@ and retains the same short-circuit provenance/member predicate. There is no
 additional traversal, allocation, publication, or change to byte admission.
 
 Retained actual state:
-`/home/zhuhe/code/litchi-worktrees/.coord/ooxml-combined-0362ul94-f5-actual-0db7ff3a6a-v2`.
+`(deleted-coord-artifact)`.
 The earlier v1 packet was rejected before GO for driver receipt handling; it
 remains inert and does not represent a failed build.
 

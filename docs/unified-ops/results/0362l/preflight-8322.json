@@ -21,7 +21,7 @@
   },
   "source_delta": {
     "manifest": {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/durable-ink-0362l/matched-v8-8322/build.json",
+      "path": "(deleted-coord-artifact)/build.json",
       "bytes": 153012,
       "sha256": "cbdb86cee60c5deef1866cd3e9813cceb948a19c7221603a97d3397d052a2ea2"
     },
@@ -32,9 +32,9 @@
     "candidate_only": 5
   },
   "build": {
-    "command": "env PATH=/home/zhuhe/code/litchi-worktrees/.coord/bin:/home/zhuhe/.cargo/bin:/usr/local/bin:/usr/bin:/bin LITCHI_MEM_MAX=20G CARGO_BUILD_JOBS=1 CARGO_INCREMENTAL=0 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_PROFILE_RELEASE_DEBUG=0 TMPDIR=/tmp/claude-1001/uo-t/docx-ink-perf-build-8322 python3 docs/unified-ops/results/0362l/ink-qualify.py build /home/zhuhe/code/litchi-worktrees/.coord/durable-ink-0362l/matched-v8-8322 --base d0406be017 --candidate 706fc5f0e1 --lock /home/zhuhe/code/litchi-worktrees/uo2-coordinator-durable-ink/Cargo.lock",
+    "command": "env PATH=(deleted-coord-artifact):/home/zhuhe/.cargo/bin:/usr/local/bin:/usr/bin:/bin LITCHI_MEM_MAX=20G CARGO_BUILD_JOBS=1 CARGO_INCREMENTAL=0 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_PROFILE_RELEASE_DEBUG=0 TMPDIR=/tmp/claude-1001/uo-t/docx-ink-perf-build-8322 python3 docs/unified-ops/results/0362l/ink-qualify.py build (deleted-coord-artifact) --base d0406be017 --candidate 706fc5f0e1 --lock /home/zhuhe/code/litchi-worktrees/uo2-coordinator-durable-ink/Cargo.lock",
     "manifest": {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/durable-ink-0362l/matched-v8-8322/build.json",
+      "path": "(deleted-coord-artifact)/build.json",
       "bytes": 153012,
       "sha256": "cbdb86cee60c5deef1866cd3e9813cceb948a19c7221603a97d3397d052a2ea2"
     },
@@ -62,9 +62,9 @@
     }
   },
   "allocation": {
-    "command": "env PATH=/home/zhuhe/code/litchi-worktrees/.coord/bin:/home/zhuhe/.cargo/bin:/usr/local/bin:/usr/bin:/bin LITCHI_MEM_MAX=20G CARGO_BUILD_JOBS=1 CARGO_INCREMENTAL=0 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_PROFILE_RELEASE_DEBUG=0 TMPDIR=/tmp/claude-1001/uo-t/docx-ink-perf-build-8322 python3 docs/unified-ops/results/0362l/ink-qualify.py allocation /home/zhuhe/code/litchi-worktrees/.coord/durable-ink-0362l/matched-v8-8322 --attempt allocation-a1",
+    "command": "env PATH=(deleted-coord-artifact):/home/zhuhe/.cargo/bin:/usr/local/bin:/usr/bin:/bin LITCHI_MEM_MAX=20G CARGO_BUILD_JOBS=1 CARGO_INCREMENTAL=0 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_PROFILE_RELEASE_DEBUG=0 TMPDIR=/tmp/claude-1001/uo-t/docx-ink-perf-build-8322 python3 docs/unified-ops/results/0362l/ink-qualify.py allocation (deleted-coord-artifact) --attempt allocation-a1",
     "manifest": {
-      "path": "/home/zhuhe/code/litchi-worktrees/.coord/durable-ink-0362l/matched-v8-8322/allocation-a1/manifest.json",
+      "path": "(deleted-coord-artifact)/manifest.json",
       "bytes": 20299,
       "sha256": "cbc72b108b64b75d2dc4d36baf55aff5db495eda688a6d6f7d9525b624d8cd82"
     },

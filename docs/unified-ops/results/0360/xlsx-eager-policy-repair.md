@@ -152,7 +152,7 @@ exact pre-W4 integration state.
 ## Returned defined-name source reparse repair
 
 The completed defined-name route in
-`/home/zhuhe/code/litchi-worktrees/.coord/w4-xlsx/e63-source-family-abba-batched-v3`
+`(deleted-coord-artifact)`
 is retained as an unaccepted diagnostic receipt. Its five source blocks were
 all slower after the W4 migration: the source means were 1.009538x,
 1.010027x, 1.016369x, 1.011511x and 1.012955x (paired block order as recorded

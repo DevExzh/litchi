@@ -284,7 +284,7 @@ so the goal's reference still resolves to an explanation.
 
 ## 6. Gate commands for the coordinator
 
-Add these to `.coord/gate.sh`, with the program's build env and one cargo
+Add these to `(deleted-coord-artifact)`, with the program's build env and one cargo
 command at a time:
 
 ```sh

@@ -24,7 +24,7 @@ manifest SHA-256: a94e262d2fd2d9055de1036f2c87a31cc198142002bc27fec92f586eda2283
 ```
 
 The final candidate root is
-`/home/zhuhe/code/litchi-worktrees/.coord/final-api-capture-472b670547/source`.
+`(deleted-coord-artifact)`.
 The selected final-source adapter identities are explicitly bound in the
 external receipt, including `tools/perf-baseline/src/lib.rs` (3,088,216 bytes,
 SHA-256 `280d61ae1f714af78be6cecf21a4432a9ea2a27478e89c237b5d358bc02db02a`),
@@ -83,11 +83,11 @@ target roots, for the paired build and ABBA phases:
 
 ```text
 env -u LITCHI_CAPPED LITCHI_MEM_MAX=20G CARGO_BUILD_JOBS=1 CARGO_INCREMENTAL=0 \
-  python3 /home/zhuhe/code/litchi-worktrees/.coord/final-api-capture-472b670547/source/tools/native_qualification/drawingml_raw_paired_runner.py \
+  python3 (deleted-coord-artifact) \
   --manifest /tmp/dml-final-472b-rebind-20261024T1830Z/expanded-manifest.json --phase build
 
 env -u LITCHI_CAPPED LITCHI_MEM_MAX=20G CARGO_BUILD_JOBS=1 CARGO_INCREMENTAL=0 \
-  python3 /home/zhuhe/code/litchi-worktrees/.coord/final-api-capture-472b670547/source/tools/native_qualification/drawingml_raw_paired_runner.py \
+  python3 (deleted-coord-artifact) \
   --manifest /tmp/dml-final-472b-rebind-20261024T1830Z/expanded-manifest.json --phase abba
 ```
 

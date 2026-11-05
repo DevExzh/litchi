@@ -94,7 +94,7 @@
     "probe_build": "cargo build --release --offline --manifest-path /external/biff/{before,after}/Cargo.toml; fat LTO, one codegen unit, panic=abort; same dependency resolution in both builds",
     "interpretation": "Scan medians improve; encoding medians are 0.993/0.994 of baseline with 0.982–1.015 individual-block range. No end-to-end timing claim."
   },
-  "raw_log_directory": "/home/zhuhe/code/litchi-worktrees/.coord/exact-limits",
+  "raw_log_directory": "(deleted-coord-artifact)",
   "raw_logs": {
     "biff-check.log": {
       "bytes": 262,

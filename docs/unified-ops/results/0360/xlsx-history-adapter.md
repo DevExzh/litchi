@@ -100,7 +100,7 @@ now prepared from the exact current-trunk integration commit
 `e63a1fe3534bcaaae2ce367339f7f8275877baef` in the external worktree
 `/home/zhuhe/code/litchi-worktrees/uo2-e63-prew4-alloc-v1`. A file-filtered
 base archive is retained outside the repository at
-`/home/zhuhe/code/litchi-worktrees/.coord/w4-xlsx/e63-prew4-allocator-base-v2.tar`
+`(deleted-coord-artifact)/e63-prew4-allocator-base-v2.tar`
 (206,110,720 bytes, SHA-256
 `c9281495a28f5abaea8326091071c2f4e77a5015a38596709c287fcd74cee42a`); its
 selected path list is next to it with SHA-256
@@ -173,14 +173,14 @@ The exact release commands were, with the W4 environment shim and distinct
 target directories:
 
 ```sh
-source /home/zhuhe/code/litchi-worktrees/.coord/w4-xlsx/env.sh
+source (deleted-coord-artifact)
 export CARGO_TARGET_DIR=/home/zhuhe/code/litchi-worktrees/uo2-e63-prew4-target-main-v1
 cargo build --release --manifest-path tools/perf-baseline/Cargo.toml \
   --bin litchi-perf-baseline
 cargo build --release --manifest-path tools/perf-baseline/Cargo.toml \
   --bin xlsx_merge_source_abba
 
-source /home/zhuhe/code/litchi-worktrees/.coord/w4-xlsx/env.sh
+source (deleted-coord-artifact)
 export CARGO_TARGET_DIR=/home/zhuhe/code/litchi-worktrees/uo2-w4-alloc-target-v2
 cargo build --release --manifest-path tools/perf-baseline/Cargo.toml \
   --bin litchi-perf-baseline
@@ -203,7 +203,7 @@ merge-child source is
 Preflight with the final driver, e63 base children, and final children
 completed with 24 family cases and four compact children. Its receipt is
 outside the repository at
-`/home/zhuhe/code/litchi-worktrees/.coord/w4-xlsx/e63-source-family-preflight-head-v2/preflight.json`.
+`(deleted-coord-artifact)`.
 
 The e63 and final allocator reports use the same fixture hashes and exact
 128/128 forward and inverse checks. In the comparable common replay interval,
@@ -220,7 +220,7 @@ artifact. The total common route is lower and exact, but the inverse apply
 allocation remains a separately reported cost for any later wall-time review.
 
 The complete allocation JSON pair is outside the repository at
-`/home/zhuhe/code/litchi-worktrees/.coord/w4-xlsx/e63-source-allocation-v1/`.
+`(deleted-coord-artifact)`.
 The base and candidate JSON SHA-256 values are
 `9fbaff2f43b8115834e7c12bd8be33306a1f2f33d9ada5bb34145b02296ee0f0` and
 `083fa101f3a8a88360fc8114a28046090ce1528c3388fcbc15a23472371ce018`,
@@ -228,7 +228,7 @@ respectively.
 No native timing is claimed from this attribution run.
 
 The prepared native protocol is outside the repository at
-`/home/zhuhe/code/litchi-worktrees/.coord/w4-xlsx/e63-source-family-abba-v1.commands`.
+`(deleted-coord-artifact)/e63-source-family-abba-v1.commands`.
 Its SHA-256 is
 `e2b0b79e365e311e3eec966febcb9273080584f2d72cc0d9338fc688a4b6bd51`. It uses
 only the protected binaries above and the final source-family driver.
@@ -252,7 +252,7 @@ the missing batching and checkpointing were found. Its temporary child JSON
 files were deleted by TemporaryJson; no elapsed observations survived. The
 external diagnostic receipt records the protected binary identities and this
 loss at
-/home/zhuhe/code/litchi-worktrees/.coord/w4-xlsx/e63-source-family-abba-v1/attempt-aborted-20261021.json (SHA-256
+(deleted-coord-artifact)/attempt-aborted-20261021.json (SHA-256
 a521dda6ae331e3db55a530baa26e7efea5502cf0ad3038194c89f70e95fc25a). It is
 not a timing result.
 
@@ -282,7 +282,7 @@ python3 tools/xlsx_source_family_abba_batched.py \\
   --merge-before-bin /tmp/litchi-w4-final-binaries-20261021/xlsx_merge_source_abba-base-e63a1fe353-v1 \\
   --merge-after-bin /tmp/litchi-w4-final-binaries-20261021/xlsx_merge_source_abba-head-6800ddc682-v1 \\
   --compact --blocks 5 --warmup 2 --target-ms 500 --minimum-ms 150 \\
-  --out-dir /home/zhuhe/code/litchi-worktrees/.coord/w4-xlsx/e63-source-family-abba-batched-v1
+  --out-dir (deleted-coord-artifact)
 ~~~
 
 The adapter refuses an existing nonempty result directory, records its own

@@ -22,12 +22,12 @@ cargo clippy --offline -p litchi-ole-common -p litchi-xls --all-targets --all-fe
 
 The full test run passed 1,316 XLS unit tests and all selected integration and
 example suites with zero failures.  The affected target was
-`/home/zhuhe/code/litchi-worktrees/.coord/w5-ole-source-arc-retag-target`.
+`(deleted-coord-artifact)`.
 
 ## Paired allocator receipt
 
 The receipt is outside the checkout at
-`/home/zhuhe/code/litchi-worktrees/.coord/w5-ole-source-arc-retag-20261022/counting`.
+`(deleted-coord-artifact)`.
 It is 256 KiB and contains only reduced TSV output and command metadata.  The
 runner is the preserved 0359i runner, copied to
 `.../w5-ole-source-arc-retag-20261022/run-counting-allocator-w5-retag.sh`;

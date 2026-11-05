@@ -8,8 +8,8 @@ source commit `e13bd7e843e3dfd5f7e22387c22a881aa6d80d43`, tree
 receipt are:
 
 ```text
-/home/zhuhe/code/litchi-worktrees/.coord/0362ul87a-f5-e13bd7e843/result.json
-/home/zhuhe/code/litchi-worktrees/.coord/0362ul87a-f5-e13bd7e843/rows.json
+(deleted-coord-artifact)
+(deleted-coord-artifact)
 ```
 
 The `fmt-scoped` row exited 1 because `rustfmt --check` reported formatting

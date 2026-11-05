@@ -117,7 +117,7 @@ The complete font lane was then run at pre-squash source commit
 All eleven rows passed: the vendor budget compile and tests, `litchi-fonts`
 tests and Clippy, DOCX/PPTX/PPT checks and Clippy, the three focused consumer
 font tests, and both font glossary profiles.  The external receipt is
-`/home/zhuhe/code/litchi-worktrees/.coord/shared-font-raw-validation-e69d10-full-20261025/state/driver-result.json`
+`(deleted-coord-artifact)/driver-result.json`
 (100,030 bytes, SHA-256
 `4ab3c781f5319af72f730d53fd0998decc6805fb408be1aae85c6abe143edd62`).
 It records the unchanged lock hashes: root

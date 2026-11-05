@@ -93,7 +93,7 @@ table) with `NoTemplate`.
 
 Callgrind, release parity binary with debug info, CPU 3, ABBA (two calls
 of each route), inclusive instructions of the probe functions (open,
-operation, commit, serialize). Raw captures in `.coord/iwa-w4m/cg{1,2,3}/`.
+operation, commit, serialize). Raw captures in `(deleted-coord-artifact)`.
 
 | Route | Probe | Host Ir | Leaf Ir | Leaf/host |
 |---|---|---:|---:|---:|

@@ -1,6 +1,6 @@
 #!/bin/sh
 # usage: docx_cg.sh BINARY TAG -> per-call Ir, I1mr, D1mr, D1mw for leaf and unified
-BIN=$1; TAG=$2; S=/home/zhuhe/code/litchi-worktrees/.coord/perf-lazy/cg
+BIN=$1; TAG=$2; S=/deleted-coord-artifact
 cd /home/zhuhe/code/litchi-worktrees/uo2-perf-lazy/crates/litchi-ops
 for leg in leaf unified; do for n in 1000 3000; do
   DOCX_FANOUT_SIZES=1 DOCX_FANOUT_PROFILE=$leg DOCX_FANOUT_LOOPS=$n valgrind --tool=callgrind --cache-sim=yes --I1=32768,8,64 --D1=32768,8,64 --LL=33554432,16,64 --callgrind-out-file=$S/docx-$TAG-$leg-$n.out $BIN >/dev/null 2>$S/docx-$TAG-$leg-$n.log &

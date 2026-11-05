@@ -10,7 +10,7 @@
       "LITCHI_PROBE_ONLY": "doc/leaf_write",
       "LITCHI_PROBE_BATCH_ROUNDS": "1",
       "argv": ["legacy_w5_source_probe", "1"],
-      "runner": "/home/zhuhe/code/litchi-worktrees/.coord/doc-toggle/tmp/runner/legacy_w5_source_probe"
+      "runner": "(deleted-coord-artifact)"
     }
   },
   "source_assemblies": {
@@ -51,7 +51,7 @@
   },
   "build": {
     "toolchain": "rustc 1.95.0 (59807616 2026-04-14); cargo 1.95.0 (f2d3ce0bd 2026-03-21)",
-    "command": "RUSTUP_TOOLCHAIN=1.95.0 LITCHI_MEM_MAX=20G CARGO_TARGET_DIR=/home/zhuhe/code/litchi-worktrees/uo2-doc-toggle/target CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 CARGO_PROFILE_RELEASE_DEBUG=0 TMPDIR=/home/zhuhe/code/litchi-worktrees/.coord/doc-toggle/tmp/repair76391 cargo build --offline --locked --release -p litchi-ops --features doc,xls,rtf --example legacy_w5_source_probe",
+    "command": "RUSTUP_TOOLCHAIN=1.95.0 LITCHI_MEM_MAX=20G CARGO_TARGET_DIR=/home/zhuhe/code/litchi-worktrees/uo2-doc-toggle/target CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=1 CARGO_PROFILE_RELEASE_DEBUG=0 TMPDIR=(deleted-coord-artifact) cargo build --offline --locked --release -p litchi-ops --features doc,xls,rtf --example legacy_w5_source_probe",
     "duration": "2m10s",
     "memory_cap": "20G; MemorySwapMax=0",
     "target": "/home/zhuhe/code/litchi-worktrees/uo2-doc-toggle/target"
