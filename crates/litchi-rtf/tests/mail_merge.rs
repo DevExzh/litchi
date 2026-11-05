@@ -94,7 +94,7 @@ fn rejects_duplicate_nonstarred_nested_and_oversized_metadata() {
     for malformed in [
         r"{\rtf1{\*\mailmerge{\*\mmquery one}{\*\mmquery two}}}",
         r"{\rtf1{\mailmerge{\*\mmquery one}}}",
-        r"{\rtf1{\*\mailmerge{\mmquery one}}}",
+        r"{\rtf1{\*\mailmerge{\mmquery one\field bad}}}",
         r"{\rtf1{\*\mailmerge{\*\mmquery before{nested}after}}}",
         r"{\rtf1{\*\mailmerge{\*\mmodso{\*\mmodsofldmpdata{\*\mmodsoname MissingColumn}}}}}",
     ] {
@@ -107,4 +107,27 @@ fn rejects_duplicate_nonstarred_nested_and_oversized_metadata() {
     let oversized = "x".repeat(MAX_MAIL_MERGE_STRING_BYTES + 1);
     let malformed = [r"{\rtf1{\*\mailmerge{\*\mmquery ", &oversized, "}}}}"].concat();
     assert!(Tree::parse(&malformed, litchi_rtf::read::OpenOptions::default()).is_err());
+}
+
+#[test]
+fn native_mail_merge_settings_are_scoped_and_do_not_accept_malformed_controls() {
+    for source in [
+        r"{\rtf1\mmmaintypeletters Body}",
+        r"{\rtf1\mmreccur1 Body}",
+        r"{\rtf1{\*\mailmerge\mmmaintypeletters1}}",
+        r"{\rtf1{\*\mailmerge\mmmaintypeletters\mmmaintypeemail}}",
+        r"{\rtf1{\*\mailmerge\mmdatatypefile\mmdatatypeexcel}}",
+        r"{\rtf1{\*\mailmerge\mmdestnewdoc\mmdestprinter}}",
+        r"{\rtf1{\*\mailmerge\mmreccur}}",
+        r"{\rtf1{\*\mailmerge\mmerrors}}",
+        r"{\rtf1{\*\mailmerge\mmreccur1\mmreccur2}}",
+        r"{\rtf1{\*\mailmerge\mmerrors1\mmerrors2}}",
+        r"{\rtf1{\*\mailmerge{\mmquery {\field evil}}}}",
+        r"{\rtf1{\*\mailmerge{\mmdatasource\bin3 bad}}}",
+    ] {
+        assert!(
+            Tree::parse(source, litchi_rtf::read::OpenOptions::default()).is_err(),
+            "{source}"
+        );
+    }
 }

@@ -1885,6 +1885,11 @@ impl Parser<'_> {
             | ControlWord::MailMergeDataSource
             | ControlWord::MailMergeHeaderSource
             | ControlWord::MailMergeLinkToQuery(_)
+            | ControlWord::MailMergeMainType(_, _)
+            | ControlWord::MailMergeInputType(_, _)
+            | ControlWord::MailMergeDestination(_, _)
+            | ControlWord::MailMergeCurrentRecord(_)
+            | ControlWord::MailMergeErrorMode(_)
             | ControlWord::MailMergeQuery
             | ControlWord::MailMergeDataSourceObject
             | ControlWord::MailMergeActiveRecord(_)
@@ -2330,6 +2335,10 @@ impl Parser<'_> {
                 state.pending_tab_alignment = None;
                 state.pending_tab_leader = None;
                 state.in_table = false;
+                // itap is a paragraph property. A later intbl without an
+                // explicit itap starts at the outer level, as native Word
+                // does after a completed nested table.
+                state.table_nesting_level = 0;
             },
 
             // Paragraph spacing

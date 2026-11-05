@@ -212,7 +212,75 @@ impl MailMergeDataSourceObject<'_> {
     }
 }
 
-/// Complete, inert RTF mail-merge information group.
+/// Stored native mail-merge document kind; never initiates a merge.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MailMergeMainType {
+    Catalog,
+    Envelopes,
+    Labels,
+    Letters,
+    Email,
+    Fax,
+}
+
+impl MailMergeMainType {
+    pub(crate) const fn control(self) -> &'static str {
+        match self {
+            Self::Catalog => "mmmaintypecatalog",
+            Self::Envelopes => "mmmaintypeenvelopes",
+            Self::Labels => "mmmaintypelabels",
+            Self::Letters => "mmmaintypeletters",
+            Self::Email => "mmmaintypeemail",
+            Self::Fax => "mmmaintypefax",
+        }
+    }
+}
+
+/// Stored native data-source kind; no source is opened or refreshed.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MailMergeInputType {
+    Access,
+    Excel,
+    QueryTable,
+    Odbc,
+    Odso,
+    File,
+}
+
+impl MailMergeInputType {
+    pub(crate) const fn control(self) -> &'static str {
+        match self {
+            Self::Access => "mmdatatypeaccess",
+            Self::Excel => "mmdatatypeexcel",
+            Self::QueryTable => "mmdatatypeqt",
+            Self::Odbc => "mmdatatypeodbc",
+            Self::Odso => "mmdatatypeodso",
+            Self::File => "mmdatatypefile",
+        }
+    }
+}
+
+/// Stored destination preference; no document, print job, message or fax is sent.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MailMergeDestination {
+    NewDocument,
+    Printer,
+    Email,
+    Fax,
+}
+
+impl MailMergeDestination {
+    pub(crate) const fn control(self) -> &'static str {
+        match self {
+            Self::NewDocument => "mmdestnewdoc",
+            Self::Printer => "mmdestprinter",
+            Self::Email => "mmdestemail",
+            Self::Fax => "mmdestfax",
+        }
+    }
+}
+
+/// Inert RTF mail-merge information group.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct MailMerge<'a> {
     pub connect_string: Option<Cow<'a, str>>,
@@ -221,6 +289,13 @@ pub struct MailMerge<'a> {
     pub data_source: Option<Cow<'a, str>>,
     pub header_source: Option<Cow<'a, str>>,
     pub link_to_query: bool,
+    pub main_type: Option<MailMergeMainType>,
+    pub input_type: Option<MailMergeInputType>,
+    pub destination: Option<MailMergeDestination>,
+    /// Stored `mmreccur` value, without selecting or evaluating a record.
+    pub current_record: Option<i32>,
+    /// Stored `mmerrors` preference, without interpreting its behavior.
+    pub error_mode: Option<i32>,
     pub data_source_object: Option<MailMergeDataSourceObject<'a>>,
 }
 
@@ -233,6 +308,11 @@ impl MailMerge<'_> {
             data_source: owned(self.data_source),
             header_source: owned(self.header_source),
             link_to_query: self.link_to_query,
+            main_type: self.main_type,
+            input_type: self.input_type,
+            destination: self.destination,
+            current_record: self.current_record,
+            error_mode: self.error_mode,
             data_source_object: self
                 .data_source_object
                 .map(MailMergeDataSourceObject::into_owned),

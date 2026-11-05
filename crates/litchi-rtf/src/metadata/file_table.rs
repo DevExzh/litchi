@@ -132,7 +132,9 @@ impl<'a> FileTable<'a> {
     /// # Errors
     /// Returns an error when the input is malformed or a configured limit is exceeded.
     pub fn validate(&self) -> crate::Result<()> {
-        if self.entries.is_empty() || self.entries.len() > MAX_FILE_TABLE_ENTRIES {
+        // Word emits an empty filetbl in native mail-merge documents. Retain
+        // its presence independently of the optional mail-merge source path.
+        if self.entries.len() > MAX_FILE_TABLE_ENTRIES {
             return Err(crate::Error::MalformedDocument(
                 "RTF file table has an invalid entry count".to_string(),
             ));

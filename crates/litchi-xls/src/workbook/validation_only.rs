@@ -115,15 +115,9 @@ impl<R: Read + Seek> Reader<R> {
     /// resource exhaustion inside a worksheet. This mode reserves its
     /// occupancy map fallibly, so a failed reservation fails that worksheet's
     /// parse with [`crate::Error::Allocation`], where the complete reader's
-    /// infallible cell map would abort the process. That error does not reach
-    /// the caller: the package walk treats it like every other per-worksheet
-    /// refusal it does not propagate (the `Err(_)` arm of `parse_workbook`),
-    /// so the worksheet is simply not published and its
-    /// `parsed_worksheet_index` stays unset. The edit owners then refuse the
-    /// package with their coverage refusal, an [`crate::Error::Refused`]:
-    /// the `cell_values` and sheet-visibility owners name the tab the complete
-    /// reader did not publish, and the comments owner reports a worksheet
-    /// substream that was not completely parsed.
+    /// infallible cell map would abort the process. The package walk propagates
+    /// worksheet errors instead of publishing an incomplete catalog, so the
+    /// validation owner receives the original allocation or parse failure.
     pub(crate) fn validation_only(reader: R, kept: KeptCells) -> Result<ValidationWorkbook<R>> {
         Self::validation_only_with_cfb_limits(reader, kept, OleFileLimits::default())
     }

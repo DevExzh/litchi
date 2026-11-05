@@ -152,6 +152,328 @@
         "Two typed insertion/deletion revisions with expected native text; both native comment/reply texts survive canonical publication."
       ],
       "scope_limit": "Content and revision type only; authors, ranges, threading, accept/reject and review mutations remain uncovered."
+    },
+    {
+      "crate": "litchi-rtf",
+      "target": "microsoft_office_native",
+      "name": "native_word_mail_merge_preserves_empty_file_table_and_inert_source",
+      "fixtures": [
+        "word/word-mailmerge-fields.rtf"
+      ],
+      "feature_rows": [
+        "rtf-482",
+        "rtf-483",
+        "rtf-477"
+      ],
+      "assertions": [
+        "Empty file table, native merge settings, source/query text and cached conditional result; three standalone merge fields and two counters; metadata and body retained through canonical writing."
+      ],
+      "scope_limit": "No query execution, source access, field evaluation or merge execution; nested field syntax is retained in its parent instruction."
+    },
+    {
+      "crate": "litchi-rtf",
+      "target": "microsoft_office_native",
+      "name": "native_word_table_style_retains_all_seven_conditional_definitions",
+      "fixtures": [
+        "word/word-tables-layout.rtf"
+      ],
+      "feature_rows": [
+        "rtf-467",
+        "rtf-468",
+        "rtf-470"
+      ],
+      "assertions": [
+        "Seven native table-style definitions with distinct scopes and unchanged based-on identity survive stylesheet writing; rich table document parses with body markers."
+      ],
+      "scope_limit": "Conditional format retention only; no application of styles or rendering, and no general table mutation claim."
+    },
+    {
+      "crate": "litchi-rtf",
+      "target": "microsoft_office_native",
+      "name": "native_word_vector_group_retains_unstarred_result_and_source_bytes",
+      "fixtures": [
+        "word/word-vector-diagram.rtf"
+      ],
+      "feature_rows": [
+        "rtf-480",
+        "rtf-477",
+        "rtf-471"
+      ],
+      "assertions": [
+        "Field-owned Graphic 3 group and its three-child legacy result retained; closed polygon has 20 points; body markers and exact original source bytes survive reopen."
+      ],
+      "scope_limit": "Known drawing properties and unchanged repeated section defaults only; no rendering or SmartArt semantic reconstruction."
+    },
+    {
+      "crate": "litchi-rtf",
+      "target": "microsoft_office_native",
+      "name": "native_word_tracked_move_markers_coexist_with_insert_delete_revisions",
+      "fixtures": [
+        "word/word-tracked-moves.rtf"
+      ],
+      "feature_rows": [
+        "rtf-490",
+        "rtf-476"
+      ],
+      "assertions": [
+        "Two move identities retain kind, tag, author and date; inserted/deleted moved text survives in revisions; source publication is byte-identical."
+      ],
+      "scope_limit": "No move execution or accept/reject; deleted text lives in revision content rather than visible body bookmark ranges."
+    },
+    {
+      "crate": "litchi-xls",
+      "target": "microsoft_office_native",
+      "name": "native_excel_metadata_reader_keeps_every_worksheet",
+      "fixtures": [
+        "excel/excel-metadata.xls"
+      ],
+      "feature_rows": [
+        "xls-135",
+        "xls-168",
+        "xls-172"
+      ],
+      "assertions": [
+        "All five worksheet names and accessible sheet handles; two exact consolidation ranges and source names; native 28-byte printer-driver payload."
+      ],
+      "scope_limit": "No print execution, consolidation recalculation or full metadata-family claim."
+    },
+    {
+      "crate": "litchi-xls",
+      "target": "microsoft_office_native",
+      "name": "native_excel_workbooks_never_silently_lose_worksheet_substreams",
+      "fixtures": [
+        "excel/excel-values-formulas-chart.xls",
+        "excel/excel-interaction-print.xls",
+        "excel/excel-recorded-macro.xls",
+        "excel/excel-recorded-macro.xlt",
+        "excel/excel-visual-analytics.xls",
+        "excel/excel-conditional-drawings.xls",
+        "excel/excel-links-objects.xls",
+        "excel/excel-pivot-controls.xls",
+        "excel/excel-form-controls.xls",
+        "excel/excel-formula-owners.xls",
+        "excel/excel-connections.xls",
+        "excel/excel-date1904-breaks.xls",
+        "excel/excel-chart-families.xls",
+        "excel/excel-revisions.xls",
+        "excel/excel-metadata.xls",
+        "excel/excel-legacy-sheets.xls"
+      ],
+      "feature_rows": [
+        "xls-135",
+        "xls-163",
+        "xls-164",
+        "xls-166"
+      ],
+      "assertions": [
+        "Expected worksheet counts for every unencrypted native XLS/XLT; exact retained SortData and key ranges in two native books; typed version-15 external table metadata."
+      ],
+      "scope_limit": "Catalog coverage plus selected sort/table metadata only; encrypted XLS and remaining worksheet semantics are separate work."
+    },
+    {
+      "crate": "litchi",
+      "target": "microsoft_office_native",
+      "name": "native_doc_reads_unicode_paragraphs_through_public_views",
+      "fixtures": [
+        "word/word-text-structure.doc"
+      ],
+      "feature_rows": [
+        "doc-034"
+      ],
+      "assertions": [
+        "Native body markers and multilingual Unicode text; paragraph query results propagate errors and resolve back through public paths."
+      ],
+      "scope_limit": "Main document text and paragraph traversal only.",
+      "required_features": [
+        "doc",
+        "docx",
+        "ppt",
+        "pptx",
+        "rtf",
+        "xls",
+        "xlsb",
+        "xlsx"
+      ]
+    },
+    {
+      "crate": "litchi",
+      "target": "microsoft_office_native",
+      "name": "native_docx_reads_unicode_paragraphs_through_public_views",
+      "fixtures": [
+        "word/word-text-structure.docx"
+      ],
+      "feature_rows": [
+        "docx-076"
+      ],
+      "assertions": [
+        "Native body markers and multilingual Unicode text; paragraph query results propagate errors and resolve back through public paths."
+      ],
+      "scope_limit": "Main document text and paragraph traversal only.",
+      "required_features": [
+        "doc",
+        "docx",
+        "ppt",
+        "pptx",
+        "rtf",
+        "xls",
+        "xlsb",
+        "xlsx"
+      ]
+    },
+    {
+      "crate": "litchi",
+      "target": "microsoft_office_native",
+      "name": "native_xls_keeps_all_five_metadata_worksheets",
+      "fixtures": [
+        "excel/excel-metadata.xls"
+      ],
+      "feature_rows": [
+        "xls-135"
+      ],
+      "assertions": [
+        "Five exact worksheet names, rich/Unicode text markers, and complete cell-query traversal with resolvable paths."
+      ],
+      "scope_limit": "No full formatting, formula, print or metadata claim from text and traversal checks.",
+      "required_features": [
+        "doc",
+        "docx",
+        "ppt",
+        "pptx",
+        "rtf",
+        "xls",
+        "xlsb",
+        "xlsx"
+      ]
+    },
+    {
+      "crate": "litchi",
+      "target": "microsoft_office_native",
+      "name": "native_xlsx_keeps_all_five_metadata_worksheets",
+      "fixtures": [
+        "excel/excel-metadata.xlsx"
+      ],
+      "feature_rows": [
+        "xlsx-198",
+        "xlsx-202"
+      ],
+      "assertions": [
+        "Five exact worksheet names, rich/Unicode text markers, and complete cell-query traversal with resolvable paths."
+      ],
+      "scope_limit": "No full formatting, formula, print or metadata claim from text and traversal checks.",
+      "required_features": [
+        "doc",
+        "docx",
+        "ppt",
+        "pptx",
+        "rtf",
+        "xls",
+        "xlsb",
+        "xlsx"
+      ]
+    },
+    {
+      "crate": "litchi",
+      "target": "microsoft_office_native",
+      "name": "native_xlsb_keeps_all_five_metadata_worksheets",
+      "fixtures": [
+        "excel/excel-metadata.xlsb"
+      ],
+      "feature_rows": [
+        "xlsb-279"
+      ],
+      "assertions": [
+        "Five exact worksheet names, rich/Unicode text markers, and complete cell-query traversal with resolvable paths."
+      ],
+      "scope_limit": "No full formatting, formula, print or metadata claim from text and traversal checks.",
+      "required_features": [
+        "doc",
+        "docx",
+        "ppt",
+        "pptx",
+        "rtf",
+        "xls",
+        "xlsb",
+        "xlsx"
+      ]
+    },
+    {
+      "crate": "litchi",
+      "target": "microsoft_office_native",
+      "name": "native_ppt_reads_three_slides_and_table_text",
+      "fixtures": [
+        "powerpoint/powerpoint-text-table.ppt"
+      ],
+      "feature_rows": [
+        "ppt-348",
+        "ppt-353"
+      ],
+      "assertions": [
+        "Exactly three slides, fixture identity, bullet text and six native table labels/values through public presentation views."
+      ],
+      "scope_limit": "Slide text projection only; PPT shape-count fallback does not establish shape parsing correctness.",
+      "required_features": [
+        "doc",
+        "docx",
+        "ppt",
+        "pptx",
+        "rtf",
+        "xls",
+        "xlsb",
+        "xlsx"
+      ]
+    },
+    {
+      "crate": "litchi",
+      "target": "microsoft_office_native",
+      "name": "native_pptx_reads_three_slides_and_table_text",
+      "fixtures": [
+        "powerpoint/powerpoint-text-table.pptx"
+      ],
+      "feature_rows": [
+        "pptx-396",
+        "pptx-409"
+      ],
+      "assertions": [
+        "Exactly three slides, fixture identity, bullet text and six native table labels/values through public presentation views."
+      ],
+      "scope_limit": "Slide text projection only; PPT shape-count fallback does not establish shape parsing correctness.",
+      "required_features": [
+        "doc",
+        "docx",
+        "ppt",
+        "pptx",
+        "rtf",
+        "xls",
+        "xlsb",
+        "xlsx"
+      ]
+    },
+    {
+      "crate": "litchi",
+      "target": "microsoft_office_native",
+      "name": "native_rtf_edit_reopen_and_inverse_keep_the_original_word_source",
+      "fixtures": [
+        "word/word-rtf-minimal.rtf"
+      ],
+      "feature_rows": [
+        "rtf-455",
+        "rtf-457",
+        "rtf-458"
+      ],
+      "assertions": [
+        "Public run edit survives save/reopen; inverse patch restores exact source; whole-paragraph replacement of mixed formatting has a precise refusal and leaves input unchanged."
+      ],
+      "scope_limit": "Run text transaction only; other operation families remain uncovered.",
+      "required_features": [
+        "doc",
+        "docx",
+        "ppt",
+        "pptx",
+        "rtf",
+        "xls",
+        "xlsb",
+        "xlsx"
+      ]
     }
   ]
 }

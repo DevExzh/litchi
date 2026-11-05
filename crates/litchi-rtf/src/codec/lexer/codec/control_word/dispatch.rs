@@ -653,6 +653,44 @@ pub(in crate::codec::lexer::codec) fn match_control_word<'a>(
         "mmdatasource" => ControlWord::MailMergeDataSource,
         "mmheadersource" => ControlWord::MailMergeHeaderSource,
         "mmlinktoquery" => ControlWord::MailMergeLinkToQuery(param_bool),
+        "mmmaintypecatalog" => {
+            ControlWord::MailMergeMainType(crate::MailMergeMainType::Catalog, param)
+        },
+        "mmmaintypeenvelopes" => {
+            ControlWord::MailMergeMainType(crate::MailMergeMainType::Envelopes, param)
+        },
+        "mmmaintypelabels" => {
+            ControlWord::MailMergeMainType(crate::MailMergeMainType::Labels, param)
+        },
+        "mmmaintypeletters" => {
+            ControlWord::MailMergeMainType(crate::MailMergeMainType::Letters, param)
+        },
+        "mmmaintypeemail" => ControlWord::MailMergeMainType(crate::MailMergeMainType::Email, param),
+        "mmmaintypefax" => ControlWord::MailMergeMainType(crate::MailMergeMainType::Fax, param),
+        "mmdatatypeaccess" => {
+            ControlWord::MailMergeInputType(crate::MailMergeInputType::Access, param)
+        },
+        "mmdatatypeexcel" => {
+            ControlWord::MailMergeInputType(crate::MailMergeInputType::Excel, param)
+        },
+        "mmdatatypeqt" => {
+            ControlWord::MailMergeInputType(crate::MailMergeInputType::QueryTable, param)
+        },
+        "mmdatatypeodbc" => ControlWord::MailMergeInputType(crate::MailMergeInputType::Odbc, param),
+        "mmdatatypeodso" => ControlWord::MailMergeInputType(crate::MailMergeInputType::Odso, param),
+        "mmdatatypefile" => ControlWord::MailMergeInputType(crate::MailMergeInputType::File, param),
+        "mmdestnewdoc" => {
+            ControlWord::MailMergeDestination(crate::MailMergeDestination::NewDocument, param)
+        },
+        "mmdestprinter" => {
+            ControlWord::MailMergeDestination(crate::MailMergeDestination::Printer, param)
+        },
+        "mmdestemail" => {
+            ControlWord::MailMergeDestination(crate::MailMergeDestination::Email, param)
+        },
+        "mmdestfax" => ControlWord::MailMergeDestination(crate::MailMergeDestination::Fax, param),
+        "mmreccur" => ControlWord::MailMergeCurrentRecord(param),
+        "mmerrors" => ControlWord::MailMergeErrorMode(param),
         "mmquery" => ControlWord::MailMergeQuery,
         "mmodso" => ControlWord::MailMergeDataSourceObject,
         "mmodsoactive" => ControlWord::MailMergeActiveRecord(param_value),

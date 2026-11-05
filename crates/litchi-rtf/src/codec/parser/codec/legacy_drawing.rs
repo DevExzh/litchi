@@ -429,6 +429,7 @@ impl<'a> Parser<'a> {
                 | ControlWord::LegacyTextBox
                 | ControlWord::LegacyDrawingEllipse
                 | ControlWord::LegacyDrawingPolyline
+                | ControlWord::LegacyDrawingPolygon
                 | ControlWord::LegacyDrawingArc
         )
     }
@@ -675,7 +676,8 @@ impl<'a> Parser<'a> {
                     properties,
                 })
             },
-            Token::Control(ControlWord::LegacyDrawingPolyline) => self.parse_legacy_polyline(),
+            Token::Control(ControlWord::LegacyDrawingPolyline) => self.parse_legacy_polyline(false),
+            Token::Control(ControlWord::LegacyDrawingPolygon) => self.parse_legacy_polyline(true),
             Token::Control(ControlWord::LegacyDrawingArc) => {
                 let (geometry, properties, flags) =
                     self.parse_legacy_simple_tail(LegacySimpleKind::Arc)?;
@@ -736,16 +738,18 @@ impl<'a> Parser<'a> {
 
     pub(super) fn parse_legacy_polyline(
         &mut self,
+        polygon: bool,
     ) -> crate::Result<crate::LegacyDrawingPrimitive<'a>> {
         self.skip_legacy_whitespace();
-        let closed = if matches!(
-            self.tokens.get(self.pos),
-            Some(Token::Control(ControlWord::LegacyDrawingPolygon))
-        ) {
+        let closed = if !polygon
+            && matches!(
+                self.tokens.get(self.pos),
+                Some(Token::Control(ControlWord::LegacyDrawingPolygon))
+            ) {
             self.pos += 1;
             true
         } else {
-            false
+            polygon
         };
         self.skip_legacy_whitespace();
         let count = match self.tokens.get(self.pos) {

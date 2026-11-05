@@ -18,21 +18,25 @@ pub enum ListObjectFeatureVersion {
 pub enum ExternalTableVersion {
     Excel2003,
     Excel2007,
+    /// Version 0xF emitted by native Microsoft Office 16.110.2 tables.
+    Version15,
 }
 impl ExternalTableVersion {
     pub(in crate::list_object) const fn code(self) -> u32 {
         match self {
             Self::Excel2003 => 0xB,
             Self::Excel2007 => 0xC,
+            Self::Version15 => 0xF,
         }
     }
     pub(in crate::list_object) fn from_code(value: u32) -> Result<Self> {
         match value {
             0xB => Ok(Self::Excel2003),
             0xC => Ok(Self::Excel2007),
+            0xF => Ok(Self::Version15),
             _ => Err(invalid(
                 FEATURE12_RECORD_TYPE,
-                "external table verXL must be 0xB or 0xC",
+                "external table verXL must be 0xB, 0xC or 0xF",
             )),
         }
     }

@@ -1,0 +1,375 @@
+{
+  "schema_version": 1,
+  "date": "2026-11-05",
+  "base_commit": "e707bd0be457dcd68e214462770f8353b70f951e",
+  "problem": "Native Word RTF files exposed over-restrictive metadata/table/drawing grammars. Native Excel XLS worksheet failures were silently discarded, causing incomplete eager catalogs and public query failures even when source text reads succeeded.",
+  "changes": {
+    "rtf": [
+      "Retain empty file tables and native passive mail-merge settings; accept the native unstarred query/source text forms.",
+      "Distinguish repeated table-style IDs by conditional region; prefer the unscoped base for typed lookup and transfer every definition.",
+      "Reset itap with pard so outer cell text does not enter a stale nested table.",
+      "Allow typed move-bookmark destinations inside revisions while continuing to reject active destinations.",
+      "Read unstarred shape-group results, direct legacy polygon primitives and exact duplicate section-numbering defaults repeated after body text."
+    ],
+    "xls": [
+      "Propagate worksheet errors rather than suppressing them and dropping catalog entries.",
+      "Read optional native DCon self-reference padding and ignore padding contents; ignore the PLS reserved prefix.",
+      "Read Feature11/12 actual ranges from the feature body, ignoring their FrtRefHeaderU ref8; accept producer version 0xF.",
+      "Retain native sort-condition ranges independently of SortData; authoring add() still checks containment.",
+      "Preserve larger legacy conditional-format groups and shared-formula anchors anywhere within their declared range, required by existing tracked regression fixtures now that parse errors propagate.",
+      "Update two frozen first-error expectations to the original worksheet errors, and repin the SST corpus digest after the native fixture merge. All tracked XLS fixtures are materialized and no untracked XLS files contributed."
+    ],
+    "ci": [
+      "Enable all eight Office leaves plus encryption in facade-format-tests.",
+      "Bind 23 concrete native tests to 36 fixtures and 34 partial feature rows; require facade gate features to include the indexed native tests."
+    ]
+  },
+  "results": {
+    "rtf_native_readable": 14,
+    "rtf_native_total": 15,
+    "xls_unencrypted_catalog_fixtures": 16,
+    "facade_format_families": 8,
+    "indexed_coverage": {
+      "fixtures": 139,
+      "fixtures_with_tests": 36,
+      "feature_rows": 494,
+      "feature_rows_with_partial_tests": 34,
+      "indexed_tests": 23,
+      "native_fixture_statuses": {
+        "verified_native_fixture": 197,
+        "pending": 252,
+        "library_boundary": 44,
+        "not_applicable": 1
+      }
+    },
+    "rust_passed_across_owner_ops_facade_suites": 3819,
+    "python_passed": 71,
+    "clippy_exit_code": 0,
+    "dependency_gate_exit_code": 0,
+    "format_check_exit_code": 0
+  },
+  "artifacts": [
+    {
+      "path": "/tmp/litchi-native-office.GMvwp4/rtf-second-full.log",
+      "bytes": 157931,
+      "sha256": "46e0edfe2b942c67fad9a8270caddd47412c647ded7a115c0bb49986ba72fcf7",
+      "command": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi-rtf --lib --tests",
+      "passed": 1557,
+      "failed": 0,
+      "ignored": 0,
+      "test_binaries": 186
+    },
+    {
+      "path": "/tmp/litchi-native-office.GMvwp4/xls-full-after.log",
+      "bytes": 165303,
+      "sha256": "6732c1a9c997e94b06c50f4cfb5a9c7cd7bc8076729ad992dfeb214d069ded69",
+      "command": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi-xls --lib --tests --no-fail-fast",
+      "passed": 1894,
+      "failed": 0,
+      "ignored": 1,
+      "test_binaries": 86
+    },
+    {
+      "path": "/tmp/litchi-native-office.GMvwp4/facade-full-final.log",
+      "bytes": 31544,
+      "sha256": "49d43dccc9962b2cb7b1f229d664fc0badc21b04a50cc561a15f31f323b36170",
+      "command": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi --no-default-features --features doc,docx,encryption,ppt,pptx,rtf,xls,xlsb,xlsx --lib --tests --no-fail-fast -- --test-threads=1",
+      "passed": 93,
+      "failed": 0,
+      "ignored": 0,
+      "test_binaries": 30
+    },
+    {
+      "path": "/tmp/litchi-native-office.GMvwp4/second-ops.log",
+      "bytes": 44516,
+      "sha256": "d5ed6ab7ce23b5d23ca2cad40638d9ad08bd6b1cb20e30f42357da99dc00d5a4",
+      "command": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi-ops --no-default-features --features rtf,xls --test 'rtf_*' --test 'xls_*' --test text_set_preservation --no-fail-fast",
+      "passed": 275,
+      "failed": 0,
+      "ignored": 0,
+      "test_binaries": 32
+    },
+    {
+      "path": "/tmp/litchi-native-office.GMvwp4/second-native-final.log",
+      "bytes": 1790,
+      "sha256": "767e040f30f9223ddf6627674948d3d50532cb0436fc40b380528a54dd5eb34f",
+      "command": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi-rtf -p litchi-xls --test microsoft_office_native",
+      "passed": 15,
+      "failed": 0,
+      "ignored": 0,
+      "test_binaries": 2
+    },
+    {
+      "path": "/tmp/litchi-native-office.GMvwp4/second-clippy.log",
+      "bytes": 136,
+      "sha256": "3f98403891d41e286c99fceb7a1bf7d61f296626c8d7605c3d7fa1a609538d36",
+      "command": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo clippy --locked --offline -p litchi-rtf -p litchi-xls --lib --no-deps -- -D warnings"
+    },
+    {
+      "path": "/tmp/litchi-native-office.GMvwp4/second-python.log",
+      "bytes": 663,
+      "sha256": "e233f251c8597e05d30672ec9c1a719c02ffbc869a026c3267ce5a781ecfcdb2",
+      "command": "python3 -m unittest tools.test_native_office_corpus tools.test_no_3rdparty_references tools.test_non_iwork_gate"
+    },
+    {
+      "path": "/tmp/litchi-native-office.GMvwp4/second-gate-verify.log",
+      "bytes": 1947,
+      "sha256": "093891c870e429ea255a96e2b70c0ab385611633fd15daebaafeccfe5f74a514",
+      "command": "python3 tools/non_iwork_gate.py verify"
+    },
+    {
+      "path": "/tmp/litchi-native-office.GMvwp4/second-coverage.json",
+      "bytes": 237697,
+      "sha256": "007b92aa4c7314bae679591a8d7431e15357571ba6ba43921f7402762d31a68b",
+      "command": "python3 tools/native_office_coverage.py"
+    },
+    {
+      "path": "/tmp/litchi-native-office.GMvwp4/xls-feature-header-final.log",
+      "command": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi-xls --lib list_object::tests",
+      "bytes": 1425,
+      "sha256": "dbd857183df4852a1e22757b095300cc6b9a69b26e8fa2e28ebd4e7e74ef1f2d",
+      "passed": 11,
+      "failed": 0,
+      "ignored": 0,
+      "test_binaries": 1
+    },
+    {
+      "path": "/tmp/litchi-native-office.GMvwp4/facade-native-final.log",
+      "command": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi --no-default-features --features doc,docx,encryption,ppt,pptx,rtf,xls,xlsb,xlsx --test microsoft_office_native",
+      "bytes": 17960,
+      "sha256": "d2b6e445492d6f0a64c99267c47fc4af824d4c137823cfdd66ddbfc093b4dbba",
+      "passed": 8,
+      "failed": 0,
+      "ignored": 0,
+      "test_binaries": 1
+    }
+  ],
+  "source_files": [
+    {
+      "path": "crates/litchi-rtf/src/codec/lexer/codec/control_word/dispatch.rs",
+      "bytes": 144022,
+      "sha256": "0af35b2d473d2a84efe8bb784ad1ea24e988f386f892a2a59fd50c47d7a00a26"
+    },
+    {
+      "path": "crates/litchi-rtf/src/codec/lexer/codec/control_word/model.rs",
+      "bytes": 38958,
+      "sha256": "d13ecf084f9022fa2ecb7fe0df6ca4a3aad418fcc9ea496ccbda17610262edb2"
+    },
+    {
+      "path": "crates/litchi-rtf/src/codec/parser/codec/controls.rs",
+      "bytes": 168217,
+      "sha256": "398c240c60d6eeb1680b6cb7b7f12c41e9cae3e7f435b8c93657929d0f7bdcf4"
+    },
+    {
+      "path": "crates/litchi-rtf/src/codec/parser/codec/document.rs",
+      "bytes": 39414,
+      "sha256": "2786cac08e1291016a90b65b86262f76b2a5cc61289ddb1e438acda7de2bf8e8"
+    },
+    {
+      "path": "crates/litchi-rtf/src/codec/parser/codec/groups.rs",
+      "bytes": 18709,
+      "sha256": "1637bebd1e34ffb7babd7d0ac3555a49295cb88f8ce4d8140171331d744f2a9b"
+    },
+    {
+      "path": "crates/litchi-rtf/src/codec/parser/codec/legacy_drawing.rs",
+      "bytes": 46507,
+      "sha256": "3540e9a957b6eef59fe81a9eae7dad21acba93ce5a3a5d5df00b66dd37326b56"
+    },
+    {
+      "path": "crates/litchi-rtf/src/codec/parser/codec/numbering.rs",
+      "bytes": 53445,
+      "sha256": "05285c040351bd04087006f82096a5b9001365e4dbc6252b4fc00982afa84c83"
+    },
+    {
+      "path": "crates/litchi-rtf/src/codec/parser/codec/shapes.rs",
+      "bytes": 79615,
+      "sha256": "1469ddfbfe7a09f7c83f9a262115a2d16703464f501fe5839f97a8256b4e3102"
+    },
+    {
+      "path": "crates/litchi-rtf/src/codec/writer/codec/output/resources.rs",
+      "bytes": 62105,
+      "sha256": "faaeb6a5bdd4cd741f23db4ee7197bff4afcbfa35e31383d22a3d1499e3fb783"
+    },
+    {
+      "path": "crates/litchi-rtf/src/edit/transfer.rs",
+      "bytes": 63570,
+      "sha256": "9779d81c23d1854b1f75bbb6df0332008767ef2a2acf641132db206c23b922a8"
+    },
+    {
+      "path": "crates/litchi-rtf/src/lib.rs",
+      "bytes": 24441,
+      "sha256": "6fc6262e0c0346f37845927d61ef269fb055bd91c4340e0dd145702cc771857a"
+    },
+    {
+      "path": "crates/litchi-rtf/src/metadata/file_table.rs",
+      "bytes": 5460,
+      "sha256": "96b0430071e58c9a9e13c3b6ca05f9145485f2410961b6b54e939640f6256902"
+    },
+    {
+      "path": "crates/litchi-rtf/src/metadata/mail_merge.rs",
+      "bytes": 13646,
+      "sha256": "0d32ee2cf37cfadd02e7ebc9e1f456de66d600305b1ffbb8bd5678f8cb5ab144"
+    },
+    {
+      "path": "crates/litchi-rtf/src/text/stylesheet.rs",
+      "bytes": 12791,
+      "sha256": "73d08ec4c72b7b52756bf7542a75942c3e3d3bfd47244fa1b4b357b6c39f83ab"
+    },
+    {
+      "path": "crates/litchi-rtf/tests/file_table.rs",
+      "bytes": 3438,
+      "sha256": "3555a1686161d2f2979dd83f0a3da0361a186dde39f3dfd3cd506099a1bb5061"
+    },
+    {
+      "path": "crates/litchi-rtf/tests/legacy_numbering.rs",
+      "bytes": 4054,
+      "sha256": "3bc02fe9bc97f1b9ca45ca2beddac7f1992e60a22fc4eadd6d05125235306f95"
+    },
+    {
+      "path": "crates/litchi-rtf/tests/mail_merge.rs",
+      "bytes": 5591,
+      "sha256": "28ebf5bdfd0183380d1cb615fa75f33d655cffec8f6fca39bc0e5fac32db4df2"
+    },
+    {
+      "path": "crates/litchi-rtf/tests/microsoft_office_native.rs",
+      "bytes": 17123,
+      "sha256": "d021613846a34d916488153e9de863d0497420b28387340dec44c7fd428c540d"
+    },
+    {
+      "path": "crates/litchi-rtf/tests/table_style_conditional.rs",
+      "bytes": 6993,
+      "sha256": "677ccf961086f361a178b7e5ad0376addd4f48c98b3e0b290749111c3401adde"
+    },
+    {
+      "path": "crates/litchi-xls/src/cell_values/tests.rs",
+      "bytes": 123077,
+      "sha256": "fcc15fb65d84a3562ccd6b2095ac7a4ddf030465b369d8b36ab481d34ebb28fb"
+    },
+    {
+      "path": "crates/litchi-xls/src/conditional_format/codec.rs",
+      "bytes": 32408,
+      "sha256": "858985a9bb4967082510569708a153ec895118f6cd77bedd842988b7aa83dc63"
+    },
+    {
+      "path": "crates/litchi-xls/src/conditional_format/model.rs",
+      "bytes": 13367,
+      "sha256": "d42a9ccae36c8af84e98cf99b4d8e33c24845b07711c4e3625a876f153b21103"
+    },
+    {
+      "path": "crates/litchi-xls/src/consolidation.rs",
+      "bytes": 21697,
+      "sha256": "800f3d3d284d4f1b08221fa3794721c3ac2893ddbc0299afc9a895f0ff6c6a35"
+    },
+    {
+      "path": "crates/litchi-xls/src/list_object/codec/binary/primitives.rs",
+      "bytes": 3781,
+      "sha256": "90d6ba3c6a82489c6e00cfcc294d03636a45818c50aff706bd735bcde95a0ea8"
+    },
+    {
+      "path": "crates/litchi-xls/src/list_object/codec/semantic/parse/common.rs",
+      "bytes": 2694,
+      "sha256": "120d09841151d8ec4550bb612c1498a09d00022a51d9bfc4e3ae151fa3df925e"
+    },
+    {
+      "path": "crates/litchi-xls/src/list_object/codec/semantic/parse/external.rs",
+      "bytes": 12111,
+      "sha256": "430769e2d361ff4cc9780f848909292cc3f8014d3bbaa3e1327a42c481588750"
+    },
+    {
+      "path": "crates/litchi-xls/src/list_object/codec/semantic/parse/ordinary.rs",
+      "bytes": 7848,
+      "sha256": "72521f392576fdab56cd8b8f3612bb989196f29fecbc444c33a1ca5bf5cce850"
+    },
+    {
+      "path": "crates/litchi-xls/src/list_object/codec/semantic/parse/source.rs",
+      "bytes": 17221,
+      "sha256": "9526a0e37519e4910c9be3238940c7241caf893dd171ccf96d2d6700b2baf6dd"
+    },
+    {
+      "path": "crates/litchi-xls/src/list_object/model/source.rs",
+      "bytes": 43774,
+      "sha256": "bbea380cb5cee8fc6435ba0b7e05fef99c3681a8a2712a7d3f1891aba77762b6"
+    },
+    {
+      "path": "crates/litchi-xls/src/page_setup.rs",
+      "bytes": 45211,
+      "sha256": "fc59fc2f71a0672f8182a9e9784b297bad662ed90e73294daea13027d0c69a54"
+    },
+    {
+      "path": "crates/litchi-xls/src/records.rs",
+      "bytes": 140541,
+      "sha256": "4959734ba4fab990d7bf0f7e9e7eca5a95cb83a9237f6ca3fbbad0a1a4220a78"
+    },
+    {
+      "path": "crates/litchi-xls/src/sort_data.rs",
+      "bytes": 53834,
+      "sha256": "8ab2a5246354ba5061a7722e2be6363b2dfe9147cdfaea4bf362aba91f6f8e92"
+    },
+    {
+      "path": "crates/litchi-xls/src/workbook/codec/semantic/worksheet.rs",
+      "bytes": 53493,
+      "sha256": "5aa7c34b40fb876f1a73f4e707bcb7bb7159c383d969fff9c850ce59dd868360"
+    },
+    {
+      "path": "crates/litchi-xls/src/workbook/package.rs",
+      "bytes": 38272,
+      "sha256": "df6c5fd716366e1ab71f616eca802f9b13758c9464a6f279e4c283aa680051b7"
+    },
+    {
+      "path": "crates/litchi-xls/src/workbook/validation_only.rs",
+      "bytes": 11586,
+      "sha256": "a2f3f2f7e13dd4f64257ac2cb42a99772fe847ee03d8bcf82484e93175e3ed0a"
+    },
+    {
+      "path": "crates/litchi-xls/src/workbook/validation_only_tests.rs",
+      "bytes": 47563,
+      "sha256": "21c7a6ddb4bc49a4bf1bbb6580245f081a031107cf70245e5997578b6d70ed25"
+    },
+    {
+      "path": "crates/litchi-xls/tests/microsoft_office_native.rs",
+      "bytes": 4259,
+      "sha256": "271735e41b99c4578a21ba4544ed7410350a2b1ebfc9561e95003f22cbacd4aa"
+    },
+    {
+      "path": "crates/litchi/tests/microsoft_office_native.rs",
+      "bytes": 5689,
+      "sha256": "3f5019af383002a643e7d766420823a294bb9d48009484e8ccedd4c3d3e5f2ba"
+    }
+  ],
+  "native_test_binaries_external_only": [
+    {
+      "path": "/tmp/litchi-native-office.GMvwp4/target/debug/deps/microsoft_office_native-3c6c9cc6df48e95c",
+      "bytes": 10217656,
+      "sha256": "70768116722e502ecb2fd1172a7cc9f887d9c7bcd2ecdf98579896fd73f42adc"
+    },
+    {
+      "path": "/tmp/litchi-native-office.GMvwp4/target/debug/deps/microsoft_office_native-83fcdd5f33aacac0",
+      "bytes": 13412248,
+      "sha256": "cc1b3035c6b14fb89a7bba891e49179f25e723a0ea68cb12de4691a37bdf469a"
+    },
+    {
+      "path": "/tmp/litchi-native-office.GMvwp4/target/debug/deps/microsoft_office_native-c3402b4f64cc8759",
+      "bytes": 142117040,
+      "sha256": "0e239461d615b50494e9c9fc02b48d8ef07f3150e9564bc1e497acd744136bff"
+    }
+  ],
+  "references": [
+    "https://learn.microsoft.com/en-us/openspecs/office_file_formats/ms-xls/589885b2-fd4e-4fcc-9c8e-37fbf7838716",
+    "https://learn.microsoft.com/en-us/openspecs/office_file_formats/ms-xls/baf5f46f-0720-4cad-a4c5-51094868d90a",
+    "https://learn.microsoft.com/en-us/openspecs/office_file_formats/ms-xls/81109a77-1dbd-43fe-84d2-b5177bb41297",
+    "https://learn.microsoft.com/en-us/openspecs/office_file_formats/ms-xls/984826cc-8bb7-412b-9907-7bbb9b08b4ad"
+  ],
+  "limitations": [
+    "Native Office applications were not run during this change; source fixtures remain byte-for-byte unchanged.",
+    "The existing XLS write_every_feature test remains ignored because it writes an evidence workbook; no new test is ignored.",
+    "A first facade run failed three tests because sparse checkout omitted images/png/lena.png. Materializing that tracked fixture and rerunning the full facade suite yielded 93 passing tests.",
+    "The RTF math fixture still fails: native mmath wraps moMath/moMathPara and character-format groups that the current parser does not model.",
+    "XLSB validation/formula/chart reader gaps and PPT shape parsing still require native regressions and fixes.",
+    "Most fixture-specific feature semantics, encryption specimens, broader CRUD/preservation and six remaining owner suites are still ahead. The coverage report marks every row partial or uncovered, not complete.",
+    "Exact duplicate late pnseclvl metadata is accepted; differing late defaults remain an explicit ownership limitation.",
+    "The full workspace/release gate remains outstanding; this record covers the affected owner, facade, operations, lint and dependency checks."
+  ],
+  "integration_parent_commit": "e707bd0be457dcd68e214462770f8353b70f951e",
+  "concurrent_merge_note": "Historical record/tool reference cleanup landed during this work; it changed no crates files and overlaps none of this worktree diff.",
+  "review_followup": "Require exactly one range before decoding the actual Feature12 body range in the opaque table path. Eleven list-object unit tests and all 23 indexed native tests passed after this guard; Clippy was rerun."
+}

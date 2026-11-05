@@ -27,7 +27,7 @@ rendering, external I/O, macro execution, or certificate trust.
 | Feature | Status | Read | Write | Notes |
 |---------|--------|------|-------|-------|
 | OLE Compound File container | ✅ | ✅ | ✅ | Opens and writes the CFB storages and streams used by .xls; package edits are bounded and transactional at the owning writer boundary. |
-| BIFF8 workbook and worksheet record streams | ✅ | ✅ | ✅ | Typed workbook, worksheet, chart-sheet, macro-sheet, and dialog-sheet record sequences are decoded and emitted through the XLS reader/writer. |
+| BIFF8 workbook and worksheet record streams | ✅ | ✅ | ✅ | Typed workbook, worksheet, chart-sheet, macro-sheet, and dialog-sheet record sequences are decoded and emitted through the XLS reader/writer. The complete reader propagates worksheet failures instead of silently publishing an incomplete catalog. Native Microsoft Office XLS/XLT worksheet catalogs are checked by `microsoft_office_native.rs`. |
 | Generic BIFF record access | ✅ | ✅ | ✅ | Public record utilities expose record headers and payloads; the typed model does not claim a semantic implementation of every record in the [MS-XLS] enumeration. |
 | Unknown and future BIFF records | 🟡 | ✅ | 🟡 | Selected Continue, FRT, extension, and opaque payload families are retained or replayed; unknown records are not guaranteed to survive every typed mutation or fresh authoring path. |
 | Workbook and sheet directory | ✅ | ✅ | ✅ | Sheet names, order, visibility, stable metadata, sheet kinds, code names, and sheet lookup are modeled. |

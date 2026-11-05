@@ -1603,14 +1603,6 @@ impl<'a> Parser<'a> {
                             "RTF shprslt may occur once after root shape-group shpinst".to_string(),
                         ));
                     }
-                    if !matches!(
-                        self.tokens.get(self.pos + 1),
-                        Some(Token::Control(ControlWord::IgnorableDestination))
-                    ) {
-                        return Err(crate::Error::MalformedDocument(
-                            "RTF shape-group shprslt destination must be starred".to_string(),
-                        ));
-                    }
                     group.result = self.parse_shape_result()?;
                     saw_result = true;
                 },

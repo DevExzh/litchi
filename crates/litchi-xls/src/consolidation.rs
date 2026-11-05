@@ -551,15 +551,11 @@ fn parse_file(c: &mut Cursor<'_>, count: usize) -> Result<ConsolidationFile> {
     };
     let file = ConsolidationFile { encoded_path };
     file.validate(c.record_type)?;
-    if file.is_self_reference()
-        && c.take(if wide { 2 } else { 1 })?
-            .iter()
-            .any(|byte| *byte != 0)
-    {
-        return invalid(
-            c.record_type,
-            "DConFile self-reference padding must be zero",
-        );
+    if file.is_self_reference() && c.offset != c.data.len() {
+        // MS-XLS DConRef/DConName/DConBin mark this tail unused: ignore its
+        // value. Native Excel 16.110.2 also omits it entirely. The declared
+        // string still must be complete, and finish rejects any extra bytes.
+        let _ = c.take(if wide { 2 } else { 1 })?;
     }
     Ok(file)
 }

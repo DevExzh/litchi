@@ -505,7 +505,7 @@ impl Extension {
     }
 }
 
-/// A range set and its one-to-three legacy conditional formatting rules.
+/// A range set and its stored legacy conditional formatting rules.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Formatting {
     pub(super) identifier: u16,

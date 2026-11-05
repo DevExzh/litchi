@@ -67,6 +67,21 @@ pub struct TableStyleConditionalFormatting {
 }
 
 impl TableStyleConditionalFormatting {
+    /// Regions identify separate definitions of the same table style. Row
+    /// defaults and band sizes are properties of a definition, not identity.
+    pub(crate) fn scope(self) -> [bool; 8] {
+        [
+            self.first_row,
+            self.last_row,
+            self.first_column,
+            self.last_column,
+            self.band_horizontal_odd,
+            self.band_horizontal_even,
+            self.band_vertical_odd,
+            self.band_vertical_even,
+        ]
+    }
+
     /// Whether no conditional-formatting metadata is present.
     #[inline]
     #[must_use]
@@ -246,11 +261,24 @@ impl<'a> StyleSheet<'a> {
     }
 
     /// Get a style by type and ID.
+    ///
+    /// For a table style with conditional definitions, prefer its unscoped
+    /// base definition. If only conditional definitions exist, return the
+    /// first one. All definitions remain available through [`Self::styles`].
     #[must_use]
     pub fn get_typed(&self, style_type: StyleType, id: u16) -> Option<&Style<'a>> {
-        self.styles
+        let mut matching = self
+            .styles
             .iter()
-            .find(|style| style.style_type == style_type && style.id == id)
+            .filter(|style| style.style_type == style_type && style.id == id);
+        let first = matching.next()?;
+        if style_type == StyleType::Table && first.table_conditional.scope() != [false; 8] {
+            matching
+                .find(|style| style.table_conditional.scope() == [false; 8])
+                .or(Some(first))
+        } else {
+            Some(first)
+        }
     }
 
     /// Get a style by name
@@ -321,7 +349,14 @@ impl<'a> StyleSheet<'a> {
         }
         let mut ids = HashSet::with_capacity(self.styles.len());
         for style in &self.styles {
-            if !ids.insert((style.style_type, style.id)) {
+            // RTF 1.9.1, Table Styles Example (p. 110): a table style may
+            // contain multiple entries, one for each conditional region.
+            let scope = if style.style_type == StyleType::Table {
+                style.table_conditional.scope()
+            } else {
+                [false; 8]
+            };
+            if !ids.insert((style.style_type, style.id, scope)) {
                 return Err(crate::Error::MalformedDocument(
                     "RTF stylesheet contains a duplicate typed style ID".to_string(),
                 ));

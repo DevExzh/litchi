@@ -1187,6 +1187,22 @@ impl<W: Write> Writer<W> {
             .validate()
             .map_err(|error| io::Error::new(io::ErrorKind::InvalidInput, error.to_string()))?;
         self.write_str("{\\*\\mailmerge")?;
+        for control in [
+            merge.main_type.map(crate::MailMergeMainType::control),
+            merge.input_type.map(crate::MailMergeInputType::control),
+            merge.destination.map(crate::MailMergeDestination::control),
+        ]
+        .into_iter()
+        .flatten()
+        {
+            self.write_control_word(control, None)?;
+        }
+        if let Some(value) = merge.current_record {
+            self.write_control_word("mmreccur", Some(value))?;
+        }
+        if let Some(value) = merge.error_mode {
+            self.write_control_word("mmerrors", Some(value))?;
+        }
         self.write_mail_merge_text("mmconnectstr", merge.connect_string.as_deref())?;
         self.write_mail_merge_text("mmconnectstrdata", merge.connect_string_data.as_deref())?;
         self.write_mail_merge_text("mmquery", merge.query.as_deref())?;

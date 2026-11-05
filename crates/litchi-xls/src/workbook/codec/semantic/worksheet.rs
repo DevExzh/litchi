@@ -834,8 +834,10 @@ impl<R: Read + Seek> Reader<R> {
                         record.kind().get(),
                         record.payload(),
                     )?;
-                    let anchor = (template.first_row, template.first_col);
-                    if (predecessor.row, predecessor.col) != anchor
+                    // MS-XLS 2.4.260: the predecessor is the first cell using
+                    // this formula, not necessarily the range's top-left.
+                    let anchor = (predecessor.row, predecessor.col);
+                    if !template.contains(anchor.0, anchor.1)
                         || predecessor.anchor != Some(anchor)
                         || !predecessor.shared
                     {

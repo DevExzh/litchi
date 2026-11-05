@@ -61,6 +61,20 @@ pub(in crate::list_object) fn append_frt(
 }
 
 pub(in crate::list_object) fn validate_frt(data: &[u8], rt: u16, reference: bool) -> Result<()> {
+    if matches!(
+        rt,
+        crate::list_object::FEATURE11_RECORD_TYPE | crate::list_object::FEATURE12_RECORD_TYPE
+    ) {
+        // MS-XLS 2.5.139: Feature11/12 ignore ref8, and do not require
+        // fFrtRef. Their actual table range is carried by the feature body.
+        if data.len() < 12
+            || u16_at(data, 0, rt, "frt.rt")? != rt
+            || u16_at(data, 2, rt, "frt.flags")? & 2 != 0
+        {
+            return Err(invalid(rt, "future-record header is invalid"));
+        }
+        return Ok(());
+    }
     if u16_at(data, 0, rt, "frt.rt")? != rt
         || u16_at(data, 2, rt, "frt.flags")? != u16::from(reference)
     {

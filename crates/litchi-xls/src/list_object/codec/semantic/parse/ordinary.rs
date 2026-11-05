@@ -16,13 +16,12 @@ impl ListObject {
             return Err(invalid(rt, "invalid table feature length"));
         }
         validate_frt(data, rt, true)?;
-        let range = parse_range(data, 4, rt)?;
+        let range = parse_range(data, 27, rt)?;
         if u16_at(data, 12, FEATURE11_RECORD_TYPE, "isf")? != ISF_LIST
             || data[14] != 0
             || u32_at(data, 15, FEATURE11_RECORD_TYPE, "reserved2")? != 0
             || u16_at(data, 19, FEATURE11_RECORD_TYPE, "cref2")? != 1
             || u16_at(data, 25, FEATURE11_RECORD_TYPE, "reserved3")? != 0
-            || parse_range(data, 27, FEATURE11_RECORD_TYPE)? != range
         {
             return Err(invalid(
                 FEATURE11_RECORD_TYPE,

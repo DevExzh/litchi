@@ -48,10 +48,13 @@ pub(crate) fn parse_condfmt(data: &[u8]) -> Result<PendingFormatting> {
         ));
     }
     let declared_rules = usize::from(read_u16(data, 0));
-    if !(1..=3).contains(&declared_rules) {
+    // Producers such as LibreOffice retain more than the historical three
+    // rules. Preserve the declared group; the u16 count bounds the allocation
+    // and collection grammar still requires every rule to be present.
+    if declared_rules == 0 {
         return Err(invalid(
             CONDFMT_RECORD_TYPE,
-            "CONDFMT rule count must be between 1 and 3",
+            "CONDFMT rule count must be positive",
         ));
     }
     let flags = read_u16(data, 2);
@@ -78,13 +81,17 @@ pub(crate) fn parse_condfmt(data: &[u8]) -> Result<PendingFormatting> {
         }
         ranges.push(range);
     }
+    let mut rules = Vec::new();
+    rules
+        .try_reserve_exact(declared_rules)
+        .map_err(|_| Error::Allocation("reserving conditional-format rules"))?;
     Ok(PendingFormatting {
         group: Formatting {
             identifier: flags >> 1,
             tough_recalculation: flags & 1 != 0,
             enclosing_range,
             ranges,
-            rules: Vec::with_capacity(declared_rules),
+            rules,
         },
         declared_rules,
     })

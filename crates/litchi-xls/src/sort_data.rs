@@ -970,7 +970,11 @@ pub(crate) fn parse_sort_data(base: &[u8], continuations: &[&[u8]]) -> Result<Co
     };
     for continuation in continuations {
         let key = parse_continuation(continuation, axis)?;
-        config.add(key)?;
+        // SortCond12 retains an independent range. Native Excel fixtures have
+        // a condition extending beyond the enclosing SortData range.
+        // Keep this inert source metadata; add() still checks containment for
+        // newly authored configurations.
+        config.keys.push(key);
     }
     Ok(config)
 }

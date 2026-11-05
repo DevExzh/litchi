@@ -289,12 +289,7 @@ impl<R: Read + Seek> Reader<R> {
                     Arc::make_mut(&mut self.sheets)[sheet_index]
                         .set_parsed_worksheet_index(worksheet_index);
                 },
-                Err(error @ Error::InvalidRecord { record_type, .. })
-                    if pivot_table::is_worksheet_view_record(record_type) =>
-                {
-                    return Err(error);
-                },
-                Err(_) => {},
+                Err(error) => return Err(error),
             }
         }
         self.tolerance = tolerance.into_report();

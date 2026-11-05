@@ -254,3 +254,194 @@ fn native_word_bidi_and_east_asian_text_retains_unicode_scalars() {
         }
     }
 }
+
+#[test]
+fn native_word_mail_merge_preserves_empty_file_table_and_inert_source() {
+    let source = native("word-mailmerge-fields.rtf");
+    let merge = source.raw().mail_merge().unwrap();
+    assert!(merge.link_to_query);
+    let data_source = merge.data_source.as_deref().unwrap();
+    assert!(data_source.ends_with("/word/word-mailmerge-source.docx"));
+    assert_eq!(
+        merge.query.as_deref(),
+        Some(format!("SELECT * FROM {data_source}").as_str())
+    );
+    assert!(source.raw().file_table().unwrap().entries().is_empty());
+    assert!(
+        source
+            .raw()
+            .fields()
+            .iter()
+            .any(|field| field.result == "MATCH_009")
+    );
+    assert_eq!(
+        merge.main_type,
+        Some(litchi_rtf::MailMergeMainType::Letters)
+    );
+    assert_eq!(merge.input_type, Some(litchi_rtf::MailMergeInputType::File));
+    assert_eq!(
+        merge.destination,
+        Some(litchi_rtf::MailMergeDestination::NewDocument)
+    );
+    assert_eq!(merge.current_record, Some(1));
+    assert_eq!(merge.error_mode, Some(2));
+    assert_eq!(source.raw().merge_field_count(), 3);
+    assert!(
+        source
+            .raw()
+            .fields()
+            .iter()
+            .any(|field| field.instruction.trim_start().starts_with("IF ")
+                && field.instruction.contains("FirstName")),
+        "{:?}",
+        source
+            .raw()
+            .fields()
+            .iter()
+            .map(|field| (&field.instruction, &field.result))
+            .collect::<Vec<_>>()
+    );
+    assert_eq!(source.raw().mail_merge_counter_count(), 2);
+    let written = serialize_model(&source);
+    assert_eq!(written.raw().file_table(), source.raw().file_table());
+    assert_eq!(written.raw().mail_merge(), source.raw().mail_merge());
+    assert_eq!(written.text(), source.text());
+    assert_eq!(written.raw().merge_field_count(), 3);
+    assert_eq!(written.raw().mail_merge_counter_count(), 2);
+}
+
+#[test]
+fn native_word_table_style_retains_all_seven_conditional_definitions() {
+    let source = native("word-tables-layout.rtf");
+    let sheet = source.raw().stylesheet();
+    let variants = sheet
+        .styles()
+        .iter()
+        .filter(|style| style.style_type == litchi_rtf::StyleType::Table && style.id == 36)
+        .collect::<Vec<_>>();
+    assert_eq!(variants.len(), 7);
+    assert!(
+        variants
+            .iter()
+            .all(|style| style.name == "Grid Table 2 Accent 1")
+    );
+    let scopes = variants
+        .iter()
+        .map(|style| {
+            let c = style.table_conditional;
+            [
+                c.first_row,
+                c.last_row,
+                c.first_column,
+                c.last_column,
+                c.band_horizontal_odd,
+                c.band_vertical_odd,
+            ]
+        })
+        .collect::<std::collections::HashSet<_>>();
+    let mut expected = std::collections::HashSet::from([[false; 6]]);
+    for index in 0..6 {
+        let mut scope = [false; 6];
+        scope[index] = true;
+        expected.insert(scope);
+    }
+    assert_eq!(scopes, expected);
+    assert_eq!(
+        sheet
+            .get_typed(litchi_rtf::StyleType::Table, 36)
+            .unwrap()
+            .based_on,
+        Some(11)
+    );
+    let mut bytes = Vec::new();
+    let mut writer = litchi_rtf::write::Writer::new(&mut bytes);
+    writer.write_document_header().unwrap();
+    writer.write_stylesheet(sheet).unwrap();
+    writer.write_str("}").unwrap();
+    let written = Package::from_bytes(&bytes).unwrap();
+    assert_eq!(written.raw().stylesheet(), sheet);
+    for marker in [
+        "TABLE_SECTION_START",
+        "LANDSCAPE_SECTION_START",
+        "SECTION_END_MARKER",
+    ] {
+        assert!(source.text().contains(marker), "missing {marker}");
+    }
+}
+
+#[test]
+fn native_word_vector_group_retains_unstarred_result_and_source_bytes() {
+    let source = native("word-vector-diagram.rtf");
+    let groups = source
+        .raw()
+        .fields()
+        .iter()
+        .flat_map(|field| &field.shape_groups)
+        .collect::<Vec<_>>();
+    assert_eq!(groups.len(), 1);
+    let group = groups[0];
+    assert_eq!(group.name, "Graphic 3");
+    assert!(!group.shapes().is_empty());
+    let litchi_rtf::LegacyDrawingPrimitive::Group { children, .. } =
+        &group.result.as_ref().unwrap().drawing.primitive
+    else {
+        panic!("expected native grouped legacy fallback")
+    };
+    assert_eq!(children.len(), 3);
+    assert!(
+        matches!(&children[1], litchi_rtf::LegacyDrawingPrimitive::Polyline {closed:true, points, ..} if points.len()==20)
+    );
+    for marker in [
+        "WORD_VECTOR_DIAGRAM_013",
+        "SVG_VECTOR_013",
+        "CONVERTED_VECTOR_GROUP_013",
+    ] {
+        assert!(source.text().contains(marker), "missing {marker}");
+    }
+    let bytes = source.to_bytes().unwrap();
+    assert_eq!(
+        bytes.as_slice(),
+        include_bytes!("../../../test-data/microsoft-office/word/word-vector-diagram.rtf")
+    );
+    let reopened = Package::from_bytes(&bytes).unwrap();
+    let reopened_groups = reopened
+        .raw()
+        .fields()
+        .iter()
+        .flat_map(|field| &field.shape_groups)
+        .collect::<Vec<_>>();
+    assert_eq!(reopened_groups, groups);
+}
+
+#[test]
+fn native_word_tracked_move_markers_coexist_with_insert_delete_revisions() {
+    let source = native("word-tracked-moves.rtf");
+    let moves = source.raw().move_bookmarks();
+    assert_eq!(moves.len(), 2);
+    assert_eq!(moves[0].kind, litchi_rtf::MoveBookmarkKind::From);
+    assert_eq!(moves[1].kind, litchi_rtf::MoveBookmarkKind::To);
+    for bookmark in moves {
+        assert_eq!(bookmark.tag, "move242987239");
+        assert_eq!(bookmark.author, 1);
+        assert_eq!(bookmark.date, 0x87ea7d07);
+    }
+    let moved = "SOURCE_018: Move this complete native paragraph to the destination below.";
+    assert!(moves[1].content.contains(moved));
+    // Deleted text is exposed through the revision rather than through the
+    // visible body range used by the Move From bookmark.
+    let revisions = source.raw().revisions();
+    assert!(revisions.iter().any(|revision| revision.revision_type
+        == litchi_rtf::RevisionType::Deletion
+        && revision.content.contains(moved)));
+    assert!(revisions.iter().any(|revision| revision.revision_type
+        == litchi_rtf::RevisionType::Insertion
+        && revision.content.contains(moved)));
+    let bytes = source.to_bytes().unwrap();
+    assert_eq!(
+        bytes.as_slice(),
+        include_bytes!("../../../test-data/microsoft-office/word/word-tracked-moves.rtf")
+    );
+    let reopened = Package::from_bytes(&bytes).unwrap();
+    assert_eq!(reopened.raw().move_bookmarks(), moves);
+    assert_eq!(reopened.raw().revisions(), revisions);
+}

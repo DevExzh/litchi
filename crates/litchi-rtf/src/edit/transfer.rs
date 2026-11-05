@@ -307,8 +307,13 @@ impl TransferPlan {
             match target
                 .model()
                 .stylesheet()
-                .get_typed(style.style_type, style.id)
-            {
+                .styles()
+                .iter()
+                .find(|existing| {
+                    existing.style_type == style.style_type
+                        && existing.id == style.id
+                        && existing.table_conditional.scope() == style.table_conditional.scope()
+                }) {
                 Some(existing) if existing == style => {},
                 Some(_) => {
                     return Err(Error::unsupported_source(
@@ -1574,25 +1579,34 @@ fn style_closure(
         if !seen.insert((style_kind as u8, style_id)) {
             continue;
         }
-        let style = stylesheet
-            .get_typed(style_kind, style_id)
-            .ok_or(Error::unsupported_source("style dependency is missing"))?;
-        if let Some(parent) = style.based_on {
-            pending.push((style_kind, parent));
+        if stylesheet.get_typed(style_kind, style_id).is_none() {
+            return Err(Error::unsupported_source("style dependency is missing"));
         }
-        if let Some(next) = style.next_style {
-            pending.push((style_kind, next));
+        // Conditional table definitions share an ID and form one transfer
+        // closure. Preserve their source order when output is reversed below.
+        for style in stylesheet
+            .styles()
+            .iter()
+            .rev()
+            .filter(|style| style.style_type == style_kind && style.id == style_id)
+        {
+            if let Some(parent) = style.based_on {
+                pending.push((style_kind, parent));
+            }
+            if let Some(next) = style.next_style {
+                pending.push((style_kind, next));
+            }
+            if let Some(linked) = style.linked_style {
+                let linked_kind = match style_kind {
+                    crate::style::Kind::Paragraph => crate::style::Kind::Character,
+                    crate::style::Kind::Character => crate::style::Kind::Paragraph,
+                    crate::style::Kind::Section => crate::style::Kind::Section,
+                    crate::style::Kind::Table => crate::style::Kind::Table,
+                };
+                pending.push((linked_kind, linked));
+            }
+            output.push(style);
         }
-        if let Some(linked) = style.linked_style {
-            let linked_kind = match style_kind {
-                crate::style::Kind::Paragraph => crate::style::Kind::Character,
-                crate::style::Kind::Character => crate::style::Kind::Paragraph,
-                crate::style::Kind::Section => crate::style::Kind::Section,
-                crate::style::Kind::Table => crate::style::Kind::Table,
-            };
-            pending.push((linked_kind, linked));
-        }
-        output.push(style);
     }
     output.reverse();
     Ok(output)

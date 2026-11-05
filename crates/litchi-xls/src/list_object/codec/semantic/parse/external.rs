@@ -23,13 +23,12 @@ impl ListObject {
             return Err(invalid(rt, "invalid external table feature length"));
         }
         validate_frt(data, rt, true)?;
-        let range = parse_range(data, 4, rt)?;
+        let range = parse_range(data, 27, rt)?;
         if u16_at(data, 12, rt, "isf")? != ISF_LIST
             || data[14] != 0
             || u32_at(data, 15, rt, "reserved2")? != 0
             || u16_at(data, 19, rt, "cref2")? != 1
             || u16_at(data, 25, rt, "reserved3")? != 0
-            || parse_range(data, 27, rt)? != range
         {
             return Err(invalid(rt, "invalid Feature12 fixed fields"));
         }

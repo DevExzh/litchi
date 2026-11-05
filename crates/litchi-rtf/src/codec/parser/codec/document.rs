@@ -215,6 +215,47 @@ impl<'a> Parser<'a> {
                     merge.link_to_query = *value;
                     self.pos += 1;
                 },
+                Some(Token::Control(ControlWord::MailMergeMainType(value, param))) => {
+                    super::require_parameterless(*param, value.control())?;
+                    if merge.main_type.replace(*value).is_some() {
+                        return Err(duplicate_mail_merge("main type"));
+                    }
+                    self.pos += 1;
+                },
+                Some(Token::Control(ControlWord::MailMergeInputType(value, param))) => {
+                    super::require_parameterless(*param, value.control())?;
+                    if merge.input_type.replace(*value).is_some() {
+                        return Err(duplicate_mail_merge("input type"));
+                    }
+                    self.pos += 1;
+                },
+                Some(Token::Control(ControlWord::MailMergeDestination(value, param))) => {
+                    super::require_parameterless(*param, value.control())?;
+                    if merge.destination.replace(*value).is_some() {
+                        return Err(duplicate_mail_merge("destination"));
+                    }
+                    self.pos += 1;
+                },
+                Some(Token::Control(
+                    control @ (ControlWord::MailMergeCurrentRecord(param)
+                    | ControlWord::MailMergeErrorMode(param)),
+                )) => {
+                    let value = param.ok_or_else(|| {
+                        crate::Error::MalformedDocument(
+                            "RTF mail-merge setting requires an integer parameter".to_string(),
+                        )
+                    })?;
+                    let (target, label) = match control {
+                        ControlWord::MailMergeCurrentRecord(_) => {
+                            (&mut merge.current_record, "current record")
+                        },
+                        _ => (&mut merge.error_mode, "error mode"),
+                    };
+                    if target.replace(value).is_some() {
+                        return Err(duplicate_mail_merge(label));
+                    }
+                    self.pos += 1;
+                },
                 Some(Token::Text(text)) if text.trim().is_empty() => self.pos += 1,
                 Some(_) => {
                     return Err(crate::Error::MalformedDocument(
@@ -237,6 +278,9 @@ impl<'a> Parser<'a> {
                 Some(Token::Control(ControlWord::IgnorableDestination)),
                 Some(Token::Control(control)),
             ) => Ok(*control),
+            (Some(Token::Control(control)), _) if Self::unstarred_mail_merge_text(control) => {
+                Ok(*control)
+            },
             _ => Err(crate::Error::MalformedDocument(
                 "nested RTF mail-merge destinations must be starred".to_string(),
             )),
@@ -254,15 +298,16 @@ impl<'a> Parser<'a> {
             ));
         }
         self.expect_token(&Token::OpenBrace)?;
-        if !matches!(
+        if matches!(
             self.tokens.get(self.pos),
             Some(Token::Control(ControlWord::IgnorableDestination))
         ) {
+            self.pos += 1;
+        } else if depth != 2 || !Self::unstarred_mail_merge_text(expected) {
             return Err(crate::Error::MalformedDocument(
                 "RTF mail-merge text destination must be starred".to_string(),
             ));
         }
-        self.pos += 1;
         if !matches!(self.tokens.get(self.pos), Some(Token::Control(control)) if control == expected)
         {
             return Err(crate::Error::MalformedDocument(
@@ -306,6 +351,20 @@ impl<'a> Parser<'a> {
                 ));
             }
         }
+    }
+
+    fn unstarred_mail_merge_text(control: &ControlWord<'_>) -> bool {
+        // Word's native mailmerge header uses the unstarred text forms in
+        // the RTF 1.9.1 Mail Merge grammar. Other nested destinations still
+        // require their own declared grammar and never become opaque data.
+        matches!(
+            control,
+            ControlWord::MailMergeQuery
+                | ControlWord::MailMergeDataSource
+                | ControlWord::MailMergeHeaderSource
+                | ControlWord::MailMergeConnectString
+                | ControlWord::MailMergeConnectStringData
+        )
     }
 
     #[allow(

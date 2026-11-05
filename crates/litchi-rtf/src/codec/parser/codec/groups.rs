@@ -128,7 +128,20 @@ impl<'a> Parser<'a> {
             return Ok(());
         }
 
+        let inert_move_marker = matches!(
+            self.tokens.get(self.pos..self.pos + 2),
+            Some([
+                Token::Control(ControlWord::IgnorableDestination),
+                Token::Control(
+                    ControlWord::MoveFromStart
+                        | ControlWord::MoveFromEnd
+                        | ControlWord::MoveToStart
+                        | ControlWord::MoveToEnd
+                )
+            ])
+        );
         if self.current_state()?.revision_type.is_some()
+            && !inert_move_marker
             && matches!(
                 self.tokens.get(self.pos),
                 Some(Token::Control(

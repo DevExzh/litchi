@@ -23,8 +23,8 @@ checked in its own invocation, in addition to each safe feature and the
 combined explicit ``--no-default-features`` closure.
 
 Two suites sit outside every per-package selection and are covered by their
-own cheap modes.  ``facade-format-tests`` compiles the facade with the four
-Office format leaves, while ``facade-polyglot-tests`` covers the separate
+own cheap modes.  ``facade-format-tests`` compiles the facade with all eight
+Office format leaves and encryption, while ``facade-polyglot-tests`` covers the separate
 ``docx,odt`` feature closure.  ``litchi``'s default feature set is empty and a
 bare ``cargo test --package litchi`` therefore compiles almost none of its
 library tests.  ``harness-tests`` runs the performance harness in
@@ -321,15 +321,14 @@ MODES = (
 
 # `litchi`'s default feature set is empty, so `cargo test --package litchi`
 # compiles almost none of the facade's library and integration tests.  These
-# four format leaves are the smallest closure that compiles every DOCX, XLSX,
-# PPTX and XLS facade test: each one pulls its own substrate (opc,
-# ooxml-common, drawingml, sheet, cfb, ole) through Cargo's feature graph, and
-# none of them reaches an iWork package.  Change 0629 found one test behind
-# `#[cfg(feature = "docx")]` red for 94 commits for exactly this reason.
-FACADE_FORMAT_TEST_FEATURES = ("docx", "pptx", "xls", "xlsx")
+# Office leaves cover all eight native corpus families. Encryption enables
+# password fixtures; the closure reaches no iWork package. Change 0629 found
+# a DOCX test hidden by the empty default features; native-fixture coverage
+# additionally requires DOC, RTF, XLSB and PPT to run in this gate.
+FACADE_FORMAT_TEST_FEATURES = ("doc", "docx", "encryption", "ppt", "pptx", "rtf", "xls", "xlsb", "xlsx")
 
 # The facade's ODF/DOCX polyglot detector tests live behind a feature pair that
-# is intentionally separate from the four-format Office closure above.  Keep
+# is intentionally separate from the eight-format Office closure above.  Keep
 # this as a named gate so a default-feature test cannot silently omit those
 # tests again.
 FACADE_POLYGLOT_TEST_FEATURES = ("docx", "odt")
@@ -1648,7 +1647,7 @@ def command_specs(cargo: str, plan: WorkspacePlan, mode: str) -> tuple[CommandSp
     if mode not in MODES or mode in {"print", "verify"}:
         raise GateError(f"{mode!r} does not generate Cargo run commands")
     if mode == "facade-format-tests":
-        # One bounded facade invocation over the four Office format leaves.
+        # One bounded facade invocation over the eight Office format leaves and encryption.
         # --no-fail-fast so a failing lib target cannot hide a later test
         # binary, which is how the gap this mode closes stayed invisible.
         return (
@@ -1672,7 +1671,7 @@ def command_specs(cargo: str, plan: WorkspacePlan, mode: str) -> tuple[CommandSp
         )
     if mode == "facade-polyglot-tests":
         # The DOCX/ODT polyglot tests are feature-gated and are not compiled by
-        # either the empty facade default or the four-leaf Office gate.
+        # either the empty facade default or the eight-leaf Office gate.
         return (
             CommandSpec(
                 "facade-polyglot-tests",

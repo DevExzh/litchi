@@ -3074,8 +3074,8 @@ fn snapshot_open_first_error_matrix_is_frozen() {
         );
     }
 
-    // Refused only after the eager parse: the reader drops a worksheet it
-    // cannot project and `require_public_worksheet_coverage` reports the tab.
+    // Worksheet failures propagate from the eager reader instead of being
+    // replaced by a later generic incomplete-catalog refusal.
     {
         let mut damaged = records.clone();
         let end = damaged.iter().position(|(k, _)| *k == EOF).unwrap();
@@ -3152,12 +3152,12 @@ fn snapshot_open_first_error_matrix_is_frozen() {
             ),
             (
                 "worksheet-bof-missing".to_string(),
-                "edit cells refused (unsupported_content): a worksheet was not published by the complete XLS reader"
+                "Unexpected record type: expected 0x0809, found 0x003C"
                     .to_string()
             ),
             (
                 "stray-string-after-formula".to_string(),
-                "edit cells refused (unsupported_content): a worksheet was not published by the complete XLS reader"
+                "Invalid record 0x0207: String record has no pending string-valued Formula"
                     .to_string()
             ),
             (

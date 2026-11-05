@@ -18,6 +18,7 @@ impl ListObject {
         validate_frt(data, FEATURE12_RECORD_TYPE, true)?;
         if u16_at(data, 12, FEATURE12_RECORD_TYPE, "isf")? != ISF_LIST
             || data[14] != 0
+            || u16_at(data, 19, FEATURE12_RECORD_TYPE, "cref2")? != 1
             || u32_at(data, 55, FEATURE12_RECORD_TYPE, "cbFSData")? != 64
         {
             return Err(invalid(
@@ -25,7 +26,7 @@ impl ListObject {
                 "invalid opaque Feature12 fixed fields",
             ));
         }
-        let range = parse_range(data, 4, FEATURE12_RECORD_TYPE)?;
+        let range = parse_range(data, 27, FEATURE12_RECORD_TYPE)?;
         let id = ListObjectId::try_new(u32_at(data, 39, FEATURE12_RECORD_TYPE, "idList")?)?;
         let header = u32_at(data, 43, FEATURE12_RECORD_TYPE, "crwHeader")?;
         let totals = u32_at(data, 47, FEATURE12_RECORD_TYPE, "crwTotals")?;

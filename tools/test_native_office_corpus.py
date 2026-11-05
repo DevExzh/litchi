@@ -13,6 +13,7 @@ import unittest
 import zipfile
 
 from tools.native_office_coverage import report
+from tools.non_iwork_gate import FACADE_FORMAT_TEST_FEATURES
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -123,6 +124,12 @@ class NativeOfficeCorpus(unittest.TestCase):
         self.assertEqual(len(coverage["feature_rows"]), 494)
         for row in coverage["feature_rows"]:
             self.assertEqual(row["automated_coverage"], "partial" if row["tests"] else "uncovered")
+
+    def test_facade_gate_enables_every_indexed_native_test(self) -> None:
+        tests = [test for test in report()["tests"] if test["crate"] == "litchi"]
+        self.assertTrue(tests)
+        for test in tests:
+            self.assertTrue(set(test["required_features"]) <= set(FACADE_FORMAT_TEST_FEATURES), test["name"])
 
 
 if __name__ == "__main__":

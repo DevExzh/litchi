@@ -54,7 +54,7 @@ fn parses_decodes_and_round_trips_file_table() {
 fn rejects_malformed_file_tables_and_active_content() {
     let malformed = [
         r"{\rtf1{\filetbl{\file\fid1 x;}}}",
-        r"{\rtf1{\*\filetbl}}",
+        r"{\rtf1{\*\filetbl}{\*\filetbl}}",
         r"{\rtf1{\*\filetbl{\file\fid1 x;}}{\*\filetbl{\file\fid2 y;}}}",
         r"{\rtf1 Body{\*\filetbl{\file\fid1 x;}}}",
         r"{\rtf1{\file\fid1 x;}}",

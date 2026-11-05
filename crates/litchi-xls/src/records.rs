@@ -2350,7 +2350,8 @@ mod sst_measure_tests {
     /// the per-fixture lines before accepting a new value.
     #[test]
     fn the_sst_index_over_the_corpus_is_pinned() {
-        const CORPUS_DIGEST: u64 = 0x9cb1_4f5d_aa02_eebc;
+        // Includes the Microsoft Office native corpus merged in b88789b1c8.
+        const CORPUS_DIGEST: u64 = 0x60fc_3a5b_a393_2f58;
 
         let root = test_data_root();
         let mut fixtures = Vec::new();

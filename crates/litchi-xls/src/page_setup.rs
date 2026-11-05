@@ -764,9 +764,8 @@ fn parse_pls(data: &[u8]) -> Result<Vec<u8>> {
             "PLS is missing its reserved field",
         ));
     }
-    if read_u16(data, 0) != 0 {
-        return Err(invalid(PLS_RECORD_TYPE, "PLS reserved field must be zero"));
-    }
+    // MS-XLS 2.4.199 requires readers to ignore the reserved prefix. Native
+    // Excel for Mac writes a nonzero value; the remaining driver data is inert.
     Ok(data[2..].to_vec())
 }
 
@@ -1139,7 +1138,8 @@ mod tests {
         );
         let overlapping = [2, 0, 4, 0, 0, 0, 10, 0, 4, 0, 9, 0, 12, 0];
         assert!(parse_page_breaks(&overlapping, HORIZONTAL_PAGE_BREAKS_RECORD_TYPE).is_err());
-        assert!(parse_pls(&[1, 0]).is_err());
+        assert_eq!(parse_pls(&[1, 0]).unwrap(), Vec::<u8>::new());
+        assert_eq!(parse_pls(&[3, 32, 1, 2, 3]).unwrap(), [1, 2, 3]);
     }
 
     #[test]

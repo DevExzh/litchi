@@ -333,12 +333,11 @@ impl<'a> Parser<'a> {
         reason = "remaining variants share the same fallback by design"
     )]
     pub(super) fn parse_legacy_section_numbering_level(&mut self) -> crate::Result<()> {
-        if self.states.len() != 3
-            || self
-                .blocks
-                .iter()
-                .any(|block| !block.text.trim().is_empty())
-        {
+        let body_started = self
+            .blocks
+            .iter()
+            .any(|block| !block.text.trim().is_empty());
+        if self.states.len() != 3 {
             return Err(crate::Error::MalformedDocument(
                 "RTF pnseclvl destinations must occur at document scope before body text"
                     .to_string(),
@@ -391,6 +390,19 @@ impl<'a> Parser<'a> {
                     level.font_ref = font_ref;
                     level.text_before = Cow::Owned(text_before);
                     level.text_after = Cow::Owned(text_after);
+                    if body_started {
+                        // Native Word repeats unchanged section defaults after
+                        // drawing groups. Accept only exact typed duplicates:
+                        // a differing late definition needs section ownership
+                        // that the document-level defaults do not represent.
+                        if self.legacy_section_numbering.get(level_index) == Some(&level) {
+                            return Ok(());
+                        }
+                        return Err(crate::Error::MalformedDocument(
+                            "RTF late pnseclvl differs from the retained section defaults"
+                                .to_string(),
+                        ));
+                    }
                     return self.legacy_section_numbering.add(level);
                 },
                 Some(Token::OpenBrace)

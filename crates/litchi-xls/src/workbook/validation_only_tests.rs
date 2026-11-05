@@ -1022,8 +1022,9 @@ fn package_outcome_agrees_under_worksheet_mutation() {
 /// (`009d515bef`) produced it: `multi_defect_cases.rs` was compiled into a
 /// temporary test on that commit and parsed through its only worksheet walk
 /// (the complete reader's), three runs with identical output. The package walk
-/// swallows these refusals (`parse_workbook` drops the sheet), so only a
-/// worksheet-level matrix can see which one comes first.
+/// swallowed these refusals (`parse_workbook` dropped the sheet), so the
+/// baseline needed a worksheet-level matrix to see which one came first.
+/// The current package reader propagates the original worksheet failure.
 ///
 /// The six cases whose first refusal was a cell-XF cross-reference changed
 /// when the Excel-compatible [`crate::CellFormatDefect::XfReference`] repair

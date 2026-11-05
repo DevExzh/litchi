@@ -67,6 +67,26 @@ fn rejects_malformed_legacy_section_numbering() {
 }
 
 #[test]
+fn accepts_only_unchanged_section_defaults_repeated_after_body_text() {
+    let source = r"{\rtf1{\*\pnseclvl1\pndec\pnstart1{\pntxta .}}Body\par\sectd{\*\pnseclvl1\pndec\pnstart1{\pntxta .}}Tail}";
+    let document = Tree::parse(source, litchi_rtf::read::OpenOptions::default()).unwrap();
+    assert_eq!(document.legacy_section_numbering().levels().len(), 1);
+    assert_eq!(
+        document.legacy_section_numbering().get(1).unwrap().start_at,
+        Some(1)
+    );
+    for changed in [
+        source.replace(
+            "\\sectd{\\*\\pnseclvl1\\pndec\\pnstart1",
+            "\\sectd{\\*\\pnseclvl1\\pndec\\pnstart2",
+        ),
+        source.replace("\\sectd{\\*\\pnseclvl1", "\\sectd{\\*\\pnseclvl2"),
+    ] {
+        assert!(Tree::parse(&changed, litchi_rtf::read::OpenOptions::default()).is_err());
+    }
+}
+
+#[test]
 fn parses_real_libreoffice_pnseclvl_fixture() {
     let doc = Tree::parse_bytes(
         include_bytes!(

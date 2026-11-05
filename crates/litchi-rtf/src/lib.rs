@@ -371,7 +371,8 @@ mod native {
     pub use mail_merge::{
         MAX_MAIL_MERGE_FIELD_MAPPINGS, MAX_MAIL_MERGE_NESTING_DEPTH, MAX_MAIL_MERGE_RECIPIENT_DATA,
         MAX_MAIL_MERGE_STRING_BYTES, MAX_MAIL_MERGE_TOTAL_BYTES, MailMerge, MailMergeColumnIndex,
-        MailMergeDataSourceObject, MailMergeDataSourceType, MailMergeFieldMapping,
+        MailMergeDataSourceObject, MailMergeDataSourceType, MailMergeDestination,
+        MailMergeFieldMapping, MailMergeInputType, MailMergeMainType,
     };
     pub use math::{
         MathElement, MathElementRole, MathMatrixColumn, MathMatrixRow, MathObject, MathProperties,

@@ -102,6 +102,75 @@ fn table_style_without_conditional_metadata_stays_empty() {
 }
 
 #[test]
+fn repeated_table_style_id_is_distinguished_by_conditional_scope() {
+    let document = Tree::parse(
+        concat!(
+            r"{\rtf1{\stylesheet",
+            r"{\*\ts16\tscfirstrow\b Example;}",
+            r"{\*\ts16\i Example;}",
+            r"{\*\ts16\tsclastrow\ul Example;}}Body}"
+        ),
+        litchi_rtf::read::OpenOptions::default(),
+    )
+    .unwrap();
+    assert_eq!(document.stylesheet().styles().len(), 3);
+    let base = document
+        .stylesheet()
+        .get_typed(StyleType::Table, 16)
+        .unwrap();
+    assert!(base.table_conditional.is_empty());
+    assert!(base.formatting.italic);
+    let reparsed =
+        Tree::parse_bytes(&write(&document), litchi_rtf::read::OpenOptions::default()).unwrap();
+    assert_eq!(reparsed.stylesheet(), document.stylesheet());
+}
+
+#[test]
+fn repeated_table_scope_is_not_a_new_style_when_only_band_size_changes() {
+    for source in [
+        r"{\rtf1{\stylesheet{\*\ts1\tscfirstrow One;}{\*\ts1\tscfirstrow Two;}}}",
+        r"{\rtf1{\stylesheet{\*\ts1 One;}{\*\ts1\tsrowd Two;}}}",
+        r"{\rtf1{\stylesheet{\*\ts1\tscbandsh1 One;}{\*\ts1\tscbandsh2 Two;}}}",
+        r"{\rtf1{\stylesheet{\s1 One;}{\s1 Two;}}}",
+        r"{\rtf1{\stylesheet{\*\cs1 One;}{\*\cs1 Two;}}}",
+    ] {
+        assert!(
+            Tree::parse(source, litchi_rtf::read::OpenOptions::default()).is_err(),
+            "{source}"
+        );
+    }
+}
+
+#[test]
+fn transfer_copies_all_conditional_definitions_and_checks_scoped_conflicts() {
+    use litchi_rtf::{Package, edit::TransferPlan};
+    let source = Package::parse(concat!(
+        r"{\rtf1{\stylesheet{\*\ts16 Base;}",
+        r"{\*\ts16\tscfirstrow\b Base;}",
+        r"{\*\ts16\tsclastrow\i Base;}}Source}"
+    ))
+    .unwrap();
+    let target = Package::parse(r"{\rtf1{\stylesheet{\*\ts16 Base;}}Target}").unwrap();
+    let copied = TransferPlan::style(&source, StyleType::Table, 16, &target)
+        .unwrap()
+        .commit()
+        .unwrap()
+        .into_package();
+    let reopened = Package::from_bytes(&copied.to_bytes().unwrap()).unwrap();
+    assert_eq!(reopened.raw().stylesheet(), source.raw().stylesheet());
+    assert_eq!(reopened.text(), "Target");
+    assert_eq!(target.raw().stylesheet().styles().len(), 1);
+
+    let conflict = Package::parse(concat!(
+        r"{\rtf1{\stylesheet{\*\ts16 Base;}",
+        r"{\*\ts16\tscfirstrow\i Base;}}Target}"
+    ))
+    .unwrap();
+    assert!(TransferPlan::style(&source, StyleType::Table, 16, &conflict).is_err());
+    assert_eq!(conflict.raw().stylesheet().styles().len(), 2);
+}
+
+#[test]
 fn rejects_misplaced_or_duplicate_table_style_controls() {
     let cases = [
         // Conditional controls in a paragraph style.

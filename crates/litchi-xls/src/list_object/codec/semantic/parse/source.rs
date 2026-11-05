@@ -21,7 +21,7 @@ impl ListObject {
                 "Web/XML source table requires Feature11 or Feature12",
             ));
         }
-        let range = parse_range(data, 4, rt)?;
+        let range = parse_range(data, 27, rt)?;
         let base = 35;
         let id = ListObjectId::try_new(u32_at(data, base + 4, rt, "idList")?)?;
         let header = u32_at(data, base + 8, rt, "crwHeader")?;
