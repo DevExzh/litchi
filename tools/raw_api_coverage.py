@@ -13,8 +13,8 @@ complete rustdoc input list and the nominal limits type.  Owner and semantic
 entries still need an explicit disposition and evidence; they are not a
 crate-wide exemption.
 
-The initial repository manifest is intentionally incomplete while the raw
-limit waves are in flight.  Normal validation reports that state.  The final
+The caller supplies the manifest with ``--manifest``; the repository tracks
+none.  Normal validation reports an incomplete manifest's state.  The final
 ``--require-complete`` mode fails unless every expected profile has a rustdoc
 input, every public callable has one exact entry, all source identities and
 required signatures match, and no active/unclassified/stale disposition
@@ -1205,7 +1205,7 @@ def validate_manifest(manifest: Mapping[str, Any], *, root: Path,
 
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--manifest", type=Path, default=Path("tools/raw_api_coverage.json"))
+    parser.add_argument("--manifest", type=Path, required=True)
     parser.add_argument("--root", type=Path, default=Path.cwd())
     parser.add_argument("--glossary", type=Path, default=Path("tools/api_glossary.json"))
     parser.add_argument("--rustdoc", action="append", default=[], metavar="PROFILE=PATH",
