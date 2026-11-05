@@ -10,8 +10,7 @@ rust-version.workspace = true
 
 [dependencies]
 litchi-core         = { workspace = true }
-# `__source_owner` keeps the structural artifacts on the exact source owner.
-litchi-iwa-archive  = { workspace = true, features = ["internal-iwork-source"] }
+litchi-iwa-archive  = { workspace = true }
 litchi-iwa-common   = { workspace = true }
 litchi-iwa-core     = { workspace = true }
 litchi-iwa-protos   = { workspace = true }

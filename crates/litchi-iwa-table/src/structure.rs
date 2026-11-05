@@ -201,10 +201,7 @@ pub fn exact_source(package: &dyn TableSource) -> FaultResult<&SourceCatalog> {
 
 /// The shared owner of `package`'s exact source bytes.
 pub fn source_owner(package: &dyn TableSource) -> FaultResult<SharedBytes> {
-    Ok(package
-        .physical()
-        .ok_or(Fault::Unsupported)?
-        .__source_owner())
+    Ok(package.physical().ok_or(Fault::Unsupported)?.source_owner())
 }
 
 /// The root previews present in `catalog` (all three, or none).

@@ -137,9 +137,6 @@ pub struct ComponentCatalog {
     components: Box<[Component]>,
 }
 
-#[cfg(feature = "internal-iwork-source")]
-mod shared;
-
 impl ComponentCatalog {
     pub(crate) fn from_semantic_components(mut components: Vec<Component>) -> Self {
         components.sort_unstable_by(|left, right| left.name().cmp(right.name()));
@@ -740,13 +737,6 @@ pub struct SourceCatalog {
     limits: Limits,
 }
 
-#[cfg(feature = "internal-iwork-source")]
-#[doc(hidden)]
-#[derive(Debug)]
-pub struct OwnedSourceCatalog {
-    inner: SourceCatalog,
-}
-
 impl SourceCatalog {
     /// Parse borrowed package bytes under caller-selected physical limits.
     ///
@@ -791,6 +781,28 @@ impl SourceCatalog {
     /// encrypted, ambiguous, or over budget.
     pub fn from_shared_bytes(source: Arc<[u8]>, limits: Limits) -> Result<Self> {
         let package = Catalog::from_shared_bytes(source, limits)?;
+        Self::from_package(package, limits)
+    }
+
+    /// Parse an already-owned package vector without copying its allocation.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the source or any package component is malformed,
+    /// encrypted, ambiguous, or over budget.
+    pub fn from_owned_bytes(source: Vec<u8>, limits: Limits) -> Result<Self> {
+        let package = Catalog::from_owned_bytes_with_limits(source, limits)?;
+        Self::from_package(package, limits)
+    }
+
+    /// Parse an immutable source owner without copying package bytes.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the source or any package component is malformed,
+    /// encrypted, ambiguous, or over budget.
+    pub fn from_source_owner(source: crate::package::SharedBytes, limits: Limits) -> Result<Self> {
+        let package = Catalog::from_source_owner_with_limits(source, limits)?;
         Self::from_package(package, limits)
     }
 
@@ -901,10 +913,8 @@ impl SourceCatalog {
     }
 
     /// Clone the authoritative immutable source owner without copying bytes.
-    #[cfg(feature = "internal-iwork-source")]
-    #[doc(hidden)]
     #[must_use]
-    pub fn __source_owner(&self) -> crate::package::SharedBytes {
+    pub fn source_owner(&self) -> crate::package::SharedBytes {
         self.package.source_owner()
     }
 
@@ -941,40 +951,6 @@ impl SourceCatalog {
     #[must_use]
     pub fn into_components(self) -> ComponentCatalog {
         self.components
-    }
-}
-
-#[cfg(feature = "internal-iwork-source")]
-impl OwnedSourceCatalog {
-    #[doc(hidden)]
-    pub fn __from_owned_bytes(source: Vec<u8>, limits: Limits) -> Result<Self> {
-        let package = Catalog::from_owned_bytes_with_limits(source, limits)?;
-        Ok(Self {
-            inner: SourceCatalog::from_package(package, limits)?,
-        })
-    }
-
-    #[doc(hidden)]
-    pub fn __from_source_owner(
-        source: crate::package::SharedBytes,
-        limits: Limits,
-    ) -> Result<Self> {
-        let package = Catalog::from_source_owner_with_limits(source, limits)?;
-        Ok(Self {
-            inner: SourceCatalog::from_package(package, limits)?,
-        })
-    }
-
-    #[doc(hidden)]
-    #[must_use]
-    pub fn __source_owner(&self) -> crate::package::SharedBytes {
-        self.inner.package.source_owner()
-    }
-
-    #[doc(hidden)]
-    #[must_use]
-    pub fn __as_source_catalog(&self) -> &SourceCatalog {
-        &self.inner
     }
 }
 
@@ -1156,7 +1132,6 @@ mod tests {
         ComponentCatalog::from_bytes(&writer.finish_to_bytes()?, Default::default())
     }
 
-    #[cfg(feature = "internal-iwork-source")]
     #[test]
     fn semantic_object_budget_accepts_the_exact_cap_and_rejects_one_more() {
         assert_eq!(
@@ -1497,7 +1472,6 @@ mod tests {
         Ok(())
     }
 
-    #[cfg(feature = "internal-iwork-source")]
     #[test]
     fn source_catalog_reuses_owned_vector_payload_without_copy() -> Result<()> {
         let mut writer =
@@ -1506,15 +1480,12 @@ mod tests {
         let bytes = writer.finish_to_bytes()?;
         let original_pointer = bytes.as_ptr();
 
-        let catalog = OwnedSourceCatalog::__from_owned_bytes(bytes, Limits::default())?;
-        let owner = catalog.__source_owner();
+        let catalog = SourceCatalog::from_owned_bytes(bytes, Limits::default())?;
+        let owner = catalog.source_owner();
 
         assert_eq!(owner.as_ref().as_ptr(), original_pointer);
-        assert_eq!(
-            catalog.__as_source_catalog().source_bytes().as_ptr(),
-            original_pointer
-        );
-        assert_eq!(catalog.__as_source_catalog().components().len(), 1);
+        assert_eq!(catalog.source_bytes().as_ptr(), original_pointer);
+        assert_eq!(catalog.components().len(), 1);
         Ok(())
     }
 
