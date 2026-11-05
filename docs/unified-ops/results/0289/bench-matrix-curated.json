@@ -3326,6 +3326,10 @@
   {
    "record": "0433",
    "reason": "macOS run-2 results and a table of sparse-array counts: native open, save and reopen outcomes, no leaf-versus-unified timing or allocation measurement. Its one-route callgrind probes compare a build with its base, in the record's section 12."
+  },
+  {
+   "record": "0434",
+   "reason": "macOS run-3 results, the owner's saved hand copies and a table of unlisted references: native open, save and reopen outcomes and re-saved byte comparisons. No code changed and there is no timing or allocation measurement."
   }
  ]
 }
