@@ -3304,6 +3304,14 @@
    "reason": "iWork exit leaf-versus-host Callgrind evidence for the W4-N chart caption routes on Pages and Numbers (inclusive Ir, CPU 3), bound to the 0363 parity harness. It compares the leaf crates with the litchi-iwa host, not a leaf call with its unified call, so it contributes no bench-matrix row; record 0427 tabulates it."
   },
   {
+   "record": "0430",
+   "reason": "macOS native open/save/reopen results for the 0363 queue packages (pass/fail and re-saved hashes), not a timing or allocation measurement."
+  },
+  {
+   "record": "0431",
+   "reason": "macOS failure diagnosis: structural discriminators over the queue packages, not a benchmark; its leaf-versus-host callgrind figures are in the record"
+  },
+  {
    "record": "0363",
    "reason": "Planning record for the litchi-iwa exit: results/0363 holds a source scan of the host's public functions (crosswalk) and its classifier, no leaf-versus-unified timing or allocation measurement."
   },
@@ -3314,6 +3322,14 @@
   {
    "record": "0367",
    "reason": "Substrate constructor and retained-header return (0361fda) and W0-A owner routes: callgrind instruction counts, allocation counts and tolerant (unqualified) ABBA of raw IWA constructors against baseline ddf2ac8ae2 and of the 0361fd owner probe against trunk. These are substrate micro-routes, not leaf-versus-unified rows."
+  },
+  {
+   "record": "0433",
+   "reason": "macOS run-2 results and a table of sparse-array counts: native open, save and reopen outcomes, no leaf-versus-unified timing or allocation measurement. Its one-route callgrind probes compare a build with its base, in the record's section 12."
+  },
+  {
+   "record": "0434",
+   "reason": "macOS run-3 results, the owner's saved hand copies and a table of unlisted references: native open, save and reopen outcomes and re-saved byte comparisons. No code changed and there is no timing or allocation measurement."
   }
  ]
 }

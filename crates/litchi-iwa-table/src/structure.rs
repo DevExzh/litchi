@@ -43,6 +43,11 @@ use crate::TableSource;
 /// A leaf package a structural transaction publishes: the engines' read
 /// view plus the leaf's strict candidate reopen.
 pub trait TableLeaf: TableSource + Sized {
+    /// Whether a first volatile conditional-highlight rule may complete a
+    /// saved document's owner family. Numbers has native evidence (record
+    /// 0432); Keynote and Pages keep refusing, as the host does.
+    const CREATES_FIRST_VOLATILE_TILE: bool = false;
+
     /// Reopen exact candidate bytes under this package's ingress profile.
     ///
     /// # Errors

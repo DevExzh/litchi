@@ -15,9 +15,11 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent / "mac_queue"))
 
 import apply_results  # noqa: E402
+import control_kit  # noqa: E402
 import generate  # noqa: E402
 import rows as mac_queue  # noqa: E402
 
+ROOT = Path(__file__).resolve().parents[1]
 RUNNER = Path(__file__).resolve().parent / "mac_queue" / "run_on_mac.sh"
 
 HEADER = (
@@ -355,6 +357,146 @@ class ApplyTests(unittest.TestCase):
         self.assertEqual(queue.read_text(), self.queue)
         self.assertEqual(apply_results.main(args), 0)
         self.assertIn("pass (0430", queue.read_text())
+
+
+class EvidenceTests(unittest.TestCase):
+    """Folding several runs by package bytes (record 0433)."""
+
+    def setUp(self) -> None:
+        self.queue = "# 0363\n\n" + HEADER
+        self.queue += queue_line("W1", "Pages", "`a`", "one", "f", "pass (0430: old bytes)", "e" * 64)
+        self.queue += queue_line("W1", "Pages", "`b`", "two", "f", "FAIL (0430: P9 save)", "-")
+        self.queue += queue_line("W1", "Pages", "`c`", "three", "f")
+        self.queue += queue_line("W1", "Numbers", "native-created", "four", "f", "partial (0432)", "e" * 64)
+        self.ids = [row.id for row in mac_queue.parse_queue(self.queue)]
+        self.manifest = {
+            "packages": [{"id": f"P000{n}", "sha256": str(n) * 64} for n in range(1, 5)],
+            "rows": [
+                {"id": self.ids[0], "packages": ["P0001"]},
+                {"id": self.ids[1], "packages": ["P0001", "P0002"]},
+                {"id": self.ids[2], "packages": ["P0003", "P0004"]},
+                {"id": self.ids[3], "packages": []},
+            ],
+        }
+
+    @staticmethod
+    def line(identifier: str, digest: str, result: str = "pass", stage: str = "-") -> dict[str, str]:
+        cells = result_line(identifier, digest, result=result, stage=stage, resaved=digest[0] * 64).split("\t")
+        return dict(zip(apply_results.RESULT_COLUMNS, cells))
+
+    def fold(self, *runs: tuple[str, dict[str, dict[str, str]]]) -> tuple[list[str], list[str], list[str]]:
+        evidence, conflicts = apply_results.evidence_by_digest(list(runs))
+        text, _, needed = apply_results.apply_evidence(
+            self.queue, self.manifest, evidence, record="0433", next_run="run 3")
+        return text.splitlines(), needed, conflicts
+
+    def test_bytes_decide_across_runs_and_ids(self) -> None:
+        run1 = {"P0777": self.line("P0777", "1" * 64)}
+        run2 = {"A-2": self.line("A-2", "2" * 64)}
+        lines, needed, conflicts = self.fold(("run 1", run1), ("run 2", run2))
+        self.assertIn("| pass (0433: run 1: Pages 14.4, 2026-11-10) | " + "1" * 64 + " |", lines[4])
+        self.assertIn("| pass (0433: run 1 + run 2: Pages 14.4, 2026-11-10) |", lines[5])
+        self.assertIn("| pending (0433: run 3: P0003, P0004) | - |", lines[6])
+        self.assertEqual(needed, ["P0003", "P0004"])
+        self.assertEqual(conflicts, [])
+        # A row with no package keeps its cells, and the row ids survive.
+        self.assertIn("| partial (0432) |", lines[7])
+        self.assertEqual([row.id for row in mac_queue.parse_queue("\n".join(lines))], self.ids)
+
+    def test_a_pass_on_other_bytes_does_not_carry(self) -> None:
+        lines, needed, _ = self.fold(("run 1", {"P0001": self.line("P0001", "9" * 64)}))
+        self.assertIn("pending (0433: run 3: P0001)", lines[4])
+        self.assertEqual(needed[0], "P0001")
+
+    def test_a_failure_stays_a_failure_until_the_bytes_pass(self) -> None:
+        failed = {"P0002": self.line("P0002", "2" * 64, result="fail", stage="save")}
+        lines, needed, _ = self.fold(("run 1", {"P0001": self.line("P0001", "1" * 64)}), ("run 2", failed))
+        self.assertIn("| FAIL (0433: P0002 save in run 2) |", lines[5])
+        self.assertNotIn("P0002", needed)
+        passed = {"P0002": self.line("P0002", "2" * 64)}
+        lines, _, conflicts = self.fold(("run 1", {"P0001": self.line("P0001", "1" * 64)}), ("run 2", failed),
+                                        ("run 3", passed))
+        self.assertIn("pass (0433:", lines[5])
+        self.assertEqual(len(conflicts), 1)
+
+    def test_a_stale_or_short_manifest_is_refused(self) -> None:
+        evidence: dict[str, dict[str, str]] = {}
+        short = dict(self.manifest, rows=self.manifest["rows"][:-1])
+        with self.assertRaises(ValueError):
+            apply_results.apply_evidence(self.queue, short, evidence, record="0433", next_run="run 3")
+        stale = dict(self.manifest, rows=self.manifest["rows"] + [{"id": "q-000000000000", "packages": []}])
+        with self.assertRaises(ValueError):
+            apply_results.apply_evidence(self.queue, stale, evidence, record="0433", next_run="run 3")
+
+    def test_command_line_writes_the_next_run(self) -> None:
+        base = Path(tempfile.mkdtemp())
+        try:
+            queue = base / "queue.md"
+            queue.write_text(self.queue)
+            (base / "manifest.json").write_text(json.dumps(self.manifest))
+            (base / "results.tsv").write_text(
+                "\t".join(apply_results.RESULT_COLUMNS) + "\n" + result_line("X", "1" * 64) + "\n")
+            args = ["--manifest", str(base / "manifest.json"), "--queue", str(queue),
+                    "--evidence", f"run 1={base / 'results.tsv'}", "--unproven", str(base / "next.txt")]
+            self.assertEqual(apply_results.main(args + ["--dry-run"]), 0)
+            self.assertEqual(queue.read_text(), self.queue)
+            self.assertEqual(apply_results.main(args), 0)
+            self.assertEqual((base / "next.txt").read_text().split(), ["P0002", "P0003", "P0004"])
+            self.assertIn("pass (0433: run 1", queue.read_text())
+        finally:
+            shutil.rmtree(base)
+
+
+class NativeRouteTests(unittest.TestCase):
+    def test_pivot_rows_no_longer_cite_the_crashing_fixture(self) -> None:
+        tests = mac_queue.parity_tests()
+        ledger = mac_queue.ledger_cases()
+        for row in mac_queue.read_queue():
+            if row.route.startswith(tuple(mac_queue.NATIVE_ROUTES)):
+                mapping = mac_queue.map_row(row, tests, ledger)
+                self.assertEqual(mapping.rule, "native-workbook", row.route)
+                self.assertTrue(all(source.kind == "example" for source in mapping.sources))
+
+    def test_a_row_can_add_a_native_package_to_its_citations(self) -> None:
+        for row in mac_queue.read_queue():
+            if row.route.startswith(tuple(mac_queue.ROUTE_EXTRA_EXAMPLES)):
+                mapping = mac_queue.map_row(row, mac_queue.parity_tests(), mac_queue.ledger_cases())
+                kinds = {source.kind for source in mapping.sources}
+                self.assertEqual(kinds, {"parity", "example"})
+                return
+        self.fail("no row uses ROUTE_EXTRA_EXAMPLES")
+
+    def test_native_route_stems_are_written_by_the_example(self) -> None:
+        source = (ROOT / "crates/litchi-numbers/examples/mac_queue_native_routes.rs").read_text()
+        for stems in list(mac_queue.NATIVE_ROUTES.values()) + list(mac_queue.ROUTE_EXTRA_EXAMPLES.values()):
+            for stem in stems:
+                self.assertIn(f'"{stem}"', source)
+
+
+class NextRunTests(unittest.TestCase):
+    def test_next_run_writes_only_the_listed_packages(self) -> None:
+        base = Path(tempfile.mkdtemp())
+        try:
+            queue_out = base / "out"
+            (queue_out / "packages/Pages").mkdir(parents=True)
+            packages = []
+            for identifier, data in (("P0001", b"one"), ("P0002", b"two")):
+                path = f"packages/Pages/{identifier}.pages"
+                (queue_out / path).write_bytes(data)
+                packages.append({"id": identifier, "app": "Pages", "path": path, "sha256": sha(data),
+                                 "rows": ["q"], "sources": [{"case": "c"}]})
+            (queue_out / "manifest.json").write_text(json.dumps({"packages": packages}))
+            (base / "next.txt").write_text("P0002\n")
+            kit = base / "kit"
+            kit.mkdir()
+            self.assertEqual(control_kit.next_run(queue_out, base / "next.txt", kit), 0)
+            self.assertFalse((kit / "packages/Pages/P0001.pages").exists())
+            self.assertEqual((kit / "packages/Pages/P0002.pages").read_bytes(), b"two")
+            lines = (kit / "queue.tsv").read_text().splitlines()
+            self.assertEqual(lines[1], f"P0002\tPages\tpackages/Pages/P0002.pages\t{sha(b'two')}\t1")
+            self.assertEqual(json.loads((kit / "manifest.json").read_text())["packages"][0]["id"], "P0002")
+        finally:
+            shutil.rmtree(base)
 
 
 @unittest.skipUnless(shutil.which("bash") and shutil.which("shasum"), "needs bash and shasum")

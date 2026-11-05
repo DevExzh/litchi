@@ -1498,9 +1498,13 @@ fn decode_source_hosts<'source>(
             )
             .map_err(|_error| Error::StrictDependency)?;
             add_decode_report(&mut report, decoded)?;
+            // Only the selected owner's tiles are placed by this rewrite. A
+            // native group-by's dependent owner keeps a tile at another origin
+            // (column 32 in the native pivot, record 0432), which passes through.
             if tile_snapshot.internal_owner_id() != owner.internal_owner
-                || tile_snapshot.tile_column_begin() != tile.tile_column_begin
-                || tile_snapshot.tile_row_begin() != tile.tile_row_begin
+                || (owner.internal_owner == graph.table_owner
+                    && (tile_snapshot.tile_column_begin() != tile.tile_column_begin
+                        || tile_snapshot.tile_row_begin() != tile.tile_row_begin))
             {
                 return Err(Error::InvalidGraph);
             }

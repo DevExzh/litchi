@@ -275,6 +275,36 @@ NATIVE_AUTHORING = {
 }
 
 
+# Routes proven on a workbook Numbers itself saved (records 0432, 0433): route
+# prefix -> stems written by the `mac_queue_native_routes` example. The parity
+# fixture of the pivot rows crashes Numbers with no Litchi edit, so its packages
+# prove nothing on a Mac; those tests stay Linux proofs of the code paths.
+NATIVE_ROUTES = {
+    "litchi_numbers::Package::pivot_categories": ("numbers-native-pivot-control",),
+    "litchi_numbers::Package::edit_table_cells::Edit::{set_formula, set_formula_cached} with Expression::pivot_category": (
+        "numbers-native-pivot-formula-source-cached",
+        "numbers-native-pivot-formula-source-stale-cache",
+        "numbers-native-pivot-formula-source-no-cache",
+        "numbers-native-pivot-formula-body",
+    ),
+    "litchi_numbers::Package::edit_table_cell_conditional_highlights (first volatile rule": (
+        "numbers-native-first-rule-text-cell",
+        "numbers-native-first-rule-empty-cell",
+        "numbers-native-first-rule-date-ladder",
+        "numbers-native-volatile-add-tomorrow",
+        "numbers-native-volatile-clear-middle",
+    ),
+}
+
+# Cited rows that also need a package on a Numbers-saved workbook: route prefix
+# -> the example's stems, in addition to the row's parity packages.
+ROUTE_EXTRA_EXAMPLES = {
+    "litchi_numbers::Package::edit_table_cells on tables with an active category or a pivot owner": (
+        "numbers-native-pivot-source-cell",
+    ),
+}
+
+
 @dataclasses.dataclass(frozen=True)
 class Source:
     """One package a row needs: a parity case's input/host/leaf output, or a
@@ -328,6 +358,9 @@ def map_row(row: Row, tests: dict[str, str], ledger: dict[str, list[str]] | None
     for prefix, reason in NATIVE_AUTHORING.items():
         if route.startswith(prefix):
             return Mapping((), "native-authoring", reason, "explicit")
+    for prefix, stems in NATIVE_ROUTES.items():
+        if route.startswith(prefix):
+            return Mapping(tuple(Source("example", stem, "file") for stem in stems), rule="native-workbook")
     file_route = _file_route(row)
     if file_route is not None:
         stem = FILE_ROUTE_STEMS.get(file_route)
@@ -352,7 +385,10 @@ def map_row(row: Row, tests: dict[str, str], ledger: dict[str, list[str]] | None
     role = "host" if is_host_route(row) else "leaf"
     cited = cited_tests(row.text(), tests)
     if cited:
-        return Mapping(tuple(Source("parity", case, role) for case in cited), rule="cited")
+        extra = next((stems for prefix, stems in ROUTE_EXTRA_EXAMPLES.items() if route.startswith(prefix)), ())
+        sources = [Source("parity", case, role) for case in cited]
+        sources += [Source("example", stem, "file") for stem in extra]
+        return Mapping(tuple(sources), rule="cited")
     destination = route.split(" ")[0]
     from_ledger = [case for case in (ledger or {}).get(destination, []) if case in tests]
     if from_ledger:
@@ -372,4 +408,6 @@ def example_stems() -> list[str]:
     stems = [f"{fmt}-{stem}" for fmt in sorted(APPS) for stem in sorted(set(FILE_ROUTE_STEMS.values()))]
     stems += list(BUILDER_STEMS)
     stems += [stem for group in EXAMPLE_ROUTES.values() for stem in group]
+    stems += [stem for group in NATIVE_ROUTES.values() for stem in group]
+    stems += [stem for group in ROUTE_EXTRA_EXAMPLES.values() for stem in group]
     return stems

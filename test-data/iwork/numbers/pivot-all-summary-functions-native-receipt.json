@@ -1,0 +1,99 @@
+{
+  "application": "Numbers",
+  "version": "14.4",
+  "macos": "26.5.2 (25F84)",
+  "verification_date": "2026-11-04",
+  "authored_by": "the repository owner, by hand, in Numbers 14.4",
+  "file": "pivot-all-summary-functions-native.numbers",
+  "size": 167650,
+  "sha256": "e0830bb9f773f755621220263a767af0e864072fe5a37a84502ccaa4900f9baa",
+  "source_sheet": "Sheet 1",
+  "source_table": "Table 1",
+  "source_header": [
+    "Region",
+    "Product",
+    "Amount"
+  ],
+  "source_data_rows": 12,
+  "pivot_sheet": "Table 1 Pivot",
+  "rows_field": "Region",
+  "columns_field": "Product",
+  "values_source_field": "Amount",
+  "displayed_dimensions": {
+    "rows": 6,
+    "columns": 40
+  },
+  "summarize_by_in_values_order": [
+    {
+      "position": 1,
+      "header": "Amount (Sum)",
+      "function": "Sum"
+    },
+    {
+      "position": 2,
+      "header": "Amount (Average)",
+      "function": "Average"
+    },
+    {
+      "position": 3,
+      "header": "Amount (Count All)",
+      "function": "Count (All)"
+    },
+    {
+      "position": 4,
+      "header": "Amount (Max.)",
+      "function": "Maximum"
+    },
+    {
+      "position": 5,
+      "header": "Amount (Min.)",
+      "function": "Minimum"
+    },
+    {
+      "position": 6,
+      "header": "Amount (Count)",
+      "function": "Count"
+    },
+    {
+      "position": 7,
+      "header": "Amount (Unique)",
+      "function": "Count (Unique)"
+    },
+    {
+      "position": 8,
+      "header": "Amount (Median)",
+      "function": "Median"
+    },
+    {
+      "position": 9,
+      "header": "Amount (Product)",
+      "function": "Product"
+    },
+    {
+      "position": 10,
+      "header": "Amount (STDEV)",
+      "function": "STDEV"
+    },
+    {
+      "position": 11,
+      "header": "Amount (STDEVP)",
+      "function": "STDEVP"
+    },
+    {
+      "position": 12,
+      "header": "Amount (VAR)",
+      "function": "VAR"
+    },
+    {
+      "position": 13,
+      "header": "Amount (VARP)",
+      "function": "VARP"
+    }
+  ],
+  "lifecycle": [
+    "The owner built the source table and the pivot in Numbers and saved the workbook.",
+    "Each value column's function was verified in the Summarize by menu; the menu was cancelled without a change.",
+    "Closed and reopened; all value columns intact. File hash unchanged by the verification."
+  ],
+  "scope": "Native pivot evidence for record 0432. Screenshots, accessibility dumps and the full receipt are kept outside the repository."
+}

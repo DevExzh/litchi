@@ -1,0 +1,6 @@
+copy	source_package	cell	saved_sha256	size	owner_note	saved_cell	saved_applied_rule	engine_map_entries	source_map_entries
+first-rule-B2-fixed	P0394	B2	3f0e75b35ac78beca597fc41a51f670067cbe539cbea69710e7512d472f8b74d	137207	Filled in Red after today's date typed in B2	date 2026-11-05	0	1	1
+first-rule-B2-no-map	W6-first-rule-text-cell-no-map	B2	8e7615f4518dc4f9d335bb30e1d7647515bfaa6e6cf44a54bebfc46608e0fc68	137194	Same as previous row	date 2026-11-05	0	1	0
+first-rule-B4-fixed	P0391	B4	81118c00a4d1111f09b46d52599950e10722264eef98f24ebb107d74b8f832f8	138438	Also filled in red for B4	date 2026-11-05	0	1	1
+native-control	W6-native-control	A2	5eadc6e05a4d30e517cec2d40b3512f86d72e4cd85f876bdcfd20c919214fc98	138688	As expected	date 2026-11-05	0	1	1
+pivot-refresh	W6-pivot-source-cell-edit	pivot B3	75ada6fd76c13dac7db6d69fcb09cd88024e31ea4ffe9e275b1f9d8a3a9e9d09	168181	Amount (Sum) for Widget and North before refresh: 80; after: 125	number 125	-	0	0

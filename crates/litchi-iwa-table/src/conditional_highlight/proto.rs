@@ -381,12 +381,19 @@ pub(crate) mod tswp {
     impl Decode for CharacterStylePropertiesArchive {
         fn decode(data: &[u8]) -> Result<Self> {
             let mut properties = Self::default();
+            let mut text_fill = None;
             for field in fields(data)? {
                 match field.number {
                     1 => properties.bold = Some(field.boolean()?),
                     7 => properties.font_color = Some(field.message()?),
+                    46 => text_fill = Some(field.message::<super::tsd::FillArchive>()?),
                     _ => properties.other = true,
                 }
+            }
+            // Numbers' preset rule styles ("Red Fill", record 0432) repeat the
+            // font colour as the text's colour fill: the same override, twice.
+            if text_fill.is_some_and(|fill| fill.other || fill.color != properties.font_color) {
+                properties.other = true;
             }
             Ok(properties)
         }

@@ -1429,7 +1429,9 @@ fn validate_selected_formula_owner_closure(
             .whole_owner_dependencies()
             .is_none_or(empty_whole_owner_dependencies)
         && owner.cell_errors().is_none_or(empty_message)
-        && owner.uuid_references().is_none_or(empty_message)
+        // A native pivot table's owner lists its category formulas' UUIDs
+        // (record 0432); the formula set is validated node by node.
+        && owner.uuid_references().is_none_or(well_formed_uuid_references)
         && owner
             .spill_range_sizes()
             .is_none_or(|payload| spill_sizes_active(payload, path).is_ok_and(|active| !active));
@@ -1450,6 +1452,11 @@ fn validate_selected_formula_owner_closure(
             .ok_or(Error::InvalidSource { path })?,
     )?;
     Ok(())
+}
+
+fn well_formed_uuid_references(payload: &[u8]) -> bool {
+    litchi_iwa_common::wire::WireView::parse(payload, litchi_iwa_common::WireLimits::DEFAULT)
+        .is_ok()
 }
 
 fn validate_selected_cell_dependencies(
@@ -3547,7 +3554,11 @@ fn resolve_dependencies(
         .ok_or(Error::InvalidSource { path })?;
     let (owner_identities, owner_map_fields) = parse_owner_id_map(owner_map_payload, budget, path)?;
     budget.charge_wire_scan(owner_map_payload.len(), owner_map_fields, 2)?;
-    if owner_identities.len() != stage.formula_owners.len() {
+    // Numbers keeps map entries without a registered owner object (the owners
+    // of a pivot's snapshot table, record 0432); `litchi_numbers_wire`'s
+    // formula graph reads them as unregistered. Every registered owner must
+    // still have its entry (checked below).
+    if owner_identities.len() < stage.formula_owners.len() {
         return Err(Error::InvalidSource { path });
     }
     let engine_object = table_headers::resolve::resolved_object(source, engine_resolved)

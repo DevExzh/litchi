@@ -1,0 +1,16 @@
+{
+  "application": "Numbers",
+  "version": "14.4",
+  "macos": "26.5.2 (25F84)",
+  "verification_date": "2026-11-05",
+  "authored_by": "the repository owner, by hand, in Numbers 14.4",
+  "file": "chart-caption-native.numbers",
+  "authored_as": "native-chart-caption.numbers",
+  "size": 130852,
+  "sha256": "46171c9af2a2d5b39c07588f1d2a67bf43fd98ae53080bda78e59233556cb704",
+  "source": "A copy of test-data/iwork/numbers/basic.numbers",
+  "steps": "Insert a 2D column chart, tick Caption in Format > Chart, type the caption, save.",
+  "sheet": "Sheet 1",
+  "caption": "Native caption",
+  "scope": "Native chart-caption structure evidence for record 0433. The full run output stays outside the repository."
+}

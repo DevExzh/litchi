@@ -1865,7 +1865,11 @@ pub struct SparseReferences {
 }
 
 impl SparseReferences {
-    /// The array length (`count`).
+    /// The array length (`count`), not the number of present entries.
+    ///
+    /// Keynote, Pages and Numbers 14.4 refuse to open a document whose entry
+    /// index exceeds it (record 0431): a `count` of 1 with an entry at index
+    /// 2 failed on all three apps, while index 1 of `count` 1 opened.
     #[must_use]
     pub const fn count(&self) -> u32 {
         self.count
@@ -2347,10 +2351,11 @@ pub fn rewrite_legend_frame(
 
 /// Replace a chart's `series_non_styles` sparse array (field 19 of the chart
 /// archive) with `entries` (`(series index, object identifier)` in order),
-/// encoded as a protobuf encoder writes it: the `count` (the number of
-/// entries) and each entry's index and reference identifier. A stored array
-/// is replaced in place; an absent one is inserted before the first chart
-/// field numbered above 19. Every other byte is kept.
+/// encoded as a protobuf encoder writes it: the `count` (the array length, one
+/// past the highest index, see [`SparseReferences::count`]) and each entry's
+/// index and reference identifier. A stored array is replaced in place; an
+/// absent one is inserted before the first chart field numbered above 19.
+/// Every other byte is kept.
 ///
 /// # Errors
 ///
@@ -2369,7 +2374,14 @@ pub fn rewrite_series_non_styles<'source>(
     }
     let mut sparse = allocate(entries.len() * 16 + 6, limits)?;
     sparse.push(0x08);
-    push_varint(&mut sparse, entries.len() as u64);
+    push_varint(
+        &mut sparse,
+        entries
+            .iter()
+            .map(|(index, _)| u64::from(*index) + 1)
+            .max()
+            .unwrap_or(0),
+    );
     for &(index, identifier) in entries {
         let mut reference = Vec::with_capacity(11);
         reference.push(0x08);
