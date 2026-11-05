@@ -1,0 +1,207 @@
+{
+  "schema_version": 1,
+  "date": "2026-11-05",
+  "source_commit": "d3f175b79b77038d746f08e5623cd65caa85c8b7",
+  "base_commit": "8d2734b76d8e5512902a5bcaefde4177ce3d53a2",
+  "problem": "Native Word exposed inline/display Office Math misclassification and ignorable comment paragraph IDs being discarded. Broader corpus testing also exposed a nested-textbox selection error in the formatting preservation test oracle.",
+  "changes": [
+    "Classify oMath by an oMathPara ancestor, including direct paragraph siblings used by Word. Keep legacy run-nested reads, namespace-aware aliases and strict bindings, exact raw fragments, byte-order-mark offsets and finite scan bounds.",
+    "Typed equation getters redeclare inherited source namespaces; add_inline_office_math emits a direct paragraph child. Native DOCX/DOTX equations can be reused alongside text with the correct inline/display envelope.",
+    "Retain the modeled Word 2010 namespace in comment markup-compatibility processing so paragraph IDs remain linked to reply metadata.",
+    "Correct the formatting test oracle to compare direct paragraph/run property children rather than properties inside a nested text box. The independent byte-preservation assertion outside the edited property container remains unchanged.",
+    "Add eleven native Word owner tests and one operations test covering catalogs, source-preserving edits/inverses, nested tables, section geometry, secondary stories, review identities/timestamps, moves, encryption, inert macro inspection and master/child boundaries."
+  ],
+  "verification_scope": {
+    "variants": "24 unencrypted DOCX/DOTX/DOCM/DOTM/extensionless-child packages plus one encrypted DOCX; package payload preservation is distinct from semantic feature coverage.",
+    "edits": "Title changes across 13 native packages; unrelated member bytes and source immutability; all member payloads restored by inverse patches. Two nested-table path changes additionally tested on eager/source-backed operations owners.",
+    "publication": "ZIP framing is not a preservation oracle: serializing after reopening may change container bytes. Tests compare complete member sets and every decompressed payload, including inert embedded assets.",
+    "protection": "Comments/forms protection and tracking state cause typed Protected refusal for changed publication; no-op remains valid. The native unprotected form accepts an edit.",
+    "encryption": "Public disposable Office42! password, absent/wrong passwords, AgileAes256Sha512 provenance, explicit plaintext publication policy, rekey and old-key refusal; all clear members preserved in memory.",
+    "macros": "DOCM/DOTM VBA relationship graph, module source markers, reference count and native payload SHA-256 checks; no compilation or execution.",
+    "corpus_environment": "Materialized tracked test-data/Open-XML-SDK and test-data/officecli fixtures required by existing tests. No fixture source bytes changed and no 3rdparty references introduced."
+  },
+  "results": {
+    "rust_passed_across_selected_suites": 3152,
+    "python_passed": 71,
+    "native_docx_owner_tests": 11,
+    "native_docx_ops_tests": 1,
+    "indexed_coverage": {
+      "fixtures": 139,
+      "fixtures_with_tests": 99,
+      "feature_rows": 494,
+      "feature_rows_with_partial_tests": 94,
+      "indexed_tests": 87,
+      "native_fixture_statuses": {
+        "verified_native_fixture": 197,
+        "pending": 252,
+        "library_boundary": 44,
+        "not_applicable": 1
+      }
+    },
+    "source_fixtures_modified": false,
+    "fresh_native_application_validation": false
+  },
+  "validation": [
+    {
+      "command": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi-docx --features encryption,vba-inspection --lib --tests --no-fail-fast",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "docx-owner-final.log",
+        "path": "/tmp/litchi-native-office.GMvwp4/docx-owner-final.log",
+        "bytes": 237398,
+        "sha256": "c8f67d0ce654021997b5c5bfc37e47436a82714ceb03af0493141e55fd5fe311"
+      },
+      "regenerate": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi-docx --features encryption,vba-inspection --lib --tests --no-fail-fast > /tmp/litchi-native-office.GMvwp4/docx-owner-final.log 2>&1",
+      "suites": 79,
+      "passed": 2379,
+      "failed": 0,
+      "ignored": 0
+    },
+    {
+      "command": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi-ops --no-default-features --features docx,encryption,formula --lib --test 'docx_*' --test text_set_preservation --test microsoft_office_native --no-fail-fast",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "docx-ops-verified.log",
+        "path": "/tmp/litchi-native-office.GMvwp4/docx-ops-verified.log",
+        "bytes": 76482,
+        "sha256": "11197def4d04ae9d54eafba24f729b2d88c24b3e3ca45fb9df8daf4c096334a2"
+      },
+      "regenerate": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi-ops --no-default-features --features docx,encryption,formula --lib --test 'docx_*' --test text_set_preservation --test microsoft_office_native --no-fail-fast > /tmp/litchi-native-office.GMvwp4/docx-ops-verified.log 2>&1",
+      "suites": 21,
+      "passed": 737,
+      "failed": 0,
+      "ignored": 0
+    },
+    {
+      "command": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi --no-default-features --features docx,encryption,formula,markdown --lib --tests --no-fail-fast",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "docx-facade-verified.log",
+        "path": "/tmp/litchi-native-office.GMvwp4/docx-facade-verified.log",
+        "bytes": 27792,
+        "sha256": "3c125f0abed83eb7b811d3cab066308904758140f02f58f2a2b0d07227d13fec"
+      },
+      "regenerate": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi --no-default-features --features docx,encryption,formula,markdown --lib --tests --no-fail-fast > /tmp/litchi-native-office.GMvwp4/docx-facade-verified.log 2>&1",
+      "suites": 30,
+      "passed": 36,
+      "failed": 0,
+      "ignored": 0
+    },
+    {
+      "command": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo clippy --locked --offline -p litchi-docx -p litchi-ops --no-default-features --features litchi-docx/encryption,litchi-docx/vba-inspection,litchi-ops/docx,litchi-ops/encryption,litchi-ops/formula --lib --tests --no-deps -- -D warnings",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "docx-clippy-final.log",
+        "path": "/tmp/litchi-native-office.GMvwp4/docx-clippy-final.log",
+        "bytes": 17093,
+        "sha256": "2e4489b0020b024b213cdf6e134e56b5dfecd2ac4ff33e69d1e7409e016a8ca9"
+      },
+      "regenerate": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo clippy --locked --offline -p litchi-docx -p litchi-ops --no-default-features --features litchi-docx/encryption,litchi-docx/vba-inspection,litchi-ops/docx,litchi-ops/encryption,litchi-ops/formula --lib --tests --no-deps -- -D warnings > /tmp/litchi-native-office.GMvwp4/docx-clippy-final.log 2>&1"
+    },
+    {
+      "command": "python3 -m unittest tools.test_native_office_corpus tools.test_non_iwork_gate tools.test_no_3rdparty_references",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "docx-python-final.log",
+        "path": "/tmp/litchi-native-office.GMvwp4/docx-python-final.log",
+        "bytes": 663,
+        "sha256": "d53abd96dc8a7fe498885d01ced51f425e21ab25c184b6a19e6b4b9744e72283"
+      },
+      "regenerate": "python3 -m unittest tools.test_native_office_corpus tools.test_non_iwork_gate tools.test_no_3rdparty_references > /tmp/litchi-native-office.GMvwp4/docx-python-final.log 2>&1"
+    },
+    {
+      "command": "python3 tools/non_iwork_gate.py verify",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "docx-gate-final.log",
+        "path": "/tmp/litchi-native-office.GMvwp4/docx-gate-final.log",
+        "bytes": 1947,
+        "sha256": "093891c870e429ea255a96e2b70c0ab385611633fd15daebaafeccfe5f74a514"
+      },
+      "regenerate": "python3 tools/non_iwork_gate.py verify > /tmp/litchi-native-office.GMvwp4/docx-gate-final.log 2>&1"
+    },
+    {
+      "command": "python3 tools/native_office_coverage.py",
+      "exit_code": 0,
+      "artifact": {
+        "file_name": "docx-coverage-final.json",
+        "path": "/tmp/litchi-native-office.GMvwp4/docx-coverage-final.json",
+        "bytes": 316210,
+        "sha256": "8ef692e9ea64df5e6441d90d0b49b33e15164e4124116989911ac618bd3189e7"
+      },
+      "regenerate": "python3 tools/native_office_coverage.py > /tmp/litchi-native-office.GMvwp4/docx-coverage-final.json 2>&1"
+    }
+  ],
+  "additional_checks": [
+    {
+      "command": "git diff-tree --no-commit-id --name-only -r d3f175b79b77038d746f08e5623cd65caa85c8b7 -- '*.rs' | xargs rustfmt --check --edition 2024",
+      "result": "pass"
+    },
+    {
+      "command": "git diff --cached --check",
+      "result": "pass"
+    },
+    {
+      "command": "AGENTS.md staged evidence-size and binaries-path guards",
+      "result": "both print nothing before each commit"
+    }
+  ],
+  "specification_references": [
+    "https://learn.microsoft.com/en-us/openspecs/office_standards/ms-oe376/39ab8c3d-6bd2-4d1f-afae-94235ab66389",
+    "https://learn.microsoft.com/en-us/openspecs/office_standards/ms-oe376/1d77457b-2884-4749-9b4a-c150ca13cc19"
+  ],
+  "reproduction_artifacts": [
+    {
+      "artifact": {
+        "file_name": "docx-native-before.log",
+        "path": "/tmp/litchi-native-office.GMvwp4/docx-native-before.log",
+        "bytes": 18082,
+        "sha256": "90d4b2e729f4e7868e60f7d9b15f26677be4c9f0e9e88c54fcc973e947e62440"
+      },
+      "scope": "Native inline getter returned zero for an oMath sibling; pre-fix failing regression."
+    },
+    {
+      "artifact": {
+        "file_name": "docx-native-expanded2.log",
+        "path": "/tmp/litchi-native-office.GMvwp4/docx-native-expanded2.log",
+        "bytes": 19340,
+        "sha256": "1f0882d55ff5e43ed094b1687a47b40a4b0210cf6e18fa26553372d281c7427b"
+      },
+      "scope": "Pre-fix native comment paragraph ID was absent. Also records corrected fixture expectations for leading endnote space and ZIP framing."
+    },
+    {
+      "artifact": {
+        "file_name": "docx-format-corpus-diagnosis.log",
+        "path": "/tmp/litchi-native-office.GMvwp4/docx-format-corpus-diagnosis.log",
+        "bytes": 18217,
+        "sha256": "960486aff7abb5cfa37d8d3367b8aa0a1551c210fc278df5a0c9b266873eea92"
+      },
+      "scope": "Identifies native vector diagram paragraph 6 as the formatting oracle false failure; its outer paragraph has no pPr but contains text boxes with pPr."
+    }
+  ],
+  "binaries": [
+    {
+      "file_name": "microsoft_office_native-af2e5b456a7b6072",
+      "path": "/tmp/litchi-native-office.GMvwp4/target/debug/deps/microsoft_office_native-af2e5b456a7b6072",
+      "bytes": 22372968,
+      "sha256": "5fca666229c5f485d356aa9989952b4f7b0dcd8b2bb32e15b64a6fe512c62eb9",
+      "source_commit": "d3f175b79b77038d746f08e5623cd65caa85c8b7",
+      "build_command": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi-docx --features encryption,vba-inspection --lib --tests --no-fail-fast"
+    },
+    {
+      "file_name": "microsoft_office_native-af817c2ac2b8f235",
+      "path": "/tmp/litchi-native-office.GMvwp4/target/debug/deps/microsoft_office_native-af817c2ac2b8f235",
+      "bytes": 36394152,
+      "sha256": "12de3638e8dd7af083aa1ca5d717b6078aecc155efe880a9dc045d35faa89e36",
+      "source_commit": "d3f175b79b77038d746f08e5623cd65caa85c8b7",
+      "build_command": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi-ops --no-default-features --features docx,encryption,formula --lib --test 'docx_*' --test text_set_preservation --test microsoft_office_native --no-fail-fast"
+    }
+  ],
+  "remaining_scope": [
+    "The goal remains active. Forty manifest fixtures remain unindexed, mostly binary DOC and SpreadsheetML, plus native encrypted Excel variants.",
+    "94 of 494 rows have partial indexed assertions, not complete feature coverage; all 252 historical pending statuses are unchanged.",
+    "Word typed reads and CRUD still need broader feature qualification, including fields/navigation, layout extensions, glossary, fonts, drawings, mail merge and legacy forms. No comment CRUD or accepting/rejecting moves is claimed here.",
+    "Math is inert XML, not layout/evaluation. This native scope does not qualify whole-document Markdown conversion or every legacy low-level math writer API.",
+    "No fresh native application reopen, external refresh, macro execution, system-font resolution or rendering was performed."
+  ]
+}
