@@ -1,7 +1,6 @@
 # 0435 — a new caption uses the application's own paragraph style
 
-- Status: merge-ready on branch `uo2/iwa-w8` (cut from trunk `feat/unified-ops-api` at
-  `3001da641b`). **Five packages and four queue rows wait on Mac run 4.**
+- Status: merged to trunk at `d097086f37`. Mac run 4 passed: 7 of 7 packages, and all four queue rows now pass (§11).
 - Date: 2026-11-05.
 - Decision: the owner, 2026-11-05: new captions use Numbers' own style (0433 §3).
 - `performance_claim`: the caption route stays within the +5% budget against the previous
@@ -233,3 +232,17 @@ registry output changed, and the tests passed against the goldens as they were.
 
 The lint fix touches only a helper in the two new test files, whose tests were rerun; the full suites ran before it. No library
 code changed after the kit was built.
+
+## 11. Run 4 result
+
+The owner ran the kit on Numbers and Keynote 14.4, macOS 26.5.2, on 2026-11-05. `results/0435/run4-results.tsv` holds the
+results (from `out4-results.tgz`, SHA-256 `a72197a085f27b2ab0677dcb496df8769284dc741d4c84283b90edfdcefdb7c3`).
+
+- All 7 packages pass open, save, close and reopen. Each package hash matches the kit, and each re-save's hash matches its row.
+- `control_kit.py audit` on the re-saves of `W8-native-caption-control`, `W8-native-parent-new-caption`, `W8-P1129` and
+  `W8-P0290`: no unlisted reference. The other three re-saves were not audited.
+- Hand check, in the owner's words: "There is no difference in the text format between the two files". The owner did not
+  report the panel's wording, so "Object Caption" stays what the file stores, not something observed on screen.
+- The Result and Artifact cells of `q-fbf3a944f61d`, `q-e8bd7cd5d7a2`, `q-077e77954c55` and `q-91327706dd7b` were entered by hand, as §7
+  requires. Row ids are unchanged. All 767 rows now pass.
+- Not checked on a Mac: Keynote's image and shape captions by eye (`W8-P0290` passed only the scripted run), and any Pages caption.
