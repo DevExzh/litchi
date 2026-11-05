@@ -61,7 +61,7 @@ map below.
 For iWork, the concrete Pages, Keynote, and Numbers matrices own user-facing semantic and package
 claims. Shared `litchi-iwa-*` crates are substrate, not a fourth format. The legacy `litchi-iwa`
 migration host was deleted by record [0429](unified-ops/0429-iwa-w3-delete-host.md) (last present
-at commit `27b4840684`); its exit ledger is
+at commit `4d8a3e161f`); its exit ledger is
 [`iwa-exit-ledger.tsv`](unified-ops/results/0363/iwa-exit-ledger.tsv).
 
 After record 0429 the workspace has 69 packages and 303 internal dependency declarations,

@@ -2,7 +2,7 @@
 //!
 //! These tests exercise the selector-first facade on a source-built drawable
 //! pair. The host differential cases ran in the retired host's parity
-//! harness (last present at commit `27b4840684`); this crate suite focuses on
+//! harness (last present at commit `4d8a3e161f`); this crate suite focuses on
 //! exact no-op, inverse and typed-refusal behavior.
 
 use std::path::PathBuf;

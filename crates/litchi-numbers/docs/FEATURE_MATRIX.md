@@ -104,7 +104,7 @@ build semantic values, not `.numbers` packages. The retired migration host is de
 The broad `litchi-iwa` migration host was deleted by record
 [0429](../../../docs/unified-ops/0429-iwa-w3-delete-host.md) (W3 of the exit plan, record
 [0363](../../../docs/unified-ops/0363-iwa-monolith-exit-plan.md)); the last commit that contains it
-is `27b4840684`. Every host public function is accounted for in the checked exit ledger
+is `4d8a3e161f`. Every host public function is accounted for in the checked exit ledger
 [`iwa-exit-ledger.tsv`](../../../docs/unified-ops/results/0363/iwa-exit-ledger.tsv): migrated to a
 leaf or shared owner (with the destination API named) or retired with a reason. Rows above that
 predate the exit waves W1 to W4 (records 0363 to 0428) may understate the leaf crate's current

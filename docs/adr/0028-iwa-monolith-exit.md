@@ -1,7 +1,7 @@
 # ADR 0028: Ordered exit of the legacy IWA migration host
 
-- Status: Accepted; host deleted by unified-ops record 0429 (W3) on a branch
-  held until the macOS queue passes (amendment of 2026-11-03 below)
+- Status: Accepted; host deleted by unified-ops record 0429 (W3); every macOS
+  queue row has Mac evidence (amendment of 2026-11-03 below)
 - Date: 2026-08-08
 - Amends: ADR 0002, ADR 0010, and the IWA record now stored as
   `0029-iwa-index-foundation.md`
@@ -12354,10 +12354,11 @@ without lint exceptions.
 
 Unified-ops record [0429](../unified-ops/0429-iwa-w3-delete-host.md) executes
 W3 of the exit plan ([0363](../unified-ops/0363-iwa-monolith-exit-plan.md))
-on branch `uo2/iwa-w3`, cut from trunk `27b4840684`, the last commit that
-contains `crates/litchi-iwa`. The branch merges only after the macOS queue
-([`0363-mac-queue.md`](../unified-ops/0363-mac-queue.md)) passes on a Mac
-(owner decision D1). Deletion gate:
+on branch `uo2/iwa-w3`, brought up to trunk `4d8a3e161f`, the last commit that
+contains `crates/litchi-iwa`. Every row of the macOS queue
+([`0363-mac-queue.md`](../unified-ops/0363-mac-queue.md)) has Mac evidence
+(owner decision D1; record [0434](../unified-ops/0434-mac-run-3-results.md)).
+Deletion gate:
 
 1. No manifest depends on `litchi-iwa`: held before the deletion (no
    workspace crate, fuzz workspace, `tools/perf-baseline` or
@@ -12367,13 +12368,17 @@ contains `crates/litchi-iwa`. The branch merges only after the macOS queue
    2,117 migrated and 119 retired, and `tools/iwa_exit_ledger.py --check` now
    validates it without the crate. The host's tests and examples are deleted
    with it; the generated-schema build path no longer reads host sources
-   (`crates/litchi-iwa-protos/build.rs`). The 798 inputs the host built for
-   the macOS queue packages (record 0430) are kept outside the repository and
+   (`crates/litchi-iwa-protos/build.rs`). The 797 inputs the host built for
+   the macOS queue packages (records 0433, 0434) are kept outside the repository and
    listed, with SHA-256, in `test-data/iwork/mac-queue/host-built-inputs.tsv`.
 3. Semantic parity: every migrated route has a parity case (Tier A or B) that
-   passed at `27b4840684` (1,190 passed); the routes without host native
-   evidence are the macOS queue.
-4. Native open/save/reopen for mutation paths: pending, the macOS queue.
+   passed at `4d8a3e161f` (1,192 passed, 210 ignored cost probes); the routes without host native
+   evidence are the macOS queue. The behaviours records 0431 to 0433 proved
+   only against the host are pinned by leaf tests (record 0429 §4).
+4. Native open/save/reopen for mutation paths: all 767 queue rows have Mac
+   evidence, 0 failed and 0 pending (record 0434 §2). Three rows name an open
+   part (0434 §10), and the by-reference pivot tree stays a shape no native
+   file is known to hold.
 5. No root-facade re-export, feature alias or type alias of the host: holds.
 6. No host or host debt in the boundary policy: `migration_hosts` and
    `migration_debt` are empty. `tools/check_crate_boundaries.py` reports 69

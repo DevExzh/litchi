@@ -1,6 +1,6 @@
 //! Named paragraph styles: the theme-visible catalog of one stylesheet and
 //! the storage-scoped apply, create, rename, delete and redefine verbs of
-//! the retired host's (commit `27b4840684`) `text::Draft` (record 0374).
+//! the retired host's (commit `4d8a3e161f`) `text::Draft` (record 0374).
 //!
 //! A named style is a `TSWP.ParagraphStyleArchive` listed in a theme's text
 //! presets (`TSWP.ThemePresetsArchive.paragraph_style_presets`, field 7 of

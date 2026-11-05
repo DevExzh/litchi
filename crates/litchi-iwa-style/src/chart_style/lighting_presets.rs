@@ -1,6 +1,6 @@
 //! The encoded `TSCH.Chart3DLightingPackageArchive` of each non-default
 //! native lighting preset, byte for byte as the host editor writes it
-//! (retired host at commit `27b4840684`, `charts::lighting_3d::presets::native_lighting_package`,
+//! (retired host at commit `4d8a3e161f`, `charts::lighting_3d::presets::native_lighting_package`,
 //! encoded with `prost`). The parity cases of record 0414 compare the
 //! published bytes with the host's, so a change to the host presets
 //! fails them.

@@ -8,7 +8,7 @@
 //! [`COMMENT_STORAGE_MESSAGE_TYPE`]): an empty body makes it a plain
 //! highlight, a nonempty one a text comment, whose direct replies are
 //! further comment storages. This is the annotation graph of the
-//! retired host's (commit `27b4840684`) `text::Draft` highlight and comment
+//! retired host's (commit `4d8a3e161f`) `text::Draft` highlight and comment
 //! families.
 //!
 //! The engine reads graphs through [`Objects`] and encodes or rewrites the

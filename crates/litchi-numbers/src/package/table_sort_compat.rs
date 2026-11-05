@@ -1,7 +1,7 @@
 //! Physical-only persisted-sort admission for legacy migration snapshots.
 //!
 //! Some historical snapshots built by the retired migration host (deleted by
-//! record 0429; last present at commit `27b4840684`) contain valid native
+//! record 0429; last present at commit `4d8a3e161f`) contain valid native
 //! table models whose cell-storage projection is not accepted by the strict
 //! semantic package reader, and may still need field 44 configured.  Keep that exception here, in the focused
 //! Numbers owner: only the rooted sheet/table graph and the sort payload are

@@ -1,7 +1,7 @@
 # iWork Progress Audit
 
 > **Historical snapshot.** The `litchi-iwa` migration host this audit describes was deleted by
-> record [0429](unified-ops/0429-iwa-w3-delete-host.md) (last present at commit `27b4840684`).
+> record [0429](unified-ops/0429-iwa-w3-delete-host.md) (last present at commit `4d8a3e161f`).
 > Statements about it describe the audited baseline, not the current tree.
 
 > Audit baseline: 2026-09-01 at committed `d33f30f41` (`feat(numbers): own currency cell formats`). This update evaluates the focused Scientific-, Fraction-, Text-, Date & Time-, Duration-, and Custom-format owner work, plus the bounded Pages body-table hidden-axis owner, from that baseline; it remains scoped verification rather than release certification.

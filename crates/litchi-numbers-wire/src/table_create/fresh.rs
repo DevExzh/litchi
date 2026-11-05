@@ -3,7 +3,7 @@
 //!
 //! This reproduces the table construction without a template of the
 //! retired migration host (deleted by record 0429; last present at commit
-//! `27b4840684`), in two profiles ([`Profile`]):
+//! `4d8a3e161f`), in two profiles ([`Profile`]):
 //!
 //! - [`Profile::Builder`], the table of that host's Numbers builder, which
 //!   its Pages builder imported for `body_table`: four data lists and the

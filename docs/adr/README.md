@@ -40,7 +40,7 @@ Office round trips.
 | [0025](0025-ograph-chart-area-transactions.md) | Typed OGraph chart-area snapshot transactions |
 | [0026](0026-ole-directory-metadata-binding.md) | Typed shared OLE CFB directory metadata |
 | [0027](0027-xls-sheet-anchor-ownership.md) | Typed XLS sheet-anchor ownership |
-| [0028](0028-iwa-monolith-exit.md) | Ordered exit of the legacy IWA migration host (host deleted by unified-ops 0429, merge held for the macOS queue) |
+| [0028](0028-iwa-monolith-exit.md) | Ordered exit of the legacy IWA migration host (host deleted by unified-ops 0429) |
 | [0029](0029-iwa-index-foundation.md) | Archive-free IWA object-index foundation |
 | [0030](0030-lazy-opc-part-decode.md) | Lazy OPC part decode behind the fallible package accessors |
 | [0031](0031-execution-context-budgets.md) | I/O concurrency, CPU task and executor budgets in the execution context |

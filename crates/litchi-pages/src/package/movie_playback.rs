@@ -1,7 +1,7 @@
 //! Bounded Pages movie-playback projection and source-preserving rewrite.
 //!
 //! This module was an internal bridge for the retired migration host
-//! (deleted by record 0429; last present at commit `27b4840684`), which
+//! (deleted by record 0429; last present at commit `4d8a3e161f`), which
 //! borrowed one MovieArchive payload from its parsed-archive cache and
 //! delegated scalar semantics to the focused Pages package.  No generated
 //! MovieArchive or package-wide source is retained by this seam.

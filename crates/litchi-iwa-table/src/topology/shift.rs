@@ -3,7 +3,7 @@
 //! An inserted or removed row or column moves every cell after it, so every
 //! coordinate the calculation engine holds for the edited table moves too.
 //! This is a wire-level port of the retired host editor's
-//! `formula_dependency_shift` (over Prost archives, at commit `27b4840684`) onto the
+//! `formula_dependency_shift` (over Prost archives, at commit `4d8a3e161f`) onto the
 //! exact payloads this crate rewrites. It uses the same bounded wire
 //! primitives (`litchi_iwa_common::wire`) in the same order, so a payload it
 //! rewrites carries the bytes the host editor wrote; the host's differential

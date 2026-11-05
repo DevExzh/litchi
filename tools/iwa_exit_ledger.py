@@ -2,7 +2,7 @@
 """Checked historical ledger of the `litchi-iwa` exit (records 0363, 0369, 0429).
 
 `litchi-iwa` was deleted by record 0429 (W3). Its public-function inventory
-was frozen at commit 27b4840684, the last commit that contains the crate, in
+was frozen at commit 4d8a3e161f, the last commit that contains the crate, in
 `docs/unified-ops/results/0363/iwa-exit-ledger.tsv`. The ledger is kept as the
 historical record of where every host function went; this tool checks it
 without the crate and fails when:
@@ -37,7 +37,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 LEDGER = Path("docs/unified-ops/results/0363/iwa-exit-ledger.tsv")
 MAC_QUEUE = Path("docs/unified-ops/0363-mac-queue.md")
-HOST_COMMIT = "27b4840684"
+HOST_COMMIT = "4d8a3e161f"
 
 COLUMNS = (
     "path", "name", "occurrence", "format", "family", "status",

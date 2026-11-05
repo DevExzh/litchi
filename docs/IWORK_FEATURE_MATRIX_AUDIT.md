@@ -1,7 +1,7 @@
 # iWork Feature-Matrix Audit
 
 > **Historical snapshot.** The `litchi-iwa` migration host this audit describes was deleted by
-> record [0429](unified-ops/0429-iwa-w3-delete-host.md) (last present at commit `27b4840684`).
+> record [0429](unified-ops/0429-iwa-w3-delete-host.md) (last present at commit `4d8a3e161f`).
 > Statements about it describe the audited baseline, not the current tree.
 
 > Source audit starting at committed `d33f30f41` (2026-09-01) and including the focused

@@ -5088,8 +5088,8 @@ internal dependency declarations with 12 explicit debt items, after trunk
 ## 2026-11-03 amendment: `litchi-iwa` deleted (unified-ops record 0429)
 
 Unified-ops record [0429](../unified-ops/0429-iwa-w3-delete-host.md) deletes
-the iWork migration host `crates/litchi-iwa` (ADR 0028 W3) on a branch held
-until the macOS queue passes. The workspace now has 69 packages and 303
+the iWork migration host `crates/litchi-iwa` (ADR 0028 W3); every macOS queue
+row has Mac evidence (record 0434). The workspace now has 69 packages and 303
 internal dependency declarations (`tools/check_crate_boundaries.py`), with no
 migration host and no migration debt: the 12 `litchi-iwa -> *` debt edges
 (orders 1, 2, 4, 8, 10, 11, 12, 13, 14, 15, 16, 17) close together. The

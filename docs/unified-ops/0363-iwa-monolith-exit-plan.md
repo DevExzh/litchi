@@ -491,20 +491,20 @@ pre-commit size checks print nothing.
 | `python3 tools/check_feature_matrix.py` | 1, environmental: every `cargo check --locked` leg stops with "cannot create the lock file" (`Cargo.lock` is ignored by `.gitignore` and absent from this worktree); unrelated to a docs-only change |
 | `python3 tools/non_iwork_gate.py verify` | 1, pre-existing: "package 'litchi-doc' dependency 'flate2' path …/vendor/flate2 is not a workspace package"; unrelated to a docs-only change |
 
-## 10. W3 executed on a held branch (record 0429, 2026-11-03)
+## 10. W3 executed (record 0429, 2026-11-05)
 
-W3 ran as record [0429](0429-iwa-w3-delete-host.md) on branch `uo2/iwa-w3`
-(cut from trunk `27b4840684`). The branch deletes `crates/litchi-iwa` and
-every tool, gate and policy reference to it, and is **held**: it merges only
-after the macOS queue ([`0363-mac-queue.md`](0363-mac-queue.md)) passes on a
-Mac, as owner decision D1 requires. State of the deletion gate (§6):
+W3 ran as record [0429](0429-iwa-w3-delete-host.md) on branch `uo2/iwa-w3`,
+brought up to trunk `4d8a3e161f`. The branch deletes `crates/litchi-iwa` and
+every tool, gate and policy reference to it. Owner decision D1 asked for the
+macOS queue ([`0363-mac-queue.md`](0363-mac-queue.md)) first; every row now has
+Mac evidence (record [0434](0434-mac-run-3-results.md)). State of the deletion
+gate (§6):
 
 | ADR 0028 gate item | State on `uo2/iwa-w3` |
 |---|---|
 | 1 no manifest depends on `litchi-iwa` | holds; the crate is gone |
-| 2 every module, example, fuzz target, schema/build path and fixture has an owner | exit ledger 0 host-only rows (2,117 migrated, 119 retired), checked without the crate; the protos build script no longer reads host sources; the 798 host-built macOS inputs of record 0430 are kept outside the repository, listed in `test-data/iwork/mac-queue/host-built-inputs.tsv` |
-| 3 semantic parity | every migrated route has a Tier-A/B parity case, all passing at `27b4840684` before deletion |
-| 4 native open/save/reopen | **pending**: the macOS queue |
+| 2 every module, example, fuzz target, schema/build path and fixture has an owner | exit ledger 0 host-only rows (2,117 migrated, 119 retired), checked without the crate; the protos build script no longer reads host sources; the 797 host-built macOS inputs that the Mac evidence rests on are kept outside the repository, listed in `test-data/iwork/mac-queue/host-built-inputs.tsv` |
+| 3 semantic parity | every migrated route has a Tier-A/B parity case, all passing at `4d8a3e161f` before deletion; behaviours proved only against the host keep a leaf test or a stated retirement (record 0429 §4) |
+| 4 native open/save/reopen | all 767 rows have Mac evidence, 0 failed, 0 pending (0434 §2); three rows name an open part (0434 §10) |
 | 5 no root-facade re-export or alias | holds |
 | 6 no host or host debt in the boundary policy | holds: `migration_hosts` and `migration_debt` empty, 0 debt items |
-

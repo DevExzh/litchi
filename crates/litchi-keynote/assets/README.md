@@ -24,7 +24,7 @@ these bytes.
 ### Regenerating
 
 The generator crate `litchi-iwa` was deleted by record 0429 (W3); check out
-commit `802995d7b7` (or any commit up to `27b4840684`, the last one that
+commit `802995d7b7` (or any commit up to `4d8a3e161f`, the last one that
 contains the crate) to regenerate.
 
 1. In that checkout, build a throwaway program outside the repository, with
