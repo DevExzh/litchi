@@ -712,7 +712,8 @@ impl<'data> Entry<'data> {
         self.mac
     }
 
-    /// Returns the FBSE UID.
+    /// Returns the FBSE pixel-data UID. This need not equal the identifier
+    /// carried by the selected BLIP's file-data record.
     #[must_use]
     pub const fn uid(&self) -> Uid {
         self.uid

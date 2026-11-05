@@ -1769,74 +1769,48 @@ impl Presentation {
         Ok(result)
     }
 
-    /// Parse custom slide shows (named shows) from the Document container.
+    /// Read custom shows from the live document and resolve stable slide IDs
+    /// against the current logical slide order. Absent slide references are
+    /// ignored as required by MS-PPT; no show or slide is executed.
     ///
-    /// Custom shows are stored as `NamedShows` (type=1040) container in the
-    /// Document record, containing `NamedShow` (type=1041) children with
-    /// `CString` names and `NamedShowSlides` (type=1042) slide ID arrays.
-    ///
-    /// # Returns
-    ///
-    /// A vector of `(name, slide_indices)` tuples for each custom show.
-    /// Slide indices are 0-based.
-    #[must_use]
-    pub fn custom_shows(&self) -> Vec<ParsedCustomShow> {
-        let mut shows = Vec::new();
-
-        // Parse Document record from the stream
-        let records = self.inner.parser.find_records_ref();
-        for record in &records {
-            if record.record_type == RecordType::Document {
-                // Find NamedShows container in Document
-                for child in &record.children {
-                    if child.record_type == RecordType::NamedShows {
-                        Self::parse_named_shows(child, &mut shows);
-                    }
-                }
-            }
-        }
-
-        shows
+    /// # Errors
+    /// Returns source, resource-limit, or malformed named-show errors.
+    pub fn custom_shows(&self) -> Result<Vec<ParsedCustomShow>> {
+        let named = crate::NamedShows::parse_with_limits(
+            self.live_document_ref()?,
+            self.inner.source_limits,
+        )?
+        .unwrap_or_default();
+        Ok(Self::resolve_named_shows(
+            named,
+            self.slide_directory()
+                .entries()
+                .iter()
+                .map(crate::SlideDirectoryEntry::slide_id),
+        ))
     }
 
-    /// Parse `NamedShow` containers from a `NamedShows` container.
-    pub(super) fn parse_named_shows(named_shows: &Record, shows: &mut Vec<ParsedCustomShow>) {
-        for child in &named_shows.children {
-            if child.record_type == RecordType::NamedShow {
-                let mut name = String::new();
-                let mut slide_indices = Vec::new();
-
-                for sub in &child.children {
-                    if sub.record_type == RecordType::CString {
-                        // UTF-16LE name
-                        let chars: Vec<u16> = sub
-                            .data
-                            .as_chunks::<2>()
-                            .0
-                            .iter()
-                            .map(|c| u16::from_le_bytes([c[0], c[1]]))
-                            .collect();
-                        name = String::from_utf16_lossy(&chars);
-                    } else if sub.record_type == RecordType::NamedShowSlides {
-                        // Array of u32 slide IDs (0x100 + slide_index)
-                        for chunk in sub.data.as_chunks::<4>().0.iter() {
-                            let slide_id =
-                                u32::from_le_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]);
-                            // Convert slide ID (0x100+index) back to 0-based index
-                            let index = slide_id.saturating_sub(0x100) as usize;
-                            slide_indices.push(index);
-                        }
-                    }
-                }
-
-                if !name.is_empty() {
-                    shows.push(ParsedCustomShow {
-                        name,
-                        slide_indices,
-                    });
-                }
-            }
-        }
+    pub(super) fn resolve_named_shows(
+        named: crate::NamedShows,
+        slide_ids: impl Iterator<Item = u32>,
+    ) -> Vec<ParsedCustomShow> {
+        let positions = slide_ids
+            .enumerate()
+            .map(|(index, id)| (id, index))
+            .collect::<std::collections::HashMap<_, _>>();
+        named
+            .shows
+            .into_iter()
+            .map(|show| ParsedCustomShow {
+                name: show.name,
+                slide_indices: show
+                    .slide_ids
+                    .into_iter()
+                    .flatten()
+                    .filter_map(|id| positions.get(&id).copied())
+                    .collect(),
+            })
+            .collect()
     }
 }
 

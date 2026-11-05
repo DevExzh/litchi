@@ -206,3 +206,59 @@ fn bounded_zlib_decompression_requires_exact_size_and_no_trailing_data() {
     .unwrap();
     assert!(trailing.decompressed_bytes(original.len()).is_err());
 }
+
+#[test]
+fn sync_flushed_native_storage_is_explicit_and_requires_exact_boundaries_and_size() {
+    use std::io::Write;
+    let original = b"native PowerPoint persisted storage".repeat(10_000);
+    let mut encoder = flate2::write::ZlibEncoder::new(Vec::new(), flate2::Compression::fast());
+    encoder.write_all(&original).unwrap();
+    encoder.flush().unwrap();
+    let flushed = encoder.get_ref().clone();
+    assert!(flushed.ends_with(&[0, 0, 0xff, 0xff]));
+    let storage =
+        Storage::compressed(Kind::VbaProject, original.len() as u32, flushed.clone()).unwrap();
+    assert_eq!(storage.compression(), Compression::ZlibSyncFlush);
+    assert_eq!(
+        storage.decompressed_bytes(original.len()).unwrap(),
+        original
+    );
+    assert!(storage.decompressed_bytes(original.len() - 1).is_err());
+    assert_eq!(
+        Storage::parse_as(&storage.to_record().unwrap(), Kind::VbaProject).unwrap(),
+        storage
+    );
+    for declared in [original.len() - 1, original.len() + 1] {
+        assert!(
+            Storage::compressed(Kind::VbaProject, declared as u32, flushed.clone())
+                .unwrap()
+                .decompressed_bytes(original.len() + 1)
+                .is_err()
+        );
+    }
+    for removed in 1..=5 {
+        let truncated = flushed[..flushed.len() - removed].to_vec();
+        assert!(
+            Storage::compressed(Kind::VbaProject, original.len() as u32, truncated)
+                .unwrap()
+                .decompressed_bytes(original.len())
+                .is_err()
+        );
+    }
+    let mut fake = encoder.finish().unwrap();
+    fake.extend_from_slice(&[0, 0, 0xff, 0xff]);
+    assert!(
+        Storage::compressed(Kind::VbaProject, original.len() as u32, fake)
+            .unwrap()
+            .decompressed_bytes(original.len())
+            .is_err()
+    );
+    let mut trailing = flushed;
+    trailing.push(0);
+    assert!(
+        Storage::compressed(Kind::VbaProject, original.len() as u32, trailing)
+            .unwrap()
+            .decompressed_bytes(original.len())
+            .is_err()
+    );
+}

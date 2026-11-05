@@ -213,3 +213,50 @@ fn native_rtf_math_opens_through_the_facade_and_unmodeled_grouping_is_typed() {
             .contains("multiple equations in one math paragraph")
     );
 }
+
+#[test]
+fn native_ppt_table_query_edit_reopen_and_inverse_preserve_neighbor_cells() {
+    let file = native("powerpoint/powerpoint-text-table.ppt", FileFormat::Ppt);
+    let original = file.to_bytes().unwrap();
+    let cells = file
+        .query("/slide[3]/table[1] tc")
+        .unwrap()
+        .collect::<litchi::Result<Vec<_>>>()
+        .unwrap();
+    assert_eq!(cells.len(), 12);
+    for cell in cells {
+        assert_eq!(file.get(cell.path().to_path()).unwrap().kind(), cell.kind());
+    }
+    let text = |file: &File, path: &str| {
+        file.get(path)
+            .unwrap()
+            .view()
+            .text()
+            .unwrap()
+            .unwrap()
+            .into_owned()
+    };
+    assert_eq!(text(&file, "/slide[3]/table[1]/tr[2]/tc[1]"), "Apples");
+    let commit = file
+        .edit(|edit| {
+            edit.set(
+                "/slide[3]/table[1]/tr[2]/tc[1]",
+                litchi::props! {"text"=>"Oranges"},
+            )
+        })
+        .unwrap();
+    let reopened = litchi::open_bytes(commit.file().to_bytes().unwrap()).unwrap();
+    assert_eq!(text(&reopened, "/slide[3]/table[1]/tr[2]/tc[1]"), "Oranges");
+    assert_eq!(text(&reopened, "/slide[3]/table[1]/tr[2]/tc[2]"), "3");
+    assert_eq!(text(&reopened, "/slide[3]/table[1]/tr[2]/tc[3]"), "3.75");
+    assert_eq!(
+        commit
+            .patch()
+            .inverse()
+            .apply(commit.file())
+            .unwrap()
+            .to_bytes()
+            .unwrap(),
+        original
+    );
+}

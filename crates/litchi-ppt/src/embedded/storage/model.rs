@@ -23,6 +23,10 @@ pub enum Compression {
     Uncompressed,
     /// The stored bytes are one complete zlib stream.
     Zlib,
+    /// Native PowerPoint's zlib payload ends at a sync-flush boundary,
+    /// without a final block or Adler trailer. Bounded decoding verifies
+    /// that boundary and the declared output size; original bytes are kept.
+    ZlibSyncFlush,
 }
 
 /// One validated, inert `PowerPoint` persisted-storage payload.
@@ -52,7 +56,15 @@ impl Compression {
     /// Whether this storage requires zlib decoding.
     #[must_use]
     pub const fn is_zlib(self) -> bool {
-        matches!(self, Self::Zlib)
+        matches!(self, Self::Zlib | Self::ZlibSyncFlush)
+    }
+
+    pub(super) fn from_zlib_bytes(data: &[u8]) -> Self {
+        if data.len() >= 6 && data.ends_with(&[0, 0, 0xff, 0xff]) {
+            Self::ZlibSyncFlush
+        } else {
+            Self::Zlib
+        }
     }
 
     pub(crate) const fn prefix_len(self) -> usize {
@@ -77,7 +89,12 @@ impl Storage {
     ///
     /// Returns an error if the operation fails.
     pub fn compressed(kind: Kind, uncompressed_len: u32, data: Vec<u8>) -> Result<Self> {
-        Self::from_parts(kind, Compression::Zlib, Some(uncompressed_len), data)
+        Self::from_parts(
+            kind,
+            Compression::from_zlib_bytes(&data),
+            Some(uncompressed_len),
+            data,
+        )
     }
 
     pub(crate) fn from_parts(

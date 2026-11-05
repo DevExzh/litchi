@@ -117,7 +117,7 @@ fn slides_without_slide_info_atom_return_no_transition_or_timing() {
 #[test]
 fn presentations_without_named_shows_return_empty_custom_shows() {
     with_presentation("WithComments.ppt", |presentation| {
-        assert!(presentation.custom_shows().is_empty());
+        assert!(presentation.custom_shows().unwrap().is_empty());
     });
 }
 

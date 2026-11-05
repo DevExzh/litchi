@@ -224,7 +224,7 @@ impl VbaProjectStorage {
     /// Whether outer metadata declares a compressed VBA project storage.
     #[must_use]
     pub fn is_compressed(&self) -> bool {
-        matches!(self.compression, Some(Compression::Zlib))
+        self.compression.is_some_and(Compression::is_zlib)
     }
 
     /// Whether persisted metadata conservatively indicates macro data.

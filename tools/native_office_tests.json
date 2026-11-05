@@ -774,6 +774,244 @@
         "Derived inside-group AC prefix reads; missing/nonempty AC ends and missing FRT end fail."
       ],
       "scope_limit": "In-memory framing variants only; original native prefix is before the group."
+    },
+    {
+      "crate": "litchi-ppt",
+      "target": "microsoft_office_native",
+      "name": "native_powerpoint_group_keeps_both_text_shapes_and_the_connector",
+      "fixtures": [
+        "powerpoint/powerpoint-visual-objects.ppt"
+      ],
+      "feature_rows": [
+        "ppt-356"
+      ],
+      "assertions": [
+        "Slide 5 exposes one three-child group with SOURCE_002, TARGET_002 and the line/connector; exact original package bytes retained."
+      ],
+      "scope_limit": "Native grouped-shape read only; no connector routing, binding or rendering claim."
+    },
+    {
+      "crate": "litchi-ppt",
+      "target": "microsoft_office_native",
+      "name": "native_powerpoint_decks_materialize_all_slide_shapes_without_dropping_any",
+      "fixtures": [
+        "powerpoint/powerpoint-text-table.ppt",
+        "powerpoint/powerpoint-visual-objects.ppt",
+        "powerpoint/powerpoint-visual-objects.pps",
+        "powerpoint/powerpoint-navigation-review.ppt",
+        "powerpoint/powerpoint-master-motion.ppt",
+        "powerpoint/powerpoint-media-objects.ppt",
+        "powerpoint/powerpoint-modern-media.ppt",
+        "powerpoint/powerpoint-fonts-math-handout.ppt",
+        "powerpoint/powerpoint-passive-macro.ppt"
+      ],
+      "feature_rows": [
+        "ppt-345",
+        "ppt-348",
+        "ppt-356"
+      ],
+      "assertions": [
+        "Nine unencrypted PPT/PPS specimens retain exact slide counts, nonempty shape arrays for every slide, no UnreadableShape repairs and byte-identical publication."
+      ],
+      "scope_limit": "Materialization is not semantic completeness. Encrypted files have a separate test; animation, layout and rendering remain separate scopes."
+    },
+    {
+      "crate": "litchi-ppt",
+      "target": "microsoft_office_native",
+      "name": "native_powerpoint_media_previews_resolve_by_slot_and_retain_exact_payloads",
+      "fixtures": [
+        "powerpoint/powerpoint-media-objects.ppt"
+      ],
+      "feature_rows": [
+        "ppt-359"
+      ],
+      "assertions": [
+        "Three exact image slots, native kinds, byte lengths and SHA-256 values; per-slot access agrees with full enumeration; source publication is exact."
+      ],
+      "scope_limit": "Stored PNG/deflated EMF preview bytes only; no image decoding/rendering or playable media claim."
+    },
+    {
+      "crate": "litchi-ppt",
+      "target": "microsoft_office_native",
+      "name": "native_powerpoint_placeholder_table_exposes_all_twelve_cells",
+      "fixtures": [
+        "powerpoint/powerpoint-text-table.ppt"
+      ],
+      "feature_rows": [
+        "ppt-358",
+        "ppt-360"
+      ],
+      "assertions": [
+        "Native content-placeholder table remains typed Table with 4 rows, 3 columns and all twelve exact cell strings."
+      ],
+      "scope_limit": "One basic native table; merged/complex table layouts remain uncovered."
+    },
+    {
+      "crate": "litchi-ppt",
+      "target": "microsoft_office_native",
+      "name": "native_powerpoint_media_and_ole_placeholders_keep_typed_frames",
+      "fixtures": [
+        "powerpoint/powerpoint-media-objects.ppt"
+      ],
+      "feature_rows": [
+        "ppt-358",
+        "ppt-374",
+        "ppt-376",
+        "ppt-342"
+      ],
+      "assertions": [
+        "Typed media and OLE preview frames retain external IDs; one inert WAV has duration 2000 ms, sound ID 1 and native flags; exact sound name/length; Excel.Sheet.12 metadata retained."
+      ],
+      "scope_limit": "The downgraded video has a media action but no ExObjRef or playable video payload; metadata does not establish a full embedded Excel payload. No playback or activation."
+    },
+    {
+      "crate": "litchi-ppt",
+      "target": "microsoft_office_native",
+      "name": "native_powerpoint_text_and_table_edits_reopen_and_invert_without_losing_other_content",
+      "fixtures": [
+        "powerpoint/powerpoint-text-table.ppt"
+      ],
+      "feature_rows": [
+        "ppt-345",
+        "ppt-346",
+        "ppt-353",
+        "ppt-360",
+        "ppt-367"
+      ],
+      "assertions": [
+        "Composed title and table-cell replacements survive reopen; every other shape text, multilingual subtitle, speaker note and both property-set streams remain unchanged; replay and inverse are byte-exact."
+      ],
+      "scope_limit": "Focused source-bound text edits only; other table structure, formatting and CRUD families remain uncovered."
+    },
+    {
+      "crate": "litchi-ppt",
+      "target": "microsoft_office_native",
+      "name": "native_powerpoint_cryptoapi_requires_the_password_and_preserves_encrypted_source",
+      "fixtures": [
+        "powerpoint/powerpoint-encrypted.ppt"
+      ],
+      "feature_rows": [
+        "ppt-385"
+      ],
+      "assertions": [
+        "Missing and wrong passwords yield exact typed errors; correct public fixture password exposes one slide, two shapes and exact text under CryptoAPI RC4 128-bit; ordinary clear publication refuses, encrypted source passthrough is exact."
+      ],
+      "scope_limit": "No password change, newly encrypted save or native-app reopen claim.",
+      "required_features": [
+        "encryption"
+      ]
+    },
+    {
+      "crate": "litchi-ppt",
+      "target": "microsoft_office_native",
+      "name": "native_powerpoint_encryption_without_the_feature_is_explicitly_unsupported",
+      "fixtures": [
+        "powerpoint/powerpoint-encrypted.ppt"
+      ],
+      "feature_rows": [
+        "ppt-385"
+      ],
+      "assertions": [
+        "Default-feature build returns UnsupportedEncryption(CryptoApi) even with the correct fixture password."
+      ],
+      "scope_limit": "Runs without encryption; CI has a standalone default-feature native PPT step. This is feature availability, not a claim that the supported profile cannot decrypt."
+    },
+    {
+      "crate": "litchi-ppt",
+      "target": "microsoft_office_native",
+      "name": "native_powerpoint_custom_shows_follow_current_order_after_summary_insertion",
+      "fixtures": [
+        "powerpoint/powerpoint-navigation-review.ppt",
+        "powerpoint/powerpoint-master-motion.ppt"
+      ],
+      "feature_rows": [
+        "ppt-372",
+        "ppt-348",
+        "ppt-347"
+      ],
+      "assertions": [
+        "Both named shows resolve exact ordered memberships before/after a Summary insertion; moving the first slide reads only the current document and remaps stable IDs; inverse restores exact source."
+      ],
+      "scope_limit": "Membership/read/order preservation only; no slideshow playback or custom-show CRUD claim."
+    },
+    {
+      "crate": "litchi-ppt",
+      "target": "microsoft_office_native",
+      "name": "native_powerpoint_image_catalogs_resolve_every_stored_preview",
+      "fixtures": [
+        "powerpoint/powerpoint-visual-objects.ppt",
+        "powerpoint/powerpoint-visual-objects.pps",
+        "powerpoint/powerpoint-media-objects.ppt",
+        "powerpoint/powerpoint-modern-media.ppt",
+        "powerpoint/powerpoint-master-motion.ppt",
+        "powerpoint/powerpoint-fonts-math-handout.ppt"
+      ],
+      "feature_rows": [
+        "ppt-359"
+      ],
+      "assertions": [
+        "Six native image-bearing PPT/PPS files expose the independent store counts 3/3/3/7/10/3 with nonempty payloads."
+      ],
+      "scope_limit": "Image catalog coverage; exact payload hashes are asserted separately for the media fixture, with no render or formula semantics."
+    },
+    {
+      "crate": "litchi-ppt",
+      "target": "microsoft_office_native",
+      "name": "native_powerpoint_malformed_custom_show_name_is_an_error_not_an_empty_result",
+      "fixtures": [
+        "powerpoint/powerpoint-navigation-review.ppt"
+      ],
+      "feature_rows": [
+        "ppt-372"
+      ],
+      "assertions": [
+        "A lone UTF-16 surrogate introduced in memory produces a typed custom-show parse error rather than an empty list."
+      ],
+      "scope_limit": "Derived corruption; original native bytes remain unchanged."
+    },
+    {
+      "crate": "litchi-ppt",
+      "target": "microsoft_office_native",
+      "name": "native_powerpoint_passive_macro_retains_module_source_without_execution",
+      "fixtures": [
+        "powerpoint/powerpoint-passive-macro.ppt"
+      ],
+      "feature_rows": [
+        "ppt-386"
+      ],
+      "assertions": [
+        "Native sync-flushed encoding is observable; exact VBAProject/Module1 source is decoded with one passive FixtureNoOp procedure; source publication is byte-identical."
+      ],
+      "scope_limit": "Source inspection only; no compilation or execution, and no macro mutation claim.",
+      "required_features": [
+        "vba-inspection"
+      ]
+    },
+    {
+      "crate": "litchi",
+      "target": "microsoft_office_native",
+      "name": "native_ppt_table_query_edit_reopen_and_inverse_preserve_neighbor_cells",
+      "fixtures": [
+        "powerpoint/powerpoint-text-table.ppt"
+      ],
+      "feature_rows": [
+        "ppt-360",
+        "ppt-345"
+      ],
+      "assertions": [
+        "Public table query yields twelve resolvable cell paths; cell text edit survives reopen with exact neighbor values and inverse source restoration."
+      ],
+      "scope_limit": "One source-backed public table-cell transaction; other unified operations remain uncovered.",
+      "required_features": [
+        "doc",
+        "docx",
+        "ppt",
+        "pptx",
+        "rtf",
+        "xls",
+        "xlsb",
+        "xlsx"
+      ]
     }
   ]
 }

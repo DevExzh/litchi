@@ -1,7 +1,7 @@
 //! Strict, inert `PowerPoint` named/custom slide-show metadata.
 
 use super::package::{Error, Result};
-use super::records::Record;
+use super::records::{Record, RecordParseSession};
 use crate::consts::RecordType;
 use std::collections::HashSet;
 
@@ -48,6 +48,18 @@ impl NamedShows {
     /// Returns an error if the container is duplicated, truncated, malformed,
     /// or exceeds the named-show limit.
     pub fn parse(document: &Record) -> Result<Option<Self>> {
+        Self::parse_with_limits(document, crate::SourceLimits::default())
+    }
+
+    /// Parse named shows under the owning presentation's resource limits.
+    ///
+    /// # Errors
+    /// The structural errors of [`Self::parse`] and aggregate record,
+    /// nesting, or payload budget exhaustion.
+    pub fn parse_with_limits(
+        document: &Record,
+        limits: crate::SourceLimits,
+    ) -> Result<Option<Self>> {
         let containers = document
             .children
             .iter()
@@ -69,7 +81,8 @@ impl NamedShows {
         if usize::try_from(container.data_length).ok() != Some(container.data.len()) {
             return corrupted("NamedShowsContainer has a truncated payload");
         }
-        let children = Record::parse_sequence_strict(&container.data, "NamedShowsContainer")?;
+        let mut session = RecordParseSession::new(limits, container.data.len())?;
+        let children = session.parse_sequence(&container.data, "NamedShowsContainer", 1)?;
         if children.len() > MAX_NAMED_SHOWS {
             return corrupted(format!(
                 "NamedShowsContainer exceeds {MAX_NAMED_SHOWS} named shows"
@@ -77,7 +90,7 @@ impl NamedShows {
         }
         let shows = children
             .iter()
-            .map(parse_named_show)
+            .map(|record| parse_named_show(record, &mut session))
             .collect::<Result<Vec<_>>>()?;
         Ok(Some(Self { shows }))
     }
@@ -147,12 +160,12 @@ impl NamedShows {
     }
 }
 
-fn parse_named_show(record: &Record) -> Result<NamedShow> {
+fn parse_named_show(record: &Record, session: &mut RecordParseSession) -> Result<NamedShow> {
     require_header(record, 0x0f, 0, RecordType::NamedShow, "NamedShowContainer")?;
     if usize::try_from(record.data_length).ok() != Some(record.data.len()) {
         return corrupted("NamedShowContainer has a truncated payload");
     }
-    let children = Record::parse_sequence_strict(&record.data, "NamedShowContainer")?;
+    let children = session.parse_sequence(&record.data, "NamedShowContainer", 2)?;
     if !(1..=2).contains(&children.len()) {
         return corrupted("NamedShowContainer must contain a name and at most one slide-list atom");
     }
@@ -325,6 +338,55 @@ mod tests {
         assert_eq!(
             parsed.to_record_bytes().unwrap(),
             shows.to_record_bytes().unwrap()
+        );
+    }
+
+    #[test]
+    fn nested_show_parsing_shares_the_callers_event_and_depth_budgets() {
+        let named = NamedShows {
+            shows: vec![
+                NamedShow {
+                    name: "A".into(),
+                    slide_ids: Some(vec![256]),
+                },
+                NamedShow {
+                    name: "B".into(),
+                    slide_ids: Some(vec![257]),
+                },
+            ],
+        };
+        let document = root(vec![named.to_record().unwrap()]);
+        for (limits, expected) in [
+            (
+                crate::SourceLimits {
+                    max_records: 5,
+                    ..Default::default()
+                },
+                crate::SourceLimitKind::Events,
+            ),
+            (
+                crate::SourceLimits {
+                    max_depth: 1,
+                    ..Default::default()
+                },
+                crate::SourceLimitKind::Depth,
+            ),
+        ] {
+            assert!(
+                matches!(NamedShows::parse_with_limits(&document,limits),Err(Error::Limit{kind,..}) if kind==expected)
+            );
+        }
+        assert_eq!(
+            NamedShows::parse_with_limits(
+                &document,
+                crate::SourceLimits {
+                    max_records: 6,
+                    max_depth: 2,
+                    ..Default::default()
+                }
+            )
+            .unwrap(),
+            Some(named)
         );
     }
 

@@ -62,7 +62,7 @@ impl<'a> Ref<'a> {
                 }
                 Ok(Self {
                     kind,
-                    compression: Compression::Zlib,
+                    compression: Compression::from_zlib_bytes(&payload[4..]),
                     declared_uncompressed_len: Some(declared_uncompressed_len),
                     data: payload.get(4..).ok_or_else(|| {
                         Error::Corrupted("compressed ExOleObjStg is missing its payload".into())
@@ -99,7 +99,7 @@ impl<'a> Ref<'a> {
                 }
                 Ok(Cow::Borrowed(self.data))
             },
-            Compression::Zlib => {
+            Compression::Zlib | Compression::ZlibSyncFlush => {
                 let declared = self.declared_uncompressed_len.ok_or_else(|| {
                     Error::Corrupted("compressed ExOleObjStg is missing its size".into())
                 })?;
@@ -112,6 +112,9 @@ impl<'a> Ref<'a> {
                     return corrupted(format!(
                         "compressed ExOleObjStg declares {declared_len} bytes above the {maximum}-byte output limit"
                     ));
+                }
+                if self.compression == Compression::ZlibSyncFlush {
+                    return decode_sync_flush(self.data, declared_len).map(Cow::Owned);
                 }
                 let read_limit = maximum.checked_add(1).ok_or_else(|| {
                     Error::Corrupted("ExOleObjStg output limit overflows".to_string())
@@ -243,7 +246,7 @@ impl Snapshot<'_> {
     pub fn to_record_bytes(self) -> Result<Vec<u8>> {
         let (instance, declared) = match self.compression() {
             Compression::Uncompressed => (0u16, None),
-            Compression::Zlib => (
+            Compression::Zlib | Compression::ZlibSyncFlush => (
                 1u16,
                 Some(self.declared_uncompressed_len().ok_or_else(|| {
                     Error::Corrupted("compressed ExOleObjStg is missing its size".into())
@@ -281,6 +284,89 @@ impl Snapshot<'_> {
     pub fn to_record(self) -> Result<Record> {
         Ok(Record::parse(&self.to_record_bytes()?, 0, &crate::SourceLimits::default())?.0)
     }
+}
+
+/// Native Mac PowerPoint can store Z_SYNC_FLUSH output instead of a finished
+/// zlib stream. Require the exact output size and a real byte-aligned block
+/// boundary. Appending an empty final block and a computed Adler trailer only
+/// to the decoder proves that boundary; it never changes the retained source.
+fn decode_sync_flush(data: &[u8], declared: usize) -> Result<Vec<u8>> {
+    use flate2::{Decompress, FlushDecompress, Status};
+    if !data.ends_with(&[0, 0, 0xff, 0xff]) {
+        return corrupted("ExOleObjStg sync-flush marker is missing");
+    }
+    let ceiling = declared
+        .checked_add(1)
+        .ok_or_else(|| Error::Corrupted("ExOleObjStg output limit overflows".into()))?;
+    let mut decoder = Decompress::new(true);
+    let mut output = Vec::new();
+    let mut buffer = [0u8; 32 * 1024];
+    loop {
+        let input_before = decoder.total_in();
+        let output_before = decoder.total_out();
+        let offset = usize::try_from(input_before)
+            .map_err(|_| Error::Corrupted("ExOleObjStg input offset overflows".into()))?;
+        let available = (ceiling - output.len()).min(buffer.len());
+        let status = decoder
+            .decompress(
+                &data[offset..],
+                &mut buffer[..available],
+                FlushDecompress::Sync,
+            )
+            .map_err(|error| {
+                Error::Corrupted(format!("invalid ExOleObjStg sync-flushed payload: {error}"))
+            })?;
+        if status == Status::StreamEnd {
+            return corrupted(
+                "ExOleObjStg sync-flushed payload has trailing data after a finished stream",
+            );
+        }
+        let produced = usize::try_from(decoder.total_out() - output_before)
+            .map_err(|_| Error::Corrupted("ExOleObjStg output size overflows".into()))?;
+        if produced > declared.saturating_sub(output.len()) {
+            return corrupted("ExOleObjStg sync-flushed payload exceeds its declared size");
+        }
+        output
+            .try_reserve_exact(produced)
+            .map_err(|_| Error::AllocationFailed("ExOleObjStg sync-flush output"))?;
+        output.extend_from_slice(&buffer[..produced]);
+        if decoder.total_in() == input_before && produced == 0 {
+            if offset != data.len() {
+                return corrupted("ExOleObjStg sync-flushed payload is truncated");
+            }
+            break;
+        }
+    }
+    if output.len() != declared {
+        return corrupted("ExOleObjStg sync-flushed payload does not match its declared size");
+    }
+    let mut a = 1u32;
+    let mut b = 0u32;
+    // RFC 1950 Adler-32, with zlib's bounded chunk size to avoid overflow.
+    for chunk in output.chunks(5552) {
+        for byte in chunk {
+            a += u32::from(*byte);
+            b += a;
+        }
+        a %= 65521;
+        b %= 65521;
+    }
+    let mut suffix = [1, 0, 0, 0xff, 0xff, 0, 0, 0, 0];
+    suffix[5..].copy_from_slice(&((b << 16) | a).to_be_bytes());
+    let input_before = decoder.total_in();
+    let output_before = decoder.total_out();
+    let status = decoder
+        .decompress(&suffix, &mut buffer[..1], FlushDecompress::Finish)
+        .map_err(|error| {
+            Error::Corrupted(format!("invalid ExOleObjStg sync-flush boundary: {error}"))
+        })?;
+    if status != Status::StreamEnd
+        || decoder.total_in() - input_before != suffix.len() as u64
+        || decoder.total_out() != output_before
+    {
+        return corrupted("ExOleObjStg payload does not end at a sync-flush boundary");
+    }
+    Ok(output)
 }
 
 fn corrupted<T>(message: impl Into<String>) -> Result<T> {

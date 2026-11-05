@@ -285,7 +285,7 @@ pub(crate) fn validate_container_record(record: &Record<'_>, kind: RecordKind) -
     if record.kind() != kind
         || record.raw_kind() != kind.raw()
         || record.version() != 0x0F
-        || record.instance() != 0
+        || (kind != RecordKind::SolverContainer && record.instance() != 0)
     {
         return Err(Error::MalformedShape {
             reason: "OfficeArt container header is invalid",

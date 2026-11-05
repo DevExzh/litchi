@@ -306,7 +306,15 @@ impl Slide<'_> {
             },
         );
 
-        if let Some(placeholder_info) = escher_shape.placeholder()? {
+        // A table, group or picture can occupy a content placeholder. Its
+        // native content still determines the shape; a text-only placeholder
+        // would lose cells, children, or media/OLE/image identity.
+        if let Some(placeholder_info) = escher_shape.placeholder()?
+            && !matches!(
+                escher_shape.kind(),
+                Kind::Table | Kind::Group | Kind::Picture
+            )
+        {
             let mut properties = shape::ShapeProperties {
                 id: shape_id,
                 shape_type: ShapeType::Placeholder,

@@ -12,18 +12,6 @@ use crate::persist::PersistMapping;
 use crate::records::Record;
 use crate::slide::SlideDirectory;
 
-fn record(record_type: RecordType, data: Vec<u8>, children: Vec<Record>) -> Record {
-    Record {
-        record_type,
-        record_type_raw: 0,
-        version: 0,
-        instance: 0,
-        data_length: u32::try_from(data.len()).unwrap(),
-        data: data.into(),
-        children,
-    }
-}
-
 fn record_bytes(version: u16, instance: u16, record_type: RecordType, data: &[u8]) -> Vec<u8> {
     let mut bytes = Vec::with_capacity(8 + data.len());
     bytes.extend_from_slice(&((instance << 4) | version).to_le_bytes());
@@ -113,73 +101,26 @@ fn lazy_live_document_reuses_presentation_source_limits() {
     ));
 }
 
-fn named_shows(children: Vec<Record>) -> Record {
-    record(RecordType::NamedShows, Vec::new(), children)
-}
-
-fn named_show(name: &str, slide_ids: &[u32]) -> Record {
-    let name_bytes: Vec<u8> = name.encode_utf16().flat_map(u16::to_le_bytes).collect();
-    let slide_bytes: Vec<u8> = slide_ids.iter().flat_map(|id| id.to_le_bytes()).collect();
-    record(
-        RecordType::NamedShow,
-        Vec::new(),
-        vec![
-            record(RecordType::CString, name_bytes, Vec::new()),
-            record(RecordType::NamedShowSlides, slide_bytes, Vec::new()),
-        ],
-    )
-}
-
 #[test]
-fn parses_named_shows_container() {
-    let container = named_shows(vec![
-        named_show("Demo Show", &[0x101, 0x103]),
-        named_show("Short", &[0x100]),
-    ]);
-
-    let mut shows = Vec::new();
-    Presentation::parse_named_shows(&container, &mut shows);
-
+fn named_show_ids_resolve_against_logical_order_and_keep_repeated_references() {
+    let named = crate::NamedShows {
+        shows: vec![
+            crate::NamedShow {
+                name: "Demo Show".into(),
+                slide_ids: Some(vec![0x101, 0x999, 0, 0x103, 0x101]),
+            },
+            crate::NamedShow {
+                name: "Empty".into(),
+                slide_ids: None,
+            },
+        ],
+    };
+    let shows = Presentation::resolve_named_shows(named, [0x103, 0x100, 0x101].into_iter());
     assert_eq!(shows.len(), 2);
     assert_eq!(shows[0].name, "Demo Show");
-    assert_eq!(shows[0].slide_indices, vec![1, 3]);
-    assert_eq!(shows[1].name, "Short");
-    assert_eq!(shows[1].slide_indices, vec![0]);
-}
-
-#[test]
-fn ignores_trailing_partial_slide_id_bytes() {
-    let mut show = named_show("Odd", &[0x102]);
-    // Append 3 stray bytes to the NamedShowSlides atom.
-    show.children[1]
-        .data
-        .to_mut()
-        .extend_from_slice(&[0xAA, 0xBB, 0xCC]);
-    let container = named_shows(vec![show]);
-
-    let mut shows = Vec::new();
-    Presentation::parse_named_shows(&container, &mut shows);
-
-    assert_eq!(shows.len(), 1);
-    assert_eq!(shows[0].slide_indices, vec![2]);
-}
-
-#[test]
-fn skips_named_show_without_name() {
-    let show = record(
-        RecordType::NamedShow,
-        Vec::new(),
-        vec![record(
-            RecordType::NamedShowSlides,
-            0x101u32.to_le_bytes().to_vec(),
-            Vec::new(),
-        )],
-    );
-    let container = named_shows(vec![show]);
-
-    let mut shows = Vec::new();
-    Presentation::parse_named_shows(&container, &mut shows);
-    assert!(shows.is_empty());
+    assert_eq!(shows[0].slide_indices, [2, 0, 2]);
+    assert_eq!(shows[1].name, "Empty");
+    assert!(shows[1].slide_indices.is_empty());
 }
 
 #[test]

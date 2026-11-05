@@ -209,14 +209,49 @@ fn resolves_delay_offset_zero_and_rejects_missing_context() {
             .unwrap(),
         Some(Blip::Png(_))
     ));
-    let mut wrong_uid = png;
-    wrong_uid[8] ^= 0xFF;
+    // The FBSE pixel-data UID and BLIP file-data UID are independent.
+    let mut other_uid = png;
+    other_uid[8] ^= 0xFF;
+    let resolved = store
+        .resolve(
+            id,
+            Context::new().with_delay(Delay::new(&other_uid, Default::default())),
+        )
+        .unwrap()
+        .unwrap();
+    let Some(Block::Entry(entry)) = store.get(id).unwrap() else {
+        panic!("expected entry")
+    };
+    assert_eq!(entry.uid(), Uid::new([1; 16]));
+    assert_ne!(resolved.uids().unwrap().effective(), entry.uid());
+    assert_eq!(resolved.data(), b"x");
+
+    // Identity independence does not permit a mismatched size or kind.
+    let mut wrong_size = other_uid.clone();
+    wrong_size.push(0);
+    wrong_size[4..8]
+        .copy_from_slice(&(u32::try_from(other_uid.len() - 8).unwrap() + 1).to_le_bytes());
     assert!(matches!(
         store.resolve(
             id,
-            Context::new().with_delay(Delay::new(&wrong_uid, Default::default()))
+            Context::new().with_delay(Delay::new(&wrong_size, Default::default()))
         ),
-        Err(Error::MalformedImage { .. })
+        Err(Error::ImageSizeMismatch {
+            field: "FBSE size",
+            ..
+        })
+    ));
+    let mut wrong_kind = other_uid;
+    wrong_kind[0..2].copy_from_slice(&(0x46au16 << 4).to_le_bytes());
+    wrong_kind[2..4].copy_from_slice(&0xf01du16.to_le_bytes());
+    assert!(matches!(
+        store.resolve(
+            id,
+            Context::new().with_delay(Delay::new(&wrong_kind, Default::default()))
+        ),
+        Err(Error::MalformedImage {
+            reason: "resolved BLIP kind does not match the FBSE instance"
+        })
     ));
 }
 

@@ -157,9 +157,11 @@ impl<'a> Snapshot<'a> {
     pub const fn contains_data(self) -> bool {
         match self.compression {
             Compression::Uncompressed => !self.stored_bytes.is_empty(),
-            Compression::Zlib => match self.declared_uncompressed_len {
-                Some(length) => length != 0,
-                None => false,
+            Compression::Zlib | Compression::ZlibSyncFlush => {
+                match self.declared_uncompressed_len {
+                    Some(length) => length != 0,
+                    None => false,
+                }
             },
         }
     }

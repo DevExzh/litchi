@@ -212,6 +212,22 @@ fn drawing<'data>(
             },
             RecordKind::SolverContainer => {
                 validate_container_record(&child, RecordKind::SolverContainer)?;
+                // MS-ODRAW 2.2.18 uses recInstance as the rule count,
+                // unlike the zero-instance shape and drawing containers.
+                budget.depth(next_depth(depth)?)?;
+                let expected = usize::from(child.instance());
+                let solver = Container::try_new(child)?;
+                let mut count = 0usize;
+                for rule in solver.children_under(budget.limits()) {
+                    budget.visit()?;
+                    let _ = crate::rule::from_record(rule?, budget.limits())?;
+                    count += 1;
+                }
+                if count != expected {
+                    return Err(Error::MalformedShape {
+                        reason: "solver container rule count does not match its children",
+                    });
+                }
             },
             RecordKind::Unknown(_) => {},
             RecordKind::DggContainer

@@ -1,6 +1,6 @@
 //! Bounded OLE2 and `[MS-OGRAPH]` chart payload decoding.
 
-use std::io::{Cursor, Read, Write};
+use std::io::{Cursor, Write};
 
 use litchi_cfb::OleFile;
 use litchi_cfb::consts::STGTY_STREAM;
@@ -40,7 +40,7 @@ pub(super) fn decode(storage: Storage, limits: Limits) -> Result<Vec<u8>> {
             )?;
             Ok(storage.into_stored_bytes())
         },
-        Compression::Zlib => {
+        Compression::Zlib | Compression::ZlibSyncFlush => {
             let uncompressed_len = storage.declared_uncompressed_len().ok_or_else(|| {
                 Error::Corrupted("compressed chart storage is missing its size".into())
             })?;
@@ -51,22 +51,7 @@ pub(super) fn decode(storage: Storage, limits: Limits) -> Result<Vec<u8>> {
                 declared,
                 limits.max_package_bytes,
             )?;
-            let capacity = declared
-                .checked_add(1)
-                .ok_or_else(|| Error::Corrupted("chart storage size overflows usize".into()))?;
-            let mut bytes = Vec::new();
-            bytes
-                .try_reserve_exact(capacity)
-                .map_err(|_err| litchi_ograph::Error::Allocation {
-                    resource: "PPT chart package bytes",
-                })?;
-            flate2::read::ZlibDecoder::new(storage.stored_bytes())
-                .take(u64::from(uncompressed_len).saturating_add(1))
-                .read_to_end(&mut bytes)?;
-            if bytes.len() != declared {
-                return corrupted("compressed chart storage size mismatch");
-            }
-            Ok(bytes)
+            storage.decompressed_bytes(declared)
         },
     }
 }
@@ -78,13 +63,22 @@ pub(super) fn decode(storage: Storage, limits: Limits) -> Result<Vec<u8>> {
 pub(super) fn encode_storage(bytes: Vec<u8>, compression: Compression) -> Result<Storage> {
     match compression {
         Compression::Uncompressed => Storage::uncompressed(StorageKind::OleObject, bytes),
-        Compression::Zlib => {
+        Compression::Zlib | Compression::ZlibSyncFlush => {
             let declared = u32::try_from(bytes.len())
                 .map_err(|_err| Error::Corrupted("chart package exceeds u32 size".into()))?;
             let mut encoder =
                 flate2::write::ZlibEncoder::new(Vec::new(), flate2::Compression::default());
             encoder.write_all(&bytes)?;
-            let compressed = encoder.finish()?;
+            let flushed_len = if compression == Compression::ZlibSyncFlush {
+                encoder.flush()?;
+                Some(encoder.get_ref().len())
+            } else {
+                None
+            };
+            let mut compressed = encoder.finish()?;
+            if let Some(length) = flushed_len {
+                compressed.truncate(length);
+            }
             Storage::compressed(StorageKind::OleObject, declared, compressed)
         },
     }

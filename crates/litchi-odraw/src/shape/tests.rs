@@ -410,6 +410,87 @@ fn metadata_records_consume_the_record_budget() {
     ));
 }
 
+fn drawing_with_solver(count: u16, rules: &[u8]) -> Vec<u8> {
+    let mut body = Vec::new();
+    write::dg(&mut body, 1, 1, Limits::default()).unwrap();
+    // Frame explicitly so negative tests can supply invalid child bytes.
+    body.extend_from_slice(&((count << 4) | 15).to_le_bytes());
+    body.extend_from_slice(&0xf005u16.to_le_bytes());
+    body.extend_from_slice(&u32::try_from(rules.len()).unwrap().to_le_bytes());
+    body.extend_from_slice(rules);
+    let mut bytes = vec![15, 0, 2, 0xf0];
+    bytes.extend_from_slice(&u32::try_from(body.len()).unwrap().to_le_bytes());
+    bytes.extend_from_slice(&body);
+    bytes
+}
+
+#[test]
+fn solver_instance_counts_rules_and_does_not_require_zero() {
+    let mut rules = Vec::new();
+    crate::rule::Rule::Connector(crate::rule::Connector::new(1, 2, 3, 4, 0, 0))
+        .write_to(&mut rules, Limits::default())
+        .unwrap();
+    assert!(
+        parse(&drawing_with_solver(1, &rules), Limits::default())
+            .unwrap()
+            .is_empty()
+    );
+    for count in [0, 2] {
+        assert!(matches!(
+            parse(&drawing_with_solver(count, &rules), Limits::default()),
+            Err(Error::MalformedShape {
+                reason: "solver container rule count does not match its children"
+            })
+        ));
+    }
+    let mut malformed = rules;
+    malformed[0] = 0; // Connector rules require recVer 1.
+    assert!(matches!(
+        parse(&drawing_with_solver(1, &malformed), Limits::default()),
+        Err(Error::MalformedShape { .. })
+    ));
+    assert!(matches!(
+        parse(
+            &drawing_with_solver(1, &malformed[..malformed.len() - 1]),
+            Limits::default()
+        ),
+        Err(Error::TruncatedPayload { .. })
+    ));
+}
+
+#[test]
+fn solver_children_consume_the_shared_drawing_record_budget() {
+    let mut rules = Vec::new();
+    crate::rule::Rule::Arc(crate::rule::Arc::new(1, 2))
+        .write_to(&mut rules, Limits::default())
+        .unwrap();
+    let bytes = drawing_with_solver(1, &rules);
+    assert!(matches!(
+        parse(
+            &bytes,
+            Limits {
+                max_records: 3,
+                ..Limits::default()
+            }
+        ),
+        Err(Error::LimitExceeded {
+            limit: LimitKind::Records,
+            maximum: 3,
+            ..
+        })
+    ));
+    assert!(
+        parse(
+            &bytes,
+            Limits {
+                max_records: 4,
+                ..Limits::default()
+            }
+        )
+        .is_ok()
+    );
+}
+
 #[test]
 fn rejects_a_group_coordinate_atom_with_the_wrong_length() {
     let data = [0_u8; 12];

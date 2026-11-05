@@ -93,13 +93,11 @@ impl<'data> Entry<'data> {
                 });
             }
         }
-        if let Some(uids) = blip.uids()
-            && uids.effective() != self.uid
-        {
-            return Err(Error::MalformedImage {
-                reason: "resolved BLIP UID does not match the FBSE UID",
-            });
-        }
+        // FBSE.rgbUid identifies pixel data (MS-ODRAW 2.2.32), while a
+        // BLIP's rgbUid identifies its uncompressed file data. The format
+        // does not require those fields to be equal, and native PowerPoint
+        // stores distinct values. The slot's foDelay, kind and size select
+        // the BLIP; both identifiers remain available without rewriting.
         Ok(())
     }
 

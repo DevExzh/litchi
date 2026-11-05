@@ -182,6 +182,9 @@ jobs:
       - name: Test the facade with the Office format leaves
         run: python3 tools/non_iwork_gate.py --record-file target/non-iwork-gate-reports/facade-format-tests.json facade-format-tests
 
+      - name: Test native PowerPoint without optional encryption support
+        run: cargo test --locked -p litchi-ppt --no-default-features --test microsoft_office_native
+
       - name: Test the facade's DOCX/ODT polyglot feature closure
         run: python3 tools/non_iwork_gate.py --record-file target/non-iwork-gate-reports/facade-polyglot-tests.json facade-polyglot-tests
 

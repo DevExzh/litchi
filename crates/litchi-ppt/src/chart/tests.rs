@@ -62,9 +62,21 @@ fn program_base_strips_only_numeric_versions() {
 fn storage(compression: Compression, declared: u32, data: Vec<u8>) -> Storage {
     match compression {
         Compression::Uncompressed => Storage::uncompressed(StorageKind::OleObject, data),
-        Compression::Zlib => Storage::compressed(StorageKind::OleObject, declared, data),
+        Compression::Zlib | Compression::ZlibSyncFlush => {
+            Storage::compressed(StorageKind::OleObject, declared, data)
+        },
     }
     .unwrap()
+}
+
+#[test]
+fn replacement_keeps_finished_or_native_sync_flushed_storage_form() {
+    let bytes = b"inert native chart storage".repeat(4096);
+    for compression in [Compression::Zlib, Compression::ZlibSyncFlush] {
+        let stored = super::codec::encode_storage(bytes.clone(), compression).unwrap();
+        assert_eq!(stored.compression(), compression);
+        assert_eq!(decode(stored, Limits::default()).unwrap(), bytes);
+    }
 }
 
 #[test]

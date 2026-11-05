@@ -3231,8 +3231,8 @@ mod tests {
         let mut files = Vec::new();
         doc_files(&root, &mut files);
         files.sort();
-        // Record 0324 adds the generated `unified-ops/0294/marks.doc`.
-        assert_eq!(files.len(), 58);
+        // The native Office corpus adds 17 DOC files to the original 58.
+        assert_eq!(files.len(), 75);
         let mut compared = 0;
         for path in &files {
             let bytes = std::fs::read(path).expect("DOC fixture");
@@ -3250,7 +3250,9 @@ mod tests {
                 (shared, Err(error)) => panic!("{name}: shared {shared:?}, source: {error}"),
             }
         }
-        assert_eq!(compared, 50);
+        // Sixteen native documents are plaintext; the password specimen is
+        // refused before protection metadata is read, as the older ones are.
+        assert_eq!(compared, 66);
     }
 
     /// The change 0768 review's DOP mutations: every `DopBase` lock, the
