@@ -12373,12 +12373,12 @@ Deletion gate:
    listed, with SHA-256, in `test-data/iwork/mac-queue/host-built-inputs.tsv`.
 3. Semantic parity: every migrated route has a parity case (Tier A or B) that
    passed at `4d8a3e161f` (1,192 passed, 210 ignored cost probes); the routes without host native
-   evidence are the macOS queue. The behaviours records 0431 to 0433 proved
-   only against the host are pinned by leaf tests (record 0429 §4).
+   evidence are the macOS queue. By owner decision of 2026-11-05 the crate is
+   removed without regard to historical debt: parity cases outside record 0429
+   §4 are dropped, not ported.
 4. Native open/save/reopen for mutation paths: all 767 queue rows have Mac
-   evidence, 0 failed and 0 pending (record 0434 §2). Three rows name an open
-   part (0434 §10), and the by-reference pivot tree stays a shape no native
-   file is known to hold.
+   evidence, 0 failed and 0 pending (record 0434 §2). The owner discarded the
+   open by-reference part of the two pivot rows (record 0429).
 5. No root-facade re-export, feature alias or type alias of the host: holds.
 6. No host or host debt in the boundary policy: `migration_hosts` and
    `migration_debt` are empty. `tools/check_crate_boundaries.py` reports 69

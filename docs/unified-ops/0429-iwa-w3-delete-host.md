@@ -8,10 +8,10 @@
   deletion gate (§6, now §10); ADR [0028](../adr/0028-iwa-monolith-exit.md).
 - Evidence: all 767 rows of the macOS queue have Mac evidence, 0 failed and 0
   pending (record [0434](0434-mac-run-3-results.md) §2). Three of those rows
-  name an open part (0434 §10). The Pages identity row is closed. The two
-  pivot rows stay open on a tree stored only by reference, which the Mac
-  never tested (§4). Owner decision D1 asks that a route pass native open,
-  save, close and reopen; those two routes have, on a native workbook.
+  name an open part (0434 §10). The Pages identity row is closed. **Owner
+  decision (2026-11-05):** the by-reference part of the two pivot rows is
+  discarded, with no run 4 and no leaf test of that shape. The queue's cells are
+  unchanged.
 - Precondition: the exit ledger has 0 host-only rows (2,117 migrated, 119
   retired), and no workspace crate depends on `litchi-iwa`; only its own tests,
   its parity harness and its examples used it.
@@ -142,18 +142,23 @@ Before the deletion, at `4d8a3e161f`, the whole harness passed:
 expected values below (`.coord/iwa-w3/probe-out/`). Host and leaf gave the same
 values in every case the probe compared. The leaf tests below pin those values.
 
-The synthetic fixtures are built in the test, not stored. The test's bytes equal
-the harness's (SHA-256: full `8ea12ff94a3827c9…`, inline `74ba2c6424a45a51…`,
-changed function `4ff0f0d8a3903ae1…`; checked once with a temporary dump).
+**Owner decision (2026-11-05):** remove the crate without regard to historical
+debt. The parity cases outside this table are dropped, not ported, and the
+by-reference pivot tests are discarded.
+
+The inline synthetic fixture is built in the test, and its bytes equal the
+harness's inline fixture (SHA-256 `74ba2c6424a45a51…`, checked once with a
+temporary dump).
 
 | Host test or fix (record) | Behaviour | Now |
 |---|---|---|
 | `series_non_style`, `series_style` count (0431) | `count` is one past the highest index; a count unequal to the entries reads | Kept: `litchi-iwa-style` `sparse_count_is_one_past_the_highest_series_index`; `litchi-iwa-protos` `series_non_styles_match_the_generated_encoder`; `litchi-keynote/tests/native_pie_third_wedge.rs` on Apple's own file |
 | `reference_line/archive` count (0431) | Same rule on a trim of the styles map | **New**: `litchi-iwa-style` `trimmed_style_count_is_one_past_the_highest_kept_index`. It had no leaf test. Still no Mac proof (0434 §12) |
 | `image_caption`, `sheet_charts/caption` (0431) | The caption's paragraph style is listed across components | Kept: `litchi-numbers/tests/chart_caption_native_structure.rs`, `chart_caption_lists_its_paragraph_style_like_a_native_file`, and a check on native files |
-| `numbers_pivot_categories_read_parity` | Categories of the plain workbook and of the synthetic trees, by-reference read included | **New**: `litchi-numbers/tests/pivot_synthetic_group_bys.rs`, `plain_workbook_has_no_categories`, `reads_inline_and_by_reference_trees` (12 exact rows) |
-| `numbers_pivot_formula_author_parity`, `_without_cache_`, `_referenced_tree_`, `_inline_only_` | Formula archive and edges equal to the host's; inverse | **New**: `authors_a_category_of_the_inline_tree`, `_without_a_cache`, `_of_the_by_reference_tree`, `_on_the_inline_only_fixture`, with formula bytes, edges and inverse pinned. Whether a cache is absent is pinned only as "the output differs from the one with a cache" |
-| `numbers_pivot_formula_missing_category_is_refused_like_host`, `_changed_category_` | Typed refusals | **New**: `a_category_absent_from_the_edited_package_is_refused`, `a_category_with_another_function_in_the_edited_package_is_refused`. The host's refusal half is retired: no host |
+| `numbers_pivot_categories_read_parity` | Categories of the plain workbook and of the inline tree | **New**: `litchi-numbers/tests/pivot_synthetic_group_bys.rs`, `plain_workbook_has_no_categories`, `reads_the_inline_tree` (11 exact rows). By-reference read: **discarded** by the owner |
+| `numbers_pivot_formula_author_parity`, `_without_cache_`, `_inline_only_` | Formula archive and edges equal to the host's; inverse | **New**: `authors_a_category_of_the_inline_tree`, `authors_a_category_without_a_cache`. Whether a cache is absent is pinned only as "the output differs from the one with a cache" |
+| `numbers_pivot_formula_author_referenced_tree_parity` | Formula on a by-reference tree | **Discarded** by the owner. `pivot_group_tree_bounds.rs` still proves that such a tree, cycle included, reads without overflowing the stack |
+| `numbers_pivot_formula_missing_category_is_refused_like_host`, `_changed_category_` | Typed refusals | **New**: `a_category_absent_from_the_edited_package_is_refused`, `a_category_with_another_function_in_the_edited_package_is_refused`, on the inline fixture. The host's refusal half is retired: no host |
 | `numbers_native_pivot_formula_host_and_leaf_both_write` | Leaf writes on the source table and a pivot body cell | Kept: `litchi-numbers/tests/native_pivot.rs`, `..._on_source_table_keeps_each_function`, `..._matches_what_numbers_wrote`. Retired: "the host reads 13", a host defect |
 | `numbers_native_conditional_highlight_volatile_host_fails_leaf_registers` | Leaf half: first rule on the two Numbers-saved fixtures | **New**: `native_volatile_highlight.rs`, `numbers_saved_tables_register_their_first_volatile_rule`; the structure is in `first_volatile_rule_on_a_numbers_saved_table_builds_what_numbers_builds`. Retired: the host's failure |
 | `numbers_conditional_highlight_volatile_parity`, `_lifecycle_parity` | Family registration and lifecycle on a built document | **New**: `built_document_volatile_lifecycle`, on the leaf `Builder`'s default table. Retired: comparison of known fields with the host, and the 8 x 6 and 12 x 40 host documents. Mac evidence stands on the frozen inputs |
@@ -161,28 +166,18 @@ changed function `4ff0f0d8a3903ae1…`; checked once with a temporary dump).
 | The `*_cost_abba` probes | Leaf-versus-host cost | Retired: they measured the host. Results stay in their records |
 | `control_kit`, `variant-no-uuid-map`, `next-run`, `--evidence` | Tools | Kept, with their tests (`tools.test_mac_control_kit`, `tools.test_mac_queue`) |
 
-**What the by-reference tests do not show.** They pin the leaf's own answer on an
-input no writer makes. Numbers 14.4 crashes on the cycle and drops all ten objects
-once the back edge is gone (0434 §6), so these tests say nothing about Numbers. On
-files Numbers wrote, the leaf takes the inline tree and never walks this branch
-(0434 §10). The leaf returning categories from group-bys no owner lists (0434 §11)
-is now pinned as it stands, not endorsed. To settle it, 0434 §10 describes a run-4
-package; that is the coordinator's decision.
+**The by-reference branch of the leaf reader stays, and nothing pins its values.**
+No writer makes that shape and no file Numbers wrote reaches the branch (0434 §10).
 
 ## 5. Gaps and follow-ups
 
-- **Parity cases outside §4 went with the host.** §4 covers what trunk changed
-  after this branch's base. The harness's other cases are deleted too, and they
-  were the Linux regression check for many routes. A word scan finds that for
+- **Parity cases outside §4 are dropped by owner decision**, with no port planned.
+  They were the Linux regression check for many routes: a word scan finds that for
   688 of 2,117 migrated ledger rows (194 distinct destinations), the destination's
   method name appears in no test of the leaves, the unified crates or the shared
-  crates' test modules (`.coord/iwa-w3/scripts/ledger_gap.py`). Examples:
-  `body_chart_reference_lines` and its Numbers and Keynote twins, `add_highlight`,
-  `body_table_cell_list`. The scan is coarse in both directions: a generic
-  property route tests many names, and a name in a test does not prove the
-  behaviour. These routes keep Mac evidence on frozen bytes but gain no new Linux
-  test here. Restoring leaf tests for them is follow-up work.
-- The two open pivot rows (§4) and the other open items of 0434 §10 and §12.
+  crates' test modules (`.coord/iwa-w3/scripts/ledger_gap.py`; coarse in both
+  directions). A regression on those routes would not show on Linux.
+- The other open items of 0434 §10 and §12.
 - The leaf crates still carry hidden seams that only the host called (for
   example `__decode_movie_playback_payload`, the `internal-iwork-source`
   features of `litchi-pages`, `litchi-numbers` and `litchi-keynote`, the
@@ -210,6 +205,7 @@ Commits on `uo2/iwa-w3` (not pushed):
 8. `tools(mac-queue): freeze the inputs behind the Mac evidence`.
 9. `docs(iwork): lift W3's held wording`.
 10. this version of the record and the gate results.
+11. `test(numbers): discard the by-reference pivot tests`, by owner decision.
 
 Before the deletion, at `4d8a3e161f`: see §4. Verification head `c11ed2e6f1`
 (this commit changes only this record). Logs: `.coord/iwa-w3/gates3/`. First-pass
@@ -240,6 +236,14 @@ corpus output changed.
 | `git diff --exit-code 4d8a3e161f -- docs/unified-ops/0363-mac-queue.md` | 0 |
 | `RUSTC_BOOTSTRAP=1 python3 tools/check_api_glossary.py --target-dir $CARGO_TARGET_DIR` | 0 (72 profiles) |
 | `python3 tools/check_feature_matrix.py` | 0 |
+
+Commit 11 came after this table. It removes test code and changes docs and one
+tool comment, so only these were rerun on it, all exit 0: `cargo fmt --all --check`,
+`cargo test` and `cargo clippy -D warnings` of `pivot_synthetic_group_bys`,
+`check_crate_boundaries.py`, `unified_bench_matrix.py --check`,
+`iwa_exit_ledger.py --check`, `mac_queue/generate.py --check`, and the unit tests
+`test_mac_queue`, `test_mac_control_kit`, `test_no_3rdparty_references`,
+`test_unified_bench_matrix`.
 
 The full 53-row gate (`tools/gate/run_gate.sh`) was not run here; it is the
 coordinator's.

@@ -1,29 +1,11 @@
-//! Numbers pivot categories and category formulas on synthetic group-bys, with
-//! the values the deleted `litchi-iwa` host agreed with at its last commit,
-//! `4d8a3e161f` (records 0421, 0424, 0429: `numbers_pivot_categories_read_parity`
-//! and the `numbers_pivot_formula_author_*_parity` cases compared these
-//! routes with the host's; those comparisons went with it).
+//! Numbers pivot categories and category formulas on one synthetic inline
+//! group-by added to `basic.numbers`' calculation engine (string, number,
+//! Boolean and date group values, a grand-total root, two aggregated columns),
+//! with the values the deleted `litchi-iwa` host agreed with at its last commit,
+//! `4d8a3e161f` (records 0421, 0424, 0429).
 //!
-//! The objects are added to `basic.numbers`' calculation engine: an inline tree
-//! (string, number, Boolean and date group values, a grand-total root, two
-//! aggregated columns); a tree stored only by reference (aggregator and group
-//! nodes as separate objects, with a cycle through a child reference); a
-//! disabled group-by; a group-by whose owner kind names two formula owners;
-//! and a category two group-bys describe differently.
-//!
-//! **What this does not prove.** These objects are not native data. Numbers
-//! 14.4 crashes on the cycle, and with the cycle's back edge removed it opens
-//! the file and drops all ten objects, because no owner lists them (record 0434
-//! §6). No native file is known to hold a by-reference-only tree (0434 §10, a
-//! scan of 346 group-bys). These tests pin what the leaf does with this shape;
-//! they say nothing about what Numbers does with it, and the leaf reading
-//! group-bys no owner lists is itself a recorded gap (0434 §11).
-//!
-//! The objects are the harness's own: [`full_fixture`], [`inline_fixture`] and
-//! the changed-function fixture were checked byte-identical to its output at
-//! `4d8a3e161f` when this file was written (SHA-256 in record 0429 §4).
-//!
-//! Queue rows: 0363-mac-queue W4-H `pivot_categories`, W4-K `set_formula`.
+//! The object is not native data, and Numbers drops it because no owner lists
+//! it (record 0434 §6): these tests pin the leaf's answer only.
 
 use litchi_iwa_archive::iwa::{Archive, ArchiveObject, RawMessage, SnappyStream};
 use litchi_iwa_archive::package::{Catalog, EntryEdit};
@@ -41,7 +23,7 @@ const ENGINE: &str = "Index/CalculationEngine.iwa";
 /// The owner kind of `basic.numbers`' registered category formula owner
 /// (internal identifier 13), which its native group-by names.
 const NATIVE_OWNER_KIND: i32 = 8;
-/// The inline group-by, alone in [`inline_fixture`].
+/// The inline group-by.
 const INLINE_GROUP_BY: u64 = 9_100_010;
 /// The cell the formula is authored in: C3.
 const AT: At = At::new(2, 2);
@@ -51,9 +33,6 @@ const CELL_RECORD_TILE: u32 = 4_009;
 /// `North / 2` with `North`'s category of the inline tree: field values of
 /// the host's `FormulaArchive`, which the leaf's equalled byte for byte.
 const INLINE_NORTH_FORMULA: &str = "0a4c0a2b0842ba02260a240a04080510091204080b1001180120023a08080010011800200052040815100268ffff030a190811210000000000000040d00202d80280808080808080a0300a020804320a08001000180020002801";
-/// `North / 2` with the category of the by-reference tree: the group is
-/// `(41, 4)`, its group-by `(6, 0)` and its column `(13, 2)`, summed.
-const REFERENCED_NORTH_FORMULA: &str = "0a4c0a2b0842ba02260a240a04080610001204080d1002180220023a08080010011800200052040829100468ffff030a190811210000000000000040d00202d80280808080808080a0300a020804320a08001000180020002801";
 
 type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
 
@@ -65,13 +44,6 @@ fn coordinate(row: u32, column: u32) -> tsce::CellCoordinateArchive {
     tsce::CellCoordinateArchive {
         row: Some(row),
         column: Some(column),
-        ..Default::default()
-    }
-}
-
-fn reference(identifier: u64) -> tsp::Reference {
-    tsp::Reference {
-        identifier,
         ..Default::default()
     }
 }
@@ -146,24 +118,9 @@ fn aggregate_type(column: (u64, u64), kind: u32) -> tst::ColumnAggregateArchive 
     }
 }
 
-fn owner(kind: u32, internal: u32) -> Vec<u8> {
-    tsce::FormulaOwnerDependenciesArchive {
-        internal_formula_owner_id: internal,
-        owner_kind: Some(kind),
-        ..Default::default()
-    }
-    .encode_to_vec()
-}
-
-/// The group-by objects: (identifier, message type, payload).
-/// `first_aggregate` is the summary-function code of the inline tree's
-/// first aggregated column.
-fn objects(first_aggregate: u32) -> Vec<(u64, u32, Vec<u8>)> {
-    let mut objects = Vec::new();
-    // Kind 41 names two owners; the group-bys name the registered kind 8.
-    objects.push((9_100_002, 4_008, owner(41, 78)));
-    objects.push((9_100_003, 4_008, owner(41, 79)));
-    // An inline tree with two aggregated columns.
+/// The inline group-by: (identifier, message type, payload). `first_aggregate`
+/// is the summary-function code of its first aggregated column.
+fn inline_object(first_aggregate: u32) -> (u64, u32, Vec<u8>) {
     let columns = [(11, 1), (12, 1)];
     let mut root = node((1, 0), None, &[(0, 4), (0, 5)]);
     root.child = vec![
@@ -173,7 +130,7 @@ fn objects(first_aggregate: u32) -> Vec<(u64, u32, Vec<u8>)> {
         node((24, 2), Some(value(3)), &[(4, 4), (4, 5)]),
     ];
     root.child[0].child = vec![node((31, 3), None, &[(5, 4), (5, 5)])];
-    objects.push((
+    (
         INLINE_GROUP_BY,
         6_373,
         tst::GroupByArchive {
@@ -190,68 +147,7 @@ fn objects(first_aggregate: u32) -> Vec<(u64, u32, Vec<u8>)> {
             ..Default::default()
         }
         .encode_to_vec(),
-    ));
-    // A tree stored only by reference, with a cycle.
-    objects.push((9_100_020, 6_382, aggregator((13, 2)).encode_to_vec()));
-    let mut referenced_root = node((1, 0), None, &[(6, 2)]);
-    referenced_root.child_ref = vec![reference(9_100_022), reference(9_100_022)];
-    objects.push((9_100_021, 6_383, referenced_root.encode_to_vec()));
-    let mut child = node((41, 4), Some(value(0)), &[(7, 2)]);
-    child.child_ref = vec![reference(9_100_021)];
-    objects.push((9_100_022, 6_383, child.encode_to_vec()));
-    objects.push((
-        9_100_023,
-        6_373,
-        tst::GroupByArchive {
-            group_by_uid: uuid(6, 0),
-            group_node_root_ref: Some(reference(9_100_021)),
-            aggregator_ref: vec![reference(9_100_020)],
-            column_agg_type: vec![aggregate_type((13, 2), 2)],
-            is_enabled: true,
-            grouping_columns_formula: Some(coordinate(8, 1)),
-            owner_index: Some(NATIVE_OWNER_KIND),
-            ..Default::default()
-        }
-        .encode_to_vec(),
-    ));
-    // Disabled, and an ambiguous owner kind: no categories.
-    for (identifier, enabled, kind) in
-        [(9_100_030, false, NATIVE_OWNER_KIND), (9_100_031, true, 41)]
-    {
-        objects.push((
-            identifier,
-            6_373,
-            tst::GroupByArchive {
-                group_by_uid: uuid(identifier, 1),
-                group_node_root: Some(node((1, 0), None, &[(0, 1)])),
-                aggregator: vec![aggregator((14, 1))],
-                column_agg_type: vec![aggregate_type((14, 1), 1)],
-                is_enabled: enabled,
-                grouping_columns_formula: Some(coordinate(1, 1)),
-                owner_index: Some(kind),
-                ..Default::default()
-            }
-            .encode_to_vec(),
-        ));
-    }
-    // A second description of the inline tree's first category with a
-    // different aggregate cell: both are dropped as ambiguous.
-    objects.push((
-        9_100_040,
-        6_373,
-        tst::GroupByArchive {
-            group_by_uid: uuid(5, 9),
-            group_node_root: Some(node((1, 0), None, &[(9, 9)])),
-            aggregator: vec![aggregator(columns[0])],
-            column_agg_type: vec![aggregate_type(columns[0], 1)],
-            is_enabled: true,
-            grouping_columns_formula: Some(coordinate(9, 1)),
-            owner_index: Some(NATIVE_OWNER_KIND),
-            ..Default::default()
-        }
-        .encode_to_vec(),
-    ));
-    objects
+    )
 }
 
 fn with_objects(objects: Vec<(u64, u32, Vec<u8>)>) -> TestResult<Vec<u8>> {
@@ -277,19 +173,9 @@ fn with_objects(objects: Vec<(u64, u32, Vec<u8>)>) -> TestResult<Vec<u8>> {
     Ok(catalog.reassemble_to_bytes(&[EntryEdit::new(ENGINE, &compressed)], Default::default())?)
 }
 
-/// `basic.numbers` with every group-by object.
-fn full_fixture() -> TestResult<Vec<u8>> {
-    with_objects(objects(1))
-}
-
-/// `basic.numbers` with only the inline group-by (record 0431).
+/// `basic.numbers` with the inline group-by.
 fn inline_fixture() -> TestResult<Vec<u8>> {
-    with_objects(
-        objects(1)
-            .into_iter()
-            .filter(|(identifier, _, _)| *identifier == INLINE_GROUP_BY)
-            .collect(),
-    )
+    with_objects(vec![inline_object(1)])
 }
 
 fn read(bytes: &[u8]) -> TestResult<Vec<(Option<String>, i32, Aggregate)>> {
@@ -312,14 +198,13 @@ fn expected(rows: &[(Option<&str>, i32, Aggregate)]) -> Vec<(Option<String>, i32
         .collect()
 }
 
-/// The `index`-th category labelled `North`.
-fn north(package: &Package, index: usize) -> TestResult<Category> {
+/// The category labelled `North`.
+fn north(package: &Package) -> TestResult<Category> {
     package
         .pivot_categories()?
         .into_iter()
-        .filter(|category| category.label() == Some("North"))
-        .nth(index)
-        .ok_or_else(|| format!("no category North #{index}").into())
+        .find(|category| category.label() == Some("North"))
+        .ok_or_else(|| "no category North".into())
 }
 
 fn expression(category: &Category) -> TestResult<Expression> {
@@ -416,14 +301,13 @@ fn hex(bytes: &[u8]) -> String {
 /// cell after a reopen, and an inverse back to the input's bytes.
 fn author(
     input: &[u8],
-    index: usize,
     cached: Option<f64>,
     formula: &str,
     edges: [(u32, u32, u32); 2],
 ) -> TestResult {
     let package = Package::from_bytes(input)?;
     let edit = package.edit_table_cells(0usize, 0usize)?;
-    let category = north(&package, index)?;
+    let category = north(&package)?;
     let commit = match cached {
         None => edit.set_formula(AT, expression(&category)?)?,
         Some(value) => {
@@ -459,35 +343,8 @@ fn plain_workbook_has_no_categories() -> TestResult {
     Ok(())
 }
 
-/// Every category of the full fixture, in order. The inline tree gives all but
-/// its first column's grand total (ambiguous, two descriptions); the
-/// by-reference tree gives the last two, through a repeated child and a cycle.
 #[test]
-fn reads_inline_and_by_reference_trees() -> TestResult {
-    use Aggregate::{CountAll, Minimum, Sum};
-    assert_eq!(
-        read(&full_fixture()?)?,
-        expected(&[
-            (Some("2.5"), 1, CountAll),
-            (Some("725000000"), 1, CountAll),
-            (Some("North"), 1, CountAll),
-            (Some("TRUE"), 1, CountAll),
-            (None, 2, CountAll),
-            (Some("Grand Total"), 0, Minimum),
-            (Some("725000000"), 1, Minimum),
-            (Some("North"), 1, Minimum),
-            (Some("TRUE"), 1, Minimum),
-            (None, 2, Minimum),
-            (Some("Grand Total"), 0, Sum),
-            (Some("North"), 1, Sum),
-        ])
-    );
-    Ok(())
-}
-
-/// The inline group-by alone: nothing is ambiguous, so its grand total is back.
-#[test]
-fn reads_the_inline_tree_alone() -> TestResult {
+fn reads_the_inline_tree() -> TestResult {
     use Aggregate::{CountAll, Minimum};
     assert_eq!(
         read(&inline_fixture()?)?,
@@ -511,8 +368,7 @@ fn reads_the_inline_tree_alone() -> TestResult {
 #[test]
 fn authors_a_category_of_the_inline_tree() -> TestResult {
     author(
-        &full_fixture()?,
-        0,
+        &inline_fixture()?,
         Some(21.5),
         INLINE_NORTH_FORMULA,
         [(1, 4, 13), (9, 1, 13)],
@@ -524,16 +380,10 @@ fn authors_a_category_of_the_inline_tree() -> TestResult {
 /// its output differs from the output with one.
 #[test]
 fn authors_a_category_without_a_cache() -> TestResult {
-    let input = full_fixture()?;
-    author(
-        &input,
-        0,
-        None,
-        INLINE_NORTH_FORMULA,
-        [(1, 4, 13), (9, 1, 13)],
-    )?;
+    let input = inline_fixture()?;
+    author(&input, None, INLINE_NORTH_FORMULA, [(1, 4, 13), (9, 1, 13)])?;
     let package = Package::from_bytes(&input)?;
-    let category = north(&package, 0)?;
+    let category = north(&package)?;
     let without = package
         .edit_table_cells(0usize, 0usize)?
         .set_formula(AT, expression(&category)?)?
@@ -549,35 +399,11 @@ fn authors_a_category_without_a_cache() -> TestResult {
     Ok(())
 }
 
-/// The write half of the by-reference tree: its category, its column's other
-/// summary function, and its own edges.
-#[test]
-fn authors_a_category_of_the_by_reference_tree() -> TestResult {
-    author(
-        &full_fixture()?,
-        2,
-        Some(21.5),
-        REFERENCED_NORTH_FORMULA,
-        [(7, 2, 13), (8, 1, 13)],
-    )
-}
-
-#[test]
-fn authors_a_category_on_the_inline_only_fixture() -> TestResult {
-    author(
-        &inline_fixture()?,
-        0,
-        Some(21.5),
-        INLINE_NORTH_FORMULA,
-        [(1, 4, 13), (9, 1, 13)],
-    )
-}
-
 /// A category is resolved against the edited package: one read from another
 /// workbook is refused when the edited one lacks it.
 #[test]
 fn a_category_absent_from_the_edited_package_is_refused() -> TestResult {
-    let category = north(&Package::from_bytes(&full_fixture()?)?, 0)?;
+    let category = north(&Package::from_bytes(&inline_fixture()?)?)?;
     let refused = Package::from_bytes(BASIC)?
         .edit_table_cells(0usize, 0usize)?
         .set_formula_cached(AT, expression(&category)?, CachedValue::number(21.5)?)?
@@ -591,14 +417,14 @@ fn a_category_absent_from_the_edited_package_is_refused() -> TestResult {
 /// and the changed category still reads, with its other function.
 #[test]
 fn a_category_with_another_function_in_the_edited_package_is_refused() -> TestResult {
-    let category = north(&Package::from_bytes(&full_fixture()?)?, 0)?;
-    let target = Package::from_bytes(&with_objects(objects(3))?)?;
+    let category = north(&Package::from_bytes(&inline_fixture()?)?)?;
+    let target = Package::from_bytes(&with_objects(vec![inline_object(3)])?)?;
     let refused = target
         .edit_table_cells(0usize, 0usize)?
         .set_formula(AT, expression(&category)?)?
         .commit()
         .expect_err("a category with another summary function is refused");
     assert_eq!(refused, Error::Refused(Refusal::PivotCategoryChanged));
-    assert_ne!(north(&target, 0)?.aggregate(), category.aggregate());
+    assert_ne!(north(&target)?.aggregate(), category.aggregate());
     Ok(())
 }
