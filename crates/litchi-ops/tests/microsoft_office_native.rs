@@ -1,5 +1,5 @@
 //! Public operation contracts on native Microsoft Office specimens.
-#![cfg(any(feature = "docx", feature = "pptx"))]
+#![cfg(any(feature = "doc", feature = "docx", feature = "pptx"))]
 
 use litchi_ops::{OpenOptions, SourceMode, props};
 
@@ -134,4 +134,78 @@ fn native_word_members(bytes: &[u8]) -> std::collections::BTreeMap<String, Vec<u
             (name, data)
         })
         .collect()
+}
+
+#[cfg(feature = "doc")]
+#[test]
+fn native_word_binary_template_queries_and_atomic_edits_preserve_autotext() {
+    let bytes = include_bytes!("../../../test-data/microsoft-office/word/word-glossary.dot");
+    for mode in [SourceMode::Auto, SourceMode::Eager] {
+        let options = OpenOptions::new().source_mode(mode);
+        let source = litchi_ops::open_bytes_with(bytes.to_vec(), &options).unwrap();
+        let nodes = source
+            .query("p")
+            .unwrap()
+            .collect::<litchi_ops::Result<Vec<_>>>()
+            .unwrap();
+        assert_eq!(nodes.len(), 4);
+        assert_eq!(nodes[0].positional_path().to_string(), "/body/p[1]");
+        assert_eq!(
+            source
+                .get("/body/p[1]")
+                .unwrap()
+                .view()
+                .text()
+                .unwrap()
+                .as_deref(),
+            Some("WORD_GLOSSARY_014")
+        );
+        let commit = source
+            .edit(|edit| {
+                edit.set("/body/p[1]", props! {"text"=>"NATIVE_TEMPLATE_EDIT"})?;
+                edit.set("/body/p[2]", props! {"text"=>"Template metadata edited"})
+            })
+            .unwrap();
+        let published = commit.file().to_bytes().unwrap();
+        let reopened = litchi_ops::open_bytes_with(published.clone(), &options).unwrap();
+        assert_eq!(
+            reopened
+                .get("/body/p[1]")
+                .unwrap()
+                .view()
+                .text()
+                .unwrap()
+                .as_deref(),
+            Some("NATIVE_TEMPLATE_EDIT")
+        );
+        assert_eq!(
+            reopened
+                .get("/body/p[2]")
+                .unwrap()
+                .view()
+                .text()
+                .unwrap()
+                .as_deref(),
+            Some("Template metadata edited")
+        );
+        let package = litchi_doc::Package::from_bytes(&published).unwrap();
+        let document = package.document();
+        let glossary = document.attached_glossary().unwrap().unwrap();
+        assert_eq!(glossary.metadata().items()[0].name(), "LITCHI_AUTOTEXT_014");
+        assert_eq!(
+            glossary.item_text(0),
+            Some("AUTOTEXT_BODY_014: reusable native Word building block.\r")
+        );
+        assert!(
+            commit
+                .patch()
+                .inverse()
+                .apply(commit.file())
+                .unwrap()
+                .to_bytes()
+                .unwrap()
+                == bytes
+        );
+        assert!(source.to_bytes().unwrap() == bytes);
+    }
 }

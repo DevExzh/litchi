@@ -101,6 +101,21 @@ fn valid_stylesheet() -> Vec<u8> {
 }
 
 #[test]
+fn stylesheet_alignment_is_local_to_the_record() {
+    let data = valid_stylesheet();
+    let even = StyleSheet::parse_data(&data, 0, Leniency::Strict).unwrap();
+    let odd = StyleSheet::parse_data(&data, 9031, Leniency::Strict).unwrap();
+    assert_eq!(even.styles(), odd.styles());
+    assert!(odd.tolerance_report().is_clean());
+
+    // A physical odd origin cannot rescue a locally misaligned LPStd.
+    let mut malformed = data.clone();
+    malformed[0..2].copy_from_slice(&19u16.to_le_bytes());
+    malformed.insert(20, 0);
+    assert!(StyleSheet::parse_data(&malformed, 9031, Leniency::Strict).is_err());
+}
+
+#[test]
 fn stshif_reserved_bits_and_fixed_count_are_ignored_and_recorded() {
     let mut data = valid_stylesheet();
     data[6..8].copy_from_slice(&0xBEEFu16.to_le_bytes()); // style-name flags

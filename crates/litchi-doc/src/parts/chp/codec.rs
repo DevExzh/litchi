@@ -703,32 +703,42 @@ impl CharacterProperties {
         Ok(())
     }
 
-    /// Read a Boolean8 revision flag. A byte other than 0/1 is decoded with
-    /// the CHP toggle semantics ([`Self::get_toggle_value`]: 0x80 keeps the
-    /// current value, 0x81 inverts it, anything else reads as false) and
-    /// recorded; a missing operand is framing and stays fatal.
-    fn revision_flag(
+    /// Read a revision ToggleOperand (MS-DOC 2.6.1 and 2.9.327).
+    /// The four defined values are valid character-property operands;
+    /// undefined values retain the recorded false fallback. A missing
+    /// operand is framing and stays fatal.
+    pub(crate) fn revision_flag(
         sprm: &Sprm,
         name: &str,
         current: Option<bool>,
         tolerance: &mut ToleranceReport,
     ) -> Result<bool> {
         match sprm.operand_byte() {
-            Some(0) => Ok(false),
-            Some(1) => Ok(true),
+            Some(value @ (0 | 1 | 0x80 | 0x81)) => Ok(Self::get_toggle_value(value, current)),
             Some(value) => {
                 tolerance.record(ChpDefect::Boolean, sprm.opcode);
                 Ok(Self::get_toggle_value(value, current))
             },
             None => Err(PackageError::Corrupted(format!(
-                "{name} must contain a Boolean8 value"
+                "{name} must contain a ToggleOperand value"
             ))),
         }
     }
 
-    /// [`Self::revision_flag`] for a Boolean8 with no prior value.
+    /// Read an actual Bool8, retaining the established recorded fallback for
+    /// undefined bytes. Unlike revision flags, 0x80/0x81 are not valid Bool8.
     fn strict_bool8(sprm: &Sprm, name: &str, tolerance: &mut ToleranceReport) -> Result<bool> {
-        Self::revision_flag(sprm, name, None, tolerance)
+        match sprm.operand_byte() {
+            Some(0) => Ok(false),
+            Some(1) => Ok(true),
+            Some(value) => {
+                tolerance.record(ChpDefect::Boolean, sprm.opcode);
+                Ok(Self::get_toggle_value(value, None))
+            },
+            None => Err(PackageError::Corrupted(format!(
+                "{name} must contain a Boolean8 value"
+            ))),
+        }
     }
 
     fn parse_conditional_formatting(

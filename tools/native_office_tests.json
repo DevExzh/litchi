@@ -1627,6 +1627,249 @@
       "required_features": [
         "docx"
       ]
+    },
+    {
+      "crate": "litchi-doc",
+      "target": "microsoft_office_native",
+      "name": "native_word_template_exposes_attached_autotext_with_end_sentinel",
+      "fixtures": [
+        "word/word-glossary.dot"
+      ],
+      "feature_rows": [
+        "doc-001",
+        "doc-041"
+      ],
+      "assertions": [
+        "Native DOT secondary FIB, exact AutoText name/content/CP range/style and ignored sentinel equal to ccpText."
+      ],
+      "scope_limit": "Inert stored content and metadata; no arbitrary glossary editing or insertion in Word."
+    },
+    {
+      "crate": "litchi-doc",
+      "target": "microsoft_office_native",
+      "name": "native_word_move_toggles_expose_both_ranges_and_shared_identity",
+      "fixtures": [
+        "word/word-tracked-moves.doc"
+      ],
+      "feature_rows": [
+        "doc-048"
+      ],
+      "assertions": [
+        "Native 0x81 revision flags produce two move ranges at [58,132) and [193,267), with exact author, local timestamp and shared RSID; valid toggles do not create Boolean repair defects."
+      ],
+      "scope_limit": "RSID-paired source ranges only; no general cross-document move identity claim."
+    },
+    {
+      "crate": "litchi-doc",
+      "target": "microsoft_office_native",
+      "name": "native_word_binary_variants_read_all_story_catalogs_and_preserve_exact_bytes",
+      "fixtures": [
+        "word/word-bidi-eastasia.doc",
+        "word/word-document-protection.doc",
+        "word/word-embedded-fonts.doc",
+        "word/word-glossary.dot",
+        "word/word-layout-extensions.doc",
+        "word/word-layout-extensions.dot",
+        "word/word-legacy-form.doc",
+        "word/word-mailmerge-fields.doc",
+        "word/word-mailmerge-source.doc",
+        "word/word-master-native.doc",
+        "word/word-master-native/LEGACY",
+        "word/word-math-navigation.doc",
+        "word/word-recorded-macro.doc",
+        "word/word-recorded-macro.dot",
+        "word/word-review-controls.doc",
+        "word/word-tables-layout.doc",
+        "word/word-text-structure.doc",
+        "word/word-tracked-moves.doc",
+        "word/word-vector-diagram.doc",
+        "word/word-visual-objects.doc"
+      ],
+      "feature_rows": [
+        "doc-019",
+        "doc-023",
+        "doc-035"
+      ],
+      "assertions": [
+        "Twenty unencrypted DOC/DOT/child files have exact all-story paragraph and top-level table counts, body markers and byte-identical no-op output."
+      ],
+      "scope_limit": "Catalog/container baseline only; not typed coverage of every part. Counts include secondary stories and table marks."
+    },
+    {
+      "crate": "litchi-doc",
+      "target": "microsoft_office_native",
+      "name": "native_word_binary_title_edits_preserve_unrelated_streams_and_invert",
+      "fixtures": [
+        "word/word-bidi-eastasia.doc",
+        "word/word-embedded-fonts.doc",
+        "word/word-glossary.dot",
+        "word/word-layout-extensions.doc",
+        "word/word-layout-extensions.dot",
+        "word/word-master-native.doc",
+        "word/word-master-native/LEGACY",
+        "word/word-math-navigation.doc",
+        "word/word-recorded-macro.doc",
+        "word/word-recorded-macro.dot",
+        "word/word-text-structure.doc",
+        "word/word-vector-diagram.doc",
+        "word/word-visual-objects.doc"
+      ],
+      "feature_rows": [
+        "doc-019",
+        "doc-034",
+        "doc-001"
+      ],
+      "assertions": [
+        "Thirteen native body title edits retain source bytes and all unrelated CFB stream payloads, preserve paragraph/table counts, keep attached AutoText readable and invert to the entire original CFB file."
+      ],
+      "scope_limit": "Only WordDocument/table streams may change; passive macro/font/object preservation is not execution or full semantic coverage."
+    },
+    {
+      "crate": "litchi-doc",
+      "target": "microsoft_office_native",
+      "name": "native_word_binary_plain_body_create_move_and_delete_round_trip",
+      "fixtures": [
+        "word/word-bidi-eastasia.doc"
+      ],
+      "feature_rows": [
+        "doc-034",
+        "doc-035"
+      ],
+      "assertions": [
+        "Unicode paragraph creation, movement and deletion on a native body; exact expected paragraph sequence and exact inverse/source bytes."
+      ],
+      "scope_limit": "Plain ordinary body only; no table restructuring or layout rendering."
+    },
+    {
+      "crate": "litchi-doc",
+      "target": "microsoft_office_native",
+      "name": "native_word_binary_master_directory_and_extensionless_child_stay_inert",
+      "fixtures": [
+        "word/word-master-native.doc",
+        "word/word-master-native/LEGACY"
+      ],
+      "feature_rows": [
+        "doc-047",
+        "doc-065"
+      ],
+      "assertions": [
+        "Exact native WKB start/outline/file-name key and FNIF absolute/relative path metadata; parent does not load child, and the extensionless child opens independently with exact body text."
+      ],
+      "scope_limit": "Inert references only; no external resolution or master assembly."
+    },
+    {
+      "crate": "litchi-doc",
+      "target": "microsoft_office_native",
+      "name": "native_word_binary_password_contract_preserves_ciphertext_and_reservation",
+      "fixtures": [
+        "word/word-encrypted.doc"
+      ],
+      "feature_rows": [
+        "doc-027",
+        "doc-043"
+      ],
+      "assertions": [
+        "Absent/wrong/correct passwords, exact five paragraphs and write-reservation string; no-op output is original ciphertext; ordinary edit returns typed Encrypted refusal."
+      ],
+      "scope_limit": "Public disposable password, native CryptoAPI RC4 profile; no encrypted body editing or rekey support claimed."
+    },
+    {
+      "crate": "litchi-doc",
+      "target": "microsoft_office_native",
+      "name": "native_word_binary_form_data_retains_defaults_and_undefined_stored_states",
+      "fixtures": [
+        "word/word-legacy-form.doc"
+      ],
+      "feature_rows": [
+        "doc-051",
+        "doc-037"
+      ],
+      "assertions": [
+        "Three typed FFData records: text name/default/cache/length/help, checkbox default true versus undefined state, dropdown two entries/default versus undefined selection; entry/exit macro names remain inert."
+      ],
+      "scope_limit": "Stored forms only; no UI state change, calculation or macro execution."
+    },
+    {
+      "crate": "litchi-doc",
+      "target": "microsoft_office_native",
+      "name": "native_word_binary_review_comments_retain_reply_parent_and_local_timestamps",
+      "fixtures": [
+        "word/word-review-controls.doc"
+      ],
+      "feature_rows": [
+        "doc-035"
+      ],
+      "assertions": [
+        "Two exact comment bodies/authors with trailing CR, root/reply depth and parent index, local DTTM timestamps and absent ink flag."
+      ],
+      "scope_limit": "Read-only legacy comment metadata; no reactions or collaboration service behavior."
+    },
+    {
+      "crate": "litchi-doc",
+      "target": "microsoft_office_native",
+      "name": "native_word_move_accept_and_reject_preserve_the_source_and_are_reversible",
+      "fixtures": [
+        "word/word-tracked-moves.doc"
+      ],
+      "feature_rows": [
+        "doc-048",
+        "doc-034"
+      ],
+      "assertions": [
+        "Both native move acceptance and rejection produce exact six-paragraph bodies, remove all revision marks and invert to original source bytes."
+      ],
+      "scope_limit": "Single fixture move pair, without fields/comments overlapping the moved ranges."
+    },
+    {
+      "crate": "litchi-doc",
+      "target": "microsoft_office_native",
+      "name": "native_word_glossary_survives_deferred_character_formatting",
+      "fixtures": [
+        "word/word-glossary.dot"
+      ],
+      "feature_rows": [
+        "doc-001",
+        "doc-040"
+      ],
+      "assertions": [
+        "Bold edit on the main title preserves attached glossary text/metadata, paragraph alignment and run text/bold/size; both FIBs retain shared CHPX/PAPX pointers and size."
+      ],
+      "scope_limit": "Main-story character edit only, not arbitrary attached glossary mutation."
+    },
+    {
+      "crate": "litchi-doc",
+      "target": "microsoft_office_native",
+      "name": "changed_publication_refuses_preexisting_broken_glossary_header_coupling",
+      "fixtures": [
+        "word/word-glossary.dot"
+      ],
+      "feature_rows": [
+        "doc-001",
+        "doc-019"
+      ],
+      "assertions": [
+        "In-memory malformed derivatives of the native DOT with mismatched shared CHPX pointers or cbMac are refused on a title edit; source bytes remain intact."
+      ],
+      "scope_limit": "Negative derivatives only; the on-disk native fixture stays unchanged."
+    },
+    {
+      "crate": "litchi-ops",
+      "target": "microsoft_office_native",
+      "name": "native_word_binary_template_queries_and_atomic_edits_preserve_autotext",
+      "fixtures": [
+        "word/word-glossary.dot"
+      ],
+      "feature_rows": [
+        "doc-001",
+        "doc-034"
+      ],
+      "assertions": [
+        "Native template paragraph query paths and two atomic text changes on Auto/Eager routes; reopen retains exact AutoText content and identity; inverse restores the original CFB bytes."
+      ],
+      "scope_limit": "Ordinary main-body edits only; no native Word reopen or glossary-content editing.",
+      "required_features": [
+        "doc"
+      ]
     }
   ]
 }

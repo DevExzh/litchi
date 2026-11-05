@@ -68,7 +68,7 @@ fn parses_insertion_and_deletion_revision_sprms() {
         [(ChpDefect::RevisionReason, u32::from(SPRM_C_IDSL_RMARK))]
     );
 
-    // A Boolean8 revision flag outside {0, 1} uses CHP toggle semantics.
+    // Defined revision toggle operands are not Bool8 repair cases.
     for (value, expected) in [(0x81u8, Some(false)), (0x80, Some(true)), (2, Some(false))] {
         let mut grpprl = SPRM_C_F_RMARK.to_le_bytes().to_vec();
         grpprl.push(1);
@@ -76,7 +76,11 @@ fn parses_insertion_and_deletion_revision_sprms() {
         grpprl.push(value);
         let (properties, defects) = parse_recorded(&grpprl);
         assert_eq!(properties.is_revision_inserted, expected, "{value:#04x}");
-        assert_eq!(defects, [(ChpDefect::Boolean, u32::from(SPRM_C_F_RMARK))]);
+        if value == 2 {
+            assert_eq!(defects, [(ChpDefect::Boolean, u32::from(SPRM_C_F_RMARK))]);
+        } else {
+            assert!(defects.is_empty());
+        }
     }
     let (_, defects) = parse_recorded(&grpprl);
     assert!(defects.is_empty(), "a conforming grpprl records nothing");

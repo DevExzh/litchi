@@ -1117,7 +1117,11 @@ fn validate_metadata(value: &GlossaryMetadata) -> Result<()> {
     if value.items.len() > u16::MAX as usize || value.styles.len() > u16::MAX as usize {
         return Err(corrupted("glossary STTB count exceeds 65535 entries"));
     }
-    if value.terminal_cp >= value.ignored_cp || value.ignored_cp >= value.main_text_length {
+    // Word's native DOT writer places the final, ignored PlcfGlsy sentinel
+    // at ccpText. It does not start an item or address a character. Keep the
+    // real item endpoints strictly inside the story and retain ordering and
+    // the upper bound for the sentinel.
+    if value.terminal_cp >= value.ignored_cp || value.ignored_cp > value.main_text_length {
         return Err(corrupted(
             "PlcfGlsy terminal CPs are not strictly increasing within ccpText",
         ));
@@ -1281,5 +1285,36 @@ mod tests {
                 .is_err()
         );
         assert!(GlossaryStyle::try_new("Normal", 0x33).is_err());
+    }
+
+    #[test]
+    fn final_glossary_sentinel_can_equal_text_length_without_extending_an_item() {
+        let original = sample();
+        let metadata =
+            GlossaryMetadata::try_new(original.items.clone(), original.styles.clone(), 9, 11, 11)
+                .unwrap();
+        let tables = metadata.to_table_bytes().unwrap();
+        assert_eq!(
+            GlossaryMetadata::parse_table_bytes(
+                tables.item_table(),
+                tables.position_table(),
+                tables.style_table(),
+                11
+            )
+            .unwrap(),
+            metadata
+        );
+        for (terminal, ignored) in [(9, 9), (9, 8), (9, 12), (11, 12), (11, 11)] {
+            assert!(
+                GlossaryMetadata::try_new(
+                    original.items.clone(),
+                    original.styles.clone(),
+                    terminal,
+                    ignored,
+                    11
+                )
+                .is_err()
+            );
+        }
     }
 }

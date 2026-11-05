@@ -22,12 +22,11 @@ use crate::parts::saved_selection::{
 };
 use crate::sprm_operations::{
     SPRM_C_DTTM_RMARK, SPRM_C_DTTM_RMARK_DEL, SPRM_C_F_BOLD, SPRM_C_F_ITALIC, SPRM_C_F_OBJ,
-    SPRM_C_F_OLE2, SPRM_C_F_RMARK, SPRM_C_F_RMARK_DEL, SPRM_C_F_SPEC, SPRM_C_IBST_RMARK,
-    SPRM_C_IBST_RMARK_DEL, SPRM_C_IDSL_RMARK, SPRM_C_IDSL_RMARK_DEL, SPRM_C_KUL,
-    SPRM_C_PIC_LOCATION, SPRM_C_PROP_RMARK_CURRENT, SPRM_C_PROP_RMARK90, SPRM_C_RSID_PROP,
-    SPRM_C_RSID_RM_DEL, SPRM_C_RSID_TEXT, SPRM_C_WALL, SPRM_P_PROP_RMARK,
-    SPRM_P_PROP_RMARK_CURRENT, SPRM_P_PROP_RMARK90, SPRM_P_WALL, SPRM_T_PROP_RMARK, SPRM_T_RSID,
-    SPRM_T_WALL,
+    SPRM_C_F_OLE2, SPRM_C_F_SPEC, SPRM_C_IBST_RMARK, SPRM_C_IBST_RMARK_DEL, SPRM_C_IDSL_RMARK,
+    SPRM_C_IDSL_RMARK_DEL, SPRM_C_KUL, SPRM_C_PIC_LOCATION, SPRM_C_PROP_RMARK_CURRENT,
+    SPRM_C_PROP_RMARK90, SPRM_C_RSID_PROP, SPRM_C_RSID_RM_DEL, SPRM_C_RSID_TEXT, SPRM_C_WALL,
+    SPRM_P_PROP_RMARK, SPRM_P_PROP_RMARK_CURRENT, SPRM_P_PROP_RMARK90, SPRM_P_WALL,
+    SPRM_T_PROP_RMARK, SPRM_T_RSID, SPRM_T_WALL,
 };
 use crate::writer::ChpxFkpBuilder;
 use litchi_cfb::{OleFile, directory_names_equal};
@@ -2806,10 +2805,11 @@ impl RevisionEditor {
         let mut output = Vec::new();
         for run in &self.chpx {
             let sprms = strict_sprms(&run.grpprl)?;
-            for (kind, flag, author_op, time_op, reason_op, rsid_op) in [
+            let (inserted, deleted) = super::codec::revision_flags(&sprms)?;
+            for (kind, enabled, author_op, time_op, reason_op, rsid_op) in [
                 (
                     RevisionKind::Insertion,
-                    SPRM_C_F_RMARK,
+                    inserted,
                     SPRM_C_IBST_RMARK,
                     SPRM_C_DTTM_RMARK,
                     SPRM_C_IDSL_RMARK,
@@ -2817,17 +2817,16 @@ impl RevisionEditor {
                 ),
                 (
                     RevisionKind::Deletion,
-                    SPRM_C_F_RMARK_DEL,
+                    deleted,
                     SPRM_C_IBST_RMARK_DEL,
                     SPRM_C_DTTM_RMARK_DEL,
                     SPRM_C_IDSL_RMARK_DEL,
                     SPRM_C_RSID_RM_DEL,
                 ),
             ] {
-                if sprms
-                    .iter()
-                    .any(|s| s.opcode == flag && s.operand_byte() == Some(1))
-                {
+                // The same resolved state as semantic runs, including
+                // native 0x80/0x81 toggles and later overrides of a flag.
+                if enabled {
                     let metadata = metadata_from_sprms(
                         &sprms,
                         author_op,
@@ -3508,9 +3507,67 @@ impl RevisionEditor {
         put_u32(&mut self.word, 64, word_len)
     }
 
+    /// Both FIBs in a template address the same physical formatting tables.
+    /// Body edits append replacement tables, while the glossary's own text,
+    /// stylesheet, fields and CP coordinates remain unchanged.
+    fn sync_attached_glossary_fib(&mut self) -> Result<()> {
+        let published = self
+            .package
+            .stream(&self.word_path)
+            .ok_or_else(|| corrupted("WordDocument stream is missing"))?;
+        let page = u16_at(published, 8)?;
+        if page == 0 {
+            return Ok(());
+        }
+        let offset = usize::from(page) * 512;
+        let main = FileInformationBlock::parse(published)?;
+        let secondary = FileInformationBlock::parse_at(published, offset)?;
+        let main_size = main
+            .minimum_serialized_size()
+            .ok_or_else(|| corrupted("template FIB is truncated"))?;
+        let secondary_size = secondary
+            .minimum_serialized_size()
+            .ok_or_else(|| corrupted("attached glossary FIB is truncated"))?;
+        let source_size =
+            main.word_document_size()
+                .ok_or_else(|| corrupted("template cbMac is missing"))? as usize;
+        if !main.is_template()
+            || main.is_glossary_document()
+            || !secondary.is_glossary_document()
+            || secondary.next_fib_page() != 0
+            || main.which_table_stream() != secondary.which_table_stream()
+            || main.word_document_size() != secondary.word_document_size()
+            || offset < main_size
+            || source_size > published.len()
+            || offset
+                .checked_add(secondary_size)
+                .is_none_or(|end| end > source_size)
+        {
+            return Err(corrupted("invalid attached glossary FIB coupling"));
+        }
+        for index in [PLCFBTE_CHPX, PLCFBTE_PAPX] {
+            if main.get_table_pointer(index) != secondary.get_table_pointer(index) {
+                return Err(corrupted(
+                    "source glossary formatting pointers are not shared",
+                ));
+            }
+        }
+        let chpx = fib_pair(&self.word, PLCFBTE_CHPX)?;
+        let papx = fib_pair(&self.word, PLCFBTE_PAPX)?;
+        let size = u32_at(&self.word, 64)?;
+        let target = self
+            .word
+            .get_mut(offset..offset + secondary_size)
+            .ok_or_else(|| corrupted("attached glossary FIB exceeds current stream"))?;
+        put_fib_pair(target, PLCFBTE_CHPX, chpx.0, chpx.1)?;
+        put_fib_pair(target, PLCFBTE_PAPX, papx.0, papx.1)?;
+        put_u32(target, 64, size)
+    }
+
     fn commit(&mut self) -> Result<()> {
         self.flush_pending_chpx()?;
         self.protection_policy.authorize(self.protection)?;
+        self.sync_attached_glossary_fib()?;
         // The package mutation below invalidates every render for the prior
         // editor state, including the Data-stream add path. Mutation callers
         // are clone-first, but clearing here keeps the ownership rule local
@@ -3556,6 +3613,7 @@ impl RevisionEditor {
     fn commit_in_place(&mut self) -> Result<()> {
         self.flush_pending_chpx()?;
         self.protection_policy.authorize(self.protection)?;
+        self.sync_attached_glossary_fib()?;
         self.release_retained_render();
 
         let mut replacements: SmallVec<[(&[String], Arc<[u8]>); 3]> = SmallVec::new();

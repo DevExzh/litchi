@@ -55,7 +55,7 @@ impl StyleSheet {
 impl StyleSheet {
     pub(crate) fn parse_data(
         data: &[u8],
-        stream_offset: usize,
+        _stream_offset: usize,
         leniency: Leniency,
     ) -> Result<Self> {
         let mut tolerance = ToleranceReport::default();
@@ -107,10 +107,10 @@ impl StyleSheet {
         let mut styles = Vec::with_capacity(usize::from(style_count));
         let mut offset = styles_offset;
         for index in 0..style_count {
-            if stream_offset
-                .checked_add(offset)
-                .is_none_or(|absolute| absolute % 2 != 0)
-            {
+            // Alignment is relative to the stylesheet record. Word can
+            // place an attached glossary's STSH at an odd stream offset;
+            // its LPStd records and padding still use even local offsets.
+            if offset % 2 != 0 {
                 return Err(corrupted("LPStd does not begin on an even-byte boundary"));
             }
             let cb_std = read_u16(data, offset, "LPStd.cbStd")?;

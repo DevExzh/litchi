@@ -92,7 +92,7 @@ that boundary. Record names refer to the checked-in [MS-DOC] structures.
 
 | Feature | Status | Read | Write | Notes |
 |---------|--------|------|-------|-------|
-| AutoText and attached glossary (`PlcfGlsy`, `SttbfGlsy`, `SttbGlsyStyle`, `LEGOXTR_V11`) | 🟡 | ✅ | 🟡 | `Document::{glossary_metadata,glossary_item_text,attached_glossary}` exposes metadata and selected content, including the secondary FIB. `Writer` can set/clear glossary metadata and attached glossary documents; `GlossaryMetadata::to_table_bytes` encodes tables. This is not arbitrary opened-template glossary transaction support. |
+| AutoText and attached glossary (`PlcfGlsy`, `SttbfGlsy`, `SttbGlsyStyle`, `LEGOXTR_V11`) | 🟡 | ✅ | 🟡 | `Document::{glossary_metadata,glossary_item_text,attached_glossary}` exposes metadata and selected content, including the secondary FIB. `Writer` can set/clear glossary metadata and attached glossary documents; `GlossaryMetadata::to_table_bytes` encodes tables. Native DOT coverage includes the ignored end sentinel at `ccpText`, a record-aligned stylesheet at an odd stream offset, and preservation of the attached glossary during main-body edits by synchronizing both FIBs’ shared formatting pointers and size. Arbitrary opened-template glossary editing remains outside this slice. |
 | Word 2003 XML schema references (`Hplxsdr`, `XSDR`, `TIQ`) | 🟡 | ✅ | ❌ | `Document::xml_schemas()` returns typed schema and name references through `parts::xml_schemas`; schema URIs remain inert. No semantic schema-table writer or external schema resolver. |
 | Structured document tags (`SttbfBkmkSdt`, SDT bookmark PLCs, `SDTI`) | 🟡 | ✅ | ❌ | `Document::structured_tags()` exposes the checked `parts::structured_tags` projection; no general tag authoring or binding evaluation. |
 | Format consistency checker marks (`SttbfBkmkFcc`, `DPCID`) | 🟡 | ✅ | ❌ | `Document::format_consistency_marks()` returns typed ranges and metadata; no checker execution or dedicated mark editor. |
@@ -154,14 +154,14 @@ execution remain outside the DOC package API.
 | Field evaluation, document navigation, and generated results | ❌ | ❌ | ❌ | Cached results and inert typed instructions are available, but fields never resolve bookmarks, pages, styles, documents, databases, prompts, or host identity and are never refreshed |
 | Tables, nested tables, cell/row marks, merges, and TAP properties | ✅ | ✅ | ✅ | [MS-DOC] 2.4 table-depth and terminating-mark rules are represented by rows/cells and typed table/paragraph properties. The fresh writer refuses, with a typed error, a row whose table properties cannot fit one PAPX FKP page (a plain row of 22 or more cells); it does not write `sprmPHugePapx` |
 | Character, paragraph, table, section, and picture SPRM families | ✅ | ✅ | ✅ | [MS-DOC] 2.6 property families map to typed formatting, page setup, borders, widths, shading, and picture options |
-| Stylesheet, list templates, list overrides, names, and numbering | ✅ | ✅ | ✅ | STSH/LSTF/LFO/LVLF and related style/list records have typed reading and writer generation |
+| Stylesheet, list templates, list overrides, names, and numbering | ✅ | ✅ | ✅ | STSH/LSTF/LFO/LVLF and related style/list records have typed reading and writer generation. Native attached-glossary stylesheets use record-relative LPStd alignment; local misalignment remains rejected. |
 | Section layout, columns, borders, page/line numbering, and note placement | ✅ | ✅ | ✅ | Section properties are typed and serialized; pagination and line-breaking calculations are not performed |
 | PLRSID, saved-by, associated strings, proofing, grammar, and spelling PLCs | ✅ | ✅ | ✅ | Bounded auxiliary tables and state are read and mutated with mandatory/optional emission rules where required |
 | Auto-summary (Asumyi and PlcfAsumy) | ✅ | ✅ | ✅ | Typed summary state and checked `PlcfAsumy` ranges support bounded CRUD and exact PLC authoring; Word’s summary algorithm remains inert |
 | Captions and AutoCaption tables | ✅ | ✅ | ✅ | Contextual `captions::{Tables, Editor, Snapshot, Transaction}` owns bounded FIB/table-stream codecs, typed labels, numbering/location options, validated ProgID-to-label references, and failure-atomic package CRUD; edits append new ranges and clear only FIB pointers, preserving unrelated table bytes. Word caption insertion, field refresh, host activation, and macro execution remain inert |
 | Smart tags and factoids (Plcffactoid, property bags, and related STTBs) | ✅ | ✅ | ✅ | `parts::smart_tags::{Snapshot, Transaction, Commit, Patch}` adds source-checked bookmark, property-bag, and recognizer-range edits while preserving opaque FIB/table bytes; recognizers, schema downloads, VBA callbacks, and URLs remain inert |
 | Master-document subdocuments (PlcfWKB, WKB, FNPI, SttbFnm) | 🟡 | ✅ | 🟡 | `parts::subdocuments::{Snapshot, Transaction, TablePatch}` owns source-checked, failure-atomic semantic edits, exact table encoders, and package publication with checked FIB pointer relocation for `PlcfWKB`/`SttbFnm`; unrelated table bytes and undefined FNIF/WKB bits remain preserved. Referenced files remain inert and are never opened or followed |
-| Revision marks, author tables, and property revisions | ✅ | ✅ | ✅ | Insert/delete/move and paragraph, table, cell, row, and property revision records support transactional edit/accept/reject behavior; `tracked_revision::{Snapshot, Transaction, Commit, Patch}` adds source-checked binary story edits with reversible snapshots |
+| Revision marks, author tables, and property revisions | ✅ | ✅ | ✅ | Insert/delete/move and paragraph, table, cell, row, and property revision records support transactional edit/accept/reject behavior; `tracked_revision::{Snapshot, Transaction, Commit, Patch}` adds source-checked binary story edits with reversible snapshots. Native 0x80/0x81 revision toggles share the semantic reader’s flag resolution; valid toggles are not Bool8 repair cases. Native move pairs retain exact CP ranges, author, timestamp and RSID, and both accept/reject routes invert exactly. |
 | Document variables, attached-template and web-export metadata | 🟡 | ✅ | ✅ | Stored settings and relationship-like metadata are available where exposed; templates and web targets are not loaded and web layout is not generated |
 | Mail-merge settings, sources, filters, and recipients (Pms, Pmfs, Rfs, ODSO) | 🟡 | ✅ | ✅ | Word 97 and Word 2002+ source descriptors, SQL/connection text, recipient filtering, sorting, inclusion, and field mappings are typed bounded metadata; data sources are never contacted and no merge is run |
 | Legacy form fields and FFData | ✅ | ✅ | ✅ | Text, checkbox, dropdown, defaults, selections, help/status text, and verbatim entry/exit macro names are typed; macros and host form behavior are inert |
@@ -199,3 +199,28 @@ execution remain outside the DOC package API.
 - `src/document/{codec,mod}.rs`, `src/paragraph/`, `src/table.rs`, `src/section/`, `src/sprm.rs`, `src/sprm_operations/`, `src/parts/`, and `src/writer/` own CP/text, PLC, FKP, style/list, story, and formatting behavior.
 - The contextual metadata codecs live under `src/parts/`, with the corresponding facade modules in `src/lib.rs`; `src/route_slip.rs` layers route-slip codecs, validation, package editors, snapshot transactions, and its contextual facade. Envelope metadata is implemented by `src/parts/envelope/` over its FIB owner.
 - `src/shape/`, `src/image.rs`, `src/equation.rs`, `src/embedded_object/`, and `src/vba.rs` own payload-oriented OfficeArt, picture, MTEF, OLE, and VBA support.
+
+## Native Microsoft Word regression scope
+
+`tests/microsoft_office_native.rs` opens 20 unmodified DOC/DOT/extensionless-child
+fixtures, checks exact all-story paragraph catalogs and top-level table counts,
+and preserves each CFB file byte for byte on no-op publication. Native body
+title edits across 13 packages preserve unrelated stream payloads and invert
+to the complete original file. A Unicode body also exercises paragraph
+creation, movement and removal.
+
+Targeted checks cover attached AutoText, move identities and accept/reject,
+comment reply metadata and timestamps, legacy FFData defaults versus undefined
+stored states, inert master/child paths, and encrypted DOC credentials and
+write-reservation metadata. Encrypted publication retains ciphertext; the
+ordinary edit API gives the typed Encrypted refusal. Main-body template text
+and deferred character-format edits retain the glossary’s text and selected
+formatting. Changed publication refuses broken pre-existing FIB coupling.
+The operations suite exercises native template queries and atomic body edits
+on both configured owner routes.
+
+`tools/native_office_tests.json` records the bounded assertion scopes. All-story
+paragraph counts include secondary stories and table marks; they are distinct
+from the ordinary body paragraph view. No-op preservation and macro-stream
+retention do not establish typed coverage of every embedded feature. These
+tests do not claim a fresh Word reopen, macro execution or external refresh.

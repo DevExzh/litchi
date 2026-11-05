@@ -355,6 +355,60 @@ pub(super) fn strict_sprms(grp: &[u8]) -> Result<Vec<crate::sprm::Sprm>> {
         .map_err(|error| corrupted(format!("malformed or overlapping SPRM sequence: {error}")))
 }
 
+/// Resolve just the revision flags with the semantic reader's ordered
+/// toggle behavior. Unrelated character properties stay outside this scan.
+pub(super) fn revision_flags(sprms: &[crate::sprm::Sprm]) -> Result<(bool, bool)> {
+    let mut inserted = None;
+    let mut deleted = None;
+    let mut tolerance = crate::leniency::ToleranceReport::default();
+    for sprm in sprms {
+        let (state, name) = match sprm.opcode {
+            SPRM_C_F_RMARK => (&mut inserted, "sprmCFRMarkIns"),
+            SPRM_C_F_RMARK_DEL => (&mut deleted, "sprmCFRMarkDel"),
+            _ => continue,
+        };
+        *state = Some(crate::parts::chp::CharacterProperties::revision_flag(
+            sprm,
+            name,
+            *state,
+            &mut tolerance,
+        )?);
+    }
+    Ok((inserted == Some(true), deleted == Some(true)))
+}
+
+#[cfg(test)]
+mod revision_flag_tests {
+    use super::*;
+
+    #[test]
+    fn revision_enumeration_resolves_toggles_and_later_flag_overrides() {
+        for (values, expected) in [
+            (vec![0], false),
+            (vec![1], true),
+            (vec![0x80], false),
+            (vec![0x81], true),
+            (vec![1, 0], false),
+            (vec![0, 1], true),
+            (vec![1, 0x80], true),
+            (vec![1, 0x81], false),
+            (vec![2], false),
+        ] {
+            let mut bytes = Vec::new();
+            for value in values {
+                bytes.extend_from_slice(&SPRM_C_F_RMARK.to_le_bytes());
+                bytes.push(value);
+                bytes.extend_from_slice(&SPRM_C_F_RMARK_DEL.to_le_bytes());
+                bytes.push(value);
+            }
+            assert_eq!(
+                revision_flags(&strict_sprms(&bytes).unwrap()).unwrap(),
+                (expected, expected)
+            );
+        }
+    }
+}
+
 /// Parse one PAPX group and retain only the final table-membership state.
 ///
 /// PAPX carries a two-byte style index before its SPRM body. The reverse

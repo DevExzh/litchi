@@ -35,12 +35,9 @@
 //! Tests for the master-document subdocument directory (`PlcfWKB`) and the
 //! referenced-file name table (`SttbFnm`), MS-DOC 2.8.34 and 2.9.288.
 //!
-//! No fixture in `test-data/` or Apache POI's `test-data/document/` carries a
-//! non-zero `lcbPlcfWkb` or `lcbSttbFnm` (the one hit elsewhere,
-//! LibreOffice core `sw/qa/extras/ww8export/data/tdf59896.doc`, holds
-//! a garbage `lcbSttbFnm` and no table stream at all), so table content is
-//! covered by the synthesized unit tests in `parts::subdocuments`; these
-//! tests pin down that ordinary documents parse cleanly and report `None`.
+//! These older producer specimens exercise absent master-document tables.
+//! The positive native Word PlcfWKB/SttbFnm and extensionless LEGACY child
+//! regressions live in `tests/microsoft_office_native.rs`.
 
 use litchi_cfb::OleFile;
 use litchi_doc::parts::fib::FileInformationBlock;
