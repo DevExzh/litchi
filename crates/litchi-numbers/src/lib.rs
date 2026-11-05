@@ -341,22 +341,6 @@ pub use limits::{
 pub use litchi_iwa_common::chart::arrangement::ChartArrangement;
 pub use litchi_iwa_common::chart::data::ChartData;
 pub use litchi_iwa_common::chart::metadata::ChartMetadata;
-#[cfg(feature = "internal-iwork-source")]
-#[doc(hidden)]
-pub use package::table_appearance::SourceBuiltAppearancePayload;
-#[cfg(feature = "internal-iwork-source")]
-#[doc(hidden)]
-pub use package::{
-    __compatibility_tables_from_prepared_source, __semantic_document_from_prepared_source,
-};
-#[cfg(feature = "internal-iwork-source")]
-#[doc(hidden)]
-pub use package::{__decode_image_adjustments_payload, ImageAdjustmentsError};
-#[cfg(feature = "internal-iwork-source")]
-#[doc(hidden)]
-pub use package::{
-    __movie_playback_settings, __rewrite_movie_playback_settings, MoviePlaybackError,
-};
 
 pub use package::{
     Error, MergeReader, Package, PayloadLimitKind, ResourceError, Result, SaveError, SemanticPath,

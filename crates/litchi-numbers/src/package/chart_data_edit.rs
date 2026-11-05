@@ -417,7 +417,7 @@ impl Package {
     /// Apply an exact-source checked standalone chart-data patch.
     pub fn apply_sheet_chart_data(&self, patch: &Patch) -> Result<Commit, ChartDataError> {
         let catalog = physical_catalog(self).map_err(map_arrangement_error)?;
-        let source_owner = catalog.__source_owner();
+        let source_owner = catalog.source_owner();
         if !patch.artifacts.authorizes_owner(&source_owner) {
             return Err(ChartDataError::PatchConflict);
         }
@@ -432,7 +432,7 @@ fn commit_edit(
     after: Option<ChartData>,
 ) -> Result<Commit, ChartDataError> {
     let catalog = physical_catalog(source).map_err(map_arrangement_error)?;
-    let source_owner = catalog.__source_owner();
+    let source_owner = catalog.source_owner();
     commit_patch_parts(source, selection, before, None, after, source_owner)
 }
 
@@ -605,7 +605,7 @@ fn commit_patch_parts(
     }
     let candidate = rewrite_sheet_chart_data(source, selection, after.as_ref(), &mut budget)?;
     let target_catalog = physical_catalog(&candidate).map_err(map_arrangement_error)?;
-    let target_owner = target_catalog.__source_owner();
+    let target_owner = target_catalog.source_owner();
     let selected = select_chart_with_budget(
         &candidate,
         SheetSelector::position(selection.sheet_position),

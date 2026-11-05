@@ -571,7 +571,7 @@ impl Package {
     /// Apply a reversible exact-source relocation patch.
     pub fn apply_table_relocation(&self, patch: &Patch) -> Result<Commit, Error> {
         let catalog = physical_source(self)?;
-        let source = catalog.__source_owner();
+        let source = catalog.source_owner();
         if !patch.artifacts.authorizes_owner(&source) {
             return Err(Error::PatchConflict);
         }
@@ -626,7 +626,7 @@ impl Package {
 
 fn commit_edit(edit: Edit<'_>) -> Result<Commit, Error> {
     let catalog = physical_source(edit.source)?;
-    let source_owner = catalog.__source_owner();
+    let source_owner = catalog.source_owner();
     if edit.operation.is_same_sheet() {
         return Ok(Commit {
             package: edit.source.snapshot(),
@@ -655,7 +655,7 @@ fn commit_edit(edit: Edit<'_>) -> Result<Commit, Error> {
     )?;
     verify_target_state(&package, edit.operation)?;
     verify_locality(edit.source, &package, edit.operation)?;
-    let target_owner = physical_source(&package)?.__source_owner();
+    let target_owner = physical_source(&package)?.source_owner();
     let touched_components =
         touched_component_count(edit.table, edit.source_sheet, edit.destination_sheet);
     Ok(Commit {
@@ -800,53 +800,6 @@ pub(super) fn rewrite_bytes(
     destination_sheet: SheetTarget,
     deleted_previews: &[&str],
 ) -> Result<Vec<u8>, Error> {
-    rewrite_bytes_with_parent_policy(
-        source,
-        operation,
-        table,
-        source_sheet,
-        destination_sheet,
-        deleted_previews,
-        false,
-    )
-}
-
-/// Rewrite a physical relocation for the legacy migration host.
-///
-/// Source-built host packages can contain a rooted table-info drawable whose
-/// payload intentionally omits the optional parent edge. The public owner
-/// requires that edge for a strict relocation, while this compatibility seam
-/// preserves the producer-authored omission and still moves the rooted sheet
-/// ownership. All archive, wire, and verification work remains in this owner.
-#[cfg(feature = "internal-iwork-source")]
-pub(super) fn rewrite_bytes_for_compatibility(
-    source: &Package,
-    operation: Operation,
-    table: table_headers::Target,
-    source_sheet: SheetTarget,
-    destination_sheet: SheetTarget,
-    deleted_previews: &[&str],
-) -> Result<Vec<u8>, Error> {
-    rewrite_bytes_with_parent_policy(
-        source,
-        operation,
-        table,
-        source_sheet,
-        destination_sheet,
-        deleted_previews,
-        true,
-    )
-}
-
-fn rewrite_bytes_with_parent_policy(
-    source: &Package,
-    operation: Operation,
-    table: table_headers::Target,
-    source_sheet: SheetTarget,
-    destination_sheet: SheetTarget,
-    deleted_previews: &[&str],
-    preserve_missing_parent: bool,
-) -> Result<Vec<u8>, Error> {
     let source_catalog = physical_source(source)?;
     let physical_limits = source_catalog.limits();
     let snappy_limits = physical_limits
@@ -932,7 +885,6 @@ fn rewrite_bytes_with_parent_policy(
                 operation.source_sheet_identifier,
                 operation.destination_sheet_identifier,
                 operation.model_identifier,
-                preserve_missing_parent,
                 physical_limits,
                 operation.path(),
             )?;
@@ -1018,7 +970,6 @@ fn mutate_table_info(
     source_sheet_identifier: u64,
     destination_sheet_identifier: u64,
     model_identifier: u64,
-    preserve_missing_parent: bool,
     limits: litchi_iwa_archive::Limits,
     path: Path,
 ) -> Result<(), Error> {
@@ -1037,42 +988,12 @@ fn mutate_table_info(
         return Err(invalid_source(path));
     }
     let parent = table_parent_identifier(&message.data, path)?;
-    if parent != Some(source_sheet_identifier) && !(preserve_missing_parent && parent.is_none()) {
+    if parent != Some(source_sheet_identifier) {
         return Err(invalid_source(path));
     }
     let before_model = table_model_identifier(&message.data, path)?;
     if before_model != model_identifier {
         return Err(invalid_source(path));
-    }
-    if parent.is_none() {
-        // A compatibility source may omit the optional TableInfo parent edge.
-        // Keep that producer-authored shape unchanged; a metadata-only edge
-        // would be ambiguous because there is no payload edge to relocate.
-        let transition = reference_transition_replace(
-            object,
-            target.info_message_index,
-            source_sheet_identifier,
-            destination_sheet_identifier,
-            path,
-        )?;
-        if transition.is_some() {
-            return Err(invalid_source(path));
-        }
-        let data = try_copy_bytes(&message.data, path)?;
-        object
-            .replace_message_preserving_header(
-                target.info_message_index,
-                RawMessage {
-                    type_: message.type_,
-                    data,
-                },
-                limits
-                    .effective_archive_limits()
-                    .map_err(|_error| invalid_source(path))?,
-            )
-            .map_err(|error| map_core_error(error, path))
-            .map(|_old| ())?;
-        return Ok(());
     }
     let data = patch_table_parent(
         &message.data,
@@ -1739,51 +1660,6 @@ pub(super) fn verify_source_state(source: &Package, operation: Operation) -> Res
     Ok(())
 }
 
-/// Verify the rooted physical source state used by the migration-host seam.
-///
-/// Unlike [`verify_source_state`], this admission does not consult the
-/// semantic document. A source-built host snapshot can retain a valid rooted
-/// table graph while its table storage is outside the focused semantic
-/// projection. The optional TableInfo parent is preserved when absent; a
-/// present parent must still identify the source sheet.
-#[cfg(feature = "internal-iwork-source")]
-pub(super) fn verify_physical_source_state(
-    source: &Package,
-    operation: Operation,
-) -> Result<Option<u64>, Error> {
-    let target = resolve_table_target(
-        source,
-        operation.source_sheet,
-        operation.source_table,
-        operation.path(),
-    )?;
-    let parent = table_parent_identifier_for_target(source, target, operation.path())?;
-    if target.sheet_identifier != operation.source_sheet_identifier
-        || target.drawable_identifier != operation.drawable_identifier
-        || target.model_identifier != operation.model_identifier
-        || parent.is_some_and(|identifier| identifier != operation.source_sheet_identifier)
-    {
-        return Err(Error::PatchConflict);
-    }
-    let destination = resolve_sheet_target(source, operation.destination_sheet, operation.path())?;
-    if destination.identifier != operation.destination_sheet_identifier {
-        return Err(Error::PatchConflict);
-    }
-    if operation.is_same_sheet() {
-        return Ok(parent);
-    }
-    if sheet_reference_count(
-        source,
-        destination,
-        operation.drawable_identifier,
-        operation.path(),
-    )? != 0
-    {
-        return Err(Error::PatchConflict);
-    }
-    Ok(parent)
-}
-
 pub(super) fn verify_target_state(candidate: &Package, operation: Operation) -> Result<(), Error> {
     let target = resolve_table_target(
         candidate,
@@ -1796,53 +1672,6 @@ pub(super) fn verify_target_state(candidate: &Package, operation: Operation) -> 
         || target.model_identifier != operation.model_identifier
         || table_parent_identifier_for_target(candidate, target, operation.path())?
             != Some(operation.destination_sheet_identifier)
-    {
-        return Err(Error::Verification);
-    }
-    let source = resolve_sheet_target(candidate, operation.source_sheet, operation.path())?;
-    let destination =
-        resolve_sheet_target(candidate, operation.destination_sheet, operation.path())?;
-    if sheet_reference_count(
-        candidate,
-        source,
-        operation.drawable_identifier,
-        operation.path(),
-    )? != 0
-        || sheet_reference_count(
-            candidate,
-            destination,
-            operation.drawable_identifier,
-            operation.path(),
-        )? != 1
-    {
-        return Err(Error::Verification);
-    }
-    Ok(())
-}
-
-/// Verify the rooted physical target state used by the migration-host seam.
-///
-/// The target must retain the source's parent-edge shape: a present parent is
-/// rewritten to the destination sheet, while an omitted parent remains
-/// omitted. Sheet ownership and cardinality are checked in both cases.
-#[cfg(feature = "internal-iwork-source")]
-pub(super) fn verify_physical_target_state(
-    candidate: &Package,
-    operation: Operation,
-    source_parent: Option<u64>,
-) -> Result<(), Error> {
-    let target = resolve_table_target(
-        candidate,
-        operation.destination_sheet,
-        operation.destination_table,
-        operation.path(),
-    )?;
-    let expected_parent = source_parent.map(|_identifier| operation.destination_sheet_identifier);
-    if target.sheet_identifier != operation.destination_sheet_identifier
-        || target.drawable_identifier != operation.drawable_identifier
-        || target.model_identifier != operation.model_identifier
-        || table_parent_identifier_for_target(candidate, target, operation.path())?
-            != expected_parent
     {
         return Err(Error::Verification);
     }

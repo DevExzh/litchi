@@ -1,40 +1,32 @@
-#![cfg(feature = "internal-iwork-source")]
+//! `Package::from_prepared_source` adopts the container detection parsed.
 
 use std::path::PathBuf;
 use std::sync::Arc;
 
 use litchi_iwa_detect::{Format, PreparedSource};
-use litchi_numbers::{
-    __compatibility_tables_from_prepared_source, compatibility_tables_from_bytes,
-};
+use litchi_numbers::Package;
 
 fn fixture_path() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../test-data/iwork/numbers/basic.numbers")
 }
 
 #[test]
-fn prepared_source_handoff_matches_global_compatibility_projection()
--> Result<(), Box<dyn std::error::Error>> {
+fn prepared_source_handoff_preserves_bytes_and_semantics() -> Result<(), Box<dyn std::error::Error>>
+{
     let source: Arc<[u8]> = std::fs::read(fixture_path())?.into();
-    let source_lifetime = Arc::downgrade(&source);
-    let expected = compatibility_tables_from_bytes(&source)?;
+    let direct = Package::from_bytes(&source)?;
     let prepared = PreparedSource::from_shared_bytes(
         Arc::clone(&source),
         litchi_iwa_detect::Limits::default(),
     )?
     .ok_or_else(|| std::io::Error::other("native Numbers fixture was not detected"))?;
     assert_eq!(prepared.format(), Format::Numbers);
-    drop(source);
-    assert!(source_lifetime.upgrade().is_some());
 
-    let actual = __compatibility_tables_from_prepared_source(
-        prepared,
-        litchi_numbers::SemanticLimits::DEFAULT,
-    )?;
+    let package = Package::from_prepared_source(prepared, litchi_numbers::SemanticLimits::DEFAULT)?;
 
-    assert!(source_lifetime.upgrade().is_none());
-    assert_eq!(actual, expected);
-    assert_eq!(actual.len(), 1);
-    assert_eq!(actual[0].name(), "Table 1");
+    let mut bytes = Vec::new();
+    package.write_to(&mut bytes)?;
+    assert_eq!(bytes, source.as_ref());
+    assert_eq!(package.sheets(), direct.sheets());
     Ok(())
 }

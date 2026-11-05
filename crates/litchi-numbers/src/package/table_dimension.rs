@@ -315,7 +315,7 @@ impl Package {
     /// Returns a conflict unless this package is the patch's exact source.
     pub fn apply_table_dimension_size(&self, patch: &Patch) -> Result<Commit, TransactionError> {
         let catalog = physical_source(self)?;
-        let source = catalog.__source_owner();
+        let source = catalog.source_owner();
         phase!(FINGERPRINT);
         if !patch.artifacts.authorizes_owner(&source) {
             return Err(TransactionError::PatchConflict);
@@ -369,7 +369,7 @@ impl Package {
 pub(crate) fn commit(edit: Edit<'_>) -> Result<Commit, TransactionError> {
     let catalog = physical_source(edit.source)?;
     if edit.before == edit.size {
-        let source = catalog.__source_owner();
+        let source = catalog.source_owner();
         phase!(FINGERPRINT);
         return Ok(Commit {
             package: edit.source.snapshot(),
@@ -410,7 +410,7 @@ pub(crate) fn commit(edit: Edit<'_>) -> Result<Commit, TransactionError> {
             crate::table::dimension::transaction::Refusal::TableLocked { path: edit.path() },
         ));
     }
-    let source = catalog.__source_owner();
+    let source = catalog.source_owner();
     let previews = root_previews(catalog)?;
     let package = rewrite(edit.source, selected, edit.size, &previews)?;
     let target_payload = selected_payload(&package, edit.evidence)?;
@@ -422,7 +422,7 @@ pub(crate) fn commit(edit: Edit<'_>) -> Result<Commit, TransactionError> {
         0,
         target_payload,
     )?;
-    let target = physical_source(&package)?.__source_owner();
+    let target = physical_source(&package)?.source_owner();
     phase!(FINGERPRINT);
     Ok(Commit {
         package,

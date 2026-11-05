@@ -189,7 +189,7 @@ impl Edit<'_> {
     pub fn commit(mut self) -> Result<Commit, TableMergesError> {
         self.ensure_loaded()?;
         let source_catalog = physical_source(self.source)?;
-        let source_bytes = source_catalog.__source_owner();
+        let source_bytes = source_catalog.source_owner();
         let source_fingerprint = fingerprint(&source_bytes);
         let mut edit = self;
         let before = edit.before.take().ok_or(TableMergesError::InvalidSource)?;
@@ -230,7 +230,7 @@ impl Edit<'_> {
             &after,
             &mut budget,
         )?;
-        let target = physical_source(&package)?.__source_owner();
+        let target = physical_source(&package)?.source_owner();
         let target_fingerprint = fingerprint(&target);
         let patch = Patch {
             source: source_bytes,

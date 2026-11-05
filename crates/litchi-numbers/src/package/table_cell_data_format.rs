@@ -481,7 +481,7 @@ impl Edit<'_> {
 fn artifact(package: &Package) -> Result<litchi_iwa_archive::package::SharedBytes, Error> {
     Ok(super::table_headers::rewrite::physical_source(package)
         .map_err(|_error| Error::Refused(Refusal::UnsupportedSource))?
-        .__source_owner())
+        .source_owner())
 }
 
 /// One family transaction: set `after` (a value of `family`) or, for

@@ -155,10 +155,9 @@ path = "examples/remove_numbers_sheet.rs"
 
 [features]
 default = []
-internal-iwork-source = []
 
 [dependencies]
-litchi-iwa-archive = { workspace = true, features = ["internal-iwork-source"] }
+litchi-iwa-archive = { workspace = true }
 litchi-iwa-common  = { workspace = true }
 litchi-iwa-core    = { workspace = true }
 litchi-iwa-detect  = { workspace = true }
@@ -169,7 +168,6 @@ litchi-iwa-text    = { workspace = true }
 litchi-iwa-text-wire = { workspace = true }
 litchi-core        = { workspace = true }
 litchi-numbers-wire = { workspace = true }
-phf                = { workspace = true }
 plist              = { workspace = true, features = ["enable_unstable_features_that_may_break_with_minor_version_bumps"] }
 ryu                = { workspace = true }
 sha1               = { workspace = true }

@@ -1646,7 +1646,7 @@ fn commit_edit(edit: Edit<'_>) -> Result<Commit, Error> {
     let mut budget = edit.budget.ok_or_else(invalid_source)?;
     let catalog =
         super::table_headers::rewrite::physical_source(edit.source).map_err(map_header_error)?;
-    let source = catalog.__source_owner();
+    let source = catalog.source_owner();
     if before == settings {
         return Ok(Commit {
             package: edit.source.snapshot(),
@@ -1694,7 +1694,7 @@ fn commit_edit(edit: Edit<'_>) -> Result<Commit, Error> {
         .map_err(map_header_error)?;
     let target_bytes = super::table_headers::rewrite::physical_source(&package)
         .map_err(map_header_error)?
-        .__source_owner();
+        .source_owner();
     let target_reopen = reopen_cost(&package)?;
     budget.charge_transaction_work(source.len().saturating_add(target_bytes.len()))?;
     budget.charge_references(
@@ -1731,7 +1731,7 @@ fn commit_edit(edit: Edit<'_>) -> Result<Commit, Error> {
 fn apply_patch(source: &Package, patch: &Patch) -> Result<Commit, Error> {
     let source_catalog =
         super::table_headers::rewrite::physical_source(source).map_err(map_header_error)?;
-    let bytes = source_catalog.__source_owner();
+    let bytes = source_catalog.source_owner();
     let mut budget = TransactionBudget::new(source);
     budget.charge_transaction_work(bytes.len())?;
     if !patch.artifacts.authorizes_owner(&bytes) {

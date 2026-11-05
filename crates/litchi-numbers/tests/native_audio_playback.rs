@@ -1,27 +1,24 @@
-#![cfg(feature = "internal-iwork-source")]
-
 //! Native Numbers integration coverage for file-backed audio playback.
 //!
 //! The fixtures were authored, saved, closed, and reopened by Numbers 14.4.
-//! The test locates the audio MovieArchive by its typed `audio_only` marker,
-//! then exercises the focused Numbers payload seam without depending on a
-//! native drawable identifier or a particular component name.
+//! The test edits playback through the drawable-properties family, then locates
+//! the audio MovieArchive by its typed `audio_only` marker to check the bytes,
+//! without depending on a native drawable identifier or a particular component
+//! name.
 
 use std::{io, path::PathBuf};
 
-use litchi_iwa_archive::{
-    Limits,
-    package::{Catalog, EntryEdit},
-};
+use litchi_iwa_archive::package::Catalog;
 use litchi_iwa_common::{
     WireLimits,
     media::playback::{MediaLoopMode, MediaPlaybackSettings, MediaVolume},
     wire::WireView,
 };
-use litchi_iwa_core::{Archive, RawMessage, SnappyStream};
-use litchi_iwa_protos::tsd;
+use litchi_iwa_core::{Archive, SnappyStream};
+use litchi_iwa_protos::{movie_playback_codec as codec, tsd};
+use litchi_numbers::Package;
 use litchi_numbers::cell::Value;
-use litchi_numbers::{__movie_playback_settings, __rewrite_movie_playback_settings, Package};
+use litchi_numbers::sheet::drawable::DrawableSelector;
 use prost::Message as _;
 
 type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
@@ -46,8 +43,6 @@ fn resaved_fixture_path() -> PathBuf {
 #[derive(Debug, Clone)]
 struct AudioPayload {
     member: String,
-    object_id: u64,
-    message_index: usize,
     bytes: Vec<u8>,
 }
 
@@ -67,8 +62,7 @@ fn audio_payload(source: &[u8]) -> TestResult<AudioPayload> {
             Err(_) => continue,
         };
         for object in archive.objects {
-            let object_id = object.archive_info.identifier;
-            for (message_index, message) in object.messages.into_iter().enumerate() {
+            for message in object.messages {
                 if message.type_ != MOVIE_MESSAGE_TYPE {
                     continue;
                 }
@@ -87,9 +81,6 @@ fn audio_payload(source: &[u8]) -> TestResult<AudioPayload> {
                 }
                 found = Some(AudioPayload {
                     member: entry.name().to_owned(),
-                    object_id: object_id
-                        .ok_or_else(|| io::Error::other("native audio object has no identifier"))?,
-                    message_index,
                     bytes: message.data,
                 });
             }
@@ -98,45 +89,18 @@ fn audio_payload(source: &[u8]) -> TestResult<AudioPayload> {
     found.ok_or_else(|| io::Error::other("native ordinary audio MovieArchive is missing").into())
 }
 
-fn rewrite_audio_payload(
-    source: &[u8],
-    location: &AudioPayload,
-    replacement: &[u8],
-) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(source, Default::default())?;
-    let entry = catalog
-        .iter()
-        .find(|entry| entry.name() == location.member)
-        .ok_or_else(|| io::Error::other("native audio component is missing"))?;
-    let mut archive = Archive::parse(
-        SnappyStream::decompress(entry.data(), Default::default())?.as_bytes(),
-        Default::default(),
-    )?;
-    let object = archive
-        .object_mut(location.object_id)
-        .ok_or_else(|| io::Error::other("native audio MovieArchive object is missing"))?;
-    let message_type = object
-        .messages
-        .get(location.message_index)
-        .map(|message| message.type_)
-        .ok_or_else(|| io::Error::other("native audio MovieArchive message is missing"))?;
-    if message_type != MOVIE_MESSAGE_TYPE {
-        return Err(io::Error::other("native audio message type changed").into());
-    }
-    object.replace_message_preserving_header(
-        location.message_index,
-        RawMessage {
-            type_: MOVIE_MESSAGE_TYPE,
-            data: replacement.to_vec(),
-        },
-        Default::default(),
-    )?;
-    let compressed =
-        SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
-    Ok(catalog.reassemble_to_bytes(
-        &[EntryEdit::new(&location.member, &compressed)],
-        Limits::default(),
-    )?)
+fn playback(package: &Package) -> TestResult<MediaPlaybackSettings> {
+    package
+        .sheet_drawable_properties(0, DrawableSelector::audio(0))?
+        .playback()
+        .ok_or_else(|| io::Error::other("native audio playback is missing").into())
+}
+
+/// Set playback through the public family and return the committed package.
+fn set_playback(package: &Package, settings: MediaPlaybackSettings) -> TestResult<Package> {
+    let mut edit = package.edit_sheet_drawable_properties(0, DrawableSelector::audio(0))?;
+    edit.set_playback(settings)?;
+    Ok(edit.commit()?.package().clone())
 }
 
 fn marker(package: &Package) -> TestResult<String> {
@@ -243,39 +207,31 @@ fn native_audio_source_reads_typed_settings_and_has_exact_noop() -> TestResult {
     let package = Package::from_bytes(&source)?;
     assert_eq!(exact_bytes(&package)?, source);
 
-    let location = audio_payload(&source)?;
-    let baseline = __movie_playback_settings(&location.bytes, WireLimits::default())?;
+    let baseline = playback(&package)?;
     assert_native_source_settings(baseline);
-    assert_eq!(
-        __rewrite_movie_playback_settings(&location.bytes, baseline, WireLimits::default())?,
-        location.bytes
-    );
+    let unchanged = set_playback(&package, baseline)?;
+    assert_eq!(exact_bytes(&unchanged)?, source);
     Ok(())
 }
 
 #[test]
 fn native_audio_source_rewrite_preserves_wire_graph_and_inverse() -> TestResult {
     let source = std::fs::read(fixture_path())?;
-    let source_marker = marker(&Package::from_bytes(&source)?)?;
+    let package = Package::from_bytes(&source)?;
+    let source_marker = marker(&package)?;
     let location = audio_payload(&source)?;
-    let baseline = __movie_playback_settings(&location.bytes, WireLimits::default())?;
+    let baseline = playback(&package)?;
     let expected = replacement(baseline)?;
-    let changed_payload =
-        __rewrite_movie_playback_settings(&location.bytes, expected, WireLimits::default())?;
 
-    assert_ne!(changed_payload, location.bytes);
+    let changed = set_playback(&package, expected)?;
+    let changed_package = exact_bytes(&changed)?;
+    let changed_location = audio_payload(&changed_package)?;
+    assert_ne!(changed_location.bytes, location.bytes);
+    assert_eq!(playback(&changed)?, expected.canonicalize()?);
     assert_eq!(
-        __movie_playback_settings(&changed_payload, WireLimits::default())?,
-        expected.canonicalize()?
-    );
-    assert_eq!(
-        unknown_playback_wire(&changed_payload)?,
+        unknown_playback_wire(&changed_location.bytes)?,
         unknown_playback_wire(&location.bytes)?
     );
-
-    let changed_package = rewrite_audio_payload(&source, &location, &changed_payload)?;
-    let changed_location = audio_payload(&changed_package)?;
-    assert_eq!(changed_location.bytes, changed_payload);
     assert_eq!(
         marker(&Package::from_bytes(&changed_package)?)?,
         source_marker
@@ -283,17 +239,10 @@ fn native_audio_source_rewrite_preserves_wire_graph_and_inverse() -> TestResult 
     assert_media_asset_untouched(&source, &changed_package)?;
     assert_member_locality(&source, &changed_package, &location.member)?;
 
-    let restored_payload =
-        __rewrite_movie_playback_settings(&changed_payload, baseline, WireLimits::default())?;
-    assert_eq!(restored_payload, location.bytes);
-    let restored_package =
-        rewrite_audio_payload(&changed_package, &changed_location, &restored_payload)?;
-    assert_eq!(audio_payload(&restored_package)?.bytes, location.bytes);
-    assert_eq!(
-        marker(&Package::from_bytes(&restored_package)?)?,
-        source_marker
-    );
-    assert_media_asset_untouched(&source, &restored_package)?;
+    let restored = exact_bytes(&set_playback(&changed, baseline)?)?;
+    assert_eq!(audio_payload(&restored)?.bytes, location.bytes);
+    assert_eq!(marker(&Package::from_bytes(&restored)?)?, source_marker);
+    assert_media_asset_untouched(&source, &restored)?;
     Ok(())
 }
 
@@ -305,54 +254,33 @@ fn native_audio_resaved_fixture_reads_changed_settings_and_roundtrips() -> TestR
     let source_marker = marker(&package)?;
 
     let location = audio_payload(&source)?;
-    let baseline = __movie_playback_settings(&location.bytes, WireLimits::default())?;
+    let baseline = playback(&package)?;
     assert_native_resaved_settings(baseline);
-    assert_eq!(
-        __rewrite_movie_playback_settings(&location.bytes, baseline, WireLimits::default())?,
-        location.bytes
-    );
+    assert_eq!(exact_bytes(&set_playback(&package, baseline)?)?, source);
 
-    let changed = baseline
+    let changed_settings = baseline
         .with_loop_mode(Some(MediaLoopMode::BackAndForth))
         .with_volume(Some(MediaVolume::new(0.25)?));
-    let changed_payload =
-        __rewrite_movie_playback_settings(&location.bytes, changed, WireLimits::default())?;
-    assert_eq!(
-        __movie_playback_settings(&changed_payload, WireLimits::default())?,
-        changed.canonicalize()?
-    );
-    let changed_package = rewrite_audio_payload(&source, &location, &changed_payload)?;
+    let changed = set_playback(&package, changed_settings)?;
+    assert_eq!(playback(&changed)?, changed_settings.canonicalize()?);
+    let changed_package = exact_bytes(&changed)?;
     let reopened = Package::from_bytes(&changed_package)?;
     assert_eq!(marker(&reopened)?, source_marker);
     assert_media_asset_untouched(&source, &changed_package)?;
     assert_member_locality(&source, &changed_package, &location.member)?;
 
-    let restored_payload =
-        __rewrite_movie_playback_settings(&changed_payload, baseline, WireLimits::default())?;
-    assert_eq!(restored_payload, location.bytes);
-    let restored = rewrite_audio_payload(
-        &changed_package,
-        &audio_payload(&changed_package)?,
-        &restored_payload,
-    )?;
+    let restored = exact_bytes(&set_playback(&changed, baseline)?)?;
     assert_eq!(audio_payload(&restored)?.bytes, location.bytes);
     assert_media_asset_untouched(&source, &restored)?;
     Ok(())
 }
 
 #[test]
-fn native_audio_playback_rejects_truncated_payload_without_rewrite() -> TestResult {
+fn native_audio_playback_codec_rejects_truncated_payload_without_rewrite() -> TestResult {
     let source = std::fs::read(fixture_path())?;
     let location = audio_payload(&source)?;
     let truncated = &location.bytes[..location.bytes.len().saturating_sub(1)];
-    assert!(__movie_playback_settings(truncated, WireLimits::default()).is_err());
-    assert!(
-        __rewrite_movie_playback_settings(
-            truncated,
-            MediaPlaybackSettings::new(std::time::Duration::from_secs(1)),
-            WireLimits::default()
-        )
-        .is_err()
-    );
+    let options = codec::DecodeOptions::for_source(truncated);
+    assert!(codec::decode_movie_playback(truncated, options).is_err());
     Ok(())
 }

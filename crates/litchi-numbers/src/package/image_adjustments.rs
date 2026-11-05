@@ -29,19 +29,6 @@ use thiserror::Error as ThisError;
 use super::{Error as PackageError, Package, SemanticLimitKind};
 use crate::{SheetSelector, selector::OwnedSheetSelector, shape::image::ImageSelector};
 
-/// Typed failures at the hidden Numbers image-adjustment seam.
-#[doc(hidden)]
-#[cfg(feature = "internal-iwork-source")]
-#[derive(Debug, Clone, PartialEq, Eq, ThisError)]
-pub enum ImageAdjustmentsError {
-    /// The bounded Buffa/wire projection rejected the source or candidate.
-    #[error("image-adjustments codec rejected the payload: {0}")]
-    Codec(#[from] codec::DecodeError),
-    /// The projected values failed the common semantic boundary.
-    #[error("invalid image adjustment value: {0}")]
-    Semantic(#[from] litchi_iwa_common::shape::image::Error),
-}
-
 const IMAGE_MESSAGE_TYPE: u32 = 3_005;
 const SHEET_MESSAGE_TYPE: u32 = 2;
 const FORM_BASED_SHEET_MESSAGE_TYPE: u32 = 3;
@@ -179,29 +166,6 @@ impl From<Refusal> for Error {
     fn from(refusal: Refusal) -> Self {
         Self::Refused(refusal)
     }
-}
-
-#[cfg(feature = "internal-iwork-source")]
-fn codec_options(source: &[u8], limits: WireLimits) -> codec::DecodeOptions {
-    let recursion_limit = u32::try_from(limits.max_nesting()).unwrap_or(u32::MAX);
-    codec::DecodeOptions::new(
-        limits.max_input_bytes().min(source.len().max(1)),
-        limits.max_fields(),
-        limits.max_rewrite_work(),
-        recursion_limit,
-    )
-    .with_max_output_bytes(limits.max_output_bytes())
-}
-
-/// Decode one borrowed Numbers ImageArchive payload into semantic controls.
-#[doc(hidden)]
-#[cfg(feature = "internal-iwork-source")]
-pub fn __decode_image_adjustments_payload(
-    source: &[u8],
-    limits: WireLimits,
-) -> Result<ImageAdjustments, ImageAdjustmentsError> {
-    let snapshot = codec::decode_image_adjustments(source, codec_options(source, limits))?;
-    adjustments_from_snapshot(snapshot).map_err(ImageAdjustmentsError::Semantic)
 }
 
 fn adjustments_from_snapshot(
@@ -1113,7 +1077,7 @@ impl Package {
     /// Apply an exact-source checked image-adjustment patch.
     pub fn apply_sheet_image_adjustments(&self, patch: &Patch) -> Result<Commit, Error> {
         let catalog = physical_catalog(self)?;
-        let owner = catalog.__source_owner();
+        let owner = catalog.source_owner();
         if !patch.artifacts.authorizes_owner(&owner) {
             return Err(Error::PatchConflict);
         }
@@ -1795,7 +1759,7 @@ fn commit_edit(
     after: ImageAdjustments,
 ) -> Result<Commit, Error> {
     let catalog = physical_catalog(source)?;
-    let source_owner = catalog.__source_owner();
+    let source_owner = catalog.source_owner();
     let mut budget = ImageBudget::for_package(source)?;
     budget.source(source.source_bytes().len())?;
     let current = select_image_with_budget(
@@ -1825,7 +1789,7 @@ fn commit_edit(
     }
     let candidate = rewrite_image(source, selection, after, &mut budget)?;
     let target_catalog = physical_catalog(&candidate)?;
-    let target_owner = target_catalog.__source_owner();
+    let target_owner = target_catalog.source_owner();
     let selected = select_image_with_budget(
         &candidate,
         SheetSelector::position(selection.sheet_position),
@@ -2627,91 +2591,6 @@ fn map_core_error(error: litchi_iwa_core::Error) -> Error {
             Error::Allocation { amount: requested }
         },
         _ => Error::InvalidSource,
-    }
-}
-
-#[cfg(all(test, feature = "internal-iwork-source"))]
-mod tests {
-    use litchi_iwa_common::WireLimits;
-    use litchi_iwa_common::shape::image::{ImageAdjustment, ImageAdjustments, ImageEnhancement};
-
-    use super::{__decode_image_adjustments_payload, codec, codec_options, write_from_adjustments};
-
-    fn rewrite_image_adjustments_payload(
-        source: &[u8],
-        adjustments: ImageAdjustments,
-    ) -> Result<Vec<u8>, codec::DecodeError> {
-        codec::rewrite_image_adjustments(
-            source,
-            write_from_adjustments(adjustments),
-            codec_options(source, WireLimits::default()),
-        )
-    }
-
-    #[test]
-    fn focused_bridge_maps_native_controls_and_preserves_unknown_bytes() {
-        let source = [
-            0x0a, 0x00, // ImageArchive.super
-            0x72, 0x10, // ImageArchive.imageAdjustments, length 16
-            0x0d, 0x00, 0x00, 0x00, 0x00, // exposure = 0.0
-            0x15, 0x00, 0x00, 0x00, 0x00, // saturation = 0.0
-            0x68, 0x00, // enhance = false
-            0x98, 0x06, 0xde, 0x07, // unknown nested field
-            0xa0, 0x06, 0xe8, 0x07, // unknown outer field
-        ];
-        let baseline = __decode_image_adjustments_payload(&source, WireLimits::default()).unwrap();
-        assert_eq!(baseline.exposure(), Some(ImageAdjustment::NEUTRAL));
-        assert_eq!(baseline.saturation(), Some(ImageAdjustment::NEUTRAL));
-        assert_eq!(baseline.enhancement(), Some(ImageEnhancement::Disabled));
-
-        let replacement = ImageAdjustments::new()
-            .with_exposure(Some(ImageAdjustment::new(0.25).unwrap()))
-            .with_saturation(Some(ImageAdjustment::new(-0.5).unwrap()))
-            .with_enhancement(Some(ImageEnhancement::Enabled));
-        let changed = rewrite_image_adjustments_payload(&source, replacement).unwrap();
-        assert_eq!(
-            __decode_image_adjustments_payload(&changed, WireLimits::default()).unwrap(),
-            replacement
-        );
-        assert!(
-            changed
-                .windows(4)
-                .any(|window| window == [0x98, 0x06, 0xde, 0x07])
-        );
-        assert!(
-            changed
-                .windows(4)
-                .any(|window| window == [0xa0, 0x06, 0xe8, 0x07])
-        );
-
-        let restored = rewrite_image_adjustments_payload(&changed, baseline).unwrap();
-        assert_eq!(restored, source);
-    }
-
-    #[test]
-    fn focused_bridge_preserves_omitted_outer_and_inner_controls() {
-        let source = [0x0a, 0x00];
-        let baseline = __decode_image_adjustments_payload(&source, WireLimits::default()).unwrap();
-        assert_eq!(baseline, ImageAdjustments::default());
-        let explicit = ImageAdjustments::new()
-            .with_exposure(Some(ImageAdjustment::NEUTRAL))
-            .with_saturation(Some(ImageAdjustment::NEUTRAL))
-            .with_enhancement(Some(ImageEnhancement::Disabled));
-        let changed = rewrite_image_adjustments_payload(&source, explicit).unwrap();
-        assert_eq!(
-            __decode_image_adjustments_payload(&changed, WireLimits::default()).unwrap(),
-            explicit
-        );
-        let reset =
-            rewrite_image_adjustments_payload(&changed, ImageAdjustments::default()).unwrap();
-        assert_eq!(reset, source);
-    }
-
-    #[test]
-    fn focused_bridge_applies_caller_limits() {
-        let source = [0x0a, 0x00, 0x72, 0x00];
-        let limits = WireLimits::default().with_input_bytes(1).unwrap();
-        assert!(__decode_image_adjustments_payload(&source, limits).is_err());
     }
 }
 

@@ -92,36 +92,14 @@ fn bounded_path_ingress_retains_an_independent_immutable_source() {
     );
 }
 
-#[cfg(feature = "internal-iwork-source")]
 #[test]
-fn shared_catalog_reader_pins_original_parsed_archives_until_last_clone_drops() {
-    use litchi_iwa_archive::{ComponentCatalog, Limits};
-
-    let records = ComponentCatalog::from_bytes(NATIVE, Default::default())
-        .unwrap()
-        .into_iter()
-        .map(|component| {
-            let (name, archive) = component.into_parts();
-            (name, Arc::new(archive))
-        })
-        .collect::<Vec<_>>();
-    let lifetimes = records
-        .iter()
-        .map(|(_, archive)| Arc::downgrade(archive))
-        .collect::<Vec<_>>();
-    let catalog = Arc::new(
-        ComponentCatalog::__from_shared_archives(
-            records
-                .iter()
-                .map(|(name, archive)| (name.as_str(), Arc::clone(archive))),
-            Limits::default(),
-        )
-        .unwrap(),
-    );
-    let object_count: usize = records
-        .iter()
-        .map(|(_, archive)| archive.objects.len())
-        .sum();
+fn semantic_object_limit_is_charged_exactly_at_ingress() {
+    let object_count: usize =
+        litchi_iwa_archive::ComponentCatalog::from_bytes(NATIVE, Default::default())
+            .unwrap()
+            .iter()
+            .map(|component| component.archive().objects.len())
+            .sum();
     let defaults = litchi_numbers::SemanticLimits::DEFAULT;
     let limited = litchi_numbers::SemanticLimits::builder()
         .max_objects(object_count - 1)
@@ -131,8 +109,8 @@ fn shared_catalog_reader_pins_original_parsed_archives_until_last_clone_drops() 
         .and_then(|b| b.build())
         .unwrap();
     assert!(matches!(
-        MergeReader::__from_shared_catalog(
-            Arc::clone(&catalog),
+        MergeReader::from_bytes_with_options(
+            NATIVE,
             litchi_numbers::OpenOptions::new().semantic_limits(limited),
         ),
         Err(TableMergesError::Limit {
@@ -141,27 +119,4 @@ fn shared_catalog_reader_pins_original_parsed_archives_until_last_clone_drops() 
             maximum,
         }) if observed == object_count as u64 && maximum == (object_count - 1) as u64
     ));
-    let reader = MergeReader::__from_shared_catalog(
-        Arc::clone(&catalog),
-        litchi_numbers::OpenOptions::new(),
-    )
-    .unwrap();
-    let clone = reader.clone();
-    for (name, archive) in &records {
-        assert!(std::ptr::eq(
-            catalog.get(name).unwrap().archive(),
-            Arc::as_ptr(archive),
-        ));
-        assert_eq!(Arc::strong_count(archive), 2);
-    }
-    drop(records);
-    drop(catalog);
-    drop(reader);
-    assert!(lifetimes.iter().all(|record| record.upgrade().is_some()));
-    assert_eq!(
-        clone.table_merges("Sheet 1", "shared-model").unwrap(),
-        vec![Region::new(10, 1, 2, 2).unwrap()]
-    );
-    drop(clone);
-    assert!(lifetimes.iter().all(|record| record.upgrade().is_none()));
 }
