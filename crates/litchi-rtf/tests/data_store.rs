@@ -51,7 +51,12 @@ fn mutation_validates_and_clear_preserves_body() {
     document.clear_data_store();
     assert!(document.data_store().is_none());
     assert_eq!(document.text(), "Text");
-    assert!(DocumentDataStore::new(Cow::Borrowed(&[])).is_err());
+    let empty = DocumentDataStore::new(Cow::Borrowed(&[])).unwrap();
+    document.set_data_store(empty.clone()).unwrap();
+    let reparsed =
+        Tree::parse_bytes(&write(&document), litchi_rtf::read::OpenOptions::default()).unwrap();
+    assert_eq!(reparsed.data_store(), Some(&empty));
+    assert_eq!(reparsed.text(), "Text");
 }
 
 #[test]
@@ -59,7 +64,6 @@ fn rejects_malformed_or_active_data_store_payloads() {
     let cases = [
         r"{\rtf1{\datastore 00}}",
         r"{\rtf1{\*\datastore 00}{\*\datastore 01}}",
-        r"{\rtf1{\*\datastore }}",
         r"{\rtf1{\*\datastore 0}}",
         r"{\rtf1{\*\datastore 0x}}",
         r"{\rtf1{\*\datastore 00{11}}}",

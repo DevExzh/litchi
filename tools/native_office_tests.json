@@ -1,0 +1,157 @@
+{
+  "schema_version": 1,
+  "tests": [
+    {
+      "crate": "litchi-rtf",
+      "target": "microsoft_office_native",
+      "name": "native_word_empty_datastore_preserves_body_and_round_trips",
+      "fixtures": [
+        "word/word-rtf-minimal.rtf"
+      ],
+      "feature_rows": [
+        "rtf-453",
+        "rtf-482"
+      ],
+      "assertions": [
+        "Exact paragraph text and count; empty data-store presence survives snapshot and canonical publication."
+      ],
+      "scope_limit": "Plain paragraph and empty metadata only; other producer metadata remains uncovered."
+    },
+    {
+      "crate": "litchi-rtf",
+      "target": "microsoft_office_native",
+      "name": "native_word_write_reservation_keeps_exact_hash_and_five_paragraphs",
+      "fixtures": [
+        "word/word-write-reservation.rtf"
+      ],
+      "feature_rows": [
+        "rtf-487",
+        "rtf-482"
+      ],
+      "assertions": [
+        "Five native paragraph markers; exact 120-byte write-reservation SHA-256; absent legacy reservation; snapshot and model-writer preservation."
+      ],
+      "scope_limit": "Passive hash retention only; no authentication or document protection execution."
+    },
+    {
+      "crate": "litchi-rtf",
+      "target": "microsoft_office_native",
+      "name": "native_word_run_edit_preserves_empty_datastore_and_source_snapshot",
+      "fixtures": [
+        "word/word-rtf-minimal.rtf"
+      ],
+      "feature_rows": [
+        "rtf-455",
+        "rtf-457"
+      ],
+      "assertions": [
+        "One body run replacement survives save/reopen with empty metadata and original source bytes intact."
+      ],
+      "scope_limit": "Single run replacement only; other transaction operations remain uncovered."
+    },
+    {
+      "crate": "litchi-rtf",
+      "target": "microsoft_office_native",
+      "name": "native_word_datastore_documents_retain_markers_through_model_writer",
+      "fixtures": [
+        "word/word-embedded-fonts.rtf",
+        "word/word-visual-objects.rtf",
+        "word/word-legacy-form.rtf",
+        "word/word-rtf-minimal.rtf",
+        "word/word-write-reservation.rtf",
+        "word/word-document-protection.rtf",
+        "word/word-review-controls.rtf",
+        "word/word-bidi-eastasia.rtf"
+      ],
+      "feature_rows": [
+        "rtf-453",
+        "rtf-482"
+      ],
+      "assertions": [
+        "Native body markers and full parsed body text survive canonical model writing; data-store presence and table/field counts retained."
+      ],
+      "scope_limit": "Counts do not establish semantic completeness of fields, pictures, objects, protection or embedded fonts."
+    },
+    {
+      "crate": "litchi-rtf",
+      "target": "microsoft_office_native",
+      "name": "native_word_bidi_and_east_asian_text_retains_unicode_scalars",
+      "fixtures": [
+        "word/word-bidi-eastasia.rtf"
+      ],
+      "feature_rows": [
+        "rtf-454",
+        "rtf-485"
+      ],
+      "assertions": [
+        "Exact Arabic, Hebrew, Japanese and Chinese text before and after canonical writing."
+      ],
+      "scope_limit": "Unicode text only; shaping, direction and East Asian layout properties remain uncovered."
+    },
+    {
+      "crate": "litchi-rtf",
+      "target": "microsoft_office_native",
+      "name": "native_word_structural_opaque_tables_preserve_source_and_refuse_canonical_loss",
+      "fixtures": [
+        "word/word-rtf-table-grid.rtf",
+        "word/word-layout-extensions.rtf"
+      ],
+      "feature_rows": [
+        "rtf-461",
+        "rtf-482"
+      ],
+      "assertions": [
+        "Native table and body markers; empty data store retained on snapshot publication; canonical writer returns InvalidInput before writing any bytes for structural opaque owners."
+      ],
+      "scope_limit": "Explicit canonical-writer boundary from the current feature matrix; supported source-splice edits are tested separately."
+    },
+    {
+      "crate": "litchi-rtf",
+      "target": "microsoft_office_native",
+      "name": "native_word_table_grid_exposes_all_four_cell_values",
+      "fixtures": [
+        "word/word-rtf-table-grid.rtf"
+      ],
+      "feature_rows": [
+        "rtf-470"
+      ],
+      "assertions": [
+        "Exact 2x2 Table Grid cell values: Key, Value, RTF_CELL_006 and 42 before and after snapshot publication."
+      ],
+      "scope_limit": "Basic table read only; nested, merged and floating tables remain uncovered."
+    },
+    {
+      "crate": "litchi-rtf",
+      "target": "microsoft_office_native",
+      "name": "native_word_table_cell_edit_preserves_every_unrelated_source_byte",
+      "fixtures": [
+        "word/word-rtf-table-grid.rtf"
+      ],
+      "feature_rows": [
+        "rtf-457",
+        "rtf-470",
+        "rtf-461"
+      ],
+      "assertions": [
+        "Changing one table cell produces exactly the source bytes with its text replaced; neighbor cell and data store retained; source snapshot unchanged."
+      ],
+      "scope_limit": "Single table-cell text operation; no general opaque-owner edit claim."
+    },
+    {
+      "crate": "litchi-rtf",
+      "target": "microsoft_office_native",
+      "name": "native_word_review_retains_insert_delete_and_comment_content",
+      "fixtures": [
+        "word/word-review-controls.rtf"
+      ],
+      "feature_rows": [
+        "rtf-474",
+        "rtf-476"
+      ],
+      "assertions": [
+        "Two typed insertion/deletion revisions with expected native text; both native comment/reply texts survive canonical publication."
+      ],
+      "scope_limit": "Content and revision type only; authors, ranges, threading, accept/reject and review mutations remain uncovered."
+    }
+  ]
+}

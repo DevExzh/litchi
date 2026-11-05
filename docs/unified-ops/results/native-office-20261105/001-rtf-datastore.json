@@ -1,0 +1,147 @@
+{
+  "schema_version": 1,
+  "date": "2026-11-05",
+  "base_commit": "b88789b1c8dcf53332ead7e4fab15208c0624bb4",
+  "change": "Accept and preserve an empty native Word datastore destination while retaining syntax, uniqueness and size validation.",
+  "regression_before": {
+    "tests": 3,
+    "failed": 3,
+    "reason": "MalformedDocument(\"RTF data-store payload cannot be empty\")"
+  },
+  "validation": [
+    {
+      "command": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi-rtf --lib --tests",
+      "passed": 1548,
+      "failed": 0,
+      "ignored": 0,
+      "test_binaries": 186
+    },
+    {
+      "command": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi-ops --no-default-features --features rtf --test 'rtf_*' --test text_set_preservation",
+      "passed": 180,
+      "failed": 0,
+      "ignored": 0,
+      "test_binaries": 21
+    },
+    {
+      "command": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo clippy --locked --offline -p litchi-rtf --lib --no-deps -- -D warnings",
+      "exit_code": 0
+    },
+    {
+      "command": "python3 -m unittest tools.test_native_office_corpus tools.test_no_3rdparty_references",
+      "passed": 10,
+      "failed": 0
+    },
+    {
+      "command": "rustfmt --edition 2024 --check crates/litchi-rtf/tests/microsoft_office_native.rs crates/litchi-rtf/tests/data_store.rs crates/litchi-rtf/src/metadata/data_store.rs crates/litchi-rtf/src/codec/parser/codec/document.rs",
+      "exit_code": 0
+    }
+  ],
+  "coverage": {
+    "fixtures": 139,
+    "fixtures_with_tests": 10,
+    "feature_rows": 494,
+    "feature_rows_with_partial_tests": 11,
+    "indexed_tests": 9,
+    "native_fixture_statuses": {
+      "verified_native_fixture": 197,
+      "pending": 252,
+      "library_boundary": 44,
+      "not_applicable": 1
+    }
+  },
+  "initial_facade_observation": {
+    "fixtures": 139,
+    "panics": 0,
+    "open_errors": {
+      "rtf": 15,
+      "xlsb": 1
+    },
+    "text_errors": {
+      "xlsb": 6
+    },
+    "unlock_errors": [
+      "excel/excel-encrypted.xlsb"
+    ],
+    "limits": "Exploratory unified-API reads and queries, not assertions of complete semantics. The older XLS missing-catalog observations did not reproduce through the current unified API. PPT slide summaries still suppress shape_count errors; successful summaries are not proof of valid shape reads. Direct format-reader qualification remains required."
+  },
+  "rtf_after": {
+    "parse_pass": 10,
+    "parse_fail": 5,
+    "remaining_failures": {
+      "word/word-tables-layout.rtf": "duplicate typed style ID",
+      "word/word-mailmerge-fields.rtf": "empty native file table rejected",
+      "word/word-math-navigation.rtf": "unsupported math object destination",
+      "word/word-vector-diagram.rtf": "unstarred native shape-group shprslt rejected",
+      "word/word-tracked-moves.rtf": "revision parser rejects nested inert move-bookmark destinations"
+    },
+    "canonical_writer_limit": [
+      "word/word-rtf-table-grid.rtf",
+      "word/word-layout-extensions.rtf"
+    ],
+    "canonical_writer_limit_reason": "Documented structural opaque ownership refusal; exact snapshot publication and a native table-cell source splice pass."
+  },
+  "artifacts": [
+    {
+      "path": "/tmp/litchi-native-office.GMvwp4/rtf-before.log",
+      "bytes": 2046,
+      "sha256": "5398211c6b1d97cc62aa6355864f8f4a5f78c4053a01666b20183a7ab4d0f095",
+      "command": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi-rtf --test microsoft_office_native (before production fix)"
+    },
+    {
+      "path": "/tmp/litchi-native-office.GMvwp4/rtf-full.log",
+      "bytes": 157208,
+      "sha256": "0ad12c0a6144f53083c63e70e58606dd05fdb5f17babe31823b61e26872b585a",
+      "command": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi-rtf --lib --tests"
+    },
+    {
+      "path": "/tmp/litchi-native-office.GMvwp4/rtf-ops.log",
+      "bytes": 35984,
+      "sha256": "57c912a1e7e4a69cdbc67798673e5b4d3248cd51768b14711bc2777f88383574",
+      "command": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo test --locked --offline -p litchi-ops --no-default-features --features rtf --test 'rtf_*' --test text_set_preservation"
+    },
+    {
+      "path": "/tmp/litchi-native-office.GMvwp4/rtf-clippy.log",
+      "bytes": 1383,
+      "sha256": "4e2b246738572201f4bfbe091c167f28cc38063219ab61b6d6a8ed3f05c2aa5c",
+      "command": "CARGO_TARGET_DIR=/tmp/litchi-native-office.GMvwp4/target CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 cargo clippy --locked --offline -p litchi-rtf --lib --no-deps -- -D warnings"
+    },
+    {
+      "path": "/tmp/litchi-native-office.GMvwp4/python-checks.log",
+      "bytes": 109,
+      "sha256": "20d7d0bbd5e720702e83a6862b2a80069b828b7a298bd4fe5738586837f07078",
+      "command": "python3 -m unittest tools.test_native_office_corpus tools.test_no_3rdparty_references"
+    },
+    {
+      "path": "/tmp/litchi-native-office.GMvwp4/coverage.json",
+      "bytes": 220771,
+      "sha256": "af50657ae2c73e5587651ccb5e7ab6c1ecb6f0e7e4b2a838655602da159e9bcd",
+      "command": "python3 tools/native_office_coverage.py"
+    },
+    {
+      "path": "/tmp/litchi-native-office.GMvwp4/baseline.jsonl",
+      "bytes": 101207,
+      "sha256": "5a7be6713329ce9598fb4f32bfcecdee48ba85120875f3d5eb8a6acef6ae6f43",
+      "command": "With production source at base_commit: cargo run --offline --manifest-path /tmp/litchi-native-office.GMvwp4/Cargo.toml --bin native-office-baseline -- test-data/microsoft-office"
+    },
+    {
+      "path": "/tmp/litchi-native-office.GMvwp4/rtf-after.jsonl",
+      "bytes": 4637,
+      "sha256": "669071871f1b9b7115f0326a7f15b28328eb3b80edf3f13024907ed394981292",
+      "command": "cargo run --offline --manifest-path /tmp/litchi-native-office.GMvwp4/Cargo.toml --bin rtf_scan"
+    },
+    {
+      "path": "/tmp/litchi-native-office.GMvwp4/probe-source.tar.gz",
+      "bytes": 14709,
+      "sha256": "e177da28094bd9bc54f003555b4fa8d63750020e5b8289f7c094c4057aa4799c",
+      "command": "tar -czf /tmp/litchi-native-office.GMvwp4/probe-source.tar.gz -C /tmp/litchi-native-office.GMvwp4 Cargo.toml Cargo.lock src"
+    }
+  ],
+  "limits": [
+    "Native Office applications were not run during this change.",
+    "The historical authoring inventory is unchanged.",
+    "Coverage entries describe limited tested scopes; 129 fixtures still have no indexed semantic tests and no entire feature row is claimed complete.",
+    "The full workspace/release gate and facade feature expansion remain work for the active goal.",
+    "Compilation used an external target; no harness executable is committed."
+  ]
+}

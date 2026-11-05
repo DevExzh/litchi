@@ -605,11 +605,6 @@ impl<'a> Parser<'a> {
                             "RTF data-store payload has an odd hexadecimal digit count".to_string(),
                         ));
                     }
-                    if data.is_empty() {
-                        return Err(crate::Error::MalformedDocument(
-                            "RTF data-store payload cannot be empty".to_string(),
-                        ));
-                    }
                     return Ok(data);
                 },
                 Some(Token::Text(text)) => {

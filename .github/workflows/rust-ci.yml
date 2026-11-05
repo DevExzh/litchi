@@ -135,6 +135,9 @@ jobs:
       - name: Check that code never references the untracked upstream checkout
         run: python3 -m unittest tools.test_no_3rdparty_references
 
+      - name: Verify native Microsoft Office fixture integrity and inventory
+        run: python3 -m unittest tools.test_native_office_corpus
+
   non-iwork-release-gate:
     name: non-iWork release gate
     runs-on: ubuntu-latest
