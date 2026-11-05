@@ -74,3 +74,65 @@ fn body_chart_caption_refusals_are_typed() -> TestResult {
     assert_eq!(exact_bytes(unstaged.package())?, NATIVE);
     Ok(())
 }
+
+/// No Pages file we hold has a caption Pages authored, so a new caption keeps
+/// the theme's first preset, the title's style, and this pins that choice: the
+/// template does list a caption style, and using it would be a guess until a
+/// native file shows it (record 0435).
+#[test]
+fn new_caption_keeps_the_theme_first_preset_without_native_evidence() -> TestResult {
+    let package = Package::from_bytes(NATIVE)?;
+    let mut edit = package.edit_body_chart_caption(BodyChartSelector::index(0))?;
+    edit.set("Pinned caption")?;
+    let written = exact_bytes(edit.commit()?.package())?;
+    let catalog = litchi_iwa_archive::package::Catalog::from_bytes(&written, Default::default())?;
+    let mut objects = Vec::new();
+    for entry in catalog.iter() {
+        if entry.name().ends_with(".iwa") {
+            let stream = litchi_iwa_archive::iwa::SnappyStream::decompress(
+                entry.data(),
+                Default::default(),
+            )?;
+            objects.extend(
+                litchi_iwa_archive::iwa::Archive::parse(stream.as_bytes(), Default::default())?
+                    .objects,
+            );
+        }
+    }
+    let identifier = objects
+        .iter()
+        .flat_map(|object| &object.messages)
+        .filter(|message| message.type_ == 2_001)
+        .find_map(|message| {
+            message
+                .data
+                .windows(b"Pinned caption".len())
+                .any(|window| window == b"Pinned caption")
+                .then(|| paragraph_reference(&message.data))
+        })
+        .ok_or("no storage holds the caption")??;
+    let style = objects
+        .iter()
+        .find(|object| object.archive_info.identifier == Some(identifier))
+        .ok_or("no paragraph style")?;
+    let stored = &style.messages[0].data;
+    let needle = b"captions-0-paragraphstyle-Caption Title";
+    assert!(stored.windows(needle.len()).any(|window| window == needle));
+    Ok(())
+}
+
+/// The object at `table_para_style.entries[0].object` of a text storage.
+fn paragraph_reference(storage: &[u8]) -> TestResult<u64> {
+    use litchi_iwa_common::WireLimits;
+    use litchi_iwa_common::wire::WireView;
+    let mut payload = storage;
+    for number in [5, 1, 2, 1] {
+        let view = WireView::parse(payload, WireLimits::DEFAULT)?;
+        payload = view
+            .fields()
+            .find(|field| field.number() == number)
+            .map(|field| field.payload())
+            .ok_or("a missing field")?;
+    }
+    Ok(litchi_iwa_common::decode_varint_from_bytes(payload)?.0)
+}
