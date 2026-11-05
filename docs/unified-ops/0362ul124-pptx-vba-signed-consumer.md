@@ -11,7 +11,7 @@ native, metadata, or performance command was run in this leaf.
 ## Runtime finding
 
 The diagnostic is retained outside the repository at
-`/home/zhuhe/code/litchi-worktrees/.coord/ooxml-pptx-joint-a8d32513b8-f5-runtime-remaining21/pptx-full-tests/0006.log`
+`(deleted-coord-artifact)/0006.log`
 (223,115 bytes, SHA-256
 `8bd5fef94baf46ff1d07c15e71c36010d6bbe8343d277c1539cf96cc2638837e`).
 The changed VBA operation returned PPTX's format-owned `Error::Signed`:

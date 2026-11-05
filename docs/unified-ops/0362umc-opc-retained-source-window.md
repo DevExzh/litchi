@@ -50,8 +50,8 @@ The original retention assertion remains unchanged; it was not weakened.
 ## Validation
 
 All commands used the isolated target
-`/home/zhuhe/code/litchi-worktrees/.coord/final-opc-retention/target`,
-`/home/zhuhe/code/litchi-worktrees/.coord/bin` first on `PATH`,
+`(deleted-coord-artifact)`,
+`(deleted-coord-artifact)` first on `PATH`,
 `env -u LITCHI_CAPPED -u LITCHI_BLESS`, `LITCHI_MEM_MAX=20G`, one Cargo job,
 one test thread, incremental compilation disabled, debug profiles disabled,
 offline locked resolution, and the isolated `TMPDIR`.
@@ -74,7 +74,7 @@ sparse checkout failures as exceptions.
 
 The final target occupied 874,825,776 bytes.  The lockfile copied into this
 worktree came from
-`/home/zhuhe/code/litchi-worktrees/.coord/odp-final-f6fe-source-20261024/Cargo.lock`;
+`(deleted-coord-artifact)/Cargo.lock`;
 it is 139,591 bytes with SHA-256
 `52ed0cacac15b5e440349bfc0f4aca2665bcf50d59d4321624e596bb410783c6`.  The
 same size and hash were independently observed at

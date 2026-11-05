@@ -11,7 +11,7 @@ The copied lockfile is SHA-256
 `52ed0cacac15b5e440349bfc0f4aca2665bcf50d59d4321624e596bb410783c6`.
 The command was run with `LITCHI_BLESS=1`, one Cargo job, one test thread,
 offline locked dependencies, the capped 20 GiB environment, and the external
-target `/home/zhuhe/code/litchi-worktrees/.coord/final-corpus-fidelity-target`.
+target `(deleted-coord-artifact)`.
 The target closed at 3,483,753,074 bytes. `LITCHI_BLESS` was not set in any
 gate checkout.
 
@@ -23,7 +23,7 @@ cargo test --offline --locked -p litchi-ops --all-features \
 Both tests passed: corpus fidelity opened 1,020 claimed-format files in
 121.7 seconds, and CRUD reported zero unreached claimed cells. The external
 stdout/stderr receipt is
-`/home/zhuhe/code/litchi-worktrees/.coord/final-corpus-fidelity-receipt/corpus-crud-blessed.log`
+`(deleted-coord-artifact)/corpus-crud-blessed.log`
 (851 bytes, SHA-256
 `0478ff68527b96bc51da8c7b7de5653ab7495518270d7e70f1a19240741d14f5`). The
 measured run took 2:52.30 and reached 184,132 KiB RSS. The corpus's
@@ -38,7 +38,7 @@ used as bounded-build evidence. The corrected explicit-path rerun is recorded
 in `0362uia`.
 
 The old diagnostic receipt is
-`/home/zhuhe/code/litchi-worktrees/.coord/final-corpus-fidelity-receipt/corpus-crud-unblessed.log`
+`(deleted-coord-artifact)/corpus-crud-unblessed.log`
 (15,377 bytes, SHA-256
 `4ba489316f5c09e032fb90ec19ab99cf2cb4739614dd0895b109d17209fd2c23`).
 
@@ -94,12 +94,12 @@ capability proof and extends the same proof to `draw-object-link.fodp` in one
 two-fixture loop. Both fixtures now check rename to `x`, changed output,
 rename back, exact source-byte restoration, and source-byte save. The focused
 receipt for that patched test is
-`/home/zhuhe/code/litchi-worktrees/.coord/final-corpus-fidelity-receipt/odp-consumer-two-fixtures.log`
+`(deleted-coord-artifact)/odp-consumer-two-fixtures.log`
 (725 bytes, SHA-256
 `fe470e247b86fbdbc1cf37f2161fe6dabdb6027283923005e6ee9921c2c74088`); all
 7/7 `odp_unified_write` tests passed. The earlier combined focused receipt
 also passed all 6/6 `xlsx_cells_runs` tests:
-`/home/zhuhe/code/litchi-worktrees/.coord/final-corpus-fidelity-receipt/focused-consumers.log`
+`(deleted-coord-artifact)/focused-consumers.log`
 (1,250 bytes, SHA-256
 `886947dcdd3917cb49444720d39a4e80697cd55f5d02cde7f74984c5e2cffe54`).
 

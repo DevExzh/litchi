@@ -36,7 +36,7 @@ remain separate requirements, not substitutes for these 25 rows.
 
 Root checks the 25 unique IDs, the historical catalog/readiness and current
 audit hashes, and the referenced record paths. The corrected external report
-is `.coord/final-native-performance-reconciliation-20261026-v2.json`:
+is `(deleted-coord-artifact)/final-native-performance-reconciliation-20261026-v2.json`:
 37,829 bytes, SHA-256
 `c9cefc340ece9216fb2cf9a1282ec5e217fca6216b65a6c3b98c69dc0b8c780c`.
 The accompanying Markdown is 5,114 bytes, SHA-256
@@ -63,13 +63,13 @@ twelve Python AST parses and two shell syntax checks pass. No archive,
 binary or native result is claimed.
 
 The external W8 packet is
-`.coord/w8-file-native-C2a-33a0a63d35-20261026/`. Root verifies all seven file
+`(deleted-coord-artifact)`. Root verifies all seven file
 seals in `packet-manifest.json` (1,678 bytes; SHA-256
 `1bc410531bb48ed51c8166fb156288bf28d56d07c9a33c1f4bd0f581098c6299`).
 Policy and quiet-runner successors are still being prepared.
 
 DOC body toggle and DOCX durable Ink have separate preliminary C2a recipes
-at `.coord/doc-durable-c2a-native-prep-20261026/`. Seven Ink qualification
+at `(deleted-coord-artifact)`. Seven Ink qualification
 tests and eleven outer-runner tests pass. DOC's static protocol checks pass,
 but its dynamic profile check returns because the historical runner points
 to a retired 472b source path. This is not a passing dynamic check. A fresh
@@ -95,7 +95,7 @@ bytecode-disabled invocation. Root preserves their exact 134,299 bytes and
 metadata outside C, verifies the copies and removes only those six files and
 their empty directories. C is tracked-clean and its only ignored file is the
 approved root Cargo lock. The external cleanup receipt is
-`.coord/doc-durable-prep-residue-20261026/receipt.json`: 3,794 bytes, SHA-256
+`(deleted-coord-artifact)/receipt.json`: 3,794 bytes, SHA-256
 `6c342e8666c79b447fd0a7fc814d5232a87b95fac2026a5758dd3f0bd40702cc`.
 No production source, archive, measurement or other worktree is changed.
 

@@ -3,7 +3,7 @@
 This source-only repair starts at integration commit `b170204d17df40c5240637437747d647026c895e`.
 The v9 API-assembly check stopped in `litchi-opc` with two library errors and
 149 test errors. The captured diagnostic log is retained outside the checkout
-at `/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/api-assembly-consumers-v9/check-0.log`
+at `(deleted-coord-artifact)/check-0.log`
 (68,469 bytes, SHA-256
 `cb259594b244f0f1544fe7bd38c131024340c85badb0185d07ac4c43f882e21d`).
 

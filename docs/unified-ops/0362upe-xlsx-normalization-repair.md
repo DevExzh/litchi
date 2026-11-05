@@ -43,7 +43,7 @@ The clean frozen source was tested with the external capped target using this
 exact command:
 
 ```text
-env CARGO_TARGET_DIR=/home/zhuhe/code/litchi-worktrees/uo2-xlsx-normalization-repair/.coord/signed-native-repair/target CARGO_INCREMENTAL=0 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_BUILD_JOBS=1 RUST_TEST_THREADS=1 LITCHI_MEM_MAX=20G PATH=/home/zhuhe/code/litchi-worktrees/.coord/bin:$PATH cargo test -p litchi-xlsx --lib --all-features --offline --locked -- --nocapture
+env CARGO_TARGET_DIR=(deleted-coord-artifact) CARGO_INCREMENTAL=0 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_BUILD_JOBS=1 RUST_TEST_THREADS=1 LITCHI_MEM_MAX=20G PATH=(deleted-coord-artifact):$PATH cargo test -p litchi-xlsx --lib --all-features --offline --locked -- --nocapture
 ```
 
 Result: `1871 passed; 0 failed; 0 ignored; 0 measured; finished in 347.14s`.
@@ -52,7 +52,7 @@ Result: `1871 passed; 0 failed; 0 ignored; 0 measured; finished in 347.14s`.
 - Log size: `183735` bytes
 - Log SHA-256:
   `48f1ce55dfffd9ac274fe352660b47d3f829d7cbe6f8864c4ba3f08cd3b2d8d1`
-- External target: `/home/zhuhe/code/litchi-worktrees/uo2-xlsx-normalization-repair/.coord/signed-native-repair/target`
+- External target: `(deleted-coord-artifact)`
 - Target size after the run: `821800822` bytes
 
 The focused a58 receipts were retained outside the repository:
@@ -67,7 +67,7 @@ coordinator acceptance remain pending.
 
 The coordinator verified the three log hashes and retained durable copies
 with the same filenames under
-`/home/zhuhe/code/litchi-worktrees/.coord/xlsx-normalization-final-a58/`.
+`(deleted-coord-artifact)`.
 These mirrors preserve the receipts independently of the temporary directory.
 The source correction passed independent scoped review and is composed in
 the diagnostic integration; final performance and complete gates remain open.

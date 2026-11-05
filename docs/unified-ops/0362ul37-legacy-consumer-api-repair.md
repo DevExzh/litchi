@@ -52,14 +52,14 @@ quiet Cargo slot and supplies the lock, is:
 
 ```
 env -u LITCHI_BLESS -u LITCHI_CAPPED \
-  PATH=/home/zhuhe/code/litchi-worktrees/uo2-corpus-gate-repairs-2/docs/unified-ops/results/0362ul29/tooling/bin:/home/zhuhe/code/litchi-worktrees/uo2-corpus-gate-repairs-2/.coord/bin:$PATH \
+  PATH=/home/zhuhe/code/litchi-worktrees/uo2-corpus-gate-repairs-2/docs/unified-ops/results/0362ul29/tooling/bin:(deleted-coord-artifact):$PATH \
   LITCHI_MEM_MAX=20G CARGO_BUILD_JOBS=1 CARGO_NET_OFFLINE=true \
   CARGO_INCREMENTAL=0 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 \
-  CARGO_TARGET_DIR=/home/zhuhe/code/litchi-worktrees/.coord/rtf-fuzz-consumer-3431/target \
+  CARGO_TARGET_DIR=(deleted-coord-artifact) \
   /home/zhuhe/code/litchi-worktrees/uo2-corpus-gate-repairs-2/docs/unified-ops/results/0362ul29/tooling/bin/cargo \
   check --offline --locked -q --manifest-path \
   /home/zhuhe/code/litchi-worktrees/uo2-corpus-gate-repairs-2/crates/litchi-rtf/fuzz/Cargo.toml \
-  --target-dir /home/zhuhe/code/litchi-worktrees/.coord/rtf-fuzz-consumer-3431/target --bins
+  --target-dir (deleted-coord-artifact) --bins
 ```
 
 The wrapper and the explicit `--offline --locked` flags are intentional. The

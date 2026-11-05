@@ -12,7 +12,7 @@ The reduced receipt is
 The full reports, streams, build logs, binary, and target remain outside Git
 under:
 
-`/home/zhuhe/code/litchi-worktrees/.coord/drawingml-native-raw-six.yo47Ie`
+`(deleted-coord-artifact)`
 
 ## Inputs and command
 
@@ -40,7 +40,7 @@ in the receipt:
     drawingml-theme-family-current,drawingml-theme-family-owner-limits-current,\
     drawingml-ink-limits-current,drawingml-transform-limits-current \
       --offline --locked \
-      --target-dir /home/zhuhe/code/litchi-worktrees/.coord/drawingml-native-raw-repair-target \
+      --target-dir (deleted-coord-artifact) \
       -j 1
 
 The resulting binary is 25,154,104 bytes with SHA-256

@@ -30,10 +30,10 @@ fixture rows.
 - Python AST syntax check passed.
 - Build: `cargo build --locked --offline -p litchi-py`, four jobs,
   incremental disabled; exit 0. Build log is external at
-  `/home/zhuhe/code/litchi-worktrees/.coord/resume-20261030-0410-pages-python-build.log`
+  `(deleted-coord-artifact)/resume-20261030-0410-pages-python-build.log`
   (SHA-256 `e6c0b36c3c04939d81978190e76af0667f23d95114800d6d26570fd7d6218871`).
 - Full test log is external at
-  `/home/zhuhe/code/litchi-worktrees/.coord/resume-20261030-0410-pages-python-gate-repair.out`
+  `(deleted-coord-artifact)/resume-20261030-0410-pages-python-gate-repair.out`
   (SHA-256 `fc4b5de572129372575fff404920e6f4d3bddd9941b34ec4393a0da04421271b`).
 - Lockfile SHA-256: `f6b3eae7157c819fd5c02dfbfe9decaf2b973778fb9659b70b738b591e7f3281`.
 - No `3rdparty/` references or generated evidence/binaries were added.

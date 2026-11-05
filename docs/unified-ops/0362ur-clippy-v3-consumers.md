@@ -18,7 +18,7 @@ common enum footprint. Existing matching, serialization, validation and
 source-retention behavior is unchanged.
 
 The immutable terminal log is retained outside the checkout at
-`/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/clippy-workspace-v3/check-0.log`
+`(deleted-coord-artifact)/check-0.log`
 (35,425 bytes, SHA-256
 `cfdaf7c207148f82599774af1a3409b34bba4506f5e50af704683a1d5cd6be4f`). The
 command was

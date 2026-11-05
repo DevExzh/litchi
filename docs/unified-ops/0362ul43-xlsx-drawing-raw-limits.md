@@ -1,7 +1,7 @@
 # 0362ul43 — Require retained limits for the XLSX drawing parser
 
 - Parent source: `30aaafbf98e097aeec8cf6fe3df6caaae62a37d6`.
-- Audit: `.coord/raw-record-limit-audit-3431ba566c.md`, SHA-256
+- Audit: `(deleted-coord-artifact)/raw-record-limit-audit-3431ba566c.md`, SHA-256
   `fe35d28ff10d953179aa2768c35abaf80e6bd178d475825bcbef07cb05ea67fd`.
 - Diagnostic source tips: `91045f088e` (API and owner migration),
   `01682c04eb` (glossary argument identity), `4d30f3e9f8` and `f1d98c3bde`
@@ -49,7 +49,7 @@ parsed successfully, and a source audit confirmed that no
 caller limit.
 
 The final bounded receipt is external at
-`.coord/xlsx-raw-limits-0362ul43-validation/state/receipt.json`, SHA-256
+`(deleted-coord-artifact)/receipt.json`, SHA-256
 `f1659bf765dcfcfa272b54b71b52ef042566901ce3a8494fc34a60dab4ea9a63`.  It
 binds clean source `f1d98c3bde4e89efb4315842238534c6b1695c05` and the copied
 workspace lock SHA-256
@@ -61,7 +61,7 @@ SHA-256 `1904177040fc7c523582433028d9bba56efc30fe0d9d96beb554a2fab343691e`.
 With `LITCHI_CAPPED` and `LITCHI_BLESS` unset, one build job, one test
 thread, incremental/debug information disabled, offline locked dependencies,
 `LITCHI_MEM_MAX=20G`, and the external target
-`.coord/xlsx-raw-limits-0362ul43-validation/target`, the receipt records:
+`(deleted-coord-artifact)`, the receipt records:
 
 - 20 `drawing::` library tests passed (2,101-byte log, SHA-256
   `bb82c4c88b940c8f66258088b8d6a27d2b7fe507926ab6a5012446f258d4db9c`).

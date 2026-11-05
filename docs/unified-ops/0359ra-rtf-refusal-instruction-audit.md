@@ -106,7 +106,7 @@ held at the candidate commits:
    directories and the capped cargo environment:
    `cargo build --locked --release -p litchi-rtf --example refusal_contract_bench`.
 2. Run the exact retained driver
-   `/home/zhuhe/code/litchi-worktrees/.coord/rtf-refusals/run-abba.py`, which
+   `(deleted-coord-artifact)`, which
    performs three CPU-7 A-B-B-A trials, six run medians per case, 34 samples,
    three warmups and 31 measured samples. Preserve the JSONL runs, summary,
    process monitor and both binary hashes.

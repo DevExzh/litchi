@@ -84,7 +84,7 @@ not fail any gate.
 | `cargo clippy -p litchi-numbers --test numbers_focused_comment_reads --all-features -- -D warnings` | pass |
 | `python3 tools/check_crate_boundaries.py` | pass; 70 packages, 313 declarations, 12 explicit debt items |
 | `python3 tools/iwa_exit_ledger.py --check` | pass |
-| `RUSTC_BOOTSTRAP=1 python3 tools/check_api_glossary.py --target-dir /home/zhuhe/code/litchi-worktrees/.coord/iwa-w2d-glossary-20261028` | pass; 73 profiles, 3,957 banned names, 708 transaction families, 125 immutable owners, 721 explicit result contracts |
+| `RUSTC_BOOTSTRAP=1 python3 tools/check_api_glossary.py --target-dir (deleted-coord-artifact)` | pass; 73 profiles, 3,957 banned names, 708 transaction families, 125 immutable owners, 721 explicit result contracts |
 | `cargo check --locked --offline --manifest-path crates/litchi/fuzz/Cargo.toml --bins` | pass |
 | `cargo check --locked --offline --manifest-path crates/litchi-iwa-protos/fuzz/Cargo.toml --bins` | pass |
 | `python3 -m unittest tools.test_no_3rdparty_references tools.test_iwa_exit_ledger` | 17 passed |

@@ -43,17 +43,17 @@ cargo clippy --offline --locked -p litchi-ops --all-targets \
 
 The commands used one capped Cargo process at a time with `CARGO_BUILD_JOBS=1`,
 `RUST_TEST_THREADS=1`, `LITCHI_MEM_MAX=20G`, and an external target under
-`.coord/xls-fence-target`; no build artifact or executable is committed. Exact
+`(deleted-coord-artifact)`; no build artifact or executable is committed. Exact
 logs remain outside Git:
 
 ```text
-/home/zhuhe/code/litchi-worktrees/.coord/xls-fence-tmp/ops-xls-tests.log
+(deleted-coord-artifact)/ops-xls-tests.log
   sha256 eeb76b42fc1f4b8c13893e2a6b37c0622ae0f6b251661437ccf8db85628cbdab
-/home/zhuhe/code/litchi-worktrees/.coord/xls-fence-tmp/xls-package-owner-tests.log
+(deleted-coord-artifact)/xls-package-owner-tests.log
   sha256 05b8e7e057ef16ba313da8fec17acad2e748c0d276e32a70545c3fd0bd50d663
-/home/zhuhe/code/litchi-worktrees/.coord/xls-fence-tmp/xls-clippy.log
+(deleted-coord-artifact)/xls-clippy.log
   sha256 159c95084c74469e58793af212409793e85a7eb33ab10bebe1f7928ea6fcf10f
-/home/zhuhe/code/litchi-worktrees/.coord/xls-fence-tmp/ops-clippy.log
+(deleted-coord-artifact)/ops-clippy.log
   sha256 0d97a524fdb8906fe7a98e531573b75111d961771f4d8050e76b4d3e34560946
 ```
 
@@ -67,30 +67,30 @@ doctests were rerun on `dfe8281fb36a920a02b6ed150bf604663ea602fe` with the
 same one-job capped environment. Both commands passed:
 
 ```text
-env PATH=/home/zhuhe/code/litchi-worktrees/.coord/bin:$PATH \
+env PATH=(deleted-coord-artifact):$PATH \
   LITCHI_MEM_MAX=20G CARGO_BUILD_JOBS=1 RUST_TEST_THREADS=1 \
   CARGO_INCREMENTAL=0 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 \
   CARGO_PROFILE_RELEASE_DEBUG=0 CARGO_NET_OFFLINE=true \
-  CARGO_TARGET_DIR=/home/zhuhe/code/litchi-worktrees/.coord/xls-fence-target \
-  TMPDIR=/home/zhuhe/code/litchi-worktrees/.coord/xls-fence-tmp \
+  CARGO_TARGET_DIR=(deleted-coord-artifact) \
+  TMPDIR=(deleted-coord-artifact) \
   cargo test --offline --locked -p litchi-xls --all-features \
     --all-targets --no-fail-fast
   status: 0; 1,327 unit tests and 556 integration tests passed; examples passed
   one existing evidence-workbook writer test remains ignored
 
-env PATH=/home/zhuhe/code/litchi-worktrees/.coord/bin:$PATH \
+env PATH=(deleted-coord-artifact):$PATH \
   LITCHI_MEM_MAX=20G CARGO_BUILD_JOBS=1 RUST_TEST_THREADS=1 \
   CARGO_INCREMENTAL=0 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 \
   CARGO_PROFILE_RELEASE_DEBUG=0 CARGO_NET_OFFLINE=true \
-  CARGO_TARGET_DIR=/home/zhuhe/code/litchi-worktrees/.coord/xls-fence-target \
-  TMPDIR=/home/zhuhe/code/litchi-worktrees/.coord/xls-fence-tmp \
+  CARGO_TARGET_DIR=(deleted-coord-artifact) \
+  TMPDIR=(deleted-coord-artifact) \
   cargo test --offline --locked -p litchi-xls --all-features \
     --doc --no-fail-fast
   status: 0; 23 doctests passed, 1 expected ignored, 1 compile-fail doctest passed
 ```
 
 The combined log is retained outside Git at
-`/home/zhuhe/code/litchi-worktrees/.coord/xls-fence-tmp/xls-full-tests-doctests.log`
+`(deleted-coord-artifact)/xls-full-tests-doctests.log`
 (172,749 bytes, SHA-256
 `1fa5a7299d317b4f8f6920977dde1eab5b4a977c1af9fcb83b83ff84208939fd`). The
 external target measured 4,531,008,467 bytes (4.3 GiB), below the 20 GiB cap.

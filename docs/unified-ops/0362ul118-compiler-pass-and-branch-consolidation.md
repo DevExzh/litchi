@@ -7,7 +7,7 @@ exposed by minimal PPTX compilation. Neither return changes behavior or
 relaxes a lint. Root verifies both failed captures and the repaired pass.
 
 The passing packet is external at
-`.coord/uo2-coordinator-replay-integration-f5-compiler-a8d32513b8` under the
+`(deleted-coord-artifact)` under the
 worktree parent. It covers 508 changed Rust files, minimal PPTX, strict
 all-target Clippy for six OOXML leaves, ops and facade consumers, the current
 performance/allocator harness, native resave, and minimal common/OPC.
@@ -22,7 +22,7 @@ have no owned or unrelated builders.
 An earlier read-only preflight left a stale target/tmp binding failure marker
 in the packet. Its timestamp predates GO; root distinguished it from the live
 capture. The exact 171-byte marker is preserved externally under
-`.coord/retained-prelaunch/`, SHA-256
+`(deleted-coord-artifact)`, SHA-256
 `7322e8a5880676e3d969c3697293105a9160908397da6b64ad3423ff95f9cced`.
 It is not a failed Cargo row and is not relabeled as a pass. The final result
 above is the independently verified terminal capture of actual execution.

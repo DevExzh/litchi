@@ -10,7 +10,7 @@ fix and the commit or record responsible. No test was deleted or ignored.
 For every failure the responsible commit was found with `git log -S`/`-G`,
 and for the two whose history did not settle it, with `git bisect run` on the
 failing test (scripts kept outside the repository in
-`.coord/fin-tests/scripts/`).
+`(deleted-coord-artifact)`).
 
 | # | Failure | Verdict | Cause (commit / record) | Fix |
 |---|---|---|---|---|
@@ -30,7 +30,7 @@ The completed gate also failed two tooling rows.
 - **Row 51 (`bench-matrix`), and the `tools.test_unified_bench_matrix` failure in row 48.** At c594870566, `docs/unified-ops/results/0289/bench-matrix.md` was stale: records landed after it was last regenerated. This is a real generated-output check, not a pin. The file is regenerated on this branch with `python3 tools/unified_bench_matrix.py`, and `--check` passes. It has to be regenerated again whenever a later record merges.
 - **Row 48 (`tooling-unit`): `tools.test_prepare_raw_api_census` raised `CensusError: tools/api_glossary.json differs from source commit f17dda6e6f…; rebind the matrix`.**
   - **Cause.** `tools/prepare_raw_api_census.py` (records 0362ul79e, 0362ul131a, 0362ul145a) binds the checked-in `tools/raw_api_census_matrix.json` to one source commit's blob hashes for the glossary, the workspace manifest, every crate manifest and `raw_api_coverage.json`. Any glossary or manifest change breaks it.
-  - **Decision (coordinator, 2026-10-26).** This belongs to Codex's frozen-candidate qualification process, which `ctx-final` says is not an owner requirement. The tool, its test and the pinned matrix are deleted, and the module is removed from `TOOL_MODULES` in `tools/gate/run_gate.sh`. Nothing else on trunk imports the tool or reads the matrix. The records that cite it stay as history. The archived `docs/unified-ops/results/0362ul29/tooling/run_safe_gate.py` still names the module, but it is evidence and the gate does not run it. The coordinator's own `.coord/gate.sh` also lists the module and must drop it as well.
+  - **Decision (coordinator, 2026-10-26).** This belongs to Codex's frozen-candidate qualification process, which `ctx-final` says is not an owner requirement. The tool, its test and the pinned matrix are deleted, and the module is removed from `TOOL_MODULES` in `tools/gate/run_gate.sh`. Nothing else on trunk imports the tool or reads the matrix. The records that cite it stay as history. The archived `docs/unified-ops/results/0362ul29/tooling/run_safe_gate.py` still names the module, but it is evidence and the gate does not run it. The coordinator's own `(deleted-coord-artifact)` also lists the module and must drop it as well.
   - **Sweep for other pins.** Every `TOOL_MODULES` test, plus `iwa_exit_ledger.py --check`, was run in a throwaway worktree after a commit that changed `tools/api_glossary.json` and appended a line to the workspace `Cargo.toml` and to every `crates/*/Cargo.toml` and `crates/*/src/lib.rs`. Only the census test and the stale bench matrix failed. Both also failed without the churn, and no other tooling test breaks on source changes. The other tests that mention commits or SHA-256 values check synthetic fixtures or immutable archived evidence, not the live tree.
 
 ## Verification

@@ -33,15 +33,15 @@ commits.
 ## Reproducibility identities
 
 All Cargo commands sourced
-`/home/zhuhe/code/litchi-worktrees/.coord/ppt-lazy-entry/env.sh` (487 bytes,
+`(deleted-coord-artifact)/env.sh` (487 bytes,
 SHA-256
 `5dc0dc3da7cb494e3b5356360f19e973b9b4611e3b9d1d8d927b2055df652676`).  The
 effective settings were the memory-capped Cargo shim, `LITCHI_MEM_MAX=20G`,
 `CARGO_BUILD_JOBS=1`, `RUST_TEST_THREADS=1`, `CARGO_INCREMENTAL=0`, all three
 Cargo debug settings set to `0`, `CARGO_NET_OFFLINE=true`, and
-`TMPDIR=/home/zhuhe/code/litchi-worktrees/.coord/ppt-lazy-entry/tmp`.
+`TMPDIR=(deleted-coord-artifact)`.
 The assigned target was
-`/home/zhuhe/code/litchi-worktrees/.coord/ppt-lazy-entry/target`; its final
+`(deleted-coord-artifact)`; its final
 size was 6,143,757,097 bytes.  No target, overlay, binary, or raw log is
 tracked.
 
@@ -62,7 +62,7 @@ standalone perf-baseline lock is tracked.  Both were used with `--locked`.
 ## Final commands and raw receipts
 
 The raw logs remain outside the repository under
-`/home/zhuhe/code/litchi-worktrees/.coord/ppt-lazy-entry/`.
+`(deleted-coord-artifact)`.
 
 The eight focused facade tests were invoked by this exact loop (each child
 used the sourced environment and `--offline --locked`):
@@ -110,7 +110,7 @@ python3 -m unittest -v tools.test_odg_joined_qualification
 At source content committed as `c793189120`, it exited 0 with all 26 tests
 passing and no failures or skips.  The raw log is retained outside the
 repository at
-`/home/zhuhe/code/litchi-worktrees/.coord/ppt-lazy-entry/validation-bindings-0686/odg-joined-tests.log`
+`(deleted-coord-artifact)/odg-joined-tests.log`
 (4,971 bytes, SHA-256
 `3e4067a47107b23e486a2f811c44b7c73c7e11a06a66739c2df450d2d93c7b52`).  No
 Cargo command or native qualification was run for this follow-up.
@@ -121,7 +121,7 @@ The ODG command copied exactly these tracked final-tip sources into the
 temporary example location `crates/litchi-odg/examples/`, compiled the example,
 and removed those temporary files before returning.  The retained external
 overlay is
-`/home/zhuhe/code/litchi-worktrees/.coord/ppt-lazy-entry/odg-probe-overlay-1cb09b9c4a`:
+`(deleted-coord-artifact)`:
 
 | Overlay source | Bytes | SHA-256 |
 | --- | ---: | --- |

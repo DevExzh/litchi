@@ -25,7 +25,7 @@ isolated filesystem free-space measurement; other work was running.
 ## Evidence
 
 External quarantine root:
-`/home/zhuhe/code/litchi-worktrees/.coord/worktree-cleanup-2026-10-23/quarantine/wave55-coordinator-constructors/`.
+`(deleted-coord-artifact)`.
 
 | Artifact | Bytes | SHA-256 |
 | --- | ---: | --- |
@@ -44,10 +44,10 @@ actual-restore results bind the helper and all payload records.
 Regenerate the large manifest from its retained metadata and payload:
 
 ```sh
-python3 /home/zhuhe/code/litchi-worktrees/.coord/worktree-cleanup-2026-10-23/quarantine/wave55-coordinator-constructors/rebuild_manifest_from_payload.py \
-  --header /home/zhuhe/code/litchi-worktrees/.coord/worktree-cleanup-2026-10-23/quarantine/wave55-coordinator-constructors/manifest-header.json \
-  --payload-root /home/zhuhe/code/litchi-worktrees/.coord/worktree-cleanup-2026-10-23/quarantine/wave55-coordinator-constructors/ignored/coordinator-constructors \
-  --output /home/zhuhe/code/litchi-worktrees/.coord/worktree-cleanup-2026-10-23/quarantine/wave55-coordinator-constructors/rebuilt-manifest.json
+python3 (deleted-coord-artifact) \
+  --header (deleted-coord-artifact) \
+  --payload-root (deleted-coord-artifact) \
+  --output (deleted-coord-artifact)
 ```
 
 The helper walks and hashes the retained payload, rather than deriving file

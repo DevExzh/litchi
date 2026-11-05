@@ -98,7 +98,7 @@ warnings denied, the ledger check, the crate-boundary check, no-`3rdparty`
 references and the affected fuzz-lock inventory tests.  The affected glossary
 profiles (`ops-iwork` and `ops-all`) are run against the final committed tip;
 their receipts are retained outside the checkout under
-`.coord/d7-chart-font-size-validation/logs/`.
+`(deleted-coord-artifact)`.
 
 The release binaries built from `9078ab5837d34d8c9baa18d54fce0903f5721017`
 and `a52c96dd7346a4d88793cde5c07d66150a8e3539` are archived externally, but
@@ -115,12 +115,12 @@ read/set/reset `1.032334883/1.015490353/1.021376734`, Keynote
 read/set/reset `1.044168189/1.006126258/1.012796304`, and Numbers
 read/set/reset `1.008898928/1.000106772/1.006676784`; all are at most 1.05.
 The immutable binary is external at
-`.coord/d7-chart-font-size-opt-91b5/staged/iwork_chart_font_size-91b5c65f-2d2209d11c1bdcae`
+`(deleted-coord-artifact)`
 (357475520 bytes, SHA-256
 `ae6d9ffb102a73cf4d06f25c6d6a2c1ae9c029a30b5873fcdbdd7f3cc88d0955`).  The
 normalized manifest, raw captures, validator receipt and performance review
 are external under
-`.coord/d7-chart-font-size-opt-91b5/captures-91b5-cpu5/`; the review SHA-256
+`(deleted-coord-artifact)`; the review SHA-256
 is `343941dd6e2f80b28b840a5d0ac8f4b1a1c77a85e7a84f877f609d18fa4f71a8`.
 This is Callgrind instruction evidence only: it makes no wall-time or native
 acceptance claim.  The final integrated coordinator candidate must still be
@@ -130,7 +130,7 @@ history only.
 The accepted current-source qualification is
 `be2b784791d4070a000ae8f6b7c4ab863ea3783a`.  Its immutable release/debug-info
 test binary is external at
-`.coord/d7-chart-font-size-release-be2b7847/staged/iwork_chart_font_size-be2b784791`
+`(deleted-coord-artifact)`
 (359,772,600 bytes, mode `0555`, SHA-256
 `2beaa8f51fc22b53a9fb4fe2ebd3f95efc24fd69a0cc752f83902b7e6a422f8b`).  The
 fresh CPU5 matrix has 18 valid legs and a maximum unified/direct inclusive-Ir
@@ -141,7 +141,7 @@ read/set/reset `1.011123/1.001909/1.006218`.  The raw selected-call validator
 two calls per wrapper, raw Ir = summary = PROGRAM TOTALS = the threshold-100
 aggregate annotation for every leg.  The current report, derived receipt and
 raw evidence remain external under
-`.coord/d7-chart-font-size-capture-be2b-cpu5-20261029/`; no wall-time or native
+`(deleted-coord-artifact)`; no wall-time or native
 acceptance claim is made.  The final integrated coordinator candidate still
 requires requalification after later merges.
 

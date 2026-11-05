@@ -52,7 +52,7 @@ claimed command-start timestamps. The target's latest artifact mtime was
 `08:40:20Z`; a post-validation `du` measurement returned:
 
 ```text
-du -sb /home/zhuhe/code/litchi-worktrees/.coord/font-cache-limits/target
+du -sb (deleted-coord-artifact)
 984570413  .../target
 ```
 
@@ -64,7 +64,7 @@ worktree was rejected by `--locked`; it is not committed. Its final SHA-256 is
 `LITCHI_CAPPED`/`LITCHI_BLESS`, `LITCHI_MEM_MAX=20G`,
 `CARGO_BUILD_JOBS=1`, `RUST_TEST_THREADS=1`, `CARGO_INCREMENTAL=0`, all three
 Cargo debug levels set to `0`, `CARGO_NET_OFFLINE=true`, the external target
-above and `TMPDIR=/home/zhuhe/code/litchi-worktrees/.coord/font-cache-limits/tmp`.
+above and `TMPDIR=(deleted-coord-artifact)`.
 The toolchain was rustc/cargo 1.95.0 (`rustc` commit
 `59807616e1fa2540724bfbac14d7976d7e4a3860`).
 
@@ -94,7 +94,7 @@ cargo fmt --all --check
 ```
 
 The external retained logs and per-command resource receipts are under
-`/home/zhuhe/code/litchi-worktrees/.coord/font-cache-limits/validation-52ed/`.
+`(deleted-coord-artifact)`.
 The raw `metadata.after.txt` remains unchanged at 3,043 bytes, SHA-256
 `31319dc48ed32444af2e9513d3d0b8841fdec357d016bfb90214bf3c61750794`. Its
 intermediate self-entry reports the earlier 2,706-byte state and hash

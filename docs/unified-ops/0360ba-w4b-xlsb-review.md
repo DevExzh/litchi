@@ -129,13 +129,13 @@ to CPU 29. Its binary is 7,196,416 bytes with SHA-256
 `0458b2b71cf07aa29c13000238bf677d99849ff2e312890d9c674fc3758326f5`.
 
 The final 31-sample run is outside the checkout at
-`/home/zhuhe/code/litchi-worktrees/.coord/w4b-xlsb/perf/expanded-run-compact-final-1792580640/head.json`
+`(deleted-coord-artifact)/head.json`
 (605 bytes, SHA-256
 `8649037883031697756c8d0ee198e790fce6d744eeb8f394ce9aff8f4a1d9c3d`),
 from:
 
 ```text
-taskset -c 29 /home/zhuhe/code/litchi-worktrees/.coord/w4b-xlsb/perf/tgt-expanded-after-v2/release/w4b-expanded-probe 31
+taskset -c 29 (deleted-coord-artifact) 31
 ```
 
 | Case | Median |
@@ -148,7 +148,7 @@ taskset -c 29 /home/zhuhe/code/litchi-worktrees/.coord/w4b-xlsb/perf/tgt-expande
 
 The complete expanded case list is exactly those five cases. The retained
 128-patch heaptrack capture is
-`/home/zhuhe/code/litchi-worktrees/.coord/w4b-xlsb/perf/expanded-run-compact-final-1792580640/retained128.heaptrack.zst`
+`(deleted-coord-artifact)/retained128.heaptrack.zst`
 (106,856 bytes, SHA-256
 `c5e9561984b5c52a9b281c0a4bb5a4c816cae6bb3b0d5200299ff2125a5f798a`). It
 reports 412,681 allocation calls, 2,541 temporary allocations, one leaked
@@ -160,7 +160,7 @@ heaptrack overhead.
 The final compact binaries were measured in a quiet `before -> after -> after
 -> before` sequence, with 31 samples per route and CPU 29 pinned. The run is
 outside the checkout at
-`/home/zhuhe/code/litchi-worktrees/.coord/w4b-xlsb/perf/final-run-compact-abba-1792581200`.
+`(deleted-coord-artifact)`.
 Its command was equivalent to:
 
 ```text
@@ -247,7 +247,7 @@ preflight exact: base_parts=7 after_parts=8 base_bytes=5155 after_bytes=5320
 ```
 
 The probe sources are outside the checkout at
-`/home/zhuhe/code/litchi-worktrees/.coord/w4b-xlsb/perf/expanded-probe/src/main.rs`
+`(deleted-coord-artifact)/main.rs`
 (SHA-256
 `65d0629300694e7bab1bbc15b053223e58f77db2832bf75523ac3ddf5b7615b4`) and
 `.../expanded-probe-before-v2/src/main.rs` (SHA-256
@@ -264,7 +264,7 @@ The release binaries were built in separate absolute target directories:
 
 The four legs ran `before -> after -> after -> before`, pinned to CPU 29,
 with 31 samples per timed case. JSON captures are in
-`/home/zhuhe/code/litchi-worktrees/.coord/w4b-xlsb/perf/expanded-run-reopened-abba-1792582900`; their individual SHA-256 values are in
+`(deleted-coord-artifact)`; their individual SHA-256 values are in
 `timing.sha256` (702 bytes). Medians are microseconds:
 
 | Case | Before | After | After / before |
@@ -377,7 +377,7 @@ and `65d0629300694e7bab1bbc15b053223e58f77db2832bf75523ac3ddf5b7615b4`.
 The isolated run was pinned to CPU 29, used 31 samples per case, and ran
 `before, after, after, before`. JSON and stderr captures are outside the
 checkout at
-`/home/zhuhe/code/litchi-worktrees/.coord/w4b-xlsb/perf/expanded-run-a6a55b09f4-abba-20261021`;
+`(deleted-coord-artifact)`;
 each leg reported the exact preflight `base_parts=7 after_parts=8
 base_bytes=5155 after_bytes=5320`. The table gives the range of the two leg
 medians and the ratio of their mean medians, in microseconds:
@@ -406,7 +406,7 @@ reported 28,070,984 instructions for the baseline and 28,945,476 for the
 candidate. In the candidate, `PartPatch::projection_unchanged` accounted for
 842,395 instructions and its `closure_is_disjoint` walk for 836,047. The
 capture and `Ir` annotations are outside the checkout at
-`/home/zhuhe/code/litchi-worktrees/.coord/w4b-xlsb/perf/inverse-callgrind-a6a55b09f4`;
+`(deleted-coord-artifact)`;
 `sha256` in that directory records the files. This isolates the extra work to
 the newly added proof rather than a second workbook projection parse.
 
@@ -436,7 +436,7 @@ release binaries were built into separate absolute target directories:
 | `tgt-expanded-after-3f085b89a6/release/w4b-expanded-probe` | 7,489,816 bytes | `5cb9b6794318da9eaf19a57878b8c6d00a4b26d27cf66af2f555f3e3150efadb` |
 
 The isolated native run is outside the checkout at
-`/home/zhuhe/code/litchi-worktrees/.coord/w4b-xlsb/perf/expanded-run-3f085b89a6-abba-20261021`.
+`(deleted-coord-artifact)`.
 It used `taskset -c 29 <binary> 31`, in the order
 `before, after, after, before`; each route used 31 samples. Every leg reported
 the same exact preflight: `base_parts=7 after_parts=8 base_bytes=5155
@@ -461,7 +461,7 @@ The final retained-history heap receipt uses direct heaptrack invocation so
 the debuggee is the probe itself:
 `LITCHI_PROBE_ONLY=history/retained128_build taskset -c 29 heaptrack --output
 <capture> <binary> 1`. Its external directory is
-`/home/zhuhe/code/litchi-worktrees/.coord/w4b-xlsb/perf/history-heap-3f085b89a6-direct`;
+`(deleted-coord-artifact)`;
 the four legs use the same `before, after, after, before` order. The
 `heaptrack_print` K/M units below are decimal. Baseline legs report
 594,916/594,920 allocation calls, 1,986/1,990 temporary allocations,
@@ -471,7 +471,7 @@ the four legs use the same `before, after, after, before` order. The
 Heaptrack timings are excluded from the native timing ratios above.
 
 The earlier directory
-`/home/zhuhe/code/litchi-worktrees/.coord/w4b-xlsb/perf/history-heap-3f085b89a6`
+`(deleted-coord-artifact)`
 is explicitly discarded: its command put `taskset` under heaptrack, and its
 reports contain only `taskset`/locale allocations with no `litchi_xlsb` stack.
 It contributes no heap claim. The direct captures in §4 and §6 invoke the

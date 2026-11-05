@@ -223,7 +223,7 @@ used CPU 3, callgrind instruction counts, and the existing host/leaf ABBA
 probe pair:
 
 ```sh
-bash /home/zhuhe/code/litchi-worktrees/.coord/iwa-w1b/cg.sh \
+bash (deleted-coord-artifact) \
   target/release/deps/parity-bf69cf43b955a09c \
   pages_shape_style_cases::line_endpoints_set_cost_abba \
   pages_shape_style_cases::line_endpoints_reset_cost_abba \
@@ -249,7 +249,7 @@ manifest makes the receipt reproducible without committing large evidence:
 | Artifact | Size | SHA-256 |
 |---|---:|---|
 | `/home/zhuhe/code/litchi-worktrees/uo2-iwa-w1b/target/release/deps/parity-bf69cf43b955a09c` | 198,830,136 | `66ede694ec732bb3150a34823d649a77e22dfddcee224094998ce9167ce15056` |
-| `/home/zhuhe/code/litchi-worktrees/.coord/iwa-w1b/cg_results.txt` | 3,298 | `0e805233b8b6f5372ebe01ecd348c2186b72da3394b5c3a643e0e711f6418daf` |
+| `(deleted-coord-artifact)/cg_results.txt` | 3,298 | `0e805233b8b6f5372ebe01ecd348c2186b72da3394b5c3a643e0e711f6418daf` |
 | `cg/pages_shape_style_cases::line_endpoints_set_cost_abba.host.out` | 592,436 | `80cef034853a871d9e80caa9f86a3960fe4d5e52ac1a3b21668b6d04cbd04e0b` |
 | `cg/pages_shape_style_cases::line_endpoints_set_cost_abba.leaf.out` | 480,629 | `f5b0aa6c4b6e4d6a33ca0aca2f5ed47132ab32ff6620960bc73dbfe72b69facf` |
 | `cg/pages_shape_style_cases::line_endpoints_reset_cost_abba.host.out` | 565,209 | `f851d2587642a30ebe9d1325aa5c71ad5c6932937ace5c8aa68bf6547fc7eec4` |
@@ -279,7 +279,7 @@ The resumed scoped checks on the post-W1-C branch passed:
 | `CARGO_BUILD_JOBS=4 cargo test -p litchi-iwa --all-features --test parity pages_body_line_endpoints -- --nocapture` | 2 passed |
 | `CARGO_BUILD_JOBS=4 cargo test -p litchi-iwa --all-features --test parity pages_body_table_duplicate -- --nocapture` | 4 passed; 17 corpus routes, 5 refused |
 
-The raw files are relative to `/home/zhuhe/code/litchi-worktrees/.coord/iwa-w1b`.
+The raw files are relative to `(deleted-coord-artifact)`.
 
 The whole-body set route was the only miss: the leaf `edit_body_text` (an
 existing family) re-encoded every archive header in its physical preflight

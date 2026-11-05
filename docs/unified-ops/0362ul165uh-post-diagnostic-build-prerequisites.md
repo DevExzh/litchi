@@ -48,7 +48,7 @@ are unchanged. This does not close the remaining branch dispositions.
 
 ## Evidence
 
-Paths below are relative to `/home/zhuhe/code/litchi-worktrees/.coord/`.
+Paths below are relative to `(deleted-coord-artifact)`.
 
 | Artifact | SHA-256 |
 | --- | --- |

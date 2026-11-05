@@ -29,13 +29,13 @@ job, from the source above:
 
 | binary | path outside the checkout | SHA-256 |
 | --- | --- | --- |
-| reader | `/home/zhuhe/code/litchi-worktrees/.coord/w4-xlsx/targets/reader-state-repair-alloc/release/xlsx_source_reader_paths_alloc` | `c8efaceeb0b5ae2f46552b829ccf664cebbc1845b11ccc5df83124b6f41904ab` |
-| tab-state | `/home/zhuhe/code/litchi-worktrees/.coord/w4-xlsx/targets/reader-state-repair-alloc/release/xlsx_tab_state_history_alloc` | `6cee6c86a82ba5bb6939dbddcb3afef9480d23c61081a45b8e36d1d753273457` |
-| e63 reader | `/home/zhuhe/code/litchi-worktrees/.coord/w4-xlsx/targets/reader-paths-e63/release/xlsx_source_reader_paths_alloc` | `83d8b69347a499fd616c066f0a986362c1bd5c167552c9a77e9c663d456ef958` |
-| e63 tab-state | `/home/zhuhe/code/litchi-worktrees/.coord/w4-xlsx/targets/final-e63-alloc/release/xlsx_tab_state_history_alloc` | `e5662fe6cb7b2db064a54ea5c2eb37ed4750ca95d333fa6132348d55cbac762d` |
+| reader | `(deleted-coord-artifact)/xlsx_source_reader_paths_alloc` | `c8efaceeb0b5ae2f46552b829ccf664cebbc1845b11ccc5df83124b6f41904ab` |
+| tab-state | `(deleted-coord-artifact)/xlsx_tab_state_history_alloc` | `6cee6c86a82ba5bb6939dbddcb3afef9480d23c61081a45b8e36d1d753273457` |
+| e63 reader | `(deleted-coord-artifact)/xlsx_source_reader_paths_alloc` | `83d8b69347a499fd616c066f0a986362c1bd5c167552c9a77e9c663d456ef958` |
+| e63 tab-state | `(deleted-coord-artifact)/xlsx_tab_state_history_alloc` | `e5662fe6cb7b2db064a54ea5c2eb37ed4750ca95d333fa6132348d55cbac762d` |
 
 The current allocator JSON is outside the checkout at
-`/home/zhuhe/code/litchi-worktrees/.coord/w4-xlsx/allocator-inline-style-v3`.
+`(deleted-coord-artifact)`.
 Its current reader, open-only, default, managed and custom report hashes are
 respectively:
 
@@ -104,7 +104,7 @@ for coordinator review; it is not accepted as a performance exception.
 The current reader and e63 binaries were run with the same
 `--iterations 64 --warmups 2` command. Three matched blocks in the external
 directory
-`/home/zhuhe/code/litchi-worktrees/.coord/w4-xlsx/reader-callgrind-v4`
+`(deleted-coord-artifact)`
 reported:
 
 | block | current c8ef Ir | e63 Ir | current / e63 |

@@ -108,11 +108,11 @@ source-bound binary was rebuilt and archived before execution:
   `pages-parity-df94ce2af6`, SHA-256
   `5fd933c7814b28abf3eb5eb8472fce9b983e336d92a2d44a78e8e93586278418`
 - measured source: `4fc75709351f7120ae69b81749e371c0880ced69`
-- measured binary: `/home/zhuhe/code/litchi-worktrees/.coord/fullmeasuredSHA/bin/pages-parity-4fc7570935`
+- measured binary: `(deleted-coord-artifact)`
 - measured binary: 40,204,912 bytes, SHA-256
   `085f9695d9c5257cfffd36d930d143c6ada46edb2ced55c03a7d3bd57d851751`
 - build: `cargo test -p litchi-iwa --test parity --release --no-run --jobs 2`
-- capture root: `/home/zhuhe/code/litchi-worktrees/.coord/fullmeasuredSHA/pages-cpu5-4fc7570935`
+- capture root: `(deleted-coord-artifact)`
 - manifest: `manifest.tsv`; `taskset -c 5 valgrind --tool=callgrind`
   captured each exact ignored test twice, with the matching host or leaf
   symbol toggle. Every capture had exit 0, one matching test pass, and

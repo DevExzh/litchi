@@ -7,7 +7,7 @@ external packet directory below.
 
 ## Frozen inputs and execution policy
 
-- Source endpoint: `/home/zhuhe/code/litchi-worktrees/.coord/final-api-capture-472b670547/source`
+- Source endpoint: `(deleted-coord-artifact)`
 - Source HEAD: `472b6705475b073e7fe08f6e11ee17fb1e29f838` (clean detached
   endpoint)
 - Constructor baseline: `ddf2ac8ae2117cd78829ef94bcb610d6cbdfa0e2`
@@ -20,14 +20,14 @@ external packet directory below.
   `cc322c2189e8e3822472627e61c45b8e463f866adcba32858c88cc237bd17a3e`
 - Owner probe: 27,230 bytes,
   `c580de1c52c2c37c1cebbc7a0e6324cd03cd827e01de09d11ca7f2d9de4b50a1`
-- Cargo shim: `/home/zhuhe/code/litchi-worktrees/.coord/bin/cargo`,
+- Cargo shim: `(deleted-coord-artifact)`,
   SHA-256 `1b22a69fd625d57565041bf6c634d8ebd1a82be8b3d0006390472c86324230d8`
 - Build and preflight environment: `LITCHI_MEM_MAX=20G`,
   `CARGO_BUILD_JOBS=1`, `RUST_TEST_THREADS=1`, offline and locked Cargo,
   debug information disabled, and fresh external `TMPDIR`.
 
 The external packet root is
-`/home/zhuhe/code/litchi-worktrees/.coord/iwa-native-qualification-472b670547-20261024T171900Z`.
+`(deleted-coord-artifact)`.
 The build outputs are `constructor/` and `owner/` below that root. Each target
 was checked with `du -sxB1` and was below 20,000,000,000 bytes:
 

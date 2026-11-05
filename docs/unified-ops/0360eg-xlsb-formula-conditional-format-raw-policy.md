@@ -36,14 +36,14 @@ Two paths have no opened owner and use the documented default authoring profile 
 
 ## Validation
 
-Commands were run with `/home/zhuhe/code/litchi-worktrees/.coord/w4b-xlsb-raw-policy/env.sh`:
+Commands were run with `(deleted-coord-artifact)`:
 
 - `cargo fmt --all -- --check`: exit 0.
 - `cargo test -p litchi-xlsb --all-features --offline`: exit 0; 1,334 passed, 0 failed.
 - `cargo clippy -p litchi-xlsb --all-targets --all-features --offline -- -D warnings`: exit 0.
 - `cargo check -p litchi-ops -p litchi -p litchi-cli --all-targets --all-features --offline`: exit 0 (no consumer outside the crate called the changed signatures).
 
-Logs under `/home/zhuhe/code/litchi-worktrees/.coord/w4b-xlsb-raw-policy/`: `xlsb-0360eg-tests.log` (121,491 bytes, SHA-256 `7cc2da4d5b343cf8b6c73b401be65ab1534d8f0e626a48639cac8c31bb85491b`) and `xlsb-0360eg-clippy.log` (172 bytes, SHA-256 `0f72bba120dead49c5d9cb8b5cb7b72485f3d8effaa96a4d4d8d9fa9943dacb2`).
+Logs under `(deleted-coord-artifact)`: `xlsb-0360eg-tests.log` (121,491 bytes, SHA-256 `7cc2da4d5b343cf8b6c73b401be65ab1534d8f0e626a48639cac8c31bb85491b`) and `xlsb-0360eg-clippy.log` (172 bytes, SHA-256 `0f72bba120dead49c5d9cb8b5cb7b72485f3d8effaa96a4d4d8d9fa9943dacb2`).
 
 ## Performance
 

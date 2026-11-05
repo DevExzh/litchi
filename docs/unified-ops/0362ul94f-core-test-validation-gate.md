@@ -11,7 +11,7 @@ the typed content-free `Refused(UnsupportedProperty)`. No public capability,
 consumer, limits, assertion, or algorithm changes.
 
 Actual state:
-`/home/zhuhe/code/litchi-worktrees/.coord/ooxml-combined-0362ul94-f5-actual-6d95f193c5`.
+`(deleted-coord-artifact)`.
 Command:
 `cargo check --keep-going --offline --locked -q -p litchi-ooxml-common --all-targets --all-features`.
 Exit 101 after 36.282 seconds; target 158,632,675 bytes. Root verifies exact

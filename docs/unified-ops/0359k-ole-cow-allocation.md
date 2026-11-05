@@ -13,7 +13,7 @@ and one capped release build per side. The baseline probe SHA-256 is
 COW candidate is
 `ec39b816664c7771711d0081e77bad795f40a9911e693094e5296b3b629fbbe6`.
 The complete external receipt is
-`/home/zhuhe/code/litchi-worktrees/.coord/w5-ole/counting-cow-ad990-20261021`;
+`(deleted-coord-artifact)`;
 its 256 KiB directory manifest has SHA-256
 `0f7fdf44002e971cb955cd176b9785654ad8f645de3cafc1ff10027bfc16d546`.
 The runner reports allocation counts and bytes only; it does not report native

@@ -9,7 +9,7 @@ bindings, process exit and target bounds. Final target usage is
 capture; it does not erase its readonly test failure or grant final acceptance.
 
 Evidence is outside the checkout at the worktree parent's
-`.coord/ooxml-pptx-joint-c780cf4c7-f5-runtime-pptx-tail-remaining26-v1/`:
+`(deleted-coord-artifact)`:
 
 | File | Bytes | SHA-256 |
 |---|---:|---|
@@ -18,7 +18,7 @@ Evidence is outside the checkout at the worktree parent's
 
 The source-bound packet is reproduced with `python3 -B run_f5.py --go`
 using fresh state/target directories and its recorded source, locks and
-runner. Root verification uses `.coord/checkpoint96/verify_capture.py STATE`.
+runner. Root verification uses `(deleted-coord-artifact) STATE`.
 The separate minimal-feature helper has started after root preflight; its
 result and remaining minimal tail are still pending. The sixteen outer
 diagnostic groups are also pending on this source.

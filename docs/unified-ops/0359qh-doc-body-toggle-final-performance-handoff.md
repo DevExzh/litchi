@@ -12,13 +12,13 @@
 The accepted correctness packet is 0359qg. Its complete external receipt is:
 
 ~~~text
-/home/zhuhe/code/litchi-worktrees/.coord/doc-toggle-472b-build-20261024/actual-receipt.txt
+(deleted-coord-artifact)/actual-receipt.txt
 SHA-256 a0dfb1d1b66c16249939a702d26565466a3ca8b86d11e9bc87461bf5df414b3a
 ~~~
 
 | item | candidate | baseline |
 |---|---|---|
-| source | `/home/zhuhe/code/litchi-worktrees/.coord/final-api-capture-472b670547/source` | `/home/zhuhe/code/litchi-worktrees/.coord/final-api-capture-472b670547/doc-body-baseline` |
+| source | `(deleted-coord-artifact)` | `(deleted-coord-artifact)` |
 | commit | `472b6705475b073e7fe08f6e11ee17fb1e29f838` | same |
 | tree | `ebc1cee05f124c0c63977aff07a23288c19e7d00` | same |
 | Cargo.lock SHA-256 | `4100b1fbb272dd24842f33a2d6f353a3f3a97dfa7e435c4649a0e1a029bfaea1` | same |
@@ -62,7 +62,7 @@ The batch hashes intentionally differ; the final CHPX oracle already passed.
 The previous actual deterministic packet is:
 
 ~~~text
-/home/zhuhe/code/litchi-worktrees/.coord/doc-toggle/final-record/docs/unified-ops/results/0359qe/qualification.json
+(deleted-coord-artifact)/qualification.json
 5912 bytes, SHA-256 086714a6f2190fafdf8ac7e14a22a6a7a844305e979d9ad43d48384b7c133279
 ~~~
 
@@ -90,11 +90,11 @@ above. This exact function shape is to be run only after a profile slot is
 granted:
 
 ~~~sh
-source /home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/env.sh
+source (deleted-coord-artifact)
 ROOT=/home/zhuhe/code/litchi-worktrees
 SOURCE_SHORT=472b
-RUN=$ROOT/.coord/doc-toggle-472b-performance-$SOURCE_SHORT
-BASE_RUN=$ROOT/.coord/doc-toggle-472b-build-20261024
+RUN=(deleted-coord-artifact)
+BASE_RUN=(deleted-coord-artifact)
 CAND_BIN=$BASE_RUN/target-candidate/release/examples/legacy_w5_source_probe
 BASE_BIN=$BASE_RUN/target-baseline/release/examples/legacy_w5_source_probe
 mkdir -p "$RUN"/allocation/{candidate,baseline} "$RUN"/tmp/{candidate,baseline}

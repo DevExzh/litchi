@@ -34,7 +34,7 @@ W4b; neither is claimed by this record.
 Validation on the dirty policy source passed:
 
 ```text
-source .coord/w8-snappy-policy/env.sh
+source (deleted-coord-artifact)
 CARGO_BUILD_JOBS=1 cargo test --offline --locked -p litchi-pages --lib --all-features
 CARGO_BUILD_JOBS=1 cargo test --offline --locked -p litchi-keynote --lib --all-features
 CARGO_BUILD_JOBS=1 cargo clippy --offline --locked \

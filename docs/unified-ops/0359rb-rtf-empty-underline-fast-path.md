@@ -68,7 +68,7 @@ route was checked separately before accepting this tradeoff.
 
 A private no-inline probe used the same source and a non-empty ASCII span. Its
 source is retained outside the checkout at
-`/home/zhuhe/code/litchi-worktrees/.coord/rtf-refusals/private-probes/underline_route_probe.rs`.
+`(deleted-coord-artifact)`.
 The cold case parsed 34 fresh packages and then made one successful underline
 commit per package. The warm case precomputed `Package::text()` and made
 34,000 successful underline commits. The no-inline `success` wrapper contains

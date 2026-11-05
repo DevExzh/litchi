@@ -14,8 +14,7 @@ The baseline remains the exact pre-repair endpoint:
 ```text
 revision 410bd99f00fdfb4161a94215710340f16ea536bb
 tree     41850bc694ccfda6f84510611d32fe452248773d
-checkout /home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/
-         opc-read-ahead-c796-prep/source-baseline-410
+checkout (deleted-coord-artifact)
 ```
 
 Its detached sparse worktree was independently rechecked clean and reused
@@ -28,7 +27,7 @@ The candidate is the existing clean final production checkout:
 ```text
 revision 472b6705475b073e7fe08f6e11ee17fb1e29f838
 tree     ebc1cee05f124c0c63977aff07a23288c19e7d00
-checkout /home/zhuhe/code/litchi-worktrees/.coord/final-api-capture-472b670547/source
+checkout (deleted-coord-artifact)
 ```
 
 The read-ahead probe and build inputs were checked at both endpoints before
@@ -59,13 +58,11 @@ The new packet is separate from the preserved c796 packet:
 
 ```text
 packet:
-/home/zhuhe/code/litchi-worktrees/.coord/final-api-capture-472b670547/
-opc-read-ahead-final472b-prep/packet.json
+(deleted-coord-artifact)/packet.json
 SHA-256 a5f2fc3a3428996949b2bf7b34732e95aed5b9857a85b541acb5b9a1a60ac3e1
 
 commands:
-/home/zhuhe/code/litchi-worktrees/.coord/final-api-capture-472b670547/
-opc-read-ahead-final472b-prep/run-opc-read-ahead-final472b.sh
+(deleted-coord-artifact)/run-opc-read-ahead-final472b.sh
 SHA-256 5b20c3980e6892c5485d99b28dcc455e3e823c0d8190d0cabd87fee51c6a3ddb
 ```
 
@@ -77,8 +74,7 @@ default, but repeats the host quiet check before and throughout every
 process.  Its fresh run root and baseline/candidate targets are under:
 
 ```text
-/home/zhuhe/code/litchi-worktrees/.coord/final-api-capture-472b670547/
-opc-read-ahead-final472b-run
+(deleted-coord-artifact)
 ```
 
 That root, its targets, its temporary directory and its CPU lock were absent

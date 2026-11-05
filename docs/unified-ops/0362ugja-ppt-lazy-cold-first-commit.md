@@ -37,9 +37,9 @@ plan without native execution:
 
 ```sh
 python3 tools/ppt_lazy_cold_first_commit.py \
-  --manifest /home/zhuhe/code/litchi-worktrees/.coord/ppt-lazy-native-final-472b-repaired-20261024/ppt-lazy-edit-472b-repaired.json \
-  --projection /home/zhuhe/code/litchi-worktrees/.coord/ppt-lazy-native-final-472b-repaired-20261024/ppt-lazy-build-input-projection-472b-repaired.json \
-  --out-dir /home/zhuhe/code/litchi-worktrees/.coord/ppt-lazy-native-final-472b-repaired-20261024/cold-first-plan-v3-20261024
+  --manifest (deleted-coord-artifact) \
+  --projection (deleted-coord-artifact) \
+  --out-dir (deleted-coord-artifact)
 ```
 
 The source-only plan completed with `execution=not_run`; its external

@@ -13,7 +13,7 @@ It is an external patch for the coordinator's current composed candidate; this
 worktree does not modify the candidate, merge branches, or `PROGRESS.md`.
 
 The qualification diagnosis remains the external log
-`/home/zhuhe/code/litchi-worktrees/.coord/pptx-combined-0362ul89-f5-qualification-ef9470f7da/fullfeatures-tests/0000.log`
+`(deleted-coord-artifact)/0000.log`
 (548,761 bytes, SHA-256
 `cfe5aa3f9c4082d67019cfc8285a121768d0a5e3063f8e0c064bfcbda60d3fef`).
 No Cargo, build, rustdoc, native, benchmark, or qualification command was run

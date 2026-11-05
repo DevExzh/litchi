@@ -38,7 +38,7 @@ carry this lock edge when assembling the final staging pin.
 With the updated local lock, this focused all-feature check passed:
 
 ```text
-source /home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/env.sh
+source (deleted-coord-artifact)
 cargo check --locked --offline --all-features \
   -p litchi-ops -p litchi-doc -p litchi-ppt -p litchi-xls \
   --message-format=short

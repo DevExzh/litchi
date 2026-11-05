@@ -14,7 +14,7 @@ baseline evidence.
   checkout at that exact commit; its protocol adapter uses the pre-Patch
   `Edit::plan` API and is not silently presented as a 0362yf patch-protocol
   endpoint.
-- External fixture: `/home/zhuhe/code/litchi-worktrees/.coord/odp-native-qualification-fixture-0362yd.odp`,
+- External fixture: `(deleted-coord-artifact)/odp-native-qualification-fixture-0362yd.odp`,
   4,215,423 bytes, SHA-256
   `078a83cd132a308e4609cf46f587cb68c1f928c8d2e6e1002d344223ec385cb5`.
   Its generated `content.xml` is 591,185 bytes with SHA-256
@@ -24,7 +24,7 @@ baseline evidence.
 ## Build boundary
 
 The candidate probe compiled successfully in the external target
-`/home/zhuhe/code/litchi-worktrees/.coord/odp-native-qualification-candidate-f28a599077`
+`(deleted-coord-artifact)`
 with one job, release profile, debug information disabled, incremental
 compilation disabled, `--offline --locked`, and the 20-GB capped cargo shim:
 
@@ -38,7 +38,7 @@ The successful diagnostic candidate binary predates the final content-scope
 assertion in `1b3ec77fa5`; it remains external build evidence only, not the
 final candidate endpoint. The original dirty e4a worktree already contained
 an older ignored example, so the baseline build used the clean detached
-checkout `/home/zhuhe/code/litchi-worktrees/.coord/odp-0362yd-baseline-clean`.
+checkout `(deleted-coord-artifact)`.
 Its generated lock file was carried from the original e4a checkout under the
 same source commit and had SHA-256
 `04665b965a919412e29c8772956ddf6267264fa40e3e0ef7c9967fd2eb584171`.
@@ -56,22 +56,22 @@ job, release debug information disabled, incremental compilation disabled,
 offline/locked mode and the 20-GB capped cargo shim:
 
 ```text
-CARGO_TARGET_DIR=/home/zhuhe/code/litchi-worktrees/.coord/odp-0362yd-baseline-clean-target \
+CARGO_TARGET_DIR=(deleted-coord-artifact) \
 CARGO_BUILD_JOBS=1 CARGO_INCREMENTAL=0 CARGO_PROFILE_RELEASE_DEBUG=0 \
 LITCHI_MEM_MAX=20G \
 cargo build --offline --locked --release --jobs 1 \
-  --manifest-path /home/zhuhe/code/litchi-worktrees/.coord/odp-0362yd-baseline-clean/Cargo.toml \
+  --manifest-path (deleted-coord-artifact) \
   -p litchi-odp --example odp_native_qualification_legacy_probe
 ```
 
 The resulting external binary is
-`/home/zhuhe/code/litchi-worktrees/.coord/odp-0362yd-baseline-clean-target/release/examples/odp_native_qualification_legacy_probe`,
+`(deleted-coord-artifact)`,
 2,241,664 bytes, SHA-256
 `fb12f47974f5a99f6a3bc136b585d2218504efe51e86d46a03771c014cacbb56`.
 The target directory is 316,582,738 bytes. After the build, only the named
 generated adapter example was moved out of the clean checkout; the source
 worktree status was empty. The moved overlay is retained externally at
-`/home/zhuhe/code/litchi-worktrees/.coord/odp-0362yd-baseline-overlay-built-47cc.rs`
+`(deleted-coord-artifact)`
 with the same adapter hash. The historical 0362yd binaries remain external
 and untouched.
 
@@ -81,9 +81,9 @@ The baseline-only verification used the frozen fixture and no timing mode:
 
 ```text
 timeout 120 taskset --cpu-list 3 \
-  /home/zhuhe/code/litchi-worktrees/.coord/odp-0362yd-baseline-clean-target/release/examples/odp_native_qualification_legacy_probe \
+  (deleted-coord-artifact) \
   --mode verify \
-  --fixture /home/zhuhe/code/litchi-worktrees/.coord/odp-native-qualification-fixture-0362yd.odp \
+  --fixture (deleted-coord-artifact) \
   --title 'Qualification appended title' \
   --body 'Qualification appended body'
 ```

@@ -13,8 +13,8 @@ preparer/validator/test provenance pins, so the candidate API tree remains the
 production 691 tree.  The fresh external source roots are:
 
 ```text
-baseline: /home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/rtf-final-native-691/source-baseline
-candidate: /home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/rtf-final-native-691/source-candidate
+baseline: (deleted-coord-artifact)
+candidate: (deleted-coord-artifact)
 ```
 
 The baseline is the frozen `86d708878fa537eab42fd4bd5ffbc0f79c606191`
@@ -34,7 +34,7 @@ The live current workspace example remains separately bound to
 `crates/litchi-rtf/examples/refusal_contract_bench.rs`, SHA-256
 `1726acb58953ae3f57d9b74207f75678a3bcc7ac4c993443aac5583d3943f791`, and
 the external root lock
-`/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/locks/4100b1fbb272dd24842f33a2d6f353a3f3a97dfa7e435c4649a0e1a029bfaea1.Cargo.lock`,
+`(deleted-coord-artifact)/4100b1fbb272dd24842f33a2d6f353a3f3a97dfa7e435c4649a0e1a029bfaea1.Cargo.lock`,
 SHA-256
 `4100b1fbb272dd24842f33a2d6f353a3f3a97dfa7e435c4649a0e1a029bfaea1`.
 
@@ -48,9 +48,9 @@ source pair.
 The immutable external manifest and source-only receipt are:
 
 ```text
-manifest: /home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/rtf-final-native-691/driver/legacy-rtf-final.json
+manifest: (deleted-coord-artifact)/legacy-rtf-final.json
 manifest SHA-256: bcdf11642a7d7eba139781ff9ac113013f78b23cc0cdba2e154a6d47c91a26f8 (4649 bytes)
-receipt: /home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/rtf-final-native-691/driver/source-preparation.json
+receipt: (deleted-coord-artifact)/source-preparation.json
 receipt SHA-256: 0058a7049b09903134b2f9653421217c9d737670f76fc38a6320e77ae3bbc8cd (7504 bytes)
 The superseded first receipt, generated before the candidate revision was
 bound to the pin-repair commit, remains at
@@ -102,7 +102,7 @@ external root; do not point a new execution at the historical 691 packet:
 
 ```sh
 QUALIFICATION_SOURCE=/home/zhuhe/code/litchi-worktrees/uo2-legacy-manifest-identity
-RTF_PREPARATION_ROOT=/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/rtf-final-native-repaired
+RTF_PREPARATION_ROOT=(deleted-coord-artifact)
 test ! -e "$RTF_PREPARATION_ROOT/driver/source-preparation.json"
 python3 "$QUALIFICATION_SOURCE/tools/native_qualification/prepare_legacy_native_inputs.py" \
   --lane legacy-rtf \

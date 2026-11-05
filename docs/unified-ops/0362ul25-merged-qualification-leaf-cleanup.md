@@ -20,7 +20,7 @@ removal. All three worktree paths are absent, their branch tips remain, and
 the final holder audit found no process using the removed worktrees.
 
 Evidence is retained under
-`/home/zhuhe/code/litchi-worktrees/.coord/worktree-cleanup-2026-10-23/quarantine/wave50-scoped/`:
+`(deleted-coord-artifact)`:
 
 | Artifact | SHA-256 |
 | --- | --- |

@@ -27,7 +27,7 @@ The three leaf heads are merged without conflicts:
 On this combined source, 151 Python tests pass across the glossary, debt
 inventory, current-native, DrawingML and signed-native policy/consumer
 suites. The external receipt is
-`/home/zhuhe/code/litchi-worktrees/.coord/contract-repair-integration-f17dda6-20261025/focused-tests.json`.
+`(deleted-coord-artifact)/focused-tests.json`.
 Its 251-byte log has SHA-256
 `c07d588e60c96671e2b255a38277036da0615aea52d4455e9d02033042da3c5a`.
 This checks the source contracts and protocol tooling; it is not Rust,
@@ -37,7 +37,7 @@ Root verifies each leaf's exact head, ancestry in the integration branch,
 and clean tracked state before removal. Each worktree contains only its
 approved ignored root lockfile beyond tracked files; its bytes and metadata
 are preserved in
-`/home/zhuhe/code/litchi-worktrees/.coord/cleanup-contract-repair-leaves-20261025/`.
+`(deleted-coord-artifact)`.
 All three worktrees and their three merged branch refs are removed. The
 terminal ledger records 62 registered worktrees and 75 remaining heads;
 cumulative unified cleanup is 276 worktrees and 438 refs. The allocated-byte

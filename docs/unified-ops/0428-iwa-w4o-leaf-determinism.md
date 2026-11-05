@@ -121,12 +121,12 @@ exit 0):
 
 Both within the 5% bar; the Keynote figure matches the final
 qualification's passing rerun (+3.456%). Evidence kept outside the
-repository: `.coord/iwa-w4o/cg-0428-custom/results.json` (20,687 bytes,
+repository: `(deleted-coord-artifact)/results.json` (20,687 bytes,
 SHA-256 `a59928040e7580c6e6cb908d1e4651565cebd8b361f898fa3090baf881c6763a`).
 
 ## 5. Gates
 
-Run on `15a211c150` plus this record (env of `.coord/iwa-w4o/env.sh`).
+Run on `15a211c150` plus this record (env of `(deleted-coord-artifact)`).
 
 | Command | Exit |
 |---|---:|

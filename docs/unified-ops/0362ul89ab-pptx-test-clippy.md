@@ -13,7 +13,7 @@ changing its contents, and replaces `19.min(1024)` with the identical value
 selected limits and assertions remain unchanged.
 
 Retained external state:
-`.coord/pptx-combined-0362ul89-f5-qualification-2da172ece2`.
+`(deleted-coord-artifact)`.
 
 - `rows.json`: 35,905 bytes, SHA-256
   `fc3a80c91ef8c91b8a5c52fed521c03578e2779ea090b74a75a935b533545381`.

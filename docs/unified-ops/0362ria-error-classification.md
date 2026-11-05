@@ -69,7 +69,7 @@ The focused adapter tests are at
 ## Validation receipt
 
 The focused runs reused the coordinator integration target. They used `CARGO_BUILD_JOBS=1` and the 20 GiB memory cap from
-`.coord/w8-part-a-integration/env.sh`; the target was
+`(deleted-coord-artifact)/env.sh`; the target was
 `/home/zhuhe/code/litchi-worktrees/unified-ops-api/target`. Those cargo
 processes have terminated; the coordinator resumed its semantic run after the
 target was released. Combined-source validation remains separate from these
@@ -77,9 +77,9 @@ worker receipts.
 
 | Command | Result | External receipt |
 |---|---|---|
-| `source /home/zhuhe/code/litchi-worktrees/.coord/w8-part-a-integration/env.sh && cargo test --offline --locked -p litchi-ops --no-default-features --features docx --lib error::tests::docx_recorded_replay_conflicts_are_invalid_input --no-fail-fast` | 1 passed, 0 failed; exit 0 | `/home/zhuhe/code/litchi-worktrees/.coord/0362ri-logs/docx-replay.txt`, 800 bytes, SHA-256 `b37878b171a04c7b4f37e3e0cc0edee90235fce14dc737d2865ce9c155f5059f` |
-| `source /home/zhuhe/code/litchi-worktrees/.coord/w8-part-a-integration/env.sh && cargo test --offline --locked -p litchi-ops --no-default-features --features pages,keynote,numbers --lib format::iwork::error::tests::iwork_source_freshness_errors_are_io_errors --no-fail-fast` | 1 passed, 0 failed; exit 0 | `/home/zhuhe/code/litchi-worktrees/.coord/0362ri-logs/iwork-freshness.txt`, 718 bytes, SHA-256 `dfe029916c542ef60255d2007f3fb7316563c53ea435ab4731b310fdbc7aaf33` |
-| `source /home/zhuhe/code/litchi-worktrees/.coord/w8-part-a-integration/env.sh && cargo test --offline --locked -p litchi-ops --no-default-features --features pages,keynote,numbers --lib format::iwork::error::tests::iwork_package_wrong_kinds_are_unsupported_formats --no-fail-fast` | 1 passed, 0 failed; exit 0 | `/home/zhuhe/code/litchi-worktrees/.coord/0362ri-logs/iwork-wrong-kind.txt`, 729 bytes, SHA-256 `f8828112d5cb9f13cd3267729eacab49445a860869fadd482a55bc5f35bb3233` |
+| `source (deleted-coord-artifact)/env.sh && cargo test --offline --locked -p litchi-ops --no-default-features --features docx --lib error::tests::docx_recorded_replay_conflicts_are_invalid_input --no-fail-fast` | 1 passed, 0 failed; exit 0 | `(deleted-coord-artifact)/docx-replay.txt`, 800 bytes, SHA-256 `b37878b171a04c7b4f37e3e0cc0edee90235fce14dc737d2865ce9c155f5059f` |
+| `source (deleted-coord-artifact)/env.sh && cargo test --offline --locked -p litchi-ops --no-default-features --features pages,keynote,numbers --lib format::iwork::error::tests::iwork_source_freshness_errors_are_io_errors --no-fail-fast` | 1 passed, 0 failed; exit 0 | `(deleted-coord-artifact)/iwork-freshness.txt`, 718 bytes, SHA-256 `dfe029916c542ef60255d2007f3fb7316563c53ea435ab4731b310fdbc7aaf33` |
+| `source (deleted-coord-artifact)/env.sh && cargo test --offline --locked -p litchi-ops --no-default-features --features pages,keynote,numbers --lib format::iwork::error::tests::iwork_package_wrong_kinds_are_unsupported_formats --no-fail-fast` | 1 passed, 0 failed; exit 0 | `(deleted-coord-artifact)/iwork-wrong-kind.txt`, 729 bytes, SHA-256 `f8828112d5cb9f13cd3267729eacab49445a860869fadd482a55bc5f35bb3233` |
 
 `rustfmt --edition 2024 --check` passed for the three changed Rust files, and
 `git diff --check` passed. The staged repository size guard and binary guard

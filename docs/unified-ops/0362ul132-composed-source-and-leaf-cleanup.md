@@ -34,7 +34,7 @@ errors; the disclosed inaccessible system/container and named service
 processes still prevent a complete visibility claim.
 
 External evidence is under
-`.coord/worktree-cleanup-2026-10-25/trunk-consolidation/` in the worktree parent:
+`(deleted-coord-artifact)` in the worktree parent:
 
 | Receipt | SHA-256 |
 |---|---|

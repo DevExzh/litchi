@@ -47,7 +47,7 @@ The exact earlier read-only check was run from
 set -e
 cand=/home/zhuhe/code/litchi-worktrees/uo2-pptx-combined-0362ul89
 git -C "$cand" status --short --branch
-git -C "$cand" apply --check /home/zhuhe/code/litchi-worktrees/.coord/0362ul94s-ooxml-ribbon-escaped-namespace.patch
+git -C "$cand" apply --check (deleted-coord-artifact)
 ```
 
 Its complete output was:

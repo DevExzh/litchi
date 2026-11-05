@@ -7,7 +7,7 @@ presentation-properties payload despite the recipient's physical XML event
 limit. Four readonly tests and the revision test pass; this fifth readonly
 test fails. Root verifies the terminal capture before further execution.
 
-The packet, relative to the worktree parent's `.coord/`, is
+The packet, relative to the worktree parent's `(deleted-coord-artifact)`, is
 `ooxml-pptx-joint-a8d32513b8-f5-runtime-pptx-tail-remaining17-v2`:
 
 | Artifact | Bytes | SHA-256 |
@@ -51,7 +51,7 @@ wrapper, source, lock or resource failures stop execution. Any admitted test
 failure leaves the final aggregate failed. This does not change final gates.
 
 The external adapter is
-`.coord/diagnostic-continuation-review-20261025-v2/diagnostic_continuation_adapter_v2.py`,
+`(deleted-coord-artifact)/diagnostic_continuation_adapter_v2.py`,
 21,467 bytes, SHA-256
 `a9eb00ccaefea42942efeb25262931c100f3a4fb6816ace779ada761fe33aaa7`.
 Its 25 synthetic cases pass; root also verifies the retained physical
@@ -87,7 +87,7 @@ and named same-user service processes remain a visibility limitation. An
 immutable addendum corrects the original receipt's misleading completion
 flags: visibility is incomplete and no zero-descriptor proof is claimed.
 
-Evidence under `.coord/worktree-cleanup-2026-10-25/trunk-consolidation/`:
+Evidence under `(deleted-coord-artifact)`:
 
 | Receipt | SHA-256 |
 |---|---|

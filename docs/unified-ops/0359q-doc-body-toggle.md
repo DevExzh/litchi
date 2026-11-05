@@ -3,7 +3,7 @@
 - **Status:** implemented on `uo2/doc-toggle`; parent merge pending.
 - **Date:** 2026-10-22.
 - **Base:** `81323113be7e166d1b37ea185e9fd712d8748a62`.
-- **Input:** follow-up 0359a-F1 in `.coord/followups-api-debt.md` (the leaf
+- **Input:** follow-up 0359a-F1 in `(deleted-coord-artifact)` (the leaf
   body-toggle cost at 1,000 paragraphs).
 - **Scope:** `litchi-doc`'s existing body transaction and its W5 probe. No
   public editing family or public type was added.
@@ -78,7 +78,7 @@ The reduced JSON/log captures and the source diff used for the temporary
 before build remain outside the repository:
 
 ```text
-/home/zhuhe/code/litchi-worktrees/.coord/doc-toggle/
+(deleted-coord-artifact)
   before-leaf-write-3.json       231 B  sha256 8617224f10d004d7b6effea6436e77c8be44c2f90077f701385a8561192de04e
   before-leaf-write-3.log         42 B  sha256 88363bee6c45588b3aab28563872ae463caa803fec68be6750026b7c6e240f59
   after-leaf-write-final.json    223 B  sha256 a821d56037df4d0edd34612358d25b6dc4df8df0cd236c7fd5c575c4e65f75cc
@@ -113,7 +113,7 @@ legs. The route-local ordinary attribution is corrected in
 [0359qa](0359qa-doc-body-toggle-profile.md).
 
 The compact profile summary is outside the repository at
-`/home/zhuhe/code/litchi-worktrees/.coord/doc-toggle/profile-summary.txt`
+`(deleted-coord-artifact)/profile-summary.txt`
 (1,064 bytes, SHA-256
 `5c66fa441092b06e6d8355c5a542eddc0ee3db3dcffbee148051092e4db9efd1`). The
 matched profile binaries are also external: `before-with-single-route-legacy_w5_source_probe`

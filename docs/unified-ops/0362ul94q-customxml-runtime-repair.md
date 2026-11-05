@@ -3,7 +3,7 @@
 This follow-up repairs the four Custom XML failures reported by the 0362ul94
 runtime qualification at source `3774fe4374dfb66e74b98b1ae742672ed6cad37f`.
 The failure receipt is retained outside the checkout at
-`.coord/ooxml-combined-0362ul94-f5-runtime-3774fe43-v2/common-tests/0000.log`.
+`(deleted-coord-artifact)`.
 
 The transactional insert assertion now follows the current typed contract:
 an occupied destination is `RefusalKind::UnsupportedTarget`, while the

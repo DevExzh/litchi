@@ -16,7 +16,7 @@ fixture filename.
 Validation used one capped Cargo process and the tracked fixtures:
 
 ```text
-CARGO_TARGET_DIR=/home/zhuhe/code/litchi-worktrees/.coord/w5-ole-source-arc-retag-20261022/target-xls-final
+CARGO_TARGET_DIR=(deleted-coord-artifact)
 cargo test --locked -p litchi-xls --lib -- --nocapture
 test result: ok. 1316 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 ```

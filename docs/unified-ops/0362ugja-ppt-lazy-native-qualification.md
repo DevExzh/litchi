@@ -190,11 +190,11 @@ measurement has passed.
 An authorized compile-only slot type-checked the shared probe through a
 temporary external mini-crate that supplied the allocator-metrics interface;
 this avoided a release build and did not run the probe. The exact command was
-`cargo check --offline --manifest-path /home/zhuhe/code/litchi-worktrees/.coord/ppt-probe-check/Cargo.toml`
+`cargo check --offline --manifest-path (deleted-coord-artifact)`
 with the repository memory-capped Cargo shim, `LITCHI_MEM_MAX=20G`,
 `CARGO_BUILD_JOBS=1`, `CARGO_INCREMENTAL=0`, `CARGO_NET_OFFLINE=true`, an
 external target directory, and a 20-GB cap. It exited 0; the external target
 was 281 MiB. The 6,687-byte log is retained outside the repository at
-`/home/zhuhe/code/litchi-worktrees/.coord/ppt-lazy-native-compile-20261024/logs/probe-harness-final.log`
+`(deleted-coord-artifact)/probe-harness-final.log`
 with SHA-256
 `012cbf16ad29524ee3a9ca5739f92de10da3bc8b6cdcfeece7bbd5e662ed1cf7`.

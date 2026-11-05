@@ -61,7 +61,7 @@ kept outside Git at `/home/zhuhe/code/litchi-worktrees/uo2-xls-property-lazy/Car
 (SHA-256 `6d7895e6056c931fc19780ff4d0a031230e2ac79b9b30a9060bc8b6fad6747da`).
 The signed metadata/property-set test passed 1/1 and the signed
 worksheet-feature test passed 1/1. Their raw logs remain outside the checkout:
-`signed-metadata-4f08-v3.log` (under `.coord/xls-property-lazy`) and
+`signed-metadata-4f08-v3.log` (under `(deleted-coord-artifact)`) and
 `signed-sheet-4f08-v2.log` (same directory). The broader focused XLS suite,
 strict Clippy, and affected `litchi-ops` checks are recorded below. No native
 qualification, benchmark, or performance claim is made here; no binary or
@@ -77,12 +77,12 @@ route through it. The deterministic dynamic-source regressions cover both
 property-set render and candidate publication refusal. The focused command was:
 
 ```text
-source /home/zhuhe/code/litchi-worktrees/.coord/xls-property-lazy/env.sh
+source (deleted-coord-artifact)
 cargo test -p litchi-xls --test package_owner --locked --offline property_set_ -- --nocapture
 ```
 
 It passed 2/2; the external 592-byte log is
-`/home/zhuhe/code/litchi-worktrees/.coord/xls-property-lazy/property-fence-tests.log`
+`(deleted-coord-artifact)/property-fence-tests.log`
 (SHA-256 `8fcb989656654c47369b24f62ad43b3c5f4ec57bd5370777e01bdf46f56bdfdd`).
 
 ## Final validation packet
@@ -91,7 +91,7 @@ The final source is commit `9fe06599d6be568218446b491312e1ce18a1e2e8`
 (`895bb4905de2` is its publication-fence parent). Every final command below
 was run with `git status --porcelain=v1` empty; the only workspace lock was the
 ignored generated lock recorded above. The command environment was the
-`.coord/xls-property-lazy/env.sh` file (493 bytes, SHA-256
+`(deleted-coord-artifact)/env.sh` file (493 bytes, SHA-256
 `9de5d9faae447066b151f8414ac80f327506a9a5ab0dae72f03f079d141bd4da`):
 Rust/Cargo 1.95.0 (`rustc 1.95.0 (59807616 2026-04-14)`, `cargo 1.95.0
 (f2d3ce0bd 2026-03-21)`), `CARGO_BUILD_JOBS=1`,
@@ -113,7 +113,7 @@ no target or executable is committed.
 Final-source commands, all exit 0:
 
 ```text
-source /home/zhuhe/code/litchi-worktrees/.coord/xls-property-lazy/env.sh
+source (deleted-coord-artifact)
 cargo test -p litchi-xls --lib --locked --offline package::tests::republish_ -- --nocapture
 ```
 
@@ -124,7 +124,7 @@ The stable control preserves the candidate CFB error; the hook control
 mutates after the leading fence and receives typed `SourceChanged`.
 
 ```text
-source /home/zhuhe/code/litchi-worktrees/.coord/xls-property-lazy/env.sh
+source (deleted-coord-artifact)
 export RUSTDOCFLAGS='-D warnings'
 cargo test -p litchi-xls --all-features --doc --locked --offline -- --test-threads=1
 ```
@@ -135,7 +135,7 @@ doctests plus 1 compile-fail doctest); the 2,856-byte log
 `7754a17d16e0f2b370730671163bd22331d502bfaa14720aa2868e434cfeebd9`.
 
 ```text
-source /home/zhuhe/code/litchi-worktrees/.coord/xls-property-lazy/env.sh
+source (deleted-coord-artifact)
 unset RUSTDOCFLAGS
 cargo clippy -p litchi-xls --all-targets --all-features --locked --offline -- -D warnings
 ```
@@ -145,7 +145,7 @@ Strict all-target/all-feature XLS Clippy passed; the 168-byte
 `fef85535f7c1b27276d09a2761711f8cb49787342bdf0f2bdaa3dfa0bbdc281f`.
 
 ```text
-source /home/zhuhe/code/litchi-worktrees/.coord/xls-property-lazy/env.sh
+source (deleted-coord-artifact)
 cargo test -p litchi-ops --all-features --test ole_metadata --test xls_features --locked --offline --no-fail-fast
 ```
 
@@ -198,7 +198,7 @@ successor to `9fe06599d6`; the earlier `9fe` receipts above are not relabeled.
 On clean `4dce73b23f`, the focused command was:
 
 ```text
-source /home/zhuhe/code/litchi-worktrees/.coord/xls-property-lazy/env.sh
+source (deleted-coord-artifact)
 cargo test -p litchi-xls --test sheet_features --locked --offline --no-fail-fast
 ```
 
@@ -217,7 +217,7 @@ the pre-admission observation and the same admission error is promoted to
 typed `SourceChanged`. On clean `3ae7b83140`, the focused control command was:
 
 ```text
-source /home/zhuhe/code/litchi-worktrees/.coord/xls-property-lazy/env.sh
+source (deleted-coord-artifact)
 cargo test -p litchi-xls --lib --locked --offline sheet_features::edit::tests::render_error_ -- --nocapture
 ```
 

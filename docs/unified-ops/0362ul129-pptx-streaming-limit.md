@@ -11,7 +11,7 @@ in this leaf.
 ## Runtime finding
 
 The diagnostic is retained outside the repository at
-`/home/zhuhe/code/litchi-worktrees/.coord/ooxml-pptx-joint-a8d32513b8-f5-runtime-remaining43-v2/20-pptx-full-chunk-52-attempt-actual-f5-20.log`
+`(deleted-coord-artifact)/20-pptx-full-chunk-52-attempt-actual-f5-20.log`
 (224,308 bytes, SHA-256
 `e4698a72c7b3c5fa99c0c5ae4c1f09ae713376f1cce002a606f5cd08394fb341`).
 The failing case supplies `max_output_bytes = 512 MiB + 1`, above the

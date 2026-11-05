@@ -60,7 +60,7 @@ disposition, capture, glossary and three registered W8 test modules together:
 119 tests passed in 5.065 seconds. The command was
 `python3 -B -m unittest tools.test_api_debt_inventory tools.test_validate_api_disposition tools.test_final_api_inventory tools.test_check_api_glossary tools.test_w8_projection_policy tools.test_w8_file_provenance tools.test_w8_original_baseline`.
 The external 297-byte log is
-`/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/composed-inventory-w8-fae96321e3.log`,
+`(deleted-coord-artifact)/composed-inventory-w8-fae96321e3.log`,
 SHA-256 `24485e6f6c74b3528fe1e66c39af7348174d1c86eee620542ffd21ceb51a3e0c`.
 This validates the composed tooling; the 440 diagnostic findings still need
 repairs or exact semantic dispositions and final-source regeneration.

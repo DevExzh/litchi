@@ -89,5 +89,5 @@ now describe the 0412c thread family.
 
 ## 4. Verification
 
-The gate script `.coord/iwa-w4t/gates.sh` runs on the merge of trunk; its
+The gate script `(deleted-coord-artifact)` runs on the merge of trunk; its
 result is reported in the hand-off.

@@ -113,7 +113,7 @@ callback and verifies that the ODF wrapper still reports `io_error`.
 The isolated worktree was `/home/zhuhe/code/litchi-worktrees/uo2-replay-error-audit`
 at `a5c83d3a2f90e5e1a3bba1889b44d9d6a22f8418` before this layout follow-up.
 The focused lane reused
-`/home/zhuhe/code/litchi-worktrees/.coord/zip-gate-repair/target`, ran with one
+`(deleted-coord-artifact)`, ran with one
 Cargo job and one test thread, and remained below the 20 GiB target cap.
 Results:
 

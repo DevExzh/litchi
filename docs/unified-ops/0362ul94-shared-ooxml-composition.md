@@ -18,7 +18,7 @@ No compatibility alias remains.
 ## Preserved compiler and glossary evidence
 
 Web/Ribbon actual state
-`/home/zhuhe/code/litchi-worktrees/.coord/0362ul87b-f5-retry-c877dee369`
+`(deleted-coord-artifact)`
 passed rows 0–8: formatting, common/four-format/ops/facade compiler checks,
 and their Clippy checks. Row 9 failed the common-minimal glossary profile
 with six findings. Five were return/nominal-identity checker errors; the
@@ -26,7 +26,7 @@ sixth exposed Web Patch's missing `is_noop`. The source return fixes all
 six, but a fresh rustdoc capture and runtime tests are still required.
 
 VBA actual state
-`/home/zhuhe/code/litchi-worktrees/.coord/0362ul87c-f5-b62c2e5359-v2`
+`(deleted-coord-artifact)`
 passed formatting, then failed the common compiler row with 12 OPC errors.
 The reviewed `b64d3b5528` repair preserves namespace resolution without
 allocation, deferred fixed-buffer comparisons, source spans and lexical

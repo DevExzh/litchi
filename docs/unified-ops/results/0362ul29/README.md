@@ -78,9 +78,9 @@ The exact immutable rerun command is:
 
 ```
 python3 docs/unified-ops/results/0362ul29/tooling/run_safe_gate.py \
-  --root /home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/full-gate-9781cf6d87/source \
-  --target /home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/full-gate-0362ul29/target \
-  --state /home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/full-gate-0362ul29
+  --root (deleted-coord-artifact) \
+  --target (deleted-coord-artifact) \
+  --state (deleted-coord-artifact)
 ```
 
 This is a fresh 53-step selection. If a quiet-window rerun is split after

@@ -35,7 +35,7 @@ command was:
 ## ODP handoff
 
 The corrected, fresh packet is
-`/home/zhuhe/code/litchi-worktrees/.coord/odp-final-build-prep-472b670547`.
+`(deleted-coord-artifact)`.
 Its files are small, JSON-valid and independently hashed:
 
 | File | Bytes | SHA-256 |
@@ -47,7 +47,7 @@ Its files are small, JSON-valid and independently hashed:
 
 The current runner's source-only `--plan` validator also passed. Its retained
 plan is
-`/home/zhuhe/code/litchi-worktrees/.coord/odp-final-build-prep-472b670547/qualification-run/manifest-plan/plan.json`,
+`(deleted-coord-artifact)/plan.json`,
 1,985 bytes, SHA-256
 `3c8922eac7d6a40d424f5be109aef3d8298d4550575ce21c534ddf66ffb7d191`.
 

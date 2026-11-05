@@ -33,14 +33,14 @@ The clean evidence commit is `88237f11d82353f0ec1666267ad34ec9e39e30c3`.
 The scoped command was:
 
 ```text
-CARGO_BUILD_JOBS=2 CARGO_INCREMENTAL=0 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 PATH=/home/zhuhe/code/litchi-worktrees/.coord/bin:$PATH cargo test --offline -p litchi-iwa --test parity comment_clear_safety_cases -- --nocapture --test-threads=1
+CARGO_BUILD_JOBS=2 CARGO_INCREMENTAL=0 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 PATH=(deleted-coord-artifact):$PATH cargo test --offline -p litchi-iwa --test parity comment_clear_safety_cases -- --nocapture --test-threads=1
 ```
 
 Result on the extended proof run: 3 baseline tests passed and 8 mutation
 tests failed because the candidate published a lossy clear before reaching the
 typed-refusal match. The proof assertions are therefore red for the intended
 runtime defect. The fresh raw stdout/stderr receipt is outside the repository
-at `/home/zhuhe/code/litchi-worktrees/.coord/resume-20261028/comments-clear-proof-295b-red-raw-extended2.log`
+at `(deleted-coord-artifact)/comments-clear-proof-295b-red-raw-extended2.log`
 (21,443 bytes, SHA-256
 `fa948bb36469434058d03fc5403e042c54dd8d6af615891fca79188c865b23f2`). It
 records source `88237f11d82353f0ec1666267ad34ec9e39e30c3`, clean status before
@@ -74,7 +74,7 @@ historical run was against proof tip `d50d57d8c439d2891f81311383b95d30eeb3a663`
 and intentionally remained mixed: the eight pre-G mutation controls were red,
 while the new known-reference controls passed. The raw receipt is outside the
 repository at
-`/home/zhuhe/code/litchi-worktrees/.coord/resume-20261029/comments-clear-proof-followup-d50.log`
+`(deleted-coord-artifact)/comments-clear-proof-followup-d50.log`
 (22,393 bytes, SHA-256
 `d9c264d7516cdef22f31f82bc7ad2dd5466ff40efe474db5dbecf8a055ba532c`).
 
@@ -95,6 +95,6 @@ comment_clear_safety_cases -- --nocapture --test-threads=1
 ```
 
 The external raw receipt is
-`/home/zhuhe/code/litchi-worktrees/.coord/iwa-w1g-comments-gate-6eebe0bab3/gates/clear-safety-13.log`.
+`(deleted-coord-artifact)`.
 It records 13 passed and 0 failed; this is focused parity proof only, with no
 native E3/E4 claim.

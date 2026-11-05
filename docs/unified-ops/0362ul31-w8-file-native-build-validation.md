@@ -4,7 +4,7 @@ This is a reduced record of the actual W8 File build and correctness run.  It
 is a provenance record, not a performance qualification or final acceptance
 claim.  Large source archives, target trees, binaries and raw route files stay
 outside Git under
-`/home/zhuhe/code/litchi-worktrees/.coord/w8-472b-native.V1lU2E/`.
+`(deleted-coord-artifact)`.
 
 The run compares the pristine historical f2 source plus the reviewed
 consumer-only adapter with the immutable 472b production checkout:
@@ -56,12 +56,12 @@ The build and initial validation used the pre-repair qualification recipe
 validation directories):
 
 ```text
-source /home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/env.sh
-export W8_PREP=/home/zhuhe/code/litchi-worktrees/.coord/w8-472b-native.V1lU2E
-export W8_BASELINE_ROOT=/home/zhuhe/code/litchi-worktrees/.coord/w8-f2-baseline-sAirXf/src
+source (deleted-coord-artifact)
+export W8_PREP=(deleted-coord-artifact)
+export W8_BASELINE_ROOT=(deleted-coord-artifact)
 export W8_BASELINE_ARCHIVE="$W8_PREP/baseline/f2-source.tar"
-export CANDIDATE_SOURCE=/home/zhuhe/code/litchi-worktrees/.coord/final-api-capture-472b670547/source
-export CARGO=/home/zhuhe/code/litchi-worktrees/.coord/bin/cargo
+export CANDIDATE_SOURCE=(deleted-coord-artifact)
+export CARGO=(deleted-coord-artifact)
 bash docs/unified-ops/results/0362yh/472b-qualification-commands.sh build
 bash docs/unified-ops/results/0362yh/472b-qualification-commands.sh validate
 ```

@@ -96,6 +96,6 @@ The runs pinned CPU 5 and used ABBA order, with `--toggle-collect` on
 
 ## 4. Verification
 
-The gate list in `.coord/iwa-w4k/gates.sh`, with `litchi-pages` added to
+The gate list in `(deleted-coord-artifact)`, with `litchi-pages` added to
 clippy, tests and docs, runs on the merge of trunk. Its results are
 reported in the hand-off.

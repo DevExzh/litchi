@@ -6,7 +6,7 @@ formatter row and stopped at row 1, `check-common`. The preserved attempt
 state is:
 
 ```text
-/home/zhuhe/code/litchi-worktrees/.coord/0362ul87a-f5-a3eff9e1a6/
+(deleted-coord-artifact)
 ```
 
 The row-1 log exited 101 after 41.5067 seconds because

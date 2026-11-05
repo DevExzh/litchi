@@ -18,7 +18,7 @@ The packet terminates with nine passing rows and one failed row. Root
 independently verifies its source and three locks, exact commands, log/trace
 hashes, process exit and target bounds. Final target usage is 410,882,457
 bytes. External evidence is under the worktree parent's
-`.coord/uo2-coordinator-replay-integration-f5-glossary-c780cf4c7/`:
+`(deleted-coord-artifact)`:
 
 | File | Bytes | SHA-256 |
 |---|---:|---|
@@ -28,7 +28,7 @@ bytes. External evidence is under the worktree parent's
 The exact failing command and captured JSON are retained in row9. The full
 packet is reproduced through `python3 -B run_f5.py --go` with fresh
 state/target directories and the recorded source/locks. Root verification
-uses `.coord/checkpoint96/verify_capture.py STATE`. The failure log is
+uses `(deleted-coord-artifact) STATE`. The failure log is
 `09-glossary-docx-minimal-check-attempt-actual-f5-09.log`; it contains all
 fifteen rejected signatures.
 

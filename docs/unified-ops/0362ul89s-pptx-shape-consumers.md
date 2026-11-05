@@ -31,7 +31,7 @@ compiler/test capture, strict Clippy, corpus execution and final acceptance
 remain required.
 
 The actual capture remains outside Git at
-`/home/zhuhe/code/litchi-worktrees/.coord/pptx-combined-0362ul89-f5-actual-15d8d53a0c`.
+`(deleted-coord-artifact)`.
 
 | Artifact | Bytes | SHA-256 |
 | --- | ---: | --- |

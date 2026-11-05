@@ -7,7 +7,7 @@ keep-going failure remains open until the composed candidate is checked again.
 ## Retained actual F5 failure
 
 The isolated capture is retained outside Git at
-`/home/zhuhe/code/litchi-worktrees/.coord/pptx-combined-0362ul89-f5-actual-15d8d53a0c`.
+`(deleted-coord-artifact)`.
 It uses source commit
 `15d8d53a0cf6d27f350b866463b4235bf26b08d9` (tree
 `a619b5d0c36cd5e4a8b088bea1d0a806d13b45d9`) and the approved finite F5
@@ -40,7 +40,7 @@ retained `15d8d53a0cf6d27f350b866463b4235bf26b08d9` failure, changes only:
   this only repairs test consumers and preserves their wire/fidelity checks.
 
 The external source patch is retained at
-`/home/zhuhe/code/litchi-worktrees/.coord/pptx-combined-0362ul89/metadata-consumers-89t-254d43fbd6.patch`
+`(deleted-coord-artifact)/metadata-consumers-89t-254d43fbd6.patch`
 (4,689 bytes, SHA-256
 `7749fc3a2bc5b0842b6c2e1faad92529a4f0bb0259fe838fc825aeb4f540d9fe`).
 Assigned diagnostic and call-site scans, direct source parsing with rustfmt,

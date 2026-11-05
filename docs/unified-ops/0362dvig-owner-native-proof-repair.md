@@ -57,7 +57,7 @@ reports.  No measurement artifact is committed here.
   },
   "current_default_all_targets": {
     "argv": [
-      "/home/zhuhe/code/litchi-worktrees/.coord/bin/cargo", "check",
+      "(deleted-coord-artifact)", "check",
       "--manifest-path", "tools/perf-baseline/Cargo.toml", "--all-targets",
       "--locked", "--offline", "--target-dir",
       "/tmp/dml-owner-record-default-alltargets-target"
@@ -85,8 +85,8 @@ reports.  No measurement artifact is committed here.
     {
       "id": "945", "source_revision": "945eb1d6b9ef6c56fa26c82e12758d38c1b9015d",
       "features": ["drawingml-probe"], "exit": {"generate_lockfile": 0, "check": 0},
-      "generate_lockfile_argv": ["/home/zhuhe/code/litchi-worktrees/.coord/bin/cargo", "generate-lockfile", "--manifest-path", "/tmp/dml-owner-baselines-v8.9eNoOE/work/945/Cargo.toml", "--offline"],
-      "check_argv": ["/home/zhuhe/code/litchi-worktrees/.coord/bin/cargo", "check", "--manifest-path", "/tmp/dml-owner-baselines-v8.9eNoOE/work/945/Cargo.toml", "--locked", "--offline", "--bins", "--features", "drawingml-probe"],
+      "generate_lockfile_argv": ["(deleted-coord-artifact)", "generate-lockfile", "--manifest-path", "/tmp/dml-owner-baselines-v8.9eNoOE/work/945/Cargo.toml", "--offline"],
+      "check_argv": ["(deleted-coord-artifact)", "check", "--manifest-path", "/tmp/dml-owner-baselines-v8.9eNoOE/work/945/Cargo.toml", "--locked", "--offline", "--bins", "--features", "drawingml-probe"],
       "lock": {"sha256": "93878f7a5925cb0484a770bdfb7132cb124dd43c7d37a31ad08fe19b0d8dd741", "bytes": 29747},
       "target": "/tmp/dml-owner-baselines-v8.9eNoOE/targets/945",
       "receipt": {"path": "/tmp/dml-owner-baselines-v8.9eNoOE/receipts/945.json", "bytes": 2974, "sha256": "93a8651745278514f475aff40e0fa8e9c18525678fb05349f85304ce9a08d85e"},
@@ -95,8 +95,8 @@ reports.  No measurement artifact is committed here.
     {
       "id": "2f7", "source_revision": "2f7db7ee7fa01893e9099217fc4243687d196f63",
       "features": ["drawingml-probe", "drawingml-owner-current", "drawingml-theme-family-current"], "exit": {"generate_lockfile": 0, "check": 0},
-      "generate_lockfile_argv": ["/home/zhuhe/code/litchi-worktrees/.coord/bin/cargo", "generate-lockfile", "--manifest-path", "/tmp/dml-owner-baselines-v8.9eNoOE/work/2f7/Cargo.toml", "--offline"],
-      "check_argv": ["/home/zhuhe/code/litchi-worktrees/.coord/bin/cargo", "check", "--manifest-path", "/tmp/dml-owner-baselines-v8.9eNoOE/work/2f7/Cargo.toml", "--locked", "--offline", "--bins", "--features", "drawingml-probe,drawingml-owner-current,drawingml-theme-family-current"],
+      "generate_lockfile_argv": ["(deleted-coord-artifact)", "generate-lockfile", "--manifest-path", "/tmp/dml-owner-baselines-v8.9eNoOE/work/2f7/Cargo.toml", "--offline"],
+      "check_argv": ["(deleted-coord-artifact)", "check", "--manifest-path", "/tmp/dml-owner-baselines-v8.9eNoOE/work/2f7/Cargo.toml", "--locked", "--offline", "--bins", "--features", "drawingml-probe,drawingml-owner-current,drawingml-theme-family-current"],
       "lock": {"sha256": "93878f7a5925cb0484a770bdfb7132cb124dd43c7d37a31ad08fe19b0d8dd741", "bytes": 29747},
       "target": "/tmp/dml-owner-baselines-v8.9eNoOE/targets/2f7",
       "receipt": {"path": "/tmp/dml-owner-baselines-v8.9eNoOE/receipts/2f7.json", "bytes": 3098, "sha256": "814e08fc19847dd8e69d72b8246f1df5964d7e88e569335a565602b4c204557a"},
@@ -105,8 +105,8 @@ reports.  No measurement artifact is committed here.
     {
       "id": "996", "source_revision": "996651b6b19717a0192dfd4144bccd367fb2ea44",
       "features": ["drawingml-probe", "drawingml-owner-current", "drawingml-theme-family-current"], "exit": {"generate_lockfile": 0, "check": 0},
-      "generate_lockfile_argv": ["/home/zhuhe/code/litchi-worktrees/.coord/bin/cargo", "generate-lockfile", "--manifest-path", "/tmp/dml-owner-baselines-v8.9eNoOE/work/996/Cargo.toml", "--offline"],
-      "check_argv": ["/home/zhuhe/code/litchi-worktrees/.coord/bin/cargo", "check", "--manifest-path", "/tmp/dml-owner-baselines-v8.9eNoOE/work/996/Cargo.toml", "--locked", "--offline", "--bins", "--features", "drawingml-probe,drawingml-owner-current,drawingml-theme-family-current"],
+      "generate_lockfile_argv": ["(deleted-coord-artifact)", "generate-lockfile", "--manifest-path", "/tmp/dml-owner-baselines-v8.9eNoOE/work/996/Cargo.toml", "--offline"],
+      "check_argv": ["(deleted-coord-artifact)", "check", "--manifest-path", "/tmp/dml-owner-baselines-v8.9eNoOE/work/996/Cargo.toml", "--locked", "--offline", "--bins", "--features", "drawingml-probe,drawingml-owner-current,drawingml-theme-family-current"],
       "lock": {"sha256": "93878f7a5925cb0484a770bdfb7132cb124dd43c7d37a31ad08fe19b0d8dd741", "bytes": 29747},
       "target": "/tmp/dml-owner-baselines-v8.9eNoOE/targets/996",
       "receipt": {"path": "/tmp/dml-owner-baselines-v8.9eNoOE/receipts/996.json", "bytes": 3098, "sha256": "6f6e9fec2b5305103fdeeeae363867bcbb87c2a829011c41c1edb792596f7f72"},
@@ -115,8 +115,8 @@ reports.  No measurement artifact is committed here.
     {
       "id": "11728", "source_revision": "11728db894181ffbcdbcea3ae0008d51fdd2d8af",
       "features": ["drawingml-probe", "drawingml-owner-current"], "exit": {"generate_lockfile": 0, "check": 0},
-      "generate_lockfile_argv": ["/home/zhuhe/code/litchi-worktrees/.coord/bin/cargo", "generate-lockfile", "--manifest-path", "/tmp/dml-owner-baselines-v8.9eNoOE/work/11728/Cargo.toml", "--offline"],
-      "check_argv": ["/home/zhuhe/code/litchi-worktrees/.coord/bin/cargo", "check", "--manifest-path", "/tmp/dml-owner-baselines-v8.9eNoOE/work/11728/Cargo.toml", "--locked", "--offline", "--bins", "--features", "drawingml-probe,drawingml-owner-current"],
+      "generate_lockfile_argv": ["(deleted-coord-artifact)", "generate-lockfile", "--manifest-path", "/tmp/dml-owner-baselines-v8.9eNoOE/work/11728/Cargo.toml", "--offline"],
+      "check_argv": ["(deleted-coord-artifact)", "check", "--manifest-path", "/tmp/dml-owner-baselines-v8.9eNoOE/work/11728/Cargo.toml", "--locked", "--offline", "--bins", "--features", "drawingml-probe,drawingml-owner-current"],
       "lock": {"sha256": "93878f7a5925cb0484a770bdfb7132cb124dd43c7d37a31ad08fe19b0d8dd741", "bytes": 29747},
       "target": "/tmp/dml-owner-baselines-v8.9eNoOE/targets/11728",
       "receipt": {"path": "/tmp/dml-owner-baselines-v8.9eNoOE/receipts/11728.json", "bytes": 3043, "sha256": "d382c4d0969bfde1cd62ff4f8871808cab606a818795e32bbe5844d96c417df9"},

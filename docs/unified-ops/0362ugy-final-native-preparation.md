@@ -73,7 +73,7 @@ This is preparation for matched builds, not performance acceptance.
 Production and protocol source is frozen at
 `f6fe430a4d19d94aa360c0e9ed03ebd757265225`. A fresh full 53-step gate
 runs from the clean diagnostic checkout with state directory
-`.coord/final-acceptance-2026-10-24/full-gate-f6fe430a4d`, the shared
+`(deleted-coord-artifact)`, the shared
 20 GiB Cargo cap, one build job and a target limit of 20,000,000,000 bytes.
 It invokes the reviewed safe runner without step selection or a starting
 offset. Later receipt-only commits do not relabel this measured source.
@@ -96,7 +96,7 @@ an external file. It performs no Cargo build, probe validation or timing.
 
 [The reduced receipt](results/0362ugy/odg-baseline-source-closure.json) binds
 460,379 source entries and 6,263,042,584 content bytes. The complete artifact
-is `/home/zhuhe/code/litchi-worktrees/.coord/odg-baseline-capture-20261024/baseline-source-closure.json`,
+is `(deleted-coord-artifact)/baseline-source-closure.json`,
 182,412,099 bytes, SHA-256
 `b1cc42d57d07baa4f02115cb9db82847e8079416f08cdf67e4421df3d906b8a5`.
 The coordinator verified that file, its embedded closure binding, the clean
@@ -115,7 +115,7 @@ python3 - /path/to/fresh-external-directory <<'PY'
 import importlib.util
 from pathlib import Path
 import sys
-script = Path('/home/zhuhe/code/litchi-worktrees/.coord/odg-baseline-capture-20261024/run_capture.py')
+script = Path('(deleted-coord-artifact)')
 spec = importlib.util.spec_from_file_location('odg_capture', script)
 capture = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(capture)

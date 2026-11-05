@@ -14,7 +14,7 @@ all three fallible DOC, XLS and PPT metadata accessor migrations.
 The clean diagnostic worktree at `2dfc4f134d94195dd9b41f2d806887b38ef10c58`
 started the full 53-step safe gate with no selection filters. Its first step,
 `cargo fmt --all --check`, failed after 81.780 seconds. The external log is
-`.coord/final-acceptance-2026-10-24/full-gate-2dfc4f134d/00-fmt-attempt-1792815904599553077-3713346.log`
+`(deleted-coord-artifact)/00-fmt-attempt-1792815904599553077-3713346.log`
 (10,644 bytes, SHA-256
 `929e9bf021a568ce3217a2f9b7185cb9c2c9a95dfe910a4583938dbd3a5c088f`).
 The reduced receipt in `results/0362ugu/first-gate-attempt.json` retains the
@@ -36,7 +36,7 @@ ran 63 tests with 11 errors, all in W8 probe identity checks. Its external
 The iWork native protocol suite ran 20 tests with one fixture-identity error;
 `iwa-native-protocol-tests-2df.log` is 1,273 bytes, SHA-256
 `507aeed85661b6baa8d18f0f9c9fb3c893f2c4a3595a7901c301855be0aa673f`.
-Both logs are under `.coord/final-acceptance-2026-10-24/`. These checks remain
+Both logs are under `(deleted-coord-artifact)`. These checks remain
 required corrections; source identities will only be refreshed after review
 of the intervening source and fixture changes. No native timing was run.
 
@@ -44,11 +44,11 @@ of the intervening source and fixture changes. No native timing was run.
 ## ODG baseline prerequisite
 
 A fresh external baseline endpoint at
-`.coord/odg-joined-baseline-ad524` retains clean tracked source
+`(deleted-coord-artifact)` retains clean tracked source
 `ad52437f5e5e2c71ea476eedd5ddcf61aee2021d`. Offline lock generation under
 Rust/Cargo 1.95.0 produced the 139,592-byte `6d7895e6...` lock. That original
 artifact is retained as
-`.coord/odg-joined-baseline-ad524-evidence/Cargo.lock.baseline-generated-6d7895e6`.
+`(deleted-coord-artifact)`.
 It validates against the baseline, correcting an earlier untested assumption
 that it was incompatible. Its dependency resolution differs from the
 candidate, so it is not the lock selected for the matched comparison.
@@ -62,10 +62,10 @@ tracked status remain unchanged. This is dependency preparation only; no
 native binary, timing or acceptance result is claimed.
 
 The external evidence directory is
-`.coord/odg-joined-baseline-ad524-evidence/`. Its source-bound metadata is
+`(deleted-coord-artifact)`. Its source-bound metadata is
 regenerated with `cargo metadata --offline --locked --all-features
 --format-version 1 --manifest-path <endpoint>/Cargo.toml`, after sourcing the
-capped `.coord/odg-native-protocol/env.sh` and overriding target/TMP to that
+capped `(deleted-coord-artifact)` and overriding target/TMP to that
 external evidence directory. The baseline endpoint above uses the seeded
 candidate lock; the candidate capture used clean diagnostic source `2dfc4f134d`.
 
@@ -111,13 +111,13 @@ skips. The external `native-protocol-tests-b673.log` is 752 bytes, SHA-256
 The explicit iWork native protocol command passes 20 tests; its 119-byte
 `iwa-native-protocol-tests-b673.log` has SHA-256
 `992669421ab4a90e4dc1b7b52d73d5d61c3518a59586510f8174fcd0d9e06051`.
-Both logs are under `.coord/final-acceptance-2026-10-24/`. These are protocol
+Both logs are under `(deleted-coord-artifact)`. These are protocol
 checks, with no native measurement claim.
 
 The full 53-step gate restarted on the same clean frozen source, using
-`.coord/replay-integration/gate-safe/run_safe_gate.py` without `--only` or
-`--start-at`, target `.coord/budget-validation/target`, and state directory
-`.coord/final-acceptance-2026-10-24/full-gate-b6732d02b2`. Formatting passes
+`(deleted-coord-artifact)` without `--only` or
+`--start-at`, target `(deleted-coord-artifact)`, and state directory
+`(deleted-coord-artifact)`. Formatting passes
 in 70.764 seconds and the composed strict consumer step passes in 17.547
 seconds. The remaining steps continue. This is an in-progress acceptance
 attempt, not a full-gate pass. The separate all-68 rustdoc inventory and quiet

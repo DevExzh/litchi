@@ -100,7 +100,7 @@ No journal code uses `serde_json`.
 
 Measurement: a 596,444-byte envelope of 2,000 operations, release, pinned
 to CPU 3, ABBA, 200 iterations per leg, three rounds (the program is outside
-the repository: `.coord/ws-hygiene/jsonbench`). The old writer allocated a
+the repository: `(deleted-coord-artifact)`). The old writer allocated a
 `String` per string and per number; the new one writes straight to the sink.
 
 | serde_json features | old writer | canonical writer | ratio |

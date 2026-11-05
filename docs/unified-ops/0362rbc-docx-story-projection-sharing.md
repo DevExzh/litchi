@@ -23,13 +23,13 @@ The matched route was
 the first projection, the repeated cached projection, invalidation after a
 mutation, the changed projection, and patch target access. The baseline is the
 protected 35b candidate binary
-`/home/zhuhe/code/litchi-worktrees/.coord/w8-docx-story-text/allocation-main/story-projection-candidate`,
+`(deleted-coord-artifact)`,
 SHA-256
 `5d0d5d1bf65e700bab70cb41fabb03446abf6fd1a70069d85826a4080fa24af9`. Its
 `story_text.rs` source SHA-256 is
 `e046b0aecc6a89e088b567e3e334de77b3726b449486054ef4265e724f151eb9`.
 The candidate binary is
-`/home/zhuhe/code/litchi-worktrees/.coord/w8-docx-story-text/story-projection-range`,
+`(deleted-coord-artifact)`,
 SHA-256
 `6f75def75b7372d7aa5056cbbc3a244e6b1365d28b81240d108ceea7258da9c8`,
 with `story_text.rs` SHA-256
@@ -44,7 +44,7 @@ temporary allocations, and 503.56 KiB peak heap: six fewer allocations and no
 peak increase. Callgrind recorded 18,108,160 Ir for the baseline and
 18,103,411 Ir for the candidate (4,749 fewer instructions, 0.026%). Raw
 captures and analyses remain outside the repository at
-`/home/zhuhe/code/litchi-worktrees/.coord/w8-docx-story-text/allocation-range-local-1792701971/`:
+`(deleted-coord-artifact)`:
 
 - baseline heaptrack Zstandard capture SHA-256
   `35e324f610a0c3875ca75b08b6f6c1d26e44f4c1b7f3a3f6246e1dce5ec967dc`;
@@ -62,11 +62,11 @@ document size.
 ## Validation
 
 The affected story and glossary suites passed 14 and 19 tests. The external
-log is `/home/zhuhe/code/litchi-worktrees/.coord/w8-docx-story-text/range-test.log`,
+log is `(deleted-coord-artifact)/range-test.log`,
 3,137 bytes, SHA-256
 `415190998248ca73b1016805b0ab8fd57d7234c1bbb90ef4e9abbc43bd907f8e`.
 All-target/all-feature `litchi-docx` Clippy passed with `-D warnings`; the log
-is `/home/zhuhe/code/litchi-worktrees/.coord/w8-docx-story-text/range-clippy.log`,
+is `(deleted-coord-artifact)/range-clippy.log`,
 171 bytes, SHA-256
 `c3eefbff404c831928bb90cf349fa91e32634f9409f693f72e1cb98786f0a5ea`.
 `cargo fmt --all -- --check` and `git diff --check` passed. No binaries or

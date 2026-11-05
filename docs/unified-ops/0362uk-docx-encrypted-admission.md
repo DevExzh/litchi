@@ -25,7 +25,7 @@ without encryption.
 
 All commands used Rust 1.95.0, `--offline`, one Cargo build job, and the
 external target
-`/home/zhuhe/code/litchi-worktrees/.coord/docx-encrypted-target`.
+`(deleted-coord-artifact)`.
 The initial size transcription, 10,585,881,195 bytes, was incorrect;
 [0362uk1](0362uk1-docx-encrypted-locked-receipt.md) records the measured
 1,058,588,195 bytes. These initial diagnostic checks omitted `--locked`.
@@ -45,6 +45,6 @@ packet contains no gate logs or compiled artifacts.
 
 | command | receipt | bytes | SHA-256 |
 | --- | --- | ---: | --- |
-| focused encrypted regression | `/home/zhuhe/code/litchi-worktrees/.coord/docx-encrypted-focused.log` | 10691 | `94e74236ea89ac2aaa82e4c121e013e035fa6a4f20896787cca2dcb20e1ba3e2` |
-| encrypted DOCX transaction suite | `/home/zhuhe/code/litchi-worktrees/.coord/docx-encrypted-docx-transactions.log` | 2426 | `674c85f7dc42c5b2ce01e4d4c1454aa0f3a77f58cfbd02daa8358146d2975fd1` |
-| non-encrypted DOCX transaction suite | `/home/zhuhe/code/litchi-worktrees/.coord/docx-encrypted-docx-no-encryption.log` | 3898 | `ea3a343807536d8eed6071af38b15359ea7fd832dc1ff7fed0e3b285ba93d833` |
+| focused encrypted regression | `(deleted-coord-artifact)/docx-encrypted-focused.log` | 10691 | `94e74236ea89ac2aaa82e4c121e013e035fa6a4f20896787cca2dcb20e1ba3e2` |
+| encrypted DOCX transaction suite | `(deleted-coord-artifact)/docx-encrypted-docx-transactions.log` | 2426 | `674c85f7dc42c5b2ce01e4d4c1454aa0f3a77f58cfbd02daa8358146d2975fd1` |
+| non-encrypted DOCX transaction suite | `(deleted-coord-artifact)/docx-encrypted-docx-no-encryption.log` | 3898 | `ea3a343807536d8eed6071af38b15359ea7fd832dc1ff7fed0e3b285ba93d833` |

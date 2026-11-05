@@ -41,7 +41,7 @@ Runtime evidence is retained outside Git:
 | `common-tests/0000.log` | 222,716 | `668db8f2afc172f4abacf8ce06d36934cc1ca6a89d3ee7c404cc805abe5a8153` |
 
 The capture root is
-`/home/zhuhe/code/litchi-worktrees/.coord/ooxml-combined-0362ul94-f5-runtime-3774fe43-v2`.
+`(deleted-coord-artifact)`.
 The capture reported 511 passing, 17 failing, and the named Ribbon failure;
 the other failures remain separate work. No Cargo, compiler, build, rustdoc,
 native, or performance command was run for this repair.

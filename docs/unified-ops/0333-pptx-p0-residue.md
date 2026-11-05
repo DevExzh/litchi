@@ -242,7 +242,7 @@ Run on the merged tree (`92d622b38f` merged, the record commits on top),
 once before the second merge and again, all green, after it;
 cargo through the memory-capped shim, `CARGO_BUILD_JOBS=6`,
 `RUST_TEST_THREADS=8`; every exit status checked
-(`.coord/pptx-p0/gate-logs/summary.txt`).
+(`(deleted-coord-artifact)`).
 
 | gate | exit |
 |---|---:|

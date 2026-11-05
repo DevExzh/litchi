@@ -45,10 +45,10 @@ The workspace lock observed in this worktree was `Cargo.lock`, SHA-256
 `52ed0cacac15b5e440349bfc0f4aca2665bcf50d59d4321624e596bb410783c6`,
 139,591 bytes. Commands used the capped shim first in `PATH`, one build job,
 incremental/debug disabled, offline locked dependencies, and the external
-target `/home/zhuhe/code/litchi-worktrees/.coord/drawingml-limits/target`.
+target `(deleted-coord-artifact)`.
 The target was 2,230,219,826 bytes after the final checks, below the 20 GB
 cap; all temporary files were under
-`/home/zhuhe/code/litchi-worktrees/.coord/drawingml-limits/tmp`.
+`(deleted-coord-artifact)`.
 
 The final DML all-target test ran before the source commit on the
 staged-equivalent working tree. No source content changed between that run
@@ -56,7 +56,7 @@ and commit `16b3705341005f3072e25c24ebb24e935f8d8183`; the post-commit check
 and XLSB test below ran against that committed source.
 
 ```text
-env -u LITCHI_CAPPED -u LITCHI_BLESS PATH=/home/zhuhe/code/litchi-worktrees/.coord/bin:$PATH LITCHI_MEM_MAX=20G CARGO_BUILD_JOBS=1 CARGO_INCREMENTAL=0 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_PROFILE_RELEASE_DEBUG=0 CARGO_PROFILE_BENCH_DEBUG=0 TMPDIR=/home/zhuhe/code/litchi-worktrees/.coord/drawingml-limits/tmp CARGO_TARGET_DIR=/home/zhuhe/code/litchi-worktrees/.coord/drawingml-limits/target cargo test -p litchi-drawingml --all-features --offline --locked --all-targets --no-fail-fast
+env -u LITCHI_CAPPED -u LITCHI_BLESS PATH=(deleted-coord-artifact):$PATH LITCHI_MEM_MAX=20G CARGO_BUILD_JOBS=1 CARGO_INCREMENTAL=0 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_PROFILE_RELEASE_DEBUG=0 CARGO_PROFILE_BENCH_DEBUG=0 TMPDIR=(deleted-coord-artifact) CARGO_TARGET_DIR=(deleted-coord-artifact) cargo test -p litchi-drawingml --all-features --offline --locked --all-targets --no-fail-fast
 ```
 
 Result: 239 library tests and 196 integration tests passed (435 total, zero
@@ -64,7 +64,7 @@ failures). External log: `test-dml-all-targets-final2.log`, 39,666 bytes,
 SHA-256 `f7a5ea7f6647d94c5d3f539eb0783c33447b5992248657e8c0f7e3a776276bc1`.
 
 ```text
-env -u LITCHI_CAPPED -u LITCHI_BLESS PATH=/home/zhuhe/code/litchi-worktrees/.coord/bin:$PATH LITCHI_MEM_MAX=20G CARGO_BUILD_JOBS=1 CARGO_INCREMENTAL=0 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_PROFILE_RELEASE_DEBUG=0 CARGO_PROFILE_BENCH_DEBUG=0 TMPDIR=/home/zhuhe/code/litchi-worktrees/.coord/drawingml-limits/tmp CARGO_TARGET_DIR=/home/zhuhe/code/litchi-worktrees/.coord/drawingml-limits/target cargo check -p litchi-drawingml --all-features --all-targets --offline --locked
+env -u LITCHI_CAPPED -u LITCHI_BLESS PATH=(deleted-coord-artifact):$PATH LITCHI_MEM_MAX=20G CARGO_BUILD_JOBS=1 CARGO_INCREMENTAL=0 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_PROFILE_RELEASE_DEBUG=0 CARGO_PROFILE_BENCH_DEBUG=0 TMPDIR=(deleted-coord-artifact) CARGO_TARGET_DIR=(deleted-coord-artifact) cargo check -p litchi-drawingml --all-features --all-targets --offline --locked
 ```
 
 The post-commit DML check exited 0. External log:
@@ -72,7 +72,7 @@ The post-commit DML check exited 0. External log:
 `2e06dd23598b6cb318964758ed2614e6ce1d6421cc9c723cb9e5c0da1036d794`.
 
 ```text
-env -u LITCHI_CAPPED -u LITCHI_BLESS PATH=/home/zhuhe/code/litchi-worktrees/.coord/bin:$PATH LITCHI_MEM_MAX=20G CARGO_BUILD_JOBS=1 CARGO_INCREMENTAL=0 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_PROFILE_RELEASE_DEBUG=0 CARGO_PROFILE_BENCH_DEBUG=0 TMPDIR=/home/zhuhe/code/litchi-worktrees/.coord/drawingml-limits/tmp CARGO_TARGET_DIR=/home/zhuhe/code/litchi-worktrees/.coord/drawingml-limits/target cargo test -p litchi-xlsb --all-features --offline --locked --lib theme --no-fail-fast
+env -u LITCHI_CAPPED -u LITCHI_BLESS PATH=(deleted-coord-artifact):$PATH LITCHI_MEM_MAX=20G CARGO_BUILD_JOBS=1 CARGO_INCREMENTAL=0 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_PROFILE_RELEASE_DEBUG=0 CARGO_PROFILE_BENCH_DEBUG=0 TMPDIR=(deleted-coord-artifact) CARGO_TARGET_DIR=(deleted-coord-artifact) cargo test -p litchi-xlsb --all-features --offline --locked --lib theme --no-fail-fast
 ```
 
 The post-commit XLSB Theme-filtered library suite passed 12 tests with 767
@@ -91,7 +91,7 @@ The earlier standalone `unified-chart-add --offline --locked` failure is not
 relabelled as a pass here. Its exact failed command was:
 
 ```text
-env -u LITCHI_CAPPED -u LITCHI_BLESS PATH=/home/zhuhe/code/litchi-worktrees/.coord/bin:$PATH LITCHI_MEM_MAX=20G CARGO_BUILD_JOBS=1 CARGO_INCREMENTAL=0 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_PROFILE_RELEASE_DEBUG=0 CARGO_PROFILE_BENCH_DEBUG=0 TMPDIR=/home/zhuhe/code/litchi-worktrees/.coord/drawingml-limits/tmp cargo check --manifest-path tools/perf-baseline/unified-chart-add/Cargo.toml --offline --locked --target-dir /home/zhuhe/code/litchi-worktrees/.coord/drawingml-limits/unified-chart-target
+env -u LITCHI_CAPPED -u LITCHI_BLESS PATH=(deleted-coord-artifact):$PATH LITCHI_MEM_MAX=20G CARGO_BUILD_JOBS=1 CARGO_INCREMENTAL=0 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_PROFILE_RELEASE_DEBUG=0 CARGO_PROFILE_BENCH_DEBUG=0 TMPDIR=(deleted-coord-artifact) cargo check --manifest-path tools/perf-baseline/unified-chart-add/Cargo.toml --offline --locked --target-dir (deleted-coord-artifact)
 ```
 
 It exited 101 with external log `unified-chart-check.log` (298 bytes,

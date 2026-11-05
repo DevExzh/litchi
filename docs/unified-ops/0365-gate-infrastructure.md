@@ -9,8 +9,8 @@ does not claim a full 53-row pass. The coordinator runs the whole gate.
 
 Before this change there were two runners, both outside tracked tooling:
 
-- `.coord/gate.sh` is short, but it has 52 rows. It has no `iwork-leaf-api`
-  row and no RTF fuzz check, it depends on untracked `.coord/scripts/*`, and
+- `(deleted-coord-artifact)` is short, but it has 52 rows. It has no `iwork-leaf-api`
+  row and no RTF fuzz check, it depends on untracked `(deleted-coord-artifact)`, and
   it inherits whatever PATH its caller has.
 - `docs/unified-ops/results/0362ul29/tooling/run_safe_gate.py` defines the
   53-row table and the row numbering the records use. It is a 1,200-line
@@ -20,7 +20,7 @@ Before this change there were two runners, both outside tracked tooling:
 
 The tracked runner `tools/gate/run_gate.sh` keeps the 53-row table and its
 indices from the 0362ul29 runner, and the simple shell structure of
-`.coord/gate.sh`:
+`(deleted-coord-artifact)`:
 
 - `GATE_DIR` selects the checkout. The default is the checkout that holds the
   script.
@@ -35,13 +35,13 @@ indices from the 0362ul29 runner, and the simple shell structure of
   environment therefore behaves like a login shell. Rows 41–52 were run that
   way: `systemd-run --user --scope … env -i …`.
 - `tools/gate/bin/cargo` is the OOM-isolation shim, copied from
-  `.coord/bin/cargo`. Each cargo command runs in its own user scope with
+  `(deleted-coord-artifact)`. Each cargo command runs in its own user scope with
   `MemoryMax=${LITCHI_MEM_MAX:-26G}` and no swap. The real cargo comes from
   `$CARGO_HOME/bin`, never from PATH. If the shell has no `XDG_RUNTIME_DIR`,
   the shim derives it. If no user manager is reachable, the shim runs
   uncapped and prints a warning.
 - `chunked_cargo_tests.py`, `target_headroom.py` and `check_goldens.sh` move
-  from `.coord/scripts` into `tools/gate/` without behaviour changes.
+  from `(deleted-coord-artifact)` into `tools/gate/` without behaviour changes.
 - `tools/test_gate_runner.py` checks the following and joins the
   tooling-unit row:
   - the row table has 53 unique rows at their stable indices;
@@ -50,11 +50,11 @@ indices from the 0362ul29 runner, and the simple shell structure of
   - the shim's exec and missing-cargo paths.
 
 Positional arguments to the new runner select rows. The extra clippy `-p`
-arguments that `.coord/gate.sh` took positionally move to `GATE_EXTRA`. A
-proposed thin `.coord/gate.sh` replacement is at
-`.coord/fin-gate-infra/gate.sh.proposed`. It execs the tracked runner with
-`GATE_OUT=.coord/gates/<name>` and the trunk lock as `GATE_LOCK_SEED`. The
-coordinator owns `.coord/gate.sh` and should swap it in.
+arguments that `(deleted-coord-artifact)` took positionally move to `GATE_EXTRA`. A
+proposed thin `(deleted-coord-artifact)` replacement is at
+`(deleted-coord-artifact)`. It execs the tracked runner with
+`GATE_OUT=(deleted-coord-artifact)` and the trunk lock as `GATE_LOCK_SEED`. The
+coordinator owns `(deleted-coord-artifact)` and should swap it in.
 `run_safe_gate.py` stays in place as historical evidence, and its two unit
 tests stay in the tooling row.
 
@@ -110,7 +110,7 @@ worktree. Row 39 passes.
   lane is not merging, so `e98ad3e8…` is not applied.
 - The runner supplies the missing `rustc` on PATH.
 - One more cause of failure: with `CARGO_TARGET_DIR` exported, as
-  `.coord/gate.sh` and every session `env.sh` do, the
+  `(deleted-coord-artifact)` and every session `env.sh` do, the
   `tools.test_native_qualification_runner` tests fail with "manifest cannot
   override the explicit CARGO_TARGET_DIR". The runner's `_environment` copied
   `os.environ`, so it took an inherited variable for a manifest override.
@@ -156,7 +156,7 @@ left to the coordinator or the owner. Instead:
 Every run used `tools/gate/run_gate.sh` under
 `systemd-run --user --scope … env -i …`, with `CARGO_BUILD_JOBS=6` and the
 trunk lock as the seed. The root lock SHA-256 was `846cf70f…7eed7`. Logs are in
-`.coord/fin-gate-infra/gate-0365-{a,b,c}/`.
+`(deleted-coord-artifact)`.
 
 | Row | Name | Exit | Run (commit) |
 | --- | --- | --- | --- |
@@ -188,15 +188,15 @@ at 101. The 101 came from the pages fuzz target described above.
 
 ## Cleanup inventory
 
-The coordinator deleted the obsolete `.coord` target directories with the
+The coordinator deleted the obsolete external target directories with the
 owner's approval, so item 6 was dropped. A pre-deletion inventory covering
 1,911 entries and 1.10 TB on disk is in
-`.coord/fin-gate-infra/cleanup-candidates.tsv.partial`. It is stale now and
+`(deleted-coord-artifact)`. It is stale now and
 kept for reference only.
 
 ## Follow-ups
 
-- The coordinator should replace `.coord/gate.sh` with the proposed wrapper
+- The coordinator should replace `(deleted-coord-artifact)` with the proposed wrapper
   (or call `tools/gate/run_gate.sh` directly) and run the full 53 rows.
 - Owner question: track the root `Cargo.lock`? That would reverse ADR 0028's
   stated policy. Until then the gate seeds or resolves the lock and records

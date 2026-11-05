@@ -96,5 +96,5 @@ migrate. One native queue row.
 
 ## 4. Verification
 
-The gate script `.coord/iwa-w4t/gates.sh` runs on the merge of trunk; its
+The gate script `(deleted-coord-artifact)` runs on the merge of trunk; its
 result is reported in the hand-off.

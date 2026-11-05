@@ -41,7 +41,7 @@ calibration, resolves `version.workspace = true` from the workspace package,
 and compares that version with the projected `litchi-ops` lock entry.
 
 Keep all generated descriptors, lockfiles, source archives, manifests and
-binaries in `.coord` or another external scratch directory.  The tool rejects
+binaries in an external scratch directory.  The tool rejects
 `3rdparty/`, `docs/performance/results/` and `docs/report/` as input/output
 locations where applicable.  The repository contains only this recipe and the
 commands below, not generated qualification artifacts.
@@ -54,7 +54,7 @@ set -eu
 SRC=/path/to/source-checkout
 PROBE="$SRC/crates/litchi-ops/examples/file_w8_qualified_probe.rs"
 LOCK=/path/to/locked/Cargo.lock
-OUT=/path/to/external/.coord/w8-file-provenance
+OUT=(deleted-coord-artifact)
 SOURCE_ARCHIVE=/path/to/source.tar
 BASE=/path/to/historical-baseline-checkout
 OVERLAY_BASE="$(git -C "$BASE" rev-parse HEAD)"

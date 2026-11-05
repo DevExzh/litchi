@@ -13,13 +13,13 @@ The review is
 ## Frozen final packet
 
 The preserved build packet remains
-`/home/zhuhe/code/litchi-worktrees/.coord/odp-final-build-prep-472b670547-repair-11858e697f`.
+`(deleted-coord-artifact)`.
 The final memory protocol is frozen at
-`/home/zhuhe/code/litchi-worktrees/.coord/odp-final-memory-qualification-2a20b44488-final/memory-protocol.json`:
+`(deleted-coord-artifact)/memory-protocol.json`:
 28,914 bytes, SHA-256
 `868313fa19b0fd3652bf84644899406721d8f811641cf327f417eb4f9895b3ec`.
 The final handoff binding is
-`/home/zhuhe/code/litchi-worktrees/.coord/odp-final-build-prep-472b670547-final-2a20b44488/final-handoff.json`:
+`(deleted-coord-artifact)/final-handoff.json`:
 3,664 bytes, SHA-256
 `44617c1befa3fa8ade24b17046221e50dca2697af91c754d3d7fac4d385d999b`.
 
@@ -38,7 +38,7 @@ authoritative correction.
   `peak_heap_bytes`, `peak_rss_bytes`, and histogram-derived `allocated_bytes`,
   with a successful histogram artifact. Partial metrics produce `incomplete`.
 - The source-only negative test log is
-  `/home/zhuhe/code/litchi-worktrees/.coord/odp-final-memory-qualification-2a20b44488-final/negative-partial-metrics-tests.log`,
+  `(deleted-coord-artifact)/negative-partial-metrics-tests.log`,
   47 bytes, SHA-256
   `ca7e7743983a6fc3d6b5f59bff03b8e42ec358e675623c0f36c7d01f5447563d`;
   all five rejection cases passed.

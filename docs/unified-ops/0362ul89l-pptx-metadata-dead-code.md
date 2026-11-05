@@ -8,7 +8,7 @@ again.
 ## Retained actual F5 failure
 
 The isolated capture is retained outside Git at
-`/home/zhuhe/code/litchi-worktrees/.coord/pptx-combined-0362ul89-f5-actual-237d6801a6`.
+`(deleted-coord-artifact)`.
 It uses source commit
 `237d6801a641b85b4477c432a26ac53e531987ed` (tree
 `97a156bd9e7c7dec682a004407d20f35cb13b496`) and the approved finite F5
@@ -45,7 +45,7 @@ retained `237d6801a641b85b4477c432a26ac53e531987ed` failure, changes only:
   capability.
 
 The external source patch is retained at
-`/home/zhuhe/code/litchi-worktrees/.coord/pptx-combined-0362ul89/metadata-dead-code-89-aaa93fdca1.patch`
+`(deleted-coord-artifact)/metadata-dead-code-89-aaa93fdca1.patch`
 (4,519 bytes, SHA-256
 `76a2566583675925107d9758e0ea26ff349cd9a4dc779d43d0c7cfcefb2f662e`).
 Call-site and replacement audits found no production consumer for either

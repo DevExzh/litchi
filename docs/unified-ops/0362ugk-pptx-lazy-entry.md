@@ -35,9 +35,9 @@ malformed-tail refusal at that first fallible `slides` operation.
 The final validation ran on 2026-10-24 from
 `/home/zhuhe/code/litchi-worktrees/uo2-pptx-lazy-entry` with the committed
 source below. There was no source or test overlay. Every Cargo command sourced
-`/home/zhuhe/code/litchi-worktrees/.coord/pptx-lazy-entry/env.sh`, which pins
+`(deleted-coord-artifact)`, which pins
 `CARGO_TARGET_DIR` to
-`/home/zhuhe/code/litchi-worktrees/.coord/pptx-lazy-entry/target`,
+`(deleted-coord-artifact)`,
 `CARGO_BUILD_JOBS=1`, `CARGO_INCREMENTAL=0`, release-like debug settings,
 offline mode, the memory-capped Cargo shim, and the assigned `TMPDIR`.
 The only ignored input overlay was the generated `Cargo.lock` required by this
@@ -75,7 +75,7 @@ Accepted commands and their exact source commits were:
   Assigned target bytes were 4,887,534,491 at start and 4,887,534,493 at end.
 
 The raw logs and their small receipts are retained outside the checkout at
-`/home/zhuhe/code/litchi-worktrees/.coord/pptx-lazy-entry/validation-c737fd1c0a/`.
+`(deleted-coord-artifact)`.
 The final assigned target size was 4,887,534,493 bytes, below the 20 GB cap.
 The earlier intermediate logs in that directory are diagnostic history, not
 acceptance evidence.

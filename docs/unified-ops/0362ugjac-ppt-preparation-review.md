@@ -10,7 +10,7 @@ to historical production source. Identity and permitted-state checks run
 before materialization, and pre-existing untracked fixture files are refused.
 
 The actual preparation receipt is
-`/home/zhuhe/code/litchi-worktrees/.coord/ppt-lazy-native-compile-20261024/preparation-sparse-cli.json`,
+`(deleted-coord-artifact)/preparation-sparse-cli.json`,
 SHA-256 `64051f07b614270cfb1769ecbc9752be6a16c7e6efb63daf79c0a77fa264c3fe`.
 Independent review verifies the six fixture identities, probe sources,
 baseline registration, locks, disjoint paths and unchanged production tree.

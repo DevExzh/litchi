@@ -23,7 +23,7 @@ lookup and stopped its own process group. The retained worktree is eligible
 for a later audit; this record does not claim its removal.
 
 Evidence is under
-`/home/zhuhe/code/litchi-worktrees/.coord/worktree-cleanup-2026-10-23/`:
+`(deleted-coord-artifact)`:
 
 | Relative artifact | SHA-256 |
 | --- | --- |

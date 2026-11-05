@@ -37,7 +37,7 @@ readiness is not performance acceptance. The retained 23-row proposal and
 final workspace qualification obligations remain open.
 
 Patch and formatter preimages are retained externally in
-`.coord/pptx-combined-0362ul89/composition-89al/`.
+`(deleted-coord-artifact)`.
 
 - `89aca.patch`: 41,888 bytes, SHA-256
   `8fb42cbbfa4877f18dc30aca48656e804ea9067013f04ecd6a2e6ad3ca7145dc`.

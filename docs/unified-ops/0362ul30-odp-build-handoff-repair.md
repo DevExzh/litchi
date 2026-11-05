@@ -18,9 +18,9 @@ memory TMPDIR was not exported; and heaptrack capture/printing assumed a
 ## Repaired packet
 
 The new packet is
-`/home/zhuhe/code/litchi-worktrees/.coord/odp-final-build-prep-472b670547-repair-40165ae0af`.
+`(deleted-coord-artifact)`.
 The prior packet at
-`/home/zhuhe/code/litchi-worktrees/.coord/odp-final-build-prep-472b670547`
+`(deleted-coord-artifact)`
 is preserved, including its failed-review artifacts and source-only plan
 receipt. Repaired packet files are JSON-valid and hashed as follows:
 

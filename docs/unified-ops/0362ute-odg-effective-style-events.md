@@ -26,16 +26,16 @@ refused.
 
 The final source commit was validated with the memory-capped cargo shim, one
 job, `CARGO_INCREMENTAL=0`, debug information disabled, offline locked
-resolution, and `TMPDIR=/home/zhuhe/code/litchi-worktrees/.coord/odg-joined-v4/tmp`.
+resolution, and `TMPDIR=(deleted-coord-artifact)`.
 The isolated target was
-`/home/zhuhe/code/litchi-worktrees/.coord/odg-joined-v2/target`, measured at
+`(deleted-coord-artifact)`, measured at
 415 MiB after the run.  External receipts are intentionally not tracked:
 
 | Command | Receipt | Size | SHA-256 |
 |---|---|---:|---|
-| `cargo check --offline --locked --all-targets --all-features -p litchi-odg -j 1` | `.coord/odg-joined-v4/w-final-check.log` | 162 bytes | `271ef2fb0f367ffc32b5be5518d51141f815fae80f73567a8b700486620e32d5` |
-| `cargo clippy --offline --locked --all-targets --all-features -p litchi-odg -j 1 -- -D warnings` | `.coord/odg-joined-v4/w-final-clippy.log` | 162 bytes | `90bb7fffb12e2f16f5785bea59c9df18779ce3372c69e7676f5ebd7cef7b5d85` |
-| `cargo test --offline --locked --all-features -p litchi-odg --test package_semantics --test transition_review --test capability_transactions -j 1` | `.coord/odg-joined-v4/w-final-tests.log` | 5152 bytes | `74cd2a6333cc50cece8e69bcb60031fdd3a3d793cbe6b65aac9053bdc032e2a7` |
+| `cargo check --offline --locked --all-targets --all-features -p litchi-odg -j 1` | `(deleted-coord-artifact)/w-final-check.log` | 162 bytes | `271ef2fb0f367ffc32b5be5518d51141f815fae80f73567a8b700486620e32d5` |
+| `cargo clippy --offline --locked --all-targets --all-features -p litchi-odg -j 1 -- -D warnings` | `(deleted-coord-artifact)/w-final-clippy.log` | 162 bytes | `90bb7fffb12e2f16f5785bea59c9df18779ce3372c69e7676f5ebd7cef7b5d85` |
+| `cargo test --offline --locked --all-features -p litchi-odg --test package_semantics --test transition_review --test capability_transactions -j 1` | `(deleted-coord-artifact)/w-final-tests.log` | 5152 bytes | `74cd2a6333cc50cece8e69bcb60031fdd3a3d793cbe6b65aac9053bdc032e2a7` |
 
 The final focused run passed 8 capability tests, 26 package-semantic tests,
 and 22 transition-review tests (56 total).  The standalone transition rerun

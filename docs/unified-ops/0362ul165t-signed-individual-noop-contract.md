@@ -40,11 +40,11 @@ No Cargo build, native qualification, archive or timing command was run during
 the active diagnostic. The row-38 extension was preserved outside the active
 target and exercised only by two focused Python tests:
 
-* `/home/zhuhe/code/litchi-worktrees/.coord/remaining20-python-signed-noop-failure-20261026/liblitchi_py-row38.so`
+* `(deleted-coord-artifact)/liblitchi_py-row38.so`
   — 269,624,384 bytes,
   SHA-256 `b152e93729732deee82c53970a1888123e0004d312123a514ec62f5ffc1a641f`.
 * Original failure log:
-  `/home/zhuhe/code/litchi-worktrees/.coord/final-gate-current-remaining20-diagnostic-20261026-v3-state/38-python-bindings-attempt-current-remaining20-full53-38.log`
+  `(deleted-coord-artifact)/38-python-bindings-attempt-current-remaining20-full53-38.log`
   — SHA-256
   `1ca770f5d3806db088a078783e3df856ec20b119fb891488410ef6fda3bada97`.
 

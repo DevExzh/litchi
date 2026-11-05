@@ -34,7 +34,7 @@ The following commands were run with the capped W8 environment and returned
 zero unless stated otherwise:
 
 ```text
-source /home/zhuhe/code/litchi-worktrees/.coord/w8-file/env.sh
+source (deleted-coord-artifact)
 CARGO_BUILD_JOBS=2 CARGO_TEST_JOBS=2 cargo check -p litchi-rtf --all-targets
 CARGO_BUILD_JOBS=2 CARGO_TEST_JOBS=2 cargo test -p litchi-rtf --test canonical_primary --test paragraph_split_merge --test external_reference_redact
 CARGO_BUILD_JOBS=2 CARGO_TEST_JOBS=2 cargo test -p litchi-rtf --all-targets
@@ -47,7 +47,7 @@ cargo clippy --all-targets -- -D warnings
 ```
 
 The full RTF test receipt is kept outside the repository at
-`/home/zhuhe/code/litchi-worktrees/.coord/w8-rtf-replay/rtf-tests.log`
+`(deleted-coord-artifact)/rtf-tests.log`
 (159,639 bytes, SHA-256
 `b3db17e0ccaa365129ce7df36cc64ba456de8995c711d0db264619b77385f36d`).  It
 contains 190 test suites with 1,534 passed and zero failed or ignored tests.

@@ -690,7 +690,7 @@ Cut from `9fe45629ab`:
 - After R6, the checklist has 7 claimed cells still failing (F1–F4, F6, F7; F5 now passes) and 70 unreached for lack of fixtures.
 - Wave R6 complete.
 
-Coordinator scripts and agent scratch now live in `/home/zhuhe/code/litchi-worktrees/.coord/` (outside the repository), so they survive `/tmp` wipes.
+Coordinator scripts and agent scratch now live in `(deleted-coord-artifact)` (outside the repository), so they survive `/tmp` wipes.
 
 ## Wave R7 (2026-10-14)
 Cut from `99cc3138eb`. It targets what Phase G (0289) found still open for the Definition of Done:
@@ -723,7 +723,7 @@ The coordinator's Claude process stalled and exited while seven agents (wave R7 
 ## Incident (2026-10-16): coordinator session lost to an OOM kill
 The session exited at 07:46 while four agents (0305, 0308, 0309, 0310) were running.
 - Cause, now confirmed: the user journal shows a kernel OOM kill in the session's tmux scope (memory peak 106.8 GB). That scope has `OOMPolicy=stop`, so systemd stopped the whole scope, coordinator included. The policy cannot be changed at runtime.
-- Mitigation: a coordinator-side cargo shim (`.coord/bin/cargo`) runs every cargo command in its own `systemd-run --user --scope` with `OOMPolicy=continue` and `MemoryMax=26G`. An OOM now kills only that command. Every agent env, the gate and the rebless scripts put the shim first on `PATH`, and the agent rules require the same scoping for valgrind and perf.
+- Mitigation: a coordinator-side cargo shim (`(deleted-coord-artifact)`) runs every cargo command in its own `systemd-run --user --scope` with `OOMPolicy=continue` and `MemoryMax=26G`. An OOM now kills only that command. Every agent env, the gate and the rebless scripts put the shim first on `PATH`, and the agent rules require the same scoping for valgrind and perf.
 - Resumed all four agents.
 
 - Merged `office-gaps` (0308):
@@ -859,7 +859,7 @@ Checked against design §13 and the generated `officecli-capability-delta.md`: s
   - Open misses 98 → 101 (three newly tracked reads, still missing).
 
 ## Coordinator audit (2026-10-17): definition of done
-A read-only audit of trunk `593d1b9fcd` against the goal's definition of done (`.coord/r9/dod-audit-2026-10-17.md`, outside the repository). Verdict: not met yet.
+A read-only audit of trunk `593d1b9fcd` against the goal's definition of done (`(deleted-coord-artifact)`, outside the repository). Verdict: not met yet.
 - Single entry point: mostly met. Bug: the facade feature lists omit odg/odc/odi/odb/odf-formula.
 - 21 formats read and write, gaps listed: partly met. There is no whole-format refusal, but 54 delta `missing` element rows and thousands of property rows have no follow-up.
 - P0: partly met. Open: PPTX paragraph/run/row/cell add and remove, comment remove; DOCX picture set/remove, comment set, SmartArt set/remove; XLSX SmartArt not recorded.
@@ -891,7 +891,7 @@ Work packages, in waves of up to four agents:
 - Merged `acceptance-adr8` (0341, WP9): per-format ADR 0008 rows (atomic failure, patch inverse, composition), 63/63 ok, mirrored in pytest; unreached cells 13 → 0 (generated `video.ppt`, `shapes.key`); Word 2007 encrypted DOCX now opens as encrypted; flat ODP accepts predefined entities; the 37 files that do not open are classified and enforced by a test.
 - Merged `keynote-batch` (0340): Keynote paragraph-set batches 21× → 1.09–1.11× at 1k and 380× → 1.72–1.77× at 10k, linear; the ODF object navigator resolves positional steps directly (ODC 10k 1.59 → 1.07). **The 1k-batch budget is now met in all 21 formats.** Open misses 103 → 101.
 - Merged `v1-closure` (0342): DOCX app/custom metadata, table style and borders, row height and flags, `listStyle`/`start` on add; PPTX table-level set. **The v1 corpus subset is green: 3,443 lines, 2,274 passed, 1,169 accounted, 0 open.** Row set 1.13 is a miss (follow-up 0342-P1).
-- Coordinator (2026-10-19): a second definition-of-done audit (`.coord/audit/dod-audit-2.md`, outside the repository) finds the remaining blockers: DOCX/PPTX P0 residue (26 planned P0 rows), Numbers `swap` (a whole-format verb refusal the first audit missed), five records absent from the bench matrix, Python `Commit.patch`, leaf-crate gates, and the glossary closure (0343). The 392 XLS/ODS P1 parity rows still marked `planned` will be relabelled deferred-P1 as an adopted default, listed in the owner memo.
+- Coordinator (2026-10-19): a second definition-of-done audit (`(deleted-coord-artifact)/dod-audit-2.md`, outside the repository) finds the remaining blockers: DOCX/PPTX P0 residue (26 planned P0 rows), Numbers `swap` (a whole-format verb refusal the first audit missed), five records absent from the bench matrix, Python `Commit.patch`, leaf-crate gates, and the glossary closure (0343). The 392 XLS/ODS P1 parity rows still marked `planned` will be relabelled deferred-P1 as an adopted default, listed in the owner memo.
 - Merged `glossary-closure` (0343, WP14): every 🔴 ADR 0034 cell is closed. Five renames, each with the old name deleted and banned: OPC `write_to*`, DOCX `PatchConflict`, XLSB scoped `Edit`, flat ODF `from_bytes(&[u8])`, positional view reads take `Position`. Stale cells flipped; deferrals D1–D11 are owner-memo items 14–24 (D8 withdrawn, done by 0342). The PROGRESS records index now covers 0249–0343; the facade docs, README and FEATURE_MATRIX say every format reads and writes through `File`. The facade iWork fuzz targets compile again; `gate.sh` now builds `crates/litchi/fuzz` and runs clippy and tests for 19 leaf crates plus `litchi-ods --lib`.
 - Merged `closure-tools` (0344, second-audit package D): the bench matrix now reads every record with evidence (18 more records; rows 2,377 → 2,737; open misses 101 → 142, each with a follow-up or explained residual), and `--check` fails on evidence without rows or any output of 1 MiB or more (per-format tables moved to `bench-matrix/`; the main file is 402 KB). The 392 XLS/ODS P1 rows are deferred-P1 (P1 planned 426 → 34; P0 still 26, to 0345/0346). 784 milestone-only follow-ups mapped to current ids. Owner memo items 25–29 added.
 - Merged `cross-small` (0347, package C): Numbers `swap` of sheets and tables, so **no format refuses a definition-of-done verb outright any more** (rows and columns refused typed, F1). Numbers relocation into a sheet holding the same table name returns a typed `DuplicateTableName`. Python `Commit.patch` (`apply`, `inverse`, `is_noop`), so the ADR 0008 pytest mirror runs 21/21/21. XLSX picture `set src` reads the drawing once: 1.27 → 1.07. `Patch` docs name the content-checked ODF formats; RTF Mac code pages are `unsupported_capability`.
@@ -951,7 +951,7 @@ Work packages, in waves of up to four agents:
 - Coordinator follow-up [0359c](0359c-typed-legacy-edit-budgets.md), Graph slice: finite budget kinds, BIFF normalization and XLS/PPT unified classification migrate together. Reusing admission under unchanged policy removes the initial measured slowdown while preserving tighter-limit/output checks. All 1,446 targeted tests, clippy, the locked harness, four glossary profiles and crate boundaries pass. Three isolated ABBA blocks give native parse/encode 0.937×, edit/commit 1.002× and replay 0.994× median ratios; failed candidates and final samples are retained. Shared OLE typed errors, the Graph owner split and final integrated corpus/performance/gate remain required.
 
 ## Coordinator status (2026-10-19): code work for the definition of done complete
-The third audit (`.coord/r9/dod-audit-2026-10-19-final.md`, outside the repository) listed three code items: PPTX batch budget (0348), the 34 DOCX chart rows (deferred-P1, owner memo 30) and docs hygiene. All three are done, and the workspace-wide gate now passes on trunk. What remains is the owner's:
+The third audit (`(deleted-coord-artifact)`, outside the repository) listed three code items: PPTX batch budget (0348), the 34 DOCX chart rows (deferred-P1, owner memo 30) and docs hygiene. All three are done, and the workspace-wide gate now passes on trunk. What remains is the owner's:
 - the 30 decisions in [0331](0331-owner-decision-memo.md); items 12, 27, 28 and 29 decide definition-of-done verdicts;
 - merging and pushing `feat/unified-ops-api` (it is not pushed);
 - the two JSON receipts under `docs/performance/results/change-0890/binaries/` (already on the base branch and origin; the AGENTS.md wording "anything under `binaries/`" covers them).
@@ -2026,8 +2026,8 @@ See [0063](0063-source-pptx-modern-comments.md).
   and final 53-check gate remain required. Nothing has been pushed.
 
 - Coordinator checkpoint (2026-10-22, resumed handoff and combined repairs):
-  Read the updated external `.coord/ctx-resume.txt` and
-  `.coord/triage-2026-10-22.md` before continuing. The replay integration
+  Read the updated external `(deleted-coord-artifact)` and
+  `(deleted-coord-artifact)` before continuing. The replay integration
   branch now includes trunk `a18593385c`, RTF through `5909588b99`, DOCX
   paragraph-copy through `9f1b3eb45f`, and durable Ink through `f97f0eef7a`.
   Its current head is `3c1d25de24`. Conflict resolutions preserve inverse
@@ -4576,7 +4576,7 @@ See [0063](0063-source-pptx-modern-comments.md).
   in 110.974 seconds, with zero target bytes, empty Cargo trace, unchanged
   source/locks and no remaining owned processes. Record 0362ul55 binds the
   independently verified receipt and preserves the separate setup failure.
-  Both runner and external `.coord/gate.sh` now register the same 35 modules.
+  Both runner and external `(deleted-coord-artifact)` now register the same 35 modules.
   This is one row of the 53-step gate, not full acceptance.
 
   Independent source review returns the raw-codec lanes for concrete repairs:
@@ -4710,7 +4710,7 @@ See [0063](0063-source-pptx-modern-comments.md).
   terminate. This current tooling row is failed, not accepted.
 
   Its external state is
-  `.coord/tooling-row-319690ffc6-20261025T-state/state.json` (20,236 bytes,
+  `(deleted-coord-artifact)/state.json` (20,236 bytes,
   SHA-256 `3eaa75e98885aa3c249fcd49846f6e6c1721ecfd9dac6fab838c68bc34b8569d`).
   The 636,346-byte child log has SHA-256
   `1f52db64e95036ff40de1ef51bc5793fd5b085f0b9a8c86991f2b79323d1bf59`.
@@ -6506,7 +6506,7 @@ See [0063](0063-source-pptx-modern-comments.md).
 
 ## Coordinator handover (2026-10-26): Claude resumes sole coordination
 - The owner paused the Codex coordinator and returned the program to Claude. Owner decisions (2026-10-26): (1) defer the ODT/ODP performance improvements; fix the IWA constructor regressions now, with refactored APIs; (2) Codex's behaviour changes are judged against the 0351 contract; (3) remove obsolete build directories while keeping the work; merge Codex's progress, or discard it where it violates the contract or regresses badly.
-- Cleanup: 366 Cargo target directories under `.coord/` and four orphaned worktree targets removed (disk 75% used, 1.0 TB free); two orphaned source worktrees archived under `.coord/salvage/`; 1,454 litchi scratch entries removed from `/tmp` (96 → 18 GB).
+- Cleanup: 366 Cargo target directories under `(deleted-coord-artifact)` and four orphaned worktree targets removed (disk 75% used, 1.0 TB free); two orphaned source worktrees archived under `(deleted-coord-artifact)`; 1,454 litchi scratch entries removed from `/tmp` (96 → 18 GB).
 - Record [0363](0363-iwa-monolith-exit-plan.md): plan to dissolve `litchi-iwa` into the leaf crates per ADR 0028 (owner instruction 2026-10-26). Of 2,228 host `pub fn`s, 123 are at leaf parity, 415 partial, 120 on unmerged Codex branches, 1,570 host-only (crosswalk in `results/0363`). The 66 Codex iWork branches (4,090 commits behind trunk, pre-0351 API) are donors to port, not merge. Waves W0 (substrate, codecs, parity harness) → W1 (Numbers, Pages, Keynote, shared text, shared charts/shapes/media) → W2 (drawables, text boxes, tests/examples) → W3 (delete the host). Coordinator adopts recommendations D2–D7; D1 (native verification without macOS) goes to the owner.
 - API-debt finish: records 0364 (glossary row 46), 0365 (gate runner and rows 41/48–51), 0366 (final API inventory and OfficeCLI corpus) in progress; then one paired ABBA run and the 53 rows on one trunk commit.
 - Owner decision D1 (2026-10-26): the Tier-B differential (known-field equality with the host plus untouched-byte preservation) is accepted as the parity proof for routes whose host version already has native evidence. Native macOS open/save/reopen runs for the remaining routes (no host native evidence, or output that differs from the host) are queued in `docs/unified-ops/0363-mac-queue.md` and must pass before W3 deletes the host.
@@ -6519,11 +6519,11 @@ See [0063](0063-source-pptx-modern-comments.md).
 - iWork W1 in progress: 0370 (Numbers tables and cells), 0371 (Pages), 0372 (Keynote). Gate repair 0373 in progress (rows 30 and 33 of the full gate on `c594870566`).
 - Merged `iwa-w0b` 0368a: drawable decode −14.6% and cell-tile remap −13.4% instructions against the host (were +205% and +35.5%); formula-graph clone −20.7%; map-aware formula-owner IDs (host defect pinned as an intentional difference, macOS-queued); typed theme-encode error. W0 is complete.
 - Merged W1-A's first table-engine slice (0370): leaf row/column insertion at parity (Tier A on `basic.numbers`, Tier B on 140 corpus routes; three documented host defects fixed, macOS-queued), `litchi_numbers_wire::table_topology` shared engine; insertion −29.8% instructions.
-- Merged `fin-tests` (0373): the four failing rows of gate `full-c594870566` (30, 33, 48, 51). Code regressions fixed: OPC replacement relationships (c0d1c2499c), the shared metadata no-op (78bd63c56f; XLSX/PPTX/XLSB no longer force a core part), the iwa-core refusal diagnostic, the odf-formula history conflict; four stale or never-passing tests corrected; Codex's hash-pinned raw-API census retired. The untracked `.coord/gate.sh` is retired in favour of the tracked `tools/gate/run_gate.sh`. Full gate rerunning on `ac0d111c4c`.
+- Merged `fin-tests` (0373): the four failing rows of gate `full-c594870566` (30, 33, 48, 51). Code regressions fixed: OPC replacement relationships (c0d1c2499c), the shared metadata no-op (78bd63c56f; XLSX/PPTX/XLSB no longer force a core part), the iwa-core refusal diagnostic, the odf-formula history conflict; four stale or never-passing tests corrected; Codex's hash-pinned raw-API census retired. The untracked `(deleted-coord-artifact)` is retired in favour of the tracked `tools/gate/run_gate.sh`. Full gate rerunning on `ac0d111c4c`.
 - iWork W1-D (0374, shared text engine) and W1-E (0375, shared chart/shape/media engine) started.
 
 ## Coordinator gate (2026-10-26): all 53 rows green on one commit
-- `tools/gate/run_gate.sh` full run on trunk `ac0d111c4c` (after records 0364–0369 and 0373): `DONE failed=0` (finished 2026-10-26T19:49:08Z). Results in `.coord/gates/full-ac0d111c4c/`. This closes the source gate of the API-debt program (owner decision 0350); what remains for it is the performance qualification under the goal's PERFORMANCE BAR (paired leaf-vs-unified routes of 0351 §5 against the pre-program baseline), which runs next. The iWork monolith exit (0363) continues in parallel and is gated separately as its waves land.
+- `tools/gate/run_gate.sh` full run on trunk `ac0d111c4c` (after records 0364–0369 and 0373): `DONE failed=0` (finished 2026-10-26T19:49:08Z). Results in `(deleted-coord-artifact)`. This closes the source gate of the API-debt program (owner decision 0350); what remains for it is the performance qualification under the goal's PERFORMANCE BAR (paired leaf-vs-unified routes of 0351 §5 against the pre-program baseline), which runs next. The iWork monolith exit (0363) continues in parallel and is gated separately as its waves land.
 
 ## iWork monolith exit (record 0363) — status 2026-10-26 evening
 - W0 complete (0367 substrate + IWA constructor return, 0368/0368a codecs/formula graph/table vocabulary, 0369 parity harness + exit ledger).
@@ -6545,12 +6545,12 @@ See [0063](0063-source-pptx-modern-comments.md).
   - Still open: OOXML metadata commit (F2), XLSX snapshot-limit cost (F3), ODC raw-XML admission (F4/F5) and DOC set instruction/wall disagreement (F1).
 - W1-E 0375a (`faf2ed2d76`): the shape-style variation engine with a plan API in `litchi_iwa_style::shape`, plus series error-bar, pie-label and value-label properties. Engine routes cost 42–90% less than the host's. W1-C now builds the Keynote shape-style facades on it.
 - Every post-merge workspace check, ledger check and boundary check passes. Nothing pushed.
-- Full coordinator gate on `c4f00f3a35`: `DONE failed=0`, finished 2026-10-27T06:23:48Z (`.coord/gates/full-c4f00f3a35/`).
+- Full coordinator gate on `c4f00f3a35`: `DONE failed=0`, finished 2026-10-27T06:23:48Z (`(deleted-coord-artifact)`).
 - More merges: W1-G Working move (`fb5f393205`); W1-A builder one-pass synthesis, +2.4% Ir against the host where it had been +275% (`e658e4676e`); W1-B shared `litchi_iwa_table::cell_appearance` engine and Pages facade (`e83c53c5fc`), with a fuzz-lock repair (`715b987097`); W1-G hidden-axes engine lift into `litchi_iwa_table::hidden_axes` (`3916c2e5d0`); W1-C Keynote shape styles, columns, layout and captions, 35 rows (`f45c927836`); W1-A sheet duplicate (`debf91e97c`).
 - W2-A 0378a (169 Numbers drawable rows) is sent back to rebase its structure-transition additions onto the moved `litchi-iwa-table` structure. `merge.sh` now also checks every fuzz lock (`--locked --offline`) and the crate boundaries after each merge. A full gate on `debf91e97c` is running.
 
 ## Coordinator handover (2026-10-27 afternoon)
-- At about 09:17 UTC an API spend limit stopped the coordinator and all eight agents mid-slice. Nothing was lost: commits are on the WP branches and unfinished edits are still in the worktrees. A new coordinator resumes the program under the same protocol. Briefs, agent IDs and the queue are in `.coord/coordinator-state-20261027.md`.
+- At about 09:17 UTC an API spend limit stopped the coordinator and all eight agents mid-slice. Nothing was lost: commits are on the WP branches and unfinished edits are still in the worktrees. A new coordinator resumes the program under the same protocol. Briefs, agent IDs and the queue are in `(deleted-coord-artifact)`.
 - Full coordinator gate on `debf91e97c`: `DONE failed=0`, finished 2026-10-27T09:20:06Z.
 - Merges since `bc01d0e790`:
   - W1-E 0375a slice 6 (`2c97520d97`): reference-line, chart-font and dual chart-number-format engines in `litchi-iwa-style`, plus the edge `litchi-iwa-style → litchi-iwa-text-wire`. Parity is Tier A or B on all three formats. Engines cost 77–81% less than the host.
@@ -6576,7 +6576,7 @@ See [0063](0063-source-pptx-modern-comments.md).
   pending. These counts describe migration evidence, not complete feature
   coverage or native acceptance.
 - Recovered the prior coordinator's briefs and evidence from
-  `/home/zhuhe/code/litchi-worktrees/.coord/`. The full gate on
+  `(deleted-coord-artifact)`. The full gate on
   `c9fd1baf87` stopped after rows 00–26 and has no completion marker or
   running process. Its partial results do not establish a green gate. The
   last recorded complete green gate remains `debf91e97c`.
@@ -6698,7 +6698,7 @@ See [0063](0063-source-pptx-modern-comments.md).
   bound to the sources in 0377a; final integrated measurements are pending.
 - The candidate is closed to new feature integration while final performance
   qualification and all 53 gate rows run on one integrated commit. Raw results
-  remain outside the checkout under `.coord/resume-20261028/`; historical
+  remain outside the checkout under `(deleted-coord-artifact)`; historical
   scoped green results do not establish the final candidate's gate status.
 - Next-wave implementation is isolated and initially limited to code/test
   edits: W1-E shared chart title/caption/axis-title graphs and facades; W1-G
@@ -6715,7 +6715,7 @@ See [0063](0063-source-pptx-modern-comments.md).
   the XLSX 1,000-cell unified route: median +5.195%, worst +5.283%. The other
   13 legs passed. That candidate was returned for repair; no full-gate or
   quiet-wall qualification is claimed for it. External receipts remain under
-  `.coord/resume-20261028/perf/`, including the failed captures.
+  `(deleted-coord-artifact)`, including the failed captures.
 - Accepted the narrow 0377a repair at `0d4f5f9b97` (code `1abe5a5cf7`).
   Unsigned distinct-target XLSX coalescing reuses the native setter's exact
   source-no-op result and worksheet admission. Signed repeated-target and
@@ -6746,7 +6746,7 @@ See [0063](0063-source-pptx-modern-comments.md).
   and one failure in row 33: Pages reference-line allocation parity compared
   the legacy host's randomized dependency-reference order as an exact list.
   The complete unchanged-source receipt and failed log remain external under
-  `.coord/resume-20261028/full-39e4bf101c/`. This candidate is not full-gate
+  `(deleted-coord-artifact)`. This candidate is not full-gate
   green. Its 19 iWork instruction routes and 14 FIN instruction legs passed;
   those measurements remain bound to that source and do not qualify later
   integration. Quiet wall/CLI measurements have not been run.
@@ -6963,7 +6963,7 @@ See [0063](0063-source-pptx-modern-comments.md).
   corpus and metadata-mirror profiles, and a destructive clear which bypassed
   the prior losslessness proof. The coordinator stopped the run during row 33:
   33 rows completed, 32 passed, and row 30 failed. Logs and the partial receipt
-  remain external under `.coord/resume-20261028/full-295b421bcd/`; this is not
+  remain external under `(deleted-coord-artifact)`; this is not
   a full-gate green result. All 68 iWork instruction routes (135 captures) and
   all 14 FIN comparisons (56 captures) passed on that exact source, but those
   receipts do not qualify its repair. Wall/CLI timing was never launched.
@@ -7168,7 +7168,7 @@ See [0063](0063-source-pptx-modern-comments.md).
   only. The original timing launcher stopped before measurement because
   GNU Awk rejected its variable name. New runner copies change only that
   binding; the original failure remains preserved. The external timing
-  receipt is `.coord/resume-20261028/perf/final-e0e297a82b-timing-receipt.md`
+  receipt is `(deleted-coord-artifact)/final-e0e297a82b-timing-receipt.md`
   (SHA-256 `87932702d02ffbb8e75b98a3cf54dcf371547c9e710f90644325c6615ecc99eb`);
   the coordinator's independent review binds seventy artifacts and the
   declared budgets. No native acceptance claim is added.
@@ -7176,7 +7176,7 @@ See [0063](0063-source-pptx-modern-comments.md).
   inactive build intermediates from eleven cache roots, preserving and
   hash-checking 912 executables and dynamic libraries. Sources, locks, raw
   evidence and active targets remain intact. The audited receipt is
-  `.coord/disk-cleanup-20261029/receipt.json`. Completed worktree retirement
+  `(deleted-coord-artifact)`. Completed worktree retirement
   had reached fifty worktrees and forty-three branches before this slice.
 - Accepted W2-D sparse-example slice `e410d50453` (record 0398). The leaf
   command retains the actual 257-by-2 table and both original batches,
@@ -7309,7 +7309,7 @@ See [0063](0063-source-pptx-modern-comments.md).
   cleanup now totals 186,976,851,364 bytes (about 174.14 GiB); active worktrees,
   qualified binaries, raw captures and source receipts remain preserved.
   Cleanup receipts and the independent review remain outside the repository
-  under `.coord/disk-cleanup-*-20261029*`.
+  under `(deleted-coord-artifact)`.
 - Chart-series symbols remain isolated for review: Numbers and Pages are
   closing publication/admission gaps, and Keynote is preserving precise
   resource kinds in its new error adapters. Earlier scoped measurements
@@ -7331,7 +7331,7 @@ See [0063](0063-source-pptx-modern-comments.md).
 - The refreshed branch audit found no additional safely merged inactive
   candidates. Active work packages, dirty donors and qualification baselines
   remain protected; the per-worktree/branch manifest is external under
-  `.coord/branch-worktree-audit-7606-20261029/`.
+  `(deleted-coord-artifact)`.
 - Numbers and Keynote symbol captures on `c768523ebd` and `62b34bc6f5` pass
   their four-route instruction checks. Pages scoped caller repairs are
   reviewed at `4dc656ff2b`. These slices remain unmerged: review exposed
@@ -7539,7 +7539,7 @@ See [0063](0063-source-pptx-modern-comments.md).
   integrated source remains e0e297a82b until these checks finish.
 
 ## Coordinator resume (2026-11-02)
-- No commits have landed on any branch since `4b26bb3379` (2026-10-30). That commit's full gate (`.coord/resume-20261028/full-4b26bb3379/`) stopped after 36 passing rows and has no completion marker. The complete 53-row gate is running again on the same frozen commit (`full-4b26bb3379-r2`). The last fully qualified source is still `e0e297a82b`.
+- No commits have landed on any branch since `4b26bb3379` (2026-10-30). That commit's full gate (`(deleted-coord-artifact)`) stopped after 36 passing rows and has no completion marker. The complete 53-row gate is running again on the same frozen commit (`full-4b26bb3379-r2`). The last fully qualified source is still `e0e297a82b`.
 - Ledger: 1,213 migrated, 43 retired and 983 host-only rows. The host-only rows are Pages 486, Keynote 290, Numbers 140 and shared 67. The largest blocks:
   - chart.style: 360 rows;
   - table.cell_rich_text: 158;
@@ -7562,7 +7562,7 @@ See [0063](0063-source-pptx-modern-comments.md).
   - W4-T slices 1–3 (`d93ff8c882`, 164 rows: `litchi_iwa_table::cell_rich_text` lifted from Numbers; Pages and Keynote cell text and lists; Keynote appearance reader fix for rich-text cells).
 - Every slice's own full gate passes, and every merge passes the post-merge workspace, ledger, fuzz-lock and boundary checks. All measured routes cost 2–47% of the host route's instructions.
 - Ledger: 1,786 migrated, 44 retired and 401 host-only rows (Pages 123, Numbers 120, Keynote 100, shared 58). The full gate on `f0aa2ad349` is still running. Nothing pushed.
-- Full gate on `f0aa2ad349` (`.coord/resume-20261028/full-f0aa2ad349/`): all 53 rows passed (`DONE failed=0`, finished 2026-11-02T11:41:13Z; summary SHA-256 `5bc9b7f645cc40b38d434e0004a036198b5304c8fe9a4f00d701fd3763b2d8d1`). It is the first complete green gate since `e0e297a82b`. Instruction qualification for this candidate is not run; final performance qualification waits for the end of wave W4 on one frozen commit.
+- Full gate on `f0aa2ad349` (`(deleted-coord-artifact)`): all 53 rows passed (`DONE failed=0`, finished 2026-11-02T11:41:13Z; summary SHA-256 `5bc9b7f645cc40b38d434e0004a036198b5304c8fe9a4f00d701fd3763b2d8d1`). It is the first complete green gate since `e0e297a82b`. Instruction qualification for this candidate is not run; final performance qualification waits for the end of wave W4 on one frozen commit.
 - Merged W4-P 0413b lifecycle (`07b612e0a2`, 10 Pages rows: text-box, shape and line adds, duplicates, body_shapes; clear-on-remove for commented drawables; host line-duplicate fix, macOS-queued). A full gate on `07b612e0a2` is starting.
 - Full gate on `661b89a041`: all 53 rows passed (finished 2026-11-02T15:26:06Z; summary SHA-256 `12bec28425937418826877f3717099b6fdc7f15c6de18d479c3950ba271a6fa5`).
 - Merged since then:
@@ -7640,7 +7640,7 @@ See [0063](0063-source-pptx-modern-comments.md).
 
 ## Final candidate qualified (2026-11-03)
 - **`7c0efb1f47` is the qualified integrated source.**
-  - Correctness gate: all 53 rows pass (`.coord/resume-20261028/full-7c0efb1f47/`, finished 2026-11-03T19:34:36Z, summary SHA-256 `4d6cfe6b3d5a4992a2236aac0db6749798851694f8f486ab8d75a1552a5a4fcf`).
+  - Correctness gate: all 53 rows pass (`(deleted-coord-artifact)`, finished 2026-11-03T19:34:36Z, summary SHA-256 `4d6cfe6b3d5a4992a2236aac0db6749798851694f8f486ab8d75a1552a5a4fcf`).
   - iWork instruction qualification passes (receipt `.coord/final-qual/final-7c0efb1f47-instruction-receipt.md`): 191 required host/leaf routes; worst +3.625%; median leaf/host 0.208.
   - FIN rows are carried from `a9ff2679e2` (max median 1.032), because the only change since then is iWork-only.
   - Wall-clock and CLI timing remain held, as before.

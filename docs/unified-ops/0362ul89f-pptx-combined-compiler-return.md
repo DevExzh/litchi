@@ -17,7 +17,7 @@ and observations are unchanged. Scoped rustfmt and `git diff --check` pass.
 A fresh guarded compiler capture is still required.
 
 The actual capture is retained outside Git at
-`/home/zhuhe/code/litchi-worktrees/.coord/pptx-combined-0362ul89-f5-actual-2915ef1762`.
+`(deleted-coord-artifact)`.
 Its approved driver is `run_f5.py --go`; runner SHA-256 is
 `1904177040fc7c523582433028d9bba56efc30fe0d9d96beb554a2fab343691e`.
 The coordinator verifies commands, source/lock fences, logs, target traces,

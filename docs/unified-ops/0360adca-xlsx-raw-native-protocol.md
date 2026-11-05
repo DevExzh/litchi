@@ -59,7 +59,7 @@ trees and grants the native/build slot:
 
 ```sh
 export NATIVE_QUAL_OUTPUT=/external/xlsx-raw-native/abba-20261024-01
-export LITCHI_COORD_BIN=/home/zhuhe/code/litchi-worktrees/.coord/bin
+export LITCHI_COORD_BIN=(deleted-coord-artifact)
 export LITCHI_NATIVE_QUAL_ROOT=/path/to/qualification-checkout
 export XLSX_BEFORE_SOURCE=/external/sources/xlsx-original-0bef-worktree
 export XLSX_AFTER_SOURCE=/external/sources/xlsx-final-candidate

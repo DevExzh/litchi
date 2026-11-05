@@ -16,7 +16,7 @@ and the MTEF node writer also retained one now-unused `LimitKind` import.
 
 The external guarded receipt is:
 
-    /home/zhuhe/code/litchi-worktrees/.coord/formula-raw-policy-328fe19328/state/00-formula-all-targets-tests-attempt-formula-all-targets-v2.log
+    (deleted-coord-artifact)/00-formula-all-targets-tests-attempt-formula-all-targets-v2.log
     23637 bytes, SHA-256 46729f580b1a8651b5cc148369cd62c41e8e9cc9dae4d733bbf53c39affe6fb6
 
 The runner was the approved f5 `run_safe_gate.py`, SHA-256

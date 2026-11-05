@@ -12,7 +12,7 @@ admission accounting exposed by the preserved runtime diagnostic
 Diagnostic log:
 
 ```text
-.coord/ooxml-pptx-joint-a8d32513b8-f5-runtime-remaining43-v2/18-pptx-full-chunk-50-attempt-actual-f5-18.log
+(deleted-coord-artifact)/18-pptx-full-chunk-50-attempt-actual-f5-18.log
 225307 bytes
 SHA-256 0acc965cd9fe88eacc6a48520ac5d3f9123e5e12fca5aafde6a6a75a0d3fd739
 ```

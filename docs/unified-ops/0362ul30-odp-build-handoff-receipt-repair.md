@@ -16,9 +16,9 @@ the array/process-substitution memory commands.
 ## Fresh packet
 
 The new packet is
-`/home/zhuhe/code/litchi-worktrees/.coord/odp-final-build-prep-472b670547-repair-11858e697f`.
+`(deleted-coord-artifact)`.
 The prior repaired packet at
-`/home/zhuhe/code/litchi-worktrees/.coord/odp-final-build-prep-472b670547-repair-40165ae0af`
+`(deleted-coord-artifact)`
 and its review artifacts remain unchanged. New packet files:
 
 | File | Bytes | SHA-256 |

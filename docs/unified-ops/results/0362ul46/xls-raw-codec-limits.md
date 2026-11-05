@@ -11,7 +11,7 @@
   fixture corpus was materialized. No native, allocation, performance,
   full-workspace, or acceptance run is claimed here.
 - Parent contract: 0351 §2.5.3 and the raw/record limit audit
-  `.coord/raw-record-limit-audit-3431ba566c.md`.
+  `(deleted-coord-artifact)`.
 
 ## Canonical boundary
 
@@ -153,13 +153,13 @@ All nine planned rows reached the runner, and every owned process exited, but
 the source failed the configured `unused-qualifications` lint at
 `cell_values::Snapshot::raw_record_limits` (`crate::Result` instead of the
 imported `Result`). Its state and logs remain outside the checkout at
-`/home/zhuhe/code/litchi-worktrees/.coord/raw-limits-xls-0362ul46c-validation-378a311c`;
+`(deleted-coord-artifact)`;
 the first diagnostic log SHA-256 is
 `292b3631488d57b6c3bc41ca33fb6ac0d95a47b9639690c564305949fa8a4655`.
 
 The one-line lint correction is `c6bad8ffeeb00eec85949197d3508d0c1c6373e5`.
 The fresh rerun state is outside the checkout at
-`/home/zhuhe/code/litchi-worktrees/.coord/raw-limits-xls-0362ul46c-validation-c6bad8`;
+`(deleted-coord-artifact)`;
 it used the pinned 1.95.0 toolchain, `Cargo.lock` SHA-256
 `4100b1fbb272dd24842f33a2d6f353a3f3a97dfa7e435c4649a0e1a029bfaea1`,
 `.cargo/config.toml` SHA-256
@@ -187,13 +187,13 @@ This is an environment-materialization gap, not an API or compile failure.
 The exact tracked fixture directories named by those failures were then
 materialized without hydrating `3rdparty/` or changing tracked source. A fresh
 rerun at `857f4efe0d163dfa7e097096100fcf255b1a5406` used state
-`/home/zhuhe/code/litchi-worktrees/.coord/raw-limits-xls-0362ul46c-validation-857f4f-fixtures`.
+`(deleted-coord-artifact)`.
 It reached 1,333 passing tests and one SST corpus-digest failure because six
 tracked `.xls`/`.xlt` files were still absent; that diagnostic log is
 `de9a90ecd95da8575c9eef825203220904e57052ffe89ebb76bd37aff0e57f86`.
 The six paths were materialized from the frozen tracked source, and the final
 corpus-complete rerun used state
-`/home/zhuhe/code/litchi-worktrees/.coord/raw-limits-xls-0362ul46c-validation-857f4f-corpus-complete`.
+`(deleted-coord-artifact)`.
 All 1,334 `litchi-xls --all-features --lib` tests passed with exit 0; its log
 SHA-256 is
 `6233bd990bc9c3adf89e1d408f96ae594dea3423ec9e22ebd6668a3d3d7d3aaa`, and
@@ -216,13 +216,13 @@ glossary work:
   (`sheet_features::Edit::features` now forwards the package's retained raw
   record limits).
 - The first `ad8713ede7` attempt is retained outside the checkout at
-  `/home/zhuhe/code/litchi-worktrees/.coord/raw-limits-xls-0362ul46-validation-ad8713e`.
+  `(deleted-coord-artifact)`.
   Its blocked workspace-parse log SHA-256 is
   `a67006dda034fb5da9bd8729f7818be8286385e0300eb2cbe66a748d5f0787ce`; its
   compile log SHA-256 is
   `951c7b6378de3b5422206e3900c81bfa2cba4b51c953bfcbaa10a60416ad71e7`.
 - The completed follow-up receipts are outside the checkout at
-  `/home/zhuhe/code/litchi-worktrees/.coord/raw-limits-xls-0362ul46-validation-62fd1507`.
+  `(deleted-coord-artifact)`.
   The fresh target remained below 600 MiB. The f5 runner, helper, adjacent
   Cargo wrapper and underlying Cargo hashes were respectively
   `1904177040fc7c523582433028d9bba56efc30fe0d9d96beb554a2fab343691e`,
@@ -282,7 +282,7 @@ cargo clippy -q -p litchi-xls --all-features --all-targets -- -D warnings
 ```
 
 The receipts are in
-`/home/zhuhe/code/litchi-worktrees/.coord/raw-limits-xls-0362ul46-clippy-62fd1507`:
+`(deleted-coord-artifact)`:
 the plan SHA-256 is recorded there, both log SHA-256 values are
 `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`, and the
 post-row target sizes are 159,742,896 and 187,853,315 bytes. The run used the
@@ -295,11 +295,11 @@ For a direct base comparison, the same two commands, tool hashes,
 `4100b1fbb272dd24842f33a2d6f353a3f3a97dfa7e435c4649a0e1a029bfaea1`, and
 `clippy.toml` SHA-256 were run from the clean 30aa checkout. Both passed with
 empty logs; their external receipts are under
-`/home/zhuhe/code/litchi-worktrees/.coord/raw-limits-xls-0362ul46-base-clippy-30aa`
+`(deleted-coord-artifact)`
 and their post-row target sizes are 159,748,823 and 187,861,703 bytes. The
 frozen 9781 gate also records passed clippy rows with the same empty-log hash,
 including `clippy-all-features` and the XLS-enabled ops rows, in
-`/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/full-gate-9781cf6d87/state.json`.
+`(deleted-coord-artifact)`.
 Thus every prior diagnostic is attributable to the absent preparation file,
 not to the new required arguments: configured current, original-base, and
 frozen gate rows all pass, while the unchanged CFB source remains unchanged.

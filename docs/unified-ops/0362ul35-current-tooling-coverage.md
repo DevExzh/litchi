@@ -27,7 +27,7 @@ docs/unified-ops/results/0362ul24/test_validate_signed_native.py
 
 The current six-suite discovery covers 68 tests: 19, 8, 7, 5, 3 and 26.
 The existing reconciliation receipt remains external at
-`.coord/tooling-coverage-reconciliation-1c2ce1f7d5.json` (8,456 bytes,
+`(deleted-coord-artifact)/tooling-coverage-reconciliation-1c2ce1f7d5.json` (8,456 bytes,
 SHA-256 `835eba64e99b0801d630eb75fd7a2da4ad3c1ab100517c9be8fa4112fd801a4d`).
 
 ## Combined-run repair
@@ -39,7 +39,7 @@ the PID bytes are written, producing `ValueError` from an empty marker. The
 preserved pre-repair log is external:
 
 ```text
-/home/zhuhe/code/litchi-worktrees/.coord/tooling-coverage-1079-combined-before.log
+(deleted-coord-artifact)/tooling-coverage-1079-combined-before.log
 1604 bytes
 c78e4c3a5bceba8920c0feba72fe99328d06a6874c660b3f464f7081158e63c4
 ```
@@ -53,7 +53,7 @@ The exact combined command then passed all 68 tests in 19.812 seconds. The
 committed repair tip was rerun unchanged; its external log is:
 
 ```text
-/home/zhuhe/code/litchi-worktrees/.coord/tooling-coverage-cc0d41a952-combined.log
+(deleted-coord-artifact)/tooling-coverage-cc0d41a952-combined.log
 901 bytes
 f8aafbbd12d9ac2374dba8710df28ee57d2e08c4ec01959e875df0757101a3df
 ```

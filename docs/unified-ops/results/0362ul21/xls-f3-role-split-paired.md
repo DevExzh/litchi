@@ -28,7 +28,7 @@ The F3 package library and both examples are byte-identical.
 
 Combined packet:
 
-- `/home/zhuhe/code/litchi-worktrees/.coord/sheet-preparation-691941/sheet-native-readiness-472b-f3-role-split.json`
+- `(deleted-coord-artifact)/sheet-native-readiness-472b-f3-role-split.json`
   SHA-256 `51258c4b0e296af95cb675621f91a3f370cfbafb5c410880b1c7dc5bae205df5`.
 
 The candidate build has a fresh target/TMP root in that packet; the paired

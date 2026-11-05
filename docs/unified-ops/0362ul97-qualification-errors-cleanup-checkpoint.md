@@ -11,7 +11,7 @@ passes formatting and minimal all-target compilation, then fails strict
 all-feature/all-target Clippy with 76 diagnostics. Root verifies the complete
 receipt, source/three-lock fences, command logs/traces, target guards and
 terminal ownership. The capture remains at
-`.coord/pptx-combined-0362ul89-f5-qualification-v2-02b2489ead`.
+`(deleted-coord-artifact)`.
 Its `result.json` is 37,850 bytes, SHA-256
 `5878d7e3ed980656fefa0ddb83823d3fa077e3041ee8cde4cf058f0f092f1274`.
 
@@ -27,7 +27,7 @@ The actual qualification on `2da172ece2` passes formatting (393 paths,
 Strict Clippy clears the original 76 findings, then reports three test-only
 findings (81.023 seconds, exit 101). No later row runs. Root verifies every
 receipt and terminal session exit. State:
-`.coord/pptx-combined-0362ul89-f5-qualification-2da172ece2`.
+`(deleted-coord-artifact)`.
 
 | Artifact | Bytes | SHA-256 |
 |---|---:|---|
@@ -39,7 +39,7 @@ in `ae6f32d202a04e3d6675fa431b2579c0d5f27192` (record 89ab), tree
 `361e2d24d8c9d0cb2c838f109646b3ede9150545`. Independent review confirms
 no changed production logic or assertions. Its fresh seven-row qualification
 is running in
-`.coord/pptx-combined-0362ul89-f5-qualification-ae6f32d202`.
+`(deleted-coord-artifact)`.
 Root corrects two prior-capture references before GO; final plan SHA-256 is
 `b0c48a6274ceb6e4a3a637cc6b3ac5e9e3d060cdc1701cc0b6492a15e3e5b2e5`.
 No result is inferred for this running capture.
@@ -49,7 +49,7 @@ No result is inferred for this running capture.
 The actual consumer capture on `5ec78a4858` passes formatting and OPC
 compilation, then fails the four-format check with DOCX/XLSX errors. Root
 verifies all completed receipts; the remaining rows did not execute. State:
-`.coord/ooxml-combined-0362ul94-f5-consumers-5ec78a4858`.
+`(deleted-coord-artifact)`.
 
 | Artifact | Bytes | SHA-256 |
 |---|---:|---|
@@ -94,7 +94,7 @@ entries are absent. No ignored/untracked payload needs quarantine. This is
 source-preservation cleanup, not candidate runtime acceptance.
 
 Evidence root:
-`.coord/worktree-cleanup-2026-10-25/quarantine/wave67-pptx-compiler-test`.
+`(deleted-coord-artifact)`.
 
 | Artifact | Bytes | SHA-256 |
 |---|---:|---|
@@ -144,7 +144,7 @@ OOXML's first prepared eleven-row packet is returned before GO because its
 step kinds do not match the runner's argv schema. Corrected v2 on `95973e8c6a`
 passes 98-path formatting, then reports 16 common-crate compiler diagnostics.
 Root verifies its terminal session exit 1 and all completed receipts.
-State: `.coord/ooxml-combined-0362ul94-f5-final-95973e8c6a-v2`.
+State: `(deleted-coord-artifact)`.
 
 | Artifact | Bytes | SHA-256 |
 |---|---:|---|
@@ -155,7 +155,7 @@ Independent review verifies 94j fixes all sixteen diagnostics without adding
 namespace copies or changing namespace scope timing. Root fast-forwards the
 private OOXML candidate to `491137abe2f7b4961beaac445e463be3c7f40418`, tree
 `9f4fd05f54b8b2a381e5675c47e902fde2b2bfbc`. Its fresh eleven-row capture is
-running at `.coord/ooxml-combined-0362ul94-f5-final-491137abe2`; formatting
+running at `(deleted-coord-artifact)`; formatting
 and common compilation have reported PASS. Full capture/terminal verification
 remains pending. Nothing is accepted into integration or trunk by these
 private source follow-ups, and nothing is pushed.

@@ -6,7 +6,7 @@
 
 ## Captured scope
 
-The preserved actual formatter failure is `/home/zhuhe/code/litchi-worktrees/.coord/0362ul86-f5-actual-a84f576138/00-fmt-check-attempt-actual-f5-00.log` (949,997 bytes; SHA-256 `6444246d15f665bdb857146323f77dc64fb61e7542e483b7c1f5cfa4ffe23b53`). It was the only executed row and failed before any subsequent validation row. I extracted each Diff in path, removed the captured checkout prefix, sorted and deduplicated it. The resulting 335 tracked Rust paths are bound by this newline-delimited path-list SHA-256:
+The preserved actual formatter failure is `(deleted-coord-artifact)/00-fmt-check-attempt-actual-f5-00.log` (949,997 bytes; SHA-256 `6444246d15f665bdb857146323f77dc64fb61e7542e483b7c1f5cfa4ffe23b53`). It was the only executed row and failed before any subsequent validation row. I extracted each Diff in path, removed the captured checkout prefix, sorted and deduplicated it. The resulting 335 tracked Rust paths are bound by this newline-delimited path-list SHA-256:
 
 `6b53128af05235f8aef4bb89b0898fb743215b470af59acbd880fe0e09d2ebb5` (112 `vendor/` paths, 223 workspace paths; 1,907 repeated diff-hunk lines in the capture). This digest is SHA-256 over the sorted relative path strings, each followed by one LF byte.
 

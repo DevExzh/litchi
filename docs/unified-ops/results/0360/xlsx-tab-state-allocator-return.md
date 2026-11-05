@@ -17,7 +17,7 @@ The protected allocator binaries are outside the repository:
 | b1a5 | `10b195ffc06527eb258c42671401e5c0d506b603cd211e15783cdb1c6464e110` | `final-b1a5-alloc` | `6ca73a16dfa8b0229d9db30177de11123a2d9883cdd9cc4ebdc7d497b154f18f` |
 
 The receipt directory is
-`/home/zhuhe/code/litchi-worktrees/.coord/w4-xlsx/allocator-final-b1a5-v2`.
+`(deleted-coord-artifact)`.
 The fixture has two defined names, 64 retained history steps, two warmups,
 and exact forward and inverse checks of 64/64 for each revision.
 
@@ -74,12 +74,12 @@ establish correctness and policy preservation only; they do not replace the
 paired allocator evidence below.
 
 The repaired allocator pair was rerun sequentially in the fresh directory
-`/home/zhuhe/code/litchi-worktrees/.coord/w4-xlsx/allocator-14370-v1`, with
+`(deleted-coord-artifact)`, with
 the same 64-step, two-name fixture and two warmups. The e63 JSON was unchanged
 from the protected baseline; its SHA-256 is
 `509453270b20147fbc034a02e0d1842abf5f60b1bc9d61e00c9c050f37cdc098`.
 The repaired binary is outside the repository at
-`/home/zhuhe/code/litchi-worktrees/.coord/w4-xlsx/targets/final-14370-alloc/release/xlsx_tab_state_history_alloc`,
+`(deleted-coord-artifact)`,
 SHA-256 `87973a079fc1bb5e3b87032c8b58702b320bde817bbfdf5096517ac530935173`;
 its JSON receipt SHA-256 is
 `539a1c9c6643f15a4c7988a7e3663d5f26065797c060535b9b53fab8e41ccac8`.
@@ -119,11 +119,11 @@ tab-state XML audit and `EditOptions` path, so the edit and stricter-recipient
 policy semantics are unchanged.
 
 The candidate binary is outside the repository at
-`/home/zhuhe/code/litchi-worktrees/.coord/w4-xlsx/targets/limits-compact-alloc/release/xlsx_tab_state_history_alloc`,
+`(deleted-coord-artifact)`,
 SHA-256
 `3e21996eedbbe71ee98daee5ed6184b0e67bc55e6f348cd595cfbdf0db7aaec4`.
 The sequential count-only receipt is outside the repository at
-`/home/zhuhe/code/litchi-worktrees/.coord/w4-xlsx/allocator-limits-compact-v1`.
+`(deleted-coord-artifact)`.
 The e63 JSON SHA-256 is
 `509453270b20147fbc034a02e0d1842abf5f60b1bc9d61e00c9c050f37cdc098`; the
 candidate JSON SHA-256 is
@@ -151,7 +151,7 @@ close the W4 performance gate.
 
 The native source-family attempt was not a measurement: a wrapper path typo
 failed before any child launch. Its host/error files are retained under
-`/home/zhuhe/code/litchi-worktrees/.coord/w4-xlsx/final-source-family-20261021-v1/page_margin`.
+`(deleted-coord-artifact)`.
 No native timing was run after the allocator return, and no performance result
 from this candidate is accepted.
 
@@ -166,10 +166,10 @@ or native source-family claim.
 | item | e63 baseline | 3dddbaf8cb candidate |
 | --- | --- | --- |
 | source | `e63a1fe3534bcaaae2ce367339f7f8275877baef` | `3dddbaf8cb8ec3b6844109cce0f1b568061fc357` |
-| protected binary | `/home/zhuhe/code/litchi-worktrees/.coord/w4-xlsx/protected/e63/xlsx_tab_state_history_alloc` | `/home/zhuhe/code/litchi-worktrees/.coord/w4-xlsx/protected/3dd/xlsx_tab_state_history_alloc` |
+| protected binary | `(deleted-coord-artifact)` | `(deleted-coord-artifact)` |
 | binary SHA-256 | `c9efeaf4c70f9e91bc0052abdda2f31cc434cfc1e25b4252b2cc5ef3f46a7fd0` | `6d52f150fbd1b6fb5ea91ad84293b34d7091181986b21555a873c6a923297a5c` |
 | JSON receipt SHA-256 | `509453270b20147fbc034a02e0d1842abf5f60b1bc9d61e00c9c050f37cdc098` | `08ad27c2c1c3e82ba61d67598318dcbeebb8f197c7c0b774522a8ed3c7a686eb` |
-| receipt directory | `/home/zhuhe/code/litchi-worktrees/.coord/w4-xlsx/allocator-14370-v1` | `/home/zhuhe/code/litchi-worktrees/.coord/w4-xlsx/allocator-3dd-v1` |
+| receipt directory | `(deleted-coord-artifact)` | `(deleted-coord-artifact)` |
 
 Both binaries were built with `cargo build --locked --release
 --features allocator-metrics --manifest-path tools/perf-baseline/Cargo.toml
@@ -191,8 +191,8 @@ benchmark manifest SHA-256 is
 | source-owner admission allocated bytes | 23,346,752 | 24,410,208 | +1,063,456 (+4.56%) |
 
 The matched heap profiles are outside the repository at
-`/home/zhuhe/code/litchi-worktrees/.coord/w4-xlsx/heaptrack-3dd-v1` and
-`/home/zhuhe/code/litchi-worktrees/.coord/w4-xlsx/heaptrack-14370-v1`. They
+`(deleted-coord-artifact)` and
+`(deleted-coord-artifact)`. They
 attribute the retained difference to the deferred family endpoint rather than
 to the OPC rewrite itself: the `raw::catalog_edit::package::rewrite` stacks are
 identical (17.57 KiB over 32 hide calls and 17.09 KiB over 32 show calls),
@@ -269,14 +269,14 @@ passed, preserving exact forward and inverse bytes and recipient-policy
 validation.
 
 The protected release allocator binary is outside the repository at
-`/home/zhuhe/code/litchi-worktrees/.coord/w4-xlsx/protected/913e/xlsx_tab_state_history_alloc`
+`(deleted-coord-artifact)`
 (10,470,200 bytes, SHA-256
 `fc7e3184e6dccbca758ae069810d692664c082479d820ada232975bd3e5424ac`). It was
 built from `913ed0f3bd` with the locked perf-baseline manifest, allocator
 features, two jobs, and a distinct target directory. The matching e63 binary
 and the 913e binary ran the same 64-history/2-warmup count-only driver against
 the same fixture; the receipt is outside the repository at
-`/home/zhuhe/code/litchi-worktrees/.coord/w4-xlsx/allocator-913e-v1`.
+`(deleted-coord-artifact)`.
 The e63 JSON SHA-256 is
 `509453270b20147fbc034a02e0d1842abf5f60b1bc9d61e00c9c050f37cdc098`; the 913e
 JSON SHA-256 is
@@ -314,7 +314,7 @@ The source validation passed `source_backed_tab_state` (15 tests),
 warning-denied Clippy for `litchi-xlsx`.
 
 The protected candidate binary is outside the repository at
-`/home/zhuhe/code/litchi-worktrees/.coord/w4-xlsx/protected/endpoint-cache/xlsx_tab_state_history_alloc` (10,425,736 bytes, SHA-256
+`(deleted-coord-artifact)` (10,425,736 bytes, SHA-256
 `f6dcafed3330cafac233a38f9678ac976320586efb5d8b652bc8c27888b708d0`). It
 was built with the capped W4 environment using
 `cargo build --locked --release --features allocator-metrics --manifest-path tools/perf-baseline/Cargo.toml --bin xlsx_tab_state_history_alloc`, with `CARGO_BUILD_JOBS=2` and a distinct target directory. The shared `Cargo.lock` SHA-256 is
@@ -325,7 +325,7 @@ benchmark manifest SHA-256 is
 The count-only pair used the same two-defined-name fixture, 64 retained
 steps, two warmups, and exact 64/64 forward and inverse checks. The receipt is
 outside the repository at
-`/home/zhuhe/code/litchi-worktrees/.coord/w4-xlsx/allocator-endpoint-cache-v1`.
+`(deleted-coord-artifact)`.
 The e63 JSON SHA-256 is
 `509453270b20147fbc034a02e0d1842abf5f60b1bc9d61e00c9c050f37cdc098`; the
 candidate JSON SHA-256 is

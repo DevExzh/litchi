@@ -73,7 +73,7 @@ Validation on this change:
 - PPTX full and minimal glossary profiles: passed.
 
 Logs remain outside the checkout under
-`/home/zhuhe/code/litchi-worktrees/.coord/pptx-manifest/`.
+`(deleted-coord-artifact)`.
 
 ## Performance evidence
 

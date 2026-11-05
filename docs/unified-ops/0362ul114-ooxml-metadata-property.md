@@ -4,7 +4,7 @@ Status: prepared source repair from `e130751fc503099c4d5fff74a5746b5099d625e1`.
 
 The isolated runtime receipt for the prior tip is:
 
-`/home/zhuhe/code/litchi-worktrees/.coord/ooxml-pptx-joint-e130751fc5-f5-runtime-remaining15/10-tests-ops-ooxml-metadata-attempt-actual-f5-10.log`
+`(deleted-coord-artifact)/10-tests-ops-ooxml-metadata-attempt-actual-f5-10.log`
 
 It is 17,975 bytes with SHA-256
 `5d648b68b997a0de1fc8c8a3adae5644484f2da2ac54afcd1c1cbf4d3654287c`.

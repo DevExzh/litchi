@@ -114,7 +114,7 @@ finish. Nothing is pushed.
 
 ## External evidence
 
-Paths are relative to `/home/zhuhe/code/litchi-worktrees/.coord/`. Each receipt
+Paths are relative to `(deleted-coord-artifact)`. Each receipt
 records its source checks and commands. No native binary is committed.
 
 | Artifact | Bytes | SHA-256 |

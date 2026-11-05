@@ -39,14 +39,14 @@ used the capped cargo shim with `LITCHI_MEM_MAX=20G`, `CARGO_BUILD_JOBS=1`,
 `CARGO_INCREMENTAL=0`, offline mode, and `--locked`. The copied lockfile SHA-256
 was `52ed0cacac15b5e440349bfc0f4aca2665bcf50d59d4321624e596bb410783c6`.
 The external target was
-`/home/zhuhe/code/litchi-worktrees/.coord/drawingml-text-media-raw/target`
+`(deleted-coord-artifact)`
 (1.1 GiB after validation); raw logs remain outside the repository.
 
 The focused commands were:
 
 ```text
-cargo test -p litchi-drawingml --all-features --offline --locked --lib --test svg_blip --no-fail-fast --target-dir /home/zhuhe/code/litchi-worktrees/.coord/drawingml-text-media-raw/target
-cargo test -p litchi-pptx --all-features --offline --locked --lib 'model3d::' --no-fail-fast --target-dir /home/zhuhe/code/litchi-worktrees/.coord/drawingml-text-media-raw/target
+cargo test -p litchi-drawingml --all-features --offline --locked --lib --test svg_blip --no-fail-fast --target-dir (deleted-coord-artifact)
+cargo test -p litchi-pptx --all-features --offline --locked --lib 'model3d::' --no-fail-fast --target-dir (deleted-coord-artifact)
 ```
 
 The DrawingML command passed 241 library tests and 24 SVG integration tests.

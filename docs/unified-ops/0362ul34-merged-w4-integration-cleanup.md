@@ -21,7 +21,7 @@ actual restoration, including file and destination-directory modes. The
 restored temporary checkout was then removed without force.
 
 Evidence is under
-`/home/zhuhe/code/litchi-worktrees/.coord/worktree-cleanup-2026-10-23/quarantine/wave54-coordinator-w4-integration/`:
+`(deleted-coord-artifact)`:
 
 | Artifact | Bytes | SHA-256 |
 | --- | ---: | --- |

@@ -29,7 +29,7 @@ filesystem free-space delta is claimed.
 ## Evidence
 
 External quarantine root:
-`/home/zhuhe/code/litchi-worktrees/.coord/worktree-cleanup-2026-10-23/quarantine/wave56-xlsx-rich-transfer/`.
+`(deleted-coord-artifact)`.
 
 | Artifact | Bytes | SHA-256 |
 | --- | ---: | --- |

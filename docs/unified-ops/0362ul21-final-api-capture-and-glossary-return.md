@@ -13,7 +13,7 @@ The detached source is clean at tree
 139,606-byte `Cargo.lock` is SHA-256
 `4100b1fbb272dd24842f33a2d6f353a3f3a97dfa7e435c4649a0e1a029bfaea1`.
 The capped cargo shim is
-`/home/zhuhe/code/litchi-worktrees/.coord/bin/cargo`, SHA-256
+`(deleted-coord-artifact)`, SHA-256
 `1b22a69fd625d57565041bf6c634d8ebd1a82be8b3d0006390472c86324230d8`.
 
 All 68 packages ran fresh (`reused=0`) with hidden-item rustdoc, all features,
@@ -31,14 +31,14 @@ The capture command was:
 
 ```sh
 env -u LITCHI_CAPPED -u LITCHI_BLESS \
-  PATH="/home/zhuhe/code/litchi-worktrees/.coord/bin:$PATH" \
+  PATH="(deleted-coord-artifact):$PATH" \
   LITCHI_MEM_MAX=20G CARGO_BUILD_JOBS=1 RUST_TEST_THREADS=1 \
   CARGO_INCREMENTAL=0 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 \
   CARGO_PROFILE_RELEASE_DEBUG=0 CARGO_NET_OFFLINE=true LC_ALL=C \
   CARGO_TARGET_DIR="$TARGET" TMPDIR="$OUTPUT/tmp" \
   python3 "$SOURCE/tools/final_api_inventory.py" --root "$SOURCE" \
   --output "$OUTPUT" --target-dir "$TARGET" \
-  --cargo /home/zhuhe/code/litchi-worktrees/.coord/bin/cargo --no-reuse
+  --cargo (deleted-coord-artifact) --no-reuse
 ```
 
 ## Inventory and reviewed dispositions
@@ -47,7 +47,7 @@ The fresh [84-row inventory](results/0362ul21/inventory-472b.tsv) is byte
 identical to the independent recheck and to the prior 0362ul14 inventory:
 38 `mut_draft`, 31 `edit_type`, 13 `transaction_type`, and 2 `mut_owner`
 rows. The captured blank scaffold remains external at
-`/home/zhuhe/code/litchi-worktrees/.coord/final-api-capture-472b670547/output/disposition.tsv`
+`(deleted-coord-artifact)/disposition.tsv`
 (12,634 bytes, SHA-256
 `57d486415c0e940160a3e0ed29bee08b79b14b013773973a06827e2b17445529`). Its
 84 rows are `UNASSIGNED_REQUIRED_REVIEW`; it is explicitly not accepted as a
@@ -77,7 +77,7 @@ source waiver and this sweep makes no minimal-feature claim. The
 feature-specific glossary gate remains required.
 
 A first attempt is preserved externally at
-`/home/zhuhe/code/litchi-worktrees/.coord/final-api-glossary-472b670547-20261024-181815`.
+`(deleted-coord-artifact)`.
 All 59 commands exited 2 because its generated path omitted
 `/home/zhuhe/code/litchi-worktrees`; its results and provenance hashes are
 listed in the sweep receipt. It is diagnostic-only and was not used as

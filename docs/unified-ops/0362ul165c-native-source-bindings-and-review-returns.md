@@ -93,7 +93,7 @@ to remove. Cumulative retirement remains 277 worktrees and 439 refs.
 
 ## External evidence
 
-Paths are relative to `/home/zhuhe/code/litchi-worktrees/.coord/`. These reduced
+Paths are relative to `(deleted-coord-artifact)`. These reduced
 receipts bind the source-only commands and exact inputs; no binary is committed.
 
 | Artifact | Bytes | SHA-256 |

@@ -24,7 +24,7 @@ The final full53 tooling row must retain all forty existing modules and add
 `tools.test_signed_native_v2_consumer` and
 `tools.test_drawingml_raw_qualification_v2`. The append-only 42-module argv
 is recorded in the external
-`.coord/final-gate-coverage-780cf4c7/coverage-map-v2-tooling-delta.json`,
+`(deleted-coord-artifact)/coverage-map-v2-tooling-delta.json`,
 3,380 bytes, SHA-256
 `f87346786599e9eeb8ae39839519e46fce1d33f6b4cfb9d33a2e3737f3a4ca59`.
 Its canonical argv SHA-256 is
@@ -40,7 +40,7 @@ absent path/registration/ref and unchanged integration, locks and protected
 probe. Holder policy passes with the existing disclosed visibility limits.
 
 Evidence is under the worktree parent's
-`.coord/worktree-cleanup-2026-10-25/trunk-consolidation/quarantine/wave104-root-removal/`:
+`(deleted-coord-artifact)`:
 
 | File | Bytes | SHA-256 |
 |---|---:|---|

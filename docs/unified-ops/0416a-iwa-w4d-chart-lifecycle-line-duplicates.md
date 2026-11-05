@@ -52,7 +52,7 @@ reshaping fallback, `set_*_chart_data_full_replace`, is not compared (§5).
 Callgrind on a release build with debug info, CPU 3, ABBA, with two calls
 of each route (open, edit, commit, serialize). The probe is
 `chart_lifecycle_cases::w4d_chart_route_cost_abba`, selected with
-`W4D_CHART_ROUTE`; the raw outputs are in `.coord/iwa-w4d/cg/s2_*.out`.
+`W4D_CHART_ROUTE`; the raw outputs are in `(deleted-coord-artifact)`.
 
 | Route | Host Ir | Leaf Ir | Δ |
 |---|---:|---:|---:|

@@ -12,7 +12,7 @@ Root verifies all three row log/trace hashes, unchanged C and all three
 locks, unchanged initial binding and manifest hashes, no live-target guard
 errors, zero target bytes and empty owned-process/builder lists in every
 post-exit sample. The failed run remains at
-`.coord/raw-census-Cf8cd398a-20261025/` under the worktree parent:
+`(deleted-coord-artifact)` under the worktree parent:
 
 | Artifact | Bytes | SHA-256 |
 |---|---:|---|

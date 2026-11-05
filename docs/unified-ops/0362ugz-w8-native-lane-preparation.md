@@ -4,7 +4,7 @@ This is an input/provenance preparation receipt for the fixed W8 source
 freeze `f6fe430a4d19d94aa360c0e9ed03ebd757265225`.  It does not contain a Cargo
 build, a binary, an untimed native run, timing, ABBA data, or an acceptance
 claim.  The historical f2 endpoint at
-`.coord/w8-f2-baseline-sAirXf` was read only; none of its endpoint evidence was
+`(deleted-coord-artifact)` was read only; none of its endpoint evidence was
 relabelled.
 
 The receipt is deliberately pinned to f6fe.  An earlier b673 candidate lane
@@ -18,7 +18,7 @@ a new lane.
 ## Frozen inputs and external lane
 
 All generated files below are outside Git in
-`/home/zhuhe/code/litchi-worktrees/.coord/w8-file-candidate-f6fe` (the lane).
+`(deleted-coord-artifact)` (the lane).
 The lane has separate `target-f2`, `target-f6fe`, `tmp/f2-build`,
 `tmp/f6fe-build`, `validation/{f2,f6fe}`, `endpoint/{f2,f6fe}` and `abba`
 directories reserved for later coordinator-controlled work.  No target
@@ -73,7 +73,7 @@ These commands were run against the f6fe tree and did not invoke Cargo:
 
 ```sh
 C=/home/zhuhe/code/litchi-worktrees/uo2-budget-validation
-LANE=/home/zhuhe/code/litchi-worktrees/.coord/w8-file-candidate-f6fe
+LANE=(deleted-coord-artifact)
 PROBE="$C/crates/litchi-ops/examples/file_w8_qualified_probe.rs"
 python3 "$C/tools/w8_file_provenance.py" fixture \
   --probe "$PROBE" --output "$LANE/provenance/litchi_w8_fixture_descriptor.json"
@@ -96,7 +96,7 @@ python3 "$C/tools/w8_file_provenance.py" source \
 ## Fresh f2 before-leg assembly
 
 The historical source archive is
-`/home/zhuhe/code/litchi-worktrees/.coord/w8-f2-baseline-sAirXf/f2-source.tar`,
+`(deleted-coord-artifact)/f2-source.tar`,
 6,614,528,000 bytes, SHA-256
 `de625729ec8e6f8055e619443ad31bf1a91719cd31465975f951d54dbc1c2280`.
 Its source commit is
@@ -135,7 +135,7 @@ The exact build-free preparation command was:
 
 ```sh
 C=/home/zhuhe/code/litchi-worktrees/uo2-budget-validation
-LANE=/home/zhuhe/code/litchi-worktrees/.coord/w8-file-candidate-b673
+LANE=(deleted-coord-artifact)
 F2="$LANE/f2-workspace"
 python3 "$C/tools/w8_original_baseline.py" prepare \
   --git-root "$C" \
@@ -144,7 +144,7 @@ python3 "$C/tools/w8_original_baseline.py" prepare \
   --lock "$F2/Cargo.lock" \
   --lock-source-commit f2bbbc8d07ab5da26c180f1ff74813d39f632d54 \
   --lock-origin "pinned offline resolution generated from the current candidate's reviewed f2-compatible dependency resolution; copied as a fresh external input" \
-  --source-archive /home/zhuhe/code/litchi-worktrees/.coord/w8-f2-baseline-sAirXf/f2-source.tar \
+  --source-archive (deleted-coord-artifact) \
   --output-dir "$LANE/provenance/f2-baseline" \
   --target x86_64-unknown-linux-gnu --profile release
 ```
@@ -179,7 +179,7 @@ identity check is unresolved.
 ## Matched build-graph overlay proposal
 
 The exact external proposal is retained at
-`/home/zhuhe/code/litchi-worktrees/.coord/w8-file-f6fe-match-overlay`:
+`(deleted-coord-artifact)`:
 
 | artifact | bytes | SHA-256 |
 |---|---:|---|
@@ -234,11 +234,11 @@ be executed only after the coordinator freezes the paired source inputs and
 confirms no forbidden process overlap.
 
 ```sh
-LANE=/home/zhuhe/code/litchi-worktrees/.coord/w8-file-candidate-f6fe
+LANE=(deleted-coord-artifact)
 CAND=/home/zhuhe/code/litchi-worktrees/uo2-w8-f6fe-native-endpoint
-BASE_LANE=/home/zhuhe/code/litchi-worktrees/.coord/w8-file-candidate-b673
+BASE_LANE=(deleted-coord-artifact)
 F2="$BASE_LANE/f2-workspace"
-export PATH=/home/zhuhe/code/litchi-worktrees/.coord/bin:$PATH
+export PATH=(deleted-coord-artifact):$PATH
 
 BASE_BUILD="env CARGO_TARGET_DIR=$LANE/target-f2 TMPDIR=$LANE/tmp/f2-build CARGO_BUILD_JOBS=1 CARGO_INCREMENTAL=0 CARGO_PROFILE_RELEASE_DEBUG=0 CARGO_NET_OFFLINE=true LITCHI_MEM_MAX=20G cargo build --offline --locked --release --jobs 1 --manifest-path $F2/Cargo.toml -p litchi-ops --example file_w8_original_baseline_probe --all-features"
 CAND_BUILD="env CARGO_TARGET_DIR=$LANE/target-f6fe TMPDIR=$LANE/tmp/f6fe-build CARGO_BUILD_JOBS=1 CARGO_INCREMENTAL=0 CARGO_PROFILE_RELEASE_DEBUG=0 CARGO_NET_OFFLINE=true LITCHI_MEM_MAX=20G cargo build --offline --locked --release --jobs 1 --manifest-path $CAND/Cargo.toml -p litchi-ops --example file_w8_qualified_probe --all-features"
@@ -267,7 +267,7 @@ the exact command used:
 python3 -B "$CAND/docs/unified-ops/results/0362h/validate.py" \
   "$LANE/target-f2/release/examples/file_w8_original_baseline_probe" \
   "$LANE/validation/f2" \
-  --source /home/zhuhe/code/litchi-worktrees/.coord/w8-f2-baseline-sAirXf/f2-source.tar \
+  --source (deleted-coord-artifact) \
   --probe "$F2/crates/litchi-ops/examples/file_w8_qualified_probe.rs" \
   --lock "$F2/Cargo.lock" \
   --source-commit f2bbbc8d07ab5da26c180f1ff74813d39f632d54 \
@@ -287,11 +287,11 @@ Then create the two endpoint manifests.  This is still provenance checking,
 not a build or timing step:
 
 ```sh
-LANE=/home/zhuhe/code/litchi-worktrees/.coord/w8-file-candidate-f6fe
+LANE=(deleted-coord-artifact)
 CAND=/home/zhuhe/code/litchi-worktrees/uo2-w8-f6fe-native-endpoint
-BASE_LANE=/home/zhuhe/code/litchi-worktrees/.coord/w8-file-candidate-b673
+BASE_LANE=(deleted-coord-artifact)
 F2="$BASE_LANE/f2-workspace"
-HIST=/home/zhuhe/code/litchi-worktrees/.coord/w8-f2-baseline-sAirXf
+HIST=(deleted-coord-artifact)
 BASE_PROV="$BASE_LANE/provenance/f2-baseline"
 
 python3 "$CAND/tools/w8_file_provenance.py" endpoint \
@@ -365,7 +365,7 @@ PROTO_COMMIT=2b1f588560c0cbf2fc7cd549944dda7601a51352
 test "$(git -C "$PROTO" rev-parse HEAD)" = "$PROTO_COMMIT"
 test -z "$(git -C "$PROTO" status --porcelain)"
 
-LANE=/home/zhuhe/code/litchi-worktrees/.coord/w8-file-candidate-f6fe
+LANE=(deleted-coord-artifact)
 POLICY="$PROTO/docs/unified-ops/results/0362yh/original-to-final-policy.json"
 PAIR_RECEIPT="$LANE/endpoint/original-to-final-pair-receipt.json"
 

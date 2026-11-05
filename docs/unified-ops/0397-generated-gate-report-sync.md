@@ -6,7 +6,7 @@ tests (48), benchmark matrix (51), and corpus dispositions (52). These
 failures have two generated-report causes. Runtime tests, strict Clippy,
 rustdoc, feature matrices, fuzz checks and the remaining gate rows passed
 on that same unchanged source. The failed receipt remains external under
-`.coord/resume-20261028/full-1bc8f22499/`; this is not a green full gate.
+`(deleted-coord-artifact)`; this is not a green full gate.
 
 The OfficeCLI capability report still recorded the previous Numbers registry
 snapshot hash. Regenerating it changes that hash only. No registry, corpus

@@ -32,7 +32,7 @@ perf/native locks retain their existing hashes.
 The final diagnostic continuation on frozen e130 passes all four remaining
 rows: facade transactions, shared error classification, OPC source freshness
 and tooling. Root verifies commands, source/locks, logs and terminal resource
-guards. External `.coord/ooxml-pptx-joint-e130751fc5-f5-runtime-remaining4/`
+guards. External `(deleted-coord-artifact)`
 retains `rows.json` (15,581 bytes, SHA-256
 `4c21e91ec746a45e1955234921d11808a98b78bc7deec325daae80cbaeefbca1`)
 and `result.json` (16,938 bytes, SHA-256
@@ -43,11 +43,11 @@ not the repaired composition. Full fresh qualification remains required.
 
 External source/composition evidence:
 
-- `.coord/runtime-repair-composition-0362ul115.json` records each merge.
-- `.coord/runtime-repair-0362ul115-source-proof.json` records the twenty
+- `(deleted-coord-artifact)` records each merge.
+- `(deleted-coord-artifact)/runtime-repair-0362ul115-source-proof.json` records the twenty
   matching source blobs, SHA-256
   `1b457c396008eb65371a55cdd79d1ccad54f877e48e33564a1a20cc5101f8cab`.
-- `.coord/lock-refresh-0362ul104e-actual/` retains both root locks and the
+- `(deleted-coord-artifact)` retains both root locks and the
   actual refresh receipt.
 
 Fresh compiler, runtime, glossary, whole-workspace and performance captures

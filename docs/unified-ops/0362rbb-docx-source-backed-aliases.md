@@ -21,13 +21,13 @@ The affected integration tests passed: 24 SVG lifecycle, 19 glossary-story,
 tail-append-stream, and one source-read-policy test (157 tests total). The
 final log is outside
 the repository at
-`/home/zhuhe/code/litchi-worktrees/.coord/w8-docx-story-text/alias-tests-v5.log`,
+`(deleted-coord-artifact)/alias-tests-v5.log`,
 14,036 bytes, SHA-256
 `f430556c3de7df59cfc8da86227fecc138788ba15e693808223936c3a1e41f61`.
 
 All-target/all-feature `litchi-docx` Clippy passed with `-D warnings`; the log
 is at
-`/home/zhuhe/code/litchi-worktrees/.coord/w8-docx-story-text/alias-clippy-v2.log`,
+`(deleted-coord-artifact)/alias-clippy-v2.log`,
 171 bytes, SHA-256
 `d3499a29a90e7d18648ad1c066d2ba8a71d8d3a4c3ec9305c6a618e5851fa5aa`.
 `cargo fmt --all -- --check` and `git diff --check` also passed. No binary or

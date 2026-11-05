@@ -16,11 +16,11 @@ A-B-B-A blocks. The reviewed W5 runner and calibration references are retained
 at:
 
 ~~~text
-/home/zhuhe/code/litchi-worktrees/.coord/doc-toggle/final-record/docs/unified-ops/results/0359a/abba.sh
+(deleted-coord-artifact)/abba.sh
 SHA-256 0dcde7efdea349e95822abf9a54063b2b1e5e73e0fd1148a359702d524c4989b
-/home/zhuhe/code/litchi-worktrees/.coord/doc-toggle/final-record/docs/unified-ops/results/0359a/analyze.py
+(deleted-coord-artifact)/analyze.py
 SHA-256 14bf15e41202cd610c8bcecb2d239d9ceef3256b354c9144b8b6aa1a808f4d21
-/home/zhuhe/code/litchi-worktrees/.coord/doc-toggle/final-record/docs/unified-ops/results/0359a/summary.json
+(deleted-coord-artifact)/summary.json
 SHA-256 6419d8c05d8494abfc922883e62b34897ccd67a78d42f8e178d79a743587be90
 ~~~
 
@@ -66,7 +66,7 @@ The protocol reuses, without rebuilding, the source-bound binaries from
 | binary SHA-256 | `ba7042fd413c26764986b0ed9dcd79beca85e91231f0beb2f850550152e14877` | `2d62dacae12b49214a086c109b506ca8eb69a33cf5e770627794efecdbcba810` |
 
 The full correctness receipt remains outside the checkout at
-`/home/zhuhe/code/litchi-worktrees/.coord/doc-toggle-472b-build-20261024/actual-receipt.txt`,
+`(deleted-coord-artifact)/actual-receipt.txt`,
 SHA-256 `a0dfb1d1b66c16249939a702d26565466a3ca8b86d11e9bc87461bf5df414b3a`.
 The expected JSON output hashes remain the 0359qh values; batch raw-byte
 inequality and the passing CHPX oracle remain explicit.

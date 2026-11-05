@@ -72,7 +72,7 @@ bar.
 | chart series symbol outlines | source-built Line2d chart | 255,539,602 | 58,734,393 | 0.229844581976 |
 
 The archived ELF is external at
-`/home/zhuhe/code/litchi-worktrees/.coord/iwa-w2a-series-style-perf-3dd6a6fee7/bin/parity-3dd6a6fee7-release-debug1`
+`(deleted-coord-artifact)`
 (0555, 219,623,840 bytes, SHA-256
 `f0fd836369ebf3346183dcb94ae29159a03852d810eff748cd86989a7d65b043`). The
 fresh capture manifest is external at
@@ -84,7 +84,7 @@ Callgrind files, stdout/stderr, exit statuses, threshold-100 annotations,
 build logs, and artifact hashes remain outside the repository under
 `.../capture-v1/`; all eight legs exited 0. The c063 validator used for the
 final audit is external at
-`/home/zhuhe/code/litchi-worktrees/.coord/resume-20261028/perf/iwork-probe-isolation-final/validate_call_audit.py`
+`(deleted-coord-artifact)/validate_call_audit.py`
 (SHA-256
 `c0637e4304f5fdbfae6fca6b0e9a9c17f7d10cb9a56c7df6846951fa4bdf6b8e`).
 The reduced four-row summary is committed at
@@ -130,7 +130,7 @@ claim separate output-limit or full catalog-storage qualification.
 
 Post-font-merge check, strict Clippy, rustdoc, ledger, no-3rdparty and five
 parity tests passed. External receipts are under
-`/home/zhuhe/code/litchi-worktrees/.coord/iwa-w2a-series-style-perf-3dd6a6fee7/post-merge-gates-54b0e44f79/`;
+`(deleted-coord-artifact)`;
 `low-budget-controls/tests.log` has SHA-256
 `b76d5f0dbdd2305b2d553b5cf452576caecc527115e4e85b977a7d727fadd4cb`.
 

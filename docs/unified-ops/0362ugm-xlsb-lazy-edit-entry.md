@@ -35,7 +35,7 @@ overlapped the two-file documentation-only overlay described below; it is not
 claimed to have run in an exactly clean checkout. The other commands completed
 before that overlay. The assigned
 environment was
-`/home/zhuhe/code/litchi-worktrees/.coord/xlsb-lazy-entry/env.sh` (SHA-256
+`(deleted-coord-artifact)/env.sh` (SHA-256
 `47251384c135d438f1fc4324038ecc11259b652d21d3c1d97ef4e0f5b60f2686`), with
 `CARGO_BUILD_JOBS=1`, `RUST_TEST_THREADS=1`, `CARGO_INCREMENTAL=0`, offline
 locked resolution, and the external target directory it defines.  The
@@ -51,11 +51,11 @@ separate `LITCHI_MEM_MAX=20G` process-memory cap.
 
 | Command (all rows use source `51c86284467a8dd834086e428acf8692781fbe9c`) | Result | Closed log and SHA-256 |
 |---|---:|---|
-| `cargo test --offline --locked -p litchi-xlsb --all-features` | 1,355 passed, 0 failed, 11 ignored (including 40 ordinary and 2 compile-fail doctests) | `.coord/xlsb-lazy-entry/receipts/full-xlsb-all-features-r7.log`, 128,061 bytes, `456525dc4bceb536d7acb6e70831d4acb13b8490b973cabdbb1e2dc9dbba8a4a` |
-| `cargo clippy --offline --locked -p litchi-xlsb -p litchi-ops -p litchi -p litchi-py --all-targets --all-features -- -D warnings` | exit 0 | `.coord/xlsb-lazy-entry/receipts/strict-xlsb-consumer-clippy-r2.log`, 18,503 bytes, `98430e245113fdd1f00cff9dbd00296964d4a24394f0dde088c8f45edbbf05c4` |
-| All 14 XLSB `litchi-ops` integration targets | 126 passed, 0 failed | `.coord/xlsb-lazy-entry/receipts/affected-xlsb-consumers-r3.log`, 12,774 bytes, `d0f8391866f9cb26e6d8ea17dd6fae8840e67907ace4bbd462c45f40c2330f9e` |
-| `cargo test --offline --locked -p litchi --all-features --test xlsb_facade` | 23 passed, 0 failed | `.coord/xlsb-lazy-entry/receipts/focused-litchi-xlsb-facade-r2.log`, 1,998 bytes, `eca6496ca5217b6bff558b38765b8a417b5eede7a9f66f256b1cc5dc422e5707` |
-| `cargo test --offline --locked --manifest-path tools/perf-baseline/Cargo.toml --features xlsb-crud --bin xlsb_crud` | 9 passed, 0 failed | `.coord/xlsb-lazy-entry/receipts/standalone-xlsb-crud-r1.log`, 9,284 bytes, `fe04c5c9095b77ab5ded6482a758f3d87f1593c8c96821ed576df06677ffe50d` |
+| `cargo test --offline --locked -p litchi-xlsb --all-features` | 1,355 passed, 0 failed, 11 ignored (including 40 ordinary and 2 compile-fail doctests) | `(deleted-coord-artifact)/full-xlsb-all-features-r7.log`, 128,061 bytes, `456525dc4bceb536d7acb6e70831d4acb13b8490b973cabdbb1e2dc9dbba8a4a` |
+| `cargo clippy --offline --locked -p litchi-xlsb -p litchi-ops -p litchi -p litchi-py --all-targets --all-features -- -D warnings` | exit 0 | `(deleted-coord-artifact)/strict-xlsb-consumer-clippy-r2.log`, 18,503 bytes, `98430e245113fdd1f00cff9dbd00296964d4a24394f0dde088c8f45edbbf05c4` |
+| All 14 XLSB `litchi-ops` integration targets | 126 passed, 0 failed | `(deleted-coord-artifact)/affected-xlsb-consumers-r3.log`, 12,774 bytes, `d0f8391866f9cb26e6d8ea17dd6fae8840e67907ace4bbd462c45f40c2330f9e` |
+| `cargo test --offline --locked -p litchi --all-features --test xlsb_facade` | 23 passed, 0 failed | `(deleted-coord-artifact)/focused-litchi-xlsb-facade-r2.log`, 1,998 bytes, `eca6496ca5217b6bff558b38765b8a417b5eede7a9f66f256b1cc5dc422e5707` |
+| `cargo test --offline --locked --manifest-path tools/perf-baseline/Cargo.toml --features xlsb-crud --bin xlsb_crud` | 9 passed, 0 failed | `(deleted-coord-artifact)/standalone-xlsb-crud-r1.log`, 9,284 bytes, `fe04c5c9095b77ab5ded6482a758f3d87f1593c8c96821ed576df06677ffe50d` |
 
 The exact 14-target consumer command was:
 

@@ -278,8 +278,8 @@ runs of one binary).
 
 ## 7. Gates
 
-Logs: `.coord/w2-pptx/gate-logs/` (`gates-summary.txt`). Commands run from the worktree
-with `source .coord/w2-pptx/env.sh`.
+Logs: `(deleted-coord-artifact)` (`gates-summary.txt`). Commands run from the worktree
+with `source (deleted-coord-artifact)`.
 
 All on the tree merged with trunk `4ff05a303e` (record 0355), merge `9536c3fa7a`.
 

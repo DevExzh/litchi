@@ -190,5 +190,5 @@ taskset -c 5 valgrind --tool=callgrind --toggle-collect='*pivot_host_route*' \
 
 ## 6. Verification
 
-The gate list in `.coord/iwa-w4k/gates.sh` runs on the merge of trunk.
+The gate list in `(deleted-coord-artifact)` runs on the merge of trunk.
 Its results are reported in the hand-off.

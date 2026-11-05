@@ -24,7 +24,7 @@ to remain intact.
 No runtime or retained-heap measurement is claimed by this source review.
 
 The reviewed source diff is retained outside the checkout at
-`.coord/w4-xlsx/cold-reader-review-before.diff` (21,084 bytes), SHA-256
+`(deleted-coord-artifact)/cold-reader-review-before.diff` (21,084 bytes), SHA-256
 `4ebad25abd52d818c70bee60cc49f6f6e715a72e592d1050d0a079c4e1a0cacc`.
 It was captured with `git diff -- crates/litchi-xlsx/src/workbook/source.rs`
 in the worker tree and can be applied to the recorded base for inspection.

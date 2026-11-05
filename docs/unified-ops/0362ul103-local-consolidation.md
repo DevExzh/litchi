@@ -17,7 +17,7 @@ common ribbon integration test; later rows do not run. Root verifies the
 complete terminal capture before source changes. The target ends at
 392,496,573 bytes.
 
-External packet `.coord/uo2-coordinator-replay-integration-f5-compiler-69640222`
+External packet `(deleted-coord-artifact)`
 retains `rows.json` (41,915 bytes, SHA-256
 `8aefb6c25259050724bed6e72557c6dfc417116d1678110469311ad336c7db9b`) and
 `result.json` (44,060 bytes, SHA-256
@@ -38,7 +38,7 @@ integration, 141 need lineage/unique-change review and seven are ambiguous
 old uo branches; the remaining four are trunk, excluded branches and private
 integration itself. These are initial classifications, not deletion approvals.
 
-The matrix lives under `.coord/worktree-cleanup-2026-10-25/trunk-consolidation/`.
+The matrix lives under `(deleted-coord-artifact)`.
 Each deletion must recheck exact tip, ancestry or supersession, registered
 worktrees, payloads and live holders. Unique useful changes are integrated;
 retired branches are deleted with exact-tip guards. No pre-rewrite history may
@@ -111,7 +111,7 @@ guards and process cleanup before starting runtime.
 | Minimal OPC/common, all targets | 21.108 |
 
 Target ends at 1,147,710,905 bytes. External packet
-`.coord/uo2-coordinator-replay-integration-f5-compiler-ea5c95e2` retains
+`(deleted-coord-artifact)` retains
 `rows.json` (62,232 bytes, SHA-256
 `cd588985432a04227ca1a9561d407aea28232ba6575d65320b5543e9b7cf29d2`) and
 `result.json` (65,467 bytes, SHA-256
@@ -192,7 +192,7 @@ The external packets retain these root-verified terminal artifacts:
 | `ooxml-pptx-joint-ea5c95e212-f5-runtime-remaining33/rows.json` | 35,685 | `c000b019f79028466eaeaff602021bcc9b48ae11b0f2c2997d9051dc0697f02d` |
 | same / `result.json` | 38,144 | `9d4f9cff506e53db59a00582d2a0475278865e24c70ca388221dba271b79eb2c` |
 
-Both packet directories are under the external `.coord` directory. Final
+Both packet directories are in an external directory. Final
 runtime targets are 387,951,653 and 955,071,697 bytes respectively.
 
 Review of an older branch identifies additional signed invalid-target
@@ -270,7 +270,7 @@ returned as 104d; no production behavior or performance loss is accepted.
 The complete 34-row packet remains required after repair.
 
 Root verifies e130's terminal capture and inner helper log. External packet
-`.coord/ooxml-pptx-joint-e130751fc5-f5-runtime` retains `rows.json`
+`(deleted-coord-artifact)` retains `rows.json`
 (4,333 bytes, SHA-256
 `a6d67c39223cb374f70a7cd0130d08b230322358308b40f3da2114ab9a8738ec`),
 `result.json` (5,072 bytes, SHA-256

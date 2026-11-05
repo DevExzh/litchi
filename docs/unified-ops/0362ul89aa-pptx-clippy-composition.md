@@ -3,7 +3,7 @@
 The isolated qualification on `02b2489eada2bfcd3d1b9bc285b0ea0d3c7ae0d6`
 passes formatting and the minimal-feature all-target compiler row, then fails
 strict Clippy with 76 diagnostics. The failure remains retained at
-`.coord/pptx-combined-0362ul89-f5-qualification-v2-02b2489ead`.
+`(deleted-coord-artifact)`.
 Its `result.json` is 37,850 bytes, SHA-256
 `5878d7e3ed980656fefa0ddb83823d3fa077e3041ee8cde4cf058f0f092f1274`.
 Root independently verifies the command, source and three-lock fences,

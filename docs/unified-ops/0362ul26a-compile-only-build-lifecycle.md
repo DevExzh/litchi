@@ -49,7 +49,7 @@ tests remain unchanged.
 No Cargo, Rust, native qualification, timing, allocation, ABBA, or benchmark
 command was run. The exact source-only checks and reduced logs are outside the
 repository under
-`/home/zhuhe/code/litchi-worktrees/.coord/cfb-generic-lifecycle-20261024/`:
+`(deleted-coord-artifact)`:
 
 | Check | Exit | Log (bytes, SHA-256) |
 | --- | ---: | --- |
@@ -65,7 +65,7 @@ The initial repaired source files at this leaf were:
 | `tools/test_native_qualification_runner.py` | 73,806 | `8a278c5b4bc3733de2e9620b3ee8efe12a33205394eb709bd1c4701243d41f89` |
 
 The follow-up source-only rerun used the same commands and is retained under
-`/home/zhuhe/code/litchi-worktrees/.coord/cfb-generic-lifecycle-20261024-r2/`:
+`(deleted-coord-artifact)`:
 `pycompile.log` (0 bytes, SHA-256
 `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`),
 `native-runner-tests.log` (333 bytes, SHA-256
@@ -74,7 +74,7 @@ The follow-up source-only rerun used the same commands and is retained under
 `df92f1da813f79675b00846421966de998dfd837b423a276a44f425ef55baa3b`).
 
 The rereview-fix source-only rerun used the same commands and is retained under
-`/home/zhuhe/code/litchi-worktrees/.coord/cfb-generic-lifecycle-20261024-r3/`:
+`(deleted-coord-artifact)`:
 
 | Check | Exit | Log (bytes, SHA-256) |
 | --- | ---: | --- |
@@ -105,7 +105,7 @@ metadata. Relevant heavy or Litchi-scoped entries still fail closed. Direct
 identity reads remain strict.
 
 The final source-only checks and read-only host snapshot are retained under
-`/home/zhuhe/code/litchi-worktrees/.coord/cfb-generic-lifecycle-20261024-r4/`:
+`(deleted-coord-artifact)`:
 
 | Check | Exit | Log (bytes, SHA-256) |
 | --- | ---: | --- |
@@ -115,7 +115,7 @@ The final source-only checks and read-only host snapshot are retained under
 | read-only host snapshot: `python3` imports the runner, calls `_proc_snapshot()`, and reports count/current-PID/restricted/heavy counts | 0 | `host-snapshot.log` (120, `80492fe3bd73d92ad75cf8fd0641e821066328a6935d39abbecd1f8d10f8b829`); 992 entries, current PID present, 919 restricted metadata entries, 4 heavy entries |
 
 After the final documentation-only source comment, the exact suites were
-rerun under `/home/zhuhe/code/litchi-worktrees/.coord/cfb-generic-lifecycle-20261024-r5/`:
+rerun under `(deleted-coord-artifact)`:
 
 | Check | Exit | Log (bytes, SHA-256) |
 | --- | ---: | --- |

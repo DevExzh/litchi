@@ -5,7 +5,7 @@ source `f14235da957f81aaff5316c18f7992b656619264`. These are compiler checks,
 not native execution, timing measurements, a full gate or final acceptance.
 
 The detached source is
-`/home/zhuhe/code/litchi-worktrees/.coord/final-composed-f14235-validation/source`.
+`(deleted-coord-artifact)`.
 Root verified its exact commit, detached/clean state, selected tracked compile
 inputs, approved locks and runner before the accepted run. The capture includes
 13,384 tracked compile paths and 1,964 test-data files. No missing compile input
@@ -53,7 +53,7 @@ The accepted rows are:
 The exact command arrays, source fences, lock identities, log sizes/digests,
 Cargo target traces and terminal ownership samples are bound by the following
 external receipts. Paths are relative to
-`/home/zhuhe/code/litchi-worktrees/.coord/final-composed-f14235-validation/`.
+`(deleted-coord-artifact)`.
 
 | Artifact | Bytes | SHA-256 |
 | --- | ---: | --- |

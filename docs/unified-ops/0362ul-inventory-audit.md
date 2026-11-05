@@ -68,7 +68,7 @@ python3 -B -m unittest tools.test_validate_api_disposition tools.test_api_debt_i
 
 It ran 63 tests and passed. The complete stdout/stderr log is retained
 outside Git at
-`/home/zhuhe/code/litchi-worktrees/.coord/inventory-owner-coverage-5d02e3b637-followup.log`;
+`(deleted-coord-artifact)/inventory-owner-coverage-5d02e3b637-followup.log`;
 it is 162 bytes with SHA-256
 `3879356988f9f2e3af2a6e3a6387dcd0afb0e42a7e1ba8b099bfaa824cd024f9`.
 The prior 60-test log remains retained at its original path and identity.

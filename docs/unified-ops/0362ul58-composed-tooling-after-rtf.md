@@ -21,7 +21,7 @@ stays clean at the held commit, and the integration hold is released after
 verification. No Cargo, native probe or timing workload runs in this row.
 
 External artifacts are retained under
-`/home/zhuhe/code/litchi-worktrees/.coord/`. No large log is committed.
+`(deleted-coord-artifact)`. No large log is committed.
 
 | Artifact | Bytes | SHA-256 |
 | --- | ---: | --- |

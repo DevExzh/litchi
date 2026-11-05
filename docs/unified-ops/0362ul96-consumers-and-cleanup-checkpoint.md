@@ -13,7 +13,7 @@ target 226,458,369 bytes). This supersedes the limited prior source audit;
 no complete consumer closure was inferred from that audit.
 
 Capture root:
-`/home/zhuhe/code/litchi-worktrees/.coord/pptx-combined-0362ul89-f5-actual-15d8d53a0c`.
+`(deleted-coord-artifact)`.
 
 | Artifact | Bytes | SHA-256 |
 |---|---:|---|
@@ -63,7 +63,7 @@ Root independently verifies payload inode/mode/size/hash, external capture
 identities, retained branch, registry absence and held heads.
 
 Evidence root:
-`/home/zhuhe/code/litchi-worktrees/.coord/worktree-cleanup-2026-10-23/quarantine/wave66-format-0362ul93`.
+`(deleted-coord-artifact)`.
 
 | Artifact | Bytes | SHA-256 |
 |---|---:|---|
@@ -94,7 +94,7 @@ The actual check on that source passes both rows: formatting on 393 changed
 Rust paths (2.890 seconds), then
 `cargo check --keep-going --offline --locked -p litchi-pptx --all-targets --all-features`
 (exit 0, 73.614 seconds, target 226,054,600 bytes).
-State: `/home/zhuhe/code/litchi-worktrees/.coord/pptx-combined-0362ul89-f5-actual-02b2489ead`.
+State: `(deleted-coord-artifact)`.
 
 | Artifact | Bytes | SHA-256 |
 |---|---:|---|
@@ -113,7 +113,7 @@ The actual check on that source passes formatting on 90 Rust paths (2.117
 seconds), then
 `cargo check --keep-going --offline --locked -q -p litchi-ooxml-common --all-targets --all-features`
 (exit 0, 36.236 seconds, target 162,771,185 bytes).
-State: `/home/zhuhe/code/litchi-worktrees/.coord/ooxml-combined-0362ul94-f5-actual-5ec78a4858`.
+State: `(deleted-coord-artifact)`.
 
 | Artifact | Bytes | SHA-256 |
 |---|---:|---|

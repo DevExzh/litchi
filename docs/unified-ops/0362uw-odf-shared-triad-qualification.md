@@ -135,7 +135,7 @@ reused as current evidence.
 The underlying Cargo command (which the runner invokes) is:
 
 ```text
-source /home/zhuhe/code/litchi-worktrees/.coord/w8-file/env.sh
+source (deleted-coord-artifact)
 export CARGO_TARGET_DIR=/external/native-final/targets/odf-shared-run
 export CARGO_BUILD_JOBS=1
 export TMPDIR=/external/native-final/tmp/odf-shared-run
@@ -187,7 +187,7 @@ On 2026-10-23, the runner completed that locked, untimed correctness check on
 source tip `c9b352265eb833423c6852f91227a28bbf1ead02` with lock SHA
 `6d7895e6056c931fc19780ff4d0a031230e2ac79b9b30a9060bc8b6fad6747da`.
 The external output is
-`/home/zhuhe/code/litchi-worktrees/.coord/w8-readiness-odf-shared-v2-output-c9b/probe.json`
+`(deleted-coord-artifact)/probe.json`
 (27,537 bytes, SHA-256
 `11cb668cb3893de0ac9ad8858ead046e4a7dbf8a13628d3febf569d9035ac6a9`), with
 receipt `receipt.json` (2,194 bytes, SHA-256

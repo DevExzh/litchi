@@ -13,7 +13,7 @@ The final source endpoint is a detached, clean checkout:
 | --- | --- |
 | commit | `32253785a50b6515f69682f7eab903d6dba63fba` |
 | tree | `e3dbfbf4a451eabf0e0a1498b6de93f8a50a5b29` |
-| endpoint | `/home/zhuhe/code/litchi-worktrees/.coord/0362ul44-odf-validation-32253785a5/source` |
+| endpoint | `(deleted-coord-artifact)` |
 | integration basis | `30aaafbf98e097aeec8cf6fe3df6caaae62a37d6` |
 | root lock | `4100b1fbb272dd24842f33a2d6f353a3f3a97dfa7e435c4649a0e1a029bfaea1` |
 | perf-baseline lock | `eac86284f67136aa856a8dcb6f383178b89ca92b26434a3de1d7408d68f2690c` |
@@ -50,19 +50,19 @@ guard.  These are decimal byte limits (20 GB and 19 GB), not GiB labels.
 
 The rows use the proven `0362ul29` runner.  The target was safely reused from
 the preceding same-policy source endpoint
-`/home/zhuhe/code/litchi-worktrees/.coord/0362ul44-odf-validation-2f7a009832c/f5/target`;
+`(deleted-coord-artifact)`;
 each row still recorded the final source and lock fence.
 
 | row | command | tests passed | seconds | target bytes | receipt (bytes, SHA-256) |
 | --- | --- | ---: | ---: | ---: | --- |
-| changed-all-targets | `cargo check --offline --locked --all-targets --all-features -p litchi-odf-common -p litchi-odf-formula -p litchi-odp -p litchi-ods -p litchi-odt -p litchi-odf -p litchi-ops -p litchi` | — | 627.27 | 825127447 | `/home/zhuhe/code/litchi-worktrees/.coord/0362ul44-odf-validation-32253785a5/f5-state/00-changed-all-targets-attempt-32253785a5-0.log` (8484, `5291270c05583c038ad2ea87c0ceb3aaa624c123ad643ff532b0a419d459b4c8`) |
-| changed-clippy | `cargo clippy --offline --locked --all-targets --all-features -p litchi-odf-common -p litchi-odf-formula -p litchi-odp -p litchi-ods -p litchi-odt -p litchi-odf -p litchi-ops -p litchi -- -D warnings` | — | 440.09 | 1116777171 | `/home/zhuhe/code/litchi-worktrees/.coord/0362ul44-odf-validation-32253785a5/f5-state/01-changed-clippy-attempt-32253785a5-1.log` (8483, `f1f100a1a24cbedef8e4646006ffc34ac913de4a0cee66f202b29376d267e1b1`) |
-| focused-odf-libs | `cargo test --offline --locked --all-features -p litchi-odf-common -p litchi-odf-formula -p litchi-odp -p litchi-ods -p litchi-odt --lib` | 2135 | 105.16 | 1500344349 | `/home/zhuhe/code/litchi-worktrees/.coord/0362ul44-odf-validation-32253785a5/f5-state/02-focused-odf-libs-attempt-32253785a5-2.log` (199331, `67fee47e92a747bcd9a22f10c556b190b4ea4e070fbf74b840f90d866b28e426`) |
-| focused-strict-xml | `cargo test --offline --locked -p litchi-odf-common --test resolved_reader -- --nocapture` | 17 | 2.91 | 1503119608 | `/home/zhuhe/code/litchi-worktrees/.coord/0362ul44-odf-validation-32253785a5/f5-state/03-focused-strict-xml-attempt-32253785a5-3.log` (1741, `d769afffd59a5948ba58a714b5fa36a9d56cbf554136fb55b51f0857f443dc37`) |
-| focused-script-envelopes | `cargo test --offline --locked -p litchi-odt --lib document_scripts::tests -- --nocapture` | 8 | 0.76 | 1503119608 | `/home/zhuhe/code/litchi-worktrees/.coord/0362ul44-odf-validation-32253785a5/f5-state/04-focused-script-envelopes-attempt-32253785a5-4.log` (1043, `677518cf5ab5fb9ab3f20a4c9530ff48486ab94c01c0ba5034665f1c73aebdbd`) |
+| changed-all-targets | `cargo check --offline --locked --all-targets --all-features -p litchi-odf-common -p litchi-odf-formula -p litchi-odp -p litchi-ods -p litchi-odt -p litchi-odf -p litchi-ops -p litchi` | — | 627.27 | 825127447 | `(deleted-coord-artifact)/00-changed-all-targets-attempt-32253785a5-0.log` (8484, `5291270c05583c038ad2ea87c0ceb3aaa624c123ad643ff532b0a419d459b4c8`) |
+| changed-clippy | `cargo clippy --offline --locked --all-targets --all-features -p litchi-odf-common -p litchi-odf-formula -p litchi-odp -p litchi-ods -p litchi-odt -p litchi-odf -p litchi-ops -p litchi -- -D warnings` | — | 440.09 | 1116777171 | `(deleted-coord-artifact)/01-changed-clippy-attempt-32253785a5-1.log` (8483, `f1f100a1a24cbedef8e4646006ffc34ac913de4a0cee66f202b29376d267e1b1`) |
+| focused-odf-libs | `cargo test --offline --locked --all-features -p litchi-odf-common -p litchi-odf-formula -p litchi-odp -p litchi-ods -p litchi-odt --lib` | 2135 | 105.16 | 1500344349 | `(deleted-coord-artifact)/02-focused-odf-libs-attempt-32253785a5-2.log` (199331, `67fee47e92a747bcd9a22f10c556b190b4ea4e070fbf74b840f90d866b28e426`) |
+| focused-strict-xml | `cargo test --offline --locked -p litchi-odf-common --test resolved_reader -- --nocapture` | 17 | 2.91 | 1503119608 | `(deleted-coord-artifact)/03-focused-strict-xml-attempt-32253785a5-3.log` (1741, `d769afffd59a5948ba58a714b5fa36a9d56cbf554136fb55b51f0857f443dc37`) |
+| focused-script-envelopes | `cargo test --offline --locked -p litchi-odt --lib document_scripts::tests -- --nocapture` | 8 | 0.76 | 1503119608 | `(deleted-coord-artifact)/04-focused-script-envelopes-attempt-32253785a5-4.log` (1043, `677518cf5ab5fb9ab3f20a4c9530ff48486ab94c01c0ba5034665f1c73aebdbd`) |
 
 The authoritative row manifest is
-`/home/zhuhe/code/litchi-worktrees/.coord/0362ul44-odf-validation-32253785a5/f5-state/rows.json`
+`(deleted-coord-artifact)/rows.json`
 (48667 bytes, SHA-256
 `a8cb7053fe96845fb8800c4a34e8d8db7908a8877ffe0300ca758ec917345909`).  All
 five rows have status `passed`; the manifest, Cargo-target traces, source
@@ -76,7 +76,7 @@ disposition: the final source endpoint was a fresh clean checkout, the three
 reviewed lock fingerprints were unchanged, `CARGO_INCREMENTAL=0` was enforced,
 Cargo target content fingerprints and the process guards were recorded, and the
 `f5-state` row manifest was new.  Only the compiled target was reused from
-`/home/zhuhe/code/litchi-worktrees/.coord/0362ul44-odf-validation-2f7a009832c/f5/target`.
+`(deleted-coord-artifact)`.
 This is not a fresh-target claim and does not alter the historical plan.
 
 The executed rows used the persisted `run_safe_gate.py` runner at the frozen
@@ -92,13 +92,13 @@ artifact was persisted, so this receipt does not invent or hash one.
 
 Earlier failures remain outside the repository and were not rewritten:
 
-- `/home/zhuhe/code/litchi-worktrees/.coord/0362ul44-odf-validation-2f7a009832/f5-state/00-changed-all-targets-attempt-2f7a009832-0.log`
+- `(deleted-coord-artifact)/00-changed-all-targets-attempt-2f7a009832-0.log`
   (21796 bytes, `cc5e806bb11228db8283811765a37506e20241510e6136e9cbc60232c47d28bd`)
   recorded the first sparse omission (`ods-formula-aggregates` evidence).
-- `/home/zhuhe/code/litchi-worktrees/.coord/0362ul44-odf-validation-2f7a009832b/f5-state/00-changed-all-targets-attempt-2f7a009832b-0.log`
+- `(deleted-coord-artifact)/00-changed-all-targets-attempt-2f7a009832b-0.log`
   (21440 bytes, `db503b5cc6a9c71cd5218c607e32d02a4a6e99982b71f676c95f034d4ec7b267`)
   recorded the second sparse omission (`ods-formula-trigonometry` evidence).
-- `/home/zhuhe/code/litchi-worktrees/.coord/0362ul44-odf-validation-2f7a009832c/f5-state/01-changed-clippy-attempt-2f7a009832c-1.log`
+- `(deleted-coord-artifact)/01-changed-clippy-attempt-2f7a009832c-1.log`
   (2308 bytes, `1f61efd5636b4efc18022262ce71ad170754d45bcf2b693ddba8b0ebc5dc9c81`)
   recorded the pre-fix `double_must_use` lint.
 - The 232/e690 source and fixture failures, including the list-style consumer

@@ -134,7 +134,7 @@ annotates it as host noise (residual), not a regression.
 ## 5. Verification
 
 On the branch after the trunk merge `c3abe0ecc4` (environment from
-`.coord/w7-iwork/env.sh`, `CARGO_BUILD_JOBS=6`); every command exited 0.
+`(deleted-coord-artifact)`, `CARGO_BUILD_JOBS=6`); every command exited 0.
 
 | Gate | Result |
 |---|---|

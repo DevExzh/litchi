@@ -38,7 +38,7 @@ fallible `regions` accessor.
 
 Validation completed in source commit
 `468bfb29d13f5827dc143d505ec5ce53f2314468` with Rust 1.95.0, the assigned
-one-job capped environment from `.coord/numbers-lazy-entry/env.sh`,
+one-job capped environment from `(deleted-coord-artifact)/env.sh`,
 `--offline --locked`, and an external target directory (4,733,132,163 bytes
 at receipt time).  `Cargo.toml` SHA-256 is
 `f5ec007892023b38f1deaef1ce20714db58b58448a3bea088be3b847b84570de`; the
@@ -46,20 +46,20 @@ matching external `Cargo.lock` SHA-256 is
 `52ed0cacac15b5e440349bfc0f4aca2665bcf50d59d4321624e596bb410783c6`.
 
 The raw logs remain outside the repository at
-`/home/zhuhe/code/litchi-worktrees/.coord/numbers-lazy-entry/`:
+`(deleted-coord-artifact)`:
 
 * `full-numbers-tests-final.log` — 118,554 bytes,
   SHA-256 `8c402e6bbfec17fe8f7e4da33a5e704d97dbfe923957765ef6ea360ee56e7e0f`.
-  Command: `source /home/zhuhe/code/litchi-worktrees/.coord/numbers-lazy-entry/env.sh && set -o pipefail && cargo test --offline --locked -p litchi-numbers --all-features --all-targets --no-fail-fast --message-format=short 2>&1 | tee /home/zhuhe/code/litchi-worktrees/.coord/numbers-lazy-entry/full-numbers-tests-final.log`.  It reported 86 suites, 1,077 passed, 0 failed, and 4 ignored.
+  Command: `source (deleted-coord-artifact)/env.sh && set -o pipefail && cargo test --offline --locked -p litchi-numbers --all-features --all-targets --no-fail-fast --message-format=short 2>&1 | tee (deleted-coord-artifact)/full-numbers-tests-final.log`.  It reported 86 suites, 1,077 passed, 0 failed, and 4 ignored.
 * `numbers-clippy-v2.log` — 177 bytes,
   SHA-256 `45eed02fe309724e174579852fcb08b982d57187f477b4b89141f27cbd5d4c9a`.
-  Command: `source /home/zhuhe/code/litchi-worktrees/.coord/numbers-lazy-entry/env.sh && set -o pipefail && cargo clippy --offline --locked -p litchi-numbers --all-targets --all-features -- -D warnings 2>&1 | tee /home/zhuhe/code/litchi-worktrees/.coord/numbers-lazy-entry/numbers-clippy-v2.log`; it exited 0 with no diagnostics.
+  Command: `source (deleted-coord-artifact)/env.sh && set -o pipefail && cargo clippy --offline --locked -p litchi-numbers --all-targets --all-features -- -D warnings 2>&1 | tee (deleted-coord-artifact)/numbers-clippy-v2.log`; it exited 0 with no diagnostics.
 * `iwa-chart-fallback-test-v2.log` — 536 bytes,
   SHA-256 `cf50714a1ddb14a1b8a54497f28a8839c6eb51df4cd352d4f8e228fde0b8024d`.
-  Command: `source /home/zhuhe/code/litchi-worktrees/.coord/numbers-lazy-entry/env.sh && set -o pipefail && cargo test --offline --locked -p litchi-iwa --all-features --lib deferred_chart_dependency_refusal_keeps_full_replace_input --no-fail-fast --message-format=short 2>&1 | tee /home/zhuhe/code/litchi-worktrees/.coord/numbers-lazy-entry/iwa-chart-fallback-test-v2.log`; it reported 1 passed, 0 failed, 1,696 filtered.
+  Command: `source (deleted-coord-artifact)/env.sh && set -o pipefail && cargo test --offline --locked -p litchi-iwa --all-features --lib deferred_chart_dependency_refusal_keeps_full_replace_input --no-fail-fast --message-format=short 2>&1 | tee (deleted-coord-artifact)/iwa-chart-fallback-test-v2.log`; it reported 1 passed, 0 failed, 1,696 filtered.
 * `numbers-facade-test.log` — 17,842 bytes,
   SHA-256 `0e5a23a1c2bbeaf2517caf5b397dd663313df818457878ad7a6f73ac4cdfd059`.
-  Command: `source /home/zhuhe/code/litchi-worktrees/.coord/numbers-lazy-entry/env.sh && set -o pipefail && cargo test --offline --locked -p litchi --all-features --test numbers_facade --no-fail-fast --message-format=short 2>&1 | tee /home/zhuhe/code/litchi-worktrees/.coord/numbers-lazy-entry/numbers-facade-test.log`; it reported all 5 facade tests passed and 0 failed.
+  Command: `source (deleted-coord-artifact)/env.sh && set -o pipefail && cargo test --offline --locked -p litchi --all-features --test numbers_facade --no-fail-fast --message-format=short 2>&1 | tee (deleted-coord-artifact)/numbers-facade-test.log`; it reported all 5 facade tests passed and 0 failed.
 
 `cargo fmt --all -- --check` and `git diff --check` passed for the validated
 commit above.  The selector-deferral successor `86c762d2a7284e3d45e2168f86865f13ea9fe3af`

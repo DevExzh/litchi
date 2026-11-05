@@ -74,7 +74,7 @@ surface.
 ## Validation
 
 Commands were run from `/home/zhuhe/code/litchi-worktrees/uo2-w8-docx-variables`
-with `source /home/zhuhe/code/litchi-worktrees/.coord/w8-file/env.sh`,
+with `source (deleted-coord-artifact)`,
 `CARGO_BUILD_JOBS=2`, `RUST_TEST_THREADS=2`, and `LITCHI_MEM_MAX=20G`:
 
 ```text
@@ -95,12 +95,12 @@ the private engine `try_edit`:
 
 | receipt | bytes | SHA-256 |
 | --- | ---: | --- |
-| `.coord/w8-docx-variables/variables-tests-policy-final.log` | 1,949 | `5d59760add22d8f08833b31675f315c4dbc0650ad1e414ac05c0817622297a17` |
-| `.coord/w8-docx-variables/source-backed-policy-final.log` | 3,544 | `1530fe6a39af01563de08c54d2e2af34e442d0b98ee84e41abf95a6550d0344e` |
-| `.coord/w8-docx-variables/clippy-policy-final.log` | 170 | `94bc541edd44e5a8d1c7b24de1635ab4ee6176a54cdacd4ddfc8268282b5c835` |
-| `.coord/w8-docx-variables/clippy-all-targets-failed.log` | 759 | `08c2b42f95a91680e62184308fd4770b6a8c885d85185ae2b2cac89f5ff37ec5` |
-| `.coord/w8-docx-variables/cow-focused-v2.log` | 1,042 | `3249e71314292f9c1a1be5c50337a86e0ebb80d9039b6487e4082ccd81582e77` |
-| `.coord/w8-docx-variables/cow-clippy-v2.log` | 222 | `146dda73c8b4c0c0716465987e56c785509e16557712e15a4cb3c7d8cd3552fe` |
+| `(deleted-coord-artifact)/variables-tests-policy-final.log` | 1,949 | `5d59760add22d8f08833b31675f315c4dbc0650ad1e414ac05c0817622297a17` |
+| `(deleted-coord-artifact)/source-backed-policy-final.log` | 3,544 | `1530fe6a39af01563de08c54d2e2af34e442d0b98ee84e41abf95a6550d0344e` |
+| `(deleted-coord-artifact)/clippy-policy-final.log` | 170 | `94bc541edd44e5a8d1c7b24de1635ab4ee6176a54cdacd4ddfc8268282b5c835` |
+| `(deleted-coord-artifact)/clippy-all-targets-failed.log` | 759 | `08c2b42f95a91680e62184308fd4770b6a8c885d85185ae2b2cac89f5ff37ec5` |
+| `(deleted-coord-artifact)/cow-focused-v2.log` | 1,042 | `3249e71314292f9c1a1be5c50337a86e0ebb80d9039b6487e4082ccd81582e77` |
+| `(deleted-coord-artifact)/cow-clippy-v2.log` | 222 | `146dda73c8b4c0c0716465987e56c785509e16557712e15a4cb3c7d8cd3552fe` |
 
 The external receipts are intentionally outside the repository. No benchmark
 or native performance claim is made here; the batching behavior is covered by

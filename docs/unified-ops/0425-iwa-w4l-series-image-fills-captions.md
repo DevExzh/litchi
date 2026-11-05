@@ -54,7 +54,7 @@ fill parity cases (210) still pass.
 Probe `chart_property_cost.rs` (`W4C_ROUTE`, release, CPU 3, ABBA,
 inclusive Ir of `w4c_host_route`/`w4c_leaf_route`; series 1 gets a tiled
 image). Receipt `results/0425/callgrind-series-image-fills.json`; raw
-captures in `.coord/iwa-w4l/cg1/` (outside the repository). The bench
+captures in `(deleted-coord-artifact)` (outside the repository). The bench
 matrix lists 0425 under `evidence_without_rows` (leaf-versus-host
 evidence).
 
@@ -62,7 +62,7 @@ evidence).
 
 Branch with trunk `a077aeeb43` (W4-J 0423) merged at `0049a606e5`
 (mac-queue conflict resolved by keeping both sides, bench matrix
-regenerated); logs `.coord/iwa-w4l/gates1`. Every command of the 0414 §8
+regenerated); logs `(deleted-coord-artifact)`. Every command of the 0414 §8
 list exits 0: fmt; the seven Python gates (boundaries, non-iWork, ledger,
 OfficeCLI delta and corpus, bench matrix, tool unit tests); clippy
 -D warnings with all features, the leaf crates without features, and
@@ -118,13 +118,13 @@ admission, macOS-queued). Two macOS-queue rows.
 Probe `numbers_caption_route_cost_abba` (`W4L_ROUTE`, release, CPU 3,
 ABBA, inclusive Ir of `w4l_host_route`/`w4l_leaf_route`). Receipt
 `results/0425/callgrind-numbers-captions.json`; raw captures in
-`.coord/iwa-w4l/cg3/`.
+`(deleted-coord-artifact)`.
 
 ### 3.1 Slices 2–3 gates
 
 Trunk `bab7c866b4`-era head (W4-K pivot, W4-J structure::create) merged at
 `e6b0b42e2b` (mac-queue conflict resolved by keeping both sides, bench
-matrix regenerated); logs `.coord/iwa-w4l/gates2`. Every command of the
+matrix regenerated); logs `(deleted-coord-artifact)`. Every command of the
 0414 §8 list exits 0 except, in the first run, the leaf tests:
 `litchi-keynote`'s `known_caption_reference_theme_and_width_wire_variants_fail_closed`
 showed that the lifted wire readers were laxer than Keynote's (a

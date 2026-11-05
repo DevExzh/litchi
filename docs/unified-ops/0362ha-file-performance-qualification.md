@@ -101,7 +101,7 @@ rootcheck ran the equivalent route preflight against the coordinator's later
 `ddf2ac8ae2` source, where result fields were public; it passed for
 `docx/set_publication`, `xlsx/import_publication`, `pptx/merge_publication`,
 `ods/batch_publication`, and `odp/open_get`. Those receipts are retained
-outside the checkout at `.coord/w8-file-correctness/` as superseded API-shape
+outside the checkout at `(deleted-coord-artifact)` as superseded API-shape
 evidence only. They do not validate this `b1ae817dc4` candidate, and no W8
 performance qualification is claimed from them.
 

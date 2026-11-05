@@ -47,9 +47,9 @@ source commit `e06bc961fc88110d229a5312be95946f9b452015` with the 33-row
 plan and the approved isolated runner. The formatter row passed. The next
 `check-common` row failed before any later row could run:
 
-* receipt: `/home/zhuhe/code/litchi-worktrees/.coord/0362ul87b-f5-retry-e06bc961fc/result.json`
+* receipt: `(deleted-coord-artifact)/result.json`
   (SHA-256 `1b5c2fb2a8c763d9bd4d1070ed0c1e418fd42913e6d4a5d21e360c3622a83e85`);
-* failed compiler log: `/home/zhuhe/code/litchi-worktrees/.coord/0362ul87b-f5-retry-e06bc961fc/01-check-common-attempt-actual-f5-01.log`
+* failed compiler log: `(deleted-coord-artifact)/01-check-common-attempt-actual-f5-01.log`
   (SHA-256 `8c9c059f8bbbfdce72f9e4cd139362918c05aae46cb22918d18ab2642020ee04`);
 * row 1 exited `101` after 38.72 seconds, with a 158,643,465-byte target;
   the runner recorded no live-target or ownership violation.
@@ -69,9 +69,9 @@ The repairs were committed as `c429e4fdd7024042a4a3d79e5095764d8801a0c0`.
 The next serialized F5 run reached the common-crate integration tests and
 found one stale consumer assertion before any later row ran:
 
-* receipt: `/home/zhuhe/code/litchi-worktrees/.coord/0362ul87b-f5-c429e4fdd7/result.json`
+* receipt: `(deleted-coord-artifact)/result.json`
   (SHA-256 `4fd668a9e8afe2793b07fa11f222b8ceb5077a4c9111f0eae7b7cf17cb6b89b5`);
-* failed compiler log: `/home/zhuhe/code/litchi-worktrees/.coord/0362ul87b-f5-c429e4fdd7/01-check-common-attempt-actual-f5-01.log`
+* failed compiler log: `(deleted-coord-artifact)/01-check-common-attempt-actual-f5-01.log`
   (SHA-256 `f597bc14dbeb308e52dbef1a9e486c8f16a1b321de392a2f6b6586d377e6df91`);
 * row 1 exited `101` after 35.27 seconds with a 162,579,023-byte target;
   the exact error was the integration test's private `Panes::panes` field
@@ -86,11 +86,11 @@ The fresh retry at source commit `85a4b3e618adb75611ee8f6004b66cf660bf2414`
 was granted the serialized validation slot and stopped at the first compiler
 failure. Its prior zero-row isolation refusal remains untouched:
 
-* retry receipt: `/home/zhuhe/code/litchi-worktrees/.coord/0362ul87b-f5-retry-85a4b3e618/result.json`
+* retry receipt: `(deleted-coord-artifact)/result.json`
   (SHA-256 `7802d2e8951664dc91bbf5271a3346b328cb15a09b961499f2fe5d31a92180dc`);
-* rows: `/home/zhuhe/code/litchi-worktrees/.coord/0362ul87b-f5-retry-85a4b3e618/rows.json`
+* rows: `(deleted-coord-artifact)/rows.json`
   (SHA-256 `2e8d7ceb06a2c199c30959fe0b7b86f2c31e03934d81a82697e0c561b824d5a0`);
-* failed compiler log: `/home/zhuhe/code/litchi-worktrees/.coord/0362ul87b-f5-retry-85a4b3e618/02-check-leaves-attempt-actual-f5-02.log`
+* failed compiler log: `(deleted-coord-artifact)/02-check-leaves-attempt-actual-f5-02.log`
   (SHA-256 `c4661133fae0e50573eb1a84832ba67555aa129a128c3733b96d6d2ab2d47d83`);
 * `fmt-scoped` and `check-common` passed; row 2 `check-leaves` exited `101`
   after 55.17 seconds with a 285,736,553-byte target. No later row ran.
@@ -108,11 +108,11 @@ The repaired source `fe767f2285ea2c5a328ac76ef45af4dd8673ee12` was then
 validated in the sole serialized slot and stopped at the first remaining
 compiler diagnostic. The fe767 capture is preserved outside the checkout:
 
-* receipt: `/home/zhuhe/code/litchi-worktrees/.coord/0362ul87b-f5-retry-fe767f2285/result.json`
+* receipt: `(deleted-coord-artifact)/result.json`
   (SHA-256 `4480421547f3afa44fa251fc662d4b8534a7322d6c2d212576a56950423ec036`);
-* rows: `/home/zhuhe/code/litchi-worktrees/.coord/0362ul87b-f5-retry-fe767f2285/rows.json`
+* rows: `(deleted-coord-artifact)/rows.json`
   (SHA-256 `d4048e4290868f3bc8a35e3c933f6ca7241c1e5d03cf23e2d209f8bad92ffeea`);
-* failed compiler log: `/home/zhuhe/code/litchi-worktrees/.coord/0362ul87b-f5-retry-fe767f2285/02-check-leaves-attempt-actual-f5-02.log`
+* failed compiler log: `(deleted-coord-artifact)/02-check-leaves-attempt-actual-f5-02.log`
   (SHA-256 `1abe0a9524a9e77b60fd72c632f802091700aa381235bb9c94ccff6ee3b1cfd0`);
 * `fmt-scoped` and `check-common` passed; row 2 `check-leaves` exited `101`
   after 63.64 seconds with a 306,737,160-byte target. No later row ran.
@@ -132,11 +132,11 @@ The beac39a4c5 source freeze passed the formatter, common check, all four
 format-leaf checks, and the two facade checks. It stopped at the first Clippy
 failure in the shared common crate:
 
-* receipt: `/home/zhuhe/code/litchi-worktrees/.coord/0362ul87b-f5-retry-beac39a4c5/result.json`
+* receipt: `(deleted-coord-artifact)/result.json`
   (SHA-256 `8319cf286c414d1b54cb86315f3ecadb934af39cb5c97697e2d7e6272c0946d2`);
-* rows: `/home/zhuhe/code/litchi-worktrees/.coord/0362ul87b-f5-retry-beac39a4c5/rows.json`
+* rows: `(deleted-coord-artifact)/rows.json`
   (SHA-256 `8d00faafde7f03d7a743d280e11df8f6540690088d0d2eae17dbb3e0b88ad14e`);
-* first failed log: `/home/zhuhe/code/litchi-worktrees/.coord/0362ul87b-f5-retry-beac39a4c5/05-clippy-common-attempt-actual-f5-05.log`
+* first failed log: `(deleted-coord-artifact)/05-clippy-common-attempt-actual-f5-05.log`
   (SHA-256 `d3af669c2338084ea3f52caf8417cbdc0e8d9b5e7453a3529ca4b33b1f836c5c`);
 * rows 0 through 4 passed; row 5 `clippy-common` exited `101` after
   16.41 seconds with a 617,685,040-byte target. No later row ran and no
@@ -154,15 +154,15 @@ repair commit and a fresh empty target.
 The c877dee369 retry passed rows 0 through 8 and stopped at the first
 glossary row. Its evidence is preserved outside the checkout:
 
-* receipt: `/home/zhuhe/code/litchi-worktrees/.coord/0362ul87b-f5-retry-c877dee369/result.json`
+* receipt: `(deleted-coord-artifact)/result.json`
   (SHA-256 `8c1edf088c78367e3629c8e593730c2e73de5abd17db2c4de30a11babe2cf664`);
-* rows: `/home/zhuhe/code/litchi-worktrees/.coord/0362ul87b-f5-retry-c877dee369/rows.json`
+* rows: `(deleted-coord-artifact)/rows.json`
   (SHA-256 `00d3ff25df5f2bacae720d4a468498dacf65d41231879915fbc8a4387d2257ec`);
-* failed glossary log: `/home/zhuhe/code/litchi-worktrees/.coord/0362ul87b-f5-retry-c877dee369/09-glossary-ooxml-common-minimal-attempt-actual-f5-09.log`
+* failed glossary log: `(deleted-coord-artifact)/09-glossary-ooxml-common-minimal-attempt-actual-f5-09.log`
   (SHA-256 `fbf5a0137db3ffa210a560d040780c744ba45e0e64b6e8ff1ae011999ad896d9`);
 * row 9 exited `1` after 16.169 seconds with a 929,942,531-byte target;
   no later row ran. The frozen rustdoc input was
-  `/home/zhuhe/code/litchi-worktrees/.coord/targets/0362ul87b-f5-retry-c877dee369/target/doc/litchi_ooxml_common.json`
+  `(deleted-coord-artifact)/litchi_ooxml_common.json`
   (SHA-256 `13b3c16a395fcda07d67d0c132a7b760337fefdba2ca174640c563c85e1bd4ff`).
 
 The six findings had two checker causes and one real API migration:

@@ -23,12 +23,12 @@ The row exited 1 with no target growth, an empty post-exit trace, a clean
 source handoff, and no owned processes remaining. The retained artifacts are:
 
 ~~~text
-state:   .coord/tooling-row-319690ffc6-20261025T-state/state.json
-wrapper: .coord/tooling-row-319690ffc6-20261025T-wrapper.log
+state:   (deleted-coord-artifact)/state.json
+wrapper: (deleted-coord-artifact)/tooling-row-319690ffc6-20261025T-wrapper.log
 wrapper bytes/SHA-256: 3999 / d69f9b504d5eeaba2b86c77ed737fcb96ea5ee95be1cdb2e240af872cd6c9fb6
-child:   .coord/tooling-row-319690ffc6-20261025T-state/48-tooling-unit-attempt-1792890578893939273-1202833.log
+child:   (deleted-coord-artifact)/48-tooling-unit-attempt-1792890578893939273-1202833.log
 child bytes/SHA-256: 636346 / 1f52db64e95036ff40de1ef51bc5793fd5b085f0b9a8c86991f2b79323d1bf59
-source freeze: .coord/tooling-row-319690ffc6-20261025T-source-freeze.txt
+source freeze: (deleted-coord-artifact)/tooling-row-319690ffc6-20261025T-source-freeze.txt
 candidate lib.rs SHA-256: ff0ca3a924852cfc5d8497f812fbf412c4eb71b5f289f1c3b3136dea92c7ed9f
 ~~~
 

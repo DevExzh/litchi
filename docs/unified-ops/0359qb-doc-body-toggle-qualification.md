@@ -39,7 +39,7 @@ The protected external binaries were 13,346,048 bytes before
 single stable runner path and argv0 was swapped between legs:
 
 ```text
-/home/zhuhe/code/litchi-worktrees/.coord/doc-toggle/tmp/runner/legacy_w5_source_probe
+(deleted-coord-artifact)
 ```
 
 Every selected route call asserted its output against the expected bytes. Both
@@ -106,7 +106,7 @@ receipt has the same output SHA above. These are diagnostic observations, not
 an isolated native qualification.
 
 The eight JSON receipts and their matching logs remain outside the repository
-under `/home/zhuhe/code/litchi-worktrees/.coord/doc-toggle/` as
+under `(deleted-coord-artifact)` as
 `native-abba-a1-*` and `native-abba-a2-*`. The machine-readable summary is
 `docs/unified-ops/results/0359qb/qualification.json`.
 

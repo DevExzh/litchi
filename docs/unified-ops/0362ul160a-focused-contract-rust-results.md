@@ -15,7 +15,7 @@ service exits successfully, with no owned builders remaining. The target
 ends at 385,684,596 bytes, below its 20 GB ceiling.
 
 Evidence is external in
-`/home/zhuhe/code/litchi-worktrees/.coord/contract-rust-157b-20261025/`:
+`(deleted-coord-artifact)`:
 
 | Artifact | Bytes | SHA-256 |
 | --- | ---: | --- |

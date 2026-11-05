@@ -39,7 +39,7 @@ required. Only memo 22 is deferred, and nothing is pushed.
 
 ## Evidence
 
-Paths are relative to `/home/zhuhe/code/litchi-worktrees/.coord/`.
+Paths are relative to `(deleted-coord-artifact)`.
 
 | Artifact | Bytes | SHA-256 |
 | --- | ---: | --- |

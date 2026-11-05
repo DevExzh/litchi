@@ -45,7 +45,7 @@ remove those imports and qualify only the fifteen new uses. The doc-only child
 df57 corrects the command scope to all-feature DOCX/PPTX/XLSX/XLSB Clippy.
 Root verifies repository formatting before composing this chain.
 
-External packet `.coord/ooxml-combined-0362ul94-f5-final-f167986c` retains
+External packet `(deleted-coord-artifact)` retains
 `rows.json` (12,754 bytes, SHA-256
 `be82d095ad6681cd7c5d26bf938cbf48f6bbda989813ba43aa04eb42e9b12108`) and
 `result.json` (13,874 bytes, SHA-256
@@ -81,7 +81,7 @@ It is compiler/consumer evidence for afede, not runtime or joint-tree acceptance
 | Standalone PPTX native-resave, all targets | 33.818 |
 
 The target ends at 957,738,123 bytes. External packet
-`.coord/pptx-combined-0362ul89-f5-consumer-afede08087` retains `rows.json`
+`(deleted-coord-artifact)` retains `rows.json`
 (56,504 bytes, SHA-256
 `56822bf4dee546421373d0ca86f426b688a15f111ec3159c78920574a0a319a1`)
 and `result.json` (59,509 bytes, SHA-256
@@ -115,7 +115,7 @@ lazy closure in application-property size accounting and exits 101 after
 36.788 seconds, with target size 272,704,264 bytes. Later rows do not run.
 Root verifies the complete terminal receipt before changing source.
 
-Packet `.coord/uo2-coordinator-replay-integration-f5-compiler-e2a833d7-v2`
+Packet `(deleted-coord-artifact)`
 retains `rows.json` (41,952 bytes, SHA-256
 `f9288d734552734f0a34218d5155ea8369b60b94a818c710a74b61c725ea836e`) and
 `result.json` (44,097 bytes, SHA-256
@@ -136,7 +136,7 @@ or glossary execution has occurred yet.
 
 Root verifies the latest baseline's eight harness blobs against e2a, unchanged
 763 production/config/vendor/fixtures and all three role locks. External proof
-`.coord/combined-source-0362ul101/baseline-c5d2b307-proof.json` is 1,344 bytes,
+`(deleted-coord-artifact)/baseline-c5d2b307-proof.json` is 1,344 bytes,
 SHA-256 `d636dd96edb07fb5a2c4fe2a835efa7cc78da1e415e303b3b5b0bbba0608db60`.
 101b changes no harness file. No benchmark measurement is claimed.
 

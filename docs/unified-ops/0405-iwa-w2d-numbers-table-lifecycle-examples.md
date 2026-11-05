@@ -41,25 +41,25 @@ Using offline mode, two build jobs, and no third-party inputs:
   existing vendor warnings only.
 - `cargo run --offline -p litchi-numbers --example add_numbers_table
   test-data/iwork/numbers/basic.numbers
-  /home/zhuhe/code/litchi-worktrees/.coord/w2d-table-run.HE7dvZ/add.numbers
+  (deleted-coord-artifact)/add.numbers
   0 Added 3 4` —
   exit 0; output 137341 bytes, SHA-256
   `42664156bda43e9c767db342e9a1aa2ee28508ac68ac60c4174c1e4355147dc5`.
 - `cargo run --offline -p litchi-numbers --example duplicate_numbers_table
   test-data/iwork/numbers/basic.numbers
-  /home/zhuhe/code/litchi-worktrees/.coord/w2d-table-run.HE7dvZ/duplicate.numbers
+  (deleted-coord-artifact)/duplicate.numbers
   0` —
   exit 0; copied 22×7 table with 2 materialized cells; output 137715 bytes,
   SHA-256 `e7b61483cd71bf5d77f744b6fdc95fbb94cb78941cd00e756a84ac22c0240f30`.
 - `cargo run --offline -p litchi-numbers --example resize_numbers_table
   test-data/iwork/numbers/basic.numbers
-  /home/zhuhe/code/litchi-worktrees/.coord/w2d-table-run.HE7dvZ/resize.numbers
+  (deleted-coord-artifact)/resize.numbers
   0 24 8` —
   exit 0; 22×7→24×8; output 136382 bytes, SHA-256
   `6f7a0e1233db74c04f7a365284f5f486fd1c2130047224b1c1fad1ee8d9ffd9b`.
 - `cargo run --offline -p litchi-numbers --example remove_numbers_table
   test-data/iwork/numbers/basic.numbers
-  /home/zhuhe/code/litchi-worktrees/.coord/w2d-table-run.HE7dvZ/remove.numbers
+  (deleted-coord-artifact)/remove.numbers
   0` —
   exit 0; 1→0 tables; output 126672 bytes, SHA-256
   `3a50da97186d533bf467770ae8d56cf147ce6687769bb69d1434b208aa543d16`.

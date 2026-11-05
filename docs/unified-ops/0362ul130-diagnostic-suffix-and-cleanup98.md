@@ -16,7 +16,7 @@ in chunk 31. Its later chunks, examples and doctests remain unrun. Sixteen
 outer suffix rows are prepared separately; their execution is not claimed
 by this record.
 
-External packet, relative to the worktree parent's `.coord/`:
+External packet, relative to the worktree parent's `(deleted-coord-artifact)`:
 `ooxml-pptx-joint-a8d32513b8-f5-runtime-remaining43-v2`.
 
 | Artifact | Bytes | SHA-256 |
@@ -57,7 +57,7 @@ nine build-free tests. The inherited commit-object, cleared-toolchain and
 immediate per-profile artifact archival checks remain intact.
 
 External adapter:
-`.coord/raw-census-f5-exec-v5-20261025/run_final_f5_v5.py`, SHA-256
+`(deleted-coord-artifact)/run_final_f5_v5.py`, SHA-256
 `0721536141117f300c51ba876f8af8b90159c624b7c187ac37a207b0de59def1`.
 Plan SHA-256:
 `8ec3fb78b9147155295e23c11a77040c346608e97d47dd6d1850897f65c30037`.
@@ -86,7 +86,7 @@ unchanged heads, manifest and protected probe. Inaccessible other-user
 system/container processes and the named services remain disclosed; no
 complete visibility or zero-descriptor proof is claimed.
 
-Evidence under `.coord/worktree-cleanup-2026-10-25/trunk-consolidation/`:
+Evidence under `(deleted-coord-artifact)`:
 
 | Artifact | SHA-256 |
 |---|---|

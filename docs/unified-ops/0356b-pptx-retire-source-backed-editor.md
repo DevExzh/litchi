@@ -79,7 +79,7 @@ reopened destination refused, chained copy collision, no-op commit).
 `litchi_pptx::builder::{Builder, ...}` are drafts by module, like the other
 formats' builders. With 0356a's core-`Commit` alias rule, the PPTX section
 is now just the header. `results/0351/inventory.tsv` is regenerated over the
-merged tree (`.coord/w2-pptx/scripts/inventory.sh`: rustdoc JSON of every
+merged tree (`(deleted-coord-artifact)`: rustdoc JSON of every
 crate, then the tool): 57 `mut_owner` rows leave, every one a `builder::`
 path — 10 PPTX, 44 DOCX and 3 PPT (the rule is not PPTX-specific); no
 other row changes.
@@ -131,7 +131,7 @@ route, `source::Edit::remove_slide`, is unchanged code.
 ## 5. Gates
 
 On the merged tree (`59922faa26` plus this record's changes), sequential,
-`.coord/w2-pptx/scripts/gates.sh`; every command exited 0.
+`(deleted-coord-artifact)`; every command exited 0.
 
 | Gate | Command | Exit |
 |---|---|---:|

@@ -12,7 +12,7 @@ The coordinator preserves every existing six raw and five owner operation row. T
 
 ## Plan identity
 
-[Immutable qualification plan](results/0362dvie/qualification-plan.json), 38,152 bytes, SHA-256 `e0cb370e0399c072de9fe4b141ceff682b87d7936bec5332cedc9a181fc13505`. External identical artifact: `/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/drawingml-additional-qualification-plan-20261024T150355Z.json`. It supersedes plan 662a9159; that plan and earlier captures remain unchanged. Future manifest/runner pins must refer to this tracked plan and its exact hash. The final candidate revision remains pending repairs and review.
+[Immutable qualification plan](results/0362dvie/qualification-plan.json), 38,152 bytes, SHA-256 `e0cb370e0399c072de9fe4b141ceff682b87d7936bec5332cedc9a181fc13505`. External identical artifact: `(deleted-coord-artifact)/drawingml-additional-qualification-plan-20261024T150355Z.json`. It supersedes plan 662a9159; that plan and earlier captures remain unchanged. Future manifest/runner pins must refer to this tracked plan and its exact hash. The final candidate revision remains pending repairs and review.
 
 Independent review confirms unchanged coverage, sample counts, duration thresholds and all four baseline fences. One stale sentence about paired fixture comparison was corrected before committing the plan: that comparison already runs before ABBA and remains mandatory. The first external draft (55bbf4ee) remains unchanged.
 

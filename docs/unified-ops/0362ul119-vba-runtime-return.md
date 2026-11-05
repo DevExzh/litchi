@@ -21,7 +21,7 @@ the remaining runtime groups will run as an explicitly partial diagnostic
 continuation on the same source while the repair is reviewed separately.
 
 The external packet is
-`.coord/ooxml-pptx-joint-a8d32513b8-f5-runtime` under the worktree parent.
+`(deleted-coord-artifact)` under the worktree parent.
 Root verifies the terminal result, source and three unchanged locks, log
 hashes, target accounting and post-exit process cleanup. The first group
 takes 61.584 seconds; its final target is 387,989,123 bytes.
@@ -45,7 +45,7 @@ payload is 1,293,606 bytes. Its manifest hash is
 the removal receipt hash is
 `497139b575d0cc7e5992cb861032f87279530750e37ca43f705527e784a5eca8`.
 Both are external under
-`.coord/worktree-cleanup-2026-10-25/trunk-consolidation/quarantine/wave95-first7/`.
+`(deleted-coord-artifact)`.
 The root verification receipt is `cleanup95-first7-root-verification.json`
 in `trunk-consolidation/`, SHA-256
 `27003e60fc5af2f4dc65e2c18c66a6e7859dab6e34f62194a8aa5425ff6206ca`.

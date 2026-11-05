@@ -11,7 +11,7 @@ This lane owns only the opened transaction helpers, PPTX open options and
 package model, and the source-backed presentation snapshot in the sparse
 worktree. The supplied all-features compiler attempt reported 113
 `dead-code` errors; its log is
-`.coord/pptx-combined-0362ul89-f5-actual-237d6801a6/01-pptx-all-features-check-attempt-actual-f5-01.log`
+`(deleted-coord-artifact)/01-pptx-all-features-check-attempt-actual-f5-01.log`
 with SHA-256
 `e3004cf8f79ec32a2dd2b082f4204dc1efe5a673dab7df97dcb63f9203aa06ea`.
 

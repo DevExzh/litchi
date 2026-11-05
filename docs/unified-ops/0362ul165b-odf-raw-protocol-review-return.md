@@ -43,7 +43,7 @@ may continue while the existing full65 run owns the build slot; Rust builds
 and actual native qualification remain pending.
 
 The external review is
-`.coord/odf-raw-native-final-48d68-independent-review-return-20261026.json`,
+`(deleted-coord-artifact)/odf-raw-native-final-48d68-independent-review-return-20261026.json`,
 12,428 bytes, SHA-256
 `f0added9c5380415486344803e089c1f0c7e8ca39a55b06444c956320ebc50ce`.
 It records exact file locations, scope, checks and required repairs.

@@ -13,7 +13,7 @@ The candidate source is the clean final-source checkout, not the historical
 c0 checkout:
 
 ~~~text
-source: /home/zhuhe/code/litchi-worktrees/.coord/final-api-capture-472b670547/source
+source: (deleted-coord-artifact)
 HEAD:   472b6705475b073e7fe08f6e11ee17fb1e29f838
 tree:   ebc1cee05f124c0c63977aff07a23288c19e7d00
 probe:  crates/litchi-ppt/examples/scoped_patch_probe.rs
@@ -25,7 +25,7 @@ fixture bytes/SHA-256: 43520 / f32f0614958a177a5195cd7537cdfd2efef52c57de4decc13
 ~~~
 
 The accepted build setup is the pinned gate-local Cargo wrapper, not the old
-`.coord/w8-file/env.sh` environment file. The reviewed target/process
+`(deleted-coord-artifact)` environment file. The reviewed target/process
 supervisor is the tracked `0362ul29` `run_safe_gate.py`; its selected PPT step
 must bind these wrapper paths and hashes. The shell must not replace them
 through an inherited `PATH`:
@@ -33,13 +33,13 @@ through an inherited `PATH`:
 ~~~text
 wrapper: docs/unified-ops/results/0362ul29/tooling/bin/cargo
 wrapper SHA-256: 495e24c6f60b238378386d86ac4158cba904992ce8870a9494f2c4a0eedd256d
-inner memory-capped shim: /home/zhuhe/code/litchi-worktrees/.coord/bin/cargo
+inner memory-capped shim: (deleted-coord-artifact)
 inner shim SHA-256: 1b22a69fd625d57565041bf6c634d8ebd1a82be8b3d0006390472c86324230d8
 target/process supervisor: docs/unified-ops/results/0362ul29/tooling/run_safe_gate.py
 supervisor SHA-256: b8603b469af213b097fcf1111ce57dbe2c8e6e3de19a9bbe01514f53eb6e663a
-reference compile command: /home/zhuhe/code/litchi-worktrees/.coord/rtf-fuzz-39a417-20261024/compile-command.txt
+reference compile command: (deleted-coord-artifact)/compile-command.txt
 reference compile command SHA-256: 81ab917ba0447718932a08dcb5e0ef1062fc0bda41d2aa4df48a5127019807b1
-reference compile receipt: /home/zhuhe/code/litchi-worktrees/.coord/rtf-fuzz-39a417-20261024/receipt.json
+reference compile receipt: (deleted-coord-artifact)/receipt.json
 reference compile receipt SHA-256: ef1fc17ff1e95bab311bacc130e06dfeb292fcf86090a3d61c5071bc6b4c4f3a
 ~~~
 
@@ -101,10 +101,10 @@ pass their own fresh-build precondition. It writes only the fresh receipt:
 
 ~~~sh
 set -eu
-SOURCE=/home/zhuhe/code/litchi-worktrees/.coord/final-api-capture-472b670547/source
-ROOT=/home/zhuhe/code/litchi-worktrees/.coord/ppt-final-source-3431ba566c
+SOURCE=(deleted-coord-artifact)
+ROOT=(deleted-coord-artifact)
 LOCK_RECEIPT="$ROOT/lock-policy"
-REFERENCE_LOCK=/home/zhuhe/code/litchi-worktrees/.coord/ppt-final-admission-20261021/Cargo.lock
+REFERENCE_LOCK=(deleted-coord-artifact)
 CANDIDATE_LOCK="$SOURCE/Cargo.lock"
 test ! -e "$LOCK_RECEIPT"
 mkdir -p "$LOCK_RECEIPT"
@@ -194,7 +194,7 @@ final-source hashes filled by the rebind receipt) is:
 
 ~~~sh
 set -eu
-SOURCE=/home/zhuhe/code/litchi-worktrees/.coord/final-api-capture-472b670547/source
+SOURCE=(deleted-coord-artifact)
 SUPERVISOR="$SOURCE/docs/unified-ops/results/0362ul29/tooling/run_safe_gate.py"
 RUN_ROOT=/external/ppt-final-source-472b670547
 STATE="$RUN_ROOT/ppt-state"
@@ -248,7 +248,7 @@ serialization is added to the historical timed loop:
 
 ~~~sh
 set -eu
-SOURCE=/home/zhuhe/code/litchi-worktrees/.coord/final-api-capture-472b670547/source
+SOURCE=(deleted-coord-artifact)
 RUN_ROOT=/external/ppt-final-source-472b670547
 TARGET="$RUN_ROOT/target"
 FIXTURE="$SOURCE/test-data/unified-ops/0294/video.ppt"
@@ -285,15 +285,15 @@ fresh and pairwise separate.
 
 ~~~sh
 set -eu
-ROOT=/home/zhuhe/code/litchi-worktrees/.coord/ppt-final-source-3431ba566c
-SOURCE=/home/zhuhe/code/litchi-worktrees/.coord/final-api-capture-472b670547/source
+ROOT=(deleted-coord-artifact)
+SOURCE=(deleted-coord-artifact)
 BOUNDARY=/home/zhuhe/code/litchi-worktrees/uo2-docx-ink-final-handoff/tools/ink_safe_runner.py
 HOST_GUARD="$SOURCE/docs/unified-ops/results/0362g/ppt_host_process_guard.py"
 RUNNER="$SOURCE/docs/unified-ops/results/0362g/ppt_phase_abba.py"
 FIXTURE="$SOURCE/test-data/unified-ops/0294/video.ppt"
 AFTER="$ROOT/candidate-build/protected/scoped_patch_probe-472b670547"
-ORIGINAL=/home/zhuhe/code/litchi-worktrees/.coord/ppt-instrumented-baselines-20261021/original-e673d4addb-scoped_patch_probe
-SIP=/home/zhuhe/code/litchi-worktrees/.coord/ppt-sip-common-lock-20261021/sip-common-lock-scoped_patch_probe
+ORIGINAL=(deleted-coord-artifact)
+SIP=(deleted-coord-artifact)
 test "$(sha256sum "$BOUNDARY" | cut -d' ' -f1)" = 1bc982f4495a16c30ac4ca2779351aec1e420781a6d6cb7c2b1f33ccff88fede
 test "$(sha256sum "$HOST_GUARD" | cut -d' ' -f1)" = 08c73174304061beeaf778df763be3507befd8200db72a8617a5d8ddc42e12b8
 test "$(sha256sum "$RUNNER" | cut -d' ' -f1)" = daf58fc8f54ecc30b105f934499ecb313975ebcbfe7a6410356afe6ab699a75c
@@ -347,8 +347,8 @@ or latency evidence.
 
 ~~~sh
 set -eu
-ROOT=/home/zhuhe/code/litchi-worktrees/.coord/ppt-final-source-3431ba566c
-SOURCE=/home/zhuhe/code/litchi-worktrees/.coord/final-api-capture-472b670547/source
+ROOT=(deleted-coord-artifact)
+SOURCE=(deleted-coord-artifact)
 BOUNDARY=/home/zhuhe/code/litchi-worktrees/uo2-docx-ink-final-handoff/tools/ink_safe_runner.py
 HOST_GUARD="$SOURCE/docs/unified-ops/results/0362g/ppt_host_process_guard.py"
 BIN="$ROOT/candidate-build/protected/scoped_patch_probe-472b670547"

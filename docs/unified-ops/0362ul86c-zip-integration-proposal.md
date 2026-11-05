@@ -68,7 +68,7 @@ unchanged in meaning.
 ## Validation receipts
 
 The fresh guarded state is
-`/home/zhuhe/code/litchi-worktrees/.coord/0362ul86-f5-actual-e49a1062ec`.
+`(deleted-coord-artifact)`.
 All eight rows passed: scoped formatter check, ZIP all-target tests, ZIP
 strict clippy, ODF streaming test, OPC source-backed test, ops/facade ODF
 checks and the Soapberry glossary check. The run covered 632 ZIP, 14 ODF and
@@ -80,7 +80,7 @@ checks and the Soapberry glossary check. The run covered 632 ZIP, 14 ODF and
   SHA-256 `e61de4e9dc48a1a810b0c1ed05b17643a40e632fd2453f44581d0cc484da20f8`.
 
 The earlier source-format failure is preserved at
-`/home/zhuhe/code/litchi-worktrees/.coord/0362ul86-f5-actual-a84f576138`:
+`(deleted-coord-artifact)`:
 its first-row log SHA-256 is
 `6444246d15f665bdb857146323f77dc64fb61e7542e483b7c1f5cfa4ffe23b53`, with
 rows/result SHA-256 `f27bbaeecbc01aee2f05d46ebf56d457fe34169c478dacf8d9ab2e9241224513`

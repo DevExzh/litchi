@@ -44,16 +44,16 @@ construction as a parse operation. The signed-container validation guard in
 
 ## 3. Validation
 
-Commands ran with `/home/zhuhe/code/litchi-worktrees/.coord/doc-lazy-entry/env.sh`
+Commands ran with `(deleted-coord-artifact)/env.sh`
 (`--offline --locked`, one job, incremental/debug disabled, 20 GiB cap). Raw
 logs are kept outside the repository:
 
 | Check | Result | Raw log |
 |---|---|---|
-| `cargo test --offline --locked -p litchi-doc --tests` | library: 1,211 passed, 2 ignored; all integration targets passed | `.coord/doc-lazy-entry/litchi-doc-tests-final2.log` |
-| `cargo test --offline --locked -p litchi-doc --lib --features performance-diagnostics` | 1,222 passed, 2 ignored | `.coord/doc-lazy-entry/litchi-doc-tests-profiled.log` |
-| `cargo clippy --offline --locked -p litchi-doc --all-targets -- -D warnings` | passed for `litchi-doc` and its dependencies with the tracked workspace `clippy.toml` thresholds | `.coord/doc-lazy-entry/litchi-doc-clippy-final2.log` |
-| `cargo clippy --offline --locked -p litchi-doc --all-targets --features performance-diagnostics -- -D warnings` | passed for the profiled callback/lifetime path and dependencies | `.coord/doc-lazy-entry/litchi-doc-clippy-profiled.log` |
+| `cargo test --offline --locked -p litchi-doc --tests` | library: 1,211 passed, 2 ignored; all integration targets passed | `(deleted-coord-artifact)` |
+| `cargo test --offline --locked -p litchi-doc --lib --features performance-diagnostics` | 1,222 passed, 2 ignored | `(deleted-coord-artifact)` |
+| `cargo clippy --offline --locked -p litchi-doc --all-targets -- -D warnings` | passed for `litchi-doc` and its dependencies with the tracked workspace `clippy.toml` thresholds | `(deleted-coord-artifact)` |
+| `cargo clippy --offline --locked -p litchi-doc --all-targets --features performance-diagnostics -- -D warnings` | passed for the profiled callback/lifetime path and dependencies | `(deleted-coord-artifact)` |
 | `rustfmt --edition 2024` on all changed Rust files; `git diff --check` | passed | terminal receipt |
 
 Both strict Clippy commands used the pinned Rust 1.95.0 toolchain from

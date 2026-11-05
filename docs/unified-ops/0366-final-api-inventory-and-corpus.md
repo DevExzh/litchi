@@ -21,9 +21,9 @@ blank disposition scaffold. It no longer passes `--locked`, because the root
 unit tests in `tools/test_final_api_inventory.py` were rewritten for this API.
 
 ```sh
-source /home/zhuhe/code/litchi-worktrees/.coord/fin-census/env.sh
+source (deleted-coord-artifact)
 python3 tools/final_api_inventory.py \
-  --output /home/zhuhe/code/litchi-worktrees/.coord/fin-census/api --expect-packages 68
+  --output (deleted-coord-artifact) --expect-packages 68
 ```
 
 Exit 0: 68 packages at source `7e72f3846e`. The 68 JSON files total

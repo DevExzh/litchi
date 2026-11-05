@@ -51,11 +51,11 @@ cargo fmt --all -- --check
 
 The eight test targets passed 104 tests. The complete test log is retained
 outside the checkout at
-`/home/zhuhe/code/litchi-worktrees/.coord/zip-gate-repair/zip-suite.log`
+`(deleted-coord-artifact)/zip-suite.log`
 (92,378 bytes, SHA-256
 `be06937340df7a6342ed0fc1a14d5b137ae5bfd09816d2afdb74c4f64016099d`). The
 Clippy log is at
-`/home/zhuhe/code/litchi-worktrees/.coord/zip-gate-repair/zip-clippy.log`
+`(deleted-coord-artifact)/zip-clippy.log`
 (223 bytes, SHA-256
 `0d3aecd8b1776627590b71af471c3891df2c07c1317c558330eb96256960ab7e`). The
 largest isolated target directory during validation was 271 MiB. No release,

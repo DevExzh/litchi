@@ -18,7 +18,7 @@ python3 tools/native_qualification_runner.py \
 Result: exit `2`; runner receipt status `failed`; `event_count=0`; no Cargo
 child, build artifact, or target directory was created. The receipt is
 external at
-`/home/zhuhe/code/litchi-worktrees/.coord/native-w4b-w5-final-472b/run-w4b-build/build-receipt.json`
+`(deleted-coord-artifact)/build-receipt.json`
 (17,167 bytes, SHA-256
 `a2ede68b1779aca12e3ffa634e690cc40d19bb3fc0420d43b38942aaa77dcc91`). The
 captured stderr is 12,135 bytes, SHA-256

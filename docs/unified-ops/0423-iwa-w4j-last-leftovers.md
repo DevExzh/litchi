@@ -68,7 +68,7 @@ callgrind_annotate --inclusive=yes callgrind.out.<pid> | grep -E 'cost_probes::(
 
 ## 4. Verification
 
-The gate script `.coord/iwa-w4j/gate.sh` (crates litchi-iwa-table,
+The gate script `(deleted-coord-artifact)` (crates litchi-iwa-table,
 litchi-numbers, litchi-keynote and litchi-iwa with parity; ops features
 `numbers` and `keynote`) runs on the merge of trunk; its result is in the
 hand-off.

@@ -137,7 +137,7 @@ CARGO_BUILD_JOBS=4 CARGO_TARGET_DIR=target/w1f \
   CARGO_PROFILE_RELEASE_DEBUG=1 \
   cargo test --release -p litchi-iwa --test parity --no-run
 taskset -c 3 valgrind --tool=callgrind \
-  '--callgrind-out-file=/home/zhuhe/code/litchi-worktrees/.coord/iwa-w1f/bench/cg.w1f.formula-author.basic.host.narrow' \
+  '--callgrind-out-file=(deleted-coord-artifact)' \
   '--toggle-collect=*numbers_formula_author_cases::host_route*' \
   target/w1f/release/deps/parity-bf69cf43b955a09c --ignored --exact \
   numbers_formula_author_cases::numbers_table_formula_author_cost_abba --test-threads=1
@@ -149,7 +149,7 @@ taskset -c 3 valgrind --tool=callgrind \
 ```
 
 The non-committed raw captures are outside the checkout at
-`/home/zhuhe/code/litchi-worktrees/.coord/iwa-w1f/bench/`:
+`(deleted-coord-artifact)`:
 
 | Artifact | Size | SHA-256 |
 |---|---:|---|

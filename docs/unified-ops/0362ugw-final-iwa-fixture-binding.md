@@ -35,7 +35,7 @@ python3 -m unittest discover -s docs/unified-ops/results/0361fda -p test_iwa_nat
 ```
 
 Result: 20 tests passed, 0 failed, 0 skipped. The external log is
-`/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/iwa-native-protocol-tests-2df-fixture-binding.log`,
+`(deleted-coord-artifact)/iwa-native-protocol-tests-2df-fixture-binding.log`,
 119 bytes, SHA-256
 `f2e68ff5eaca5112c86f24c4ad0c9d0d26001ccbe752852d8d57a9abf2564f99`.
 

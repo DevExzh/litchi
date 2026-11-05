@@ -17,7 +17,7 @@ full-worktree tree (061c4bc1134fe9599bde4e6f3e0d608538008950). The current
 final-source endpoint is the clean external checkout:
 
 ~~~
-/home/zhuhe/code/litchi-worktrees/.coord/final-api-capture-472b670547/source
+(deleted-coord-artifact)
 HEAD 472b6705475b073e7fe08f6e11ee17fb1e29f838
 tree ebc1cee05f124c0c63977aff07a23288c19e7d00
 ~~~
@@ -55,7 +55,7 @@ The workload remains the accepted scoped changed-commit/replay workload:
 The fixture is present and unchanged:
 
 ~~~
-/home/zhuhe/code/litchi-worktrees/.coord/ppt-replay-c0-source-20261021/test-data/unified-ops/0294/video.ppt
+(deleted-coord-artifact)/video.ppt
 bytes 43520
 sha256 f32f0614958a177a5195cd7537cdfd2efef52c57de4decc13cf65eadc66cdb8a
 ~~~
@@ -71,8 +71,8 @@ The protected reference binaries are retained, not rebuilt or modified:
 
 | reference | path | bytes | SHA-256 |
 | --- | --- | ---: | --- |
-| original | /home/zhuhe/code/litchi-worktrees/.coord/ppt-instrumented-baselines-20261021/original-e673d4addb-scoped_patch_probe | 1,716,976 | 9f23a1a9119cfb541361e7661c3384a1b2c63c59ae9d95f4842f4a9c1d5a5b28 |
-| matched SipHash | /home/zhuhe/code/litchi-worktrees/.coord/ppt-sip-common-lock-20261021/sip-common-lock-scoped_patch_probe | 1,770,160 | 61272a3cc329c27b8ad0dfa1c20934e4c95c6e7b0d57a0de8331bae868b01139 |
+| original | (deleted-coord-artifact)/original-e673d4addb-scoped_patch_probe | 1,716,976 | 9f23a1a9119cfb541361e7661c3384a1b2c63c59ae9d95f4842f4a9c1d5a5b28 |
+| matched SipHash | (deleted-coord-artifact)/sip-common-lock-scoped_patch_probe | 1,770,160 | 61272a3cc329c27b8ad0dfa1c20934e4c95c6e7b0d57a0de8331bae868b01139 |
 
 The reviewed runner is the tracked 0362g runner, not the older external copy
 under the e3aa harness directory:
@@ -116,8 +116,8 @@ receipts may be written.
 
 ~~~sh
 set -eu
-SOURCE=/home/zhuhe/code/litchi-worktrees/.coord/final-api-capture-472b670547/source
-ROOT=/home/zhuhe/code/litchi-worktrees/.coord/ppt-final-source-3431ba566c
+SOURCE=(deleted-coord-artifact)
+ROOT=(deleted-coord-artifact)
 TARGET="$ROOT/candidate-target"
 BUILD="$ROOT/candidate-build"
 TMP="$ROOT/candidate-tmp"
@@ -134,7 +134,7 @@ test "$(sha256sum "$FIXTURE" | cut -d' ' -f1)" = f32f0614958a177a5195cd7537cdfd2
 for path in "$TARGET" "$BUILD" "$TMP"; do test ! -e "$path"; done
 mkdir -p "$BUILD" "$TMP"
 
-source /home/zhuhe/code/litchi-worktrees/.coord/w8-file/env.sh
+source (deleted-coord-artifact)
 export CARGO_BUILD_JOBS=1 CARGO_INCREMENTAL=0 CARGO_TARGET_DIR="$TARGET" TMPDIR="$TMP"
 cargo build --offline --locked --release -p litchi-ppt --example scoped_patch_probe \
   >"$BUILD/build.log" 2>&1
@@ -147,10 +147,10 @@ by 0362j against this source and fresh target, with one capped Cargo job:
 
 ~~~sh
 set -eu
-SOURCE=/home/zhuhe/code/litchi-worktrees/.coord/final-api-capture-472b670547/source
-TARGET=/home/zhuhe/code/litchi-worktrees/.coord/ppt-final-source-3431ba566c/candidate-target
-TMP=/home/zhuhe/code/litchi-worktrees/.coord/ppt-final-source-3431ba566c/candidate-tmp
-source /home/zhuhe/code/litchi-worktrees/.coord/w8-file/env.sh
+SOURCE=(deleted-coord-artifact)
+TARGET=(deleted-coord-artifact)
+TMP=(deleted-coord-artifact)
+source (deleted-coord-artifact)
 export CARGO_BUILD_JOBS=1 CARGO_INCREMENTAL=0 CARGO_TARGET_DIR="$TARGET" TMPDIR="$TMP"
 cd "$SOURCE"
 cargo test --offline --locked -p litchi-ppt --all-features --lib scoped::tests -- --test-threads=2
@@ -169,8 +169,8 @@ inverse_verified == true:
 
 ~~~sh
 set -eu
-ROOT=/home/zhuhe/code/litchi-worktrees/.coord/ppt-final-source-3431ba566c
-SOURCE=/home/zhuhe/code/litchi-worktrees/.coord/final-api-capture-472b670547/source
+ROOT=(deleted-coord-artifact)
+SOURCE=(deleted-coord-artifact)
 BUILD="$ROOT/candidate-build"
 PROTECTED="$BUILD/protected/scoped_patch_probe-472b670547"
 FIXTURE="$SOURCE/test-data/unified-ops/0294/video.ppt"
@@ -188,13 +188,13 @@ twice. The existing protected references are inputs only. Never use the
 historical c0 binary as --after.
 
 ~~~sh
-ROOT=/home/zhuhe/code/litchi-worktrees/.coord/ppt-final-source-3431ba566c
-SOURCE=/home/zhuhe/code/litchi-worktrees/.coord/final-api-capture-472b670547/source
+ROOT=(deleted-coord-artifact)
+SOURCE=(deleted-coord-artifact)
 RUNNER="$SOURCE/docs/unified-ops/results/0362g/ppt_phase_abba.py"
 FIXTURE="$SOURCE/test-data/unified-ops/0294/video.ppt"
 AFTER="$ROOT/candidate-build/protected/scoped_patch_probe-472b670547"
-ORIGINAL=/home/zhuhe/code/litchi-worktrees/.coord/ppt-instrumented-baselines-20261021/original-e673d4addb-scoped_patch_probe
-SIP=/home/zhuhe/code/litchi-worktrees/.coord/ppt-sip-common-lock-20261021/sip-common-lock-scoped_patch_probe
+ORIGINAL=(deleted-coord-artifact)
+SIP=(deleted-coord-artifact)
 
 test ! -e "$ROOT/native-original"; test ! -e "$ROOT/native-sip"
 test "$(sha256sum "$RUNNER" | cut -d' ' -f1)" = daf58fc8f54ecc30b105f934499ecb313975ebcbfe7a6410356afe6ab699a75c
@@ -234,10 +234,10 @@ because it names the c0 source and output directory.
 The rebased candidate leg is:
 
 ~~~sh
-ROOT=/home/zhuhe/code/litchi-worktrees/.coord/ppt-final-source-3431ba566c
+ROOT=(deleted-coord-artifact)
 ALLOC="$ROOT/candidate-allocation"
 BIN="$ROOT/candidate-build/protected/scoped_patch_probe-472b670547"
-FIXTURE=/home/zhuhe/code/litchi-worktrees/.coord/final-api-capture-472b670547/source/test-data/unified-ops/0294/video.ppt
+FIXTURE=(deleted-coord-artifact)
 test ! -e "$ALLOC"
 mkdir -p "$ALLOC"
 heaptrack --record-only -o "$ALLOC/candidate" "$BIN" "$FIXTURE" 7400 3300 42600

@@ -126,7 +126,7 @@ shell commands. The matched-Sip comparison completed all five blocks in
 production source changed; they are not pooled with the final candidate.
 
 Regenerate the reduction with `python3
-docs/unified-ops/results/0362f/reduce.py --coord ../.coord --out OUT` using the
+docs/unified-ops/results/0362f/reduce.py --coord (deleted-coord-artifact) --out OUT` using the
 retained raw directories. The runner's complete invocations appear in each
 run's measurement record; replace its external path with the committed
 runner and choose a fresh output directory for a new attempt.

@@ -22,7 +22,7 @@ and assert the facade keeps it as `Source::Odf`.
 
 The v6 compiler receipt remains outside the checkout:
 
-* `/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/api-assembly-consumers-v6/compiler-errors.json`
+* `(deleted-coord-artifact)/compiler-errors.json`
 * 299,345 bytes, SHA-256
   `77134b691f7c50fe98d18255fad4bc228d74bdcc6249f3414c9778e629e978c2`
 

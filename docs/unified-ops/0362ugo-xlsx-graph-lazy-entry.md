@@ -36,7 +36,7 @@ snapshot to hide deferred errors.
 No Cargo command was run in this lane because the coordinator had no build
 slot during implementation.  Before integration, run the pinned offline,
 locked XLSX all-target/all-feature check and the focused graph-family tests
-under `.coord/xlsx-lazy-entry/env.sh`; record exact source and external log
+under `(deleted-coord-artifact)`; record exact source and external log
 receipts in the follow-up review.  `rustfmt` and `git diff --check` were run
 on the edited sources.  No binaries, large evidence files or `3rdparty/`
 references were added.

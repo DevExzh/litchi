@@ -36,7 +36,7 @@ registry double-charge was removed. No limit ceiling or headroom was raised.
   parity and contract vectors. Series-style failures are outside this slice.
 
 External command receipts are under
-`/home/zhuhe/code/litchi-worktrees/.coord/resume-20261028/font-gate-repair-1255/`:
+`(deleted-coord-artifact)`:
 
 - `parity-numbers-chart-font.log` — SHA-256
   `c05f03627d67316fe581b36cdaafa390680608dab5b417739bc29bf651e6c4ee`, exit
@@ -77,7 +77,7 @@ lock, fixture, probe and ELF hashes remained stable. The initial shell wrapper
 failed before any capture; its zero-leg failure receipt is preserved separately.
 
 External artifacts and regeneration commands are under
-`/home/zhuhe/code/litchi-worktrees/.coord/iwa-w2a-numbers-font-gate-d6717521fd/`.
+`(deleted-coord-artifact)`.
 The reduced owner receipt is `scoped-font-receipt-v1.md` (SHA-256
 `d39e5dd680a03ac0a46abafbd7cdb3cb29b6ff7149db37089ae874f0c5d77d91`);
 the independent receipt is `audit-v1/audit-v1.json` (SHA-256

@@ -50,7 +50,7 @@ The active runner was not touched. Its current and prepared identities are:
 | `bin/cargo` | 2,068 | `495e24c6f60b238378386d86ac4158cba904992ce8870a9494f2c4a0eedd256d` | 2,068 | `495e24c6f60b238378386d86ac4158cba904992ce8870a9494f2c4a0eedd256d` |
 
 The prepared external copy is
-`/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/gate-safe-next-20261024/`.
+`(deleted-coord-artifact)`.
 The tracked minimal patch is
 `docs/unified-ops/results/0362uva/safe-gate-tooling.patch`, 1,614 bytes,
 SHA-256
@@ -64,9 +64,9 @@ The exact command was:
 
 ```text
 python3 -B docs/unified-ops/results/0362uva/verify_safe_gate.py \
-  --runner /home/zhuhe/code/litchi-worktrees/.coord/replay-integration/gate-safe-next-20261024/run_safe_gate.py \
+  --runner (deleted-coord-artifact) \
   --root /home/zhuhe/code/litchi-worktrees/uo2-coordinator-metadata-integration \
-  --scratch /home/zhuhe/code/litchi-worktrees/.coord/replay-integration/gate-safe-next-20261024/verification-tooling
+  --scratch (deleted-coord-artifact)
 ```
 
 It passed with:
@@ -78,7 +78,7 @@ PASS: 53 steps, inventory tests, cap isolation, preserved child/failure receipts
 The verifier is 14,047 bytes with SHA-256
 `5c4583bdef66b4eda17f4fac5b3e56e98ab02223750150b9f9fef64daaa827c0`.
 The post-commit external log is
-`/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/gate-safe-next-20261024/verification-tooling-postcommit.log`,
+`(deleted-coord-artifact)/verification-tooling-postcommit.log`,
 81 bytes with SHA-256
 `ddeed317add455825af1593f549c74a979cb3715a4a17792b5911f770db06b11`.
 No Cargo command was run. The prepared copy is for coordinator adoption only

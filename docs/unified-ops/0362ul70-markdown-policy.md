@@ -93,7 +93,7 @@ and `tools/native-resave`
 `51c25d3d6f36e20b50f0b19e39b1aa9c7b49777154122ecc95d3acd05c041378`.
 
 State and concise receipts are preserved outside the repository at
-`/home/zhuhe/code/litchi-worktrees/.coord/markdown-0362ul70-f5-19767b4467-tests`
+`(deleted-coord-artifact)`
 (target reached 440,957,202 bytes). All seven steps passed: Markdown
 all-target tests and Clippy, `litchi-ops` Markdown lib tests/check/Clippy, and
 `litchi` Markdown check/Clippy. The seven receipt log SHA-256 values, in that
@@ -107,15 +107,15 @@ order, are:
 
 The earlier failed attempts remain preserved: the unrelated pre-existing
 workspace formatting failure is recorded at
-`/home/zhuhe/code/litchi-worktrees/.coord/markdown-0362ul70-f5-d504ee4572/00-fmt-attempt-markdown-f5-00.log`
+`(deleted-coord-artifact)/00-fmt-attempt-markdown-f5-00.log`
 (SHA-256
 `192f26c38d0ec2aaa45e37b1ddc8c81f6a89a15930f9a19ba8332af5f8a785ac`), the
 first compile failure at
-`/home/zhuhe/code/litchi-worktrees/.coord/markdown-0362ul70-f5-d504ee4572-tests`
+`(deleted-coord-artifact)`
 (log SHA
 `3c3853e0aab07f15fd2e77050b3456ddc9c3bb575911b1ea33fdce9a9ac8dbf0`), and
 the subsequent `double_must_use` Clippy failure at
-`/home/zhuhe/code/litchi-worktrees/.coord/markdown-0362ul70-f5-d504ee4572-tests3`
+`(deleted-coord-artifact)`
 (log SHA
 `d8649f6ff233c0431b2a1d65cb4920f2049f8d2f3d3bef4b71eaab26a56216a5`). No
 broad all-features operations suite, rustdoc, native benchmark, or final

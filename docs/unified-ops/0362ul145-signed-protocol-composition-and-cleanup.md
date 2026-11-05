@@ -7,7 +7,7 @@ Root merges independently reviewed signed-native 136e at
 integration, and the three role locks are unchanged. The combined focused
 current-native, signed-policy/consumer, DrawingML-v2 and no-3rdparty suite
 passes all 67 tests. The composition receipt is external at
-`.coord/signed-protocol-composition-0362ul145.json`, 2,552 bytes, SHA-256
+`(deleted-coord-artifact)/signed-protocol-composition-0362ul145.json`, 2,552 bytes, SHA-256
 `f511f33197d6092c6632bb49694c57a604322172b232618b0bd97b8335f55232`.
 
 The before endpoint uses verified f2 source and separately pinned harness
@@ -32,7 +32,7 @@ the absent path/ref/registration, locks and protected 15-byte probe. Unlike the
 105 worker preflight, this attempt uses a unique immutable output directory.
 
 Evidence is external under the parent worktree directory's
-`.coord/worktree-cleanup-2026-10-25/trunk-consolidation/quarantine/wave106-root-removal/`:
+`(deleted-coord-artifact)`:
 
 | File | Bytes | SHA-256 |
 |---|---:|---|

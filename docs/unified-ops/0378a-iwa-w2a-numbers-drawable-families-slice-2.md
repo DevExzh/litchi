@@ -141,7 +141,7 @@ callgrind_annotate --inclusive=yes callgrind.out.<pid> | grep w2a_
 ```
 
 The raw outputs (`s2_<route>.out`, 16 MB together) stay in the session
-scratch (`.coord/iwa-w2a/cg/`), not in the repository.
+scratch (`(deleted-coord-artifact)`), not in the repository.
 
 ## 6. Gaps and follow-ups
 

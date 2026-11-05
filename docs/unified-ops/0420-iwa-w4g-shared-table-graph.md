@@ -67,7 +67,7 @@ before and after the move.
 ## 4. Performance
 
 Callgrind on a release build with debug info, CPU 3, ABBA, two calls of
-each route; raw outputs in `.coord/iwa-w4g/cg/`.
+each route; raw outputs in `(deleted-coord-artifact)`.
 
 | Route | Probe | Host Ir | Leaf Ir | Δ |
 |---|---|---:|---:|---:|
@@ -84,7 +84,7 @@ callgrind_annotate --inclusive=yes callgrind.out.<pid> | grep -E 'probe_(host|le
 
 ## 5. Verification
 
-Full gate (`.coord/iwa-w4g/gate.sh`, log `gate-s1b.log`) on `11da80653b`, crates
+Full gate (`(deleted-coord-artifact)`, log `gate-s1b.log`) on `11da80653b`, crates
 litchi-numbers-wire, litchi-numbers, litchi-pages and litchi-iwa (parity included), ops
 features `numbers` and `pages`: 32 of 33 rows exit 0. Clippy (all and no-feature ops),
 the crate tests, the litchi-ops lib/doc/test groups, rustdoc, boundaries, non-iWork,
@@ -98,7 +98,7 @@ cases (23) exit 0. No litchi-ops dispatch arm changed, so the goldens were not r
 
 | Item | Rows | Next |
 |---|---:|---|
-| Keynote `add_slide_table` | 1 | The leaf `edit_slide_drawables().add_table` (record 0329) clones the deck's first slide table on Keynote's own drawable workspace; the host clones the deck's detached creation scaffold (a `TST.TableInfoArchive` with no parent, which builder decks carry), keeps the scaffold's frame, then sets the frame, flags 3 and angle 0 and sizes every row and column uniformly in the header buckets (`set_uniform_table_dimensions`). `keynote_slide_table_add_divergence_is_reported` pins that no deck admits both. Next: when a deck has exactly one detached scaffold, clone it instead of the first slide table, with the model's default sizes kept (`Shape::row_height`/`column_width` `None`), then run the frame and uniform-dimension staging of `litchi_iwa_table::topology::{stage_frame, stage_uniform_dimensions}` (record 0412g) on the clone; turn the divergence test into a Tier B parity case on a builder deck. A lift of Numbers' template clone and owner creation into `litchi_iwa_table::structure::create` (draft in `.coord/iwa-w4g/create.rs.draft`) serves it if Keynote moves the add onto the shared `Working` |
+| Keynote `add_slide_table` | 1 | The leaf `edit_slide_drawables().add_table` (record 0329) clones the deck's first slide table on Keynote's own drawable workspace; the host clones the deck's detached creation scaffold (a `TST.TableInfoArchive` with no parent, which builder decks carry), keeps the scaffold's frame, then sets the frame, flags 3 and angle 0 and sizes every row and column uniformly in the header buckets (`set_uniform_table_dimensions`). `keynote_slide_table_add_divergence_is_reported` pins that no deck admits both. Next: when a deck has exactly one detached scaffold, clone it instead of the first slide table, with the model's default sizes kept (`Shape::row_height`/`column_width` `None`), then run the frame and uniform-dimension staging of `litchi_iwa_table::topology::{stage_frame, stage_uniform_dimensions}` (record 0412g) on the clone; turn the divergence test into a Tier B parity case on a builder deck. A lift of Numbers' template clone and owner creation into `litchi_iwa_table::structure::create` (draft in `(deleted-coord-artifact)`) serves it if Keynote moves the add onto the shared `Working` |
 | Pages table insertion without a template | — | route `table::creation` on a scratch document through `builder_table::install` at the anchor, as the host's `bootstrap_first_table_graph` |
 | Pages chart duplicate and remove | 2 | not started; 0418 §6 has the plan (a chart variant on Pages `DrawableSelector` or `chart::lifecycle::Edit::{duplicate, remove}` mirroring Numbers `sheet_drawable_chart.rs`, with the attachment and U+FFFC handling of `body_media_lifecycle`) |
 | Numbers shape image fill | 1 | not started: `sheet_drawable_style` publishes through `numbers_style_graph::publish`, which carries no data-member insertion and no registry data transitions; it needs the Pages 0413b/0415 sequence (`stage_image`, `own_image`, `released_image`, `ReleasingFills`) on `litchi_iwa_table::structure::metadata::Transition::{data_additions, data_owner_additions, data_record_removals}` |

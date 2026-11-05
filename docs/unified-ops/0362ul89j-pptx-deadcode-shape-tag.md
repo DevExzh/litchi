@@ -6,7 +6,7 @@ runtime, performance, or qualification result is claimed.
 The repair is based on frozen source
 `237d6801a641b85b4477c432a26ac53e531987ed`. The actual all-features compiler
 diagnostic log is retained outside Git at
-`/home/zhuhe/code/litchi-worktrees/.coord/pptx-combined-0362ul89-f5-actual-237d6801a6/01-pptx-all-features-check-attempt-actual-f5-01.log`
+`(deleted-coord-artifact)/01-pptx-all-features-check-attempt-actual-f5-01.log`
 (49,586 bytes, SHA-256
 `e3004cf8f79ec32a2dd2b082f4204dc1efe5a673dab7df97dcb63f9203aa06ea`). Its
 diagnostics index is 16,760 bytes with SHA-256

@@ -12,7 +12,7 @@ The composed source under diagnosis is
 is external to the repository:
 
 ```text
-/home/zhuhe/code/litchi-worktrees/.coord/pptx-combined-0362ul89-f5-qualification-ae6f32d202/fullfeatures-tests/0000.log
+(deleted-coord-artifact)/0000.log
 size: 378736 bytes
 sha256: 4924bcd19683868b0cc259024ceefdb93f3ba4ef0d3ec7d8653fcf564639fb6a
 ```

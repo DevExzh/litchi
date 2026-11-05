@@ -6,8 +6,8 @@ endpoint at `472b6705475b073e7fe08f6e11ee17fb1e29f838` (tree
 worktree as cwd, the 1.95.0 toolchain, offline/locked Cargo, JOBS=1, debug=0,
 20G memory cap, the coordinator shim prefix, and fresh roots:
 
-- target: `/home/zhuhe/code/litchi-worktrees/.coord/sheet-preparation-691941/targets/xls-f3-candidate-472b-repair-v2-slot3`;
-- TMPDIR: `/home/zhuhe/code/litchi-worktrees/.coord/sheet-preparation-691941/tmp/xls-f3-candidate-472b-repair-v2-slot3`;
+- target: `(deleted-coord-artifact)`;
+- TMPDIR: `(deleted-coord-artifact)`;
 - PID/SID/PGID: `1518284/1518284/1518284`;
 - build log: `xls-f3-candidate-472b-repair-v2-slot3-build.log`, SHA-256
   `44964368d787e248306ab199720f4dfc75305cc9b2426198e4e0e355cfa7aab7`.
@@ -28,6 +28,6 @@ touched. Qualification/ABBA did not run.
 Full external receipt, including structured argv/env and the later driver argv
 bound to this slot-3 binary:
 
-`/home/zhuhe/code/litchi-worktrees/.coord/sheet-preparation-691941/sheet-native-build-receipt-472b-f3-candidate-v2-slot3.json`
+`(deleted-coord-artifact)/sheet-native-build-receipt-472b-f3-candidate-v2-slot3.json`
 
 SHA-256 `47abc06d0cd2463d1653d1afc4a923ee3323e2fd5b3243c431f9484ef38f8f33`.

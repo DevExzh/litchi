@@ -58,11 +58,11 @@ The root regeneration started by copying the approved lock, then ran:
 
 ```sh
 cp /home/zhuhe/.cache/litchi-api-contract/font-deps-21b845-baseline/old-4100-Cargo.lock Cargo.lock
-/home/zhuhe/code/litchi-worktrees/.coord/bin/cargo metadata --offline --format-version 1 \
+(deleted-coord-artifact) metadata --offline --format-version 1 \
   --manifest-path /home/zhuhe/code/litchi-worktrees/uo2-font-dependency-bridge/Cargo.toml \
   > /home/zhuhe/.cache/litchi-api-contract/font-deps-21b845-candidate-exclude/metadata-unlocked.json \
   2> /home/zhuhe/.cache/litchi-api-contract/font-deps-21b845-candidate-exclude/metadata-unlocked.stderr
-/home/zhuhe/code/litchi-worktrees/.coord/bin/cargo metadata --offline --locked --format-version 1 \
+(deleted-coord-artifact) metadata --offline --locked --format-version 1 \
   --manifest-path /home/zhuhe/code/litchi-worktrees/uo2-font-dependency-bridge/Cargo.toml \
   > /home/zhuhe/.cache/litchi-api-contract/font-deps-21b845-candidate-exclude/metadata-locked.json \
   2> /home/zhuhe/.cache/litchi-api-contract/font-deps-21b845-candidate-exclude/metadata-locked.stderr
@@ -140,7 +140,7 @@ Receipts are retained under
 The all-features metadata command was:
 
 ```sh
-/home/zhuhe/code/litchi-worktrees/.coord/bin/cargo metadata --offline --locked --all-features --format-version 1 \
+(deleted-coord-artifact) metadata --offline --locked --all-features --format-version 1 \
   --manifest-path /home/zhuhe/code/litchi-worktrees/uo2-font-dependency-bridge/tools/<consumer>/Cargo.toml
 ```
 

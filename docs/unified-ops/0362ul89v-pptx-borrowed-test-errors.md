@@ -8,7 +8,7 @@ limit match guards. This commit repairs every reported occurrence in eight
 source files, retaining all assertions and production behavior.
 
 Retained actual state:
-`/home/zhuhe/code/litchi-worktrees/.coord/pptx-combined-0362ul89-f5-actual-096422a20a`.
+`(deleted-coord-artifact)`.
 The command is
 `cargo check --keep-going --offline --locked -p litchi-pptx --all-targets --all-features`.
 It exits 101 after 73.362 seconds; target size is 226,067,450 bytes.

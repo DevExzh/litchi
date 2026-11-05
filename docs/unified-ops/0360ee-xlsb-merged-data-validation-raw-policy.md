@@ -15,14 +15,14 @@ The strict tests cover exact and one-under payload limits for fixed-width merged
 
 ## Validation
 
-Commands were run with `/home/zhuhe/code/litchi-worktrees/.coord/w4b-xlsb-raw-policy/env.sh` and `CARGO_BUILD_JOBS=1` where applicable:
+Commands were run with `(deleted-coord-artifact)` and `CARGO_BUILD_JOBS=1` where applicable:
 
 - `cargo fmt --all -- --check`: exit 0.
 - `cargo test -p litchi-xlsb --lib writer::data_validation::tests::raw_limits_bound_writer_strings_and_payloads --offline`: 1 passed.
 - `cargo test -p litchi-xlsb --tests --offline`: exit 0; 744 unit tests plus all integration targets passed.
 - `cargo clippy -p litchi-xlsb --all-targets --all-features --offline -- -D warnings`: exit 0.
 
-Full-test log (kept outside the checkout): `xlsb-merged-dval-final-tests.log`, 114149 bytes, SHA-256 `5b7a9fd751e0ece9e8bbdc90f430f383af24527743254e8fdaadacc2d1b820d6`. Clippy log: `xlsb-merged-dval-final-clippy.log`, 172 bytes, SHA-256 `4a944caea790f52354b9249877080f4d24a58dc35d2585701a07e032fe0f4677`. Both are under `/home/zhuhe/code/litchi-worktrees/.coord/w4b-xlsb-raw-policy/`; no evidence or binary is committed.
+Full-test log (kept outside the checkout): `xlsb-merged-dval-final-tests.log`, 114149 bytes, SHA-256 `5b7a9fd751e0ece9e8bbdc90f430f383af24527743254e8fdaadacc2d1b820d6`. Clippy log: `xlsb-merged-dval-final-clippy.log`, 172 bytes, SHA-256 `4a944caea790f52354b9249877080f4d24a58dc35d2585701a07e032fe0f4677`. Both are under `(deleted-coord-artifact)`; no evidence or binary is committed.
 
 ## Current raw-audit disposition
 

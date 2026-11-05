@@ -8,7 +8,7 @@ The benchmark now propagates the getter error before iteration. It preserves
 the selected slide parts, edit operations and measured boundary.
 
 The diagnostic log is outside the repository:
-`/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/composed-lazy-consumers-0d35a83a31/01-clippy-all-features-attempt-1792811253378323215-2180562.log`
+`(deleted-coord-artifact)/01-clippy-all-features-attempt-1792811253378323215-2180562.log`
 (505 bytes, SHA-256
 `dbf46af8711e49cfaab1f1a196435149256b99739975b031c21383964bc43371`).
 The gate monitor separately encountered a vanished-process `ESRCH` race and

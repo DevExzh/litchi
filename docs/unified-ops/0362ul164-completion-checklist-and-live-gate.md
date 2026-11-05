@@ -16,7 +16,7 @@ owned processes or builders. The service is still running; isolated workspace
 rustdoc and the remaining checks have no acceptance claim yet.
 
 The immutable row snapshot and verification are external under
-`.coord/final-gate-C2a-33a0a63d35-20261026/root-checkpoint-20261026T013414Z/`.
+`(deleted-coord-artifact)`.
 `verification.json` is 7,990 bytes, SHA-256
 `3ca5556f1eb9c1abfaa73284b0e07e5fdab115913fdd70cac7cf457d043493a8`.
 It binds the original plan and the exact row snapshot. This supplements
@@ -51,7 +51,7 @@ existing verified baseline roots. Its aggregate migration patch is applied
 alone, without also applying its component patches. The final protocol hash
 and archive identities remain unknown until those operations occur.
 
-External corrected audit artifacts, relative to `.coord/`:
+External corrected audit artifacts, relative to `(deleted-coord-artifact)`:
 
 | Artifact | SHA-256 |
 | --- | --- |
@@ -78,5 +78,5 @@ free-space claim. Required baseline paths and gate imports remain until their
 consumers finish.
 
 The per-ref decisions and exact registry snapshot are external at
-`.coord/branch-worktree-164-20261026/observation.json`: 17,195 bytes, SHA-256
+`(deleted-coord-artifact)/observation.json`: 17,195 bytes, SHA-256
 `c71b8898a1c4a198652898e5af81dd1912e3aea37c5ef56eaab218419902ebe7`.

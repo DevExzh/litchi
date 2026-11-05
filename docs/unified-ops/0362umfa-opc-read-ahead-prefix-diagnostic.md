@@ -8,8 +8,7 @@ The complete reduced receipt is external because the build logs and binaries
 must remain outside Git:
 
 ```text
-/home/zhuhe/code/litchi-worktrees/.coord/final-api-capture-472b670547/
-opc-read-ahead-final472b-prep/prefix-diagnostic-receipt-fixture-rerun.json
+(deleted-coord-artifact)/prefix-diagnostic-receipt-fixture-rerun.json
 bytes 8851
 sha256 1559c13d0a4cd05eef6b3defaab304a3ecfa55b4b504ce8b2d15d3ea20f2f6e3
 ```

@@ -60,7 +60,7 @@ approved environment: the build shim was first in `PATH`, `LITCHI_CAPPED` and
 `LITCHI_BLESS` were unset, `LITCHI_MEM_MAX=20G`,
 `CARGO_BUILD_JOBS=1`, `RUST_TEST_THREADS=1`, `CARGO_INCREMENTAL=0`, and the
 external target was
-`/home/zhuhe/code/litchi-worktrees/.coord/zip-explicit-limits-target`. The
+`(deleted-coord-artifact)`. The
 coordinator-pinned ignored `Cargo.lock` remained SHA-256
 `52ed0cacac15b5e440349bfc0f4aca266bcf50d59d4321624e596bb410783c6`.
 

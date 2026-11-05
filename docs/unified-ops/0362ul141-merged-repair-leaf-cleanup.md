@@ -26,7 +26,7 @@ bytes under all prior exclusions and evidence limitations; it is not an
 observed filesystem free-space change.
 
 Evidence is under the worktree parent's
-`.coord/worktree-cleanup-2026-10-25/trunk-consolidation/quarantine/wave103-root-removal/`:
+`(deleted-coord-artifact)`:
 
 | File | Bytes | SHA-256 |
 |---|---:|---|

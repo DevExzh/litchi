@@ -5,7 +5,7 @@ qualification source tests. It does not change owner adapters, the paired
 runner, or the allocator/RSS harness.
 
 The coordinator's immutable native qualification plan is
-`.coord/final-acceptance-2026-10-24/drawingml-additional-qualification-plan-20261024T150355Z.json`
+`(deleted-coord-artifact)`
 (the committed copy is `docs/unified-ops/results/0362dvie/qualification-plan.json`,
 SHA-256
 `e0cb370e0399c072de9fe4b141ceff682b87d7936bec5332cedc9a181fc13505`). It

@@ -34,8 +34,8 @@ commands used the environment and target below; they passed `--offline` but
 did not pass `--locked`:
 
 ```text
-source /home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/env.sh
-export CARGO_TARGET_DIR=/home/zhuhe/code/litchi-worktrees/.coord/drawingml-fragments-raw-target
+source (deleted-coord-artifact)
+export CARGO_TARGET_DIR=(deleted-coord-artifact)
 export CARGO_BUILD_JOBS=1 RUST_TEST_THREADS=1 CARGO_NET_OFFLINE=true
 cargo check --offline --all-targets -p litchi-drawingml -p litchi-spreadsheet-drawing -p litchi-pptx -p litchi-xlsb
 cargo test --offline -p litchi-drawingml --lib --test chart_formatcode2 --test chart_formatcode2_adversarial --test chart_formatcode2_xml_misc --test transform

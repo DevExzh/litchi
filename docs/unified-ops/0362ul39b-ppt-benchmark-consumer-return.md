@@ -13,7 +13,7 @@ pre-timer archive clone, post-open checks and receipt semantics are unchanged.
 Independent source review confirms these equivalences.
 
 The failed capture remains at
-`.coord/final-composed-9d8b8e5a-validation/f5-minimal-perf-validation/result.json`
+`(deleted-coord-artifact)/result.json`
 (48,179 bytes, SHA-256
 `93102e96b29e1137574bdfa011172dcd983212d888a9d6df50bacee6d864868b`).
 Both minimal/non-encryption PPT check and Clippy passed there; standalone
@@ -29,10 +29,10 @@ check and Clippy rows across its two attempts. The first attempt's sparse
 XLSX input failure remains preserved; the fully hydrated rerun passes that
 row. Receipt identities are:
 
-* `.coord/final-composed-200a3e5a-validation/f5-fixed-validation/result.json`,
+* `(deleted-coord-artifact)/result.json`,
   43,535 bytes, SHA-256
   `9dbc2a426fb1352d611a7ef75977e96c290f2839cbf9544c77f8d8864e600846`;
-* `.coord/final-composed-200a3e5a-validation/f5-fixed-rehydrated-validation-v2/result.json`,
+* `(deleted-coord-artifact)/result.json`,
   74,647 bytes, SHA-256
   `916f1ec91e71430d66f350a2bcaf9428c60d2c0c00d6ce5349eef54d5f67ced3`.
 

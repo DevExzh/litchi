@@ -45,7 +45,7 @@ With `CARGO_BUILD_JOBS=2`, `CARGO_INCREMENTAL=0`, and
   dependency warnings.
 - `python3 -m unittest tools.test_no_3rdparty_references`: pass.
 - Formula-owner diagnostic repro against frozen `9932c7d069`:
-  `/home/zhuhe/code/litchi-worktrees/.coord/w2d-formula-dup-repro-9932`;
+  `(deleted-coord-artifact)`;
   log SHA-256
   `1640144d7ff691b65c924ea54ee552255c83173bd412a5d9ef2a4d9387368c3b`;
   regenerate with `CARGO_BUILD_JOBS=2 CARGO_INCREMENTAL=0

@@ -70,7 +70,7 @@ allocator preflight matched all twelve routes exactly; recursive remained 256
 allocated bytes with 2,113,611 peak live bytes, and scan remained 704 with
 2,110,086 peak live bytes.  The protected release and allocator binaries and
 raw captures are retained outside the checkout under
-`/home/zhuhe/code/litchi-worktrees/.coord/odraw-policy-final-20261021/`; none
+`(deleted-coord-artifact)`; none
 are committed.  Candidate release SHA-256 is
 `b6a3496aaf8298dc2d9413429ad7fb0bdaf008015daa0a26ba3df3230d2e825c`, and
 candidate allocator SHA-256 is
@@ -87,5 +87,5 @@ additional migration or policy gap: every remaining `Limits::default()` in
 these paths is an explicit host-selected policy or test/fixture setup, while
 raw ODraw entry points continue to require a `Limits` argument. The target
 used for this rerun was
-`/home/zhuhe/code/litchi-worktrees/.coord/uo2-w8-odraw-limits-target` and was
+`(deleted-coord-artifact)` and was
 7.0 GB after completion; no generated artifact was added to the repository.

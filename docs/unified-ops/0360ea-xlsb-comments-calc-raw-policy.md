@@ -32,9 +32,9 @@ Validation on the final source:
   -D warnings` passed.
 
 The complete test log is retained outside the checkout at
-`.coord/w4b-xlsb-raw-policy/xlsb-tests-final.log` (113131 bytes, SHA-256
+`(deleted-coord-artifact)/xlsb-tests-final.log` (113131 bytes, SHA-256
 `e652ccebc54ce5cdd7ac84b865a9bf892fde881736efb5a030e9ea487fe4d6ce`). The
 Clippy log is retained outside the checkout at
-`.coord/w4b-xlsb-raw-policy/xlsb-clippy-final.log` (3925 bytes, SHA-256
+`(deleted-coord-artifact)/xlsb-clippy-final.log` (3925 bytes, SHA-256
 `bef1c1138397be5e5b497a77bc61854e4fc6860fd4b2d36b3a31c5ec19b033ea`). No
 native timing or binary evidence is claimed by this record.

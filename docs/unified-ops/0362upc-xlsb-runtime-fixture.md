@@ -60,8 +60,8 @@ The granted focused receipt was generated outside the checkout (so no large
 evidence is committed):
 
 ```text
-CARGO_TARGET_DIR=/home/zhuhe/code/litchi-worktrees/.coord/signed-xlsb-budget/target \
-TMPDIR=/home/zhuhe/code/litchi-worktrees/.coord/signed-xlsb-budget/tmp \
+CARGO_TARGET_DIR=(deleted-coord-artifact) \
+TMPDIR=(deleted-coord-artifact) \
 CARGO_BUILD_JOBS=1 RUST_TEST_THREADS=1 \
 cargo test --offline --locked -p litchi-xlsb --all-features --lib 'opc::tests::' \
   --message-format=json-render-diagnostics -- --test-threads=1
@@ -70,4 +70,4 @@ cargo test --offline --locked -p litchi-xlsb --all-features --lib 'opc::tests::'
 Result: 13 passed, 0 failed, 759 filtered out, finished in 0.12s. Receipt:
 `opc-focused-v19.log`, 159901 bytes,
 SHA-256 `de5143c536f00eea1eb3b8babb4053dadb6f2e501c3473a5c6b71d1e18523743`,
-stored under `/home/zhuhe/code/litchi-worktrees/.coord/signed-xlsb-budget/`.
+stored under `(deleted-coord-artifact)`.

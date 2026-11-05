@@ -54,14 +54,14 @@ legs. These counts show that the ordinary full commit-and-write route is
 The old single-leg Callgrind files remain outside the repository as:
 
 ```text
-/home/zhuhe/code/litchi-worktrees/.coord/doc-toggle/before-single.callgrind
+(deleted-coord-artifact)/before-single.callgrind
   485,720 B  sha256 f61deedfd92bf21abf3f3ece78440538558a169837a2670c945dcca48c4d453f
-/home/zhuhe/code/litchi-worktrees/.coord/doc-toggle/after-single.callgrind
+(deleted-coord-artifact)/after-single.callgrind
   469,665 B  sha256 3904a436bf05771dd03bb73b2dcea583bbbc3d10231d9db99043c33b94a67fb5
 ```
 
 The corresponding compact summary remains
-`/home/zhuhe/code/litchi-worktrees/.coord/doc-toggle/profile-summary.txt`
+`(deleted-coord-artifact)/profile-summary.txt`
 (1,064 B, sha256
 `5c66fa441092b06e6d8355c5a542eddc0ee3db3dcffbee148051092e4db9efd1`).
 
@@ -75,9 +75,9 @@ observation and cannot be separated into fixture and ordinary-route heap from
 these captures. The external files are:
 
 ```text
-/home/zhuhe/code/litchi-worktrees/.coord/doc-toggle/before-leaf_write.massif
+(deleted-coord-artifact)/before-leaf_write.massif
   812,109 B  sha256 8faa46ae90e493b49ed3cf891f2ef69db7d8a2ee0f5b45fa4bfe4de897326c6c
-/home/zhuhe/code/litchi-worktrees/.coord/doc-toggle/after-leaf_write.massif
+(deleted-coord-artifact)/after-leaf_write.massif
   299,874 B  sha256 8bf626c956ea00ce201e4ff4882d733f9029045b6107d7b89a7ec69bd3e0e9cb
 ```
 

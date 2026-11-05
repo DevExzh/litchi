@@ -11,7 +11,7 @@ Receipt keys, proofs, assertions, allocation observation and measured closures
 are unchanged. The correction does not relax the lint policy.
 
 The diagnostic log remains external:
-`/home/zhuhe/code/litchi-worktrees/.coord/budget-validation/composed-xlsx-consumers-3d129677ce/01-clippy-all-features-attempt-1792813427121951447-2920408.log`
+`(deleted-coord-artifact)/01-clippy-all-features-attempt-1792813427121951447-2920408.log`
 (750 bytes, SHA-256
 `5c1f66ad8ef52a63de075853d0eed937962da724e9ecf0a91a157dc74d4dda92`).
 The check exited 101; the runner verified clean source, no remaining owned
@@ -36,6 +36,6 @@ baseline, all routes, proof checks and measurement boundaries.
 Build-free validation: `python3 -m unittest tools.test_odf_shared_triad_runner
 tools.test_odf_shared_triad_paired_runner` passes 16 tests, with no failures
 or skips. The external log is
-`.coord/final-acceptance-2026-10-24/odf-manifest-binding-tests.log`
+`(deleted-coord-artifact)/odf-manifest-binding-tests.log`
 (115 bytes, SHA-256 `0c5b9385d3e288ccac90e88b3a2e57269f17a8cbc122007aafa74ce027262458`). No native
 qualification is inferred from these protocol tests.

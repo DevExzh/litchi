@@ -15,7 +15,7 @@ remains immutable at `f8cd398a770f7363f628be40edb3ce4219566c16`.
 The first v11 C packet contained a plan only. Root requests the missing
 capture binding, manifest and preflight, then independently exercises their
 actual inherited validation path. The complete new packet is external at
-`.coord/raw-census-f5-v11-Cf8cd398a-20261025-source-bound/`:
+`(deleted-coord-artifact)`:
 
 | Artifact | Bytes | SHA-256 |
 |---|---:|---|
@@ -60,7 +60,7 @@ The final65 service from 149 remains live. Its first four compiler checks
 have passed; there is no terminal gate result. A separate source-only job,
 `litchi-unified-cf8cd-tracked-archive.service`, creates the exact C Git-tree
 archive outside Git under
-`.coord/native-Cf8cd398a-source-archives-20261025/`. It has a 2G memory cap
+`(deleted-coord-artifact)`. It has a 2G memory cap
 and invokes no Cargo or native probe. Until terminal success and archive
 verification, its temporary tar is not accepted as a source pin.
 

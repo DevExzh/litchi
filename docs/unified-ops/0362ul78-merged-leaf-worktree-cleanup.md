@@ -21,7 +21,7 @@ cross-device restore rejects with `EXDEV` before payload mutation; the
 same-device retry verifies all files and parent-directory modes.
 
 The external receipt directory is
-`.coord/worktree-cleanup-2026-10-23/quarantine/wave60/`:
+`(deleted-coord-artifact)`:
 
 | Artifact | Bytes | SHA-256 |
 | --- | ---: | --- |

@@ -124,7 +124,7 @@ entry are `3056 -> 212` (3 times) and `401 -> 2003` (2 times, in a source-built 
 ### Field-by-field against the native chart caption
 
 No Numbers fixture holds a chart caption, but `keynote/chart-caption-native.key` does,
-saved by Keynote. Compared with P1141's graph (`.coord/iwa-w5/nat.txt`, `our.txt`):
+saved by Keynote. Compared with P1141's graph (`(deleted-coord-artifact)`, `our.txt`):
 
 | Part | Native Keynote | P1141 | Assessment |
 |---|---|---|---|
@@ -226,7 +226,7 @@ also be refused; a refusal there would not count against the route.
 Callgrind, release, CPU 3, inclusive Ir of the probe's route functions, two calls
 each (ABBA); binary SHA-256
 `12de80267be250745336c83a114d9fe12d1f4b3511a7788ac14eb2f170e83215`; captures in
-`.coord/iwa-w5/cg/`.
+`(deleted-coord-artifact)`.
 
 | Route | Host Ir | Leaf Ir | Leaf/host | 0427 leaf Ir |
 |---|---:|---:|---:|---:|
@@ -290,7 +290,7 @@ Follow-ups after the control run:
 
 ## 8. Gates
 
-Logs are in `.coord/iwa-w5/gates/` (before merging trunk) and `gates2/` (after merging
+Logs are in `(deleted-coord-artifact)` (before merging trunk) and `gates2/` (after merging
 `72ebb6e117`, record 0432). All exit 0.
 
 | Gate | Before merge | After merge |

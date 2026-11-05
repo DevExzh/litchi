@@ -22,7 +22,7 @@ allocation is **15,131,107,328 bytes**; net apparent size is 12,551,828,253
 bytes. These are filesystem measurements, not memory/performance results.
 
 Evidence remains outside Git at
-`/home/zhuhe/code/litchi-worktrees/.coord/worktree-cleanup-2026-10-23/quarantine/wave63/`:
+`(deleted-coord-artifact)`:
 
 | Artifact | Bytes | SHA-256 |
 | --- | ---: | --- |

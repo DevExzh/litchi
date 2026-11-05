@@ -471,7 +471,7 @@ The Numbers and Keynote results are within the established cost bar. The
 Pages value is reported as an engine/facade probe only, not as host-vs-leaf
 parity or a qualification of the whole `File` stack. Raw callgrind output and
 the profiling binary remain outside the repository under
-`.coord/iwa-w1g/cg/`; the Numbers/Keynote profiling binary SHA-256 is
+`(deleted-coord-artifact)`; the Numbers/Keynote profiling binary SHA-256 is
 `a13fceee820290d82e4f70a6fb0dd02f2a1a3164295874df55ca0fa711ffbbb5` and the
 Pages profiling binary SHA-256 is
 `31659bbaa0f9cdc44b427f3df59d4ad802ee7b0afbf7918807d51527a9786ebd`.
@@ -482,11 +482,11 @@ The external artifact manifest is:
 |---|---:|---|
 | `/home/zhuhe/code/litchi-worktrees/uo2-iwa-w1g/target/profiling/deps/parity-15e248d1d90252bd` | 472,404,512 bytes | `a13fceee820290d82e4f70a6fb0dd02f2a1a3164295874df55ca0fa711ffbbb5` |
 | `/home/zhuhe/code/litchi-worktrees/uo2-iwa-w1g/target/profiling/deps/native_hidden_axes-007c6be3300edad5` | 34,327,072 bytes | `31659bbaa0f9cdc44b427f3df59d4ad802ee7b0afbf7918807d51527a9786ebd` |
-| `/home/zhuhe/code/litchi-worktrees/.coord/iwa-w1g/cg/current-numbers-host.out` | 465,419 bytes | `9c906f4b5a77a91933f8b28f2ff182567c7cb4c97b15864b93c36d506cfc5224` |
-| `/home/zhuhe/code/litchi-worktrees/.coord/iwa-w1g/cg/current-numbers-leaf.out` | 618,093 bytes | `aa13f8db95fbb50eff795e25c021d8a4be68209a07da2fa15664181da05acd5a` |
-| `/home/zhuhe/code/litchi-worktrees/.coord/iwa-w1g/cg/current-keynote-host.out` | 687,987 bytes | `655bdb7a7f8f28dd649ba8d378eb614169d6396bdbd3053444c5f3c4d37b341e` |
-| `/home/zhuhe/code/litchi-worktrees/.coord/iwa-w1g/cg/current-keynote-leaf.out` | 705,093 bytes | `394ab2d4fcbfa7cdda94dd6ed16c6738fb882550ddab3de82d35706a5cde7ec3` |
-| `/home/zhuhe/code/litchi-worktrees/.coord/iwa-w1g/cg/current-pages.out` | 599,645 bytes | `5baad48d0c85f6a81311c03e82f5cbd551e8da588ada687807b8623b0c499d1c` |
+| `(deleted-coord-artifact)/current-numbers-host.out` | 465,419 bytes | `9c906f4b5a77a91933f8b28f2ff182567c7cb4c97b15864b93c36d506cfc5224` |
+| `(deleted-coord-artifact)/current-numbers-leaf.out` | 618,093 bytes | `aa13f8db95fbb50eff795e25c021d8a4be68209a07da2fa15664181da05acd5a` |
+| `(deleted-coord-artifact)/current-keynote-host.out` | 687,987 bytes | `655bdb7a7f8f28dd649ba8d378eb614169d6396bdbd3053444c5f3c4d37b341e` |
+| `(deleted-coord-artifact)/current-keynote-leaf.out` | 705,093 bytes | `394ab2d4fcbfa7cdda94dd6ed16c6738fb882550ddab3de82d35706a5cde7ec3` |
+| `(deleted-coord-artifact)/current-pages.out` | 599,645 bytes | `5baad48d0c85f6a81311c03e82f5cbd551e8da588ada687807b8623b0c499d1c` |
 
 The two binaries are in this worktree's untracked `target/`; the callgrind
 captures are in the external coordinator directory. None is repository
@@ -537,11 +537,11 @@ evidence threshold and remain outside the checkout:
 | `comments-cfc334e754/numbers-leaf.out` | 530,672 bytes | `626d1af2f31bb97201fa47e789db8a7c45bdcb790be95bd26e8bbb8dc26683ce` |
 
 The external paths above are relative to
-`/home/zhuhe/code/litchi-worktrees/.coord/iwa-w1g/cg/`. Regenerate the
+`(deleted-coord-artifact)`. Regenerate the
 binary with:
 
 ```sh
-PATH=/home/zhuhe/code/litchi-worktrees/.coord/bin:/home/zhuhe/.cargo/bin:/usr/bin:/bin \
+PATH=(deleted-coord-artifact):/home/zhuhe/.cargo/bin:/usr/bin:/bin \
 CARGO_TARGET_DIR=/home/zhuhe/code/litchi-worktrees/uo2-iwa-w1g/target \
 CARGO_INCREMENTAL=0 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_BUILD_JOBS=4 \
 cargo test --locked --profile profiling -p litchi-iwa \
@@ -552,7 +552,7 @@ Then run each route twice, changing `--toggle-collect` and the output path:
 
 ```sh
 taskset -c 3 valgrind --tool=callgrind --quiet --error-exitcode=1 \
-  --callgrind-out-file=/home/zhuhe/code/litchi-worktrees/.coord/iwa-w1g/cg/comments-cfc334e754/<route>.out \
+  --callgrind-out-file=(deleted-coord-artifact) \
   '--toggle-collect=*probe_host*' \
   /home/zhuhe/code/litchi-worktrees/uo2-iwa-w1g/target/profiling/deps/parity-a78c3cd1bd84cfcd \
   --ignored --exact <parity-test> --test-threads=1
@@ -574,7 +574,7 @@ release binary was built with `CARGO_INCREMENTAL=0`, release debug information
 disabled, and four build jobs:
 
 ```sh
-PATH=/home/zhuhe/code/litchi-worktrees/.coord/bin:/home/zhuhe/.cargo/bin:/usr/bin:/bin \
+PATH=(deleted-coord-artifact):/home/zhuhe/.cargo/bin:/usr/bin:/bin \
 CARGO_TARGET_DIR=/home/zhuhe/code/litchi-worktrees/uo2-iwa-w1g/target/profiling \
 CARGO_INCREMENTAL=0 CARGO_PROFILE_RELEASE_DEBUG=0 CARGO_BUILD_JOBS=4 \
 cargo test --locked --release -p litchi-iwa --test parity \
@@ -612,7 +612,7 @@ final integrated trunk candidate; this WP result does not qualify a later
 merge.
 
 The raw captures remain outside the repository under
-`/home/zhuhe/code/litchi-worktrees/.coord/iwa-w1g/cg/comments-read-create-clear/`:
+`(deleted-coord-artifact)`:
 
 | Artifact | Size | SHA-256 |
 |---|---:|---|
@@ -665,12 +665,12 @@ is recorded below.
 The final matrix ran on clean source commit
 `9d9666b7824bd6e10acbcb42af624c98077ebad2` using one release-derived parity
 binary. The binary is archived outside the repository at
-`/home/zhuhe/code/litchi-worktrees/.coord/iwa-w1g/bin/9d9666b7824bd6e10acbcb42af624c98077ebad2/parity-de33078d71de6252`,
+`(deleted-coord-artifact)`,
 size 41,247,376 bytes, SHA-256
 `e13587d38f53e96c13d8a471ac457f4c5141ec60790ad0cbf7931b3848ad2e8d`. The
 immutable capture manifest, 24 Callgrind files and 36 matching-test logs are
 under
-`/home/zhuhe/code/litchi-worktrees/.coord/iwa-w1g/cg/final-9d9666b7824bd6e10acbcb42af624c98077ebad2/RECEIPT.md`.
+`(deleted-coord-artifact)/RECEIPT.md`.
 Receipt SHA-256: `d0e7ffdc3b5309d3a751e906533e58b5db6299346a9abe9c45d7995505cfb057`
 (5,680 bytes).
 The 24 captures are exactly one `probe_host` and one `probe_leaf` capture for
@@ -724,7 +724,7 @@ documented profile defaults; it is not claimed as a debug-off measurement.
 
 Build env of the coordinator rules (`CARGO_BUILD_JOBS=6`,
 `RUST_TEST_THREADS=8`), sequential gate scripts outside the repository
-(`.coord/iwa-w1g/gates{1,2}.sh`). Both pre-commit size checks printed
+(`(deleted-coord-artifact)`). Both pre-commit size checks printed
 nothing for every commit.
 
 | Command | `35908bbc0a` | `73f6fa976a` |

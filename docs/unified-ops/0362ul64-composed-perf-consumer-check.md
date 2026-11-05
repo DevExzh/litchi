@@ -9,7 +9,7 @@ crypto retention repair, font dependency bridge and new PPTX raw returns;
 it does not validate those changes.
 
 The source is a new detached capture at
-`.coord/final-composed-perf-805c08/source`. Historical RTF sources remain
+`(deleted-coord-artifact)`. Historical RTF sources remain
 unchanged. All 1,962 tracked test-data files were hydrated before the check.
 The command, from `tools/perf-baseline`, was:
 
@@ -27,7 +27,7 @@ locks, source identity and clean source state. Compiler runtime is not a
 native timing measurement.
 
 The external receipt is
-`.coord/final-composed-perf-805c08/perf-baseline-explicit-check/receipt.json`
+`(deleted-coord-artifact)/receipt.json`
 (17,408 bytes), SHA-256
 `1c034d333f5db83c95e0e61251c7915116c25aa2a1d4ce57d911ca2f7b611a77`.
 The command log is `00-perf-baseline-check-attempt-805-explicit.log`

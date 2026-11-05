@@ -40,7 +40,7 @@ required; no evidence or binary belongs in this checkout.
 The stable source endpoint used to prepare these commands is:
 
 ```text
-/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/full-gate-c796d0acc2/source
+(deleted-coord-artifact)
 HEAD: c796d0acc24c7c6e6fd08980b9e31af6bb86b18b
 Cargo.lock: 4100b1fbb272dd24842f33a2d6f353a3f3a97dfa7e435c4649a0e1a029bfaea1
 ```
@@ -49,15 +49,15 @@ Run from the full candidate worktree after this protocol/probe repair has
 been applied, with all generated directories outside the checkout:
 
 ```sh
-export PATH=/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/gate-safe-drawingml-20261024/bin:$PATH
+export PATH=(deleted-coord-artifact):$PATH
 export CARGO_BUILD_JOBS=1
 export RUST_TEST_THREADS=1
 export LITCHI_MEM_MAX=20G
-export LITCHI_IWA_WORKTREE=/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/full-gate-c796d0acc2/source
+export LITCHI_IWA_WORKTREE=(deleted-coord-artifact)
 export IWA_ROOT_LOCK=$LITCHI_IWA_WORKTREE/Cargo.lock
-export IWA_FIXTURES=/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/iwa-fixtures
-export IWA_CONSTRUCTOR=/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/iwa-constructor
-export IWA_OWNER=/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/iwa-owner
+export IWA_FIXTURES=(deleted-coord-artifact)
+export IWA_CONSTRUCTOR=(deleted-coord-artifact)
+export IWA_OWNER=(deleted-coord-artifact)
 
 python3 docs/unified-ops/results/0361fda/iwa_native_qualification.py \
   prepare-fixtures "$IWA_FIXTURES"

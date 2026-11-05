@@ -49,7 +49,7 @@ before any Cargo execution.
 
 ## Evidence
 
-Paths are relative to `/home/zhuhe/code/litchi-worktrees/.coord/`.
+Paths are relative to `(deleted-coord-artifact)`.
 
 | Artifact | SHA-256 |
 | --- | --- |

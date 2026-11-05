@@ -62,7 +62,7 @@ and the pre-squash record tip
 preserved locally for audit. The same approved runner, pinned toolchain,
 limits, and three lock hashes recorded in `0362ul70` were used with source commit
 `19767b446796cef6f0df49c48c54ff8bf8528c9e`. The isolated state is
-`/home/zhuhe/code/litchi-worktrees/.coord/markdown-0362ul70-f5-19767b4467-tests`;
+`(deleted-coord-artifact)`;
 all seven focused Markdown, `litchi-ops` Markdown, and `litchi` Markdown
 test/check/Clippy steps passed under `--offline --locked`, one job/thread,
 `debug=0`, `incremental=0`, and the 20 GB decimal target policy with a 19 GB

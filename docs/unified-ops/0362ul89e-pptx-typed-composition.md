@@ -57,7 +57,7 @@ output construction and lexical preservation unchanged.
 ## Actual early compiler result
 
 The earlier standalone typed branch has an actual two-row guarded capture at
-`.coord/0362ul84-f5-c6bd8c7ff9` in the worktrees parent directory. All 178 scoped
+`(deleted-coord-artifact)` in the worktrees parent directory. All 178 scoped
 formatter paths pass. The all-target/all-feature PPTX check fails with 79
 compiler errors, including missing older-branch helpers, private laser fields,
 stale typed calls, moved owners and denied unused imports. The coordinator

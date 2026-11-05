@@ -27,7 +27,7 @@ Net reclaimed allocation is **15,120,351,232 bytes**; net apparent size is
 memory or performance results.
 
 Evidence is outside Git under
-`/home/zhuhe/code/litchi-worktrees/.coord/worktree-cleanup-2026-10-23/quarantine/wave62/`:
+`(deleted-coord-artifact)`:
 
 | Artifact | Bytes | SHA-256 |
 | --- | ---: | --- |

@@ -15,7 +15,7 @@ unchanged source/locks, and empty post-exit build/process observations. The
 next row has a log but no completed receipt. There is no final result.
 
 This is an incomplete run; its termination cause is unknown. All original
-files remain at `.coord/final-gate-Cf8cd398a-20261025-v6-final/`. The root
+files remain at `(deleted-coord-artifact)`. The root
 observation is `root-interruption-observation.json`, 4,353 bytes, SHA-256
 `e71bab6657120dc238f43d0ad90c313721d9aebe73b35708533f6d94a89985b7`.
 The observation also lists a separate read-only `rg` process matching the
@@ -30,7 +30,7 @@ plan-hash dry-check passes. The entire gate starts again, without importing
 the partial attempt's rows, in the user service
 `litchi-unified-final65-cf8cd-v6-r2.service`.
 
-The new external packet is `.coord/final-gate-Cf8cd398a-20261025-v6-r2/`:
+The new external packet is `(deleted-coord-artifact)`:
 
 | Artifact | Bytes | SHA-256 |
 |---|---:|---|
@@ -47,7 +47,7 @@ and the single build slot stays assigned to this gate.
 ## Measurement preparation
 
 The notes packet is rebound from C780 to C in a new external directory,
-`.coord/pptx-notes-memo-f5-cf8cd398a77/`. Its driver changes only candidate
+`(deleted-coord-artifact)`. Its driver changes only candidate
 commit/tree and the packet target prefix. The preparer and tests remain
 byte-identical. Root checks the normalized four build rows and unchanged
 guards, runner, result contract and subsequent measurement workload. All
@@ -63,7 +63,7 @@ All 16 focused tests pass; the real source-only inspection reports
 | `rebind-delta.json` | 1,690 | `53661a11ae5046bff27fc43c8d8510c85eea20560e8d07b2b3064e59c574de5f` |
 
 The physical XML replay-scan packet is separately rebound at
-`.coord/0362ul126-pptx-replay-perf-Cf8cd398a-v3/`. Its five code/probe/test
+`(deleted-coord-artifact)`. Its five code/probe/test
 files are byte-identical to the reviewed v3 packet. The ten scoped source
 blobs also match C780; commands, workloads and baseline a8 are unchanged.
 Both endpoint source/lock observations pass, as do all eight protocol tests

@@ -47,7 +47,7 @@ All commands below used the capped cargo shim with `LITCHI_MEM_MAX=20G`,
 The copied lockfile was pinned to SHA-256
 `52ed0cacac15b5e440349bfc0f4aca2665bcf50d59d4321624e596bb410783c6`.
 The external target directory was
-`/home/zhuhe/code/litchi-worktrees/.coord/drawingml-text-media-raw/target`
+`(deleted-coord-artifact)`
 (691 MiB after the checks), and no target or raw log is tracked here.
 
 The first attempt compiled dependencies but stopped on the source-only
@@ -56,7 +56,7 @@ fixed in the follow-up source commit before the passing rerun. The canonical
 DrawingML command was:
 
 ```text
-cargo test -p litchi-drawingml --all-features --offline --locked --lib --test svg_blip --no-fail-fast --target-dir /home/zhuhe/code/litchi-worktrees/.coord/drawingml-text-media-raw/target
+cargo test -p litchi-drawingml --all-features --offline --locked --lib --test svg_blip --no-fail-fast --target-dir (deleted-coord-artifact)
 ```
 
 It passed 238 library tests and 22 `svg_blip` integration tests. The consumer

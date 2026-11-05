@@ -28,7 +28,7 @@ the temporary restore destination was removed afterward. External validation
 captures and targets were retained.
 
 The external receipt directory is
-`/home/zhuhe/code/litchi-worktrees/.coord/worktree-cleanup-2026-10-23/quarantine/wave61/`:
+`(deleted-coord-artifact)`:
 
 | Artifact | Bytes | SHA-256 |
 | --- | ---: | --- |

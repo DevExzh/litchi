@@ -36,7 +36,7 @@ Both runs use root lock SHA-256
 `4100b1fbb272dd24842f33a2d6f353a3f3a97dfa7e435c4649a0e1a029bfaea1`
 and the capped Cargo shim with `LITCHI_MEM_MAX=20G`, one build job,
 `CARGO_INCREMENTAL=0`, disabled debug info and offline resolution. The
-external target is `.coord/target-cfb-explicit-limits`.
+external target is `(deleted-coord-artifact)`.
 
 Command:
 
@@ -62,7 +62,7 @@ JSON receipts are added after the validated source tree.
 
 The three reduced receipts are committed under
 [`results/0362zada/`](results/0362zada/); full logs remain under
-`/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/cfb-composed/`.
+`(deleted-coord-artifact)`.
 
 The four composed glossary/inventory/disposition modules passed 91 tests
 in 1.305 seconds before these two compile-only fallback repairs. Changed-file

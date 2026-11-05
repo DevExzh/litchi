@@ -248,7 +248,7 @@ batch budget).
 ## 8. Gates
 
 Re-run in full on the head after the trunk merge (`e3e805f2dd`), one
-cargo command at a time (`.coord` gate script; logs not committed); the
+cargo command at a time (external gate script; logs not committed); the
 working tree was clean afterwards.
 
 | Command | Exit |

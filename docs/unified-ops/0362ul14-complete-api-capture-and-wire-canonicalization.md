@@ -2,7 +2,7 @@
 
 The fresh all-68 capture at `082fbeafe8f1e68c7118ec8561b5bd6fe1577415` completes successfully with no reused artifacts. Every package uses all features, hidden rustdoc items, `--offline --locked`, the 4100 root lock, one Cargo job and the 20G memory cap. Peak RSS is 2,995,302,400 bytes; the target ends at 3,748,188,159 bytes. The coordinator independently rehashes all 68 rustdoc artifacts, all receipts and 204 logs. [Capture verification](results/0362ul14/capture-verification.json) binds the complete package set, source, commands and evidence identities.
 
-The 1,098,614,789 bytes of raw rustdoc JSON remain external under `/home/zhuhe/code/litchi-worktrees/.coord/final-api-capture-082fbeafe8/output/inventory/`. The verification receipt records each artifact's size, SHA-256 and exact regeneration command. The original blank disposition scaffold is unchanged.
+The 1,098,614,789 bytes of raw rustdoc JSON remain external under `(deleted-coord-artifact)`. The verification receipt records each artifact's size, SHA-256 and exact regeneration command. The original blank disposition scaffold is unchanged.
 
 ## Reviewed inventory
 

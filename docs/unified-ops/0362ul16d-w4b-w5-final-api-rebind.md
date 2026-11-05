@@ -15,15 +15,15 @@ endpoints at that same ref are used because the preparer requires pairwise
 disjoint source roots:
 
 ```text
-W4b after: /home/zhuhe/code/litchi-worktrees/.coord/final-api-capture-472b670547/source
-W5 after:  /home/zhuhe/code/litchi-worktrees/.coord/final-api-capture-472b670547/source-w5
+W4b after: (deleted-coord-artifact)
+W5 after:  (deleted-coord-artifact)
 ```
 
 The fresh baseline endpoints are:
 
 ```text
-W4b before: /home/zhuhe/code/litchi-worktrees/.coord/native-w4b-w5-final-472b/sources/w4b-before
-W5 before:  /home/zhuhe/code/litchi-worktrees/.coord/native-w4b-w5-final-472b/sources/w5-before
+W4b before: (deleted-coord-artifact)
+W5 before:  (deleted-coord-artifact)
 ```
 
 W4b before remains commit `be644568846ad2fcf0622386f2f2438d0eac21c0` with
@@ -52,11 +52,11 @@ use the reviewed manifest/environment exactly as recorded.
 ## Locks and validation
 
 The source-preparation receipt is external at
-`/home/zhuhe/code/litchi-worktrees/.coord/native-w4b-w5-final-472b/receipts/source-preparation-472b.json`
+`(deleted-coord-artifact)/source-preparation-472b.json`
 (6,404 bytes, SHA-256
 `664fac47612eacc9c21caf5099785b8486e050b9dc4644ce55dc682c31d9f0b2`). The
 static validation receipt is external at
-`/home/zhuhe/code/litchi-worktrees/.coord/native-w4b-w5-final-472b/receipts/manifest-source-validation-472b.json`
+`(deleted-coord-artifact)/manifest-source-validation-472b.json`
 (36,381 bytes, SHA-256
 `1029b6e4f7c59ca72a0806b3f537cc2ce1f87f4e6e47c06ffd57adbbadf5e2f7`). It
 passes manifest/workload validation, normalized Cargo argv checks,
@@ -75,7 +75,7 @@ The historical baseline root lock is the reused generated lock
 receipt.
 
 The focused protocol command passed all 41 tests; its external log is
-`/home/zhuhe/code/litchi-worktrees/.coord/native-w4b-w5-final-472b/receipts/protocol-tests-472b.log`
+`(deleted-coord-artifact)/protocol-tests-472b.log`
 (332 bytes, SHA-256
 `a54eaa63cff67d4408aa370450c3249bc90b3db8eba9e47e389684484c1ce022`).
 

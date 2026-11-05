@@ -55,7 +55,7 @@ tracked files. No VBA compiler or runtime result is claimed yet.
 The coordinator independently verifies actual completed rows against their
 commands, source/lock identities, logs, target traces, resource guards and
 terminal process ownership. Additional checked failures are retained outside
-Git under `/home/zhuhe/code/litchi-worktrees/.coord/`:
+Git under `(deleted-coord-artifact)`:
 
 | Capture directory | Result bytes | Result SHA-256 |
 | --- | ---: | --- |
@@ -84,7 +84,7 @@ The worktree occupied 148,369,408 allocated bytes; final quarantine occupies
 target, validation evidence or native input is removed.
 
 Artifacts reside at
-`/home/zhuhe/code/litchi-worktrees/.coord/worktree-cleanup-2026-10-23/quarantine/wave64-imgconv/`:
+`(deleted-coord-artifact)`:
 
 | Artifact | Bytes | SHA-256 |
 | --- | ---: | --- |

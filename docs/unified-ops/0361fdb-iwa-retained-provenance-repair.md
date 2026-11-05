@@ -33,7 +33,7 @@ The reduced receipt is
 `7e837df4ff05ee3fc6de8b293bfd31e9cc3c3c30410edcc21a317ae3a50f0f65`.
 The external raw callgrind captures, allocation JSON, layout outputs and
 binaries remain under
-`/home/zhuhe/code/litchi-worktrees/.coord/constructor-0361f-coordinator`.
+`(deleted-coord-artifact)`.
 The base is `ddf2ac8ae2117cd78829ef94bcb610d6cbdfa0e2`; the candidate is this
 record's source commit. Both use the same probe source (SHA-256
 `e2e16d88f9fa70c621599b9d6ac85fef85d2a1997810be311bcaaeae447366ad`), lock
@@ -188,7 +188,7 @@ The reduced receipt is
 [`constructor-v15-push-admission.json`](results/0361fd/constructor-v15-push-admission.json).
 The raw captures, allocation JSON and measured binaries remain outside the
 repository under
-`/home/zhuhe/code/litchi-worktrees/.coord/constructor-0361f-coordinator`.
+`(deleted-coord-artifact)`.
 Callgrind used the matched release probe with setup inside each end-to-end
 iteration, `IWA_MESSAGE_COUNT=8`, and 12,000 iterations. Both routes produced
 the same checksum, output size and output digest on base and candidate.
@@ -232,7 +232,7 @@ for each matched fixture. The reduced receipt is
 It records source commit `cad8523c0c`, the candidate probe source after caching
 `message_count()`, and the protected baseline/candidate binary hashes. The raw
 callgrind captures remain outside the repository under
-`/home/zhuhe/code/litchi-worktrees/.coord/constructor-0361f-coordinator/count-callgrind-v16`.
+`(deleted-coord-artifact)`.
 
 Callgrind uses `(Ir at 12,000 - Ir at 2,000) / 10,000`. `archive_info` is the
 original generic `Vec<MessageInfo>` route compared with `push(MessageInfo)`;
@@ -291,7 +291,7 @@ in v17; they are not silently substituted for the raw baseline.
 The probe source was `91f5cdac...` / `1b7f55f8...`, the base/candidate binaries
 were `858bc0ca...` / `b8bfda6d...`, and the 48 `.out` captures are outside the
 repository at
-`/home/zhuhe/code/litchi-worktrees/.coord/constructor-0361f-coordinator/count-callgrind-v17-ledger`.
+`(deleted-coord-artifact)`.
 The sorted capture digest is
 `e97b087cd9c0ad86ded97883ec60e6540b909ae97aa7969b7e7f3a499c2fcd34` and the
 captures occupy 5,201,998 bytes. The complete reduced receipt is
@@ -330,7 +330,7 @@ and `f125ce58ace22bbe0da15834f2847e53f48e493b63596efd8c1e505339be7185`
 `0fc6c951fbce366b6e4cae0eed9ae38851617dfc07bade1267634a75c36e2cb9` and
 `32345cdd8a17ba0fb98697bcc72db6cb15f87bbeb952da4e586f5d901a2ec6e0`.
 The 32 `.out` captures are outside the repository at
-`/home/zhuhe/code/litchi-worktrees/.coord/constructor-0361f-coordinator/count-callgrind-v18-raw`;
+`(deleted-coord-artifact)`;
 the sorted capture digest is
 `789b3f55b095e0283498962bacbd20261b2636eb442ff205757501abcf3aa812` and
 the captures occupy 3,449,352 bytes.
@@ -382,7 +382,7 @@ construction.
 The reduced receipt is
 [`constructor-v22-complete-lifecycle.json`](results/0361fd/constructor-v22-complete-lifecycle.json).
 The v20 and v21 captures and measured binaries remain outside the repository at
-`/home/zhuhe/code/litchi-worktrees/.coord/constructor-0361f-coordinator`.
+`(deleted-coord-artifact)`.
 The capture manifests are `f8142abd30ae9c0fe173d2d4756afdb5775c14d25f8999fc55bcd5290eb86f27`
 for the 16 v20 output captures and
 `211df51863e86e5d2881b129f86aaa3bcf6968f9cd3babae1285a28ad61a3460` for the
@@ -435,7 +435,7 @@ serialization routes, peak bytes, allocated bytes and allocation calls are
 identical between endpoints, and every checksum and serialized hash matches.
 The Callgrind and allocation manifests are recorded in the v22 receipt; the
 captures remain outside the repository under
-`/home/zhuhe/code/litchi-worktrees/.coord/constructor-0361f-coordinator`.
+`(deleted-coord-artifact)`.
 
 The collection comparison is diagnostic because its base adapter retains the
 historical constructor signature. On the candidate, `push_new` is cheaper
@@ -483,7 +483,7 @@ the original `ddf2ac8a...` core as base and the public-version guard at
 [`constructor-ceb87-followup.json`](results/0361fd/constructor-ceb87-followup.json).
 The complete allocation summary and Callgrind captures remain outside the
 repository under
-`/home/zhuhe/code/litchi-worktrees/.coord/constructor-0361f-coordinator`.
+`(deleted-coord-artifact)`.
 
 The allocation run used the same allocator-enabled probe on both endpoints,
 100 iterations per route and ABBA ordering. All 15 routes had stable counters
@@ -602,8 +602,8 @@ The exact matched targets remain outside the repository:
 
 | target | path | bytes | files |
 |---|---|---:|---:|
-| base | `/home/zhuhe/code/litchi-worktrees/.coord/constructor-0361f-coordinator/matched-v24-target-base` | 753,422,513 | 1,498 |
-| candidate | `/home/zhuhe/code/litchi-worktrees/.coord/constructor-0361f-coordinator/matched-v24-target-candidate` | 476,841,172 | 1,128 |
+| base | `(deleted-coord-artifact)` | 753,422,513 | 1,498 |
+| candidate | `(deleted-coord-artifact)` | 476,841,172 | 1,128 |
 
 The allocator binaries are 658,296 bytes (base) and 698,704 bytes
 (candidate); the Callgrind binaries are 633,744 and 677,464 bytes. Their

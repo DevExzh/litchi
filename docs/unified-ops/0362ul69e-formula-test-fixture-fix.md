@@ -12,7 +12,7 @@ guard failed.
 
 The external f5 receipt is:
 
-    /home/zhuhe/code/litchi-worktrees/.coord/formula-raw-policy-328fe19328/state/01-formula-all-targets-tests-attempt-formula-all-targets-post-fix.log
+    (deleted-coord-artifact)/01-formula-all-targets-tests-attempt-formula-all-targets-post-fix.log
     1860 bytes, SHA-256 6ec3b437cc4c7ef542c1e1a1bb93fa5ceef311e68454818733c911450acd0cc8
 
 The repair clones each fixture only for its first temporary slice, leaving the

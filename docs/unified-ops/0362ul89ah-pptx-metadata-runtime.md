@@ -6,7 +6,7 @@ a new compiler, runtime, performance, or qualification result.
 The frozen source base is
 `ae6f32d202a04e3d6675fa431b2579c0d5f27192`. The preserved full-feature test
 log is outside Git at
-`/home/zhuhe/code/litchi-worktrees/.coord/pptx-combined-0362ul89-f5-qualification-ae6f32d202/fullfeatures-tests/0000.log`
+`(deleted-coord-artifact)/0000.log`
 (378,736 bytes, SHA-256
 `4924bcd19683868b0cc259024ceefdb93f3ba4ef0d3ec7d8653fcf564639fb6a`). Its
 terminal result was 1,356 passed, 23 failed, and 1 ignored. This return owns

@@ -78,7 +78,7 @@ completed repair leaves are retired after their merge. Nothing is pushed.
 
 ## Evidence
 
-Paths are relative to `/home/zhuhe/code/litchi-worktrees/.coord/`.
+Paths are relative to `(deleted-coord-artifact)`.
 
 | Artifact | SHA-256 |
 | --- | --- |

@@ -4,7 +4,7 @@ This source-only repair starts from the composed OOXML runtime candidate
 `3774fe4374dfb66e74b98b1ae742672ed6cad37f`.  The coordinator's runtime
 receipt reached 511 passing tests and 17 failures.  The owned ten failures
 are recorded in
-`/home/zhuhe/code/litchi-worktrees/.coord/ooxml-combined-0362ul94-f5-runtime-3774fe43-v2/common-tests/0000.log`
+`(deleted-coord-artifact)/0000.log`
 (222,716 bytes, SHA-256
 `668db8f2afc172f4abacf8ce06d36934cc1ca6a89d3ee7c404cc805abe5a8153`).
 

@@ -367,7 +367,7 @@ view), then one migration of `litchi-ops`: follow-up **F-0337-PATH**.
 Tree: this branch with trunk `1d2a8e47c0` (records 0334, 0335) merged at
 `10a6e9d5ec`. Build environment per the rules (`CARGO_BUILD_JOBS=6`,
 `RUST_TEST_THREADS=8`, the memory-capped cargo shim, one cargo command at a
-time); every exit status checked (`.coord/perf-closure/gates.sh`, not
+time); every exit status checked (`(deleted-coord-artifact)`, not
 committed).
 
 | Command | Exit |

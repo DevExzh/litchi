@@ -60,7 +60,7 @@ routes. Every `open_get` route also compared the native `read_marker` length
 with the facade marker length. The command used for the probe build was:
 
 ```text
-source .coord/w8-file/env.sh
+source (deleted-coord-artifact)
 cargo build --offline --locked -p litchi-ops --all-features \
   --example file_w8_qualified_probe
 cargo clippy --offline --locked -p litchi-ops --all-features \
@@ -78,18 +78,18 @@ committed at
 it is 38,435 bytes with SHA-256
 `e8d4f5cc21b538fd77ffa93b35aba8f5c549a7cd658e3a62bf578712d7107797`.
 The external raw route artifact is
-`/home/zhuhe/code/litchi-worktrees/.coord/w8-file-qualification-e44d7b7160-v4/matrix/routes.jsonl`,
+`(deleted-coord-artifact)/routes.jsonl`,
 238,193 bytes with SHA-256
 `877802466f1a0b4338b57e58a2cc9ad614427869ad4eef69e1bf7f6b78f71761`.
 The reduced receipt also retains the superseded one-scene ODP failure as
-`/home/zhuhe/code/litchi-worktrees/.coord/w8-file-qualification-e44d7b7160-v4/superseded-odp-one-scene-batch100.receipt.json`,
+`(deleted-coord-artifact)/superseded-odp-one-scene-batch100.receipt.json`,
 971 bytes with SHA-256
 `155b26508fa00ead8ef1a7d35a465a11dc8533107969905cffd72c72c161c658`.
 Its exact development probe variant is 72,713 bytes with SHA-256
 `07c6fcf2097df901f0a8adf79d2c53e50aadcd10ba8300cfd0587b5b10cb1693`;
 the reduced failure receipt states that raw stderr was unavailable.
 The exact source archive used by this rerun is
-`/home/zhuhe/code/litchi-worktrees/.coord/w8-file-qualification-e44d7b7160-v4/source.tar`,
+`(deleted-coord-artifact)/source.tar`,
 245,760 bytes with SHA-256
 `07cd6ff373721adcbda8c80190f312546ebe04c7a47f8e63f97a9d1a74f85ec5`. The receipt records the exact source archive, probe, binary and lock paths,
 sizes and hashes; the protected binary is 244,723,872 bytes with SHA-256

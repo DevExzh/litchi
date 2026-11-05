@@ -44,7 +44,7 @@ change to it is 0362ul165ud's ODF re-export binding.
 ## Gates
 
 Each gate ran on its own, in order. Logs are kept outside the repository in
-`.coord/fin-glossary/logs/`. Cargo ran on `fc780f5685`, which is the source
+`(deleted-coord-artifact)`. Cargo ran on `fc780f5685`, which is the source
 tree of the final commit. The post-merge trunk delta touches only `tools/`
 and `docs/`, so the tool gates were re-run after the merge.
 

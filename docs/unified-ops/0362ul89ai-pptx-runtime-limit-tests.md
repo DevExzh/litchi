@@ -13,7 +13,7 @@ cargo test -p litchi-pptx --all-features --lib --no-fail-fast --message-format j
 ```
 
 Its external receipt is at
-`/home/zhuhe/code/litchi-worktrees/.coord/pptx-combined-0362ul89-f5-qualification-ae6f32d202/fullfeatures-tests/`.
+`(deleted-coord-artifact)`.
 The 378,736-byte `0000.log` has SHA-256
 `4924bcd19683868b0cc259024ceefdb93f3ba4ef0d3ec7d8653fcf564639fb6a`.
 The run exited 101 after 1,356 passed, 23 failed, and 1 ignored test.  The
@@ -48,7 +48,7 @@ unchanged-list/unchanged-value atomicity assertions remain intact.
 
 The exact two-file patch from the frozen base to the source tip is retained
 outside the repository at
-`/home/zhuhe/code/litchi-worktrees/.coord/pptx-runtime-89ai-e412373e0e.patch`.
+`(deleted-coord-artifact)/pptx-runtime-89ai-e412373e0e.patch`.
 It is 2,918 bytes with SHA-256
 `9161bbee6b1b1c383f2bf3275b0d7db737d651ca19b1064d3296e980914f7370`.
 

@@ -7,7 +7,7 @@ timing result, or an acceptance claim.  Candidate source identities remain
 parameterized until the final integrated freeze.
 
 The corrected catalog is
-`.coord/final-acceptance-2026-10-24/native-qualification-lanes-76c21c49cf.json`
+`(deleted-coord-artifact)`
 (audited staging `76c21c49cfc7fedb995fb1b2c11351098eddef7b`).  Its path policy
 is literal external paths from the cited records; new execution output must
 use a fresh external directory.  The catalog records no tracked RTF or
@@ -31,12 +31,12 @@ also diagnostic only; they are never relabeled as outputs of this protocol.
 The following catalog paths are read-only historical receipts and must not be
 used as fresh output destinations:
 
-- `/home/zhuhe/code/litchi-worktrees/.coord/rtf-refusals/`;
-- `/home/zhuhe/code/litchi-worktrees/.coord/rtf-refusals/native-qual-20261022/block-01-01-baseline.json` (rejected clean-window receipt);
-- `/home/zhuhe/code/litchi-worktrees/.coord/w5-ole-source-arc-final-20261021/protected/base-alloc/ole_w5_probe`;
-- `/home/zhuhe/code/litchi-worktrees/.coord/w5-ole-source-arc-retag-20261022/protected/candidate-base-package-edit-cf3c9a4eb6c8b1d661ee57cef238de78ed67bb29/ole_w5_probe`;
-- `/home/zhuhe/code/litchi-worktrees/.coord/w5-ole-source-arc-retag-20261022/counting-base-package-edit-v2/MANIFEST.txt`;
-- `/home/zhuhe/code/litchi-worktrees/.coord/xls-property-lazy/env.sh`.
+- `(deleted-coord-artifact)`;
+- `(deleted-coord-artifact)` (rejected clean-window receipt);
+- `(deleted-coord-artifact)`;
+- `(deleted-coord-artifact)`;
+- `(deleted-coord-artifact)`;
+- `(deleted-coord-artifact)`.
 
 Prepare clean detached source worktrees outside this checkout.  Preserve the
 original source HEADs exactly; qualification overlays are limited to the
@@ -111,7 +111,7 @@ target size and memory caps.  It emits `performance_claim: false`.
 The common execution envelope is:
 
 ```sh
-export PATH=/home/zhuhe/code/litchi-worktrees/.coord/bin:$PATH
+export PATH=(deleted-coord-artifact):$PATH
 unset LITCHI_CAPPED LITCHI_BLESS
 export CARGO_BUILD_JOBS=1 CARGO_INCREMENTAL=0 CARGO_PROFILE_RELEASE_DEBUG=0
 export LITCHI_MEM_MAX=20G

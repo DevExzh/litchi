@@ -9,7 +9,7 @@
 ## Preserved failed full-format row
 
 The fresh full-workspace formatter attempt is preserved at
-`/home/zhuhe/code/litchi-worktrees/.coord/format-0362ul93-f5-actual-2106417c0d/`.
+`(deleted-coord-artifact)`.
 Its only row was the canonical `cargo fmt --all -- --check`, which exited 1
 after 29.048958 seconds. The row is a failure receipt, not an acceptance
 claim; its target stayed at 0 bytes and its post-exit owned/builders samples

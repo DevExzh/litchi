@@ -40,14 +40,14 @@ The three XML part families had only module constants. They now take a required 
 
 ## Validation
 
-Commands were run with `/home/zhuhe/code/litchi-worktrees/.coord/w4b-xlsb-raw-policy/env.sh`:
+Commands were run with `(deleted-coord-artifact)`:
 
 - `cargo fmt --all -- --check`: exit 0.
 - `cargo test -p litchi-xlsb --all-features --offline`: exit 0; 1,342 passed, 0 failed.
 - `cargo clippy -p litchi-xlsb --all-targets --all-features --offline -- -D warnings`: exit 0.
 - `cargo check -p litchi-ops -p litchi -p litchi-cli --all-targets --all-features --offline`: exit 0.
 
-Logs under `/home/zhuhe/code/litchi-worktrees/.coord/w4b-xlsb-raw-policy/`: `xlsb-0360ei-tests.log` (122,046 bytes, SHA-256 `a5c78d047e67eec35385632d231f1b07d681cc1f3923bbc7b4d2b3e384a99544`) and `xlsb-0360ei-clippy.log` (171 bytes, SHA-256 `a4e0f7d0240f4b75a04c3b18c1b9ef2d1ad227a6631fd4f77a153650d6bbee72`).
+Logs under `(deleted-coord-artifact)`: `xlsb-0360ei-tests.log` (122,046 bytes, SHA-256 `a5c78d047e67eec35385632d231f1b07d681cc1f3923bbc7b4d2b3e384a99544`) and `xlsb-0360ei-clippy.log` (171 bytes, SHA-256 `a4e0f7d0240f4b75a04c3b18c1b9ef2d1ad227a6631fd4f77a153650d6bbee72`).
 
 ## 0360e closure
 

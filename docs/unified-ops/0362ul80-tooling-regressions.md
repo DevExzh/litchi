@@ -25,11 +25,11 @@ error.  The receipt remains external and is not relabelled as a pass:
   observed return code `-15` instead of `0`.
 
 The wrapper is
-`/home/zhuhe/code/litchi-worktrees/.coord/tooling-row-0dc6c76634-20261025T-wrapper.log`
+`(deleted-coord-artifact)/tooling-row-0dc6c76634-20261025T-wrapper.log`
 (4,141 bytes, SHA-256
 `f30aeca725ac3b8e44c3fb567e55564f1b7001d835ee9b472a52cd3ac28151db`).  Its
 child log is
-`/home/zhuhe/code/litchi-worktrees/.coord/tooling-row-0dc6c76634-20261025T-state/48-tooling-unit-attempt-1792900092755500553-677681.log`
+`(deleted-coord-artifact)/48-tooling-unit-attempt-1792900092755500553-677681.log`
 (639,430 bytes, SHA-256
 `222fb2ce0dacd5cf44b7852c4ab7b3c6cf9dd04ac97642b05aaa4d4e871e3213`).
 The failed run ended with target size zero, an empty Cargo-target trace,

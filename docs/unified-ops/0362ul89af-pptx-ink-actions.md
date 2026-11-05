@@ -25,7 +25,7 @@ The assertion now requires `RetainedBytes`, observes the checked sum
 budget, atomicity, payload, or fidelity implementation behavior changes.
 
 The retained terminal capture remains outside Git at
-`/home/zhuhe/code/litchi-worktrees/.coord/pptx-combined-0362ul89-f5-qualification-ae6f32d202`.
+`(deleted-coord-artifact)`.
 It reported 1,356 passing tests and 23 failures; this source repair addresses
 only the named InkAction assertion. Fresh qualification is required, and no
 runtime result is inferred from this source change.
@@ -37,7 +37,7 @@ runtime result is inferred from this source change.
 | `fullfeatures-tests/checks.json` | 1,076 | `25a4e9375b216cdc639b2ea553fe84ca4b370f489e298bc5ed9d03d3b5b8fea1` |
 
 The source patch is retained outside Git at
-`/home/zhuhe/code/litchi-worktrees/.coord/0362ul89af-pptx-ink-actions.patch`:
+`(deleted-coord-artifact)/0362ul89af-pptx-ink-actions.patch`:
 1,096 bytes, SHA-256
 `03d2e271a481f212fb7e89a07bf96c0c55e978019ef968831e024a4b8a84fe27`.
 No Cargo, build or rustdoc command was run for this repair.

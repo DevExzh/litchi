@@ -16,7 +16,7 @@ before the four route families; the one complete block and the retained
 partial attempts remain external evidence.
 
 The raw receipt is outside the checkout at
-`/home/zhuhe/code/litchi-worktrees/.coord/w5-ole/matched-abba-clone-9f685`.
+`(deleted-coord-artifact)`.
 Its `measurements.json` is 14,943 bytes with SHA-256
 `92cc8664841dbcdde3f13129bdda25e7d46a61f73f56f917e1c9b24a6e0cc7e5`.
 The flat-run source and binary identities are recorded in that manifest. The
@@ -35,7 +35,7 @@ tests and all integration suites, and all-target performance-diagnostics
 Clippy is clean.
 
 The corrected current binaries were built in the external target
-`/home/zhuhe/code/litchi-worktrees/.coord/w5-ole/target-matched-cow-current2`
+`(deleted-coord-artifact)`
 from `ad9904197c3b1dc79aba6b35c2f7dbb42a9b2190` with one capped Cargo job.
 The OLE probe SHA-256 is
 `c6376a020ec332d371038de0fe4cde01fd8b9421837b85ef49b7739dcf01e6db`; the

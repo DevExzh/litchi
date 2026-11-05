@@ -95,7 +95,7 @@ Callgrind Ir, not wall time; all rows meet the 1.05 regression bar.
 | single chart symbol set | 485,876,385 | 186,028,085 | 0.382871221453 |
 
 The immutable release-debug1 ELF is external at
-`/home/zhuhe/code/litchi-worktrees/.coord/iwa-w2a-symbols-facade-ff06bcf61b/bin/parity-8ccb274458659a4c`
+`(deleted-coord-artifact)`
 (mode 0555, 217,652,104 bytes, SHA-256
 `9545d118a7d9aace70f122981be65ee820fc2622db7817f43ddf4a5e2f1c27a1`).
 The clean-source build receipt is external at

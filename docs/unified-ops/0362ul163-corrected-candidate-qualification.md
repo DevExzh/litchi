@@ -6,7 +6,7 @@ Candidate C2a is frozen at
 The protocol worktree remains at that same pending revision. Subsequent
 coordinator documentation on trunk does not advance either frozen checkout.
 The candidate identity is external at
-`.coord/candidate-C2a-33a0a63d35-20261026/c2-identity.json`, SHA-256
+`(deleted-coord-artifact)/c2-identity.json`, SHA-256
 `73754fd078e462678df0025c913e85f7323910d115c288f5a0fc641e9e91e7e3`.
 
 ## Full gate
@@ -25,7 +25,7 @@ completed rows have clean resource/process guards. The remaining rows are
 not accepted until they complete. The earlier e7aca formatting failure stays
 preserved as a failed run.
 
-External packet `.coord/final-gate-C2a-33a0a63d35-20261026/`:
+External packet `(deleted-coord-artifact)`:
 
 | Artifact | SHA-256 |
 | --- | --- |
@@ -38,7 +38,7 @@ External packet `.coord/final-gate-C2a-33a0a63d35-20261026/`:
 The following packets pass independent or coordinator source review. None
 is a native measurement, final census capture, archive verification or
 terminal OfficeCLI acceptance result. Paths below are relative to the
-external `/home/zhuhe/code/litchi-worktrees/.coord/` directory.
+external `(deleted-coord-artifact)` directory.
 
 | Preparation | Final review receipt | SHA-256 |
 | --- | --- | --- |

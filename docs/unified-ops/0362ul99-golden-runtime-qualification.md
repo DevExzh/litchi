@@ -27,7 +27,7 @@ passes concern identical Rust/Cargo blobs; no redundant direct compiler row is
 added. The original 23-row proposal and downstream/performance obligations
 remain retained.
 
-Packet: `.coord/pptx-combined-0362ul89-f5-qualification-ef9470f7da`.
+Packet: `(deleted-coord-artifact)`.
 
 | Artifact | Bytes | SHA-256 |
 |---|---:|---|
@@ -60,7 +60,7 @@ review and root fast-forwards the private candidate. All promoted errors and
 the future-variant fallback retain their previous behavior; no lint is weakened.
 Fresh scoped qualification is being prepared.
 
-Packet: `.coord/ooxml-combined-0362ul94-f5-final-11c3f2fc-clippy`.
+Packet: `(deleted-coord-artifact)`.
 
 | Artifact | Bytes | SHA-256 |
 |---|---:|---|
@@ -118,7 +118,7 @@ bytes after subtracting all 20,480 bytes of wave evidence. Cleanup68–70 togeth
 recover 52,964,249,600 bytes; no validation capture or target is removed.
 
 Evidence root:
-`.coord/worktree-cleanup-2026-10-25/quarantine/wave70-pptx-raw-shapes-89a-89c`.
+`(deleted-coord-artifact)`.
 
 | Artifact | Bytes | SHA-256 |
 |---|---:|---|
@@ -140,7 +140,7 @@ four-format strict Clippy 229.325, ops strict Clippy 142.565 and facade strict
 Clippy 103.173. The persistent session exits 0. Root verifies every completed
 receipt and terminal ownership; final target size is 535,040,406 bytes.
 
-Capture: `.coord/ooxml-combined-0362ul94-f5-final-3774fe43-clippy`.
+Capture: `(deleted-coord-artifact)`.
 
 | Artifact | Bytes | SHA-256 |
 |---|---:|---|
@@ -153,7 +153,7 @@ for rebinding external log/quarantine paths. Common helper row 24 includes
 rows 25–27, so those three duplicates are omitted. The 13 glossary profiles
 remain a separate requirement. No runtime result is claimed at this checkpoint.
 
-Packet: `.coord/ooxml-combined-0362ul94-f5-runtime-3774fe43`.
+Packet: `(deleted-coord-artifact)`.
 
 | Artifact | Bytes | SHA-256 |
 |---|---:|---|
@@ -189,7 +189,7 @@ CLI audit; this is a driver failure and provides no runtime qualification.
 | `rows.json` | 3,846 | `28929df7915bfd4413a0e3eb89d9dff211c38c4c243f163afe38c190ae5ff591` |
 | `result.json` | 4,552 | `e9c24ce177e0b78bf5b50dd53a45e6770b048b8e4536aeaffe38824052ecc740` |
 
-Corrected packet `.coord/ooxml-combined-0362ul94-f5-runtime-3774fe43-v2`
+Corrected packet `(deleted-coord-artifact)`
 removes only that option/value and rebinds external paths. F5 already sets the
 source working directory. Root reads the actual parser and verifies all 38
 command deltas, source/tool/three-lock/fixture fences, empty target and global
@@ -280,7 +280,7 @@ instead of runner status and duplicating compiler/Clippy rows. V2 fixes both;
 root verifies exact commands, source/parents/tree, locks, hydration, tools and
 empty target before GO. No result is claimed at this checkpoint.
 
-Packet: `.coord/pptx-combined-0362ul89-f5-consumer-v2-cc2ab3f79d`.
+Packet: `(deleted-coord-artifact)`.
 
 | Artifact | Bytes | SHA-256 |
 |---|---:|---|

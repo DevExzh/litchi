@@ -18,7 +18,7 @@ then checks the emitted packet against C, S, all role locks, 84 profiles and
 68 packages. No historical capture is relabeled.
 
 The fresh packet is external at
-`.coord/raw-census-Cf8cd398a-20261025/` under the worktree parent:
+`(deleted-coord-artifact)` under the worktree parent:
 
 | Artifact | Bytes | SHA-256 |
 |---|---:|---|
@@ -32,9 +32,9 @@ from the parent worktree directory (all paths remain external to source):
 
 ```sh
 PYTHONDONTWRITEBYTECODE=1 python3 -B \
-  .coord/raw-census-f5-exec-v9-20261025/run_final_f5_v9.py --execute --go \
-  --binding .coord/raw-census-Cf8cd398a-20261025/capture-binding-Cf8cd398a770f.json \
-  --packet-root .coord/raw-census-Cf8cd398a-20261025
+  (deleted-coord-artifact) --execute --go \
+  --binding (deleted-coord-artifact) \
+  --packet-root (deleted-coord-artifact)
 ```
 
 The first two guarded rustc identity steps pass. The 68-package inventory,

@@ -35,7 +35,7 @@ that carrier when reopening generated ZIP bytes. This preserves exact flat
 input ceilings without incorrectly applying them to a larger internal ZIP.
 
 Focused and affected validation completed with the capped environment from
-`.coord/w8-odf-flat-limits/env.sh`, `CARGO_BUILD_JOBS=1`, and offline mode:
+`(deleted-coord-artifact)`, `CARGO_BUILD_JOBS=1`, and offline mode:
 
 * `cargo test -p litchi-odf-common --all-features --offline flat::tests` —
   11 passed.
@@ -53,7 +53,7 @@ Focused and affected validation completed with the capped environment from
 * The exact glossary rustdoc command that previously exposed the iWork-only
   detector warning was rerun and passed:
   `RUSTC_BOOTSTRAP=1 cargo rustdoc --package litchi --lib --target-dir
-  /home/zhuhe/code/litchi-worktrees/.coord/w8-odf-flat-limits/iwork-rustdoc
+  (deleted-coord-artifact)
   --no-default-features --features iwork --offline -- -Zunstable-options
   --output-format json --document-hidden-items`.
 
@@ -78,15 +78,15 @@ The complete bounded ODS gate was rerun after this follow-up, rather than only
 the library target:
 
 ```text
-source /home/zhuhe/code/litchi-worktrees/.coord/w8-odf-flat-limits/env.sh
+source (deleted-coord-artifact)
 export CARGO_NET_OFFLINE=true
-python3 /home/zhuhe/code/litchi-worktrees/.coord/scripts/chunked-cargo-tests.py -p litchi-ods --all-features
+python3 (deleted-coord-artifact) -p litchi-ods --all-features
 ```
 
 The gate ran 18 bounded commands and 120 result blocks. It reported 1,768
 passed, 0 failed and 13 filtered compile/doctest cases. The full output is
 kept outside the checkout at
-`/home/zhuhe/code/litchi-worktrees/.coord/w8-odf-flat-limits/ods-gate-full.log`
+`(deleted-coord-artifact)/ods-gate-full.log`
 (183,230 bytes, SHA-256
 `32921e8cfdab15c4eeaccb52f3dcdef47b7ea4e49661a0aa73a65ad1ba718062`). The
 largest reported target was 5,892,730,880 bytes; the final target directory
@@ -103,10 +103,10 @@ the tracked fixture is 31,441 bytes with SHA-256
 The exact build commands were:
 
 ```text
-source /home/zhuhe/code/litchi-worktrees/.coord/w8-odf-flat-limits/env.sh
-export CARGO_TARGET_DIR=/home/zhuhe/code/litchi-worktrees/.coord/w8-odf-flat-limits/probe-target-base
+source (deleted-coord-artifact)
+export CARGO_TARGET_DIR=(deleted-coord-artifact)
 cargo build --release --offline                 # probe dependency paths at 8d6abdab69
-export CARGO_TARGET_DIR=/home/zhuhe/code/litchi-worktrees/.coord/w8-odf-flat-limits/probe-target-final
+export CARGO_TARGET_DIR=(deleted-coord-artifact)
 cargo build --release --offline --features final # probe dependency paths at 384205d218
 ```
 
@@ -148,7 +148,7 @@ check, retained-depth recheck, and independent-source content proof without
 retaining a second flat source.
 
 The initial JSON receipts are outside the checkout at
-`/home/zhuhe/code/litchi-worktrees/.coord/w8-odf-flat-limits/matched-results-20261022/`;
+`(deleted-coord-artifact)`;
 the base and final JSONL files are 4,359 and 3,604 bytes. Native latency and
 allocator qualification beyond this fresh-process count/retention probe
 remain coordinator work.

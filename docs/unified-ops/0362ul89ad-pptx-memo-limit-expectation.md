@@ -10,7 +10,7 @@ The scoped full-feature capture is frozen at source commit
 `ae6f32d202a04e3d6675fa431b2579c0d5f27192` (tree
 `361e2d24d8c9d0cb2c838f109646b3ede9150545`; the full tree is recorded by the
 qualification packet). Its library-test log is outside Git at
-`/home/zhuhe/code/litchi-worktrees/.coord/pptx-combined-0362ul89-f5-qualification-ae6f32d202/fullfeatures-tests/0000.log`,
+`(deleted-coord-artifact)/0000.log`,
 378,736 bytes, SHA-256
 `4924bcd19683868b0cc259024ceefdb93f3ba4ef0d3ec7d8653fcf564639fb6a`.
 
@@ -46,7 +46,7 @@ target, without writing the tracked golden file:
 
 ```text
 env PATH=/home/zhuhe/code/litchi-worktrees/uo2-gate-runner-self-attribution/docs/unified-ops/results/0362ul29/tooling/bin:$PATH \
-    CARGO_TARGET_DIR=/home/zhuhe/code/litchi-worktrees/.coord/targets/pptx-lptx0003-golden-regeneration/target \
+    CARGO_TARGET_DIR=(deleted-coord-artifact) \
     /home/zhuhe/code/litchi-worktrees/uo2-gate-runner-self-attribution/docs/unified-ops/results/0362ul29/tooling/bin/cargo \
     test --offline --locked -p litchi-pptx --all-features --lib \
     digest_reuse_tests::print_the_golden_transcript -- --ignored --nocapture

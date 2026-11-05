@@ -21,7 +21,7 @@ cargo test -p litchi-ops --all-features \
 ```
 
 The external log is
-`/home/zhuhe/code/litchi-worktrees/.coord/final-gate-Cf8cd398a-20261025-v6-r2/state/ops-tests/0005.log`,
+`(deleted-coord-artifact)/0005.log`,
 376,777 bytes, SHA-256
 `235b2e984bb00d71b6aaffee237e20f9764fc822f023fdd0850298deae6727fd`.
 Root verifies the terminal service result, all 32 passing outer rows, the

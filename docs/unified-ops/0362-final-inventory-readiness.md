@@ -23,7 +23,7 @@ export TMPDIR
 Each receipt records `FREEZE`, the exact command, `rustc -Vv`, `cargo -V`,
 feature configuration, peak RSS, and the output SHA-256. The existing
 isolated wsdoc target at
-`/home/zhuhe/code/litchi-worktrees/.coord/isolated-wsdoc/target` is about
+`(deleted-coord-artifact)` is about
 4.44 GB (decimal) and is valid for the safe-53 profile set, not merely for
 ordinary docs. A Cargo target cache may be reused across source commits:
 Cargo fingerprints rebuild changed inputs. Reusing captured JSON or other
@@ -45,7 +45,7 @@ the target and free-space guards. The environment below is the payload's
 expected environment, not a replacement for that outer receipt:
 
 ```sh
-source /home/zhuhe/code/litchi-worktrees/.coord/<slug>/env.sh
+source (deleted-coord-artifact)
 export CARGO_BUILD_JOBS=1 CARGO_INCREMENTAL=0 \
   CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 \
   CARGO_PROFILE_RELEASE_DEBUG=0 \
@@ -98,13 +98,13 @@ candidate is frozen. The following is the payload argv recorded by the
 reviewed F5 driver; do not run it directly from an unowned shell:
 
 ```sh
-source /home/zhuhe/code/litchi-worktrees/.coord/<slug>/env.sh
+source (deleted-coord-artifact)
 FREEZE=$(GIT_OPTIONAL_LOCKS=0 git rev-parse HEAD)
 OUT=/home/zhuhe/.cache/litchi-api-contract/$FREEZE
 python3 tools/final_api_inventory.py \
   --root "$PWD" \
   --output "$OUT" \
-  --target-dir /home/zhuhe/code/litchi-worktrees/.coord/isolated-wsdoc/target
+  --target-dir (deleted-coord-artifact)
 ```
 
 The wrapper creates and preflights the external `$OUT/tmp` `TMPDIR` without

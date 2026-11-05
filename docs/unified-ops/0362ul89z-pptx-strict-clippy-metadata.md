@@ -15,7 +15,7 @@ the package or the 0362ul89 candidate is accepted.
 
 The retained external evidence is:
 
-- state: `/home/zhuhe/code/litchi-worktrees/.coord/pptx-combined-0362ul89-f5-qualification-v2-02b2489ead`
+- state: `(deleted-coord-artifact)`
 - command log: `02-pptx-strict-clippy-all-features-attempt-qualification-f5-02.log`, 59,454 bytes, SHA-256 `bfe533c51350b5e9bfdeeb60ec6db7485f033679a4962e47d0264b14751785f6`
 - diagnostic index: `clippy-diagnostics-index.json`, 13,168 bytes, SHA-256 `8c08ff22b3d5942f141cc6e488944838ebf35aef6c6a5c7e476c6930c80ca6ce`
 - command: `cargo clippy --offline --locked -p litchi-pptx --all-features --all-targets -- -D warnings`
@@ -40,7 +40,7 @@ bound parsing and retained-node serialization at the same call sites.
 
 An external source patch against the exact qualification base is retained at:
 
-`/home/zhuhe/code/litchi-worktrees/.coord/pptx-combined-0362ul89/metadata-clippy-89z-b8cfe14138.patch`
+`(deleted-coord-artifact)/metadata-clippy-89z-b8cfe14138.patch`
 
 It is 18,621 bytes and has SHA-256
 `2a7b6dcf8bdd8ed5b72950d2c32b971edd0532ab88cb40de072e12722270b1d1`.

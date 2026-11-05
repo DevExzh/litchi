@@ -184,7 +184,7 @@ clears it, and clears inside Numbers' range.
 ## 6. Mac kit additions
 
 These fixes need native proof. The packages and lists are in
-`.coord/iwa-w5n/mac-additions/` (`additions.tsv` for `control_kit.py add`,
+`(deleted-coord-artifact)` (`additions.tsv` for `control_kit.py add`,
 `additions-queue.tsv` in the `queue.tsv` format). None is committed.
 
 | Package | Question for Numbers |
@@ -240,7 +240,7 @@ replaces the test that pinned the refusal.
 Gates ran on this branch at trunk `52f3d60714`, which had not moved. The first
 pass used the prescribed `TMPDIR`. `/tmp` hit its quota, so its doctest and pyo3
 failures (`ld` bus errors, `Disk quota exceeded`) were reruns with `TMPDIR` under
-`.coord/iwa-w5n/tmp`.
+`(deleted-coord-artifact)`.
 
 | Gate | Result |
 |---|---|

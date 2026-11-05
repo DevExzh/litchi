@@ -7,7 +7,7 @@ The matched release binaries pass all six exact-output comparisons, including
 the forward, inverse and no-op durable forms. All four counting legs agree.
 The [verified receipt](results/0362l/evidence.json) records the protected
 binaries, source manifests, dependency lock, probe and commands. Raw evidence
-remains outside the checkout under `.coord/durable-ink-0362l/matched-v1`.
+remains outside the checkout under `(deleted-coord-artifact)`.
 
 Per 100 operations, forward and inverse replay have unchanged allocation
 counts and requested bytes; their peaks fall by 40 and 272 bytes respectively.

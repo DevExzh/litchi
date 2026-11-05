@@ -7,7 +7,7 @@ not claim a rebuild, native timing, calibration, allocator qualification, or
 ABBA acceptance.
 
 The external packet root is
-`/home/zhuhe/code/litchi-worktrees/.coord/ppt-lazy-native-final-472b-20261024`:
+`(deleted-coord-artifact)`:
 
 | artifact | bytes | SHA-256 |
 | --- | ---: | --- |
@@ -39,11 +39,11 @@ Run the source-only handoff with no Cargo or probe execution:
 
 ```sh
 python3 tools/ppt_lazy_build_receipt_adapter.py \
-  --manifest /home/zhuhe/code/litchi-worktrees/.coord/ppt-lazy-native-final-472b-20261024/ppt-lazy-edit-472b-final.json \
-  --projection /home/zhuhe/code/litchi-worktrees/.coord/ppt-lazy-native-final-472b-20261024/ppt-lazy-build-input-projection-472b.json \
-  --preflight-receipt /home/zhuhe/code/litchi-worktrees/.coord/ppt-lazy-native-compile-20261024/qualification-receipt-472b670547-corrected.json \
-  --logs-root /home/zhuhe/code/litchi-worktrees/.coord/ppt-lazy-native-compile-20261024/logs \
-  --output /home/zhuhe/code/litchi-worktrees/.coord/ppt-lazy-native-final-472b-20261024/ppt-lazy-build-adapter-472b.json
+  --manifest (deleted-coord-artifact) \
+  --projection (deleted-coord-artifact) \
+  --preflight-receipt (deleted-coord-artifact) \
+  --logs-root (deleted-coord-artifact) \
+  --output (deleted-coord-artifact)
 ```
 
 The historical adapter used the frozen runner's manifest, probe-source, and
@@ -91,7 +91,7 @@ manifest.  CPU 29 is reserved for a future quiet execution only.
 The initial 472b packet above is retained as historical evidence.  The
 reviewable source-only handoff uses the separately materialized repaired
 packet at
-`/home/zhuhe/code/litchi-worktrees/.coord/ppt-lazy-native-final-472b-repaired-20261024`:
+`(deleted-coord-artifact)`:
 
 | artifact | bytes | SHA-256 |
 | --- | ---: | --- |
@@ -129,11 +129,11 @@ Its exact source-only invocation was:
 
 ```sh
 python3 tools/ppt_lazy_build_receipt_adapter.py \
-  --manifest /home/zhuhe/code/litchi-worktrees/.coord/ppt-lazy-native-final-472b-repaired-20261024/ppt-lazy-edit-472b-repaired.json \
-  --projection /home/zhuhe/code/litchi-worktrees/.coord/ppt-lazy-native-final-472b-repaired-20261024/ppt-lazy-build-input-projection-472b-repaired.json \
-  --preflight-receipt /home/zhuhe/code/litchi-worktrees/.coord/ppt-lazy-native-compile-20261024/qualification-receipt-472b670547-corrected.json \
-  --logs-root /home/zhuhe/code/litchi-worktrees/.coord/ppt-lazy-native-compile-20261024/logs \
-  --output /home/zhuhe/code/litchi-worktrees/.coord/ppt-lazy-native-final-472b-repaired-20261024/ppt-lazy-build-adapter-472b-repaired-public-v3.json
+  --manifest (deleted-coord-artifact) \
+  --projection (deleted-coord-artifact) \
+  --preflight-receipt (deleted-coord-artifact) \
+  --logs-root (deleted-coord-artifact) \
+  --output (deleted-coord-artifact)
 ```
 
 ## Integration validation

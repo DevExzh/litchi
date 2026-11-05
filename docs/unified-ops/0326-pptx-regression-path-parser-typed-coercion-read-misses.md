@@ -355,7 +355,7 @@ the text routes, which stay above it (§4). The read misses of records
 Merged tree (`4423bd2096` + `895245e210` + this record), build
 environment per the rules (`CARGO_BUILD_JOBS=6`, `RUST_TEST_THREADS=8`,
 the memory-capped cargo shim, one cargo command at a time). Every exit
-status was checked (`.coord/perf-r13/gates.sh`, not committed).
+status was checked (`(deleted-coord-artifact)`, not committed).
 
 | Command | Exit |
 |---|---:|

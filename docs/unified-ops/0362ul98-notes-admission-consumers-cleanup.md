@@ -15,7 +15,7 @@ Later rows do not execute. Root verifies all completed receipts, exact
 commands, source/three-lock fences, logs/traces, live guards and terminal
 ownership. Final target size is 370,191,600 bytes.
 
-Capture: `.coord/ooxml-combined-0362ul94-f5-final-491137abe2`.
+Capture: `(deleted-coord-artifact)`.
 
 | Artifact | Bytes | SHA-256 |
 |---|---:|---|
@@ -70,7 +70,7 @@ remaining holders. Root verifies all four held heads and the protected
 15-byte constructor probe's inode, mode, size and hash. Holds are released.
 
 Evidence root:
-`.coord/worktree-cleanup-2026-10-25/quarantine/wave68-pptx-89y-89ad`.
+`(deleted-coord-artifact)`.
 
 | Artifact | Bytes | SHA-256 |
 |---|---:|---|
@@ -97,7 +97,7 @@ rows do not execute. Root verifies all completed receipts and terminal
 ownership; final target size is 633,306,257 bytes. The source-only 94l repair
 is in progress.
 
-Capture: `.coord/ooxml-combined-0362ul94-f5-final-5e89400413-private-v2`.
+Capture: `(deleted-coord-artifact)`.
 
 | Artifact | Bytes | SHA-256 |
 |---|---:|---|
@@ -132,8 +132,8 @@ ownership. Every one exits 1; unexecuted rows remain unclaimed.
   fixes all 16, preserving literal error variants, messages and allocation
   behavior; root fast-forwards the private candidate.
 
-Capture roots retain the prefixes `.coord/pptx-combined-0362ul89-f5-qualification-`
-and `.coord/ooxml-combined-0362ul94-f5-final-`, respectively.
+Capture roots retain the prefixes `(deleted-coord-artifact)`
+and `(deleted-coord-artifact)`, respectively.
 
 | Capture | Artifact | Bytes | SHA-256 |
 |---|---|---:|---|
@@ -153,7 +153,7 @@ with its inode, mode and hash preserved. All paths/registry entries are absent,
 the removal audit reports no holders, and cleanup holds are released.
 
 Evidence root:
-`.coord/worktree-cleanup-2026-10-25/quarantine/wave69-ooxml-94j-94k-94l`.
+`(deleted-coord-artifact)`.
 
 | Artifact | Bytes | SHA-256 |
 |---|---:|---|
