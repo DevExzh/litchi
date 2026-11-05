@@ -449,8 +449,11 @@ class RawApiCoverageTests(unittest.TestCase):
         tools = source / "tools"
         tools.mkdir(parents=True)
         for name in ("raw_api_coverage.py", "check_api_glossary.py", "rustdoc_return_types.py",
-                     "raw_api_coverage.json", "api_glossary.json"):
+                     "api_glossary.json"):
             shutil.copyfile(Path(__file__).with_name(name), tools / name)
+        (tools / "raw_api_coverage.json").write_text(
+            json.dumps(manifest([], state="incomplete")), encoding="utf-8",
+        )
         environment = os.environ.copy()
         environment.pop("PYTHONDONTWRITEBYTECODE", None)
         result = subprocess.run(

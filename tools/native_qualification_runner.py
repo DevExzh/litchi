@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Fail-closed runner for XLSB, XLSX raw, W5 and legacy native ABBA lanes.
+"""Fail-closed runner for XLSB, XLSX raw, W5 and DrawingML raw ABBA lanes.
 
 The runner deliberately takes all source, target, binary, fixture, and output
 paths from a JSON manifest.  It does not know a wave commit and therefore
@@ -402,9 +402,6 @@ def load_manifest(path: Path) -> dict[str, Any]:
         "w4-xlsx-raw",
         "w5-legacy",
         "drawingml-raw",
-        "legacy-rtf",
-        "legacy-ole-properties",
-        "legacy-xls-properties",
     }
     if data.get("lane") not in allowed_lanes:
         raise RunnerError(f"lane must be one of {sorted(allowed_lanes)!r}")
@@ -430,11 +427,6 @@ def load_manifest(path: Path) -> dict[str, Any]:
         preparation_receipt = _resolve_path(value)
         if _under(preparation_receipt, output) or preparation_receipt == output:
             raise RunnerError(f"{data['lane']} preparation receipt must be outside the fresh output directory")
-    elif str(data.get("lane", "")).startswith("legacy-"):
-        value = data.get("preparation_receipt")
-        if not isinstance(value, str) or not value:
-            raise RunnerError("legacy lane must bind a source-preparation receipt")
-        preparation_receipt = _resolve_path(value)
     source_roots: list[Path] = []
     for leg, spec in data["legs"].items():
         if not isinstance(spec, dict):
@@ -587,9 +579,6 @@ def _validate_validator(command: Any, location: str) -> None:
 
 
 def _validate_lane_workload(data: Mapping[str, Any]) -> None:
-    if str(data["lane"]).startswith("legacy-"):
-        _validate_legacy_native_workload(data)
-        return
     expected: dict[str, list[tuple[str, list[str]]]] = {
         "w4b-xlsb": [
             ("probe", ["{rounds}"]),
@@ -1161,177 +1150,6 @@ def _validate_xlsx_preparation_manifest(data: Mapping[str, Any]) -> None:
         )
     except (OSError, ValueError) as error:
         raise RunnerError(f"XLSX preparation receipt validation failed: {error}") from error
-
-
-def _validate_legacy_native_workload(data: Mapping[str, Any]) -> None:
-    """Keep the reusable legacy probes on an explicit, reviewed workload.
-
-    The ordinary W4b/W5 lanes intentionally keep their historical hard-coded
-    argv.  These three lanes share the same process/identity/cap guard but
-    have different standalone manifests and route contracts.  A manifest is
-    accepted only when it matches one of those contracts exactly; the
-    lane-specific validator then checks the probe output and receipt.
-    """
-
-    lane = str(data["lane"])
-    preparation_receipt = data.get("preparation_receipt")
-    if not isinstance(preparation_receipt, str) or not preparation_receipt:
-        raise RunnerError(f"{lane} must bind a source-preparation receipt")
-    contracts: dict[str, dict[str, Any]] = {
-        "legacy-rtf": {
-            "probe": ["tools/perf-baseline/examples/refusal_contract_bench.rs"],
-            "lock": "tools/perf-baseline/Cargo.lock",
-            "build_id": "rtf_refusal_contract",
-            "build_argv": [
-                "cargo",
-                "build",
-                "--release",
-                "--manifest-path",
-                "tools/perf-baseline/Cargo.toml",
-                "--no-default-features",
-                "--features",
-                "{rtf_features}",
-                "--example",
-                "refusal_contract_bench",
-            ],
-            "artifacts": ["{target_dir}/release/examples/refusal_contract_bench"],
-            "programs": [("routes", [])],
-            "stdout": "{output_dir}/rtf-routes-block-{block}-{leg}-{index}.jsonl",
-            "stderr": "{output_dir}/rtf-routes-block-{block}-{leg}-{index}.stderr",
-            "blocks": 5,
-        },
-        "legacy-ole-properties": {
-            "probe": ["tools/perf-baseline/examples/ole_w5_probe.rs"],
-            "lock": "tools/perf-baseline/Cargo.lock",
-            "build_id": "ole_properties_probe",
-            "build_argv": [
-                "cargo",
-                "build",
-                "--release",
-                "--manifest-path",
-                "tools/perf-baseline/Cargo.toml",
-                "--no-default-features",
-                "--features",
-                "{property_features}",
-                "--example",
-                "ole_w5_probe",
-            ],
-            "artifacts": ["{target_dir}/release/examples/ole_w5_probe"],
-            "programs": [
-                (
-                    "read",
-                    ["--route", "read", "--warmup", "20", "--samples", "500", "--batch", "1"],
-                ),
-                (
-                    "edit",
-                    ["--route", "edit", "--warmup", "20", "--samples", "500", "--batch", "1"],
-                ),
-            ],
-            "stdout": "{output_dir}/ole-{program}-block-{block}-{leg}-{index}.csv",
-            "stderr": "{output_dir}/ole-{program}-block-{block}-{leg}-{index}.stderr",
-            "features": {"before": "current-owner-api,legacy-property-api", "after": "current-owner-api,current-property-api"},
-            "blocks": 1,
-        },
-        "legacy-xls-properties": {
-            "probe": ["crates/litchi-ops/examples/ole_metadata_bench.rs"],
-            "lock": "Cargo.lock",
-            "fixtures": [
-                "test-data/ole/doc/FancyFoot.doc",
-                "test-data/ole/xls/Simple.xls",
-                "test-data/ole/ppt/SampleShow.ppt",
-            ],
-            "build_id": "xls_metadata_bench",
-            "build_argv": [
-                "cargo",
-                "build",
-                "--release",
-                "--manifest-path",
-                "Cargo.toml",
-                "-p",
-                "litchi-ops",
-                "--no-default-features",
-                "--features",
-                "doc,xls,ppt",
-                "--example",
-                "ole_metadata_bench",
-            ],
-            "artifacts": ["{target_dir}/release/examples/ole_metadata_bench"],
-            "programs": [
-                ("metadata", []),
-            ],
-            "stdout": "{output_dir}/xls-properties-block-{block}-{leg}-{index}.jsonl",
-            "stderr": "{output_dir}/xls-properties-block-{block}-{leg}-{index}.stderr",
-            "blocks": 1,
-        },
-    }
-    contract = contracts[lane]
-    if data.get("abba_blocks", 1) != contract["blocks"]:
-        raise RunnerError(f"{lane} must use exactly {contract['blocks']} ABBA block(s)")
-    shared = data.get("shared", {})
-    if shared.get("probe_paths") != contract["probe"] or shared.get("fixture_paths", []) != contract.get("fixtures", []):
-        raise RunnerError(f"{lane} does not bind the reviewed reusable probe")
-    for leg, spec in data["legs"].items():
-        allowed_dirty = spec.get("allowed_dirty_paths")
-        if not isinstance(allowed_dirty, list) or not all(
-            isinstance(value, str) and value and not Path(value).is_absolute() for value in allowed_dirty
-        ):
-            raise RunnerError(f"{leg} must declare relative allowed_dirty_paths")
-        if spec.get("allow_dirty") is not True:
-            raise RunnerError(f"{leg} must retain the reviewed preparation overlay mode")
-        if spec.get("lock_paths") != [contract["lock"]]:
-            raise RunnerError(f"{leg} does not bind the reviewed {lane} lock path")
-        commands = spec["build"]
-        if len(commands) != 1 or commands[0].get("id") != contract["build_id"]:
-            raise RunnerError(f"{leg} does not preserve the reviewed {lane} build command")
-        command = commands[0]
-        expected_build = list(contract["build_argv"])
-        if lane == "legacy-rtf":
-            expected_build[7] = "rtf-legacy-api" if leg == "before" else "rtf-current-api"
-        elif lane == "legacy-ole-properties":
-            expected_build[7] = contract["features"][leg]
-        if command.get("argv") != expected_build or command.get("artifacts") != contract["artifacts"]:
-            raise RunnerError(f"{leg} does not preserve the reviewed {lane} build route")
-        programs = spec.get("programs", [])
-        if [program.get("id") for program in programs] != [item[0] for item in contract["programs"]]:
-            raise RunnerError(f"{leg} does not preserve the reviewed {lane} program order")
-        for program, (program_id, expected_argv) in zip(programs, contract["programs"]):
-            if program.get("binary") != contract["artifacts"][0]:
-                raise RunnerError(f"{leg}/{program_id} does not use the built {lane} binary")
-            if program.get("argv") != expected_argv:
-                raise RunnerError(f"{leg}/{program_id} does not preserve the reviewed route arguments")
-            if program.get("outputs") != []:
-                raise RunnerError(f"{leg}/{program_id} must use the stdout report, not an unbound output")
-            expected_stdout = contract["stdout"].replace("{program}", program_id)
-            expected_stderr = contract["stderr"].replace("{program}", program_id)
-            if program.get("stdout") != expected_stdout or program.get("stderr") != expected_stderr:
-                raise RunnerError(f"{leg}/{program_id} does not use its dedicated report paths")
-            if program.get("require_stdout") is not True:
-                raise RunnerError(f"{leg}/{program_id} must emit a nonempty report stream")
-    validators = data.get("validators", [])
-    if len(validators) != 1 or validators[0].get("id") != "legacy-native-contract":
-        raise RunnerError(f"{lane} needs exactly one legacy-native-contract validator")
-    if validators[0].get("outputs") != ["{output_dir}/summary.json"]:
-        raise RunnerError(f"{lane} validator must write summary.json in the output directory")
-    validator_argv = validators[0].get("argv")
-    if not isinstance(validator_argv, list) or len(validator_argv) != 9:
-        raise RunnerError(f"{lane} validator must receive the explicit manifest path")
-    if validator_argv[0] != "python3" or validator_argv[-1] != "{manifest_path}":
-        raise RunnerError(f"{lane} validator is not bound to the current manifest path")
-    validator_script = validators[0].get("script")
-    expected_validator_script = (
-        Path(__file__).resolve().parent / "native_qualification/legacy_native_validator.py"
-    ).resolve()
-    if not isinstance(validator_script, str) or _resolve_path(validator_script) != expected_validator_script:
-        raise RunnerError(f"{lane} validator script is not bound to the active qualification source")
-    if validator_argv[1] != validator_script:
-        raise RunnerError(f"{lane} validator argv does not use its bound script")
-    if validators[0].get("cwd") != "{output_dir}":
-        raise RunnerError(f"{lane} validator cwd is not output-bound")
-    environment = data.get("environment", {})
-    if environment.get("CARGO_PROFILE_RELEASE_DEBUG") != "0":
-        raise RunnerError(f"{lane} must disable release debug information")
-    if not isinstance(environment.get("TMPDIR"), str) or not environment["TMPDIR"]:
-        raise RunnerError(f"{lane} must bind an external TMPDIR")
 
 
 def _render(value: str, context: Mapping[str, Any]) -> str:
@@ -2585,11 +2403,6 @@ class SafeRunner:
         self.shared = manifest.get("shared", {})
         if manifest.get("lane") == "w4-xlsx-raw":
             _validate_xlsx_preparation_manifest(manifest)
-        self.preparation: dict[str, Any] | None = None
-        self.preparation_path: Path | None = None
-        if str(manifest.get("lane", "")).startswith("legacy-"):
-            self.preparation_path = _resolve_path(str(manifest["preparation_receipt"]))
-            self.preparation = self._load_preparation_receipt()
         self.recorded_events: list[dict[str, Any]] = []
 
     def _event_execution_class(self, event_kind: str) -> str:
@@ -2626,80 +2439,6 @@ class SafeRunner:
             self.manifest, self.manifest_path, clock=self.clock
         )
         self.overlap_lease.acquire()
-
-    def _load_preparation_receipt(self) -> dict[str, Any]:
-        if self.preparation_path is None:
-            raise RunnerError("legacy lane has no preparation receipt path")
-        path = self.preparation_path
-        if path.is_symlink() or not path.is_file():
-            raise RunnerError(f"legacy preparation receipt is missing or symlinked: {path}")
-        try:
-            receipt = json.loads(path.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError) as error:
-            raise RunnerError(f"cannot read legacy preparation receipt: {error}") from error
-        if not isinstance(receipt, dict) or receipt.get("schema") != "litchi.legacy-native-preparation.v1":
-            raise RunnerError("legacy preparation receipt schema mismatch")
-        if receipt.get("lane") != self.manifest.get("lane"):
-            raise RunnerError("legacy preparation receipt lane mismatch")
-        manifest_record = receipt.get("manifest")
-        if not isinstance(manifest_record, dict) or manifest_record.get("path") != str(self.manifest_path):
-            raise RunnerError("legacy preparation receipt is bound to a different manifest")
-        manifest_hash, manifest_bytes = _sha256_file(self.manifest_path)
-        if manifest_record.get("sha256") != manifest_hash or manifest_record.get("bytes", manifest_bytes) != manifest_bytes:
-            raise RunnerError("legacy preparation receipt manifest identity changed")
-        preparer = receipt.get("preparer")
-        preparer_path = Path(__file__).resolve().parent / "native_qualification" / "prepare_legacy_native_inputs.py"
-        if not isinstance(preparer, dict) or preparer.get("path") != str(preparer_path):
-            raise RunnerError("legacy preparation receipt was produced by a different preparer")
-        preparer_hash, _ = _sha256_file(preparer_path)
-        if preparer.get("sha256") != preparer_hash:
-            raise RunnerError("legacy preparation preparer identity changed")
-        identities = receipt.get("identities")
-        if not isinstance(identities, dict) or set(identities) != {"before", "after"}:
-            raise RunnerError("legacy preparation receipt identities are incomplete")
-        reviewed = receipt.get("reviewed_inputs")
-        if not isinstance(reviewed, dict):
-            raise RunnerError("legacy preparation reviewed inputs are missing")
-        for leg in ("before", "after"):
-            allowed = self.manifest["legs"][leg].get("allowed_dirty_paths")
-            if reviewed.get("allowed_dirty_paths") != allowed:
-                raise RunnerError(f"legacy preparation dirty-path allow-list differs for {leg}")
-        return receipt
-
-    def _validate_preparation_identity(self, leg: str, identity: Mapping[str, Any]) -> None:
-        if self.preparation is None:
-            return
-        expected = self.preparation.get("identities", {}).get(leg)
-        if not isinstance(expected, dict):
-            raise RunnerError(f"legacy preparation identity is missing for {leg}")
-        for key in (
-            "source_root",
-            "head",
-            "tree",
-            "source_tree_sha256",
-            "clean",
-            "status_paths",
-            "status_sha256",
-            "diff_sha256",
-            "identity_sha256",
-            "lock_paths",
-            "probe_paths",
-            "fixture_paths",
-        ):
-            if identity.get(key) != expected.get(key):
-                raise RunnerError(f"legacy preparation identity differs for {leg}: {key}")
-        expected_files = {
-            str(item.get("path")): (item.get("bytes"), item.get("sha256"))
-            for item in expected.get("identity_files", [])
-            if isinstance(item, dict)
-        }
-        actual_files = {
-            str(item.get("path")): (item.get("bytes"), item.get("sha256"))
-            for item in identity.get("identity_files", [])
-            if isinstance(item, dict)
-        }
-        if actual_files != expected_files:
-            raise RunnerError(f"legacy preparation identity files differ for {leg}")
 
     def _context(
         self,
@@ -3678,13 +3417,6 @@ class SafeRunner:
                 "count": len(self.recorded_events),
             },
         }
-        if self.preparation_path is not None and self.preparation is not None:
-            preparation_hash, preparation_bytes = _sha256_file(self.preparation_path)
-            receipt["preparation"] = {
-                "path": str(self.preparation_path),
-                "bytes": preparation_bytes,
-                "sha256": preparation_hash,
-            }
         if error is not None:
             receipt["error"] = error
         if self.receipt_path.is_symlink() or self.receipt_path.exists():
@@ -3704,7 +3436,6 @@ class SafeRunner:
                 self._check_target(target, preflight=True)
             for leg in ("before", "after"):
                 identity = self._identity(leg)
-                self._validate_preparation_identity(leg, identity)
                 target = _resolve_path(str(identity["target_dir"]))
                 identity["target_initial_bytes"] = self._check_target(target, preflight=True)
                 identities[leg] = identity
@@ -3819,13 +3550,6 @@ class SafeRunner:
             permit_value = self.build_execution.get("permit_path")
             if build_execution.get("permit_path") != str(_resolve_path(str(permit_value))):
                 raise RunnerError("build receipt permit path differs from the current manifest")
-        if self.preparation_path is not None:
-            preparation = receipt.get("preparation")
-            if not isinstance(preparation, dict) or preparation.get("path") != str(self.preparation_path):
-                raise RunnerError("build receipt preparation path does not match the current preparation")
-            preparation_hash, preparation_bytes = _sha256_file(self.preparation_path)
-            if preparation.get("sha256") != preparation_hash or preparation.get("bytes") != preparation_bytes:
-                raise RunnerError("build receipt preparation identity differs from the current receipt")
         limits = receipt.get("limits")
         expected_limits = {
             "target_preflight_bytes": TARGET_PREFLIGHT_BYTES,
@@ -3995,7 +3719,6 @@ class SafeRunner:
         self._validate_build_handoff(expected_command_logs)
         for leg in ("before", "after"):
             current = self._identity(leg)
-            self._validate_preparation_identity(leg, current)
             recorded = identities.get(leg)
             if not isinstance(recorded, dict):
                 raise RunnerError(f"missing identity for {leg}")
@@ -4027,7 +3750,6 @@ class SafeRunner:
             build_receipt = self._load_build_receipt()
             for leg in ("before", "after"):
                 identity = self._identity(leg)
-                self._validate_preparation_identity(leg, identity)
                 recorded = build_receipt.get("identities", {}).get(leg, {})
                 if (
                     identity.get("head") != recorded.get("head")

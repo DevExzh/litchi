@@ -33,26 +33,9 @@ def _exact_policy_line(value: str) -> re.Pattern[str]:
 
 
 INTENTIONAL_POLICY_LINES: dict[str, tuple[re.Pattern[str], ...]] = {
-    "tools/native_qualification/prepare_signed_native_inputs_v2.py": (
-        _exact_policy_line(
-            '    _expect("__UPSTREAM__" not in path.parts, f"{label} may not use an upstream checkout")'
-        ),
-        _exact_policy_line(
-            '    _expect("__UPSTREAM__" not in absolute.parts, f"{label} may not use an upstream checkout")'
-        ),
-        _exact_policy_line(
-            '    _expect("__UPSTREAM__" not in archive_path.parts, '
-            '"bound source archive may not use an upstream checkout")'
-        ),
-    ),
     "tools/raw_api_coverage.py": (
         _exact_policy_line('    if "__UPSTREAM__" in path_obj.parts:'),
         _exact_policy_line('        raise CoverageError(f"{label} must not reference __UPSTREAM__/")'),
-    ),
-    "tools/test_signed_native_policy_v2.py": (
-        _exact_policy_line(
-            '        for value in ("/tmp/input", "../input", "a/../input", "test-data/__UPSTREAM__/file"):'
-        ),
     ),
 }
 
@@ -111,17 +94,8 @@ class NoUpstreamCheckoutReferences(unittest.TestCase):
                     )
 
     def test_policy_line_exception_does_not_allow_a_fixture_path(self) -> None:
-        allowed = (
-            f'    _expect("{_UPSTREAM_TOKEN}" not in path.parts, '
-            'f"{label} may not use an upstream checkout")'
-        )
-        self.assertTrue(_is_intentional_policy_line(
-            "tools/native_qualification/prepare_signed_native_inputs_v2.py", allowed
-        ))
-        self.assertFalse(_is_intentional_policy_line(
-            "tools/native_qualification/prepare_signed_native_inputs_v2.py",
-            f'    source = "test-data/{_UPSTREAM_TOKEN}/file"',
-        ))
+        allowed = f'    if "{_UPSTREAM_TOKEN}" in path_obj.parts:'
+        self.assertTrue(_is_intentional_policy_line("tools/raw_api_coverage.py", allowed))
         self.assertFalse(_is_intentional_policy_line(
             "tools/raw_api_coverage.py",
             f'    return root / "{_UPSTREAM_TOKEN}" / "fixture"',

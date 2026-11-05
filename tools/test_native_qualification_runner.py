@@ -105,49 +105,6 @@ class NativeQualificationRunnerTests(unittest.TestCase):
                     else:
                         os.environ[key] = value
 
-    def test_legacy_external_manifest_is_rendered_and_bound_to_validator(self) -> None:
-        with tempfile.TemporaryDirectory(prefix="legacy-native-external-manifest-") as directory:
-            root = Path(directory)
-            manifest_path = root / "legacy-rtf-final.json"
-            source_manifest = ROOT / "tools/native_qualification/manifests/legacy-rtf.json"
-            manifest_path.write_text(source_manifest.read_text(encoding="utf-8"), encoding="utf-8")
-            environment = {
-                "LITCHI_COORD_BIN": str(root / "coord-bin"),
-                "LITCHI_NATIVE_QUAL_ROOT": str(ROOT),
-                "RTF_NATIVE_QUAL_OUTPUT": str(root / "output"),
-                "RTF_BEFORE_SOURCE": str(root / "before"),
-                "RTF_AFTER_SOURCE": str(root / "after"),
-                "RTF_TARGET_ROOT": str(root / "targets"),
-                "RTF_NATIVE_TMP": str(root / "tmp"),
-                "RTF_NATIVE_PREPARATION_RECEIPT": str(root / "preparation.json"),
-                "RTF_BASELINE_REVISION": "0" * 40,
-                "RTF_CANDIDATE_REVISION": "1" * 40,
-            }
-            old = {key: os.environ.get(key) for key in environment}
-            try:
-                os.environ.update(environment)
-                loaded = runner.load_manifest(manifest_path)
-                validator_argv = loaded["validators"][0]["argv"]
-                self.assertEqual(validator_argv[-1], "{manifest_path}")
-                context = {
-                    "manifest_path": manifest_path.resolve(),
-                    "output_dir": root / "output",
-                }
-                rendered = runner._render_argv(validator_argv, context)
-                self.assertEqual(rendered[-1], str(manifest_path.resolve()))
-
-                invalid = json.loads(manifest_path.read_text(encoding="utf-8"))
-                invalid["validators"][0]["argv"][-1] = str(root / "wrong.json")
-                manifest_path.write_text(json.dumps(invalid), encoding="utf-8")
-                with self.assertRaisesRegex(runner.RunnerError, "current manifest path"):
-                    runner.load_manifest(manifest_path)
-            finally:
-                for key, value in old.items():
-                    if value is None:
-                        os.environ.pop(key, None)
-                    else:
-                        os.environ[key] = value
-
     def test_xlsx_raw_manifest_preserves_original_and_candidate_routes(self) -> None:
         with tempfile.TemporaryDirectory(prefix="xlsx-raw-manifest-") as directory:
             root = Path(directory)
