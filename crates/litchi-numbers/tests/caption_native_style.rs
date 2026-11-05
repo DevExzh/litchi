@@ -42,7 +42,7 @@ fn objects(bytes: &[u8]) -> TestResult<Vec<litchi_iwa_core::ArchiveObject>> {
     Ok(objects)
 }
 
-fn field<'a>(payload: &'a [u8], number: u32) -> TestResult<Option<&'a [u8]>> {
+fn field(payload: &[u8], number: u32) -> TestResult<Option<&[u8]>> {
     let view = WireView::parse(payload, WireLimits::DEFAULT)?;
     Ok(view
         .fields()
