@@ -47,7 +47,7 @@ generator output record 0434 folded against, not from a new host run.
   the manifest), and that run's parity dumps are nowhere under `.coord`. I do not
   know who removed them. `inputs/`, `packages/` and the manifest remain, and they
   are what the evidence cites. `--reuse-dumps` is therefore proved only by the
-  unit tests on a fake repository; a real run on a copy stops, naming 743 rows
+  unit tests on a fake repository; a real run on a copy stops, naming 741 rows
   with no dump.
 - `tools/mac_queue` without the host: `generate.py --check` maps all 767 rows
   (765 to packages, 2 grouped, 0 errors) from the 1,402 parity-test names frozen
@@ -75,6 +75,10 @@ Against trunk `4d8a3e161f`:
 | `iwa` profile of `tools/api_glossary.json` | 1 | 1,005 |
 | host route checks in `crates/litchi-iwa-protos/build.rs` | 1 | 249 net |
 | 12 `litchi-iwa -> *` debt entries and the host package entry in `tools/crate_boundaries.json` | 1 | 88 net |
+
+Files other than the crate: 65 changed, 22343 lines added and 68,736 removed. The
+additions are mostly the checker's test file re-laid out (17,671 lines by this
+diff), the two frozen lists, this record and the new leaf tests.
 
 ## 3. What changes besides the deletion
 
@@ -207,4 +211,35 @@ Commits on `uo2/iwa-w3` (not pushed):
 9. `docs(iwork): lift W3's held wording`.
 10. this version of the record and the gate results.
 
-Gate table: pending this commit.
+Before the deletion, at `4d8a3e161f`: see §4. Verification head `c11ed2e6f1`
+(this commit changes only this record). Logs: `.coord/iwa-w3/gates3/`. First-pass
+failures: `owner_allocator_native` failed once, because it found 5 colliding
+workbooks where I had copied the host test's 3 (§4; the test was corrected, no
+leaf changed). `generate.py --reuse-dumps` on a copy of the frozen output exited 1
+(§1). Nothing else failed. Goldens were not re-blessed: no capability, registry or
+corpus output changed.
+
+| Command | Exit |
+|---|---:|
+| `cargo fmt --all --check` | 0 |
+| `cargo clippy` nine changed crates, `-p litchi-ops -p litchi -p litchi-py --all-targets --all-features -- -D warnings` | 0 |
+| `cargo clippy --workspace --all-targets --all-features -- -D warnings` | 0 |
+| `cargo clippy -p litchi-ops --no-default-features [--features pages, keynote, numbers] --all-targets -- -D warnings` | 0 (all four) |
+| `RUSTDOCFLAGS=-Dwarnings cargo doc --no-deps --all-features` nine changed crates | 0 |
+| `tools/gate/chunked_cargo_tests.py` nine changed crates `--all-features`, new tests included | 0 |
+| `tools/gate/chunked_cargo_tests.py -p litchi-ops --all-features` | 0 |
+| `tools/gate/chunked_cargo_tests.py -p litchi --all-features` | 0 |
+| `crates/pyo3-litchi/tests/run_tests.sh` | 0 |
+| `cd tools/perf-baseline && cargo check --locked --all-targets` | 0 |
+| `mac_queue_file_routes`, `mac_queue_native_routes` examples | 0 |
+| `python3 tools/check_crate_boundaries.py` | 0 (69 packages, 303 declarations, 0 debt items) |
+| `python3 tools/non_iwork_gate.py verify` | 0 |
+| `python3 -m unittest` the rules' tool modules plus `test_iwa_exit_ledger`, `test_mac_queue`, `test_mac_control_kit`, `test_gate_runner`, `test_check_iwork_leaf_public_api`, `test_check_api_glossary`, `test_api_debt_inventory`, `test_validate_api_disposition`, `test_unified_bench_matrix` | 0 |
+| `officecli_capability_delta.py --check`, `officecli_corpus.py --check`, `unified_bench_matrix.py --check`, `iwa_exit_ledger.py --check`, `mac_queue/generate.py --check` | 0 |
+| `.coord/iwa-w3/scripts/verify_frozen.py` | 0 |
+| `git diff --exit-code 4d8a3e161f -- docs/unified-ops/0363-mac-queue.md` | 0 |
+| `RUSTC_BOOTSTRAP=1 python3 tools/check_api_glossary.py --target-dir $CARGO_TARGET_DIR` | 0 (72 profiles) |
+| `python3 tools/check_feature_matrix.py` | 0 |
+
+The full 53-row gate (`tools/gate/run_gate.sh`) was not run here; it is the
+coordinator's.
