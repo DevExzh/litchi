@@ -897,3 +897,65 @@ pub fn write_lines(
     budget.set_scope(scope);
     Ok((true, budget.report(true)))
 }
+
+#[cfg(test)]
+mod count_rule_tests {
+    use super::*;
+
+    /// A primary value-axis styles entry whose sparse array holds `indexes`,
+    /// with a stale `count` of 9.
+    fn styles_extension(indexes: &[u64]) -> Vec<u8> {
+        let mut axis = Vec::new();
+        push_varint_field(&mut axis, AXIS_TYPE, AXIS_TYPE_Y);
+        push_varint_field(&mut axis, AXIS_ORDINAL, 0);
+        let mut sparse = Vec::new();
+        push_varint_field(&mut sparse, 1, 9);
+        for index in indexes {
+            let mut reference = Vec::new();
+            push_varint_field(&mut reference, 1, 100 + index);
+            let mut raw = Vec::new();
+            push_varint_field(&mut raw, 1, *index);
+            push_message_field(&mut raw, 2, &reference);
+            push_message_field(&mut sparse, 2, &raw);
+        }
+        let mut entry = Vec::new();
+        push_message_field(&mut entry, AXIS_ID, &axis);
+        push_message_field(&mut entry, AXIS_STYLES, &sparse);
+        let mut extension = Vec::new();
+        push_message_field(&mut extension, STYLES_MAP, &entry);
+        extension
+    }
+
+    /// `(count, indexes)` of the styles map after a write of `line_count` lines.
+    fn kept(indexes: &[u64], line_count: usize) -> Result<Option<(u64, Vec<u64>)>> {
+        let items = (0..line_count)
+            .map(|line| (line as u64 + 1, (line as u64 + 1, 1)))
+            .collect::<Vec<_>>();
+        let extension = styles_extension(indexes);
+        let Some(output) = next_extension(Some(&extension), &items)? else {
+            return Ok(None);
+        };
+        let Some(entry) = axis_entries(&output, STYLES_MAP)?.into_iter().next() else {
+            return Ok(None);
+        };
+        let sparse = strict(entry.raw, AXIS_STYLES, 2)?.ok_or(Error::Invalid("no sparse array"))?;
+        let entries = style_entries(entry.raw)?.ok_or(Error::Invalid("no entries"))?;
+        Ok(Some((
+            graph::varint(sparse, 1)?.ok_or(Error::Invalid("no count"))?,
+            entries.into_iter().map(|(index, _, _)| index).collect(),
+        )))
+    }
+
+    /// Record 0431: `count` is the array length, one past the highest kept
+    /// index, not the number of entries. No package with these styles has been
+    /// to a Mac (record 0434 §12).
+    #[test]
+    fn trimmed_style_count_is_one_past_the_highest_kept_index() -> Result<()> {
+        assert_eq!(kept(&[0, 2], 3)?, Some((3, vec![0, 2])));
+        assert_eq!(kept(&[2], 3)?, Some((3, vec![2])));
+        assert_eq!(kept(&[0, 2], 2)?, Some((1, vec![0])));
+        assert_eq!(kept(&[1, 3], 3)?, Some((2, vec![1])));
+        assert_eq!(kept(&[3], 3)?, None);
+        Ok(())
+    }
+}
