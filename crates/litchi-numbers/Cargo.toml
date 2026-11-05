@@ -10,6 +10,10 @@ rust-version.workspace = true
 autoexamples = false
 
 [[example]]
+name = "numbers_mac_queue_caption_routes"
+path = "examples/mac_queue_caption_routes.rs"
+
+[[example]]
 name = "mac_queue_native_routes"
 path = "examples/mac_queue_native_routes.rs"
 
